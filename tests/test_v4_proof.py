@@ -516,9 +516,16 @@ class TestGrowthSurface1395:
         og = v4_proof.data_og(summary)
         assert "13 sources, 7 fresh" in og[("property", "og:title")]
 
-    def test_data_block_omits_when_empty(self):
-        assert v4_proof.data_block_html({}) == ""
-        assert v4_proof.data_block_html({"total": 0}) == ""
+    def test_data_block_degrades_to_the_topic_links_when_empty(self):
+        # #4182: no roster → no numbers (never a fake), but the five topic links still ship —
+        # they are the door's static reach into the 25-page set, not data.
+        for empty in ({}, {"total": 0}):
+            html = v4_proof.data_block_html(empty)
+            assert "sources on the board" not in html and "fresh" not in html
+            for href, _ in v4_proof.DATA_TOPIC_LINKS:
+                assert f'href="{href}"' in html
+        full = v4_proof.data_block_html({"total": 3, "fresh": 1, "labels": ["Whoop"], "as_of": "2026-09-26"})
+        assert all(f'href="{href}"' in full for href, _ in v4_proof.DATA_TOPIC_LINKS)
 
     def test_protocols_block_and_og_from_experiments(self):
         summary = {"total": 67, "available": 4, "as_of": "2026-07-19"}

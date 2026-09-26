@@ -20,9 +20,32 @@ function escapeHTML(s) {
 
 /** An inline gloss: the term, defined in place. `.gloss` is the shared dotted-underline
  *  treatment the build-time glossary (#4035) already uses, so the two read as one system.
- *  tabindex=0 so a keyboard reader can reach the definition too. */
+ *  tabindex=0 so a keyboard reader can reach the definition too; `data-gloss` feeds the
+ *  tap reveal (tokens.css `dfn.gloss:focus::after`) — a phone has no hover for `title`.
+ *  The same element shape as scripts/v4_glossary.py::dfn_html, the build-time half. */
 export function dfn(term, definition) {
-  return `<dfn class="gloss" tabindex="0" title="${escapeHTML(definition)}">${escapeHTML(term)}</dfn>`;
+  const d = escapeHTML(definition);
+  return `<dfn class="gloss" tabindex="0" title="${d}" data-gloss="${d}">${escapeHTML(term)}</dfn>`;
+}
+
+// Where a gloss never goes: inside another gloss, a link or a button (one focusable inside
+// another), a heading or label (a name, not prose), code, and served text fenced
+// `[data-verbatim]` (a coach's words are glossed beside, never spliced into).
+const GLOSS_SKIP = "dfn, abbr, a, button, h1, h2, code, label, script, style, noscript, textarea, select, option, [data-verbatim]";
+const isWordChar = (c) => !!c && /[A-Za-z0-9_]/.test(c);
+
+/** Index of the first word-bounded occurrence of `term` in `s` (case-insensitive when
+ *  `ci`), or -1. Manual boundaries, not a lookbehind regex, so older Safari parses it. */
+export function findTerm(s, term, ci) {
+  const hay = ci ? s.toLowerCase() : s;
+  const needle = ci ? term.toLowerCase() : term;
+  let from = 0;
+  for (;;) {
+    const i = hay.indexOf(needle, from);
+    if (i < 0) return -1;
+    if (!isWordChar(s[i - 1]) && !isWordChar(s[i + needle.length])) return i;
+    from = i + 1;
+  }
 }
 
 /** The strip's markup — pure, so it is testable without a DOM. `what` is the page's own
@@ -56,19 +79,24 @@ export function mountOrientStrip({ key, what, anchor }) {
 
 /** Wrap the FIRST text occurrence of `term` inside `root` in a gloss. Used where the term
  *  lives in a generated shell (the /data/ door's hero lede) so the definition lands where
- *  the reader first meets the word, without regenerating every shell. No-op when absent. */
-export function glossFirst(root, term, definition) {
+ *  the reader first meets the word, without regenerating every shell. No-op when absent.
+ *  `opts.ci` (the runtime glossary pass, gloss_runtime.js) matches case-insensitively and
+ *  word-bounded, keeps the text's own casing, and skips every GLOSS_SKIP context; without
+ *  it the historical exact-substring behaviour (skipping dfn/abbr/a/button) is unchanged. */
+export function glossFirst(root, term, definition, opts = {}) {
   if (!root || typeof document === "undefined" || !document.createTreeWalker) return false;
   const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+  const skip = opts.ci ? GLOSS_SKIP : "dfn, abbr, a, button";
   let node;
   while ((node = walker.nextNode())) {
-    const i = node.nodeValue.indexOf(term);
+    const i = opts.ci ? findTerm(node.nodeValue, term, true) : node.nodeValue.indexOf(term);
     if (i < 0) continue;
-    if (node.parentElement && node.parentElement.closest("dfn, abbr, a, button")) continue;
+    if (node.parentElement && node.parentElement.closest(skip)) continue;
+    const text = node.nodeValue.slice(i, i + term.length);
     const after = node.splitText(i);
     after.nodeValue = after.nodeValue.slice(term.length);
     const tpl = document.createElement("template");
-    tpl.innerHTML = dfn(term, definition);
+    tpl.innerHTML = dfn(text, definition);
     node.parentNode.insertBefore(tpl.content.firstChild, after);
     return true;
   }

@@ -549,11 +549,11 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
 <header class="story-top">
   <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
   <nav class="doors" aria-label="Doors">
-    <a href="/cockpit/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
-    <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
-    <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
-    <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
-    <a href="/story/" aria-current="page" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
+    <a href="/cockpit/" title="Today, in one screen — how his week is going, how he slept, what today holds"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>today</a>
+    <a href="/data/" title="His numbers — weight, sleep, training, eating and blood tests, as his devices record them"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the numbers</a>
+    <a href="/coaching/" title="What his AI coaches say about his data — and how often they have been right"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaches</a>
+    <a href="/protocols/" title="What he takes and what he tries — each with what it should move"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>what he tries</a>
+    <a href="/story/" aria-current="page" title="The weekly write-up, his own words, and who he is"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
     <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
   </nav>
 </header>
@@ -584,22 +584,22 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   </aside>
   <nav class="post-nav">
     <a href="/story/chronicle/"><span>&larr; All installments</span>The Measured Life archive</a>
-    <a href="/cockpit/"><span>Today</span>The live cockpit &rarr;</a>
+    <a href="/cockpit/"><span>Today</span>How today is going &rarr;</a>
   </nav>
 </div>
 </main>
 <footer class="site-foot">
   <nav class="site-foot-cols" aria-label="Site map">
-    <div class="sf-col"><p class="sf-h label">The Story</p>
-      <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
-    <div class="sf-col"><p class="sf-h label">The Coaching</p>
-      <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
-    <div class="sf-col"><p class="sf-h label">The Data</p>
-      <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
-    <div class="sf-col"><p class="sf-h label">The Protocols</p>
-      <a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>
-    <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
-      <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{social_foot_html}<a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>
+    <div class="sf-col"><p class="sf-h label">The numbers</p>
+      <a href="/data/physical/">Weight &amp; body</a><a href="/data/sleep/">Sleep</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Eating</a><a href="/data/labs/">Blood tests</a></div>
+    <div class="sf-col"><p class="sf-h label">The coaches</p>
+      <a href="/coaching/">The read</a><a href="/coaching/by-coach/">By coach</a><a href="/coaching/scorecard/">Their record</a><a href="/coaching/lab-notes/">What the AI said, and how it felt</a></div>
+    <div class="sf-col"><p class="sf-h label">What he tries</p>
+      <a href="/protocols/">What he takes</a><a href="/protocols/experiments/">Experiments</a></div>
+    <div class="sf-col"><p class="sf-h label">The story</p>
+      <a href="/story/">The weekly write-up</a><a href="/story/journal/">In his own words</a><a href="/story/panel/">The podcast</a><a href="/story/attempts/">Every start, counted</a><a href="/story/about/">Who he is</a></div>
+    <div class="sf-col"><p class="sf-h label">Follow</p>
+      <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{social_foot_html}<a href="/method/">Under the hood</a><a href="/privacy/">Privacy</a></div>
   </nav>
   <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
 </footer>

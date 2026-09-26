@@ -1303,11 +1303,12 @@ a.mb-row:hover .mb-row-k { color: var(--ember); }
 .dx-main > .page-hero { padding-inline: 0; }
 @media (max-width: 760px) {
   .dx-main { padding-top: var(--sp-3); }
-  .dx-main > .page-hero { padding-block: var(--sp-3) var(--sp-2); }
+  .dx-main > .page-hero { padding-block: var(--sp-2) 0; }
   .page-hero .art-hub, .dx-read .art-chapter { display: none; }
-  .dx-tabs { margin-top: var(--sp-3); }
-  .dx-layout { margin-top: var(--sp-4); }
-  .dx-read .dx-readmore { margin-top: var(--sp-4); }
+  .dx-tabs { margin-top: var(--sp-2); }
+  .dx-layout { margin-top: var(--sp-3); }
+  .dx-read .dx-readmore { margin-top: var(--sp-3); }
+  .dx-read .dx-excerpt { margin-top: var(--sp-3); }
   .dx-layout.dx-layout--solo { margin-top: var(--sp-3); }
   .dx-layout--solo .dx-title { margin-top: 0; }
   .dx-layout--solo .dx-prose { margin-top: var(--sp-3); }

@@ -36,12 +36,18 @@ import v4_wayfinding  # noqa: E402 — the #1475 wayfinding layer (station regis
 
 # The five doors, in loop order: cockpit · data · coaching · protocols · story.
 # (href, label, sprite-key, title) — title becomes the hover tooltip, HTML-escaped.
+# Labels are the reader's words, not the platform's (#4182, the owner's pick 2026-09-26:
+# TODAY · THE NUMBERS · THE COACHES · WHAT HE TRIES · THE STORY). The URLs and sprite keys
+# keep the builder names — no URL moves. Tooltips are third person: the site is about
+# Matthew, the reader is not the subject. Measured at 360 + 390px: every two-word label
+# wraps to two lines under its icon exactly as "the protocols" did, and the fixed bottom
+# app-bar stays 66.8px (≤ its 68px body clearance) — no phone-only short label needed.
 DOORS = [
-    ("/cockpit/", "the cockpit", "cockpit", "Today's live instrument — your daily numbers, read back to you"),
-    ("/data/", "the data", "data", "Every source the platform reads — trends now and over time"),
-    ("/coaching/", "the coaching", "coaching", "The AI team & their arguments — stances, track records, disagreements"),
-    ("/protocols/", "the protocols", "protocols", "The levers — supplements, experiments, challenges, discoveries"),
-    ("/story/", "the story", "story", "The writing & the why — chronicle, journal, timeline, about"),
+    ("/cockpit/", "today", "cockpit", "Today, in one screen — how his week is going, how he slept, what today holds"),
+    ("/data/", "the numbers", "data", "His numbers — weight, sleep, training, eating and blood tests, as his devices record them"),
+    ("/coaching/", "the coaches", "coaching", "What his AI coaches say about his data — and how often they have been right"),
+    ("/protocols/", "what he tries", "protocols", "What he takes and what he tries — each with what it should move"),
+    ("/story/", "the story", "story", "The weekly write-up, his own words, and who he is"),
 ]
 
 _VALID_DOORS = {href for href, _, _, _ in DOORS}
@@ -231,61 +237,59 @@ _SOCIAL_FOOT_HTML = "".join(f'<a href="{href}" target="_blank" rel="me noopener"
 # wayfinder ribbon above it can light the column it owns, and so the station the reader
 # is currently inside is the one and only ember thing in the menu.
 #
-# Every link is unchanged from the pre-#1475 footer — this is a re-pour of the same link
-# coverage onto the loop, not an IA edit (`tests/test_site_orphans.py` and
-# `tests/test_wayfinding.py::test_wayfinding_kept_every_footer_link` both pin that).
+# (#1475 kept every pre-existing link; #4182 below is the deliberate IA edit that cut it.)
 #
-# IA notes (2026-07-12): "The Technology" column (#1110) is the menu home for the
-# platform-itself content — the /method/ hub, the build log (moved here OUT of the
-# story sub-nav; URL unchanged), the curated machine pages, and /gear/ (#1111 — the
-# devices behind the data). "The ledger" (#1109) and "The agents" (#1111) are footer-
-# linked so neither is an unaccounted orphan; the ledger stays OFF the /data/ tile
-# rail by explicit registry intent (`"unlisted"` in v4_build_evidence.REGISTRY).
-# The Coaching column is the FULLER set unified up in #1009 (The Read / By Coach /
-# Scorecard / The Team / AI lab notes), with /coaching/ correctly labelled "The Read".
+# The 25-page reach set (#4182, the 2026-09-26 panel ruling): the footer is re-poured from
+# 42 links to the 23 page links below, under the doors' new labels plus FOLLOW. A newcomer
+# meets the REACHABLE set, not the served one, so the pages this drops — /data/ledger/,
+# /data/reading/, /data/glucose/, /coaching/team/ (→ By coach), /protocols/supplements/
+# (pixel-identical to /protocols/), /protocols/challenges/, /story/chronicle/ (→ /story/),
+# /story/timeline/, /story/agents/, /method/platform/ and the /method/{ask,cost,pipeline,…}
+# cuts — stay SERVED at their URLs, just unlinked (no URL moves, no 301s, no deletions).
+# `tests/site_vocabulary_residue.py::NAV_REACH_CEILING` (25) is the ratchet that holds it;
+# `tests/test_wayfinding.py::FOOTER_LINKS_4182` pins the pour.
+#   "How it's built" is the menu home for the platform-itself pages (#1110): the /method/
+# hub, the build log (URL unchanged), the gear, and the score explainer.
+#   FOLLOW keeps the six outbound social marks (#1620) — they are follow destinations, not
+# pages, so they are outside the 23 and outside the reach count.
 #   (station key or None, heading, links HTML)
 FOOTER_COLUMNS = (
     (
         "data",
-        "The Data",
-        '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a>'
-        '<a href="/data/labs/">Labs</a><a href="/data/training/">Training</a>'
-        '<a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a>',
+        "The numbers",
+        '<a href="/data/physical/">Weight &amp; body</a><a href="/data/sleep/">Sleep</a>'
+        '<a href="/data/training/">Training</a><a href="/data/nutrition/">Eating</a>'
+        '<a href="/data/labs/">Blood tests</a>',
     ),
     (
         "coaching",
-        "The Coaching",
-        '<a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a>'
-        '<a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a>'
-        '<a href="/coaching/lab-notes/">AI lab notes</a>',
+        "The coaches",
+        '<a href="/coaching/">The read</a><a href="/coaching/by-coach/">By coach</a>'
+        '<a href="/coaching/scorecard/">Their record</a>'
+        '<a href="/coaching/lab-notes/">What the AI said, and how it felt</a>',
     ),
     (
         "protocols",
-        "The Protocols",
-        '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a>'
-        '<a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a>',
+        "What he tries",
+        '<a href="/protocols/">What he takes</a><a href="/protocols/experiments/">Experiments</a>',
     ),
     (
         "story",
-        "The Story",
-        '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a>'
-        '<a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a>'
-        '<a href="/story/attempts/">The attempts</a>'
-        '<a href="/story/agents/">The agents</a><a href="/story/about/">About</a>',
+        "The story",
+        '<a href="/story/">The weekly write-up</a><a href="/story/journal/">In his own words</a>'
+        '<a href="/story/panel/">The podcast</a><a href="/story/attempts/">Every start, counted</a>'
+        '<a href="/story/about/">Who he is</a>',
     ),
     (
         None,
-        "The Technology",
-        '<a href="/method/">The machine</a><a href="/story/build/">Build log</a>'
-        '<a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a>'
-        '<a href="/method/cost/">Cost</a><a href="/gear/">The gear</a>',
+        "How it&#x27;s built",
+        '<a href="/method/">Under the hood</a><a href="/story/build/">The build log</a>'
+        '<a href="/gear/">The gear</a><a href="/method/character/">How the score works</a>',
     ),
     (
         None,
-        "Follow &amp; context",
-        f'<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{_SOCIAL_FOOT_HTML}'
-        '<a href="/story/about/">About</a>'
-        '<a href="/privacy/">Privacy</a>',
+        "Follow",
+        f'<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{_SOCIAL_FOOT_HTML}' '<a href="/privacy/">Privacy</a>',
     ),
 )
 
@@ -320,11 +324,38 @@ def site_footer(with_asof: bool = False, current_door: str | None = None) -> str
         for station, heading, links in FOOTER_COLUMNS
     )
     return (
-        f'<footer class="site-foot">{v4_wayfinding.wayfinder(current_door)}'
+        f'<footer class="site-foot">{PAGE_FEEDBACK_FORM}{v4_wayfinding.wayfinder(current_door)}'
         f'<nav class="site-foot-cols" aria-label="Site map">{cols}</nav>'
         f'<p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p>'
-        f"{ATTRIBUTION_TAG}</footer>"
+        f"{ATTRIBUTION_TAG}{GLOSS_RUNTIME_TAG}{PAGE_FEEDBACK_TAG}</footer>"
     )
+
+
+# #4182 (M2): the runtime half of the glossary — glosses registered terms in JS-rendered
+# text (the build-time pass in v4_glossary.py cannot see it). Rides in the footer for the
+# same reason as ATTRIBUTION_TAG: the footer is on every chrome-bearing page by
+# construction and FOOT_RE rewrites it wholesale, so the tag is idempotent.
+GLOSS_RUNTIME_TAG = '<script type="module" src="/assets/js/gloss_runtime.js"></script>'
+
+# #4182 (M3, site half): the reader form — "did this page make sense?" Three radios + an
+# optional ≤500-char "what were you looking for?". Ships `hidden`: page_feedback.js
+# un-hides it, so a no-JS reader never meets a form that cannot send. It POSTs to
+# /api/page_feedback, which lands separately (the engine half) — until then the endpoint
+# 404s and the script stays silent, never claiming a send that didn't happen.
+PAGE_FEEDBACK_FORM = (
+    '<form class="page-feedback" hidden>'
+    '<fieldset class="pf-set"><legend class="pf-q">Did this page make sense?</legend>'
+    '<label class="pf-opt"><input type="radio" name="made_sense" value="yes" required> Yes</label>'
+    '<label class="pf-opt"><input type="radio" name="made_sense" value="partly"> Partly</label>'
+    '<label class="pf-opt"><input type="radio" name="made_sense" value="no"> No</label>'
+    "</fieldset>"
+    '<label class="pf-more">What were you looking for? <span class="pf-optional">(optional)</span>'
+    '<textarea name="looking_for" maxlength="500" rows="2"></textarea></label>'
+    '<button class="pf-send" type="submit">Send</button>'
+    '<p class="pf-status" role="status" aria-live="polite"></p>'
+    "</form>"
+)
+PAGE_FEEDBACK_TAG = '<script type="module" src="/assets/js/page_feedback.js"></script>'
 
 
 # #1621: site-wide UTM capture. This rides in the canonical footer — INSIDE the
@@ -356,13 +387,13 @@ ATTRIBUTION_TAG = '<script type="module" src="/assets/js/attribution.js"></scrip
 # for credibility would want next. `/gear/`, `/privacy/`, home, and the utility pages
 # carry no current door — they fall to DEFAULT_NEXT (start the loop at the cockpit).
 NEXT_STATION = {
-    "/cockpit/": ("/data/", "the data", "See what's driving today's read"),
-    "/data/": ("/coaching/", "the coaching", "See what the AI team makes of it"),
-    "/coaching/": ("/protocols/", "the protocols", "See what levers get pulled next"),
+    "/cockpit/": ("/data/", "the numbers", "See what's driving today's read"),
+    "/data/": ("/coaching/", "the coaches", "See what the AI team makes of it"),
+    "/coaching/": ("/protocols/", "what he tries", "See what levers get pulled next"),
     "/protocols/": ("/story/", "the story", "Follow whether it moved anything"),
-    "/story/": ("/cockpit/", "the cockpit", "Check today's live read"),
+    "/story/": ("/cockpit/", "today", "Check today's live read"),
 }
-DEFAULT_NEXT = ("/cockpit/", "the cockpit", "Start with today's live read")
+DEFAULT_NEXT = ("/cockpit/", "today", "Start with today's live read")
 
 RETURN_TRIGGER = ("/subscribe/", "follow by email", "for the next entry")
 # The two pages the universal return trigger would self-link on — swap to a neutral

@@ -431,9 +431,12 @@ def _write_wayfinder(out_dir: Path) -> None:
     sys.path.insert(0, str(SCRIPT_DIR))
     import v4_chrome  # noqa: E402  (local import — scripts/ path added just above)
 
-    # Drop the UTM-capture <script>: a preview page must not run site JS, and its src is
-    # an absolute /assets/ ref the bundle sweep bans.
-    foot = v4_chrome.site_footer(current_door="/data/").replace(v4_chrome.ATTRIBUTION_TAG, "")
+    # Drop the footer's <script> tags (UTM capture; since #4182 the runtime gloss pass and
+    # the reader form): a preview page must not run site JS, and each src is an absolute
+    # /assets/ ref the bundle sweep bans.
+    foot = v4_chrome.site_footer(current_door="/data/")
+    for tag in (v4_chrome.ATTRIBUTION_TAG, v4_chrome.GLOSS_RUNTIME_TAG, v4_chrome.PAGE_FEEDBACK_TAG):
+        foot = foot.replace(tag, "")
     (out_dir / "wayfinder.html").write_text(
         _page("components", ".wayfinder — the footer loop spine + mega-menu", _neutralize_nav_links(foot)),
         encoding="utf-8",

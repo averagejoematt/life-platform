@@ -4,7 +4,8 @@ One source of truth for the `.loop-ribbon` — the platform's causal-loop spine 
 literal and clickable — so it can't drift across the evidence / coaching / dispatches
 builders (and the hand-authored Home + Cockpit shells reuse the same markup).
 
-The ribbon: Now · Data → Coaching → Protocols → Story, cycling back. `Now` (the live
+The ribbon: Today · The numbers → The coaches → What he tries → The story, cycling back
+(labels since #4182). `Today` (the live
 cockpit vantage) leads, set apart by a faint separator from the four causal-loop
 stages; the current door is marked ember (.lr-here). On pages that are neither the
 vantage nor a stage (Home, the footer-tier Method) nothing is marked — the ribbon
@@ -16,12 +17,14 @@ still orients ("here's the loop, click to enter").
 
 from __future__ import annotations
 
-LOOP_VANTAGE = ("/cockpit/", "Now", "cockpit")
+# #4182: the ribbon names the doors in the nav's own words (the owner's 2026-09-26 pick),
+# so the page-hero spine, the doors nav and the footer wayfinder say one thing.
+LOOP_VANTAGE = ("/cockpit/", "Today", "cockpit")
 LOOP_NODES = [
-    ("/data/", "Data", "data"),
-    ("/coaching/", "Coaching", "coaching"),
-    ("/protocols/", "Protocols", "protocols"),
-    ("/story/", "Story", "story"),
+    ("/data/", "The numbers", "data"),
+    ("/coaching/", "The coaches", "coaching"),
+    ("/protocols/", "What he tries", "protocols"),
+    ("/story/", "The story", "story"),
 ]
 
 
