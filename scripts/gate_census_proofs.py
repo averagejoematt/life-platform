@@ -1906,7 +1906,8 @@ _RECEDE_OBSERVED = {
     ".ch-fx.is-inert": (0.55, 16, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
     ".ch-badge": (0.55, 10, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
     ".ch-tl li.ch-tl-muted": (0.75, 11, "dark 3.70:1 / @media-light 3.03:1 / data-theme-light 3.03:1"),
-    ".ev-intro__note": (0.8, 4, "@media-light 3.35:1 / data-theme-light 3.35:1 — dark held 5.13:1 and did NOT fail"),
+    # `.ev-intro__note` (0.8, 4 failures, light-only) left with its rule: #4182 retired the
+    # /data/ first-run card, so the gate at its id no longer exists — the proof goes with it.
     ".rdg-abandoned .rdg-face": (0.72, 6, "dark 3.52:1 / @media-light 2.87:1 / data-theme-light 2.87:1"),
     ".vg-off": (0.55, 12, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
 }

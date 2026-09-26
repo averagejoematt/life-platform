@@ -1427,6 +1427,19 @@ def capture_page(
         # ── interaction (cockpit pillar disclosure) ──
         if page_def.get("interact"):
             it = page_def["interact"]
+            # #4182: an interaction can sit inside a collapsed disclosure (the cockpit's
+            # pillar rows live in the closed "engine's score" <details>). `open` names the
+            # control a reader taps first; a missing opener is a real regression, not a skip.
+            if it.get("open"):
+                opener = page.query_selector(it["open"])
+                if not opener:
+                    issues.append(f"Interaction opener '{it['open']}' not present — {it['desc']}")
+                else:
+                    try:
+                        opener.click(timeout=3000)
+                        page.wait_for_timeout(200)
+                    except Exception:
+                        issues.append(f"Interaction opener '{it['open']}' could not be clicked — {it['desc']}")
             target = page.query_selector(it["click"])
             if not target:
                 warnings.append(f"Interaction skipped — '{it['click']}' not present")

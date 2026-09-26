@@ -94,7 +94,7 @@ GATE_PAGES = [
         "wait_for": "body",
         # Exercise the pillar disclosure when data mounted a row; if the mock
         # yielded no rows it's skipped as a warning, not failed (honest empty state).
-        "interact": {"click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens"},
+        "interact": {"open": ".engine-sum", "click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens"},
     },
     {"path": "/story/", "name": "Story hub", "wait_for": "body"},
     {"path": "/data/", "name": "Data hub", "wait_for": "body"},

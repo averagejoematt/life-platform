@@ -8,12 +8,12 @@
   <link rel="canonical" href="https://averagejoematt.com/cockpit/">
   <meta name="twitter:creator" content="@averagejoematt_">
   <meta name="twitter:site" content="@averagejoematt_">
-  <meta name="twitter:description" content="Am I winning, and what's the one thing right now? The daily instrument: seven pillars scored from real data. Character level 1 · Foundation as of 2026-09-05.">
-  <meta name="twitter:title" content="The Cockpit — character level 1 · Foundation">
+  <meta name="twitter:description" content="Am I winning, and what's the one thing right now? The daily instrument: seven pillars scored from real data. Character level 6 as of 2026-09-24.">
+  <meta name="twitter:title" content="The Cockpit — character level 6">
   <meta name="twitter:card" content="summary_large_image">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-character.png">
-  <meta property="og:description" content="Am I winning, and what's the one thing right now? The daily instrument: seven pillars scored from real data. Character level 1 · Foundation as of 2026-09-05.">
-  <meta property="og:title" content="The Cockpit — character level 1 · Foundation">
+  <meta property="og:description" content="Am I winning, and what's the one thing right now? The daily instrument: seven pillars scored from real data. Character level 6 as of 2026-09-24.">
+  <meta property="og:title" content="The Cockpit — character level 6">
   <meta property="og:url" content="https://averagejoematt.com/cockpit/">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:type" content="website">
@@ -69,19 +69,15 @@
   </div>
 
   <main id="cockpit" class="cockpit" data-state="loading">
-    <h1 class="sr-only">The Cockpit — one life, measured live: today's whole-life score and the one thing that matters now.</h1>
+    <h1 class="sr-only">The Cockpit — today, in one screen: how Matthew's week is going, how he slept, and what today holds.</h1>
     <!-- #578: the loop spine, made literal — the cockpit is the live "Now" vantage
          that watches the whole cycle. Slim by design (kicker + ribbon, no promise):
-         the big score below is the real headline.
+         the three questions below are the headline (#4182 — the level used to be).
          #1992: moved inside the main landmark (was a landmark-orphan sibling of
          header/main, unreachable by landmark navigation — axe region, 4 nodes)
          to match every other v4 page's pattern of page-hero as main's first child. -->
     <div class="page-hero cockpit-hero">
-      <p class="ph-kicker label">the cockpit · one life, measured live</p>
-      <!-- #1379: the Daily Fingerprint masthead — the day's deterministic mark (a pure
-           function of today's real numbers), injected by cockpit.js from /api/fingerprint.
-           Earned glow only; links through to the wall of every attempt. Self-hides. -->
-      <div class="cockpit-fingerprint" data-bind="fingerprint" hidden></div>
+      <p class="ph-kicker label">the cockpit · today, in one screen</p>
       <!-- #1375 RETIRED at the 2026-09-06 launch re-anchor (owner decision, 2026-08-31 —
            the September 1st launch, Session O Phase D1). The masthead read
            "Attempt #N — previous best: D days" over the cockpit hero; the launch reads
@@ -91,7 +87,40 @@
            site-wide chrome), /method/cycles/ and /data/wall/. The renderer
            (cockpit.js loadAttemptLine) is removed with it. -->
       <nav class="loop-ribbon" aria-label="Where this sits in the loop"><span class="lr-here" aria-current="page">Now</span><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
-      <!-- #1106: the instrument strip — the first screen reads as a cockpit. Composed
+    </div>
+    <!-- #4182 (epic, ruling 2(ii) of the 2026-09-25 panel): the first screen answers the
+         three questions a reader — and Matthew himself — actually asks, in plain words, third
+         person, before any score. Every number is a served field with its own date / n / CI
+         (ADR-104/105); a missing field drops its clause, never a dash. Rendered by cockpit.js
+         (renderThreeQuestions) from /api/snapshot (vitals + journey), /api/routine,
+         /api/nutrition_overview and /api/coaching-dashboard. No computation beyond
+         formatting and comparing served values. -->
+    <section class="three-q" data-three-q aria-label="The three questions — the week, last night, today">
+      <p class="tq-fresh label" data-bind="tq-fresh"></p>
+      <div class="tq-block" data-tq="week">
+        <h2 class="tq-h">How's the week?</h2>
+        <p class="tq-a" data-bind="tq-week"><span class="shimmer">Reading the week…</span></p>
+      </div>
+      <div class="tq-block" data-tq="night">
+        <h2 class="tq-h">Last night?</h2>
+        <p class="tq-a" data-bind="tq-night"><span class="shimmer">Reading last night…</span></p>
+      </div>
+      <div class="tq-block" data-tq="today">
+        <h2 class="tq-h">Today?</h2>
+        <p class="tq-a" data-bind="tq-today"><span class="shimmer">Reading today…</span></p>
+        <p class="tq-ask" data-bind="tq-ask" hidden></p>
+      </div>
+      <p class="tq-next label"><a href="#daily-line">the daily line &darr;</a><span aria-hidden="true"> &middot; </span><a href="#engine">the engine&rsquo;s score &darr;</a></p>
+    </section>
+
+    <!-- Screen two (#4182, Tyrell's amendment): the rings + the day's mark sit under the
+         three questions, never above them. -->
+    <div class="cockpit-instruments">
+      <!-- #1379: the Daily Fingerprint — the day's deterministic mark (a pure function of
+           today's real numbers), injected by cockpit.js from /api/fingerprint. Links through
+           to the wall of every attempt. Self-hides. -->
+      <div class="cockpit-fingerprint" data-bind="fingerprint" hidden></div>
+      <!-- #1106: the instrument strip (screen two since #4182). Composed
            from the EXISTING ring() primitive (charts.js) + the instrument mark
            (sigils.js §8.5); populated by cockpit.js from the same /api/snapshot the
            page already fetches. Earned glow only: ember strictly on the thresholds
@@ -100,7 +129,7 @@
       <div class="hero-instruments" data-bind="hero-instruments" hidden aria-label="Today's instruments at a glance"></div>
     </div>
     <!-- cockpit-proof:start -->
-    <noscript><section class="proof-static dx-prose" aria-label="Cockpit summary"><p class="label">The cockpit — one life, measured live · as of 2026-09-05</p><p><strong>Character level 1 · Foundation</strong> — a 1–100 score of the whole day: seven pillars, each from real data, rolled into one.</p><p>Body 0 · Mind 0 · Consistency 0</p><ul><li>Movement 0 · Foundation</li><li>Nutrition 0 · Foundation</li><li>Sleep 0 · Foundation</li><li>Metabolic 0 · Foundation</li><li>Mind 0 · Foundation</li><li>Relationships 0 · Foundation</li></ul><p>The live view (today's board read, trends, time travel) needs JavaScript. What a level means: <a href="/method/character/">the method</a>.</p></section></noscript>
+    <noscript><section class="proof-static dx-prose" aria-label="Cockpit summary"><p class="label">The cockpit — today, in one screen · the engine's score as of 2026-09-24</p><p><strong>Character level 6</strong> — 1 to 100; it climbs only after a run of sustained days. Each area below is the engine's 0–100 for that day.</p><p>Body 47 · Mind 34 · Consistency 32</p><ul><li>Movement 56</li><li>Nutrition 2</li><li>Sleep 72</li><li>Metabolic 59</li><li>Mind 17</li><li>Relationships 50</li></ul><p>The live view (today's board read, trends, time travel) needs JavaScript. What a level means: <a href="/method/character/">the method</a>.</p></section></noscript>
     <!-- cockpit-proof:end -->
     <article class="panel" aria-busy="true">
       <!-- Signature 1: the measuring-rule spine -->
@@ -109,34 +138,11 @@
       </div>
 
       <div class="panel-body">
-        <p class="cap label">character level · <span data-bind="scopeLabel">today</span> · <a href="/method/character/">what's a level?</a></p>
-
-        <!-- #807: one-sentence first-visit context for the bare number. JS unhides it
-             until dismissed (localStorage) — a returning visitor never sees it. -->
-        <p class="hub-hint label" data-hub-hint hidden>Character level: a 1&ndash;100 score of Matthew's whole day &mdash; seven pillars of real data, rolled into one each morning. <button class="hub-hint-x" type="button" aria-label="Dismiss the level explainer">got it</button></p>
-
-        <!-- The hub: the single largest, calmest element -->
-        <div class="hub">
-          <span class="big num" data-bind="level">··</span>
-          <span class="tier" data-bind="tier">&nbsp;</span>
-          <span class="movement" data-bind="movement" hidden></span>
-        </div>
-        <!-- P2.2 — anti-black-box: the level is the SUM of the seven pillars, decomposed below. -->
-        <p class="hub-decomp label"><a href="#domains">the sum of seven pillars — see what builds it ↓</a></p>
-
-        <!-- #406: intra-day sync strip — REAL ingestion write times, ticking "ago";
-             glow only when a pipe wrote within the earned-glow window. Honest stale
-             states ("9h ago") shown as-is, never hidden. -->
-        <p class="sync-line label" data-bind="syncline" hidden></p>
-
-        <!-- Honesty vocabulary: down/flat states, muted, never red, never hidden -->
-        <p class="honest" data-bind="honest" hidden></p>
-
         <!-- Signature 2: the machine ↔ human dialogue (the Third Wall).
              #1115: the Today slot carries the DAILY line (the morning brief's
              one-liner) — the integrator's weekly call lives on /coaching/'s
              Week lens; the who label tracks the active time scope. -->
-        <section class="dialogue" aria-label="The machine's daily line, and Matthew's reply">
+        <section class="dialogue" id="daily-line" aria-label="The machine's daily line, and Matthew's reply">
           <div class="voice machine">
             <span class="who">Today</span>
             <p class="what" data-bind="verdict"><span class="shimmer">Reading today…</span></p>
@@ -146,6 +152,64 @@
             <p class="what" data-bind="reply"></p>
           </div>
         </section>
+
+        <!-- #4182 (ruling 2(iii)): the engine's score, demoted — below the three questions,
+             the rings and the daily line, COLLAPSED under a plain-English heading with its
+             key printed first. The level NUMBER stays; the level NAME and XP are off the
+             reader surface (kept on /method/character/ and /method/game/). The engine is
+             unchanged — this is only where and how the page shows it. -->
+        <details class="engine" id="engine" data-engine>
+          <summary class="engine-sum"><span class="engine-h">The engine&rsquo;s score for yesterday &mdash; what built it</span></summary>
+          <p class="engine-key">
+            <span class="engine-date" data-bind="engine-date"></span>
+            <strong>Score</strong> = the engine&rsquo;s 0&ndash;100 for each area of that day.
+            <strong>Level</strong> = 1 to 100; it climbs only after a run of sustained days, so one good day can&rsquo;t move it.
+            <strong>&ldquo;Absent&rdquo;</strong> = the engine saw no evidence of the behavior &mdash; which can mean its rule, not him.
+          </p>
+          <p class="cap label">the level &middot; <a href="/method/character/">how it works</a></p>
+
+          <div class="hub">
+            <span class="big num" data-bind="level">··</span>
+            <span class="movement" data-bind="movement" hidden></span>
+          </div>
+          <!-- P2.2 — anti-black-box: the level is built from the seven areas, decomposed below. -->
+          <p class="hub-decomp label"><a href="#domains">built from seven areas &mdash; see each one &darr;</a></p>
+
+          <!-- #406: intra-day sync strip — REAL ingestion write times, ticking "ago";
+               glow only when a pipe wrote within the earned-glow window. -->
+          <p class="sync-line label" data-bind="syncline" hidden></p>
+
+          <!-- Honesty vocabulary: down/flat states, muted, never red, never hidden -->
+          <p class="honest" data-bind="honest" hidden></p>
+
+          <p class="cap label cap-today">yesterday, area by area</p>
+          <!-- Two glance domains; the seven pillars live one drill beneath -->
+          <section class="domains" id="domains" aria-label="Pillar domains">
+            <div class="domain" data-domain="body">
+              <header class="domain-head">
+                <span class="label">Body</span>
+                <span class="domain-roll num" data-bind="roll-body">··</span>
+              </header>
+              <div class="rows" data-rows="body"></div>
+            </div>
+            <div class="domain" data-domain="mind">
+              <header class="domain-head">
+                <span class="label">Mind</span>
+                <span class="domain-roll num" data-bind="roll-mind">··</span>
+              </header>
+              <div class="rows" data-rows="mind"></div>
+            </div>
+          </section>
+
+          <!-- Consistency: a cross-cutting discipline band, not a sixth peer tile.
+               Display-only (no detail drill-in) — no role/tabindex, so assistive tech
+               doesn't announce a button that goes nowhere. See AUDIT FE-01. -->
+          <div class="band" data-pillar="consistency">
+            <span class="label">Consistency</span>
+            <span class="meter"><i data-bind="consistency-fill" style="width:0%"></i></span>
+            <span class="band-val num" data-bind="consistency-val">··</span>
+          </div>
+        </details>
 
         <!-- #591: the argument underneath the board's read — the inter-coach dispute
              (#540), rendered as a thread of sigil/portrait-marked turns. The renderer
@@ -172,35 +236,6 @@
           <p class="rd-confidence" data-bind="readiness-confidence" hidden></p>
           <ul class="rd-rows" data-bind="readinessrows"></ul>
         </section>
-
-        <!-- Band: today — where you stand. The morning character sheet. -->
-        <p class="cap label cap-today">today — where you stand</p>
-        <!-- Two glance domains; the seven pillars live one drill beneath -->
-        <section class="domains" id="domains" aria-label="Pillar domains">
-          <div class="domain" data-domain="body">
-            <header class="domain-head">
-              <span class="label">Body</span>
-              <span class="domain-roll num" data-bind="roll-body">··</span>
-            </header>
-            <div class="rows" data-rows="body"></div>
-          </div>
-          <div class="domain" data-domain="mind">
-            <header class="domain-head">
-              <span class="label">Mind</span>
-              <span class="domain-roll num" data-bind="roll-mind">··</span>
-            </header>
-            <div class="rows" data-rows="mind"></div>
-          </div>
-        </section>
-
-        <!-- Consistency: a cross-cutting discipline band, not a sixth peer tile.
-             Display-only (no detail drill-in) — no role/tabindex, so assistive tech
-             doesn't announce a button that goes nowhere. See AUDIT FE-01. -->
-        <div class="band" data-pillar="consistency">
-          <span class="label">Consistency</span>
-          <span class="meter"><i data-bind="consistency-fill" style="width:0%"></i></span>
-          <span class="band-val num" data-bind="consistency-val">··</span>
-        </div>
 
         <!-- A named persona's read, made glanceable -->
         <p class="boardline" data-bind="boardline" hidden></p>
