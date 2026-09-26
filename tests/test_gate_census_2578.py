@@ -955,7 +955,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 4066c80eb: lane {proven 213, unproven 540, not-applicable 6, attempted-unproven 5} vs main {212, 540, 6, 5}. The bound
         # was already 213 from the concurrent #4182 merge above, so this entrant needed no numeric raise — recorded here rather
         # than silently absorbed.
-        <= 213
+        # Upper bound 213 -> 214 (2026-09-26, #4182 M4, the comprehension judge): `ci::visual-qa.yml::visual-qa::10`, the new
+        # `continue-on-error` CI step this lane's workflow edit mints, arrives PROVEN — CI_PROOFS in
+        # scripts/gate_census_proofs.py, wired into gate_census.PROVEN_CAN_FAIL. Mutation planted directly in the real tracked
+        # tests/comprehension_qa.py: main()'s body replaced with a bare `return 0`, deleting the
+        # `if not os.path.exists(_ARTIFACT_PATH): return 1` check. `python3 -m pytest tests/test_comprehension_qa.py -k
+        # main_returns -v`: BASELINE 3 passed; MUTATED 2 failed / 1 passed (the two artifact-missing/crash cases both asserted
+        # `main() == 1` and got 0); REVERTED 3 passed, byte-identical. Unproven stays 540; one entrant.
+        <= 214
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
