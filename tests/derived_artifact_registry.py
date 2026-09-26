@@ -268,6 +268,18 @@ ARTIFACTS: dict[str, dict] = {
             "Idempotent over the page set; reconciled every merge."
         ),
     ),
+    "scripts/v4_glossary.py": _builder(
+        "scripts/v4_glossary.py",
+        step="python3 scripts/v4_glossary.py --emit-js, on the PR that edits site/data/glossary.json",
+        reason=(
+            "#4182: writes site/assets/js/glossary_terms.js — the runtime gloss pass's copy of the one "
+            "registry (site/data/glossary.json). Its only input is that JSON, so the PR that edits the "
+            "registry is the PR that must regenerate it; tests/test_glossary_4035.py::"
+            "test_runtime_half_is_the_registry_and_never_touches_served_coach_text reds a stale copy "
+            "byte-for-byte in the code lane, on that same PR. The build-time half (the <dfn> wraps) "
+            "is written by v4_apply_chrome.py, reconciled above."
+        ),
+    ),
     "scripts/v4_build_methods.py": _builder(
         "scripts/v4_build_methods.py",
         step="deploy/sync_site_to_s3.sh",

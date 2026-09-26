@@ -155,6 +155,18 @@ function buildTabs() {
 const tileHTML = (t) =>
   `<a class="ev-tile ${t.slug === current ? "is-active" : ""}" href="${esc(BASE + t.slug + "/")}" data-slug="${esc(t.slug)}"${t.slug === current ? ' aria-current="page"' : ""}><span class="ev-tile-t">${domainIcon(t.slug, { cls: "dom-ico" })}${esc(t.title)}</span><span class="ev-tile-b">${esc(t.blurb)}</span></a>`;
 
+/* #4182 — the page you are on is always the active tile. An UNLISTED topic's own URL
+   (/protocols/ lands on the supplements readout, which the 25-page reach set took off
+   the rail as a duplicate tile) used to render a rail with NOTHING active — and at
+   ≤600, where the rail collapses to the active tile, an empty chip. The current topic
+   joins its group's tiles (first) on its own page only; it is never added to the
+   "All N topics" count and never appears on any other page. */
+function railTiles(grp) {
+  const tiles = LISTED.filter((t) => t.group === grp);
+  const cur = BYSLUG[current];
+  return cur && cur.unlisted && cur.group === grp ? [cur, ...tiles] : tiles;
+}
+
 let listOpen = false; // #1014 — the rail's full-index view (mobile wayfinding)
 
 function buildSide() {
@@ -162,8 +174,8 @@ function buildSide() {
   const g = BYSLUG[current] ? BYSLUG[current].group : GROUPS[0];
   side.classList.toggle("is-list", listOpen);
   side.innerHTML = listOpen
-    ? GROUPS.map((grp) => `<p class="ev-side-h label">${esc(grp)}</p>` + LISTED.filter((t) => t.group === grp).map(tileHTML).join("")).join("")
-    : LISTED.filter((t) => t.group === g).map(tileHTML).join("");
+    ? GROUPS.map((grp) => `<p class="ev-side-h label">${esc(grp)}</p>` + railTiles(grp).map(tileHTML).join("")).join("")
+    : railTiles(g).map(tileHTML).join("");
   side.querySelectorAll(".ev-tile").forEach((a) => a.addEventListener("click", (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // let the browser do link things
     // #1392: an external entry (e.g. The Mirror) is a curated page, not an archive

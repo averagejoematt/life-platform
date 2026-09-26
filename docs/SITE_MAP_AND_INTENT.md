@@ -14,11 +14,19 @@
 
 ## Navigation (v5)
 
-**Home + 5 doors:** `the cockpit · the data · the coaching · the protocols · the story`.
+**Home + 5 doors:** `today · the numbers · the coaches · what he tries · the story` (nav labels since #4182, 2026-09-26; the URLs `/cockpit/ /data/ /coaching/ /protocols/ /story/` and the page kickers are unchanged).
 **Method** is footer-tier (no top-nav door) — the "under the hood" pages, reachable from the
-footer's "The Technology" column (#1110: the /method/ hub, the build log, platform/pipeline/cost,
-/gear/) + About. The build log lives at `/story/build/` (URL unchanged) but is menu-homed under
-The Technology, not the story sub-nav. Old `/evidence/*` URLs 301 to their new pillar homes.
+footer's "How it's built" column (#1110, re-poured #4182: the /method/ hub "Under the hood", the
+build log, /gear/, and "How the score works" = /method/character/). The build log lives at
+`/story/build/` (URL unchanged) but is menu-homed under How it's built, not the story sub-nav.
+Old `/evidence/*` URLs 301 to their new pillar homes.
+
+**The reachable set is 25 (#4182, 2026-09-26 panel ruling):** home · the five doors · the five
+topic pages (physical, sleep, training, nutrition, labs) · by-coach, scorecard, lab-notes ·
+experiments · journal, panel, about, attempts · /method/ + /method/character/ · /story/build/ ·
+/gear/ · /subscribe/ · /privacy/. Everything else stays SERVED at its URL but unlinked (registry
+`"unlisted"` flag or dropped footer link) — no URL moves, no 301s, no deletions.
+`tests/site_vocabulary_residue.py::NAV_REACH_CEILING` holds it.
 
 **Wayfinding (#1475):** every chrome-bearing page's footer opens with the `.wayfinder` —
 this registry's five stations in loop order, with the page's own station marked, the next

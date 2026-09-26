@@ -24,6 +24,7 @@ does NOT import the facade; no import cycle.
 import re
 
 from boto3.dynamodb.conditions import Key
+from common.text_guards import strip_tool_call_residue  # #4190 — defence in depth, serve-time
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 from web.site_api_common import (
@@ -224,10 +225,21 @@ def _public_decision_note(text):
     Same runtime content filter (the channel-derived blocked terms) the CI content-policy scan
     enforces. A verbatim quote is all-or-nothing: if the filter would alter it at all
     (a blocked term excised, or the refuse-whole sentinel), the note is withheld
-    ENTIRELY — a decision whose note doesn't cleanly survive simply isn't shown."""
+    ENTIRELY — a decision whose note doesn't cleanly survive simply isn't shown.
+
+    #4190: tool-call XML residue is stripped BEFORE the all-or-nothing comparison,
+    not after — `_scrub_blocked_terms` has no reason to touch a `<parameter name=…>`
+    fragment, so an unstripped compare would find scrubbed == raw and let the residue
+    sail through as if it were a clean quote. This is the write-time guard's serve-time
+    backstop (defence in depth): the mcp write door now strips it going forward, but an
+    already-stored record (the 2026-09-08 decision this issue was filed on) can only be
+    cleaned here until the owner scrubs the row.
+    """
     if not text or not str(text).strip():
         return None
-    raw = str(text).strip()
+    raw = strip_tool_call_residue(str(text).strip())
+    if not raw:
+        return None
     scrubbed = _scrub_blocked_terms(raw)
     if not scrubbed or re.sub(r"\s+", " ", scrubbed).strip() != re.sub(r"\s+", " ", raw).strip():
         return None
@@ -280,12 +292,18 @@ def handle_decisions(event, *, _g):
             {
                 "date": i.get("date"),
                 # The platform's recommendation — the MACHINE voice half of the wall.
-                # Surgically scrubbed (defensive; it's platform text, not a sacred
-                # verbatim quote, so a stray term is excised rather than blanking it).
-                "decision": _scrub_blocked_terms(str(i.get("decision") or "")),
+                # #4190: tool-call XML residue stripped BEFORE the blocked-terms scrub
+                # (which has no reason to touch a `<parameter name=…>` fragment) —
+                # defence in depth against an already-stored dirty row, same rule as
+                # `_public_decision_note` above. Surgically scrubbed after (defensive;
+                # it's platform text, not a sacred verbatim quote, so a stray term is
+                # excised rather than blanking it).
+                "decision": _scrub_blocked_terms(strip_tool_call_residue(str(i.get("decision") or ""))),
                 "source": i.get("source"),
                 "followed": followed,
-                "override_reason": (_scrub_blocked_terms(str(i.get("override_reason"))) if i.get("override_reason") else None),
+                "override_reason": (
+                    _scrub_blocked_terms(strip_tool_call_residue(str(i.get("override_reason")))) if i.get("override_reason") else None
+                ),
                 # The HUMAN voice — Matthew's verbatim, dated note.
                 "note": note,
                 "note_at": i.get("note_at"),

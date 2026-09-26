@@ -126,10 +126,12 @@ test("glosses: only for terms the served text uses; HRV's and EWMA's lines ARE t
   assert.deepEqual(T.glossesFor("Whoop logged 86% recovery, HRV at 48.2 ms").map((g) => g.term), ["HRV", "recovery"]);
   assert.deepEqual(T.glossesFor("His protein EWMA sits at 154g").map((g) => g.term), ["EWMA"]);
   assert.deepEqual(T.glossesFor("Matthew is at a critical fork."), []);
-  const glossary = JSON.parse(readFileSync(join(REPO, "site", "config", "glossary.json"), "utf8")).terms;
+  const glossary = Object.fromEntries(
+    JSON.parse(readFileSync(join(REPO, "site", "data", "glossary.json"), "utf8")).terms.map((t) => [t.term, t.gloss]),
+  );
   for (const term of ["HRV", "EWMA"]) {
     const g = T.READER_GLOSS.find((x) => x.term === term);
-    assert.equal(g.plain, glossary[term], `the door's ${term} gloss drifted from site/config/glossary.json`);
+    assert.equal(g.plain, glossary[term], `the door's ${term} gloss drifted from site/data/glossary.json`);
   }
 });
 

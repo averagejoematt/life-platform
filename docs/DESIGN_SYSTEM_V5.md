@@ -35,7 +35,7 @@ THE COCKPIT (/now) = today's slice of the loop.   HOME = teaches the loop.
 
 ## 2. Information architecture
 
-Top nav = **Home + 5 doors**: `the cockpit · the data · the coaching · the protocols · the story`.
+Top nav = **Home + 5 doors**: `today · the numbers · the coaches · what he tries · the story` (the reader's words, owner's pick 2026-09-26, #4182 — URLs and page kickers keep the builder names `/cockpit/ · /data/ · /coaching/ · /protocols/ · /story/`; source `scripts/v4_chrome.DOORS`).
 
 | Door | Route | Loop role |
 |---|---|---|

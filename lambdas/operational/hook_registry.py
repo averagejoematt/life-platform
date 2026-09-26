@@ -285,6 +285,16 @@ HOOK_REGISTRY: tuple = (
         artifacts=(Artifact(id="door", label="POST door mounted", kind=HTTP_DOOR, locator="/api/experiment_suggest"),),
     ),
     Hook(
+        id="page_feedback",
+        label="Did this page make sense? (the reader form)",
+        why=(
+            "#4182 M3: the one channel a first-time reader has to say a page lost them; the footer form "
+            "stays silent on a dead door by design, so without a probe a dead door looks like no feedback"
+        ),
+        post_endpoints=("/api/page_feedback",),
+        artifacts=(Artifact(id="door", label="POST door mounted", kind=HTTP_DOOR, locator="/api/page_feedback"),),
+    ),
+    Hook(
         id="replicate_certify",
         label="Replication self-certification",
         why="the engagement ladder's top rung — a PII-free self-cert POST",

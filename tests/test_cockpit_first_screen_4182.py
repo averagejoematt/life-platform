@@ -72,7 +72,15 @@ def test_the_three_questions_are_labelled_in_plain_words():
 
 
 def test_kicker_reads_today_in_one_screen():
-    assert '<p class="ph-kicker label">the cockpit · today, in one screen</p>' in HTML
+    # The kicker is where a newcomer first meets the word "cockpit", so since #4182 the
+    # build glosses it there (<dfn class="gloss">, site/data/glossary.json). The words are
+    # what this pins; the gloss wrap is stripped before comparing.
+    import sys
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import v4_glossary
+
+    assert '<p class="ph-kicker label">the cockpit · today, in one screen</p>' in v4_glossary.strip_glossary(HTML)
     assert "one life, measured live</p>" not in _strip_comments(_main().split("<noscript>")[0])
 
 

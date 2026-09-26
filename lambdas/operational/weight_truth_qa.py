@@ -264,7 +264,7 @@ _VITALS_TARGET_SENTENCE = re.compile(
     re.IGNORECASE,
 )
 
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?;…])\s+|\n+")
 
 # #3793: "Sept. 12" is one date, and the splitter above would cut it in half at the
 # abbreviation's own period — leaving the day number stranded in the next sentence
@@ -277,8 +277,137 @@ _MONTH_ABBREV_DOT = re.compile(rf"\b({_MONTHS_UNAMBIGUOUS}|may)\.", re.IGNORECAS
 
 
 def _sentences(prose: str) -> list[str]:
-    """The ONE sentence seam both cited-in readers use. See `_DATED_SENTENCE`."""
+    """The ONE sentence seam both cited-in readers use. See `_DATED_SENTENCE`.
+
+    #4186: split on an ellipsis (`…`, the single-character form) too — the
+    excerpted, ellided form a coach's own prose sample is quoted in
+    ("...September 19th … Six days without logs") otherwise reads as ONE
+    sentence, and the dated half's `_DATED_SENTENCE` match then silently
+    swallows the undated half's numeric claim along with it. The 3-dot ASCII
+    form ("...") already splits — it ends in a literal period the pre-existing
+    rule already matches — so this only adds the one character that didn't.
+    """
     return _SENTENCE_SPLIT.split(_MONTH_ABBREV_DOT.sub(r"\1", prose or ""))
+
+
+# ── #4180: trend/aggregate language is not a claim about the current reading ──
+#
+# The specimen (2026-09-25, the sole driver of that night's `qa-smoke-failures`
+# ALARM): "His recovery EWMA has climbed from 71.7% to 82.2% over seven days" —
+# read, pre-#4180, as a bare claim of 71.7% (the pattern below simply finds the
+# FIRST number near the word "recovery") and compared against the cockpit's
+# CURRENT reading (99%). The coach was narrating honest smoothed history, not
+# today's number — the same #1985 shape as the dated-sentence and
+# target-sentence exemptions above: a gate that reddens correct writing trains
+# readers to ignore it.
+#
+# Deliberately loose on "average"/"mean": a false positive here only ever
+# WITHHOLDS a figure from the strict `current` comparison — it still gets
+# compared, against a served rolling/aggregate fact if the caller has one
+# (`classify_claims`'s `trend_end` bucket) — never manufactures a contradiction,
+# so the failure direction stays the one #1985/#3793/#4025 already established.
+_TREND_SENTENCE = re.compile(
+    r"""\b(?:
+          ewma
+        | rolling
+        | trailing
+        | average
+        | mean
+        | over\s+\d+\s+(?:days?|nights?)\b
+    )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# "climbed/rose/fell/dropped ... from X to Y": the trend's two endpoints named in
+# one sentence. X is categorically a past point — the same class as a dated
+# citation — and Y is the trend's END, the only figure ever a candidate for
+# comparison (against a served aggregate, never the raw current reading).
+_FROM_TO_NUMBERS = re.compile(r"\bfrom\s+([−-]?\d+(?:\.\d+)?)\b.{0,30}?\bto\s+([−-]?\d+(?:\.\d+)?)\b", re.IGNORECASE)
+
+# Bare keyword (no number) per quantity a from/to trend sentence can name — used
+# ONLY to decide which quantity a from-to pair belongs to. Every non-trend
+# ("current") figure, and every bare-aggregate trend figure, still goes through
+# that quantity's own adjacency-scoped pattern in `patterns`, unchanged.
+_QUANTITY_KEYWORD = {
+    "recovery": re.compile(r"\b(?:recovery|readiness)\b", re.IGNORECASE),
+    "hrv": re.compile(r"\bhrv\b", re.IGNORECASE),
+    "rhr": re.compile(r"\b(?:rhr|resting (?:heart rate|hr|pulse))\b", re.IGNORECASE),
+    "sleep": re.compile(r"\bslept?\b", re.IGNORECASE),
+    "protein": re.compile(r"\b(?:protein|intake)\b", re.IGNORECASE),
+}
+
+
+def _quantity_matches(sentence: str, patterns, lo: float, hi: float) -> list[float]:
+    """Every value `patterns` (one quantity's forward/backward regex pair, same
+    shape as `_VITALS_PATTERNS`) finds in `sentence`, domain- and anchor-filtered.
+    The one number-extraction seam `classify_claims`'s two branches share."""
+    out = []
+    for pat in patterns:
+        for m in pat.finditer(sentence):
+            try:
+                v = float(m.group(1))
+            except (TypeError, ValueError):
+                continue
+            if not (lo <= v <= hi):
+                continue
+            if _HISTORICAL_ANCHOR.match(sentence[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
+                continue  # dated / prior-cycle framing — not a claim about now
+            out.append(v)
+    return out
+
+
+def classify_claims(prose: str, patterns: dict, domain: dict):
+    """The ONE seam #4180 and #4186 share: every quantity a blob of prose states,
+    split three ways so a caller can never mis-compare a figure that was never a
+    claim about the present:
+
+      * ``current``     — ``{quantity: [values]}``: a claim about NOW. Compared
+        against a live/current fact (e.g. the cockpit's latest reading).
+      * ``trend_end``    — ``{quantity: [values]}``: a trend's END point, or a
+        bare aggregate's own value ("7-day average recovery is 84%", "protein
+        EWMA sits at 154g"). Comparable ONLY to a served rolling/aggregate fact
+        — never the raw current reading — and MUST be reported as skipped when
+        no such fact is served (#4180's acceptance: a skip is visible, never
+        silent).
+      * ``trend_start``  — ``[(quantity, value)]``: a trend's START point (the
+        "from X" in "climbed from X to Y"). Never comparable to anything — it
+        is categorically a past point — and the caller must name it as skipped.
+
+    Sentences an explicit calendar date/day-N/"as of" anchors, or that frame a
+    target/goal, are excluded exactly as `vitals_cited_in` always excluded them
+    — unchanged and silent, shared via `_sentences`/`_DATED_SENTENCE`/
+    `_HISTORICAL_ANCHOR`/`_VITALS_TARGET_SENTENCE` so no two callers can drift
+    on what "dated" or "goal-framed" means.
+
+    ``patterns``/``domain`` are keyed the same way `_VITALS_PATTERNS`/
+    `_VITALS_DOMAIN` are, so `vitals_cited_in` below is a thin, contract-frozen
+    wrapper over this — every existing caller/test is unaffected.
+    """
+    current: dict[str, list[float]] = {}
+    trend_end: dict[str, list[float]] = {}
+    trend_start: list[tuple[str, float]] = []
+
+    for sentence in _sentences(prose):
+        if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
+            continue
+        is_trend = bool(_TREND_SENTENCE.search(sentence))
+        from_to = _FROM_TO_NUMBERS.search(sentence) if is_trend else None
+        for quantity, pats in patterns.items():
+            lo, hi = domain[quantity]
+            keyword = _QUANTITY_KEYWORD.get(quantity)
+            if is_trend and from_to and keyword is not None and keyword.search(sentence):
+                start = float(from_to.group(1).replace("−", "-"))
+                end = float(from_to.group(2).replace("−", "-"))
+                if lo <= start <= hi:
+                    trend_start.append((quantity, start))
+                if lo <= end <= hi:
+                    trend_end.setdefault(quantity, []).append(end)
+                continue  # from-to consumed this quantity for this sentence — never double-count
+            vals = _quantity_matches(sentence, pats, lo, hi)
+            if not vals:
+                continue
+            (trend_end if is_trend else current).setdefault(quantity, []).extend(vals)
+    return current, trend_end, trend_start
 
 
 def vitals_cited_in(prose: str) -> dict:
@@ -287,26 +416,12 @@ def vitals_cited_in(prose: str) -> dict:
     Returns ``{metric: [values]}``. Excluded, by design: figures the prose anchors to
     a past point (`_HISTORICAL_ANCHOR`, shared with the weight assessor so the dated
     escape hatch is ONE seam), figures in a sentence that frames a target or goal,
-    and figures outside the metric's real domain.
+    figures outside the metric's real domain, and — since #4180 — a trend/aggregate
+    sentence's figures (its own `classify_claims` bucket; see `assess_cross_surface_vitals`
+    for where those are compared instead, and named when they can't be).
     """
-    out: dict[str, list[float]] = {}
-    for sentence in _sentences(prose):
-        if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
-            continue
-        for metric, patterns in _VITALS_PATTERNS.items():
-            lo, hi = _VITALS_DOMAIN[metric]
-            for pat in patterns:
-                for m in pat.finditer(sentence):
-                    try:
-                        v = float(m.group(1))
-                    except (TypeError, ValueError):
-                        continue
-                    if not (lo <= v <= hi):
-                        continue
-                    if _HISTORICAL_ANCHOR.match(sentence[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
-                        continue  # dated / prior-cycle framing — not a claim about now
-                    out.setdefault(metric, []).append(v)
-    return out
+    current, _trend_end, _trend_start = classify_claims(prose or "", _VITALS_PATTERNS, _VITALS_DOMAIN)
+    return current
 
 
 # ── #2575: a FROZEN artifact vs a LIVE surface is not a comparison ──────────────
@@ -486,6 +601,14 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None, histor
     (#4025). `history=None` keeps the strict pre-#4025 behaviour and the message says
     so explicitly — omitting history is never a silent pass.
 
+    #4180: a trend/aggregate sentence's figures (`classify_claims`'s `trend_end` /
+    `trend_start` buckets) are never judged against the cockpit's raw current
+    reading. A trend's START value is categorically a past point and is always
+    skipped; its END value is compared against a served `{metric}_ewma` cockpit
+    field IF ONE EXISTS (none is served today — this is forward-compatible, not
+    a live comparison yet), otherwise skipped too. Every skip is named in the
+    message so it is visible, never silent.
+
     Returns (ok, message). Absence is a clean pass (ADR-104) on BOTH sides: a null
     cockpit field has nothing to contradict, and a coach that cites nothing is silent,
     not wrong. Pure — no network, no clock — so the rule is unit-testable offline.
@@ -509,12 +632,52 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None, histor
 
     disagreements = []
     dated_matches = []
+    skipped = []
     for c in coaches or []:
         if not isinstance(c, dict):
             continue
         name = c.get("name") or c.get("persona_id") or "coach"
         prose = " ".join(str(c.get(k) or "") for k in _PROSE_FIELDS)
-        for metric, values in vitals_cited_in(prose).items():
+        # `current` comes from `vitals_cited_in` (the frozen, current-only contract
+        # every pre-#4180 caller/test already relies on) rather than re-deriving it
+        # from `classify_claims`'s own `current` bucket — the two are byte-identical
+        # (`vitals_cited_in` is a thin wrapper over `classify_claims`), but routing
+        # through the named wrapper keeps it a live, exercised production caller
+        # instead of a def nothing but a unit test ever reaches.
+        current = vitals_cited_in(prose)
+        _, trend_end, trend_start = classify_claims(prose, _VITALS_PATTERNS, _VITALS_DOMAIN)
+
+        for metric, cited in trend_start:
+            if metric not in truth:
+                continue
+            unit = _VITALS_UNIT[metric]
+            skipped.append(
+                f"{name} cites {metric} {cited:g}{unit} as a trend's START point — a past point by "
+                "definition, never a claim about now, skipped (#4180)"
+            )
+
+        for metric, values in trend_end.items():
+            if metric not in truth:
+                continue
+            unit = _VITALS_UNIT[metric]
+            served_ewma = vitals.get(f"{metric}_ewma")
+            served_ewma_f = None
+            if served_ewma is not None:
+                try:
+                    served_ewma_f = float(served_ewma)
+                except (TypeError, ValueError):
+                    served_ewma_f = None
+            for cited in values:
+                if served_ewma_f is None:
+                    skipped.append(
+                        f"{name} cites {metric} {cited:g}{unit} as a trend/aggregate (EWMA/rolling/average) — "
+                        "no served EWMA figure to compare against, skipped (#4180)"
+                    )
+                    continue
+                if abs(cited - served_ewma_f) > tol[metric]:
+                    disagreements.append(f"{name} cites {metric} trend/aggregate {cited:g}{unit} vs served EWMA {served_ewma_f:g}{unit}")
+
+        for metric, values in current.items():
             if metric not in truth:
                 continue
             unit = _VITALS_UNIT[metric]
@@ -534,13 +697,15 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None, histor
                     disagreements.append(f"{name} cites {metric} {cited:g}{unit} vs {provenance} {baseline:g}{unit}")
 
     no_history_note = " (no per-day history supplied — dated citations judged strictly)" if history is None else ""
+    skipped_note = " — skipped (trend/aggregate): " + "; ".join(sorted(set(skipped))[:4]) if skipped else ""
 
     if disagreements:
         return (
             False,
             "coach-cited vitals disagree with the reading they were published against — "
             + "; ".join(sorted(set(disagreements))[:4])
-            + no_history_note,
+            + no_history_note
+            + skipped_note,
         )
 
     base = "coach narratives agree with the cockpit vitals (" + ", ".join(f"{k} {v:g}" for k, v in sorted(truth.items())) + ")"
@@ -548,6 +713,7 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None, histor
         base += " — " + "; ".join(sorted(set(dated_matches)))
     else:
         base += no_history_note
+    base += skipped_note
     return True, base
 
 
@@ -606,6 +772,338 @@ def assess_cross_surface_sleep_disclosure(vitals, sleep_detail, tol: float = CRO
     )
 
 
+# ── #4186: coach-to-coach and coach-to-engine agreement on ONE served page ─────
+#
+# `assess_cross_surface_weight`/`assess_cross_surface_vitals` above each diff every
+# coach against ONE truth (the cockpit). Neither compares coaches to EACH OTHER, and
+# neither reaches nutrition or the loss rate at all. Measured live 2026-09-25 (Session
+# AV B3 audit): the dashboard served protein as 106.9g / 141g / 154g and the loss rate
+# as 3.7 and -4.4 lb/wk on ONE page, and `cross_surface:*` stayed green throughout —
+# while the same leg went red on a TREND sentence (#4180) the same night. The
+# instrument was firing on the wrong class.
+#
+# Both legs below reuse `classify_claims` (#4180) so a trend's start, or any
+# dated/target-framed figure, is skipped and named exactly as it is for vitals —
+# never mis-compared here either.
+
+# Quantity domains + patterns beyond the vitals four. Protein/rate/days-logged use
+# their own extraction (rate needs signed-number parsing `classify_claims`'s shared
+# regex shape doesn't carry; days-logged/log-gap are two DIFFERENT questions — see
+# `_days_and_gap_claims` — so neither fits the quantity-pattern shape either).
+_PROTEIN_PATTERNS = (
+    # "his average intake has dropped to 106.9 grams", "protein EWMA sits at 154g"
+    re.compile(r"\b(?:protein|intake)\b[^.\n;]{0,40}?(\d{1,3}(?:\.\d+)?)\s*(?:g\b|grams?\b)", re.IGNORECASE),
+    re.compile(r"(\d{1,3}(?:\.\d+)?)\s*(?:g\b|grams?\b)[^.\n;]{0,30}?\b(?:protein|intake)\b", re.IGNORECASE),
+)
+_PROTEIN_DOMAIN = (0.0, 400.0)
+
+# The quantities `coach_quantity_claims` extracts via `classify_claims` — the vitals
+# four plus protein. `weight`/`rate`/`days_logged`/`log_gap_days` are appended
+# separately below (see `coach_quantity_claims`) because none of them fits this
+# adjacency-scoped, unsigned, single-capture-group shape.
+_CLAIM_PATTERNS = {**_VITALS_PATTERNS, "protein": _PROTEIN_PATTERNS}
+_CLAIM_DOMAIN = {**_VITALS_DOMAIN, "protein": _PROTEIN_DOMAIN}
+
+# The unit each quantity is rendered with in a check's detail line.
+_CLAIM_UNIT = {
+    "recovery": "%",
+    "hrv": " ms",
+    "rhr": " bpm",
+    "sleep": " h",
+    "protein": "g",
+    "weight": " lb",
+    "rate": " lb/wk",
+    "days_logged": "d",
+    "log_gap_days": "d",
+}
+
+# "3.7 pounds per week", "−4.4 lb/week" — the loss-rate figure a coach states in
+# plain prose. Unicode minus (−, U+2212) travels through some renderers instead
+# of an ASCII hyphen, so both are accepted (see `_parse_signed`).
+_RATE_PATTERNS = (re.compile(r"([−-]?\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\s*(?:per|/)\s*(?:week|wk)\b", re.IGNORECASE),)
+_RATE_DOMAIN = (-20.0, 20.0)
+
+
+def _parse_signed(token: str) -> float:
+    """A number that may carry a Unicode minus (−) instead of a hyphen."""
+    return float(token.replace("−", "-"))
+
+
+def _rate_claims(prose: str) -> list[float]:
+    """Every loss-rate figure (lb/week, signed or not) `prose` states as current.
+    Dated/target-framed sentences are excluded — the same rule every other
+    extractor here uses (`_sentences`/`_DATED_SENTENCE`/`_VITALS_TARGET_SENTENCE`)."""
+    out = []
+    for sentence in _sentences(prose):
+        if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
+            continue
+        for pat in _RATE_PATTERNS:
+            for m in pat.finditer(sentence):
+                try:
+                    v = _parse_signed(m.group(1))
+                except ValueError:
+                    continue
+                if _RATE_DOMAIN[0] <= v <= _RATE_DOMAIN[1]:
+                    out.append(v)
+    return out
+
+
+# "14 logged days", "from 19 logged days" (a POSITIVE claim: this many days carry a
+# log) vs "six days without logs", "the log went dark ... six days" (a GAP claim:
+# this many days carry NO log — the engine's own `lag_days`, not its `days_logged`).
+# Two different engine facts, so two different quantities — conflating them would
+# compare a coach's "20 good days" against the engine's "0 days since the last one"
+# and call it a match. Small English number-words are accepted because the live
+# specimen ("Six days without logs") spells it out rather than using a digit.
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19, "twenty": 20,
+}  # fmt: skip
+_NUM_TOKEN = r"(?:\d{1,3}|" + "|".join(_NUMBER_WORDS) + r")"
+_DAYS_LOGGED_PATTERN = re.compile(rf"\b({_NUM_TOKEN})\s+logged\s+days?\b", re.IGNORECASE)
+_LOG_GAP_PATTERN = re.compile(
+    rf"\b({_NUM_TOKEN})\s+days?\s+(?:without\s+(?:a\s+)?logs?|dark|since\s+(?:a|the\s+last)\s+log)\b", re.IGNORECASE
+)
+
+
+def _num_token(token: str) -> float:
+    try:
+        return float(token)
+    except ValueError:
+        return float(_NUMBER_WORDS.get(token.lower(), float("nan")))
+
+
+def _days_and_gap_claims(prose: str) -> list[tuple[str, float]]:
+    """``[("days_logged"|"log_gap_days", value)]`` — see the module comment above
+    for why these are two quantities, never one."""
+    out = []
+    for sentence in _sentences(prose):
+        if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
+            continue
+        for m in _DAYS_LOGGED_PATTERN.finditer(sentence):
+            v = _num_token(m.group(1))
+            if 0 <= v <= 60:
+                out.append(("days_logged", v))
+        for m in _LOG_GAP_PATTERN.finditer(sentence):
+            v = _num_token(m.group(1))
+            if 0 <= v <= 60:
+                out.append(("log_gap_days", v))
+    return out
+
+
+def coach_quantity_claims(coach: dict) -> dict:
+    """Every numeric claim one coach's served prose makes, by quantity.
+
+    Returns ``{quantity: [(value, "current"|"trend_end")]}`` — reuses #4180's
+    `classify_claims` for the vitals four + protein (so a trend's start, or a
+    dated/target-framed figure, is never in here at all — see that function's
+    docstring), and appends weight/rate/days-logged/log-gap via their own
+    extractors, all tagged ``"current"`` (none of the four fixtures behind
+    #4186 need trend detection on those quantities).
+    """
+    prose = " ".join(str(coach.get(k) or "") for k in _PROSE_FIELDS)
+    current, trend_end, _trend_start = classify_claims(prose, _CLAIM_PATTERNS, _CLAIM_DOMAIN)
+    out: dict[str, list[tuple[float, str]]] = {}
+    for quantity, values in current.items():
+        out.setdefault(quantity, []).extend((v, "current") for v in values)
+    for quantity, values in trend_end.items():
+        out.setdefault(quantity, []).extend((v, "trend_end") for v in values)
+    for v in weights_cited_in(prose):
+        out.setdefault("weight", []).append((v, "current"))
+    for v in _rate_claims(prose):
+        out.setdefault("rate", []).append((v, "current"))
+    for quantity, v in _days_and_gap_claims(prose):
+        out.setdefault(quantity, []).append((v, "current"))
+    return out
+
+
+# Default tolerances for a quantity the engine may not always serve a CI for.
+# `recovery`/`hrv`/`rhr`/`sleep` reuse `VITALS_TOL` (#2113 above) unchanged — same
+# quantity, same reason, one number. `rate`'s tolerance is derived from the engine's
+# own CI at call time (`_rate_tolerance`) and is never read from this dict.
+COACH_CONSISTENCY_TOL: dict = {
+    **VITALS_TOL,
+    # g — rounding + ordinary day-to-day meal-logging variance. The live 2026-09-25
+    # gap (106.9 vs 154, a 47g spread) sits more than 3x past this; an honest
+    # same-window rounding difference does not.
+    "protein": 15.0,
+    "weight": CROSS_SURFACE_WEIGHT_TOL_LBS,
+    # days — each coach names its OWN trailing window ("the last N logged days")
+    # independently, and those windows commonly differ by nearly a week without
+    # either coach being wrong about any single day's log status. A same-day
+    # disagreement about whether logging has STOPPED is `log_gap_days`, below,
+    # which stays tight because that is a same-day factual claim, not a window.
+    "days_logged": 5.0,
+    # days — a coach narrating "the log went dark" / "N days without logs" is
+    # making a claim about right now, directly checkable against the engine's own
+    # `lag_days` — no window latitude belongs here.
+    "log_gap_days": 2.0,
+    "rate": None,
+}
+
+
+def _rate_tolerance(rate_ci: tuple | None) -> float:
+    """The loss-rate tolerance: half the engine's own CI width when the engine
+    serves one (`journey.weekly_rate_ci_low/high`), per #4186's acceptance
+    ("tolerance derived from the engine's own CI... where one is served").
+    Falls back to a documented default when no CI is available: a coach's own
+    rounding of the rate to one decimal place is the only source of disagreement
+    the fallback needs to absorb.
+    """
+    if rate_ci and rate_ci[0] is not None and rate_ci[1] is not None:
+        return abs(float(rate_ci[1]) - float(rate_ci[0])) / 2.0
+    return 1.0
+
+
+# #4186's chosen rule for `rate`, stated once here rather than at each call site:
+# coach prose states the loss rate in plain, usually-unsigned terms ("3.7 pounds
+# per week"), while the engine's `weekly_rate_lbs` is SIGNED negative-for-loss.
+# Requiring sign agreement would fail ordinary correct writing ("losing 3.7
+# lb/week") — the exact #1985 anti-pattern this whole file exists to avoid — so
+# every rate comparison here is by MAGNITUDE. The documented limit: a coach who
+# reports a rate of GAIN using the same unsigned phrasing a loss would use is
+# invisible to this rule; nothing here reads direction, only size.
+def _rate_value(v: float) -> float:
+    return abs(v)
+
+
+def _claims_by_quantity(coaches) -> tuple[dict, int]:
+    """``({quantity: [(value, cls, coach_name)]}, skipped_count)`` across every
+    served coach — `skipped_count` is `classify_claims`'s `trend_start` figures,
+    which never reach `coach_quantity_claims`'s return at all (they are never a
+    claim about anything comparable — see `classify_claims`) and so would
+    otherwise vanish from both legs' emitted counts."""
+    out: dict = {}
+    skipped = 0
+    for c in coaches or []:
+        if not isinstance(c, dict):
+            continue
+        name = c.get("name") or c.get("persona_id") or "coach"
+        for quantity, entries in coach_quantity_claims(c).items():
+            for value, cls in entries:
+                out.setdefault(quantity, []).append((value, cls, name))
+        prose = " ".join(str(c.get(k) or "") for k in _PROSE_FIELDS)
+        _cur, _te, trend_start = classify_claims(prose, _CLAIM_PATTERNS, _CLAIM_DOMAIN)
+        skipped += len(trend_start)
+    return out, skipped
+
+
+def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None):
+    """Two coach texts served on ONE page must not state the same quantity with
+    different values — protein, weight, loss rate, recovery, HRV, RHR, sleep
+    hours, days logged (#4186).
+
+    The rule: two `current`/`trend_end` claims for the SAME quantity from
+    DIFFERENT coaches are compared unconditionally, beyond the quantity's own
+    tolerance (`COACH_CONSISTENCY_TOL`) — a differently-named window is NOT an
+    excuse (the live specimen: 106.9g matches no served field for ANY window, so
+    "the coaches meant different spans" cannot be the answer). The one exception
+    is `rate`, judged by magnitude (see `_rate_value`) — a signed/unsigned
+    mismatch is not a content disagreement. A `trend_start` figure never reaches
+    here at all (see `classify_claims`) — it is not a claim, so it cannot
+    disagree with one.
+
+    Returns (ok, message) — the message ALWAYS carries the claim count (extracted
+    / compared / skipped), pass or fail, per #4186's dead-man requirement.
+    """
+    claims, trend_start_skipped = _claims_by_quantity(coaches)
+    extracted = sum(len(v) for v in claims.values()) + trend_start_skipped
+    disagreements = []
+    compared = 0
+    for quantity, entries in claims.items():
+        tol = _rate_tolerance(rate_ci) if quantity == "rate" else COACH_CONSISTENCY_TOL.get(quantity)
+        if tol is None:
+            continue
+        for i in range(len(entries)):
+            for j in range(i + 1, len(entries)):
+                v1, _c1, n1 = entries[i]
+                v2, _c2, n2 = entries[j]
+                if n1 == n2:
+                    continue  # the same coach citing itself twice is not a disagreement
+                compared += 1
+                a, b = (_rate_value(v1), _rate_value(v2)) if quantity == "rate" else (v1, v2)
+                if abs(a - b) > tol:
+                    unit = _CLAIM_UNIT.get(quantity, "")
+                    disagreements.append(f"{quantity}: {n1} cites {v1:g}{unit} vs {n2} cites {v2:g}{unit}")
+
+    note = f" (claims: {extracted} extracted, {compared} compared, {trend_start_skipped} skipped as trend-start)"
+    if disagreements:
+        return False, "coach texts disagree with each other — " + "; ".join(sorted(set(disagreements))[:6]) + note
+    return True, "coach texts agree with each other on every shared quantity" + note
+
+
+def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None):
+    """Every protein / loss-rate / log-gap figure a coach states must agree with
+    the engine's own served fact for the window the sentence names (#4186) —
+    `nutrition_overview`'s `avg_protein_g`/`lag_days`, `journey`'s
+    `weekly_rate_lbs` + its CI.
+
+    `days_logged` (a coach's "N logged days") is deliberately NOT checked here,
+    only in `assess_cross_surface_coach_consistency` — documented limit: a
+    coach's stated day-count is ambiguous between "the trailing window my
+    average was computed over" and "the total days logged this cycle", and only
+    the second reading is comparable to `nutrition_overview.days_logged`
+    (`len(items)` over ITS OWN query window, not necessarily the coach's). Two
+    coaches both using the first reading with different window sizes is not an
+    engine disagreement; `log_gap_days` carries no such ambiguity (a claimed
+    logging GAP is a same-day fact, checked against `lag_days` below) and stays.
+
+    Reuses the SAME classifier as `assess_cross_surface_coach_consistency` (a
+    `trend_end` figure — an EWMA/rolling protein claim — is judged against the
+    engine's own served average exactly like a `current` one, because
+    `avg_protein_g` already IS the engine's rolling/aggregate figure; a
+    `trend_start` never reaches here).
+
+    Returns (ok, message) — always carries the claim count, per #4186's
+    dead-man requirement.
+    """
+    claims, trend_start_skipped = _claims_by_quantity(coaches)
+    extracted = sum(len(v) for v in claims.values()) + trend_start_skipped
+
+    engine_facts: dict = {}
+    if isinstance(nutrition, dict):
+        if nutrition.get("avg_protein_g") is not None:
+            engine_facts["protein"] = nutrition["avg_protein_g"]
+        if nutrition.get("lag_days") is not None:
+            engine_facts["log_gap_days"] = nutrition["lag_days"]
+    rate_ci = None
+    if isinstance(journey, dict) and journey.get("weekly_rate_lbs") is not None:
+        engine_facts["rate"] = journey["weekly_rate_lbs"]
+        lo, hi = journey.get("weekly_rate_ci_low"), journey.get("weekly_rate_ci_high")
+        if lo is not None and hi is not None:
+            rate_ci = (lo, hi)
+
+    disagreements = []
+    compared = 0
+    for quantity, entries in claims.items():
+        truth = engine_facts.get(quantity)
+        if truth is None:
+            continue
+        try:
+            truth = float(truth)
+        except (TypeError, ValueError):
+            continue
+        tol = _rate_tolerance(rate_ci) if quantity == "rate" else COACH_CONSISTENCY_TOL.get(quantity)
+        if tol is None:
+            continue
+        for value, _cls, name in entries:
+            compared += 1
+            a, b = (_rate_value(value), _rate_value(truth)) if quantity == "rate" else (value, truth)
+            if abs(a - b) > tol:
+                unit = _CLAIM_UNIT.get(quantity, "")
+                disagreements.append(f"{quantity}: {name} cites {value:g}{unit} vs engine {truth:g}{unit}")
+
+    no_field = extracted - compared - trend_start_skipped
+    note = (
+        f" (claims: {extracted} extracted, {compared} compared, "
+        f"{trend_start_skipped} skipped as trend-start, {no_field} skipped — no served engine field for that quantity)"
+    )
+    if disagreements:
+        return False, "coach text disagrees with the engine's own served fact — " + "; ".join(sorted(set(disagreements))[:6]) + note
+    return True, "coach texts agree with the engine's own served facts" + note
+
+
 def checks(check_cls, site_base_url, partition, timeout=15, table=None):
     """The qa_smoke-facing entrypoint: fetch both surfaces and return [Check].
 
@@ -637,9 +1135,14 @@ def checks(check_cls, site_base_url, partition, timeout=15, table=None):
     # independently below so a /sleep-only outage never blanks the weight/vitals
     # legs, and vice versa.
     sleep_check = check_cls("cross_surface:sleep_disclosure", "Reader Truth", partition)
+    # #4186: two more legs riding the SAME coaching-dashboard fetch, plus two new
+    # surfaces (nutrition_overview / journey) fetched independently below so their
+    # absence never blanks anything the weight/vitals/sleep legs already cover.
+    consistency_check = check_cls("cross_surface:coach_consistency", "Reader Truth", partition)
+    vs_engine_check = check_cls("cross_surface:coach_vs_engine", "Reader Truth", partition)
 
     payloads, fetch_errors = {}, {}
-    for path in ("/api/vitals", "/api/coaching-dashboard", "/api/sleep_detail"):
+    for path in ("/api/vitals", "/api/coaching-dashboard", "/api/sleep_detail", "/api/nutrition_overview", "/api/journey"):
         try:
             req = urllib.request.Request(site_base_url + path, headers={"User-Agent": "life-platform-qa-smoke"})
             with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -662,6 +1165,25 @@ def checks(check_cls, site_base_url, partition, timeout=15, table=None):
             vitals_check.ok(v_msg) if v_ok else vitals_check.fail(v_msg),
         ]
 
+    if "/api/coaching-dashboard" in fetch_errors:
+        msg = f"cross-surface fetch failed (fail-soft): /api/coaching-dashboard — {fetch_errors['/api/coaching-dashboard']}"
+        coach_agreement_checks = [consistency_check.warn(msg), vs_engine_check.warn(msg)]
+    else:
+        served_coaches = payloads.get("/api/coaching-dashboard", {}).get("coaches", [])
+        served_nutrition = payloads.get("/api/nutrition_overview", {}).get("nutrition")
+        served_journey = payloads.get("/api/journey", {}).get("journey")
+        _rate_ci = None
+        if isinstance(served_journey, dict):
+            _lo, _hi = served_journey.get("weekly_rate_ci_low"), served_journey.get("weekly_rate_ci_high")
+            if _lo is not None and _hi is not None:
+                _rate_ci = (_lo, _hi)
+        c_ok, c_msg = assess_cross_surface_coach_consistency(served_coaches, rate_ci=_rate_ci)
+        e_ok, e_msg = assess_cross_surface_coach_vs_engine(served_coaches, nutrition=served_nutrition, journey=served_journey)
+        coach_agreement_checks = [
+            consistency_check.ok(c_msg) if c_ok else consistency_check.fail(c_msg),
+            vs_engine_check.ok(e_msg) if e_ok else vs_engine_check.fail(e_msg),
+        ]
+
     if "/api/vitals" in fetch_errors or "/api/sleep_detail" in fetch_errors:
         sleep_result = sleep_check.warn(
             "cross-surface fetch failed (fail-soft): "
@@ -673,7 +1195,7 @@ def checks(check_cls, site_base_url, partition, timeout=15, table=None):
         s_ok, s_msg = assess_cross_surface_sleep_disclosure(served_vitals, served_sleep_detail)
         sleep_result = sleep_check.ok(s_msg) if s_ok else sleep_check.fail(s_msg)
 
-    return weight_vitals_checks + [sleep_result]
+    return weight_vitals_checks + [sleep_result] + coach_agreement_checks
 
 
 # ── #1225: single-surface hero-weight arithmetic. Moved here from

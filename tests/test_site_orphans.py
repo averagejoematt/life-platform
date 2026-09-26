@@ -126,11 +126,17 @@ def test_unlisted_allowlist_stays_honest():
 
 
 def test_this_prs_ia_moves_are_live():
-    """#1109/#1110/#1111: the footer carries the new homes; build left the sub-nav."""
+    """#1109/#1110/#1111: the footer carries the new homes; build left the sub-nav.
+
+    #4182 (2026-09-26 panel ruling) reverses the footer half for /data/ledger/ and
+    /story/agents/: both are now served-but-unlinked (the 25-page reach set), and the
+    Technology column is re-labelled "How it's built". The other homes still hold."""
     foot = v4_chrome.site_footer()
-    for url in ("/data/ledger/", "/story/agents/", "/story/build/", "/gear/", "/method/"):
+    for url in ("/story/build/", "/gear/", "/method/"):
         assert f'href="{url}"' in foot, f"footer lost {url}"
-    assert "The Technology" in foot, "footer lost the Technology column (#1110)"
+    for url in ("/data/ledger/", "/story/agents/"):
+        assert f'href="{url}"' not in foot, f"{url} is back in the footer — it is off the 25-page reach set (#4182)"
+    assert "How it&#x27;s built" in foot, "footer lost the How-it's-built column (#1110, relabelled #4182)"
     dispatches_js = (SITE / "assets" / "js" / "dispatches.js").read_text(encoding="utf-8")
     build_entry = next(line for line in dispatches_js.splitlines() if 'key: "build"' in line)
     assert "unlisted: true" in build_entry, "build log is back in the story sub-nav (#1110)"
