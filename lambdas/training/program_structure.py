@@ -523,16 +523,20 @@ from `ACCESSORY_POOL[archetype]`, fixed per role for the block (`ROTATION_RULE`)
 back (row + pulldown, twice) sits at 10. v0.3's four roles are `program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
-    "provenance": "platform-proposed",
+    # Owner ratification 2026-09-25 (session AU, answering "ratify the three platform-proposed sessions":
+    # "approved"). The three placements were the platform's; they are now the owner's, unchanged.
+    "provenance": "owner",
     "owner_committed_roles": ["lower_heavy"],
-    "stated": "2026-09-24",
+    "owner_ratified_roles": ["upper_heavy", "upper_volume", "lower_volume"],
+    "placed_by": "platform (2026-09-24, #4147); ratified by the owner 2026-09-25 (#4161, PR #4162 ruling)",
+    "stated": "2026-09-25",
     "issue": "#4147",
     "note": (
         "The owner fixed the SPLIT and its ORDER (Upper-heavy -> Lower-heavy -> Upper-volume -> Lower-volume), the heavy scheme "
         "(top 4–6 @ RPE 7–8 + 2 back-offs at −10 %), the volume reps (8–12), each muscle 2x/wk, ~10 sets/muscle/wk, the trap "
         "bar until ≤ 275 lb and the RDL as the moderate hinge. Lower-heavy is the session he committed on 2026-09-23 (routine "
         "b1b9960468f374e30dcdeca8630dd18f). The other three placements are the platform's: 15 / 17 / 12 sets, 56 hard sets/wk "
-        "(inside §3's 50–65), every group inside its band. Nobody has ratified them; the block is owner-locked until 2026-11-04."
+        "(inside §3's 50–65), every group inside its band. The owner ratified them unchanged on 2026-09-25; the block is owner-locked until 2026-11-04."
     ),
 }
 
