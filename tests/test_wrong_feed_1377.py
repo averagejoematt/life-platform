@@ -119,16 +119,18 @@ class TestObituaries:
             }
         )
         o = _wrong(t, monkeypatch)["obituaries"][0]
-        assert o["believed"] == "sleep hours would come in at or above 7.5"
-        assert "sleep hours measured 6.8" in o["number"]
-        assert "at or above 7.5" in o["number"]
-        assert o["what_changed"] == "sleep_hours trend=down, predicted=up"  # the evaluator's own reason string
+        assert o["believed"] == "sleep would come in at or above 7.5 hours"
+        assert "sleep measured 6.8 hours" in o["number"]
+        assert "at or above 7.5 hours" in o["number"]
+        # #4218: a templated sentence, never the evaluator's raw reason string.
+        assert o["what_changed"] == "It came in at 6.8 hours, not at or above 7.5 hours."
 
     def test_number_formatting_strips_spurious_trailing_zero(self, monkeypatch):
         t = FakeTable({"COACH#sleep_coach": [_learning("sleep", "p1", "refuted", "steps", "gte", 8000, 6500.0, "short")]})
         o = _wrong(t, monkeypatch)["obituaries"][0]
-        assert "8000" in o["believed"] and "6500" in o["number"]
-        assert "8000.0" not in o["believed"] and "6500.0" not in o["number"]
+        # #4218: thousands separators, as the site's formatter prints them.
+        assert "8,000" in o["believed"] and "6,500" in o["number"]
+        assert "8000" not in o["believed"] and ".0" not in o["number"]
 
     def test_id_is_stable_and_permalink_og_derive_from_it(self, monkeypatch):
         t = FakeTable({"COACH#sleep_coach": [_learning("sleep", "p1", "refuted", "hrv", "gte", 60, 50, "hrv fell")]})

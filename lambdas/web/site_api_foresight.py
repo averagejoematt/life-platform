@@ -19,9 +19,11 @@ facade; no import cycle.
 """
 
 import hashlib
+import re
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from coach.prediction_grading import EWMA_PRIOR_LAG  # #4218 — the directional slope's lag, in words
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1197
 
 from web.site_api_common import (
@@ -186,16 +188,172 @@ _WRONG_COND_PHRASE = {
     "down": "trending down",
 }
 
+# #4218: a directional call's word for each direction ("the call was falling").
+_WRONG_DIRECTION_WORD = {"up": "rising", "down": "falling", "flat": "flat"}
 
-def _wrong_num(v) -> str:
-    """Format a graded number without a spurious trailing .0 (7.0 -> '7', 6.8 -> '6.8')."""
+# #4218: a metric id's trailing unit token -> the unit a reader sees beside the value.
+# The id itself never reaches the card (it read "RECOVERY_SCORE=73.00" in caps).
+_WRONG_UNIT_SUFFIX = (("_kcal", "kcal"), ("_hours", "hours"), ("_hrs", "hours"), ("_min", "min"), ("_pct", "%"), ("_g", "g"))
+_WRONG_WINDOW_SUFFIX = (("_7day_avg", "7-day average"), ("_14day_avg", "14-day average"), ("_30day_avg", "30-day average"))
+
+# The evaluator's own reason strings (coach_prediction_evaluator / prediction_point_grader).
+# Parsed ONLY for values the record stores nowhere else (the point call's tolerance band
+# and reading date, the directional call's observed direction and noise band); the raw
+# string itself never leaves this lambda (#4218).
+_RE_POINT = re.compile(r"=\s*[-\d.]+\s+on\s+(?P<on>\d{4}-\d{2}-\d{2})\s+vs\s+predicted\s+[-+\d.eE]+\s+±(?P<tol>[-+\d.eE]+)")
+_RE_POINT_RULE = re.compile(r"±1 SD of the trailing (?P<days>\d+)-day personal series")
+_RE_TREND = re.compile(r"\btrend=(?P<dir>up|down|flat)\b")
+_RE_FLAT = re.compile(r"metric flat .*?within ±(?P<band>[\d.]+) noise band")
+_RE_DOCKET = re.compile(r"^dispute docket resolved\b.*?\bon (?P<on>\d{4}-\d{2}-\d{2})\s*$")
+
+
+def _wrong_num(v, *, keep_decimal: bool = False) -> str:
+    """Format a graded number the way a reader reads one (#4218).
+
+    Thousands separators at 1,000+; one decimal at 10+ (73.0, 52.9, ±18.3); two
+    below (8.98, 1.24). A whole number drops its spurious trailing .0 (7.0 -> '7')
+    unless ``keep_decimal`` — a point card prints its measured value and its centre
+    at the same precision so '73.0 vs 52.9' compares like with like.
+    """
     if v is None:
         return ""
     try:
         f = float(v)
     except (TypeError, ValueError):
         return str(v)
-    return str(int(f)) if f == int(f) else f"{round(f, 2)}"
+    a = abs(f)
+    places = 0 if a >= 1000 else 1 if a >= 10 else 2
+    r = round(f, places)
+    if not keep_decimal and r == int(r):
+        return f"{int(r):,}"
+    s = f"{r:,.{places}f}"
+    if not keep_decimal and "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s
+
+
+def _wrong_date(iso) -> str:
+    """'2026-09-13' -> 'September 13' (the card already carries its own year-dated stamp)."""
+    try:
+        d = datetime.strptime(str(iso)[:10], "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return ""
+    return f"{d.strftime('%B')} {d.day}"
+
+
+def _wrong_metric(metric: str) -> tuple:
+    """A metric id -> (reader label, unit). 'total_protein_g' -> ('total protein', 'g')."""
+    m = metric.strip()
+    prefix = ""
+    for suf, words in _WRONG_WINDOW_SUFFIX:
+        if m.endswith(suf):
+            m, prefix = m[: -len(suf)], words + " "
+            break
+    unit = ""
+    for suf, u in _WRONG_UNIT_SUFFIX:
+        if m.endswith(suf):
+            m, unit = m[: -len(suf)], u
+            break
+    return (prefix + m.replace("_", " ")).strip(), unit
+
+
+def _with_unit(value: str, unit: str) -> str:
+    if not value or not unit:
+        return value
+    return f"{value}{unit}" if unit == "%" else f"{value} {unit}"
+
+
+def _wrong_obituary_text(rec: dict) -> tuple:
+    """(believed, number, what_changed) for ONE refuted LEARNING# record (#4218).
+
+    Branches on the evaluation type, because ``actual_value`` means a different thing on
+    each: a measured reading for machine and point calls, but the EWMA's FRACTIONAL
+    change (the slope) for a directional call — printing that as 'recovery score
+    measured 0.08' is the bug #4218 names. Every number here is a field the record
+    holds, or a value its own reason string recorded; nothing is recomputed.
+    """
+    metric = str(rec.get("metric") or "").strip()
+    cond = str(rec.get("condition") or "").strip().lower()
+    etype = str(rec.get("evaluation_type") or "").strip().lower()
+    thr = rec.get("threshold")
+    actual = rec.get("actual_value")
+    reason = str(rec.get("reason") or "").strip()
+    label, unit = _wrong_metric(metric) if metric else ("", "")
+    fallback = "a dated call the data refused to confirm"
+
+    # ── Directional: 'X would trend down' graded against the EWMA's observed direction ──
+    if etype == "directional" or (cond in ("up", "down") and etype in ("", "directional")):
+        called = _WRONG_DIRECTION_WORD.get(cond, cond)
+        believed = f"{label} would trend {cond}" if label and cond in ("up", "down") else fallback
+        tm = _RE_TREND.search(reason)
+        flat = _RE_FLAT.search(reason)
+        seen = tm.group("dir") if tm else ("flat" if flat else "")
+        number = ""
+        if label and seen:
+            number = f"measured {_WRONG_DIRECTION_WORD[seen]}"
+            if actual is not None:
+                pct = float(actual) * 100
+                move = "rose" if pct > 0 else "fell" if pct < 0 else "held"
+                size = "" if move == "held" else f" {round(abs(pct), 1):g}%"
+                number += f": the smoothed average of {label} {move}{size} across its last {EWMA_PRIOR_LAG} readings"
+            else:
+                number += f": {label}"
+            if flat:
+                number += f", inside the ±{round(float(flat.group('band')) * 100, 1):g}% noise band"
+            number += f" — the call was {called}"
+        if seen == "flat":
+            what_changed = (
+                f"Nothing moved beyond the noise band. A call that {label or 'the metric'} would move is refuted by it holding still."
+            )
+        elif seen:
+            what_changed = f"The trend ran {seen}, the opposite of the call, so it was graded refuted."
+        else:
+            what_changed = "The trend did not go the way the call said, so it was graded refuted."
+        return believed, number, what_changed
+
+    # ── Point: 'X on <date> would land at <centre> ± 1 SD' ──
+    if etype == "point" or cond == "within":
+        pm = _RE_POINT.search(reason)
+        tol = float(pm.group("tol")) if pm else None
+        band = ""
+        if tol is not None:
+            band = f" ±{_wrong_num(tol, keep_decimal=True)}"
+            rm = _RE_POINT_RULE.search(reason)
+            if rm:
+                band += f" (one standard deviation of his last {rm.group('days')} days)"
+        centre = _wrong_num(thr, keep_decimal=True)
+        believed = f"{label} would come in at {_with_unit(centre, unit)}{band}" if label and thr is not None else fallback
+        number = ""
+        if label and actual is not None:
+            on = _wrong_date(pm.group("on")) if pm else ""
+            number = f"{label} measured {_with_unit(_wrong_num(actual, keep_decimal=True), unit)}"
+            number += f" on {on}" if on else ""
+            if thr is not None:
+                number += f" — the call was {_with_unit(centre, unit)}{band}"
+        if actual is not None and thr is not None:
+            miss = abs(float(actual) - float(thr))
+            what_changed = f"It landed {_with_unit(_wrong_num(miss, keep_decimal=True), unit)} from the call"
+            what_changed += f", outside the ±{_wrong_num(tol, keep_decimal=True)} band." if tol is not None else "."
+        else:
+            what_changed = "The reading landed outside the call's band, so it was graded refuted."
+        return believed, number, what_changed
+
+    # ── Machine (threshold) calls, and anything else ──
+    phrase = _WRONG_COND_PHRASE.get(cond, "")
+    believed = f"{label} would come in {phrase} {_with_unit(_wrong_num(thr), unit)}" if label and phrase and thr is not None else fallback
+    number = ""
+    if actual is not None and label:
+        number = f"{label} measured {_with_unit(_wrong_num(actual), unit)}"
+        if thr is not None and phrase:
+            number += f" — the call was {phrase} {_with_unit(_wrong_num(thr), unit)}"
+    dm = _RE_DOCKET.search(reason)
+    if dm:
+        what_changed = f"Settled against the call by the dispute docket on {_wrong_date(dm.group('on'))}."
+    elif actual is not None and thr is not None and phrase:
+        what_changed = f"It came in at {_with_unit(_wrong_num(actual), unit)}, not {phrase} {_with_unit(_wrong_num(thr), unit)}."
+    else:
+        what_changed = "The deterministic evaluator graded the call refuted."
+    return believed, number, what_changed
 
 
 def _wrong_obituary(coach: str, rec: dict) -> dict:
@@ -204,28 +362,12 @@ def _wrong_obituary(coach: str, rec: dict) -> dict:
     #1377: what we believed / the number that killed it / what changed. Sourced ONLY
     from the LEARNING# record's own fields (never AI-asserted). The id is a stable
     deterministic slug so the permalink + OG card + RSS entry all agree, and re-sweeping
-    is idempotent.
+    is idempotent. #4218: every field is a templated sentence — the evaluator's raw
+    reason string (metric ids, 'slope=', '|Δ|') is not served.
     """
-    metric = str(rec.get("metric") or "").strip()
-    cond = str(rec.get("condition") or "").strip()
-    thr = rec.get("threshold")
-    actual = rec.get("actual_value")
-    reason = str(rec.get("reason") or "").strip()
     pid = str(rec.get("prediction_id") or str(rec.get("sk", "")).replace("LEARNING#", "")).strip()
     oid = hashlib.sha256(f"{coach}|{pid}|refuted".encode()).hexdigest()[:12]
-
-    metric_label = metric.replace("_", " ") if metric else ""
-    phrase = _WRONG_COND_PHRASE.get(cond, cond)
-    if metric_label and phrase and thr is not None:
-        believed = f"{metric_label} would come in {phrase} {_wrong_num(thr)}"
-    else:
-        believed = reason or "a dated call the data refused to confirm"
-
-    number = ""
-    if actual is not None and metric_label:
-        number = f"{metric_label} measured {_wrong_num(actual)}"
-        if thr is not None and phrase:
-            number += f" — the call was {phrase} {_wrong_num(thr)}"
+    believed, number, what_changed = _wrong_obituary_text(rec)
 
     return {
         "id": oid,
@@ -233,7 +375,7 @@ def _wrong_obituary(coach: str, rec: dict) -> dict:
         "coach": coach,
         "believed": believed[:240],
         "number": number[:240],
-        "what_changed": reason[:240],
+        "what_changed": what_changed[:240],
         "verdict": "refuted",
         # Generated feed item (no PAGE_BINDINGS entry): the moments sweep draws the
         # permalink shell + data-driven OG card at these exact paths (og_moments._sweep_wrong).
