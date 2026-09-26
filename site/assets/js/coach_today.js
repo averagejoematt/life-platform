@@ -50,6 +50,52 @@ export function pickTodaysRead(coaches) {
   return best;
 }
 
+// #4182 — THE SELECTION CHAIN. "Freshest" alone resolved to whichever coach the daily
+// batch ran LAST (all seven are written within ~10 minutes), i.e. the same coach every
+// day regardless of merit. The chain is deterministic and every pick states its reason
+// on the page (a mono provenance line under the byline):
+//   1. the open ask — the coach who owns open_actions[0] (the soonest-due live ask),
+//      so the ask renders WITH its author's read. Requires that coach to have a served,
+//      datable read; otherwise fall through (a byline over no text is not a read).
+//   2. the best checked record — among reads written within 24 h of the newest one, the
+//      coach with the highest THIS-CYCLE accuracy_pct at n >= 10 in /api/calibration
+//      (retired seats excluded). Below n = 10 a percentage is noise — Okafor's 100 % is
+//      n = 1 — so those coaches are ineligible, however high. Ties -> the newer read. The
+//      reason prints "<confirmed> of <n> held up", never a bare percentage (ADR-105).
+//   3. the freshest read.
+export const RECORD_MIN_N = 10;
+export const SAME_BATCH_HOURS = 24;
+export function chooseTodaysRead(coaches, openActions, calibration) {
+  const servable = (Array.isArray(coaches) ? coaches : []).filter(
+    (c) => c && String(c.position_summary || "").trim() && toDate(c.analysis_generated_at),
+  );
+  if (!servable.length) return null;
+  const t = (c) => toDate(c.analysis_generated_at).getTime();
+  const acts = (Array.isArray(openActions) ? openActions : []).filter((a) => a && String(a.text || "").trim());
+  if (acts.length) {
+    const owner = servable.find((c) => c.coach_id === acts[0].coach_id);
+    if (owner) return { coach: owner, rule: "ask", reason: "chosen: the open ask" };
+  }
+  const newest = Math.max(...servable.map(t));
+  const batch = servable.filter((c) => newest - t(c) <= SAME_BATCH_HOURS * 36e5);
+  const rec = {};
+  for (const r of (calibration && Array.isArray(calibration.coaches) ? calibration.coaches : [])) {
+    if (r && !r.retired && Number(r.n) >= RECORD_MIN_N && r.accuracy_pct != null && !isNaN(Number(r.accuracy_pct))) rec[r.coach_id] = r;
+  }
+  const ranked = batch
+    .filter((c) => rec[c.coach_id])
+    .sort((a, b) => Number(rec[b.coach_id].accuracy_pct) - Number(rec[a.coach_id].accuracy_pct) || t(b) - t(a));
+  if (ranked.length) {
+    const r = rec[ranked[0].coach_id];
+    return {
+      coach: ranked[0],
+      rule: "record",
+      reason: `chosen: the best checked record this cycle — ${Number(r.confirmed) || 0} of ${Number(r.n)} held up`,
+    };
+  }
+  return { coach: pickTodaysRead(servable), rule: "freshest", reason: "chosen: the freshest read" };
+}
+
 export function ageHours(iso, now) {
   const d = toDate(iso);
   return d ? (nowMs(now) - d.getTime()) / 36e5 : null;

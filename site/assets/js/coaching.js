@@ -41,7 +41,7 @@ import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — rea
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { rosterEntries } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
-import { pickTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
+import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -509,7 +509,15 @@ async function renderToday(mount) {
   if (!d) return; // the Read tab below states the failure; the first screen stays quiet
   const now = Date.now();
   const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
-  const chosen = pickTodaysRead(coaches);
+  // #4182: the deterministic selection chain (coach_today.chooseTodaysRead) — the open
+  // ask, else the best checked record at n >= 10 among today's batch, else the freshest.
+  // /api/calibration is fetched only when rule 1 cannot decide (no other code on this
+  // page reads it, so this is the one added request).
+  const hasAsk = (d.open_actions || []).some((a) => a && String(a.text || "").trim());
+  const calib = hasAsk ? null : await tryOnce("/api/calibration");
+  let pick = chooseTodaysRead(coaches, d.open_actions, calib);
+  if (pick && pick.rule !== "ask" && hasAsk) pick = chooseTodaysRead(coaches, d.open_actions, await tryOnce("/api/calibration"));
+  const chosen = pick ? pick.coach : null;
   const wp = d.weekly_priority || {};
   const wpText = String(wp.text || "").trim();
   const readTier = chosen ? freshness(chosen.analysis_generated_at, now) : "unknown";
@@ -537,6 +545,7 @@ async function renderToday(mount) {
       `<p class="ct-who"><span class="ct-name">${esc(chosen.name || "")}</span>${_roleOf(chosen) ? ` <span class="ct-role label">· ${esc(_roleOf(chosen))}</span>` : ""}</p>` +
       `<p class="provenance"><span class="pv-src${readTier === "stale" ? " pv-stale" : ""}">${esc(writtenStamp(chosen.analysis_generated_at, now))}</span>` +
       `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
+      `<p class="provenance ct-why"><span>${esc(pick.reason)}</span></p>` +
       `<div class="prose ct-text"><p>${esc(text)}</p></div>` +
       `<p class="ct-full label"><a href="/coaching/by-coach/#${esc(pid)}">${clipped ? "full read" : "more from this coach"} →</a></p>` +
       glossHTML(text);
