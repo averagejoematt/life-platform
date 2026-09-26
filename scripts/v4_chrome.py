@@ -401,6 +401,14 @@ NEXT_STATION = {
 DEFAULT_NEXT = ("/cockpit/", "today", "Start with today's live read")
 
 RETURN_TRIGGER = ("/subscribe/", "follow by email", "for the next entry")
+# #4182 (A-grade sweep fix 1): the return trigger now carries a DATE. The static copy names
+# the cadence; `loop_return.js` swaps the `data-next-writeup` span for the served next
+# write-up ("the write-up lands Wednesday, September 30") via entry_age.js — the same
+# /api/content_cadence rule the story door's "Next write-up" line uses. No date is ever
+# baked here: a build-time date goes stale the day after the sync.
+RETURN_LEAD = "the coaches read his numbers every morning; "
+RETURN_FALLBACK = "a new write-up lands each week"
+LOOP_RETURN_TAG = '<script type="module" src="/assets/js/loop_return.js"></script>'
 # The two pages the universal return trigger would self-link on — swap to a neutral
 # "back into the loop" trigger there instead (#1468 audit finding).
 _RETURN_SELF_SWAP = {"/subscribe/", "/subscribe/confirm/"}
@@ -417,8 +425,11 @@ def loop_forward(current_door: str | None, self_path: str | None = None) -> str:
     if self_path in _RETURN_SELF_SWAP:
         return_bit = '<a href="/">keep exploring the loop</a>'
     else:
-        r_href, r_label, r_hook = RETURN_TRIGGER
-        return_bit = f'<a href="{r_href}">{r_label}</a> {r_hook}'
+        r_href, r_label, _r_hook = RETURN_TRIGGER
+        return_bit = (
+            f"{_esc(RETURN_LEAD)}<span data-next-writeup>{_esc(RETURN_FALLBACK)}</span> — "
+            f'<a href="{r_href}">{r_label}</a>{LOOP_RETURN_TAG}'
+        )
     return (
         '<aside class="loop-forward" aria-label="Continue the loop">'
         f'<p class="lf-next"><span class="label">next on the loop</span> '
