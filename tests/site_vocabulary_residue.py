@@ -22,7 +22,7 @@ BASELINE = {
     "reset": 1,
     "correlation": 2,
     "cockpit": 20,
-    "chronicle": 4,
+    "chronicle": 5,  # 4 → 5 on 2026-09-26 (#4182, v7 Follow): /next/subscribe/ carries the #3564 cadence promise, which names the Chronicle by its product name and is pinned byte for byte to the senders' crons — the rename cannot touch it. Back to 4 at the cut-over, when /next/subscribe/ becomes /subscribe/.
     "model": 10,
     "as of": 3,
     "cycle": 2,  # 6 → 2 on the 2026-09-26 cycle-count ruling (#4182): only unlisted /method/cycles/ + /method/registry/ remain
