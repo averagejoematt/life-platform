@@ -487,6 +487,7 @@ def serve_reuse(
     *,
     surface: str,
     cache_output_type: Optional[str] = None,
+    data_through: Optional[str] = None,
 ) -> str:
     """Everything a cache HIT owes the rest of the platform, then return `text`.
 
@@ -513,6 +514,9 @@ def serve_reuse(
                     "output_type": output_type,
                     "generation_date": today,
                     "unchanged_since": unchanged_since,
+                    # #4185: the last data day the reused read was re-validated against — a
+                    # hit means today's inputs are unchanged, so it is today's data day too.
+                    "data_through": data_through,
                 }
             ).encode(),
         )
@@ -536,7 +540,7 @@ class BriefCacheGate:
     decide must never decide "unchanged".
     """
 
-    def __init__(self, lambda_client, table, cw, namespace: str, coach_id: str, output_type: str):
+    def __init__(self, lambda_client, table, cw, namespace: str, coach_id: str, output_type: str, data_through: Optional[str] = None):
         # `table` is constructed by the caller, not here, so a test can hand in a fake
         # and this stays hermetic — a gate that reaches for its own DDB resource is a
         # gate whose tests either hit the network or never exercise it.
@@ -546,6 +550,7 @@ class BriefCacheGate:
         self.namespace = namespace
         self.coach_id = coach_id
         self.output_type = output_type
+        self.data_through = data_through  # #4185 — stamped on the OUTPUT# row a reuse writes
         self.upstream_type = upstream_output_type(output_type)
         self.up_fp: Optional[str] = None
         self.up_parts: Optional[dict] = None
@@ -571,6 +576,7 @@ class BriefCacheGate:
             today,
             surface=surface,
             cache_output_type=output_type,
+            data_through=self.data_through,
         )
         return fingerprint, text
 

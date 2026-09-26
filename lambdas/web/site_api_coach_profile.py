@@ -377,6 +377,10 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
                     "date": it.get("sk", "").replace("OUTPUT#", "").split("#")[0],
                     "summary": coach_derived_prose.served_summary(it),
                     "themes": it.get("themes", []),
+                    # #4185: every coach read carries when it was written AND the last data
+                    # day it was written from (null on records that predate the stamp).
+                    "generated_at": it.get("created_at"),
+                    "data_through": it.get("data_through"),
                 }
             )
     except Exception:

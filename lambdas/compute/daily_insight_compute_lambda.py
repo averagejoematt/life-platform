@@ -51,7 +51,7 @@ from decimal import Decimal
 
 import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
-from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.pacific_time import pacific_clock_label, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 
@@ -499,7 +499,9 @@ def _fetch_execution_metrics(date_str, profile):
     if whoop:
         sleep_start = whoop.get("sleep_start", "")
         if sleep_start and "T" in sleep_start:
-            metrics["sleep_start_time"] = sleep_start.split("T")[1][:5]
+            # #4185: a labelled PT bedtime ("9:45 PM PT") — the old `split("T")[1][:5]` handed the
+            # intention evaluator the UTC clock ("04:45"), a 9:45 PM bedtime read as 4:45 AM.
+            metrics["sleep_start_time"] = pacific_clock_label(sleep_start) or sleep_start
         rec = safe_float(whoop, "recovery_score")
         if rec is not None:
             metrics["recovery_score"] = int(rec)

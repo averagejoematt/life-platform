@@ -16,14 +16,16 @@ from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
-from health import tdee as health_tdee  # ADR-152 / #2310: THE one TDEE definition
+from health import (
+    nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
+    tdee as health_tdee,  # ADR-152 / #2310: THE one TDEE definition
+)
 
 from web.site_api_common import (
     PT,
     _get_profile,
     _ok,
     _window_span,
-    logger,
     nutrition_delivery_public,
 )
 
@@ -458,9 +460,13 @@ def nutrition_overview(*, _g) -> dict:
     floor_hit_days = sum(1 for v in pro_vals if v >= protein_floor)
     floor_hit_pct = round(floor_hit_days / len(pro_vals) * 100) if pro_vals else None
 
-    # Latest day
+    # Latest day. #4185: days_logged / latest_date / today_pending / lag_days / stalled come
+    # from ONE derivation (health.nutrition_logging) that the coach inputs import too — the
+    # nutrition coach once narrated "six days without logs" over a record this endpoint
+    # served as 20/20 logged, because it had no logging record of its own to read.
     latest = items[-1] if items else {}
-    latest_date = latest.get("date") or latest.get("sk", "").replace("DATE#", "")
+    _log_rec = nutrition_logging.logging_record(items, today)
+    latest_date = _log_rec["latest_date"]
 
     # 7-day vs 30-day comparison.
     # #2221 fixed the eighth-day bug HERE, in this one filter, by making the lower bound
@@ -918,17 +924,9 @@ def nutrition_overview(*, _g) -> dict:
     # Jun 24" normalized a 16-day-dead log as routine upload lag. Emit the real lag +
     # a stalled flag graded against the macrofactor threshold in source_registry (the
     # one place staleness thresholds live) so the front-end can say "logging stopped".
-    _nut_lag_days = None
-    _nut_stalled = False
-    if latest_date:
-        try:
-            from ingestion.source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
-
-            _nut_lag_days = max(0, (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(latest_date, "%Y-%m-%d")).days)
-            _mf_stale_hours = stale_hours_overrides().get("macrofactor") or DEFAULT_STALE_HOURS
-            _nut_stalled = _nut_lag_days * 24 > _mf_stale_hours
-        except Exception as _lag_e:
-            logger.warning(f"[nutrition_overview] lag computation failed (non-fatal): {_lag_e}")
+    # #4185: the lag/stalled pair is `_log_rec` above — computed once, shared with the coaches.
+    _nut_lag_days = _log_rec["lag_days"]
+    _nut_stalled = _log_rec["stalled"]
 
     return _ok(
         {
@@ -944,7 +942,7 @@ def nutrition_overview(*, _g) -> dict:
                 "protein_floor_g": protein_floor,
                 "protein_floor_hit_pct": floor_hit_pct,
                 "protein_floor_hit_days": floor_hit_days,
-                "days_logged": len(items),
+                "days_logged": _log_rec["days_logged"],
                 "tdee": round(tdee) if tdee else None,
                 "tdee_source": tdee_source,
                 # #3931 box 4: the method behind the number, and the impossibility verdict.
@@ -964,7 +962,7 @@ def nutrition_overview(*, _g) -> dict:
                 # current day's intake simply hasn't been uploaded yet — expected, not a
                 # logging gap. Front-end labels "through <as_of>", never "not logged today".
                 "as_of": latest_date,
-                "today_pending": bool(latest_date and latest_date < today),
+                "today_pending": _log_rec["today_pending"],
                 "lag_days": _nut_lag_days,
                 "stalled": _nut_stalled,
                 # #2221: guarded on PRESENCE, like every average above. These two used to

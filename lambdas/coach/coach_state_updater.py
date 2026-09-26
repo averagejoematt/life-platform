@@ -551,8 +551,14 @@ def _gate_derived_prose(coach_id, date, output_text, extraction):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _write_output_record(coach_id, date, output_type, output_text, extraction):
-    """Write the OUTPUT# record with full content and extracted metadata."""
+def _write_output_record(coach_id, date, output_type, output_text, extraction, data_through=None):
+    """Write the OUTPUT# record with full content and extracted metadata.
+
+    #4185: `data_through` is the last data day (Pacific YYYY-MM-DD) the read was written
+    from, stamped beside `created_at` so the door can label a weekly or stale read as one
+    instead of serving it as current. Absent (None) on callers that do not know it — the
+    read sites then serve null, never a guess.
+    """
     word_count = len(output_text.split())
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -600,6 +606,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
         "word_count": word_count,
         "created_at": now_iso,
     }
+    if data_through:
+        item["data_through"] = str(data_through)[:10]
     # #2575: freeze what the cockpit served AT PUBLICATION (fail-soft no-op) — see coach/published_vitals.py.
     published_vitals.stamp_published_vitals(item, table, f"USER#{USER_ID}#SOURCE#")
     if extraction.get("derived_prose_held"):
@@ -1147,7 +1155,7 @@ def lambda_handler(event, context):
 
     # Write state updates
     # 1. OUTPUT# record
-    _write_output_record(coach_id, generation_date, output_type, output_text, extraction)
+    _write_output_record(coach_id, generation_date, output_type, output_text, extraction, data_through=event.get("data_through"))
 
     # 2. VOICE#state update
     _update_voice_state(coach_id, extraction)

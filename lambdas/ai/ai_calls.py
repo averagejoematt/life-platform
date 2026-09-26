@@ -1259,6 +1259,11 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
+# #4185: coach inputs read the served facts (logging record, PT sleep instants), and the gate
+# below folds the served-fact check into the judge's report (`_ci.gated`). A late import, like
+# the one after it, so the size-ratcheted top-of-module block stays one line per module.
+from coach import coach_input_facts as _ci  # noqa: E402
+
 # #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
 # helper module beside it", not a baseline raise). Re-exported under its original name so
 # every caller and the #390 tests that monkeypatch `ai_calls._retain_coach_brief_flag`
@@ -1293,7 +1298,7 @@ def _enforce_quality_gate(
     named and #812's retention wiring missed (see `_retain_coach_brief_flag`).
     """
     original_draft = output_text
-    report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+    report = _ci.gated(_invoke_quality_gate_sync, lambda_client, coach_id, output_text, generation_brief)
     fired = not report.get("passed", True)
     attempts = 0
     while not report.get("passed", True) and attempts < max_regenerations:
@@ -1308,7 +1313,7 @@ def _enforce_quality_gate(
             print(f"[COACH-QUALITY-GATE:{coach_id}] regeneration attempt {attempts} returned empty — keeping prior draft")
             break
         output_text = regenerated
-        report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+        report = _ci.gated(_invoke_quality_gate_sync, lambda_client, coach_id, output_text, generation_brief)
 
     if not report.get("passed", True):
         print(
@@ -1611,7 +1616,10 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         except Exception as _tbl_e:
             print(f"[COACH-V2:{coach_id}] generation cache table unavailable (non-blocking): {_tbl_e}")
             _tbl = None
-        _gate = _in_gate.BriefCacheGate(lambda_client, _tbl, _cw, _CW_NAMESPACE, coach_id, output_type)
+        # #4185: THE input boundary — every coach's sleep instants in PT, the nutrition coach's
+        # logging record from the served derivation. Before the change-gate hashes domain_data.
+        domain_data = _ci.coach_inputs(coach_id, domain_data, data, table=_tbl)
+        _gate = _in_gate.BriefCacheGate(lambda_client, _tbl, _cw, _CW_NAMESPACE, coach_id, output_type, data_through=_ci.data_through(data))
         _reuse = _gate.check_upstream(
             domain_label, comp_results, domain_data, _data_inventory, corrections_block, voice_spec, pacific_today()
         )
@@ -1650,7 +1658,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         voice_rules = voice_spec.get("structural_voice_rules", {})
         decision_style = voice_spec.get("decision_style", {})
         anti_patterns = voice_spec.get("anti_pattern_detection", {})
-        brief = generation_brief.get("generation_brief", generation_brief)
+        brief = _ci.localize_sleep_instants(generation_brief.get("generation_brief", generation_brief))  # #4185: PT, never UTC
         voice_guidance = brief.get("voice_guidance", {})
 
         # #549: journal mood/connection signal — only present in the brief for the
@@ -2185,6 +2193,7 @@ Write your {domain_label} coaching section now."""
                         # SAME `common.pacific_time.pacific_today()` now, so the sk this
                         # writes and the sk that read matches against never desync.
                         "generation_date": pacific_today(),
+                        "data_through": _ci.data_through(data),  # #4185: the last data day this read was written from
                     }
                 ).encode(),
             )

@@ -123,6 +123,9 @@ def report_findings(report: dict) -> list:
     for v in report.get("cycle_boundary_violations") or []:  # #1973
         if isinstance(v, dict):
             findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
+    for v in report.get("served_fact_violations") or []:  # #4185 — coach_input_facts.served_fact_gate
+        if isinstance(v, dict):
+            findings.append({"type": "served_fact", "detail": v.get("detail", "")})
     _raw_gr = report.get("number_grounding")
     _gr: dict = _raw_gr if isinstance(_raw_gr, dict) else {}
     findings += [{"type": f.get("type"), "detail": f.get("detail", "")} for f in (_gr.get("findings") or []) if isinstance(f, dict)]
