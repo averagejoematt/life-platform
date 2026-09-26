@@ -155,7 +155,7 @@ Assumptions: one driver session (merges, deploys, the census, the red team), up 
 
 **What is owner-gated, in one list:** the prototype pick (Sun) · the photo (E10, #3761 — without it Home and Who-he-is ship the honest frame) · the privacy ruling on publishing session loads (E3) · the privacy tier for the morning note (E2, before its first write) · two ci-cd production approvals · the Friday "go".
 
-**Lane discipline (from the memory index, the ones that bite this week):** invoke `deploy/agent_commit.sh` unpiped and read its output; never `git checkout -- site/` in a loop with uncommitted edits; a `Fixes #N` closes the issue on merge — use `Refs` on every preview PR; no tool-attribution trailers; paste private texts into briefs, never make a lane read `config/` from S3 (the 6–8 h prompt stalls of Session AR).
+**Lane discipline (from the memory index, the ones that bite this week):** invoke `deploy/agent_commit.sh` unpiped and read its output; never `git checkout -- site/` in a loop with uncommitted edits; a `Fixes #N` closes the issue on merge — use `Refs` on every preview PR; commits and PRs carry the work, not the tooling (CLAUDE.md, Authorship); paste private texts into briefs, never make a lane read `config/` from S3 (the 6–8 h prompt stalls of Session AR).
 
 ---
 
