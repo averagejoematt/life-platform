@@ -26,8 +26,8 @@ The `<!-- home-proof:start/end -->` pair is the cut-over anchor for
 
 from __future__ import annotations
 
-HEAD = '  <link rel="stylesheet" href="/assets/css/v7_home.css">\n'
-SCRIPTS = '  <script type="module" src="/assets/js/v7_home.js"></script>\n'
+CSS = "/assets/css/v7_home.css"
+JS = "/assets/js/v7_home.js"
 
 _PENDING = '<p class="v7h-pending">Loading the numbers — this line fills from the site’s served data.</p>'
 
