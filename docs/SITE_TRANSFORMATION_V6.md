@@ -1,6 +1,7 @@
 # Site Transformation v6 — a site worth opening
 
-> **Status:** live plan · **Owner:** Matthew · **Written:** 2026-09-26 (Session AV, overnight, Fable 5.1) · **Epic:** #4182
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-26
+> Written 2026-09-26 by Session AV (overnight, Fable 5.1) · **Epic:** #4182
 > Companions: [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) (the why — unchanged), [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) (per-page intent — amended by §5), [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) (the kit — unchanged), [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) (how to change it — unchanged).
 
 ## 0. What this is
