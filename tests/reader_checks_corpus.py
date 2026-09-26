@@ -83,6 +83,6 @@ def assert_class_contract(check, monkeypatch):
     for fx in controls_clear_of(check):
         hits = [f for f in fired(fx) if f["check"] == check]
         assert hits == [], f"{fx['_file']}: {check} over-fires on a fixture that must pass it: {hits}"
-    monkeypatch.setitem(reader_checks._CHECKS, check, lambda *a, **k: [])
+    monkeypatch.setitem(reader_checks._CHECKS, check, (lambda *a, **k: [], reader_checks._CHECKS[check][1]))
     for fx in specs:
         assert not caught(fx, check), f"mutation control is vacuous: with {check} dropped, {fx['_file']} still fails it"

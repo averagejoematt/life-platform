@@ -97,5 +97,5 @@ def test_corpus_is_sealed():
 
 def test_every_positive_control_is_clean_on_every_narrative_class():
     for fx in (f for f in corpus.FIXTURES if f["kind"] == "control"):
-        hits = [f for f in corpus.fired(fx, reader_checks.NARRATIVE_CHECKS + ("audience_violation", "ask_cardinality"))]
+        hits = [f for f in corpus.fired(fx, reader_checks.NARRATIVE_CHECK_NAMES + ("audience_violation", "ask_cardinality"))]
         assert hits == [], f"{fx['_file']}: {hits}"

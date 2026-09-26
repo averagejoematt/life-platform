@@ -39,26 +39,15 @@ and says so in ``armed_checks`` — never a silent pass dressed as a verdict.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timezone
 from typing import Any, Callable, Optional
 
 from ai import grounded_generation as _gg
 from ai.quality_gate_contract import GROUNDING_ALLOWLIST_KEY
+from common.pacific_time import PACIFIC, parse_day_key, parse_iso_utc
 
 from coach.audience_guard import is_owner_directed
 
-CHECK_NAMES = (
-    "audience_violation",
-    "absence_premise",
-    "unit_number_not_served",
-    "unlabeled_window_figure",
-    "raw_instant",
-    "banned_term",
-    "first_sentence",
-    "ask_cardinality",
-)
-NARRATIVE_CHECKS = ("absence_premise", "unit_number_not_served", "unlabeled_window_figure", "raw_instant", "banned_term")
-SLOT_CHECKS = ("audience_violation", "first_sentence", "ask_cardinality")
 READER_SLOTS = frozenset({"public_summary", "public_ask", "headline_read", "daily"})
 
 # The report key the findings land under, and the brief keys the checks read.
@@ -143,10 +132,7 @@ def _gap_fact(sentence: str, facts: dict) -> Optional[int]:
 
 def _last_log_date(facts: dict) -> Optional[date]:
     raw = facts.get("last_food_log_date") or facts.get("latest_date")
-    try:
-        return date.fromisoformat(str(raw)[:10]) if raw else None
-    except ValueError:
-        return None
+    return parse_day_key(str(raw)[:10]) if raw else None
 
 
 def absence_premise(text: str, facts: Optional[dict] = None, **_: Any) -> list:
@@ -282,15 +268,6 @@ _UTC_MATCH_MIN = 20
 _PT_CLEAR_MIN = 60
 
 
-def _pt_offset_hours(d: date) -> int:
-    """US Pacific UTC offset for a date (DST: 2nd Sun Mar → 1st Sun Nov) — stdlib only."""
-    mar = date(d.year, 3, 8)
-    dst_start = mar + timedelta(days=(6 - mar.weekday()) % 7)
-    nov = date(d.year, 11, 1)
-    dst_end = nov + timedelta(days=(6 - nov.weekday()) % 7)
-    return -7 if dst_start <= d < dst_end else -8
-
-
 def _minute_gap(a: int, b: int) -> int:
     d = abs(a - b) % 1440
     return min(d, 1440 - d)
@@ -300,12 +277,11 @@ def _instant_minutes(instants: Any) -> list:
     """[(utc_minute_of_day, pt_minute_of_day)] for each parseable ISO-Z instant."""
     out = []
     for raw in instants or []:
-        try:
-            dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00")).astimezone(timezone.utc)
-        except ValueError:
+        dt = parse_iso_utc(raw)
+        if dt is None:
             continue
-        utc_m = dt.hour * 60 + dt.minute
-        out.append((utc_m, (utc_m + 60 * _pt_offset_hours(dt.date())) % 1440))
+        utc, pt = dt.astimezone(timezone.utc), dt.astimezone(PACIFIC)
+        out.append((utc.hour * 60 + utc.minute, pt.hour * 60 + pt.minute))
     return out
 
 
@@ -475,16 +451,23 @@ def ask_cardinality(text: str, **_: Any) -> list:
     ]
 
 
-_CHECKS: dict[str, Callable[..., list]] = {
-    "audience_violation": audience_violation,
-    "absence_premise": absence_premise,
-    "unit_number_not_served": unit_number_not_served,
-    "unlabeled_window_figure": unlabeled_window_figure,
-    "raw_instant": raw_instant,
-    "banned_term": banned_term,
-    "first_sentence": first_sentence,
-    "ask_cardinality": ask_cardinality,
+# THE registry — one entry per check class: (function, where it runs). "narrative" runs on
+# every text the quality gate judges; "slot" runs only when the brief names a reader slot
+# (and ask_cardinality only on public_ask). Every selection below is DERIVED from this
+# dict, so a class can never be registered in one place and forgotten in another.
+_CHECKS: dict[str, tuple[Callable[..., list], str]] = {
+    "audience_violation": (audience_violation, "slot"),
+    "absence_premise": (absence_premise, "narrative"),
+    "unit_number_not_served": (unit_number_not_served, "narrative"),
+    "unlabeled_window_figure": (unlabeled_window_figure, "narrative"),
+    "raw_instant": (raw_instant, "narrative"),
+    "banned_term": (banned_term, "narrative"),
+    "first_sentence": (first_sentence, "slot"),
+    "ask_cardinality": (ask_cardinality, "slot"),
 }
+CHECK_NAMES = tuple(_CHECKS)
+NARRATIVE_CHECK_NAMES = tuple(n for n, (_, where) in _CHECKS.items() if where == "narrative")
+SLOT_CHECK_NAMES = tuple(n for n, (_, where) in _CHECKS.items() if where == "slot")
 
 
 def reader_findings(
@@ -500,12 +483,13 @@ def reader_findings(
     ``checks`` restricts the run to a subset (the tests' mutation controls use it); by
     default the narrative classes always run and the slot classes run for a reader slot.
     """
-    names = checks if checks is not None else NARRATIVE_CHECKS + (SLOT_CHECKS if slot in READER_SLOTS else ())
+    names = checks if checks is not None else NARRATIVE_CHECK_NAMES + (SLOT_CHECK_NAMES if slot in READER_SLOTS else ())
     if slot != "public_ask" and checks is None:
         names = tuple(n for n in names if n != "ask_cardinality")
     out: list = []
     for name in names:
-        out.extend(_CHECKS[name](text, facts=facts or {}, allowed=allowed))
+        fn, _where = _CHECKS[name]
+        out.extend(fn(text, facts=facts or {}, allowed=allowed))
     return out
 
 

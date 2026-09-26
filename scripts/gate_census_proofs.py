@@ -2547,3 +2547,43 @@ REGISTRY_PROOFS.update(
         }
     }
 )
+
+
+# ── #4185: the reader CHECK classes merged into the coach quality gate ──────────────────────
+#
+# `lambdas/coach/reader_checks._CHECKS` is the ONE registry of the eight deterministic reader
+# classes (the narrative/slot selections are derived from it). Each entry is a gate: deleting it
+# silently drops that class from `_invoke_quality_gate_sync`'s regenerate-or-hold path. Each was
+# watched failing with its entry deleted from the REAL tracked file, against that class's own
+# fixture-driven test file (whose contract asserts the live specimen fails the class).
+_READER_CHECK_OBSERVED = {
+    # class: (MUTATED pytest summary, REVERTED pytest summary)
+    "audience_violation": ("2 failed, 1 passed", "3 passed"),
+    "absence_premise": ("1 failed, 4 passed", "5 passed"),
+    "unit_number_not_served": ("1 failed, 4 passed", "5 passed"),
+    "unlabeled_window_figure": ("1 failed, 3 passed", "4 passed"),
+    "raw_instant": ("1 failed, 4 passed", "5 passed"),
+    "banned_term": ("1 failed, 3 passed", "4 passed"),
+    "first_sentence": ("1 failed, 2 passed", "3 passed"),
+    "ask_cardinality": ("2 failed, 1 passed", "3 passed"),
+}
+REGISTRY_PROOFS.update(
+    {
+        f"registry::lambdas/coach/reader_checks.py::_CHECKS::{name}": {
+            "gate_name": f"_CHECKS[{name}]",
+            "command": f"python3 -m pytest tests/test_reader_check_{name}_4185.py -q -p no:cacheprovider",
+            "mutation": (
+                f'The `"{name}": (...)` entry deleted from `_CHECKS` in the REAL tracked file '
+                "(lambdas/coach/reader_checks.py), restored byte-identical (cmp) from a pre-mutation copy afterwards."
+            ),
+            "observed": f"MUTATED: {mutated} — the live-specimen contract test failed. REVERTED: {reverted}. Watched 2026-09-26.",
+            "scope": (
+                "Proves the entry is load-bearing against the frozen live specimens in tests/grounding_corpus/reader_checks/. "
+                "It does not prove recall beyond those specimens, and absence_premise has no live input until the brief "
+                "carries `served_facts` (the #4185 input-side work)."
+            ),
+            "proved_on": "2026-09-26",
+        }
+        for name, (mutated, reverted) in _READER_CHECK_OBSERVED.items()
+    }
+)
