@@ -3641,6 +3641,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4155"
         }
       ]
+    },
+    {
+      "id": "2026-09-25-the-machines-he-actually-uses",
+      "date": "2026-09-25",
+      "title": "The machines he actually uses",
+      "shipped": "The program had been drafting a lying leg curl and a standing calf raise. He trains on a seated leg curl (four sessions since 09-09) and a calf press (six sessions, 270 to 320 lb). The catalog now points at his own machines, a stale lookup cache was cleared, and the next red-team pass loaded the seated curl from Thursday's 90 lb and started tracking the calf press as an accessory trend. The same night, a routine note that said 'RPE 7 max' for the squat stopped capping every other lift, and the rule for what counts as a training week (four sessions and at least seven days) went live, so week 2 opens no earlier than October 1.",
+      "why_it_mattered": "A plan that names a machine he never uses has no load to anchor to, and its strength trend stays empty, so the one number meant to catch a slide in accessory strength could never fire. Fixing the name fixed both. He also asked the question the engine had skipped: why would a protein miss change the loss rate at all? A short evidence read (Forbes and Hall on body fat and lean loss, Sardeli on resistance training) moved the protein gate to report-only at his current body fat; the tiers that tighten it as he gets leaner are filed, not built.",
+      "gotcha": "Two of the night's fixes were each green alone and red together. One changed the catalog; the other had a test fixture that copied the old catalog ids by hand. Main went red minutes after the second merge. The fixture now reads the catalog instead of copying it.",
+      "honest_miss": "Asking the adherence tool to re-grade Thursday's session graded Friday's workout instead, because it matches a routine by its planned date and he did it a day early. The per-lift ceilings are right; the re-graded count of sets over the ceiling is not yet in hand. It is filed.",
+      "prs": [
+        {
+          "label": "PR #4176",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4176"
+        },
+        {
+          "label": "PR #4173",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4173"
+        },
+        {
+          "label": "PR #4162",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4162"
+        },
+        {
+          "label": "PR #4175",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4175"
+        }
+      ]
     }
   ]
 }
