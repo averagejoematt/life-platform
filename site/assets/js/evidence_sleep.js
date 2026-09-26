@@ -6,7 +6,8 @@ import { lineChart, stackedBar, correlationChip, dualLineChart, sparkline, targe
 import { explainMount } from "/assets/js/explain.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, todayPT, fig, figs, sec, empty, note, socialContextSection } from "/assets/js/evidence_shared.js";
 import { genesisCount } from "/assets/js/coach_popover.js"; // #2941 — THE PT day-index, so #2957's window copy states a checked cause
-import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter
+import { dayInWords } from "/assets/js/entry_age.js"; // #4182 D5 — the ONE prose date formatter fold sentences use
+import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the compact date LABEL, for headers/captions only
 
 // #4182 — the sleep fold: the night named, BOTH instruments' hours side by side (Whoop and
 // the Eight Sleep mattress measure the same night differently — #2921/#3451 show both,
@@ -20,12 +21,12 @@ export function sleepFold(d) {
   const wh = (s.whoop || {}).total_sleep_hours ?? s.whoop_hours;
   const es = (s.eightsleep || {}).total_sleep_hours ?? ((s.figure_scope || {}).total_sleep_hours_source === "eightsleep" ? s.total_sleep_hours : null);
   const bits = [];
-  if (wh != null && es != null) bits.push(`Night of ${calendarDay(night)}: ${h(wh)} h by Whoop, ${h(es)} h by the Eight Sleep mattress — two instruments, both shown.`);
-  else if (wh != null || es != null) bits.push(`Night of ${calendarDay(night)}: ${h(wh ?? es)} h by ${wh != null ? "Whoop" : "the Eight Sleep mattress"}.`);
-  else bits.push(`Night of ${calendarDay(night)}.`);
+  if (wh != null && es != null) bits.push(`Night of ${dayInWords(night)}: ${h(wh)} h by Whoop, ${h(es)} h by the Eight Sleep mattress — two instruments, both shown.`);
+  else if (wh != null || es != null) bits.push(`Night of ${dayInWords(night)}: ${h(wh ?? es)} h by ${wh != null ? "Whoop" : "the Eight Sleep mattress"}.`);
+  else bits.push(`Night of ${dayInWords(night)}.`);
   if (s.recovery_score != null) {
     const avg = s.avg_recovery_window != null && s.avg_window_days != null ? ` against his ${s.avg_window_days}-day average of ${fmt(s.avg_recovery_window)}%` : "";
-    const other = s.recovery_night_of ? ` (from the night of ${calendarDay(String(s.recovery_night_of).slice(0, 10))}, the latest Whoop reading)` : "";
+    const other = s.recovery_night_of ? ` (from the night of ${dayInWords(String(s.recovery_night_of).slice(0, 10))}, the latest Whoop reading)` : "";
     bits.push(`Recovery ${fmt(s.recovery_score)}%${avg}${other}.`);
   }
   if (s.hrv != null) bits.push(`HRV (heart-rate variability) ${fmt(s.hrv)} ms — higher usually means better recovered.`);

@@ -5,7 +5,7 @@
 import { lineChart, barChart, stackedBar, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, ring } from "/assets/js/charts.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
 import { genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
-import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the ONE served-date-in-words formatter
+import { dayInWords } from "/assets/js/entry_age.js"; // #4182 D5 — the ONE prose date formatter fold sentences use
 
 // #4182 — the refusal, stated whole. When the engine declines to publish a deficit
 // (`deficit_published: false` — its model's estimate exceeds what it will vouch for),
@@ -26,7 +26,7 @@ export function nutritionFold(d, mg) {
   const last = String(n.latest_date || n.as_of || "").slice(0, 10);
   const span = /^\d{4}-\d{2}-\d{2}$/.test(first) && /^\d{4}-\d{2}-\d{2}$/.test(last) ? Math.round((Date.parse(last) - Date.parse(first)) / 86400000) + 1 : null;
   const bits = [span ? `Logged ${n.days_logged} of ${span} days.` : `Logged ${n.days_logged} days.`];
-  if (last && n.latest_calories != null) bits.push(`${calendarDay(last)}: ${_int(n.latest_calories)} calories${n.latest_protein_g != null ? `, ${_int(n.latest_protein_g)} g protein` : ""}.`);
+  if (last && n.latest_calories != null) bits.push(`${dayInWords(last)}: ${_int(n.latest_calories)} calories${n.latest_protein_g != null ? `, ${_int(n.latest_protein_g)} g protein` : ""}.`);
   if (n.avg_calories != null) {
     const floor = n.protein_floor_g != null && n.protein_floor_hit_days != null ? `; the ${_int(n.protein_floor_g)} g protein floor cleared ${_kOfN(n.protein_floor_hit_days, n.days_logged)} days` : "";
     bits.push(`Average ${_int(n.avg_calories)} calories${n.avg_protein_g != null ? ` and ${_int(n.avg_protein_g)} g protein` : ""} a day${floor}.`);
