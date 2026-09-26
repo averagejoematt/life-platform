@@ -1,0 +1,167 @@
+/* v7_who.css — the v7 "Who he is" page (#4182): Prototype C's logbook entries — a dated
+   margin column with one red spine, his paragraph set in the serif, labels in the sans,
+   figures in the mono. Tokens from tokens.css ONLY (no raw hex, no font-size literal,
+   breakpoints from DESIGN_SYSTEM_V5 §10.1). Faces: the self-hosted Fraunces stands in for
+   C's Newsreader, Instrument Sans for its IBM Plex Sans; IBM Plex Mono is C's own. The
+   spine is --ember-line — the one live accent — because it is the frame's margin, not a
+   claim. The photo frame is honest until #3761 lands: a dashed empty frame, never a
+   silhouette or a stock image. */
+
+.v7 {
+  --who-margin-w: 50px;
+}
+
+/* ── one entry: the margin and the body ── */
+.who-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--who-margin-w) 1fr;
+  gap: 0 var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-5);
+  border-bottom: 1px solid var(--rule);
+}
+.who-entry::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0;
+  left: calc(var(--who-margin-w) - var(--sp-2));
+  width: 1px;
+  background: var(--ember-line);
+}
+
+.who-m {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--lh-snug);
+  color: var(--ink-muted);
+  padding-top: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+}
+.who-m .d {
+  display: block;
+  font-size: var(--fs-h3);
+  font-weight: var(--weight-med);
+  color: var(--ink);
+  line-height: var(--lh-tight);
+  margin-bottom: var(--sp-1);
+}
+.who-m .mo { display: block; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.who-m .w { display: none; }
+
+.who-body { min-width: 0; }
+.who-body p { max-width: none; }
+
+.who-h {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 var(--sp-3);
+}
+
+/* ── the fold: the honest photo frame beside his paragraph ── */
+.who-fold-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-4);
+  align-items: start;
+}
+.who-photo {
+  width: 116px;
+  aspect-ratio: 3 / 4;
+  border: 1px dashed var(--rule-strong);
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: var(--sp-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: var(--lh-snug);
+  color: var(--ink-muted);
+}
+.who-photo b { color: var(--ink); font-weight: var(--weight-med); display: block; margin-bottom: var(--sp-1); }
+.who-first {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-2);
+}
+.who-sig {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+/* ── the receipts strip: one mono line, every figure served ── */
+.who-receipts {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--lh-relaxed);
+  color: var(--ink-muted);
+  margin: var(--sp-4) 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.who-receipts b { color: var(--ink); font-weight: var(--weight-med); }
+.who-receipts a { color: var(--ember); }
+
+/* ── the weigh-in line, drawn to the day ── */
+.who-strip svg { width: 100%; height: auto; max-height: 96px; display: block; }
+.who-strip .who-ln { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.who-strip .who-pt { fill: var(--ink); }
+.who-strip .who-last { fill: var(--ember); }
+.who-strip .who-ax { stroke: var(--rule); }
+.who-strip-lab {
+  display: flex; justify-content: space-between; gap: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--ink-muted);
+  margin: var(--sp-1) 0 var(--sp-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.who-small {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-2);
+}
+.who-small b { color: var(--ink); font-weight: var(--weight-med); }
+.who-how {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-3);
+}
+.who-note {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-faint);
+  margin: 0 0 var(--sp-2);
+}
+.who-pending { color: var(--ink-faint); }
+.who-body a { color: var(--ember); }
+.who-mail {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+/* ── the dated return line ── */
+.who-return {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+  margin: var(--sp-5) 0 0;
+}
+.who-return:empty { display: none; }
+
+@media (min-width: 601px) {
+  .v7 { --who-margin-w: 96px; }
+  .who-m .w { display: block; }
+  .who-fold-grid { grid-template-columns: 116px 1fr; }
+}
