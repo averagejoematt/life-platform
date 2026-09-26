@@ -238,3 +238,26 @@ def test_v7_committed_preview_shells_match_a_fresh_build():
         text=True,
     )
     assert proc.returncode == 0, f"v7 shells drifted — run scripts/v7_build.py --base /next/ and commit:\n{proc.stdout}\n{proc.stderr}"
+
+
+def test_v7_numbers_shell_is_the_logbook_and_carries_no_number_or_ruled_word():
+    """#4182 — the v7 His numbers page (scripts/v7/numbers.py) is Prototype C's screen IV: the
+    six dated entries in the design order (weight · sleep · eating · training · blood tests ·
+    the absence strip), the engine's score folded under a <details>, the page's own sheet and
+    module — and NO number in the static HTML (every figure is poured from a served field at
+    runtime, so the shell can never go stale) and none of the owner-ruled words."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    import site_text  # noqa: E402
+
+    html = (SITE / "next" / "data" / "index.html").read_text(encoding="utf-8")
+    slots = ["nm-weight", "nm-sleep", "nm-eating", "nm-training", "nm-labs", "nm-absent", "nm-engine"]
+    for slot in slots:
+        assert f'id="{slot}"' in html, f"His numbers shell missing the {slot} entry"
+    order = [html.index(f'id="{s}"') for s in slots]
+    assert order == sorted(order), "the entries are out of the design order"
+    assert 'href="/assets/css/v7_numbers.css"' in html and 'src="/assets/js/v7_numbers.js"' in html
+    assert '<details class="nm-engine"' in html
+    text = site_text.main_text("site/next/data/index.html")
+    assert not re.search(r"\d", text), f"a number in the static His numbers shell: {text[:200]!r}"
+    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|as of|went dark)\b", text, re.I)
+    assert (SITE / "assets" / "css" / "v7_numbers.css").exists() and (SITE / "assets" / "js" / "v7_numbers.js").exists()
