@@ -11,3 +11,4 @@ The research and artefacts behind [../../SITE_TRANSFORMATION_V7.md](../../SITE_T
 - `R4_PROTOTYPE_REDTEAM.md` — the same five personas' verdict on both prototypes and the pick.
 - `prototype_c_the_logbook_investigation.html` — the pick, built: B's frame with A's type and voice and the red team's five fixes.
 - `R5_PROTOTYPE_C_SCORE.md` — the personas' re-score of C (36 of 50) and the three fixes left for the build week.
+- `R6_BUILT_PAGES_REDTEAM.md` — the personas' scores of the first three built pages on `/next/` (Home 36 · This week 34 · The coaches 28) and the fixes before the coaches page ships.
