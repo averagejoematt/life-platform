@@ -20,7 +20,17 @@ if (typeof globalThis.window === "undefined") {
 const M = await import("../../site/assets/js/v7_numbers.js");
 // The reader-visible text of an HTML fragment — the data-src attributes name served fields
 // (days_dark, composite_pillar_count) and are not prose, so the vocabulary asserts read this.
-const visible = (html) => String(html).replace(/<[^>]+>/g, "");
+// A character walk, not a tag-stripping regex: this is a test-side text extractor over the
+// module's own output, never a sanitizer (CodeQL's incomplete-multi-character-sanitization).
+const visible = (html) => {
+  let out = "", inTag = false;
+  for (const ch of String(html)) {
+    if (ch === "<") inTag = true;
+    else if (ch === ">") inTag = false;
+    else if (!inTag) out += ch;
+  }
+  return out;
+};
 
 const JOURNEY = {
   start_weight_lbs: 327.3, goal_weight_lbs: 185.0, current_weight_lbs: 313.8, lost_lbs: 13.5, remaining_lbs: 128.8,
