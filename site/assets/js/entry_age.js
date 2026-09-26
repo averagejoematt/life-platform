@@ -117,3 +117,22 @@ export function nextWriteUpText(cad, pending) {
   }
   return String(c.display || "").replace(/\s*[—–-]\s*publishes once Matthew reviews and approves the draft\.?\s*$/i, ".").replace(/\.\.$/, ".");
 }
+
+// #4219 — how many Pacific calendar days an open coach ask is past its `due` date. The
+// cockpit served an ask due September 19 as "the one ask" on September 26 with nothing
+// saying it was late. A served `days_overdue` (the issue's server-side box) wins when it
+// is a number; otherwise it is ptDaysAgo(due) on the #2506 PT clock. 0 when due today or
+// later; null when `due` is unusable (a lateness we cannot substantiate is never printed).
+export function daysOverdue(action, now = new Date()) {
+  if (!action) return null;
+  const served = action.days_overdue;
+  if (typeof served === "number" && Number.isFinite(served)) return Math.max(0, Math.round(served));
+  const d = ptDaysAgo(action.due, now);
+  return d === null ? null : Math.max(0, d);
+}
+
+// "7 days late" / "1 day late" — "" when not late.
+export function lateWords(days) {
+  const n = Number(days);
+  return Number.isFinite(n) && n > 0 ? `${n} day${n === 1 ? "" : "s"} late` : "";
+}

@@ -39,7 +39,8 @@ import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 �
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
-import { rosterEntries } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping
+import { daysOverdue, lateWords } from "/assets/js/entry_age.js"; // #4219 — an overdue ask says it is late
+import { rosterEntries, scorecardSeats, retiredSeatNote } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping; #4215 retired seats apart
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
 
@@ -148,18 +149,19 @@ function entriesFor(s, data) {
     // #1376: a coach with zero calls THIS season never appeared in `predictions`
     // — fall back to the roster names so a fresh-slate coach still gets a title.
     for (const bareId of Object.keys(byc)) if (!names[bareId] && BOARD_PERSONAS[`${bareId}_coach`]) names[bareId] = BOARD_PERSONAS[`${bareId}_coach`].name;
-    Object.keys(byc)
-      .filter((cid) => byc[cid].total || (byc[cid].lifetime && byc[cid].lifetime.total))
-      .sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0) || ((byc[b].lifetime && byc[b].lifetime.decided) || 0) - ((byc[a].lifetime && byc[a].lifetime.decided) || 0))
-      .forEach((cid) => {
-        const c = byc[cid];
-        const cl = c.lifetime || {};
-        // #1376: fresh slate this season never disappears — it reads the career rate instead.
-        const rate = c.total
-          ? (c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : `${c.decided || 0} decided`)
-          : `fresh slate · career ${cl.decided || 0} decided`;
-        out.push({ id: cid, title: names[cid] || cid, date: rate });
-      });
+    const seats = scorecardSeats(data);
+    seats.live.forEach((cid) => {
+      const c = byc[cid];
+      const cl = c.lifetime || {};
+      // #1376: fresh slate this season never disappears — it reads the career rate instead.
+      const rate = c.total
+        ? (c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : `${c.decided || 0} decided`)
+        : `fresh slate · career ${cl.decided || 0} decided`;
+      out.push({ id: cid, title: names[cid] || cid, date: rate });
+    });
+    // #4215: a retired seat's sealed calls stay on the record — after the live cast,
+    // with the label in the title so no reader counts it as a current coach.
+    seats.retired.forEach((cid) => out.push({ id: cid, title: `${names[cid] || cid} · retired seat`, date: retiredSeatNote(cid, data).replace(/^retired seat · /, "") }));
     return out;
   }
   return [];
@@ -555,7 +557,7 @@ async function renderToday(mount) {
     const ask = pickAsk(d.open_actions, chosen.coach_id);
     if (ask) {
       h += `<p class="ct-ask"><span class="label">the ask</span> <span data-verbatim>${esc(ask.text)}</span>` +
-        `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}</span></p>`;
+        `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}${lateWords(daysOverdue(ask, now)) ? ` · ${esc(lateWords(daysOverdue(ask, now)))}` : ""}</span></p>`;
     }
     const rec = recordLine(preds && preds.overall);
     if (rec) h += `<p class="ct-record label">The board's record this cycle: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>`;
@@ -1445,9 +1447,9 @@ async function renderScorecard(read, id) {
     h += commitmentLedgerHTML(data.commitments);
     // Per-coach rows — include a coach with ONLY a career record (fresh slate
     // this season) so its track record never disappears from the list (#1376).
-    const rows = Object.keys(byc)
-      .filter((c) => byc[c].total || (byc[c].lifetime && byc[c].lifetime.total))
-      .sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0) || ((byc[b].lifetime && byc[b].lifetime.decided) || 0) - ((byc[a].lifetime && byc[a].lifetime.decided) || 0));
+    // #4215: the live cast and any retired seat are two groups, never interleaved.
+    const seats = scorecardSeats(data);
+    const rows = seats.live;
     if (rows.length) {
       h += `<p class="dx-kicker label sc-sub">by coach</p><ul class="sc-coachlist">`;
       for (const cid of rows) {
@@ -1461,6 +1463,17 @@ async function renderScorecard(read, id) {
           `<span class="sc-coach">${esc(names[cid] || cid)}</span>` +
           `<span class="sc-rate label">${esc(rate)}</span>` +
           `<span class="sc-mix label">${esc(mix)}</span></button></li>`;
+      }
+      h += `</ul>`;
+    }
+    if (seats.retired.length) {
+      h += `<p class="dx-kicker label sc-sub">retired seat${seats.retired.length === 1 ? "" : "s"} · no longer on the team</p><ul class="sc-coachlist sc-retired">`;
+      for (const cid of seats.retired) {
+        const c = byc[cid];
+        h += `<li class="sc-row"><button type="button" class="sc-coachbtn" data-coach="${esc(cid)}">` +
+          `<span class="sc-coach">${esc(names[cid] || cid)}</span>` +
+          `<span class="sc-rate label">retired seat</span>` +
+          `<span class="sc-mix label">${esc(retiredSeatNote(cid, data).replace(/^retired seat · /, ""))} · ${c.confirmed || 0}✓ · ${c.refuted || 0}✗ · ${c.pending || 0} open</span></button></li>`;
       }
       h += `</ul>`;
     }
@@ -1501,6 +1514,8 @@ async function renderScorecard(read, id) {
   const mine = preds.filter((p) => p.coach_id === id);
   const decidedC = c.decided || 0;
   let h = `<p class="dx-kicker label">scorecard · one coach</p><h2 class="dx-title">${esc(name)}</h2>`;
+  // #4215: a retired seat says so under its name, with the reason it still has calls.
+  if (scorecardSeats(data).retired.includes(String(id))) h += `<p class="dx-prose sc-note label">${esc(retiredSeatNote(String(id), data))} — this seat is no longer on the team.</p>`;
   h += `<p class="dx-kicker label sc-sub">this season</p>`;
   h += `<div class="sc-tiles">` +
     `<div class="sc-tile"><span class="sc-n">${decidedC ? `${c.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${decidedC ? ` · ${decidedC} decided` : ""}</span></div>` +

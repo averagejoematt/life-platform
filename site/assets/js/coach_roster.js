@@ -38,3 +38,55 @@ export function rosterEntries(coaches, opts) {
     tier: c.tier,
   }));
 }
+
+/*
+  #4215 — the scorecard's retired seats. The training seat retired at the cycle-13
+  genesis (ADR-153), but the cycle-17 pre-registration sealed two calls in its name
+  about 18 hours before #3520's cast guard went live. Sealed calls cannot be edited
+  (#1378) and hiding them would break ADR-104, so the scorecard keeps them — labelled,
+  in their own group, never interleaved with the live cast. Before this, both
+  scorecard lists in coaching.js built every by_coach key into one list and a stranger
+  met "Dr. Sarah Chen" as a ninth current coach.
+
+  The page never decides who is retired: the flag is the persona registry's, served on
+  each /api/predictions row (and on by_coach once the server carries it, #4215's server
+  box). evidence_intelligence.js's `_retiredTag` reads the same flag from /api/calibration.
+*/
+
+/** The set of bare coach ids the served payload marks retired. */
+export function retiredSeats(data) {
+  const out = new Set();
+  const byc = (data && data.by_coach) || {};
+  for (const cid of Object.keys(byc)) if (byc[cid] && byc[cid].retired === true) out.add(cid);
+  for (const p of (data && data.predictions) || []) if (p && p.retired === true && p.coach_id) out.add(String(p.coach_id));
+  return out;
+}
+
+/**
+ * The scorecard's coach rows, split: `live` (the current cast, sorted by decided calls
+ * this season then career) and `retired` (same order, rendered apart and labelled).
+ * A coach with neither a season nor a career record is omitted, as before (#1376).
+ */
+export function scorecardSeats(data) {
+  const byc = (data && data.by_coach) || {};
+  const retired = retiredSeats(data);
+  const ids = Object.keys(byc)
+    .filter((c) => byc[c] && (byc[c].total || (byc[c].lifetime && byc[c].lifetime.total)))
+    .sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0) || ((byc[b].lifetime && byc[b].lifetime.decided) || 0) - ((byc[a].lifetime && byc[a].lifetime.decided) || 0));
+  return { live: ids.filter((c) => !retired.has(c)), retired: ids.filter((c) => retired.has(c)) };
+}
+
+/** Why a retired seat still has rows: "retired seat · 2 sealed calls from this cycle's
+ *  pre-registration, graded like any other" — or, with no calls this season, the career
+ *  record that stays on file. */
+export function retiredSeatNote(cid, data) {
+  const byc = (data && data.by_coach) || {};
+  const c = byc[cid] || {};
+  const sealed = ((data && data.predictions) || []).filter((p) => p && p.coach_id === cid && p.pre_registered === true).length;
+  const n = sealed || c.total || 0;
+  if (n > 0) {
+    const what = sealed ? "sealed call" : "call";
+    return `retired seat · ${n} ${what}${n === 1 ? "" : "s"}${sealed ? " from this cycle's pre-registration" : " this cycle"}, graded like any other`;
+  }
+  return "retired seat · career record kept on file";
+}

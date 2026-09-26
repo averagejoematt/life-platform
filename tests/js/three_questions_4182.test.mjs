@@ -110,7 +110,8 @@ test("the one ask: omitted when open_actions is empty (live 2026-09-26) — neve
   const dash = { open_actions: [{ coach_id: "physical_coach", coach_name: "Dr. Max Reyes",
     text: "reach 170 g protein per day for seven consecutive days", asked_on: "2026-09-25", due: "2026-10-02", status: "pending" }] };
   // the coach's own words, quoted verbatim
-  assert.equal(text(tq.askLine(dash)), "The one ask: “reach 170 g protein per day for seven consecutive days” — Dr. Max Reyes, Sep 25, due Oct 2.");
+  // #4219: pinned `now` (the ask is current on 09-26) and dates in words
+  assert.equal(text(tq.askLine(dash, new Date("2026-09-26T19:31:00Z"))), "The one ask: “reach 170 g protein per day for seven consecutive days” — Dr. Max Reyes, asked September 25, due October 2.");
 });
 
 test("one freshness line, in words: weekday · Day N · data through the latest served data date", () => {
