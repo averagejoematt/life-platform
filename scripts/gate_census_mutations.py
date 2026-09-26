@@ -554,6 +554,14 @@ _SECOND_V03_LOAD_PATH_PY = (
     '"""probe."""\n\nfrom training.load_ramp import ramp_floor\n\n\n' "def my_load(floor, week):\n" "    return ramp_floor(floor, week)\n"
 )
 
+# #4182: a coaching page whose <main> names "the Third Wall" — the vocabulary the panel cut
+# from reader surfaces (ruling vii-8). Planted as a NEW page under site/coaching/ so the RED
+# also proves the sweep reaches a shell nobody edited.
+_THIRD_WALL_COACHING_HTML = (
+    "<!doctype html><html lang=en><head><meta charset=utf-8><title>census probe</title></head>\n"
+    "<body><main><p>The weekly lab notes are the Third Wall.</p></main></body></html>\n"
+)
+
 # #4035 box 2: a site page carrying a bare, unregistered, un-glossed capitalised acronym
 # in reader-visible prose — the exact gate-(b) defect the glossary's two-sided gate exists
 # to catch (`site/config/glossary.json` has no entry, `v4_glossary.GLOSS_ALLOWLIST` has no
@@ -1009,6 +1017,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("lambdas/training/_census_probe_4107.py", _SECOND_V03_LOAD_PATH_PY),),
         track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
+    "structural::test_coaching_first_screen_4182.py": MutationSpec(
+        gate_id="structural::test_coaching_first_screen_4182.py",
+        target="tests/test_coaching_first_screen_4182.py",
+        detects=(
+            "a site/coaching/** page whose <main> says 'the Third Wall' — the builder vocabulary the "
+            "#4182 panel cut from reader surfaces (ruling vii-8); coaching shells are generator output "
+            "and site/** auto-deploys on merge, so the phrase coming back is a PR's own diff"
+        ),
+        plants=(("site/coaching/_census_probe_4182/index.html", _THIRD_WALL_COACHING_HTML),),
+        track=False,  # the guard rglobs site/coaching/ on disk, so an untracked page is in scope
     ),
     "structural::test_glossary_4035.py": MutationSpec(
         gate_id="structural::test_glossary_4035.py",
@@ -1723,6 +1742,19 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "is visible. STILL INVISIBLE, stated: a module that re-implements the ramp arithmetic without calling either "
         "function (a hand-written `anchor * 0.85 * 0.60`), and a call made through an alias or getattr string.",
         proved_on="2026-09-23",
+    ),
+    "structural::test_coaching_first_screen_4182.py": _proof(
+        "structural::test_coaching_first_screen_4182.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 5 passed in 0.17s | mutated: 1 failed, 4 passed in 0.17s "
+        ":: tests/test_coaching_first_screen_4182.py::test_third_wall_is_absent_from_every_coaching_page_main | "
+        "reverted: 5 passed in 0.15s",
+        "Covers the SET: every index.html under site/coaching/ on disk (rglob, so an untracked or brand-new shell is in "
+        "scope), each page's <main> checked for the phrase 'Third Wall'. The file's other tests pin the first-screen mount "
+        "(hub + /coaching/read/ only, under the hero, above the tabs, disclaimer below) and that the hero's roster numeral "
+        "equals the persona registry's served roster (with an in-file mutation control). STILL INVISIBLE, stated: the phrase "
+        "in JS-rendered text (coaching.js is pinned separately by tests/js/coach_today_4182.test.mjs, which checks the "
+        "lab-notes label, not every string), in the shared footer chrome outside <main>, and a case variant ('third wall').",
+        proved_on="2026-09-26",
     ),
     "structural::test_glossary_4035.py": _proof(
         "structural::test_glossary_4035.py",
