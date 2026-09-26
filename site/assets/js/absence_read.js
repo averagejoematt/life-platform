@@ -86,11 +86,17 @@ export function absenceLine(pillar, { short = false } = {}) {
 */
 export function familyChip(pillar, trendState) {
   if (isDark(pillar)) return { txt: absenceLine(pillar, { short: true }) || "nothing logged", state: "absent" };
-  // Not dark, but the engine flagged behaviors that didn't happen inside the window. The
-  // score moved; attributing that move to effort ("eased off a little") credits a trend
-  // to days that were simply never logged. Name the absence instead.
+  // Not dark, but the engine flagged behaviors it found no evidence of inside the window.
+  // The score moved; attributing that move to effort ("eased off a little") would credit a
+  // trend the engine itself says is a scoring absence. BUT `absent_behaviors` are the
+  // engine's RULES going unmet (protein_total, calorie_adherence, …), not unlogged days —
+  // the unlogged case is the dark-source branch above, decided from the registry's own
+  // freshness. #4182 (2026-09-26): this chip read "some days went unlogged" on the front
+  // door while /api/nutrition_overview served 20 of 20 days logged (139–186 g each) — a
+  // claim a friend would believe that the site's own numbers contradict. Say what is
+  // true: the days were logged, and the engine scored the habit low.
   const flagged = pillar && Array.isArray(pillar.absent_behaviors) ? pillar.absent_behaviors.length : 0;
-  if (trendState === "down" && flagged) return { txt: "some days went unlogged", state: "absent" };
+  if (trendState === "down" && flagged) return { txt: "logged, but the engine scored it low", state: "down" };
   return null;
 }
 
