@@ -397,7 +397,6 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
 # reader_input/ S3 prefix (#3559) nor `put_capture_record`. The guard ORDER is
 # `_handle_submit_finding`'s; the write is `_handle_experiment_suggest`'s
 # (content-hash sk + attribute_not_exists → a replay is a true no-op).
-PAGE_FEEDBACK_PK = "USER#matthew#SOURCE#reader_feedback"
 PAGE_FEEDBACK_ANSWERS = ("yes", "partly", "no")
 # A site pathname only: lowercase slugs and slashes. Anything else (a query string,
 # a full URL, markup) is a 400 — the client sends `location.pathname`.
@@ -471,7 +470,10 @@ def _handle_page_feedback(event: dict, *, _g) -> dict:
     try:
         table.put_item(
             Item={
-                "pk": PAGE_FEEDBACK_PK,
+                # The pk literal lives INSIDE the put_item call on purpose:
+                # tests/test_site_partition_orphans.py credits a site-api self-write
+                # only from pk-forms found within the write call itself.
+                "pk": "USER#matthew#SOURCE#reader_feedback",
                 "sk": f"FEEDBACK#{feedback_id}",
                 "id": feedback_id,
                 "page": page,
