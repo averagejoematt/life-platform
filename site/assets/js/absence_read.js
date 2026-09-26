@@ -111,7 +111,8 @@ export function deterministicPillarRead(label, pillar) {
   const dir = !Number.isFinite(d) || d === 0 ? "flat" : d > 0.05 ? "up" : d < -0.05 ? "down" : "flat";
   const moving = dir === "up" ? "climbing" : dir === "down" ? "slipping" : "holding";
   return (
-    `${label} is at ${score} and ${moving} (${p.tier || "Foundation"}). ` +
+    // #4182: no level NAME ("Foundation") on the reader surface — the score says it.
+    `${label} is at ${score} and ${moving}. ` +
     `Correlative read only — open the Data door for the components behind it.`
   );
 }

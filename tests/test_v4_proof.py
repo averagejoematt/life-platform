@@ -83,7 +83,10 @@ class TestChronicleList:
 
 
 class TestCockpitBlock:
-    """#788 — the cockpit's static proof: level + tier + pillar scores + as-of."""
+    """#788 — the cockpit's static proof: level + pillar scores + as-of.
+
+    #4182 reverses #788's "level + TIER" shape: the tier NAME ("Foundation", "Momentum")
+    is off the reader surface (panel ruling 2(iii), 2026-09-25) — the number stays."""
 
     CH = {
         "level": 12,
@@ -103,9 +106,11 @@ class TestCockpitBlock:
     def test_bakes_level_pillars_and_as_of(self):
         html = v4_proof.cockpit_block_html(self.CH)
         # #788 AC: real numbers + the honest stamp in the served no-JS HTML.
-        assert "Character level 12 · Foundation" in html
+        assert "Character level 12" in html
         assert "as of 2026-07-06" in html
-        assert "Sleep 83" in html and "Momentum" in html
+        assert "Sleep 83" in html
+        # #4182: no tier name anywhere in the no-JS block — not the level's, not a pillar's.
+        assert "Foundation" not in html and "Momentum" not in html
         assert "Movement 26" in html and "Nutrition 2" in html
         assert "Consistency 33" in html  # rounded, same as cockpit.js
         assert html.startswith("<noscript>") and html.endswith("</noscript>")
@@ -199,13 +204,18 @@ class TestCockpitInjection:
         assert "Character level" in html
         assert "as of 20" in html  # a dated honesty stamp
 
-    def test_committed_now_page_carries_the_first_visit_hint(self):
-        # #807: the inline explainer markup ships in the HTML (hidden; JS unhides
-        # it for first-time visitors only).
+    def test_committed_now_page_keys_the_level_in_plain_words(self):
+        # #807 shipped a dismiss-once "1–100 score of Matthew's whole day" hint beside the
+        # bare level. #4182 (panel ruling 2(iii)) REVERSES that shape: the hint read the
+        # level as a grade ("he's a 6 out of 100?!"), so it is replaced by an always-visible
+        # key at the top of the collapsed engine section — score, level and "absent" each
+        # defined in plain words.
         html = (Path(__file__).resolve().parent.parent / "site" / "cockpit" / "index.html").read_text(encoding="utf-8")
-        assert "data-hub-hint" in html
-        assert "1&ndash;100 score" in html
-        assert "hub-hint-x" in html
+        assert "data-hub-hint" not in html and "hub-hint-x" not in html
+        key = html[html.index('class="engine-key"') :]
+        key = key[: key.index("</p>")]
+        for term in ("Score</strong>", "Level</strong>", "Absent"):
+            assert term in key, term
 
 
 class TestCoachingReadBlock:
@@ -521,7 +531,8 @@ class TestGrowthSurface1395:
 
     def test_cockpit_og_carries_level(self):
         og = v4_proof.cockpit_og(self.CHAR)
-        assert "character level 1 · Foundation" in og[("property", "og:title")]
+        assert "character level 1" in og[("property", "og:title")]
+        assert "Foundation" not in og[("property", "og:title")]  # #4182: the number, never the tier name
         assert og[("property", "og:image")].endswith("/og-character.png")
 
     def test_story_og_counts_dispatches(self):

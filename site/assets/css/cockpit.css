@@ -26,7 +26,56 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 /* #578: slim the shared .page-hero on the cockpit — it's the dense daily
    instrument, so trim the standard hero padding to a thin orientation strip. */
 .cockpit-hero { padding-block: var(--sp-3) var(--sp-2); }
+/* #4182: .cockpit already carries the gutter — the hero's own gutter doubled it, so the
+   kicker sat indented from the three questions and the panel beneath it. One edge. */
+.cockpit .cockpit-hero { padding-inline: 0; }
 .cockpit-hero .loop-ribbon { margin-top: var(--sp-2); }
+
+/* ── #4182: the three questions — the first screen ─────────────────────────
+   Human questions in the serif (the triad's human voice), answers in the interface
+   sans at body size, one hairline between blocks. No numbers-as-display, no ember
+   ground, no card: a reader should be able to read it aloud. The shimmer placeholders
+   in the shell reserve each block's height so the async answer doesn't shift the page. */
+.three-q { margin-top: var(--sp-3); margin-bottom: var(--sp-5); max-width: var(--measure); }
+.three-q[hidden] { display: none; }
+.tq-fresh { margin: 0 0 var(--sp-3); color: var(--ink-muted); }
+.tq-fresh:empty { display: none; }
+.tq-block { padding: var(--sp-3) 0; border-top: var(--border-hair); }
+.tq-block[hidden] { display: none; }
+.tq-h {
+  margin: 0 0 var(--sp-1); font-family: var(--font-serif); font-weight: var(--weight-med);
+  font-size: var(--fs-h3); line-height: 1.15; color: var(--ink);
+}
+.tq-a { margin: 0; font-size: var(--fs-body); line-height: 1.5; color: var(--ink); min-height: 3em; }
+.tq-ask { margin: var(--sp-2) 0 0; font-size: var(--fs-small); line-height: 1.5; color: var(--ink-muted); }
+.tq-ask[hidden] { display: none; }
+.tq-ask-k { color: var(--ink); font-weight: var(--weight-med); }
+.tq-next { margin: var(--sp-2) 0 0; padding-top: var(--sp-3); border-top: var(--border-hair); color: var(--ink-faint); }
+.tq-next a { color: var(--ink-muted); text-decoration: none; padding-block: var(--sp-2); }
+.tq-next a:hover, .tq-next a:focus-visible { color: var(--ember); }
+
+/* Screen two: the day's mark + the rings, under the questions (#4182). */
+.cockpit-instruments { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-4); margin-bottom: var(--sp-5); }
+.cockpit-instruments .hero-instruments { margin-top: 0; }
+
+/* ── #4182 (ruling 2(iii)): the engine's score, collapsed under a plain heading, its key
+   printed first. The summary is a text button: 44px floor on every width. */
+.engine { margin-top: var(--sp-5); border-top: var(--border-hair); }
+.engine-sum {
+  display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding-block: var(--sp-3);
+  cursor: pointer; list-style: none; color: var(--ink);
+}
+.engine-sum::-webkit-details-marker { display: none; }
+.engine-sum::before { content: "›"; font-family: var(--font-mono); color: var(--ink-muted); transition: transform var(--dur-fast); }
+.engine[open] > .engine-sum::before { transform: rotate(90deg); }
+.engine-h { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-body-lg); line-height: 1.3; }
+.engine-sum:hover .engine-h, .engine-sum:focus-visible .engine-h { color: var(--ember); }
+.engine-sum:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.engine-key { margin: 0 0 var(--sp-4); max-width: var(--measure); font-size: var(--fs-small); line-height: 1.55; color: var(--ink-muted); }
+.engine-key strong { color: var(--ink); font-weight: var(--weight-med); }
+.engine-date:empty { display: none; }
+/* The contradiction, printed beside the pillar it contradicts (nutrition vs the food log). */
+.pillar-note { margin: 0; padding: 0 0 var(--sp-3); color: var(--ink-muted); text-transform: none; letter-spacing: 0.01em; line-height: 1.5; }
 
 /* ── #1106: the hero instrument strip — small ring() instruments + the faint
    instrument mark. Deliberately quiet: the tones (ember/muted/alert) come from
@@ -40,7 +89,9 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .hero-instruments .hi-mark { display: flex; flex: none; color: var(--ink-faint); }
 .hero-instruments .hi-imark { width: 30px; height: 30px; opacity: 0.75; }
 .hero-instruments .hi-rings {
-  display: grid; grid-template-columns: repeat(4, minmax(56px, 76px));
+  /* column auto-flow, not a fixed repeat(4): a ring omitted for honest absence (#4182 —
+     readiness while unserved) leaves no empty cell behind. */
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(56px, 76px);
   gap: var(--sp-3); flex: 0 1 auto;
 }
 /* Scale the shared .vr primitive down to hero-strip size (tokens.css owns the
@@ -56,7 +107,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 @media (max-width: 480px) {
   .hero-instruments { gap: var(--sp-3); }
   .hero-instruments .hi-mark { display: none; } /* the rings ARE the mark at phone width */
-  .hero-instruments .hi-rings { grid-template-columns: repeat(4, 1fr); width: 100%; }
+  .hero-instruments .hi-rings { grid-auto-columns: 1fr; width: 100%; }
   .hero-instruments .vr-svg { max-width: 54px; }
 }
 
@@ -101,16 +152,6 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .hub-decomp a { color: var(--ink-muted); text-decoration: none; }
 .hub-decomp a:hover { color: var(--ember); }
 
-/* #807 — one-sentence first-visit context for the bare level number. Muted,
-   inline, dismissible; JS unhides it only until "got it" (localStorage). */
-.hub-hint { margin: var(--sp-1) 0 var(--sp-2); max-width: 52ch; color: var(--ink-muted); line-height: 1.5; }
-.hub-hint-x {
-  appearance: none; background: none; border: none; padding: 0 0 0 4px;
-  font: inherit; color: var(--ember); cursor: pointer; text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.hub-hint-x:hover { color: var(--ink); }
-
 .theme-toggle {
   appearance: none; cursor: pointer; background: transparent;
   border: var(--border-hair); border-radius: 50%; width: 28px; height: 28px;
@@ -146,46 +187,8 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   box-shadow: var(--shadow-panel);
 }
 
-/* ── First-run orientation card (PG-02) — shows once, never blocks the panel ── */
-.cockpit-intro {
-  position: relative;
-  background: var(--surface); box-shadow: var(--shadow-panel);
-  border: var(--border-hair); border-left: 3px solid var(--ember);
-  border-radius: var(--radius);
-  padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-4);
-  animation: introIn 240ms ease-out both;
-}
-@keyframes introIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .cockpit-intro { animation: none; } }
-.cockpit-intro__k { margin: 0; color: var(--ember); }
-.cockpit-intro__h {
-  font-family: var(--font-serif); font-weight: var(--weight-med);
-  font-size: var(--fs-h3); line-height: 1.1;
-  margin: var(--sp-2) 0 var(--sp-4); max-width: 28ch;
-}
-.cockpit-intro__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
-.cockpit-intro__list li { color: var(--ink-muted); line-height: 1.5; max-width: 64ch; }
-.cockpit-intro__list strong { color: var(--ink); font-weight: var(--weight-med); }
-.cockpit-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); }
-.cockpit-intro__go {
-  appearance: none; cursor: pointer; margin-top: var(--sp-5);
-  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
-  color: var(--ember); background: var(--ember-wash);
-  border: 1px solid var(--ember-line); padding: var(--sp-2) var(--sp-4);
-  border-radius: var(--radius-xs); transition: background var(--dur-fast);
-}
-.cockpit-intro__go:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); }
-/* #3544 — prose ("Shown once. It won't interrupt again."). The opacity composited
-   --ink-muted to 3.35:1 on the light page; the ramp step IS the recede. */
-.cockpit-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); }
-.cockpit-intro__x {
-  position: absolute; top: var(--sp-3); right: var(--sp-3);
-  appearance: none; cursor: pointer; background: transparent; border: 0;
-  font-size: var(--fs-body-lg); line-height: 1; color: var(--ink-muted); padding: 2px 8px;
-  border-radius: var(--radius-xs); transition: color var(--dur-fast);
-}
-.cockpit-intro__x:hover { color: var(--ink); }
-.cockpit-intro :focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+/* The first-run "NEW HERE?" card (.cockpit-intro, PG-02) was retired by #4182 — it is
+   now the shared one-line .orient-strip in tokens.css (orient.js). */
 
 /* ── Predict the week (PG-ENG-1) — a glanceable bet card, ember-accented like the
    intro; honest small-n (muted reader %), wrong calls never red. ── */
@@ -310,7 +313,6 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   font-family: var(--font-mono); font-weight: var(--weight-med);
   font-size: var(--fs-data-xl); line-height: 0.8; letter-spacing: var(--tracking-tight);
 }
-.tier { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: 1; padding-bottom: 0.35rem; }
 .movement {
   font-family: var(--font-mono); font-size: var(--fs-small); padding-bottom: 0.5rem;
   color: var(--ink-muted); letter-spacing: 0.02em;
@@ -327,8 +329,12 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   letter-spacing: 0.01em; max-width: min(100%, var(--measure));
 }
 
+.honest[hidden] { display: none; } /* #4182: the inline-block above beat [hidden] — an empty dashed box */
+
 /* Signature 2 — the machine ↔ human dialogue */
 .dialogue { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+/* #4182: the daily line now opens the panel (the level used to) — no rule above it. */
+.panel-body > .dialogue:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .voice { display: flex; gap: var(--sp-3); padding: var(--sp-2) 0; }
 .voice .who {
   font-family: var(--voice-who-font); font-size: var(--voice-who-size);
@@ -770,7 +776,6 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cfp-link:hover .cfp-cap { color: var(--ember); }
 .cockpit-fingerprint .fingerprint { width: 84px; height: 84px; display: block; }
 .cfp-cap { font-size: var(--fs-label); letter-spacing: var(--tracking-label); }
-@media (min-width: 761px) {
-  .cockpit-fingerprint { position: absolute; top: var(--sp-3); right: var(--sp-3); margin-top: 0; }
-  .cockpit-hero { position: relative; }
-}
+/* #4182: the mark sits beside the rings on screen two (it was absolutely placed in the
+   hero's top-right corner while the hero was the first screen). */
+.cockpit-instruments .cockpit-fingerprint { margin-top: 0; }

@@ -248,13 +248,25 @@ _CURATED = [
         "api_deps": ["/api/character", "/api/pulse", "/api/journey"],
         "js_modules": ["cockpit.js"],
         "visual": {
-            "wait_for": "[data-bind='level']",
+            # #4182: the first screen is the three questions; the level moved into the
+            # collapsed "engine's score" section (visible only once opened).
+            "wait_for": ".three-q .tq-h",
             "checks": [
+                {
+                    "selector": "[data-bind='tq-week'], [data-bind='tq-night'], [data-bind='tq-today']",
+                    "not_empty": True,
+                    "desc": "the three questions answered",
+                },
                 {"selector": "[data-bind='level']", "not_empty": True, "desc": "character level rendered"},
                 {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
                 {"selector": ".site-foot-cols .sf-col", "min_count": 4, "desc": "footer mega-menu (4 columns) present (CC-05)"},
             ],
-            "interact": {"click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens with the Day-Grade Replay detail"},
+            "interact": {
+                "open": ".engine-sum",
+                "click": ".row",
+                "expect": ".pillar-detail",
+                "desc": "engine section opens, then the pillar disclosure opens with the Day-Grade Replay detail",
+            },
         },
     },
     {
