@@ -27,6 +27,7 @@ Offline: no AWS. boto3 and call_anthropic are fakes wherever the pipeline runs.
 
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
@@ -347,6 +348,43 @@ def test_a_protein_figure_inside_the_served_ci_passes():
 def test_a_single_logged_day_is_not_judged_as_an_average():
     facts = _facts("2026-09-25", "2026-09-26")
     assert ci.served_fact_findings("Yesterday you logged 245 g of protein.", facts, today="2026-09-26") == []
+
+
+# #4343: verbatim sentences from the 2026-09-27 17:00Z brief (EVALRET#coach_brief) that
+# the served-fact check held although none of them states his daily intake or its average.
+NUTRITION_0927_SERVINGS = (
+    "Morning smoothie at 9am delivers 15 g, protein shake at noon adds 30 g, buffalo edamame in the afternoon contributes 11 g."
+)
+NUTRITION_0927_SHIFT = "One ask this week: redistribute 40g of protein away from dinner into morning and midday."
+GLUCOSE_0927_CONDITIONAL = (
+    "If protein reaches 190g next week and your fasting glucose still looks elevated, I need you to not read that as non-response."
+)
+PHYSICAL_0927_AVERAGE = "Protein averaging around 122.7 grams per day through the recent logged period is not sufficient substrate."
+
+
+def test_a_serving_a_shift_or_a_conditional_target_is_not_an_intake_claim():
+    """#4343: the 09-27 holds — per-item amounts, a redistribution and a conditional
+    target were each judged against the 21-logged-day average and held their coach."""
+    facts = _facts("2026-09-25", "2026-09-26")
+    for text in (NUTRITION_0927_SERVINGS, NUTRITION_0927_SHIFT, GLUCOSE_0927_CONDITIONAL):
+        assert ci.served_fact_findings(text, facts, today="2026-09-26") == [], text
+
+
+def test_an_average_framed_figure_is_still_judged():
+    """The frame requirement does not loosen the check: the physical coach's 122.7 g
+    "averaging … per day" still fails against the served average (cause B of #4343)."""
+    facts = _facts("2026-09-25", "2026-09-26")
+    found = ci.served_fact_findings(PHYSICAL_0927_AVERAGE, facts, today="2026-09-26")
+    assert [(f["metric"], f["cited"]) for f in found] == [("protein_g", 122.7)], found
+
+
+def test_mutation_control_without_the_intake_frame_the_servings_are_held(monkeypatch):
+    """Revert the frame to "every figure is an intake claim" (the pre-#4343 behaviour):
+    the three 09-27 fragments fail again, so the test above cannot pass by accident."""
+    monkeypatch.setattr(ci, "_INTAKE_FRAME", re.compile(r""))
+    facts = _facts("2026-09-25", "2026-09-26")
+    for text in (NUTRITION_0927_SERVINGS, NUTRITION_0927_SHIFT, GLUCOSE_0927_CONDITIONAL):
+        assert [f["metric"] for f in ci.served_fact_findings(text, facts, today="2026-09-26")], text
 
 
 def test_more_logged_days_than_the_record_holds_fails():
