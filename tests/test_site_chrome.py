@@ -238,3 +238,85 @@ def test_v7_committed_preview_shells_match_a_fresh_build():
         text=True,
     )
     assert proc.returncode == 0, f"v7 shells drifted — run scripts/v7_build.py --base /next/ and commit:\n{proc.stdout}\n{proc.stderr}"
+
+
+def test_v7_hood_shell_is_the_receipts_page_and_carries_no_served_number_or_ruled_word():
+    """#4182 — the v7 Under the hood (scripts/v7/hood.py) is the receipts a sceptic checks:
+    the five dated entries in the design order, the repo link in the masthead, the live gear
+    page's affiliate disclosure verbatim, the gear rows derived from the source registry
+    (one row per catalogue entry, the id only in a data attribute — never printed), the
+    page's own sheet and module — and none of the owner-ruled words (no earlier starts,
+    attempts, cycles or resets). The served numbers are poured at runtime; the one static
+    figure allowed is inside a registry `metrics` string (a registry fact, not a served count)."""
+    sys.path.insert(0, str(ROOT / "lambdas"))
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from ingestion.source_registry import catalog_entries  # noqa: E402
+    from v4_build_gear import DISCLOSURE  # noqa: E402
+
+    html = (SITE / "next" / "method" / "index.html").read_text(encoding="utf-8")
+    slots = ["hd-how", "hd-corrections", "hd-log", "hd-gear", "hd-return"]
+    for slot in slots:
+        assert f'id="{slot}"' in html, f"hood shell missing the {slot} entry"
+    order = [html.index(f'id="{s}"') for s in slots]
+    assert order == sorted(order), "the entries are out of the design order"
+    assert 'href="/assets/css/v7_hood.css"' in html and 'src="/assets/js/v7_hood.js"' in html
+    assert 'class="v7-repo" href="https://github.com/averagejoematt/life-platform"' in html, "the repo link belongs in the masthead"
+    assert DISCLOSURE in html, "the affiliate disclosure is the live gear page's, verbatim"
+    rows = re.findall(r'<tr data-source="([a-z_]+)">', html)
+    assert rows == [e["id"] for e in catalog_entries()], "the gear rows are the registry's catalogue, in its order"
+    text = re.sub(r"<[^>]+>", " ", html.split('<main id="main"')[1].split("</main>")[0])
+    for rid in rows:
+        assert (
+            not re.search(rf"(?<![A-Za-z]){re.escape(rid)}(?![A-Za-z])", text) or "_" not in rid
+        ), f"a registry id printed on the screen: {rid}"
+    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
+    assert (SITE / "assets" / "css" / "v7_hood.css").exists() and (SITE / "assets" / "js" / "v7_hood.js").exists()
+
+
+def test_v7_numbers_shell_is_the_logbook_and_carries_no_number_or_ruled_word():
+    """#4182 — the v7 His numbers page (scripts/v7/numbers.py) is Prototype C's screen IV: the
+    six dated entries in the design order (weight · sleep · eating · training · blood tests ·
+    the absence strip), the engine's score folded under a <details>, the page's own sheet and
+    module — and NO number in the static HTML (every figure is poured from a served field at
+    runtime, so the shell can never go stale) and none of the owner-ruled words."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    import site_text  # noqa: E402
+
+    html = (SITE / "next" / "data" / "index.html").read_text(encoding="utf-8")
+    slots = ["nm-weight", "nm-sleep", "nm-eating", "nm-training", "nm-labs", "nm-absent", "nm-engine"]
+    for slot in slots:
+        assert f'id="{slot}"' in html, f"His numbers shell missing the {slot} entry"
+    order = [html.index(f'id="{s}"') for s in slots]
+    assert order == sorted(order), "the entries are out of the design order"
+    assert 'href="/assets/css/v7_numbers.css"' in html and 'src="/assets/js/v7_numbers.js"' in html
+    assert '<details class="nm-engine"' in html
+    text = site_text.main_text("site/next/data/index.html")
+    assert not re.search(r"\d", text), f"a number in the static His numbers shell: {text[:200]!r}"
+    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|as of|went dark)\b", text, re.I)
+    assert (SITE / "assets" / "css" / "v7_numbers.css").exists() and (SITE / "assets" / "js" / "v7_numbers.js").exists()
+
+
+def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
+    """#4182 — the v7 Home (scripts/v7/home.py) is Prototype C's screen I: the eight dated
+    entries in the design order, the honest photo frame, the page's own sheet and module,
+    the cut-over proof anchor — and NO number in the static HTML (every figure is poured
+    from a served field at runtime, so the shell can never go stale) and none of the
+    owner-ruled words (no earlier starts, attempts, cycles or resets)."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    import site_text  # noqa: E402
+
+    html = (SITE / "next" / "index.html").read_text(encoding="utf-8")
+    for slot in ["v7h-fold", "v7h-weighins", "v7h-words", "v7h-okay", "v7h-record", "v7h-how", "v7h-next", "v7h-follow"]:
+        assert f'id="{slot}"' in html, f"Home shell missing the {slot} entry"
+    order = [
+        html.index(f'id="{s}"')
+        for s in ["v7h-fold", "v7h-weighins", "v7h-words", "v7h-okay", "v7h-record", "v7h-how", "v7h-next", "v7h-follow"]
+    ]
+    assert order == sorted(order), "the entries are out of the design order"
+    assert 'href="/assets/css/v7_home.css"' in html and 'src="/assets/js/v7_home.js"' in html
+    assert "<!-- home-proof:start -->" in html and "<!-- home-proof:end -->" in html
+    assert "No photo yet." in html
+    text = site_text.main_text("site/next/index.html")
+    assert not re.search(r"\d", text), f"a number in the static Home shell: {text[:200]!r}"
+    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
+    assert (SITE / "assets" / "css" / "v7_home.css").exists() and (SITE / "assets" / "js" / "v7_home.js").exists()

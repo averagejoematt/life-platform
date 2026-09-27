@@ -1,0 +1,231 @@
+/* v7_hood.css — the v7 "Under the hood" page (#4182): Prototype C's logbook entries — a dated
+   margin column with one red spine, the prose set in the serif, labels in the sans, figures
+   and dates in the mono. Tokens from tokens.css ONLY (no raw hex, no font-size literal,
+   breakpoints from DESIGN_SYSTEM_V5 §10.1). Faces: the site's self-hosted Fraunces stands in
+   for C's Newsreader, Instrument Sans for its IBM Plex Sans; IBM Plex Mono is C's own. The
+   spine is --ember — the one live accent — because it is the frame's margin, not a claim. */
+
+.v7 {
+  --hd-margin-w: 50px;
+}
+
+/* ── one entry: the margin and the body ── */
+.hd-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--hd-margin-w) 1fr;
+  gap: 0 var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-5);
+  border-bottom: 1px solid var(--rule);
+}
+.hd-entry:last-of-type { border-bottom: 0; }
+.hd-entry::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0;
+  left: calc(var(--hd-margin-w) - var(--sp-2));
+  width: 1px;
+  background: var(--ember-line);
+}
+
+.hd-m {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--lh-snug);
+  color: var(--ink-muted);
+  padding-top: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+}
+.hd-m .d {
+  display: block;
+  font-size: var(--fs-h3);
+  font-weight: var(--weight-med);
+  color: var(--ink);
+  line-height: var(--lh-tight);
+  margin-bottom: var(--sp-1);
+}
+.hd-m .mo { display: block; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.hd-m .w { display: none; }
+
+.hd-body { min-width: 0; }
+.hd-body p { max-width: none; }
+.hd-body a { color: var(--ember); }
+
+.hd-h {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 var(--sp-3);
+}
+
+/* ── the paragraph, the cost line ── */
+.hd-prose {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-3);
+}
+.hd-cost {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-2);
+}
+.hd-cost .num, .hd-prose .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.hd-small {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-3);
+}
+.hd-small b { color: var(--ink); font-weight: var(--weight-med); }
+.hd-note {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-faint);
+  margin: 0 0 var(--sp-2);
+}
+.hd-pending { color: var(--ink-faint); }
+
+/* ── a correction: three sentences, the record folded ── */
+.hd-card {
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--rule);
+}
+.hd-card p {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--sp-2);
+}
+.hd-card p b {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  font-weight: var(--weight-med);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-right: var(--sp-1);
+}
+
+/* ── folds: the served record, the rest of the column ── */
+.hd-fold {
+  border-top: 1px solid var(--rule);
+  padding-top: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.hd-fold summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ember);
+  padding: var(--sp-1) 0 var(--sp-2);
+  list-style: none;
+}
+.hd-fold summary::-webkit-details-marker { display: none; }
+.hd-fold summary::before { content: "+ "; font-family: var(--font-mono); }
+.hd-fold[open] summary::before { content: "– "; }
+
+.hd-record, .hd-compact, .hd-gear {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-snug);
+}
+.hd-record th, .hd-record td, .hd-compact td, .hd-gear th, .hd-gear td {
+  vertical-align: top;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.hd-record td:last-child, .hd-compact td:last-child, .hd-gear td:last-child, .hd-gear th:last-child { padding-right: 0; }
+.hd-record th {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  width: 1%;
+}
+.hd-record td { overflow-wrap: anywhere; }
+.hd-compact td.d {
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+}
+
+/* ── the build log ── */
+.hd-log {
+  list-style: none;
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+}
+.hd-log li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-snug);
+}
+.hd-log .hd-d {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--ink-muted);
+  white-space: nowrap;
+  padding-top: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the gear ── */
+.hd-disclosure {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+  border-left: 3px solid var(--ember);
+  padding-left: var(--sp-3);
+  margin: 0 0 var(--sp-4);
+}
+.hd-gear th {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: var(--weight-reg);
+}
+.hd-gear-name { white-space: nowrap; color: var(--ink); font-weight: var(--weight-med); }
+.hd-gear-feeds { color: var(--ink-muted); }
+.hd-gear-seen {
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.hd-gear-seen[data-status="stale"], .hd-gear-seen[data-status="paused"], .hd-gear-seen[data-status="unknown"] { color: var(--ink-faint); }
+
+@media (max-width: 600px) {
+  .hd-gear thead { display: none; }
+  .hd-gear tr { display: block; padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+  .hd-gear td { display: block; border: 0; padding: 0 0 var(--sp-1); }
+  .hd-gear-name { white-space: normal; }
+}
+
+@media (min-width: 601px) {
+  .v7 { --hd-margin-w: 96px; }
+  .hd-m .w { display: block; }
+}

@@ -1,0 +1,149 @@
+/* v7_today.css — the v7 "Today" page (#4182): Prototype C's logbook entries — a dated margin
+   column with one red spine, the answers set in the serif, labels in the sans, figures in
+   the mono. Tokens from tokens.css ONLY (no raw hex, no font-size literal, breakpoints from
+   DESIGN_SYSTEM_V5 §10.1). Faces: Fraunces stands in for C's Newsreader, Instrument Sans for
+   its IBM Plex Sans; IBM Plex Mono is C's own. The spine is --ember — the one live accent —
+   because it is the frame's margin, not a claim; "7 days late" is set in the ink at medium
+   weight, never in a colour that could carry a verdict. */
+
+.v7 {
+  --td-margin-w: 50px;
+}
+
+.td-through {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-5);
+  font-variant-numeric: tabular-nums;
+}
+.td-through:empty { display: none; }
+
+/* ── one entry: the margin and the body ── */
+.td-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--td-margin-w) 1fr;
+  gap: 0 var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-5);
+  border-bottom: 1px solid var(--rule);
+}
+.td-entry:last-of-type { border-bottom: 0; }
+.td-entry[hidden] { display: none; }
+.td-entry::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0;
+  left: calc(var(--td-margin-w) - var(--sp-2));
+  width: 1px;
+  background: var(--ember-line);
+}
+
+.td-m {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--lh-snug);
+  color: var(--ink-muted);
+  padding-top: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+}
+.td-m .d {
+  display: block;
+  font-size: var(--fs-h3);
+  font-weight: var(--weight-med);
+  color: var(--ink);
+  line-height: var(--lh-tight);
+  margin-bottom: var(--sp-1);
+}
+.td-m .mo { display: block; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.td-m .w { display: none; }
+
+.td-body { min-width: 0; }
+.td-body p { max-width: none; }
+
+.td-h {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 var(--sp-3);
+}
+
+/* the answer to a question — the serif, the reading size */
+.td-a {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  margin: 0 0 var(--sp-3);
+}
+.td-a:last-child { margin-bottom: 0; }
+.td-a .tq-ask-k { display: none; }
+.td-a .tq-late { color: var(--ink); font-weight: var(--weight-med); }
+.td-a dfn.gloss { font-style: normal; }
+
+.td-small {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-2);
+}
+.td-small b { color: var(--ink); font-weight: var(--weight-med); }
+.td-note {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-faint);
+  margin: 0 0 var(--sp-2);
+}
+.td-note:last-child { margin-bottom: 0; }
+.td-pending { color: var(--ink-faint); }
+.td-body a { color: var(--ember); }
+
+/* ── what he skips: one line per gap, the count in the mono ── */
+.td-skips {
+  list-style: none;
+  margin: 0 0 var(--sp-2);
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+}
+.td-skips li {
+  padding: var(--sp-1) 0;
+  border-top: 1px dashed var(--rule);
+}
+.td-skips li:first-child { border-top: 0; padding-top: 0; }
+.td-skips b { color: var(--ink); font-weight: var(--weight-med); }
+.td-skips .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── the session's loads, when /api/session serves them ── */
+.td-loads {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-snug);
+  margin: 0 0 var(--sp-2);
+}
+.td-loads td {
+  vertical-align: top;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.td-loads td:last-child { padding-right: 0; }
+.td-loads td.n {
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+}
+
+@media (min-width: 601px) {
+  .v7 { --td-margin-w: 96px; }
+  .td-m .w { display: block; }
+}

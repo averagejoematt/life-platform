@@ -1,0 +1,212 @@
+/* v7_tries.css — the v7 "What he's trying" page (#4182): Prototype C's logbook entries — a
+   dated margin column with one red spine, the compounds and the tests as three-line cards
+   (what · should move · how we'd know), his own notes set as quotations. Tokens from
+   tokens.css ONLY (no raw hex, no font-size literal, breakpoints from DESIGN_SYSTEM_V5
+   §10.1). Faces: Fraunces stands in for C's Newsreader, Instrument Sans for its IBM Plex
+   Sans; IBM Plex Mono is C's own. The spine is --ember — the one live accent — because it
+   is the frame's margin, not a claim. */
+
+.v7 {
+  --tr-margin-w: 50px;
+}
+
+.tr-through {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-5);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── one entry: the margin and the body ── */
+.tr-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--tr-margin-w) 1fr;
+  gap: 0 var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-5);
+  border-bottom: 1px solid var(--rule);
+}
+.tr-entry:last-of-type { border-bottom: 0; }
+.tr-entry::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0;
+  left: calc(var(--tr-margin-w) - var(--sp-2));
+  width: 1px;
+  background: var(--ember-line);
+}
+
+.tr-m {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: var(--lh-snug);
+  color: var(--ink-muted);
+  padding-top: var(--sp-1);
+  font-variant-numeric: tabular-nums;
+}
+.tr-m .d {
+  display: block;
+  font-size: var(--fs-h3);
+  font-weight: var(--weight-med);
+  color: var(--ink);
+  line-height: var(--lh-tight);
+  margin-bottom: var(--sp-1);
+}
+.tr-m .mo { display: block; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.tr-m .w { display: none; }
+
+.tr-body { min-width: 0; }
+.tr-body p { max-width: none; }
+
+.tr-h {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 var(--sp-3);
+}
+
+/* the fold line of an entry */
+.tr-lead {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-snug);
+  margin: 0 0 var(--sp-2);
+}
+.tr-lead .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tr-small {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-2);
+}
+.tr-small b { color: var(--ink); font-weight: var(--weight-med); }
+.tr-note {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-faint);
+  margin: 0 0 var(--sp-2);
+}
+.tr-pending { color: var(--ink-faint); }
+.tr-body a { color: var(--ember); }
+
+/* ── a group of cards (the served stack groups; running / ready) ── */
+.tr-group {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-small);
+  color: var(--ink);
+  margin: var(--sp-4) 0 var(--sp-2);
+}
+.tr-group:first-of-type { margin-top: var(--sp-3); }
+.tr-cards { margin: 0; padding: 0; list-style: none; }
+
+/* ── one card: what · should move · how we'd know ── */
+.tr-card {
+  border-top: 1px solid var(--rule);
+  padding: var(--sp-3) 0;
+}
+.tr-card:last-child { border-bottom: 1px solid var(--rule); }
+.tr-card-what {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-med);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-snug);
+  margin: 0 0 var(--sp-1);
+}
+.tr-card-what .num {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-reg);
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  margin-left: var(--sp-2);
+}
+.tr-card-flag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: 1px solid var(--rule-strong);
+  padding: 0 var(--sp-1);
+  margin-left: var(--sp-2);
+  vertical-align: middle;
+}
+.tr-card--paused .tr-card-what { color: var(--ink-muted); }
+.tr-card dl { margin: 0; }
+.tr-card dl > div { display: grid; grid-template-columns: 1fr; gap: 0; margin: 0 0 var(--sp-1); }
+.tr-card dt {
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  font-weight: var(--weight-med);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.tr-card dd {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink);
+}
+.tr-card dd.tr-absent { color: var(--ink-faint); }
+
+/* ── his notes: typed messages, set as quotations ── */
+.tr-quote {
+  margin: 0 0 var(--sp-3);
+  padding: 0 0 0 var(--sp-4);
+  border-left: 2px solid var(--ink);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--fs-quote);
+  line-height: var(--lh-body);
+}
+.tr-quote p { margin: 0 0 var(--sp-1); }
+.tr-quote .tr-dated {
+  display: block;
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: var(--fs-small);
+  color: var(--ink-muted);
+}
+
+/* ── folded: the August correction, the platform's side of a call ── */
+.tr-fold {
+  border-top: 1px solid var(--rule);
+  padding-top: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.tr-fold summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ember);
+  padding: var(--sp-1) 0 var(--sp-2);
+  list-style: none;
+}
+.tr-fold summary::-webkit-details-marker { display: none; }
+.tr-fold summary::before { content: "+ "; font-family: var(--font-mono); }
+.tr-fold[open] summary::before { content: "– "; }
+.tr-fold p {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  color: var(--ink-muted);
+  margin: 0 0 var(--sp-2);
+}
+.tr-quote .tr-fold { border-top: 0; margin-top: 0; padding-top: 0; font-style: normal; }
+.tr-quote .tr-fold summary { font-family: var(--font-sans); font-style: normal; }
+
+@media (min-width: 601px) {
+  .v7 { --tr-margin-w: 96px; }
+  .tr-m .w { display: block; }
+  .tr-card dl > div { grid-template-columns: 9rem 1fr; gap: 0 var(--sp-3); }
+}

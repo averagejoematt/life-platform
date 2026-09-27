@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_follow.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body class="v7-body">
@@ -23,12 +24,57 @@
   <p class="v7-preview">preview — the live site is at <a href="/">/</a></p>
   <header class="v7-mast"><a class="v7-brand" href="/next/">averagejoematt</a><a class="v7-repo" href="https://github.com/averagejoematt/life-platform" rel="noopener">the code</a></header>
   <main id="main" class="v7-main">
-    <h1>Follow</h1>
-    <p class="v7-job">The numbers every Sunday; the write-up every Wednesday.</p>
-    <p class="v7-placeholder">Not built yet — Wednesday of the build week.</p>
+    <h1>Follow the experiment.</h1>
+    <p class="fo-promise" data-src="subscriber_cadence.promise_sentence">At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.</p>
+    <section class="fo-entry" id="fo-form" aria-labelledby="fo-form-h">
+      <div class="fo-m" data-margin><span class="d">§</span><span class="mo">by</span><span class="w">email</span></div>
+      <div class="fo-body">
+        <h2 class="fo-h" id="fo-form-h">By email</h2>
+        <div id="form-block">
+          <label class="fo-label" for="email">Email address</label>
+          <div class="fo-row">
+            <input type="email" class="fo-input" id="email" placeholder="your@email.com" autocomplete="email" aria-invalid="false">
+            <button class="fo-btn" id="submit-btn" type="button">Follow by email</button>
+          </div>
+          <input type="hidden" id="source-field" value="next-subscribe">
+          <p class="fo-status" id="form-status" role="status" aria-live="polite"></p>
+          <p class="fo-note">Double opt-in, unsubscribe anytime. <a href="/privacy/">Privacy</a></p>
+          <p class="fo-count" id="sub-count-line" data-src="api_sub_count.count">Be one of the first to follow the experiment.</p>
+        </div>
+        <div class="fo-success" id="success-block">
+          <div class="si" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-mail"></use></svg></div>
+          <p class="st">Check your inbox</p>
+          <p class="sb">Confirmation email sent. Click the link to confirm and you are in.<br><br><a href="/next/">← back to the experiment</a></p>
+        </div>
+      </div>
+    </section>
+    <section class="fo-entry" id="fo-get" aria-labelledby="fo-get-h">
+      <div class="fo-m" data-margin></div>
+      <div class="fo-body">
+        <h2 class="fo-h" id="fo-get-h">What you’d get</h2>
+        <p class="fo-small" id="fo-writeup">The numbers every Sunday; the write-up every Wednesday.</p>
+        <p class="fo-small fo-pending" id="fo-weighin" data-src="api_journey.journey.last_weighin_date + 1 day">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="fo-entry" id="fo-write" aria-labelledby="fo-write-h">
+      <div class="fo-m" data-margin><span class="d">§</span><span class="mo">write</span><span class="w">to him</span></div>
+      <div class="fo-body">
+        <h2 class="fo-h" id="fo-write-h">Write to him</h2>
+        <p class="fo-small">The address, to copy: <span class="fo-addr">matt@averagejoematt.com</span></p>
+        <p class="fo-note">The code, in full: <a href="https://github.com/averagejoematt/life-platform" rel="noopener">github.com/averagejoematt/life-platform</a></p>
+      </div>
+    </section>
+    <section class="fo-entry" id="fo-return" aria-labelledby="fo-return-h">
+      <div class="fo-m" data-margin></div>
+      <div class="fo-body">
+        <h2 class="fo-h" id="fo-return-h">Come back</h2>
+        <p class="fo-return fo-pending" id="fo-return-line" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>
+      </div>
+    </section>
   </main>
   <footer class="v7-foot"><nav aria-label="More"><a href="/next/protocols/">What he’s trying</a><a href="/next/story/about/">Who he is</a><a href="/next/method/">Under the hood</a><a href="/next/subscribe/">Follow</a><a href="/privacy/">Privacy</a></nav></footer>
   <nav class="v7-bar" aria-label="Pages"><a href="/next/">Home</a><a href="/next/cockpit/">Today</a><a href="/next/story/">This week</a><a href="/next/data/">His numbers</a><a href="/next/coaching/">The coaches</a></nav>
   <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_follow.js"></script>
 </body>
 </html>
