@@ -256,11 +256,15 @@ def test_phase_derivation_matches_the_two_facets_it_composes():
 
       /cockpit/    live-data, deps resolve to nothing (aggregate endpoints) → True
       /data/labs/  live-data, /api/labs → CROSS_PHASE in phase_taxonomy    → False
-      /story/about/ static                                                 → False
+      /privacy/    static                                                  → False
+
+    (The static specimen was /story/about/ until the v7 cut-over, ADR-157 — it is now the
+    live-data "Who he is" page reading /api/journey, /api/receipts …, and correctly flags True.)
     """
     assert a11y_audit.phase_dependent_page("/cockpit/") is True
     assert a11y_audit.phase_dependent_page("/data/labs/") is False
-    assert a11y_audit.phase_dependent_page("/story/about/") is False
+    assert a11y_audit.phase_dependent_page("/privacy/") is False
+    assert a11y_audit.phase_dependent_page("/story/about/") is True
     # an in-page anchor is not a manifest page and is never flagged
     assert a11y_audit.phase_dependent_page("/coaching/by-coach/#eli_marsh") is False
 
