@@ -165,3 +165,19 @@ test("the dated return line, a held draft's own words winning", () => {
   assert.equal(H.returnLine(null, null), "The next write-up’s date is not served right now.");
   assert.equal(H.returnLine({ chronicle: { paused: true, next_date: null, display: "" } }, null), "The next write-up has no date yet.");
 });
+
+test("getJSON drains a non-2xx body before returning null — an unread body holds networkidle open (the visual-QA rollback class)", async () => {
+  const calls = [];
+  const stub = (status, ok, body) => async () => ({ ok, status, json: async () => body, text: async () => { calls.push(`text:${status}`); return ""; } });
+  assert.deepEqual(await H.getJSON("/api/x", stub(200, true, { a: 1 })), { a: 1 });
+  assert.equal(calls.length, 0, "an ok body is read as JSON, not drained twice");
+  assert.equal(await H.getJSON("/api/x", stub(404, false, null)), null);
+  assert.deepEqual(calls, ["text:404"], "the 404 body was read");
+  assert.equal(await H.getJSON("/api/x", stub(500, false, null)), null);
+  assert.deepEqual(calls, ["text:404", "text:500"]);
+  // a drain that itself throws still returns null, never rejects
+  const throwing = async () => ({ ok: false, status: 502, json: async () => null, text: async () => { throw new Error("gone"); } });
+  assert.equal(await H.getJSON("/api/x", throwing), null);
+  // a fetch that rejects returns null
+  assert.equal(await H.getJSON("/api/x", async () => { throw new Error("offline"); }), null);
+});

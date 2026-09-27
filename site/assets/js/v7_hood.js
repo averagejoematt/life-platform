@@ -339,10 +339,15 @@ function renderReturn(cad, pending, vitals) {
   if (thr) thr.textContent = dataThrough(vitals && vitals.vitals && vitals.vitals.as_of_date);
 }
 
-async function getJSON(p) {
+/** One served JSON, or null. A non-2xx body is DRAINED before returning null: an unread body
+ *  stays "in flight" to Chromium, so `networkidle` never arrives and the visual-QA gate that
+ *  waits on it rolls the deploy back (proved live by the Today lane, Session AW). */
+export async function getJSON(p, fetchImpl = fetch) {
   try {
-    const r = await fetch(p, { headers: { accept: "application/json" } });
-    return r.ok ? await r.json() : null;
+    const r = await fetchImpl(p, { headers: { accept: "application/json" } });
+    if (r.ok) return await r.json();
+    await r.text().catch(() => "");
+    return null;
   } catch (e) {
     return null;
   }
