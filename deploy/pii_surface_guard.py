@@ -369,7 +369,8 @@ def iter_payload_leaves(node, path="$"):
 # and a bare 16-digit run at any OTHER path — including inside a content field that
 # merely happens to sit next to `_meta` — still fires
 # (test_card_arm_ignores_meta_request_id_but_not_a_sibling_card, tests/test_public_
-# surface_pii_guard.py).
+# surface_pii_guard.py). The skip lives in `_scan_fragment`, the one per-leaf/per-key
+# scan every endpoint-arm violation now flows through.
 _ENVELOPE_ID_PATHS = frozenset({"$.request_id", "$._meta.request_id"})
 
 
@@ -403,42 +404,71 @@ def _scan_keys(key_iter) -> list:
     return out
 
 
+def _masked(arm: str, detail: str) -> str:
+    """The endpoint arm's violation details never carry the matched value (#4164 box 3):
+    the scheduled sweep's log is a PUBLIC GitHub Actions run, so an echoed
+    blocked-category keyword or a leaked address in the red line would be a second
+    leak. scan_text's remaining details are already value-free."""
+    if arm == "blocked-vice":
+        return "blocked-category keyword (masked — #2370)"
+    if arm == "pii-email":
+        return "non-allowlisted email address"
+    return detail
+
+
+def _scan_fragment(path: str, text: str, vice, literals) -> list:
+    """Every value arm over ONE payload fragment — a scalar leaf or a key name —
+    each violation carrying the fragment's JSON path and a masked detail. The
+    pii-card arm alone skips the response envelope's own opaque per-request id
+    (`_ENVELOPE_ID_PATHS`, #4164); `_CARD_RE` itself is untouched."""
+    out = []
+    for arm, detail in scan_text(text, vice=vice, literals=literals):
+        if arm == "pii-card" and path in _ENVELOPE_ID_PATHS:
+            continue
+        out.append((arm, f"{path} ({_masked(arm, detail)})"))
+    if _GENETIC_VALUE_RE.search(text):
+        out.append(("pii-genetic", f"{path} (genetic identifier tell)"))
+    if _BIRTH_VALUE_RE.search(text):
+        out.append(("pii-age", f"{path} (birth-date/chronological-age tell)"))
+    return out
+
+
 def scan_endpoint_payload(text: str, vice=None, literals=None) -> list:
-    """All arms over one /api/* payload body: the existing scan_text arms PLUS the
+    """All arms over one /api/* payload body: the scan_text value arms PLUS the
     endpoint-only value tells, PLUS the key tells when the body parses as JSON.
 
-    #4164: the pii-card arm is re-run JSON-PATH scoped when the body parses — every
-    leaf scanned independently, skipping the response envelope's own opaque
-    per-request id (`_ENVELOPE_ID_PATHS`) rather than relaxing `_CARD_RE` itself, so
-    a bare 16-digit run at any OTHER path still fires. scan_text's own (whole-text,
-    unscoped) pii-card result is discarded in that case — it cannot tell `_meta.
-    request_id` apart from a planted card. Every pii-card violation this function
-    returns carries a JSON path in its detail and never the matched digits; a body
-    that fails to parse as JSON falls back to scan_text's whole-text result annotated
-    `(path=non-json)` — there is no path to scope by, so the arm cannot be scoped and
-    must still fire."""
-    base = scan_text(text, vice=vice, literals=literals)
-    out = [h for h in base if h[0] != "pii-card"]
+    #4164: when the body parses, every arm runs JSON-PATH scoped — each scalar leaf
+    and each key name scanned as its own fragment (`_scan_fragment`), so every
+    violation names the path of the match and never the matched value, and the
+    pii-card arm skips the envelope's own `request_id` by path rather than by
+    relaxing `_CARD_RE`. Leaves + keys cover every character a whole-document
+    `json.dumps` would have carried except the structural punctuation none of the
+    patterns can match across, so nothing the pre-#4164 whole-text scan caught goes
+    uncaught — it just arrives with a path. A body that fails to parse as JSON has no
+    path to scope by, so every arm falls back to the whole-text scan annotated
+    `(path=non-json)`, masked the same way — the arm cannot be scoped and must still
+    fire."""
+    vice = vice if vice is not None else _blocked_vice_keywords()
+    literals = literals if literals is not None else _literal_denylist()
     try:
         data = json.loads(text)
     except Exception:
         data = None
     if data is None:
-        for arm, detail in base:
-            if arm == "pii-card":
-                out.append((arm, f"{detail} (path=non-json)"))
-    else:
-        for path, leaf_text in iter_payload_leaves(data):
-            if path in _ENVELOPE_ID_PATHS:
-                continue
-            if _CARD_RE.search(_DOI_RE.sub(" ", leaf_text)):
-                out.append(("pii-card", f"{path} (16-digit number)"))
-    if _GENETIC_VALUE_RE.search(text):
-        out.append(("pii-genetic", "genetic identifier tell in payload text"))
-    if _BIRTH_VALUE_RE.search(text):
-        out.append(("pii-age", "birth-date/chronological-age tell in payload text"))
-    if data is not None:
-        out.extend(_scan_keys(iter_payload_keys(data)))
+        out = [(arm, f"{_masked(arm, detail)} (path=non-json)") for arm, detail in scan_text(text, vice=vice, literals=literals)]
+        if _GENETIC_VALUE_RE.search(text):
+            out.append(("pii-genetic", "genetic identifier tell (path=non-json)"))
+        if _BIRTH_VALUE_RE.search(text):
+            out.append(("pii-age", "birth-date/chronological-age tell (path=non-json)"))
+        return out
+    out = []
+    for path, leaf_text in iter_payload_leaves(data):
+        out.extend(_scan_fragment(path, leaf_text, vice, literals))
+    for path, key in iter_payload_keys(data):
+        # A key name that matches a VALUE pattern is itself the value, and its path
+        # would echo it — so the key fragment reports its parent's path + a mask.
+        out.extend(_scan_fragment(f"{path[: -len(key) - 1]}.<key masked>", key, vice, literals))
+    out.extend(_scan_keys(iter_payload_keys(data)))
     return out
 
 
