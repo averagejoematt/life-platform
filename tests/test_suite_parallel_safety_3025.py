@@ -79,7 +79,7 @@ IN_TREE_WRITERS = {
         "case is only reproducible when the registry the test AST-parses is the checkout's own (#4123)."
     ),
     "tests/test_branch_never_carries_platform_counts_3984.py": (
-        "rewrites the REAL lambdas/web/platform_counts.py (a bumped `lambdas`, a deleted `test_count` line) "
+        "rewrites the REAL lambdas/web/platform_counts.py (a bumped `lambdas`, a deleted `alarms` line) "
         "to prove the literal gate tolerates bot-owned drift off main and still reds a broken counter — "
         "the gate under test runs as a subprocess against the checkout, so the checkout is the fixture."
     ),

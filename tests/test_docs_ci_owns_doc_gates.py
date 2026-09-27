@@ -290,16 +290,29 @@ def _counts_mod():
 _COUNTS_FILE = os.path.join(_REPO, "lambdas", "web", "platform_counts.py")
 
 
-def _stale_test_count():
-    """A value wrong-by-construction relative to the COMMITTED literal (which is
-    allowed to lag reality between reconcile-bot runs — never assume its value)."""
-    m = re.search(r'"test_count":\s*(\d+)', _read(_COUNTS_FILE))
-    assert m, "no test_count literal in platform_counts.py — the literal shape drifted"
+def _counts_copy(tmp_path, *, test_count_line: bool):
+    """A copy of the generated module in one of its two #4250 shapes. `test_count` is no
+    longer a committed counter (bundle-stamped); the reconcile bot deletes the literal on
+    main. With `test_count_line=True` the copy carries it (the pre-#4250 shape the generic
+    PR-exemption mechanism is exercised on); with False it is the steady-state shape."""
+    body = re.sub(r'^\s*"test_count":\s*\d+,?\s*\n', "", _read(_COUNTS_FILE), flags=re.M)
+    if test_count_line:
+        body = body.replace("DISCOVERED_COUNTS = {\n", 'DISCOVERED_COUNTS = {\n    "test_count": 12345,\n', 1)
+    path = tmp_path / "platform_counts.py"
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _stale_test_count(path):
+    """A value wrong-by-construction relative to the literal in `path` — never assume it."""
+    m = re.search(r'"test_count":\s*(\d+)', _read(str(path)))
+    assert m, "no test_count literal in the copy — the literal shape drifted"
     return int(m.group(1)) + 1
 
 
 def _stale_adrs():
-    """Same shape as `_stale_test_count`, for the #3437 `adrs` field."""
+    """A value wrong-by-construction relative to the COMMITTED #3437 `adrs` literal (which is
+    allowed to lag reality between reconcile-bot runs — never assume its value)."""
     m = re.search(r'"adrs":\s*(\d+)', _read(_COUNTS_FILE))
     assert m, "no adrs literal in platform_counts.py — the literal shape drifted"
     return int(m.group(1)) + 1
@@ -323,10 +336,11 @@ def test_the_pr_exemption_covers_exactly_the_two_bot_owned_literals():
     )
 
 
-def test_pull_request_event_reports_test_count_as_info_not_drift(monkeypatch):
+def test_pull_request_event_reports_test_count_as_info_not_drift(monkeypatch, tmp_path):
     mod = _counts_mod()
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
-    changes = mod.sync({"test_count": _stale_test_count()}, dry_run=True)
+    copy = _counts_copy(tmp_path, test_count_line=True)
+    changes = mod.sync({"test_count": _stale_test_count(copy)}, dry_run=True, path=copy)
     assert not any(c.startswith("  ~") for c in changes), f"a PR run still counts test_count as drift: {changes}"
     info = [c for c in changes if c.startswith("  i ")]
     # Visible, never silent: the skipped literal is NAMED, with both values and the owner.
@@ -336,7 +350,7 @@ def test_pull_request_event_reports_test_count_as_info_not_drift(monkeypatch):
 
 
 @pytest.mark.parametrize("event", ["push", "schedule", "workflow_dispatch", None])
-def test_the_exemption_is_dead_outside_pull_request_events(monkeypatch, event):
+def test_the_exemption_is_dead_outside_pull_request_events(monkeypatch, event, tmp_path):
     """push/main runs (and local runs, where GITHUB_EVENT_NAME is absent) keep the
     literal fully enforced — a wrong count on main still reds main's own run."""
     mod = _counts_mod()
@@ -344,20 +358,21 @@ def test_the_exemption_is_dead_outside_pull_request_events(monkeypatch, event):
         monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     else:
         monkeypatch.setenv("GITHUB_EVENT_NAME", event)
-    changes = mod.sync({"test_count": _stale_test_count()}, dry_run=True)
+    copy = _counts_copy(tmp_path, test_count_line=True)
+    changes = mod.sync({"test_count": _stale_test_count(copy)}, dry_run=True, path=copy)
     assert any(
         c.startswith("  ~") and "test_count" in c for c in changes
     ), f"event={event!r} must enforce the test_count literal, got: {changes}"
     assert not any(c.startswith("  i") for c in changes), f"the exemption fired outside pull_request: {changes}"
 
 
-def test_pull_request_event_reports_adrs_as_info_not_drift(monkeypatch):
+def test_pull_request_event_reports_adrs_as_info_not_drift(monkeypatch, tmp_path):
     """#3437 parity: `adrs` gets the exact same pull_request treatment as test_count —
     this is the inverted #3432 reproduction (a stale `adrs` literal, standing in for
     what a freshly-minted `## ADR-NNN` heading would produce, must not fail --check)."""
     mod = _counts_mod()
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
-    changes = mod.sync({"adrs": _stale_adrs()}, dry_run=True)
+    changes = mod.sync({"adrs": _stale_adrs()}, dry_run=True, path=_counts_copy(tmp_path, test_count_line=False))
     assert not any(c.startswith("  ~") for c in changes), f"a PR run still counts adrs as drift: {changes}"
     info = [c for c in changes if c.startswith("  i ")]
     assert (
@@ -379,13 +394,15 @@ def test_the_adrs_exemption_is_dead_outside_pull_request_events(monkeypatch, eve
     assert not any(c.startswith("  i") for c in changes), f"the exemption fired outside pull_request: {changes}"
 
 
-def test_the_adrs_exemption_does_not_swallow_a_concurrent_genuine_drift(monkeypatch):
+def test_the_adrs_exemption_does_not_swallow_a_concurrent_genuine_drift(monkeypatch, tmp_path):
     """The must-fail positive control (#3437 acceptance): exempting `adrs` must not
     blanket-exempt the PR — a genuine drift on any OTHER field in the SAME sync call
     still fails --check's accounting."""
     mod = _counts_mod()
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
-    changes = mod.sync({"adrs": _stale_adrs(), "mcp_tools": _stale_test_count() + 999999}, dry_run=True)
+    changes = mod.sync(
+        {"adrs": _stale_adrs(), "mcp_tools": _stale_adrs() + 999999}, dry_run=True, path=_counts_copy(tmp_path, test_count_line=False)
+    )
     assert any(
         c.startswith("  ~") and "mcp_tools" in c for c in changes
     ), f"a genuine same-PR drift on a non-exempt field was swallowed by the adrs exemption: {changes}"
@@ -393,7 +410,7 @@ def test_the_adrs_exemption_does_not_swallow_a_concurrent_genuine_drift(monkeypa
     assert len(info) == 1 and "adrs" in info[0], f"adrs itself must still be reported as the exemption, not drift: {changes}"
 
 
-def test_every_other_literal_stays_enforced_on_pull_request(monkeypatch):
+def test_every_other_literal_stays_enforced_on_pull_request(monkeypatch, tmp_path):
     """Guard the SET, not the instance: derive the non-exempt fields from the generated
     module itself, so a counter added later is covered without editing this test."""
     import sys
@@ -405,7 +422,7 @@ def test_every_other_literal_stays_enforced_on_pull_request(monkeypatch):
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
     stale = {k: v + 1 for k, v in DISCOVERED_COUNTS.items() if k not in mod.PR_EXEMPT_FIELDS}
     assert stale, "no non-exempt discovered counters found — DISCOVERED_COUNTS drifted"
-    changes = mod.sync(stale, dry_run=True)
+    changes = mod.sync(stale, dry_run=True, path=_counts_copy(tmp_path, test_count_line=False))
     flagged = {c.split()[2].rstrip(":") for c in changes if c.startswith("  ~")}
     assert flagged == set(stale), f"every non-exempt literal must still red a PR run: expected {sorted(stale)}, flagged {sorted(flagged)}"
     assert not any(c.startswith("  i") for c in changes), f"the exemption leaked beyond PR_EXEMPT_FIELDS: {changes}"
@@ -416,10 +433,9 @@ def test_the_pr_exemption_never_writes_the_counter(tmp_path, monkeypatch):
     writing it is exactly what the branch is forbidden to do."""
     mod = _counts_mod()
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
-    copy = tmp_path / "platform_counts.py"
-    body = _read(_COUNTS_FILE)
-    copy.write_text(body, encoding="utf-8")
-    mod.sync({"test_count": _stale_test_count()}, dry_run=False, path=copy)
+    copy = _counts_copy(tmp_path, test_count_line=True)
+    body = _read(str(copy))
+    mod.sync({"test_count": _stale_test_count(copy)}, dry_run=False, path=copy)
     assert copy.read_text(encoding="utf-8") == body, "the PR exemption wrote the counter it exists to not write"
 
 

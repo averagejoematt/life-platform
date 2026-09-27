@@ -63,6 +63,15 @@ PATH = ROOT / "lambdas" / "web" / "platform_counts.py"
 # every other DECISIONS.md-derived literal stays strict instead of joining this set.
 PR_EXEMPT_FIELDS = frozenset({"test_count", "adrs"})
 
+# #4250: `test_count` is no longer a committed counter — deploy/build_bundle.py stamps it
+# into every bundle (lambdas/web/bundle_counts.py reads it). It changed on nearly every
+# merge, so the reconcile bot committed to main after nearly every merge. The sync no
+# longer writes it; a leftover `"test_count": N` line in the counter module is reported as
+# `~` drift and `--apply` DELETES it (on main: the first reconcile after #4250, once).
+# It stays in PR_EXEMPT_FIELDS so a pull_request run reports the leftover line as `i`, not
+# drift — the branch that retires it is policy-forbidden to edit the module (#3101).
+BUNDLE_STAMPED_FIELD = "test_count"
+
 
 def _is_pr_event() -> bool:
     """True only inside a GitHub Actions `pull_request` run (GITHUB_EVENT_NAME is set by
@@ -101,6 +110,15 @@ def sync(values: dict, dry_run: bool, path: Path = PATH) -> list[str]:
             continue
         src = re.sub(pattern, rf"\g<1>{int(value)}", src, count=1)
         changes.append(f"  ~ DISCOVERED_COUNTS {field}: {old} → {int(value)}")
+    stamped = re.compile(rf'^[ \t]*"{BUNDLE_STAMPED_FIELD}":[ \t]*\d+,?[ \t]*\n', re.MULTILINE)
+    if BUNDLE_STAMPED_FIELD not in values and stamped.search(src):  # an explicit value keeps the generic path above
+        if BUNDLE_STAMPED_FIELD in PR_EXEMPT_FIELDS and _is_pr_event():
+            changes.append(f"  i PR-EXEMPT {BUNDLE_STAMPED_FIELD}: retired literal (#4250), removed by the reconcile bot on main")
+        else:
+            src = stamped.sub("", src, count=1)
+            changes.append(
+                f"  ~ DISCOVERED_COUNTS {BUNDLE_STAMPED_FIELD}: retired literal removed — stamped into the bundle at build (#4250)"
+            )
     if any(c.startswith("  ~") for c in changes) and not dry_run:
         path.write_text(src, encoding="utf-8")
     return changes
