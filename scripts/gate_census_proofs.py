@@ -2497,35 +2497,40 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
 }
 
 # ── #4190: the tool-call XML residue guard (lambdas/common/text_guards.py) ─────────────
-# Proved by neutering the strip side of the guard — `strip_tool_call_residue` replaced
-# with a straight `return text` in the REAL tracked module — which fails it open at both
-# defence-in-depth call sites (mcp/handler.py's write-tool dispatch guard and the
-# site-api decisions serializer) without touching `has_tool_call_residue` or the regex
-# itself, since a mutation that also breaks detection would not isolate which half failed.
+# Second cut (2026-09-26, the refuse-not-trim ruling): proved by neutering the DETECT side —
+# `find_tool_call_residue` replaced with a straight `return None` in the REAL tracked module.
+# That fails the MCP write-door refuser open (`residue_fragments` finds nothing, every write
+# proceeds) and `has_tool_call_residue` with it, while `strip_tool_call_residue` — which
+# searches the regex directly — keeps working, so the mutation isolates the refuse half from
+# the serve-time strip. The first cut's proof (strip neutered, 33/68 of 101) is superseded:
+# the door no longer trims, so a strip mutation would no longer touch it.
 GUARD_PROOFS.update(
     {
         "guard::lambdas/common/text_guards.py": {
             "gate_name": "lambdas/common/text_guards.py",
-            "command": "python3 -m pytest tests/test_mcp_tool_call_residue_guard_4190.py -q   # 101 tests, baseline 101 passed",
+            "command": "python3 -m pytest tests/test_mcp_tool_call_residue_guard_4190.py -q   # 260 tests, baseline 260 passed",
             "mutation": (
-                "`strip_tool_call_residue` body replaced with a single `return text` in the real tracked "
-                "module — every string, residue or not, now passes through unchanged. `has_tool_call_residue` "
-                "and TOOL_CALL_RESIDUE_RE were left untouched, so detection still fires; only the strip side "
-                "is neutered."
+                "`find_tool_call_residue` body replaced with a single `return None` in the real tracked "
+                "module — no string is ever reported as carrying residue, so the dispatch refuser "
+                "(mcp/handler.py::_refuse_tool_call_residue) lets every write through. TOOL_CALL_RESIDUE_RE, "
+                "TOOL_CALL_ENVELOPE_RE and `strip_tool_call_residue` were left untouched, so the serve-time "
+                "strip and the leak-token sweep still fire; only the detect/refuse side is neutered."
             ),
             "observed": (
-                "2026-09-26. BASELINE 101 passed. MUTATED: 33 failed, 68 passed — every "
-                "test_every_write_tool_is_sanitized_by_the_dispatch_guard[<tool>] case (17 write tools), "
-                "test_dispatch_guard_walks_nested_dicts_and_lists, and "
-                "test_log_decision_end_to_end_strips_residue_via_real_dispatch, each on the residue surviving "
-                "into the cleaned/stored value it should have been truncated out of. REVERTED (md5 restored to "
-                "28c26ca6fa2eed8326286ef09b289df7, matching pre-mutation): 101 passed."
+                "2026-09-26. BASELINE 260 passed. MUTATED: 190 failed, 70 passed — all 156 "
+                "test_every_free_text_field_of_every_write_door_refuses_the_live_residue[<door>.<field>] cases "
+                "(27 write tools x their registry-derived free-text fields), the 23 envelope-shape and 5 "
+                "generic-tag detection cases, the ordering test (refusal before the validator and the rate "
+                "limiter), the no-modify test, the nested-walk test, the end-to-end refusal, and the guard-off "
+                "control itself. REVERTED (md5 restored to 76f96f825a1a555cb0547bfc3e36bc10, matching "
+                "pre-mutation): 260 passed. A second, handler-level control — the CALL to the refuser removed "
+                "from handle_tools_call — fails 158 (every door.field, named) / 102 passed, reverted 260 passed "
+                "(md5 5029aa3925cb5186a56cf6311681b3d7)."
             ),
             "scope": (
-                "This proves the strip half only. The detect half (`has_tool_call_residue` / "
-                "TOOL_CALL_RESIDUE_RE) is exercised by the same suite's clean-string and residue-fixture cases "
-                "but was not itself mutated here — regex-pattern drift (a form the live incident didn't cover "
-                "silently stops matching) is a separate, unproven risk this record does not close."
+                "This proves the detect/refuse half at the MCP door. The serve-time strip "
+                "(`strip_tool_call_residue`, lambdas/web/site_api_thirdwall.py) is exercised by "
+                "tests/test_site_api_decisions_residue_guard_4190.py but was not itself mutated here."
             ),
             "proved_on": "2026-09-26",
         }

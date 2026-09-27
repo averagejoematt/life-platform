@@ -44,6 +44,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from lambdas.common.text_guards import TOOL_CALL_ENVELOPE_RE  # noqa: E402  (#4190 — one pattern set, three doors)
 
 # JSON endpoints to fetch and inspect for stale fields. cycle_compare must show
 # the NEW cycle; the two feed indexes must not carry prior-cycle entries.
@@ -111,16 +112,13 @@ FORBIDDEN_TOKENS = [
     # assembling (a client-side parsing bug), later stored and served verbatim. A
     # 2026-09-08 log_decision record's `decision` field ended
     # `…</decision>\n<parameter name="followed">true` and rendered as prose on
-    # /protocols/experiments/. Deliberately NOT a bare `<` here (unlike
-    # common.text_guards.TOOL_CALL_RESIDUE_RE, the write-time/serve-time guard this
-    # sweep backstops) — this sweep scans full page HTML, which is legitimately
-    # full of `<div>`/`<span>` markup; only the literal tool-call forms are
-    # unambiguous on a rendered page or a JSON body alike.
-    (
-        "Tool-call XML residue",
-        re.compile(r"</decision>|<parameter\s+name\s*=|</parameter>|<invoke\b|</invoke>|<function_calls\b|</function_calls>"),
-        [],
-    ),
+    # /protocols/experiments/. The pattern is THE SAME OBJECT the write-door refuser
+    # and the serve-time strip use (`common.text_guards.TOOL_CALL_ENVELOPE_RE`) —
+    # derived, not a second hand-typed copy that drifts. It is the envelope set,
+    # not the wider per-argument `TOOL_CALL_RESIDUE_RE`: this sweep scans full page
+    # HTML, which is legitimately full of `<div>`/`<span>` markup, and only the
+    # literal tool-call forms are unambiguous on a rendered page or a JSON body.
+    ("Tool-call XML residue", TOOL_CALL_ENVELOPE_RE, []),
 ]
 
 # The subset of FORBIDDEN_TOKENS that only makes sense while the CURRENT cycle
