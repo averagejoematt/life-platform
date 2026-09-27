@@ -33,7 +33,7 @@ for _p in (_ROOT, os.path.join(_ROOT, "lambdas")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from common.text_guards import has_tool_call_residue  # noqa: E402
+from common.text_guards import find_tool_call_residue  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 # The runtime content filter's term source — same fixture shape site_api_common
@@ -85,7 +85,7 @@ def test_decisions_field_residue_is_stripped_at_serve_time(monkeypatch):
     assert body["count"] == 1
     d0 = body["decisions"][0]
     assert d0["decision"] == LIVE_RESIDUE_CLEAN
-    assert not has_tool_call_residue(d0["decision"])
+    assert find_tool_call_residue(d0["decision"]) is None
 
 
 def test_override_reason_residue_is_stripped_at_serve_time(monkeypatch):
@@ -101,7 +101,7 @@ def test_override_reason_residue_is_stripped_at_serve_time(monkeypatch):
     body = _coach_decisions(monkeypatch, rows)
     d0 = body["decisions"][0]
     assert d0["override_reason"] == LIVE_RESIDUE_CLEAN
-    assert not has_tool_call_residue(d0["override_reason"])
+    assert find_tool_call_residue(d0["override_reason"]) is None
 
 
 def test_note_residue_is_stripped_before_the_all_or_nothing_screen(monkeypatch):
@@ -120,7 +120,7 @@ def test_note_residue_is_stripped_before_the_all_or_nothing_screen(monkeypatch):
     body = _coach_decisions(monkeypatch, rows)
     assert body["count"] == 1, "a note carrying residue must still publish once the residue is stripped, not be withheld"
     d0 = body["decisions"][0]
-    assert not has_tool_call_residue(d0["note"])
+    assert find_tool_call_residue(d0["note"]) is None
     # Only the tool-call-XML TAIL (from the first `<`) is residue — everything
     # before it, including "Committed to Hevy..." run together with no space, is
     # real prior text and must survive.
@@ -140,3 +140,44 @@ def test_clean_decision_is_unaffected_by_the_new_strip(monkeypatch):
     body = _coach_decisions(monkeypatch, rows)
     assert body["decisions"][0]["decision"] == "Take a rest day."
     assert body["decisions"][0]["note"] == "Needed it."
+
+
+# ── the tightened pattern set (#4190, second cut): no bare-`<` catch-all ─────
+# The write door now REFUSES residue rather than trimming it, so the pattern both
+# doors share had to stop treating every `<` as residue — a refuser that bounced
+# "keep HR < 150" would rewrite the owner's words by another route. Serve time
+# inherits the same tightening: an inequality in his note survives verbatim, while
+# every real envelope shape (and the generic field-closer form) is still stripped.
+
+
+def test_an_inequality_in_the_owners_note_survives_serve_time_verbatim(monkeypatch):
+    note = "Kept HR < 150 the whole ride; deficit < 500 kcal."
+    rows = [
+        _dec_row("2026-09-08T05:08:54.979Z", decision="Ride easy, HR < 150.", followed=True, note=note, note_at="2026-09-08T05:08:54.979Z")
+    ]
+    body = _coach_decisions(monkeypatch, rows)
+    assert body["count"] == 1
+    assert body["decisions"][0]["note"] == note
+    assert body["decisions"][0]["decision"] == "Ride easy, HR < 150."
+
+
+def test_other_field_closers_and_envelope_shapes_are_still_stripped_at_serve_time(monkeypatch):
+    """The specimen closed `decision`; another leaked argument would close as
+    `</note>` or `</override_reason>`, and a results envelope as
+    `<function_results>`. All are the same class and all are stripped."""
+    rows = [
+        _dec_row(
+            "2026-09-08T05:08:54.979Z",
+            decision='Take a rest day.</override_reason>\n<parameter name="followed">false',
+            followed=False,
+            override_reason="Felt fine.<function_results>ok</function_results>",
+            note="My call.</note>",
+            note_at="2026-09-08T05:08:54.979Z",
+        )
+    ]
+    body = _coach_decisions(monkeypatch, rows)
+    d0 = body["decisions"][0]
+    assert d0["decision"] == "Take a rest day."
+    assert d0["override_reason"] == "Felt fine."
+    assert d0["note"] == "My call."
+    assert all(find_tool_call_residue(d0[k]) is None for k in ("decision", "override_reason", "note"))

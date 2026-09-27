@@ -437,12 +437,18 @@ WRITE_PLATFORM_MEMORY_DESCRIPTION = (
     "life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. "
     "Writes are validated against the code taxonomy (lambdas/platform_memory.py) and stamped "
     "channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — "
-    "that is what reaches coach prompts. Call list_memory_categories for the full taxonomy."
+    "that is what reaches coach prompts. Call list_memory_categories for the full taxonomy. "
+    "ADDITIVE (#4171): every write is a new row keyed by content — a second note on the same day never "
+    "erases the first, and an identical replay converges (status 'unchanged'). The ONLY way to overwrite is "
+    "replace_key=<the exact sk read_platform_memory returned>, which rewrites that one row and refuses an "
+    "absent key. There is no overwrite flag."
 )
 
 READ_PLATFORM_MEMORY_DESCRIPTION = (
     "Retrieve recent memory records for a given category from the platform_memory partition. "
-    "Use to pull coaching calibration, failure patterns, or episodic wins into context."
+    "Use to pull coaching calibration, failure patterns, or episodic wins into context. "
+    "Every same-day record is returned (newest stored first) and each carries its `sk` — the handle "
+    "write_platform_memory's replace_key and delete_platform_memory's key take (#4171)."
 )
 
 LIST_MEMORY_CATEGORIES_DESCRIPTION = (
@@ -452,7 +458,9 @@ LIST_MEMORY_CATEGORIES_DESCRIPTION = (
 )
 
 DELETE_PLATFORM_MEMORY_DESCRIPTION = (
-    "Delete a specific platform_memory record by category + date. Use to correct bad memories or remove stale records."
+    "Delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
+    "category + key (the exact sk from read_platform_memory — the only handle for a per-note row, #4171). "
+    "Use to correct bad memories or remove stale records."
 )
 
 LOG_DECISION_DESCRIPTION = (

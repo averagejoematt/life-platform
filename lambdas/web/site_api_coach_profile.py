@@ -24,6 +24,7 @@ from coach import (
     audience_guard,  # #4213: the by-coach slots serve the public twin or nothing
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
+    coach_record,  # #4220: the ONE record producer — K of N through <day>, from the PREDICTION# ledger
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
     latest_checked,  # E1 / #4182: the ledger line — the coach's most recent GRADED call, audience-guarded
     lead_daily_read,  # #4188: the head coach's daily grounded lead read (LEAD_DAILY# rows)
@@ -124,7 +125,14 @@ def _reader_reason(raw):
 def _track_record(coach_id, *, _g):
     """Confirmed/refuted hit-rate from the COACH#<id>/LEARNING# eval trail (CC-02).
     Honest pre-D-05: empty -> hit_rate None, preliminary True. Always labelled
-    self-assessment, never external validation (ER-05)."""
+    self-assessment, never external validation (ER-05).
+
+    #4220: this is the coach page's SELF-ASSESSED report card, not the record. The
+    LEARNING# trail is a second write of each grade (and, per #4216, can carry one
+    docket re-recorded daily), so no headline or scorecard derives from it any more —
+    the record every public surface prints is ``coach.coach_record`` over PREDICTION#.
+    Named, not fixed here: Park's report card read 7 of 16 while the record read 7 of 17
+    on 2026-09-26 (the LEARNING# page cap of 60 and the docket dupes are both in play)."""
     _reader_reason = _g["_reader_reason"]
     table = _g["table"]
     confirmed = refuted = 0
@@ -552,7 +560,6 @@ def handle_coaches(event, *, _g):
     """GET /api/coaches — the roster (CC-01). Shaped-empty 200 by design."""
     _COACH_MODULES = _g["_COACH_MODULES"]
     _registry = _g["_registry"]
-    _track_record = _g["_track_record"]
     persona_registry = _g["persona_registry"]
     if not _COACH_MODULES:
         return _ok({"coaches": [], "count": 0, "disclosure": _DISCLOSURE}, cache_seconds=60)
@@ -563,10 +570,13 @@ def handle_coaches(event, *, _g):
         coaches = []
         absent = _absent_coaches(_g)
         for pid, p in ops.items():
-            tr = _track_record(pid)
-            headline = (
-                f"{tr['hit_rate_pct']:.0f}% hit-rate · n={tr['decided']}" if tr["hit_rate_pct"] is not None else "track record accruing"
-            )
+            # #4220: the record is the PREDICTION# ledger's, counted by the ONE producer
+            # (coach.coach_record) that /api/calibration, /api/predictions and /api/wrong
+            # also derive from — never the LEARNING# re-count `_track_record` makes (that
+            # trail carries a docket re-recorded daily, #4216, and printed Webb "80% · n=25"
+            # beside the scorecard's 0 of 5). `_track_record` still feeds the coach page's
+            # self-assessed report card; it no longer feeds a headline.
+            record = coach_record.for_coach(_g["table"], pid, genesis=_g["EXPERIMENT_START"])
             coaches.append(
                 {
                     "persona_id": pid,
@@ -576,7 +586,8 @@ def handle_coaches(event, *, _g):
                     "emoji": p.get("emoji"),
                     "color": p.get("color"),
                     "board_role": p.get("board_role"),
-                    "headline_stat": headline,
+                    "headline_stat": coach_record.headline(record),
+                    "record": record,  # {confirmed, refuted, n, through} — K of N through <day>
                     "tier": "staff",
                     "latest_checked": latest_checked.for_coach(_g["table"], pid),
                     # #4217: the coach's domain instrument ({source, datatype} or null) —
@@ -604,6 +615,7 @@ def handle_coaches(event, *, _g):
                     "color": lead.get("color"),
                     "board_role": lead.get("board_role"),
                     "headline_stat": "runs the program",
+                    "record": None,  # #4220: no graded calls — null, never a zero record
                     "tier": "lead",
                     "latest_checked": None,  # E1: the lead makes no graded calls — null, never a placeholder
                     "instrument": None,  # #4217: the lead reads the whole board; no single sensor is his

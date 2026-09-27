@@ -9,7 +9,7 @@
 // The pure builders are exported so the node tests can drive them from fixtures; mount()
 // is the only thing that touches the DOM, and only when the Home slots are on the page.
 import { tryJSON, esc, todayPT } from "/assets/js/evidence_shared.js";
-import { dayInWords, instantDayInWords, countWord, dayLabel } from "/assets/js/entry_age.js";
+import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText } from "/assets/js/entry_age.js";
 
 const HORIZON = 30; // the day the next photo is due (the first, day 1, is on the fold — #3761)
 const DAY1_PHOTO_DATE = "2026-09-06"; // the day the fold's photograph was taken (its file name carries the same date)
@@ -124,12 +124,12 @@ export function leadSentence(journey, coachCount) {
 
 // The alive line: data through · the coaches' checked calls K of N · next write-up. The ONE
 // "Data through" on the page.
-export function aliveLine(throughDate, calibration, cadence) {
+export function aliveLine(throughDate, calibration, cadence, throughSrc = "vitals.as_of_date") {
   const parts = [];
-  if (throughDate) parts.push(`Data through <b${src("vitals.as_of_date")}>${esc(dayInWords(throughDate))}</b>`);
+  if (throughDate) parts.push(`Data through <b${src(throughSrc)}>${esc(dayInWords(throughDate))}</b>`);
   const c = calibration && calibration.platform && calibration.platform.strata && calibration.platform.strata.coaches;
   if (c && num(c.n) !== null && num(c.confirmed) !== null) {
-    parts.push(`the coaches’ checked calls so far, by the site’s scorekeeper: <b>${span("calibration.platform.strata.coaches.confirmed", String(c.confirmed))} of ${span("calibration.platform.strata.coaches.n", String(c.n))}</b> right`);
+    parts.push(`the coaches’ checked calls so far, by the site’s own count: <b>${span("calibration.platform.strata.coaches.confirmed", String(c.confirmed))} of ${span("calibration.platform.strata.coaches.n", String(c.n))}</b> right`);
   } else parts.push("no checked coach call is served yet");
   const ch = cadence && cadence.chronicle;
   if (ch && !ch.paused && ch.next_date) parts.push(`next write-up <b>${time(ch.next_date, "content_cadence.chronicle.next_date")}</b>`);
@@ -209,14 +209,16 @@ export function wordsBlock(decisions, pulse) {
     const earliest = byTime[0];
     const latest = byTime[byTime.length - 1];
     const ptDay = (d) => (d.at ? new Date(Date.parse(d.at)).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) : d.date);
-    // Every note from the first evening, in order — not just the first of them.
-    const firstEvening = byTime.filter((d) => d !== latest && ptDay(d) === ptDay(earliest));
+    // Every note from the first evening, in order — not just the first of them. A lone note is
+    // both earliest and latest: it prints once, as the earliest (it used to print nowhere).
+    const firstEvening = byTime.filter((d) => (byTime.length === 1 || d !== latest) && ptDay(d) === ptDay(earliest));
+    const stampSrc = (d) => `decisions[${d.i}].${d.at ? "note_at" : "date"}`;
     firstEvening.forEach((d, k) => {
-      out.push(`<p class="v7h-dated">${esc(stamp(d))} — ${k === 0 ? "the earliest note of his on file, to his coaches" : "the same evening"}:</p>`);
+      out.push(`<p class="v7h-dated"${src(stampSrc(d))}>${esc(stamp(d))} — ${k === 0 ? "the earliest note of his on file, to his coaches" : "the same evening"}:</p>`);
       out.push(`<blockquote${src(`decisions[${d.i}].note`)}>“${esc(d.note)}”</blockquote>`);
     });
     if (latest !== earliest) {
-      out.push(`<p class="v7h-dated">${esc(stamp(latest))} — the most recent words of his on file:</p>`);
+      out.push(`<p class="v7h-dated"${src(stampSrc(latest))}>${esc(stamp(latest))} — the most recent words of his on file:</p>`);
       out.push(`<blockquote${src(`decisions[${latest.i}].note`)}>“${esc(latest.note)}”</blockquote>`);
     }
   }
@@ -268,14 +270,16 @@ export function okayBlock(sleep, vitals, nutrition, training, pulse) {
     const latest = n.latest_date || (trend.length ? trend[trend.length - 1].date : "");
     const spanDays = first && latest ? dayNum(latest) - dayNum(first) + 1 : null;
     const every = spanDays !== null && spanDays === logged;
+    const firstW = span("nutrition_overview.nutrition_trend[0].date", dayInWords(first, { weekday: false }));
+    const latestW = span(n.latest_date ? "nutrition_overview.nutrition.latest_date" : "nutrition_overview.nutrition_trend[last].date", dayInWords(latest));
     let e = every
-      ? `He logged food every day from ${dayInWords(first, { weekday: false })} to ${dayInWords(latest)} — ${span("nutrition_overview.nutrition.days_logged", String(logged))} days`
-      : `He logged food on ${span("nutrition_overview.nutrition.days_logged", String(logged))}${spanDays !== null ? ` of the ${spanDays} days from ${dayInWords(first, { weekday: false })} to ${dayInWords(latest)}` : " days"}`;
+      ? `He logged food every day from ${firstW} to ${latestW} — ${span("nutrition_overview.nutrition.days_logged", String(logged))} days`
+      : `He logged food on ${span("nutrition_overview.nutrition.days_logged", String(logged))}${spanDays !== null ? ` of the ${span("nutrition_overview.nutrition_trend[0].date → nutrition.latest_date", String(spanDays))} days from ${firstW} to ${latestW}` : " days"}`;
     if (num(n.avg_calories) !== null) e += ` — averaging ${span("nutrition_overview.nutrition.avg_calories", fmtInt(n.avg_calories))} calories`;
     if (num(n.avg_protein_g) !== null) e += `${num(n.avg_calories) !== null ? " and" : " — averaging"} ${span("nutrition_overview.nutrition.avg_protein_g", fmtInt(n.avg_protein_g))} g of protein`;
     e += ".";
     if (num(n.protein_floor_g) !== null && num(n.protein_floor_hit_days) !== null) {
-      e += ` The ${span("nutrition_overview.nutrition.protein_floor_g", fmtInt(n.protein_floor_g))} g protein floor was cleared on ${span("nutrition_overview.nutrition.protein_floor_hit_days", String(n.protein_floor_hit_days))} of those ${logged} days.`;
+      e += ` The ${span("nutrition_overview.nutrition.protein_floor_g", fmtInt(n.protein_floor_g))} g protein floor was cleared on ${span("nutrition_overview.nutrition.protein_floor_hit_days", String(n.protein_floor_hit_days))} of those ${span("nutrition_overview.nutrition.days_logged", String(logged))} days.`;
     }
     if (n.avg_deficit_published === false) e += ` <span${src("nutrition_overview.nutrition.avg_deficit_published")}>The site does not publish a calorie deficit: its estimate is larger than it is willing to vouch for.</span>`;
     else if (num(n.avg_deficit) !== null) e += ` Its average deficit reads ${span("nutrition_overview.nutrition.avg_deficit", fmtInt(n.avg_deficit))} calories a day.`;
@@ -287,8 +291,9 @@ export function okayBlock(sleep, vitals, nutrition, training, pulse) {
   const lifts = num(t.strength_sessions_30d);
   const walks = num(w.total_walks_30d);
   let tr = "";
-  if (lifts !== null) tr += `${span("training_overview.training.strength_sessions_30d", countWord(lifts, { capital: true }))} lifting session${lifts === 1 ? "" : "s"} in the last 30 days, by the strength-session count`;
-  if (walks !== null) tr += `${tr ? ", and " : ""}${span("training_overview.walking.total_walks_30d", countWord(walks))} walk${walks === 1 ? "" : "s"}${tr ? "" : " in the last 30 days"}`;
+  const window30 = (field) => `in the last ${span(field, "30")} days`;
+  if (lifts !== null) tr += `${span("training_overview.training.strength_sessions_30d", countWord(lifts, { capital: true }))} lifting session${lifts === 1 ? "" : "s"} ${window30("training_overview.training.strength_sessions_30d")}, by the strength-session count`;
+  if (walks !== null) tr += `${tr ? ", and " : ""}${span("training_overview.walking.total_walks_30d", countWord(walks))} walk${walks === 1 ? "" : "s"}${tr ? "" : ` ${window30("training_overview.walking.total_walks_30d")}`}`;
   if (tr) tr += ".";
   const sessions = (training && training.cardio_sessions) || [];
   if (sessions.length && sessions[0].date) {
@@ -321,7 +326,7 @@ export function okayBlock(sleep, vitals, nutrition, training, pulse) {
 // ── also on the record ─────────────────────────────────────────────────────────
 export function recordBlock(calibration, wrong, predictions, freshness, pulse) {
   const items = [];
-  // Two scorekeepers that disagree, per coach, both left up.
+  // Two counts that disagree, per coach, both left up (R5 §d: no house jargon — "count", not "scorekeeper").
   const cal = (calibration && calibration.coaches) || [];
   const byCoach = (wrong && wrong.predictions && wrong.predictions.by_coach) || [];
   cal.forEach((c) => {
@@ -330,7 +335,7 @@ export function recordBlock(calibration, wrong, predictions, freshness, pulse) {
     const wn = num(w.confirmed) !== null && num(w.refuted) !== null ? w.confirmed + w.refuted : null;
     if (wn === null || (wn === c.n && w.confirmed === c.confirmed)) return;
     items.push(
-      `<li><b>${esc(c.coach_name)}, the ${esc(coachField(c.coach_id))} coach: <span${src(`calibration.coaches[${c.coach_id}].{confirmed,n}`)}>${c.confirmed} of ${c.n}</span></b> checked calls right so far, by one of the site’s scorekeepers. A second says <span${src(`wrong.predictions.by_coach[${c.coach_id}].{confirmed,refuted}`)}>${w.confirmed} of ${wn}</span>. The two disagree, and both are left up.</li>`,
+      `<li><b>${esc(c.coach_name)}, the ${esc(coachField(c.coach_id))} coach: <span${src(`calibration.coaches[${c.coach_id}].{confirmed,n}`)}>${c.confirmed} of ${c.n}</span></b> checked calls right so far, by one of the site’s two counts. The other says <span${src(`wrong.predictions.by_coach[${c.coach_id}].{confirmed,refuted}`)}>${w.confirmed} of ${wn}</span>. The two disagree, and both are left up.</li>`,
     );
   });
   const life = predictions && predictions.commitments && predictions.commitments.lifetime;
@@ -369,7 +374,7 @@ export function howBlock(freshness, coaches, receipts, subs) {
   const sum = (freshness && freshness.summary) || {};
   const out = [];
   if (num(sum.total) !== null) {
-    let s = `${countWord(sum.total, { capital: true })} devices and apps are wired in — a scale, a wrist strap, a bed sensor, a food log, a lifting log, his phone`;
+    let s = `${span("source_freshness.summary.total", countWord(sum.total, { capital: true }))} devices and apps are wired in — a scale, a wrist strap, a bed sensor, a food log, a lifting log, his phone`;
     if (num(sum.fresh) !== null) {
       s += ` — and ${span("source_freshness.summary.fresh", countWord(sum.fresh))} reported this week`;
       const tail = [];
@@ -393,14 +398,14 @@ export function howBlock(freshness, coaches, receipts, subs) {
   return `<p>${out.join(" ")}</p><p class="v7h-note">The code, in full: <a href="https://github.com/averagejoematt/life-platform" rel="noopener">github.com/averagejoematt/life-platform</a></p>`;
 }
 
-// The next weigh-in is last_weighin_date + 1 — unless that day has passed, in which case the
-// honest line is the last one and the silence since. `today` is injectable for the tests.
-export function nextWeighinText(journey, today = todayPT()) {
-  const last = journey && journey.last_weighin_date;
-  if (!last) return "";
-  const due = isoPlus(last, 1);
-  if (today && due < today) return `the last weigh-in was ${time(last, "journey.last_weighin_date")}; none since`;
-  return `the next weigh-in is due ${time(due, "journey.last_weighin_date + 1 day")}`;
+// The next weigh-in, in the ONE spelling every v7 page uses (entry_age.nextWeighInText, R6 fix 4):
+// due when the day after the last weigh-in is on or after the page's data-through day, else
+// the silence since, counted — never a past day as "due". `through` is the page's data-through
+// (injectable for the tests); the day is wrapped in <time> naming the served field.
+export function nextWeighinText(journey, through = todayPT()) {
+  const r = nextWeighInText(journey && journey.last_weighin_date, through);
+  if (!r.text) return "";
+  return r.text.replace(dayInWords(r.day), time(r.day, "journey.last_weighin_date"));
 }
 
 // ── what resolves next ─────────────────────────────────────────────────────────
@@ -425,7 +430,7 @@ function criterionWords(c) {
 export function nextRows(docket, predictions, cadence, journey, coaches) {
   const rows = [];
   const due = predictions && predictions.overall && predictions.overall.due;
-  if (due && due.earliest_due) rows.push({ date: due.earliest_due, html: `<td${src("predictions.overall.due.earliest_due")}>The next graded call of any kind comes due. Graded by code.</td>` });
+  if (due && due.earliest_due) rows.push({ date: due.earliest_due, src: "predictions.overall.due.earliest_due", html: `<td${src("predictions.overall.due.earliest_due")}>The next graded call of any kind comes due. Graded by code.</td>` });
   (Array.isArray(docket) ? docket : []).forEach((d, i) => {
     if (!d || !d.resolution_date) return;
     const a = d.coach_a;
@@ -437,28 +442,28 @@ export function nextRows(docket, predictions, cadence, journey, coaches) {
     let text = "";
     if (yes && words) text = `${esc(coachName(coaches, yes))} says ${words} that day; ${esc(coachName(coaches, no))} says it won’t.`;
     else text = `${esc(coachName(coaches, a))} and ${esc(coachName(coaches, b))} disagree${d.topic ? ` on ${esc(String(d.topic).replace(/:.*$/, "").toLowerCase())}` : ""}.`;
-    rows.push({ date: d.resolution_date, html: `<td${src(`coach_docket.open[${i}]`)}>${text} Graded by code.</td>` });
+    rows.push({ date: d.resolution_date, src: `coach_docket.open[${i}].resolution_date`, html: `<td${src(`coach_docket.open[${i}]`)}>${text} Graded by code.</td>` });
   });
   const ch = cadence && cadence.chronicle;
-  if (ch && !ch.paused && ch.next_date) rows.push({ date: ch.next_date, html: `<td${src("content_cadence.chronicle.next_date")}>The next write-up — drafted that day, published once Matthew has read it.</td>` });
+  if (ch && !ch.paused && ch.next_date) rows.push({ date: ch.next_date, src: "content_cadence.chronicle.next_date", html: `<td${src("content_cadence.chronicle.next_date")}>The next write-up — drafted that day, published once Matthew has read it.</td>` });
   const j = journey || {};
-  if (num(j.day_n) !== null && j.day_n < HORIZON && j.started_date) rows.push({ date: isoPlus(j.started_date, HORIZON - 1), html: `<td${src("journey.started_date + 29 days")}>Day ${HORIZON} — and the next photo.</td>` });
+  if (num(j.day_n) !== null && j.day_n < HORIZON && j.started_date) rows.push({ date: isoPlus(j.started_date, HORIZON - 1), src: "journey.started_date + 29 days", html: `<td${src("journey.started_date + 29 days")}>Day ${HORIZON} — and the next photo.</td>` });
   rows.sort((x, y) => String(x.date).localeCompare(String(y.date)));
   return rows;
 }
 
-export function nextBlock(docket, predictions, cadence, journey, coaches, today = todayPT()) {
+export function nextBlock(docket, predictions, cadence, journey, coaches, through = todayPT()) {
   const rows = nextRows(docket, predictions, cadence, journey, coaches);
   if (!rows.length) {
-    const nw = nextWeighinText(journey, today);
+    const nw = nextWeighinText(journey, through);
     return `<p class="v7h-note">Nothing is on the docket and no graded call is due.${nw ? ` ${nw.charAt(0).toUpperCase()}${nw.slice(1)}.` : ""}</p>`;
   }
-  const body = rows.map((r) => `<tr><td class="v7h-td-d"><time datetime="${esc(r.date)}">${esc(dayLabel(r.date))}</time></td>${r.html}</tr>`).join("");
+  const body = rows.map((r) => `<tr><td class="v7h-td-d"${src(r.src)}><time datetime="${esc(r.date)}">${esc(dayLabel(r.date))}</time></td>${r.html}</tr>`).join("");
   return `<table><thead><tr><th>When</th><th>What</th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
 // ── follow ─────────────────────────────────────────────────────────────────────
-export function followBlock(subs, cadence, journey, today = todayPT()) {
+export function followBlock(subs, cadence, journey, through = todayPT()) {
   let count = "The subscriber count is not available right now.";
   if (subs && subs.available !== false && num(subs.count) !== null) {
     count = subs.count === 0 ? "No subscribers yet." : subs.count === 1 ? "One subscriber so far." : `${subs.count.toLocaleString("en-US")} subscribers so far.`;
@@ -466,7 +471,7 @@ export function followBlock(subs, cadence, journey, today = todayPT()) {
   const parts = [`<span${src("sub_count.count")}>${esc(count)}</span>`];
   const ch = cadence && cadence.chronicle;
   const next = ch && !ch.paused && ch.next_date ? `The next write-up is ${time(ch.next_date, "content_cadence.chronicle.next_date")}` : "The next write-up is not yet scheduled";
-  const nw = nextWeighinText(journey, today);
+  const nw = nextWeighinText(journey, through);
   parts.push(`${next}${nw ? `; ${nw}` : ""}.`);
   parts.push('<a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a>');
   return `<p>${parts.join(" ")}</p>`;
@@ -481,10 +486,11 @@ export function marginParts(iso) {
   return { d: day || "", mo: (month || "").slice(0, 3), w: weekday || "" };
 }
 
-function setMargin(entry, parts) {
+function setMargin(entry, parts, path) {
   if (!entry || !parts) return;
   const m = entry.querySelector(".v7h-m");
   if (!m) return;
+  if (path) m.setAttribute("data-src", path);
   m.querySelector(".v7h-d").textContent = parts.d;
   m.querySelector(".v7h-mo").textContent = parts.mo;
   m.querySelector(".v7h-w").textContent = parts.w;
@@ -527,32 +533,33 @@ export async function mount() {
   const docket = (docketR && docketR.open) || [];
   const posts = (postsR && postsR.posts) || [];
   const through = (vitals && vitals.vitals && vitals.vitals.as_of_date) || (journey && journey.last_weighin_date) || "";
+  const throughSrc = vitals && vitals.vitals && vitals.vitals.as_of_date ? "vitals.as_of_date" : "journey.last_weighin_date";
 
   // the fold
   const cap = photoCaption(journey);
   if (cap) put("v7h-photo-cap", cap);
   put("v7h-number", journey ? numberBlock(journey) + thisWeekLine(progress, posts) : pending("The latest weigh-in"));
   put("v7h-lead", journey ? leadSentence(journey, coachesR && coachesR.count) : pending("The lead"));
-  put("v7h-alive", aliveLine(through, calibration, cadence));
-  setMargin(document.getElementById("v7h-fold"), marginParts(journey && journey.last_weighin_date));
+  put("v7h-alive", aliveLine(through, calibration, cadence, throughSrc));
+  setMargin(document.getElementById("v7h-fold"), marginParts(journey && journey.last_weighin_date), "journey.last_weighin_date");
 
   // the entries
   put("v7h-weighins-body", weighinsBlock(progress, journey));
   const wm = marginParts(journey && journey.started_date);
-  if (wm) setMargin(document.getElementById("v7h-weighins"), { d: wm.d, mo: wm.mo, w: "to today" });
+  if (wm) setMargin(document.getElementById("v7h-weighins"), { d: wm.d, mo: wm.mo, w: "to today" }, "journey.started_date");
   put("v7h-words-body", wordsBlock(decisions && decisions.decisions, pulse));
   const notes = ((decisions && decisions.decisions) || []).filter((d) => d && d.note);
-  if (notes.length) setMargin(document.getElementById("v7h-words"), marginParts(notes[0].note_at ? instantDayInWords(notes[0].note_at) && new Date(Date.parse(notes[0].note_at)).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) : notes[0].date));
+  if (notes.length) setMargin(document.getElementById("v7h-words"), marginParts(notes[0].note_at ? instantDayInWords(notes[0].note_at) && new Date(Date.parse(notes[0].note_at)).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) : notes[0].date), `decisions[0].${notes[0].note_at ? "note_at" : "date"}`);
   put("v7h-okay-body", okayBlock(sleep, vitals, nutrition, training, pulse));
-  setMargin(document.getElementById("v7h-okay"), marginParts(through));
+  setMargin(document.getElementById("v7h-okay"), marginParts(through), throughSrc);
   put("v7h-record-body", recordBlock(calibration, wrong, predictions, freshness, pulse));
-  setMargin(document.getElementById("v7h-record"), marginParts(through));
+  setMargin(document.getElementById("v7h-record"), marginParts(through), throughSrc);
   put("v7h-how-body", howBlock(freshness, coachesR, receipts, subs));
   setMargin(document.getElementById("v7h-how"), { d: "§", mo: "how", w: "it works" });
-  put("v7h-next-body", nextBlock(docket, predictions, cadence, journey, coaches));
+  put("v7h-next-body", nextBlock(docket, predictions, cadence, journey, coaches, through));
   const rows = nextRows(docket, predictions, cadence, journey, coaches);
-  if (rows.length) setMargin(document.getElementById("v7h-next"), marginParts(rows[0].date));
-  put("v7h-follow-body", followBlock(subs, cadence, journey));
+  if (rows.length) setMargin(document.getElementById("v7h-next"), marginParts(rows[0].date), rows[0].src);
+  put("v7h-follow-body", followBlock(subs, cadence, journey, through));
   setMargin(document.getElementById("v7h-follow"), { d: "→", mo: "next", w: "page" });
 }
 

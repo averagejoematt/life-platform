@@ -166,7 +166,12 @@ def call_anthropic_api(
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # Auth is IAM — no API key. See lambdas/bedrock_client.py.
     import botocore.exceptions as _bce
-    from ai.bedrock_client import budget_stop_cls as _budget_stop_cls, first_text as _first_text, invoke as _bedrock_invoke
+    from ai.bedrock_client import (
+        UnknownModelError as _UnknownModel,
+        budget_stop_cls as _budget_stop_cls,
+        first_text as _first_text,
+        invoke as _bedrock_invoke,
+    )
 
     _BudgetStop = _budget_stop_cls()
 
@@ -191,6 +196,16 @@ def call_anthropic_api(
             # now; the caller's own degrade path (fallback brief, skip-AI) engages
             # in seconds instead of minutes.
             print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
+            raise
+
+        except _UnknownModel as e:
+            # #4275: same refusal-not-failure rule as the budget stop above — a model
+            # name that resolves to nothing is a configuration error, raised before
+            # invoke_model, that no retry can change. Loud, immediate, unbilled: the
+            # message names the input and every known name. Never the old silent
+            # Haiku fallback.
+            _emit_failure_metric()
+            print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
             raise
 
         except _bce.ClientError as e:
@@ -246,7 +261,7 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
     system message (the wire format is identical on Bedrock).
     """
     import botocore.exceptions as _bce
-    from ai.bedrock_client import budget_stop_cls as _budget_stop_cls, invoke as _bedrock_invoke
+    from ai.bedrock_client import UnknownModelError as _UnknownModel, budget_stop_cls as _budget_stop_cls, invoke as _bedrock_invoke
 
     _BudgetStop = _budget_stop_cls()
 
@@ -268,6 +283,16 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
         except _BudgetStop as e:
             # #3084 — same refusal-not-failure rule as call_anthropic_api above.
             print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
+            raise
+
+        except _UnknownModel as e:
+            # #4275: same refusal-not-failure rule as the budget stop above — a model
+            # name that resolves to nothing is a configuration error, raised before
+            # invoke_model, that no retry can change. Loud, immediate, unbilled: the
+            # message names the input and every known name. Never the old silent
+            # Haiku fallback.
+            _emit_failure_metric()
+            print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
             raise
 
         except _bce.ClientError as e:

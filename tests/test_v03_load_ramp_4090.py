@@ -93,7 +93,11 @@ def _done(n: int) -> list[dict]:
         {
             "date": shift_day_key("2026-09-24", i),
             "source_workout_id": f"w{i}",
-            "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}],
+            # #4312: a lower and an upper set, so each generic session matches the role it takes
+            "exercises": [
+                {"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]},
+                {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]},
+            ],
         }
         for i in range(n)
     ]

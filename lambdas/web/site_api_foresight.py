@@ -23,6 +23,7 @@ import re
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from coach import coach_record  # #4220 — the ONE per-coach record producer (K of N through <day>)
 from coach.prediction_grading import EWMA_PRIOR_LAG  # #4218 — the directional slope's lag, in words
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1197
 
@@ -428,8 +429,20 @@ def wrong(*, _g) -> dict:
         # 2. Prediction verdicts per coach
         # #1377: every refuted verdict also becomes a first-class OBITUARY card (what we
         # believed / the number that killed it / what changed) — the feed the page renders.
+        #
+        # #4220: the per-coach ledger line is the ONE record producer's (coach.coach_record
+        # over the PREDICTION# partition — K of N through <day>), the same numbers
+        # /api/coaches, /api/calibration and /api/predictions serve. It used to re-count
+        # LEARNING# rows here, which is how Webb read 20 confirmed / 5 refuted on /method/
+        # while the scorecard read 0 of 5: twenty of those learnings were one docket
+        # re-recorded daily (#4216). The obituary cards below still read LEARNING# — that
+        # is the only row carrying the grader's reason text — so a re-recorded docket still
+        # yields one card per re-write until #4216 stops the writer.
         ledger, recent_misses, obituaries = [], [], []
         for c in _WRONG_COACHES:
+            record = coach_record.for_coach(table, f"{c}_coach", genesis=EXPERIMENT_START)
+            if record and record["n"]:
+                ledger.append({"coach": c, **record})
             r = table.query(
                 KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
             )
@@ -437,13 +450,8 @@ def wrong(*, _g) -> dict:
             # ADR-141 §4 defense-in-depth (2026-07-26 review): conversation-channel
             # learnings are Matthew-private and outside the verdict vocabulary —
             # exclude explicitly so a future status writer can't put private reason
-            # text on /api/wrong, and so conversation rows never pad the ledger counts.
+            # text on /api/wrong.
             live = [x for x in recs if not x.get("tombstone") and (x.get("channel") or "data") != "conversation"]
-            counts: dict[str, int] = {}
-            for x in live:
-                counts[x.get("status", "unknown")] = counts.get(x.get("status", "unknown"), 0) + 1
-            if live:
-                ledger.append({"coach": c, **{k: counts.get(k, 0) for k in ("confirmed", "refuted", "inconclusive", "expired")}})
             for x in live:
                 if x.get("status") == "refuted":
                     recent_misses.append(

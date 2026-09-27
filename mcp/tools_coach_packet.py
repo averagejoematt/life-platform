@@ -56,19 +56,21 @@ from __future__ import annotations
 from typing import Any
 
 from common.pacific_time import pacific_today, shift_day_key
+from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.1.0"  # 1.1.0 (#4311): the `today` view
+PACKET_VERSION = "coach-session-packet@1.2.0"  # 1.2.0 (#4311): the `today` view; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
 # The routine index's nearest-preceding-routine fallback needs rows from before the window.
-ROUTINE_INDEX_LOOKBACK_DAYS = 90
+ROUTINE_INDEX_LOOKBACK_DAYS = _ROUTINE_INDEX_LOOKBACK_DAYS  # one value (#4312): the block-read seams read the same lookback
 
 SOURCES: dict[str, str] = {
     "muscle_volume": "get_muscle_volume (training.muscle_volume.working_sets_by_muscle, #4071) — plan_next_session's window",
     "last_session_by_type": (
         "tools_strength._read_hevy_all_phases + training.muscle_volume.normalize_hevy_items; type = "
-        "training.routine_title.resolve_archetype, role = session_sequence.completed_positions (#4110/#4161), loaded = training_streaks.is_loaded_session"
+        "training.routine_title.resolve_archetype, role = session_sequence.completed_positions (#4110/#4161), loaded = training_streaks.is_loaded_session; "
+        "a session the sequence refused (an off-program Flex complement, or content that does not match the role — #4312) carries sequence_credit"
     ),
     "nutrition_7d": "get_nutrition view=summary + tools_plan._protein_days_7d (plan_next_session's protein window)",
     "walking_hours_7d": "tools_plan._walking_volume_last_7d -> mcp.shared_quantities.walking_layer (#4068/#4105)",
@@ -76,7 +78,8 @@ SOURCES: dict[str, str] = {
     "streaks": "tools_plan._training_streaks -> training.training_streaks.streaks (#4067)",
     "readiness": "get_readiness_score, tier by tools_plan._recovery_tier",
     "readiness_low_streak": "tools_plan._readiness_low_streak (Whoop recovery, #4072)",
-    "block_position": "training.session_sequence.next_session + program_week over plan_hevy_windows._block_workouts (#4110/#4147)",
+    "block_position": "training.session_sequence.next_session + program_week over plan_hevy_windows._block_workouts (#4110/#4147); "
+    "next_session.not_credited names every loaded log the sequence refused and why (#4312)",
     "today": (
         "mcp.coach_packet_today.today_view (#4311): Hevy via tools_strength._read_hevy_all_phases + Strava via core.query_source_range, "
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
@@ -184,10 +187,16 @@ def _sequence_positions(target_date: str) -> tuple[dict[str, dict[str, Any]], di
     try:
         rows = _block_workouts(after)
         done = session_sequence.completed_positions(rows, after)  # #4161: the ledger's hybrid week, one definition
+        refused = session_sequence.uncredited_sessions(rows, after)  # #4312: the loaded logs the sequence would not credit
     except Exception as e:  # noqa: BLE001 — roles go unassigned and say why; the sessions still read
         return {}, {"state": "read_failed", "error": error_label(e)}
     out = {c["date"]: {k: v for k, v in c.items() if k not in ("title", "start_time", "loaded_logs_that_day")} for c in done}
-    return out, {"state": "measured", "block_start": session_sequence.block_start(), "sessions_credited": len(done)}
+    return out, {
+        "state": "measured",
+        "block_start": session_sequence.block_start(),
+        "sessions_credited": len(done),
+        "not_credited": [{k: v for k, v in r.items() if k not in ("start_time", "content_check")} for r in refused],
+    }
 
 
 def _last_sessions(target_date: str) -> dict[str, Any]:
@@ -217,14 +226,16 @@ def _last_sessions(target_date: str) -> dict[str, Any]:
 
         index, index_state = [], {"state": "read_failed", "error": error_label(e)}
     positions, sequence_state = _sequence_positions(target_date)
+    refused = {r.get("workout_id"): r for r in sequence_state.get("not_credited") or []}
     by_type: dict[str, dict[str, Any]] = {}
     by_role: dict[str, dict[str, Any]] = {}
     for it in workouts:
         day = str(it.get("date") or "")[:10]
         pos = positions.get(day) or {}
+        wid = it.get("source_workout_id") or it.get("workout_id")
         # The ONE loaded session the sequence credited for that day — a second log that day, or an
         # unloaded one, is not a program session and claims no role.
-        credited = bool(pos) and pos.get("workout_id") in (None, it.get("source_workout_id") or it.get("workout_id"))
+        credited = bool(pos) and pos.get("workout_id") in (None, wid)
         role = pos.get("session_role") if credited else None
         archetype = resolve_archetype(it, index) or "unresolved"
         if archetype in by_type and (not role or role in by_role):
@@ -232,6 +243,8 @@ def _last_sessions(target_date: str) -> dict[str, Any]:
         row = _session_row(it, archetype, role)
         if credited:
             row["sequence_position"] = pos.get("position_label")
+        elif wid in refused:  # #4312: an off-program complement, or content that does not match the role it would take
+            row["sequence_credit"] = {k: refused[wid][k] for k in ("credited", "reason") if k in refused[wid]}
         by_type.setdefault(archetype, row)
         if role:
             by_role.setdefault(role, row)

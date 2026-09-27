@@ -25,7 +25,9 @@
   <header class="v7-mast"><a class="v7-brand" href="/next/">averagejoematt</a><a class="v7-repo" href="https://github.com/averagejoematt/life-platform" rel="noopener">the code</a></header>
   <main id="main" class="v7-main">
     <h1>Follow the experiment.</h1>
-    <p class="fo-promise" data-src="subscriber_cadence.promise_sentence">At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.</p>
+    <p class="fo-promise" data-src="subscriber_cadence.{signal_weekday,chronicle_weekday}">The numbers every Sunday; the write-up every Wednesday.</p>
+    <p class="fo-small fo-terms" data-src="subscriber_cadence.{chronicle_autopublish_weekday,weekly_count_word}">Or Friday, when Matthew has not read the draft by then; now and then a short note on Sunday when there is something new. Never more than three emails a week.</p>
+    <details class="fo-fold"><summary>The exact terms</summary><p class="fo-note" data-src="subscriber_cadence.promise_sentence">At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.</p></details>
     <section class="fo-entry" id="fo-form" aria-labelledby="fo-form-h">
       <div class="fo-m" data-margin><span class="d">§</span><span class="mo">by</span><span class="w">email</span></div>
       <div class="fo-body">
@@ -52,8 +54,8 @@
       <div class="fo-m" data-margin></div>
       <div class="fo-body">
         <h2 class="fo-h" id="fo-get-h">What you’d get</h2>
-        <p class="fo-small" id="fo-writeup">The numbers every Sunday; the write-up every Wednesday.</p>
-        <p class="fo-small fo-pending" id="fo-weighin" data-src="api_journey.journey.last_weighin_date + 1 day">Not loaded yet.</p>
+        <p class="fo-small fo-pending" id="fo-writeup" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>
+        <p class="fo-small fo-pending" id="fo-weighin" data-src="api_journey.journey.last_weighin_date">Not loaded yet.</p>
       </div>
     </section>
     <section class="fo-entry" id="fo-write" aria-labelledby="fo-write-h">

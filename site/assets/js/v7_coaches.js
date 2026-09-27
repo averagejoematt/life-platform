@@ -17,7 +17,9 @@
 //   * dates are words (entry_age.js), "Data through <day>" once, every number data-src;
 //   * no "cycle" / "reset" / "attempt" word (owner ruling 2026-09-26): "since Day 1",
 //     "so far", "all time";
-//   * a coach whose instrument is dark (/api/source_freshness) is NAMED, never QUOTED.
+//   * a coach whose instrument is dark is NAMED, never QUOTED — the engine's map and verdict
+//     (/api/coaches[].instrument / absent / reason, #4217) with /api/source_freshness as the
+//     second witness; the reason's date is printed in words.
 //
 // Pure functions first (tests/js/v7_coaches.test.mjs); run() composes them at the end.
 
@@ -248,36 +250,71 @@ export function standingAsk(commitments) {
   return list[0] || null;
 }
 
-// ── instruments: a coach whose sensor is dark is named, not quoted (plan E6) ─────
-// coach → the source (and datatype) its reads stand on. Derived from config/personas.json
-// domains; the truth is /api/source_freshness (a top-level `status`, or a datatype's `dark`).
+// ── instruments: a coach whose sensor is dark is named, not quoted (plan E6 / #4217) ──
+// The coach → instrument map is the ENGINE's: `source_registry` inverts its `instrument_for`
+// facets and serves the result on /api/coaches[].instrument as {source, datatype} (null for a
+// coach no single sensor grounds — the lead, mind and the explorer read the whole board), with
+// the engine's own verdict beside it: `absent` (bool) and `reason` ("no sensor since
+// <YYYY-MM-DD>"). The page reads THAT. `COACH_SOURCE` below is the pre-deploy FALLBACK only —
+// used when no served coach carries an `instrument` key — and is held equal to the engine's
+// rows by the PairContract "source_freshness -> the absent coach" (tests/pair_contract_registry.py),
+// which lifts this block verbatim and runs darkCoaches() under node, so nothing between
+// `COACH_SOURCE` and the end of `darkCoaches` may reach a module import.
 export const COACH_SOURCE = {
   sleep_coach: { source: "whoop" },
   physical_coach: { source: "hevy" },
   nutrition_coach: { source: "macrofactor" },
   glucose_coach: { source: "apple_health", datatype: "cgm" },
-  mind_coach: { source: "whoop" },
-  explorer_coach: { source: "withings" },
-  labs_coach: { source: "measurements" },
-  eli_marsh: { source: "withings" },
+  labs_coach: { source: "labs" },
+  // mind_coach, explorer_coach, eli_marsh: no single instrument (the engine serves null) — never dark.
 };
 export const INSTRUMENT_WORDS = {
   sleep_coach: "the wrist strap",
   physical_coach: "the lifting log",
   nutrition_coach: "the food log",
   glucose_coach: "a blood-sugar sensor",
-  mind_coach: "the wrist strap",
-  explorer_coach: "the scale",
-  labs_coach: "the tape and the scale",
-  eli_marsh: "the scale",
+  labs_coach: "the blood-test panel",
 };
-export function darkCoaches(freshness) {
+// /api/coaches (persona ids) or /api/coaching-dashboard (short ids) → {map, absent, reasons}
+// from the served `instrument` / `absent` / `reason` fields — null when NO coach carries an
+// `instrument` key (the pre-deploy window: the caller falls back to COACH_SOURCE).
+export function servedInstruments(coachesApi) {
+  const list = coachesApi && Array.isArray(coachesApi.coaches) ? coachesApi.coaches : [];
+  const carries = (c) => c && typeof c === "object" && Object.prototype.hasOwnProperty.call(c, "instrument");
+  if (!list.some(carries)) return null;
+  const pid = (c) => {
+    const id = String(c.persona_id || c.coach_id || "");
+    return !id || id === "eli_marsh" || id.endsWith("_coach") ? id : `${id}_coach`;
+  };
+  const out = { map: {}, absent: new Set(), reasons: {} };
+  for (const c of list) {
+    if (!carries(c)) continue;
+    const id = pid(c);
+    if (!id) continue;
+    const inst = c.instrument;
+    out.map[id] = inst && typeof inst === "object" && inst.source ? { source: String(inst.source), datatype: inst.datatype ? String(inst.datatype) : undefined } : null;
+    if (c.absent === true) {
+      out.absent.add(id);
+      if (typeof c.reason === "string" && c.reason) out.reasons[id] = c.reason;
+    }
+  }
+  return out;
+}
+// The dark set. `coachesApi` (optional) is /api/coaches: a served `absent: true` is the
+// engine's verdict and darks the coach regardless of the board; a served `instrument`
+// row is checked against /api/source_freshness as before (defence in depth: the two
+// halves stand on one wire); `instrument: null` is never dark. Without a served
+// `instrument` key anywhere the hand map stands in.
+export function darkCoaches(freshness, coachesApi) {
   const out = new Set();
   const sources = (freshness && Array.isArray(freshness.sources) ? freshness.sources : []).reduce((m, s) => {
     if (s && s.id) m[s.id] = s;
     return m;
   }, {});
-  for (const [pid, ref] of Object.entries(COACH_SOURCE)) {
+  const served = coachesApi ? servedInstruments(coachesApi) : null;
+  for (const pid of served ? served.absent : []) out.add(pid);
+  for (const [pid, ref] of Object.entries(served ? served.map : COACH_SOURCE)) {
+    if (!ref || !ref.source) continue;
     const s = sources[ref.source];
     if (!s) continue;
     if (ref.datatype) {
@@ -286,6 +323,22 @@ export function darkCoaches(freshness) {
     } else if (s.status === "stale" || s.status === "paused") out.add(pid);
   }
   return out;
+}
+// {pid: reason} — the engine's words for each served-absent coach ("no sensor since
+// 2026-08-27"); {} before the engine serves them.
+export function absentReasons(coachesApi) {
+  const served = coachesApi ? servedInstruments(coachesApi) : null;
+  return served ? served.reasons : {};
+}
+// The words beside a named-not-quoted coach: the engine's reason with its date in words
+// ("no sensor since Thursday, August 27") — never the ISO string; without a served reason,
+// the instrument ("a blood-sugar sensor is not worn").
+export function darkWords(pid, reasons) {
+  const r = String((reasons && reasons[pid]) || "");
+  const m = r.match(/^no sensor since (\d{4}-\d{2}-\d{2})$/);
+  const day = m ? dayInWords(m[1]) : "";
+  if (day) return `no sensor since ${day}`;
+  return `${INSTRUMENT_WORDS[pid] || "the instrument"} is not worn`;
 }
 
 // ── the docket: the engine's number between the witnesses ────────────────────────
@@ -310,9 +363,14 @@ export function engineNumber(criterion, sleepDetail) {
     src: "api_sleep_detail.sleep_trend[].recovery_score",
   };
 }
-export function docketRow(item, names, dark, sleepDetail) {
+export function docketRow(item, names, dark, sleepDetail, reasons) {
   if (!item || !item.coach_a || !item.coach_b) return null;
   const sides = item.sides || {};
+  // #4217: the docket entry's own `absent: {pid: {reason, instrument}}` block (served when
+  // the engine omitted a dark side's claim) darks the seat too, and its reason wins.
+  const absent = item.absent && typeof item.absent === "object" ? item.absent : {};
+  const isDark = (pid) => dark.has(pid) || Object.prototype.hasOwnProperty.call(absent, pid);
+  const why = (pid) => darkWords(pid, { ...(reasons || {}), ...(absent[pid] && absent[pid].reason ? { [pid]: absent[pid].reason } : {}) });
   const yes = Object.keys(sides).find((k) => sides[k] === true) || item.coach_a;
   const no = Object.keys(sides).find((k) => sides[k] === false) || item.coach_b;
   const nm = (pid) => (names && names[pid]) || pid.replace(/_coach$/, "").replace(/_/g, " ");
@@ -323,8 +381,8 @@ export function docketRow(item, names, dark, sleepDetail) {
   return {
     question: docketQuestion(crit, item.resolution_date) || String(item.topic || "").replace(/_/g, " "),
     topic: String(item.topic || ""),
-    yes: { id: yes, name: nm(yes), dark: dark.has(yes), claim: dark.has(yes) ? "" : String(claims[yes] || "") },
-    no: { id: no, name: nm(no), dark: dark.has(no), claim: dark.has(no) ? "" : String(claims[no] || "") },
+    yes: { id: yes, name: nm(yes), dark: isDark(yes), claim: isDark(yes) ? "" : String(claims[yes] || ""), why: isDark(yes) ? why(yes) : "" },
+    no: { id: no, name: nm(no), dark: isDark(no), claim: isDark(no) ? "" : String(claims[no] || ""), why: isDark(no) ? why(no) : "" },
     engine: engineNumber(crit, sleepDetail),
     settled: settle ? `Code, on ${settle}: ${rule} and ${nm(yes)} wins. The loser’s miss stays on the record.` : `Code: ${rule} and ${nm(yes)} wins.`,
     opened: dayInWords(item.opened_date),
@@ -458,13 +516,13 @@ export function docketHTML(rows) {
         ? `<span class="v7c-num" data-src="${esc(r.engine.src)}">${r.engine.readings.map(esc).join(" · ")}</span> — the last ${esc(numberWords(r.engine.readings.length))} nightly recovery readings, ${esc(r.engine.span)}${r.engine.avg ? `; the average over ${r.engine.nights ? `${esc(numberWords(r.engine.nights))} nights` : "the window"} is <span class="v7c-num" data-src="api_sleep_detail.sleep_detail.avg_recovery_window">${esc(r.engine.avg)}</span>` : ""}.`
         : "No series for this number is served here.";
       const served = [r.yes, r.no]
-        .map((s) => (s.dark ? `<p class="v7c-dated">${esc(s.name)} is named but not quoted: ${esc(INSTRUMENT_WORDS[s.id] || "the instrument")} is not worn.</p>` : s.claim ? `<p class="v7c-dated">${esc(s.name)}:</p><blockquote class="v7c-coach" data-src="api_coach_docket.open[].claims.${esc(s.id)}">${esc(s.claim)}</blockquote>` : `<p class="v7c-dated">${esc(s.name)}: no words served.</p>`))
+        .map((s) => (s.dark ? `<p class="v7c-dated">${esc(s.name)} is named but not quoted: ${esc(s.why || darkWords(s.id))}.</p>` : s.claim ? `<p class="v7c-dated">${esc(s.name)}:</p><blockquote class="v7c-coach" data-src="api_coach_docket.open[].claims.${esc(s.id)}">${esc(s.claim)}</blockquote>` : `<p class="v7c-dated">${esc(s.name)}: no words served.</p>`))
         .join("");
       return (
         `<table class="v7c-table" data-src="api_coach_docket.open[]">` +
         `<tr><th>The question</th><td>${esc(r.question)}</td></tr>` +
-        `<tr><th>${esc(r.yes.name)}</th><td><b>Says yes</b>${r.yes.dark ? ` — named, not quoted: ${esc(INSTRUMENT_WORDS[r.yes.id] || "the instrument")} is not worn.` : "."}</td></tr>` +
-        `<tr><th>${esc(r.no.name)}</th><td><b>Says no</b>${r.no.dark ? ` — named, not quoted: ${esc(INSTRUMENT_WORDS[r.no.id] || "the instrument")} is not worn.` : "."}</td></tr>` +
+        `<tr><th>${esc(r.yes.name)}</th><td><b>Says yes</b>${r.yes.dark ? ` — named, not quoted: ${esc(r.yes.why || darkWords(r.yes.id))}.` : "."}</td></tr>` +
+        `<tr><th>${esc(r.no.name)}</th><td><b>Says no</b>${r.no.dark ? ` — named, not quoted: ${esc(r.no.why || darkWords(r.no.id))}.` : "."}</td></tr>` +
         `<tr class="v7c-engine"><th>The number between them</th><td>${eng}</td></tr>` +
         `<tr><th>Settled by</th><td data-src="api_coach_docket.open[].resolution_date">${esc(r.settled)}</td></tr>` +
         `</table>` +
@@ -541,8 +599,11 @@ export async function run(doc) {
   // (2) where two disagree
   const names = {};
   for (const c of coachesApi && Array.isArray(coachesApi.coaches) ? coachesApi.coaches : []) if (c && c.persona_id) names[c.persona_id] = String(c.name || "");
-  const dark = darkCoaches(fresh);
-  const rows = (docket && Array.isArray(docket.open) ? docket.open : []).map((it) => docketRow(it, names, dark, sleep)).filter(Boolean);
+  // #4217: the engine's map + verdict from /api/coaches (instrument / absent / reason); the
+  // freshness board is the second witness; the hand map stands in only before the deploy.
+  const dark = darkCoaches(fresh, coachesApi);
+  const reasons = absentReasons(coachesApi);
+  const rows = (docket && Array.isArray(docket.open) ? docket.open : []).map((it) => docketRow(it, names, dark, sleep, reasons)).filter(Boolean);
   if (!docket) setHTML("v7c-docket-body", NOT_SERVED("The docket is"));
   else if (!rows.length) setHTML("v7c-docket-body", `<p class="v7c-absent">No open disagreement on the record.</p>`);
   else {

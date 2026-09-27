@@ -172,15 +172,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "qa_check_subscriber_promise); deleting the set the promise is checked AGAINST "
         "would leave the promise asserted only against itself."
     ),
-    "lambdas/common/subscriber_cadence.py:chronicle_weekday": (
-        "the second seat of a symmetric two-sender family — `signal_weekday()` (live: "
-        "email_subscriber_lambda + subscriber_onboarding_lambda both render 'see you "
-        "<day>' from it) and this, the chronicle's own cron day. Both are one line over "
-        "`required_weekday(sender(<id>).cron)`; keeping only the seat that happens to have "
-        "a caller today is the shrink-a-safety-set anti-pattern (#2610) that the "
-        "send_guard entry above records. Retiring a subscriber sender is an email-cadence "
-        "decision (#3564), not a dead-code sweep."
-    ),
     "lambdas/ai/prompt_cache.py:cached_prefix_blocks": (
         "same class as clears_floor: the byte-stable prefix assembler the #2888 tests "
         "drive directly. Its production callers are the ones #2888/#3085 are still "

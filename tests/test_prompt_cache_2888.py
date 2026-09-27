@@ -40,6 +40,14 @@ from ai import prompt_cache
         ("us.anthropic.claude-sonnet-4-6", 1024),
         ("claude-sonnet-4-6", 1024),
         ("claude-opus-4-6", 4096),
+        # #4275: the Claude 5 family, read from Anthropic's prompt-caching page on
+        # 2026-09-26 — Sonnet 5 sits on the 1,024 tier with Sonnet 4.6; Opus 5, Opus 5.5
+        # and Fable 5.1 on the 512 tier. RECORDED, not assumed: an id that matched no
+        # registry key would get the 4,096 conservative floor and this row would red.
+        ("us.anthropic.claude-sonnet-5", 1024),
+        ("us.anthropic.claude-opus-5", 512),
+        ("us.anthropic.claude-opus-5-5", 512),
+        ("us.anthropic.claude-fable-5-1", 512),
     ],
 )
 def test_cache_floor_matches_anthropic_documented_minimums(model_id, expected):

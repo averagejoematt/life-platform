@@ -50,8 +50,6 @@ from common.pacific_time import pacific_clock_label, pacific_today, parse_iso_ut
 from training import walking_volume
 
 TODAY_VIEW_VERSION = "coach-packet-today@1.0.0"
-# The routine index's nearest-preceding-routine fallback needs rows from before the day.
-ROUTINE_INDEX_LOOKBACK_DAYS = 90
 
 RowReader = Callable[[str], list[dict[str, Any]]]
 
@@ -203,9 +201,9 @@ def activities_on_day(
     index: list[dict[str, Any]] = []
     if hevy:
         try:
-            from training.routine_title import _load_routine_index
+            from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS, _load_routine_index
 
-            index = _load_routine_index(shift_day_key(day, -ROUTINE_INDEX_LOOKBACK_DAYS))
+            index = _load_routine_index(shift_day_key(day, -ROUTINE_INDEX_LOOKBACK_DAYS))  # one home (#4312)
         except Exception as e:  # noqa: BLE001 — the TYPE goes unresolved and says why; the sessions still list
             index_state = {"state": "read_failed", "error": error_label(e)}
 

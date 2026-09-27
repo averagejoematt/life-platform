@@ -610,7 +610,7 @@ SESSION_SEQUENCE: dict[str, Any] = {
     },
     "sessions_per_week": 4,
     "weeks_per_block": 6,
-    "advances_on": "a loaded Hevy session (training_streaks.is_loaded_session), one per Pacific day, dated on/after block_start",
+    "advances_on": "a loaded Hevy session (training_streaks.is_loaded_session), one per Pacific day, dated on/after block_start, whose routine archetype is a program archetype and whose loaded sets reach the role's anchor muscles (session_sequence.classify_sessions, #4312) — an off-program complement (Flex) never advances it",
     "provenance": "owner",
     "stated": "2026-09-23",
     "decision_sk": DECISION_SK,

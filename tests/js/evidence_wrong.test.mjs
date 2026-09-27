@@ -85,3 +85,19 @@ test("an empty feed is an honest empty-state, not a broken render", () => {
   assert.equal(figValue(out, "graded failures"), "0");
   assert.match(out, /No graded failures on the board yet/);
 });
+
+test("#4220: the ledger prints one record per coach — K of N through <day> — from the served fields", () => {
+  const out = renderWrong({
+    validator: {},
+    predictions: { by_coach: [{ coach: "nutrition", confirmed: 0, refuted: 5, n: 5, through: "2026-09-26" }], refuted_recent: [] },
+    obituaries: [],
+    obituary_count: 0,
+    note: "",
+  });
+  assert.match(out, /<td class="rd-name">nutrition<\/td><td class="num">0 of 5<\/td><td class="num">5<\/td><td>Sep 26<\/td>/);
+  assert.doesNotMatch(out, /inconclusive|expired/);
+  // Before the site-api deploy lands `n`/`through`, the row degrades honestly: n from the
+  // two counts it has, the day as an absence — never a percentage, never a guessed date.
+  const pre = renderWrong({ validator: {}, predictions: { by_coach: [{ coach: "sleep", confirmed: 7, refuted: 10 }] }, obituaries: [] });
+  assert.match(pre, /<td class="num">7 of 17<\/td><td class="num">10<\/td><td>—<\/td>/);
+});
