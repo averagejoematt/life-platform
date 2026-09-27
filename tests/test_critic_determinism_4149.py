@@ -410,3 +410,148 @@ def test_a_real_conditional_up_is_still_a_finding():
 def test_the_audit_no_longer_refuses_the_09_23_note():
     ex = [{"movement_key": "squat_barbell", "notes": "Week 1 ramp. If it feels heavy, don't add weight.", "sets": []}]
     assert ra.audit_prescription(ex, "", floors=None, scheme=BACK_OFF_SCHEME)["violations"] == []
+
+
+# ── 5. the live proof, replayed (#4149 box 4) ────────────────────────────────────────
+# The first stage-2 runs on a STALE-ANCHOR movement after the code rule shipped, read back from
+# DynamoDB (`live_proof_runs`): af379af3 v6 at 2026-09-26T03:54:17Z (trap-bar deadlift, exposure 1
+# after 323 days) and ff7518cd v3 at 2026-09-27T02:00:56Z (machine row, exposure 1, never in the
+# window). Live, each got the cap 3 -> 2 working sets, load untouched, recheck.passed = true, no
+# veto — a committable draft. Replayed here through the #4161 `stale_by_idx` path the 09-23 replay
+# never exercises (it predates stale exposure), with every stored model output crossed in.
+LIVE = FIXTURE["live_proof_runs"]["runs"]
+
+
+def _stale_by_idx(n: dict) -> dict[int, dict]:
+    """`critics_fatigue.stale_exposure` output rebuilt from the packet's stored numbers. The stored
+    numbers carry exposure and gap_days, not gap_class; `stale_exposure` gives gap_days None to
+    BOTH the long class (never / before the window) and the `none` class (current for the whole
+    window), and the two are told apart here by `days_since_movement` — None means never."""
+    from coach import critics_fatigue as cf
+
+    out = {}
+    for i, exposure in _idx_numbers(n, "stale_exposure").items():
+        gap = n.get(f"stale_gap_days[{i}]")
+        if gap is None:
+            cls = "long" if n.get(f"days_since_movement[{i}]") is None else "none"
+        else:
+            cls = "long" if int(gap) >= cf.STALE_LONG_GAP_DAYS else "short"
+        out[i] = {"exposure": int(exposure), "gap_days": gap, "gap_class": cls}
+    return out
+
+
+def _live_joints_packet(run: dict, draft: dict) -> dict:
+    n = run["joints_packet_numbers"]
+    return c.build_joints_packet(
+        draft,
+        pain_by_idx={i: {"pain_flag_any": bool(v), "pain_dates": []} for i, v in _idx_numbers(n, "pain_flag").items()},
+        days_since_by_idx=_idx_numbers(n, "days_since_movement"),
+        active_day_streak=n.get("active_day_streak"),
+        loaded_lifting_streak=n.get("loaded_lifting_streak"),
+        pain_layer_status=n.get("pain_layer_status"),
+        stale_by_idx=_stale_by_idx(n),
+    )
+
+
+def _live_verdict(run: dict, model_json: dict | None) -> tuple[dict, RoutineSpec, list]:
+    ir = _ir_of(run)
+    packet = _live_joints_packet(run, c.draft_summary(ir))
+    model = c.parse_model_verdict(_replying(model_json)({})) if model_json else None
+    v = c.reconcile(c.deterministic_verdict(packet), model, packet)
+    recs = c.apply_changes(ir, [v], set_floors=lambda ex: [])  # no load floor stored for these lifts: the clamp has nothing to hold
+    return v, ir, recs
+
+
+def test_the_live_proof_fixture_is_two_stale_anchor_runs_on_the_shipped_engine():
+    """Guard the fixture: two runs after #4155 (critics@1.5.0), each with ONE exposure-1 long-gap
+    anchor lift drafted at 3 working sets, each stored committable (recheck passed, no veto)."""
+    assert [r["routine_id"][:8] for r in LIVE] == ["af379af3", "ff7518cd"]
+    assert [r["ran_at"][:19] for r in LIVE] == ["2026-09-26T03:54:17", "2026-09-27T02:00:56"]
+    assert all(r["engine"] == "critics@1.5.0" for r in LIVE)
+    assert all(r["recheck"]["passed"] is True and r["veto"] is False for r in LIVE)
+    for run, idx in zip(LIVE, (0, 1)):
+        n = run["joints_packet_numbers"]
+        assert n[f"stale_exposure[{idx}]"] == 1 and n[f"stale_gap_days[{idx}]"] in (323, None)
+        assert run["draft_exercises"][idx]["rationale_tag"].startswith("anchor:")
+        assert len(run["draft_exercises"][idx]["sets"]) == 3
+        assert (run["joints_stored_verdict"]["field"], run["joints_stored_verdict"]["to"]) == (f"exercises[{idx}].set_count", 2)
+
+
+def test_a_stale_anchor_run_gives_one_committable_answer_whatever_the_model_said():
+    """The live-proof replay: each run crossed with no model, its own model, and the three 09-23
+    models (one of which asked for the -25 % load cut) lands on ONE answer — the flagged anchor at
+    the long-gap cap, every surviving set at the coach's load, no set of any other lift moved, and
+    the same set total the live recheck recorded. Mutation control: `STALE_CAPS["long"][1] = 3` ->
+    no cap flag, the draft keeps 3 working sets and this reds."""
+    from coach import critics_fatigue as cf
+
+    cap = cf.STALE_CAPS["long"][1]
+    models = [None] + [r["joints_stored_model"] for r in LIVE] + [r["joints_stored_model"] for r in RUNS]
+    for run, idx in zip(LIVE, (0, 1)):
+        answers = set()
+        for model_json in models:
+            v, ir, recs = _live_verdict(run, model_json)
+            lift = _working(ir.exercises[idx])
+            drafted = [s["weight_kg"] for s in run["draft_exercises"][idx]["sets"]]
+            assert len(lift) == cap and [s.weight_kg for s in lift] == drafted[:cap], (run["routine_id"][:8], model_json)
+            for j, ex in enumerate(ir.exercises):
+                if j != idx:
+                    assert [s.weight_kg for s in ex.sets] == [s["weight_kg"] for s in run["draft_exercises"][j]["sets"]]
+            assert [r_["applied"] for r_ in recs] == [True] and "clamped_to_floor" not in recs[0]
+            assert sum(len(e.sets) for e in ir.exercises) == run["recheck"]["total_sets"]
+            answers.add((v["verdict"], v["metric"], v["field"], v["to"], v.get("discarded")))
+        assert answers == {("change", f"days_since_movement[{idx}]", f"exercises[{idx}].set_count", cap, None)}, answers
+        # the replay reproduces the stored verdict exactly, and on the revised draft the flagged
+        # lift's own rule is met: no change-grade flag on that metric, no violation anywhere.
+        # (LIVE RESIDUE, observed on this fixture and left for its own issue: ff7518cd drafted a
+        # SECOND exposure-1 long-gap lift, machine_shoulder_press at idx 2 with 3 working sets;
+        # `deterministic_verdict` carries one change per critic, so it stays over the cap and
+        # `recheck` passes because it counts vetoes, not changes. Not #4149's box.)
+        v, ir, _ = _live_verdict(run, run["joints_stored_model"])
+        keys = ("verdict", "metric", "field", "to")
+        assert {k: v[k] for k in keys} == {k: run["joints_stored_verdict"][k] for k in keys}
+        again = _live_joints_packet(run, c.draft_summary(ir))
+        assert not [f for f in again["flags"] if f["severity"] == "change" and f["metric"] == v["metric"]]
+        assert not again["violations"]
+
+
+# ── 6. the clamp states the conflict as data ─────────────────────────────────────────
+def test_the_clamp_records_the_conflict_as_data_beside_the_sentence():
+    """Box 2's record shape: `clamped_to_floor`, `requested_kg`, `floor_kg`, `clamped_sets` beside
+    the prose `conflict`. The 1b09ec51 specimen (79.35 lb = 36 kg on every set) and the partial
+    cut (45 kg: only the top set under its 48 floor). Mutation control: drop the four assignments
+    at the end of `_hold_at_floors` -> KeyError here."""
+    ir = _squat_ir()
+    [rec] = c.apply_changes(
+        ir, [{"critic": "joints_tendons", "verdict": "change", "field": "exercises[0].weight_lbs", "to": 79.35}], set_floors=_gate_floors
+    )
+    assert rec["clamped_to_floor"] is True and rec["floor_kg"] == 48.0
+    assert rec["requested_kg"] == pytest.approx(36.0, abs=0.01)
+    assert [(r["set"], r["requested_kg"], r["floor_kg"]) for r in rec["clamped_sets"]] == [
+        (1, 35.99, 48.0),
+        (2, 35.99, 43.0),
+        (3, 35.99, 43.0),
+    ]
+    assert all(r["exercise"] == "squat_barbell" for r in rec["clamped_sets"])
+    assert rec["conflict"].startswith("joints_tendons vs the subtract-only floor") and rec["applied"] is False
+    partial = _squat_ir(top=52.0, back=46.0)
+    [rec] = c.apply_changes(
+        partial,
+        [{"critic": "blueprint_historian", "verdict": "change", "field": "exercises[0].weight_lbs", "to": 45 * c._LBS_PER_KG}],
+        set_floors=_gate_floors,
+    )
+    assert (rec["clamped_to_floor"], rec["requested_kg"], rec["floor_kg"]) == (True, 45.0, 48.0)
+    assert rec["clamped_sets"] == [{"exercise": "squat_barbell", "set": 1, "requested_kg": 45.0, "floor_kg": 48.0}]
+    assert rec["applied"] is True
+
+
+def test_a_change_the_floor_never_touches_carries_no_clamp_fields():
+    """Negative control: a set-count cut on a draft at its floors clashes with nothing, so the
+    record carries neither `conflict` nor any of the data fields — absence means no clamp."""
+    ir = _squat_ir()
+    [rec] = c.apply_changes(
+        ir, [{"critic": "joints_tendons", "verdict": "change", "field": "exercises[0].set_count", "to": 2}], set_floors=_gate_floors
+    )
+    assert rec["applied"] is True
+    assert not ({"conflict", "clamped_to_floor", "requested_kg", "floor_kg", "clamped_sets"} & set(rec))
+    assert [s.weight_kg for s in ir.exercises[0].sets] == [48.0, 43.0]
