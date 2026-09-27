@@ -29,6 +29,7 @@ from coach import (
     lead_daily_read,  # #4188: the head coach's daily grounded lead read (LEAD_DAILY# rows)
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
+from health import instrument_presence  # #4217: the absent coach — the same liveness /api/source_freshness serves
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 
 from web.site_api_common import (
@@ -535,6 +536,18 @@ def _dossier_block(coach_id, *, _g):
     }
 
 
+def _absent_coaches(_g):
+    """#4217: {coach_id: instrument_state} for the coaches whose domain instrument is DARK —
+    the SAME derivation /api/source_freshness serves, over the facade's table. Fail-open
+    with a logged warning: a sentinel read failing must not blank a roster, and the
+    renderer keeps its own darkCoaches guard (defence in depth)."""
+    try:
+        return instrument_presence.absent_coaches(_g["table"])
+    except Exception as _e:
+        logger.warning(f"[/api/coach*] instrument presence check failed (fail-open): {_e}")
+        return {}
+
+
 def handle_coaches(event, *, _g):
     """GET /api/coaches — the roster (CC-01). Shaped-empty 200 by design."""
     _COACH_MODULES = _g["_COACH_MODULES"]
@@ -548,6 +561,7 @@ def handle_coaches(event, *, _g):
         ops = {k: v for k, v in personas.items() if v.get("operational")}
         order = persona_registry.OPERATIONAL_COACH_IDS
         coaches = []
+        absent = _absent_coaches(_g)
         for pid, p in ops.items():
             tr = _track_record(pid)
             headline = (
@@ -565,6 +579,12 @@ def handle_coaches(event, *, _g):
                     "headline_stat": headline,
                     "tier": "staff",
                     "latest_checked": latest_checked.for_coach(_g["table"], pid),
+                    # #4217: the coach's domain instrument ({source, datatype} or null) —
+                    # registry-derived, served so the renderer reads it rather than keeping
+                    # its own table — and whether it is dark right now.
+                    "instrument": instrument_presence.served_instrument(pid),
+                    "absent": pid in absent,
+                    "reason": absent[pid].get("reason") if pid in absent else None,
                 }
             )
         coaches.sort(key=lambda c: order.index(c["persona_id"]) if c["persona_id"] in order else 99)
@@ -586,6 +606,9 @@ def handle_coaches(event, *, _g):
                     "headline_stat": "runs the program",
                     "tier": "lead",
                     "latest_checked": None,  # E1: the lead makes no graded calls — null, never a placeholder
+                    "instrument": None,  # #4217: the lead reads the whole board; no single sensor is his
+                    "absent": False,
+                    "reason": None,
                 },
             )
         return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
@@ -630,7 +653,15 @@ def handle_coach(event, *, _g):
             return _error(404, "Unknown coach")
         weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
         lead_daily = lead_daily_read.latest_served(_g["table"]) if is_lead else None
-        if is_lead:
+        # #4217: a staff coach whose domain instrument is dark is ABSENT — the stance,
+        # daily read and headline slots serve nothing, and the payload says why in the
+        # engine's own words ("no sensor since <YYYY-MM-DD>"; the page puts the date in
+        # words). History (stance_history, recent_outputs, the dossier) stays: those are
+        # dated records, not today's argument.
+        absent_state = None if is_lead else _absent_coaches(_g).get(pid)
+        if absent_state:
+            stance = {"source": "absent", "headline_read": "", "stage": {}}
+        elif is_lead:
             # No weight-band ladder config exists for the lead and the opinion
             # engine writes him no weekly stance — the staff ladder fallback would
             # fabricate a scaffold. Serve an explicit source:"none" (honest-empty,
@@ -662,6 +693,10 @@ def handle_coach(event, *, _g):
                 "working_hypotheses": _working_hypotheses(pid),
                 # E1 / #4182: "On <date> I said <claim> — it came in at <value>" (null when none graded).
                 "latest_checked": latest_checked.for_coach(_g["table"], pid),
+                # #4217: the instrument on the wire + the absence verdict (see above).
+                "instrument": None if is_lead else instrument_presence.served_instrument(pid),
+                "absent": bool(absent_state),
+                "reason": absent_state.get("reason") if absent_state else None,
                 "stance": stance,
                 "stance_history": _stance_history(pid),
                 # The lead has no generation voice spec (config/coaches/{id}.json) —
@@ -683,7 +718,7 @@ def handle_coach(event, *, _g):
                 # #4188: the lead's daily read lives in its own LEAD_DAILY# row (the CC-08
                 # reflection batch covers staff only). `daily` keeps its string type for
                 # every consumer; `lead_daily` carries the text WITH its cited block.
-                "daily": (lead_daily or {}).get("text") if is_lead else _coach_daily(pid),
+                "daily": "" if absent_state else ((lead_daily or {}).get("text") if is_lead else _coach_daily(pid)),
                 "lead_daily": lead_daily,
                 "memoir": _coach_memoir(pid),
             },

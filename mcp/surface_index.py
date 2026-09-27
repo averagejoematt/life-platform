@@ -287,6 +287,7 @@ _PHASE_READER_FNS = frozenset(
         "_apply_phase_filter",
         "singleton_visible",
         "query_source_range",
+        "latest_date_str",  # #4217: health.instrument_presence — the freshness board's DATE# read, one hop out of web/
     }
 )
 

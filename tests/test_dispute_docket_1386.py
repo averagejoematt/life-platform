@@ -949,10 +949,17 @@ class TestDocketPaginationIsSplitPerPrefix1799:
         dossier_open = len(sac._docket_rows("OPEN#", 40, newest_first=False))
         assert endpoint_open == dossier_open == 1
 
+    @staticmethod
+    def _docket_queries(t):
+        """#4217: the endpoint now also runs the instrument-liveness reads (USER#…#SOURCE#
+        partitions, deliberately phase-unfiltered — #1203) over the same table; these
+        assertions are about the DOCKET partition's own two queries."""
+        return [q for q in t.queries if q["KeyConditionExpression"]._values[0]._values[1] == dd.DOCKET_PK]
+
     def test_each_prefix_is_queried_separately(self, api):
         sac, t = api
         sac.handle_coach_docket({})
-        prefixes = [q["KeyConditionExpression"]._values[1]._values[1] for q in t.queries]
+        prefixes = [q["KeyConditionExpression"]._values[1]._values[1] for q in self._docket_queries(t)]
         assert prefixes == ["OPEN#", "RESOLVED#"]
 
     def test_tombstoned_prior_cycle_rows_are_dropped_in_the_query(self, api):
@@ -967,7 +974,7 @@ class TestDocketPaginationIsSplitPerPrefix1799:
         body = self._body(sac.handle_coach_docket({}))
         assert body["counts"]["open"] == 2
         assert body["counts"]["resolved"] == 0  # honest zero: every resolved row is a wiped cycle's
-        assert all("#phase" in str(q.get("FilterExpression")) for q in t.queries)
+        assert all("#phase" in str(q.get("FilterExpression")) for q in self._docket_queries(t))
 
     def test_resolved_history_is_newest_first(self, api):
         sac, t = api
@@ -975,3 +982,129 @@ class TestDocketPaginationIsSplitPerPrefix1799:
             t.put_item(Item=_resolved_row(n))
         skorder = [e["topic_slug"] for e in self._body(sac.handle_coach_docket({}))["resolved"]]
         assert skorder == sorted(skorder, reverse=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #4217 — a coach with a dark instrument has no seat on a NEW docket item, and its
+# claim on an OPEN item is not served. Fixture = the live 2026-09-26 sentinel (cgm
+# dark since 2026-08-27) + the live glucose/nutrition item opened 2026-09-23;
+# mutation control = the same rows with the checker's `dark` verdict flipped.
+# ═════════════════════════════════════════════════════════════════════════════
+
+from instrument_presence_fixture import (  # noqa: E402
+    ABSENT_REASON,
+    GLUCOSE_DOCKET_CLAIM,
+    NOW,
+    NUTRITION_DOCKET_CLAIM,
+    fresh_instrument_rows,
+    glucose_docket_item,
+    sentinel_item,
+)
+
+
+def _seed_presence(t, cgm_dark):
+    t.put_item(Item=sentinel_item(cgm_dark=cgm_dark))
+    for row in fresh_instrument_rows():
+        t.put_item(Item=row)
+
+
+class TestAbsentCoachDocket4217:
+    @pytest.fixture()
+    def pinned(self, monkeypatch, fake_table):
+        """The SAME derivation the freshness board runs, over the docket's own table,
+        pinned to the corpus's instant."""
+        from health import instrument_presence
+
+        monkeypatch.setattr(dd, "_absent_coaches", lambda: instrument_presence.absent_coaches(fake_table, now=NOW))
+        return fake_table
+
+    def _live_disagreement(self):
+        return {
+            "topic": "Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?",
+            "coaches": ["glucose_coach", "nutrition_coach"],
+            "positions": {"glucose_coach": GLUCOSE_DOCKET_CLAIM, "nutrition_coach": NUTRITION_DOCKET_CLAIM},
+            "resolution_criterion": {
+                "metric": "recovery_score",
+                "condition": "lt",
+                "threshold": 70.0,
+                "resolution_days": 7,
+                "sides": {"glucose_coach": False, "nutrition_coach": True},
+            },
+        }
+
+    def test_the_glucose_coach_is_not_admitted_while_the_cgm_is_dark(self, pinned):
+        _seed_presence(pinned, cgm_dark=True)
+        result = dd.open_from_disagreements([self._live_disagreement()], "2026-09-23")
+        assert result["opened"] == []
+        assert len(result["skipped"]) == 1
+        reason = result["skipped"][0]["reason"]
+        assert "instrument dark" in reason and f"glucose_coach has {ABSENT_REASON}" in reason
+        assert not [sk for (pk, sk) in pinned.store if pk == dd.DOCKET_PK], "a docket row was written for a coach with no sensor"
+
+    def test_mutation_control_the_item_opens_when_the_cgm_is_not_dark(self, pinned):
+        _seed_presence(pinned, cgm_dark=False)
+        result = dd.open_from_disagreements([self._live_disagreement()], "2026-09-23")
+        assert len(result["opened"]) == 1, result["skipped"]
+        assert [sk for (pk, sk) in pinned.store if pk == dd.DOCKET_PK] == ["OPEN#glucose_coach__nutrition_coach#recovery"]
+
+    def test_a_pair_of_present_coaches_is_unaffected(self, pinned):
+        _seed_presence(pinned, cgm_dark=True)
+        result = dd.open_from_disagreements([_disagreement("weight", coaches=("physical_coach", "nutrition_coach"))], OPEN_DATE)
+        assert len(result["opened"]) == 1, result["skipped"]
+
+    def test_a_failed_presence_read_fails_open_with_a_warning(self, fake_table, monkeypatch):
+        monkeypatch.setattr(dd, "_absent_coaches", lambda: (_ for _ in ()).throw(RuntimeError("sentinel unreadable")))
+        result = dd.open_from_disagreements([_disagreement("weight")], OPEN_DATE)
+        assert len(result["opened"]) == 1, "a broken presence read must not close the docket to everyone"
+
+
+class TestAbsentCoachDocketServe4217:
+    @pytest.fixture()
+    def api(self, monkeypatch):
+        sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
+        from health import instrument_presence
+        from web import site_api_coach as sac
+
+        t = FakeTable()
+        monkeypatch.setattr(sac, "table", t)
+        real = instrument_presence.absent_coaches  # the SAME derivation the board runs, pinned to the corpus's instant
+        monkeypatch.setattr(instrument_presence, "absent_coaches", lambda table, now=None, instruments=None: real(table, NOW, instruments))
+        return sac, t
+
+    @staticmethod
+    def _body(resp):
+        import json
+
+        assert resp["statusCode"] == 200
+        return json.loads(resp["body"])
+
+    def test_the_dark_sides_claim_is_not_served_but_its_seat_is(self, api):
+        sac, t = api
+        _seed_presence(t, cgm_dark=True)
+        t.put_item(Item=glucose_docket_item())
+        entry = self._body(sac.handle_coach_docket({}))["open"][0]
+        assert entry["coach_a"] == "glucose_coach" and entry["coach_b"] == "nutrition_coach"
+        assert entry["sides"] == {"glucose_coach": False, "nutrition_coach": True}
+        assert set(entry["stakes"]) == {"glucose_coach", "nutrition_coach"}, "the frozen stake stays — the item is history"
+        assert "glucose_coach" not in entry["claims"], "a stake 'based on CGM data' from a coach with no CGM was served"
+        assert entry["claims"] == {"nutrition_coach": NUTRITION_DOCKET_CLAIM}
+        assert entry["absent"] == {"glucose_coach": {"reason": ABSENT_REASON, "instrument": {"source": "apple_health", "datatype": "cgm"}}}
+
+    def test_mutation_control_the_claim_serves_when_the_cgm_is_not_dark(self, api):
+        sac, t = api
+        _seed_presence(t, cgm_dark=False)
+        t.put_item(Item=glucose_docket_item())
+        entry = self._body(sac.handle_coach_docket({}))["open"][0]
+        assert entry["claims"]["glucose_coach"] == GLUCOSE_DOCKET_CLAIM
+        assert "absent" not in entry
+
+    def test_resolved_history_keeps_every_claim(self, api):
+        sac, t = api
+        _seed_presence(t, cgm_dark=True)
+        item = glucose_docket_item()
+        item.update(
+            {"sk": "RESOLVED#2026-09-30#glucose_coach__nutrition_coach#recovery", "status": "resolved", "resolved_date": "2026-09-30"}
+        )
+        t.put_item(Item=item)
+        entry = self._body(sac.handle_coach_docket({}))["resolved"][0]
+        assert set(entry["claims"]) == {"glucose_coach", "nutrition_coach"}

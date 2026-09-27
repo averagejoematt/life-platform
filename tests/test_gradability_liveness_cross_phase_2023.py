@@ -451,6 +451,17 @@ _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
 # per call or per source rather than fixed at the site. Recording them here is a
 # claim that the deciding expression is sound — cite where that soundness is pinned.
 _PER_SOURCE_READS: dict[str, str] = {
+    "lambdas/health/instrument_presence.py::latest_date_str": (
+        "#4217: the ONE DATE# 'newest day' read behind both the public freshness board and the "
+        "coach absence gate. include_pilot is an explicit keyword (default True) so the decision is "
+        "READABLE at each call site: site_api_freshness._latest_date_str passes include_pilot=True "
+        "(#1203 — liveness is pipe/behaviour recency regardless of phase; the filter is applied AFTER "
+        "Limit, so a filtered read of the newest key returns empty on exactly the source whose lapse is "
+        "longest), and instrument_state() takes the default — the same cross-phase read — because a "
+        "sensor that last wrote in a prior cycle is exactly the dark sensor the gate exists to name. "
+        "Every source it can be asked about is RAW_TIMESERIES (cross_phase) by taxonomy. Pinned by "
+        "tests/test_persona_registry.py (#4217 block) and the freshness board's own suites."
+    ),
     "lambdas/coach/coach_prediction_evaluator.py::_fetch_range": (
         "include_pilot is a PER-CALLER decision in this module (#3553), and the two callers want "
         "opposite things. PREDICTION# grading stays phase-filtered for the reason this entry "

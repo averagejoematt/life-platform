@@ -20,6 +20,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from training.rep_scheme import is_below_floor
+
 # `change` grammar — the only fields a critic may move, and the only ones `apply_changes`
 # knows how to move. Anything else is recorded as `unapplied` and never silently dropped.
 CHANGE_FIELD_RE = re.compile(r"^(exercises\[(\d+)\]\.(weight_lbs|set_count|reps|drop)|session\.total_sets)$")
@@ -37,9 +39,10 @@ def _label(ex: Any) -> str:
     return (tag if tag and tag != "custom" else key) or "?"
 
 
-# #4149: the commit gate's tolerance (`mcp.recovery_authoring.LOAD_TOLERANCE_KG`, #4065) — this
-# module cannot import mcp/, so the number is mirrored and a test holds the two equal.
-FLOOR_TOLERANCE_KG = 0.05
+# #4149/#4065: the commit gate's floor comparison. This module cannot import mcp/, so #4149
+# mirrored the gate's 0.05 kg tolerance here and a test held the two numbers equal. Both sides
+# now call the ONE predicate on the bundled side — `training.rep_scheme.is_below_floor` (imported
+# above), the gap rounded to whole plate steps — so there is no second number to keep equal.
 
 
 def apply_changes(ir: Any, verdicts: list[dict[str, Any]], *, set_floors: Callable[[Any], list] | None = None) -> list[dict[str, Any]]:
@@ -96,7 +99,7 @@ def _hold_at_floors(ir: Any, m: "re.Match[str]", set_floors: Callable[[Any], lis
         for i, s in enumerate(ex.sets):
             f = floors[i] if i < len(floors) else None
             w = getattr(s, "weight_kg", None)
-            if f is None or w is None or (getattr(s, "type", "normal") or "normal") == "warmup" or w >= float(f) - FLOOR_TOLERANCE_KG:
+            if f is None or w is None or (getattr(s, "type", "normal") or "normal") == "warmup" or not is_below_floor(float(w), float(f)):
                 continue
             clashes.append(f"{_label(ex)} set {i + 1} {float(w):.1f}kg < floor {float(f):.1f}kg")
             s.weight_kg = float(f)
