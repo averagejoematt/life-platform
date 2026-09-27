@@ -187,15 +187,17 @@ def _assert_no_leaks(res, path):
 
 
 def test_home_counts_down(pre_start_pages):
+    """Since the v7 cut-over (ADR-157) `/` is the v7 Home (scripts/v7/home.py): no dial, no
+    family panel — every figure is poured from the served payload, so pre-start the page
+    must carry no running-state caption and no leak; `dialCopy()` (daily_line.js) is still
+    the pre-start caption's one source and is still asserted to answer."""
     res = pre_start_pages["/"]
     text = res["text"].lower()
     dial_copy = pre_start_pages["_dial_copy"]
     assert dial_copy and dial_copy.get("cap"), "dialCopy() returned nothing for the pre-start payload"
-    assert dial_copy["cap"].lower() in text
-    assert START_LABEL.lower() in text
-    assert "awaiting day 1" in text  # the family panel's neutral state
     assert "days into the experiment" not in text  # the running-state caption is gone
     assert "since june 14 2026" not in text  # the running-state genesis stamp is hidden
+    assert "the case so far" in text or "every weigh-in so far" in text, "the v7 Home log did not render"
     _assert_no_leaks(res, "/")
 
 
@@ -212,10 +214,12 @@ def test_the_derived_caption_would_have_caught_the_3584_drift(pre_start_pages):
 
 
 def test_cockpit_pre_start_banner(pre_start_pages):
+    # Since the v7 cut-over (ADR-157) /cockpit/ is the Today page — no instrument banner;
+    # pre-start it must render its honest not-served/absence lines with no leak.
     res = pre_start_pages["/cockpit/"]
     text = res["text"].lower()
-    assert "the instruments are on" in text
-    assert f"t−{DAYS_UNTIL}" in text
+    assert "how’s the week?" in text or "how's the week?" in text, "the v7 Today shell did not render"
+    assert "the instruments are on" not in text
     _assert_no_leaks(res, "/cockpit/")
 
 

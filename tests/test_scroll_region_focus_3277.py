@@ -86,7 +86,10 @@ def test_motion_js_is_loaded_by_every_page_that_renders_tables_or_code():
     affected = (
         "data/vitals",
         "story/attempts",
-        "method",
+        # "method" left this list at the v7 cut-over (ADR-157): /method/ is the v7 Under the hood
+        # page (scripts/v7/hood.py) — its one table wraps at 390 px and the live axe pass on
+        # /next/method/ (2026-09-27) raised no scrollable-region finding; the v7 shells load
+        # v7_shell.js, not motion.js.
         "method/game",
         "method/grade-your-coach",
         "data/labs",

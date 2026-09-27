@@ -251,14 +251,14 @@ def _reader_facing(markup: str) -> str:
 
 
 def test_cockpit_scope_sections_ship_no_unearned_span_claim():
+    """Since the v7 cut-over (ADR-157) /cockpit/ is the Today page: no week/month view
+    sections at all, so the whole static <main> is the surface — it must ship no span claim
+    (every figure is poured from a served field at runtime)."""
     html = open(os.path.join(REPO, "site", "cockpit", "index.html")).read()
-    for marker in ("data-weekview", "data-monthview"):
-        at = html.find(marker)
-        assert at != -1, f"could not locate the {marker} section"
-        start = html.rfind("<section", 0, at)  # this section's own open tag, not a neighbour's
-        end = html.find("</section>", at)
-        hit = _SPAN_CLAIMS.search(_reader_facing(html[start:end]))
-        assert not hit, f"{marker} ships the static claim {hit.group(0)!r} — a fresh cycle has not lived it yet"
+    main = html[html.index("<main") : html.index("</main>")]
+    assert 'id="td-week"' in main, "the v7 Today shell is not what /cockpit/ serves"
+    hit = _SPAN_CLAIMS.search(_reader_facing(main))
+    assert not hit, f"the static Today shell ships the span claim {hit.group(0)!r} — a fresh cycle has not lived it yet"
 
 
 def test_the_javascript_still_promotes_to_the_earned_copy():

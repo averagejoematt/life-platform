@@ -773,16 +773,25 @@ def _build_reference_pages(repo_root: Path, out_dir: Path) -> None:
         'rel="alternate" type="application/rss+xml"',
     ]
 
+    # ADR-157 (the v7 cut-over): the three reference snapshots are the v7 shells the live site
+    # serves — each page's own sheet plus the shared v7.css, its module stripped like the v4 ones.
     pages = [
-        ("index.html", "home.html", "story.css", ['src="/assets/js/story.js"']),
-        ("cockpit/index.html", "cockpit.html", "cockpit.css", ['src="/assets/js/cockpit.js"']),
-        ("data/index.html", "data-hub.html", "evidence.css", ['src="/assets/js/evidence.js"']),
+        ("index.html", "home.html", "v7_home.css", ['src="/assets/js/v7_home.js"', 'src="/assets/js/v7_shell.js"']),
+        (
+            "cockpit/index.html",
+            "cockpit.html",
+            "v7_today.css",
+            ['src="/assets/js/v7_today.js"', 'src="/assets/js/v7_shell.js"', 'src="/assets/js/boot_sw.js"'],
+        ),
+        ("data/index.html", "data-hub.html", "v7_numbers.css", ['src="/assets/js/v7_numbers.js"', 'src="/assets/js/v7_shell.js"']),
     ]
+    shutil.copyfile(repo_root / "site/assets/css/v7.css", out_dir / "css" / "v7.css")
     for src_rel, out_name, door_css, extra_scripts in pages:
         src_path = repo_root / "site" / src_rel
         html = src_path.read_text(encoding="utf-8")
         html = _replace_once(html, "/assets/css/tokens.css", "../assets/css/tokens.css", what=f"{src_rel} tokens.css link")
         html = _replace_once(html, "/assets/css/fonts.css", "../assets/css/fonts.css", what=f"{src_rel} fonts.css link")
+        html = _replace_once(html, "/assets/css/v7.css", "css/v7.css", what=f"{src_rel} v7.css link")
         html = _replace_once(html, f"/assets/css/{door_css}", f"css/{door_css}", what=f"{src_rel} {door_css} link")
         html = _sanitize_reference_page(
             html,

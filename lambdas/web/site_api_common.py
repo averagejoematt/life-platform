@@ -251,7 +251,7 @@ PLATFORM_STATS = {
     "review_grade": "B+",
     "review_grade_distribution": "B+ 9 · B 3 · B- 3 · C+ 2 (17 lenses, 2026-09-05)",
     "active_secrets": 30,  # #3690: was 21; 28 -> 29 with life-platform/ip-hash-salt (#3620); 29 -> 30 with life-platform/progress-photos-signing (#3760). model/platform_model.json cost_surface.secrets
-    "site_pages": 93,  # #3690: was 77; tests/qa_manifest.py is the single page registry
+    "site_pages": 102,  # #3690: was 77, then 93; 102 at the v7 cut-over (ADR-157 — the nine /next/ preview shells registered); tests/qa_manifest.py is the single page registry
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

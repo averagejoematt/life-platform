@@ -51,10 +51,14 @@ def test_registry_derivation_ignores_a_file_absent_from_the_registry(tmp_path, m
 
 
 def test_registry_derivation_respects_live_noindex():
-    """A registered page whose OWN html asserts noindex is excluded (cockpit,
-    the redirect stubs) — the same live check as before, just registry-scoped."""
+    """A registered page whose OWN html asserts noindex is excluded (the /next/
+    preview shells — `noindex,nofollow`, the token form — and the redirect stubs) — the
+    same live check as before, just registry-scoped. Until the v7 cut-over (ADR-157) the
+    specimen was /cockpit/; the v7 Today page indexes like the rest of the nine."""
     urls = sm.registry_urls()
-    assert f"{sm.BASE}/cockpit/" not in urls, "noindex page leaked into the sitemap"
+    assert f"{sm.BASE}/next/" not in urls, "noindex page leaked into the sitemap"
+    assert f"{sm.BASE}/next/cockpit/" not in urls, "noindex,nofollow (the token form) leaked into the sitemap"
+    assert f"{sm.BASE}/cockpit/" in urls, "the v7 Today page is one of the nine and indexes"
     assert f"{sm.BASE}/mind/" not in urls
     assert f"{sm.BASE}/subscribe/confirm/" not in urls
 

@@ -48,9 +48,10 @@ def test_render_produces_a_complete_v5_page():
     assert 'class="prose"' in html  # v5 .prose body
     assert 'class="reading-progress"' in html
     # chrome comes from the single source (v4_chrome), so the page is born normalized
-    assert 'class="doors"' in html and 'aria-current="page"' in html
-    assert 'class="loop-forward"' in html
-    assert 'class="site-foot"' in html
+    # ADR-157 (the v7 cut-over): the one chrome is the v7 bar + footer tier; the loop-forward close retired
+    assert 'class="v7-bar"' in html
+    assert 'class="loop-forward"' not in html
+    assert 'class="v7-foot"' in html
 
 
 def test_canonical_and_title_track_the_entry():

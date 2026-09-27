@@ -41,6 +41,11 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 pytest.importorskip("playwright.sync_api", reason="playwright not installed — render check runs where it is")
+# 2026-09-27 (ADR-157, the v7 cut-over): the constellation left the live Home — the v7 Home
+# (scripts/v7/home.py) mounts no constellation, and no other page ever did. story.js still
+# carries the #1215 edge readout code; there is no served page to render it on, so this
+# module is skipped rather than pointed at a page that does not exist. Delete it with story.js.
+pytest.skip("the constellation left the live Home at the v7 cut-over (ADR-157); story.js is unmounted", allow_module_level=True)
 
 from pr_render_gate import _serve, _wait_port  # noqa: E402
 
