@@ -38,6 +38,8 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         "    <h1>This week</h1>\n"
         '    <p class="v7-job">The write-up of the week, with the page before and the page after.</p>\n'
         '    <p class="wk-through" id="wk-through" data-src="api_journey.journey.last_weighin_date"></p>\n'
+        '    <noscript><p class="wk-note">Every line on this page is drawn from the site’s served data when scripts run. '
+        "With scripts off the entries below name what each one holds, not the words or the numbers.</p></noscript>\n"
         + _entry("wk-latest", "The latest write-up")
         + _entry("wk-previously", "Previously")
         + _entry("wk-sofar", "This week, so far")

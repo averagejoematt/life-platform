@@ -19,7 +19,7 @@
 // data-src naming the served field it came from.
 import { weekLine, nightLine, sessionLine, proteinLine, askLine, unwrap } from "/assets/js/three_questions.js";
 import { absenceLine, isDark } from "/assets/js/absence_read.js";
-import { dayInWords, dayLabel, dataThrough, daysOverdue } from "/assets/js/entry_age.js";
+import { dayInWords, dayLabel, dataThrough, daysOverdue, nextWeighInText } from "/assets/js/entry_age.js";
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const iso = (s) => String(s || "").slice(0, 10);
@@ -146,11 +146,12 @@ export function skipsList({ pillars, freshness } = {}) {
   return out;
 }
 
-/** The dated return line: rewritten every morning; the next weigh-in from the last one plus a day. */
-export function returnLine(journey) {
-  const nw = plusDays(journey && journey.last_weighin_date, 1);
-  const w = dayInWords(nw);
-  return { date: nw, text: w ? `Rewritten every morning. The next weigh-in is due ${w}.` : "Rewritten every morning." };
+/** The dated return line: rewritten every morning; the next weigh-in in the ONE spelling every v7
+ *  page uses (entry_age.nextWeighInText, R6 fix 4) — due when the day after the last weigh-in is on
+ *  or after `through` (this page's data-through day), else "No weigh-in since <day> — N days". */
+export function returnLine(journey, through) {
+  const r = nextWeighInText(journey && journey.last_weighin_date, through, { capital: true });
+  return { date: r.day, text: r.text ? `Rewritten every morning. ${r.text}.` : "Rewritten every morning." };
 }
 
 // ── rendering ────────────────────────────────────────────────────────────────
@@ -220,14 +221,14 @@ function renderSkips({ pillars, freshness }) {
   if (freshness) setMargin(sec, freshness.pacific_today);
 }
 
-function renderReturn(journey) {
+function renderReturn(journey, through) {
   const sec = document.getElementById("td-return");
   const el = document.getElementById("td-return-line");
-  const r = returnLine(journey);
+  const r = returnLine(journey, through);
   if (el) {
     el.textContent = r.text;
     el.classList.remove("td-pending");
-    el.setAttribute("data-src", "api_snapshot.journey.last_weighin_date + 1 day");
+    el.setAttribute("data-src", "api_snapshot.journey.last_weighin_date");
   }
   if (r.date) setMargin(sec, r.date);
 }
@@ -255,14 +256,15 @@ async function main() {
   const character = snap ? unwrap(snap.character, "character") : null;
   const pillars = (snap && snap.character && snap.character.pillars) || (character && character.pillars) || [];
   const thr = document.getElementById("td-through");
-  if (thr) thr.textContent = dataThrough(throughDate({ journey, vitals, nutrition: nut }));
+  const through = throughDate({ journey, vitals, nutrition: nut });
+  if (thr) thr.textContent = dataThrough(through);
   const now = new Date();
   renderWeek(journey);
   renderNight(vitals);
   renderToday({ rt, nut, session });
   renderAsk(dash, now);
   renderSkips({ pillars, freshness: fresh });
-  renderReturn(journey);
+  renderReturn(journey, through);
 }
 
 if (typeof document !== "undefined" && document.getElementById("td-week")) {
