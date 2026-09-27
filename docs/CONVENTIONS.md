@@ -492,7 +492,8 @@ each.
 The counter now has **exactly one committed home**: `DISCOVERED_COUNTS` in
 `lambdas/web/platform_counts.py`, a generated module that exists for no other purpose and
 is spliced into `PLATFORM_STATS` at import. `docs/TESTING.md` states the count as derived
-and names the command (`--print test_count`) instead of quoting a number. So running
+and names where it comes from instead of quoting a number (since #4250: the bundle stamp,
+§4c). So running
 `sync --apply` before pushing a docs PR now produces a counter diff that is *separable* —
 in a file the branch has no reason to commit, and which `agent_commit.sh` refuses and
 restores. **A test-adding PR touches zero lines any sibling PR touches.** Everything
@@ -639,6 +640,17 @@ run then lints/tests/deploys that reconciled sha (`needs.reconcile.outputs.build
 Only the generator-output **whitelist** may be auto-committed — any other dirty path
 fails the job with no commit. The manual `/reconcile-branch` merge-queue ritual is
 still valid; the bot is the net under it, not a replacement for pre-merge hygiene.
+
+**A number that moves on nearly every merge is not committed at all (#4250).** The
+reconcile bot is for artifacts that change *occasionally*. `test_count` changed on nearly
+every merge (7 d to 2026-09-27: 120 of 125 `chore(reconcile)` commits touched it, 70
+changed nothing else), and every such push cost a second full CI/CD run and a gated fleet
+deploy for one integer. It is now **stamped into the bundle at build time**
+(`deploy/build_bundle.py::stage_bundle_counts` → `bundle_counts.json` at the bundle root,
+read by `lambdas/web/bundle_counts.py`); in a checkout the reader counts `tests/` live. The
+served number is therefore exactly as fresh as the last deploy of the bundle — which is
+what `/api/platform_stats` describes. The rule for the next such counter: if a generator's
+output would move on most merges, stamp it where the artifact is built, never commit it.
 
 **When the reconcile job itself reds, check in this order:**
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
@@ -1559,7 +1571,7 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | Layer-retirement invariant (#781) | `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be `[]` (the layer is retired; there is no version to quote) |
 | Lambda count | `python3 deploy/sync_doc_metadata.py` (AST-discovers; syncs `PLATFORM_STATS` + doc headers) |
 | MCP tool count | `deploy/sync_doc_metadata.py::_auto_discover_tool_count` — the top-level keys in `TOOLS` in `mcp/registry.py`. **Do not** `grep -c '"name":'` — it over-counts nested schema fields |
-| Test count | `python3 deploy/sync_doc_metadata.py --print test_count` (writes nothing). The one committed home is `DISCOVERED_COUNTS` in **`lambdas/web/platform_counts.py`** — generated, single-writer, never hand-edited and never carried on a branch (#3101). It is spliced into `PLATFORM_STATS` at import; `PLATFORM_STATS["test_count"]` is still the value served at `/api/platform_stats` |
+| Test count | `python3 -c "import sys; sys.path.insert(0,'lambdas'); from web.bundle_counts import load_bundle_counts; print(load_bundle_counts())"` (writes nothing). **Not committed anywhere** since #4250: `deploy/build_bundle.py` stamps it into every bundle (`bundle_counts.json`), `lambdas/web/bundle_counts.py` reads it, and it is spliced into `PLATFORM_STATS` after `DISCOVERED_COUNTS`; `PLATFORM_STATS["test_count"]` is the value served at `/api/platform_stats`, as fresh as the last deploy (§4c) |
 | Live site build | `curl -s https://averagejoematt.com/version.json` → compare `build` to `git rev-parse --short HEAD`; a mismatch means the viewer's device is stale |
 | Open CodeQL alerts | `gh api '/repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100' --paginate --jq length` → steady state **0** since the #1902 triage (every alert is fixed or dismissed-with-reason; a just-merged fix stays open until CodeQL re-analyzes main). `drift_sentinel.check_codeql_alerts` alarms on regrowth — an open alert is un-triaged by definition, so triage it, never let the list re-accumulate |
 | `main` classic branch protection | `gh api repos/<owner>/<repo>/branches/main/protection` → must 404 "Branch not protected" (removed 2026-07-13, #1173; a 200 here means protection was re-added out of band — reconcile the doc, don't assume this table is wrong) |

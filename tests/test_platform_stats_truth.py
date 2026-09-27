@@ -10,6 +10,7 @@ fields; this test reds CI whenever the served literal drifts from the discoverer
 
 import glob
 import os
+import pathlib
 import sys
 
 import pytest
@@ -25,7 +26,6 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
 import doc_drift_verdict as _verdict  # noqa: E402 — #3984: the off-main predicate, imported not restated
-import doc_platform_counts as counts  # noqa: E402 — #3384: the PR-exempt registry (single source, never a second hand-list)
 import sync_doc_metadata as sync  # noqa: E402
 
 
@@ -55,17 +55,64 @@ def test_adr_count_matches_decisions_doc():
 
 
 def test_test_count_matches_suite():
+    """#4250: test_count is no longer a committed literal, so there is nothing to lag — in a
+    checkout the reader derives it from tests/ live, and it must equal the sync's discoverer."""
     actual = sync._count_test_functions()
     assert actual is not None
-    if "test_count" in counts.PR_EXEMPT_FIELDS and counts._is_pr_event() and PLATFORM_STATS["test_count"] != actual:
-        # #3384: the pytest twin of the Wiki-drift gate. On a pull_request event the
-        # committed literal is bot-owned (#3101) and the branch is policy-forbidden to
-        # update it, so a mixed code+tests PR reds here with no green path. Visible skip,
-        # named values; push/main runs (and any test-neutral PR) still enforce equality.
-        pytest.skip(
-            f"#3384: test_count {PLATFORM_STATS['test_count']} vs actual {actual} — bot-owned literal (#3101), reconciled on main; push runs enforce"
-        )
-    _assert_or_skip_off_main("test_count", actual)
+    assert PLATFORM_STATS["test_count"] == actual
+
+
+# ── #4250: the bundle stamp — the served test_count's only home in a deployed Lambda ──
+import json  # noqa: E402
+
+import build_bundle  # noqa: E402
+from web import bundle_counts  # noqa: E402
+
+
+def test_the_bundle_stamp_is_the_suite_count(tmp_path):
+    build_bundle.stage_bundle_counts(str(tmp_path))
+    stamp = json.loads((tmp_path / bundle_counts.BUNDLE_COUNTS_NAME).read_text(encoding="utf-8"))
+    assert stamp == {"test_count": sync._count_test_functions()}, "the stamp and the sync disagree on what a test is"
+
+
+def test_a_deployed_bundle_serves_the_stamp_not_a_recount(tmp_path):
+    """A bundle root has no tests/ beside it; the stamp is the only source. A value the
+    checkout could never produce proves the stamp — not a recount — is what is read."""
+    root = tmp_path / "bundle"
+    root.mkdir()
+    (root / bundle_counts.BUNDLE_COUNTS_NAME).write_text('{"test_count": 7}', encoding="utf-8")
+    assert bundle_counts.load_bundle_counts(str(root)) == {"test_count": 7}
+
+
+@pytest.mark.parametrize("stamp", [None, "{not json", '{"test_count": 0}', '{"test_count": "24000"}', '{"test_count": true}', "[]"])
+def test_no_valid_stamp_and_no_tests_dir_omits_the_key(tmp_path, stamp):
+    """Absent beats remembered: with nothing to derive from, /api/platform_stats drops the key."""
+    root = tmp_path / "bundle"
+    root.mkdir()
+    if stamp is not None:
+        (root / bundle_counts.BUNDLE_COUNTS_NAME).write_text(stamp, encoding="utf-8")
+    assert bundle_counts.load_bundle_counts(str(root)) == {}
+
+
+def test_a_failed_count_stages_nothing_and_never_raises(tmp_path, capsys):
+    empty_repo = tmp_path / "repo"
+    (empty_repo / "lambdas" / "web").mkdir(parents=True)
+    (empty_repo / "tests").mkdir()
+    (empty_repo / "lambdas" / "web" / "bundle_counts.py").write_text(
+        (pathlib.Path(_REPO) / "lambdas" / "web" / "bundle_counts.py").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    out = tmp_path / "out"
+    out.mkdir()
+    build_bundle.stage_bundle_counts(str(out), repo_root=str(empty_repo))
+    assert not (out / bundle_counts.BUNDLE_COUNTS_NAME).exists()
+    assert "not staged" in capsys.readouterr().err
+
+
+def test_stage_tree_stamps_every_bundle():
+    """The stamp rides the one staging path every deploy uses (#781) — not an optional extra."""
+    import inspect
+
+    assert "stage_bundle_counts(out_dir)" in inspect.getsource(build_bundle.stage_tree)
 
 
 def test_lambda_count_matches_cdk():

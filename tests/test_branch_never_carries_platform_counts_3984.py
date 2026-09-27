@@ -132,12 +132,13 @@ def test_a_push_to_main_is_still_the_warning_and_exit_zero(counts_text):
 
 
 def test_must_fail_a_deleted_field_off_main_is_still_a_red(counts_text):
-    """The tolerance is for `~` (bot-owned) drift ONLY. Delete the `"test_count":` line — a
+    """The tolerance is for `~` (bot-owned) drift ONLY. Delete the `"alarms":` line — a
     field the sync cannot rewrite because it cannot find it — and the `!` class must red off
     main exactly as it does on main. If this test ever passes with exit 0 the tolerance has
-    become a blanket exemption and the gate is gone."""
-    gone, n = re.subn(r'^\s*"test_count": \d+,?\n', "", counts_text, count=1, flags=re.M)
-    assert n == 1, "could not remove the test_count line — the counter file changed shape"
+    become a blanket exemption and the gate is gone. (#4250: was `test_count`, which is no
+    longer a committed counter — deleting it is now the sanctioned retirement, not a `!`.)"""
+    gone, n = re.subn(r'^\s*"alarms": \d+,?\n', "", counts_text, count=1, flags=re.M)
+    assert n == 1, "could not remove the alarms line — the counter file changed shape"
     _COUNTS.write_text(gone, encoding="utf-8")
     r = _check(_env("refs/pull/3984/merge", "pull_request"))
     assert r.returncode == _verdict.EXIT_FAILURE, f"a missing DISCOVERED_COUNTS field must be exit 1 everywhere\n{r.stdout}"

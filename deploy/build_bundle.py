@@ -93,6 +93,35 @@ def stage_qa_coverage(out_dir):
         )
 
 
+def stage_bundle_counts(out_dir, repo_root=REPO_ROOT):
+    """#4250: stamp the counters that move on nearly every merge into the bundle.
+
+    `test_count` is no longer a committed literal (it made the reconcile bot commit to
+    main after nearly every merge, each push a second CI run and a gated fleet deploy).
+    It is counted HERE, at build time, by the same function the serving Lambda's reader
+    uses on a checkout (lambdas/web/bundle_counts.py — loaded by path, so the builder
+    does not import the web package), and written to bundle_counts.json at the bundle
+    root. Deterministic by contract (sort_keys, NO timestamp), like qa_coverage_stats.
+
+    Fail-SOFT: a counting failure must never block a deploy — the reader then omits the
+    key from /api/platform_stats rather than serving a remembered number.
+    """
+    import importlib.util
+
+    try:
+        src = os.path.join(repo_root, "lambdas", "web", "bundle_counts.py")
+        spec = importlib.util.spec_from_file_location("_bundle_counts_for_build", src)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        n = mod.count_test_functions(os.path.join(repo_root, "tests"))
+        if not n:
+            raise RuntimeError("no `def test_` found under tests/")
+        with open(os.path.join(out_dir, mod.BUNDLE_COUNTS_NAME), "w", encoding="utf-8") as f:
+            json.dump({"test_count": n}, f, sort_keys=True)
+    except Exception as e:
+        print(f"⚠️  bundle_counts.json not staged ({e}) — /api/platform_stats will omit test_count", file=sys.stderr)
+
+
 def _git(args, cwd=REPO_ROOT):
     """Run a git command, returning stripped stdout or None (never raises)."""
     try:
@@ -293,6 +322,8 @@ def stage_tree(out_dir):
         print("⚠️  redirects.map missing — the #1430 weekly redirect spot-check will warn+skip", file=sys.stderr)
     # #1446: QA-coverage snapshot for the Monday ops green report (fail-soft).
     stage_qa_coverage(out_dir)
+    # #4250: the per-merge counters, stamped at build time instead of committed (fail-soft).
+    stage_bundle_counts(out_dir)
     # #2377: commit fingerprint — every bundle, every path, no exceptions.
     stage_build_info(out_dir)
     return out_dir

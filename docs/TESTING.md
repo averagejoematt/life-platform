@@ -17,7 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-**Total tests:** derived, never committed — `test_count` in the generated `lambdas/web/platform_counts.py`, served at `/api/platform_stats` (#3101).
+**Total tests:** derived, never committed — `test_count` is stamped into every Lambda bundle by `deploy/build_bundle.py`, served at `/api/platform_stats` (#4250).
 
 ---
 

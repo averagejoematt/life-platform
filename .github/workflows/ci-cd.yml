@@ -267,7 +267,8 @@ jobs:
           # CI gate. Keep this list and ALLOWED below in lockstep.
           #   sync_doc_metadata --apply  → doc-sync literals: lambdas/web/platform_counts.py
           #                                (#3101 — the generated single-writer counter module;
-          #                                it replaced the in-place rewrite of site_api_common.py)
+          #                                it replaced the in-place rewrite of site_api_common.py;
+          #                                test_count left it at #4250 — stamped into the bundle)
           #                                + CLAUDE.md/README.md/.claude/README.md/docs/*.md
           #                                (gate: lint "Doc-drift gate", test_sync_doc_metadata_check)
           #   generate_adr_index --apply → docs/DECISIONS.md index table (gate: lint "Wiki gates")

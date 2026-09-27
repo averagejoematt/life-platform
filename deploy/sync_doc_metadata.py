@@ -523,8 +523,7 @@ def _platform_counts_values(facts: dict) -> dict:
         "data_sources": facts.get("data_sources"),
         "cdk_stacks": facts.get("cdk_stacks"),
         "adrs": _count_adrs(),
-        "test_count": _count_test_functions(),
-    }
+    }  # test_count left this set at #4250: stamped into the bundle (build_bundle.stage_bundle_counts)
 
 
 def _sync_platform_counts(facts: dict, dry_run: bool) -> list[str]:
@@ -1042,7 +1041,7 @@ RULES = [
     (
         "docs/TESTING.md",
         r"\*\*Total tests:\*\* derived, never committed[^\n]*",
-        "**Total tests:** derived, never committed — `test_count` in the generated `lambdas/web/platform_counts.py`, served at `/api/platform_stats` (#3101).",
+        "**Total tests:** derived, never committed — `test_count` is stamped into every Lambda bundle by `deploy/build_bundle.py`, served at `/api/platform_stats` (#4250).",
     ),
     # ── docs/content/ essays (#3162, Part of #2986, re-fixes #2838's class) ─────
     # check_doc_facts.py's prose safety-net deliberately does NOT police lambda_count

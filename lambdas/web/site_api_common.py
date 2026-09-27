@@ -39,6 +39,7 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
 )
 from experiment.phase_filter import with_phase_filter
 
+from web.bundle_counts import load_bundle_counts
 from web.platform_counts import DISCOVERED_COUNTS
 
 # ── Config ─────────────────────────────────────────────────
@@ -203,7 +204,7 @@ CORS_HEADERS = {
 
 # ── Platform stats — single source of truth for all site pages ──
 # TWO KINDS OF NUMBER, TWO HOMES (#3101):
-#   • DISCOVERED — mcp_tools, lambdas, alarms, data_sources, adrs, test_count.
+#   • DISCOVERED — mcp_tools, lambdas, alarms, data_sources, adrs, cdk_stacks.
 #     Re-derived from the repo by `python3 deploy/sync_doc_metadata.py --apply`
 #     and pinned by tests/test_platform_stats_truth.py. They live in the
 #     generated single-writer module lambdas/web/platform_counts.py, NOT here,
@@ -216,10 +217,15 @@ CORS_HEADERS = {
 #     rewritten by the sync. (cdk_stacks moved into the discovered set at #3143
 #     — the hand-maintained copy here was stale 8 vs 10, missing the #793 serve
 #     split and the DIL-027 backup stack; see platform_counts.py's docstring.)
+#   • BUNDLE-STAMPED — test_count (#4250). It moved on nearly every merge, so it is no
+#     longer committed at all: deploy/build_bundle.py stamps it into the bundle and
+#     web/bundle_counts.py reads it. Spliced AFTER DISCOVERED_COUNTS so a leftover
+#     literal there (removed by the first reconcile after #4250) can never win.
 # Splice order is deliberate: the discovered block cannot silently shadow a
 # judgment field, because a duplicate key would be caught by the guard test.
 PLATFORM_STATS = {
     **DISCOVERED_COUNTS,
+    **load_bundle_counts(),
     "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
     # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
     # $98.35, both closed months. The LAST CLOSED MONTH is the honest trailing run-rate, so
