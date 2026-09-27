@@ -89,6 +89,41 @@ def latest_weight(withings_records, apple_records=None):
     return best
 
 
+def experiment_rate_window(today, genesis, lookback_days=28):
+    """#4184: the ONE window the experiment's weekly rate is read over — (start, end), inclusive.
+
+    end is TODAY (the Pacific day the rate is stated as of, the morning weigh-in
+    included); start is `lookback_days` back, clamped to the genesis (the rate is
+    experiment-scoped even though withings rows are RAW_TIMESERIES). Both producers —
+    `/api/journey` and daily-metrics-compute (-> public_stats.json) — take their bounds
+    from here. The genesis clamp alone (#4193) was not enough: the compute side ended
+    at YESTERDAY, so on 2026-09-27 it read a 20-day span (provisional, -4.36) while the
+    API read today's weigh-in too (21 days, firm, -4.04).
+    """
+    today = today if isinstance(today, str) else today.isoformat()
+    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    return max(start, genesis), today
+
+
+def withings_series(rows):
+    """Sorted (date, lbs) from withings day rows — `weight_lbs` only, as /api/journey always read it."""
+    return sorted((str(r.get("sk", "")).replace("DATE#", ""), float(r["weight_lbs"])) for r in rows or [] if r.get("weight_lbs"))
+
+
+def fetch_experiment_trajectory(fetch, today, genesis, goal_weight, ref_dt=None):
+    """#4184: the experiment's weekly rate, read over `experiment_rate_window` through
+    `fetch(source, start, end) -> day rows`, with /api/journey's current-weight resolution
+    (the latest withings weigh-in, unless an Apple Health reading from the last 7 days is
+    strictly newer) — so the projection's start weight agrees as well as the slope."""
+    start, end = experiment_rate_window(today, genesis)
+    series = withings_series(fetch("withings", start, end))
+    current = series[-1][1] if series else None
+    newer = latest_weight([], fetch("apple_health", experiment_rate_window(today, genesis, lookback_days=7)[0], end))
+    if newer["as_of"] and series and newer["as_of"] > series[-1][0]:
+        current = newer["weight_lbs"]
+    return weight_trajectory(series, current, goal_weight, ref_dt=ref_dt)
+
+
 def weight_trajectory(
     weight_series,
     current_weight,
