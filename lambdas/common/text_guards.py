@@ -102,11 +102,6 @@ def find_tool_call_residue(text) -> str | None:
     return m.group(0) if m else None
 
 
-def has_tool_call_residue(text) -> bool:
-    """True if `text` is a string carrying a tool-call-XML fragment."""
-    return find_tool_call_residue(text) is not None
-
-
 def residue_fragments(value, _path: str = "") -> list[tuple[str, str]]:
     """Walk a JSON-shaped value (dict / list / scalars) and return every
     `(path, fragment)` pair where a string leaf carries tool-call residue.

@@ -51,7 +51,6 @@ import pytest  # noqa: E402
 from common.text_guards import (  # noqa: E402
     TOOL_CALL_ENVELOPE_RE,
     find_tool_call_residue,
-    has_tool_call_residue,
     residue_fragments,
     strip_tool_call_residue,
 )
@@ -125,7 +124,6 @@ GENERIC_TAG_SHAPES = ["</note>", "</content>", "</override_reason>", "<decision>
 
 def test_find_names_the_first_fragment_of_the_live_fixture():
     assert find_tool_call_residue(LIVE_RESIDUE_DECISION) == LIVE_FIRST_FRAGMENT
-    assert has_tool_call_residue(LIVE_RESIDUE_DECISION) is True
 
 
 @pytest.mark.parametrize("shape", ENVELOPE_SHAPES)
@@ -139,7 +137,7 @@ def test_every_envelope_shape_is_residue_on_both_patterns(shape):
 @pytest.mark.parametrize("shape", GENERIC_TAG_SHAPES)
 def test_generic_field_tags_are_residue_for_an_argument_but_not_for_a_page(shape):
     text = f"his words {shape} more"
-    assert has_tool_call_residue(text), f"per-argument pattern missed {shape!r}"
+    assert find_tool_call_residue(text) is not None, f"per-argument pattern missed {shape!r}"
     assert not TOOL_CALL_ENVELOPE_RE.search(text), f"the page-sweep pattern must not fire on a generic tag {shape!r}"
 
 
@@ -331,7 +329,9 @@ def test_mutation_guard_off_reproduces_the_pre_fix_leak(fake_table, monkeypatch)
     h.handle_tools_call({"name": "log_decision", "arguments": {"decision": LIVE_RESIDUE_DECISION, "followed": True}})
     stored = next(v for v in fake_table.store.values() if "decision" in v)
     assert stored["decision"] == LIVE_RESIDUE_DECISION, "guard-off control did not reproduce the pre-fix leak"
-    assert has_tool_call_residue(stored["decision"]), "guard-off control must actually carry residue — the point of a mutation control"
+    assert (
+        find_tool_call_residue(stored["decision"]) == LIVE_FIRST_FRAGMENT
+    ), "guard-off control must actually carry residue — the point of a mutation control"
 
 
 def test_mutation_one_door_dropped_from_the_set_fails_and_names_it(monkeypatch):

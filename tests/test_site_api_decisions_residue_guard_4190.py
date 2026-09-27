@@ -33,7 +33,7 @@ for _p in (_ROOT, os.path.join(_ROOT, "lambdas")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from common.text_guards import has_tool_call_residue  # noqa: E402
+from common.text_guards import find_tool_call_residue  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 # The runtime content filter's term source — same fixture shape site_api_common
@@ -85,7 +85,7 @@ def test_decisions_field_residue_is_stripped_at_serve_time(monkeypatch):
     assert body["count"] == 1
     d0 = body["decisions"][0]
     assert d0["decision"] == LIVE_RESIDUE_CLEAN
-    assert not has_tool_call_residue(d0["decision"])
+    assert find_tool_call_residue(d0["decision"]) is None
 
 
 def test_override_reason_residue_is_stripped_at_serve_time(monkeypatch):
@@ -101,7 +101,7 @@ def test_override_reason_residue_is_stripped_at_serve_time(monkeypatch):
     body = _coach_decisions(monkeypatch, rows)
     d0 = body["decisions"][0]
     assert d0["override_reason"] == LIVE_RESIDUE_CLEAN
-    assert not has_tool_call_residue(d0["override_reason"])
+    assert find_tool_call_residue(d0["override_reason"]) is None
 
 
 def test_note_residue_is_stripped_before_the_all_or_nothing_screen(monkeypatch):
@@ -120,7 +120,7 @@ def test_note_residue_is_stripped_before_the_all_or_nothing_screen(monkeypatch):
     body = _coach_decisions(monkeypatch, rows)
     assert body["count"] == 1, "a note carrying residue must still publish once the residue is stripped, not be withheld"
     d0 = body["decisions"][0]
-    assert not has_tool_call_residue(d0["note"])
+    assert find_tool_call_residue(d0["note"]) is None
     # Only the tool-call-XML TAIL (from the first `<`) is residue — everything
     # before it, including "Committed to Hevy..." run together with no space, is
     # real prior text and must survive.
@@ -180,4 +180,4 @@ def test_other_field_closers_and_envelope_shapes_are_still_stripped_at_serve_tim
     assert d0["decision"] == "Take a rest day."
     assert d0["override_reason"] == "Felt fine."
     assert d0["note"] == "My call."
-    assert not any(has_tool_call_residue(d0[k]) for k in ("decision", "override_reason", "note"))
+    assert all(find_tool_call_residue(d0[k]) is None for k in ("decision", "override_reason", "note"))

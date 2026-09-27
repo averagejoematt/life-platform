@@ -2500,7 +2500,7 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
 # Second cut (2026-09-26, the refuse-not-trim ruling): proved by neutering the DETECT side —
 # `find_tool_call_residue` replaced with a straight `return None` in the REAL tracked module.
 # That fails the MCP write-door refuser open (`residue_fragments` finds nothing, every write
-# proceeds) and `has_tool_call_residue` with it, while `strip_tool_call_residue` — which
+# proceeds), while `strip_tool_call_residue` — which
 # searches the regex directly — keeps working, so the mutation isolates the refuse half from
 # the serve-time strip. The first cut's proof (strip neutered, 33/68 of 101) is superseded:
 # the door no longer trims, so a strip mutation would no longer touch it.
