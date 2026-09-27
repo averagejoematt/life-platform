@@ -50,6 +50,7 @@ import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
 from v7 import (
     coaches,  # noqa: E402
+    follow,  # noqa: E402
     hood,  # noqa: E402
     numbers,  # noqa: E402
     today,  # noqa: E402
@@ -87,6 +88,7 @@ BODIES = {
     "protocols/": tries,
     "method/": hood,
     "data/": numbers,
+    "subscribe/": follow,
 }
 
 
