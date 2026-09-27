@@ -1291,15 +1291,9 @@ TOOLS = {
                             "'episodic_wins' → what_worked, 'failure_pattern' → failure_patterns."
                         ),
                     },
-                    "content": {
-                        "type": "object",
-                        "description": (
-                            'Key-value dict of data to store, with the readable core in "summary". '
-                            'E.g. {"summary": "work trip Tue-Fri, hotel gym only", "detail": {...}}'
-                        ),
-                    },
+                    "content": {"type": "object", "description": 'Key-value dict; put the readable core in "summary" — what coaches read.'},
                     "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
-                    "overwrite": {"type": "boolean", "description": "Overwrite if record exists (default true)."},
+                    "replace_key": {"type": "string", "description": "Exact sk of the one row to rewrite; default adds a new row (#4171)"},
                     "privacy_tier": {
                         "type": "string",
                         "enum": ["public_ok", "coach_context", "private"],
@@ -1360,9 +1354,10 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "category": {"type": "string", "description": "Memory category."},
-                    "date": {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
+                    "date": {"type": "string", "description": "Date of the legacy one-row-per-day record to delete (YYYY-MM-DD)."},
+                    "key": {"type": "string", "description": "Exact sk of the row to delete — the only handle for a per-note row (#4171)"},
                 },
-                "required": ["category", "date"],
+                "required": ["category"],
             },
         },
     },

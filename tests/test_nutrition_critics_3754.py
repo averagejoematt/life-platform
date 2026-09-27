@@ -655,6 +655,7 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
         "withings": [{"date": k, "weight_lbs": 320 - 0.4 * i} for i, k in enumerate(KEYS)],
     }
     monkeypatch.setattr(nci, "query_source", lambda source, start, end: rows[source])
+    monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: [])  # #4312: the complement split's index read
     monkeypatch.setattr(nci, "_walking_hours", lambda end: 9.0)
     monkeypatch.setattr(nci, "_metabolic_severity", lambda end: None)  # IC-29 unreadable
     monkeypatch.setattr(nci, "already_logged", lambda days=14: [])

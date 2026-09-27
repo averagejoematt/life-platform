@@ -464,3 +464,223 @@ def test_training_category_write_then_read_back_through_mcp_handler(monkeypatch)
 
 def test_mcp_valid_categories_derived_from_registry():
     assert tm.VALID_CATEGORIES == set(pm.MEMORY_CATEGORIES)
+
+
+# ── #4171 — writes are ADDITIVE: a same-day note never erases the earlier one ────────────
+#
+# Live, 2026-09-26 02:16:35Z: approving queued write 20260926T021548Z-6ef85360 (a training
+# note) landed on MEMORY#training#2026-09-25 and silently replaced the injury note stored
+# there at 02:15:00Z. The fixture below IS that wire — the two writes, 60 s apart — against a
+# table that honours the calls the tool makes (conditional puts on sk, a BETWEEN /
+# begins_with key condition, ScanIndexForward, Limit), so "both survive" is read back from
+# the store, not inferred from a return value.
+
+import ast  # noqa: E402
+import inspect  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+
+
+class _ConditionalCheckFailedException(Exception):
+    pass
+
+
+class _MemoryWireTable(FakeDdbTable):
+    """FakeDdbTable that honours what tools_memory actually sends."""
+
+    def __init__(self, rows=None):
+        super().__init__(rows=rows, filter_by_pk=True)
+
+    def put_item(self, Item=None, **kwargs):
+        cond = kwargs.get("ConditionExpression")
+        exists = self._key_of(Item) in self.store
+        if cond == "attribute_not_exists(sk)" and exists:
+            raise _ConditionalCheckFailedException("The conditional request failed: attribute_not_exists(sk)")
+        if cond == "attribute_exists(sk)" and not exists:
+            raise _ConditionalCheckFailedException("The conditional request failed: attribute_exists(sk)")
+        if cond not in (None, "attribute_not_exists(sk)", "attribute_exists(sk)"):
+            raise AssertionError(f"unexpected condition {cond!r}")
+        return super().put_item(Item=Item, **kwargs)
+
+    def query(self, **kwargs):
+        self.query_calls.append(kwargs)
+        eav = kwargs["ExpressionAttributeValues"]
+        kce = kwargs["KeyConditionExpression"]
+        rows = [i for i in self.store.values() if i.get("pk") == eav[":pk"]]
+        if "BETWEEN" in kce:
+            rows = [r for r in rows if eav[":s"] <= r["sk"] <= eav[":e"]]
+        elif "begins_with" in kce:
+            rows = [r for r in rows if r["sk"].startswith(eav[":p"])]
+        else:  # pragma: no cover — a new key-condition shape must be taught to the wire
+            raise AssertionError(f"unexpected key condition {kce!r}")
+        rows.sort(key=lambda r: r["sk"], reverse=not kwargs.get("ScanIndexForward", True))
+        limit = kwargs.get("Limit")
+        if limit:
+            rows = rows[:limit]
+        return {"Items": [dict(r) for r in rows]}
+
+
+class _Clock:
+    """Sequenced `datetime.now()` — each write stamps the next instant from the wire."""
+
+    def __init__(self, *instants):
+        self._instants = list(instants)
+
+    def now(self, tz=None):
+        cur = self._instants.pop(0) if len(self._instants) > 1 else self._instants[0]
+        return cur if tz is None else cur.astimezone(tz)
+
+
+_T_INJURY = datetime(2026, 9, 26, 2, 15, 0, tzinfo=timezone.utc)  # the injury note, stored_at
+_T_MACHINES = datetime(2026, 9, 26, 2, 16, 35, tzinfo=timezone.utc)  # the approved queued note, 95 s later
+_INJURY = "No current injuries or ailments (as of 2026-09-25)"
+_MACHINES = "Seated leg curl and calf press are my machines, not lying curl / standing calf raise."
+
+
+def _wire_0925(monkeypatch, *instants):
+    """A wire table on the 2026-09-25 Pacific day with a sequenced clock (see `_Clock`)."""
+    fake = _MemoryWireTable()
+    monkeypatch.setattr(tm, "_table_ref", fake)
+    # 02:15Z on 09-26 UTC is 19:15 PT on 09-25 — the date both notes keyed on.
+    monkeypatch.setattr(tm, "pacific_now", lambda: datetime(2026, 9, 25, 19, 15, 0))
+    monkeypatch.setattr(tm, "datetime", _Clock(*(instants or (_T_INJURY, _T_MACHINES))))
+    return fake
+
+
+def _training_rows(fake):
+    return sorted((r for r in fake.store.values() if r["sk"].startswith("MEMORY#training#")), key=lambda r: r["stored_at"])
+
+
+def test_issue_4171_the_second_same_day_note_never_erases_the_first(monkeypatch):
+    """THE fixture: the two 09-25 writes, 60 s apart, on the same category-day."""
+    fake = _wire_0925(monkeypatch)
+    first = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    second = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _MACHINES}})
+    assert first["status"] == "stored" and second["status"] == "stored"
+    assert first["sk"] != second["sk"], "a second same-day note must get its OWN key"
+    assert first["sk"].startswith("MEMORY#training#2026-09-25#") and second["sk"].startswith("MEMORY#training#2026-09-25#")
+
+    rows = _training_rows(fake)
+    assert [r["summary"] for r in rows] == [_INJURY, _MACHINES], "both notes are in the store — the first was not erased"
+    assert [r["stored_at"] for r in rows] == [_T_INJURY.isoformat(), _T_MACHINES.isoformat()]
+
+    read = tm.tool_read_platform_memory({"category": "training", "days": 365})
+    assert read["count"] == 2
+    assert [r["summary"] for r in read["records"]] == [_MACHINES, _INJURY], "newest stored first; both served"
+    assert all(r["sk"] for r in read["records"]), "each record carries its sk — the handle replace_key / delete key take"
+
+
+def test_issue_4171_the_write_path_has_no_unconditional_put():
+    """Derivation guard for the mutation control: restoring `table.put_item(Item=item)` (the
+    unconditional put that erased the injury note) is caught here, not only by the fixture."""
+    tree = ast.parse(inspect.getsource(tm.tool_write_platform_memory))
+    puts = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", None) == "put_item"]
+    assert puts, "the write path must still write"
+    for call in puts:
+        kws = {k.arg for k in call.keywords}
+        assert "ConditionExpression" in kws, f"unconditional put_item at line {call.lineno} — a race could clobber a same-day note"
+
+
+def test_issue_4171_an_identical_replay_converges_on_one_row(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    first = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    replay = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    assert first["status"] == "stored"
+    assert replay["status"] == "unchanged" and replay["sk"] == first["sk"], replay
+    assert len(_training_rows(fake)) == 1, "a replay is not a second note (#3114 CONTENT_KEY)"
+    assert _training_rows(fake)[0]["stored_at"] == _T_INJURY.isoformat(), "the replay did not touch the original row"
+
+
+def test_issue_4171_replace_key_rewrites_one_named_row_and_only_that_row(monkeypatch):
+    fake = _wire_0925(monkeypatch, _T_INJURY, _T_MACHINES, datetime(2026, 9, 26, 2, 20, 56, tzinfo=timezone.utc))
+    first = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    second = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _MACHINES}})
+
+    out = tm.tool_write_platform_memory(
+        {"category": "training", "content": {"summary": "Right knee niggle since 09-24; no other injuries"}, "replace_key": first["sk"]}
+    )
+    assert out["status"] == "replaced" and out["replaced_key"] == first["sk"] and out["date"] == "2026-09-25"
+    rows = {r["sk"]: r for r in _training_rows(fake)}
+    assert set(rows) == {first["sk"], second["sk"]}, "a replace neither adds a row nor removes the other"
+    assert rows[first["sk"]]["summary"].startswith("Right knee niggle") and "replaced_at" in rows[first["sk"]]
+    assert rows[second["sk"]]["summary"] == _MACHINES, "the other same-day note is untouched"
+
+
+def test_issue_4171_replace_key_refuses_an_absent_key_a_foreign_category_and_a_disagreeing_date(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    first = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    before = {k: dict(v) for k, v in fake.store.items()}
+
+    absent = tm.tool_write_platform_memory(
+        {"category": "training", "content": {"summary": "x"}, "replace_key": "MEMORY#training#2026-09-25#0000000000"}
+    )
+    assert "error" in absent and "nothing to replace" in absent["error"], absent
+    foreign = tm.tool_write_platform_memory({"category": "life_context", "content": {"summary": "x"}, "replace_key": first["sk"]})
+    assert "error" in foreign and "does not name a 'life_context' record" in foreign["error"], foreign
+    disagree = tm.tool_write_platform_memory(
+        {"category": "training", "content": {"summary": "x"}, "replace_key": first["sk"], "date": "2026-09-24"}
+    )
+    assert "error" in disagree and "disagrees" in disagree["error"], disagree
+    assert {k: dict(v) for k, v in fake.store.items()} == before, "a refused replace writes nothing"
+
+
+def test_issue_4171_overwrite_true_is_refused_and_overwrite_false_is_additive(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    refused = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _MACHINES}, "overwrite": True})
+    assert "error" in refused and "replace_key" in refused["error"], refused
+    assert len(_training_rows(fake)) == 1, "the refused call wrote nothing"
+    ok = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _MACHINES}, "overwrite": False})
+    assert ok["status"] == "stored"
+    assert [r["summary"] for r in _training_rows(fake)] == [_INJURY, _MACHINES]
+
+
+def test_issue_4171_the_registry_schema_offers_replace_key_and_no_overwrite():
+    from mcp.registry import TOOLS
+
+    props = TOOLS["write_platform_memory"]["schema"]["inputSchema"]["properties"]
+    assert "replace_key" in props and props["replace_key"]["type"] == "string"
+    assert "overwrite" not in props, "the default-overwrite flag is what erased the 09-25 note"
+    dprops = TOOLS["delete_platform_memory"]["schema"]["inputSchema"]
+    assert "key" in dprops["properties"] and dprops["required"] == ["category"]
+
+
+def test_issue_4171_every_reader_sees_both_same_day_records(monkeypatch):
+    """The acceptance's second box: read_platform_memory, the coach memory block's selector,
+    and list_memory_categories all serve BOTH same-day rows (a 3-segment legacy row and a
+    4-segment note row side by side)."""
+    fake = _wire_0925(monkeypatch)
+    legacy = _mem("training", "2026-09-25", summary=_INJURY, stored_at=_T_INJURY.isoformat())
+    fake._seed(legacy)  # the pre-#4171 one-row-per-day shape, as every existing row is keyed
+    tm.tool_write_platform_memory({"category": "training", "content": {"summary": _MACHINES}})
+
+    read = tm.tool_read_platform_memory({"category": "training", "days": 365})
+    assert read["count"] == 2 and {r["summary"] for r in read["records"]} == {_INJURY, _MACHINES}
+
+    picked = pm.select_conversation_memories(list(fake.store.values()), coach_id="training", today=date(2026, 9, 26))
+    assert {p["record"]["summary"] for p in picked} == {_INJURY, _MACHINES}, "the coach block selector keeps both"
+    assert all(p["date"] == "2026-09-25" for p in picked)
+
+    # A note row with no duplicate `date` attribute is dated from the sk's DATE segment (index 2),
+    # not from its last segment (the content hash).
+    undated = {k: v for k, v in _mem("training", "2026-09-25", summary="undated").items() if k != "date"}
+    undated["sk"] = "MEMORY#training#2026-09-25#abcdef0123"
+    fake._seed(undated)
+    census = tm.tool_list_memory_categories({"days": 365})
+    (training,) = [c for c in census["categories"] if c["category"] == "training"]
+    assert training["count"] == 3 and training["latest_date"] == "2026-09-25"
+
+
+def test_issue_4171_delete_by_exact_key_and_the_legacy_date_form_both_work(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    fake._seed(_mem("training", "2026-09-24", summary="legacy"))
+    note = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _MACHINES}})
+
+    wrong_cat = tm.tool_delete_platform_memory({"category": "life_context", "key": note["sk"]})
+    assert "error" in wrong_cat and len(fake.store) == 2
+    assert "error" in tm.tool_delete_platform_memory({"category": "training"}), "date or key is required"
+
+    out = tm.tool_delete_platform_memory({"category": "training", "key": note["sk"]})
+    assert out["status"] == "deleted" and out["sk"] == note["sk"] and out["date"] == "2026-09-25"
+    legacy = tm.tool_delete_platform_memory({"category": "training", "date": "2026-09-24"})
+    assert legacy["status"] == "deleted" and legacy["sk"] == "MEMORY#training#2026-09-24"
+    assert fake.store == {}

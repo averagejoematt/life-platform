@@ -9,7 +9,9 @@ sites and every `patch("mcp.tools_plan._rotation_window", ...)` keep working unc
   * `_rotation_window`     — the accessory-rotation window (#3755)
   * `_prescription_window` — the self_added_volume window (#4081)
   * `_block_workouts`      — the program's session sequence record since the block start (#4110);
-                             also read by `mcp.hevy_prescription_gate` for the ramp's week
+                             also read by `mcp.hevy_prescription_gate` for the ramp's week. Since
+                             #4312 the rows carry their routine archetype (`routine_title.
+                             annotate_with_routine_index`) so the sequence can refuse a Flex session
 
 A raise propagates to the caller (`tools_plan._read` records it as `read_failed`, #4072).
 """
@@ -54,7 +56,11 @@ def _prescription_window(end_date: str) -> list[dict[str, Any]] | None:
     start = self_added_volume.window_start(end_date)
     if start is None:
         return None
-    return query_source_range("hevy", start, end_date)
+    from training.routine_title import annotate_with_routine_index
+
+    # #4312: each row carries its routine archetype so an off-program complement (Flex) is reported
+    # on its own line, never counted against the plan. An index read that raises reaches `_read`.
+    return annotate_with_routine_index(query_source_range("hevy", start, end_date), start)
 
 
 def _block_workouts(target_date: str) -> list[dict[str, Any]]:
@@ -71,4 +77,10 @@ def _block_workouts(target_date: str) -> list[dict[str, Any]]:
     if end < start:
         return []
     items, _phases = _read_hevy_all_phases(start, end)
-    return items
+    from training.routine_title import annotate_with_routine_index
+
+    # #4312: the sequence credits a loaded log only when its routine archetype is a program one —
+    # the routine index is read HERE, once, and carried on the rows; a failed index read raises
+    # (`read_failed`), because a record that cannot tell a Flex complement from a program session
+    # must not silently credit it.
+    return annotate_with_routine_index(items, start) or []
