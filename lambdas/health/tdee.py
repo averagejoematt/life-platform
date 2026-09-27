@@ -91,34 +91,28 @@ IN_TO_CM = 2.54
 #: ``age_basis`` so it can never be mistaken for a measured input (ADR-104).
 ASSUMED_AGE_YEARS = 35
 
-#: Duration proxy for activities that report no mechanical work — ~6 kcal/kg/hour,
-#: ~6 METs (moderate cycling/running intensity — see ``common.met_energy`` for the
-#: Compendium-cited rates below 6 MET). Applied to time the body was actually MOVING.
-#: Applying it to rest between sets double-charges that time: a minute sitting on a
-#: bench is already inside the 24-hour BMR term, and charging it again at ~6x resting
-#: is the #3931 inflation.
+#: Duration proxy for LIFTING-CLASS time that reports no mechanical work — ~6 kcal/kg/hour,
+#: ~6 METs. Applied to time the body was actually MOVING: a minute sitting on a bench
+#: between sets is already inside the 24-hour BMR term, and charging it again at ~6x
+#: resting is the #3931 inflation.
 #:
-#: **Two call sites, ONE now split by modality (#4158, owner ruling 2026-09-25 option
-#: A):** ``lifting_energy`` still charges THIS rate to rep-set (assumed) and hold-type
-#: Hevy seconds (genuinely lifting-adjacent work), but a Hevy CARDIO block (a timed set
-#: with ``distance_m`` — cycling/treadmill/walking) no longer does: 6 kcal/kg/hour is a
-#: ~6-MET rate, and a walking-pace block is not a 6-MET activity. Cardio now takes a
-#: Compendium of Physical Activities MET rate from ``common.met_energy`` instead (see
-#: ``lifting_energy``'s docstring for the full preference order and provenance).
+#: **Where it applies — and nowhere else (#4158 owner ruling 2026-09-25 option A, carried
+#: to the Strava side by #4178):** rep-set (assumed 40 s) and hold-type Hevy seconds in
+#: ``lifting_energy``, and a Strava lifting-class activity with no set log (the stated
+#: 0.25 work fraction). Every OTHER non-kJ activity — a Hevy cardio block AND a
+#: Strava/Whoop/Garmin Walk, Hike or Ride — is priced by ``common.met_energy``'s
+#: Compendium rates through the ONE walk-pace predicate (``met_energy.is_walk_pace``):
+#: walk pace -> 3.5 METs, any other cardio -> 4.0. Before #4178, ``exercise_energy``'s
+#: own proxy branch still charged a Strava-logged Zone-1 walk at THIS ~6-MET rate while
+#: the identical walk logged in Hevy took 3.5 — one walk, two rates; at 143 kg an hour
+#: read ~858 kcal one way and ~500 the other.
 #:
-#: **Residual, stated rather than fixed here (#4158 review item 2):** ``exercise_energy``'s
-#: own proxy branch (below) still charges EVERY non-kJ, non-lifting Strava activity —
-#: Run/Ride/Walk/Elliptical/HIIT alike — at this SAME flat 6 kcal/kg/hour rate, with no
-#: walk-vs-other modality split. A Strava-logged Zone-1 walk is charged the identical
-#: over-rate a Hevy-logged one used to be. Left untouched in this PR because it is a
-#: DIFFERENT code path (``exercise_energy``'s own per-day loop, not
-#: ``worked_set_seconds``/``lifting_energy``) — the owner ruling was explicit that only
-#: the same code gets changed here. What the same MET split would do there: a
-#: Strava-classified walk/hike currently costs ``6 * weight_kg`` kcal/hour; splitting it
-#: the same way would drop that to ``common.met_energy.WALK_MET_KCAL_PER_KG_HOUR *
-#: weight_kg`` (~3.5), a ~42% reduction for every walk-classified Strava activity with no
-#: kilojoules — the SAME shape of over-count this PR fixes on the Hevy side, just not
-#: fixed here.
+#: **The one non-lifting residual this rate still touches:** a legacy Strava row with no
+#: per-activity ``activities`` list (pre-2026-05 archaeology — the current writer always
+#: emits one) cannot be classified by modality, so its whole moving time stays here and
+#: is named ``proxy:unsplit_legacy`` in ``kcal_by_basis`` — stated, over-stating rather
+#: than hiding. The 2026-08-09..09-26 strava partition carried zero such rows (27 of 27
+#: split), so no live day takes it.
 PROXY_KCAL_PER_KG_HOUR = 6.0
 
 #: **The stated assumption** (#3931). A Hevy set row carries ``reps`` and, for
@@ -130,6 +124,13 @@ PROXY_KCAL_PER_KG_HOUR = 6.0
 #: worked time rather than understating expenditure. It is an assumption wearing a
 #: number, which is exactly why it is labelled rather than buried.
 WORK_SECONDS_PER_REP_SET = 40.0
+
+#: Provenance tokens ``kcal_by_basis`` is keyed by (#4178). The two MET tokens are
+#: ``met_energy.BASIS_MET_WALK`` / ``BASIS_MET_CARDIO_LIGHT`` — one spelling for both
+#: devices — so only the bases this module OWNS are named here.
+BASIS_KJ = "kj"
+BASIS_PROXY_LIFTING = "proxy:lifting"
+BASIS_PROXY_UNSPLIT_LEGACY = "proxy:unsplit_legacy"
 
 #: Fallback when a lifting block is visible in Strava but NO Hevy set log covers the
 #: window: charge this fraction of the logged duration as work. A hypertrophy session
@@ -212,6 +213,16 @@ def _is_lifting(activity: Mapping[str, Any]) -> bool:
         if v and v in LIFTING_SPORT_TYPES:
             return True
     return False
+
+
+def _walk_label(activity: Mapping[str, Any]) -> str:
+    """The text ``met_energy.is_walk_pace`` reads for a Strava activity (#4178).
+
+    ``sport_type``, ``type`` and ``name`` together, so a ``Walk``-typed activity classifies
+    by its type even under a custom name, and a "Morning Walk" named one classifies by
+    its name — the same fragments the Hevy path matches on an exercise name.
+    """
+    return " ".join(str(activity.get(k) or "") for k in ("sport_type", "type", "name"))
 
 
 def worked_set_seconds(
@@ -389,11 +400,15 @@ def lifting_energy(
          split possible without a set log — unchanged from before #4158).
       3. **Neither** -> 0 kcal, ``no_lifting_in_window``.
 
-    Returns ``{"kcal", "basis", "worked_seconds", "logged_seconds", "cardio_seconds",
-    "cardio_seconds_hr_covered", "cardio_walk_seconds", "cardio_other_seconds", ...}``.
+    Returns ``{"kcal", "basis", "kcal_by_basis", "worked_seconds", "logged_seconds",
+    "cardio_seconds", "cardio_seconds_hr_covered", "cardio_walk_seconds",
+    "cardio_other_seconds", ...}``. ``kcal_by_basis`` (#4178) is the same figure as a
+    ledger — ``proxy:lifting`` / ``met:walk`` / ``met:cardio_light``, each the rounded
+    kcal that rate contributed, zero entries omitted.
     """
     ws = worked_set_seconds(hevy_workouts, covered_intervals=covered_intervals)
     logged = max(0.0, _num(logged_duration_seconds) or 0.0)
+    walk_kcal = other_kcal = 0.0
     if ws["sets"] > 0:
         proxy_secs = ws["hold_seconds"] + ws["assumed_seconds"]
         secs = ws["seconds"]
@@ -409,22 +424,27 @@ def lifting_energy(
             basis += "_plus_light_cardio_at_4.0_met"
         if ws["cardio_seconds_hr_covered"] > 0:
             basis += "_cardio_hr_covered_discounted"
-        kcal = (
-            PROXY_KCAL_PER_KG_HOUR * weight_kg * (proxy_secs / 3600.0)
-            + met_energy.WALK_MET_KCAL_PER_KG_HOUR * weight_kg * (ws["cardio_walk_seconds"] / 3600.0)
-            + met_energy.CARDIO_LIGHT_MET_KCAL_PER_KG_HOUR * weight_kg * (ws["cardio_other_seconds"] / 3600.0)
-        )
+        lifting_kcal = PROXY_KCAL_PER_KG_HOUR * weight_kg * (proxy_secs / 3600.0)
+        walk_kcal = met_energy.WALK_MET_KCAL_PER_KG_HOUR * weight_kg * (ws["cardio_walk_seconds"] / 3600.0)
+        other_kcal = met_energy.CARDIO_LIGHT_MET_KCAL_PER_KG_HOUR * weight_kg * (ws["cardio_other_seconds"] / 3600.0)
     elif logged > 0:
         secs = logged * LIFTING_WORK_FRACTION_FALLBACK
         basis = "lifting_duration_x0.25_no_set_log"
-        kcal = PROXY_KCAL_PER_KG_HOUR * weight_kg * (secs / 3600.0)
+        lifting_kcal = PROXY_KCAL_PER_KG_HOUR * weight_kg * (secs / 3600.0)
     else:
         secs = 0.0
         basis = "no_lifting_in_window"
-        kcal = 0.0
+        lifting_kcal = 0.0
+    kcal = lifting_kcal + walk_kcal + other_kcal
+    by_basis = {
+        BASIS_PROXY_LIFTING: round(lifting_kcal, 0),
+        met_energy.BASIS_MET_WALK: round(walk_kcal, 0),
+        met_energy.BASIS_MET_CARDIO_LIGHT: round(other_kcal, 0),
+    }
     return {
         "kcal": round(kcal, 0),
         "basis": basis,
+        "kcal_by_basis": {k: v for k, v in by_basis.items() if v},
         "worked_seconds": round(secs, 1),
         "logged_seconds": round(logged, 1),
         "sets": ws["sets"],
@@ -443,33 +463,60 @@ def exercise_energy(
 ) -> dict:
     """Measured exercise energy over whatever window ``strava_items`` covers.
 
-    Returns ``{"kcal", "basis", "days", "lifting"}``. ``days`` is the count of rows that
-    actually carried an activity signal — the ADR-152 gap tell. ``basis`` names which
-    branch ran: until the strava writer rolled ``total_kilojoules`` up, ``total_kj`` was
-    always 0 and every TDEE came from the duration proxy while the payload said nothing
-    about it.
+    Returns ``{"kcal", "basis", "kcal_by_basis", "days", "lifting", ...}``. ``days`` is the
+    count of rows that actually carried an activity signal — the ADR-152 gap tell.
+    ``basis`` names every branch that ran, joined by ``_plus_`` (until the strava writer
+    rolled ``total_kilojoules`` up, ``total_kj`` was always 0 and every TDEE came from a
+    duration proxy while the payload said nothing about it). ``kcal_by_basis`` (#4178) is
+    the same provenance as a ledger, keyed ``kj`` / ``met:walk`` / ``met:cardio_light`` /
+    ``proxy:lifting`` / ``proxy:unsplit_legacy`` — the rounded kcal each basis contributed,
+    zero entries omitted — so a reader can see how much of the term is measured
+    mechanical work, how much a Compendium MET rate and how much the lifting proxy,
+    without reading this source (ADR-105).
 
-    **#3931 — rest time is no longer charged.** Each day's activities are split three
-    ways instead of summed into one duration:
+    Each day's activities are split by MODALITY, never summed into one duration:
 
-      * activities reporting mechanical work (``kilojoules``) -> measured, unchanged;
+      * activities reporting mechanical work (``kilojoules``) -> measured, ``kj``
+        (unchanged since #2310);
       * **lifting** activities (``LIFTING_SPORT_TYPES``) -> their duration is REMOVED
-        from the proxy and replaced by ``lifting_energy`` (worked-set time from the Hevy
-        set log, or the stated 0.25 work fraction when no set log covers the window);
-      * everything else (Run / Ride / Walk / Elliptical / row / HIIT…) -> the duration
-        proxy, **exactly as before**. Cardio was never the bug.
+        from every proxy and replaced by ``lifting_energy`` (#3931: worked-set time from
+        the Hevy set log, or the stated 0.25 work fraction when no set log covers the
+        window) -> ``proxy:lifting``;
+      * **walk-pace** activities -> ``common.met_energy.WALK_MET`` (3.5 METs, Compendium
+        17190) -> ``met:walk``. Walk pace is decided by ``met_energy.is_walk_pace``, THE
+        predicate the Hevy path (``worked_set_seconds``) and the TSB load
+        (``training.training_load``) already use, fed the activity's
+        ``sport_type``/``type``/``name`` for a walk-type word and its
+        ``distance_meters``/``moving_time_seconds`` for pace (a WHOOP walk carries no
+        distance, so it reads as walk pace whenever its type says Walk). ONE derivation
+        (#4178): a Zone-1 walk earns the same energy whichever device logged it —
+        before this, a Strava-logged walk took ``PROXY_KCAL_PER_KG_HOUR`` (~6 METs)
+        while the same walk logged in Hevy took 3.5;
+      * everything else with no kJ (Ride / Run / Elliptical / row / a walk above 2.0 m/s)
+        -> ``common.met_energy.CARDIO_LIGHT_MET`` (4.0 METs) -> ``met:cardio_light``.
+        Stated rather than hidden: this is the LIGHT-effort rate, so a genuine run or
+        hard ride with no power meter is UNDER-charged here, never over-charged. The
+        platform has no measured intensity input for such an activity (no HR->kcal
+        derivation exists in the tree — ``common.met_energy`` records the search), and
+        erring low is the ADR-104 direction. Every non-lifting activity in the live
+        2026-08-10..09-26 strava partition was a walk-pace Walk (26 of 26), so no live
+        day takes this branch today.
 
-    A legacy Strava row that carries no per-activity ``activities`` list cannot be split,
-    so its whole moving time stays on the proxy — the old behaviour, stated rather than
-    silently assumed. The residual that implies: on such a day a Hevy set log would add
-    worked-set energy ON TOP of a duration that still includes its own rest. Every row
-    the current writer produces carries ``activities`` (``ingestion/strava_lambda.py``),
-    so this is a pre-2026-05 archaeology case, and it over-states rather than hides.
+    Each bucket is clamped, in that order, against the moving time kJ did not already
+    cover — the rule that kept #3931's lifting subtraction from ever eating kJ-covered
+    time, applied to all three. Whatever remains after the split is zero on every row
+    the current writer produces (``ingestion/strava_lambda.py`` always emits
+    ``activities``); on a pre-2026-05 legacy row with no per-activity list it is the
+    whole day, which cannot be classified and so stays on ``PROXY_KCAL_PER_KG_HOUR`` as
+    ``proxy:unsplit_legacy`` — stated rather than silently assumed, over-stating rather
+    than hiding.
     """
     rows = list(strava_items or [])
     total_kj = 0.0
     covered_s = 0.0
-    proxy_s = 0.0
+    walk_s = 0.0
+    cardio_s = 0.0
+    legacy_s = 0.0
     lifting_s = 0.0
     unsplit_days = 0
     days = 0
@@ -495,19 +542,30 @@ def exercise_energy(
         all_acts.extend(acts)
         if not acts and day_time > 0:
             unsplit_days += 1
-        # #3931: the ONLY new subtraction — the logged duration of lifting activities,
-        # which is mostly rest between sets. Clamped so it can never eat kJ-covered time.
-        lifting = 0.0
+        day_lift = day_walk = day_cardio = 0.0
         for a in acts:
             if (_num(a.get("kilojoules")) or 0.0) > 0:
                 continue
+            secs = _num(a.get("moving_time_seconds")) or 0.0
             if _is_lifting(a):
-                lifting += _num(a.get("moving_time_seconds")) or 0.0
-        lifting = max(0.0, min(lifting, day_time - covered))
+                day_lift += secs  # #3931: mostly rest — priced by lifting_energy, never here
+            elif met_energy.is_walk_pace(_walk_label(a), secs, _num(a.get("distance_meters")) or 0.0):
+                day_walk += secs  # #4178: the ONE walk-pace predicate, shared with the Hevy path
+            else:
+                day_cardio += secs
+        remaining = max(0.0, day_time - covered)
+        lifting = min(day_lift, remaining)
+        remaining -= lifting
+        walk = min(day_walk, remaining)
+        remaining -= walk
+        cardio = min(day_cardio, remaining)
+        remaining -= cardio
 
         covered_s += covered
         lifting_s += lifting
-        proxy_s += max(0.0, day_time - covered - lifting)
+        walk_s += walk
+        cardio_s += cardio
+        legacy_s += remaining
 
     # #4158: the SAME HR-covered-interval derivation `training.training_load.hevy_session_load`
     # (#4075) uses on the TSB-load side, so a Hevy cardio block already scored by an
@@ -515,35 +573,48 @@ def exercise_energy(
     # against a WHOOP walk carrying HR over 3,539 s of it) is not charged twice here.
     covered_intervals = hr_intervals(all_acts)
     lift = lifting_energy(hevy_workouts, weight_kg, logged_duration_seconds=lifting_s, covered_intervals=covered_intervals)
-    proxy_kcal = PROXY_KCAL_PER_KG_HOUR * weight_kg * (proxy_s / 3600.0)
+    walk_kcal = met_energy.WALK_MET_KCAL_PER_KG_HOUR * weight_kg * (walk_s / 3600.0)
+    cardio_kcal = met_energy.CARDIO_LIGHT_MET_KCAL_PER_KG_HOUR * weight_kg * (cardio_s / 3600.0)
+    legacy_kcal = PROXY_KCAL_PER_KG_HOUR * weight_kg * (legacy_s / 3600.0)
+    # kJ of mechanical work ~= kcal expended at ~25% gross efficiency. Moving time NOT
+    # covered by a kJ reading still takes its modality rate, so a walk sharing the day
+    # with a power-metered ride is not dropped.
+    kcal = total_kj + walk_kcal + cardio_kcal + legacy_kcal + lift["kcal"]
 
-    if total_kj <= 0:
-        if proxy_s <= 0 and lift["kcal"] <= 0:
-            basis = "no_activity_in_window"
-        elif lift["worked_seconds"] > 0:
-            basis = f"duration_proxy_6_kcal_per_kg_hour_plus_{lift['basis']}"
-        else:
-            basis = "duration_proxy_6_kcal_per_kg_hour"
-        kcal = proxy_kcal + lift["kcal"]
-    else:
-        # kJ of mechanical work ~= kcal expended at ~25% gross efficiency. Moving time
-        # NOT covered by a kJ reading still gets the proxy, so a run sharing the day with
-        # a ride is not dropped.
-        kcal = total_kj + proxy_kcal + lift["kcal"]
-        if proxy_s <= 0 and lift["worked_seconds"] <= 0:
-            basis = "measured_kilojoules"
-        elif lift["worked_seconds"] > 0:
-            basis = f"mixed_measured_kilojoules_and_duration_proxy_plus_{lift['basis']}"
-        else:
-            basis = "mixed_measured_kilojoules_and_duration_proxy"
+    parts = []
+    if total_kj > 0:
+        parts.append("measured_kilojoules")
+    if walk_s > 0:
+        parts.append(f"activity_walk_pace_at_{met_energy.WALK_MET:.1f}_met")
+    if cardio_s > 0:
+        parts.append(f"activity_light_cardio_at_{met_energy.CARDIO_LIGHT_MET:.1f}_met")
+    if legacy_s > 0:
+        parts.append("duration_proxy_6_kcal_per_kg_hour_unsplit_legacy")
+    if lift["worked_seconds"] > 0:
+        parts.append(lift["basis"])
+    basis = "_plus_".join(parts) if parts else "no_activity_in_window"
+
+    lift_by = lift["kcal_by_basis"]
+    by_basis = {
+        BASIS_KJ: round(total_kj, 0),
+        met_energy.BASIS_MET_WALK: round(walk_kcal, 0) + lift_by.get(met_energy.BASIS_MET_WALK, 0.0),
+        met_energy.BASIS_MET_CARDIO_LIGHT: round(cardio_kcal, 0) + lift_by.get(met_energy.BASIS_MET_CARDIO_LIGHT, 0.0),
+        BASIS_PROXY_LIFTING: lift_by.get(BASIS_PROXY_LIFTING, 0.0),
+        BASIS_PROXY_UNSPLIT_LEGACY: round(legacy_kcal, 0),
+    }
 
     return {
         "kcal": round(kcal, 0),
         "basis": basis,
+        "kcal_by_basis": {k: v for k, v in by_basis.items() if v},
         "days": days,
         "method": METHOD,
         "lifting": lift,
-        "proxy_seconds": round(proxy_s, 1),
+        "walk_pace_seconds": round(walk_s, 1),
+        "light_cardio_seconds": round(cardio_s, 1),
+        # Seconds still on the 6 kcal/kg/hour proxy OUTSIDE lifting — since #4178 only a
+        # legacy row with no `activities` list can put anything here.
+        "proxy_seconds": round(legacy_s, 1),
         "unsplit_legacy_days": unsplit_days,
     }
 

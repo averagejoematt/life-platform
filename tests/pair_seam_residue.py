@@ -542,6 +542,23 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "from a live SOURCE#hevy read in tests/test_training_load_worked_set_4075.py, and a record with no set log "
         "degrades to the stated work fraction BY NAME (basis `no_set_log_work_fraction`), never to zero.",
     ),
+    # #4311 (2026-09-26): the packet's `today` view — the day a night-before debrief reviews,
+    # across Hevy AND Strava, each activity once.
+    "hevy::mcp/coach_packet_today.py::read": (
+        "2026-09-26",
+        "#4311: `read_hevy_day` reads through `tools_strength._read_hevy_all_phases` (the ONE sanctioned "
+        "cross-phase Hevy read, itself a residue seam) and parses no set shape of its own: cardio blocks go through "
+        "`walking_volume.hevy_sessions`, the time interval through `start_time`/`end_time` exactly as "
+        "`walking_volume.hevy_cardio_intervals` reads them, the type through `routine_title.resolve_archetype`, load "
+        "through `training_streaks.is_loaded_session` — the same shared readers `hevy::mcp/tools_coach_packet.py::read` "
+        "is dispositioned on. Its own keys are `sk` (the DATE#<day>#WORKOUT#<id> filter), `date` (the writer keys the "
+        "row by the LOCAL day of the start — `hevy_common.local_date_of_start` — so the Pacific day is read, not "
+        "re-derived) and display pass-throughs (title, workout_uid, source_workout_id, duration_sec, exercise_count, "
+        "set_count), shown verbatim, None visible. VERIFIED, not assumed: a Hevy read that raises reports the field "
+        "`measured` as a FLOOR with `sources.hevy.status = read_failed` BY NAME, and with Strava also unreadable the "
+        "field is `read_failed` naming both errors — never `absent`, never an empty day. Pinned by "
+        "tests/test_coach_session_packet_4082.py::test_today_is_read_failed_when_neither_source_reads_and_a_floor_when_one_does.",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]

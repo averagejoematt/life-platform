@@ -35,16 +35,30 @@ factor, from 1 MET = 3.5 mL O2/(kg*min) and ~5 kcal per liter O2, rounds to 1:1 
 same way the existing constant already does). This module follows that SAME
 convention rather than introducing a second unit rule.
 
-**Stated uncertainty (verify empirically; do not assert — CLAUDE.md).** The MET
-VALUES below are the owner's own cited figures (2026-09-25 review: "treadmill walking
-~3.5 METs", "stationary cycling light/easy 4.0-5.5, pick the light effort code"),
-sourced to the 2011 Compendium. The exact 5-digit Compendium CODE NUMBER for each
-entry could NOT be independently verified in this sandboxed session — no network
-access to the published table. `CODE` below is left `None` with the activity
-description carried instead of a guessed number, specifically so a wrong code is
-never silently shipped as if checked. A human should confirm the code number
-against the published Compendium table before this constant is treated as
-code-cited rather than description-cited.
+**What is verified, and what is not (#4178, 2026-09-26 — checked against the
+published table, not recalled).** The MET VALUES below are the owner's own cited
+figures (2026-09-25 review: "treadmill walking ~3.5 METs", "stationary cycling
+light/easy 4.0-5.5, pick the light effort code"). The CODE numbers were read on
+2026-09-26 from the journal's own supplemental table for Ainsworth et al. 2011 —
+Med Sci Sports Exerc 43(8), Supplemental Digital Content 1,
+https://cdn-links.lww.com/permalink/mss/a/mss_43_8_2011_06_13_ainsworth_202093_sdc1.pdf
+(text-extracted with pdftotext; header "2011 Compendium of Physical Activities",
+columns CODE / METS / MAJOR HEADING / SPECIFIC ACTIVITIES):
+
+  * ``17190  3.5  walking  walking, 2.8 to 3.2 mph, level, moderate pace, firm surface``
+    — the value matches WALK_MET exactly, so WALK_MET_CODE is pinned to it. The table
+    carries NO separate "treadmill walking" row (its only treadmill entries are 02065
+    stair-treadmill ergometer 9.0 and 11003 treadmill-desk walking 2.3), so level
+    ground at moderate pace is the row a treadmill walk is priced by.
+  * Stationary bicycling rows: ``02011 3.5 … 30-50 watts, very light to light effort``,
+    ``02017 4.8 … 51-89 watts, light-to-moderate effort``, ``02010 7.0 … general``,
+    ``02012 6.8 … 90-100 watts``. **No stationary-bicycling row carries 4.0**: the
+    owner's 4.0 sits between 02011 (3.5) and 02017 (4.8). The one 4.0 bicycling row,
+    ``01010 bicycling, <10 mph, leisure, to work or for pleasure``, is outdoor leisure
+    cycling — a different modality — so CARDIO_LIGHT_MET_CODE stays ``None`` rather
+    than borrowing a code whose row does not say what this constant means. The value
+    4.0 itself is unchanged: it is the owner's ruling, bracketed by two verified rows,
+    and this module does not re-rule it.
 """
 
 from __future__ import annotations
@@ -53,24 +67,31 @@ from typing import Any, Optional
 
 MET_SOURCE = "ainsworth_2011_compendium_of_physical_activities"
 
-#: Ainsworth 2011 Compendium — "walking, treadmill or level ground, moderate pace
-#: (~3.5 METs)" per the owner's own citation. Code number NOT independently verified
-#: here (no network access) — see the module docstring.
+#: Ainsworth 2011 Compendium row 17190 — description verbatim from the published
+#: table (see the module docstring for the source and the 2026-09-26 verification).
 WALK_MET = 3.5
-WALK_MET_DESCRIPTION = "walking, treadmill or level ground, moderate pace"
-WALK_MET_CODE: Optional[str] = None  # unverified in this session; see docstring
+WALK_MET_DESCRIPTION = "walking, 2.8 to 3.2 mph, level, moderate pace, firm surface"
+WALK_MET_CODE: Optional[str] = "17190"  # verified against the published table 2026-09-26 (#4178)
 
 #: Ainsworth 2011 Compendium — "bicycling, stationary, light/easy effort" — the LOW
 #: end of the owner-cited 4.0-5.5 "light effort" band, per the explicit instruction to
-#: pick the light-effort code. Code number NOT independently verified here.
+#: pick the light-effort code. The published table has no stationary row at 4.0 (it
+#: brackets this value: 02011 = 3.5, 02017 = 4.8 — see the module docstring), so the
+#: code is deliberately left None rather than guessed (#4178).
 CARDIO_LIGHT_MET = 4.0
 CARDIO_LIGHT_MET_DESCRIPTION = "bicycling, stationary, light/easy effort"
-CARDIO_LIGHT_MET_CODE: Optional[str] = None  # unverified in this session; see docstring
+CARDIO_LIGHT_MET_CODE: Optional[str] = None  # no published row at 4.0; bracketed by 02011/02017 — see docstring
 
 #: 1 MET ~= 1 kcal/(kg*hour) — the existing platform convention (see module docstring;
 #: matches how `health.tdee.PROXY_KCAL_PER_KG_HOUR` already documents itself).
 WALK_MET_KCAL_PER_KG_HOUR = WALK_MET
 CARDIO_LIGHT_MET_KCAL_PER_KG_HOUR = CARDIO_LIGHT_MET
+
+#: Provenance tokens for the two MET bases, as `health.tdee` publishes them in
+#: `kcal_by_basis` (#4178) — one spelling for the Hevy side and the Strava side, so a
+#: reader can add a walk's energy across devices without knowing which device logged it.
+BASIS_MET_WALK = "met:walk"
+BASIS_MET_CARDIO_LIGHT = "met:cardio_light"
 
 #: Hevy exercise-name fragments that mark walking-type locomotion — the SAME set
 #: `training.training_load._cardio_rate` uses for its own (TSS-point) modality split,

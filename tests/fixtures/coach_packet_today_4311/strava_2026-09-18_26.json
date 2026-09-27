@@ -1,0 +1,380 @@
+[
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 3900,
+    "max_heartrate": null,
+    "moving_time_seconds": 3900,
+    "name": "Foundation - Engine - 1 - 9",
+    "sport_type": "Workout",
+    "start_date": "2026-09-18T21:20:19Z",
+    "strava_id": "20232868039",
+    "type": "Workout"
+   }
+  ],
+  "date": "2026-09-18",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-18"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 12600,
+    "max_heartrate": null,
+    "moving_time_seconds": 12600,
+    "name": "Foundation - Push - 4 - 13",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-19T15:50:36Z",
+    "strava_id": "20245534837",
+    "type": "WeightTraining"
+   },
+   {
+    "average_heartrate": 106.7,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 2639,
+    "max_heartrate": 140,
+    "moving_time_seconds": 2639,
+    "name": "Morning Weight Training",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-19T16:23:00Z",
+    "strava_id": "20244285682",
+    "type": "WeightTraining",
+    "zone1_seconds": 2544,
+    "zone2_seconds": 95,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   },
+   {
+    "average_heartrate": 113.2,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 3539,
+    "max_heartrate": 124,
+    "moving_time_seconds": 3539,
+    "name": "Lunch Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-19T18:01:00Z",
+    "strava_id": "20245372006",
+    "type": "Walk",
+    "zone1_seconds": 3539,
+    "zone2_seconds": 0,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-19",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-19"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 12325,
+    "max_heartrate": null,
+    "moving_time_seconds": 12325,
+    "name": "Foundation - Pull - 4 - 14",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-20T18:18:09Z",
+    "strava_id": "20260810130",
+    "type": "WeightTraining"
+   },
+   {
+    "average_heartrate": 116.7,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 2099,
+    "max_heartrate": 153,
+    "moving_time_seconds": 2099,
+    "name": "Lunch Weight Training",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-20T18:48:00Z",
+    "strava_id": "20259974145",
+    "type": "WeightTraining",
+    "zone1_seconds": 1717,
+    "zone2_seconds": 382,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   },
+   {
+    "average_heartrate": 111.8,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 3779,
+    "max_heartrate": 128,
+    "moving_time_seconds": 3779,
+    "name": "Afternoon Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-20T20:15:00Z",
+    "strava_id": "20260790115",
+    "type": "Walk",
+    "zone1_seconds": 3777,
+    "zone2_seconds": 2,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-20",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-20"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 7808,
+    "max_heartrate": null,
+    "moving_time_seconds": 7808,
+    "name": "Foundation - Engine - 3 - 15",
+    "sport_type": "Workout",
+    "start_date": "2026-09-21T22:35:14Z",
+    "strava_id": "20275201795",
+    "type": "Workout"
+   },
+   {
+    "average_heartrate": 127.8,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 6239,
+    "max_heartrate": 152,
+    "moving_time_seconds": 6239,
+    "name": "Afternoon Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-21T22:38:00Z",
+    "strava_id": "20275175930",
+    "type": "Walk",
+    "zone1_seconds": 3400,
+    "zone2_seconds": 2839,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-21",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-21"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 9482,
+    "max_heartrate": null,
+    "moving_time_seconds": 9482,
+    "name": "Foundation - Legs - 5 - 16",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-22T22:35:06Z",
+    "strava_id": "20290322132",
+    "type": "WeightTraining"
+   }
+  ],
+  "date": "2026-09-22",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-22"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 8874,
+    "max_heartrate": null,
+    "moving_time_seconds": 8874,
+    "name": "Foundation - Upper - 1 - 17",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-23T12:11:01Z",
+    "strava_id": "20297270912",
+    "type": "WeightTraining"
+   },
+   {
+    "average_heartrate": 114.8,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 3779,
+    "max_heartrate": 131,
+    "moving_time_seconds": 3779,
+    "name": "Morning Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-23T13:14:00Z",
+    "strava_id": "20297221224",
+    "type": "Walk",
+    "zone1_seconds": 3744,
+    "zone2_seconds": 35,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-23",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-23"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 9077,
+    "max_heartrate": null,
+    "moving_time_seconds": 9077,
+    "name": "Foundation - Lower - 1 - 18",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-24T12:12:06Z",
+    "strava_id": "20311423506",
+    "type": "WeightTraining"
+   },
+   {
+    "average_heartrate": 113.3,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 3719,
+    "max_heartrate": 139,
+    "moving_time_seconds": 3719,
+    "name": "Morning Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-24T13:21:00Z",
+    "strava_id": "20311346649",
+    "type": "Walk",
+    "zone1_seconds": 3516,
+    "zone2_seconds": 203,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-24",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-24"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 10001,
+    "max_heartrate": null,
+    "moving_time_seconds": 10001,
+    "name": "Foundation - Upper - 2 - 19",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-25T22:08:50Z",
+    "strava_id": "20330495895",
+    "type": "WeightTraining"
+   },
+   {
+    "average_heartrate": 121.4,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 1379,
+    "max_heartrate": 150,
+    "moving_time_seconds": 1379,
+    "name": "Afternoon Weight Training",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-25T22:40:00Z",
+    "strava_id": "20329674746",
+    "type": "WeightTraining",
+    "zone1_seconds": 884,
+    "zone2_seconds": 495,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   },
+   {
+    "average_heartrate": 116.9,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 4319,
+    "max_heartrate": 150,
+    "moving_time_seconds": 4319,
+    "name": "Afternoon Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-25T23:20:00Z",
+    "strava_id": "20330443265",
+    "type": "Walk",
+    "zone1_seconds": 4197,
+    "zone2_seconds": 122,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-25",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-25"
+ },
+ {
+  "activities": [
+   {
+    "average_heartrate": null,
+    "device_name": "Hevy",
+    "distance_miles": null,
+    "elapsed_time_seconds": 3937,
+    "max_heartrate": null,
+    "moving_time_seconds": 3937,
+    "name": "Foundation - Flex - 1 - 20",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-26T17:59:23Z",
+    "strava_id": "20341744941",
+    "type": "WeightTraining"
+   },
+   {
+    "average_heartrate": 106.6,
+    "device_name": "WHOOP",
+    "distance_miles": null,
+    "elapsed_time_seconds": 1019,
+    "max_heartrate": 136,
+    "moving_time_seconds": 1019,
+    "name": "Lunch Weight Training",
+    "sport_type": "WeightTraining",
+    "start_date": "2026-09-26T18:28:00Z",
+    "strava_id": "20341700974",
+    "type": "WeightTraining",
+    "zone1_seconds": 934,
+    "zone2_seconds": 85,
+    "zone3_seconds": 0,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   },
+   {
+    "average_heartrate": 116.8,
+    "device_name": "Garmin epix (Gen2)",
+    "distance_miles": 5.16,
+    "elapsed_time_seconds": 6175,
+    "max_heartrate": 171,
+    "moving_time_seconds": 6108,
+    "name": "Afternoon Walk",
+    "sport_type": "Walk",
+    "start_date": "2026-09-26T20:09:22Z",
+    "strava_id": "20343117320",
+    "type": "Walk",
+    "zone1_seconds": 5061,
+    "zone2_seconds": 850,
+    "zone3_seconds": 197,
+    "zone4_seconds": 0,
+    "zone5_seconds": 0
+   }
+  ],
+  "date": "2026-09-26",
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-26"
+ }
+]

@@ -1051,23 +1051,39 @@ def check_orphan_routine_drafts():
     """#3772: routines still `draft` more than 7 days after creation. The #3765 soft-timeout
     lands the draft and tells the client it timed out, so nothing ever lists it — one sat
     from 2026-09-08 with nobody knowing. A count here is a WARN naming them (the owner
-    archives or commits); zero is the ok line. Read-only: one bounded index Query."""
-    from training.routine_repo import list_stale_drafts
+    archives or commits); zero is the ok line. Read-only: one bounded index Query.
+
+    #4183: the census is partitioned by the GENESIS. The leg's first night (2026-09-20)
+    reported 22, not the one soft-timeout orphan its citation described — eighteen were June
+    2026 drafts from the cycle the 2026-09-06 reset closed, and they kept `qa-smoke-warnings`
+    lit for six days behind an expired citation. A draft targeting a day before the genesis
+    is history, not an orphan: the ROUTINE# partition is SYSTEM_STATE by ruling (the reset
+    never tombstones a prescription), so the check reads the genesis itself. Both verdict
+    lines NAME the window and the excluded count, so a widened census is visible, never
+    silent (acceptance box 2)."""
+    from training.routine_repo import stale_draft_census
 
     c = Check("data:orphan_routine_drafts", "Orphaned routine drafts", CONTENT_TRUTH)
     try:
-        stale = list_stale_drafts(older_than_days=7)
+        census = stale_draft_census(older_than_days=7)
     except Exception as e:  # noqa: BLE001
         return [c.warn(f"orphan-draft census errored (no verdict was reached): {e}")]
-    if stale:
-        names = ", ".join(f"{ir.routine_id[:8]}… ({ir.target_date}, created {str(ir.created_at)[:10]})" for ir in stale[:5])
-        more = f" (+{len(stale) - 5} more)" if len(stale) > 5 else ""
+    live, history, w = census["live"], census["pre_genesis"], census["window"]
+    window = (
+        f"census window {w['start']}..{w['end']} (created on/before {w['cutoff']}), genesis {w['genesis'] or 'UNRESOLVED'}: "
+        f"{len(history)} pre-genesis draft(s) excluded as history"
+    )
+    if live:
+        names = ", ".join(f"{ir.routine_id[:8]}… ({ir.target_date}, created {str(ir.created_at)[:10]})" for ir in live[:5])
+        more = f" (+{len(live) - 5} more)" if len(live) > 5 else ""
         return [
             c.warn(
-                f"{len(stale)} routine draft(s) older than 7 days never committed or archived: {names}{more} — `manage_hevy_routine list status=draft older_than_days=7` lists them (#3772)"
+                f"{len(live)} live-cycle routine draft(s) older than 7 days never committed or archived: {names}{more} — "
+                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days=7` "
+                f"lists them (#3772); {window} (#4183)"
             )
         ]
-    return [c.ok("no routine draft older than 7 days is left uncommitted (#3772).")]
+    return [c.ok(f"no live-cycle routine draft older than 7 days is left uncommitted (#3772); {window} (#4183).")]
 
 
 def check_pk_family_census():

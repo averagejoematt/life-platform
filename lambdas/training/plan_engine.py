@@ -437,18 +437,33 @@ def _tripwire_states(
         # The dismissal is a DDB record the caller read; the RULE — including the date
         # comparison that re-arms it — lives in `training_context_registry`, once, so this
         # engine and the joints critic cannot drift into two different answers.
-        instances = pain_flag_instances or [{"movement": s, "note_dates": []} for s in (pain_flag_sites or [])]
-        sites = pain_flag_sites or [str(i.get("movement")) for i in instances]
+        #
+        # #4174: an instance is (movement, SITE), never the movement alone. The registry
+        # splits a movement's notes per site (a dismissal's `flag_note_date` pin, or the
+        # note's own words); a note no dismissal names stays its own OPEN instance, so
+        # Cycling's saddle-sore dismissal cannot cover the 2026-09-18 big-toe note.
+        instances = training_context_registry.expand_instances(
+            pain_flag_instances or [{"movement": s, "note_dates": []} for s in (pain_flag_sites or [])], pain_dismissals
+        )
+        sites = pain_flag_sites or list(dict.fromkeys(str(i.get("movement")) for i in instances))
         resolutions = training_context_registry.resolve_flags(instances, pain_dismissals)
-        dismissed = {r["movement"] for r in resolutions if r.get("dismissed")}
-        live = [str(i.get("movement")) for i in instances if i.get("movement") not in dismissed]
+        dismissed = {(str(r["movement"]), r.get("instance_site")) for r in resolutions if r.get("dismissed")}
+        live_instances = [i for i in instances if (str(i.get("movement")), i.get("site")) not in dismissed]
+        live = list(dict.fromkeys(str(i.get("movement")) for i in live_instances))
+        dismissed_movements = {str(r["movement"]) for r in resolutions}
+        open_lines = [
+            f"{i.get('movement')}: note(s) {', '.join(i.get('note_dates') or [])} name no dismissed site — "
+            "open until a dismissal of their own (#4174)"
+            for i in live_instances
+            if i.get("site") is None and i.get("note_dates") and str(i.get("movement")) in dismissed_movements
+        ]
+        detail = "; ".join([r["detail"] for r in resolutions] + open_lines)
         if resolutions and not live:
             # NEVER "clear": the flag happened and a human overrode it. That is a different
             # row from "nothing was flagged", and a reader must be able to tell them apart.
-            row = _row("pain_flag_named_site", "dismissed_by_owner", sites, "; ".join(r["detail"] for r in resolutions))
+            row = _row("pain_flag_named_site", "dismissed_by_owner", sites, detail)
             row["dismissals"] = resolutions
         else:
-            detail = "; ".join(r["detail"] for r in resolutions)
             row = _row("pain_flag_named_site", "tripped", live or sites, detail)
             if resolutions:
                 row["dismissals"] = resolutions
@@ -463,9 +478,27 @@ def _tripwire_states(
         # aggregate is correctly `tripped` there, and a reader who wants to know whether
         # HIS dismissal held must not have to infer it from that.
         row["instances"] = instances
-        row["by_movement"] = {
-            str(i.get("movement")): ("dismissed_by_owner" if i.get("movement") in dismissed else "tripped") for i in instances
-        }
+        by_movement: dict[str, str] = {}
+        for i in instances:
+            m = str(i.get("movement"))
+            state = "dismissed_by_owner" if (m, i.get("site")) in dismissed else "tripped"
+            by_movement[m] = "tripped" if (by_movement.get(m) == "tripped" or state == "tripped") else state
+        row["by_movement"] = by_movement
+        # #4174: the per-SITE verdict — each open pain site with its own dismissal state, so a
+        # reader sees "Cycling / saddle_sore dismissed 09-25" AND "Cycling / big_toe open"
+        # instead of one movement-level word that hides the second note.
+        res_by_key = {(str(r["movement"]), r.get("instance_site")): r for r in resolutions}
+        row["by_site"] = [
+            {
+                "movement": str(i.get("movement")),
+                "site": i.get("site"),
+                "state": "dismissed_by_owner" if (str(i.get("movement")), i.get("site")) in dismissed else "tripped",
+                "note_dates": list(i.get("note_dates") or []),
+                "dismissal": (res_by_key.get((str(i.get("movement")), i.get("site"))) or {}).get("sk"),
+                "dismissal_state": (res_by_key.get((str(i.get("movement")), i.get("site"))) or {}).get("state", "none"),
+            }
+            for i in instances
+        ]
         row["layer_status"] = pain_layer_status
         if pain_layer_status in (None, "dark", "unknown", "degraded"):
             row["layer_note"] = (

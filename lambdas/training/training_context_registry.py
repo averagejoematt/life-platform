@@ -216,6 +216,11 @@ DISMISSAL_RULE: dict[str, Any] = {
         "A flag whose note date cannot be read is NOT dismissed: with nothing to compare, 'dismissed' would be "
         "an assumption wearing a verdict's clothes (the #3767 rule for safety conditions)."
     ),
+    "scope": (
+        "A dismissal covers the SITE it names on the movement it names — never every note on that movement (#4174). "
+        "A note belongs to a site when a dismissal pins its date (flag_note_date) or when the note's own words name "
+        "the site; a note that names no dismissed site stays open until it gets a dismissal of its own."
+    ),
     "store": f"{DISMISSAL_PK} / {DISMISSAL_SK_PREFIX}<site>#<YYYY-MM-DD> — CROSS_PHASE (ADR-077), Tier 2 owner-only",
 }
 
@@ -299,22 +304,114 @@ def build_dismissal_record(
     }
 
 
-def _dismissal_matches(dismissal: dict[str, Any], *, movement: str | None, site: str | None) -> bool:
-    """Does this dismissal cover this flag? By MOVEMENT first — the only identifier the flag
-    layer and the dismissal share, because the derived note layer is keyed per exercise and
-    knows no anatomy — and by SITE when a caller has one (`pain_flag_sites` carries movement
-    labels today, so the site leg is the forward-compatible half, not the live one)."""
+def _movement_keys(dismissal: dict[str, Any]) -> set[str]:
     keys = {str(k) for k in (dismissal.get("movement_keys") or [])}
     if not keys:
         keys = {normalize_dismissal_key(m) for m in (dismissal.get("movements") or [])}
-    site_key = str(dismissal.get("site_key") or normalize_dismissal_key(dismissal.get("site", "")))
-    for candidate in (movement, site):
-        if not candidate:
+    return keys
+
+
+def _site_key_of(dismissal: dict[str, Any]) -> str:
+    return str(dismissal.get("site_key") or normalize_dismissal_key(dismissal.get("site", "")))
+
+
+def _names_movement(dismissal: dict[str, Any], movement: str | None) -> bool:
+    """A dismissal with no movement leg cannot exist (`build_dismissal_record` refuses it), so
+    an instance WITH a movement is covered only by a dismissal that names it."""
+    return not movement or normalize_dismissal_key(movement) in _movement_keys(dismissal)
+
+
+def _note_names_site(text: Any, site_key: str) -> bool:
+    """Every token of the site key appears in the note's own words, in any order: 'big toe
+    throbbing from ingrown toe' names `big_toe`; 'more just saddle sore and uncomfortable'
+    names `saddle_sore`. Deterministic — the note layer knows no anatomy, so the only
+    vocabulary of sites is the one the owner's dismissals have named."""
+    want = [t for t in str(site_key or "").split("_") if t]
+    have = set(normalize_dismissal_key(text).split("_")) if text else set()
+    return bool(want) and bool(have) and all(t in have for t in want)
+
+
+def site_instances(
+    movement: str | None, notes: list[dict[str, Any]] | None, dismissals: list[dict[str, Any]] | None
+) -> list[dict[str, Any]]:
+    """Split ONE movement's pain notes into per-site flag instances (#4174).
+
+    `notes` are `{"date": YYYY-MM-DD, "text": <note_raw or None>}`. Returns
+    `{"movement", "site", "note_dates", "notes"}` rows — one per site attributed, sites in
+    key order, plus one `site: None` row for the notes no site claims. A note is attributed
+    to a dismissed site, in this order:
+      1. a dismissal on this movement pins the note (`flag_note_date` == the note's date);
+      2. the note's own words name the site;
+      3. the note is dated AFTER a dismissal of that site on this movement — it may be the
+         same site flagged again, and the layer is over-inclusive by design, so it lands on
+         that site and `resolve_flag` reads it as the re-arm.
+    A note none of those reach is `site: None`: OPEN, and no dismissal can cover it — the
+    2026-09-18 Cycling big-toe note under the saddle-sore dismissal alone.
+    """
+    covering = [d for d in (dismissals or []) if isinstance(d, dict) and _names_movement(d, movement)]
+    by_site: dict[str, list[dict[str, Any]]] = {}
+    for d in covering:
+        by_site.setdefault(_site_key_of(d), []).append(d)
+    buckets: dict[str | None, list[dict[str, Any]]] = {}
+    for raw in notes or []:
+        note = raw if isinstance(raw, dict) else {"date": raw}
+        day = str(note.get("date") or "")[:10]
+        if not _is_iso_date(day):
             continue
-        k = normalize_dismissal_key(candidate)
-        if k and (k in keys or k == site_key):
-            return True
-    return False
+        sites: list[str | None] = [s for s, ds in by_site.items() if any(str(d.get("flag_note_date") or "")[:10] == day for d in ds)]
+        if not sites:
+            sites = [s for s in by_site if _note_names_site(note.get("text"), s)]
+        if not sites:
+            sites = [s for s, ds in by_site.items() if any(day > str(d.get("dismissed_on") or "")[:10] for d in ds)]
+        for s in sites or [None]:
+            buckets.setdefault(s, []).append({"date": day, "text": note.get("text")})
+    out: list[dict[str, Any]] = []
+    ordered: list[str | None] = sorted(s for s in buckets if s is not None)
+    if None in buckets:
+        ordered.append(None)  # the unattributed notes last, after every named site
+    for site in ordered:
+        rows = sorted(buckets[site], key=lambda n: n["date"])
+        out.append({"movement": movement, "site": site, "note_dates": [n["date"] for n in rows], "notes": rows})
+    return out
+
+
+def expand_instances(instances: list[dict[str, Any]] | None, dismissals: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Every flag instance keyed (movement, site) — the shape both consumers resolve (#4174).
+
+    An instance that already carries a `site` key passes through. One that does not is split
+    by `site_instances` over its `notes` (or its bare `note_dates`). A flag with NO note dates
+    at all stays one undated instance (`site: None`) so `resolve_flag` can say `undated_flag`
+    rather than lose the flag.
+    """
+    out: list[dict[str, Any]] = []
+    for inst in instances or []:
+        inst = inst or {}
+        if "site" in inst:
+            out.append(dict(inst))
+            continue
+        notes = inst.get("notes") or [{"date": d} for d in (inst.get("note_dates") or [])]
+        split = site_instances(inst.get("movement"), notes, dismissals)
+        out.extend(split or [{"movement": inst.get("movement"), "site": None, "note_dates": [], "notes": []}])
+    return out
+
+
+def _dismissal_matches(dismissal: dict[str, Any], *, movement: str | None, site: str | None, note_dates: list[str] | None) -> bool:
+    """Does this dismissal cover this instance? Per SITE, never per movement (#4174).
+
+    With a site: the dismissal names that site AND this movement. Without one: the dismissal
+    names this movement and PINS one of the instance's note dates (`flag_note_date`) — the
+    write-time preview's path — so it can never cover a note it did not name. An instance
+    with no note dates at all matches on the movement alone, only so `resolve_flag` can
+    report `undated_flag` (never `dismissed`) instead of dropping the flag.
+    """
+    if not _names_movement(dismissal, movement):
+        return False
+    if site:
+        return normalize_dismissal_key(site) == _site_key_of(dismissal)
+    dates = {str(d)[:10] for d in (note_dates or []) if _is_iso_date(d)}
+    if not dates:
+        return bool(movement)
+    return str(dismissal.get("flag_note_date") or "")[:10] in dates
 
 
 def resolve_flag(
@@ -326,13 +423,15 @@ def resolve_flag(
 ) -> dict[str, Any] | None:
     """The ONE date comparison. Returns None when no dismissal covers this flag, else a row.
 
-    `note_dates` are the flag's own note dates (the derived layer's `pain_dates`). The
-    latest one decides:
+    One call resolves ONE (movement, site) instance (#4174) — callers split a movement's
+    notes per site with `expand_instances` first, or use `resolve_flags`, which does. The
+    `note_dates` are that instance's own (the derived layer's `pain_dates`). The latest
+    one decides:
       * latest note <= the dismissal date  -> `dismissed_by_owner`
       * latest note  > the dismissal date  -> `re_armed`, and the dismissal is `superseded`
       * no readable note date              -> `undated_flag`: NOT dismissed (see DISMISSAL_RULE)
     """
-    covering = [d for d in (dismissals or []) if _dismissal_matches(d, movement=movement, site=site)]
+    covering = [d for d in (dismissals or []) if _dismissal_matches(d, movement=movement, site=site, note_dates=note_dates)]
     if not covering:
         return None
     latest = max(covering, key=lambda d: str(d.get("dismissed_on") or ""))
@@ -341,6 +440,11 @@ def resolve_flag(
     row: dict[str, Any] = {
         "movement": movement,
         "site": latest.get("site"),
+        "site_key": _site_key_of(latest),
+        # #4174 — the (movement, site) INSTANCE this row resolves; consumers key on it, so a
+        # matcher that covered an instance it should not would show up as exactly that.
+        "instance_site": site,
+        "note_dates": dates,
         "dismissed_on": dismissed_on,
         "words": latest.get("words"),
         "sk": latest.get("sk"),
@@ -371,11 +475,12 @@ def resolve_flag(
 
 
 def resolve_flags(instances: list[dict[str, Any]] | None, dismissals: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
-    """`resolve_flag` over every flagged instance. `instances` are
-    `{"movement": <label>, "note_dates": [...], "site": <optional>}`; unmatched flags are
+    """`resolve_flag` over every flagged instance, per (movement, site) (#4174). `instances`
+    are `{"movement": <label>, "note_dates": [...], "notes": [{date, text}], "site": <optional>}`;
+    one without a `site` key is split by `expand_instances` first. Unmatched instances are
     omitted, so an empty list means no dismissal is in play at all."""
     out: list[dict[str, Any]] = []
-    for inst in instances or []:
+    for inst in expand_instances(instances, dismissals):
         res = resolve_flag(
             movement=(inst or {}).get("movement"),
             note_dates=(inst or {}).get("note_dates"),

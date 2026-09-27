@@ -282,7 +282,11 @@ def test_both_consumers_derive_from_the_one_rule_module():
     engine = (REPO / "lambdas" / "training" / "plan_engine.py").read_text()
     critic = (REPO / "lambdas" / "coach" / "critics.py").read_text()
     assert "training_context_registry.resolve_flags(" in engine
-    assert "training_context_registry.resolve_flag(" in critic
+    assert (
+        "training_context_registry.resolve_flags(" in critic
+    ), "#4174: the critic resolves per (movement, site) through the same entry point"
+    for consumer in (engine, critic):
+        assert "training_context_registry.expand_instances(" in consumer, "the per-site split is the registry's, not a local copy (#4174)"
 
 
 def test_the_store_is_classified_tiered_and_documented():
@@ -350,3 +354,141 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
     # a dismissal that cannot name its instance is refused BEFORE any read or write.
     refused = ttn.tool_get_exercise_notes({"action": "dismiss", "site": "right lower back", "words": ""})
     assert refused["error"].startswith("refused:") and "VERBATIM" in refused["error"]
+
+
+# ── 5. #4174 — a dismissal covers its own SITE, never every note on the movement ──────
+#
+# THE WIRE (read-only, 2026-09-26): Cycling carries two flagged notes on two sites — 09-09
+# "…more just saddle sore and uncomfortable with compression shorts" and 09-18 "…big toe
+# throbbing from ingrown toe so took it easy" — and two owner dismissals dated 09-25, each
+# pinning its own note (`flag_note_date`), both with `movements: ["cycling"]` as the chat
+# wrote them. Pre-#4174 `_dismissal_matches` matched by MOVEMENT, so the saddle-sore record
+# alone resolved the whole movement `dismissed_by_owner` with `latest_note_date 2026-09-18`.
+CYCLING = "Cycling"
+CYCLING_WORDS = "Dismiss the Cycling pain flag — it's resolved, no pain cycling now"
+SADDLE_NOTE = {
+    "date": "2026-09-09",
+    "text": "Level 8 flat - cardio felt ok - more just saddle sore and uncomfortable with compression shorts",
+}
+TOE_NOTE = {"date": "2026-09-18", "text": "Level 10 flat - big toe throbbing from ingrown toe so took it easy"}
+
+
+def _cycling_dismissal(site, flag_note_date):
+    return tcr.build_dismissal_record(
+        site=site,
+        dismissed_on="2026-09-25",
+        words=CYCLING_WORDS,
+        movements=["cycling"],
+        flag_note_date=flag_note_date,
+        recorded_at="2026-09-26T02:21:26Z",
+    )
+
+
+SADDLE_SORE = _cycling_dismissal("saddle sore", "2026-09-09")
+BIG_TOE = _cycling_dismissal("big toe", "2026-09-18")
+CYCLING_INSTANCE = {"movement": CYCLING, "note_dates": [SADDLE_NOTE["date"], TOE_NOTE["date"]], "notes": [SADDLE_NOTE, TOE_NOTE]}
+
+
+def _cycling_tripwires(dismissals):
+    return plan_engine._tripwire_states(
+        protein_days_missed_7d=0,
+        readiness_low_streak_days=0,
+        anchor_lift_drop_pct=0.0,
+        anchor_lift_drop_sessions=0,
+        pain_flag_sites=[CYCLING],
+        pain_flag_instances=[dict(CYCLING_INSTANCE)],
+        pain_dismissals=dismissals,
+        pain_layer_status="ok",
+        weight_stall_days=0,
+        adherence_on_plan=True,
+    )
+
+
+def _movement_only_rule(dismissal, *, movement, site, note_dates=None):
+    """The pre-#4174 matcher, verbatim in effect: any dismissal naming the movement covers it."""
+    return bool(movement) and tcr.normalize_dismissal_key(movement) in tcr._movement_keys(dismissal)
+
+
+class TestPerSite4174:
+    def test_the_split_keys_each_note_to_its_own_site_and_leaves_the_unnamed_one_open(self):
+        inst = tcr.expand_instances([CYCLING_INSTANCE], [SADDLE_SORE])
+        assert [(i["site"], i["note_dates"]) for i in inst] == [("saddle_sore", ["2026-09-09"]), (None, ["2026-09-18"])]
+        both = tcr.expand_instances([CYCLING_INSTANCE], [SADDLE_SORE, BIG_TOE])
+        assert [(i["site"], i["note_dates"]) for i in both] == [("big_toe", ["2026-09-18"]), ("saddle_sore", ["2026-09-09"])]
+
+    def test_the_words_tie_an_unpinned_note_to_its_site(self):
+        """A second saddle note the dismissal did not pin still belongs to `saddle_sore` by its
+        own words — and a note dated after the dismissal re-arms it, the #4036 rule unchanged."""
+        again = {"date": "2026-09-20", "text": "saddle still sore, shorter ride"}
+        inst = tcr.expand_instances(
+            [{"movement": CYCLING, "note_dates": ["2026-09-09", "2026-09-20"], "notes": [SADDLE_NOTE, again]}], [SADDLE_SORE]
+        )
+        assert [(i["site"], i["note_dates"]) for i in inst] == [("saddle_sore", ["2026-09-09", "2026-09-20"])]
+        res = tcr.resolve_flags(inst, [SADDLE_SORE])
+        assert res[0]["state"] == "dismissed_by_owner", "both notes predate the 09-25 dismissal"
+        later = {"date": "2026-09-27", "text": "saddle sore again"}
+        res = tcr.resolve_flags(
+            [{"movement": CYCLING, "note_dates": ["2026-09-09", "2026-09-27"], "notes": [SADDLE_NOTE, later]}], [SADDLE_SORE]
+        )
+        assert res[0]["state"] == "re_armed" and res[0]["superseded"] is True
+
+    def test_one_dismissal_on_a_two_site_movement_stays_tripped_with_the_toe_open(self):
+        """Acceptance box 1, first half. The saddle-sore record covers 09-09 and nothing else."""
+        row = _pain_row(_cycling_tripwires([SADDLE_SORE]))
+        assert row["state"] == "tripped", row
+        assert row["by_movement"] == {CYCLING: "tripped"}
+        states = {(r["site"], r["state"], r["dismissal_state"]) for r in row["by_site"]}
+        assert states == {("saddle_sore", "dismissed_by_owner", "dismissed_by_owner"), (None, "tripped", "none")}
+        assert [d["sk"] for d in row["dismissals"]] == ["DISMISSAL#saddle_sore#2026-09-25"]
+        assert row["dismissals"][0]["latest_note_date"] == "2026-09-09", "the saddle row must not carry the toe note's date"
+        assert "2026-09-18" in row["detail"] and "name no dismissed site" in row["detail"]
+
+    def test_both_dismissals_read_dismissed_by_owner_and_the_block_lists_both(self):
+        """Acceptance box 1, second half, and box 2: every dismissal in play is listed."""
+        row = _pain_row(_cycling_tripwires([SADDLE_SORE, BIG_TOE]))
+        assert row["state"] == "dismissed_by_owner", row
+        assert sorted(d["sk"] for d in row["dismissals"]) == ["DISMISSAL#big_toe#2026-09-25", "DISMISSAL#saddle_sore#2026-09-25"]
+        assert {r["site"]: r["state"] for r in row["by_site"]} == {"big_toe": "dismissed_by_owner", "saddle_sore": "dismissed_by_owner"}
+        block = plan_engine.constraint_block(
+            date="2026-09-26",
+            pain_flag_sites=[CYCLING],
+            pain_flag_instances=[dict(CYCLING_INSTANCE)],
+            pain_dismissals=[SADDLE_SORE, BIG_TOE],
+            pain_layer_status="ok",
+        )
+        assert sorted(d["sk"] for d in block["owner_dismissals"]) == ["DISMISSAL#big_toe#2026-09-25", "DISMISSAL#saddle_sore#2026-09-25"]
+        assert "pain_flag_named_site" not in block["tripped"]
+
+    def test_the_joints_critic_vetoes_until_every_site_on_the_lift_is_dismissed(self):
+        def packet(dismissals):
+            return c.build_joints_packet(
+                _draft(),
+                pain_by_idx={
+                    0: {"pain_flag_any": True, "pain_dates": [SADDLE_NOTE["date"], TOE_NOTE["date"]], "pain_notes": [SADDLE_NOTE, TOE_NOTE]}
+                },
+                days_since_by_idx={0: 3},
+                active_day_streak=1,
+                loaded_lifting_streak=1,
+                pain_layer_status="ok",
+                dismissals=dismissals,
+            )
+
+        one = packet([{**SADDLE_SORE, "movements": [RDL], "movement_keys": [tcr.normalize_dismissal_key(RDL)]}])
+        assert [v["redline"] for v in one["violations"]] == ["pain_flag_loaded"], "one site dismissed, the other open: the veto stands"
+        assert "2026-09-18" in one["violations"][0]["reason"] and "#4174" in one["violations"][0]["reason"]
+        assert one["numbers"]["pain_dismissed[0]"] is False
+        both = packet([{**d, "movements": [RDL], "movement_keys": [tcr.normalize_dismissal_key(RDL)]} for d in (SADDLE_SORE, BIG_TOE)])
+        assert both["violations"] == [] and both["numbers"]["pain_dismissed[0]"] is True
+        assert sorted(d["sk"] for d in both["owner_dismissals"]) == ["DISMISSAL#big_toe#2026-09-25", "DISMISSAL#saddle_sore#2026-09-25"]
+
+    def test_mutation_control_the_per_movement_rule_hides_the_big_toe_note_again(self, monkeypatch):
+        """THE control for #4174. Both halves in one run: under the shipped per-site matcher the
+        one-dismissal case stays `tripped` with the toe note open; put the pre-#4174
+        movement-only matcher back and the same inputs read `dismissed_by_owner` — the
+        defect, reproduced — so the green above is bought by the site leg, not the fixture."""
+        intact = _pain_row(_cycling_tripwires([SADDLE_SORE]))
+        assert intact["state"] == "tripped"
+        monkeypatch.setattr(tcr, "_dismissal_matches", _movement_only_rule)
+        broken = _pain_row(_cycling_tripwires([SADDLE_SORE]))
+        assert broken["state"] == "dismissed_by_owner", "the movement-only rule no longer hides the toe note — the control is dead"
+        assert all(r["state"] == "dismissed_by_owner" for r in broken["by_site"]), broken["by_site"]

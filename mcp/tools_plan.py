@@ -314,6 +314,7 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
             continue
         r["pain_flag_any"] = bool(f.get("pain_flag_any"))
         r["pain_dates"] = f.get("pain_dates") or []
+        r["pain_notes"] = f.get("pain_notes") or []  # #4174: the words tie a note to its site
         r["sessions_with_notes"] = f.get("sessions_with_notes")
     scope = {
         # `read` is the only value `plan_engine._evidence_scope_read` accepts, and it also
@@ -657,7 +658,11 @@ def tool_plan_next_session(args):
         pain_flag_sites=[r["label"] for r in flagged],
         # #4036: the flag's own note dates travel with it, because the owner-dismissal rule
         # is a DATE comparison — a flag with no readable date can never read as dismissed.
-        pain_flag_instances=[{"movement": r["label"], "note_dates": r.get("pain_dates") or []} for r in flagged],
+        # #4174: and the notes' own words, because a dismissal covers a SITE — the engine splits
+        # a movement's notes per site and a note naming no dismissed site stays open.
+        pain_flag_instances=[
+            {"movement": r["label"], "note_dates": r.get("pain_dates") or [], "notes": r.get("pain_notes") or []} for r in flagged
+        ],
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
         pain_evidence_scope=pain_scope,
