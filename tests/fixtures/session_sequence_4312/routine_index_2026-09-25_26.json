@@ -1,0 +1,112 @@
+[
+ {
+  "target_date": "2026-09-25",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "ideal",
+  "routine_id": "208daac78ac7bce239fcce23472d183d",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "archetype": "aerobic",
+  "sk": "DATE#2026-09-25#ROUTINE#208daac78ac7bce239fcce23472d183d"
+ },
+ {
+  "target_date": "2026-09-25",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "ideal",
+  "archetype": "upper",
+  "routine_id": "7f3ea514b0d34d4a67c777587c754fd2",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "sk": "DATE#2026-09-25#ROUTINE#7f3ea514b0d34d4a67c777587c754fd2"
+ },
+ {
+  "target_date": "2026-09-25",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "floor",
+  "archetype": "upper",
+  "routine_id": "ab23a19c2f3b041bca99efb8e660ed66",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "sk": "DATE#2026-09-25#ROUTINE#ab23a19c2f3b041bca99efb8e660ed66"
+ },
+ {
+  "target_date": "2026-09-25",
+  "hevy_routine_id": "4b743f67-df90-4eb9-bd62-9e53ac343435",
+  "status": "active",
+  "variant": "ideal",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "archetype": "lower",
+  "routine_id": "b1b9960468f374e30dcdeca8630dd18f",
+  "sk": "DATE#2026-09-25#ROUTINE#b1b9960468f374e30dcdeca8630dd18f"
+ },
+ {
+  "target_date": "2026-09-25",
+  "hevy_routine_id": "28cab4f5-f663-4597-9433-ca98dec2675a",
+  "status": "active",
+  "variant": "ideal",
+  "archetype": "upper",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "routine_id": "edd83e5731bb675eb312e0cc8f9cd1b7",
+  "sk": "DATE#2026-09-25#ROUTINE#edd83e5731bb675eb312e0cc8f9cd1b7"
+ },
+ {
+  "target_date": "2026-09-26",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "ideal",
+  "archetype": "lower",
+  "routine_id": "2c101a6f4126831827a9caeb3af4733f",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "sk": "DATE#2026-09-26#ROUTINE#2c101a6f4126831827a9caeb3af4733f"
+ },
+ {
+  "target_date": "2026-09-26",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "ideal",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "routine_id": "38995601e14726de32d92febfa723fec",
+  "archetype": "flex",
+  "sk": "DATE#2026-09-26#ROUTINE#38995601e14726de32d92febfa723fec"
+ },
+ {
+  "target_date": "2026-09-26",
+  "hevy_routine_id": "99d3794a-c424-4a84-bbf1-3293c1c7149a",
+  "status": "active",
+  "variant": "ideal",
+  "routine_id": "52bbecb2496d88854df9c51c4a51f86b",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "archetype": "flex",
+  "sk": "DATE#2026-09-26#ROUTINE#52bbecb2496d88854df9c51c4a51f86b"
+ },
+ {
+  "target_date": "2026-09-26",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "floor",
+  "routine_id": "7d2d79961690b1efadefb23856a3ce41",
+  "archetype": "lower",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "sk": "DATE#2026-09-26#ROUTINE#7d2d79961690b1efadefb23856a3ce41"
+ },
+ {
+  "target_date": "2026-09-26",
+  "hevy_routine_id": "",
+  "status": "draft",
+  "variant": "ideal",
+  "archetype": "lower",
+  "routine_id": "af379af3a1e874e814d1123ab6ea9326",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "sk": "DATE#2026-09-26#ROUTINE#af379af3a1e874e814d1123ab6ea9326"
+ },
+ {
+  "target_date": "2026-09-26",
+  "hevy_routine_id": "9764f978-0908-4547-a066-45deeba21749",
+  "status": "active",
+  "variant": "ideal",
+  "pk": "USER#matthew#SOURCE#routine_index",
+  "archetype": "flex",
+  "routine_id": "b14a398e15a93ef72d5dedec42b61cad",
+  "sk": "DATE#2026-09-26#ROUTINE#b14a398e15a93ef72d5dedec42b61cad"
+ }
+]

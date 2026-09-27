@@ -38,8 +38,16 @@ def test_guess_model_sonnet():
 
 
 def test_guess_model_mixed_when_no_tier_matches():
-    # A cost between haiku ($6) and sonnet ($18) for the same tokens matches neither.
-    assert asa._guess_model(_tok(12.0, i=1_000_000, o=1_000_000)) == "mixed"
+    # A cost that sits BETWEEN two tiers for the same tokens matches neither. The
+    # ladder for 1M in + 1M out, from ai.bedrock_client.PRICES: haiku $6 · sonnet-5 $12
+    # · sonnet $18 · opus-5-5 $24 · opus / opus-5 $30 · fable / fable-5-1 $60. This
+    # test used $12 while that was a gap; #4275 added Sonnet 5, whose 1M/1M price IS
+    # exactly $12, so `_guess_model` correctly answered "sonnet-5" and the premise, not
+    # the function, was wrong. $9 is 50% off haiku and 25% off sonnet-5 — far outside
+    # _MODEL_MATCH_TOL (2%) — and no row prices 1M/1M anywhere near it.
+    ladder = sorted(asa.estimate_cost_usd({"input_tokens": 1_000_000, "output_tokens": 1_000_000}, k) for k in asa._PRICES)
+    assert all(abs(9.0 - c) / 9.0 > asa._MODEL_MATCH_TOL for c in ladder), f"$9 now sits on a tier: {ladder}"
+    assert asa._guess_model(_tok(9.0, i=1_000_000, o=1_000_000)) == "mixed"
 
 
 def test_guess_model_no_signal():

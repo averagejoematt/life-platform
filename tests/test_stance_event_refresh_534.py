@@ -397,6 +397,7 @@ class TestEventStanceRefreshDispatch:
         from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+        monkeypatch.setattr(chs, "_absent_coaches", lambda: {})  # #4217: no instrument is dark in this dispatch test
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: None)
         out = chs.lambda_handler({"mode": "event_stance_refresh", "coach_id": "sleep_coach"}, None)
         assert out["skipped"] == "no_compressed_baseline"
@@ -405,6 +406,7 @@ class TestEventStanceRefreshDispatch:
         from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+        monkeypatch.setattr(chs, "_absent_coaches", lambda: {})  # #4217: no instrument is dark in this dispatch test
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: {"_fallback": True})
         out = chs.lambda_handler({"mode": "event_stance_refresh", "coach_id": "sleep_coach"}, None)
         assert out["skipped"] == "no_compressed_baseline"
@@ -413,6 +415,7 @@ class TestEventStanceRefreshDispatch:
         from ai import budget_guard
 
         monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+        monkeypatch.setattr(chs, "_absent_coaches", lambda: {})  # #4217: no instrument is dark in this dispatch test
         monkeypatch.setattr(chs, "_get_item", lambda pk, sk: {"summary": "compressed history"})
         monkeypatch.setattr(chs, "_query_begins_with", lambda pk, prefix: [])
         captured = {}

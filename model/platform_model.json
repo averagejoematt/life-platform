@@ -951,6 +951,16 @@
       "note": "DIL-025. Nine other senders write this same row WITHOUT `period_key` (weekly_digest, monday_compass, anomaly_detector, \u2026) \u2014 for those the guard structurally cannot fire. #3113 is enrolling them; this pair pins the shape they are converging on.",
       "partition": null,
       "producer": "common.send_ledger::record_sent"
+    },
+    {
+      "consumer": "health.instrument_presence::absent_coaches",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 5,
+      "name": "source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
+      "note": "E6 / #4217 / epic #4182: a coach whose domain instrument is dark is absent \u2014 no read, no stance, no docket seat, and the renderer names it without quoting it. Both halves stand on /api/source_freshness: the consumer named here is the engine's gate (health.instrument_presence.absent_coaches); `consume` drives the renderer's shipped darkCoaches() from site/assets/js/v7_coaches.js under node and `agree` holds the two equal. The engine's map is source_registry.coach_instruments() (the `instrument_for` facets), served on /api/coaches as `instrument`.",
+      "partition": null,
+      "producer": "web.site_api_freshness::source_freshness"
     }
   ],
   "cost_surface": {
@@ -2929,6 +2939,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/health/instrument_presence.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/health/meal_projection.py",
@@ -4326,13 +4343,6 @@
       "lambda": null,
       "module": "lambdas/web/site_api_foresight.py",
       "partition": "state_of_matthew",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_freshness.py",
-      "partition": "apple_health",
       "via": "pk"
     },
     {
@@ -7387,10 +7397,10 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 10,
-      "contracts_enrolled": 10,
-      "contracts_known": 10,
-      "contracts_ratchet": 10,
+      "contracts": 11,
+      "contracts_enrolled": 11,
+      "contracts_known": 11,
+      "contracts_ratchet": 11,
       "edges": 715,
       "lambdas": 106,
       "mcp_tool_modules": 34,
@@ -7405,9 +7415,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 355,
+        "sites_dynamic": 356,
         "sites_resolved": 888,
-        "sites_total": 1243
+        "sites_total": 1244
       },
       "schedule_resolution": {
         "dynamic": 0,

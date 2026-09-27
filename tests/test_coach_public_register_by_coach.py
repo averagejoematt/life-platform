@@ -384,3 +384,158 @@ def test_write_stance_holds_an_owner_directed_headline_empty(monkeypatch):
     written.clear()
     assert chs._write_stance(_COACH, {"as_of": "2026-09-26", "headline_read": _PUBLIC_HEADLINE, "stage": {}})
     assert [w["headline_read"] for w in written] == [_PUBLIC_HEADLINE, _PUBLIC_HEADLINE]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4217 — a coach with a dark instrument is ABSENT on /api/coach/<id>, /api/coaches
+# and in the stance writer. Fixture = the live 2026-09-26 sentinel (cgm dark since
+# 2026-08-27); mutation control = the same rows with the checker's verdict flipped.
+# ══════════════════════════════════════════════════════════════════════════════
+
+from instrument_presence_fixture import (  # noqa: E402
+    ABSENT_REASON,
+    GLUCOSE_HEADLINE,
+    NOW,
+    dispatching_query_hook,
+    fresh_instrument_rows,
+    glucose_output_row,
+    sentinel_item,
+)
+
+_GLUCOSE = "glucose_coach"
+_GPK = f"COACH#{_GLUCOSE}"
+
+
+def _glucose_stance():
+    return {
+        "pk": _GPK,
+        "sk": "STANCE#latest",
+        "as_of": "2026-09-21",
+        "headline_read": GLUCOSE_HEADLINE,
+        "focused_on_now": ["Whether the sensor is accumulating usable data"],
+        "set_aside_for_now": [],
+        "stage": {"label": "Data gate: awaiting synchronization", "rationale": "He has the sensors in place but not the context."},
+        "how_my_read_changed": "",
+        "confidence_note": "",
+    }
+
+
+def _glucose_table(cgm_dark):
+    rows = [
+        sentinel_item(cgm_dark=cgm_dark),
+        *fresh_instrument_rows(),
+        _glucose_stance(),
+        dict(_glucose_stance(), sk="STANCE#2026-09-21"),
+        glucose_output_row(),
+    ]
+    return FakeDdbTable(rows=rows, query_hook=dispatching_query_hook)
+
+
+def _pin_presence_clock(monkeypatch):
+    """The SAME derivation the board runs, pinned to the corpus's instant."""
+    from health import instrument_presence
+    from web import site_api_coach_profile as P
+
+    monkeypatch.setattr(P, "_absent_coaches", lambda _g: instrument_presence.absent_coaches(_g["table"], now=NOW))
+
+
+def _glucose_body(monkeypatch, cgm_dark):
+    monkeypatch.setattr(C, "table", _glucose_table(cgm_dark))
+    real_load = C._load_s3_json
+    monkeypatch.setattr(C, "_load_s3_json", lambda key, cache_name: {} if key.startswith("generated/") else real_load(key, cache_name))
+    _pin_presence_clock(monkeypatch)
+    resp = C.handle_coach({"rawPath": f"/api/coach/{_GLUCOSE}"})
+    assert resp["statusCode"] == 200, resp
+    body = json.loads(resp["body"])
+    assert body.get("persona_id") == _GLUCOSE, body
+    return body
+
+
+def test_the_glucose_coach_is_absent_with_the_sensor_dark(monkeypatch):
+    """RED before #4217: the handler served the CGM headline as today's stance."""
+    body = _glucose_body(monkeypatch, cgm_dark=True)
+    assert body["absent"] is True
+    assert body["reason"] == ABSENT_REASON
+    assert body["instrument"] == {"source": "apple_health", "datatype": "cgm"}
+    assert body["stance"] == {"source": "absent", "headline_read": "", "stage": {}}
+    assert body["daily"] == ""
+    assert "CGM" not in json.dumps({k: body[k] for k in ("stance", "daily", "reason")})
+
+
+def test_mutation_control_the_glucose_stance_serves_when_the_cgm_is_not_dark(monkeypatch):
+    body = _glucose_body(monkeypatch, cgm_dark=False)
+    assert body["absent"] is False and body["reason"] is None
+    assert body["stance"]["source"] == "stance"
+    assert body["stance"]["headline_read"] == GLUCOSE_HEADLINE
+    assert body["instrument"] == {"source": "apple_health", "datatype": "cgm"}
+
+
+def test_history_stays_while_the_coach_is_absent(monkeypatch):
+    """Dated records are history, not today's argument — only the live slots go quiet."""
+    body = _glucose_body(monkeypatch, cgm_dark=True)
+    assert body["stance_history"], "the dated STANCE# history was withheld — that is a record, not a read"
+    assert body["recent_outputs"], "the dated OUTPUT# timeline was withheld"
+
+
+def test_the_roster_serves_the_instrument_map_and_the_absence(monkeypatch):
+    """/api/coaches carries {source, datatype} per coach — the renderer reads THIS instead of
+    its own table — and the same absence verdict as the profile."""
+    from ingestion.source_registry import coach_instruments
+
+    monkeypatch.setattr(C, "table", _glucose_table(cgm_dark=True))
+    _pin_presence_clock(monkeypatch)
+    body = json.loads(C.handle_coaches({})["body"])
+    by_id = {c["persona_id"]: c for c in body["coaches"]}
+    assert by_id[_GLUCOSE]["absent"] is True and by_id[_GLUCOSE]["reason"] == ABSENT_REASON
+    for cid, row in coach_instruments().items():
+        assert by_id[cid]["instrument"] == {"source": row["source"], "datatype": row["datatype"]}, cid
+    for cid in ("mind_coach", "explorer_coach", "eli_marsh"):
+        assert by_id[cid]["instrument"] is None and by_id[cid]["absent"] is False, cid
+    assert sum(1 for c in body["coaches"] if c["absent"]) == 1, "only the coach with the dark sensor is absent"
+
+
+# ── the stance writer: no STANCE# while the instrument is dark ─────────────────
+
+
+def _stance_run(monkeypatch, cgm_dark, event=None):
+    from health import instrument_presence
+
+    table = _glucose_table(cgm_dark)
+    monkeypatch.setattr(chs, "table", table)
+    monkeypatch.setattr(chs, "_absent_coaches", lambda: instrument_presence.absent_coaches(table, now=NOW))
+    monkeypatch.setattr(chs, "_presence_signal", lambda: None)
+    monkeypatch.setattr(
+        chs,
+        "_gather_coach_state",
+        lambda cid: {"outputs": [{"x": 1}], "open_threads": [], "active_predictions": [], "confidence_records": []},
+    )
+    monkeypatch.setattr(chs, "_compress_coach", lambda cid, state, presence_signal=None: {"summary": "compressed"})
+    monkeypatch.setattr(chs, "_write_compressed_state", lambda cid, compressed: True)
+    monkeypatch.setattr(chs, "_get_item", lambda pk, sk: {"summary": "compressed history"})
+    monkeypatch.setattr(chs, "_query_begins_with", lambda pk, prefix, **kw: [])
+    from ai import budget_guard
+
+    monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+    ran = []
+    monkeypatch.setattr(chs, "_run_stance", lambda coach_id, *a, **kw: ran.append(coach_id) or {"written": True})
+    out = chs.lambda_handler(event or {"coach_ids": [_GLUCOSE, "sleep_coach"]}, None)
+    return ran, out
+
+
+def test_the_weekly_batch_writes_no_glucose_stance_while_the_cgm_is_dark(monkeypatch):
+    ran, out = _stance_run(monkeypatch, cgm_dark=True)
+    assert ran == ["sleep_coach"], ran
+    assert out["results"][_GLUCOSE]["stance"] == {"written": False, "reason": "instrument_dark", "instrument_reason": ABSENT_REASON}
+    assert out["results"][_GLUCOSE]["status"] == "success", "compression (his private memory) still runs"
+
+
+def test_mutation_control_the_weekly_batch_writes_the_glucose_stance_when_not_dark(monkeypatch):
+    ran, _out = _stance_run(monkeypatch, cgm_dark=False)
+    assert ran == [_GLUCOSE, "sleep_coach"]
+
+
+def test_an_event_refresh_for_an_absent_coach_is_skipped(monkeypatch):
+    ran, out = _stance_run(
+        monkeypatch, cgm_dark=True, event={"mode": "event_stance_refresh", "coach_id": _GLUCOSE, "trigger_event": {"type": "refuted"}}
+    )
+    assert ran == [] and out["skipped"] == "instrument_dark" and out["reason"] == ABSENT_REASON

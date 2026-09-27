@@ -259,6 +259,15 @@ def tts_voice(persona_id, s3_client=None, bucket=None):
     return p.get("tts_voice") if p else None
 
 
+# ── #4217: a coach's domain instrument is NOT a personas.json field. The map is
+# inverted from the source registry's own `instrument_for` facets
+# (ingestion.source_registry.coach_instruments) — the registry owns which sensor is
+# which coach's, so the owner's S3 copy of this JSON needs no new field. Whether that
+# instrument is DARK is health.instrument_presence (the same liveness
+# /api/source_freshness serves); a coach named by no facet has no single instrument
+# and is never absent for want of one (mind, explorer, the lead).
+
+
 # ── Availability voice (#2495) ────────────────────────────────────────────────
 # The budget-pause and daily-cap replies used to be ONE shared string in
 # coach_chat.py — the exact tell the coach-humanity roadmap works to remove. Each

@@ -53,9 +53,23 @@ RULINGS (#4110/#4147/#4161 — stated so a reader can dispute them, not discover
     NEXT day's plan. So the plan for a date is stable all day — a re-run after the workout (the
     stage-2 critics, the commit gate) sees the same session the draft was built for.
   * Two loaded logs on one Pacific day are ONE session (a split or re-started log), never two.
-  * Any loaded session advances the position — the plan does not try to decide from a Hevy
-    title whether he "really" did the upper day. The session that advanced it is named
-    (`advanced_by`: date, title, workout id) so a mismatch is visible, not inferred.
+  * SUPERSEDED 2026-09-26 (#4312): "any loaded session advances the position". Owner: "Flex-folder /
+    archetype=flex sessions are off-program complements. They never advance the sequence and never
+    take a session_role." A loaded log is CREDITED only when (a) its routine archetype — resolved
+    EXACTLY by `routine_title.resolve_archetype_source` (a sticker or the Hevy routine it was
+    started from; the date fallback is a guess and never un-credits) — is one of the program's own
+    (`program_archetypes()`: the `SESSION_TEMPLATES` archetypes, derived — no list of complement
+    names), and (b) its loaded sets reach an anchor muscle of the role it would take
+    (`role_anchor_muscles`: `SESSION_TEMPLATES[role].anchors -> ANCHORS[*].primary_muscles`, one
+    source; sets attributed by `muscle_volume.attribute_exercise`). A log that fails either is
+    FLAGGED, not credited, and named in `not_credited` with its reason; a session no set of which
+    can be attributed is credited and says so (`content_check.matched: None`). Still no title
+    parsing. An out-of-order PROGRAM session (upper logged when lower is due) is flagged, never
+    re-slotted — the owner said flag, don't credit; the sequence does not reorder itself. The
+    session that advanced it is still named (`advanced_by`) so a mismatch is visible, not inferred.
+    The routine index is read ONCE at the two block-read seams (`plan_hevy_windows._block_workouts`,
+    `load_block_workouts`) and carried on the rows; a row without it counts as it always did and
+    `credit_rule.routine_index_consulted` says so.
   * #4161: "the 4-session cycle is complete" is read as ">= 4 sessions in the CURRENT week",
     not "at a multiple of 4 in the sequence": with the latter, one blocked advance would push the
     next boundary four more sessions out and a week would run ~9 days at his pace — slower than
@@ -80,6 +94,7 @@ from training import program_structure, training_streaks
 ISSUE = "#4110"
 PROGRAM_ISSUE = "#4147"
 WEEK_ISSUE = "#4161"
+CREDIT_ISSUE = "#4312"
 
 WEEK_RULE: dict[str, Any] = {
     "sessions_per_week": "program_structure.SESSION_SEQUENCE['sessions_per_week']",
@@ -124,15 +139,106 @@ def _days(a: str, b: str) -> int:
     return (pb - pa).days
 
 
-def completed_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> list[dict[str, Any]]:
-    """The completed sessions of the program before `before_day`, oldest first — one per day.
+def _role_at(index: int) -> str:
+    """The role of the session at 0-based `index` in the sequence — THE role formula (`ledger` and
+    the credit guard read this one function, so the role a candidate WOULD take is the role the
+    ledger gives it once credited)."""
+    seq = _seq()
+    roles = seq["session_roles"]
+    return str(roles[(roles.index(seq.get("first_role") or roles[0]) + index) % len(roles)])
 
-    `workouts` is Hevy per-workout rows (the raw DDB shape or `normalize_hevy_items` output).
+
+# ── #4312: what a loaded log must be to be credited as a PROGRAM session ─────────────
+def program_archetypes() -> set[str]:
+    """The archetypes of the program's own sessions — `SESSION_TEMPLATES[role]['archetype']` over
+    the sequence's roles (v0.4: upper, lower). One derivation; no list of complement names."""
+    return {str(program_structure.SESSION_TEMPLATES[r]["archetype"]) for r in _seq()["session_roles"]}
+
+
+def role_anchor_muscles(role: str) -> set[str]:
+    """The planner-key muscles a role's ANCHOR patterns train (`SESSION_TEMPLATES[role].anchors` ->
+    `ANCHORS[pattern].primary_muscles`) — what makes a session that role. Accessories are not it."""
+    tmpl = program_structure.SESSION_TEMPLATES[role]
+    return {str(m) for pattern, _exposure in tmpl["anchors"] for m in program_structure.ANCHORS[pattern]["primary_muscles"]}
+
+
+def off_program_archetype(row: dict[str, Any]) -> str | None:
+    """The row's routine archetype when it resolves EXACTLY (a sticker, or the Hevy routine it was
+    started from) to one outside `program_archetypes()` — an off-program complement (owner,
+    2026-09-26: "Flex-folder / archetype=flex sessions are off-program complements"). None for a
+    program session, a row the routine index was not read for, a date-fallback resolution
+    (a freestyle log is not a Flex-folder session), or a row dated BEFORE the block start — v0.4's
+    archetypes do not define the program before 2026-09-24 (the v0.3 / PPL sessions in
+    `self_added_volume`'s three-week window were the program then, not complements)."""
+    from training.routine_title import EXACT_ARCHETYPE_SOURCES, routine_archetype
+
+    if training_streaks._day(row) < block_start():
+        return None
+    arch, via = routine_archetype(row)
+    if arch is None or via not in EXACT_ARCHETYPE_SOURCES:
+        return None
+    return arch if arch not in program_archetypes() else None
+
+
+def session_anchor_muscles(logs: Iterable[dict[str, Any]]) -> tuple[set[str], int]:
+    """(the planner-key muscles the logs' loaded sets reach, how many loaded sets were attributed).
+    Loaded = `training_streaks.loaded_sets` (the one definition); muscle = `muscle_volume.
+    attribute_exercise`'s primary (template overrides first, then the one taxonomy), mapped to the
+    planner key through `HEVY_MUSCLE_GROUP` — the same table the catalog and `_ARCHETYPE_TARGETS` use."""
+    from training import muscle_volume
+
+    keys = {label: key for label, key in muscle_volume.HEVY_MUSCLE_GROUP.values() if label}
+    muscles: set[str] = set()
+    n = 0
+    for w in logs:
+        for ex, _s in training_streaks.loaded_sets(w):
+            primary = muscle_volume.attribute_exercise(str(ex.get("name") or ex.get("exercise_name") or ""), ex.get("template_id"))[
+                "primary"
+            ]
+            key = keys.get(primary) if primary else None
+            if key:
+                muscles.add(key)
+                n += 1
+    return muscles, n
+
+
+def content_check(logs: list[dict[str, Any]], role: str) -> dict[str, Any]:
+    """The derivation guard on a candidate's CONTENT (#4312): `matched` is False when its attributed
+    loaded sets reach none of `role`'s anchor muscles (flag, don't credit); None when no set could
+    be attributed — nothing to judge, so the session is credited and says so."""
+    need = role_anchor_muscles(role)
+    have, n = session_anchor_muscles(logs)
+    return {
+        "role": role,
+        "matched": None if n == 0 else bool(have & need),
+        "anchor_muscles": sorted(need),
+        "logged_muscles": sorted(have),
+        "attributed_loaded_sets": n,
+    }
+
+
+def _rec(w: dict[str, Any], day: str) -> dict[str, Any]:
+    return {
+        "date": day,
+        "title": w.get("title") or w.get("workout_name") or None,
+        "workout_id": w.get("source_workout_id") or w.get("workout_id") or None,
+        "start_time": w.get("start_time"),
+    }
+
+
+def classify_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Every loaded Hevy log in [block start, `before_day`) sorted into (credited sessions, oldest
+    first, one per day; the logs NOT credited, each with `credited: False` and its `reason`).
+
+    `workouts` is Hevy per-workout rows (the raw DDB shape or `normalize_hevy_items` output),
+    annotated by `routine_title.annotate_with_routine_index` when the routine index was read.
     Tombstoned rows are skipped; the day key is the row's own `date` (Pacific, as ingested).
-    """
+    Per day: off-program complements are set aside first; the remaining program logs are ONE
+    session (a split or re-started log), checked as one against the role it would take; the log
+    with the earliest start names the session."""
     _check_day(before_day)
     start = block_start()
-    by_day: dict[str, dict[str, Any]] = {}
+    by_day: dict[str, list[dict[str, Any]]] = {}
     for w in workouts or []:
         if w.get("tombstone"):
             continue
@@ -141,23 +247,64 @@ def completed_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: st
             continue
         if not training_streaks.is_loaded_session(w):
             continue
-        rec = {
-            "date": d,
-            "title": w.get("title") or w.get("workout_name") or None,
-            "workout_id": w.get("source_workout_id") or w.get("workout_id") or None,
-            "start_time": w.get("start_time"),
-        }
-        prev = by_day.get(d)
-        if prev is None:
-            by_day[d] = {**rec, "loaded_logs_that_day": 1}
-        else:
-            prev["loaded_logs_that_day"] += 1
-            if rec["start_time"] and (not prev["start_time"] or str(rec["start_time"]) < str(prev["start_time"])):
-                prev.update(rec)
-    out = [by_day[d] for d in sorted(by_day)]
-    for i, r in enumerate(out):
-        r["sequence_index"] = i
-    return out
+        by_day.setdefault(d, []).append(w)
+    credited: list[dict[str, Any]] = []
+    refused: list[dict[str, Any]] = []
+    kinds = "/".join(sorted(program_archetypes()))
+    for d in sorted(by_day):
+        logs = sorted(by_day[d], key=lambda w: (w.get("start_time") is None, str(w.get("start_time") or "")))
+        program: list[dict[str, Any]] = []
+        for w in logs:
+            off = off_program_archetype(w)
+            if off is None:
+                program.append(w)
+                continue
+            refused.append(
+                {
+                    **_rec(w, d),
+                    "credited": False,
+                    "archetype": off,
+                    "reason": (
+                        f"off-program complement: routine archetype {off!r} is not a program session archetype ({kinds}) — "
+                        f"never advances the sequence, never takes a role (owner, 2026-09-26, {CREDIT_ISSUE})"
+                    ),
+                }
+            )
+        if not program:
+            continue
+        role = _role_at(len(credited))
+        check = content_check(program, role)
+        if check["matched"] is False:
+            logged = "/".join(check["logged_muscles"]) or "none"
+            for w in program:
+                refused.append(
+                    {
+                        **_rec(w, d),
+                        "credited": False,
+                        "would_take": role,
+                        "reason": (
+                            f"content does not match {role}: 0 of {check['attributed_loaded_sets']} attributed loaded sets on "
+                            f"{'/'.join(check['anchor_muscles'])} (logged: {logged}) — flagged, not credited ({CREDIT_ISSUE})"
+                        ),
+                        "content_check": check,
+                    }
+                )
+            continue
+        credited.append(
+            {**_rec(program[0], d), "loaded_logs_that_day": len(program), "sequence_index": len(credited), "content_check": check}
+        )
+    return credited, refused
+
+
+def completed_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> list[dict[str, Any]]:
+    """The CREDITED sessions of the program before `before_day`, oldest first — one per day
+    (`classify_sessions`; the logs it refused are `uncredited_sessions`)."""
+    return classify_sessions(workouts, before_day)[0]
+
+
+def uncredited_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> list[dict[str, Any]]:
+    """The loaded logs before `before_day` the sequence would NOT credit, each with its reason (#4312)."""
+    return classify_sessions(workouts, before_day)[1]
 
 
 # ── the deload and the block lock (#4161) ─────────────────────────────────────────────
@@ -240,8 +387,6 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
     THE one place a week, a deload and a block are computed (#4161); every reader goes through it."""
     seq = _seq()
     per = int(seq["sessions_per_week"])
-    roles = seq["session_roles"]
-    offset = roles.index(seq.get("first_role") or roles[0])
     floor = _floor_days()
     dl = deload_cfg()
     dl_days, dl_every = int(dl["days"]), int(dl["every_nth_week"])
@@ -264,7 +409,7 @@ def ledger(dates: list[str], day: str | None = None) -> list[dict[str, Any]]:
         if dl_start is None and week >= due_week and (not_before is None or d >= not_before):
             dl_start, dl_week = d, week
         deload = dl_start is not None and _days(dl_start, d) < dl_days
-        role = roles[(offset + i) % len(roles)]
+        role = _role_at(i)
         label = program_structure._ROLE_LABEL[role].lower()
         if in_week <= per:
             pos_label = f"week {week} · session {in_week} of {per} · {label}"
@@ -359,7 +504,10 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
                 f"(it advances only on a completed loaded session, {ISSUE})"
             ),
         }
-    done = completed_sessions(workouts, day)
+    from training.routine_title import ROUTINE_ARCHETYPE_KEY
+
+    rows = list(workouts)
+    done, refused = classify_sessions(rows, day)
     led = ledger([c["date"] for c in done], day)
     pos = {k: v for k, v in led[-1].items() if k != "date"}
     last = done[-1] if done else None
@@ -369,6 +517,19 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
         **pos,
         "source": "session_sequence",
         "completed_sessions": len(done),
+        # #4312: every loaded log the sequence refused, and the rule it applied
+        "not_credited": [{k: v for k, v in r.items() if k != "start_time"} for r in refused],
+        "credit_rule": {
+            "rule": (
+                "a loaded Hevy log is credited as the next program session only when its routine archetype is a program "
+                f"archetype ({'/'.join(sorted(program_archetypes()))}; an EXACTLY resolved off-program archetype such as flex never "
+                "advances the sequence or takes a role) AND its loaded sets reach an anchor muscle of the role it would take "
+                "(else flagged, not credited)"
+            ),
+            "program_archetypes": sorted(program_archetypes()),
+            "routine_index_consulted": (any(ROUTINE_ARCHETYPE_KEY in w for w in rows) if rows else None),
+            "issue": CREDIT_ISSUE,
+        },
         # #4161: the week counter's basis, flat, so a reader of the served session sees WHY it is this week
         "days_since_last_advance": basis["days_since_last_advance"],
         "advance_blocked_by": basis["advance_blocked_by"],
@@ -409,6 +570,7 @@ def next_session(day: str, workouts: Iterable[dict[str, Any]] | None) -> dict[st
             + " -> ".join(program_structure._ROLE_LABEL[r].lower() for r in _seq()["session_roles"])
             + f", from {program_structure._ROLE_LABEL[_seq()['first_role']].lower()}); the position advances only on a completed "
             f"loaded Hevy session, so a walk or rest day postpones a session and never skips it ({ISSUE}, {PROGRAM_ISSUE}); "
+            f"an off-program complement (Flex) never advances it and never takes a role ({CREDIT_ISSUE}); "
             f"the WEEK advances only when its {pos['sessions_per_week']}-session cycle is complete AND >= {basis['floor_days']} days "
             f"have passed since the previous advance ({WEEK_ISSUE})"
         ),
@@ -442,7 +604,8 @@ def block_boundaries(workouts: Iterable[dict[str, Any]] | None, before_day: str)
 
 # ── the one DDB read (the generator path; MCP reads through its sanctioned helper) ──────
 def load_block_workouts(before_day: str) -> list[dict[str, Any]]:
-    """Every Hevy per-workout row in [block start, `before_day`) — raises on a failed read.
+    """Every Hevy per-workout row in [block start, `before_day`), each annotated with its routine
+    archetype (`routine_title.annotate_with_routine_index`, #4312) — raises on a failed read.
 
     Same key shape `exercise_history.load_history_indexes` reads (per-workout rows only,
     `source_workout_id` present); the phase filter off (ADR-058: training continuity), and
@@ -479,4 +642,8 @@ def load_block_workouts(before_day: str) -> list[dict[str, Any]]:
         last_key = resp.get("LastEvaluatedKey")
         if not last_key:
             break
-    return rows
+    from training.routine_title import annotate_with_routine_index
+
+    # #4312: one routine-index read, carried on the rows, so the credit rule can tell a Flex
+    # complement from a program session; a failed index read raises like a failed Hevy read.
+    return annotate_with_routine_index(rows, start) or []

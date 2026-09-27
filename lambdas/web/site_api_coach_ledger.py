@@ -142,6 +142,19 @@ def handle_coach_docket(event, *, _g):
     _docket_rows = _g["_docket_rows"]
     open_entries, resolved = [], []
     withheld = 0
+    # #4217: a coach whose domain instrument is DARK (the same liveness
+    # /api/source_freshness serves — health.instrument_presence) keeps its SEAT on an
+    # open item (coach_a/coach_b, sides, stakes stay: the item is history) but its CLAIM
+    # is not served — a stake "based on CGM data" from a coach with no CGM is not a
+    # position a reader can weigh. The entry names why under `absent`. Resolved history
+    # is untouched. Fail-open with a logged warning; the renderer keeps its own guard.
+    try:
+        from health import instrument_presence as _presence
+
+        absent = _presence.absent_coaches(_g["table"])
+    except Exception as _pe:
+        logger.warning(f"[coach_docket] instrument presence check failed (fail-open): {_pe}")
+        absent = {}
     try:
         items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
             "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
@@ -170,6 +183,13 @@ def handle_coach_docket(event, *, _g):
                 "stakes": it.get("stakes") or {},
             }
             if sk.startswith("OPEN#"):
+                _dark = {c: absent[c] for c in (entry["coach_a"], entry["coach_b"]) if c in absent}
+                if _dark:
+                    entry["claims"] = {c: t for c, t in dict(claims).items() if c not in _dark}
+                    entry["absent"] = {
+                        c: {"reason": st.get("reason"), "instrument": {"source": st.get("source"), "datatype": st.get("datatype")}}
+                        for c, st in _dark.items()
+                    }
                 open_entries.append(entry)
             elif sk.startswith("RESOLVED#"):
                 verdict = it.get("verdict") or {}

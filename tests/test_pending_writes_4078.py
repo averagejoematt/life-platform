@@ -64,6 +64,9 @@ class WireTable:
         if ConditionExpression == "attribute_not_exists(sk)":
             if existing is not None:
                 raise ConditionalCheckFailedException("attribute_not_exists(sk)")
+        elif ConditionExpression == "attribute_exists(sk)":  # #4171: write_platform_memory's replace_key branch
+            if existing is None:
+                raise ConditionalCheckFailedException("attribute_exists(sk)")
         elif ConditionExpression == "#st = :expected":
             assert ExpressionAttributeNames == {"#st": "status"}
             if existing is None or existing.get("status") != ExpressionAttributeValues[":expected"]:
@@ -77,11 +80,18 @@ class WireTable:
         item = self.store.get((Key["pk"], Key["sk"]))
         return {"Item": dict(item)} if item else {}
 
-    def query(self, KeyConditionExpression, ExpressionAttributeValues, ExclusiveStartKey=None):
-        assert KeyConditionExpression == "pk = :pk AND begins_with(sk, :pfx)"
-        pk, pfx = ExpressionAttributeValues[":pk"], ExpressionAttributeValues[":pfx"]
-        rows = sorted((dict(v) for (p, s), v in self.store.items() if p == pk and s.startswith(pfx)), key=lambda r: r["sk"])
-        return {"Items": rows}
+    def query(self, KeyConditionExpression, ExpressionAttributeValues, ExclusiveStartKey=None, **kwargs):
+        eav = ExpressionAttributeValues
+        pk = eav[":pk"]
+        if KeyConditionExpression == "pk = :pk AND begins_with(sk, :pfx)":
+            rows = [dict(v) for (p, s), v in self.store.items() if p == pk and s.startswith(eav[":pfx"])]
+        elif KeyConditionExpression == "pk = :pk AND sk BETWEEN :s AND :e":  # #4171: read_platform_memory's read-back
+            rows = [dict(v) for (p, s), v in self.store.items() if p == pk and eav[":s"] <= s <= eav[":e"]]
+        else:
+            raise AssertionError(f"unexpected key condition {KeyConditionExpression!r}")
+        rows.sort(key=lambda r: r["sk"], reverse=not kwargs.get("ScanIndexForward", True))
+        limit = kwargs.get("Limit")
+        return {"Items": rows[:limit] if limit else rows}
 
     def rows(self, pk):
         return [v for (p, _s), v in self.store.items() if p == pk]
@@ -292,3 +302,89 @@ def test_taxonomy_and_tier_rulings():
 
     assert ptx.classify(pw.PK, pw.sk_for("20260923T000000Z-deadbeef")) == ptx.SYSTEM_STATE
     assert ft.SOURCE_TIERS["pending_writes"] == ft.TIER_OWNER_ONLY
+
+
+# ── #4171 — the approve path is ADDITIVE: the 2026-09-25 wire, replayed ─────────────────
+#
+# Live: the injury note was written straight through write_platform_memory at 02:15:00Z
+# (2026-09-26 UTC = the 09-25 Pacific evening), the machines note was ENQUEUED at 02:15:48Z
+# (pending_id 20260926T021548Z-6ef85360) and APPROVED at 02:16:35Z. The approval performed
+# write_platform_memory with the stored args and its put overwrote MEMORY#training#2026-09-25.
+# Here the same three calls run against one wire table, and both notes are read back from
+# the training partition through the same tool stage 1 reads.
+
+from datetime import datetime, timezone  # noqa: E402
+
+import mcp.tools_memory as tm  # noqa: E402
+
+_T_INJURY = datetime(2026, 9, 26, 2, 15, 0, tzinfo=timezone.utc)
+_T_APPROVE = datetime(2026, 9, 26, 2, 16, 35, tzinfo=timezone.utc)
+_INJURY = "No current injuries or ailments (as of 2026-09-25)"
+_MACHINES = "Seated leg curl and calf press are my machines, not lying curl / standing calf raise."
+_QUEUED_0925 = {
+    "action": "enqueue",
+    "target_tool": "write_platform_memory",
+    "target_args": {"category": "training", "content": {"summary": _MACHINES}},
+    "summary": "Training memory: seated leg curl + calf press are my machines, not lying curl / standing calf raise",
+    "context": "Open check-in 2026-09-25, after plan_next_session stage 1 for 2026-09-26 (lower-volume prescribes leg_curl + calf_raise_machine). Owner asked to queue, not write.",
+}
+
+
+class _Clock:
+    def __init__(self, *instants):
+        self._instants = list(instants)
+
+    def now(self, tz=None):
+        cur = self._instants.pop(0) if len(self._instants) > 1 else self._instants[0]
+        return cur if tz is None else cur.astimezone(tz)
+
+
+@pytest.fixture
+def memory_wire(wire, monkeypatch):
+    monkeypatch.setattr(tm, "_table_ref", wire)
+    monkeypatch.setattr(tm, "pacific_now", lambda: datetime(2026, 9, 25, 19, 15, 0))  # 02:15Z = 19:15 PT on 09-25
+    monkeypatch.setattr(tm, "datetime", _Clock(_T_INJURY, _T_APPROVE))
+    return wire
+
+
+def _training_rows(t):
+    return sorted((r for r in t.rows(tm._memory_pk()) if r["sk"].startswith("MEMORY#training#")), key=lambda r: r["stored_at"])
+
+
+def test_issue_4171_approving_the_queued_note_does_not_erase_the_note_written_60s_earlier(memory_wire):
+    first = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    assert first["status"] == "stored"
+
+    queued = tpw.tool_manage_pending_writes(_QUEUED_0925)
+    assert queued.get("queued") is True, queued
+    assert [r["summary"] for r in _training_rows(memory_wire)] == [_INJURY], "enqueue performs nothing"
+
+    res = tpw.tool_manage_pending_writes({"action": "approve", "pending_id": queued["pending_id"]})
+    assert res.get("approved") is True, res
+    assert res["target_result"]["status"] == "stored"
+    assert res["target_result"]["sk"] != first["sk"], "the approved note landed on its OWN key"
+    assert res["target_result"]["sk"].startswith("MEMORY#training#2026-09-25#")
+
+    rows = _training_rows(memory_wire)
+    assert [r["summary"] for r in rows] == [_INJURY, _MACHINES], "the injury note survived the approval"
+    assert [r["stored_at"] for r in rows] == [_T_INJURY.isoformat(), _T_APPROVE.isoformat()]
+
+    # The read stage 1 makes (`plan_next_session` -> tool_read_platform_memory(category='training')) serves both.
+    read = tm.tool_read_platform_memory({"category": "training", "days": 730, "limit": 20})
+    assert read["count"] == 2 and [r["summary"] for r in read["records"]] == [_MACHINES, _INJURY]
+    assert ("write_platform_memory", "success") in memory_wire.audited
+
+
+def test_issue_4171_a_queued_item_still_carrying_overwrite_true_is_refused_visibly_at_approve(memory_wire):
+    """An item queued before #4171 with the retired flag: the approval is refused, the row
+    stays pending with the refusal attached, and the earlier note is untouched."""
+    tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    stale = dict(_QUEUED_0925, target_args={**_QUEUED_0925["target_args"], "overwrite": True})
+    queued = tpw.tool_manage_pending_writes(stale)
+    assert queued.get("queued") is True, queued
+
+    res = tpw.tool_manage_pending_writes({"action": "approve", "pending_id": queued["pending_id"]})
+    assert "error" in res and "replace_key" in res["error"], res
+    row = memory_wire.get_item(Key={"pk": pw.PK, "sk": pw.sk_for(queued["pending_id"])})["Item"]
+    assert row["status"] == pw.STATUS_PENDING and "replace_key" in row["last_error"]
+    assert [r["summary"] for r in _training_rows(memory_wire)] == [_INJURY]

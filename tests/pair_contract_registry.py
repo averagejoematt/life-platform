@@ -21,6 +21,8 @@ Seeded 2026-08-24 with six pairs spanning four wire kinds:
 
 import json
 import os
+import shutil
+import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 
@@ -953,6 +955,105 @@ def _agree_coach_record_rows(produced, consumed):
     assert consumed["through"] == max(rows[0]["outcome_date"], first_docket_day), consumed
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #4217 — the absent coach: /api/source_freshness -> the engine's absence gate AND
+# the v7 renderer's darkCoaches rule.
+#
+# The engine (health.instrument_presence, run by the analyzer, the stance writer,
+# docket admission and the coach serve surfaces) and the renderer
+# (site/assets/js/v7_coaches.js::darkCoaches, defence in depth) both decide "this
+# coach's sensor is dark" from the SAME wire: the freshness board's per-source
+# `status` and per-datatype `dark`. The producer here is the REAL board handler over
+# a fake table seeded with the live 2026-09-26 sentinel (cgm dark since 2026-08-27);
+# the consumer is the REAL shipped JS, run under node. `agree` holds the renderer's
+# dark set equal to the engine's absent set over the same table, and every coach the
+# engine maps to an instrument to the renderer's COACH_SOURCE row for it (the JS may
+# carry extra rows for coaches the registry gives no instrument — those are reported
+# in the PR, not asserted, until the JS reads `/api/coaches.instrument`).
+# ══════════════════════════════════════════════════════════════════════════════
+
+_NODE = shutil.which("node")
+_V7_COACHES_JS = os.path.join(_REPO, "site", "assets", "js", "v7_coaches.js")
+
+
+def _dark_coaches_js_source() -> str:
+    """The shipped `COACH_SOURCE` table + `darkCoaches()` extracted verbatim from
+    v7_coaches.js (the module also imports DOM helpers, so the two exports are lifted
+    rather than the module imported). `export` is stripped so node -e can run it."""
+    src = open(_V7_COACHES_JS, encoding="utf-8").read()
+    start = src.index("export const COACH_SOURCE")
+    fn = src.index("export function darkCoaches")
+    end = src.index("\n}\n", fn) + 3
+    return src[start:end].replace("export ", "")
+
+
+def _absent_coach_table():
+    from common.pacific_time import pacific_today
+    from fakes import FakeDdbTable
+    from instrument_presence_fixture import dispatching_query_hook, fresh_instrument_rows, sentinel_item
+
+    today = pacific_today()  # the board reads the wall clock; a PT-today DATE# row is fresh under every instrument's window
+    return FakeDdbTable(rows=[sentinel_item(cgm_dark=True), *fresh_instrument_rows(today=today)], query_hook=dispatching_query_hook)
+
+
+def _produce_absent_coach():
+    from health import instrument_presence
+    from ingestion.source_registry import coach_instruments
+    from web import site_api_data as D, site_api_freshness as F
+
+    table = _absent_coach_table()
+    g = dict(vars(D))
+    g["table"] = table
+    resp = F.source_freshness(_g=g)  # the REAL /api/source_freshness handler
+    assert resp["statusCode"] == 200, resp
+    return {
+        "freshness": json.loads(resp["body"]),
+        # the engine's own verdict over the SAME table — what the analyzer/stance/docket gates read
+        "engine_absent": sorted(instrument_presence.absent_coaches(table)),
+        "engine_instruments": {
+            cid: {"source": r["source"], "datatype": r["datatype"], "behavioral": r["behavioral"]} for cid, r in coach_instruments().items()
+        },
+    }
+
+
+def _consume_absent_coach(payload):
+    if _NODE is None:
+        raise RuntimeError("node is required to run the shipped darkCoaches() — the renderer half of this contract")
+    harness = (
+        _dark_coaches_js_source()
+        + "\nconsole.log(JSON.stringify({map: COACH_SOURCE, dark: [...darkCoaches(JSON.parse(process.argv[1]))].sort()}));\n"
+    )
+    out = subprocess.run([_NODE, "-e", harness, json.dumps(payload["freshness"])], capture_output=True, text=True, timeout=20)
+    if out.returncode != 0:
+        raise RuntimeError(f"darkCoaches() failed under node: {out.stderr}")
+    return json.loads(out.stdout.strip())
+
+
+def _agree_absent_coach(produced, consumed):
+    assert consumed["dark"] == produced["engine_absent"], "the renderer and the engine disagree about which coaches are absent"
+    assert "glucose_coach" in consumed["dark"], "the live 2026-09-26 shape — a CGM dark since 08-27 — must read as absent"
+    # The rows that CARRY the absence rule — a sensor that can go dark — must be the same
+    # row on both sides. A behavioral instrument (the lifting log, the food log, the blood
+    # panel) can only ever be behavioral-stale, so neither half can dark its coach; its row
+    # is served on /api/coaches.instrument for the renderer to adopt, not asserted here
+    # (the live differences are named in PR #4217's body, ENGINE wins).
+    for cid, inst in produced["engine_instruments"].items():
+        if inst["behavioral"]:
+            continue
+        js = consumed["map"].get(cid)
+        assert js is not None, f"{cid}: the engine names an instrument the renderer's COACH_SOURCE lacks"
+        assert (js.get("source"), js.get("datatype")) == (
+            inst["source"],
+            inst["datatype"],
+        ), f"{cid}: instrument rows differ (engine {inst}, renderer {js})"
+
+
+def _board_index(source_id):
+    from ingestion.source_registry import public_board_sources
+
+    return list(public_board_sources()).index(source_id)
+
+
 register(
     PairContract(
         name="coach PREDICTION# resolutions -> the one record (K of N through <day>)",
@@ -988,6 +1089,60 @@ register(
 )
 
 
+register(
+    PairContract(
+        name="source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
+        producer="web.site_api_freshness::source_freshness",
+        # The consumer side is named as the ENGINE's gate (a lambdas/ module, as the seam
+        # sweep requires); `consume` runs the RENDERER's half — the shipped darkCoaches()
+        # from site/assets/js/v7_coaches.js under node — and `agree` holds it equal to that
+        # engine gate over the same table. See the note.
+        consumer="health.instrument_presence::absent_coaches",
+        partition=None,  # the sentinel + DATE# liveness reads span several USER#…#SOURCE# partitions; the wire is the board payload
+        produce=_produce_absent_coach,
+        consume=_consume_absent_coach,
+        agree=_agree_absent_coach,
+        mutations=(
+            Mutation(
+                ("freshness", "sources", _board_index("apple_health"), "datatypes", 0, "dark"),
+                "retype",
+                to=False,
+                why="the checker's verdict on the CGM — the mutation control: not dark => the glucose coach is quoted again",
+            ),
+            Mutation(
+                ("freshness", "sources", _board_index("apple_health"), "datatypes", 0, "dark"),
+                "drop",
+                why="no verdict is not a dark sensor",
+            ),
+            Mutation(
+                ("freshness", "sources", _board_index("apple_health"), "datatypes", 0, "key"),
+                "rename",
+                to="datatype",
+                why="the row is found by its datatype key",
+            ),
+            Mutation(
+                ("freshness", "sources", _board_index("apple_health"), "datatypes"),
+                "drop",
+                why="the per-datatype block the glucose rule reads",
+            ),
+            Mutation(
+                ("freshness", "sources", _board_index("whoop"), "status"),
+                "retype",
+                to="stale",
+                why="the source-level rule: a stale strap darks the sleep coach",
+            ),
+        ),
+        note=(
+            "E6 / #4217 / epic #4182: a coach whose domain instrument is dark is absent — no read, no stance, no docket seat, "
+            "and the renderer names it without quoting it. Both halves stand on /api/source_freshness: the consumer named here "
+            "is the engine's gate (health.instrument_presence.absent_coaches); `consume` drives the renderer's shipped "
+            "darkCoaches() from site/assets/js/v7_coaches.js under node and `agree` holds the two equal. The engine's map is "
+            "source_registry.coach_instruments() (the `instrument_for` facets), served on /api/coaches as `instrument`."
+        ),
+    )
+)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # THE FLOOR — pairs this platform KNOWS must agree.
 #
@@ -1015,11 +1170,13 @@ KNOWN_MUST_AGREE_PAIRS = (
     "coach PREDICTION# graded row -> ledger line (latest_checked)",
     # #4220 / #4182 — one record per coach, four endpoints.
     "coach PREDICTION# resolutions -> the one record (K of N through <day>)",
+    # E6 / #4217 — the absent coach: the engine's gate and the renderer's guard read one wire.
+    "source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
 )
 
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 10
+ENROLLED_FLOOR = 11  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record)
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]

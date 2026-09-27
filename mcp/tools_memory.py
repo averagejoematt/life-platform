@@ -5,7 +5,19 @@ The compounding intelligence substrate. Stores structured key-value memories
 computed by the platform: failure patterns, episodic "what worked" records,
 coaching calibration, weekly plate history, and future IC features.
 
-DDB key pattern: pk=USER#matthew#SOURCE#platform_memory, sk=MEMORY#<category>#<date>
+DDB key pattern: pk=USER#matthew#SOURCE#platform_memory,
+                 sk=MEMORY#<category>#<date>#<content-hash10>   (#4171 — one row PER NOTE)
+                 sk=MEMORY#<category>#<date>                    (legacy — one row per category-day)
+
+#4171 (2026-09-26, P2 data loss): the key used to be one row per category per day and the
+default was to overwrite, so approving a queued training note at 02:16:35Z silently erased
+the injury note written on the same key 60 s earlier. Every write is now ADDITIVE — the
+sort key ends in a content hash, so a second same-day note is a second row and a replayed
+identical write converges on the first (mcp/idempotency.py: CONTENT_KEY). The ONLY way to
+overwrite is `replace_key=<exact sk>`, and both branches are CONDITIONAL puts
+(attribute_not_exists / attribute_exists on the row) so a race cannot clobber either way.
+Every reader ranges or prefixes on `MEMORY#<category>#<date…>`, so legacy 3-segment rows
+and 4-segment rows are served together, newest first.
 
 Tools:
   136. write_platform_memory  — store a memory record
@@ -21,6 +33,8 @@ so the coach-prompt consumption seam (platform_memory.platform_memory_block)
 can inject conversation-derived memories without passing them off as data.
 """
 
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
@@ -33,9 +47,11 @@ from mcp.layer_status import DERIVED_LAYERS, LAYER_DEGRADED, LAYER_OK, counted, 
 try:
     # Shared, bundled module (#781) — staged at zip root in the Lambda.
     from ai import platform_memory as _pm
+    from common.numeric import floats_to_decimal as _floats_to_decimal
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import platform_memory as _pm
+        from lambdas.common.numeric import floats_to_decimal as _floats_to_decimal
 
 
 def _get_table():
@@ -71,7 +87,44 @@ def _channels_of(category):
 
 
 def _sk(category, date_str):
+    """The category-day PREFIX (and the legacy one-row-per-day key). Readers range on it;
+    #4171 writers append a content hash (`_note_sk`) so a same-day note never shares a key."""
     return f"MEMORY#{category}#{date_str}"
+
+
+# #4171: the per-note suffix. Ten hex chars of sha256 over the canonical JSON of what the
+# writer supplied (content + the validated privacy_tier/domains) — the same canonical form
+# as `mcp.audit.args_hash`, and the same shape as `mark_journal_quote`'s
+# QUOTE#{date}#{sha256(norm(quote))[:10]}, the in-repo CONTENT_KEY precedent.
+_NOTE_HASH_LEN = 10
+
+
+def _note_hash(content: dict, privacy_tier, domains) -> str:
+    payload = {"content": content, "privacy_tier": privacy_tier, "domains": domains}
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:_NOTE_HASH_LEN]
+
+
+def _note_sk(category, date_str, content, privacy_tier, domains) -> str:
+    return f"{_sk(category, date_str)}#{_note_hash(content, privacy_tier, domains)}"
+
+
+def _sk_parts(sk: str) -> tuple[str | None, str | None]:
+    """(category, date) named by a MEMORY# sort key — 3-segment legacy or 4-segment note."""
+    parts = str(sk or "").split("#")
+    if len(parts) < 3 or parts[0] != "MEMORY":
+        return None, None
+    return parts[1], parts[2]
+
+
+def _is_conditional_failure(exc: Exception) -> bool:
+    return "ConditionalCheckFailed" in type(exc).__name__ or "ConditionalCheckFailed" in str(exc)
+
+
+def _same_category_key(category: str, sk: str) -> bool:
+    """True when `sk` names `category` (aliases included — legacy rows may carry the alias spelling)."""
+    named, _date = _sk_parts(sk)
+    return named is not None and _pm.canonical_category(named) == category
 
 
 # ==============================================================================
@@ -81,7 +134,7 @@ def _sk(category, date_str):
 
 def tool_write_platform_memory(args: dict) -> dict:
     """
-    Store a structured memory record in the platform_memory partition.
+    Store a structured memory record in the platform_memory partition — ADDITIVELY (#4171).
 
     Args (via args dict):
         category: Memory category — must be in the sanctioned taxonomy
@@ -91,25 +144,33 @@ def tool_write_platform_memory(args: dict) -> dict:
                  Put the human-readable core in a 'summary' or 'text' field —
                  that's what the coach-prompt block renders.
         date: Date key for the record (YYYY-MM-DD). Defaults to today.
-        overwrite: If True (default), overwrites existing record for this category+date.
+        replace_key: The EXACT sort key (as `read_platform_memory` returns it in `sk`) of the
+                     ONE record to rewrite. This is the only path that overwrites anything, and
+                     it is a conditional put (attribute_exists) — replacing a key that is not
+                     there is refused, never a silent insert. Without it every write is a new
+                     row keyed MEMORY#<category>#<date>#<content-hash>; an identical replay
+                     converges on the existing row (status "unchanged").
         privacy_tier: Optional per-record override ('public_ok' | 'coach_context'
                       | 'private') — may only TIGHTEN the category default.
         domains: Optional list of bare coach ids this memory is relevant to
                  (e.g. ["nutrition", "training"]); default = the category rule.
 
+    `overwrite` was RETIRED by #4171 — its default (True) is what erased the 2026-09-25
+    injury note. `overwrite=true` is refused with a pointer to `replace_key`;
+    `overwrite=false` (the old additive form) is accepted and ignored.
+
     Returns:
-        {"status": "stored", "sk": "...", "category": "...", "date": "..."}
+        {"status": "stored" | "replaced" | "unchanged", "sk": "...", "category": "...", "date": "..."}
     """
     raw_category = args.get("category", "")
     content = args.get("content", {})
     date = args.get("date")
-    overwrite = args.get("overwrite", True)
+    replace_key = args.get("replace_key")
     privacy_tier = args.get("privacy_tier")
     domains = args.get("domains")
 
     table = _get_table()
     today = pacific_now().date().isoformat()
-    date_str = date or today
 
     if not raw_category:
         return {"error": "category is required"}
@@ -123,6 +184,15 @@ def tool_write_platform_memory(args: dict) -> dict:
         }
     if not isinstance(content, dict):
         return {"error": "content must be a dict"}
+    if args.get("overwrite") is True:
+        return {
+            "error": (
+                "`overwrite` was retired by #4171 — every write is additive, so nothing here overwrites by default. "
+                "To rewrite ONE existing record pass replace_key=<its exact sk from read_platform_memory>; "
+                "to add a note alongside the existing ones, drop the overwrite argument."
+            ),
+            "hint": "read_platform_memory(category=…) lists each record's sk — that is the handle replace_key takes",
+        }
     # PR #1581 review (minor): content-supplied domains/privacy_tier go through
     # the SAME validation as the top-level args (args win) — a domains list
     # smuggled inside `content` can no longer silently exclude the record from
@@ -141,6 +211,27 @@ def tool_write_platform_memory(args: dict) -> dict:
             return {"error": f"unknown coach domain in {domains} — valid: {sorted(_pm.COACH_DOMAINS)}"}
         domains = normalized
 
+    # #4171: the key. A named record is the ONLY thing a write may replace, and the name
+    # must be one of this category's own rows — a replace_key naming another category (or
+    # not a MEMORY# key at all) is a caller error, never a cross-category overwrite.
+    if replace_key is not None:
+        if not isinstance(replace_key, str) or not replace_key.strip():
+            return {"error": "replace_key must be the exact sk string of the record to rewrite"}
+        replace_key = replace_key.strip()
+        if not _same_category_key(category, replace_key):
+            return {
+                "error": f"replace_key {replace_key!r} does not name a '{category}' record — "
+                "it must be a sk returned by read_platform_memory for this category",
+            }
+        _cat, key_date = _sk_parts(replace_key)
+        if date and date != key_date:
+            return {"error": f"date {date!r} disagrees with the date inside replace_key ({key_date!r}) — drop `date` to keep the row's day"}
+        date_str = key_date or today
+        sk = replace_key
+    else:
+        date_str = date or today
+        sk = _note_sk(category, date_str, content, privacy_tier, domains)
+
     # Honest provenance (#1482): this tool is the CHAT surface — a write through
     # it is conversation-channel when the category sanctions conversation,
     # otherwise it inherits the category's (computed) channel.
@@ -148,7 +239,6 @@ def tool_write_platform_memory(args: dict) -> dict:
     channel = _pm.CHANNEL_CONVERSATION if _pm.CHANNEL_CONVERSATION in spec["channels"] else spec["channels"][0]
 
     pk = _memory_pk()
-    sk = _sk(category, date_str)
 
     item = {
         "pk": pk,
@@ -172,27 +262,41 @@ def tool_write_platform_memory(args: dict) -> dict:
         item["privacy_tier"] = privacy_tier
     if domains is not None:
         item["domains"] = domains
+    if replace_key is not None:
+        item["replaced_at"] = item["stored_at"]
 
-    # Convert any float values to Decimal for DynamoDB compatibility
-    from decimal import Decimal as _Dec
+    # Decimal before DDB — the whole item, nested values included (common.numeric).
+    item = _floats_to_decimal(item)
 
-    for k, v in item.items():
-        if isinstance(v, float):
-            item[k] = _Dec(str(v))
-
-    if overwrite:
-        table.put_item(Item=item)
-    else:
-        # Conditional write — don't overwrite if exists
+    # #4171: BOTH branches are conditional. There is no unconditional put in this tool —
+    # tests/test_platform_memory_block.py walks this function's AST to keep it that way.
+    if replace_key is not None:
         try:
-            table.put_item(
-                Item=item,
-                ConditionExpression="attribute_not_exists(pk)",
-            )
-        except Exception as e:
-            if "ConditionalCheckFailed" in str(e):
-                return {"status": "skipped", "reason": "record already exists", "sk": sk}
+            table.put_item(Item=item, ConditionExpression="attribute_exists(sk)")
+        except Exception as e:  # noqa: BLE001 — only the conditional failure is ours to interpret
+            if _is_conditional_failure(e):
+                return {
+                    "error": f"nothing to replace at {sk!r} — that key is not in the store (deleted, or never written). "
+                    "Nothing was written. Drop replace_key to add the note as a new record.",
+                    "sk": sk,
+                }
             raise
+        return {"status": "replaced", "sk": sk, "replaced_key": sk, "category": category, "date": date_str, "channel": channel}
+
+    try:
+        table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as e:  # noqa: BLE001
+        if _is_conditional_failure(e):
+            # A replay: the identical note already sits on this key. Nothing to add, nothing lost.
+            return {
+                "status": "unchanged",
+                "reason": "an identical record already exists on this key — a replayed write converges (#3114). "
+                "A distinct note needs different content; a rewrite of this one needs replace_key.",
+                "sk": sk,
+                "category": category,
+                "date": date_str,
+            }
+        raise
 
     return {"status": "stored", "sk": sk, "category": category, "date": date_str, "channel": channel}
 
@@ -266,12 +370,16 @@ def tool_read_platform_memory(args: dict) -> dict:
             **layer_fields(status, reason, producer=DERIVED_LAYERS["platform_memory"]["producer"], channels=_channels_of(category)),
         }
     records = [_d2f(i) for i in resp.get("Items", [])]
-    # Remove internal DDB keys from response for readability
+    # #4171: the sk STAYS on each record — it is the handle `replace_key` (write) and `key`
+    # (delete) take, and a caller cannot name a row it was never shown. Only the pk is
+    # dropped (one constant for the whole partition, no information). Within one day the
+    # key orders notes by content hash, so the page is re-sorted newest-first by the
+    # instant each note was stored; the date stays the primary order.
     clean = []
     for r in records:
         r.pop("pk", None)
-        r.pop("sk", None)
         clean.append(r)
+    clean.sort(key=lambda r: (str(r.get("date") or ""), str(r.get("stored_at") or ""), str(r.get("sk") or "")), reverse=True)
     # A successful read of a sanctioned category with nothing in the window is a measured
     # zero (nobody wrote); the health block says which channels COULD have written it.
     return {
@@ -340,15 +448,16 @@ def tool_list_memory_categories(args: dict) -> dict:
                 break
 
         # Group by category, keeping only records inside the requested window. The date
-        # falls back to the sk's own last segment: it is the authoritative copy (the key
-        # is built from it), so a row missing the duplicate `date` attribute is dated
-        # correctly rather than silently landing in every window as "".
+        # falls back to the sk's own DATE segment (index 2 — #4171 keys carry a content
+        # hash after it, so "last segment" is no longer the date): it is the authoritative
+        # copy (the key is built from it), so a row missing the duplicate `date` attribute
+        # is dated correctly rather than silently landing in every window as "".
         from collections import defaultdict
 
         cats = defaultdict(list)
         in_window = 0
         for item in items:
-            date = item.get("date") or (item.get("sk", "").rsplit("#", 1)[-1] if "#" in item.get("sk", "") else "")
+            date = item.get("date") or (_sk_parts(item.get("sk", ""))[1] or "")
             if not date or date < start:
                 continue
             in_window += 1
@@ -400,21 +509,40 @@ def tool_list_memory_categories(args: dict) -> dict:
 
 def tool_delete_platform_memory(args: dict) -> dict:
     """
-    Delete a specific memory record by category + date.
+    Delete a specific memory record by category + date (the legacy one-row-per-day key),
+    or by its exact sort key.
 
     Args (via args dict):
         category: Memory category.
-        date: Date of the record to delete (YYYY-MM-DD).
+        date: Date of the record to delete (YYYY-MM-DD) — names the legacy
+              `MEMORY#<category>#<date>` row.
+        key: The exact sk (as `read_platform_memory` returns it) — the only way to name a
+             #4171 per-note row (`MEMORY#<category>#<date>#<hash>`). Must belong to `category`.
 
     Returns:
         {"status": "deleted", "sk": "..."} or {"status": "not_found"}
     """
     category = args.get("category", "")
     date = args.get("date", "")
+    key = args.get("key")
 
     table = _get_table()
     pk = _memory_pk()
-    sk = _sk(category, date)
+    if key is not None:
+        if not isinstance(key, str) or not key.strip():
+            return {"error": "key must be the exact sk string of the record to delete"}
+        key = key.strip()
+        canonical = _pm.canonical_category(category) if category else None
+        if canonical is None or not _same_category_key(canonical, key):
+            return {
+                "error": f"key {key!r} does not name a '{category}' record — pass the sk read_platform_memory returned for this category"
+            }
+        sk = key
+        date = date or (_sk_parts(sk)[1] or "")
+    elif not date:
+        return {"error": "date (the legacy category-day row) or key (an exact sk) is required"}
+    else:
+        sk = _sk(category, date)
 
     try:
         # Check it exists first

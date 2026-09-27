@@ -133,7 +133,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `adaptive_mode` | adaptive_mode_lambda.py | tools_coach_checkin.py, tools_reading.py |
 | `ai_analysis` | ai_expert_analyzer_lambda.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coherence_sentinel_lambda.py, site_api_coach_narrative.py, site_api_coach_stance.py, state_of_matthew_lambda.py |
 | `anomalies` | anomaly_detector_lambda.py | anomaly_detector_lambda.py, daily_brief_lambda.py |
-| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, qa_smoke_lambda.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_health.py, tools_lifestyle.py |
+| `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, qa_smoke_lambda.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_health.py, tools_lifestyle.py |
 | `benchmarks` | — | site_api_training.py |
 | `calibration` | — | state_of_matthew_lambda.py |
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
@@ -248,7 +248,7 @@ producer's output is round-tripped through the real consumer, then a disagreemen
 injected into BOTH sides (`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is
 one registry entry in `tests/pair_contract_registry.py`. **Floor** = named in
 `KNOWN_MUST_AGREE_PAIRS` (only ever grows); **Enrolled** = a live `PairContract` backs it —
-a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 10.
+a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 11.
 See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
 | Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |
@@ -263,6 +263,7 @@ See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 | input_manifest -> character page projection | `common.input_manifest::build_input_manifest` | `web.site_api_character::_public_input_manifest` | `computed_metrics` | 4 | yes | yes |
 | public_stats.json -> fingerprint broadcast projection | `content.site_writer::write_public_stats` | `content.fingerprint_broadcast::project_public` | — | 4 | yes | yes |
 | send_ledger row -> replay guard + status page | `common.send_ledger::record_sent` | `common.send_ledger::already_sent` | — | 3 | yes | yes |
+| source_freshness -> the absent coach (engine gate + v7 darkCoaches) | `web.site_api_freshness::source_freshness` | `health.instrument_presence::absent_coaches` | — | 5 | yes | yes |
 
 ## 5. Alarms + Routing
 
@@ -504,7 +505,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1243 total · 888 resolved · 355 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1244 total · 888 resolved · 356 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

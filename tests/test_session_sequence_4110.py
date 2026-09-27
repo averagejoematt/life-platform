@@ -25,6 +25,14 @@ Lower-heavy session he had already committed for 2026-09-25. These tests hold th
      the generator builds the sequence's session on a day the nominal grid calls a walk;
      plan_next_session through the MCP handler serves it; an unread Hevy record is
      `sequence_unreadable` / week None — never a silent session 1.
+  7. WHAT IS CREDITED (#4312, owner 2026-09-26: "Flex-folder / archetype=flex sessions are
+     off-program complements. They never advance the sequence and never take a session_role").
+     A Flex session between two program sessions leaves `next_session` unchanged; the REAL
+     2026-09-26 rows (Hevy 80a19118, credited lower_volume before the fix) un-credit; each guard
+     — the routine archetype and the role's anchor-muscle content — refuses it on its own and
+     has a mutation control that credits it again; a freestyle log resolved only by date is
+     never un-credited; a same-morning complement is set aside, not merged; a pre-block row is
+     never a complement; the gate, the engine and the served session read the one credit rule.
 """
 
 from __future__ import annotations
@@ -46,6 +54,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
+from common.pacific_time import shift_day_key  # noqa: E402
 from training import owner_redlines, plan_engine, program_structure, routine_generator, session_sequence, training_streaks  # noqa: E402
 
 UH, LH, UV, LV = "upper_heavy", "lower_heavy", "upper_volume", "lower_volume"
@@ -59,11 +68,14 @@ def lift(day: str, title: str = "Foundation - Full Body - 1 - 1", *, start: str 
         "title": title,
         "source_workout_id": wid or "L" + day,
         "start_time": start or f"{day}T14:00:00Z",
+        # #4312: a lower AND an upper anchor movement, so this generic lift matches whichever role it takes
+        # (the content guard refuses a session that reaches none of the role's anchor muscles)
         "exercises": [
             {
                 "name": "Linear Leg Press",
                 "sets": [{"type": "warmup", "weight_kg": 40, "reps": 10}, {"type": "normal", "weight_kg": 90, "reps": 5}],
-            }
+            },
+            {"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "weight_kg": 60, "reps": 5}]},
         ],
     }
 
@@ -406,11 +418,19 @@ def test_plan_next_session_through_the_mcp_handler_serves_the_next_undone_sessio
 
 
 def test_the_mcp_reader_uses_the_sanctioned_hevy_path_from_the_block_start():
+    """#4312: the rows come back carrying their routine archetype — ONE routine-index read at this seam
+    (`routine_title.annotate_with_routine_index`), from `ROUTINE_INDEX_LOOKBACK_DAYS` before the block start."""
+    from training import routine_title
+
     from mcp import tools_plan
 
-    with patch("mcp.tools_strength._read_hevy_all_phases", return_value=([lift("2026-09-24")], ["experiment"])) as rd:
-        assert tools_plan._block_workouts("2026-09-27") == [lift("2026-09-24")]
+    with (
+        patch("mcp.tools_strength._read_hevy_all_phases", return_value=([lift("2026-09-24")], ["experiment"])) as rd,
+        patch.object(routine_title, "_load_routine_index", return_value=[]) as idx,
+    ):
+        assert tools_plan._block_workouts("2026-09-27") == routine_title.annotate_routine_archetypes([lift("2026-09-24")], [])
     rd.assert_called_once_with("2026-09-24", "2026-09-26")
+    idx.assert_called_once_with(shift_day_key("2026-09-24", -routine_title.ROUTINE_INDEX_LOOKBACK_DAYS))
     with patch("mcp.tools_strength._read_hevy_all_phases", side_effect=AssertionError("nothing to read before the block")):
         assert tools_plan._block_workouts("2026-09-24") == []
 
@@ -479,7 +499,198 @@ def test_the_generator_side_read_closes_the_day_before_the_planned_day():
             sks = ["DATE#2026-09-24#WORKOUT#a", "DATE#2026-09-26#WORKOUT#b", "DATE#2026-09-27#WORKOUT#c"]
             return {"Items": [{"sk": k, "source_workout_id": k[-1]} for k in sks if lo <= k <= hi]}
 
-    with patch.object(exercise_history, "_table", return_value=_Table()):
+    with (
+        patch.object(exercise_history, "_table", return_value=_Table()),
+        patch("training.routine_title._load_routine_index", return_value=[]),  # #4312: the index read at this seam
+    ):
         rows = session_sequence.load_block_workouts("2026-09-27")
     assert captured["bounds"] == ("DATE#2026-09-24", "DATE#2026-09-26~")
     assert [r["source_workout_id"] for r in rows] == ["a", "b"], "yesterday's session (09-26) must advance today's plan"
+
+
+# ── 7. #4312: a Flex session never advances the sequence or takes a role ─────
+FIX_4312 = REPO / "tests" / "fixtures" / "session_sequence_4312"
+LOWER_HRID = "4b743f67-df90-4eb9-bd62-9e53ac343435"  # the committed Lower-heavy (Hevy routine)
+UPPER_HRID = "28cab4f5-f663-4597-9433-ca98dec2675a"
+FLEX_HRID = "9764f978-0908-4547-a066-45deeba21749"  # "Foundation - Flex - 1 - 20", routine_index archetype=flex
+FLEX_WID = "80a19118-1eae-4a0a-9d5a-7669427d5f97"
+
+
+def _wire_4312() -> tuple[list[dict], list[dict]]:
+    """The real 2026-09-24..26 Hevy rows (field-projected, read-only 2026-09-26) and the real
+    `routine_index` rows for 09-25/26, filtered and sorted exactly as `_load_routine_index` does."""
+    from training.routine_title import _NON_COUNTING_VARIANTS
+
+    rows = json.loads((FIX_4312 / "hevy_2026-09-24_26.json").read_text())
+    idx = json.loads((FIX_4312 / "routine_index_2026-09-25_26.json").read_text())
+    idx = [r for r in idx if (r.get("variant") or "") not in _NON_COUNTING_VARIANTS]
+    return rows, sorted(idx, key=lambda r: str(r.get("target_date") or ""))
+
+
+INDEX_4312 = _wire_4312()[1]
+
+
+def ann(rows: list[dict]) -> list[dict]:
+    """What the two block-read seams do: carry each row's routine archetype (`annotate_with_routine_index`)."""
+    from training.routine_title import annotate_routine_archetypes
+
+    return annotate_routine_archetypes(rows, INDEX_4312)
+
+
+def flex(day: str, *, wid: str = FLEX_WID, hrid: str = FLEX_HRID, start: str | None = None, exercises: list | None = None) -> dict:
+    """A Flex-folder session in the live shape: loaded carry/core work, started from the Flex routine."""
+    return {
+        "date": day,
+        "sk": f"DATE#{day}#WORKOUT#{wid}",
+        "title": "Foundation - Flex - 1 - 20",
+        "source_workout_id": wid,
+        "hevy_routine_id": hrid,
+        "start_time": start or f"{day}T13:00:00Z",
+        "exercises": exercises
+        or [
+            {"name": "Suitcase Carry", "sets": [{"type": "normal", "weight_kg": 19.96, "distance_m": 40}] * 4},
+            {"name": "Cable Pallof Press", "sets": [{"type": "normal", "weight_kg": 16.78, "reps": 10}] * 3},
+            {"name": "Stretching", "sets": [{"type": "normal", "duration_sec": 900}]},
+        ],
+    }
+
+
+def program(day: str, hrid: str, **kw) -> dict:
+    return {**lift(day, **kw), "hevy_routine_id": hrid}
+
+
+TWO_PROGRAM = [
+    program("2026-09-24", LOWER_HRID, title="Foundation - Lower - 1 - 18"),
+    program("2026-09-25", UPPER_HRID, title="Foundation - Upper - 2 - 19"),
+]
+
+
+def test_a_flex_session_between_two_program_sessions_leaves_next_session_unchanged():
+    with_flex = TWO_PROGRAM + [flex("2026-09-26")]
+    for day in ("2026-09-27", "2026-09-28"):
+        a, b = served(day, ann(TWO_PROGRAM)), served(day, ann(with_flex))
+        key = ("session_role", "week", "session_in_week", "completed_sessions", "position_label")
+        assert tuple(a[k] for k in key) == tuple(b[k] for k in key) == (LV, 1, 3, 2, "week 1 · session 3 of 4 · lower-volume"), day
+    e = served("2026-09-27", ann(with_flex))
+    assert e["advanced_by"]["date"] == "2026-09-25" and e["advanced_by"]["title"] == "Foundation - Upper - 2 - 19"
+    [nc] = e["not_credited"]
+    assert (nc["workout_id"], nc["archetype"], nc["credited"], nc["date"]) == (FLEX_WID, "flex", False, "2026-09-26")
+    assert nc["reason"].startswith("off-program complement: routine archetype 'flex'") and "never takes a role" in nc["reason"]
+    assert e["credit_rule"]["routine_index_consulted"] is True and e["credit_rule"]["program_archetypes"] == ["lower", "upper"]
+    # it takes no role anywhere the ledger is read
+    assert FLEX_WID not in {c["workout_id"] for c in session_sequence.completed_positions(ann(with_flex), "2026-09-27")}
+    assert e["rule"].count("#4312") == 1
+
+
+def test_the_2026_09_26_wire_rows_uncredit_the_flex_session():
+    """The owner's report, on the real rows: before the fix the Flex session was `lower_volume`,
+    sequence_index 2, and 09-27 served upper_heavy. With both guards off it still does (the
+    defect, reproduced); with them on, 09-27 is lower_volume, week 1 · session 3 of 4."""
+    rows, _ = _wire_4312()
+    e = served("2026-09-27", ann(rows))
+    assert (e["session_role"], e["position_label"], e["completed_sessions"]) == (LV, "week 1 · session 3 of 4 · lower-volume", 2)
+    assert (e["advanced_by"]["date"], e["advanced_by"]["title"]) == ("2026-09-25", "Foundation - Upper - 2 - 19")
+    assert [(n["workout_id"], n["archetype"]) for n in e["not_credited"]] == [(FLEX_WID, "flex")]
+    checks = {c["date"]: c["content_check"] for c in session_sequence.completed_positions(ann(rows), "2026-09-27")}
+    assert checks["2026-09-24"]["matched"] is True and {"quadriceps", "hamstrings"} <= set(checks["2026-09-24"]["logged_muscles"])
+    assert checks["2026-09-25"]["matched"] is True and {"chest", "back", "shoulders"} <= set(checks["2026-09-25"]["logged_muscles"])
+    assert session_sequence.program_week("2026-09-27", ann(rows)) == 1
+    # the defect, reproduced: with both guards off the Flex session is credited lower_volume and 09-27 serves upper_heavy
+    with (
+        patch.object(session_sequence, "off_program_archetype", lambda row: None),
+        patch.object(session_sequence, "content_check", lambda logs, role: {"role": role, "matched": None}),
+    ):
+        was = session_sequence.next_session("2026-09-27", ann(rows))
+    assert (was["session_role"], was["completed_sessions"], was["advanced_by"]["workout_id"]) == (UH, 3, FLEX_WID)
+    assert was["advanced_by"]["was"] == "week 1 · session 3 of 4 · lower-volume"
+
+
+def test_mutation_control_the_content_guard_alone_refuses_the_flex_session():
+    """The routine index NOT read: the archetype guard cannot fire, and the content guard refuses the
+    Flex session on its own (0 loaded sets on the role's anchor muscles). Remove the guard and the
+    Flex session credits lower_volume again — the fixture can fail."""
+    rows = TWO_PROGRAM + [flex("2026-09-26")]
+    e = served("2026-09-27", rows)
+    assert e["credit_rule"]["routine_index_consulted"] is False
+    assert (e["session_role"], e["completed_sessions"]) == (LV, 2)
+    [nc] = e["not_credited"]
+    assert nc["would_take"] == LV and nc["reason"].startswith("content does not match lower_volume: 0 of")
+    assert nc["content_check"]["anchor_muscles"] == ["glutes", "hamstrings", "quadriceps"] and nc["content_check"]["logged_muscles"] == [
+        "abs"
+    ]
+    assert "archetype" not in nc
+    with patch.object(session_sequence, "content_check", lambda logs, role: {"role": role, "matched": True}):
+        e = session_sequence.next_session("2026-09-27", rows)
+    assert (e["session_role"], e["completed_sessions"], e["advanced_by"]["workout_id"]) == (
+        UH,
+        3,
+        FLEX_WID,
+    ), "with the guard gone, Flex is credited"
+    assert e["not_credited"] == []
+
+
+def test_mutation_control_the_archetype_guard_alone_refuses_a_flex_routine_whose_content_would_pass():
+    """A session started from the Flex routine but built of goblet squats reaches lower_volume's anchor
+    muscles — only the archetype guard refuses it. Widen the program's archetypes to include flex and it
+    credits — the fixture can fail."""
+    squats = [{"name": "Goblet Squat", "sets": [{"type": "normal", "weight_kg": 24, "reps": 10}] * 3}]
+    rows = ann(TWO_PROGRAM + [flex("2026-09-26", exercises=squats)])
+    e = served("2026-09-27", rows)
+    assert (e["session_role"], e["completed_sessions"]) == (LV, 2)
+    [nc] = e["not_credited"]
+    assert nc["archetype"] == "flex" and nc["reason"].startswith("off-program complement")
+    assert session_sequence.content_check([flex("2026-09-26", exercises=squats)], LV)["matched"] is True
+    with patch.object(session_sequence, "program_archetypes", lambda: {"lower", "upper", "flex"}):
+        e = session_sequence.next_session("2026-09-27", rows)
+    assert (e["session_role"], e["completed_sessions"], e["advanced_by"]["workout_id"]) == (UH, 3, FLEX_WID)
+
+
+def test_a_freestyle_log_resolved_only_by_date_is_never_uncredited():
+    """No `hevy_routine_id`: `resolve_archetype_source` falls back to the nearest pushed routine by date —
+    a guess that may name a Flex draft. A guess never un-credits: the log is credited on its content."""
+    from training.routine_title import routine_archetype
+
+    freestyle = {k: v for k, v in lift("2026-09-26", title="Morning workout").items() if k != "hevy_routine_id"}
+    [row] = ann([freestyle])
+    arch, via = routine_archetype(row)
+    assert via == "nearest_routine_by_date" and arch in {"flex", "lower", "upper"}
+    assert session_sequence.off_program_archetype(row) is None
+    e = served("2026-09-27", ann(TWO_PROGRAM) + [row])
+    assert (e["session_role"], e["completed_sessions"], e["not_credited"]) == (UH, 3, [])
+
+
+def test_a_flex_complement_the_same_morning_as_a_program_session_is_set_aside_not_merged():
+    rows = ann(
+        [program("2026-09-24", LOWER_HRID, start="2026-09-24T12:00:00Z", wid="lower-a"), flex("2026-09-24", start="2026-09-24T13:00:00Z")]
+    )
+    e = served("2026-09-25", rows)
+    assert (e["session_role"], e["completed_sessions"]) == (UV, 1)
+    assert (e["advanced_by"]["workout_id"], e["advanced_by"]["loaded_logs_that_day"]) == ("lower-a", 1)
+    assert [n["workout_id"] for n in e["not_credited"]] == [FLEX_WID]
+
+
+def test_a_pre_block_row_is_never_an_off_program_complement():
+    """v0.4's archetypes do not define the program before the block start (2026-09-24): a `legs` PPL
+    session on 09-22 in `self_added_volume`'s window is not a complement (and the sequence never sees it)."""
+    from training.routine_title import annotate_routine_archetypes
+
+    legs_idx = [{"target_date": "2026-09-22", "archetype": "legs", "hevy_routine_id": "legs-hrid", "variant": "ideal"}]
+    [pre] = annotate_routine_archetypes([program("2026-09-22", "legs-hrid")], legs_idx)
+    [post] = annotate_routine_archetypes([program("2026-09-24", "legs-hrid")], legs_idx)
+    assert session_sequence.off_program_archetype(pre) is None
+    assert session_sequence.off_program_archetype(post) == "legs"
+
+
+def test_the_engine_the_gate_and_the_served_session_read_the_one_credit_rule():
+    from mcp import hevy_prescription_gate
+
+    rows = ann(TWO_PROGRAM + [flex("2026-09-26")])
+    block = plan_engine.constraint_block(date="2026-09-27", block_workouts=rows)
+    assert (block["session"]["session_role"], block["program_week"]) == (LV, 1)
+    assert [n["workout_id"] for n in block["session"]["not_credited"]] == [FLEX_WID]
+    assert hevy_prescription_gate.v03_load_rule("2026-09-27", block_workouts=rows)["week"] == 1
+    assert session_sequence.program_week("2026-09-27", rows) == 1
+    ideal = _generate("2026-09-27", block_workouts=rows)[0]
+    assert ideal.archetype == "lower" and ideal.title.startswith("LOWER-VOLUME — W1")
+    # the role formula is ONE function: the role a candidate WOULD take is the role the ledger gives it
+    assert [session_sequence._role_at(i) for i in range(4)] == [p["session_role"] for p in session_sequence.preview(4)]

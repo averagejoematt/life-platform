@@ -75,11 +75,13 @@ def _num(v: Any) -> float:
         return 0.0
 
 
-def is_loaded_session(workout: dict[str, Any]) -> bool:
-    """True when the session carries LOAD: a non-warm-up set with weight > 0 on an exercise
-    that is not a counted cardio modality (`walking_volume`'s lexicon — one list, so a treadmill
-    block can never be a lift here and a walk there). Accepts both the raw per-workout row
-    (`weight_kg`, `type`) and `normalize_hevy_items` output (`weight_kg`/`weight_lbs`, `set_type`)."""
+def loaded_sets(workout: dict[str, Any]) -> Iterable[tuple[dict[str, Any], dict[str, Any]]]:
+    """(exercise, set) for every set that carries LOAD: a non-warm-up set with weight > 0 on an
+    exercise that is not a counted cardio modality (`walking_volume`'s lexicon — one list, so a
+    treadmill block can never be a lift here and a walk there). THE one definition of a loaded set
+    (#4105); `session_sequence` reads it per exercise for the role content guard (#4312). Accepts
+    both the raw per-workout row (`weight_kg`, `type`) and `normalize_hevy_items` output
+    (`weight_kg`/`weight_lbs`, `set_type`)."""
     for ex in workout.get("exercises") or []:
         name = (ex.get("name") or ex.get("exercise_name") or "").strip()
         if walking_volume._modality_for_hevy(name) is not None:
@@ -88,8 +90,12 @@ def is_loaded_session(workout: dict[str, Any]) -> bool:
             if (s.get("set_type") or s.get("type") or "normal") == "warmup":
                 continue
             if _num(s.get("weight_kg")) > 0 or _num(s.get("weight_lbs")) > 0:
-                return True
-    return False
+                yield ex, s
+
+
+def is_loaded_session(workout: dict[str, Any]) -> bool:
+    """True when the session carries LOAD — any `loaded_sets` (the one definition, #4105)."""
+    return any(True for _ in loaded_sets(workout))
 
 
 def _day(row: dict[str, Any]) -> str:
