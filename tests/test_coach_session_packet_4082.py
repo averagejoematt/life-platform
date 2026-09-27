@@ -447,7 +447,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.2.0"
+    assert out["packet_version"] == "coach-session-packet@1.3.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):

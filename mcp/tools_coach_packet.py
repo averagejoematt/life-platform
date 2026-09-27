@@ -55,7 +55,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.2.0"  # 1.2.0 #4189: morning_note field; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.3.0"  # 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28

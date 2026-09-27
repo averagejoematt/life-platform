@@ -129,7 +129,8 @@ def handle_morning_note_read(event: dict, *, _g) -> dict:
 
     Tier 1: {state: "served", date, sleep_word, body_word, mood_word, felt_recovered, written_at}
     plus `notes` (newest first) when `days` is given; {state: "absent", reason: "no note yet"}
-    when the window holds none; 503 when the read fails (never an empty week).
+    when the window holds none; 503 when the read fails (never an empty week). Edge-cached 900 s
+    (the `/api/routine` posture — a note changes once a morning; #2289's floor is 300).
     """
     PT = _g["PT"]
     _error = _g["_error"]
@@ -152,9 +153,9 @@ def handle_morning_note_read(event: dict, *, _g) -> dict:
     if rows is None:
         return _error(503, "Morning note read unavailable")
     if not rows:
-        return _ok({"state": "absent", "reason": "no note yet", "days_searched": days, "as_of": today_pt}, cache_seconds=60)
+        return _ok({"state": "absent", "reason": "no note yet", "days_searched": days, "as_of": today_pt}, cache_seconds=900)
     latest = _mn.public_view(rows[0])
     payload = {**latest, "days_searched": days, "as_of": today_pt}
     if raw_days is not None:
         payload["notes"] = [_mn.public_view(r) for r in rows]
-    return _ok(payload, cache_seconds=60)
+    return _ok(payload, cache_seconds=900)
