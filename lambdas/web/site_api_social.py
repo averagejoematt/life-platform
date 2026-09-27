@@ -10,6 +10,7 @@ Endpoints:
   /api/nudge              — track in-page nudge clicks
   /api/submit_finding     — reader-submitted experiment findings (S3)
   /api/page_feedback      — the two-question reader door, every page (DynamoDB, #4182)
+  /api/morning_note       — the owner's four words before the number (#4189): POST owner write, GET Tier-1 read
   /api/experiment_library, /api/experiment_vote, /api/experiment_follow,
   /api/experiment_detail, /api/experiment_suggest
   /api/challenge_catalog, /api/challenges, /api/current_challenge,
@@ -84,6 +85,7 @@ from web import (
     site_api_social_experiments as _experiments,
     site_api_social_ladder as _ladder,
     site_api_social_membrane as _membrane,
+    site_api_social_note as _note,
 )
 from web.site_api_common import (
     EXPERIMENT_START,  # #2622 — the live genesis; a challenge from an earlier cycle never rolls forward
@@ -194,6 +196,7 @@ NUDGE_LABELS = {
 }
 FINDING_RATE_LIMIT = 3  # per IP per hour
 PAGE_FEEDBACK_RATE_LIMIT = 5  # per IP per hour — /api/page_feedback (#4182)
+MORNING_NOTE_RATE_LIMIT = 10  # per IP per hour — /api/morning_note (#4189): the owner's door; a token guess costs a slot
 FOLLOW_RATE_LIMIT = 10  # per IP per hour — shared by the experiment and challenge follow doors
 # A run is DONE (not still running) in any of these terminal states. Read by BOTH the
 # library pillar stats and the experiment-detail page so the two can't disagree (#2221).
@@ -407,6 +410,16 @@ def _handle_submit_finding(event: dict) -> dict:
 def _handle_page_feedback(event: dict) -> dict:
     """POST /api/page_feedback (#4182) — thin entrypoint; logic in the engage split module."""
     return _engage._handle_page_feedback(event, _g=globals())
+
+
+def _handle_morning_note(event: dict) -> dict:
+    """POST /api/morning_note (#4189) — thin entrypoint; logic in the note split module."""
+    return _note._handle_morning_note(event, _g=globals())
+
+
+def handle_morning_note_read(event: dict) -> dict:
+    """GET /api/morning_note (#4189) — thin entrypoint; logic in the note split module."""
+    return _note.handle_morning_note_read(event, _g=globals())
 
 
 def handle_experiment_library() -> dict:

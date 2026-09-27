@@ -162,6 +162,7 @@ DOOR_FIELDS = [
     ("/api/board_question", "question"),
     ("/api/predict_week", "week_id"),
     ("/api/page_feedback", "page"),  # #4182 — `page` is validated raw (isinstance + path regex)
+    ("/api/morning_note", "sleep_word"),  # #4189 — the four words are validated raw (isinstance + letters regex) before the owner token
 ]
 
 NON_STRING_VALUES = [999, [1, 2], {"nested": "object"}, True, 3.5]
