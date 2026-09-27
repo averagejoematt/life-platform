@@ -138,6 +138,24 @@ def counts_this_cycle(row: dict, genesis: str | None) -> bool:
     return True
 
 
+def decided_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = False) -> list[dict]:
+    """The graded rows a record counts — one per resolution, in this cycle unless ``career``.
+
+    This IS the record's row-set: ``record_from_rows`` tallies it, and ``/api/wrong``'s
+    obituary cards are drawn from its refuted members (#4220 — the obituaries were a
+    second derivation over ``LEARNING#`` that printed 23 explorer refutations beside a
+    record of 3, twenty of them one pre-genesis docket re-recorded daily).
+    """
+    out: list[dict] = []
+    for row in resolved_once(rows):
+        if graded_status(row) is None:
+            continue
+        if not career and not counts_this_cycle(row, genesis):
+            continue
+        out.append(row)
+    return out
+
+
 def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = False) -> dict:
     """``{confirmed, refuted, n, through}`` over a coach's PREDICTION# rows.
 
@@ -147,12 +165,8 @@ def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool =
     """
     confirmed = refuted = 0
     through = ""
-    for row in resolved_once(rows):
+    for row in decided_rows(rows, genesis=genesis, career=career):
         status = graded_status(row)
-        if status is None:
-            continue
-        if not career and not counts_this_cycle(row, genesis):
-            continue
         if status == "confirmed":
             confirmed += 1
         else:
@@ -235,10 +249,20 @@ def _query_rows(table: Any, coach_id: str) -> list:
 
 def for_coach(table: Any, coach_id: str, *, genesis: str | None) -> dict | None:
     """The current-cycle record for one coach, or None when the read failed."""
+    return for_coach_with_rows(table, coach_id, genesis=genesis)[0]
+
+
+def for_coach_with_rows(table: Any, coach_id: str, *, genesis: str | None) -> tuple[dict | None, list[dict]]:
+    """``(record, decided_rows)`` from ONE read — the record and the exact rows it counted.
+
+    ``(None, [])`` when the read failed: a consumer drawing cards from the rows draws none
+    rather than falling back to a second derivation.
+    """
     if not coach_id or table is None:
-        return None
+        return None, []
     try:
-        return record_from_rows(_query_rows(table, coach_id), genesis=genesis)
+        rows = _query_rows(table, coach_id)
+        return record_from_rows(rows, genesis=genesis), decided_rows(rows, genesis=genesis)
     except Exception as exc:  # noqa: BLE001 — absence is the honest degradation, logged
         logger.warning("[coach_record] %s: %s", coach_id, exc)
-        return None
+        return None, []
