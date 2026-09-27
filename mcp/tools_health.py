@@ -935,6 +935,12 @@ def _get_energy_expenditure(args):
         "exercise_kcal_30d_daily_avg": ex_daily_30d_avg,
         "exercise_energy_basis_7d": ex_basis_7d,
         "exercise_energy_basis_30d": ex_basis_30d,
+        # #4178: the same provenance as a ledger — kcal per basis (`kj` / `met:walk` /
+        # `met:cardio_light` / `proxy:lifting` / `proxy:unsplit_legacy`), DERIVED from
+        # health.tdee, so a reader can see a walk's energy is one figure whichever device
+        # logged it, and how much of the term is a Compendium rate vs the lifting proxy.
+        "exercise_kcal_by_basis_7d": ex_7d["kcal_by_basis"],
+        "exercise_kcal_by_basis_30d": ex_30d["kcal_by_basis"],
         "tdee_7d_avg": tdee_7d_avg,
         "tdee_30d_avg": tdee_30d_avg,
         "target_deficit_kcal": target_deficit_kcal,

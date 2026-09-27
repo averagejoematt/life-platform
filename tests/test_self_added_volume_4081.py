@@ -352,9 +352,9 @@ def test_the_digest_carries_the_complements_line_and_names_a_failed_separation(m
 
     rows, _ = _wire_4312()
     monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: INDEX_4312)
-    # `weekly_excess` reads the week containing `end_date` as in progress even on its Sunday, so a Monday end
-    # makes the week of 09-21 the latest COMPLETE week the digest row renders
-    saw = rep.evaluate_for_digest(rows, "2026-09-28")
+    # a Monday 09-28 digest run: `w1_end` is Sunday 09-27, a finished day, so the week of 09-21 is the latest
+    # COMPLETE week the digest row renders (#4111's week-boundary fix — before it this needed a Monday end)
+    saw = rep.evaluate_for_digest(rows, "2026-09-27")
     assert saw["off_program_separation"] == {"state": "measured"}
     rendered = rep.digest_rows(saw, lambda label, value, highlight=False: f"[{label}|{value}]", lambda t: t)
     assert "[Off-Program Complements|2 set(s) added over 1 flex session(s) — not counted against the plan]" in rendered
@@ -364,7 +364,49 @@ def test_the_digest_carries_the_complements_line_and_names_a_failed_separation(m
         raise RuntimeError("ddb down")
 
     monkeypatch.setattr("training.routine_title._load_routine_index", boom)
-    saw = rep.evaluate_for_digest(rows, "2026-09-28")
+    saw = rep.evaluate_for_digest(rows, "2026-09-27")
     assert saw["off_program_separation"]["state"] == "read_failed" and "RuntimeError" in saw["off_program_separation"]["error"]
     rendered = rep.digest_rows(saw, lambda label, value, highlight=False: f"[{label}|{value}]", lambda t: t)
     assert "not separated — routine index read failed" in rendered and "Off-Program Complements|" not in rendered
+
+
+# ══ #4111: the just-ended week is the latest complete one on a Monday digest run ══════════
+def _render(saw):
+    from training import self_added_volume_report as rep
+
+    return rep.digest_rows(saw, lambda label, value, highlight=False: f"[{label}|{value}]", lambda t: t)
+
+
+def test_a_monday_digest_run_reports_the_week_that_ended_yesterday(monkeypatch):
+    """Monday 2026-09-21 run: `w1_end` = Sunday 09-20, a finished day. The week of 09-14 (Mon 09-14 ..
+    Sun 09-20) has ENDED — it is the latest complete week and the one the report renders, with its
+    added sets by movement, day and RPE. Before the fix it read as in progress and the report showed
+    the week of 09-07 instead: a week stale, the just-ended week never reported."""
+    from training import self_added_volume_report as rep
+
+    monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: [])
+    rows = _fire_rows()[:3]  # through Sunday 09-20; nothing after the run's yesterday
+    saw = rep.evaluate_for_digest(rows, "2026-09-20")
+    last = saw["weeks"][-1]
+    assert last["week_start"] == "2026-09-14" and last["week_end"] == "2026-09-20" and last["complete"] is True
+    assert saw["state"] == "tripped" and saw["run_weeks"] == 2 and "in progress" not in saw["detail"]
+    rendered = _render(saw)
+    assert "[Added Beyond Plan|6 set(s) added (+6 net) — week of 2026-09-14]" in rendered
+    assert "[↳ 2026-09-20 Hammer Curl (Dumbbell)|2 → 4 sets @ RPE 9.5]" in rendered
+    assert "week of 2026-09-07" not in rendered
+
+    # mutation control: the same rows read with the Sunday still "in progress" fall back a week
+    stale = {**self_added_volume.evaluate(rows, "2026-09-20", THRESHOLD), "off_program_separation": {"state": "measured"}}
+    assert stale["weeks"][-1]["complete"] is False
+    assert "week of 2026-09-07" in _render(stale) and "week of 2026-09-14" not in _render(stale)
+
+
+def test_a_planned_sunday_is_still_in_progress_for_the_engine():
+    """plan_engine's `date` is the day being planned — a Sunday target has not been trained yet, so its
+    week stays in progress there (the flag is the digest's, whose end day is finished)."""
+    rows = _fire_rows()[:2]
+    ev = self_added_volume.evaluate(rows, "2026-09-20", THRESHOLD)
+    assert ev["weeks"][-1]["week_start"] == "2026-09-14" and ev["weeks"][-1]["complete"] is False
+    row = _row(plan_engine.constraint_block(date="2026-09-20", hevy_workouts_prescription_window=rows))
+    assert row["evidence"]["weeks"][-1]["complete"] is False and row["evidence"]["run_weeks"] == 1
+    assert "in progress" in row["detail"]

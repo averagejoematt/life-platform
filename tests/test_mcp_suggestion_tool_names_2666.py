@@ -93,22 +93,149 @@ def _registry() -> tuple[set[str], set[str], set[str]]:
     return names, {n.split("_", 1)[0] for n in names}, args
 
 
+# #4172: the one envelope builder outside mcp/ — `training.commit_binding` takes `mcp_error` in
+# as `err` and calls it with `suggestions=`; its strings reach the caller like any other.
+_ENVELOPE_BUILDERS = frozenset({"mcp_error", "err"})
+_EXTRA_FILES = (REPO / "lambdas" / "training" / "commit_binding.py",)
+
+
+def _error_source_files() -> list[pathlib.Path]:
+    return sorted(MCP_DIR.rglob("*.py")) + list(_EXTRA_FILES)
+
+
+def _binding_targets(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Assign):
+        return [getattr(t, "id", "") for t in node.targets]
+    if isinstance(node, ast.AnnAssign):
+        return [getattr(node.target, "id", "")]
+    return []
+
+
 def _suggestion_strings() -> list[tuple[str, int, str]]:
     """Every string that can reach a caller as an MCP error `suggestions` entry."""
     found: list[tuple[str, int, str]] = []
-    for path in sorted(MCP_DIR.rglob("*.py")):
+    for path in _error_source_files():
         tree = ast.parse(path.read_text())
         rel = str(path.relative_to(REPO))
         for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "_DEFAULTS" for t in node.targets):
+            if "_DEFAULT_SUGGESTIONS" in _binding_targets(node):
                 found += [(rel, ln, s) for ln, s in _string_constants(node.value)]
-            if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "mcp_error":
+            if isinstance(node, ast.Call) and getattr(node.func, "id", "") in _ENVELOPE_BUILDERS:
                 for kw in node.keywords:
                     if kw.arg == "suggestions":
                         found += [(rel, ln, s) for ln, s in _string_constants(kw.value)]
                 if len(node.args) >= 3:
                     found += [(rel, ln, s) for ln, s in _string_constants(node.args[2])]
     return found
+
+
+# ── #4172: a POLICY refusal is never told to retry ─────────────────────────────────────────
+#
+# The live specimen (2026-09-26 ~02:17Z): `manage_hevy_routine commit` refused a routine that
+# had not passed stage 2 — error_code REDTEAM_BINDING, the right error, the right detail — and
+# `suggestions` read ["Retry or check system status."], the transport fallback. A policy
+# refusal answers the same call identically; an agent that reads only `suggestions` loops.
+#
+# THE SET, NOT THE INSTANCE. The kind lives on the code in `mcp.utils._ERROR_CODE_SPECS`, so
+# "which codes are policy" is read from the registry, and "which codes are emitted" is read
+# out of source — every `error_code=` constant at an envelope-builder call and every
+# module-level `*_ERROR_CODE` name under mcp/ and commit_binding. A code that is emitted and
+# not registered has no kind and no honest default, so it fails here the day it lands.
+
+_RETRY_WORDS = re.compile(r"retry|try again|system status|temporar", re.I)
+
+
+def _emitted_error_codes() -> dict[str, list[str]]:
+    """code -> the source sites that emit it, read out of the AST."""
+    sites: dict[str, list[str]] = {}
+    for path in _error_source_files():
+        tree = ast.parse(path.read_text())
+        rel = str(path.relative_to(REPO))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", "") in _ENVELOPE_BUILDERS:
+                for kw in node.keywords:
+                    if kw.arg == "error_code" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                        sites.setdefault(kw.value.value, []).append(f"{rel}:{node.lineno}")
+                if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+                    sites.setdefault(node.args[1].value, []).append(f"{rel}:{node.lineno}")
+            for name in _binding_targets(node):
+                if name.endswith("_ERROR_CODE") and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                    sites.setdefault(node.value.value, []).append(f"{rel}:{node.lineno} ({name})")
+    return sites
+
+
+def policy_retry_violations(kinds: dict[str, str], defaults: dict[str, list[str]]) -> list[str]:
+    """Every (policy code, suggestion) pair that tells the caller to retry. Pure — the mutation
+    control below feeds it a flipped table and must see it red."""
+    out = []
+    for code, kind in sorted(kinds.items()):
+        if kind != "policy":
+            continue
+        texts = defaults.get(code)
+        if not texts:
+            out.append(f"{code}: a policy code with NO default suggestions — the fallback would be the transport advice")
+            continue
+        out += [f"{code}: {t!r}" for t in texts if _RETRY_WORDS.search(t)]
+    return out
+
+
+def test_every_emitted_error_code_is_registered_with_a_kind():
+    from mcp.utils import ERROR_CODES, ERROR_KINDS, ERROR_KINDS_VALID
+
+    emitted = _emitted_error_codes()
+    assert {"REDTEAM_BINDING", "SUBTRACT_ONLY_VIOLATION", "CRITIC_VETO", "TOOL_CALL_RESIDUE", "INTERNAL"} <= set(emitted), sorted(emitted)
+    assert len(emitted) >= 15, f"only {len(emitted)} emitted codes found — extractor broke"
+    unregistered = {c: s for c, s in emitted.items() if c not in ERROR_CODES}
+    assert not unregistered, "error codes emitted with no registry entry (so no kind, no honest default):\n  " + "\n  ".join(
+        f"{c} <- {', '.join(s)}" for c, s in sorted(unregistered.items())
+    )
+    assert set(ERROR_KINDS) == set(ERROR_CODES)
+    bad_kind = {c: k for c, k in ERROR_KINDS.items() if k not in ERROR_KINDS_VALID}
+    assert not bad_kind, bad_kind
+
+
+def test_every_registered_code_has_default_suggestions():
+    """The unregistered-code fallback is for codes NOT in the table; a registered code always has its own."""
+    from mcp.utils import _DEFAULT_SUGGESTIONS, ERROR_CODES
+
+    missing = sorted(set(ERROR_CODES) - set(_DEFAULT_SUGGESTIONS))
+    assert not missing, f"registered codes with no default suggestions: {missing}"
+    assert sorted(set(_DEFAULT_SUGGESTIONS) - set(ERROR_CODES)) == [], "defaults for a code nobody registered"
+
+
+def test_no_policy_code_is_told_to_retry():
+    from mcp.utils import _DEFAULT_SUGGESTIONS, ERROR_KINDS
+
+    policy = sorted(c for c, k in ERROR_KINDS.items() if k == "policy")
+    assert {"REDTEAM_BINDING", "SUBTRACT_ONLY_VIOLATION", "CRITIC_VETO", "TOOL_CALL_RESIDUE"} <= set(policy), policy
+    violations = policy_retry_violations(ERROR_KINDS, _DEFAULT_SUGGESTIONS)
+    assert not violations, "policy refusals told to retry:\n  " + "\n  ".join(violations)
+
+
+def test_mutation_a_policy_code_told_to_retry_is_caught():
+    """Flip ONE policy code's suggestion to the old transport line — the check must name it."""
+    from mcp.utils import _DEFAULT_SUGGESTIONS, ERROR_KINDS
+
+    flipped = {**_DEFAULT_SUGGESTIONS, "REDTEAM_BINDING": ["Retry or check system status."]}
+    out = policy_retry_violations(ERROR_KINDS, flipped)
+    assert out == ["REDTEAM_BINDING: 'Retry or check system status.'"], out
+    # and a transport code saying so is not a violation — the rule is about the KIND
+    assert policy_retry_violations(ERROR_KINDS, {**_DEFAULT_SUGGESTIONS, "INTERNAL": ["Retry."]}) == []
+    # and a policy code with no defaults at all is caught too (it would fall to the fallback)
+    emptied = {k: v for k, v in _DEFAULT_SUGGESTIONS.items() if k != "CRITIC_VETO"}
+    assert any(o.startswith("CRITIC_VETO: a policy code with NO default") for o in policy_retry_violations(ERROR_KINDS, emptied))
+
+
+def test_the_envelope_carries_the_kind_and_an_unregistered_code_is_not_told_to_retry():
+    from mcp.utils import mcp_error
+
+    assert mcp_error("x", "REDTEAM_BINDING")["kind"] == "policy"
+    assert mcp_error("x", "INTERNAL")["kind"] == "transport"
+    assert mcp_error("x", "MISSING_ARG")["kind"] == "argument"
+    unknown = mcp_error("x", "NEVER_REGISTERED")
+    assert unknown["kind"] == "unregistered"
+    assert not any(_RETRY_WORDS.search(t) for t in unknown["suggestions"]), unknown
+    assert "NEVER_REGISTERED" in unknown["suggestions"][0]
 
 
 def _tool_references(text: str, verbs: set[str], schema_args: set[str]) -> set[str]:
