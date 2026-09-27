@@ -521,6 +521,72 @@ def _best_by_overlap(candidates: list[RoutineSpec], performed: dict[str, Any]) -
     return scored[0][1], "date_overlap"
 
 
+def resolve_routine_for_workout(performed: dict[str, Any]) -> tuple[RoutineSpec | None, str | None, list[RoutineSpec]]:
+    """THE routine<->workout matcher (#4177) — the one derivation every adherence reader shares.
+
+    Given a RAW Hevy /v1/workouts item, return ``(ir, match_method, candidates)``:
+
+      1. ``hevy_routine_id`` — the workout carries the Hevy routine id it was started from;
+         reverse the id-map to our routine_id. Immune to the UTC-date keying bug, and to
+         the day the session was actually done (a routine dated D performed on D-1 still
+         resolves to ITS routine).
+      2. ``date_single`` — no id link; exactly one routine was pushed for the workout's
+         Pacific calendar day.
+      3. ``date_overlap`` — several routines for that day; the one whose programmed
+         template-ids best overlap what was performed (``_best_by_overlap``; a tie or a
+         zero overlap resolves to nothing rather than a guess, ADR-104).
+
+    ``candidates`` is the day's routine list when the date path ran (empty otherwise), so
+    a caller can name an ambiguous result instead of grading a stranger's session.
+
+    Ingestion (``derive_adherence``) and the MCP readback (``mcp.hevy_readback_report.
+    action_adherence`` via ``find_workout_for_routine``) BOTH call this — the pre-#4177
+    readback kept a private date-only matcher and graded the 09-25-dated Lower-heavy
+    (done early, on 09-24) against Friday's Upper session: 0/12 sets, 9 extras.
+    """
+    from common.pacific_time import pacific_date_of
+    from training import routine_repo
+
+    pac_date = pacific_date_of(performed.get("start_time"))
+    ir: RoutineSpec | None = None
+    match_method: str | None = None
+    candidates: list[RoutineSpec] = []
+
+    hevy_rid = str(performed.get("routine_id") or "").strip()
+    if hevy_rid:
+        rid = routine_repo.lookup_routine_id(hevy_rid)
+        if rid:
+            ir = routine_repo.get_current(rid)
+            if ir:
+                match_method = "hevy_routine_id"
+
+    if ir is None and pac_date:
+        candidates = routine_repo.list_by_date_range(pac_date, pac_date)
+        if len(candidates) == 1:
+            ir, match_method = candidates[0], "date_single"
+        elif len(candidates) > 1:
+            ir, match_method = _best_by_overlap(candidates, performed)
+
+    return ir, match_method, candidates
+
+
+def find_workout_for_routine(ir: RoutineSpec, workouts: list[dict[str, Any]]) -> tuple[dict[str, Any] | None, str | None]:
+    """The inverse question, answered by the SAME derivation: which of these performed
+    workouts was ``ir``? (#4177)
+
+    Walks ``workouts`` in the order given (Hevy returns newest first) and returns the
+    first one that ``resolve_routine_for_workout`` resolves to ``ir.routine_id``, with
+    the match method it resolved by. Returns ``(None, None)`` when none does — the caller
+    says ``no_workout_for_routine``; it never falls back to "whatever was done on the
+    routine's date", which is exactly how a different routine's session got graded.
+    """
+    for w in workouts:
+        resolved, method, _ = resolve_routine_for_workout(w)
+        if resolved is not None and getattr(resolved, "routine_id", None) == ir.routine_id:
+            return w, method
+    return None, None
+
+
 def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
     """On-ingest deviation readback (#412): match a performed Hevy workout to the plan
     that was pushed for it, and compute programmed-vs-performed adherence.
@@ -541,7 +607,6 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
     can render a fabricated number (ADR-104)."""
     try:
         from common.pacific_time import pacific_date_of
-        from training import routine_repo
 
         performed = raw_workout or {}
         pac_date = pacific_date_of(performed.get("start_time"))
@@ -550,27 +615,7 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
             "computed_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        ir: RoutineSpec | None = None
-        match_method: str | None = None
-        candidates: list[RoutineSpec] = []
-
-        # 1) Exact — the workout carries the Hevy routine id it was started from;
-        #    reverse the id-map to our routine_id. Immune to the UTC-date keying bug.
-        hevy_rid = str(performed.get("routine_id") or "").strip()
-        if hevy_rid:
-            rid = routine_repo.lookup_routine_id(hevy_rid)
-            if rid:
-                ir = routine_repo.get_current(rid)
-                if ir:
-                    match_method = "hevy_routine_id"
-
-        # 2) Fallback — the routine(s) pushed for this Pacific calendar day.
-        if ir is None and pac_date:
-            candidates = routine_repo.list_by_date_range(pac_date, pac_date)
-            if len(candidates) == 1:
-                ir, match_method = candidates[0], "date_single"
-            elif len(candidates) > 1:
-                ir, match_method = _best_by_overlap(candidates, performed)
+        ir, match_method, candidates = resolve_routine_for_workout(performed)
 
         if ir is None:
             if candidates:  # plans existed but none matched confidently → say so, don't guess
