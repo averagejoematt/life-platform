@@ -52,6 +52,7 @@ from v7 import (
     coaches,  # noqa: E402
     today,  # noqa: E402
     week,  # noqa: E402
+    who,  # noqa: E402
 )
 
 SITE_DIR = os.path.join(ROOT, "site")
@@ -79,6 +80,7 @@ BODIES = {
     "cockpit/": today,
     "story/": week,
     "coaching/": coaches,
+    "story/about/": who,
 }
 
 
