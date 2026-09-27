@@ -1375,7 +1375,10 @@ def board_grounding_receipts(ctx, limit=6):
     # the computation was always a real 30-day cross-phase average (#2109); only
     # the key/prose claimed 7 days.
     if isinstance(protein, dict) and isinstance(protein.get("avg_30d_g"), (int, float)):
-        receipts.append({"label": "protein", "value": f"30d avg {protein['avg_30d_g']:.0f}g"})
+        _pd = protein.get("logged_days")  # #4343: genesis-floored window — its n, never a claimed "30d"
+        receipts.append(
+            {"label": "protein", "value": f"{protein['avg_30d_g']:.0f}g avg" + (f" over {int(_pd)} logged days" if _pd else "")}
+        )
 
     sleep_hours = ctx.get("sleep_hours")
     if isinstance(sleep_hours, (int, float)):

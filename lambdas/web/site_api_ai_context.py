@@ -313,7 +313,10 @@ def _ask_fetch_computed_reads() -> dict:
             # to match reality rather than gated, because there is nothing to gate
             # — the window is genuinely, permanently full.
             reads["protein"] = {
+                # #4343: the producer now averages the genesis-floored window /api/nutrition_overview
+                # serves — at most 30 days, so the key keeps its name; the n rides beside it.
                 "avg_30d_g": facts["protein_g_avg"],
+                "logged_days": facts.get("protein_g_avg_days"),
                 "target_g": facts.get("protein_g_target"),
                 "floor_g": facts.get("protein_g_floor"),
             }

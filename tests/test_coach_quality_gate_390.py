@@ -183,6 +183,62 @@ class TestEnforceQualityGate:
         regenerate_fn.assert_not_called()
 
 
+class _FakeContext:
+    """A Lambda context whose clock reads a fixed remaining time."""
+
+    def __init__(self, remaining_ms):
+        self.remaining_ms = remaining_ms
+
+    def get_remaining_time_in_millis(self):
+        return self.remaining_ms
+
+
+class TestRegenerationTimeGuard4343:
+    """#4343: past the reserved tail (the lead read + the send), a failing coach is HELD
+    without the regenerate attempt. 09-27 ran 728.7 s of 900 s with every coach regenerating."""
+
+    RESERVE_MS = int(ai_calls._deadline.RESERVE_SECONDS * 1000)
+
+    def teardown_method(self):
+        ai_calls._deadline.arm(None)
+
+    def _run(self, remaining_ms):
+        from ai import regen_deadline
+
+        regen_deadline.arm(_FakeContext(remaining_ms) if remaining_ms is not None else None)
+        client = _lambda_client_returning({"passed": False, "score": 42}, {"passed": True, "score": 92})
+        regenerate_fn = MagicMock(return_value="regenerated draft")
+        output, report = ai_calls._enforce_quality_gate(client, "physical_coach", "first draft", {}, regenerate_fn)
+        return output, report, regenerate_fn
+
+    def test_below_the_reserve_the_draft_is_held_without_a_regenerate_call(self, capsys):
+        output, report, regenerate_fn = self._run(self.RESERVE_MS - 1)
+        regenerate_fn.assert_not_called()
+        assert output is None and report["passed"] is False
+        assert "regeneration SKIPPED" in capsys.readouterr().out  # the skip is logged
+
+    def test_at_or_above_the_reserve_it_regenerates(self):
+        output, _, regenerate_fn = self._run(self.RESERVE_MS)
+        regenerate_fn.assert_called_once()
+        assert output == "regenerated draft"
+
+    def test_an_unarmed_run_always_regenerates(self):
+        """Every other ai_calls caller (analyzer, chat) never armed the deadline."""
+        _, _, regenerate_fn = self._run(None)
+        regenerate_fn.assert_called_once()
+
+    def test_the_reserve_covers_the_measured_tail(self):
+        # 09-27: last coach -> lead read 21.6 s -> Sent 52.9 s (74.4 s tail) + one rewrite <= 45 s.
+        assert ai_calls._deadline.RESERVE_SECONDS >= 74.4 + 45
+
+    def test_the_brief_handler_arms_the_deadline(self):
+        import ast
+
+        path = os.path.join(os.path.dirname(__file__), "..", "lambdas", "emails", "daily_brief_lambda.py")
+        handler = next(n for n in ast.parse(open(path).read()).body if isinstance(n, ast.FunctionDef) and n.name == "lambda_handler")
+        assert "regen_deadline.arm(context)" in ast.unparse(handler)
+
+
 class TestEnforceQualityGateRetention:
     """#744: `_enforce_quality_gate` is the ORIGINAL surface #744 named (the
     highest-fire-rate ADR-104-adjacent gate, ADR-108) and #812's retention
