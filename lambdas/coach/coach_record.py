@@ -50,7 +50,6 @@ decides which cycle the resolution belongs to).
 from __future__ import annotations
 
 import logging
-from datetime import date
 from typing import Any, Iterable
 
 from boto3.dynamodb.conditions import Key
@@ -164,13 +163,36 @@ def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool =
     return {"confirmed": confirmed, "refuted": refuted, "n": confirmed + refuted, "through": through or None}
 
 
+_MONTH_WORDS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
 def day_words(iso: str | None) -> str:
-    """'2026-09-26' -> 'September 26' (no ISO date reaches a reader sentence)."""
-    try:
-        d = date.fromisoformat(str(iso or "")[:10])
-    except ValueError:
+    """'2026-09-26' -> 'September 26' (no ISO date reaches a reader sentence).
+
+    A calendar day, read from the string's own slices — never parsed to an instant
+    (#3609: a YYYY-MM-DD day needs no parser; every date comparison in this module is
+    likewise lexical on the ISO string).
+    """
+    text = str(iso or "")[:10]
+    if len(text) != 10 or not (text[5:7].isdigit() and text[8:10].isdigit()):
         return ""
-    return f"{d.strftime('%B')} {d.day}"
+    month, day = int(text[5:7]), int(text[8:10])
+    if not (1 <= month <= 12 and 1 <= day <= 31):
+        return ""
+    return f"{_MONTH_WORDS[month - 1]} {day}"
 
 
 def headline(record: dict | None) -> str:
