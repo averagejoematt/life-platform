@@ -188,9 +188,16 @@ def test_lead_leads_the_roster_before_staff():
 def test_team_view_shape():
     data = _body(api.handle_coach_team({}))
     assert len(data["huddle"]) == len(api.persona_registry.OPERATIONAL_COACH_IDS)
+    from coach.audience_guard import is_owner_directed
+
     for c in data["huddle"]:
-        assert c.get("name") and c.get("headline") and c.get("stage_id")
+        assert c.get("name") and c.get("stage_id")
+        # #4213: the headline is a reader slot — the authored text, or "" where the
+        # authored rung addresses Matthew ("First, I just need to see what you eat.").
+        assert isinstance(c.get("headline"), str) and not is_owner_directed(c["headline"])
+        assert not is_owner_directed(c.get("graduation_gate") or "")
         assert "watch" in c
+    assert sum(1 for c in data["huddle"] if c["headline"]) >= len(data["huddle"]) - 2  # not a blanking machine
     assert data["team_focus"] and len(data["team_focus"]) == len(set(data["team_focus"]))
     assert isinstance(data["tensions"], list)  # honest empty pre-data, never an error
     assert "AI character" in data["disclosure"]
