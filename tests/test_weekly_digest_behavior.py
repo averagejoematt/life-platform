@@ -1754,6 +1754,9 @@ class TestGatherAll:
         """`gather_all` must call `training.self_added_volume.evaluate` over the SAME `hevy_full`
         window it already queries — never a second Hevy read, and never a hand-rolled count."""
         monkeypatch.setattr(wd, "boto3", FakeBoto3(FakeS3({})))
+        # #4312: the report annotates the rows from the routine index (one read, its own partition) so an
+        # off-program complement lands on its own line — stubbed empty here: no row is a complement.
+        monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: [])
         table.add(profile_row())
         # A complete Mon–Sun week inside the lookback window, above prescription on one movement.
         added_day = (datetime.strptime(W1_START, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
@@ -1765,7 +1768,7 @@ class TestGatherAll:
         threshold = next(
             t for t in __import__("training.owner_redlines", fromlist=["TRIPWIRES"]).TRIPWIRES if t["id"] == "self_added_volume"
         )["threshold_weeks"]
-        expected = saw_mod.evaluate([row], W1_END, threshold)
+        expected = {**saw_mod.evaluate([row], W1_END, threshold), "off_program_separation": {"state": "measured"}}  # #4312
         assert data["self_added_volume"] == expected
 
     def test_self_added_volume_tripwire_is_report_only_not_a_veto(self):

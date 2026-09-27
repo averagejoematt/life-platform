@@ -48,11 +48,15 @@ START = "2026-09-24"
 
 
 def lift(day: str, name: str = "Linear Leg Press", wid: str | None = None) -> dict:
+    # #4312: `name` plus a bench set, so the generic lift reaches an anchor muscle of whichever role it takes
     return {
         "date": day,
         "sk": f"DATE#{day}#WORKOUT#{wid or day}",
         "source_workout_id": wid or day,
-        "exercises": [{"name": name, "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]}],
+        "exercises": [
+            {"name": name, "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]},
+            {"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "weight_kg": 60, "reps": 5}]},
+        ],
     }
 
 
@@ -329,7 +333,10 @@ def test_readiness_low_on_one_day_does_not_trigger_and_consecutive_soreness_is_b
 
 
 def test_the_48h_same_region_guard():
-    squat_yesterday = [lift("2026-10-09", name="Squat (Barbell)")]
+    # a single-region row on purpose: the generic `lift()` spans both regions since #4312
+    squat_yesterday = [
+        {**lift("2026-10-09"), "exercises": [{"name": "Squat (Barbell)", "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]}]}
+    ]
     got = cf.same_region_recent(squat_yesterday, "2026-10-10", "lower")
     assert got == {"state": "triggered", "region": "lower", "loaded_on": ["2026-10-09"]}
     assert cf.same_region_recent(squat_yesterday, "2026-10-11", "lower")["state"] == "clear", "two days is >= 48 h"

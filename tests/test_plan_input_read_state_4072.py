@@ -123,6 +123,11 @@ def _wire(monkeypatch, rows, raise_on_pk=None):
     fake = _FakeTable(rows, raise_on_pk=raise_on_pk)
     monkeypatch.setattr(core, "table", fake)
     monkeypatch.setattr(tn, "table", fake)
+    # #4312: the block and prescription reads now annotate their rows from the routine index
+    # (`routine_title.annotate_with_routine_index`) — an empty index here, so no row is a complement.
+    import training.routine_title as rt
+
+    monkeypatch.setattr(rt, "_load_routine_index", lambda start: [])
     return fake
 
 

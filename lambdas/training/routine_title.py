@@ -81,6 +81,17 @@ def load_phase_state() -> dict[str, Any]:
     return json.loads(obj["Body"].read())
 
 
+# #4312: how far before a window the routine index is read so a performed workout can be
+# matched to the routine it was STARTED from (`resolve_archetype`, priority 2) — a Hevy routine
+# keeps its id across re-runs, so the index row that names its archetype may predate the window.
+# One value; `mcp.tools_coach_packet` and the two block-read seams read it from here.
+ROUTINE_INDEX_LOOKBACK_DAYS = 90
+# The resolution `annotate_routine_archetypes` stores on a read row, and the two `via` values
+# that mean the routine is KNOWN (a stored sticker, or the exact Hevy routine the workout was
+# started from). The date fallback is a guess about a freestyle log and never counts as exact.
+ROUTINE_ARCHETYPE_KEY = "_routine_archetype"
+EXACT_ARCHETYPE_SOURCES = ("sticker", "hevy_routine_id")
+
 # Performed-workout sources to union for the honest counters. workout_uid
 # ("hevy:<id>" / the MacroFactor formula) dedupes the same session arriving via
 # more than one pipe so it isn't counted twice in N or Y (work order §1.5).
@@ -127,30 +138,31 @@ def _load_routine_index(start_date: str) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: str(r.get("target_date") or ""))
 
 
-def resolve_archetype(workout: dict[str, Any], index_rows: list[dict[str, Any]]) -> str | None:
-    """Resolve a performed workout's session type WITHOUT parsing its title.
+def resolve_archetype_source(workout: dict[str, Any], index_rows: list[dict[str, Any]]) -> tuple[str | None, str | None]:
+    """(archetype, via) for a performed workout, WITHOUT parsing its title — the one resolver.
 
-    Priority:
-      1. a stored `archetype` sticker (if a future ingestion path sets one);
-      2. the EXACT routine the workout was performed from — match the workout's
-         `hevy_routine_id` (preserved by hevy_common.normalize_workout) against the
+    Priority (`via`):
+      1. `"sticker"` — a stored `archetype` sticker (if a future ingestion path sets one);
+      2. `"hevy_routine_id"` — the EXACT routine the workout was performed from — match the
+         workout's `hevy_routine_id` (preserved by hevy_common.normalize_workout) against the
          routine-index entry's `hevy_routine_id`. This is unambiguous when present;
-      3. else the nearest pushed routine whose target_date <= the workout date.
-    Returns None when nothing matches (uncounted)."""
+      3. `"nearest_routine_by_date"` — else the nearest pushed routine whose target_date <= the
+         workout date (a guess about a freestyle log; #4312 never un-credits a session on it).
+    (None, None) when nothing matches (uncounted)."""
     sticker = workout.get("archetype")
     if sticker:
-        return str(sticker)
+        return str(sticker), "sticker"
     # 2. Exact link via the Hevy routine the workout came from.
     hrid = workout.get("hevy_routine_id")
     if hrid:
         for r in index_rows:
             if str(r.get("hevy_routine_id") or "") == str(hrid):
                 arch = r.get("archetype")
-                return str(arch) if arch else None
+                return (str(arch) if arch else None), "hevy_routine_id"
     # 3. Fallback: nearest preceding pushed routine by date.
     wdate = str(workout.get("date") or "")
     if not wdate:
-        return None
+        return None, None
     best = None
     for r in index_rows:  # index_rows sorted ascending by target_date
         td = str(r.get("target_date") or "")
@@ -158,7 +170,45 @@ def resolve_archetype(workout: dict[str, Any], index_rows: list[dict[str, Any]])
             best = r
         elif td > wdate:
             break
-    return str(best.get("archetype")) if best else None
+    return (str(best.get("archetype")), "nearest_routine_by_date") if best else (None, None)
+
+
+def resolve_archetype(workout: dict[str, Any], index_rows: list[dict[str, Any]]) -> str | None:
+    """The archetype half of `resolve_archetype_source` (the title counters' read)."""
+    return resolve_archetype_source(workout, index_rows)[0]
+
+
+def annotate_routine_archetypes(rows: list[dict[str, Any]] | None, index_rows: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    """Copies of `rows`, each carrying its `resolve_archetype_source` result under
+    `ROUTINE_ARCHETYPE_KEY` (`{"archetype", "via"}`), so a pure reader downstream
+    (`session_sequence`, `self_added_volume`) can tell an off-program complement from a program
+    session without a second resolver or a second index read (#4312). Pure; None passes through."""
+    if rows is None:
+        return None
+    out = []
+    for r in rows:
+        arch, via = resolve_archetype_source(r, index_rows)
+        out.append({**r, ROUTINE_ARCHETYPE_KEY: {"archetype": arch, "via": via}})
+    return out
+
+
+def routine_archetype(row: dict[str, Any]) -> tuple[str | None, str | None]:
+    """(archetype, via) an annotated row carries; (None, None) when the routine index was not read."""
+    ann = row.get(ROUTINE_ARCHETYPE_KEY) if isinstance(row, dict) else None
+    if not isinstance(ann, dict):
+        return None, None
+    return ann.get("archetype"), ann.get("via")
+
+
+def annotate_with_routine_index(rows: list[dict[str, Any]] | None, window_start: str) -> list[dict[str, Any]] | None:
+    """The I/O seam: read the routine index from `ROUTINE_INDEX_LOOKBACK_DAYS` before
+    `window_start` and annotate `rows` (#4312). Raises on a failed index read — a caller that
+    cannot tell a Flex complement from a program session must say so, never credit it."""
+    from common.pacific_time import shift_day_key
+
+    if rows is None:
+        return None
+    return annotate_routine_archetypes(rows, _load_routine_index(shift_day_key(window_start, -ROUTINE_INDEX_LOOKBACK_DAYS)))
 
 
 def count_performed_of_type(archetype: str, performed: list[dict[str, Any]], index_rows: list[dict[str, Any]]) -> int:
