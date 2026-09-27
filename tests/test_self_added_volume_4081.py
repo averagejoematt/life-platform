@@ -23,6 +23,9 @@ WHAT IS PINNED HERE
   * MUTATION CONTROLS — the fire fixture with week 1 flattened to prescription stops firing,
     and raising the row's `threshold_weeks` to 3 stops it too (the engine reads the row, not a
     literal).
+  * OFF-PROGRAM COMPLEMENTS (#4312) — the real 2026-09-26 Flex session's two added sets land on
+    the week's own `off_program` line ("not counted against the plan"), never in `net_sets`; the
+    digest carries the line; strip the row's routine archetype and they count again.
 
 THE FIXTURE IS THE WIRE
   Rows are the live `USER#matthew#SOURCE#hevy` shape (read-only, 2026-09-22): `DATE#<day>#WORKOUT#<uid>`
@@ -282,6 +285,7 @@ def test_stage_1_names_a_raising_read_as_read_failed(monkeypatch):
 def test_the_nutrition_critic_input_is_the_same_evaluation(monkeypatch):
     import mcp.nutrition_critics_inputs as nci
 
+    monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: [])  # #4312: the complement split's index read
     monkeypatch.setattr(nci, "query_source", lambda source, start, end: _fire_rows())
     assert nci._above_prescription_weeks(TODAY) == (2, False)
     monkeypatch.setattr(nci, "query_source", lambda source, start, end: [])
@@ -296,3 +300,71 @@ def test_the_nutrition_critic_input_is_the_same_evaluation(monkeypatch):
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ══ 9. #4312: an off-program complement is its own line, never counted against the plan ═══════
+def _real_rows_4312():
+    from training.routine_title import annotate_routine_archetypes
+
+    from tests.test_session_sequence_4110 import INDEX_4312, _wire_4312
+
+    rows, _ = _wire_4312()
+    return annotate_routine_archetypes(rows, INDEX_4312), rows
+
+
+def test_off_program_complement_sets_are_their_own_line_and_never_counted_against_the_plan():
+    """The real 09-24 Lower, 09-25 Upper and 09-26 Flex rows (Suitcase Carry 3→4, Cable Twist 2→3).
+    End 2026-09-28 (a Monday): the week of 09-21 is complete."""
+    annotated, raw = _real_rows_4312()
+    ev = self_added_volume.evaluate(annotated, "2026-09-28", THRESHOLD)
+    wk = next(w for w in ev["weeks"] if w["week_start"] == "2026-09-21")
+    assert wk["complete"] and wk["sessions_matched"] == 2 and wk["sessions_unmatched"] == 0
+    op = wk["off_program"]
+    assert (op["sessions"], op["archetypes"], op["added_sets"]) == (1, ["flex"], 2)
+    assert [(a["movement"], a["programmed_sets"], a["performed_sets"], a["archetype"]) for a in op["added"]] == [
+        ("Suitcase Carry", 3, 4, "flex"),
+        ("Cable Twist (Up to down)", 2, 3, "flex"),
+    ]
+    assert not any(a["movement"] in ("Suitcase Carry", "Cable Twist (Up to down)") for a in wk["added"])
+    # the program numbers are exactly those of the two program sessions alone
+    alone = next(w for w in self_added_volume.evaluate(annotated[:2], "2026-09-28", THRESHOLD)["weeks"] if w["week_start"] == "2026-09-21")
+    assert (wk["net_sets"], wk["added_sets"], wk["programmed_sets"], wk["performed_sets"]) == tuple(
+        alone[k] for k in ("net_sets", "added_sets", "programmed_sets", "performed_sets")
+    )
+    line = self_added_volume._week_line(wk)
+    assert "off-program complements (flex): 2 set(s) added over 1 session(s) — not counted against the plan" in line
+    # MUTATION: without the routine archetype on the row the Flex sets count against the plan again
+    wk_raw = next(w for w in self_added_volume.evaluate(raw, "2026-09-28", THRESHOLD)["weeks"] if w["week_start"] == "2026-09-21")
+    assert wk_raw["off_program"]["sessions"] == 0 and wk_raw["sessions_matched"] == 3 and wk_raw["sessions_archetype_unresolved"] == 3
+    assert wk_raw["net_sets"] == wk["net_sets"] + 2 and any(a["movement"] == "Suitcase Carry" for a in wk_raw["added"])
+
+
+def test_a_window_of_complements_only_is_unknown_and_says_so():
+    annotated, _ = _real_rows_4312()
+    ev = self_added_volume.evaluate([annotated[2]], "2026-09-28", THRESHOLD)
+    assert ev["state"] == "unknown" and "1 off-program complement session(s) only" in ev["detail"]
+
+
+def test_the_digest_carries_the_complements_line_and_names_a_failed_separation(monkeypatch):
+    from training import self_added_volume_report as rep
+
+    from tests.test_session_sequence_4110 import INDEX_4312, _wire_4312
+
+    rows, _ = _wire_4312()
+    monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: INDEX_4312)
+    # `weekly_excess` reads the week containing `end_date` as in progress even on its Sunday, so a Monday end
+    # makes the week of 09-21 the latest COMPLETE week the digest row renders
+    saw = rep.evaluate_for_digest(rows, "2026-09-28")
+    assert saw["off_program_separation"] == {"state": "measured"}
+    rendered = rep.digest_rows(saw, lambda label, value, highlight=False: f"[{label}|{value}]", lambda t: t)
+    assert "[Off-Program Complements|2 set(s) added over 1 flex session(s) — not counted against the plan]" in rendered
+    assert "Suitcase Carry (flex)|3 → 4 sets" in rendered and "Added Beyond Plan" in rendered
+
+    def boom(start):
+        raise RuntimeError("ddb down")
+
+    monkeypatch.setattr("training.routine_title._load_routine_index", boom)
+    saw = rep.evaluate_for_digest(rows, "2026-09-28")
+    assert saw["off_program_separation"]["state"] == "read_failed" and "RuntimeError" in saw["off_program_separation"]["error"]
+    rendered = rep.digest_rows(saw, lambda label, value, highlight=False: f"[{label}|{value}]", lambda t: t)
+    assert "not separated — routine index read failed" in rendered and "Off-Program Complements|" not in rendered

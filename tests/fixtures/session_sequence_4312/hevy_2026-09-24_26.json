@@ -1,0 +1,1027 @@
+[
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-24#WORKOUT#3ca1117e-4e1d-4eba-bc33-7da38d2ae2ca",
+  "date": "2026-09-24",
+  "phase": "experiment",
+  "source": "hevy",
+  "title": "Foundation - Lower - 1 - 18",
+  "hevy_routine_id": "4b743f67-df90-4eb9-bd62-9e53ac343435",
+  "source_workout_id": "3ca1117e-4e1d-4eba-bc33-7da38d2ae2ca",
+  "workout_uid": "hevy:3ca1117e-4e1d-4eba-bc33-7da38d2ae2ca",
+  "start_time": "2026-09-24T12:12:06+00:00",
+  "end_time": "2026-09-24T14:43:23+00:00",
+  "set_count": 21.0,
+  "exercise_count": 8.0,
+  "exercises": [
+   {
+    "name": "Squat (Barbell)",
+    "template_id": "D04AC939",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 61.235042773811365,
+      "reps": 5.0,
+      "rpe": 7.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 70.30690096252415,
+      "reps": 5.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 79.37875915123695,
+      "reps": 5.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 88.45061733994974,
+      "reps": 5.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Romanian Deadlift (Barbell)",
+    "template_id": "2B4B7310",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 79.37875915123695,
+      "reps": 8.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 79.37875915123695,
+      "reps": 8.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 79.37875915123695,
+      "reps": 8.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 79.37875915123695,
+      "reps": 8.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Leg Extension (Machine)",
+    "template_id": "75A4F6C4",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 31.75150366049478,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 31.75150366049478,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Linear Leg Press",
+    "template_id": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 163.29344739683032,
+      "reps": 8.0,
+      "rpe": 7.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 185.9730928686123,
+      "reps": 8.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 185.9730928686123,
+      "reps": 8.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Calf Press (Machine)",
+    "template_id": "91237BDD",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 145.14973101940473,
+      "reps": 15.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 145.14973101940473,
+      "reps": 15.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 145.14973101940473,
+      "reps": 15.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Seated Leg Curl (Machine)",
+    "template_id": "11A123F3",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 12.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 12.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 10.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null,
+      "distance_m": 4828.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ],
+  "adherence": {
+   "status": "matched",
+   "match_method": "hevy_routine_id",
+   "matched_routine_id": "b1b9960468f374e30dcdeca8630dd18f",
+   "routine_target_date": "2026-09-25",
+   "workout_pacific_date": "2026-09-24",
+   "movements": [
+    {
+     "movement_key": "squat_barbell",
+     "programmed_sets": 3.0,
+     "performed_sets": 4.0,
+     "intensity": {
+      "max_rpe": 7.5
+     }
+    },
+    {
+     "movement_key": "tmpl:2B4B7310",
+     "programmed_sets": 3.0,
+     "performed_sets": 4.0,
+     "intensity": {
+      "max_rpe": 8.0
+     }
+    },
+    {
+     "movement_key": "tmpl:cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
+     "programmed_sets": 2.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 8.0
+     }
+    },
+    {
+     "movement_key": "tmpl:11A123F3",
+     "programmed_sets": 2.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 8.5
+     }
+    },
+    {
+     "movement_key": "tmpl:91237BDD",
+     "programmed_sets": 2.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 7.5
+     }
+    }
+   ],
+   "extra": [
+    "75A4F6C4",
+    "243710DE",
+    "527DA061"
+   ]
+  }
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-25#WORKOUT#35882de8-1923-4684-98ec-5fedb8934a73",
+  "date": "2026-09-25",
+  "phase": "experiment",
+  "source": "hevy",
+  "title": "Foundation - Upper - 2 - 19",
+  "hevy_routine_id": "28cab4f5-f663-4597-9433-ca98dec2675a",
+  "source_workout_id": "35882de8-1923-4684-98ec-5fedb8934a73",
+  "workout_uid": "hevy:35882de8-1923-4684-98ec-5fedb8934a73",
+  "start_time": "2026-09-25T22:08:50+00:00",
+  "end_time": "2026-09-26T00:55:31+00:00",
+  "set_count": 29.0,
+  "exercise_count": 9.0,
+  "exercises": [
+   {
+    "name": "Bench Press (Barbell)",
+    "template_id": "79D0BB3A",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "warmup",
+      "weight_kg": 20.41168092460379,
+      "reps": 10.0,
+      "rpe": null,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "warmup",
+      "weight_kg": 43.091326396385774,
+      "reps": 5.0,
+      "rpe": null,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "warmup",
+      "weight_kg": 61.235042773811365,
+      "reps": 3.0,
+      "rpe": null,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 74.84283005688056,
+      "reps": 12.0,
+      "rpe": 9.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 4.0,
+      "type": "normal",
+      "weight_kg": 74.84283005688056,
+      "reps": 12.0,
+      "rpe": 9.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 5.0,
+      "type": "normal",
+      "weight_kg": 74.84283005688056,
+      "reps": 7.0,
+      "rpe": 10.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 6.0,
+      "type": "normal",
+      "weight_kg": 61.235042773811365,
+      "reps": 12.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Dumbbell Row",
+    "template_id": "F1E57334",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 8.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 8.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 8.0,
+      "rpe": 9.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 40.82336184920758,
+      "reps": 8.0,
+      "rpe": 9.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Shoulder Press (Dumbbell)",
+    "template_id": "878CD1D0",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 23.813627745371086,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 23.813627745371086,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 23.813627745371086,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 23.813627745371086,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Lat Pulldown (Cable)",
+    "template_id": "6A6C31A5",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 63.50300732098956,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 63.50300732098956,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Fly Crossovers",
+    "template_id": "651F844C",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 13.607787283069193,
+      "reps": 12.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 13.607787283069193,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 13.607787283069193,
+      "reps": 12.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Triceps Pushdown",
+    "template_id": "93A552C6",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 36.28743275485118,
+      "reps": 15.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 36.28743275485118,
+      "reps": 15.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 36.28743275485118,
+      "reps": 12.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Bicep Curl (Dumbbell)",
+    "template_id": "37FCC2BB",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 11.339822735890994,
+      "reps": 12.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 11.339822735890994,
+      "reps": 12.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 11.339822735890994,
+      "reps": 12.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 11.339822735890994,
+      "reps": 12.0,
+      "rpe": 8.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Treadmill",
+    "template_id": "243710DE",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null,
+      "distance_m": 4989.0,
+      "duration_sec": 3600.0
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ],
+  "adherence": {
+   "status": "matched",
+   "match_method": "hevy_routine_id",
+   "matched_routine_id": "edd83e5731bb675eb312e0cc8f9cd1b7",
+   "routine_target_date": "2026-09-25",
+   "workout_pacific_date": "2026-09-25",
+   "movements": [
+    {
+     "movement_key": "barbell_bench_press",
+     "programmed_sets": 6.0,
+     "performed_sets": 7.0,
+     "intensity": {
+      "max_rpe": 10.0
+     }
+    },
+    {
+     "movement_key": "one_arm_db_row",
+     "programmed_sets": 3.0,
+     "performed_sets": 4.0,
+     "intensity": {
+      "max_rpe": 9.0
+     }
+    },
+    {
+     "movement_key": "db_shoulder_press",
+     "programmed_sets": 3.0,
+     "performed_sets": 4.0,
+     "intensity": {
+      "max_rpe": 8.0
+     }
+    },
+    {
+     "movement_key": "lat_pulldown",
+     "programmed_sets": 2.0,
+     "performed_sets": 2.0,
+     "intensity": {
+      "max_rpe": 7.5
+     }
+    },
+    {
+     "movement_key": "cable_chest_fly",
+     "programmed_sets": 2.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 8.0
+     }
+    },
+    {
+     "movement_key": "cable_tricep_pushdown",
+     "programmed_sets": 2.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 8.5
+     }
+    },
+    {
+     "movement_key": "db_curl",
+     "programmed_sets": 2.0,
+     "performed_sets": 4.0,
+     "intensity": {
+      "max_rpe": 8.5
+     }
+    },
+    {
+     "movement_key": "treadmill",
+     "programmed_sets": 1.0,
+     "performed_sets": 1.0,
+     "intensity": {
+      "max_rpe": null
+     }
+    },
+    {
+     "movement_key": "tmpl:527DA061",
+     "programmed_sets": 1.0,
+     "performed_sets": 1.0,
+     "intensity": {
+      "max_rpe": null
+     }
+    }
+   ],
+   "extra": []
+  }
+ },
+ {
+  "pk": "USER#matthew#SOURCE#hevy",
+  "sk": "DATE#2026-09-26#WORKOUT#80a19118-1eae-4a0a-9d5a-7669427d5f97",
+  "date": "2026-09-26",
+  "phase": "experiment",
+  "source": "hevy",
+  "title": "Foundation - Flex - 1 - 20",
+  "hevy_routine_id": "9764f978-0908-4547-a066-45deeba21749",
+  "source_workout_id": "80a19118-1eae-4a0a-9d5a-7669427d5f97",
+  "workout_uid": "hevy:80a19118-1eae-4a0a-9d5a-7669427d5f97",
+  "start_time": "2026-09-26T17:59:23+00:00",
+  "end_time": "2026-09-26T19:05:00+00:00",
+  "set_count": 22.0,
+  "exercise_count": 7.0,
+  "exercises": [
+   {
+    "name": "Suitcase Carry",
+    "template_id": "056a1c53-c778-4ace-bb18-6f72e81b6724",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": null,
+      "rpe": null,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": null,
+      "rpe": null,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": null,
+      "rpe": null,
+      "distance_m": 40.0,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": null,
+      "rpe": null,
+      "distance_m": 40.0,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Side Bend (Dumbbell)",
+    "template_id": "026FD047",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": 10.0,
+      "rpe": 7.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": 15.0,
+      "rpe": 7.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": 15.0,
+      "rpe": 7.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 19.958088015168148,
+      "reps": 15.0,
+      "rpe": 7.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Rotator Cuff External Rotation",
+    "template_id": "fda0298c-dca2-4b05-9292-c323e7cb0b1d",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 5.896707822663316,
+      "reps": 12.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 5.896707822663316,
+      "reps": 12.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 5.896707822663316,
+      "reps": 12.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Twist (Up to down)",
+    "template_id": "A2D838BD",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 21.318866743475066,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 21.318866743475066,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 21.318866743475066,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Cable Pallof Press",
+    "template_id": "4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 16.782937649118672,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 16.782937649118672,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 16.782937649118672,
+      "reps": 10.0,
+      "rpe": 7.5,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Abdominal Oblique Crunch",
+    "template_id": "95e728f7-bde3-475f-976c-8219c31ae43f",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": 0.0,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 1.0,
+      "type": "normal",
+      "weight_kg": 0.0,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 2.0,
+      "type": "normal",
+      "weight_kg": 0.0,
+      "reps": 10.0,
+      "rpe": 8.0,
+      "distance_m": null,
+      "duration_sec": null
+     },
+     {
+      "set_index": 3.0,
+      "type": "normal",
+      "weight_kg": 0.0,
+      "reps": 10.0,
+      "rpe": 9.0,
+      "distance_m": null,
+      "duration_sec": null
+     }
+    ]
+   },
+   {
+    "name": "Stretching",
+    "template_id": "527DA061",
+    "sets": [
+     {
+      "set_index": 0.0,
+      "type": "normal",
+      "weight_kg": null,
+      "reps": null,
+      "rpe": null,
+      "distance_m": null,
+      "duration_sec": 900.0
+     }
+    ]
+   }
+  ],
+  "adherence": {
+   "status": "matched",
+   "match_method": "hevy_routine_id",
+   "matched_routine_id": "b14a398e15a93ef72d5dedec42b61cad",
+   "routine_target_date": "2026-09-26",
+   "workout_pacific_date": "2026-09-26",
+   "movements": [
+    {
+     "movement_key": "tmpl:056a1c53-c778-4ace-bb18-6f72e81b6724",
+     "programmed_sets": 3.0,
+     "performed_sets": 4.0,
+     "intensity": {
+      "max_rpe": null
+     }
+    },
+    {
+     "movement_key": "tmpl:A2D838BD",
+     "programmed_sets": 2.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 8.0
+     }
+    },
+    {
+     "movement_key": "tmpl:4eea8956-e0f1-4327-9e7d-e4f4f9a0b1df",
+     "programmed_sets": 3.0,
+     "performed_sets": 3.0,
+     "intensity": {
+      "max_rpe": 7.5
+     }
+    },
+    {
+     "movement_key": "tmpl:527DA061",
+     "programmed_sets": 1.0,
+     "performed_sets": 1.0,
+     "intensity": {
+      "max_rpe": null
+     }
+    }
+   ],
+   "extra": [
+    "026FD047",
+    "fda0298c-dca2-4b05-9292-c323e7cb0b1d",
+    "95e728f7-bde3-475f-976c-8219c31ae43f"
+   ]
+  }
+ }
+]

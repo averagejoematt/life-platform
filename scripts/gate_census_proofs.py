@@ -1912,6 +1912,45 @@ _RECEDE_OBSERVED = {
     ".vg-off": (0.55, 12, "dark 2.56:1 / @media-light 2.16:1 / data-theme-light 2.16:1"),
 }
 
+# #4217 (2026-09-26) — the absent-coach gate's glue. A `# gate-entrypoint:` module: nothing in
+# it raises (fail-open by contract), the CALLERS block — so the proof plants the defect in the
+# real tracked file and watches the callers' tests.
+GUARD_PROOFS.update(
+    {
+        "guard::lambdas/coach/coach_presence_gate.py": {
+            "gate_name": "lambdas/coach/coach_presence_gate.py",
+            "command": (
+                "env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACCESS_KEY=FAKESECRET "
+                "AWS_DEFAULT_REGION=us-west-2 python3 -m pytest tests/test_ai_expert_analyzer_behavior.py "
+                "tests/test_coach_public_register_by_coach.py -q -k '4217 or absent or dark or glucose'   # baseline 25 passed"
+            ),
+            "mutation": (
+                "In the REAL tracked lambdas/coach/coach_presence_gate.py (md5 8b58fd7b4208f60bf897ddf855675fca before and "
+                "after), `absent_or_empty()`'s `return read() or {}, None` replaced by `return {}, None` — the gate never "
+                "names an absent coach, i.e. the exact pre-#4217 world in which the glucose coach with a CGM dark since "
+                "2026-08-27 is still asked for a read and still writes a stance."
+            ),
+            "observed": (
+                "2026-09-26. BASELINE 25 passed. MUTATED 5 failed / 20 passed: "
+                "TestAbsentCoach4217::test_the_glucose_coach_is_not_asked_while_the_cgm_is_dark, "
+                "::test_a_single_expert_request_for_an_absent_coach_is_also_skipped, "
+                "::test_a_failed_presence_read_fails_open_and_says_so (the `_presence_check` failure report vanished with "
+                "the gate), test_the_weekly_batch_writes_no_glucose_stance_while_the_cgm_is_dark, "
+                "test_an_event_refresh_for_an_absent_coach_is_skipped. RESTORED (md5 identical) 25 passed."
+            ),
+            "scope": (
+                "Proves the GLUE — that the analyzer and the stance writer act on what the gate names. Which coaches it "
+                "names is health.instrument_presence's verdict, proved separately in PR #4305's mutation control "
+                "(absent_coaches() returning {} -> 9 failed across the analyzer, by-coach, dashboard and docket suites). "
+                "Docket admission calls instrument_presence directly (dispute_docket._absent_coaches) and is covered by "
+                "that control, not this one."
+            ),
+            "proved_on": "2026-09-26",
+        },
+    }
+)
+
+
 REGISTRY_PROOFS: dict[str, dict[str, Any]] = {
     f"registry::tests/test_token_contrast.py::RECEDE_TEXT_RULES::{selector}": _recede_proof(
         selector,

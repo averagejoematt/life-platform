@@ -1625,6 +1625,7 @@ def handler_env(monkeypatch):
     is what is under test here."""
     calls = {"experts": [], "synthesis": 0, "arc": 0, "month": 0}
     monkeypatch.setattr(az, "_build_shared_system_prompt", lambda: "SHARED")
+    monkeypatch.setattr(az, "_absent_coaches", lambda: {})  # #4217: no instrument is dark in these branch tests
     monkeypatch.setattr(az, "generate_and_cache", lambda k, shared_system=None: calls["experts"].append(k) or f"{k} text")
     monkeypatch.setattr(az, "generate_synthesis", lambda outs: calls.__setitem__("synthesis", calls["synthesis"] + 1) or {"x": 1})
     monkeypatch.setattr(
@@ -1743,3 +1744,84 @@ class TestLambdaHandler:
         resp = az.lambda_handler({}, None)
         assert resp["statusCode"] == 200
         assert json.loads(resp["body"])["sleep"]["status"] == "ok"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #4217 — a coach with a dark instrument is ABSENT: not asked for a read at all
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestAbsentCoach4217:
+    """The live 2026-09-26 shape: `/api/source_freshness` said the CGM had been dark since
+    2026-08-27 and the glucose coach was still asked for (and wrote) "His CGM is generating
+    traces…". The gate reads the SAME sentinel the board serves, through this Lambda's own
+    table, and skips the coach before any prompt is built — one Bedrock call not spent."""
+
+    @staticmethod
+    def _table(cgm_dark):
+        from fakes import FakeDdbTable
+        from instrument_presence_fixture import dispatching_query_hook, fresh_instrument_rows, sentinel_item
+
+        return FakeDdbTable(rows=[sentinel_item(cgm_dark=cgm_dark), *fresh_instrument_rows()], query_hook=dispatching_query_hook)
+
+    def _run(self, monkeypatch, cgm_dark):
+        from instrument_presence_fixture import NOW
+
+        calls = []
+        monkeypatch.setattr(az, "_build_shared_system_prompt", lambda: "SHARED")
+        monkeypatch.setattr(az, "generate_and_cache", lambda k, shared_system=None: calls.append(k) or f"{k} text")
+        monkeypatch.setattr(az, "generate_synthesis", lambda outs: {"x": 1})
+        monkeypatch.setattr(az, "generate_experiment_arc", lambda: None)
+        monkeypatch.setattr(az, "generate_month_rollup", lambda: None)
+        monkeypatch.setattr(az, "table", self._table(cgm_dark))
+        from health import instrument_presence
+
+        # the SAME derivation the board runs, pinned to the corpus's instant
+        monkeypatch.setattr(az, "_absent_coaches", lambda: instrument_presence.absent_coaches(az.table, now=NOW))
+        return calls, _body(az.lambda_handler({}, None))
+
+    def test_the_glucose_coach_is_not_asked_while_the_cgm_is_dark(self, monkeypatch):
+        from instrument_presence_fixture import ABSENT_REASON
+
+        calls, body = self._run(monkeypatch, cgm_dark=True)
+        assert "glucose" not in calls, "a prompt was built for a coach whose sensor stopped 30 days ago"
+        assert body["glucose"]["status"] == "skipped_absent"
+        assert body["glucose"]["reason"] == ABSENT_REASON
+        assert body["glucose"]["instrument"] == {"source": "apple_health", "datatype": "cgm"}
+        # every other coach on the roster still ran
+        assert set(calls) == set(az.EXPERTS) - {"glucose"}
+
+    def test_mutation_control_the_glucose_coach_runs_when_the_cgm_is_not_dark(self, monkeypatch):
+        calls, body = self._run(monkeypatch, cgm_dark=False)
+        assert "glucose" in calls
+        assert body["glucose"]["status"] == "ok"
+
+    def test_a_single_expert_request_for_an_absent_coach_is_also_skipped(self, monkeypatch):
+        from health import instrument_presence
+        from instrument_presence_fixture import NOW
+
+        calls = []
+        monkeypatch.setattr(az, "_build_shared_system_prompt", lambda: "SHARED")
+        monkeypatch.setattr(az, "generate_and_cache", lambda k, shared_system=None: calls.append(k) or "t")
+        monkeypatch.setattr(az, "table", self._table(cgm_dark=True))
+        monkeypatch.setattr(az, "_absent_coaches", lambda: instrument_presence.absent_coaches(az.table, now=NOW))
+        body = _body(az.lambda_handler({"expert": "glucose"}, None))
+        assert calls == [] and body["glucose"]["status"] == "skipped_absent"
+
+    def test_a_failed_presence_read_fails_open_and_says_so(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(az, "_build_shared_system_prompt", lambda: "SHARED")
+        monkeypatch.setattr(az, "generate_and_cache", lambda k, shared_system=None: calls.append(k) or f"{k} text")
+        monkeypatch.setattr(az, "generate_synthesis", lambda outs: {"x": 1})
+        monkeypatch.setattr(az, "generate_experiment_arc", lambda: None)
+        monkeypatch.setattr(az, "generate_month_rollup", lambda: None)
+        monkeypatch.setattr(az, "_absent_coaches", lambda: (_ for _ in ()).throw(RuntimeError("sentinel unreadable")))
+        body = _body(az.lambda_handler({}, None))
+        assert set(calls) == set(az.EXPERTS), "a broken presence read must not silence the roster"
+        assert body["_presence_check"]["status"] == "failed"
+
+    def test_the_short_key_maps_to_the_roster_id_not_string_surgery(self):
+        from coach import coach_presence_gate
+
+        assert coach_presence_gate.full_coach_id("glucose") == "glucose_coach"
+        assert coach_presence_gate.full_coach_id("astrology") is None

@@ -1828,3 +1828,37 @@ def test_decimal_values_from_dynamodb_never_reach_the_prompt_as_decimals(env):
     env["table"].rows.append(dict(_installment_row("2026-07-28", Decimal("4")), content_markdown="Fourth week prose."))
     m.lambda_handler({}, None)
     assert "Decimal(" not in (env["calls"]["ai"][0]["archive"] or "")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4191 — the FORMAT block: the third line is a parsed header, never prose
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _format_block(src: str) -> str:
+    start = src.index("FORMAT:\n")
+    end = src.index("Just prose.", start) + len("Just prose.")
+    return src[start:end]
+
+
+def _both_prompt_sources():
+    """The two copies of Elena's prompt: the config-driven module's literal and the
+    Lambda's in-code fallback template (the same words must reach the model either way)."""
+    import inspect
+
+    return (inspect.getsource(m._prompt._build_elena_prompt_from_config), m._FALLBACK_ELENA_PROMPT_TEMPLATE)
+
+
+def test_4191_the_format_block_names_the_third_line_as_a_parsed_header_not_prose():
+    for src in _both_prompt_sources():
+        block = _format_block(src)
+        # the wire contract the card engine + parse_installment read is unchanged …
+        assert "[Weight: X lbs | Week Grade: avg X | T0 Streak: X days]" in block
+        # … and the model is told what it is: a field, never a line of the story
+        assert "is parsed into a data field and is never shown to a reader as prose" in block
+        assert "the body opens on the installment's first sentence" in block
+
+
+def test_4191_the_two_prompt_copies_carry_the_same_format_block():
+    a, b = (_format_block(s) for s in _both_prompt_sources())
+    assert a == b

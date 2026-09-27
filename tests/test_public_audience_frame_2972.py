@@ -288,3 +288,72 @@ def test_dashboard_read_path_has_no_owner_channel_fallback():
     assert "audience_guard.public_blurb" in src
     assert 'truncate_at_word(_cd_out_item.get("content"' not in src, "the content fallthrough is back on the public blurb slot"
     assert 'truncate_at_word(_cd_out_item.get("observatory_summary"' not in src
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4217 — THE DASHBOARD WIRE, second slot rule: a coach whose domain instrument is
+# DARK is ABSENT. The live 2026-09-26 defect: `/api/source_freshness` said the CGM had
+# been dark since 2026-08-27 while `coaches[glucose].position_summary` served "His CGM
+# is generating traces…" — a public-register sentence (#2972 passes it), so only an
+# absence gate keyed on the SAME sentinel the board serves can hold it.
+# ══════════════════════════════════════════════════════════════════════════════
+
+from health import instrument_presence as _presence  # noqa: E402
+from instrument_presence_fixture import (  # noqa: E402
+    ABSENT_REASON,
+    GLUCOSE_POSITION_SUMMARY,
+    NOW,
+    dispatching_query_hook,
+    fresh_instrument_rows,
+    glucose_output_row,
+    sentinel_item,
+)
+
+_REAL_ABSENT = _presence.absent_coaches
+
+
+def _dashboard_body_4217(monkeypatch, cgm_dark):
+    table = FakeDdbTable(
+        rows=[sentinel_item(cgm_dark=cgm_dark), *fresh_instrument_rows(), glucose_output_row()], query_hook=dispatching_query_hook
+    )
+    monkeypatch.setattr(L, "table", table)
+    monkeypatch.setattr(L, "_integrator_digest", lambda: None)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    # the SAME derivation the freshness board runs, pinned to the corpus's instant
+    monkeypatch.setattr(_presence, "absent_coaches", lambda t, now=None, instruments=None: _REAL_ABSENT(t, NOW, instruments))
+    resp = L.lambda_handler(dict(_EVENT), None)
+    assert resp["statusCode"] == 200, resp
+    return json.loads(resp["body"])
+
+
+def test_dashboard_serves_the_glucose_coach_as_absent_while_the_cgm_is_dark(monkeypatch):
+    """RED before #4217: the live position_summary passed the audience guard and served."""
+    body = _dashboard_body_4217(monkeypatch, cgm_dark=True)
+    slot = {c["coach_id"]: c for c in body["coaches"]}["glucose"]
+    assert slot["absent"] is True
+    assert slot["reason"] == ABSENT_REASON
+    assert slot["instrument"] == {"source": "apple_health", "datatype": "cgm"}
+    assert slot["position_summary"] == ""
+    assert slot["prediction_count"] == 0
+    assert not any(a["coach_id"] == "glucose" for a in body["open_actions"])
+    assert not any(p["coach_id"] == "glucose" for p in body["predictions"])
+
+
+def test_dashboard_mutation_control_the_glucose_read_serves_when_the_cgm_is_not_dark(monkeypatch):
+    body = _dashboard_body_4217(monkeypatch, cgm_dark=False)
+    slot = {c["coach_id"]: c for c in body["coaches"]}["glucose"]
+    assert slot["absent"] is False
+    assert slot["position_summary"] == GLUCOSE_POSITION_SUMMARY
+    assert slot["instrument"] == {"source": "apple_health", "datatype": "cgm"}
+
+
+def test_dashboard_serves_every_coachs_instrument_and_only_the_dark_one_is_absent(monkeypatch):
+    from ingestion.source_registry import coach_instruments
+
+    body = _dashboard_body_4217(monkeypatch, cgm_dark=True)
+    slots = {c["coach_id"]: c for c in body["coaches"]}
+    for cid, row in coach_instruments().items():
+        short = cid.replace("_coach", "")
+        assert slots[short]["instrument"] == {"source": row["source"], "datatype": row["datatype"]}, cid
+    assert slots["mind"]["instrument"] is None and slots["explorer"]["instrument"] is None
+    assert [c["coach_id"] for c in body["coaches"] if c["absent"]] == ["glucose"]

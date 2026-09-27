@@ -975,7 +975,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # from the real file -> its tests/test_reader_check_<class>_4185.py FAILED; restored byte-identical -> passed).
         # Unproven stays 540; eight entrants. MEASURED by id-set diff on the MERGE tree against a `git archive origin/main`
         # export at 33aa0f474: lane {proven 224, unproven 540, 6, 5} vs main {216, 540, 6, 5}.
-        <= 224
+        # Upper bound 224 -> 225 (2026-09-26, #4217 the absent coach, PR #4305, merged on top of #4302/#4185's 224):
+        # `guard::lambdas/coach/coach_presence_gate.py` arrives PROVEN — a `# gate-entrypoint:` module (nothing in it
+        # raises; the analyzer / stance-writer callers do the blocking), GUARD_PROOFS in scripts/gate_census_proofs.py:
+        # `absent_or_empty()` neutered to `return {}, None` in the REAL tracked file (md5 8b58fd7b… before and after);
+        # baseline 25 passed, MUTATED 5 failed / 20 passed against the analyzer + by-coach suites
+        # (-k '4217 or absent or dark or glucose'), RESTORED 25 passed. Measured by id-set diff on COMMITTED trees:
+        # this lane -> 776 {proven 225, unproven 540, not-applicable 6, attempted-unproven 5}; a `git archive
+        # origin/main` export at 3c43af4ce -> 775 {224, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven
+        # does NOT move.
+        <= 225
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -717,6 +717,18 @@ def _dispatch_route(event, path, method):
                 "explorer": "/explorer/",
             }
             _cd_names = _registry_display_map(include=("operational",))
+            # #4217: which coaches are ABSENT right now — a dark domain instrument, decided by
+            # the SAME liveness /api/source_freshness serves (health.instrument_presence). An
+            # absent coach's slot carries {absent, reason, instrument} and NO prose: no
+            # position summary, no open ask, no prediction. Fail-open with a logged warning —
+            # the renderer keeps its own darkCoaches guard (defence in depth, PairContract).
+            from health import instrument_presence as _cd_presence
+
+            try:
+                _cd_absent = _cd_presence.absent_coaches(table)
+            except Exception as _cd_pe:
+                print(f"[WARN] /api/coaching-dashboard instrument presence check failed (fail-open): {_cd_pe}")
+                _cd_absent = {}
             _cd_coach_display = {
                 short: {
                     "coach_id": short,
@@ -786,6 +798,8 @@ def _dispatch_route(event, path, method):
             try:
                 for _cd_domain, _cd_info in _cd_coach_display.items():
                     _cd_full_id = _cd_coach_id_map[_cd_domain]
+                    if _cd_full_id in _cd_absent:
+                        continue  # #4217: an absent coach has no standing ask on the door
                     try:
                         _cd_dossier = _dossier_block(_cd_full_id)
                     except Exception:
@@ -854,6 +868,16 @@ def _dispatch_route(event, path, method):
                 # #4185: the last data day the read was written from (OUTPUT#.data_through,
                 # coach_state_updater). None = the record predates the stamp — unknown.
                 coach_entry["analysis_data_through"] = None
+                # #4217: the coach's domain instrument on the wire ({source, datatype} or
+                # null) — the v7 renderer reads THIS rather than its own table — and the
+                # absence verdict. An absent coach's slot stops here: no OUTPUT# read, no
+                # prose, no predictions; the reason is the engine's own words.
+                coach_entry["instrument"] = _cd_presence.served_instrument(_cd_coach_id_map[_cd_domain])
+                coach_entry["absent"] = _cd_coach_id_map[_cd_domain] in _cd_absent
+                if coach_entry["absent"]:
+                    coach_entry["reason"] = _cd_absent[_cd_coach_id_map[_cd_domain]].get("reason")
+                    _cd_coaches.append(coach_entry)
+                    continue
 
                 # Latest output for position_summary
                 try:

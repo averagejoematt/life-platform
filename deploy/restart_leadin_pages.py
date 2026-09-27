@@ -51,6 +51,7 @@ import boto3
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402
 from common.text_utils import truncate_at_word  # noqa: E402  # #2389: word-boundary excerpts, parity with chronicle_render (#1224)
+from content import chronicle_schema  # noqa: E402  # #4191: the ONE envelope→body derivation, shared with chronicle_render
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"
@@ -127,24 +128,11 @@ def excerpt_from_record(item, limit=300):
 def body_markdown_from_record(item):
     """Prose-only markdown (for excerpts): strip either stored header format —
     old assembled ('# heading' + '*By …*' byline + '---') or raw installment
-    ('"Title"' line + '[stats]' line)."""
-    lines = (item.get("content_markdown") or "").strip().split("\n")
-    i = 0
-    while i < len(lines) and not lines[i].strip():
-        i += 1
-    if i < len(lines):
-        first = lines[i].strip()
-        if first.startswith("# ") or (first.startswith('"') and first.endswith('"')):
-            i += 1
-    while i < len(lines):
-        s = lines[i].strip()
-        if not s:
-            i += 1
-        elif s.startswith("*By ") or s.startswith("[") or s == "---":
-            i += 1
-        else:
-            break
-    return "\n".join(lines[i:]).strip()
+    ('"Title"' line + '[stats]' line). #4191: the strip itself lives in ONE place,
+    content.chronicle_schema.body_markdown, shared with the standing writer
+    (chronicle_render.publish_to_journal) — the two manifest builders had diverged
+    (this one stripped, the Lambda did not) and the live excerpts opened on the bracket."""
+    return chronicle_schema.body_markdown(item.get("content_markdown") or "", item.get("title") or "")
 
 
 def markdown_to_html(md_text):
@@ -287,6 +275,8 @@ def render_post_html(title, stats_line, body_html, cur_label, date_str, seq):
     # No editorial image for resurrected lead-ins (the no-image path): default OG card.
     og_image = "https://averagejoematt.com/assets/images/og-home.png"
     canonical_url = CANONICAL_URL_FMT.format(seq=seq)
+    # #4191: the dek and share description read as words, parity with publish_to_journal().
+    stats_row = chronicle_schema.stats_row_text(stats_line)
     # JSON-LD datePublished uses the record's (pre-genesis) date, not the run date —
     # truthful for a lead-in and keeps re-runs byte-identical.
     return f"""<!DOCTYPE html>
@@ -301,11 +291,11 @@ def render_post_html(title, stats_line, body_html, cur_label, date_str, seq):
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="{canonical_url}">
   <meta property="og:title" content="{title} — The Measured Life">
-  <meta property="og:description" content="{stats_line}">
+  <meta property="og:description" content="{stats_row}">
   <meta property="og:image" content="{og_image}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{title} — The Measured Life">
-  <meta name="twitter:description" content="{stats_line}">
+  <meta name="twitter:description" content="{stats_row}">
   <meta name="twitter:image" content="{og_image}">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
@@ -395,7 +385,7 @@ def render_post_html(title, stats_line, body_html, cur_label, date_str, seq):
       <span>&middot;</span>
       <span>{read_min} min read</span>
     </div>
-    <div class="post-header__stats">{stats_line}</div>
+    <div class="post-header__stats">{stats_row}</div>
   </div>
   <article class="post-body">
     <div class="prose">

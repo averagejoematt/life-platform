@@ -113,7 +113,6 @@ CALIBRATION_REDLINES = {
 from coach.critics_apply import (  # noqa: E402,F401
     _LBS_PER_KG,
     CHANGE_FIELD_RE,
-    FLOOR_TOLERANCE_KG,
     MAX_ADDED_SETS,
     _label,
     apply_changes,

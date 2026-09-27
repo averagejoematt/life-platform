@@ -447,6 +447,39 @@ def test_every_sweep_caller_handles_unreachable():
         assert "unreachable" in open(os.path.join(_REPO, rel), encoding="utf-8").read(), f"{rel} no longer handles unreachable"
 
 
+# ── #4191: the chronicle's bracketed machine header printed as prose ─────────
+
+_LIVE_4191_EXCERPT = (
+    '"The Silence and the Signal"\n\n[Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0 days]\n\n'
+    "On Monday afternoon, Matthew logged what the platform’s daily brief called the biggest training day of the experiment."
+)
+
+
+def test_4191_stat_line_bracket_flags_a_page_but_not_the_manifests_stored_excerpt():
+    """The live 2026-09-26 excerpt on a PAGE is a finding; on /journal/posts.json it is the
+    stored artifact the fix cannot change at deploy, exempt until the manifest is re-rendered."""
+    page = f"<p class='dx-prose'>{_LIVE_4191_EXCERPT}</p>"
+    assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", page))
+    assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/", page))
+    manifest = '{"posts": [{"excerpt": "' + _LIVE_4191_EXCERPT.replace("\n", "\\n") + '"}]}'
+    assert not any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/journal/posts.json", manifest))
+
+
+def test_4191_t0_streak_segment_flags_a_page_but_the_manifests_field_is_legitimate():
+    page = "<div class='post-header__stats'>Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0 days</div>"
+    assert any(label == "Chronicle T0 Streak segment on a page" for label, _ in lts.check_body("/story/", page))
+    field = '{"stats_line": "Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0 days"}'
+    assert not any(label == "Chronicle T0 Streak segment on a page" for label, _ in lts.check_body("/journal/posts.json", field))
+
+
+def test_4191_the_cleaned_prose_carries_neither_token():
+    clean = "<p class='dx-prose'>On Monday afternoon, Matthew logged what the platform’s daily brief called the biggest training day.</p>"
+    clean += "<p class='dx-meta'>315.0 lb that week · the engine's week score 74</p>"
+    labels = {label for label, _ in lts.check_body("/story/", clean)}
+    assert "Chronicle stat-line bracket as prose" not in labels
+    assert "Chronicle T0 Streak segment on a page" not in labels
+
+
 def test_tool_call_residue_token_is_the_shared_pattern_object():
     """#4190 (second cut): the sweep's residue token is DERIVED — it is the very
     regex object the write-door refuser and the serve-time strip are built on

@@ -703,3 +703,28 @@ def test_a_failed_repair_reports_failed_not_a_raise():
     assert _indexed(table, date, embed=_vec, now=_NOW) == ri.INDEXED
     table.rows[sr.sk_for(sr.KIND_CHRONICLE, date)]["link"] = "/chronicle/week-1/"
     assert _indexed(table, date, embed=_boom, now=_NOW) == ri.FAILED
+
+
+def test_4191_the_card_quotes_the_first_sentence_not_the_envelope_head():
+    """#4191: a chronicle row is indexed from `title + subtitle + content_markdown`, and
+    content_markdown is the whole envelope — so the stored snippet opens on
+    `The X Week N of The Measured Life "The X" [Weight: … | T0 Streak: 0 days]` (live on
+    /journal/posts/week-06/, 2026-09-26). The card cleans it at render time, so every row
+    already indexed reads clean without a re-embed. Fixture = the live snippet head."""
+    live = (
+        'The System Goes Dark Week 2 of The Measured Life "The System Goes Dark" '
+        "[Weight: 326.2 lbs | Week Grade: avg 34 | T0 Streak: 0 days] The Whoop strap is still transmitting. Every morning"
+    )
+    assert "[Weight:" in live  # mutation control: the raw snippet DOES carry the machine line
+    html = _render()._recall_card_html(
+        _found({"resembles_date": WEEK_1, "similarity": 0.9, "link": "", "snippet": live, "provenance": "p"})
+    )
+    assert "[Weight:" not in html
+    assert "T0 Streak" not in html
+    assert "Week 2 of The Measured Life" not in html
+    assert "&ldquo;The Whoop strap is still transmitting. Every morning&rdquo;" in html
+    # a snippet the storage cap cut INSIDE the bracket is cleaned too
+    cut = 'The System Goes Dark Week 2 of The Measured Life "The System Goes Dark" [Weight: 326.2 lbs | Week Gr'
+    assert "[Weight:" not in _render()._recall_card_html(
+        _found({"resembles_date": WEEK_1, "similarity": 0.9, "link": "", "snippet": cut, "provenance": "p"})
+    )

@@ -112,6 +112,17 @@ FORBIDDEN_TOKENS = [
     # assembling (a client-side parsing bug), later stored and served verbatim. A
     # 2026-09-08 log_decision record's `decision` field ended
     # `…</decision>\n<parameter name="followed">true` and rendered as prose on
+    # #4191: the chronicle's bracketed machine header — `[Weight: X lbs | Week Grade: avg X |
+    # T0 Streak: X days]`, the card-engine parsing hook the prompt asks for — printed as
+    # PROSE. The writer stores the whole envelope as content_markdown and, until #4191,
+    # truncated it straight into the manifest excerpt, so /story/ and the home teaser opened
+    # on the bracket. /journal/posts.json is exempt ONLY while its stored excerpts predate the
+    # fix (a stored artifact does not change at deploy); lift the exemption once the manifest
+    # has been re-rendered (deploy/restart_leadin_pages.py --apply, or the next publish).
+    ("Chronicle stat-line bracket as prose", re.compile(r"\[Weight:[^\]]*\]"), ["/journal/posts.json"]),
+    # The builder-only segment of that header on a PAGE. The manifest carries it legitimately
+    # in its `stats_line` data field (the card engine reads it there), so the JSON is exempt.
+    ("Chronicle T0 Streak segment on a page", re.compile(r"\bT0 Streak:"), ["/journal/posts.json"]),
     # /protocols/experiments/. The pattern is THE SAME OBJECT the write-door refuser
     # and the serve-time strip use (`common.text_guards.TOOL_CALL_ENVELOPE_RE`) —
     # derived, not a second hand-typed copy that drifts. It is the envelope set,
