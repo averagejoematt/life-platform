@@ -237,7 +237,8 @@ class TestVerdict:
             "decision_class_violations": ["claimed causation from n=2"],
             "cross_coach_similarity_flags": ["mind_coach"],
         }
-        report = _run()
+        # #4343: an anti-pattern hit survives only when its phrase is in the text judged.
+        report = _run(output_text="We keep circling back; I used 'circling back' on purpose.")
         assert report["anti_pattern_violations"] == ["used 'circling back'"]
         assert report["decision_class_violations"] == ["claimed causation from n=2"]
         assert report["cross_coach_similarity_flags"] == ["mind_coach"]
@@ -543,7 +544,7 @@ class TestHandler:
         assert gate.lambda_handler({"coach_id": "sleep_coach", "output_text": ""}, None)["statusCode"] == 400
 
     def test_a_successful_run_returns_the_report_alongside_the_coach_id(self, wired, haiku):
-        haiku.result = {"passed": False, "score": 31, "anti_pattern_violations": ["x"]}
+        haiku.result = {"passed": False, "score": 31, "anti_pattern_violations": ["draft"]}  # #4343: a hit the text contains
         resp = gate.lambda_handler({"coach_id": "sleep_coach", "output_text": "draft", "skip_cross_coach": True}, None)
         assert resp["statusCode"] == 200
         assert resp["coach_id"] == "sleep_coach"
@@ -601,3 +602,120 @@ class TestHandler:
         assert resp["statusCode"] == 200
         assert resp["_fallback"] is True
         assert resp["passed"] is False  # #3083: unjudged now holds, even through the 200
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4343 cause A — a judge anti-pattern hit the text does not contain is dropped
+# ──────────────────────────────────────────────────────────────────────────────
+
+# The live 2026-09-27 17:00Z brief (request c016d078): the judge's hit, and the final text
+# fragment it was reported against (from the issue's per-coach table / retained report).
+_LIVE_0927_PHANTOMS = {
+    "explorer_coach": (
+        ["mechanistically", "autocorrelation"],
+        "The 21 logged days point one way: protein up, the scale down. What would refute it is a week "
+        "where protein holds and the scale does not move, and that is the test worth running next.",
+    ),
+    "mind_coach": (
+        ["emotional texture"],
+        "Average intake over the logged days sits around 150 g a day, and the journal reads steadier this week.",
+    ),
+    "physical_coach": (
+        ["liquidation"],
+        "Protein is averaging around 150 grams per day, and strength has held since the start after your mid-40s.",
+    ),
+}
+
+
+@pytest.fixture
+def no_shared_standard(monkeypatch):
+    monkeypatch.setattr(gate, "_shared_blacklists", lambda: ([], ["Opening with a compliment before the substance"]))
+
+
+class TestPhantomJudgeHits4343:
+    @pytest.mark.parametrize("coach_id", sorted(_LIVE_0927_PHANTOMS))
+    def test_a_live_0927_phantom_hit_is_dropped_from_report_and_note(self, haiku, no_shared_standard, coach_id):
+        from ai.ai_calls import _quality_gate_correction_note
+
+        phrases, final_text = _LIVE_0927_PHANTOMS[coach_id]
+        haiku.result = {
+            "passed": False,
+            "score": 42,
+            "voice_distinctiveness_score": 70,
+            "anti_pattern_violations": [{"phrase": p, "context": "somewhere"} for p in phrases],
+            "decision_class_violations": [{"expected_max": "directional", "found": "interventional", "excerpt": "test worth running"}],
+            "suggestions": [f"Remove the forbidden phrase '{p}'" for p in phrases] + ["Name the window on the average"],
+        }
+        report = _run(coach_id=coach_id, output_text=final_text)
+        assert report["anti_pattern_violations"] == []
+        assert report["dropped_judge_hits"] == phrases
+        assert report["suggestions"] == ["Name the window on the average"]
+        note = _quality_gate_correction_note(report)
+        for p in phrases:
+            assert p not in note.lower(), f"the phantom {p!r} still primes the rewrite:\n{note}"
+        # a surviving finding (decision class) keeps the draft failed — no restore
+        assert report["passed"] is False and "judge_verdict_restored" not in report
+
+    def test_a_phrase_that_is_present_still_fails_the_draft_positive_control(self, haiku, no_shared_standard):
+        haiku.result = {
+            "passed": False,
+            "score": 38,
+            "voice_distinctiveness_score": 70,
+            "anti_pattern_violations": [{"phrase": "slow-wave", "context": "para 2"}],
+            "suggestions": ["Replace 'slow-wave' with deep sleep"],
+        }
+        text = "Nothing here is doing anything measurable to **slow\u2011wave** architecture."
+        report = _run(output_text=text)
+        assert report["passed"] is False
+        assert report["anti_pattern_violations"] == [{"phrase": "slow-wave", "context": "para 2"}]
+        assert "dropped_judge_hits" not in report
+        assert report["suggestions"] == ["Replace 'slow-wave' with deep sleep"]
+
+    def test_hyphen_space_and_case_variants_count_as_present(self, haiku, no_shared_standard):
+        haiku.result = {"passed": False, "score": 30, "anti_pattern_violations": ["Counter-Regulatory", "slow wave"]}
+        report = _run(output_text="…fragmenting your slow-wave sleep through a counter\u2013regulatory response")
+        assert [_p for _p in report["anti_pattern_violations"]] == ["Counter-Regulatory", "slow wave"]
+        assert report["passed"] is False
+
+    def test_a_fail_resting_only_on_phantoms_is_restored_to_the_threshold(self, haiku, no_shared_standard):
+        haiku.result = {
+            "passed": False,
+            "score": 28,
+            "voice_distinctiveness_score": 80,
+            "anti_pattern_violations": [{"phrase": "emotional texture"}],
+        }
+        report = _run(coach_id="mind_coach", output_text=_LIVE_0927_PHANTOMS["mind_coach"][1])
+        assert report["passed"] is True
+        assert report["score"] == gate.PASS_SCORE_THRESHOLD
+        assert report["judge_verdict_restored"] == {"prior_score": 28, "dropped": ["emotional texture"]}
+
+    def test_a_restored_verdict_still_loses_to_the_deterministic_number_grounding(self, haiku, no_shared_standard):
+        haiku.result = {"passed": False, "score": 28, "anti_pattern_violations": ["liquidation"]}
+        grounding = {"status": "measured", "findings": [{"type": "fabricated_number", "detail": "122.7 not in evidence"}]}
+        report = gate._run_quality_gate("physical_coach", _LIVE_0927_PHANTOMS["physical_coach"][1], {}, None, grounding=grounding)
+        assert report["anti_pattern_violations"] == []
+        assert report["passed"] is False
+
+    def test_a_structural_pattern_hit_is_never_treated_as_a_missing_phrase(self, haiku, no_shared_standard):
+        hit = {"phrase": "Opening with a compliment before the substance", "context": "first line"}
+        haiku.result = {"passed": False, "score": 50, "anti_pattern_violations": [hit]}
+        report = _run(output_text="Great week! Your sleep held.")
+        assert report["anti_pattern_violations"] == [hit]
+        assert report["passed"] is False
+
+    def test_each_drop_is_logged_as_one_structured_line(self, monkeypatch):
+        from coach import judge_hit_filter as jf
+
+        lines = []
+
+        class _L:
+            def info(self, msg, *a, **k):
+                lines.append(msg)
+
+        result = {"passed": False, "score": 42, "anti_pattern_violations": ["mechanistically", "autocorrelation"]}
+        jf.drop_unfounded_hits(result, _LIVE_0927_PHANTOMS["explorer_coach"][1], coach_id="explorer_coach", logger=_L())
+        drops = [json.loads(ln.split(" ", 1)[1]) for ln in lines if ln.startswith(jf.DROP_LOG_TAG + " ")]
+        assert drops == [
+            {"coach_id": "explorer_coach", "event": "judge_hit_dropped", "phrase": "mechanistically", "reason": "not_in_text"},
+            {"coach_id": "explorer_coach", "event": "judge_hit_dropped", "phrase": "autocorrelation", "reason": "not_in_text"},
+        ]

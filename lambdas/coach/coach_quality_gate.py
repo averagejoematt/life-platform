@@ -85,6 +85,8 @@ import boto3
 from ai.quality_gate_contract import AUTHORITATIVE_FACTS_KEY, EMIT_VERDICT_KEY, GROUNDING_ALLOWLIST_KEY, report_findings
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
+from coach.judge_hit_filter import drop_unfounded_hits  # #4343
+
 # Structured logger
 try:
     from common.platform_logger import get_logger
@@ -908,6 +910,20 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
         result.setdefault("voice_distinctiveness_score", 50)
         result.setdefault("cross_coach_similarity_flags", [])
         result.setdefault("suggestions", [])
+
+        # #4343 (cause A): a forbidden-phrase hit whose phrase is not in the text is a
+        # judge hallucination — dropped here, before it can fail the verdict or be written
+        # into `ai_calls._quality_gate_correction_note` (which primed the rewrite with it).
+        _spec_structural = list(((voice_spec or {}).get("anti_pattern_detection") or {}).get("structural_blacklist") or [])
+        drop_unfounded_hits(
+            result,
+            output_text,
+            structural=_spec_structural + _shared_blacklists()[1],
+            voice_minimum=VOICE_DISTINCTIVENESS_MINIMUM,
+            pass_threshold=PASS_SCORE_THRESHOLD,
+            coach_id=coach_id,
+            logger=logger,
+        )
 
         # #2573: the deterministic verdict is applied to the report structurally,
         # BEFORE the score threshold — a fabricated number blocks whatever the model
