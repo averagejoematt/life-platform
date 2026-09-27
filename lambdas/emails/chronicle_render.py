@@ -13,6 +13,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DA
 from common.digest_utils import _confidence_badge, compute_confidence
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.text_utils import truncate_at_word
+from content import chronicle_schema  # #4191 — the ONE envelope→body / stat-line→words derivation
 
 _HAS_CONFIDENCE = True
 
@@ -293,7 +294,9 @@ def _recall_card_html(outcome):
     link = _html.escape(str(card.get("link") or ""))
     dated = f'<a href="{link}">the week of {date}</a>' if link else f"the week of {date}"
     provenance = _html.escape(str(card.get("provenance", "")))
-    snippet = _html.escape(str(card.get("snippet", "") or ""))
+    # #4191: a row indexed from the envelope opens on `title subtitle "title" [Weight: …]`;
+    # the quote a reader sees starts on the installment's first sentence.
+    snippet = _html.escape(chronicle_schema.clean_snippet(card.get("snippet", "") or ""))
     quote = f'<p class="post-recall__snippet">&ldquo;{snippet}&rdquo;</p>' if snippet else ""
     return (
         '  <aside class="post-recall">\n'
@@ -441,6 +444,9 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # "no comparison run" note instead when the lookup couldn't happen at all — a
     # coverage gap must not render the same as an honest no-match (#2708, ADR-104).
     recall_card_html = _recall_card_html(recall_card_for(_g.get("table"), f"{title} {body_html}"))
+    # #4191: the dek and the share description read as words ("315.0 lb that week · the
+    # engine's week score 74"), never as the bracketed machine header the card engine parses.
+    stats_row = chronicle_schema.stats_row_text(stats_line)
     post_html = f"""<!DOCTYPE html>
 <html lang="en" data-door="story">
 <head>
@@ -453,13 +459,13 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="{canonical_url}">
   <meta property="og:title" content="{title} — The Measured Life">
-  <meta property="og:description" content="{stats_line}">
+  <meta property="og:description" content="{stats_row}">
   <meta property="og:image" content="{og_image}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@averagejoematt_">
   <meta name="twitter:creator" content="@averagejoematt_">
   <meta name="twitter:title" content="{title} — The Measured Life">
-  <meta name="twitter:description" content="{stats_line}">
+  <meta name="twitter:description" content="{stats_row}">
   <meta name="twitter:image" content="{og_image}">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
@@ -568,7 +574,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
       <span>&middot;</span>
       <span>{read_min} min read</span>
     </div>
-    <div class="post-header__stats">{stats_line}</div>
+    <div class="post-header__stats">{stats_row}</div>
   </div>
   <article class="post-body">
     <div class="prose">
@@ -665,7 +671,10 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
                 "date": idate,
                 "stats_line": display_stats_line(inst.get("stats_line", ""), idate, _g=_g),  # #949 — prologue-framed dek pre-genesis
                 "url": _u,
-                "excerpt": truncate_at_word(inst.get("content_markdown") or "", 300),  # #1224: word boundary, no mid-word cut
+                # #4191: the stored content_markdown is the whole ENVELOPE (quoted title, bracketed stat
+                # line, body); the excerpt is the BODY — a reader never meets the machine line as prose.
+                # #1224: word boundary, no mid-word cut.
+                "excerpt": truncate_at_word(chronicle_schema.body_markdown(inst.get("content_markdown") or "", inst.get("title", "")), 300),
                 "word_count": inst.get("word_count", 0),
                 "has_board_interview": inst.get("has_board_interview", False),
                 "image_url": _im.get("image_url", ""),
