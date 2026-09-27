@@ -204,7 +204,7 @@ def action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("adherence requires routine_id", error_code="MISSING_ARG")
-    from health.adherence_calc import calculate_adherence
+    from health.adherence_calc import calculate_adherence, find_workout_for_routine
     from training import hevy_write_client as wc
     from training.routine_repo import get_current
 
@@ -212,13 +212,27 @@ def action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     if not ir:
         return mcp_error(f"routine_id={routine_id} not found", error_code="NOT_FOUND")
     workouts = wc.get_workouts(page=1, page_size=10).get("workouts") or []
-    performed: dict[str, Any] = {}
-    for w in workouts:
-        # #2798: `start_time` is a UTC instant; its DAY is Pacific (`health.adherence_calc`
-        # already resolves it that way). A raw [:10] compared an evening workout to tomorrow.
-        if pacific_date_of(w.get("start_time")) == ir.target_date:
-            performed = w
-            break
-    if not performed:
-        return {"status": "no_workout_for_date", "routine_id": routine_id, "target_date": ir.target_date}
-    return {"status": "ok", "routine_id": routine_id, "adherence": calculate_adherence(ir, performed)}
+    # #4177: the SAME matcher ingestion uses (hevy_routine_id -> Pacific date -> overlap),
+    # asked in reverse. The private date-only matcher this replaced picked the first
+    # workout whose Pacific day equalled `ir.target_date` — so the 09-25-dated Lower-heavy,
+    # done early on 09-24, was graded against Friday's Upper session (0/12 sets).
+    performed, match_method = find_workout_for_routine(ir, workouts)
+    if performed is None:
+        # A named absence (ADR-104): no recent workout resolves to THIS routine. Never
+        # grade a different routine's session because it shares the date.
+        return {
+            "status": "no_workout_for_routine",
+            "routine_id": routine_id,
+            "target_date": ir.target_date,
+            "hevy_routine_id": ir.hevy_routine_id or None,
+            "workouts_searched": len(workouts),
+        }
+    return {
+        "status": "ok",
+        "routine_id": routine_id,
+        "match_method": match_method,
+        "workout_id": performed.get("id"),
+        "workout_pacific_date": pacific_date_of(performed.get("start_time")),
+        "target_date": ir.target_date,
+        "adherence": calculate_adherence(ir, performed),
+    }
