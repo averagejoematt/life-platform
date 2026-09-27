@@ -10,6 +10,8 @@ import json
 import os
 import sys
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -22,6 +24,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 from ai import budget_guard  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as api  # noqa: E402
+from web.site_api_common import EXPERIMENT_START  # noqa: E402
 
 
 def _body(resp):
@@ -47,16 +50,30 @@ def test_roster_returns_lead_plus_staff():
     assert "AI character" in data["disclosure"]
 
 
-def test_roster_headline_is_honest_pre_data():
+def test_roster_headline_is_honest_pre_data(monkeypatch):
+    # #4220: no checked call yet -> every staff coach says so in words, never a fake
+    # rate and never a zero record — and the lead never carries a track-record line at
+    # all (he makes no graded calls; his headline is his role).
+    monkeypatch.setattr(api, "table", FakeDdbTable(rows=[]))
     data = _body(api.handle_coaches({}))
-    # no predictions decided yet -> every staff coach reads "accruing", never a fake
-    # rate — and the lead never carries a track-record line at all (he makes no
-    # graded calls; his headline is his role).
     staff = [c for c in data["coaches"] if c["tier"] == "staff"]
-    assert all(c["headline_stat"] == "track record accruing" for c in staff)
+    assert all(c["headline_stat"] == "no checked call yet" for c in staff)
+    assert all(c["record"] == {"confirmed": 0, "refuted": 0, "n": 0, "through": None} for c in staff)
     lead = data["coaches"][0]
     assert lead["tier"] == "lead"
     assert lead["headline_stat"] == "runs the program"
+    assert lead["record"] is None
+
+
+def test_roster_headline_says_unavailable_when_the_ledger_read_fails():
+    # ADR-104: a failed read is not a clean slate. The default module table is the real
+    # boto3 handle under FAKE creds — every query raises — so the record is null and the
+    # headline says so, instead of the old producer's "track record accruing" (a zero
+    # count rendered as a fresh start).
+    data = _body(api.handle_coaches({}))
+    staff = [c for c in data["coaches"] if c["tier"] == "staff"]
+    assert all(c["record"] is None for c in staff)
+    assert all(c["headline_stat"] == "record unavailable" for c in staff)
 
 
 # ── coach page (/api/coach/{id}) ─────────────────────────────────────────────
@@ -512,3 +529,386 @@ def test_latest_checked_skips_undecided_and_archived_rows_and_degrades_to_null()
             raise RuntimeError("ddb down")
 
     assert latest_checked.for_coach(_Boom(), "physical_coach") is None
+
+
+# ── #4220: ONE record producer — the four endpoints agree per coach ───────────
+#
+# THE LIVE CORPUS, 2026-09-26/27 (Session AV/AW inventory, /api/* read 02:47Z):
+#
+#   coach              /api/coaches headline   /api/calibration + /api/predictions   /api/wrong by_coach
+#   Webb (nutrition)   "80% hit-rate · n=25"   n 5 · 0 confirmed / 5 refuted         20 confirmed / 5 refuted
+#   Brandt (explorer)  "12% hit-rate · n=24"   n 4 · 3 / 1                           3 / 21
+#
+# Two producers: /api/coaches and /api/wrong re-counted LEARNING# rows; the scorecard
+# counted PREDICTION#. Twenty of Webb's learnings were ONE dispute docket re-recorded
+# daily 09-07 → 09-26 (#4216: the resolver re-grades a stranded pre-cycle OPEN# row every
+# run; its LEARNING# key carries today's date, its PREDICTION# key does not, so
+# `_put_unique` wrote -2…-5 suffixed copies and then raised). Measured on Webb's live
+# partition 2026-09-27: five PREDICTION#docket-… rows, ONE prediction_id, every one
+# stamped phase=pilot cycle=16 tombstone=true (the reset/reconcile stamp,
+# deploy/reconcile_provenance_2026_09.py `after=`).
+#
+# THE FIXTURE IS THE WIRE. Every row below is written by the REAL producer that writes
+# it live — `prediction_emission.build_prediction_record` + `prediction_grading.
+# build_outcome_notes` for the graded calls, `coach_prediction_evaluator.
+# _write_learning_record` for their learnings, `dispute_docket._write_docket_learning`
+# / `_write_docket_prediction` (through the real `_put_unique`, against a table that
+# enforces its ConditionExpression) for the docket trail — twenty resolver days, in the
+# resolver's own write order. Since #4317 the prediction writer writes once and REFUSES
+# the nineteen re-runs (asserted); the four suffixed PREDICTION# copies the retired
+# writer left on the live table (measured 2026-09-27, still there until #4216's cleanup
+# box) are added as that measured shape, because the consumer must count them once.
+# Dates derive from the live genesis (never literals — the #2376 dated-fixture timebomb
+# class): the docket opens 34 days before Day 1, its criterion day is 27 days before,
+# the re-runs run Day 1 → Day 20.
+
+
+def _day(offset):
+    from datetime import date, timedelta
+
+    return (date.fromisoformat(EXPERIMENT_START) + timedelta(days=offset)).isoformat()
+
+
+class _ConditionalTable(FakeDdbTable):
+    """A FakeDdbTable whose put_item honours `attribute_not_exists(pk) AND
+    attribute_not_exists(sk)` the way DynamoDB does — so `_put_unique`'s real
+    disambiguation trail (and its exhaustion) is exercised, not assumed."""
+
+    def put_item(self, Item=None, **kwargs):  # noqa: N803 — boto3's own kwarg casing
+        from botocore.exceptions import ClientError
+
+        item = Item if Item is not None else kwargs.get("Item")
+        if kwargs.get("ConditionExpression") and self._key_of(item) in self.store:
+            raise ClientError({"Error": {"Code": "ConditionalCheckFailedException", "Message": "exists"}}, "PutItem")
+        return super().put_item(Item=item, **kwargs)
+
+
+def _docket_0810():
+    """The one docket behind the 20 re-writes — the live row's own fields (topic, pair,
+    criterion, opened/criterion dates relative to genesis)."""
+    opened = _day(-34)
+    criterion_day = _day(-27)
+    return {
+        "sk": "OPEN#explorer_coach__nutrition_coach#calories",
+        "coach_a": "explorer_coach",
+        "coach_b": "nutrition_coach",
+        "pair_key": "explorer_coach__nutrition_coach",
+        "subdomain": "calories",
+        "topic": "Caloric variance interpretation: distribution modeling vs point estimates",
+        "topic_slug": "caloric-variance-interpretation-distribution-modeling-vs-poi",
+        "criterion": {
+            "metric": "total_calories_kcal_7day_avg",
+            "condition": "gte",
+            "threshold": 2200,
+            "description": f"total_calories_kcal_7day_avg >= 2200 on {criterion_day}",
+        },
+        "claims": {
+            "explorer_coach": "The 7-day calorie average will sit under 2200.",
+            "nutrition_coach": "The 7-day calorie average will hold at or above 2200.",
+        },
+        "stakes": {},
+        "opened_date": opened,
+        "opened_at": f"{opened}T17:41:16+00:00",
+    }
+
+
+def _write_live_0926_wire(monkeypatch):
+    """Drive the real writers into ONE conditional table; return it."""
+    from coach import coach_prediction_evaluator as ev, dispute_docket as dd
+
+    table = _ConditionalTable(rows=[])
+    monkeypatch.setattr(ev, "table", table)
+    monkeypatch.setattr(dd, "table", table)
+
+    def _graded_call(coach_id, made, claim, status, graded_on, actual, metric, condition):
+        row = _graded(_emitted(coach_id, made, claim, metric=metric, condition=condition, threshold=1), status, graded_on, actual)
+        table.put_item(Item=row)
+        ev._write_learning_record(
+            coach_id,
+            graded_on,
+            {
+                "prediction_id": row["prediction_id"],
+                "status": status,
+                "metric": metric,
+                "condition": condition,
+                "actual_value": actual,
+                "evaluation_type": "directional",
+                "reason": f"{metric} trend=up (slope={actual}), predicted=down",
+            },
+        )
+        return row
+
+    # Webb: five in-cycle directional calls, every one refuted (the live 0 of 5).
+    webb = [
+        _graded_call(
+            "nutrition_coach",
+            _day(6),
+            "Protein will trend down after the disrupted dinner.",
+            "refuted",
+            _day(20),
+            0.0314,
+            "total_protein_g",
+            "down",
+        ),
+        _graded_call(
+            "nutrition_coach",
+            _day(6),
+            "Recovery will trend down if evening carbs are cut.",
+            "refuted",
+            _day(20),
+            0.0778,
+            "recovery_score",
+            "down",
+        ),
+        _graded_call(
+            "nutrition_coach", _day(7), "Calories will trend down this week.", "refuted", _day(19), 0.0859, "total_calories_kcal", "down"
+        ),
+        _graded_call(
+            "nutrition_coach", _day(8), "Protein will trend down over the weekend.", "refuted", _day(18), 0.0383, "total_protein_g", "down"
+        ),
+        _graded_call(
+            "nutrition_coach", _day(9), "Recovery will trend down under the deficit.", "refuted", _day(18), 0.1439, "recovery_score", "down"
+        ),
+    ]
+    # Brandt: three confirmed, one refuted (the live 3 of 4).
+    brandt = [
+        _graded_call(
+            "explorer_coach", _day(5), "HRV will trend up as the deficit settles.", "confirmed", _day(16), 0.02, "hrv_7day_avg", "up"
+        ),
+        _graded_call("explorer_coach", _day(6), "Sleep hours will trend up.", "confirmed", _day(17), 0.03, "sleep_hours", "up"),
+        _graded_call("explorer_coach", _day(7), "Resting heart rate will trend down.", "confirmed", _day(18), -0.01, "rhr_bpm", "down"),
+        _graded_call(
+            "explorer_coach", _day(8), "Calorie variance will trend down.", "refuted", _day(19), 0.05, "total_calories_kcal", "down"
+        ),
+    ]
+
+    # The docket, resolved by the real resolver path twenty days running (its order:
+    # both learnings, then both predictions — #4216's mechanism verbatim).
+    docket = _docket_0810()
+    refused = []
+    for offset in range(1, 21):
+        day = _day(offset)
+        dd._write_docket_learning("nutrition_coach", day, docket, "confirmed")
+        dd._write_docket_learning("explorer_coach", day, docket, "refuted", concession="CONCESSION — I lost the docket dispute.")
+        w = dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, day)
+        l = dd._write_docket_prediction("explorer_coach", docket, "refuted", 2310.0, day)
+        if offset > 1:
+            refused.append((w, l))
+    assert len(refused) == 19 and all(w is None and l is None for w, l in refused), "#4317: the docket writer refuses every re-run"
+    # The retired writer's trail, as the live table still carries it (2026-09-27): four
+    # suffixed copies of each side's docket row, one later outcome_date per daily re-run.
+    for (pk, sk), row in list(table.store.items()):
+        if str(sk).startswith("PREDICTION#docket-"):
+            for n in (2, 3, 4, 5):
+                table.store[(pk, f"{sk}-{n}")] = dict(row, sk=f"{sk}-{n}", outcome_date=_day(n))
+
+    # The reset/reconcile stamp the live docket rows carry (measured 2026-09-27 on all
+    # five of Webb's PREDICTION#docket-… rows): phase=pilot, tombstone=true, cycle=16 —
+    # the `after=` shape of deploy/reconcile_provenance_2026_09.py.
+    for (_pk, sk), row in table.store.items():
+        if str(sk).startswith("PREDICTION#docket-"):
+            row.update({"phase": "pilot", "tombstone": True, "cycle": "16"})
+
+    return table, {"webb": webb, "brandt": brandt}
+
+
+def _route_table(store_table):
+    """A query fake that routes by pk AND sk prefix — the two partitions a coach's pk
+    holds (PREDICTION#, LEARNING#) must not answer each other's query."""
+
+    def _pk_sk(kw):
+        expr = kw["KeyConditionExpression"].get_expression()
+        pk = prefix = None
+        if expr["operator"] == "AND":
+            left, right = expr["values"]
+            pk = left.get_expression()["values"][1]
+            r = right.get_expression()
+            if r["operator"] == "begins_with":
+                prefix = r["values"][1]
+        else:
+            pk = expr["values"][1]
+        return pk, prefix
+
+    def _hook(table, **kw):
+        pk, prefix = _pk_sk(kw)
+        rows = [dict(r) for (p, s), r in store_table.store.items() if p == pk and (prefix is None or str(s).startswith(prefix))]
+        rows.sort(key=lambda r: str(r.get("sk") or ""), reverse=not kw.get("ScanIndexForward", True))
+        return {"Items": rows}
+
+    return FakeDdbTable(query_hook=_hook)
+
+
+def _served_four(monkeypatch, table):
+    from web import site_api_intelligence as intel
+
+    routed = _route_table(table)
+    monkeypatch.setattr(api, "table", routed)
+    monkeypatch.setattr(intel, "table", routed)
+    coaches = _body(api.handle_coaches({}))
+    calibration = _body(api.handle_calibration({}))
+    predictions = _body(api.handle_predictions({"queryStringParameters": {"limit": "200"}}))
+    wrong = _body(intel.handle_wrong())
+    return coaches, calibration, predictions, wrong
+
+
+def _assert_one_record(short_id, coaches, calibration, predictions, wrong):
+    """The #4220 guard: for one coach, the four endpoints serve ONE record."""
+    roster = {c["persona_id"]: c for c in coaches["coaches"]}
+    cal = {c["coach_id"]: c for c in calibration["coaches"]}[short_id]
+    pred = predictions["by_coach"][short_id]
+    wrong_by = {r["coach"]: r for r in wrong["predictions"]["by_coach"]}
+    record = roster[f"{short_id}_coach"]["record"]
+    assert record is not None, f"{short_id}: /api/coaches served no record"
+    assert set(record) == {"confirmed", "refuted", "n", "through"}
+    assert record["n"] == record["confirmed"] + record["refuted"]
+    assert cal["record"] == record, f"{short_id}: /api/calibration.record disagrees with /api/coaches.record"
+    assert (cal["n"], cal["confirmed"], cal["refuted"]) == (record["n"], record["confirmed"], record["refuted"]), short_id
+    assert pred["record"] == record, f"{short_id}: /api/predictions.record disagrees"
+    assert (pred["decided"], pred["confirmed"], pred["refuted"]) == (record["n"], record["confirmed"], record["refuted"]), short_id
+    if record["n"]:
+        assert wrong_by[short_id] == {"coach": short_id, **record}, f"{short_id}: /api/wrong.by_coach disagrees"
+    else:
+        assert short_id not in wrong_by
+    return record
+
+
+def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
+    table, rows = _write_live_0926_wire(monkeypatch)
+    served = _served_four(monkeypatch, table)
+    coaches, calibration, predictions, wrong = served
+
+    webb = _assert_one_record("nutrition", *served)
+    assert webb == {"confirmed": 0, "refuted": 5, "n": 5, "through": _day(20)}
+    brandt = _assert_one_record("explorer", *served)
+    assert brandt == {"confirmed": 3, "refuted": 1, "n": 4, "through": _day(19)}
+    # Every operational coach, not just the two the issue named.
+    for c in calibration["coaches"]:
+        if f"{c['coach_id']}_coach" in {x["persona_id"] for x in coaches["coaches"]}:
+            _assert_one_record(c["coach_id"], *served)
+
+    # The docket contributed zero to this cycle's record on either side; career counts
+    # it ONCE per side (five suffixed rows, one prediction_id).
+    assert calibration["coaches"] and {c["coach_id"]: c["lifetime"]["n"] for c in calibration["coaches"]}["nutrition"] == 6
+    assert predictions["by_coach"]["nutrition"]["lifetime"] == {
+        **predictions["by_coach"]["nutrition"]["lifetime"],
+        "confirmed": 1,
+        "decided": 6,
+    }
+    # Below n = 10 the headline prints counts, never a percentage — and names the day.
+    roster = {c["persona_id"]: c for c in coaches["coaches"]}
+    from coach.coach_record import day_words
+
+    assert roster["nutrition_coach"]["headline_stat"] == f"0 of 5 checked calls right through {day_words(_day(20))}"
+    assert roster["explorer_coach"]["headline_stat"] == f"3 of 4 checked calls right through {day_words(_day(19))}"
+    assert "%" not in roster["nutrition_coach"]["headline_stat"]
+
+
+def test_4220_mutation_control_the_learning_count_fails_on_webb(monkeypatch):
+    """Restore the retired producer — `_track_record`'s LEARNING# count — over the SAME
+    wire and hand its numbers to the guard: it must fail on Webb (25 ≠ 5)."""
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    coaches, calibration, predictions, wrong = _served_four(monkeypatch, table)
+    old = api._track_record("nutrition_coach")
+    assert old["decided"] == 25 and old["confirmed"] == 20, old  # the live headline's numbers, reproduced
+    forged = json.loads(json.dumps(coaches))
+    for c in forged["coaches"]:
+        if c["persona_id"] == "nutrition_coach":
+            c["record"] = {"confirmed": old["confirmed"], "refuted": old["refuted"], "n": old["decided"], "through": _day(20)}
+    with pytest.raises(AssertionError, match="calibration.record disagrees"):
+        _assert_one_record("nutrition", forged, calibration, predictions, wrong)
+    # And the guard is not one-sided: a scorecard that drifted from the roster also reds.
+    forged_cal = json.loads(json.dumps(calibration))
+    for c in forged_cal["coaches"]:
+        if c["coach_id"] == "nutrition":
+            c["confirmed"] = 1
+    with pytest.raises(AssertionError):
+        _assert_one_record("nutrition", coaches, forged_cal, predictions, wrong)
+
+
+def test_4220_a_prediction_resolves_once_and_in_the_cycle_it_resolved_in():
+    """The two counting rules, pure: re-writes collapse to the EARLIEST resolution; a
+    graded row resolved before genesis never counts in the current record even when its
+    stamp says it is visible; the docket trail counts once in career."""
+    from coach import coach_record as cr
+
+    original = {"prediction_id": "p1", "sk": "PREDICTION#p1", "status": "confirmed", "outcome_date": _day(-27), "confidence": 0.5}
+    rewrites = [
+        {"prediction_id": "p1", "sk": f"PREDICTION#p1-{i}", "status": "confirmed", "outcome_date": _day(i), "confidence": 0.5}
+        for i in range(2, 6)
+    ]
+    in_cycle = {"prediction_id": "p2", "sk": "PREDICTION#p2", "status": "refuted", "outcome_date": _day(12), "confidence": 0.5}
+    pending = {"prediction_id": "p3", "sk": "PREDICTION#p3", "status": "pending", "confidence": 0.5}
+    archived = {
+        "prediction_id": "p4",
+        "sk": "PREDICTION#p4",
+        "status": "confirmed",
+        "outcome_date": _day(3),
+        "phase": "pilot",
+        "tombstone": True,
+    }
+    rows = rewrites + [in_cycle, pending, original, archived]
+
+    once = cr.resolved_once(rows)
+    assert [r["sk"] for r in once] == ["PREDICTION#p2", "PREDICTION#p3", "PREDICTION#p1", "PREDICTION#p4"]
+    assert cr.record_from_rows(rows, genesis=EXPERIMENT_START) == {"confirmed": 0, "refuted": 1, "n": 1, "through": _day(12)}
+    assert cr.record_from_rows(rows, genesis=EXPERIMENT_START, career=True) == {"confirmed": 2, "refuted": 1, "n": 3, "through": _day(12)}
+    # The pre-genesis original is visible (no stamp) and still excluded: resolved_date < genesis.
+    assert cr.counts_this_cycle(original, EXPERIMENT_START) is False
+    assert cr.counts_this_cycle(in_cycle, EXPERIMENT_START) is True
+    assert cr.counts_this_cycle(pending, EXPERIMENT_START) is True  # an ungraded row is judged by visibility alone
+    assert cr.counts_this_cycle(archived, EXPERIMENT_START) is False
+    # A graded row with no identity is its own resolution — never collapsed into another.
+    anon = [{"status": "confirmed", "outcome_date": _day(2)}, {"status": "confirmed", "outcome_date": _day(3)}]
+    assert cr.record_from_rows(anon, genesis=EXPERIMENT_START)["n"] == 2
+    # Headline copy at the three bands.
+    assert cr.headline(None) == "record unavailable"
+    assert cr.headline({"confirmed": 0, "refuted": 0, "n": 0, "through": None}) == "no checked call yet"
+    assert cr.headline({"confirmed": 1, "refuted": 0, "n": 1, "through": None}) == "1 of 1 checked call right"
+    assert (
+        cr.headline({"confirmed": 7, "refuted": 10, "n": 17, "through": _day(20)})
+        == f"7 of 17 checked calls right (41%) through {cr.day_words(_day(20))}"
+    )
+
+
+@pytest.mark.parametrize("pt_clock", ["23:30", "08:00"])
+def test_4220_pair10_holds_under_a_frozen_pacific_clock(monkeypatch, pt_clock):
+    """#3222-class control for PAIR 10: the contract must hold at 23:30 PT (a UTC day ahead
+    of the Pacific day) and at 08:00 PT alike. Every clock the producer's writers read is
+    frozen — `dispute_docket` / `coach_prediction_evaluator` / `prediction_emission`'s
+    `datetime`, and `common.pacific_time`'s `pacific_today`/`pacific_now` (the names
+    `phase_taxonomy._write_date` imports for the write-time stamp) — and the freeze is
+    proved to have reached the writer through the row's own `resolved_at`. The 2026-09-27
+    red on main was NOT this class (it was #4317 retiring the writer's -N trail); this pins
+    that the pair never becomes one."""
+    from datetime import datetime, timezone
+
+    import pair_contract_registry  # noqa: F401 — populates the registry
+    from coach import coach_prediction_evaluator as ev, dispute_docket as dd, prediction_emission as pe
+    from common import pacific_time
+    from common.pacific_time import PACIFIC
+    from pacific_clock import freeze_pacific
+    from pair_contract import PAIR_CONTRACT_REGISTRY
+
+    pair = next(p for p in PAIR_CONTRACT_REGISTRY if p.name.startswith("coach PREDICTION# resolutions"))
+    hour, minute = (int(x) for x in pt_clock.split(":"))
+    pt_day = datetime.fromisoformat(_day(12)).replace(hour=hour, minute=minute, tzinfo=PACIFIC)
+    frozen_utc = pt_day.astimezone(timezone.utc)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen_utc.astimezone(tz) if tz else frozen_utc.replace(tzinfo=None)
+
+    for mod in (dd, ev, pe):
+        monkeypatch.setattr(mod, "datetime", _FrozenDatetime)
+    pinned = freeze_pacific(monkeypatch, pacific_time, _FrozenDatetime)
+    assert pinned.strftime("%H:%M") == pt_clock and pacific_time.pacific_today() == _day(12)
+    if pt_clock == "23:30":
+        assert frozen_utc.date().isoformat() != _day(12), "the control must sit where the UTC day and the Pacific day disagree"
+
+    produced = pair.produce()
+    consumed = pair.consume(produced)
+    pair.agree(produced, consumed)
+    docket_row = produced["rows"][1]
+    assert str(docket_row["resolved_at"]).startswith(frozen_utc.isoformat()[:16]), "the frozen clock did not reach the writer"
+    assert consumed == {"confirmed": 1, "refuted": 1, "n": 2, "through": _day(9)}
