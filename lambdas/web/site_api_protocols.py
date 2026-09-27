@@ -2,6 +2,7 @@
 site_api_data.py (#1654): experiments / supplements / protocols / domains / routine.
 Handlers read facade state via `_g` (see freshness)."""
 
+import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -270,7 +271,10 @@ def routine(*, _g) -> dict:
     Deliberately NOT returned: the IR title (force_title can carry user-authored
     free text), notes (session cues + private notes), exercise names/loads/reps,
     rationale, inputs_snapshot (recovery/deficit internals), budget_used, and
-    the Hevy ids. Read-only; always a shaped 200 — the cockpit self-hides when
+    the Hevy ids; the platform routine id leaves only as `routine_ref` (a 12-hex
+    digest — the same one /api/session serves for the same pick, #4338).
+    Today's routine is `pick_todays_routine`'s pick — the SAME session
+    /api/session names. Read-only; always a shaped 200 — the cockpit self-hides when
     nothing is prescribed. Cache: 900s.
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
@@ -284,54 +288,32 @@ def routine(*, _g) -> dict:
     phase = state.get("current") or ((state.get("phases") or [None])[0])
     block = {"phase": phase, "phase_started": state.get("current_started")} if phase else None
 
-    # Newest index rows first (sk = DATE#<target_date>#ROUTINE#<id>).
-    rows = []
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}routine_index"),
-            ScanIndexForward=False,
-            Limit=16,
-        )
-        rows = _decimal_to_float(resp.get("Items", []))
-    except Exception as e:
-        logger.warning("handle_routine index read failed: %s", e)
-
-    rows = [
-        r
-        for r in rows
-        if r.get("routine_id") and (r.get("variant") or "") not in _ROUTINE_HIDDEN_VARIANTS and (r.get("status") or "") != "archived"
-    ]
-    # Prefer the newest prescription on/before today; else the nearest upcoming
-    # one (a session staged for tomorrow / Day 1 is honestly "prescribed") —
-    # rows are newest-first, so the last remaining row is the nearest future date.
-    current = next((r for r in rows if str(r.get("target_date") or "") <= today), None)
-    if current is None and rows:
-        current = rows[-1]
+    # ONE pick of today's routine, shared with /api/session (#4338) — the two routes name the same session.
+    pick = pick_todays_routine(table, today, lambda: _program_next(today))
+    current = None
+    ir: dict = {}
+    if pick["ir"] is not None:
+        current, ir = {"routine_id": pick["routine_id"]}, pick["ir"]
+    else:
+        # Nothing picked for today: the newest prescription on/before today, else the nearest upcoming one
+        # (a session staged for tomorrow / Day 1 is honestly "prescribed") — rows are newest-first, so the
+        # last remaining row is the nearest future date. Today's rows the picker READ and passed over are
+        # never named here: /api/session serves the program for them, and this route must not name a
+        # draft that one declined (#4338). A row whose IR was unreadable stays eligible — index truth.
+        rows = [r for r in pick["rows"] if str(r["routine_id"]) not in pick["declined"]]
+        current = next((r for r in rows if str(r.get("target_date") or "") <= today), None)
+        if current is None and rows:
+            current = rows[-1]
+        if current:
+            ir = _read_routine_ir(table, str(current["routine_id"]))
 
     routine = None
     if current:
-        ir: dict = {}
-        try:
-            resp = table.get_item(
-                Key={"pk": f"USER#{USER_ID}#ROUTINE#{current['routine_id']}", "sk": "VERSION#current"},
-                ProjectionExpression="target_date, archetype, variant, #st, exercises, branches, hevy_pushed_at",
-                ExpressionAttributeNames={"#st": "status"},
-            )
-            ir = _decimal_to_float(resp.get("Item")) or {}
-        except Exception as e:
-            logger.warning("handle_routine IR read failed: %s", e)
         src = ir or current
         # Counts come from the recommended branch's own exercise list when one
         # exists (that is what the pushed Hevy routine actually shows, #417 2b),
         # else the routine-level list. Unknown (IR read failed) → honest nulls.
-        exercises = None
-        if ir:
-            for b in ir.get("branches") or []:
-                if b.get("recommended") and b.get("exercises"):
-                    exercises = b["exercises"]
-                    break
-            if exercises is None:
-                exercises = ir.get("exercises") or []
+        exercises = _routine_exercises(ir) if ir else None
         target = str(src.get("target_date") or "")
         try:
             # NB: datetime.strptime (not a module-level `date` import) — two
@@ -348,6 +330,8 @@ def routine(*, _g) -> dict:
             "exercise_count": len(exercises) if exercises is not None else None,
             "total_sets": sum(len(e.get("sets") or []) for e in exercises) if exercises is not None else None,
             "pushed": bool(ir.get("hevy_pushed_at")),
+            # the same public handle /api/session serves for the same pick — agreement is checkable (#4338)
+            "routine_ref": routine_ref(current.get("routine_id")),
         }
 
     data = {"available": routine is not None, "as_of_date": today, "block": block, "routine": routine}
@@ -403,7 +387,7 @@ def domains() -> dict:
 # The two tuples below ARE the public shape — tests/test_routine_endpoint.py asserts
 # the served body carries exactly these keys, so a key added here without being
 # added there is a red, and a key added there without a privacy reason is a review.
-_SESSION_KEYS = ("date", "state", "reason", "source", "kind", "session_role", "position_label", "exercises", "as_of")
+_SESSION_KEYS = ("date", "state", "reason", "source", "kind", "session_role", "position_label", "routine_ref", "exercises", "as_of")
 _EXERCISE_KEYS = ("name", "sets", "reps", "load_lbs", "loads_lbs")
 
 _SOURCE_COMMITTED = "hevy-routine"  # pushed to Hevy — the routine on his phone
@@ -565,14 +549,109 @@ def _program_exercises(role: str, deload: bool, catalog: dict, titles: dict) -> 
     return rows
 
 
+def routine_ref(routine_id) -> "str | None":
+    """The PUBLIC handle of a picked routine: 12 hex of sha256 over the platform routine id. The id
+    itself never leaves (the #4318 privacy sweep); the ref lets a reader, a page or a contract test
+    check that /api/routine and /api/session name the same routine (#4338). None for no routine."""
+    if not routine_id:
+        return None
+    return hashlib.sha256(f"routine:{routine_id}".encode()).hexdigest()[:12]
+
+
+_ROUTINE_IR_PROJECTION = (
+    "target_date, archetype, variant, #st, exercises, branches, hevy_pushed_at, hevy_routine_id, "
+    "inputs_snapshot.calendar.session_role, inputs_snapshot.nightly_predraft.session_role"
+)
+
+
+def _read_routine_ir(table, routine_id: str) -> dict:
+    """VERSION#current of one routine, projected to what the two routes read; {} on a failed read."""
+    try:
+        resp = table.get_item(
+            Key={"pk": f"USER#{USER_ID}#ROUTINE#{routine_id}", "sk": "VERSION#current"},
+            ProjectionExpression=_ROUTINE_IR_PROJECTION,
+            ExpressionAttributeNames={"#st": "status"},
+        )
+        return _decimal_to_float(resp.get("Item")) or {}
+    except Exception as e:
+        # no record field in the log line — the failure class is enough (CodeQL, PR #4318)
+        logger.warning("routine IR read failed: %s", type(e).__name__)
+        return {}
+
+
+def _committed(ir: dict) -> bool:
+    """Pushed to Hevy — the routine on his phone."""
+    return bool(ir.get("hevy_routine_id")) or bool(ir.get("hevy_pushed_at")) or (ir.get("status") or "") == "active"
+
+
+def pick_todays_routine(table, today: str, program_next) -> dict:
+    """THE pick of today's routine — the ONE selection /api/routine and /api/session both serve (#4338;
+    two pickers named an upper draft and a lower draft for 2026-09-27). Over today's visible index rows
+    (floor / re-entry variants and archived rows never selected):
+      1. a routine COMMITTED to Hevy — `source: hevy-routine`
+      2. else the only draft; else the draft stamped with the sequence's next role; else the draft whose
+         archetype is the next session's — `source: hevy-routine-draft`
+      3. else none (two drafts, neither the program's next session: the program is the answer, #4110)
+    `program_next` is a zero-arg callable returning `_program_next`'s (next_session, reason) — called
+    only when two or more drafts need the sequence to decide, so /api/routine pays the Hevy read only then.
+
+    Returns {"rows": the visible index rows newest-first (every date), "routine_id", "ir", "source",
+    "declined": today's readable routine ids NOT picked}. "ir" is None when nothing was picked."""
+    rows: list = []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}routine_index"),
+            ScanIndexForward=False,
+            Limit=32,
+        )
+        rows = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:
+        logger.warning("routine index read failed: %s", e)
+    rows = [
+        r
+        for r in rows
+        if r.get("routine_id") and (r.get("variant") or "") not in _ROUTINE_HIDDEN_VARIANTS and (r.get("status") or "") != "archived"
+    ]
+    readable = []
+    for r in rows:
+        if str(r.get("target_date") or "") == today:
+            ir = _read_routine_ir(table, str(r["routine_id"]))
+            if ir:
+                readable.append((str(r["routine_id"]), ir))
+
+    committed = [p for p in readable if _committed(p[1])]
+    drafts = [p for p in readable if not _committed(p[1])]
+    picked, source = None, None
+    if committed:
+        picked, source = committed[0], _SOURCE_COMMITTED
+    elif len(drafts) == 1:
+        picked, source = drafts[0], _SOURCE_DRAFT
+    elif drafts:
+        nxt, _reason = program_next()
+        next_role = (nxt or {}).get("session_role")
+        next_arch = str((nxt or {}).get("archetype") or "").lower()
+        by_role = [p for p in drafts if next_role and _stamped_role(p[1]) == next_role]
+        by_arch = [p for p in drafts if next_arch and str(p[1].get("archetype") or "").lower() == next_arch]
+        if by_role or by_arch:
+            picked, source = (by_role or by_arch)[0], _SOURCE_DRAFT
+    return {
+        "rows": rows,
+        "routine_id": picked[0] if picked else None,
+        "ir": picked[1] if picked else None,
+        "source": source,
+        "declined": {rid for rid, _ in readable if not picked or rid != picked[0]},
+    }
+
+
 def session(*, _g) -> dict:
     """GET /api/session — the session Matthew lifts TODAY, as it will be lifted: exercise names,
     sets × reps, the load in pounds (owner ruling 2026-09-26, option (a); E3 of epic #4182).
 
-    THE PICK, in order, all for the Pacific day:
+    THE PICK, in order, all for the Pacific day (1–2 are `pick_todays_routine`, the ONE picker
+    /api/routine serves too — #4338; both carry the pick's `routine_ref`):
       1. a routine COMMITTED to Hevy for today (`hevy_routine_id` / status active) — `source: hevy-routine`
-      2. else the DRAFT for today whose stamped role is the sequence's next role; else the draft
-         whose archetype is the next session's; else the only draft — `source: hevy-routine-draft`
+      2. else the only DRAFT for today; else the draft whose stamped role is the sequence's next role;
+         else the draft whose archetype is the next session's — `source: hevy-routine-draft`
       3. else the program's own prescription for the next undone session — `source: program`
          (names, sets × reps; loads null — the program prescribes % of a top set, not pounds)
       4. else `state: absent` with the reason (before the block start; the Hevy record unreadable)
@@ -587,7 +666,7 @@ def session(*, _g) -> dict:
     today = datetime.now(PT).strftime("%Y-%m-%d")
     as_of = datetime.now(timezone.utc).isoformat()
 
-    def _out(state, *, reason=None, source=None, kind=None, role=None, label=None, exercises=None):
+    def _out(state, *, reason=None, source=None, kind=None, role=None, label=None, ref=None, exercises=None):
         body = {
             "date": today,
             "state": state,
@@ -596,72 +675,19 @@ def session(*, _g) -> dict:
             "kind": kind,
             "session_role": role,
             "position_label": label,
+            "routine_ref": ref,
             "exercises": [{k: e.get(k) for k in _EXERCISE_KEYS} for e in (exercises or [])],
             "as_of": as_of,
         }
         return _ok({k: body[k] for k in _SESSION_KEYS}, cache_seconds=900)
 
-    # Today's routine rows from the index (newest first; sk = DATE#<target_date>#ROUTINE#<id>).
-    rows: list = []
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}routine_index"),
-            ScanIndexForward=False,
-            Limit=32,
-        )
-        rows = _decimal_to_float(resp.get("Items", []))
-    except Exception as e:
-        logger.warning("handle_session index read failed: %s", e)
-    rows = [
-        r
-        for r in rows
-        if r.get("routine_id")
-        and str(r.get("target_date") or "") == today
-        and (r.get("variant") or "") not in _ROUTINE_HIDDEN_VARIANTS
-        and (r.get("status") or "") != "archived"
-    ]
-
     # The program's position — read once; it names the role a draft must match and the position label.
     nxt, program_reason = _program_next(today)
     next_role = (nxt or {}).get("session_role")
-    next_archetype = (nxt or {}).get("archetype")
 
-    irs: list = []
-    for r in rows:
-        try:
-            resp = table.get_item(
-                Key={"pk": f"USER#{USER_ID}#ROUTINE#{r['routine_id']}", "sk": "VERSION#current"},
-                ProjectionExpression=(
-                    "target_date, archetype, variant, #st, exercises, branches, hevy_pushed_at, hevy_routine_id, "
-                    "inputs_snapshot.calendar.session_role, inputs_snapshot.nightly_predraft.session_role"
-                ),
-                ExpressionAttributeNames={"#st": "status"},
-            )
-            ir = _decimal_to_float(resp.get("Item")) or {}
-        except Exception as e:
-            # no record field in the log line — the failure class is enough (CodeQL, PR #4318)
-            logger.warning("handle_session IR read failed: %s", type(e).__name__)
-            ir = {}
-        if ir:
-            irs.append(ir)
-
-    def _committed(ir):
-        return bool(ir.get("hevy_routine_id")) or bool(ir.get("hevy_pushed_at")) or (ir.get("status") or "") == "active"
-
-    picked, source = None, None
-    committed = [ir for ir in irs if _committed(ir)]
-    drafts = [ir for ir in irs if not _committed(ir)]
-    if committed:
-        picked, source = committed[0], _SOURCE_COMMITTED
-    elif drafts:
-        by_role = [ir for ir in drafts if next_role and _stamped_role(ir) == next_role]
-        by_arch = [ir for ir in drafts if next_archetype and str(ir.get("archetype") or "").lower() == str(next_archetype).lower()]
-        if by_role:
-            picked, source = by_role[0], _SOURCE_DRAFT
-        elif by_arch:
-            picked, source = by_arch[0], _SOURCE_DRAFT
-        elif len(drafts) == 1:
-            picked, source = drafts[0], _SOURCE_DRAFT
+    # ONE pick of today's routine, shared with /api/routine (#4338).
+    pick = pick_todays_routine(table, today, lambda: (nxt, program_reason))
+    picked, source = pick["ir"], pick["source"]
 
     catalog, titles = _load_movement_names()
 
@@ -673,7 +699,7 @@ def session(*, _g) -> dict:
         role = _stamped_role(picked) if kind == "program" else None
         label = (nxt or {}).get("position_label") if role and role == next_role else None
         exercises = [_exercise_row(ex, catalog, titles) for ex in _routine_exercises(picked) if isinstance(ex, dict)]
-        return _out("served", source=source, kind=kind, role=role, label=label, exercises=exercises)
+        return _out("served", source=source, kind=kind, role=role, label=label, ref=routine_ref(pick["routine_id"]), exercises=exercises)
 
     if nxt is not None and next_role:
         try:
