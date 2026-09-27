@@ -3,7 +3,7 @@
 **Written:** 2026-09-26 15:40–16:10 PT, read-only lane (no git writes, no deploys, no AWS). Every path below was read in `/Users/matthewwalker/dev/worktrees/life-platform/issue-4182-wrap-session-av` (branch tip `c5fd0e99e`; its `origin/main` = `fce761c1d`) or via `gh`; **main moved during the read: `3b305f5e3` (22:34:56Z) = #4233 merged.** Live `version.json` = `4f24f2a` (the #4228 scaffold); the site-deploy for `3b305f5e3` was `pending` (run `36276742443`).
 **Clock:** the Fable session limit hit at 15:40 PT; the owner enabled credits at ~15:45 PT; the weekly reset is 17:00 PT; every page lane resumes with an **18:15 PT deadline**; the owner plans **~15 hours on the site from tonight** (≈17:00 PT Sat → ≈08:00 PT Sun). The five-day plan in `docs/design/v7/V7_BUILD_PLAN.md` §4 is re-cut below for that window.
 **Canonical:** `docs/SITE_TRANSFORMATION_V7.md` (§2 the order rule, §3 the nine, §12 the cut-over bar, §16 the decisions, §17 prototype C) · the plan (`§2a` page rows, `§2b` engine asks, `§3` the cut-over, `§5` risks) · `R4_PROTOTYPE_REDTEAM.md`, `R5_PROTOTYPE_C_SCORE.md` · the design source `scratchpad/v7/prototype_c/index.html` (66,515 bytes; screens I the log, II the coaches, III this week; IV/V are "Not in this prototype." stubs at `:508`, `:514`).
-**Owner rulings that bind every lane:** no cycle count on any reader surface (14:10 PT; #4231 shipped it — no "cycle / reset / attempt / seventeenth / start-count" word); reader credibility first (09-06); no tool-attribution trailers.
+**Owner rulings that bind every lane:** no cycle count on any reader surface (14:10 PT; #4231 shipped it — no "cycle / reset / attempt / seventeenth / start-count" word); reader credibility first (09-06); no (authorship rule — CLAUDE.md) trailers.
 
 ---
 
@@ -68,8 +68,7 @@ RULES (Session AW lanes, epic #4182)
 - Registration: scripts/v7_build.py `BODIES = {"<page>/": <module>}` is THE protocol (main, #4233):
   your module in scripts/v7/<page>.py exposes CSS, JS and body(base). One import + one dict line.
 - Commit: `bash deploy/agent_commit.sh <paths…>` invoked bare and unpiped; read its output.
-  No tool-attribution trailer of any kind (no Co-Authored-By: Claude…, no Claude-Session:,
-  no "Generated with"). PR body ends with the lane's own verification, real output pasted.
+  Commits and PRs carry the work, not the tooling (CLAUDE.md, Authorship). PR body ends with the lane's own verification, real output pasted.
 - Issues: `Refs #4182` (+ `Refs #N`) — NEVER `Fixes`/`Closes` (a Fixes closes the issue on merge, #3715).
 - Census: if tests/test_gate_census_lane_3000.py reds, re-measure by id-set diff, never arithmetic:
   `python3 scripts/gate_census.py --json /tmp/lane.json` on the MERGE tree vs a `git archive origin/main`
@@ -183,7 +182,7 @@ RULES block applies (the lane opens the PR; the driver merges on "go"). Title: `
 
 1. **Green by name, never by count:** `python3 scripts/assert_pr_green.py <N>` (the expected check-name set; `gh pr checks | grep -c` reads "no checks yet" as green — the 2026-08-15 P4). For site PRs the required fast-lane check is "Collect + deploy-critical + format"; the "Full unit suite (pre-merge, issue 3025)" must be SUCCESS (it was FAILURE on #4234 at `3cdd64a8c`).
 2. **Closure keywords:** `gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[].number'` → empty. A `Closes #N` SENTENCE in the body also auto-closes (#3715). #4182 closes on the 30-day measure, never on a page.
-3. **Trailer grep:** `gh pr view <N> --json commits --jq '.commits[].messageBody' | grep -iE "co-authored-by: claude|claude-session|generated with"` → 0, and the same on `--json body`. (`Co-authored-by: integration <integration@local>` is the git identity, not a tool trailer — #4233 carries it; fine.)
+3. **Authorship grep:** `gh pr view <N> --json commits --jq '.commits[].messageBody' | grep -ic "claude"` → 0 (CLAUDE.md, Authorship), and the same on `--json body`. (`Co-authored-by: integration <integration@local>` is the git identity, not a tool trailer — #4233 carries it; fine.)
 4. **Merge conflicts first:** `gh pr view <N> --json mergeable,mergeStateStatus` — `CONFLICTING`/`DIRTY` means the lane merges main (never rebase) before anything else; zero checks reported = CONFLICT first.
 5. **Squash:** `gh pr merge <N> --squash --delete-branch`. Expect the reconcile commit (`chore(reconcile): regenerate derived artifacts after merge [skip-reconcile]`) to follow on main.
 6. **Serialise `site/**`:** one site merge, then `gh run list --workflow site-deploy.yml --limit 1 --json databaseId,headSha,status,conclusion`, then **watch by run id with a Monitor** (`gh run watch <id> --exit-status` dies under the 10-minute Bash cap), then the next. `concurrency.group: site-deploy, cancel-in-progress: false` (`site-deploy.yml:88-91`) keeps one pending run; a superseded run is `cancelled` (the `fb1f50b48` run today) — that is normal, the newer sha carries the change. Engine PRs (`lambdas/**`) don't trigger it.
