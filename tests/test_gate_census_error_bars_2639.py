@@ -37,6 +37,7 @@ report still calls flag counts an upper bound — now with a number instead of a
 
 from __future__ import annotations
 
+import functools
 import importlib
 import json
 import os
@@ -52,7 +53,8 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 import pytest  # noqa: E402
 
 # `gate_census.discover_ci_gates` imports PyYAML lazily so the module stays importable
-# without it — but this file builds the census at IMPORT time, which runs that path. The
+# without it — but this file's tests build the census, which runs that path (at IMPORT time
+# until #4251 made it lazy; the skip below is still what keeps its tests honest). The
 # deploy-critical CI lane installs a minimal dependency set and has no yaml, so the whole
 # module raised ModuleNotFoundError there and reddened a lane that had nothing to do with
 # this change. Skipping is correct rather than a cop-out: the gate still runs in the full
@@ -65,9 +67,28 @@ gate_census = importlib.import_module("gate_census")
 # re-exports FLAG_PRECISION but not the superseded PRIOR_FLAG_PRECISION (#2999).
 gate_census_precision = importlib.import_module("gate_census_precision")
 
-CENSUS = gate_census.build_census(pathlib.Path(_REPO))
-CI_COUNTERS = (CENSUS.get("counters") or {}).get("ci") or {}
-CI_GATES = [g for g in CENSUS["gates"] if g["family"] == "ci-step"]
+# LAZY (#4251): the full-repo census is ~10 s. At import time it was paid by EVERY pytest
+# collection (every xdist worker, every lane, selected or not). Cached per process, it is
+# built once, only when a test asks — and `tests/test_gate_census_lane_3000.py` reuses
+# this same cache through `CENSUS()` rather than building a second one. `CI_GATES` keeps
+# its module-level binding (a non-literal call) so the census's own registry id for it is
+# unchanged.
+
+
+@functools.lru_cache(maxsize=None)
+def CENSUS() -> dict:
+    return gate_census.build_census(pathlib.Path(_REPO))
+
+
+def CI_COUNTERS() -> dict:
+    return (CENSUS().get("counters") or {}).get("ci") or {}
+
+
+def _ci_step_gates() -> list:
+    return [g for g in CENSUS()["gates"] if g["family"] == "ci-step"]
+
+
+CI_GATES = functools.lru_cache(maxsize=None)(_ci_step_gates)
 
 
 # ── the two the issue named ──────────────────────────────────────────────────
@@ -75,7 +96,7 @@ CI_GATES = [g for g in CENSUS["gates"] if g["family"] == "ci-step"]
 
 @pytest.mark.parametrize("needle", ["Syntax check (py_compile)", "Check lambda_map coverage"])
 def test_the_two_missed_enforcing_steps_are_now_in_the_inventory(needle):
-    assert any(needle in g["name"] for g in CI_GATES), f"{needle!r} is still invisible to the census"
+    assert any(needle in g["name"] for g in CI_GATES()), f"{needle!r} is still invisible to the census"
 
 
 def test_they_are_detected_by_the_widened_derivation_not_a_hand_added_row():
@@ -168,13 +189,13 @@ def test_the_enforcement_detector_is_narrow_on_purpose(run, expected):
 
 def test_the_widening_found_far_more_than_the_two_that_were_filed():
     """The measured false-negative rate of the verb-only detector."""
-    assert CI_COUNTERS["by_enforcement_only"] >= 10, CI_COUNTERS
-    assert CI_COUNTERS["by_verb_only"] > 0, "both detectors must be contributing, or one is dead"
+    assert CI_COUNTERS()["by_enforcement_only"] >= 10, CI_COUNTERS()
+    assert CI_COUNTERS()["by_verb_only"] > 0, "both detectors must be contributing, or one is dead"
 
 
 def test_the_report_states_its_error_in_both_directions():
     """Acceptance box 4 — `n` must never read as exact."""
-    report = gate_census.render_report(CENSUS)
+    report = gate_census.render_report(CENSUS())
     assert "n is a FLOOR" in report
     assert "FALSE NEGATIVES (measured)" in report
     assert "FALSE POSITIVES (sampled)" in report
@@ -183,24 +204,24 @@ def test_the_report_states_its_error_in_both_directions():
 
 def test_the_report_quantifies_the_residual_rather_than_hand_waving_it():
     """ "we might be missing some" is not a measurement. The residual has a number."""
-    report = gate_census.render_report(CENSUS)
-    assert f"UNADJUDICATED: {CI_COUNTERS['steps_nongate']} workflow steps" in report
-    assert f"{CI_COUNTERS['by_enforcement_only']} of" in report
+    report = gate_census.render_report(CENSUS())
+    assert f"UNADJUDICATED: {CI_COUNTERS()['steps_nongate']} workflow steps" in report
+    assert f"{CI_COUNTERS()['by_enforcement_only']} of" in report
 
 
 def test_the_residual_labels_are_carried_so_the_adjudication_is_possible():
     """Boxes 2 and 3 need a human to read specific steps. The instrument's job is to hand
     over the list, which is what turns an unbounded worry into a finite queue."""
-    sample = CI_COUNTERS.get("nongate_sample")
+    sample = CI_COUNTERS().get("nongate_sample")
     assert isinstance(sample, list)
-    assert len(sample) == CI_COUNTERS["steps_nongate"], "the sample must be the WHOLE residual, not a slice"
+    assert len(sample) == CI_COUNTERS()["steps_nongate"], "the sample must be the WHOLE residual, not a slice"
     assert all("::" in s and "/" in s for s in sample), sample[:3]
 
 
 def test_the_json_output_carries_the_counters():
     """`--json` is the machine surface the residual is worked from."""
-    blob = json.loads(json.dumps(CENSUS, default=str))
-    assert blob["counters"]["ci"]["by_enforcement_only"] == CI_COUNTERS["by_enforcement_only"]
+    blob = json.loads(json.dumps(CENSUS(), default=str))
+    assert blob["counters"]["ci"]["by_enforcement_only"] == CI_COUNTERS()["by_enforcement_only"]
 
 
 # ── box 3: the two flags now carry a real precision number ──────────────────
@@ -251,7 +272,7 @@ def test_the_report_prints_the_measured_fp_proportions_for_both_flags():
     the 2026-08-27 re-sample it kept passing on the superseded prior-draw line while the
     current proportion had moved to 78%. A percentage that matches somewhere in a
     900-line report is not evidence the report printed it here."""
-    section = gate_census._render_error_bars(CENSUS)
+    section = gate_census._render_error_bars(CENSUS())
     assert "vacuous-empty" in section and "78%" in section
     assert "exempt-by-incompleteness" in section and "79%" in section
     # the Wilson interval bounds, rendered to the nearest percent
@@ -264,7 +285,7 @@ def test_the_report_prints_the_measured_fp_proportions_for_both_flags():
 def test_the_report_still_calls_flag_counts_an_upper_bound():
     """A real precision number does not license treating the flag count as a defect
     count — most of the sampled hits were noise, and the report must keep saying so."""
-    report = gate_census.render_report(CENSUS)
+    report = gate_census.render_report(CENSUS())
     assert "upper bound" in report.lower()
 
 
@@ -279,9 +300,9 @@ def test_no_drift_note_when_live_count_matches_the_recorded_sample():
     `StackDriftStatus=DRIFTED`, so "DRIFT" is in the full report whatever the samples say.
     The `# pragma: no cover` note sat on the arm that DID run. Scoped to the error-bar
     section, which is the only place the note can legitimately appear."""
-    error_bars = gate_census._render_error_bars(CENSUS)
-    vacuous_live = gate_census._live_flag_count(CENSUS, "vacuous-empty")
-    incomplete_live = gate_census._live_flag_count(CENSUS, "exempt-by-incompleteness")
+    error_bars = gate_census._render_error_bars(CENSUS())
+    vacuous_live = gate_census._live_flag_count(CENSUS(), "vacuous-empty")
+    incomplete_live = gate_census._live_flag_count(CENSUS(), "exempt-by-incompleteness")
     if vacuous_live == gate_census.FLAG_PRECISION["vacuous-empty"].n_flagged and incomplete_live == (
         gate_census.FLAG_PRECISION["exempt-by-incompleteness"].n_flagged
     ):
