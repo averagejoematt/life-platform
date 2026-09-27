@@ -488,6 +488,8 @@ def nutrition_overview(*, _g) -> dict:
     # page): nothing here serves a supplement row — only per-nutrient AMOUNTS attributed to
     # the channel, plus the names of doses that could NOT be converted (stack names the
     # protocols page already publishes). No timings, no manual notes, no row shape.
+    # Owner ruling 2026-09-27 (on #4333): per-nutrient supplement totals MAY be public on this
+    # endpoint — the projection above is the consented shape, not a pending question.
     _supp_row = None
     if latest_date:
         _supp_rows = _query_source("supplements", latest_date, latest_date)
