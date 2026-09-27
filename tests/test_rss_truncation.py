@@ -130,3 +130,20 @@ def test_short_excerpt_is_not_ellipsized(monkeypatch, tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([os.path.abspath(__file__), "-v"]))
+
+
+def test_4191_feed_description_opens_on_the_first_sentence_not_the_envelope_head(monkeypatch, tmp_path):
+    """#4191: the builder reads the LIVE manifest, whose excerpts written before the fix are
+    the stored envelope — quoted title, bracketed machine header, then the prose. The feed
+    description is the body, derived by the same helper the writer uses. Fixture = the live
+    2026-09-22 excerpt shape under this helper's title."""
+    envelope = (
+        '"Word Boundary Guard"\n\n[Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0 days]\n\n'
+        "On Monday afternoon, Matthew logged what the platform’s daily brief called the biggest training day of the experiment."
+    )
+    assert "[Weight:" in envelope  # mutation control: the source DOES carry the machine line
+    desc = _first_description(_run_builder(monkeypatch, tmp_path, envelope))
+    assert desc.startswith("On Monday afternoon"), desc[:60]
+    assert "[Weight:" not in desc
+    assert "T0 Streak" not in desc
+    assert "Word Boundary Guard" not in desc
