@@ -61,15 +61,14 @@ false entrant; a relabelled one is a real decision on the PR that relabels it.
 
 WHY THIS FILE DOES NOT CALL `gate_census.build_census()` A SECOND TIME
 -----------------------------------------------------------------------------------
-`tests/test_gate_census_error_bars_2639.py` already computes the full-repo census (all 5
-families) at MODULE level — `CENSUS = gate_census.build_census(pathlib.Path(_REPO))` —
-and pytest COLLECTION imports every file under `tests/` regardless of which tests a `-m`
-filter will actually run, so that ~7s (measured 2026-08-24: `python3 scripts/
-gate_census.py --json /dev/null` took 7.3s wall-clock) is ALREADY paid once per lane,
-whether or not `test_gate_census_lane_3000.py` exists. The #3106 unit suite is already 7s
-over its 1500s budget (`tests/test_duration_budget_ratchet.py`), so a second independent
-`build_census()` call here would make that worse for nothing — this file reuses 2639's
-already-computed `CENSUS` when it is available in `sys.modules`, and falls back to
+`tests/test_gate_census_error_bars_2639.py` builds the full-repo census (all 5 families,
+~7s — measured 2026-08-24: `python3 scripts/gate_census.py --json /dev/null` took 7.3s
+wall-clock) behind a per-process cache, `CENSUS()`. Until #4251 it was built at MODULE
+level, so every pytest COLLECTION paid it whether or not a test used it; now it is built
+the first time a test asks. The #3106 unit suite runs against a duration budget
+(`tests/test_duration_budget_ratchet.py`), so a second independent `build_census()` call
+here would cost a second ~7s for nothing — this file calls 2639's cached `CENSUS()` when
+that module is in `sys.modules` (one build shared by both files), and falls back to
 building its own only when run in isolation (e.g. `pytest tests/test_gate_census_lane_
 3000.py` alone, which a developer might do locally).
 """
@@ -804,8 +803,8 @@ _ERR_BARS_MODULE = "test_gate_census_error_bars_2639"
 
 def _live_census() -> dict:
     cached = sys.modules.get(_ERR_BARS_MODULE)
-    if cached is not None and hasattr(cached, "CENSUS"):
-        return cached.CENSUS  # already computed during collection — see module docstring
+    if cached is not None and callable(getattr(cached, "CENSUS", None)):
+        return cached.CENSUS()  # 2639's per-process cache — built once, shared (#4251; module docstring)
     pytest.importorskip("yaml", reason="gate_census's CI-family walk needs PyYAML")
     import gate_census
 

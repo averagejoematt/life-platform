@@ -38,6 +38,9 @@ import the counting / estimating primitives themselves):
   readiness_low_streak     `tools_plan._readiness_low_streak` (Whoop, #4072).
   block_position           `session_sequence.next_session` + `session_sequence.program_week` (#4110/#4147),
                            over the planner's block read `plan_hevy_windows._block_workouts`.
+  morning_note             `coach.morning_note.coach_fact` over `coach.morning_note.read_notes` (#4189) — the
+                           owner's four words before the number, today's or yesterday's; the SAME
+                           derivation `/api/morning_note` and the coach input read.
   today                    `coach_packet_today.today_view` (#4311): every activity on target_date - 1
                            (Pacific) from Hevy AND Strava, each once — `walking_volume.dedup_strava`
                            (the #4068 time rule), walking hours by `shared_quantities.walking_layer_for_day`,
@@ -58,7 +61,7 @@ from typing import Any
 from common.pacific_time import pacific_today, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.2.0"  # 1.2.0 (#4311): the `today` view; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.3.0"  # 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -80,6 +83,8 @@ SOURCES: dict[str, str] = {
     "readiness_low_streak": "tools_plan._readiness_low_streak (Whoop recovery, #4072)",
     "block_position": "training.session_sequence.next_session + program_week over plan_hevy_windows._block_workouts (#4110/#4147); "
     "next_session.not_credited names every loaded log the sequence refused and why (#4312)",
+    "morning_note": "coach.morning_note.coach_fact over coach.morning_note.read_notes (#4189) — the owner's four words for the target morning "
+    "(or the morning before), the same derivation /api/morning_note serves",
     "today": (
         "mcp.coach_packet_today.today_view (#4311): Hevy via tools_strength._read_hevy_all_phases + Strava via core.query_source_range, "
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
@@ -94,11 +99,12 @@ COACH_PACKET_DESCRIPTION = (
     "otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the "
     "last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + "
     "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), the loss "
-    "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.4 "
-    "sequence position (the next undone session, #4110), and `today` (#4311) — every activity on the day BEFORE target_date (what a "
+    "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 "
+    "sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a "
     "night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, "
     "type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and a flag on any walk over the HR ceiling; "
-    "it is labelled PARTIAL while the day is in progress. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
+    "it is labelled PARTIAL while the day is in progress — and the owner's MORNING NOTE — his own four words "
+    "before he opened any number (#4189; quote them verbatim or not at all). Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
     "error class) — a failed read is never an empty week — and names the canonical function it came from; "
     "nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. "
     "It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block."
@@ -440,6 +446,23 @@ def _last_sessions_field(target_date: str) -> tuple[Any, dict[str, Any]]:
     return value, _st(MEASURED)
 
 
+def _morning_note(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The owner's four words for `target_date`'s morning, or the morning before (#4189) — read
+    through `coach.morning_note`, the one derivation, never a second query of the partition."""
+    from coach import morning_note as mn
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED
+
+    from mcp.config import table
+
+    rows = mn.read_notes(table, target_date, mn.COACH_LOOKBACK_DAYS)
+    if rows is None:
+        return None, _st(READ_FAILED, error="ReadError: the morning-note query failed")
+    if not rows:
+        return None, _st(ABSENT, f"no morning note on {target_date} or the morning before")
+    fact = mn.coach_fact(rows[0])
+    return {k: v for k, v in fact.items() if k != "state"}, _st(MEASURED)
+
+
 READERS = {
     "muscle_volume": _muscle_volume,
     "last_session_by_type": _last_sessions_field,
@@ -450,6 +473,7 @@ READERS = {
     "readiness": _readiness,
     "readiness_low_streak": _readiness_low_streak,
     "block_position": _block_position,
+    "morning_note": _morning_note,
     "today": _today,
 }
 
