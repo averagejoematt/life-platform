@@ -247,12 +247,16 @@ def test_v7_committed_preview_shells_match_a_fresh_build():
 
 def test_v7_hood_shell_is_the_receipts_page_and_carries_no_served_number_or_ruled_word():
     """#4182 — the v7 Under the hood (scripts/v7/hood.py) is the receipts a sceptic checks:
-    the five dated entries in the design order, the repo link in the masthead, the live gear
-    page's affiliate disclosure verbatim, the gear rows derived from the source registry
-    (one row per catalogue entry, the id only in a data attribute — never printed), the
-    page's own sheet and module — and none of the owner-ruled words (no earlier starts,
-    attempts, cycles or resets). The served numbers are poured at runtime; the one static
-    figure allowed is inside a registry `metrics` string (a registry fact, not a served count)."""
+    the five dated entries in the design order, the repo link in the masthead, the gear rows
+    derived from the source registry (one row per catalogue entry, the id only in a data
+    attribute — never printed) folded under a plain-words key, NO affiliate disclosure (the
+    rows carry no links, so the live gear page's FTC line would describe links this page does
+    not have — R6 class 1's shape: never a claim the page cannot back), the engine's-score
+    explainer absorbed as one collapsed paragraph, one <noscript> line and no static absence
+    sentence (R6 class 9), the page's own sheet and module — and none of the owner-ruled
+    words (no earlier starts, attempts, cycles or resets). The served numbers are poured at
+    runtime; the static figures allowed are the registry's row count and a figure inside a
+    registry `metrics` string (registry facts, not served counts)."""
     sys.path.insert(0, str(ROOT / "lambdas"))
     sys.path.insert(0, str(ROOT / "scripts"))
     from ingestion.source_registry import catalog_entries  # noqa: E402
@@ -266,7 +270,12 @@ def test_v7_hood_shell_is_the_receipts_page_and_carries_no_served_number_or_rule
     assert order == sorted(order), "the entries are out of the design order"
     assert 'href="/assets/css/v7_hood.css"' in html and 'src="/assets/js/v7_hood.js"' in html
     assert 'class="v7-repo" href="https://github.com/averagejoematt/life-platform"' in html, "the repo link belongs in the masthead"
-    assert DISCLOSURE in html, "the affiliate disclosure is the live gear page's, verbatim"
+    assert DISCLOSURE not in html and "affiliate" not in html, "no affiliate links on this page, so no affiliate disclosure"
+    gear_at = html.index('id="hd-gear"')
+    assert 'id="hd-gear-list"' in html and html.index("<details", gear_at) < html.index('<table class="hd-gear"'), "the gear table folds"
+    assert 'id="hd-score"' in html and "<details" in html.split('id="hd-score"')[0][-40:], "the score explainer is collapsed"
+    assert "<noscript>" in html and 'id="hd-through"' in html, "one <noscript> line and the one Data-through slot"
+    assert not re.search(r"No (call|build note|write-up)[^<]*\.", html), "the static shell asserts no absence fact (R6 class 9)"
     rows = re.findall(r'<tr data-source="([a-z_]+)">', html)
     assert rows == [e["id"] for e in catalog_entries()], "the gear rows are the registry's catalogue, in its order"
     text = re.sub(r"<[^>]+>", " ", html.split('<main id="main"')[1].split("</main>")[0])
@@ -275,6 +284,8 @@ def test_v7_hood_shell_is_the_receipts_page_and_carries_no_served_number_or_rule
             not re.search(rf"(?<![A-Za-z]){re.escape(rid)}(?![A-Za-z])", text) or "_" not in rid
         ), f"a registry id printed on the screen: {rid}"
     assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
+    machine = r"\b(pipeline|registry|pillar|pillars|chronicle|calibration|EWMA|gate)\b"
+    assert not re.search(machine, text), "no machine word in the shell's own copy"
     assert (SITE / "assets" / "css" / "v7_hood.css").exists() and (SITE / "assets" / "js" / "v7_hood.js").exists()
 
 
