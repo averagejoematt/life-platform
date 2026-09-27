@@ -299,7 +299,11 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     "mark_journal_quote": (CONTENT_KEY, "QUOTE#{date}#{sha256(norm(quote))[:10]} — the in-repo precedent this change copied"),
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),
-    "write_platform_memory": (DETERMINISTIC_KEY, "one row per (category, key) — a rewrite is the point, not a duplicate"),
+    "write_platform_memory": (
+        CONTENT_KEY,
+        "MEMORY#{category}#{date}#{sha256(content)[:10]} under attribute_not_exists (#4171) — a replay converges on the same row, "
+        "a different same-day note is its own row, and only replace_key=<exact sk> rewrites (attribute_exists)",
+    ),
     # ── #4078 ──────────────────────────────────────────────────────────────────
     "manage_pending_writes": (
         READ_BEFORE_WRITE,

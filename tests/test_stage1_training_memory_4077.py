@@ -130,3 +130,34 @@ def test_stage1_standing_constraints_from_chat_stays_separate_from_the_code_regi
     block = out["constraint_block"]
     assert "standing_constraints" in block
     assert block["standing_constraints"] != block["standing_constraints_from_chat"]
+
+
+# ── #4171 — two same-day training notes are BOTH served to stage 1 ─────────────────────────
+
+_INJURY_0925 = {
+    "sk": "MEMORY#training#2026-09-25#8c1e0f2a4b",
+    "category": "training",
+    "date": "2026-09-25",
+    "stored_at": "2026-09-26T02:15:00+00:00",
+    "summary": "No current injuries or ailments (as of 2026-09-25)",
+    "channel": "conversation",
+}
+_MACHINES_0925 = {
+    "sk": "MEMORY#training#2026-09-25#5d7a9b3c1e",
+    "category": "training",
+    "date": "2026-09-25",
+    "stored_at": "2026-09-26T02:16:35+00:00",
+    "summary": "Seated leg curl and calf press are my machines, not lying curl / standing calf raise.",
+    "channel": "conversation",
+}
+
+
+def test_issue_4171_stage1_carries_both_same_day_notes_as_standing_constraints():
+    """The acceptance's live-proof shape: two training notes on one day, both present in
+    stage 1's `standing_constraints_from_chat` — the block passes every record through,
+    it never collapses a day to one row."""
+    out = _stage1(memory_response={"records": [_MACHINES_0925, _INJURY_0925], "count": 2})
+    block = out["constraint_block"]
+    assert block["standing_constraints_from_chat"] == [_MACHINES_0925, _INJURY_0925]
+    assert {r["sk"] for r in block["standing_constraints_from_chat"]} == {_MACHINES_0925["sk"], _INJURY_0925["sk"]}
+    assert block["inputs"]["training_memory_constraints"]["state"] == "measured"
