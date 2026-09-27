@@ -394,3 +394,291 @@ def domains() -> dict:
         _domains_cache = _load_s3_json("site/config/domains.json", "domains")
     domains = _domains_cache.get("domains", [])
     return _ok({"domains": domains, "count": len(domains)}, cache_seconds=3600)
+
+
+# ── /api/session — today's session as it will be lifted (E3, epic #4182) ─────
+# Owner ruling 2026-09-26 ~23:05 PT, option (a): exercise NAMES + sets × reps + the
+# LOAD in pounds are public. Nothing else from a routine row leaves: no title, no
+# notes, no coach text, no rationale, no inputs_snapshot, no RPE targets, no Hevy ids.
+# The two tuples below ARE the public shape — tests/test_routine_endpoint.py asserts
+# the served body carries exactly these keys, so a key added here without being
+# added there is a red, and a key added there without a privacy reason is a review.
+_SESSION_KEYS = ("date", "state", "reason", "source", "kind", "session_role", "position_label", "exercises", "as_of")
+_EXERCISE_KEYS = ("name", "sets", "reps", "load_lbs", "loads_lbs")
+
+_SOURCE_COMMITTED = "hevy-routine"  # pushed to Hevy — the routine on his phone
+_SOURCE_DRAFT = "hevy-routine-draft"  # drafted (nightly pre-draft or chat), not yet pushed
+_SOURCE_PROGRAM = "program"  # no routine for the day — the program's own prescription for the next session
+
+_KG_TO_LBS = 2.20462  # the constant training.muscle_volume._KG_TO_LBS uses; the IR stores weight_kg (hevy_compiler)
+
+
+def _lbs(kg) -> "int | None":
+    """Whole pounds from a stored weight_kg; None when the set carries no load (a timed or bodyweight set)."""
+    try:
+        v = float(kg)
+    except (TypeError, ValueError):
+        return None
+    return int(round(v * _KG_TO_LBS)) if v > 0 else None
+
+
+def _reps_of(sets: list) -> "int | str | None":
+    """The rep target of the exercise, from its TOP (first) set: an int when the range collapses
+    (or the set names a single `reps`), the range as "a–b" when it does not — exactly what Hevy shows
+    him. None for a set with no rep target (a timed set)."""
+    for s in sets:
+        if not isinstance(s, dict):
+            continue
+        lo, hi, reps = s.get("rep_range_start"), s.get("rep_range_end"), s.get("reps")
+        try:
+            if lo is not None and hi is not None:
+                lo_i, hi_i = int(float(lo)), int(float(hi))
+                return lo_i if lo_i == hi_i else f"{lo_i}–{hi_i}"
+            if reps is not None:
+                return int(float(reps))
+        except (TypeError, ValueError):
+            pass
+        return None
+    return None
+
+
+def _movement_name(movement_key, catalog: dict, alias_titles: dict) -> "str | None":
+    """The Hevy-catalog title for a routine movement_key — by key, or for the ADR-069 `tmpl:<id>`
+    form through the entry whose template-id hint IS that id, then the alias registry's own titles
+    (the same two resolvers adherence scoring uses, `health.adherence_calc`). A catalog-style key
+    that resolves nowhere is rendered from its own words ("barbell_bench_press" → "Barbell bench
+    press") — a transliteration, not a guess; an unresolvable template id has no honest name → None,
+    and the page drops that row rather than print an id."""
+    if not movement_key:
+        return None
+    key = str(movement_key)
+    try:
+        from health.adherence_calc import _catalog_entry_for
+
+        entry = _catalog_entry_for(key, catalog or {})
+    except Exception as e:  # noqa: BLE001 — the name resolver must not take the route down
+        logger.warning("handle_session catalog lookup failed for %s: %s", key, e)
+        entry = {}
+    if entry.get("title"):
+        return str(entry["title"])
+    if key.startswith("tmpl:"):
+        t = (alias_titles or {}).get(key[len("tmpl:") :]) or (alias_titles or {}).get(key[len("tmpl:") :].upper())
+        return str(t) if t else None
+    return key.replace("_", " ").strip().capitalize() or None
+
+
+def _load_movement_names() -> "tuple[dict, dict]":
+    """(catalog, alias titles) — the bundled config/movement_catalog.json (S3 `config/` when the local
+    file is absent) + the alias registry's `titles`. Both non-fatal: an unreadable catalog means
+    transliterated names, never a 500."""
+    catalog: dict = {}
+    titles: dict = {}
+    try:
+        from health.adherence_calc import _load_catalog, _load_template_aliases
+
+        catalog = _load_catalog() or {}
+        titles = (_load_template_aliases() or {}).get("titles") or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("handle_session movement catalog unavailable: %s", e)
+    return catalog, titles
+
+
+def _exercise_row(ex: dict, catalog: dict, titles: dict) -> dict:
+    """ONE exercise as the page reads it — built field-by-field from the IR row; the row is never spread."""
+    sets = [s for s in (ex.get("sets") or []) if isinstance(s, dict)]
+    loads = [lb for lb in (_lbs(s.get("weight_kg")) for s in sets) if lb is not None]
+    return {
+        "name": _movement_name(ex.get("movement_key"), catalog, titles),
+        "sets": len(sets),
+        "reps": _reps_of(sets),
+        # the top set's load (the heavy scheme is one top set + back-offs at −10 %) …
+        "load_lbs": max(loads) if loads else None,
+        # … and every set's load in order, so "3 × 4–6 · 123 lb" can be read as 123 · 110 · 110
+        "loads_lbs": loads or None,
+    }
+
+
+def _routine_exercises(ir: dict) -> list:
+    """The exercise list Hevy actually shows: the recommended branch's own list when one exists
+    (#417 2b), else the routine-level list — the same choice /api/routine's counts make."""
+    for b in ir.get("branches") or []:
+        if isinstance(b, dict) and b.get("recommended") and b.get("exercises"):
+            return list(b["exercises"])
+    return list(ir.get("exercises") or [])
+
+
+def _stamped_role(ir: dict) -> "str | None":
+    """The session role the generator (calendar) or the nightly pre-draft stamped on the routine — the
+    ONLY field read from inputs_snapshot, and only to pick the routine; the snapshot never leaves."""
+    snap = ir.get("inputs_snapshot") or {}
+    if not isinstance(snap, dict):
+        return None
+    role = (snap.get("calendar") or {}).get("session_role") or (snap.get("nightly_predraft") or {}).get("session_role")
+    return str(role) if role else None
+
+
+def _program_next(today: str) -> "tuple[dict | None, str | None]":
+    """(next_session, reason-when-none): the program's own answer for `today` — the next UNDONE
+    session of the v0.4 sequence over the Hevy record since the block start (#4110; a Flex never
+    advances it, #4312). A Hevy read that raises is handed to next_session as None so it says
+    `sequence_unreadable` by name — never session 1 by default."""
+    from training import program_structure, session_sequence
+
+    if not getattr(program_structure, "ACTIVE", False):
+        return None, "no active training program"
+    workouts = None
+    try:
+        workouts = session_sequence.load_block_workouts(today)
+    except Exception as e:  # noqa: BLE001 — named below, never a fabricated position
+        logger.warning("handle_session block record read failed: %s", e)
+    try:
+        nxt = session_sequence.next_session(today, workouts)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("handle_session next_session failed: %s", e)
+        return None, "the program's session sequence could not be computed"
+    if nxt is None:
+        return None, f"before the program's first session ({session_sequence.block_start()})"
+    if not nxt.get("session_role"):
+        return None, "the record of lifted sessions could not be read, so the next session in the sequence is unknown"
+    return nxt, None
+
+
+def _program_exercises(role: str, deload: bool, catalog: dict, titles: dict) -> list:
+    """The program's prescription for one role as exercise rows: names from the catalog, sets and the
+    rep range from the exposure — no loads (the program prescribes % of a top set; the pounds live on
+    the drafted routine, which is why the draft is preferred when it exists)."""
+    from training import program_structure
+
+    rx = program_structure.session_prescription_for_role(role, deload=deload, catalog_movements=(catalog or {}).get("movements") or None)
+    rows = []
+    for e in rx.get("exposures") or []:
+        sets = e.get("sets") or []
+        reps = None
+        if sets and isinstance(sets[0], dict) and sets[0].get("reps"):
+            lo, hi = sets[0]["reps"][0], sets[0]["reps"][-1]
+            reps = int(lo) if int(lo) == int(hi) else f"{int(lo)}–{int(hi)}"
+        name = _movement_name(e.get("movement_key"), catalog, titles) if e.get("movement_key") else None
+        if not name and e.get("pattern"):
+            name = str(e["pattern"]).replace("_", " ").capitalize()
+        rows.append({"name": name, "sets": len(sets), "reps": reps, "load_lbs": None, "loads_lbs": None})
+    return rows
+
+
+def session(*, _g) -> dict:
+    """GET /api/session — the session Matthew lifts TODAY, as it will be lifted: exercise names,
+    sets × reps, the load in pounds (owner ruling 2026-09-26, option (a); E3 of epic #4182).
+
+    THE PICK, in order, all for the Pacific day:
+      1. a routine COMMITTED to Hevy for today (`hevy_routine_id` / status active) — `source: hevy-routine`
+      2. else the DRAFT for today whose stamped role is the sequence's next role; else the draft
+         whose archetype is the next session's; else the only draft — `source: hevy-routine-draft`
+      3. else the program's own prescription for the next undone session — `source: program`
+         (names, sets × reps; loads null — the program prescribes % of a top set, not pounds)
+      4. else `state: absent` with the reason (before the block start; the Hevy record unreadable)
+    Two drafts and no program match is served as (3): the program is the engine's ONE answer to
+    "what is next" (#4110). Floor / re-entry variants and archived routines are never selected,
+    exactly as /api/routine.
+
+    FAIL-CLOSED: `_SESSION_KEYS` / `_EXERCISE_KEYS` are the whole public shape, built field-by-field;
+    the stored IR is never spread. Read-only; always a shaped 200. Cache: 900s, like /api/routine.
+    """
+    table = _g["table"]
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    as_of = datetime.now(timezone.utc).isoformat()
+
+    def _out(state, *, reason=None, source=None, kind=None, role=None, label=None, exercises=None):
+        body = {
+            "date": today,
+            "state": state,
+            "reason": reason,
+            "source": source,
+            "kind": kind,
+            "session_role": role,
+            "position_label": label,
+            "exercises": [{k: e.get(k) for k in _EXERCISE_KEYS} for e in (exercises or [])],
+            "as_of": as_of,
+        }
+        return _ok({k: body[k] for k in _SESSION_KEYS}, cache_seconds=900)
+
+    # Today's routine rows from the index (newest first; sk = DATE#<target_date>#ROUTINE#<id>).
+    rows: list = []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}routine_index"),
+            ScanIndexForward=False,
+            Limit=32,
+        )
+        rows = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:
+        logger.warning("handle_session index read failed: %s", e)
+    rows = [
+        r
+        for r in rows
+        if r.get("routine_id")
+        and str(r.get("target_date") or "") == today
+        and (r.get("variant") or "") not in _ROUTINE_HIDDEN_VARIANTS
+        and (r.get("status") or "") != "archived"
+    ]
+
+    # The program's position — read once; it names the role a draft must match and the position label.
+    nxt, program_reason = _program_next(today)
+    next_role = (nxt or {}).get("session_role")
+    next_archetype = (nxt or {}).get("archetype")
+
+    irs: list = []
+    for r in rows:
+        try:
+            resp = table.get_item(
+                Key={"pk": f"USER#{USER_ID}#ROUTINE#{r['routine_id']}", "sk": "VERSION#current"},
+                ProjectionExpression=(
+                    "target_date, archetype, variant, #st, exercises, branches, hevy_pushed_at, hevy_routine_id, "
+                    "inputs_snapshot.calendar.session_role, inputs_snapshot.nightly_predraft.session_role"
+                ),
+                ExpressionAttributeNames={"#st": "status"},
+            )
+            ir = _decimal_to_float(resp.get("Item")) or {}
+        except Exception as e:
+            logger.warning("handle_session IR read failed for %s: %s", r.get("routine_id"), e)
+            ir = {}
+        if ir:
+            irs.append(ir)
+
+    def _committed(ir):
+        return bool(ir.get("hevy_routine_id")) or bool(ir.get("hevy_pushed_at")) or (ir.get("status") or "") == "active"
+
+    picked, source = None, None
+    committed = [ir for ir in irs if _committed(ir)]
+    drafts = [ir for ir in irs if not _committed(ir)]
+    if committed:
+        picked, source = committed[0], _SOURCE_COMMITTED
+    elif drafts:
+        by_role = [ir for ir in drafts if next_role and _stamped_role(ir) == next_role]
+        by_arch = [ir for ir in drafts if next_archetype and str(ir.get("archetype") or "").lower() == str(next_archetype).lower()]
+        if by_role:
+            picked, source = by_role[0], _SOURCE_DRAFT
+        elif by_arch:
+            picked, source = by_arch[0], _SOURCE_DRAFT
+        elif len(drafts) == 1:
+            picked, source = drafts[0], _SOURCE_DRAFT
+
+    catalog, titles = _load_movement_names()
+
+    if picked is not None:
+        from training import session_sequence
+
+        archetype = str(picked.get("archetype") or "").lower()
+        kind = "program" if archetype in session_sequence.program_archetypes() else "complement"
+        role = _stamped_role(picked) if kind == "program" else None
+        label = (nxt or {}).get("position_label") if role and role == next_role else None
+        exercises = [_exercise_row(ex, catalog, titles) for ex in _routine_exercises(picked) if isinstance(ex, dict)]
+        return _out("served", source=source, kind=kind, role=role, label=label, exercises=exercises)
+
+    if nxt is not None and next_role:
+        try:
+            exercises = _program_exercises(next_role, bool(nxt.get("deload")), catalog, titles)
+        except Exception as e:  # noqa: BLE001 — a template the program cannot render is an absence, not a 500
+            logger.warning("handle_session program prescription failed: %s", e)
+            return _out("absent", reason="the program's prescription for the next session could not be built")
+        return _out("served", source=_SOURCE_PROGRAM, kind="program", role=next_role, label=nxt.get("position_label"), exercises=exercises)
+
+    return _out("absent", reason=program_reason or "no session drafted for today and none prescribed")
