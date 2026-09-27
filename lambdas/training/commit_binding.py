@@ -109,7 +109,12 @@ def check(ir: Any, lister: Any = None) -> dict[str, Any]:
         where = (
             f" Red-teamed routine(s) for {ir.target_date}: {', '.join(sib)}." if sib else f" No routine for {ir.target_date} carries one."
         )
-        return {"bound": False, "reason": "not_red_teamed", "message": f"routine {ir.routine_id} has NO stage-2 verdict.{where}"}
+        return {
+            "bound": False,
+            "reason": "not_red_teamed",
+            "message": f"routine {ir.routine_id} has NO stage-2 verdict.{where}",
+            "siblings": sib,
+        }
     if not b.get("content_hash"):
         return {"bound": False, "reason": "unbound", "message": f"routine {ir.routine_id}'s stage-2 verdict predates binding (#4066)."}
     if b.get("routine_id") != ir.routine_id:
@@ -131,9 +136,41 @@ def check(ir: Any, lister: Any = None) -> dict[str, Any]:
     return {"bound": True, "reason": None, "message": f"bound — stage-2 verdict v{b.get('version')} hash {now[:12]} matches (#4066)"}
 
 
+def refusal_suggestions(ir: Any, verdict: dict[str, Any]) -> list[str]:
+    """The ways forward, derived from THIS refusal (#4172) — never the transport default.
+
+    A policy refusal answers the same commit identically; "retry" is a loop. Each reason
+    names the one call that changes the answer, the routine it applies to, and the override.
+    """
+    rid = ir.routine_id
+    stage2 = f"Run plan_next_session with routine_id={rid} (stage 2) and commit what it verdicts"
+    override = (
+        f"Or pass {OVERRIDE_ARG}=true with {REASON_ARG} in the owner's own words — stamped into the stored routine, reported as a warning."
+    )
+    reason = verdict.get("reason")
+    if reason == "not_red_teamed":
+        out = [f"{stage2} — this routine has never been red-teamed."]
+        sib = [s for s in (verdict.get("siblings") or []) if not str(s).startswith("(lookup failed")]
+        if sib:
+            out.append(f"Or commit the routine already red-teamed for {ir.target_date}, if that is the one meant: {', '.join(sib)}.")
+        return out + [override]
+    if reason == "unbound":
+        return [f"{stage2} — its verdict predates binding, one call stamps it.", override]
+    if reason == "other_routine":
+        b = ((getattr(ir, "inputs_snapshot", None) or {}).get("critics") or {}).get("binding") or {}
+        return [
+            f"Commit routine {b.get('routine_id')} — that is the routine this verdict was issued for.",
+            f"Or, if {rid} is the one meant: {stage2}.",
+            override,
+        ]
+    if reason == "content_changed":
+        return [f"{stage2} — the content changed since the verdict; the red team must see this version.", override]
+    return [f"{stage2}.", override]
+
+
 def preflight(ir: Any, args: dict[str, Any], err: Any, lister: Any = None) -> tuple[dict[str, Any] | None, str, list[str]]:
     """(refusal | None, status line for the result, warnings). Stamps an override. `err` is the
-    caller's error-envelope builder (message, error_code=..., detail=...)."""
+    caller's error-envelope builder (message, error_code=..., suggestions=..., detail=...)."""
     verdict = check(ir, lister)
     if verdict["bound"]:
         return None, verdict["message"], []
@@ -146,6 +183,7 @@ def preflight(ir: Any, args: dict[str, Any], err: Any, lister: Any = None) -> tu
                 f"routine_id={ir.routine_id} (stage 2) and commit what it verdicts, or pass {OVERRIDE_ARG}=true with "
                 f"{REASON_ARG} in the owner's words.",
                 error_code=BINDING_ERROR_CODE,
+                suggestions=refusal_suggestions(ir, verdict),  # #4172: derived from the refusal, never 'retry'
                 detail=verdict,
             ),
             "",
@@ -168,4 +206,8 @@ def deleted_routine_error(status: int, body_text: str, ir: Any, took_update_bran
         f"no longer holds (HTTP 404: {body_text[:200] or 'empty body'}) — it was deleted in the app. Nothing was written. "
         "Draft a new routine (draft_custom), red-team it (plan_next_session with routine_id), then commit that.",
         error_code=DELETED_ERROR_CODE,
+        suggestions=[  # #4172: a policy refusal names the way forward, never 'retry'
+            "Draft a new routine (draft_custom), red-team it (plan_next_session with the new routine_id), then commit that routine_id.",
+            f"routine_id={ir.routine_id} still points at Hevy routine {ir.hevy_routine_id}, which the app deleted — committing it again refuses the same way.",
+        ],
     )
