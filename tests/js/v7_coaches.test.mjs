@@ -273,3 +273,19 @@ test("R6 fix 3: the late line is ink, no weight — the sheet carries no --alert
   assert.ok(rule, "the rule exists");
   assert.ok(!/alert|font-weight/.test(rule), rule);
 });
+
+test("getJSON drains a non-2xx body before returning null — an unread body keeps networkidle from ever arriving (rollback class)", async () => {
+  const realFetch = globalThis.fetch;
+  let served;
+  globalThis.fetch = async () => (served = new Response("{}", { status: 404, headers: { "content-type": "application/json" } }));
+  try {
+    assert.equal(await V.getJSON("/api/coach_docket"), null);
+    assert.equal(served.bodyUsed, true, "the 404 body was read, not left in flight");
+    globalThis.fetch = async () => (served = new Response('{"open":[]}', { status: 200, headers: { "content-type": "application/json" } }));
+    assert.deepEqual(await V.getJSON("/api/coach_docket"), { open: [] });
+    globalThis.fetch = async () => { throw new Error("offline"); };
+    assert.equal(await V.getJSON("/api/coach_docket"), null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

@@ -487,10 +487,16 @@ export function rosterHTML(rows) {
 }
 
 // ── the page ─────────────────────────────────────────────────────────────────────
-async function getJSON(url) {
+// Exported for the test. A non-2xx body is DRAINED before the null return: an unread body
+// stays "in flight" to Chromium, so `networkidle` never arrives and the visual-QA gate that
+// waits on it times out — a rollback class (proven live by the Today lane, 2026-09-26).
+export async function getJSON(url) {
   try {
     const r = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      await r.text().catch(() => "");
+      return null;
+    }
     return await r.json();
   } catch (e) {
     return null;
