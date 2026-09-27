@@ -320,8 +320,17 @@ def test_an_added_set_is_refused_so_no_back_off_window_can_be_overrun():
     assert ra.audit_prescription(ir.exercises, floors={"squat_barbell": SQUAT_FLOOR}, scheme=BACK_OFF_SCHEME)["ok"] is True
 
 
-def test_the_clamp_and_the_gate_share_one_tolerance():
-    assert c.FLOOR_TOLERANCE_KG == ra.LOAD_TOLERANCE_KG
+def test_the_clamp_and_the_gate_judge_with_one_predicate():
+    """#4149 mirrored the gate's 0.05 kg tolerance into `critics_apply` and held the two NUMBERS
+    equal. #4065 replaced both with ONE plate-grid predicate on the bundled side
+    (`training.rep_scheme.is_below_floor`), so there is no second number left to keep equal."""
+    from coach import critics_apply
+    from training import rep_scheme
+
+    assert critics_apply.is_below_floor is rep_scheme.is_below_floor
+    assert ra.rep_scheme.is_below_floor is rep_scheme.is_below_floor
+    assert not hasattr(c, "FLOOR_TOLERANCE_KG") and not hasattr(critics_apply, "FLOOR_TOLERANCE_KG")
+    assert not hasattr(ra, "LOAD_TOLERANCE_KG")
 
 
 def test_critic_set_floors_reads_the_commit_gates_own_floors():
