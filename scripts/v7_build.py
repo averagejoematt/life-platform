@@ -51,6 +51,7 @@ import v4_chrome  # noqa: E402
 from v7 import (
     coaches,  # noqa: E402
     today,  # noqa: E402
+    tries,  # noqa: E402
     week,  # noqa: E402
     who,  # noqa: E402
 )
@@ -81,6 +82,7 @@ BODIES = {
     "story/": week,
     "coaching/": coaches,
     "story/about/": who,
+    "protocols/": tries,
 }
 
 
