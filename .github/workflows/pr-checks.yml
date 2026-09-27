@@ -114,9 +114,14 @@ jobs:
       # gates mean the FIRST red masks every gate after it, so an agent fixes black,
       # discovers mypy, fixes mypy, discovers the size ceiling: one push per layer. Each
       # gate's own non-zero exit still fails the job, so gating is unchanged.
+      # #4251: tee'd so the deselection report below knows the universe — the parallel
+      # pass runs under xdist, whose summary line carries no "deselected" count.
+      # pipefail per #2746: without it the step exits with tee's status.
       - name: Collection gate (the #1297 class dies here)
         if: always()
-        run: python3 -m pytest tests/ --collect-only -q
+        run: |
+          set -o pipefail
+          python3 -m pytest tests/ --collect-only -q | tee /tmp/premerge_collect_output.txt
 
       # #2258: the pre-merge lane must not be a strict SUBSET of the post-merge one.
       # `premerge` is applied automatically by tests/conftest.py to every
@@ -149,6 +154,16 @@ jobs:
           echo "PR_COMMITS_FILE_UNDER_TEST=/tmp/pr_commits_3005.txt" >> "$GITHUB_ENV"
           echo "collected $(grep -c '^---$' /tmp/pr_commits_3005.txt || true) separator(s)"
 
+      # #4251: TWO PASSES over the unchanged `premerge and not integration` selection, the
+      # same idiom and the same xdist flags as the full-suite job below (#3025). The lane ran
+      # its ~12.3k tests in ONE process and took longer than the 30k-test parallel full suite
+      # on the same PR (21 min vs 19, run 36273477305). The parallel pass takes
+      # `-n auto --dist loadfile` (a file's tests stay on one worker, so intra-file ordering
+      # holds); the 46 premerge tests marked `serial` — the in-tree writers that mutate the
+      # checkout (tests/test_suite_parallel_safety_3025.py is their registry) — run
+      # afterwards in one process. The two `-m` expressions are exact complements over
+      # `serial`, so every selected test runs exactly once;
+      # tests/test_premerge_lane.py asserts that partition.
       - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)
         if: always()
         # `set -o pipefail` is LOAD-BEARING (#2746 class, caught by
@@ -157,9 +172,26 @@ jobs:
         # pipefail this enforcing step exits with tee's status — 0 — so the whole
         # pre-merge lane reports SUCCESS on failing tests. A gate that cannot fail is a
         # green light wired to nothing.
+        #
+        # ONE step, not two, on purpose: the step name is this gate's id in
+        # scripts/gate_census.py, so a second step would enter the census as a new gate.
+        # `|| status=$?` keeps the #749 property inside the step — a red parallel pass does
+        # not hide the serial result — and `exit $status` keeps the gate able to fail
+        # (the bundle-boot step's idiom).
         run: |
           set -o pipefail
-          python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short | tee /tmp/premerge_lane_output.txt
+          status=0
+          python3 -m pytest tests/ -m "premerge and not integration and not serial" -q --tb=short -n auto --dist loadfile | tee /tmp/premerge_lane_output.txt || status=$?
+          # The serial pass collects ONLY the files that carry the marker: a whole-tree
+          # collection costs ~160s on the runner (measured on this PR's first run, where
+          # this pass took 156.59s for 46 tests). `serial` is applied only by the literal
+          # `mark.serial` in a test file — tests/conftest.py never adds it — so the grep
+          # covers every marked test (a superset of files — `-m` still selects); tests/test_premerge_lane.py holds that premise.
+          SERIAL_FILES=$(grep -l 'mark\.serial' tests/test_*.py || true)
+          if [ -n "$SERIAL_FILES" ]; then
+            python3 -m pytest $SERIAL_FILES -m "premerge and not integration and serial" -q --tb=short | tee -a /tmp/premerge_lane_output.txt || status=$?
+          fi
+          exit $status
 
       # #2692: the gap this closes is not "the lane is slow", it's that a green PR
       # check gave no signal about what it did NOT run — PR #2884 merged 7/7 green
@@ -171,7 +203,7 @@ jobs:
       - name: Report pre-merge deselection (#2692 — a green check states what it skipped)
         if: always()
         run: |
-          python3 scripts/report_premerge_deselection.py /tmp/premerge_lane_output.txt >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/report_premerge_deselection.py /tmp/premerge_collect_output.txt /tmp/premerge_lane_output.txt >> "$GITHUB_STEP_SUMMARY"
 
       # The SAME command ci-lint.yml's "Mypy gate" runs, against the same authoritative
       # module list (tests/mypy_clean_set.py). It is duplicated as an explicit step rather

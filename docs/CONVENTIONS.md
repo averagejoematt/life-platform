@@ -406,6 +406,16 @@ listed: `tests/conftest.py` applies `premerge` to every `tests/*_behavior.py` fi
 everything `deploy_critical`, and to the structural gates in `_PREMERGE_EXTRA_FILES`.
 **8,813 tests in 155s** (measured locally 2026-08-21) against the job's 10-minute timeout.
 
+**On the runner it is two passes over that one selection (#4251)** — the full-suite job's
+idiom: `-m "premerge and not integration and not serial" -n auto --dist loadfile`, then
+`-m "premerge and not integration and serial"` in one process for the in-tree writers.
+The expressions are exact complements, so no test runs twice inside the lane
+(`tests/test_premerge_lane.py` holds the partition). Run serially, it had grown to ~21 min
+on the runner — slower than the 30k-test parallel full suite on the same PR. Locally the
+one-pass command above is still the same selection; add `-n auto --dist loadfile -m
+"premerge and not integration and not serial"` for the lane's speed (12,258 tests in
+406s on 12 cores, 2026-09-27, plus 46 serial in 94s).
+
 **What it does NOT do: predict main.** It covers the *merge* gate. The lane that reds
 `main` is the full `Unit Tests` job — ~1,320s (#2692) — and no cheap local subset honestly
 predicts it. A green run here means "the required check should pass," never "main will
