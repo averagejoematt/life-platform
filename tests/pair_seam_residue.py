@@ -542,6 +542,21 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "from a live SOURCE#hevy read in tests/test_training_load_worked_set_4075.py, and a record with no set log "
         "degrades to the stated work fraction BY NAME (basis `no_set_log_work_fraction`), never to zero.",
     ),
+    # #4244 (2026-09-26): the public nutrition door joins the latest day's supplement record
+    # into the micronutrient figure it serves — the food-only number was published as
+    # "sufficiency" while this partition held Vitamin D 5,000 IU on a day the bar read 5%.
+    "supplements::lambdas/web/site_api_nutrition.py::read": (
+        "2026-09-26",
+        "#4244: site_api_nutrition reads no supplement field itself — it hands the day's row, untouched, to "
+        "health.nutrient_intake.nutrient_intake, the ONE consumer the weekly review (emails/nutrition_review_lambda, "
+        "already a reader of this partition in the residue above) also feeds, so this seam adds no second shape to "
+        "agree on. The shape that consumer depends on is exactly what the writer (habitify_lambda.supplement_bridge) "
+        "emits — `supplements[].{name, dose, unit}` — and is pinned from a live SOURCE#supplements read (2026-09-25 "
+        "and 2026-09-26 rows) in tests/test_macrofactor_ingestion_behavior.py::test_the_live_wire_row_joins_the_"
+        "supplement_record_into_vitamin_d; a writer-side rename of `dose`/`unit` makes every entry unconvertible, "
+        "which lands it in `unconverted[]` BY NAME and drops the supplement channel from `channels_counted` — never a "
+        "silent zero and never a silent addition (the mutation control in the same module).",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]

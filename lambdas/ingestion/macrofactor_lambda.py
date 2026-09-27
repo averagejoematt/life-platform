@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 import boto3
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from health import nutrient_intake  # #4244: targets + the food-only scorer; the join lives there too
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -262,47 +263,16 @@ def compute_protein_distribution(food_log):
 
 
 # ── Micronutrient Sufficiency (Derived Metrics Phase 1e) ─────────────────────
-# Board of Directors consensus targets for adult male, active, weight loss phase.
-MICRONUTRIENT_TARGETS = {
-    "fiber_g": {"target": 38, "label": "Fiber"},
-    "potassium_mg": {"target": 3400, "label": "Potassium"},
-    "magnesium_mg": {"target": 420, "label": "Magnesium"},
-    "vitamin_d_mcg": {"target": 100, "label": "Vitamin D"},  # 4000 IU
-    "omega3_total_g": {"target": 3, "label": "Omega-3"},
-}
-
-
-def compute_micronutrient_sufficiency(totals_prefixed):
-    """
-    Compute per-nutrient sufficiency as % of optimal daily target.
-    Returns (sufficiency_map, avg_pct) or (None, None) if no data.
-
-    sufficiency_map: {nutrient_key: {"actual": float, "target": float, "pct": float}}
-    Pct is capped at 100 — exceeding target still scores 100%.
-    """
-    sufficiency = {}
-    pcts = []
-
-    for nutrient_key, config in MICRONUTRIENT_TARGETS.items():
-        total_key = f"total_{nutrient_key}"
-        actual = totals_prefixed.get(total_key)
-        if actual is None:
-            continue
-        actual = float(actual)
-        target = config["target"]
-        pct = min(round(actual / target * 100, 1), 100.0)
-        sufficiency[nutrient_key] = {
-            "actual": round(actual, 1),
-            "target": target,
-            "pct": pct,
-        }
-        pcts.append(pct)
-
-    if not pcts:
-        return None, None
-
-    avg_pct = round(sum(pcts) / len(pcts), 1)
-    return sufficiency, avg_pct
+# #4244: the targets and the FOOD-ONLY scorer live in health.nutrient_intake now — the one
+# module that also joins the supplement record — and are re-exported here so the ingest
+# path and its tests (`mf.MICRONUTRIENT_TARGETS`, `mf.compute_micronutrient_sufficiency`)
+# are unchanged. What THIS lambda stores is still food-only (the supplement bridge runs on
+# its own cadence and a join at ingest would race it); the stored item says so with
+# `micronutrient_intake_channels: ["food"]`, and every published label reads the joined
+# figure from health.nutrient_intake.nutrient_intake instead.
+MICRONUTRIENT_TARGETS = nutrient_intake.MICRONUTRIENT_TARGETS
+compute_micronutrient_sufficiency = nutrient_intake.food_sufficiency
+STORED_INTAKE_CHANNELS = ["food"]
 
 
 def build_day_items(rows):
@@ -357,7 +327,16 @@ def build_day_items(rows):
                 if pds_score is not None
                 else {}
             ),
-            **({"micronutrient_sufficiency": micro_suff, "micronutrient_avg_pct": micro_avg} if micro_suff is not None else {}),
+            **(
+                {
+                    "micronutrient_sufficiency": micro_suff,
+                    "micronutrient_avg_pct": micro_avg,
+                    # #4244: the stored figure counts ONE channel; the artifact at rest says which.
+                    "micronutrient_intake_channels": list(STORED_INTAKE_CHANNELS),
+                }
+                if micro_suff is not None
+                else {}
+            ),
         }
         day_items[date_str] = item
     return day_items

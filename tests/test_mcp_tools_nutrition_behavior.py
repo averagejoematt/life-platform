@@ -388,6 +388,14 @@ def test_micronutrients_scores_a_nutrient_against_rda_and_optimal_with_its_n(mon
     assert out["summary"]["near_gaps"] == 1
 
 
+def test_micronutrients_report_names_the_one_channel_it_read(monkeypatch):
+    """#4244: this RDA table reads MacroFactor alone; the label says so beside the numbers."""
+    install(monkeypatch, micro_rows(total_fiber_g=10))
+    out = tn.tool_get_nutrition(MICRO_ARGS)
+    assert out["intake_channels"] == ["food"]
+    assert "supplement doses are not counted" in out["scope"]
+
+
 def test_micronutrients_calls_a_sustained_shortfall_deficient(monkeypatch):
     """fiber 10 -> 10/38 * 100 = 26.3 -> below 60 -> DEFICIENT."""
     install(monkeypatch, micro_rows(total_fiber_g=10))

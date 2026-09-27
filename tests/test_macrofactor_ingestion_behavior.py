@@ -1365,3 +1365,199 @@ def test_both_macrofactor_partitions_are_registered_sources_with_their_own_schem
     assert "macrofactor" in SOURCE_REGISTRY
     assert set(_SCHEMAS) >= {"macrofactor", "macrofactor_workouts"}
     assert mf.PK != mf.PK_WORKOUTS
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4244 / #4245 — the micronutrient figure counts food AND the supplement record
+# ══════════════════════════════════════════════════════════════════════════════
+# THE WIRE: these rows are the live DynamoDB items as boto3 returns them (Decimal
+# amounts), read 2026-09-27 from USER#matthew#SOURCE#macrofactor and
+# USER#matthew#SOURCE#supplements (written by habitify_lambda.supplement_bridge — it
+# lists only the doses TICKED that day, so the row IS the adherence record). 2026-09-25
+# is the day /api/nutrition_overview served vitamin D at 5.0%.
+from decimal import Decimal as _D  # noqa: E402
+
+from health import nutrient_intake as ni  # noqa: E402
+
+_WIRE_MF = {
+    "2026-09-25": {
+        "date": "2026-09-25",
+        "total_fiber_g": _D("16.7"),
+        "total_magnesium_mg": _D("176"),
+        "total_omega3_ala_g": _D("0.1"),
+        "total_omega3_total_g": _D("0.1"),
+        "total_potassium_mg": _D("2996.4"),
+        "total_vitamin_d_mcg": _D("5"),
+        "micronutrient_avg_pct": _D("36.4"),
+    },
+    "2026-09-26": {
+        "date": "2026-09-26",
+        "total_fiber_g": _D("24.4"),
+        "total_magnesium_mg": _D("207.9"),
+        "total_omega3_ala_g": _D("0.4"),
+        "total_omega3_dha_g": _D("0"),
+        "total_omega3_epa_g": _D("0"),
+        "total_omega3_total_g": _D("0.4"),
+        "total_potassium_mg": _D("4823.4"),
+        "total_vitamin_d_mcg": _D("0.4"),
+        "micronutrient_avg_pct": _D("45.5"),
+    },
+}
+
+
+def _wire_supp(date, taken):
+    return {
+        "pk": "USER#matthew#SOURCE#supplements",
+        "sk": f"DATE#{date}",
+        "date": date,
+        "bridge_source": "habitify",
+        "source": "supplements",
+        "schema_version": _D("1"),
+        "supplements": [{"name": n, "dose": _D(str(d)), "unit": u, "source": "habitify_bridge"} for n, d, u in taken],
+    }
+
+
+_WIRE_SUPP = {
+    "2026-09-25": _wire_supp(
+        "2026-09-25",
+        [
+            ("Collagen", 10, "g"),
+            ("Creatine", 5, "g"),
+            ("Electrolytes", 1, "packet"),
+            ("L Glutamine", 5, "g"),
+            ("Multivitamin", 1, "capsule"),
+            ("Glycine", 3, "g"),
+            ("Inositol", 2000, "mg"),
+            ("Basic B Complex", 1, "capsule"),
+            ("NAC", 600, "mg"),
+            ("Omega 3", 2000, "mg"),
+            ("Zinc Picolinate", 30, "mg"),
+            ("Vitamin D", 5000, "IU"),
+        ],
+    ),
+    "2026-09-26": _wire_supp(
+        "2026-09-26",
+        [
+            ("Multivitamin", 1, "capsule"),
+            ("Glycine", 3, "g"),
+            ("Inositol", 2000, "mg"),
+            ("Basic B Complex", 1, "capsule"),
+            ("NAC", 600, "mg"),
+            ("Omega 3", 2000, "mg"),
+            ("Zinc Picolinate", 30, "mg"),
+            ("Vitamin D", 5000, "IU"),
+            ("L-Threonate", 2000, "mg"),
+            ("Apigenin", 50, "mg"),
+            ("Theanine", 200, "mg"),
+            ("Collagen", 10, "g"),
+            ("Creatine", 5, "g"),
+            ("Electrolytes", 1, "packet"),
+            ("L Glutamine", 5, "g"),
+        ],
+    ),
+}
+
+
+def test_the_live_wire_row_joins_the_supplement_record_into_vitamin_d():
+    """The published 5% was food alone; 5,000 IU = 125 mcg (FDA 1 mcg = 40 IU) is on the record."""
+    food_only, _ = mf.compute_micronutrient_sufficiency(_WIRE_MF["2026-09-25"])
+    assert food_only["vitamin_d_mcg"]["pct"] == 5.0  # the before, on the same row
+
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-25"], _WIRE_SUPP["2026-09-25"])
+    vd = out["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_food"], vd["from_supplements"], vd["actual"], vd["pct"]) == (5.0, 125.0, 130.0, 100.0)
+    assert vd["channels_counted"] == ["food", "supplements"]
+    assert vd["uncounted_supplements"] == ["Multivitamin"]  # a floor, and it says so
+    assert out["intake_channels"] == ["food", "supplements"]
+    assert out["supplements_state"] == "recorded"
+    # Omega 3 is EPA/DHA (2.0 g) and is kept apart from the food's ALA.
+    o3 = out["sufficiency"]["omega3_total_g"]
+    assert (o3["from_food"], o3["from_supplements"]) == (0.1, 2.0)
+    assert o3["species"] == {"ala_g": {"food": 0.1}, "epa_dha_g": {"food": None, "supplements": 2.0}}
+    # No L-Threonate ticked on 09-25; the multivitamin/electrolytes MAY carry Mg — food-only, named.
+    mg = out["sufficiency"]["magnesium_mg"]
+    assert (mg["from_supplements"], mg["channels_counted"]) == (None, ["food"])
+    assert sorted(mg["uncounted_supplements"]) == ["Electrolytes", "Multivitamin"]
+    assert out["food_only_avg_pct"] == 36.4  # matches what ingest stored
+    assert out["avg_pct"] > out["food_only_avg_pct"]
+
+
+def test_the_2026_09_26_wire_row_counts_elemental_magnesium_not_the_compound():
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-26"], _WIRE_SUPP["2026-09-26"])
+    vd = out["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_food"], vd["from_supplements"], vd["pct"]) == (0.4, 125.0, 100.0)
+    mg = out["sufficiency"]["magnesium_mg"]
+    # 2,000 mg magnesium L-threonate supplies 144 mg elemental Mg — never 2,000.
+    assert (mg["from_food"], mg["from_supplements"], mg["actual"]) == (207.9, 144.0, 351.9)
+    assert mg["pct"] == 83.8
+    zinc = [c for c in out["counted"] if c["nutrient"] == "zinc_mg"]
+    assert [c["amount"] for c in zinc] == [30.0]
+
+
+def test_mutation_control_with_the_join_removed_vitamin_d_falls_back_to_5_percent(monkeypatch):
+    """The join is load-bearing: severing the supplement channel returns the published 5%,
+    so the wire test above cannot pass without it."""
+    monkeypatch.setattr(
+        ni,
+        "_supplement_contributions",
+        lambda row: {"state": "absent", "amounts": {}, "species": {}, "counted": [], "unconverted": [], "may_contain": {}},
+    )
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-25"], _WIRE_SUPP["2026-09-25"])
+    assert out["sufficiency"]["vitamin_d_mcg"]["pct"] == 5.0
+    assert out["sufficiency"]["vitamin_d_mcg"]["channels_counted"] == ["food"]
+
+
+def test_an_unconvertible_unit_lands_in_unconverted_and_is_not_summed():
+    """Vitamin E in IU needs the tocopherol FORM to convert (0.67 vs 0.45 mg/IU); a vitamin D
+    dose in an unknown unit has no cited factor. Neither is guessed."""
+    row = {
+        "supplements": [
+            {"name": "Vitamin D", "dose": _D("2"), "unit": "drops"},
+            {"name": "Mystery Stack", "dose": _D("1"), "unit": "scoop"},
+        ]
+    }
+    out = ni.nutrient_intake({"total_vitamin_d_mcg": _D("5")}, row)
+    vd = out["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["actual"], vd["from_supplements"], vd["channels_counted"]) == (5.0, None, ["food"])
+    assert vd["uncounted_supplements"] == ["Vitamin D"]  # taken, not converted: a floor, never "took none"
+    names = [u["name"] for u in out["unconverted"]]
+    assert names == ["Vitamin D", "Mystery Stack"]
+    assert "no cited conversion" in out["unconverted"][0]["reason"]
+    assert out["counted"] == []
+    assert ni.UNIT_CONVERSIONS[("IU", "vitamin_e_mg")]["factor"] is None
+
+
+def test_a_day_with_no_supplement_record_is_absent_not_zero():
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-25"], None)
+    vd = out["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_supplements"], vd["channels_counted"], vd["pct"]) == (None, ["food"], 5.0)
+    assert out["supplements_state"] == "absent"
+
+
+def test_every_conversion_and_every_counted_supplement_cites_its_source():
+    for key, conv in ni.UNIT_CONVERSIONS.items():
+        assert conv["source"].strip(), key
+    for name, spec in ni.SUPPLEMENT_NUTRIENT_CONTENT.items():
+        if spec.get("content") is None:
+            assert spec["reason"].strip(), name
+            continue
+        for c in spec["content"]:
+            assert c["basis"].strip(), name
+            assert (c["unit"], c["nutrient"]) in ni.UNIT_CONVERSIONS, name
+
+
+def test_the_nutrient_registry_covers_every_supplement_the_bridge_can_write():
+    """Guard the SET: every habit habitify_lambda.SUPPLEMENT_MAP can write has an explicit
+    disposition, and each counted dose's unit matches the unit the bridge writes."""
+    import ast
+
+    tree = ast.parse(open(os.path.join(ROOT, "lambdas", "ingestion", "habitify_lambda.py")).read())
+    smap = next(
+        ast.literal_eval(n.value)
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "SUPPLEMENT_MAP" for t in n.targets)
+    )
+    assert set(smap) == set(ni.SUPPLEMENT_NUTRIENT_CONTENT)
+    for name, spec in ni.SUPPLEMENT_NUTRIENT_CONTENT.items():
+        for c in spec.get("content") or []:
+            assert c["unit"] == smap[name]["unit"], name
