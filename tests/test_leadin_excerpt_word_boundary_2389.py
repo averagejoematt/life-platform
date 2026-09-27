@@ -61,3 +61,36 @@ def test_no_raw_300_slice_in_module_source():
         src = f.read()
     assert not re.search(r"\[\s*:\s*300\s*\]", src), "raw [:300] slice reintroduced — use truncate_at_word (#1224/#2389)"
     assert "truncate_at_word" in src
+
+
+# ── #4191: one derivation for both manifest writers ────────────────────────────────
+
+_LIVE_TITLE = "The Silence and the Signal"
+_LIVE_STATS = "Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0 days"
+_LIVE_ENVELOPE = f'"{_LIVE_TITLE}"\n\n[{_LIVE_STATS}]\n\nOn Monday afternoon, Matthew logged the biggest training day of the experiment.'
+
+
+def test_4191_excerpt_shares_the_standing_writers_derivation():
+    """The two manifest builders had diverged — this script stripped the envelope head, the
+    Lambda writer did not, and the live excerpts opened on the bracket. Both now call the
+    ONE helper, so the re-render and the next publish derive the same excerpt."""
+    import inspect
+
+    from content import chronicle_schema
+
+    rec = {"content_markdown": _LIVE_ENVELOPE, "title": _LIVE_TITLE}
+    excerpt = rlp.excerpt_from_record(rec)
+    assert excerpt.startswith("On Monday afternoon"), excerpt[:60]
+    assert "[Weight:" not in excerpt
+    assert excerpt == rlp.excerpt_from_record.__globals__["truncate_at_word"](
+        chronicle_schema.body_markdown(_LIVE_ENVELOPE, _LIVE_TITLE), 300
+    )
+    assert "chronicle_schema.body_markdown(" in inspect.getsource(rlp.body_markdown_from_record)
+
+
+def test_4191_re_rendered_page_dek_reads_as_words():
+    page = rlp.render_post_html(_LIVE_TITLE, _LIVE_STATS, "<p>Body.</p>", "Week 3", "2026-09-22", 6)
+    assert '<div class="post-header__stats">315.0 lb that week · the engine\'s week score 74</div>' in page
+    assert 'property="og:description" content="315.0 lb that week · the engine\'s week score 74"' in page
+    assert "T0 Streak" not in page
+    assert "[Weight:" not in page

@@ -31,6 +31,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 from common.text_utils import truncate_at_word  # noqa: E402
 from common.utm import with_utm  # noqa: E402  — the ONE canonical outbound UTM tagger (#1621)
+from content import chronicle_schema  # noqa: E402  — #4191: a stored excerpt may still open on the envelope head
 
 # /journal/posts.json is the live genesis-anchored chronicle feed (served from
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a
@@ -243,7 +244,9 @@ def main() -> int:
         # tagging it would change every historical item's identity and re-notify
         # every subscriber of every past post on the next build.
         tagged_link = with_utm(link, source="rss", medium="feed", campaign="chronicle")
-        excerpt = " ".join((p.get("excerpt") or "").split())
+        # #4191: the manifest excerpts written before the fix open on the quoted title and
+        # the bracketed stat line; the feed description is the BODY, same derivation as the writer.
+        excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
         # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261).
         excerpt = truncate_at_word(excerpt, 360)
         items.append(
