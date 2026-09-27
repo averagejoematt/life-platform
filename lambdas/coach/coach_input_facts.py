@@ -24,6 +24,11 @@ own served numbers contradicted:
      nightly QA and this generation-time gate read prose ONE way.
 
 Rate / weight figures (the issue's item 4) are NOT checked here — a named residual.
+
+  4. **The morning note (#4189).** Every coach's input carries the owner's own four words
+     for the morning (`coach.morning_note.coach_fact` — the SAME derivation
+     `/api/morning_note` and the coach packet serve), read for today or yesterday only,
+     with absence stated (`state: absent`) rather than a blank the model might fill.
 """
 
 from __future__ import annotations
@@ -37,6 +42,8 @@ from typing import Any, Optional
 from common.constants import EXPERIMENT_START_DATE
 from common.pacific_time import pacific_clock_label, pacific_today, parse_day_key
 from health import nutrition_logging as _nl
+
+from coach import morning_note as _mn
 
 # ── 2. sleep instants → labelled Pacific time ────────────────────────────────
 
@@ -127,6 +134,15 @@ def fetch_macrofactor_window(table, today: str) -> Optional[list]:
         return None
 
 
+def morning_note_fact(table, today: str) -> dict:
+    """The owner's morning note as a served fact (#4189): today's, else yesterday's, else
+    `absent`; a failed read is `read_failed`. Never a default word."""
+    rows = _mn.read_notes(table, today, _mn.COACH_LOOKBACK_DAYS)
+    if rows is None:
+        return _mn.coach_fact(None, read_ok=False)
+    return _mn.coach_fact(rows[0] if rows else None)
+
+
 def nutrition_record(rows: list, today: str) -> dict:
     """The prompt-facing logging record: `nutrition_logging.logging_record` plus the
     protein average (with its 95% CI) over the same window."""
@@ -171,6 +187,9 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
         "data_through": data_through(data),
         "nutrition": nutrition_record(rows, today) if rows is not None else None,
         "protein_series": _nl.protein_series(rows) if rows is not None else [],
+        # #4189: the note is read for TODAY (Pacific) — the brief runs after the morning it
+        # was written — not for `data_through`, which is the previous data day.
+        "morning_note": morning_note_fact(table, today),
     }
     # The table itself is held (not its id) so an identity check can never match a
     # different object that happens to reuse a freed id.
@@ -186,6 +205,11 @@ def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table
     out = localize_sleep_instants(domain_data)
     if coach_id == "nutrition_coach" and isinstance(out, dict):
         out = {**out, "logging_record": (facts or {}).get("nutrition")}
+    if isinstance(out, dict):
+        # #4189: every coach reads the owner's four words — the sleep and mind coaches asked
+        # for them by name; the rest see the same fact so no coach narrates a morning he
+        # described differently.
+        out = {**out, "morning_note": (facts or {}).get("morning_note") or _mn.coach_fact(None, read_ok=False)}
     return out
 
 

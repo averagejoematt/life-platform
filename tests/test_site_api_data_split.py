@@ -121,6 +121,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/nutrition_overview": "handle_nutrition_overview",
     "/api/observatory_week": "handle_observatory_week",
     "/api/page_feedback": "_handle_page_feedback",  # #4182
+    "/api/morning_note": "_route_morning_note",  # #4189 — GET served note / POST owner write
     "/api/panel_ledger": "handle_panel_ledger",
     "/api/phenoage": "handle_phenoage",
     "/api/physical_overview": "handle_physical_overview",

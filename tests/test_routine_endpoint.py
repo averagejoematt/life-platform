@@ -16,6 +16,11 @@ pick order (committed > role-matched draft > archetype-matched draft > only draf
 program), the program fallback, the absent states, and the privacy assertion that the
 body carries EXACTLY the listed keys — the mutation "add `notes` to the serializer"
 reds `test_session_body_carries_only_the_listed_keys`.
+
+#4338: the two routes share ONE picker (`pick_todays_routine`) and both serve the pick's
+`routine_ref`; the live 2026-09-27 two-draft state (an upper pre-draft stamped before the
+#4312 Flex fix + an unstamped lower chat draft, sequence next = lower_volume) is the fixture
+that proves they name the same routine.
 """
 
 import json
@@ -377,7 +382,7 @@ _WIRE_DRAFT_INDEX = {
     "hevy_routine_id": "",
 }
 
-_SESSION_KEYS = ("date", "state", "reason", "source", "kind", "session_role", "position_label", "exercises", "as_of")
+_SESSION_KEYS = ("date", "state", "reason", "source", "kind", "session_role", "position_label", "routine_ref", "exercises", "as_of")
 _EXERCISE_KEYS = ("name", "sets", "reps", "load_lbs", "loads_lbs")
 
 _SESSION_PRIVATE_MARKERS = (
@@ -599,3 +604,99 @@ def test_session_cache_headers_like_routine(monkeypatch):
     resp, _ = _session_body(monkeypatch, [_WIRE_DRAFT_INDEX], {_WIRE_DRAFT_IR["routine_id"]: _WIRE_DRAFT_IR})
     assert resp["statusCode"] == 200
     assert "max-age=900" in resp["headers"]["Cache-Control"]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #4338 — /api/routine and /api/session name the SAME routine (one picker)
+# ═════════════════════════════════════════════════════════════════════════════
+
+_LIVE_LOWER_ID = "6b31012523dfd24bc27d1d10d474f822"
+
+# THE WIRE: routine 6b310125… (VERSION#current) as stored 2026-09-26 17:03Z — a chat
+# `draft_custom` for 2026-09-27, archetype lower, NO role stamp (read-only DDB, 2026-09-27).
+_WIRE_LOWER_IR = {
+    "pk": f"USER#matthew#ROUTINE#{_LIVE_LOWER_ID}",
+    "sk": "VERSION#current",
+    "routine_id": _LIVE_LOWER_ID,
+    "target_date": _BLOCK_DAY,
+    "archetype": "lower",
+    "variant": "ideal",
+    "status": "draft",
+    "created_by": "chat",
+    "source_action": "draft_custom",
+    "hevy_routine_id": None,
+    "hevy_pushed_at": None,
+    "exercises": [
+        {"movement_key": "deadlift_trap_bar", "sets": [_set(55.5, 8, 12)] * 2},
+        {"movement_key": "squat_barbell", "sets": [_set(53.5, 8, 12)] * 3},
+        {"movement_key": "leg_curl", "sets": [_set(24.5, 8, 15)] * 2},
+        {"movement_key": "calf_raise_machine", "sets": [_set(87.5, 8, 15)] * 2},
+        {"movement_key": "machine_crunch", "sets": [_set(None, 8, 15)] * 2},
+        {"movement_key": "treadmill", "sets": [{"type": "normal", "duration_seconds": 600}]},
+    ],
+    "branches": [],
+}
+_WIRE_LOWER_INDEX = dict(_WIRE_DRAFT_INDEX, sk=f"DATE#{_BLOCK_DAY}#ROUTINE#{_LIVE_LOWER_ID}", routine_id=_LIVE_LOWER_ID, archetype="lower")
+
+# get_coach_session_packet(2026-09-27).next_session after #4312 (the Flex no longer advances it).
+_LIVE_NEXT = {"session_role": "lower_volume", "archetype": "lower", "position_label": "week 1 · session 4 of 4 · lower-volume"}
+
+
+def _both_routes(monkeypatch, rows, irs, nxt=_LIVE_NEXT):
+    _freeze(monkeypatch, _BLOCK_DAY)
+    monkeypatch.setattr(sad._protocols, "_program_next", lambda day: (nxt, None))
+    _mount(monkeypatch, rows, irs)
+    return _body(sad.handle_routine()), _body(sad.handle_session())
+
+
+def test_4338_live_two_drafts_both_routes_name_the_lower_draft(monkeypatch):
+    """The live 2026-09-27 state: /api/routine served the UPPER pre-draft (newest index row)
+    while /api/session served the LOWER draft (the sequence's next archetype). One picker →
+    both name the lower draft, and both carry the same routine_ref. Mutation control: restore
+    routine()'s own `next(r for r in rows if target_date <= today)` pick and this reds on the
+    archetype (upper) and on the ref."""
+    rows = [_WIRE_DRAFT_INDEX, _WIRE_LOWER_INDEX]  # the fake sorts newest-first: ff75… (upper) before 6b31…
+    irs = {_WIRE_DRAFT_IR["routine_id"]: _WIRE_DRAFT_IR, _LIVE_LOWER_ID: _WIRE_LOWER_IR}
+    rbody, sbody = _both_routes(monkeypatch, rows, irs)
+    rt = rbody["routine"]
+    assert rt["archetype"] == "lower", rt
+    assert (rt["exercise_count"], rt["total_sets"], rt["days_out"]) == (6, 12, 0)
+    assert sbody["source"] == "hevy-routine-draft"
+    assert sum(e["sets"] for e in sbody["exercises"]) == rt["total_sets"]
+    assert len(sbody["exercises"]) == rt["exercise_count"]
+    assert sbody["exercises"][0]["name"] and "Trap" in sbody["exercises"][0]["name"]
+    # THE agreement: one routine, one public handle, served by both routes
+    ref = sad._protocols.routine_ref(_LIVE_LOWER_ID)
+    assert rt["routine_ref"] == sbody["routine_ref"] == ref
+    assert ref != sad._protocols.routine_ref(_WIRE_DRAFT_IR["routine_id"])
+    # the handle is a digest — the platform routine id itself still never leaves either route
+    for body in (rbody, sbody):
+        assert _LIVE_LOWER_ID not in json.dumps(_public(body))
+
+
+def test_4338_a_draft_the_picker_declines_is_never_named_by_routine(monkeypatch):
+    """Two drafts, neither the sequence's next session → /api/session serves the program
+    (routine_ref null); /api/routine must not name either declined draft — it falls back to the
+    last prescription BEFORE today (yesterday's), never one of today's the session route passed over."""
+    a_idx, a_ir = _draft_row("a" * 32, "upper", "upper_heavy")
+    b_idx, b_ir = _draft_row("b" * 32, "upper", "upper_volume")
+    y_idx, y_ir = _draft_row("y" * 32, "lower", "lower_heavy", target="2026-09-26")
+    rbody, sbody = _both_routes(monkeypatch, [a_idx, b_idx, y_idx], {"a" * 32: a_ir, "b" * 32: b_ir, "y" * 32: y_ir})
+    assert sbody["source"] == "program" and sbody["routine_ref"] is None
+    rt = rbody["routine"]
+    assert rt["target_date"] == "2026-09-26" and rt["days_out"] == -1
+    assert rt["routine_ref"] == sad._protocols.routine_ref("y" * 32)
+
+
+def test_4338_one_draft_needs_no_sequence_read(monkeypatch):
+    """A single draft for today is the pick without consulting the sequence — /api/routine pays the
+    Hevy read only when two drafts need it to decide."""
+    _freeze(monkeypatch, _BLOCK_DAY)
+
+    def _no_read(day):
+        raise AssertionError("the sequence was read for a single draft")
+
+    monkeypatch.setattr(sad._protocols, "_program_next", _no_read)
+    _mount(monkeypatch, [_WIRE_LOWER_INDEX], {_LIVE_LOWER_ID: _WIRE_LOWER_IR})
+    rt = _body(sad.handle_routine())["routine"]
+    assert rt["archetype"] == "lower" and rt["routine_ref"] == sad._protocols.routine_ref(_LIVE_LOWER_ID)
