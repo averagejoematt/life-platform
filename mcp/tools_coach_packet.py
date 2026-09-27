@@ -38,6 +38,12 @@ import the counting / estimating primitives themselves):
   readiness_low_streak     `tools_plan._readiness_low_streak` (Whoop, #4072).
   block_position           `session_sequence.next_session` + `session_sequence.program_week` (#4110/#4147),
                            over the planner's block read `plan_hevy_windows._block_workouts`.
+  today                    `coach_packet_today.today_view` (#4311): every activity on target_date - 1
+                           (Pacific) from Hevy AND Strava, each once — `walking_volume.dedup_strava`
+                           (the #4068 time rule), walking hours by `shared_quantities.walking_layer_for_day`,
+                           the HR ceiling from `owner_redlines`. Labelled PARTIAL while the day is in
+                           progress. The one window that is NOT completed days: it is the day a
+                           night-before debrief reviews.
 
 READ STATES (#4072's vocabulary, `plan_engine.input_status`)
 
@@ -51,7 +57,7 @@ from typing import Any
 
 from common.pacific_time import pacific_today, shift_day_key
 
-PACKET_VERSION = "coach-session-packet@1.0.0"
+PACKET_VERSION = "coach-session-packet@1.1.0"  # 1.1.0 (#4311): the `today` view
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -71,6 +77,11 @@ SOURCES: dict[str, str] = {
     "readiness": "get_readiness_score, tier by tools_plan._recovery_tier",
     "readiness_low_streak": "tools_plan._readiness_low_streak (Whoop recovery, #4072)",
     "block_position": "training.session_sequence.next_session + program_week over plan_hevy_windows._block_workouts (#4110/#4147)",
+    "today": (
+        "mcp.coach_packet_today.today_view (#4311): Hevy via tools_strength._read_hevy_all_phases + Strava via core.query_source_range, "
+        "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
+        "HR ceiling = owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']"
+    ),
 }
 
 # Model-facing prose + schema live beside the tool (the #4078 manage_pending_writes precedent), so
@@ -81,7 +92,10 @@ COACH_PACKET_DESCRIPTION = (
     "last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + "
     "protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), the loss "
     "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, and the v0.4 "
-    "sequence position (the next undone session, #4110). Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
+    "sequence position (the next undone session, #4110), and `today` (#4311) — every activity on the day BEFORE target_date (what a "
+    "night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, "
+    "type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and a flag on any walk over the HR ceiling; "
+    "it is labelled PARTIAL while the day is in progress. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
     "error class) — a failed read is never an empty week — and names the canonical function it came from; "
     "nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. "
     "It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block."
@@ -378,6 +392,14 @@ def _block_position(target_date: str) -> tuple[Any, dict[str, Any]]:
     return value, _st(plan_engine.MEASURED)
 
 
+def _today(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The day before `target_date`, across sources, each activity once (#4311) — arranged by
+    `coach_packet_today`; this module only carries it."""
+    from mcp.coach_packet_today import today_view
+
+    return today_view(target_date)
+
+
 def _wrap(fn):
     """A reader that returns (value, status) and may raise -> (value, status) that never raises."""
 
@@ -415,6 +437,7 @@ READERS = {
     "readiness": _readiness,
     "readiness_low_streak": _readiness_low_streak,
     "block_position": _block_position,
+    "today": _today,
 }
 
 
@@ -443,7 +466,9 @@ def tool_get_coach_session_packet(args):
             "Call this FIRST in a coaching session and quote its numbers — do not re-pull a field whose state is "
             "`measured` unless the owner disputes it. `absent` = read, nothing there (say so); `read_failed` = the "
             "read broke (name the error, never read it as zero). Windows: volume and walking are COMPLETED days before "
-            "target_date; nutrition is plan_next_session's protein window. Planning a session is still "
+            "target_date; nutrition is plan_next_session's protein window; `today` is the ONE day before target_date across "
+            "Hevy AND Strava — review it in a night-before debrief, and read it as PARTIAL (a floor) while the day is in progress. "
+            "Planning a session is still "
             "plan_next_session (the constraint block + the red team) — this packet is its inputs, not its verdict."
         ),
         "_disclaimer": (

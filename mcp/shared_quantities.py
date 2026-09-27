@@ -144,6 +144,43 @@ def walking_layer(
     return layer
 
 
+def walking_layer_for_day(
+    day: str,
+    *,
+    today: str | None = None,
+    read: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
+) -> dict[str, Any] | None:
+    """THE walking definition over ONE Pacific day — the day a night-before debrief reviews
+    (#4311). Same sources, same counting, same time de-dup as `walking_layer`; the window is
+    the single `day`, and unlike `walking_layer` it MAY be a day still in progress. So the
+    result carries `partial` (True until the day has completed), `hr_wk` is None and `days`
+    is 1 — a part-day is reported as hours so far and never extrapolated to a week. None
+    only for an unparseable day key; a partition read that RAISES reaches the layer as
+    None — unreadable, never zero hours. `read(source, start, end)` is the caller's
+    partition reader (default `mcp.core.query_source_range`); the DEFINITION is not
+    injectable."""
+    from common.pacific_time import parse_day_key
+
+    if parse_day_key(day) is None:
+        return None
+
+    def _read(source: str) -> list[dict[str, Any]] | None:
+        try:
+            return (read or _core.query_source_range)(source, day, day)
+        except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
+            return None
+
+    layer = walking_volume.build(window_start=day, window_end=day, strava_items=_read("strava"), hevy_workouts=_read("hevy"))
+    layer["window"] = {"start": day, "end": day, "days": 1}
+    layer["hr_wk"] = None
+    layer["partial"] = str(day)[:10] >= (today or pacific_today())
+    layer["definition"] = (
+        SHARED_QUANTITIES_VERSION + ": walking hours over ONE day — the weekly definition's sources, counting rule and time "
+        "de-dup, never extrapolated to a week (see mcp/shared_quantities.py, #4311)"
+    )
+    return layer
+
+
 def weekly_walking_hours(end_day: str, *, today: str | None = None) -> float | None:
     """Hours in the 7 completed days ending `completed_end(end_day)`. None = unknown."""
     layer = walking_layer(end_day, today=today)
