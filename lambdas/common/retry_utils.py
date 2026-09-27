@@ -1,7 +1,7 @@
 """
 retry_utils.py — Shared Anthropic API retry + CloudWatch metrics utility.
 
-P1.8: Exponential backoff — 4 attempts, delays 5s / 15s / 45s.
+P1.8 / #4279: retry is `ai.bedrock_client.invoke_with_retry` — the one policy (3 sends, jittered 5/15 s).
 P1.9: Token usage emitted to CloudWatch LifePlatform/AI per Lambda.
 
 Bundled with: daily-brief, weekly-digest, monthly-digest, nutrition-review,
@@ -11,7 +11,7 @@ Bundled with: daily-brief, weekly-digest, monthly-digest, nutrition-review,
 
 import json
 import os
-import time
+import time  # noqa: F401 — the retry sleep moved to ai.bedrock_client (#4279); kept so `retry_utils.time` stays patchable
 import urllib.error
 import urllib.request
 from typing import Any, Optional, Union
@@ -23,12 +23,10 @@ _cw = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-we
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
 _CW_NAMESPACE = "LifePlatform/AI"
 
-# Backoff delays between attempts (seconds)
-_BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
-_MAX_ATTEMPTS = len(_BACKOFF_DELAYS) + 1  # 4
-
-# Retryable HTTP status codes
-_RETRYABLE_CODES = frozenset([429, 500, 502, 503, 504, 529])
+# #4279: no backoff schedule lives here any more. Both wrappers below call
+# `ai.bedrock_client.invoke_with_retry` — the ONE retry policy (its constants are
+# INVOKE_MAX_ATTEMPTS / INVOKE_RETRY_BASE_DELAYS) — imported lazily inside each call so
+# `common/` keeps no import-time dependency on `ai/` (see `budget_stop_cls`).
 
 # AI model constants — override via env to avoid silent deprecation failures
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
@@ -149,7 +147,7 @@ def call_anthropic_api(
         str: Response text, stripped.
 
     Raises:
-        urllib.error.HTTPError / URLError on final failure (after 4 attempts).
+        the final botocore error once the one retry policy gives up (#4279).
         Emits AnthropicAPIFailure CloudWatch metric on final failure.
     """
     body = {
@@ -165,75 +163,42 @@ def call_anthropic_api(
 
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # Auth is IAM — no API key. See lambdas/bedrock_client.py.
-    import botocore.exceptions as _bce
     from ai.bedrock_client import (
         UnknownModelError as _UnknownModel,
         budget_stop_cls as _budget_stop_cls,
         first_text as _first_text,
-        invoke as _bedrock_invoke,
+        invoke_with_retry as _invoke_with_retry,
     )
 
     _BudgetStop = _budget_stop_cls()
 
-    # #2893: ONLY the transport call lives inside the retry `try`. It used to end
+    # #2893: ONLY the transport call lives inside the `try`. It used to end
     # `return resp["content"][0]["text"].strip()` in here, so an empty `content`
     # list — the exact shape of a max_tokens stop with no emitted text — raised
-    # IndexError, was caught by the generic `except Exception` below, and
-    # re-invoked the model: up to 4 billed calls, zero usable output, logged at
-    # WARN with Errors flat. Transport failures retry; a response you have
-    # already paid for does not.
-    resp: dict[str, Any] = {}
-    for attempt in range(1, _MAX_ATTEMPTS + 1):
-        try:
-            resp = _bedrock_invoke(body, model_name=body["model"])
-            break
-
-        except _BudgetStop as e:
-            # #3084: a tier-3 budget stop is a refusal raised BEFORE invoke_model —
-            # nothing billed, nothing that another attempt could change. The generic
-            # handler below used to retry it, sleeping 5+15+45 = 65s per call and
-            # logging a transport-shaped WARN that buried the real cause. Re-raise
-            # now; the caller's own degrade path (fallback brief, skip-AI) engages
-            # in seconds instead of minutes.
-            print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
-            raise
-
-        except _UnknownModel as e:
-            # #4275: same refusal-not-failure rule as the budget stop above — a model
-            # name that resolves to nothing is a configuration error, raised before
-            # invoke_model, that no retry can change. Loud, immediate, unbilled: the
-            # message names the input and every known name. Never the old silent
-            # Haiku fallback.
-            _emit_failure_metric()
-            print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
-            raise
-
-        except _bce.ClientError as e:
-            code = e.response.get("Error", {}).get("Code", "Unknown")
-            retryable = code in (
-                "ThrottlingException",
-                "ModelTimeoutException",
-                "ServiceUnavailableException",
-                "InternalServerException",
-                "ModelNotReadyException",
-            )
-            print(f"[WARN] Bedrock {code} attempt {attempt}/{_MAX_ATTEMPTS}")
-            if retryable and attempt < _MAX_ATTEMPTS:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                raise
-        except Exception as e:
-            print(f"[WARN] Bedrock error attempt {attempt}/{_MAX_ATTEMPTS}: {e}")
-            if attempt < _MAX_ATTEMPTS:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                raise
+    # IndexError, was retried, and re-invoked the model: up to 4 billed calls, zero
+    # usable output. Transport failures retry (inside invoke_with_retry, #4279);
+    # a response you have already paid for does not.
+    try:
+        resp: dict[str, Any] = _invoke_with_retry(body, model_name=body["model"])
+    except _BudgetStop as e:
+        # #3084: a tier-3 budget stop is a refusal raised BEFORE invoke_model —
+        # nothing billed, nothing another attempt could change; invoke_with_retry
+        # re-raises it at once. Re-raise; the caller's own degrade path (fallback
+        # brief, skip-AI) engages in seconds instead of minutes.
+        print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
+        raise
+    except _UnknownModel as e:
+        # #4275: same refusal-not-failure rule as the budget stop above — a model
+        # name that resolves to nothing is a configuration error, raised before
+        # invoke_model, that no retry can change. Loud, immediate, unbilled: the
+        # message names the input and every known name. Never the old silent
+        # Haiku fallback.
+        _emit_failure_metric()
+        print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
+        raise
+    except Exception:
+        _emit_failure_metric()
+        raise
 
     # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
     text = _first_text(resp)
@@ -246,7 +211,7 @@ def call_anthropic_api(
     return text.strip()
 
 
-def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeout: int = 55) -> dict[str, Any]:  # type: ignore[return]  # loop always returns on success or re-raises on the final attempt; the fall-through is unreachable
+def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeout: int = 55) -> dict[str, Any]:
     """Retry wrapper around bedrock_client.invoke() for a raw Messages body.
 
     Preferred call shape (#505/J-2): pass the Anthropic Messages dict directly
@@ -260,8 +225,11 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
     Prompt caching: preserved if the body has cache_control blocks in its
     system message (the wire format is identical on Bedrock).
     """
-    import botocore.exceptions as _bce
-    from ai.bedrock_client import UnknownModelError as _UnknownModel, budget_stop_cls as _budget_stop_cls, invoke as _bedrock_invoke
+    from ai.bedrock_client import (
+        UnknownModelError as _UnknownModel,
+        budget_stop_cls as _budget_stop_cls,
+        invoke_with_retry as _invoke_with_retry,
+    )
 
     _BudgetStop = _budget_stop_cls()
 
@@ -274,53 +242,26 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
             raw = raw.decode("utf-8")
         body = json.loads(raw) if raw else {}
 
-    for attempt in range(1, _MAX_ATTEMPTS + 1):
-        try:
-            resp = _bedrock_invoke(body, model_name=body.get("model"))
-            # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
-            return resp
-
-        except _BudgetStop as e:
-            # #3084 — same refusal-not-failure rule as call_anthropic_api above.
-            print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
-            raise
-
-        except _UnknownModel as e:
-            # #4275: same refusal-not-failure rule as the budget stop above — a model
-            # name that resolves to nothing is a configuration error, raised before
-            # invoke_model, that no retry can change. Loud, immediate, unbilled: the
-            # message names the input and every known name. Never the old silent
-            # Haiku fallback.
-            _emit_failure_metric()
-            print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
-            raise
-
-        except _bce.ClientError as e:
-            code = e.response.get("Error", {}).get("Code", "Unknown")
-            retryable = code in (
-                "ThrottlingException",
-                "ModelTimeoutException",
-                "ServiceUnavailableException",
-                "InternalServerException",
-                "ModelNotReadyException",
-            )
-            print(f"[WARN] Bedrock {code} attempt {attempt}/{_MAX_ATTEMPTS}")
-            if retryable and attempt < _MAX_ATTEMPTS:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                raise
-        except Exception as e:
-            print(f"[WARN] Bedrock error attempt {attempt}/{_MAX_ATTEMPTS}: {e}")
-            if attempt < _MAX_ATTEMPTS:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                raise
+    try:
+        # #4279: the ONE retry policy — no loop of this wrapper's own.
+        # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
+        return _invoke_with_retry(body, model_name=body.get("model"))
+    except _BudgetStop as e:
+        # #3084 — same refusal-not-failure rule as call_anthropic_api above.
+        print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
+        raise
+    except _UnknownModel as e:
+        # #4275: same refusal-not-failure rule as the budget stop above — a model
+        # name that resolves to nothing is a configuration error, raised before
+        # invoke_model, that no retry can change. Loud, immediate, unbilled: the
+        # message names the input and every known name. Never the old silent
+        # Haiku fallback.
+        _emit_failure_metric()
+        print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
+        raise
+    except Exception:
+        _emit_failure_metric()
+        raise
 
 
 # ── #3688 — the unreadable-VERDICT retry ───────────────────────────────────────

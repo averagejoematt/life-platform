@@ -275,6 +275,14 @@ def test_pk_rules():
     assert pt.classify("ENSEMBLE#influence_graph", "CONFIG#v1") == pt.SYSTEM_STATE
     assert pt.classify("PULSE", "DATE#2026-04-04") == pt.SYSTEM_STATE
     assert pt.classify("USER#system", "CANARY#last_state") == pt.SYSTEM_STATE
+    # #4183 ruling: the Hevy routine IR partition + its date index stay SYSTEM_STATE — the
+    # reset never tombstones a prescription; a pre-genesis draft is excluded by a genesis-
+    # reading consumer (routine_repo.stale_draft_census), not by a class flip that would mint
+    # every un-stamped ROUTINE# row into the inverse census. Pinned so the class is a ruling,
+    # not a default someone re-litigates the next time June drafts show up in a count.
+    assert pt.classify("USER#matthew#ROUTINE#2af150189cdb413e97b3de585385abde", "VERSION#current") == pt.SYSTEM_STATE
+    assert pt.classify("USER#matthew#SOURCE#routine_index", "DATE#2026-06-02#ROUTINE#2af150189cdb413e97b3de585385abde") == pt.SYSTEM_STATE
+    assert pt.reads_current_cycle_only("USER#matthew#ROUTINE#2af150189cdb413e97b3de585385abde") is False
     # audience state — kept across resets (reader emails awaiting challenge-start notify)
     assert pt.classify("CHALLENGE_FOLLOWS", "EMAIL#abc#CH#no-doordash-30") == pt.SYSTEM_STATE
     # inter-coach dispute threads (#540) = experiment_scoped, wiped at reset

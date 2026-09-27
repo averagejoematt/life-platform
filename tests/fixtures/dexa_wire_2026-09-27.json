@@ -1,0 +1,31 @@
+{
+ "_source": "DDB USER#matthew#SOURCE#dexa (all rows), read 2026-09-27 read-only (us-west-2 life-platform); trimmed to the fields the #4166 derivation reads, values unchanged",
+ "items": [
+  {
+   "pk": "USER#matthew#SOURCE#dexa",
+   "sk": "DATE#2025-05-10",
+   "scan_date": "2025-05-10",
+   "scan_type": "dexa",
+   "body_composition": {
+    "lean_mass_lb": 160.9,
+    "bone_mineral_content_lb": 7.9,
+    "total_mass_lb": 199.9,
+    "fat_mass_lb": 31.1,
+    "body_fat_pct": 15.6
+   }
+  },
+  {
+   "pk": "USER#matthew#SOURCE#dexa",
+   "sk": "DATE#2026-03-30",
+   "scan_date": "2026-03-30",
+   "scan_type": "dexa",
+   "body_composition": {
+    "lean_mass_lb": 170.6,
+    "bone_mineral_content_lb": 8,
+    "total_mass_lb": 311.7,
+    "fat_mass_lb": 133.1,
+    "body_fat_pct": 42.7
+   }
+  }
+ ]
+}

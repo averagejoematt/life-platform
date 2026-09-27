@@ -24,6 +24,11 @@ own served numbers contradicted:
      nightly QA and this generation-time gate read prose ONE way.
 
 Rate / weight figures (the issue's item 4) are NOT checked here — a named residual.
+
+  4. **The morning note (#4189).** Every coach's input carries the owner's own four words
+     for the morning (`coach.morning_note.coach_fact` — the SAME derivation
+     `/api/morning_note` and the coach packet serve), read for today or yesterday only,
+     with absence stated (`state: absent`) rather than a blank the model might fill.
 """
 
 from __future__ import annotations
@@ -37,6 +42,8 @@ from typing import Any, Optional
 from common.constants import EXPERIMENT_START_DATE
 from common.pacific_time import pacific_clock_label, pacific_today, parse_day_key
 from health import nutrition_logging as _nl
+
+from coach import morning_note as _mn
 
 # ── 2. sleep instants → labelled Pacific time ────────────────────────────────
 
@@ -127,6 +134,15 @@ def fetch_macrofactor_window(table, today: str) -> Optional[list]:
         return None
 
 
+def morning_note_fact(table, today: str) -> dict:
+    """The owner's morning note as a served fact (#4189): today's, else yesterday's, else
+    `absent`; a failed read is `read_failed`. Never a default word."""
+    rows = _mn.read_notes(table, today, _mn.COACH_LOOKBACK_DAYS)
+    if rows is None:
+        return _mn.coach_fact(None, read_ok=False)
+    return _mn.coach_fact(rows[0] if rows else None)
+
+
 def nutrition_record(rows: list, today: str) -> dict:
     """The prompt-facing logging record: `nutrition_logging.logging_record` plus the
     protein average (with its 95% CI) over the same window."""
@@ -171,6 +187,9 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
         "data_through": data_through(data),
         "nutrition": nutrition_record(rows, today) if rows is not None else None,
         "protein_series": _nl.protein_series(rows) if rows is not None else [],
+        # #4189: the note is read for TODAY (Pacific) — the brief runs after the morning it
+        # was written — not for `data_through`, which is the previous data day.
+        "morning_note": morning_note_fact(table, today),
     }
     # The table itself is held (not its id) so an identity check can never match a
     # different object that happens to reuse a freed id.
@@ -186,6 +205,11 @@ def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table
     out = localize_sleep_instants(domain_data)
     if coach_id == "nutrition_coach" and isinstance(out, dict):
         out = {**out, "logging_record": (facts or {}).get("nutrition")}
+    if isinstance(out, dict):
+        # #4189: every coach reads the owner's four words — the sleep and mind coaches asked
+        # for them by name; the rest see the same fact so no coach narrates a morning he
+        # described differently.
+        out = {**out, "morning_note": (facts or {}).get("morning_note") or _mn.coach_fact(None, read_ok=False)}
     return out
 
 
@@ -210,6 +234,16 @@ _GAP_SINCE_DATE = re.compile(
 # A window the sentence names for its protein figure, beyond "N logged days" (which the
 # shared extractor already returns as a `days_logged` claim).
 _NAMED_WINDOW = re.compile(r"\b(\d{1,2})[- ](?:calendar\s+)?days?\b|\b(?:this|past|last)\s+week\b|\b7-day\b", re.IGNORECASE)
+# #4343: the average refutes only a figure the sentence frames as his daily intake or an
+# average of it. "Morning smoothie delivers 15 g, protein shake adds 30 g", "redistribute
+# 40g of protein away from dinner" and "if protein reaches 190g next week" are a serving,
+# a shift and a conditional target — the 09-27 brief held the nutrition, glucose and
+# explorer coaches on exactly those. A day-count window ("across 21 logged days") also frames.
+_INTAKE_FRAME = re.compile(
+    r"\b(?:averag\w*|mean|running|rolling|trailing|ewma|typical(?:ly)?|usual(?:ly)?|daily|per\s+day|a\s+day|each\s+day)\b"
+    r"|/\s*day\b|\bg/d\b",
+    re.IGNORECASE,
+)
 
 
 def _named_windows(sentence: str) -> list:
@@ -294,7 +328,10 @@ def served_fact_findings(text: str, facts: Optional[dict], today: Optional[str] 
                     _finding("days_logged", v, days_logged, f"claims {v} logged days; the served record has {days_logged}", sentence)
                 )
         windows = named + _named_windows(sentence)
-        for v, _cls in claims.get("protein", []):
+        # A day-count window frames the figure as an aggregate; "this week" alone does not
+        # ("One ask this week: redistribute 40g" is a timing, not a window, #4343).
+        framed = bool(named) or bool(_INTAKE_FRAME.search(sentence)) or any(m.group(1) for m in _NAMED_WINDOW.finditer(sentence))
+        for v, _cls in claims.get("protein", []) if framed else []:
             win = _nl.protein_window(series, min(windows)) if windows else _nl.protein_window(series)
             if not win or win["half_width"] is None:
                 continue  # no spread → no tolerance to derive; skipped, never guessed

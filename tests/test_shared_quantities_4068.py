@@ -294,6 +294,7 @@ CALL_SITES = {
     ("mcp/tools_benchmark.py", "_recent_volume"): "shared_quantities.walking_layer",  # get_benchmark walking hours
     ("mcp/tools_benchmark.py", "_loss_rate_block"): "shared_quantities.loss_rate_from_rows",  # get_benchmark loss rate
     ("mcp/tools_benchmark.py", "_current_weight_and_rate"): "_loss_rate_block",  # every get_benchmark view's rate
+    ("mcp/coach_packet_today.py", "today_view"): "shared_quantities.walking_layer_for_day",  # the packet's today view (#4311)
 }
 
 # Sites that compute the TDEE back-solve's endpoint trend — a DIFFERENT quantity (#3931: "could

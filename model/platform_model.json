@@ -933,6 +933,16 @@
       "producer": "common.input_manifest::build_input_manifest"
     },
     {
+      "consumer": "coach.morning_note::coach_fact",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 6,
+      "name": "morning note row -> the coach fact",
+      "note": "the words are the owner's own; the contract is that nothing between the door and the coach can add, drop or retype one",
+      "partition": "morning_note",
+      "producer": "web.site_api_social_note::_handle_morning_note"
+    },
+    {
       "consumer": "content.fingerprint_broadcast::project_public",
       "enrolled": true,
       "floor": true,
@@ -1186,6 +1196,20 @@
       "lambda": null,
       "module": "lambdas/coach/intake_response.py",
       "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/morning_note.py",
+      "partition": "morning_note",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/morning_note.py",
+      "partition": "morning_note",
       "via": "pk"
     },
     {
@@ -5144,6 +5168,20 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_note.py",
+      "partition": "morning_note",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_note.py",
+      "partition": "morning_note",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_status.py",
@@ -5340,6 +5378,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/coach_packet_today.py",
+      "partition": "hevy",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "unknown",
       "lambda": "life-platform-mcp",
       "module": "mcp/config.py",
@@ -5464,6 +5509,13 @@
       "module": "mcp/plan_hevy_windows.py",
       "partition": "hevy",
       "via": "fixed-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/shared_quantities.py",
+      "partition": "dexa",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -7397,15 +7449,15 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 11,
-      "contracts_enrolled": 11,
-      "contracts_known": 11,
-      "contracts_ratchet": 11,
-      "edges": 715,
+      "contracts": 12,
+      "contracts_enrolled": 12,
+      "contracts_known": 12,
+      "contracts_ratchet": 12,
+      "edges": 721,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
-      "partitions": 112,
+      "partitions": 113,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 17,
@@ -7415,9 +7467,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 357,
-        "sites_resolved": 889,
-        "sites_total": 1246
+        "sites_dynamic": 356,
+        "sites_resolved": 894,
+        "sites_total": 1250
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7829,6 +7881,11 @@
       "privacy_tier": "public"
     },
     "mood": {
+      "class": "raw_timeseries",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "morning_note": {
       "class": "raw_timeseries",
       "ingestion": false,
       "privacy_tier": "public"

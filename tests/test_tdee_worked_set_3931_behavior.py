@@ -153,15 +153,25 @@ def test_without_a_set_log_the_lifting_duration_is_charged_at_the_stated_work_fr
     assert "lifting_duration_x0.25_no_set_log" in out["basis"]
 
 
-def test_cardio_is_still_charged_by_duration_exactly_as_before():
-    """Cardio was never the bug. A walk/run/ride's logged duration IS moving time.
+def test_a_strava_walk_is_charged_at_the_compendium_walk_met_not_the_lifting_proxy():
+    """Cardio was never the #3931 bug — its logged duration IS moving time — but its RATE
+    was #4178's: a Strava/Whoop walk took the ~6-MET lifting proxy while the same walk
+    logged in Hevy took 3.5 METs (#4158). One walk, one rate now.
 
-    3,600 s at 142.88 kg -> 6 x 142.88 x 1.0 = 857 kcal, identical to the retired form.
+    3,600 s at 142.88 kg -> 3.5 x 142.88 x 1.0 = 500 kcal, not the retired 6 x 142.88 = 857.
+    A legacy row with no per-activity list cannot be classified, so it alone stays on
+    the 6 proxy — and says so in `kcal_by_basis`.
     """
     walk = strava_walk_day("2026-09-02", 3600)
-    legacy = [{"date": "2026-09-02", "total_moving_time_seconds": 3600}]
-    assert tdee.exercise_energy([walk], SPECIMEN_WEIGHT_KG)["kcal"] == tdee.exercise_energy(legacy, SPECIMEN_WEIGHT_KG)["kcal"] == 857.0
-    assert tdee.exercise_energy([walk], SPECIMEN_WEIGHT_KG)["basis"] == "duration_proxy_6_kcal_per_kg_hour"
+    out = tdee.exercise_energy([walk], SPECIMEN_WEIGHT_KG)
+    assert out["kcal"] == 500.0
+    assert out["basis"] == "activity_walk_pace_at_3.5_met"
+    assert out["kcal_by_basis"] == {"met:walk": 500.0}
+    assert out["walk_pace_seconds"] == 3600.0 and out["proxy_seconds"] == 0.0
+    legacy = tdee.exercise_energy([{"date": "2026-09-02", "total_moving_time_seconds": 3600}], SPECIMEN_WEIGHT_KG)
+    assert legacy["kcal"] == 857.0
+    assert legacy["kcal_by_basis"] == {"proxy:unsplit_legacy": 857.0}
+    assert legacy["basis"] == "duration_proxy_6_kcal_per_kg_hour_unsplit_legacy"
 
 
 def test_a_kilojoule_reading_still_wins_over_the_proxy():
@@ -213,19 +223,32 @@ def test_the_specimen_window_replays_the_published_tdee_exactly():
     assert BMR_FROM_ISSUE + round(old["kcal"] / 7) == PUBLISHED_TDEE
 
 
-def test_the_specimen_replays_to_a_defensible_tdee_under_the_fixed_method():
-    """THE ACCEPTANCE. Same 13-day specimen, fixed method -> 3,854 kcal, not 5,059.
+# The red-team band above was drawn against "Mifflin RMR ~2,350 plus measured activity";
+# the specimen's own BMR arithmetic (BMR_FROM_ISSUE) is 2,162. The band is applied at the
+# RMR it was written against, so the activity term — the thing under test — is what is
+# judged, not a 188 kcal difference between two ways of stating the resting term.
+RED_TEAM_MIFFLIN_RMR = 2350
 
-    Lifting worked time 3 x 20 x 40 s = 2,400 s; walking 47,348 s unchanged.
-    6 x 142.88 x (49,748/3600) = 11,847 kcal over 7 days -> 1,692 kcal/day.
-    TDEE = 2,162 BMR + 1,692 = 3,854 — inside the red-team's 3,300-4,000 band, and
-    ~1,200 kcal/day below the number the reader was shown.
+
+def test_the_specimen_replays_to_a_defensible_tdee_under_the_fixed_method():
+    """THE ACCEPTANCE. Same 13-day specimen, fixed method -> 3,183 kcal, not 5,059.
+
+    Lifting worked time 3 x 20 x 40 s = 2,400 s at the 6 kcal/kg/hour lifting proxy =
+    572 kcal; walking 47,348 s at the Compendium walk rate (#4178: 3.5 METs, code 17190,
+    the SAME rate a Hevy-logged walk takes since #4158) = 6,577 kcal. 7,149 kcal over 7
+    days -> 1,021 kcal/day. TDEE = 2,162 BMR + 1,021 = 3,183 — ~1,900 kcal/day below
+    the number the reader was shown. (#3931 alone, with walking still on the 6-MET proxy,
+    replayed to 3,854; #4178 moves the walking term, which is 4 of the 7 specimen days.)
+    At the red-team's own ~2,350 RMR the activity term lands the TDEE at 3,371, inside
+    their 3,300-4,000 band.
     """
     rows, hevy = specimen_window()
     new = tdee.exercise_energy(rows, SPECIMEN_WEIGHT_KG, hevy)
-    replayed = BMR_FROM_ISSUE + round(new["kcal"] / 7)
-    assert replayed == 3854
-    assert DEFENSIBLE_TDEE_LO <= replayed <= DEFENSIBLE_TDEE_HI
+    activity_daily = round(new["kcal"] / 7)
+    replayed = BMR_FROM_ISSUE + activity_daily
+    assert replayed == 3183
+    assert new["kcal_by_basis"] == {"met:walk": 6577.0, "proxy:lifting": 572.0}
+    assert DEFENSIBLE_TDEE_LO <= RED_TEAM_MIFFLIN_RMR + activity_daily <= DEFENSIBLE_TDEE_HI
     assert replayed < PUBLISHED_TDEE - 1000
 
 
