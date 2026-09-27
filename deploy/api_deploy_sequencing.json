@@ -21,12 +21,5 @@
     "entry hides a genuinely dead route (same discipline as the old inline set)."
   ],
   "sequenced_routes": [],
-  "pending_deploy_routes": [
-    {
-      "route": "/api/session",
-      "pr": 4318,
-      "date": "2026-09-26",
-      "reason": "E3 #4182 — site/assets/js/v7_today.js (merged #4243) already fetches /api/session and renders its counts line on a 404; this PR makes the route exist. Smoke/visual treat the 404 as a warning until the driver runs deploy/deploy_site_api.sh, then REMOVE this entry (post-deploy re-arm)."
-    }
-  ]
+  "pending_deploy_routes": []
 }
