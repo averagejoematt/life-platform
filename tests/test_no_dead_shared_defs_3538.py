@@ -499,13 +499,7 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/web/recap_canvas.py:render_card": (
         "#3609 box 2 widen: exercised only by tests/test_recap_render_3744.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
-    "lambdas/web/recap_charts.py:draw_dots": (
-        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
-    ),
     "lambdas/web/recap_charts.py:draw_kv_row": (
-        "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
-    ),
-    "lambdas/web/recap_charts.py:draw_rule": (
         "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
     ),
     "lambdas/web/recap_templates.py:all_strings": (
