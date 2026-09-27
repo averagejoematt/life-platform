@@ -884,3 +884,262 @@ def test_writes_stay_inside_sanctioned_partitions(wp):
 
     # (c) S3 writes: only the two moderated capture prefixes (#3559: reader_input/, never the public generated/).
     assert all(k.startswith(("reader_input/findings/", "reader_input/board_questions/")) for k in wp.s3.put_keys), wp.s3.put_keys
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4189 — the morning note: POST owner write → MORNING_NOTE#<PT day> → GET Tier-1 read
+# ══════════════════════════════════════════════════════════════════════════════
+# Every case runs the WIRE: a Function-URL envelope → lambda_handler → the real route
+# table → the real handler → E2ETable, whose put_item refuses a conditional put on an
+# existing key (fixture = wire). The frozen clock is 2026-07-15 05:34 PT — a real
+# 05:xx morning. Three mutation controls are named in the PR: the ConditionExpression,
+# the owner-token check and the residue refusal each removed → the test named fails.
+
+NOTE_PATH = "/api/morning_note"
+NOTE_PK = "USER#matthew#SOURCE#morning_note"
+NOTE_SECRET = "e2e-morning-note-secret"
+NOTE_WORDS = {"sleep_word": "heavy", "body_word": "stiff", "mood_word": "steady", "felt_recovered": False}
+
+
+def _note_today(wp) -> str:
+    return wp.social.datetime.now(wp.social.PT).strftime("%Y-%m-%d")
+
+
+def _note_token(wp, day=None) -> str:
+    from content.ritual_link import sign_morning_note_token
+
+    return sign_morning_note_token(NOTE_SECRET, day or _note_today(wp))
+
+
+def _arm_owner(wp, monkeypatch):
+    monkeypatch.setattr(wp.social, "_get_ritual_token_secret", lambda: NOTE_SECRET)
+
+
+def _note_rows(wp) -> dict:
+    return {sk: it for (pk, sk), it in wp.table.store.items() if pk == NOTE_PK}
+
+
+def _owner_body(wp, **over) -> dict:
+    return {**NOTE_WORDS, "token": _note_token(wp), **over}
+
+
+def test_morning_note_owner_write_lands_one_row_and_the_get_serves_it_tier_1(wp, monkeypatch):
+    _arm_owner(wp, monkeypatch)
+    today = _note_today(wp)
+    assert today == "2026-07-15", "the frozen clock is a 05:34 PT morning"
+
+    status, body = wp.call(NOTE_PATH, body=_owner_body(wp))
+    assert status == 200 and body["ok"] is True and body["replaced"] is False and body["date"] == today
+    rows = _note_rows(wp)
+    assert list(rows) == [f"MORNING_NOTE#{today}"]
+    row = rows[f"MORNING_NOTE#{today}"]
+    assert {k: row[k] for k in NOTE_WORDS} == NOTE_WORDS
+    assert row["date"] == today and row["tier"] == 1 and row["source"] == "site_api_morning_note" and "replaced" not in row
+    assert row["written_at"].startswith("2026-07-15T12:34:56"), "the UTC instant of the write, a field"
+    assert "token" not in row and "ip_hash" not in row, "the token is a permission, never stored"
+
+    # The public read, Tier 1: the words and the day.
+    status, served = wp.call(NOTE_PATH, method="GET")
+    assert status == 200 and served["state"] == "served" and served["date"] == today
+    assert {k: served[k] for k in NOTE_WORDS} == NOTE_WORDS and served["written_at"] == row["written_at"]
+    assert "notes" not in served
+    status, week = wp.call(NOTE_PATH, method="GET", qs={"days": "7"})
+    assert status == 200 and week["days_searched"] == 7 and [n["date"] for n in week["notes"]] == [today]
+
+
+def test_morning_note_a_second_write_the_same_day_is_refused_unless_replace_is_explicit(wp, monkeypatch):
+    """One note per Pacific day. MUTATION CONTROL: drop the ConditionExpression from the
+    put_item → the second write overwrites `heavy` with `light` → this test fails."""
+    _arm_owner(wp, monkeypatch)
+    today = _note_today(wp)
+    assert wp.call(NOTE_PATH, body=_owner_body(wp))[0] == 200
+    status, body = wp.call(NOTE_PATH, body=_owner_body(wp, sleep_word="light"))
+    assert status == 409 and today in body["error"] and body.get("date") == today
+    rows = _note_rows(wp)
+    assert len(rows) == 1 and rows[f"MORNING_NOTE#{today}"]["sleep_word"] == "heavy", "the first note stands"
+
+    status, body = wp.call(NOTE_PATH, body=_owner_body(wp, sleep_word="light", replace=True))
+    assert status == 200 and body["replaced"] is True
+    rows = _note_rows(wp)
+    assert len(rows) == 1 and rows[f"MORNING_NOTE#{today}"]["sleep_word"] == "light" and rows[f"MORNING_NOTE#{today}"]["replaced"] is True
+    assert wp.call(NOTE_PATH, body=_owner_body(wp, replace="yes"))[0] == 400, "replace is a bool, not a word"
+
+
+def test_morning_note_an_anonymous_or_wrong_day_token_is_refused_with_no_write(wp, monkeypatch):
+    """The owner check. MUTATION CONTROL: remove the verify_morning_note_token branch → an
+    anonymous POST lands a row → this test fails."""
+    _arm_owner(wp, monkeypatch)
+    body = dict(NOTE_WORDS)
+    for bad in (
+        body,
+        {**body, "token": ""},
+        {**body, "token": "f" * 32},
+        {**body, "token": _note_token(wp, "2026-07-14")},
+        {**body, "token": 7},
+    ):
+        status, resp = wp.call(NOTE_PATH, body=bad)
+        assert status == 403, (bad, status, resp)
+    assert _note_rows(wp) == {}
+    # And a ritual tap token for today does not double as the owner's note token.
+    from content.ritual_link import sign_ritual_token
+
+    status, _ = wp.call(NOTE_PATH, body={**body, "token": sign_ritual_token(NOTE_SECRET, _note_today(wp), "connection", 3)})
+    assert status == 403 and _note_rows(wp) == {}
+
+
+def test_morning_note_tool_call_residue_in_a_word_is_refused_by_the_residue_guard(wp, monkeypatch):
+    """#4190's refusal, BEFORE storage and BEFORE the shape regex. MUTATION CONTROL: remove the
+    has_tool_call_residue branch → the letters regex still 400s, but with ITS reason → the
+    message assertion fails (the guard's own reason is what proves the guard, not the status)."""
+    _arm_owner(wp, monkeypatch)
+    for field in ("sleep_word", "body_word", "mood_word"):
+        status, body = wp.call(NOTE_PATH, body=_owner_body(wp, **{field: 'heavy</parameter><parameter name="x">'}))
+        assert status == 400 and "residue" in body["error"] and body["field"] == field and body["fragment"] == "</parameter>", (field, body)
+    assert _note_rows(wp) == {}
+
+
+def test_morning_note_a_blocked_vice_word_is_refused_with_no_write(wp, monkeypatch):
+    _arm_owner(wp, monkeypatch)
+    monkeypatch.setattr(wp.social, "_is_blocked_vice", lambda text: "forbidden" in (text or ""))
+    status, body = wp.call(NOTE_PATH, body=_owner_body(wp, mood_word="forbidden"))
+    assert status == 400 and _note_rows(wp) == {}
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"sleep_word": 999},
+        {"sleep_word": ""},
+        {"sleep_word": "x" * 25},
+        {"body_word": "http://x.y"},
+        {"body_word": "tired 2"},
+        {"mood_word": ["ok"]},
+        {"mood_word": "fine."},
+        {"felt_recovered": "yes"},
+        {"felt_recovered": 1},
+        {"felt_recovered": None},
+        {"date": "2026-07-14"},
+        {"date": "2026-07-16"},
+    ],
+)
+def test_morning_note_every_field_is_validated_raw_and_a_bad_one_is_a_400_with_no_write(wp, monkeypatch, over):
+    _arm_owner(wp, monkeypatch)
+    status, body = wp.call(NOTE_PATH, body=_owner_body(wp, **over))
+    assert status == 400, (over, status, body)
+    assert _note_rows(wp) == {}
+
+
+def test_morning_note_words_are_whitespace_normalised_and_hyphens_and_spaces_pass(wp, monkeypatch):
+    _arm_owner(wp, monkeypatch)
+    status, body = wp.call(NOTE_PATH, body=_owner_body(wp, sleep_word="  well  rested ", body_word="not-bad", mood_word="Quietly hopeful"))
+    assert status == 200, body
+    row = _note_rows(wp)[f"MORNING_NOTE#{_note_today(wp)}"]
+    assert (row["sleep_word"], row["body_word"], row["mood_word"]) == ("well rested", "not-bad", "Quietly hopeful")
+
+
+def test_morning_note_get_with_no_row_is_absent_never_a_default(wp):
+    status, body = wp.call(NOTE_PATH, method="GET")
+    assert status == 200
+    assert {k: body.get(k) for k in ("state", "reason", "days_searched", "as_of")} == {
+        "state": "absent",
+        "reason": "no note yet",
+        "days_searched": 14,
+        "as_of": "2026-07-15",
+    }
+    assert not any(k in body for k in NOTE_WORDS), "absence carries no default word"
+    assert wp.call(NOTE_PATH, method="GET", qs={"days": "abc"})[0] == 400
+    assert wp.call(NOTE_PATH, method="GET", qs={"days": "99"})[0] == 400
+    assert wp.call(NOTE_PATH, method="GET", qs={"days": "0"})[0] == 400
+
+
+def test_morning_note_get_serves_presence_only_for_a_presence_tier_row(wp):
+    """The stored tier is honoured by the read: a re-ruling to presence-only is a data change."""
+    wp.table.seed(
+        {
+            "pk": NOTE_PK,
+            "sk": "MORNING_NOTE#2026-07-14",
+            "date": "2026-07-14",
+            **NOTE_WORDS,
+            "written_at": "2026-07-14T12:30:00+00:00",
+            "tier": 2,
+            "source": "site_api_morning_note",
+        }
+    )
+    status, body = wp.call(NOTE_PATH, method="GET")
+    assert status == 200 and body["state"] == "present" and body["date"] == "2026-07-14"
+    assert not any(k in body for k in NOTE_WORDS), body
+
+
+def test_morning_note_get_is_newest_first_across_the_window_and_bounded(wp, monkeypatch):
+    _arm_owner(wp, monkeypatch)
+    wp.table.seed(
+        {
+            "pk": NOTE_PK,
+            "sk": "MORNING_NOTE#2026-07-13",
+            "date": "2026-07-13",
+            **NOTE_WORDS,
+            "written_at": "2026-07-13T12:00:00+00:00",
+            "tier": 1,
+        }
+    )
+    wp.table.seed(
+        {
+            "pk": NOTE_PK,
+            "sk": "MORNING_NOTE#2026-06-01",
+            "date": "2026-06-01",
+            **NOTE_WORDS,
+            "written_at": "2026-06-01T12:00:00+00:00",
+            "tier": 1,
+        }
+    )
+    assert wp.call(NOTE_PATH, body=_owner_body(wp, sleep_word="light"))[0] == 200
+    status, body = wp.call(NOTE_PATH, method="GET", qs={"days": "7"})
+    assert status == 200 and body["date"] == "2026-07-15" and body["sleep_word"] == "light"
+    assert [n["date"] for n in body["notes"]] == ["2026-07-15", "2026-07-13"], "June 1 is outside the 7-day window"
+
+
+def test_morning_note_signing_secret_unavailable_fails_closed_503_with_no_write(wp):
+    """The harness's boto3 factory has no Secrets Manager — the facade's secret read raises,
+    and the door answers 503 before any write (never an unauthenticated accept)."""
+    status, body = wp.call(NOTE_PATH, body={**NOTE_WORDS, "token": "f" * 32})
+    assert status == 503 and _note_rows(wp) == {}
+
+
+def test_morning_note_rate_limit_counts_every_attempt_including_refused_ones(wp, monkeypatch):
+    """A token guess costs a slot: the limiter runs before the owner check."""
+    _arm_owner(wp, monkeypatch)
+    statuses = [wp.call(NOTE_PATH, body={**NOTE_WORDS, "token": "0" * 32}, ip=IP_C)[0] for _ in range(11)]
+    assert statuses[:10] == [403] * 10 and statuses[10] == 429, statuses
+    assert _note_rows(wp) == {}
+    # A different reader is not affected.
+    assert wp.call(NOTE_PATH, body=_owner_body(wp), ip=IP_B)[0] == 200
+
+
+def test_morning_note_get_is_not_a_write_and_post_only_verbs_are_refused(wp, monkeypatch):
+    _arm_owner(wp, monkeypatch)
+    before = list(wp.table.written_pks)
+    wp.call(NOTE_PATH, method="GET")
+    assert wp.table.written_pks == before, "a GET writes nothing (not even a rate counter)"
+    resp = wp.api.lambda_handler(wp.event(NOTE_PATH, "PUT", NOTE_WORDS), None)
+    assert resp["statusCode"] == 405
+
+
+def test_morning_note_the_write_partition_is_the_read_partition_and_is_in_the_role_scope():
+    """Derivation guard: the pk literal inside the door's put_item (the orphan test's
+    requirement) and `coach.morning_note.MORNING_NOTE_PK` (every reader's spelling) are one
+    string, and the SEC-01 LeadingKeys allowlist covers it."""
+    import ast
+    import pathlib
+    from fnmatch import fnmatch
+
+    from coach import morning_note as mn
+    from test_site_api_write_scope import _site_api_leadingkeys
+
+    src = (pathlib.Path(__file__).resolve().parents[1] / "lambdas" / "web" / "site_api_social_note.py").read_text(encoding="utf-8")
+    literals = {
+        n.value
+        for n in ast.walk(ast.parse(src))
+        if isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value.startswith("USER#") and "SOURCE#" in n.value
+    }
+    assert literals == {mn.MORNING_NOTE_PK} == {NOTE_PK}
+    assert any(fnmatch(NOTE_PK, p) for p in _site_api_leadingkeys()), "cdk/stacks/role_policies_serve.py must carry the LeadingKey"

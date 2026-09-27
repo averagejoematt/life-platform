@@ -27,15 +27,42 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
+from common.pacific_time import shift_day_key  # noqa: E402
+
 from mcp import tools_coach_packet as pkt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 HEVY_FIX = Path(__file__).parent / "fixtures" / "shared_quantities_4068" / "hevy_2026-09-08_22.json"
+# #4311 — field-projected copies of the live `USER#matthew#SOURCE#hevy` per-workout rows and the
+# `USER#matthew#SOURCE#strava` day rows for 2026-09-18..26 (read 2026-09-26): the Flex session, the
+# Garmin walk (Strava 20343117320) and the six WHOOP walks recorded inside Hevy sessions 19-25 Sep.
+TODAY_FIX = Path(__file__).parent / "fixtures" / "coach_packet_today_4311"
 STATES = {"measured", "absent", "read_failed"}
+# #4189: a stored morning-note row exactly as the write door puts it (tests/test_e2e_write_paths.py holds the wire).
+MORNING_NOTE_ROW = {
+    "pk": "USER#matthew#SOURCE#morning_note",
+    "sk": "MORNING_NOTE#2026-09-23",
+    "date": "2026-09-23",
+    "sleep_word": "heavy",
+    "body_word": "stiff",
+    "mood_word": "steady",
+    "felt_recovered": False,
+    "written_at": "2026-09-23T12:34:56+00:00",
+    "tier": 1,
+    "source": "site_api_morning_note",
+}
 
 
 def _hevy_rows() -> list[dict]:
     return json.loads(HEVY_FIX.read_text())
+
+
+def _today_hevy(day: str) -> list[dict]:
+    return [w for w in json.loads((TODAY_FIX / "hevy_2026-09-18_26.json").read_text()) if w["date"] == day]
+
+
+def _today_strava(day: str) -> list[dict]:
+    return [r for r in json.loads((TODAY_FIX / "strava_2026-09-18_26.json").read_text()) if r["date"] == day]
 
 
 @pytest.fixture
@@ -85,6 +112,15 @@ def stub_readers(monkeypatch):
     monkeypatch.setattr(
         tools_plan, "_readiness_low_streak", lambda d: (0, {"state": "measured", "threshold": 50.0, "latest_day": "2026-09-22"})
     )
+    # #4189: the morning note reads through coach.morning_note (the one derivation); stub the row read.
+    from coach import morning_note as mn
+
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=mn.DEFAULT_LOOKBACK_DAYS: [dict(MORNING_NOTE_ROW)])
+    from mcp import coach_packet_today
+
+    monkeypatch.setattr(coach_packet_today, "read_hevy_day", _today_hevy)
+    monkeypatch.setattr(coach_packet_today, "read_strava_day", _today_strava)
+    monkeypatch.setattr(coach_packet_today, "pacific_today", lambda: "2026-09-26")
 
 
 # ── the contract: one tool, every field, three states ─────────────────────────────────
@@ -410,3 +446,227 @@ def test_the_packet_reads_the_routine_index_lookback_from_its_one_home():
     from training import routine_title
 
     assert pkt.ROUTINE_INDEX_LOOKBACK_DAYS == routine_title.ROUTINE_INDEX_LOOKBACK_DAYS == 90
+
+
+# ── #4189: the morning note in the packet ────────────────────────────────────────────
+
+
+def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant(stub_readers):
+    """The field is `coach.morning_note.coach_fact` over the stored row — one derivation with
+    /api/morning_note and the coach input. Mutation: read the partition here directly, or
+    hand the raw UTC `written_at` through (the #4214 raw-instant check would fire on it)."""
+    from coach import morning_note as mn
+
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    f = out["fields"]["morning_note"]
+    assert f["state"] == "measured" and f["source"] == pkt.SOURCES["morning_note"]
+    v = f["value"]
+    assert (v["sleep_word"], v["body_word"], v["mood_word"], v["felt_recovered"]) == ("heavy", "stiff", "steady", False)
+    assert v["date"] == "2026-09-23" and v["day"].startswith("Wednesday, September 23")
+    assert v["written_at_pt"].endswith("PT") and "written_at" not in v
+    expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
+    assert v == expected, "the packet must carry coach_fact's shape verbatim"
+    assert out["packet_version"] == "coach-session-packet@1.3.0"
+
+
+def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):
+    """Absence semantics at birth (ADR-104): no row = no note that morning, stated; a failed
+    read is never an empty morning. Mutation: return `absent` for None."""
+    from coach import morning_note as mn
+
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=2: [])
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    f = out["fields"]["morning_note"]
+    assert f["state"] == "absent" and f["value"] is None and "2026-09-23" in f["detail"]
+    assert "morning_note" in out["not_measured"]
+
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=2: None)
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["morning_note"]
+    assert f["state"] == "read_failed" and f["value"] is None and "ReadError" in f["error"]
+
+
+def test_morning_note_reads_the_target_morning_with_the_coach_lookback(stub_readers, monkeypatch):
+    """The packet asks for the target date's morning or the one before — COACH_LOOKBACK_DAYS,
+    never the site's 14-day default — so a stale note cannot pose as this morning's."""
+    from coach import morning_note as mn
+
+    seen = {}
+
+    def fake(table, today, days=None):
+        seen.update(today=today, days=days)
+        return [dict(MORNING_NOTE_ROW)]
+
+    monkeypatch.setattr(mn, "read_notes", fake)
+    pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    assert seen == {"today": "2026-09-23", "days": mn.COACH_LOOKBACK_DAYS} and mn.COACH_LOOKBACK_DAYS == 2
+
+
+def test_morning_note_packet_field_never_serves_a_half_note(stub_readers, monkeypatch):
+    """A producer drift that dropped a word must surface as read_failed, not as a note with a
+    blank in it (public_view raises; the packet's _wrap keeps the error by name)."""
+    from coach import morning_note as mn
+
+    broken = {k: v for k, v in MORNING_NOTE_ROW.items() if k != "mood_word"}
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=2: [broken])
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["morning_note"]
+    assert f["state"] == "read_failed" and "ValueError" in f["error"]
+
+
+# ── today (#4311): the day a night-before debrief reviews, across sources, each activity once ──
+def _today(target_date: str) -> tuple[dict, dict]:
+    f = pkt.tool_get_coach_session_packet({"target_date": target_date})["fields"]["today"]
+    return f["value"], {k: v for k, v in f.items() if k != "value"}
+
+
+def test_today_lists_the_flex_session_and_the_garmin_walk_as_separate_items(stub_readers):
+    """The owner's sentence (#4311). Mutation: read Hevy only (the 09-26 defect), or let the Garmin
+    walk fold into the Flex session, or extrapolate the part-day to a week."""
+    assert "today" in pkt.SOURCES and "today" in pkt.READERS
+    value, status = _today("2026-09-27")
+    assert status["state"] == "measured" and "PARTIAL" in status["detail"]
+    assert value["day"] == "2026-09-26" and value["partial"] is True and "PARTIAL" in value["label"]
+    items = value["activities"]
+    assert [(i["source"], i["title"]) for i in items] == [("hevy", "Foundation - Flex - 1 - 20"), ("strava", "Afternoon Walk")]
+    flex, walk = items
+    assert flex["type"] == "full" and flex["start"]["pt"] == "Sep 26, 10:59 AM PT" and flex["moving_time_s"] == 3937
+    assert flex["distance_mi"] is None and flex["avg_hr"] is None and flex["zones"] is None  # absence, not a default
+    assert walk["id"] == "strava:20343117320" and walk["device"] == "Garmin epix (Gen2)" and walk["type"] == "Walk"
+    assert walk["start"] == {"utc": "2026-09-26T20:09:22Z", "pt": "Sep 26, 1:09 PM PT"}
+    assert (walk["moving_time_s"], walk["distance_mi"], walk["avg_hr"], walk["max_hr"]) == (6108, 5.16, 116.8, 171)
+    assert walk["zones"]["zone2_s"] == 850 and "moving_time_s_counted" not in walk
+    # the Hevy->Strava mirror and WHOOP's view of the session are named as duplicates, not dropped
+    assert [(d["device"], d["title"]) for d in value["deduplicated"]] == [
+        ("Hevy", "Foundation - Flex - 1 - 20"),
+        ("WHOOP", "Lunch Weight Training"),
+    ]
+    assert all(d["inside_hevy_session"] == ["Foundation - Flex - 1 - 20"] for d in value["deduplicated"])
+    # walking hours so far — the shared definition over one day, never a week
+    assert (
+        value["walking_hours_today"] == 1.7
+        and value["walking"]["partial"] is True
+        and value["walking"]["by_source"]["strava"]["hours"] == 1.7
+    )
+    assert "walking_layer_for_day" in pkt.SOURCES["today"] and "dedup_strava" in pkt.SOURCES["today"]
+
+
+def test_today_flags_the_garmin_walk_over_the_hr_ceiling_read_from_the_redline(stub_readers, monkeypatch):
+    """Mutation: hard-code 105, or flag on max HR, or skip the walk because it was de-duplicated."""
+    from training import owner_redlines
+
+    ceiling = owner_redlines.REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
+    value, _ = _today("2026-09-27")
+    assert value["walking_floor_hr_wk"]["hr_ceiling_bpm"] == ceiling
+    assert [(f["id"], f["avg_hr"], f["hr_ceiling_bpm"], f["over_by_bpm"], f["deduplicated"]) for f in value["hr_ceiling_flags"]] == [
+        ("strava:20343117320", 116.8, ceiling, round(116.8 - ceiling, 1), False)
+    ]
+    src = (ROOT / "mcp" / "coach_packet_today.py").read_text()
+    assert not any(isinstance(n, ast.Constant) and n.value == ceiling for n in ast.walk(ast.parse(src))), "the ceiling is a literal"
+    monkeypatch.setitem(owner_redlines.REDLINES["walking_floor_hr_wk"], "hr_ceiling_bpm", 200)
+    value, _ = _today("2026-09-27")
+    assert value["hr_ceiling_flags"] == [] and value["walking_floor_hr_wk"]["hr_ceiling_bpm"] == 200
+
+
+def test_today_keeps_the_six_whoop_in_hevy_walks_de_duplicated(stub_readers, monkeypatch):
+    """19-25 Sep: WHOOP auto-detected the treadmill block inside six Hevy sessions and posted each
+    to Strava as its own Walk. Each is listed ONCE — as a named duplicate of its session, never as
+    a second activity. Mutation control: neuter `walking_volume.dedup_strava` — every WHOOP walk
+    appears beside its Hevy session and the predicate below catches it."""
+    from training import walking_volume
+
+    def whoop_walks(value: dict, key: str) -> list[tuple[str, str]]:
+        return [(i["title"], i["start"]["pt"]) for i in value[key] if i.get("device") == "WHOOP" and i.get("modality") == "walking"]
+
+    days = [f"2026-09-{d}" for d in range(19, 26)]
+    listed_twice, deduplicated = [], []
+    for day in days:
+        value, status = _today(shift_day_key(day, 1))
+        assert status["state"] == "measured" and value["day"] == day
+        assert [i["source"] for i in value["activities"]] == ["hevy"], (day, value["activities"])
+        listed_twice += whoop_walks(value, "activities")
+        for d in [d for d in value["deduplicated"] if d["device"] == "WHOOP" and d["modality"] == "walking"]:
+            assert d["inside_hevy_session"] and d["inside_hevy_session"][0].startswith("Foundation - ")
+            deduplicated.append((d["title"], d["start"]["pt"]))
+    assert listed_twice == [] and len(deduplicated) == 6 and len(set(deduplicated)) == 6
+    assert [d[1][:6] for d in deduplicated] == [
+        "Sep 19",
+        "Sep 20",
+        "Sep 21",
+        "Sep 23",
+        "Sep 24",
+        "Sep 25",
+    ]  # 09-22 had a Hevy Walking block, no WHOOP walk
+    # the control: without the #4068 rule the same predicate reds
+    monkeypatch.setattr(
+        walking_volume,
+        "dedup_strava",
+        lambda strava, intervals: (list(strava), {"rule": "none", "removed": [], "hours_removed": 0.0, "untimed": 0}),
+    )
+    value, _ = _today("2026-09-20")
+    assert whoop_walks(value, "activities") == [("Lunch Walk", "Sep 19, 11:01 AM PT")] and value["deduplicated"] == []
+
+
+def test_today_is_read_failed_when_neither_source_reads_and_a_floor_when_one_does(stub_readers, monkeypatch):
+    """Mutation: swallow a source failure into an empty day (the #4072 class), or let it escape the packet."""
+    from mcp import coach_packet_today
+
+    def boom(day):
+        raise TimeoutError("hevy query timed out")
+
+    monkeypatch.setattr(coach_packet_today, "read_hevy_day", boom)
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-27"})
+    f = out["fields"]["today"]
+    assert f["state"] == "measured" and "FLOOR — hevy read failed" in f["detail"]
+    assert f["value"]["sources"]["hevy"] == {"status": "read_failed", "rows": None, "error": "TimeoutError: hevy query timed out"}
+    assert [i["id"] for i in f["value"]["activities"]] == [
+        "strava:20341744941",
+        "strava:20343117320",
+    ]  # the mirror stands in for the session
+    assert any("hevy could not be read" in h for h in f["value"]["honesty"])
+    assert out["fields"]["walking_hours_7d"]["state"] == "measured" and out["not_measured"] == []
+
+    def boom2(day):
+        raise RuntimeError("strava partition unreadable")
+
+    monkeypatch.setattr(coach_packet_today, "read_strava_day", boom2)
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-27"})
+    f = out["fields"]["today"]
+    assert (
+        f["state"] == "read_failed"
+        and f["error"].startswith("SourceReadError: hevy: TimeoutError")
+        and "strava: RuntimeError" in f["error"]
+    )
+    assert out["not_measured"] == ["today"] and out["fields"]["last_session_by_type"]["state"] == "measured"
+
+
+def test_today_is_absent_for_a_day_not_started_and_for_an_empty_day(stub_readers, monkeypatch):
+    """Mutation: read a day that has not happened as an empty measured day, or an empty day as read_failed."""
+    from mcp import coach_packet_today
+
+    value, status = _today("2026-09-28")  # today is pinned to 09-26: the 27th has not started
+    assert status["state"] == "absent" and "has not started" in status["detail"] and value is None
+    monkeypatch.setattr(coach_packet_today, "read_hevy_day", lambda day: [])
+    monkeypatch.setattr(coach_packet_today, "read_strava_day", lambda day: [])
+    value, status = _today("2026-09-27")
+    assert status["state"] == "absent" and "so far" in status["detail"]
+    assert value["activities"] == [] and value["walking_hours_today"] is None and value["sources"]["hevy"]["status"] == "no_records"
+
+
+def test_today_walking_hours_are_the_shared_definitions_and_the_ceiling_is_carried_not_counted(stub_readers, monkeypatch):
+    """Mutation: sum the day's walks in `coach_packet_today` instead of reading the shared layer."""
+    from mcp import shared_quantities
+
+    seen = {}
+    orig = shared_quantities.walking_layer_for_day
+
+    def spy(day, **kw):
+        seen["day"] = day
+        layer = orig(day, **kw)
+        layer["total_hr"] = 99.9
+        return layer
+
+    monkeypatch.setattr(shared_quantities, "walking_layer_for_day", spy)
+    value, _ = _today("2026-09-27")
+    assert seen == {"day": "2026-09-26"} and value["walking_hours_today"] == 99.9
+    tree = ast.parse((ROOT / "mcp" / "coach_packet_today.py").read_text())
+    calls = {n.func.attr for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+    assert "walking_layer_for_day" in calls and "build" not in calls and "walking_layer" not in calls

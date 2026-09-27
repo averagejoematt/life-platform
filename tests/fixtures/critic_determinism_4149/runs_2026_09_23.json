@@ -473,5 +473,371 @@
     "verdict": "change"
    }
   }
- ]
+ ],
+ "live_proof_runs": {
+  "_source": "DynamoDB life-platform, USER#matthew#ROUTINE#<routine_id> VERSION#current, inputs_snapshot.critics \u2014 read-only 2026-09-27 for #4149's live-proof box. The first stage-2 runs on a STALE-ANCHOR movement after critics@1.4.0 shipped (#4155, merged 2026-09-24T05:01Z): af379af3 v6 \u2014 deadlift_trap_bar (anchor:hinge:volume), exposure 1 after 323 days; ff7518cd v3 \u2014 machine_row (anchor:row:heavy), exposure 1, never in the window read. Both: the code rule capped working sets 3 -> 2, the load stayed the coach's, recheck.passed = true, no veto \u2014 a committable draft. Same keys as `runs`, plus the stored `changes`/`recheck`/`veto` and the #4161 stale_exposure/stale_gap_days numbers.",
+  "runs": [
+   {
+    "changes": [
+     {
+      "applied": false,
+      "critic": "muscle_defense",
+      "field": "session.total_sets",
+      "to": "hold",
+      "why": "hold: no growth this week \u2014 the draft is not enlarged, nothing to trim automatically"
+     },
+     {
+      "applied": true,
+      "critic": "joints_tendons",
+      "field": "exercises[0].set_count",
+      "to": 2,
+      "why": null
+     }
+    ],
+    "draft_exercises": [
+     {
+      "movement_key": "deadlift_trap_bar",
+      "rationale_tag": "anchor:hinge:volume",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 55.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 55.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 55.5
+       }
+      ]
+     },
+     {
+      "movement_key": "squat_barbell",
+      "rationale_tag": "anchor:squat:volume",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 53.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 53.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 53.5
+       }
+      ]
+     },
+     {
+      "movement_key": "leg_curl",
+      "rationale_tag": "accessory:leg_curl:accessory",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 10
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 10
+       }
+      ]
+     },
+     {
+      "movement_key": "calf_raise_machine",
+      "rationale_tag": "accessory:calf_raise_machine:accessory",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 42
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 42
+       }
+      ]
+     },
+     {
+      "movement_key": "machine_crunch",
+      "rationale_tag": "accessory:machine_crunch:accessory",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": null
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": null
+       }
+      ]
+     }
+    ],
+    "engine": "critics@1.5.0",
+    "joints_packet_numbers": {
+     "active_day_streak": 20,
+     "days_since_movement[0]": null,
+     "days_since_movement[1]": 2,
+     "days_since_movement[2]": 2,
+     "days_since_movement[3]": 2,
+     "days_since_movement[4]": null,
+     "fatigue_cut_superseded_by_deload": false,
+     "fatigue_trigger": false,
+     "heavy_axial_patterns_cold": 0,
+     "loaded_lifting_streak": 4,
+     "pain_flag[0]": false,
+     "pain_flag[1]": false,
+     "pain_flag[2]": false,
+     "pain_flag[3]": false,
+     "pain_flag[4]": false,
+     "pain_layer_status": "ok",
+     "same_region_48h": false,
+     "stale_exposure[0]": 1,
+     "stale_exposure[1]": 2,
+     "stale_exposure[2]": 5,
+     "stale_exposure[3]": 7,
+     "stale_exposure[4]": 1,
+     "stale_gap_days[0]": 323,
+     "stale_gap_days[1]": 98,
+     "stale_gap_days[2]": 80,
+     "stale_gap_days[3]": null,
+     "stale_gap_days[4]": null
+    },
+    "joints_stored_model": {
+     "field": "exercises[0].set_count",
+     "metric": "days_since_movement[0]",
+     "sentence": "Deadlift trap bar returns after 323 days; reduce working sets from 3 to 2 to manage DOMS risk on long-gap reintroduction.",
+     "to": 2,
+     "value": 323,
+     "verdict": "change"
+    },
+    "joints_stored_verdict": {
+     "field": "exercises[0].set_count",
+     "metric": "days_since_movement[0]",
+     "to": 2,
+     "value": null,
+     "verdict": "change"
+    },
+    "ran_at": "2026-09-26T03:54:17.661803+00:00",
+    "recheck": {
+     "exercise_count": 5,
+     "hevy_precheck_errors": [],
+     "passed": true,
+     "remaining_vetoes": [],
+     "total_sets": 11
+    },
+    "routine_id": "af379af3a1e874e814d1123ab6ea9326",
+    "status": "draft",
+    "target_date": "2026-09-26",
+    "version": 6,
+    "veto": false
+   },
+   {
+    "changes": [
+     {
+      "applied": false,
+      "critic": "muscle_defense",
+      "field": "session.total_sets",
+      "to": "hold",
+      "why": "hold: no growth this week \u2014 the draft is not enlarged, nothing to trim automatically"
+     },
+     {
+      "applied": true,
+      "critic": "joints_tendons",
+      "field": "exercises[1].set_count",
+      "to": 2,
+      "why": null
+     }
+    ],
+    "draft_exercises": [
+     {
+      "movement_key": "barbell_bench_press",
+      "rationale_tag": "anchor:bench:heavy",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 56
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 50
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 50
+       }
+      ]
+     },
+     {
+      "movement_key": "machine_row",
+      "rationale_tag": "anchor:row:heavy",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 32
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 28.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 28.5
+       }
+      ]
+     },
+     {
+      "movement_key": "machine_shoulder_press",
+      "rationale_tag": "anchor:overhead_press:moderate",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 12.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 12.5
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 12.5
+       }
+      ]
+     },
+     {
+      "movement_key": "lat_pulldown",
+      "rationale_tag": "anchor:vertical_pull:moderate",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 44
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 44
+       }
+      ]
+     },
+     {
+      "movement_key": "cable_tricep_pushdown",
+      "rationale_tag": "accessory:cable_tricep_pushdown:accessory",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 22
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 22
+       }
+      ]
+     },
+     {
+      "movement_key": "db_curl",
+      "rationale_tag": "accessory:db_curl:accessory",
+      "sets": [
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 7
+       },
+       {
+        "reps": null,
+        "type": "normal",
+        "weight_kg": 7
+       }
+      ]
+     }
+    ],
+    "engine": "critics@1.5.0",
+    "joints_packet_numbers": {
+     "active_day_streak": 21,
+     "days_since_movement[0]": 2,
+     "days_since_movement[1]": null,
+     "days_since_movement[2]": null,
+     "days_since_movement[3]": 2,
+     "days_since_movement[4]": 2,
+     "days_since_movement[5]": 2,
+     "fatigue_cut_superseded_by_deload": false,
+     "fatigue_trigger": false,
+     "heavy_axial_patterns_cold": 0,
+     "loaded_lifting_streak": 5,
+     "pain_flag[0]": false,
+     "pain_flag[1]": false,
+     "pain_flag[2]": false,
+     "pain_flag[3]": false,
+     "pain_flag[4]": false,
+     "pain_flag[5]": false,
+     "pain_layer_status": "ok",
+     "same_region_48h": false,
+     "stale_exposure[0]": 7,
+     "stale_exposure[1]": 1,
+     "stale_exposure[2]": 1,
+     "stale_exposure[3]": 8,
+     "stale_exposure[4]": 6,
+     "stale_exposure[5]": 3,
+     "stale_gap_days[0]": 79,
+     "stale_gap_days[1]": null,
+     "stale_gap_days[2]": null,
+     "stale_gap_days[3]": 70,
+     "stale_gap_days[4]": 77,
+     "stale_gap_days[5]": 75
+    },
+    "joints_stored_model": {
+     "field": "exercises[1].set_count",
+     "metric": "days_since_movement[1]",
+     "sentence": "Machine row has not been performed in over 6 months; reduce working sets from 3 to 2 to manage DOMS risk.",
+     "to": 2,
+     "value": null,
+     "verdict": "change"
+    },
+    "joints_stored_verdict": {
+     "field": "exercises[1].set_count",
+     "metric": "days_since_movement[1]",
+     "to": 2,
+     "value": null,
+     "verdict": "change"
+    },
+    "ran_at": "2026-09-27T02:00:56.500359+00:00",
+    "recheck": {
+     "exercise_count": 6,
+     "hevy_precheck_errors": [],
+     "passed": true,
+     "remaining_vetoes": [],
+     "total_sets": 14
+    },
+    "routine_id": "ff7518cdab4a1197f8e03e17d6458370",
+    "status": "draft",
+    "target_date": "2026-09-27",
+    "version": 3,
+    "veto": false
+   }
+  ]
+ }
 }

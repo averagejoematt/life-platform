@@ -44,6 +44,7 @@ failure mode this repo has filed twice.
 
 import ast
 import collections
+import functools
 import os
 import re
 import sys
@@ -60,13 +61,16 @@ import emf_namespace_ledger as ledger  # noqa: E402
 import emf_series_census as census  # noqa: E402
 from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
-PRODUCERS = disc.discover_producers()
-CONSUMERS = disc.discover_consumers()
+# LAZY (#4251): the producer sweep is ~9 s of AST work over the whole tree. At import
+# time it was paid by EVERY pytest collection (every xdist worker, every lane, selected
+# or not). Cached per process, it runs once, and only when a test here asks for it.
+PRODUCERS = functools.lru_cache(maxsize=None)(disc.discover_producers)
+CONSUMERS = functools.lru_cache(maxsize=None)(disc.discover_consumers)
 LEDGER = ledger.LEDGER
 
 
 def _kinds(ns):
-    return disc.consumer_kinds(ns, CONSUMERS)
+    return disc.consumer_kinds(ns, CONSUMERS())
 
 
 # ── the registry, both directions ─────────────────────────────────────────────
@@ -79,7 +83,7 @@ def test_every_emitted_namespace_is_registered():
     consumer or gets retired." A new namespace is a decision, and the decision
     is made here or it is made by CloudWatch's invoice three weeks later.
     """
-    missing = sorted(set(PRODUCERS) - set(LEDGER))
+    missing = sorted(set(PRODUCERS()) - set(LEDGER))
     assert not missing, (
         f"{len(missing)} emitted namespace(s) have no row in deploy/emf_namespace_ledger.py: {missing}. "
         "Add a row naming the owner, the consumer (alarm/dashboard/reader/ritual) or the retirement "
@@ -95,7 +99,7 @@ def test_the_ledger_does_not_rot():
     than either containment alone and the reason there is no third state to
     drift into.
     """
-    stale = sorted(set(LEDGER) - set(PRODUCERS))
+    stale = sorted(set(LEDGER) - set(PRODUCERS()))
     assert not stale, (
         f"ledger rows with no emitter anywhere in the tree: {stale}. Either the emitter was removed "
         "(drop the row — the live series age out on their own and the census reports them as live "
@@ -212,7 +216,7 @@ def test_shared_namespace_constants_are_registered():
 
 def test_user_agent_header_is_not_a_namespace():
     """`notion_lambda` sends `User-Agent: LifePlatform/1.0`. A grep calls that a namespace."""
-    assert "LifePlatform/1.0" not in PRODUCERS
+    assert "LifePlatform/1.0" not in PRODUCERS()
     assert "LifePlatform/1.0" not in disc.discover_readers()
     assert "LifePlatform/1.0" not in LEDGER
     src = open(os.path.join(_REPO, "lambdas", "ingestion", "notion_lambda.py"), encoding="utf-8").read()
@@ -225,7 +229,7 @@ def test_imported_namespace_constant_resolves_to_its_emitter():
     A literal-only producer scan reports the estate's LARGEST namespace as
     emitted by nobody.
     """
-    emitters = PRODUCERS.get("LifePlatform/SiteAPI", {}).get(disc.PRODUCER_EMIT, set())
+    emitters = PRODUCERS().get("LifePlatform/SiteAPI", {}).get(disc.PRODUCER_EMIT, set())
     assert "lambdas/web/site_api_common.py" in emitters, f"site_api_common must resolve as a SiteAPI emitter; got {sorted(emitters)}"
     src = open(os.path.join(_REPO, "lambdas", "web", "site_api_common.py"), encoding="utf-8").read()
     assert "LifePlatform/SiteAPI" not in src, "site_api_common now contains the literal — #3002's guard should have caught this first"
@@ -241,11 +245,11 @@ def test_a_metric_reader_is_not_counted_as_a_producer():
     readers = disc.discover_readers()
     for ns in ("LifePlatform/QaSmoke", "LifePlatform/QA", "LifePlatform/Budget"):
         assert "lambdas/operational/traffic_digest_lambda.py" in readers.get(ns, set()), f"{ns}: traffic digest should read it"
-        assert "lambdas/operational/traffic_digest_lambda.py" not in PRODUCERS.get(ns, {}).get(
+        assert "lambdas/operational/traffic_digest_lambda.py" not in PRODUCERS().get(ns, {}).get(
             disc.PRODUCER_EMIT, set()
         ), f"{ns}: traffic digest queries it, it does not write it"
     # …and the one it does write.
-    assert "lambdas/operational/traffic_digest_lambda.py" in PRODUCERS["LifePlatform/Traffic"][disc.PRODUCER_EMIT]
+    assert "lambdas/operational/traffic_digest_lambda.py" in PRODUCERS()["LifePlatform/Traffic"][disc.PRODUCER_EMIT]
 
 
 def test_a_test_file_is_never_counted_as_a_consumer():
@@ -261,7 +265,7 @@ def test_a_test_file_is_never_counted_as_a_consumer():
     from_tests = sorted((ns, m) for ns, mods in readers.items() for m in mods if m.startswith("tests/"))
     assert not from_tests, f"test files counted as metric consumers: {from_tests}"
     # …while the CI harness that genuinely writes production metrics is still a producer.
-    assert "tests/golden_brief_eval.py" in PRODUCERS["LifePlatform/GoldenBrief"][disc.PRODUCER_EMIT]
+    assert "tests/golden_brief_eval.py" in PRODUCERS()["LifePlatform/GoldenBrief"][disc.PRODUCER_EMIT]
 
 
 def test_a_query_shaped_dict_with_a_literal_namespace_is_not_an_emit():
@@ -281,7 +285,7 @@ def test_a_query_shaped_dict_with_a_literal_namespace_is_not_an_emit():
         n for n in ast.walk(tree) if isinstance(n, ast.Dict) and "Namespace" in disc._dict_keys(n) and "Metrics" not in disc._dict_keys(n)
     ]
     assert shapes, "the query-shaped payload this rule exists for is gone — re-verify the discriminator has a subject"
-    assert "tests/test_oauth_alarm_coverage.py" not in PRODUCERS["LifePlatform/OAuth"].get(
+    assert "tests/test_oauth_alarm_coverage.py" not in PRODUCERS()["LifePlatform/OAuth"].get(
         disc.PRODUCER_EMIT, set()
     ), "a query/notification payload was counted as a metric emit"
 
@@ -292,7 +296,7 @@ def test_emit_through_a_defaulted_parameter_is_found():
     Without parameter-default resolution the module reads as a *reader* of the
     namespace it writes, which inverts its ledger row.
     """
-    assert "lambdas/common/timeout_watchdog.py" in PRODUCERS["LifePlatform/Email"][disc.PRODUCER_EMIT]
+    assert "lambdas/common/timeout_watchdog.py" in PRODUCERS()["LifePlatform/Email"][disc.PRODUCER_EMIT]
 
 
 def test_log_metric_filter_namespaces_are_producers():
@@ -307,7 +311,7 @@ def test_log_metric_filter_namespaces_are_producers():
     # deliberate edit here, not a silent hole.
     for ns, home in (("LifePlatform/Lambda", "monitoring_stack.py"), ("LifePlatform/Privacy", "monitoring_silence_alarms.py")):
         assert home in minted.get(ns, set()), f"{ns}: expected a MetricFilter producer in {home}"
-        assert PRODUCERS[ns].get(disc.PRODUCER_EMIT) is None, f"{ns}: has no Python emitter by construction"
+        assert PRODUCERS()[ns].get(disc.PRODUCER_EMIT) is None, f"{ns}: has no Python emitter by construction"
         assert disc.CONSUMER_ALARM in _kinds(ns), f"{ns}: the alarm built on the filter must resolve as a consumer"
 
 

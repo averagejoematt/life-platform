@@ -116,6 +116,11 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
     return timeline, pain_dates, latest_progression
 
 
+def _pain_notes(timeline: list) -> list:
+    """`[{date, text}]` for every flagged entry — the per-site instance input (#4174)."""
+    return [{"date": str(e.get("date") or "")[:10], "text": e.get("note_raw")} for e in (timeline or []) if e.get("pain_flag")]
+
+
 def pain_flags_for_templates(template_ids, start: str, layer_status: str, max_workers: int = 8) -> dict:
     """The pain-flag record for MANY exercise templates at once — the stage-1 read (#4051).
 
@@ -161,6 +166,9 @@ def pain_flags_for_templates(template_ids, start: str, layer_status: str, max_wo
         return tid, {
             "pain_flag_any": bool(pain_dates),
             "pain_dates": [str(d)[:10] for d in pain_dates if d],
+            # #4174: each flagged note with its own words — the dismissal rule is per SITE, and
+            # the note layer knows no anatomy, so the words are how a note is tied to a site.
+            "pain_notes": _pain_notes(timeline),
             "sessions_with_notes": len(timeline),
             "layer_status": layer_status,
         }
@@ -376,13 +384,28 @@ def _dismiss_pain_flag(args):
             **record,
         }
     )
-    resolution = tcr.resolve_flag(movement=record["movements"][0], note_dates=pain_dates, dismissals=[record])
+    # #4174: the preview resolves per SITE. This record covers the note it pinned (and any
+    # note whose words name the site) — every other flagged note on the movement stays open
+    # and is named here, so the chat asks about it instead of assuming it was covered.
+    instances = tcr.expand_instances(
+        [{"movement": record["movements"][0], "note_dates": pain_dates, "notes": _pain_notes(notes.get("timeline") or [])}], [record]
+    )
+    resolution = next((r for r in tcr.resolve_flags(instances, [record]) if r.get("site_key") == record["site_key"]), None)
+    still_open = [i for i in instances if i.get("site") != record["site_key"] and i.get("note_dates")]
     return {
         "status": "dismissed",
         "wrote": True,
         "sk": record["sk"],
         "record": record,
         "reads_as": resolution,
+        "still_open": [
+            {
+                "movement": i["movement"],
+                "note_dates": i["note_dates"],
+                "why": "these flagged notes name no dismissed site — they need a dismissal of their own (#4174)",
+            }
+            for i in still_open
+        ],
         "next": (
             "Call plan_next_session — the pain_flag_named_site tripwire now reads `dismissed_by_owner` with this "
             "date and these words, and the joints/tendons critic will not veto the dismissed instance."

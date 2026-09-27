@@ -989,6 +989,30 @@ def _claims_by_quantity(coaches) -> tuple[dict, int]:
     return out, skipped
 
 
+# #4186 (the wire gap): the page's LEAD coach does not live in `coaches[]`. On
+# `/api/coaching-dashboard` the head coach's weekly read is `weekly_priority` and its
+# daily read is `lead_daily` — each `{text, coach_name, ...}` — and that is where the
+# 2026-09-25 specimen lives ("his average intake has dropped to 106.9 grams across 14
+# logged days", Dr. Eli Marsh). Measured 2026-09-27 16:12Z: reading `coaches[]` alone,
+# both legs extracted 0 claims and passed green while that sentence was still served
+# against an engine `avg_protein_g` of 153.5. The slot rides the name, so a finding says
+# WHERE on the page the figure sits, not only who wrote it.
+_PAGE_LEAD_SLOTS = ("weekly_priority", "lead_daily")
+
+
+def served_coach_texts(dashboard) -> list:
+    """Every coach text one `/api/coaching-dashboard` payload serves, as coach-shaped
+    dicts: `coaches[]` as served, plus each non-empty page-level lead slot."""
+    if not isinstance(dashboard, dict):
+        return []
+    out = [c for c in dashboard.get("coaches") or [] if isinstance(c, dict)]
+    for slot in _PAGE_LEAD_SLOTS:
+        block = dashboard.get(slot)
+        if isinstance(block, dict) and str(block.get("text") or "").strip():
+            out.append({"name": f"{block.get('coach_name') or 'the lead coach'} ({slot})", "summary": str(block["text"])})
+    return out
+
+
 def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None):
     """Two coach texts served on ONE page must not state the same quantity with
     different values — protein, weight, loss rate, recovery, HRV, RHR, sleep
@@ -1169,7 +1193,7 @@ def checks(check_cls, site_base_url, partition, timeout=15, table=None):
         msg = f"cross-surface fetch failed (fail-soft): /api/coaching-dashboard — {fetch_errors['/api/coaching-dashboard']}"
         coach_agreement_checks = [consistency_check.warn(msg), vs_engine_check.warn(msg)]
     else:
-        served_coaches = payloads.get("/api/coaching-dashboard", {}).get("coaches", [])
+        served_coaches = served_coach_texts(payloads.get("/api/coaching-dashboard"))
         served_nutrition = payloads.get("/api/nutrition_overview", {}).get("nutrition")
         served_journey = payloads.get("/api/journey", {}).get("journey")
         _rate_ci = None
@@ -1183,6 +1207,11 @@ def checks(check_cls, site_base_url, partition, timeout=15, table=None):
             consistency_check.ok(c_msg) if c_ok else consistency_check.fail(c_msg),
             vs_engine_check.ok(e_msg) if e_ok else vs_engine_check.fail(e_msg),
         ]
+        # #4186 dead-man: the claim count reaches the LOG every night, green included —
+        # qa_smoke prints only FAIL/WARN lines, so a passing leg's count was otherwise
+        # recorded nowhere, and "0 extracted" was indistinguishable from "never ran".
+        print(f"[QA] COUNT cross_surface:coach_consistency: {c_msg}")
+        print(f"[QA] COUNT cross_surface:coach_vs_engine: {e_msg}")
 
     if "/api/vitals" in fetch_errors or "/api/sleep_detail" in fetch_errors:
         sleep_result = sleep_check.warn(

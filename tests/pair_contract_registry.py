@@ -1181,11 +1181,96 @@ KNOWN_MUST_AGREE_PAIRS = (
     "coach PREDICTION# resolutions -> the one record (K of N through <day>)",
     # E6 / #4217 — the absent coach: the engine's gate and the renderer's guard read one wire.
     "source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
+    # E2 / #4189 — the morning note: the owner's door and the coach fact read one row.
+    "morning note row -> the coach fact",
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4189 — the morning note: the owner's write door -> the coach fact
+# ══════════════════════════════════════════════════════════════════════════════
+# Producer: the REAL `POST /api/morning_note` handler through the facade (the owner
+# token minted with the same signing function the door verifies), its stored Item
+# captured off the transport. Consumer: `coach.morning_note.coach_fact` — the one
+# derivation the coach packet and every coach's input read (the GET route's
+# `public_view` is the same function's first half). The four words are free text the
+# owner typed, so every mutation below is a shape the consumer must REFUSE, never
+# serve with a blank in it.
+
+_NOTE_SECRET = "pair-contract-note-secret"
+_NOTE_BODY = {"sleep_word": "heavy", "body_word": "stiff", "mood_word": "steady", "felt_recovered": False}
+
+
+def _produce_morning_note():
+    from content.ritual_link import sign_morning_note_token
+    from web import site_api_common as sac, site_api_social as social
+
+    table = CapturingTable()
+    today = social.datetime.now(social.PT).strftime("%Y-%m-%d")
+    body = {**_NOTE_BODY, "date": today, "token": sign_morning_note_token(_NOTE_SECRET, today)}
+    event = {
+        "body": json.dumps(body),
+        "headers": {"cloudfront-viewer-address": "203.0.113.9:443"},
+        "requestContext": {"http": {"method": "POST", "sourceIp": "203.0.113.9"}},
+    }
+    saved = {k: getattr(social, k) for k in ("table", "_get_ritual_token_secret", "_ddb_rate_check", "_RATE_LIMITER_READY")}
+    saved_cf = (sac._content_filter_cache, sac._content_filter_cache_at)
+    social.table = table
+    social._get_ritual_token_secret = lambda: _NOTE_SECRET
+    social._ddb_rate_check = lambda *a, **k: (True, 0, 0)
+    social._RATE_LIMITER_READY = True
+    sac._content_filter_cache, sac._content_filter_cache_at = {"blocked_vices": [], "blocked_vice_keywords": []}, None
+    try:
+        resp = social._handle_morning_note(event)
+    finally:
+        for k, v in saved.items():
+            setattr(social, k, v)
+        sac._content_filter_cache, sac._content_filter_cache_at = saved_cf
+    assert resp["statusCode"] == 200, resp
+    assert len(table.items) == 1, "the door must write exactly one row"
+    return table.items[0]
+
+
+def _consume_morning_note(row):
+    from coach import morning_note
+
+    return morning_note.coach_fact(row)
+
+
+def _agree_morning_note(produced, consumed):
+    assert consumed["state"] == "measured", consumed
+    for field in ("sleep_word", "body_word", "mood_word", "felt_recovered"):
+        assert consumed[field] == produced[field], f"{field}: the coach reads a word the owner did not write"
+    assert consumed["date"] == produced["date"] == produced["sk"].split("#", 1)[1]
+    assert consumed["data_through"] == produced["date"]
+    assert consumed["tier"] == produced["tier"] == 1, "the ruling's tier travels with the row"
+    assert "written_at" not in consumed and consumed["written_at_pt"].endswith("PT"), "the UTC instant never reaches a coach"
+
+
+register(
+    PairContract(
+        name="morning note row -> the coach fact",
+        producer="web.site_api_social_note::_handle_morning_note",
+        consumer="coach.morning_note::coach_fact",
+        partition="morning_note",
+        produce=_produce_morning_note,
+        consume=_consume_morning_note,
+        agree=_agree_morning_note,
+        mutations=(
+            Mutation(("sleep_word",), "drop", why="one of the four words — a note with a blank must never be served as a note"),
+            Mutation(("mood_word",), "rename", to="mood", why="a plausible drift of the exact key the coach quotes"),
+            Mutation(("felt_recovered",), "retype", to="yes", why="his call is a bool; a string would be narrated as a word"),
+            Mutation(("written_at",), "drop", why="the write instant — without it there is no PT clock label to give the coach"),
+            Mutation(("tier",), "retype", to=2, why="the ruling's tier: at presence-only the words are withheld, and agree must see that"),
+            Mutation(("date",), "drop", why="the day — the fact falls back to the sk suffix, and a row with neither is not a note"),
+        ),
+        note="the words are the owner's own; the contract is that nothing between the door and the coach can add, drop or retype one",
+    )
 )
 
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 11  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record)
+ENROLLED_FLOOR = 12  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record) -> 12 (2026-09-27, #4189: the morning note)
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]

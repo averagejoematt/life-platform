@@ -406,6 +406,16 @@ listed: `tests/conftest.py` applies `premerge` to every `tests/*_behavior.py` fi
 everything `deploy_critical`, and to the structural gates in `_PREMERGE_EXTRA_FILES`.
 **8,813 tests in 155s** (measured locally 2026-08-21) against the job's 10-minute timeout.
 
+**On the runner it is two passes over that one selection (#4251)** — the full-suite job's
+idiom: `-m "premerge and not integration and not serial" -n auto --dist loadfile`, then
+`-m "premerge and not integration and serial"` in one process for the in-tree writers.
+The expressions are exact complements, so no test runs twice inside the lane
+(`tests/test_premerge_lane.py` holds the partition). Run serially, it had grown to ~21 min
+on the runner — slower than the 30k-test parallel full suite on the same PR. Locally the
+one-pass command above is still the same selection; add `-n auto --dist loadfile -m
+"premerge and not integration and not serial"` for the lane's speed (12,258 tests in
+406s on 12 cores, 2026-09-27, plus 46 serial in 94s).
+
 **What it does NOT do: predict main.** It covers the *merge* gate. The lane that reds
 `main` is the full `Unit Tests` job — ~1,320s (#2692) — and no cheap local subset honestly
 predicts it. A green run here means "the required check should pass," never "main will
@@ -1439,7 +1449,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | A public route serves **handled** 5xx indefinitely at AWS/Lambda `Errors` = 0 — the top-level `except` returns `_error(500, …)` instead of re-raising, so every existing alarm stays OK (the 2026-07-19 `/api/fulfillment_ritual` ~4h class) | Handled-5xx EMF metric + `site-api-handled-5xx` alarm (#2819), emitted from the error **envelope** — not the route log, which the early-returning routes never reach | `tests/test_handled_5xx_metric_2819.py`; `site_api_common::emit_handled_5xx`; `serve_stack.py` |
 | A tracked file instructs — or a commit on `main` carries — a Claude tool-attribution trailer, against the owner's 2026-08-12 authorship decision (CLAUDE.md "Authorship"); four instruction files drifted, one driving the unattended remediation agent (#3005) | No-tool-attribution guard (#3005): tracked-file instruction scan (allowlist = only the files that state the ban) + reachable-history trailer scan since the ban date; predicates mutation-proved both directions | `tests/test_no_tool_attribution_3005.py` |
 | A coach's honest recovery/HRV TREND sentence (an EWMA / rolling / N-day-average / "climbed from X to Y") is read as a claim about the current reading and reddens `cross_surface:vitals` against the cockpit (the 2026-09-25 `qa-smoke-failures` specimen) | Trend/aggregate classifier (#4180): `classify_claims` splits every cited figure into `current` / `trend_end` / `trend_start`; only `current` is compared with the cockpit, a trend's END is compared against a served `{metric}_ewma` field if one exists (else skipped), and a trend's START is always skipped — every skip named in the check's detail line | `lambdas/operational/weight_truth_qa.py`; `tests/test_cross_surface_vitals_trend_classifier_4180.py` |
-| Two coach texts served on one page state the same quantity (protein/rate/vitals/days-logged) with different values, or a coach figure contradicts the engine's own served fact for the window it names, with nothing comparing them (the 2026-09-25 corpus: protein 106.9g/141g/154g and rate 3.7/−4.4 lb/wk, `cross_surface:*` green throughout) | `cross_surface:coach_consistency` + `cross_surface:coach_vs_engine` legs (#4186), sharing #4180's classifier so a trend/dated figure is never mis-compared; both emit a claim count (extracted/compared/skipped) every run | `lambdas/operational/weight_truth_qa.py`; `tests/test_cross_surface_coach_agreement_4186.py` |
+| Two coach texts served on one page state the same quantity (protein/rate/vitals/days-logged) with different values, or a coach figure contradicts the engine's own served fact for the window it names, with nothing comparing them (the 2026-09-25 corpus: protein 106.9g/141g/154g and rate 3.7/−4.4 lb/wk, `cross_surface:*` green throughout) | `cross_surface:coach_consistency` + `cross_surface:coach_vs_engine` legs (#4186), sharing #4180's classifier so a trend/dated figure is never mis-compared; the corpus is every served coach text — `coaches[]` AND the page-level `weekly_priority`/`lead_daily` lead reads (`served_coach_texts`; reading `coaches[]` alone extracted 0 claims live on 2026-09-27 while the 106.9g sentence was still served); both emit a claim count (extracted/compared/skipped) every run, printed as a `[QA] COUNT` log line green or red | `lambdas/operational/weight_truth_qa.py`; `tests/test_cross_surface_coach_agreement_4186.py` |
 
 **Pre-commit hook** (`scripts/install_hooks.sh`, installed once per clone — runs on every local commit):
 

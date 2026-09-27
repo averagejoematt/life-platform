@@ -173,11 +173,44 @@ def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list
     return routines
 
 
-def list_stale_drafts(older_than_days: int = 7, lookback_days: int = 120, today: str | None = None) -> list[RoutineSpec]:
-    """#3772: routines still `draft` whose creation is older than `older_than_days` — the orphans
-    the #3765 soft-timeout leaves behind (the draft lands, the client is told it timed out, and
-    nothing ever lists it). Walks the date index over `lookback_days` (a draft targets a date
-    near its creation), so no Scan. Sorted oldest first."""
+def _live_genesis() -> str | None:
+    """The current cycle's genesis as a day key, read at CALL time (a re-anchor or a test
+    monkeypatch lands without a module reload — the same shape as
+    `phase_taxonomy.cycle_read_floor`). None when the constant is unavailable, and a None
+    genesis means NOTHING is pre-genesis: the census falls back to counting every stale draft,
+    which is the conservative direction (a widened census, never a silently narrowed one)."""
+    try:
+        from common import constants as _c
+
+        g = str(getattr(_c, "EXPERIMENT_START_DATE", "") or "")
+    except Exception:  # noqa: BLE001 — fail-soft: never break a census over the constant
+        return None
+    return g or None
+
+
+def stale_draft_census(older_than_days: int = 7, lookback_days: int = 120, today: str | None = None, genesis: str | None = None) -> dict:
+    """#4183: the orphan-draft census, partitioned by the genesis.
+
+    #3772's question was "which drafts did the soft-timeout leave behind that nobody knows
+    about?" — and the answer it computed was "every draft older than `older_than_days`
+    inside the lookback", which on 2026-09-20 (the leg's FIRST night) was 22: eighteen of
+    them June 2026 drafts from a cycle the 2026-09-06 reset had already closed. A draft whose
+    target day is BEFORE the genesis is history — nobody can commit it to Hevy for a day the
+    experiment does not count, and the reset never tombstones the ROUTINE# partition (it is
+    SYSTEM_STATE by ruling, see phase_taxonomy), so the leg has to read the genesis itself.
+
+    The routine rows carry no `phase`/`cycle` stamp (SYSTEM_STATE rows never do — verified
+    on the wire 2026-09-26), so the ONE discriminator is the row's own `target_date`
+    against the live genesis, compared as ISO day-key strings (#3609: never fromisoformat).
+
+    Returns a dict, never a bare list, so the caller can NAME the window it used:
+      live        — stale drafts targeting a day on/after the genesis (the actionable set)
+      pre_genesis — stale drafts targeting a day before it (history, excluded by name)
+      window      — {start, end, cutoff, genesis, today} exactly as the Query walked them
+    Both lists are sorted oldest-created first. Read-only: one bounded index Query. This
+    REPLACES #3772's `list_stale_drafts` (the unpartitioned list; its only caller was the leg).
+    The listing a human asks for is `list_for_tool` (`manage_hevy_routine list`), unpartitioned.
+    """
     from common.pacific_time import pacific_today, shift_day_key
 
     # #3609: day keys move through the platform's one day-key shifter, never a hand-rolled fromisoformat
@@ -185,12 +218,25 @@ def list_stale_drafts(older_than_days: int = 7, lookback_days: int = 120, today:
     start = shift_day_key(today_key, -lookback_days)
     end = shift_day_key(today_key, 7)  # a draft may target a day still ahead
     cutoff = shift_day_key(today_key, -older_than_days)
-    out = []
+    genesis_key = genesis if genesis is not None else _live_genesis()
+    live: list[RoutineSpec] = []
+    pre_genesis: list[RoutineSpec] = []
     for ir in list_by_date_range(start, end, limit=500):
         created = str(ir.created_at or "")[:10]
-        if ir.status == "draft" and created and created <= cutoff:
-            out.append(ir)
-    return sorted(out, key=lambda r: (str(r.created_at or ""), r.routine_id))
+        if not (ir.status == "draft" and created and created <= cutoff):
+            continue
+        # A None genesis partitions nothing into history (see _live_genesis) — the widened
+        # census is the honest failure, a narrowed one is the silent failure.
+        if genesis_key and str(ir.target_date or "") < genesis_key:
+            pre_genesis.append(ir)
+        else:
+            live.append(ir)
+    order = lambda r: (str(r.created_at or ""), r.routine_id)  # noqa: E731
+    return {
+        "live": sorted(live, key=order),
+        "pre_genesis": sorted(pre_genesis, key=order),
+        "window": {"start": start, "end": end, "cutoff": cutoff, "genesis": genesis_key, "today": today_key},
+    }
 
 
 def list_for_tool(args: dict) -> dict:
