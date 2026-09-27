@@ -206,6 +206,18 @@ def unit_bearing_numbers(text: str) -> set:
     return out
 
 
+# #4185/#4343: an AGE-DECADE idiom is not a measurement. "the anabolic environment degrades
+# roughly 1% per year after your mid-40s" (physical coach, 2026-09-27 17:00Z brief) was
+# read as a bare 40 that must be grounded, and the coach was held on it. Deliberately
+# narrow: the decade must be a PERSON's ("your/his/her/their/my … 40s"), so "HRV in the
+# mid-40s" or "rest 40s between sets" — each a measurement a reader believes — still
+# has to be earned from the input.
+_AGE_DECADE_RE = re.compile(
+    r"\b(?:your|his|her|their|my|one's)\s+(?:(?:early|mid|late)[-\s]?)?['\u2019]?[1-9]0['\u2019]?s\b",
+    re.IGNORECASE,
+)
+
+
 def allowed_numbers(*sources) -> set:
     """The allow-list: every number present in what the model was given.
 
@@ -267,6 +279,7 @@ def fabricated_numbers(text: str, allowed: set, *, tolerance: float = NUMBER_TOL
     like any other measurement. Off by default so every pre-#4185 caller is unchanged; the
     reader checks (``coach.reader_checks``) turn it on.
     """
+    text = _AGE_DECADE_RE.sub(" ", text or "")  # "after your mid-40s" is an age, not a figure (#4185)
     with_unit = unit_bearing_numbers(text) if unit_voids_benign else set()
     out = []
     for x in sorted(numbers_in_text(text)):
