@@ -237,8 +237,8 @@ def test_pair2_adherence_matches_a_pt_evening_workout_to_the_routine_day(pt_even
     """The consumer that used to slice the vendor instant raw, driven as the REAL action.
 
     A workout STARTED at 18:30 PT carries a UTC `start_time` of the next day; `[:10]`
-    compared that to a Pacific-keyed `target_date` and returned `no_workout_for_date` for
-    a session that demonstrably happened. `pacific_date_of` is the platform's existing
+    compared that to a Pacific-keyed `target_date` and returned `no_workout_for_date` (now
+    `no_workout_for_routine`, #4177) for a session that demonstrably happened. `pacific_date_of` is the platform's existing
     answer — `health.adherence_calc` already resolved hevy `start_time` that way, with a
     comment calling itself "immune to the UTC-date keying bug". This removes the bug it
     was immune to.
@@ -267,9 +267,18 @@ def test_pair2_adherence_matches_a_pt_evening_workout_to_the_routine_day(pt_even
     )
     # No exercises: this test is about the DAY MATCH, and Hevy wire-schema knowledge is
     # confined to the compiler by `tests/test_hevy_compiler_isolation.py`. `status` alone
-    # distinguishes "matched the routine's day" from "no_workout_for_date".
+    # distinguishes "matched the routine's day" from "no_workout_for_routine".
+    # #4177: the action now resolves through `health.adherence_calc.resolve_routine_for_workout`
+    # (hevy_routine_id -> Pacific date -> overlap). This workout carries no routine id, so the
+    # match rides the DATE step — `list_by_date_range` is asked for the workout's PACIFIC day
+    # and must find `ir` there; a UTC day would ask for the 27th and find nothing.
     workout = {"start_time": start_time, "exercises": []}
     monkeypatch.setattr("training.routine_repo.get_current", lambda rid: ir)
+    monkeypatch.setattr("training.routine_repo.lookup_routine_id", lambda hevy_id: None)
+    monkeypatch.setattr(
+        "training.routine_repo.list_by_date_range",
+        lambda start, end: [ir] if start == end == ir.target_date else [],
+    )
     monkeypatch.setattr(wc, "get_workouts", lambda **kw: {"workouts": [workout]})
 
     out = tools_hevy_routine._action_adherence({"routine_id": "r1"})

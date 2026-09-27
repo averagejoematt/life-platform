@@ -133,6 +133,7 @@ from web.site_api_data import (
     handle_presence,
     handle_protocols,
     handle_routine,
+    handle_session,
     handle_source_freshness,
     handle_supplements,
     handle_survival,
@@ -397,6 +398,8 @@ ROUTES = {
     "/api/supplements": handle_supplements,
     # #1066: the prescribed training block for the cockpit levers (counts-only projection)
     "/api/routine": handle_routine,
+    # E3 (#4182, owner ruling 2026-09-26 option a): today's session as it will be lifted — names, sets × reps, the load in lb
+    "/api/session": handle_session,
     "/api/habits": handle_habits,
     "/api/vice_streaks": handle_vice_streaks,
     "/api/fulfillment_ritual": handle_fulfillment_ritual,  # #769 (ADR-124): C-floor aggregate-only publish surface
