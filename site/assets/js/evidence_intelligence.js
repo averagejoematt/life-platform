@@ -221,10 +221,18 @@ export function renderWrong(d) {
   const caught = cr
     ? sec("Caught by the validator — claims the data contradicted", `<table class="rd-tbl"><thead><tr><th>date</th><th>coach</th><th>what was wrong</th></tr></thead><tbody>${cr}</tbody></table>${undetailedNote}`)
     : sec("Caught by the validator", undetailed ? undetailedNote : `<p class="rd-archive">No catches in the window — every audited claim matched the data it cited.</p>`);
-  const lr = (pr.by_coach || []).map((c) =>
-    `<tr><td class="rd-name">${esc(c.coach)}</td><td class="num">${fmt(c.confirmed)}</td><td class="num">${fmt(c.refuted)}</td><td class="num">${fmt(c.inconclusive)}</td><td class="num">${fmt(c.expired)}</td></tr>`).join("");
+  /* #4220 — one record per coach, "K of N through <day>", from the same producer the
+     scorecard and the roster print (the PREDICTION# ledger, one resolution per call).
+     This table used to re-count LEARNING# rows and read Webb 20 confirmed beside the
+     scorecard's 0 of 5. Every figure here is served: confirmed, n, through. */
+  const lr = (pr.by_coach || []).map((c) => {
+    // `n` and `through` arrive with the site-api deploy; until then (site/** deploys first)
+    // n falls back to confirmed + refuted and the day column reads "—", never a guess.
+    const n = c.n != null ? c.n : (Number(c.confirmed) || 0) + (Number(c.refuted) || 0);
+    return `<tr><td class="rd-name">${esc(c.coach)}</td><td class="num">${fmt(c.confirmed)} of ${fmt(n)}</td><td class="num">${fmt(c.refuted)}</td><td>${c.through ? esc(fmtShort(c.through)) : "—"}</td></tr>`;
+  }).join("");
   const ledger = lr
-    ? sec("The prediction ledger — every dated call, scored", `<table class="rd-tbl"><thead><tr><th>coach</th><th>confirmed</th><th>refuted</th><th>inconclusive</th><th>expired</th></tr></thead><tbody>${lr}</tbody></table>`)
+    ? sec("The prediction ledger — every checked call, one record per coach", `<table class="rd-tbl"><thead><tr><th>coach</th><th>checked calls right</th><th>refuted</th><th>through</th></tr></thead><tbody>${lr}</tbody></table>`)
     : "";
   const mr = (pr.refuted_recent || []).map((m) =>
     `<tr class="rd-flag"><td class="rd-name">${esc(String(m.date || "").slice(0, 10))}</td><td>${esc(m.coach)}</td><td>${esc(m.what)}</td></tr>`).join("");
