@@ -1,0 +1,84 @@
+{
+  "captured_at": "2026-09-27T22:27:36.527115+00:00",
+  "fetch_path": "/api/session",
+  "is_prefix_sample": false,
+  "path": "/api/session",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "exercises": {
+        "items": {
+          "keys": {
+            "load_lbs": {
+              "type": "integer"
+            },
+            "loads_lbs": {
+              "items": {
+                "type": "integer"
+              },
+              "length_sample": 2,
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            },
+            "reps": {
+              "type": "string"
+            },
+            "sets": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 6,
+        "type": "array"
+      },
+      "kind": {
+        "type": "string"
+      },
+      "position_label": {
+        "type": "null"
+      },
+      "reason": {
+        "type": "null"
+      },
+      "routine_ref": {
+        "type": "string"
+      },
+      "session_role": {
+        "type": "null"
+      },
+      "source": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

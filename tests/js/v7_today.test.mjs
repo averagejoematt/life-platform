@@ -165,12 +165,95 @@ test("the one ask: the first current ask leads; when every ask is late the first
   assert.equal(T.askBody({ open_actions: [] }, NOW), "");
 });
 
+// The live /api/session body, fetched 2026-09-27 16:45Z (PR #4318's route, loads public by the
+// owner's 2026-09-26 ruling) — inlined verbatim minus _meta.
+const LIVE_SESSION = {
+  date: "2026-09-27",
+  state: "served",
+  reason: null,
+  source: "hevy-routine-draft",
+  kind: "program",
+  session_role: null,
+  position_label: null,
+  exercises: [
+    { name: "Deadlift (Trap bar)", sets: 2, reps: "8\u201312", load_lbs: 122, loads_lbs: [122, 122] },
+    { name: "Squat (Barbell)", sets: 3, reps: "8\u201312", load_lbs: 118, loads_lbs: [118, 118, 118] },
+    { name: "Seated Leg Curl (Machine)", sets: 2, reps: "8\u201315", load_lbs: 54, loads_lbs: [54, 54] },
+    { name: "Calf Press (Machine)", sets: 2, reps: "8\u201315", load_lbs: 193, loads_lbs: [193, 193] },
+    { name: "Crunch (Machine)", sets: 2, reps: "8\u201315", load_lbs: null, loads_lbs: null },
+    { name: "Treadmill", sets: 1, reps: null, load_lbs: null, loads_lbs: null },
+  ],
+  as_of: "2026-09-27T16:45:28.307257+00:00",
+};
+
 test("the loads render only when /api/session serves an exercise list; a 404 is null, never a guessed list", () => {
   assert.equal(T.loadRows(null), null);
   assert.equal(T.loadRows({}), null);
   assert.equal(T.loadRows({ exercises: [] }), null);
-  assert.deepEqual(T.loadRows({ exercises: [{ name: "Leg press", sets: 3, reps: 10, load_lbs: 270 }, { name: "Plank", sets: 2 }] }), [
-    { name: "Leg press", dose: "3 × 10 · 270 lb" },
-    { name: "Plank", dose: "2 sets" },
-  ]);
+  assert.deepEqual(
+    T.loadRows({ exercises: [{ name: "Leg press", sets: 3, reps: 10, load_lbs: 270 }, { name: "Plank", sets: 2 }] }).map((r) => r.dose),
+    ["3 × 10 · 270 lb", "2 sets"],
+  );
+});
+
+test("the live shape: a served range prints verbatim, one load when the sets agree, no load when none is served", () => {
+  const rows = T.loadRows(LIVE_SESSION);
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.dose]),
+    [
+      ["Deadlift (Trap bar)", "2 × 8–12 · 122 lb"],
+      ["Squat (Barbell)", "3 × 8–12 · 118 lb"],
+      ["Seated Leg Curl (Machine)", "2 × 8–15 · 54 lb"],
+      ["Calf Press (Machine)", "2 × 8–15 · 193 lb"],
+      ["Crunch (Machine)", "2 × 8–15"],
+      ["Treadmill", "1 set"],
+    ],
+  );
+  const html = T.sessionBlockHTML(LIVE_SESSION);
+  assert.match(html, /<span data-src="api_session.date">Sunday, September 27<\/span>, as it will be lifted:/);
+  assert.match(html, /<span data-src="api_session.exercises\[0\].sets">2<\/span> × <span data-src="api_session.exercises\[0\].reps">8–12<\/span> · <span data-src="api_session.exercises\[0\].load_lbs">122<\/span> lb/);
+  assert.match(html, /data-src="api_session.exercises\[5\].name">Treadmill/);
+  assert.doesNotMatch(html, /session_role|position_label<|NaN|undefined|null|coming soon|2026-/);
+});
+
+test("distinct loads print every set — a top set and its back-offs, never one load for three sets", () => {
+  const s = { date: "2026-09-27", state: "served", kind: "program", position_label: "week 2 · session 3 of 4 · upper-heavy", exercises: [{ name: "Bench Press (Barbell)", sets: 3, reps: "4–6", load_lbs: 123, loads_lbs: [123, 110, 110] }] };
+  assert.equal(T.loadRows(s)[0].dose, "3 × 4–6 · 123 / 110 / 110 lb");
+  const html = T.sessionBlockHTML(s);
+  assert.match(html, /<span data-src="api_session.exercises\[0\].loads_lbs">123 \/ 110 \/ 110<\/span> lb/);
+  assert.match(html, /<span data-src="api_session.position_label">week 2, session 3 of 4 — upper body, heavy<\/span>, as it will be lifted:/);
+});
+
+test("the position label reads in reader words: the role, the deload, the extra session's date spelled", () => {
+  assert.equal(T.positionWords(null), "");
+  assert.equal(T.positionWords("week 3 · session 1 of 4 · lower-volume · DELOAD"), "week 3, session 1 of 4 — lower body, more reps at a lighter weight, a lighter (deload) week");
+  assert.equal(
+    T.positionWords("week 2 · session 5 (extra — the 7-day floor holds week 3 until 2026-10-01) · upper-heavy"),
+    "week 2, session 5 — an extra one; week 3 opens no sooner than October 1 — upper body, heavy",
+  );
+});
+
+test("a Flex day is named an off-program session; an absent session prints its served reason; a null fetch is 'not served'", () => {
+  const flex = { date: "2026-09-26", state: "served", kind: "complement", session_role: null, position_label: null, exercises: [{ name: "Suitcase Carry", sets: 3, reps: null, load_lbs: null, loads_lbs: null }] };
+  const f = T.sessionBlockHTML(flex);
+  assert.match(f, /<span data-src="api_session.kind">an off-program session<\/span>/);
+  assert.match(f, /Suitcase Carry<\/td><td class="n"><span data-src="api_session.exercises\[0\].sets">3<\/span> sets<\/td>/);
+  const absent = { date: "2026-09-27", state: "absent", reason: "before the program's first session (2026-09-28)", exercises: [] };
+  const a = T.sessionBlockHTML(absent);
+  assert.equal(a, `<p class="td-note" data-src="api_session.reason">No exercise list for today: before the program's first session (September 28).</p>`);
+  assert.doesNotMatch(a, /coming soon|yet/i);
+  assert.equal(T.sessionBlockHTML(null), '<p class="td-note">Today’s exercise list is not served right now.</p>');
+});
+
+
+test("getJSON drains a non-2xx body before returning null — the unread /api/session 404 held networkidle open (the visual-QA rollback class)", async () => {
+  const calls = [];
+  const stub = (status, ok, body) => async () => ({ ok, status, json: async () => body, text: async () => { calls.push(`text:${status}`); return ""; } });
+  assert.deepEqual(await T.getJSON("/api/session", stub(200, true, { state: "served" })), { state: "served" });
+  assert.equal(calls.length, 0, "an ok body is read as JSON, not drained twice");
+  assert.equal(await T.getJSON("/api/session", stub(404, false, null)), null);
+  assert.deepEqual(calls, ["text:404"], "the 404 body was read");
+  const throwing = async () => ({ ok: false, status: 502, json: async () => null, text: async () => { throw new Error("gone"); } });
+  assert.equal(await T.getJSON("/api/session", throwing), null);
+  assert.equal(await T.getJSON("/api/session", async () => { throw new Error("offline"); }), null);
 });

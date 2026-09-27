@@ -214,6 +214,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/receipts",
     "/api/routine",
     "/api/scenarios",
+    "/api/session",
     "/api/sleep_correlations",
     "/api/sleep_detail",
     "/api/snapshot",

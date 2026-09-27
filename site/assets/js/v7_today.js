@@ -9,9 +9,11 @@
 // for the dark channels and the paused device in /api/source_freshness), a one-line note
 // that this is his screen, and the dated return line. Nothing after it.
 //
-// The exercises and loads are deliberately NOT served by /api/routine (an owner privacy
-// ruling on publishing loads comes first — plan E3); until /api/session exists the page
-// says so, honestly, instead of inventing a list.
+// The exercises and loads come from /api/session (plan E3, #4318; owner ruling 2026-09-26:
+// loads are public): names, sets × reps exactly as served (a range string "8–12" is printed
+// verbatim), every set's load when they differ ("123 / 110 / 110 lb"), a Flex day named as
+// an off-program session, and a served absence printed with its own reason. A null fetch
+// says the list is not served right now — never a guessed list.
 //
 // The pure helpers are exported and unit-tested (tests/js/v7_today.test.mjs); every one
 // takes its inputs explicitly so no test reads the wall clock. Dates in words come from
@@ -141,20 +143,108 @@ export function stateHTML({ served, line, what, fact, src, cls = "td-a" }) {
   return `<p class="td-note" data-src="${esc(src)}">${esc(fact)}</p>`;
 }
 
-/** The session's loads, IF /api/session serves them: [{name, sets, reps, load}] rows from an
- *  `exercises[]` list. Null when the endpoint is absent or carries no list — the page then
- *  says the loads are on his phone, never a guessed list. */
+/** Served reps as the reader sees them: a number, or the served range string verbatim
+ *  ("8–12" — Hevy's own range, never parsed into one number). "" when nothing usable. */
+function repsText(r) {
+  if (typeof r === "string") return r.trim();
+  const n = num(r);
+  return n != null ? String(n) : "";
+}
+
+/** The session's rows, IF /api/session serves an exercise list: [{i, name, sets, reps, loads,
+ *  dose}] — `loads` is every set's pounds in order when they differ (a top set and its
+ *  back-offs), else the one load; `dose` is the plain-text line. Null when the endpoint is
+ *  absent or carries no list — never a guessed list. */
 export function loadRows(session) {
   const ex = session && Array.isArray(session.exercises) ? session.exercises : null;
   if (!ex || !ex.length) return null;
-  const rows = ex
-    .filter((e) => e && e.name)
-    .map((e) => {
-      const sets = num(e.sets), reps = num(e.reps), load = num(e.load_lbs != null ? e.load_lbs : e.load);
-      const dose = [sets != null && reps != null ? `${sets} × ${reps}` : sets != null ? `${sets} sets` : "", load != null ? `${load} lb` : ""].filter(Boolean).join(" · ");
-      return { name: String(e.name), dose };
-    });
+  const rows = [];
+  ex.forEach((e, i) => {
+    if (!e || !e.name) return;
+    const sets = num(e.sets);
+    const reps = repsText(e.reps);
+    const per = Array.isArray(e.loads_lbs) ? e.loads_lbs.map(num).filter((x) => x != null) : [];
+    const one = num(e.load_lbs != null ? e.load_lbs : e.load);
+    const distinct = new Set(per).size > 1;
+    const loads = distinct ? per : one != null ? [one] : per.length ? [per[0]] : [];
+    const loadSrc = distinct ? "loads_lbs" : one != null ? "load_lbs" : "loads_lbs";
+    const setsTxt = sets != null && reps ? `${sets} × ${reps}` : sets != null ? `${sets} set${sets === 1 ? "" : "s"}` : reps ? `${reps} reps` : "";
+    const dose = [setsTxt, loads.length ? `${loads.join(" / ")} lb` : ""].filter(Boolean).join(" · ");
+    rows.push({ i, name: String(e.name), sets, reps, loads, loadSrc, dose });
+  });
   return rows.length ? rows : null;
+}
+
+/** One row's dose as HTML — every figure in its own span carrying the served field it came from. */
+export function doseHTML(r) {
+  const at = (f) => `data-src="api_session.exercises[${r.i}].${f}"`;
+  const s = r.sets != null ? `<span ${at("sets")}>${r.sets}</span>` : "";
+  let setsPart = "";
+  if (s && r.reps) setsPart = `${s} × <span ${at("reps")}>${esc(r.reps)}</span>`;
+  else if (s) setsPart = `${s} set${r.sets === 1 ? "" : "s"}`;
+  else if (r.reps) setsPart = `<span ${at("reps")}>${esc(r.reps)}</span> reps`;
+  const loadPart = r.loads.length ? `<span ${at(r.loadSrc)}>${r.loads.join(" / ")}</span> lb` : "";
+  return [setsPart, loadPart].filter(Boolean).join(" · ");
+}
+
+// The program's role labels (session_sequence: `_ROLE_LABEL[role].lower()`), in a reader's words.
+const ROLE_WORDS = {
+  "upper-heavy": "upper body, heavy",
+  "lower-heavy": "lower body, heavy",
+  "upper-volume": "upper body, more reps at a lighter weight",
+  "lower-volume": "lower body, more reps at a lighter weight",
+  heavy: "heavy",
+  moderate: "moderate",
+  "heavy-moderate": "heavy to moderate",
+};
+const isoToWords = (t) => String(t || "").replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (m) => dayInWords(m, { weekday: false }) || m);
+
+/** The served position_label in reader words: "week 2 · session 3 of 4 · upper-heavy · DELOAD"
+ *  → "week 2, session 3 of 4 — upper body, heavy, a lighter (deload) week". Any ISO date in it
+ *  is spelled through entry_age.js. "" when nothing is served. */
+export function positionWords(label) {
+  const parts = String(label || "").split(" · ").map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) return "";
+  let deload = false;
+  const out = [];
+  let role = "";
+  for (const p of parts) {
+    if (/^deload$/i.test(p)) deload = true;
+    else if (ROLE_WORDS[p.toLowerCase()]) role = ROLE_WORDS[p.toLowerCase()];
+    else
+      out.push(
+        isoToWords(p.replace(/_/g, " ")).replace(/\s*\(extra — the \d+-day floor holds (week \d+) until ([^)]+)\)/, (_, w, d) => ` — an extra one; ${w} opens no sooner than ${d}`),
+      );
+  }
+  let s = out.join(", ");
+  if (role) s = s ? `${s} — ${role}` : role;
+  if (deload) s += ", a lighter (deload) week";
+  return s;
+}
+
+/** The session block under the /api/routine line: a heading naming the day and the program
+ *  position (or the off-program day), then the table; a served absence prints its reason; a
+ *  null fetch says the list is not served right now. "" only when there is nothing to say. */
+export function sessionBlockHTML(session, { served = session != null } = {}) {
+  if (!served || !session) return '<p class="td-note">Today’s exercise list is not served right now.</p>';
+  if (session.state === "absent") {
+    const why = isoToWords(session.reason);
+    return `<p class="td-note" data-src="api_session.reason">No exercise list for today${why ? `: ${esc(why)}` : ""}.</p>`;
+  }
+  const rows = loadRows(session);
+  const day = dayInWords(session.date);
+  const daySpan = day ? `<span data-src="api_session.date">${esc(day)}</span>` : "Today";
+  let head;
+  if (session.kind === "complement") {
+    head = `${daySpan} is <span data-src="api_session.kind">an off-program session</span> — extra work outside the program’s rotation, lifted like this:`;
+  } else {
+    const pos = positionWords(session.position_label);
+    head = pos ? `${daySpan}, <span data-src="api_session.position_label">${esc(pos)}</span>, as it will be lifted:` : `${daySpan}, as it will be lifted:`;
+  }
+  const headHTML = `<p class="td-small">${head}</p>`;
+  if (!rows) return `${headHTML}<p class="td-note" data-src="api_session.exercises">The session is served with no exercise list.</p>`;
+  const body = rows.map((r) => `<tr><td data-src="api_session.exercises[${r.i}].name">${esc(r.name)}</td><td class="n">${doseHTML(r)}</td></tr>`).join("");
+  return `${headHTML}<table class="td-loads" data-src="api_session.exercises"><tbody>${body}</tbody></table>`;
 }
 
 // The seven scored areas of his life, in a reader's words (the pillar name is an engine key).
@@ -267,12 +357,7 @@ function renderToday({ rt, nut, session }) {
   const bits = [];
   const s = readerWords(sessionLine(rt));
   bits.push(stateHTML({ served: !!rt, line: s, what: "The session", fact: "No session is on the sheet for today.", src: SRC.session }));
-  const rows = loadRows(session);
-  if (rows) {
-    bits.push(`<table class="td-loads" data-src="api_session.exercises"><tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td class="n">${esc(r.dose)}</td></tr>`).join("")}</tbody></table>`);
-  } else if (s) {
-    bits.push('<p class="td-note">The exercises and the loads are on his phone; the site doesn’t publish them yet.</p>');
-  }
+  bits.push(sessionBlockHTML(session));
   bits.push(stateHTML({ served: !!nut, line: readerWords(proteinLine(nut)), what: "The food log", fact: "Nothing from the food log is on the record.", src: SRC.protein }));
   fill(sec, bits.join(""));
   const r = rt && rt.routine;
@@ -326,9 +411,9 @@ function renderReturn(journey, through) {
 // 404 for /api/session in flight forever, so Playwright's networkidle (the cut-over
 // visual-QA gate's wait) never arrived on this page while every other /next/ page idled
 // in seconds (driver sweep, build 6cb06c7, 2026-09-26 19:56 PT).
-async function getJSON(p) {
+export async function getJSON(p, fetchImpl = fetch) {
   try {
-    const r = await fetch(p, { headers: { accept: "application/json" } });
+    const r = await fetchImpl(p, { headers: { accept: "application/json" } });
     if (!r.ok) {
       await r.text().catch(() => "");
       return null;
@@ -346,7 +431,7 @@ async function main() {
     getJSON("/api/nutrition_overview"),
     getJSON("/api/coaching-dashboard"),
     getJSON("/api/source_freshness"),
-    getJSON("/api/session"), // plan E3 — absent today (a 404, drained above); the honest branch
+    getJSON("/api/session"), // plan E3 (#4318) — a non-2xx is drained above and prints as not served
   ]);
   const journey = snap ? unwrap(snap.journey, "journey") : null;
   const vitals = snap ? unwrap(snap.vitals, "vitals") : null;
