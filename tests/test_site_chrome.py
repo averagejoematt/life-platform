@@ -238,3 +238,36 @@ def test_v7_committed_preview_shells_match_a_fresh_build():
         text=True,
     )
     assert proc.returncode == 0, f"v7 shells drifted — run scripts/v7_build.py --base /next/ and commit:\n{proc.stdout}\n{proc.stderr}"
+
+
+def test_v7_hood_shell_is_the_receipts_page_and_carries_no_served_number_or_ruled_word():
+    """#4182 — the v7 Under the hood (scripts/v7/hood.py) is the receipts a sceptic checks:
+    the five dated entries in the design order, the repo link in the masthead, the live gear
+    page's affiliate disclosure verbatim, the gear rows derived from the source registry
+    (one row per catalogue entry, the id only in a data attribute — never printed), the
+    page's own sheet and module — and none of the owner-ruled words (no earlier starts,
+    attempts, cycles or resets). The served numbers are poured at runtime; the one static
+    figure allowed is inside a registry `metrics` string (a registry fact, not a served count)."""
+    sys.path.insert(0, str(ROOT / "lambdas"))
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from ingestion.source_registry import catalog_entries  # noqa: E402
+    from v4_build_gear import DISCLOSURE  # noqa: E402
+
+    html = (SITE / "next" / "method" / "index.html").read_text(encoding="utf-8")
+    slots = ["hd-how", "hd-corrections", "hd-log", "hd-gear", "hd-return"]
+    for slot in slots:
+        assert f'id="{slot}"' in html, f"hood shell missing the {slot} entry"
+    order = [html.index(f'id="{s}"') for s in slots]
+    assert order == sorted(order), "the entries are out of the design order"
+    assert 'href="/assets/css/v7_hood.css"' in html and 'src="/assets/js/v7_hood.js"' in html
+    assert 'class="v7-repo" href="https://github.com/averagejoematt/life-platform"' in html, "the repo link belongs in the masthead"
+    assert DISCLOSURE in html, "the affiliate disclosure is the live gear page's, verbatim"
+    rows = re.findall(r'<tr data-source="([a-z_]+)">', html)
+    assert rows == [e["id"] for e in catalog_entries()], "the gear rows are the registry's catalogue, in its order"
+    text = re.sub(r"<[^>]+>", " ", html.split('<main id="main"')[1].split("</main>")[0])
+    for rid in rows:
+        assert (
+            not re.search(rf"(?<![A-Za-z]){re.escape(rid)}(?![A-Za-z])", text) or "_" not in rid
+        ), f"a registry id printed on the screen: {rid}"
+    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
+    assert (SITE / "assets" / "css" / "v7_hood.css").exists() and (SITE / "assets" / "js" / "v7_hood.js").exists()
