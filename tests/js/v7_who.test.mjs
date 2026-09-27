@@ -52,13 +52,26 @@ test("the margin is the served day, split for the column", () => {
   assert.equal(W.marginParts("nope"), null);
 });
 
-test("the photo frame is honest before and after day 30, in words, from the served start", () => {
-  assert.equal(strip(W.photoDue(JOURNEY)), " The first is due Monday, October 5 — day 30.");
-  assert.equal(strip(W.photoDue({ ...JOURNEY, day_n: 40 })), " The first was due Monday, October 5 — day 30.");
-  assert.match(W.photoDue(JOURNEY), /data-src="api_journey\.journey\.started_date \+ 29 days"/);
-  assert.equal(W.photoDue({}), "");
+test("the photographs' captions: dated in words, the day number computed from the served start (#3761)", () => {
+  assert.equal(strip(W.photoCaption(JOURNEY, "2026-09-06")), "Sunday, September 6 — day 1, 327.3 lb");
+  assert.equal(strip(W.photoCaption(JOURNEY, "2026-09-24", "in the gym")), "Thursday, September 24 — in the gym, day 19");
+  // never hard-coded: move the served start and the day moves with it
+  assert.equal(strip(W.photoCaption({ ...JOURNEY, started_date: "2026-09-01" }, "2026-09-24", "in the gym")), "Thursday, September 24 — in the gym, day 24");
+  assert.match(W.photoCaption(JOURNEY, "2026-09-24", "in the gym"), /data-src="api_journey\.journey\.started_date → photo date">19</);
+  assert.match(W.photoCaption(JOURNEY, "2026-09-06"), /data-src="api_journey\.journey\.start_weight_lbs"/);
+  assert.doesNotMatch(W.photoCaption(JOURNEY, "2026-09-24", "in the gym"), /lb/);
+  // April 2025 predates the start: no computed caption, the static one stands
+  assert.equal(W.photoCaption(JOURNEY, "2025-04"), "");
+  assert.equal(W.photoCaption({}, "2026-09-24"), "");
 });
 
+test("the next photo's due line: day 30 from the served start, in words", () => {
+  assert.equal(strip(W.nextPhotoDue(JOURNEY)), "The next photo is due Monday, October 5 — day 30.");
+  assert.equal(strip(W.nextPhotoDue({ ...JOURNEY, day_n: 40 })), "The next photo was due Monday, October 5 — day 30.");
+  assert.match(W.nextPhotoDue(JOURNEY), /data-src="api_journey\.journey\.started_date \+ 29 days"/);
+  assert.equal(W.nextPhotoDue({}), "");
+  assert.equal(W.photoDue, undefined);
+});
 test("the receipts strip: weight now and since the day it began, the day, data through, the cost for one subscriber, the code", () => {
   const items = W.receiptItems(JOURNEY, RECEIPTS, SUBS).map(strip);
   assert.deepEqual(items, [

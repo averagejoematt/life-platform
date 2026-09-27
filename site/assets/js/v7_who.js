@@ -1,9 +1,12 @@
 // v7_who.js — the v7 "Who he is" page (#4182, plan §2a row 7; Prototype C screen V).
 //
-// One page, three entries and a return line, every number served: the fold (the honest
-// photo frame's due line from the served start date; his paragraph is static, verbatim),
+// One page, four entries and a return line, every number served: the fold (the day-1
+// photograph, its caption's date, day number and weight from the served journey; his
+// paragraph is static, verbatim),
 // the receipts strip in one line (the weight now and since the day it began, the day count,
-// data through, the cost this month for the subscriber count, the code), the weigh-in line
+// data through, the cost this month for the subscriber count, the code), the photographs —
+// three, dated, in order, each September caption's day number computed from the served start
+// date and never typed, then the next photo's due date (#3761) — the weigh-in line
 // drawn to the DAY from /api/weight_progress with one sentence, how to check (the same four
 // plain sentences Home's "How it works" carries, from the same served counts), and the dated
 // return line from /api/content_cadence.
@@ -17,7 +20,7 @@
 import { esc, tryJSON } from "/assets/js/evidence_shared.js";
 import { dayInWords, dataThrough, countWord, nextWriteUpText } from "/assets/js/entry_age.js";
 
-const HORIZON = 30; // the day the first photo is due
+const HORIZON = 30; // the day the next photo is due (#3761 — the day-1 photo is published)
 const REPO_URL = "https://github.com/averagejoematt/life-platform";
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -44,14 +47,34 @@ export function marginParts(dateStr) {
   return { d: String(d.getUTCDate()), mo: d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }), w: w.split(",")[0] };
 }
 
-/** The photo frame's second line: due on day 30 from the served start date (Home's rule, the same words). */
-export function photoDue(journey) {
+/**
+ * A photograph's caption: its date in words, the words the page gives it, and the day of the
+ * experiment it was taken on — computed from the served start date, never typed — plus, on
+ * day 1 only, the served start weight (the weigh-in of that same morning).
+ * photoCaption(journey, "2026-09-24", "in the gym") → "Thursday, September 24 — in the gym, day 19".
+ * "" when the start is not served or the photo predates it (April 2025 keeps its static caption).
+ */
+export function photoCaption(journey, photoDate, what = "") {
+  const j = journey || {};
+  if (!isIso(j.started_date) || !isIso(photoDate)) return "";
+  const n = dayNum(photoDate) - dayNum(j.started_date) + 1;
+  if (!Number.isFinite(n) || n < 1) return "";
+  const onStart = iso(j.started_date) === iso(photoDate);
+  const when = time(photoDate, onStart ? "api_journey.journey.started_date" : "");
+  const day = `day ${span("api_journey.journey.started_date → photo date", String(n))}`;
+  const w = num(j.start_weight_lbs);
+  const weight = n === 1 && w !== null ? `, ${span("api_journey.journey.start_weight_lbs", fmt1(w))} lb` : "";
+  return `${when} — ${what ? `${esc(what)}, ` : ""}${day}${weight}`;
+}
+
+/** The line under the photographs: the next one is due on day 30, from the served start date. */
+export function nextPhotoDue(journey) {
   const j = journey || {};
   const n = num(j.day_n);
   const due = j.started_date ? plusDays(j.started_date, HORIZON - 1) : "";
   if (!due) return "";
   const when = time(due, "api_journey.journey.started_date + 29 days");
-  return n !== null && n > HORIZON ? ` The first was due ${when} — day ${HORIZON}.` : ` The first is due ${when} — day ${HORIZON}.`;
+  return n !== null && n > HORIZON ? `The next photo was due ${when} — day ${HORIZON}.` : `The next photo is due ${when} — day ${HORIZON}.`;
 }
 
 /** The receipts strip: [html, …] — one item per receipt the page can substantiate, in the design order. */
@@ -184,16 +207,30 @@ function fill(section, html) {
 
 function renderFold(journey, receipts, subs) {
   const sec = document.getElementById("who-fold");
-  const due = photoDue(journey);
-  const photo = document.getElementById("who-photo");
-  if (photo && due) {
-    document.getElementById("who-photo-due").innerHTML = due;
-    photo.setAttribute("aria-label", photo.querySelector("div").textContent);
-  }
+  const cap = document.getElementById("who-photo-cap");
+  const capHtml = photoCaption(journey, cap && cap.getAttribute("data-photo-date"));
+  if (cap && capHtml) cap.innerHTML = capHtml;
   const strip = document.getElementById("who-receipts");
   if (strip) strip.innerHTML = receiptItems(journey, receipts, subs).join(" · ");
   const j = journey || {};
   if (j.last_weighin_date) setMargin(sec, j.last_weighin_date);
+}
+
+// The words each September photograph's caption carries after its date (the file's date is the key).
+const PHOTO_WORDS = { "2026-09-06": "", "2026-09-24": "in the gym" };
+
+function renderPhotos(journey) {
+  const sec = document.getElementById("who-photos");
+  if (!sec) return;
+  sec.querySelectorAll(".who-shot .who-cap[data-photo-date]").forEach((cap) => {
+    const d = cap.getAttribute("data-photo-date");
+    const html = d in PHOTO_WORDS ? photoCaption(journey, d, PHOTO_WORDS[d]) : "";
+    if (html) cap.innerHTML = html;
+  });
+  const next = document.getElementById("who-photo-next");
+  if (next) next.innerHTML = nextPhotoDue(journey);
+  const dates = [...sec.querySelectorAll("[data-photo-date]")].map((c) => c.getAttribute("data-photo-date")).filter(isIso).sort();
+  if (dates.length) setMargin(sec, dates[dates.length - 1]);
 }
 
 function renderSince(progress, journey) {
@@ -233,6 +270,7 @@ async function main() {
   ]);
   const journey = journeyJson && journeyJson.journey;
   renderFold(journey, receipts, subs);
+  renderPhotos(journey);
   renderSince(progressJson && progressJson.weight_progress, journey);
   renderCheck(freshness, coaches, receipts);
   renderReturn(cad, postsJson && postsJson.pending);

@@ -2,14 +2,17 @@
 
 THE FRAME. A logbook kept in public: every block is a dated entry with the day in the
 margin. Home is "the case so far", in the design source's order — the fold (the honest
-photo frame beside the number, its day and range, and the this-week line), the lead
+day-1 photograph beside the number, its day and range, and the this-week line), the lead
 sentence (day N of an experiment run in public, with the day-only branches), the alive
 line (data through · the coaches' checked calls K of N · next write-up), every weigh-in
 so far, in his words, is he okay this week, also on the record, how it works, what
 resolves next, follow.
 
-WHAT IS STATIC. The headings, the entry order, the photo frame's first line and one
-"loading the numbers" line per slot. Every number, date and served sentence is poured by
+WHAT IS STATIC. The headings, the entry order, the day-1 photograph (#3761 — the owner
+chose it and said yes to publishing it on 2026-09-26; re-saved with no EXIF) with its alt
+text, and one "loading the numbers" line per slot. The photo's caption is poured by JS
+(`photoCaption`: the date from `journey.started_date`, the weight from
+`journey.start_weight_lbs`). Every number, date and served sentence is poured by
 `site/assets/js/v7_home.js` from the served endpoints — nothing here is a number, so the
 static page can never go stale, and it reads correctly with scripts off (the slots say
 plainly that the numbers load from the site's served data).
@@ -29,6 +32,19 @@ from __future__ import annotations
 CSS = "/assets/css/v7_home.css"
 JS = "/assets/js/v7_home.js"
 
+# The day-1 photograph (#3761): two widths, the reader's browser picks by the frame's size.
+DAY1_PHOTO = "/assets/images/photo-2026-09-06-day1"
+DAY1_ALT = "Matthew on day 1, Sunday September 6, front view"
+
+
+def photo_img(stem: str, alt: str, sizes: str, loading: str = "eager") -> str:
+    """One photograph as a responsive <img>: the 480-px `-sm` file and the 1200-px file (3:4, 900×1200)."""
+    return (
+        f'<img src="{stem}-sm.jpg" srcset="{stem}-sm.jpg 360w, {stem}.jpg 900w" sizes="{sizes}"'
+        f' width="360" height="480" alt="{alt}" loading="{loading}" decoding="async">'
+    )
+
+
 _PENDING = '<p class="v7h-pending">Loading the numbers — this line fills from the site’s served data.</p>'
 
 
@@ -46,7 +62,8 @@ def _entry(slot: str, heading: str | None, inner: str, margin_kind: str = "date"
 def body(base: str) -> str:  # noqa: ARG001 — every link on Home is off-site (the repo, mail); no page link, by the reach rule
     fold = (
         '<div class="v7h-fold">'
-        '<div class="v7h-photo" id="v7h-photo" role="img" aria-label="No photo yet."><div><b>No photo yet.</b><span id="v7h-photo-due"></span></div></div>'
+        f'<figure class="v7h-photo" id="v7h-photo">{photo_img(DAY1_PHOTO, DAY1_ALT, "(min-width: 601px) 150px, 116px")}'
+        '<figcaption class="v7h-cap" id="v7h-photo-cap">Day one, front view.</figcaption></figure>'
         f'<div id="v7h-number">{_PENDING}</div>'
         "</div>"
         f'<div id="v7h-lead">{_PENDING}</div>'
