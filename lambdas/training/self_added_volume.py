@@ -34,6 +34,16 @@ answer (derivation guard). Two consequences it inherits and states:
 `adherence.sets_adherence.performed_sets` is NOT used: it is capped per muscle at the
 prescription (it is a completion measure), so it can never show a surplus.
 
+OFF-PROGRAM COMPLEMENTS (#4312, owner 2026-09-26: "Flex-folder / archetype=flex sessions are
+off-program complements") are reported on their OWN line and never counted against the plan.
+A row whose routine archetype resolves exactly to one outside the program's session archetypes
+(`session_sequence.off_program_archetype`, read from the annotation `routine_title.
+annotate_with_routine_index` stores at the read seam) goes to the week's `off_program` bucket —
+its matched-routine set counts and added sets are listed there, and it is neither a matched nor an
+unmatched program session for the verdict. A separate line, not a silent exclusion: #4111 made
+this a report, and the Sunday reader should see the Flex adds as what they are. A row with no
+annotation (the index was not read) counts as it always did, and the week says so.
+
 THE RULE
 
 A Pacific calendar week (Mon–Sun) is ABOVE the prescription when, across its sessions that
@@ -111,7 +121,30 @@ def _week(start: Any, end_date: Any) -> dict[str, Any]:
         "added": [],
         "unprogrammed_exercises": 0,
         "unmatched": [],
+        # #4312: off-program complements (Flex) — their own line, never counted against the plan
+        "off_program": {"sessions": 0, "archetypes": [], "programmed_sets": 0, "performed_sets": 0, "added_sets": 0, "added": []},
+        "sessions_archetype_unresolved": 0,
     }
+
+
+def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: dict[str, Any], **extra: Any) -> None:
+    """Accumulate one matched session's per-movement programmed/performed counts into `bucket`."""
+    for m in adh["movements"]:
+        prog, perf = _int(m.get("programmed_sets")), _int(m.get("performed_sets"))
+        bucket["programmed_sets"] += prog
+        bucket["performed_sets"] += perf
+        if perf > prog:
+            bucket["added_sets"] += perf - prog
+            bucket["added"].append(
+                {
+                    "date": day.isoformat(),
+                    "movement": _label(m.get("movement_key"), row),
+                    "programmed_sets": prog,
+                    "performed_sets": perf,
+                    "max_rpe": _num((m.get("intensity") or {}).get("max_rpe")) if isinstance(m.get("intensity"), dict) else None,
+                    **extra,
+                }
+            )
 
 
 def weekly_excess(hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = LOOKBACK_WEEKS) -> list[dict[str, Any]]:
@@ -122,6 +155,9 @@ def weekly_excess(hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = L
         return []
     first = parse_day_key(start_key)
     out = [_week(first + timedelta(days=7 * i), end) for i in range(weeks + 1)]
+    from training import session_sequence
+    from training.routine_title import routine_archetype
+
     for row in sorted(hevy_rows or [], key=lambda r: (str(r.get("date") or ""), str(r.get("sk") or ""))):
         if row.get("tombstone"):
             continue
@@ -130,7 +166,19 @@ def weekly_excess(hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = L
             continue
         wk = out[(day - first).days // 7]
         adh = row.get("adherence") if isinstance(row.get("adherence"), dict) else None
-        if not adh or adh.get("status") != "matched" or not isinstance(adh.get("movements"), list):
+        matched = adh is not None and adh.get("status") == "matched" and isinstance(adh.get("movements"), list)
+        off = session_sequence.off_program_archetype(row)
+        if off is not None:  # #4312: a complement — its own bucket, never a program session for the verdict
+            op = wk["off_program"]
+            op["sessions"] += 1
+            if off not in op["archetypes"]:
+                op["archetypes"].append(off)
+            if matched and adh is not None:
+                _movement_adds(adh, row, day, op, archetype=off)
+            continue
+        if routine_archetype(row) == (None, None):
+            wk["sessions_archetype_unresolved"] += 1
+        if not matched or adh is None:
             wk["sessions_unmatched"] += 1
             wk["unmatched"].append(
                 {"date": day.isoformat(), "title": row.get("title"), "status": (adh or {}).get("status") or "no_adherence_record"}
@@ -138,21 +186,7 @@ def weekly_excess(hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = L
             continue
         wk["sessions_matched"] += 1
         wk["unprogrammed_exercises"] += len(adh.get("extra") or [])
-        for m in adh["movements"]:
-            prog, perf = _int(m.get("programmed_sets")), _int(m.get("performed_sets"))
-            wk["programmed_sets"] += prog
-            wk["performed_sets"] += perf
-            if perf > prog:
-                wk["added_sets"] += perf - prog
-                wk["added"].append(
-                    {
-                        "date": day.isoformat(),
-                        "movement": _label(m.get("movement_key"), row),
-                        "programmed_sets": prog,
-                        "performed_sets": perf,
-                        "max_rpe": _num((m.get("intensity") or {}).get("max_rpe")) if isinstance(m.get("intensity"), dict) else None,
-                    }
-                )
+        _movement_adds(adh, row, day, wk)
     for wk in out:
         wk["net_sets"] = wk["performed_sets"] - wk["programmed_sets"]
         if wk["sessions_matched"]:
@@ -164,11 +198,24 @@ def weekly_excess(hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = L
     return out
 
 
+def _off_program_line(wk: dict[str, Any]) -> str:
+    """The complements' own line (#4312), or '' when the week held none."""
+    op = wk.get("off_program") or {}
+    if not op.get("sessions"):
+        return ""
+    kinds = "/".join(op.get("archetypes") or []) or "off-program"
+    return (
+        f"off-program complements ({kinds}): {op['added_sets']} set(s) added over {op['sessions']} session(s) "
+        "— not counted against the plan"
+    )
+
+
 def _week_line(wk: dict[str, Any]) -> str:
     return (
         f"week of {wk['week_start']}: {wk['performed_sets']} sets performed vs {wk['programmed_sets']} prescribed "
         f"({wk['net_sets']:+d} net, {wk['added_sets']} added) over {wk['sessions_matched']} matched session(s)"
         + (f", {wk['sessions_unmatched']} unmatched" if wk["sessions_unmatched"] else "")
+        + (f"; {_off_program_line(wk)}" if _off_program_line(wk) else "")
     )
 
 
@@ -187,12 +234,14 @@ def evaluate(hevy_rows: list[dict[str, Any]], end_date: str, threshold_weeks: in
     current = wks[-1]
     base["window_start"] = wks[0]["week_start"]
     if all(w["verdict"] == NO_SESSIONS for w in wks):
+        off = sum(w["off_program"]["sessions"] for w in wks)
         return {
             **base,
             "state": "unknown",
             "run_weeks": None,
             "observed": None,
-            "detail": f"no Hevy session in {wks[0]['week_start']}..{end_date} — nothing to compare against a prescription",
+            "detail": f"no Hevy session in {wks[0]['week_start']}..{end_date} matched to the program — nothing to compare against a prescription"
+            + (f" ({off} off-program complement session(s) only — not the program's, #4312)" if off else ""),
         }
     run = 0
     for w in reversed(complete):

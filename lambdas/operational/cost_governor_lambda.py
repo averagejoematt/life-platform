@@ -132,6 +132,10 @@ except ImportError:  # pragma: no cover - packaging drift; the class split degra
     # AST-parses this literal and asserts it equals ai.bedrock_client.PRICES, so the
     # fallback cannot become the second hand-maintained table this issue was caused by.
     _BEDROCK_PRICES = {
+        "fable-5-1": {"in": 10.00, "out": 50.00, "cache_read": 0.25, "cache_write": 12.50, "cache_write_1h": 20.00},
+        "opus-5-5": {"in": 4.00, "out": 20.00, "cache_read": 0.20, "cache_write": 5.00, "cache_write_1h": 8.00},
+        "opus-5": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
+        "sonnet-5": {"in": 2.00, "out": 10.00, "cache_read": 0.20, "cache_write": 2.50, "cache_write_1h": 4.00},
         "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50, "cache_write_1h": 20.00},
         "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
         "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75, "cache_write_1h": 6.00},
@@ -392,10 +396,14 @@ def _non_ai_daily_series(month_start: datetime, now: datetime) -> list[tuple[str
 
 
 def _price_for(model_id: str) -> dict:
+    # #4275: LONGEST key first, mirroring `ai.bedrock_client.price_key_for`, so the
+    # specific "sonnet-5" / "opus-5-5" rows beat their family rows here too. The
+    # numerator of CostMetricDriftRatio must price a model exactly as the denominator
+    # does, or the ratio measures a matching-order difference (#2883's lesson, again).
     m = (model_id or "").lower()
-    for key, price in _PRICES.items():
+    for key in sorted(_PRICES, key=len, reverse=True):
         if key in m:
-            return price
+            return _PRICES[key]
     return _DEFAULT_PRICE
 
 

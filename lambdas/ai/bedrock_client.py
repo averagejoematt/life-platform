@@ -18,6 +18,8 @@ Key facts:
     downstream parsing is unchanged.
   • Prompt caching is GA on Bedrock for supported Claude models via the
     same cache_control blocks used on the direct API — no beta header.
+  • A model NAME that maps to nothing raises UnknownModelError here (#4275);
+    it is never silently rewritten to another model.
 
 This module is bundled into every function's deploy package (#781 retired the shared Lambda layer).
 """
@@ -44,15 +46,57 @@ _MODEL_MAP = {
     "claude-opus-4-7": "us.anthropic.claude-opus-4-7",
     "claude-opus-4-6": "us.anthropic.claude-opus-4-6-v1",
     "claude-3-5-haiku-20241022": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    # ── Claude 5 family (#4275). Every profile id below was read LIVE from
+    # `aws bedrock list-inference-profiles --region us-west-2` on 2026-09-26: all four
+    # are ACTIVE, SYSTEM_DEFINED, and exist in both the `us.` and `global.` variants.
+    # Resolvable-and-priced is not selected: no surface moves off its current model
+    # here — that flip is #4278 (gate:owner) and happens through AI_MODEL, not this map.
+    "claude-fable-5-1": "us.anthropic.claude-fable-5-1",
+    "claude-opus-5": "us.anthropic.claude-opus-5",
+    "claude-opus-5-5": "us.anthropic.claude-opus-5-5",
+    "claude-sonnet-5": "us.anthropic.claude-sonnet-5",
 }
 
-# Fable 5 / Opus 4.7+ removed sampling params (temperature/top_p/top_k → 400);
-# Fable additionally rejects an explicit thinking disable. Scrub at this single
-# chokepoint so callers (retry_utils, ai_calls) stay model-agnostic.
-_ADAPTIVE_SURFACE_MARKERS = ("fable", "opus-4-7", "opus-4-8")
+# Fable 5 / Opus 4.7+ removed sampling params (temperature/top_p/top_k → 400), and so
+# did the whole Claude 5 line: Sonnet 5, Opus 5 and Opus 5.5 all reject them (#4275).
+# Scrub at this single chokepoint so callers (retry_utils, ai_calls, the ~40 helpers
+# that still pass `temperature=0.2`) stay model-agnostic. "opus-5" also covers
+# "opus-5-5"; neither matches "opus-4-5-…", and "sonnet-5" does not match "sonnet-4-5-…".
+_ADAPTIVE_SURFACE_MARKERS = ("fable", "opus-4-7", "opus-4-8", "opus-5", "sonnet-5")
 
-# Fallback if an unmapped model name shows up — Haiku 4.5 (cheapest current).
+# An explicit `thinking: {type: "disabled"}` is a 400 on Fable (5 and 5.1) and on Opus 5.5
+# at every effort level. Opus 5 accepts it at effort high or below and Sonnet 5 accepts
+# it outright, so those two are deliberately NOT here — the body passes through.
+_THINKING_DISABLE_REJECTED_MARKERS = ("fable", "opus-5-5")
+
+# Used ONLY when no model is named at all (None / ""), i.e. a caller that built a raw
+# body without a "model" key. It is NOT a fallback for an unrecognised NAME: since
+# #4275 an unmapped name raises UnknownModelError at the chokepoint — the old
+# `.get(name, _DEFAULT_PROFILE)` quietly rewrote `AI_MODEL=claude-sonnet-5` (or any
+# typo) into Haiku 4.5 on every narrative surface, with no error anywhere.
 _DEFAULT_PROFILE = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+
+class UnknownModelError(ValueError):
+    """A model NAME that maps to no Bedrock inference profile (#4275).
+
+    Raised by `resolve_model_id` — before `invoke_model`, so nothing is billed — in
+    place of the silent Haiku fallback that used to run here. The message names the
+    input and every name that would have resolved, so the misconfiguration reads as
+    one in the log rather than as a brief that quietly got worse. Both retry wrappers
+    (`common/retry_utils`, `ai/ai_transport`) except this class ahead of their generic
+    handler: a name that is wrong on attempt 1 is wrong on attempt 4, so it never
+    enters the 5+15+45s backoff ladder (#3084's rule for the budget stop, same reason).
+    """
+
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        known = ", ".join(sorted(_MODEL_MAP))
+        super().__init__(
+            f"unknown AI model name {model_name!r}: not a Bedrock profile id (us./global./arn:) "
+            f"and not one of the {len(_MODEL_MAP)} mapped names [{known}] — refusing to guess a model (#4275)"
+        )
+
 
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "us-west-2")
 
@@ -188,9 +232,14 @@ _SELF_DECLARED_DEV_VALUES = frozenset({"dev", "dev-session", "interactive", "loc
 # `name: Remediation Agent` (.github/workflows/remediation-agent.yml), which GHA
 # exports as GITHUB_WORKFLOW (and inside GITHUB_WORKFLOW_REF as the file path).
 _REMEDIATION_WORKFLOW_MARKER = "remediation"
-# $/1M tokens, keyed by a substring of the resolved model id. An unmapped model
-# prices as the most expensive tier so a new/unknown model can never under-report
-# spend.
+# $/1M tokens, keyed by a substring of the resolved model id. Matching is LONGEST KEY
+# FIRST (`price_key_for`), so a specific row ("sonnet-5") beats its family row
+# ("sonnet"); the dict is ALSO ordered specific-before-generic so the first-match
+# consumers that iterate it in insertion order (`web/site_api_budget._price_for_model`,
+# `scripts/ai_spend_attribution.py`, `scripts/batch_feasibility.py`) land on the same row
+# — `tests/test_bedrock_client.py` holds the two orderings equal for every mapped model.
+# An unmapped model prices as the most expensive tier so a new/unknown model can never
+# under-report spend.
 #
 # #2883: this table is now the PLATFORM'S ONE price registry, not a mirror.
 # `cost_governor_lambda` imports it (as `_PRICES`) instead of hand-maintaining a
@@ -206,7 +255,30 @@ _REMEDIATION_WORKFLOW_MARKER = "remediation"
 # for it, and only this chokepoint can see which TTL was actually billed (the nested
 # `usage.cache_creation` breakdown). Without the second rate a 1h write meters at
 # 62.5% of what it costs.
+#
+# #4275: every rate here is the Anthropic LIST price, which is what this table has always
+# carried (ADR-062: "Bedrock Claude pricing ≈ direct API"). Two facts a reader should
+# hold: (a) the AWS Pricing API (`aws pricing get-products --service-code AmazonBedrock`,
+# regionCode=us-west-2, 1,052 rows on 2026-09-26) lists only Claude 2.x / 3 / Instant —
+# the current models are Marketplace-billed and absent from it, so the list price is the
+# best VERIFIABLE number; (b) Anthropic's pricing page states that on Bedrock the
+# REGIONAL `us.` profiles this platform invokes carry a 10% premium over `global.` for
+# 4.5+ models, which no row here includes — the governor's `_AI_SAFETY_BUFFER` (1.15) is
+# what covers it, and re-pricing the rows the platform runs on today would move the
+# month-end projection, which is a ceiling decision (ADR-133), not a model-map fix.
+# `PRICE_PROVENANCE` records the source and the date each row was last read against it.
 PRICES = {
+    # ── Claude 5 family (#4275): explicit rows BEFORE the family rows they would
+    # otherwise fall into. Sonnet 5 would have metered at Sonnet 4.6's $3/$15 (1.5x its
+    # real $2/$10 — the introductory price Anthropic made permanent); Fable 5.1 and
+    # Opus 5.5 carry cache-read rates (0.025x / 0.05x base) the family rows (0.1x) cannot
+    # express, so a caching Fable 5.1 workload metered on the "fable" row would over-count
+    # its reads 4x.
+    "fable-5-1": {"in": 10.00, "out": 50.00, "cache_read": 0.25, "cache_write": 12.50, "cache_write_1h": 20.00},
+    "opus-5-5": {"in": 4.00, "out": 20.00, "cache_read": 0.20, "cache_write": 5.00, "cache_write_1h": 8.00},
+    "opus-5": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
+    "sonnet-5": {"in": 2.00, "out": 10.00, "cache_read": 0.20, "cache_write": 2.50, "cache_write_1h": 4.00},
+    # ── Family rows: Fable 5 · Opus 4.5–4.8 · Sonnet 4.5/4.6 · Haiku 4.5.
     "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50, "cache_write_1h": 20.00},
     "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
     "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75, "cache_write_1h": 6.00},
@@ -224,6 +296,40 @@ PRICES = {
 # Back-compat alias: ~8 modules/scripts/tests already read `_PRICES` from here.
 _PRICES = PRICES
 _DEFAULT_PRICE = PRICES["fable"]
+
+# ── Where each price row came from, and when it was last read there (#4275) ─────
+# Not consumed by any pricing path — `PRICES` rows stay pure {leg: rate} dicts because
+# ~8 consumers index them by leg. This is the audit trail the rows lacked: a row with no
+# source is a remembered number, and remembered numbers are how Titan was metered at
+# 500x (#2883). `tests/test_bedrock_client.py` asserts every PRICES key has an entry.
+_ANTHROPIC_PRICING_DOC = "https://platform.claude.com/docs/en/about-claude/pricing"
+PRICE_PROVENANCE = {
+    "fable-5-1": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "cache read 0.025x base (page footnote 1)"},
+    "opus-5-5": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "cache read 0.05x base (page footnote 2)"},
+    "opus-5": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "same rates as the Opus 4.5-4.8 family row"},
+    "sonnet-5": {
+        "source": _ANTHROPIC_PRICING_DOC,
+        "verified_on": "2026-09-26",
+        "note": "introductory $2/$10 made the standard price (page footnote 3); the scheduled 2026-09-01 rise to $3/$15 did not occur",
+    },
+    "fable": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "Fable 5"},
+    "opus": {
+        "source": _ANTHROPIC_PRICING_DOC,
+        "verified_on": "2026-09-26",
+        "note": "Opus 4.5-4.8. Opus 4.1 and earlier list at $15/$75 and are not in _MODEL_MAP",
+    },
+    "sonnet": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "Sonnet 4.5 / 4.6"},
+    "haiku": {
+        "source": _ANTHROPIC_PRICING_DOC,
+        "verified_on": "2026-09-26",
+        "note": "Haiku 4.5. Haiku 3.5 (claude-3-5-haiku-20241022, still in _MODEL_MAP) lists at $0.80/$4 and is OVER-metered by this row — the conservative direction",
+    },
+    "titan": {
+        "source": "https://aws.amazon.com/bedrock/pricing/ — Amazon Titan Text Embeddings V2",
+        "verified_on": "2026-08-30",
+        "note": "#1384/#2883: input-only $0.02/1M, measured against real cost 2026-08-30",
+    },
+}
 
 # ── Titan-v2 embeddings (semantic recall #1384) ─────────────────────────────
 # Amazon Titan is NOT an inference profile: a bare foundation-model id, on-demand,
@@ -288,12 +394,24 @@ def caller_class(env=None) -> str:
     return CALLER_CLASS_DEV_SESSION
 
 
-def _price_for(model_id: str) -> dict:
+def price_key_for(model_id: str) -> str | None:
+    """The `PRICES` key that prices `model_id`, or None when no key matches (#4275).
+
+    Longest key first — the same discipline as `prompt_cache.cache_floor` — so
+    `us.anthropic.claude-sonnet-5` lands on "sonnet-5", not "sonnet", and
+    `…-opus-5-5` on "opus-5-5", not "opus-5" or "opus". Exposed (not underscored) so a
+    test can ask WHICH row priced a model rather than only what number came back.
+    """
     mid = (model_id or "").lower()
-    for key, price in _PRICES.items():
+    for key in sorted(_PRICES, key=len, reverse=True):
         if key in mid:
-            return price
-    return _DEFAULT_PRICE
+            return key
+    return None
+
+
+def _price_for(model_id: str) -> dict:
+    key = price_key_for(model_id)
+    return _PRICES[key] if key is not None else _DEFAULT_PRICE
 
 
 def cache_write_split(usage: dict) -> tuple[int, int]:
@@ -590,13 +708,20 @@ def _client():
 def resolve_model_id(model_name: str | None) -> str:
     """Map an Anthropic model name to a Bedrock inference-profile ID.
 
-    Pass-through if already a profile id (us.* / global.*) or a full ARN.
+    Pass-through if already a profile id (us.* / global.*) or a full ARN. No name at
+    all (None / "") is the one case that takes `_DEFAULT_PROFILE`. A NAME that maps to
+    nothing raises `UnknownModelError` (#4275) — it used to return `_DEFAULT_PROFILE`
+    too, which turned `AI_MODEL=claude-sonnet-5` into a silent Haiku 4.5 downgrade of
+    every narrative surface. Absent is not unknown; unknown fails loudly.
     """
     if not model_name:
         return _DEFAULT_PROFILE
     if model_name.startswith(("us.", "global.", "arn:")):
         return model_name
-    return _MODEL_MAP.get(model_name, _DEFAULT_PROFILE)
+    try:
+        return _MODEL_MAP[model_name]
+    except KeyError:
+        raise UnknownModelError(model_name) from None
 
 
 def structured_output_config(schema: dict) -> dict:
@@ -661,10 +786,12 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
 
     model_id = resolve_model_id(model_name or body.get("model"))
     bedrock_body = {k: v for k, v in body.items() if k != "model"}
-    if any(marker in model_id.lower() for marker in _ADAPTIVE_SURFACE_MARKERS):
+    lowered = model_id.lower()
+    if any(marker in lowered for marker in _ADAPTIVE_SURFACE_MARKERS):
         for param in ("temperature", "top_p", "top_k"):
             bedrock_body.pop(param, None)
-        if "fable" in model_id.lower() and (bedrock_body.get("thinking") or {}).get("type") == "disabled":
+    if any(marker in lowered for marker in _THINKING_DISABLE_REJECTED_MARKERS):
+        if (bedrock_body.get("thinking") or {}).get("type") == "disabled":
             bedrock_body.pop("thinking", None)
     # Bedrock requires this exact version string for the Anthropic schema.
     bedrock_body["anthropic_version"] = "bedrock-2023-05-31"

@@ -265,13 +265,16 @@ def test_last_session_by_type_is_the_newest_with_sets_and_notes(stub_readers):
 
 
 def _block_rows() -> list[dict]:
-    """Two LOADED lifts after the v0.4 block start (the live-projected fixture row, re-dated) and
-    one unloaded day between them — the walk/Engine day that must never advance the sequence."""
-    base = _hevy_rows()[0]
-    lift1 = dict(base, sk="DATE#2026-09-25#WORKOUT#u1", date="2026-09-25", workout_uid="hevy:u1", source_workout_id="u1")
-    walk = dict(base, sk="DATE#2026-09-26#WORKOUT#w1", date="2026-09-26", workout_uid="hevy:w1", source_workout_id="w1")
+    """Two LOADED lifts after the v0.4 block start (live-projected fixture rows, re-dated) and
+    one unloaded day between them — the walk/Engine day that must never advance the sequence.
+    #4312: the first is the fixture's LEGS session (the sequence's first role is lower-heavy) and
+    the second its PULL session (upper-volume) — a lift whose content reaches none of the role's
+    anchor muscles is flagged, not credited (`test_session_sequence_4110.py` holds that guard)."""
+    pull, legs = _hevy_rows()[0], _hevy_rows()[1]
+    lift1 = dict(legs, sk="DATE#2026-09-25#WORKOUT#u1", date="2026-09-25", workout_uid="hevy:u1", source_workout_id="u1")
+    walk = dict(pull, sk="DATE#2026-09-26#WORKOUT#w1", date="2026-09-26", workout_uid="hevy:w1", source_workout_id="w1")
     walk["exercises"] = [{"name": "Treadmill", "sets": [{"type": "normal", "duration_sec": 1800}]}]
-    lift2 = dict(base, sk="DATE#2026-09-27#WORKOUT#u2", date="2026-09-27", workout_uid="hevy:u2", source_workout_id="u2")
+    lift2 = dict(pull, sk="DATE#2026-09-27#WORKOUT#u2", date="2026-09-27", workout_uid="hevy:u2", source_workout_id="u2")
     return [lift1, walk, lift2]
 
 
@@ -316,6 +319,7 @@ def test_no_hevy_session_is_absent(stub_readers, monkeypatch):
 def test_block_position_is_next_session_for_the_same_date_and_record(stub_readers, monkeypatch):
     """Mutation: compute the position any other way — v0.3's `calendar_entry` / weekday
     `program_week` again, or a re-derived role — and this equality reds."""
+    import training.routine_title as rt
     from training import session_sequence
 
     from mcp import tools_strength
@@ -324,7 +328,8 @@ def test_block_position_is_next_session_for_the_same_date_and_record(stub_reader
     monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: ([r for r in rows if s <= r["date"] <= e], ["experiment"]))
     for day in ("2026-09-25", "2026-09-26", "2026-09-28", "2026-10-01"):
         value, status = pkt._block_position(day)
-        block = [r for r in rows if r["date"] < day]
+        # #4312: the seam carries each row's routine archetype from the (stubbed) index — the same record, annotated
+        block = rt.annotate_routine_archetypes([r for r in rows if r["date"] < day], rt._load_routine_index("2026-06-26"))
         assert status["state"] == "measured"
         assert value["next_session"] == session_sequence.next_session(day, block), day
         assert value["program_week"] == session_sequence.program_week(day, block)
@@ -362,3 +367,46 @@ def test_a_hevy_key_scheme_drift_is_read_failed_not_absent(stub_readers, monkeyp
     monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: (drifted, ["experiment"]))
     value, status = pkt._last_sessions_field("2026-09-23")
     assert status["state"] == "read_failed" and "InputShapeError" in status["error"] and value is None
+
+
+# ── #4312: an off-program Flex complement is refused by the sequence, and the packet says so ──
+def test_block_position_passes_not_credited_through_and_the_flex_row_carries_sequence_credit(stub_readers, monkeypatch):
+    """The real Flex row (Hevy 80a19118, routine_index archetype=flex) after the two block lifts: `block_position`
+    serves lower_volume and names the refused session; `last_session_by_type` shows it under `flex` with
+    `sequence_credit.credited: False` and no role. Mutation: credit it (the pre-#4312 rule) and both change."""
+    import training.routine_title as rt
+    from training import session_sequence
+
+    from mcp import tools_strength
+    from tests.test_session_sequence_4110 import FLEX_WID, INDEX_4312, _wire_4312
+
+    flex_row = _wire_4312()[0][2]
+    assert flex_row["source_workout_id"] == FLEX_WID and flex_row["date"] == "2026-09-26"
+    flex_row = dict(flex_row, sk="DATE#2026-09-28#WORKOUT#" + FLEX_WID, date="2026-09-28", workout_uid="hevy:" + FLEX_WID)
+    rows = _block_rows() + [flex_row]
+    monkeypatch.setattr(tools_strength, "_read_hevy_all_phases", lambda s, e: ([r for r in rows if s <= r["date"] <= e], ["experiment"]))
+    monkeypatch.setattr(rt, "_load_routine_index", lambda start: INDEX_4312)
+    value, status = pkt._block_position("2026-09-29")
+    nxt = value["next_session"]
+    assert status["state"] == "measured" and (nxt["session_role"], nxt["completed_sessions"]) == ("lower_volume", 2)
+    assert [(n["workout_id"], n["archetype"], n["credited"]) for n in nxt["not_credited"]] == [(FLEX_WID, "flex", False)]
+    assert nxt["credit_rule"]["routine_index_consulted"] is True and nxt["advanced_by"]["workout_id"] == "u2"
+    last = pkt._last_sessions("2026-09-29")
+    assert last["by_archetype"]["flex"]["session_role"] is None and "sequence_position" not in last["by_archetype"]["flex"]
+    assert last["by_archetype"]["flex"]["sequence_credit"]["credited"] is False
+    assert last["by_archetype"]["flex"]["sequence_credit"]["reason"].startswith("off-program complement")
+    assert set(last["by_session_role"]) == {"lower_heavy", "upper_volume"}
+    assert [n["workout_id"] for n in last["session_sequence"]["not_credited"]] == [FLEX_WID]
+    with (monkeypatch.context() as m,):
+        m.setattr(session_sequence, "off_program_archetype", lambda row: None)
+        m.setattr(session_sequence, "content_check", lambda logs, role: {"role": role, "matched": None})
+        value, _ = pkt._block_position("2026-09-29")
+        last = pkt._last_sessions("2026-09-29")
+    assert value["next_session"]["session_role"] == "upper_heavy" and value["next_session"]["advanced_by"]["workout_id"] == FLEX_WID
+    assert last["by_archetype"]["flex"]["session_role"] == "lower_volume" and "sequence_credit" not in last["by_archetype"]["flex"]
+
+
+def test_the_packet_reads_the_routine_index_lookback_from_its_one_home():
+    from training import routine_title
+
+    assert pkt.ROUTINE_INDEX_LOOKBACK_DAYS == routine_title.ROUTINE_INDEX_LOOKBACK_DAYS == 90

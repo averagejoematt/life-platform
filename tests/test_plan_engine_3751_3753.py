@@ -41,7 +41,14 @@ from training import owner_redlines, plan_engine, training_context_registry  # n
 WEEK_7 = "2026-11-06"  # #4098: a date in program week 7, given WEEK_7_ROWS
 # #4161: weeks are HYBRID (4 sessions AND >= 7 days) — lifting daily from the block start, week 7 opens on day 42 (11-05)
 WEEK_7_ROWS = [
-    {"date": shift_day_key("2026-09-24", i), "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]}
+    # #4312: a lower and an upper set, so each generic session matches the role it takes
+    {
+        "date": shift_day_key("2026-09-24", i),
+        "exercises": [
+            {"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]},
+            {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]},
+        ],
+    }
     for i in range(43)
 ]
 

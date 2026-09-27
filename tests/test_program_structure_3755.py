@@ -265,7 +265,14 @@ def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
         )
 
     def _lift(day):
-        return {"date": day, "exercises": [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}]}
+        # #4312: a lower and an upper set, so each generic session matches the role it takes
+        return {
+            "date": day,
+            "exercises": [
+                {"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]},
+                {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]},
+            ],
+        }
 
     # #4110/#4147: from the block start the session SEQUENCE answers, and a program role is built
     # as the program's session, not a muscle-budget one. v0.4 starts at lower-heavy: two sessions

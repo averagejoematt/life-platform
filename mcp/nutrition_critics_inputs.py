@@ -149,11 +149,17 @@ def _above_prescription_weeks(end_date: str) -> tuple[int | None, bool]:
     `unknown` (no session, or no assessable week) — the critic names None as unknown.
     """
     from training import owner_redlines, self_added_volume
+    from training.routine_title import annotate_with_routine_index
 
     start = self_added_volume.window_start(end_date)
     rows = _safe(query_source, "hevy", start, end_date) if start else None
     if rows is None:
         return None, bool(start)
+    # #4312: off-program complements (Flex) are separated by routine archetype; an index read that
+    # raises leaves the run unknown — a week cannot be called "above" on sets the plan never asked for.
+    rows = _safe(annotate_with_routine_index, rows, start)
+    if rows is None:
+        return None, True
     t = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "self_added_volume")
     ev = self_added_volume.evaluate(rows, end_date, int(t["threshold_weeks"]))
     return (ev.get("run_weeks") if ev.get("state") in ("tripped", "clear") else None), False
