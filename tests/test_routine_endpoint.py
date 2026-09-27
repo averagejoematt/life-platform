@@ -8,6 +8,14 @@ inputs_snapshot (recovery/deficit internals). The projection is counts-only and
 built field-by-field; these tests prove it, plus the selection rules (newest
 on/before today, else nearest upcoming; floor/re_entry/archived never selected)
 and the honest-empty / read-error shapes.
+
+/api/session (E3, epic #4182 — owner ruling 2026-09-26 option (a)) lives in the same
+module and is tested below the routine block: the served shape from a WIRE fixture (the
+2026-09-27 nightly pre-draft as stored — movement keys, weight_kg, rep ranges), the
+pick order (committed > role-matched draft > archetype-matched draft > only draft >
+program), the program fallback, the absent states, and the privacy assertion that the
+body carries EXACTLY the listed keys — the mutation "add `notes` to the serializer"
+reds `test_session_body_carries_only_the_listed_keys`.
 """
 
 import json
@@ -273,5 +281,321 @@ def test_pre_start_flag_carried(monkeypatch):
 def test_cache_headers_present(monkeypatch):
     _mount(monkeypatch, [_INDEX_ROW], {"r-abc123": _STORED_IR})
     resp = sad.handle_routine()
+    assert resp["statusCode"] == 200
+    assert "max-age=900" in resp["headers"]["Cache-Control"]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# /api/session — today's session as it will be lifted (E3, #4182)
+# ═════════════════════════════════════════════════════════════════════════════
+
+from training import session_sequence  # noqa: E402
+
+_BLOCK_DAY = "2026-09-27"  # on/after program_structure.SESSION_SEQUENCE['block_start'] (2026-09-24)
+_LIVE_HEVY_ID = "9764f978-0908-4547-a066-45deeba21749"
+
+
+def _freeze(monkeypatch, day):
+    """Pin the handler's clock to `day` (the autouse fixture pins _TODAY; the session
+    tests need a day inside the v0.4 block)."""
+
+    class _Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            base = datetime.strptime(day, "%Y-%m-%d")
+            return base.replace(tzinfo=tz) if tz else base
+
+    monkeypatch.setattr(sad._protocols, "datetime", _Frozen)
+
+
+def _no_lifts(monkeypatch):
+    """The Hevy record since the block start reads EMPTY → the sequence serves its first role."""
+    monkeypatch.setattr(session_sequence, "load_block_workouts", lambda day: [])
+
+
+def _set(kg, lo, hi):
+    return {
+        "weight_kg": kg,
+        "custom_metric": None,
+        "rep_range_start": lo,
+        "rep_range_end": hi,
+        "duration_seconds": None,
+        "type": "normal",
+        "distance_meters": None,
+        "reps": None,
+    }
+
+
+# THE WIRE: routine ff7518cd… (VERSION#current) as stored on 2026-09-26 — the nightly
+# pre-draft for 2026-09-27, stamped upper_heavy. Private fields carry markers.
+_WIRE_DRAFT_IR = {
+    "pk": "USER#matthew#ROUTINE#ff7518cdab4a1197f8e03e17d6458370",
+    "sk": "VERSION#current",
+    "routine_id": "ff7518cdab4a1197f8e03e17d6458370",
+    "target_date": _BLOCK_DAY,
+    "archetype": "upper",
+    "variant": "ideal",
+    "status": "draft",
+    "title": "PRIVATE-FORCED-TITLE upper heavy",
+    "notes": "PRIVATE-NOTE session cue",
+    "rationale": ["PRIVATE-RATIONALE recovery amber"],
+    "version": 3,
+    "created_by": "cron",
+    "source_action": "cron_generated",
+    "hevy_routine_id": None,
+    "hevy_pushed_at": None,
+    "budget_used": {"upper_sets": 14},
+    "inputs_snapshot": {
+        "recovery_tier": "amber",
+        "calendar": {"session_role": "upper_heavy", "label": "UPPER-HEAVY — week 1 · session 4 of 4, block 1"},
+        "nightly_predraft": {"role": "primary", "session_role": "upper_heavy", "engine": "1.0.0"},
+    },
+    "exercises": [
+        {
+            "movement_key": "barbell_bench_press",
+            "notes": "PRIVATE-EXERCISE-NOTE",
+            "rest_seconds": 180,
+            "sets": [_set(56, 4, 6), _set(50, 4, 6), _set(50, 4, 6)],
+        },
+        {"movement_key": "machine_row", "notes": None, "rest_seconds": 180, "sets": [_set(32, 4, 6), _set(28.5, 4, 6)]},
+        {"movement_key": "machine_shoulder_press", "notes": None, "rest_seconds": 120, "sets": [_set(12.5, 6, 10)] * 3},
+        {"movement_key": "lat_pulldown", "notes": None, "rest_seconds": 120, "sets": [_set(44, 6, 10)] * 2},
+        {"movement_key": "cable_tricep_pushdown", "notes": None, "rest_seconds": 90, "sets": [_set(22, 8, 15)] * 2},
+        {"movement_key": "db_curl", "notes": None, "rest_seconds": 90, "sets": [_set(7, 8, 15)] * 2},
+    ],
+    "branches": [],
+}
+
+_WIRE_DRAFT_INDEX = {
+    "pk": "USER#matthew#SOURCE#routine_index",
+    "sk": f"DATE#{_BLOCK_DAY}#ROUTINE#ff7518cdab4a1197f8e03e17d6458370",
+    "routine_id": "ff7518cdab4a1197f8e03e17d6458370",
+    "target_date": _BLOCK_DAY,
+    "archetype": "upper",
+    "variant": "ideal",
+    "status": "draft",
+    "hevy_routine_id": "",
+}
+
+_SESSION_KEYS = ("date", "state", "reason", "source", "kind", "session_role", "position_label", "exercises", "as_of")
+_EXERCISE_KEYS = ("name", "sets", "reps", "load_lbs", "loads_lbs")
+
+_SESSION_PRIVATE_MARKERS = (
+    "PRIVATE-FORCED-TITLE",
+    "PRIVATE-NOTE",
+    "PRIVATE-EXERCISE-NOTE",
+    "PRIVATE-RATIONALE",
+    "inputs_snapshot",
+    "recovery_tier",
+    "nightly_predraft",
+    "budget_used",
+    "hevy_routine_id",
+    "hevy_pushed_at",
+    _LIVE_HEVY_ID,
+    "ff7518cdab4a1197f8e03e17d6458370",  # the routine id itself never leaves
+    "weight_kg",
+    "movement_key",
+    "rest_seconds",
+    "rpe",
+)
+
+
+def _draft_row(rid, archetype, role, target=_BLOCK_DAY, **ir_over):
+    ir = dict(_WIRE_DRAFT_IR, routine_id=rid, pk=f"USER#matthew#ROUTINE#{rid}", archetype=archetype, target_date=target, **ir_over)
+    ir["inputs_snapshot"] = dict(_WIRE_DRAFT_IR["inputs_snapshot"], calendar={"session_role": role} if role else {}, nightly_predraft={})
+    idx = dict(_WIRE_DRAFT_INDEX, sk=f"DATE#{target}#ROUTINE#{rid}", routine_id=rid, archetype=archetype, target_date=target)
+    return idx, ir
+
+
+def _session_body(monkeypatch, rows, irs, day=_BLOCK_DAY, lifts=True):
+    _freeze(monkeypatch, day)
+    if lifts:
+        _no_lifts(monkeypatch)
+    monkeypatch.setattr(sad, "table", _FakeTable(rows, irs))
+    resp = sad.handle_session()
+    return resp, _body(resp)
+
+
+def _public(body):
+    return {k: v for k, v in body.items() if k != "_meta"}
+
+
+def test_session_served_from_the_wire_draft(monkeypatch):
+    """The 2026-09-27 pre-draft as stored → exactly what the page's loadRows reads:
+    names from the catalog, sets, the rep range, the load in whole pounds."""
+    resp, body = _session_body(monkeypatch, [_WIRE_DRAFT_INDEX], {_WIRE_DRAFT_IR["routine_id"]: _WIRE_DRAFT_IR})
+    assert resp["statusCode"] == 200
+    assert body["state"] == "served"
+    assert body["source"] == "hevy-routine-draft"
+    assert body["kind"] == "program"
+    assert body["session_role"] == "upper_heavy"
+    assert body["date"] == _BLOCK_DAY
+    assert body["reason"] is None
+    ex = body["exercises"]
+    assert [e["name"] for e in ex] == [
+        "Bench Press (Barbell)",
+        "Seated Row (Machine)",
+        "Seated Shoulder Press (Machine)",
+        "Lat Pulldown (Cable)",
+        "Triceps Pushdown",
+        "Bicep Curl (Dumbbell)",
+    ]
+    bench = ex[0]
+    assert bench["sets"] == 3
+    assert bench["reps"] == "4–6"
+    assert bench["load_lbs"] == 123  # 56 kg, the top set
+    assert bench["loads_lbs"] == [123, 110, 110]  # top + two back-offs at −10 %
+    assert ex[2] == {"name": "Seated Shoulder Press (Machine)", "sets": 3, "reps": "6–10", "load_lbs": 28, "loads_lbs": [28, 28, 28]}
+    assert sum(e["sets"] for e in ex) == 14
+
+
+def test_session_body_carries_only_the_listed_keys(monkeypatch):
+    """THE privacy assertion (owner ruling option a): names + sets × reps + loads, and
+    nothing else — exactly these keys, top-level and per exercise. Mutation control:
+    add `"notes": ex.get("notes")` to `_exercise_row` in site_api_protocols.py and this
+    fails on the exercise key set; add a top-level key to `_out` and it fails on the
+    body key set. Private markers are ALSO swept so a leak through a value is caught."""
+    _, body = _session_body(monkeypatch, [_WIRE_DRAFT_INDEX], {_WIRE_DRAFT_IR["routine_id"]: _WIRE_DRAFT_IR})
+    assert tuple(sorted(_public(body))) == tuple(sorted(_SESSION_KEYS))
+    assert body["exercises"], "the wire fixture must serve rows or this assertion is vacuous"
+    for e in body["exercises"]:
+        assert tuple(sorted(e)) == tuple(sorted(_EXERCISE_KEYS)), e
+    raw = json.dumps(_public(body))
+    for marker in _SESSION_PRIVATE_MARKERS:
+        assert marker not in raw, f"private field/marker {marker!r} leaked to /api/session"
+    # And the serializer's own declaration matches this test's — the two tuples are one contract.
+    assert tuple(sad._protocols._SESSION_KEYS) == _SESSION_KEYS
+    assert tuple(sad._protocols._EXERCISE_KEYS) == _EXERCISE_KEYS
+
+
+def test_session_committed_routine_beats_a_draft_and_a_flex_is_a_complement(monkeypatch):
+    """A routine pushed to Hevy for today is THE session (it is on his phone), whatever
+    else is drafted; a Flex-folder routine is off-program — kind complement, no role."""
+    d_idx, d_ir = _draft_row("d" * 32, "lower", "lower_heavy")
+    c_idx, c_ir = _draft_row(
+        "c" * 32, "flex", None, status="active", hevy_routine_id=_LIVE_HEVY_ID, hevy_pushed_at="2026-09-26T17:37:41+00:00"
+    )
+    c_ir["exercises"] = [
+        {"movement_key": "tmpl:056a1c53-c778-4ace-bb18-6f72e81b6724", "sets": [{"type": "normal", "duration_seconds": 30}] * 3},
+        {"movement_key": "tmpl:A2D838BD", "sets": [{"type": "normal", "reps": 10}] * 2},
+    ]
+    c_idx.update(status="active", hevy_routine_id=_LIVE_HEVY_ID)
+    _, body = _session_body(monkeypatch, [d_idx, c_idx], {"d" * 32: d_ir, "c" * 32: c_ir})
+    assert body["source"] == "hevy-routine"
+    assert body["kind"] == "complement"
+    assert body["session_role"] is None and body["position_label"] is None
+    # tmpl:<id> keys resolve through the catalog's template-id hints (both id spellings)
+    assert body["exercises"] == [
+        {"name": "Suitcase Carry", "sets": 3, "reps": None, "load_lbs": None, "loads_lbs": None},
+        {"name": "Cable Twist (Up to down)", "sets": 2, "reps": 10, "load_lbs": None, "loads_lbs": None},
+    ]
+    assert _LIVE_HEVY_ID not in json.dumps(_public(body))
+
+
+def test_session_two_drafts_the_sequence_next_role_picks(monkeypatch):
+    """Two ideal drafts for one day (the live 09-27 state: a cron upper_heavy + a chat lower):
+    the one stamped with the sequence's NEXT role is the session. With no lifts since the
+    block start the next role is the first role — lower_heavy — so the lower draft wins,
+    and the position label comes from the ledger."""
+    u_idx, u_ir = _draft_row("a" * 32, "upper", "upper_heavy")
+    l_idx, l_ir = _draft_row("b" * 32, "lower", "lower_heavy")
+    _, body = _session_body(monkeypatch, [u_idx, l_idx], {"a" * 32: u_ir, "b" * 32: l_ir})
+    assert body["source"] == "hevy-routine-draft"
+    assert body["session_role"] == "lower_heavy"
+    assert body["position_label"] == "week 1 · session 1 of 4 · lower-heavy"
+    # a chat draft with NO role stamp matches on archetype instead
+    l_ir["inputs_snapshot"] = {"calendar": {}}
+    _, body = _session_body(monkeypatch, [u_idx, l_idx], {"a" * 32: u_ir, "b" * 32: l_ir})
+    assert body["source"] == "hevy-routine-draft"
+    assert body["session_role"] is None  # unstamped: the role is not invented
+    assert [e["name"] for e in body["exercises"]][0] == "Bench Press (Barbell)"  # the lower draft's (fixture) exercises
+
+
+def test_session_two_drafts_neither_matching_serves_the_program(monkeypatch):
+    """Two drafts, neither the next role nor its archetype → the program is the ONE answer to
+    'what is next' (#4110); no draft is guessed."""
+    a_idx, a_ir = _draft_row("a" * 32, "upper", "upper_heavy")
+    b_idx, b_ir = _draft_row("b" * 32, "upper", "upper_volume")
+    _, body = _session_body(monkeypatch, [a_idx, b_idx], {"a" * 32: a_ir, "b" * 32: b_ir})
+    assert body["state"] == "served" and body["source"] == "program"
+    assert body["session_role"] == "lower_heavy"
+
+
+def test_session_falls_back_to_the_program_prescription(monkeypatch):
+    """No routine for today → the program's prescription for the next undone session:
+    names from the catalog, sets + the rep range from the exposure, loads honestly null
+    (the program prescribes % of a top set, not pounds). Yesterday's draft is NOT today's."""
+    y_idx, y_ir = _draft_row("y" * 32, "lower", "lower_heavy", target="2026-09-26")
+    _, body = _session_body(monkeypatch, [y_idx], {"y" * 32: y_ir})
+    assert body["state"] == "served"
+    assert body["source"] == "program"
+    assert body["kind"] == "program"
+    assert body["session_role"] == "lower_heavy"
+    assert body["position_label"] == "week 1 · session 1 of 4 · lower-heavy"
+    ex = body["exercises"]
+    assert ex[0]["name"] == "Squat (Barbell)"
+    assert ex[0]["sets"] == 3 and ex[0]["reps"] == "4–6"  # 1 top set + 2 back-offs
+    assert all(e["load_lbs"] is None and e["loads_lbs"] is None for e in ex)
+    assert all(e["name"] for e in ex), ex
+    assert tuple(sorted(_public(body))) == tuple(sorted(_SESSION_KEYS))
+    for e in ex:
+        assert tuple(sorted(e)) == tuple(sorted(_EXERCISE_KEYS))
+
+
+def test_session_absent_before_the_block_start(monkeypatch):
+    """The autouse clock (2026-06-20) is before the v0.4 block: nothing drafted, nothing
+    prescribed → absent, with the reason, every key present, exercises empty."""
+    monkeypatch.setattr(sad, "table", _FakeTable([], {}))
+    _no_lifts(monkeypatch)
+    body = _body(sad.handle_session())
+    assert body["state"] == "absent"
+    assert body["source"] is None and body["exercises"] == []
+    assert "before the program's first session" in body["reason"]
+    assert tuple(sorted(_public(body))) == tuple(sorted(_SESSION_KEYS))
+
+
+def test_session_absent_when_the_hevy_record_cannot_be_read(monkeypatch):
+    """A Hevy read that RAISES is handed to the sequence as None → `sequence_unreadable`,
+    no role → absent by name, never session 1 by default (ADR-104)."""
+    _freeze(monkeypatch, _BLOCK_DAY)
+
+    def _boom(day):
+        raise RuntimeError("ddb down")
+
+    monkeypatch.setattr(session_sequence, "load_block_workouts", _boom)
+    monkeypatch.setattr(sad, "table", _FakeTable([], {}))
+    body = _body(sad.handle_session())
+    assert body["state"] == "absent"
+    assert "could not be read" in body["reason"]
+
+
+def test_session_index_read_error_still_serves_the_program(monkeypatch):
+    """The routine index down → the program still answers (its record is a different read)."""
+
+    class _Boom:
+        def query(self, **kwargs):
+            raise RuntimeError("ddb down")
+
+        def get_item(self, Key=None, **kwargs):
+            raise RuntimeError("ddb down")
+
+    _freeze(monkeypatch, _BLOCK_DAY)
+    _no_lifts(monkeypatch)
+    monkeypatch.setattr(sad, "table", _Boom())
+    body = _body(sad.handle_session())
+    assert body["state"] == "served" and body["source"] == "program"
+
+
+def test_session_floor_and_archived_never_selected(monkeypatch):
+    f_idx, f_ir = _draft_row("f" * 32, "upper", "upper_heavy", variant="floor")
+    f_idx["variant"] = "floor"
+    a_idx, a_ir = _draft_row("e" * 32, "upper", "upper_heavy", status="archived")
+    a_idx["status"] = "archived"
+    _, body = _session_body(monkeypatch, [f_idx, a_idx], {"f" * 32: f_ir, "e" * 32: a_ir})
+    assert body["source"] == "program"
+
+
+def test_session_cache_headers_like_routine(monkeypatch):
+    resp, _ = _session_body(monkeypatch, [_WIRE_DRAFT_INDEX], {_WIRE_DRAFT_IR["routine_id"]: _WIRE_DRAFT_IR})
     assert resp["statusCode"] == 200
     assert "max-age=900" in resp["headers"]["Cache-Control"]

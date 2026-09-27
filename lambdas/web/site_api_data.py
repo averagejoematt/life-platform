@@ -19,6 +19,7 @@ Endpoints routed from this module (kept in sync by tests/test_site_api_data_spli
   /api/character_calibration (#1409 — felt-reality calibration ledger, aggregates only)
   /api/habits, /api/habit_streaks, /api/habit_registry
   /api/routine (#1066 — the prescribed training block, counts-only projection)
+  /api/session (E3 #4182 — today's session as it will be lifted: names, sets × reps, the load in lb; owner ruling 2026-09-26)
   /api/tools_baseline, /api/platform_stats
   /api/protocols, /api/domains
 
@@ -329,6 +330,11 @@ def handle_supplements() -> dict:
 def handle_routine() -> dict:
     """GET /api/routine — thin entrypoint; logic in protocols split module."""
     return _protocols.routine(_g=globals())
+
+
+def handle_session() -> dict:
+    """GET /api/session — thin entrypoint; logic in protocols split module (E3, #4182)."""
+    return _protocols.session(_g=globals())
 
 
 def handle_vice_streaks() -> dict:
