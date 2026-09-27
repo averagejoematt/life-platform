@@ -184,7 +184,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-154 | The new-signal playbook — a new metric/source lands through one ordered checklist, absence semantics and privacy tier first | Accepted | 2026-08-16 |
 | ADR-155 | Self-publication of selected Tier-2 fields by owner consent — publication is a stamp, never an omission | Accepted | 2026-08-23 |
 | ADR-156 | The reader's three questions come before the loop on every door's first screen | Accepted | 2026-09-26 |
-| ADR-157 | The site is one serialised investigation — nine reachable pages, the human first, the cycle count internal (cut over 2026-09-27) | Accepted | 2026-09-26 |
+| ADR-157 | The site is one serialised investigation — nine reachable pages, the human first, the cycle count internal | Accepted | 2026-09-26 |
 <!-- ADR-INDEX:END -->
 
 ---
