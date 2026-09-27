@@ -90,19 +90,24 @@
 
 /* ── the fold ── */
 .v7h-fold { display: grid; grid-template-columns: 116px 1fr; gap: var(--sp-4); align-items: start; }
-.v7h-photo {
+/* The day-1 photograph (#3761): the same 3:4 frame the empty state held, now filled. */
+.v7h-photo { margin: 0; }
+.v7h-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
   aspect-ratio: 3 / 4;
-  border: 1px dashed var(--rule-strong);
+  object-fit: cover;
   background: var(--surface-2);
-  display: flex; align-items: center; justify-content: center;
-  text-align: center;
-  padding: var(--sp-2);
+  border: 1px solid var(--rule);
+}
+.v7h-cap {
   font-family: var(--font-sans);
   font-size: var(--fs-label);
   line-height: 1.4;
   color: var(--ink-muted);
+  margin-top: var(--sp-1);
 }
-.v7h-photo b { color: var(--ink); font-weight: 600; display: block; margin-bottom: var(--sp-1); }
 .v7h-big {
   font-family: var(--font-serif);
   font-weight: 500;

@@ -298,7 +298,7 @@ def test_v7_numbers_shell_is_the_logbook_and_carries_no_number_or_ruled_word():
 
 def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
     """#4182 — the v7 Home (scripts/v7/home.py) is Prototype C's screen I: the eight dated
-    entries in the design order, the honest photo frame, the page's own sheet and module,
+    entries in the design order, the day-1 photograph (#3761), the page's own sheet and module,
     the cut-over proof anchor — and NO number in the static HTML (every figure is poured
     from a served field at runtime, so the shell can never go stale) and none of the
     owner-ruled words (no earlier starts, attempts, cycles or resets)."""
@@ -315,7 +315,10 @@ def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
     assert order == sorted(order), "the entries are out of the design order"
     assert 'href="/assets/css/v7_home.css"' in html and 'src="/assets/js/v7_home.js"' in html
     assert "<!-- home-proof:start -->" in html and "<!-- home-proof:end -->" in html
-    assert "No photo yet." in html
+    # #3761: the frame holds the owner-approved day-1 photograph (two widths, alt text), no longer the empty state
+    assert 'src="/assets/images/photo-2026-09-06-day1-sm.jpg"' in html and "/assets/images/photo-2026-09-06-day1.jpg 900w" in html
+    assert 'alt="Matthew on day 1, Sunday September 6, front view"' in html
+    assert "No photo yet." not in html
     text = site_text.main_text("site/next/index.html")
     assert not re.search(r"\d", text), f"a number in the static Home shell: {text[:200]!r}"
     assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)

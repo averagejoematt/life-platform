@@ -11,7 +11,8 @@
 import { tryJSON, esc, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, instantDayInWords, countWord, dayLabel } from "/assets/js/entry_age.js";
 
-const HORIZON = 30; // the day the first photo is due
+const HORIZON = 30; // the day the next photo is due (the first, day 1, is on the fold — #3761)
+const DAY1_PHOTO_DATE = "2026-09-06"; // the day the fold's photograph was taken (its file name carries the same date)
 
 // ── small helpers ──────────────────────────────────────────────────────────────
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -42,13 +43,20 @@ const coachName = (coaches, id) => {
 };
 
 // ── the fold ───────────────────────────────────────────────────────────────────
-export function photoDue(journey) {
+// The photograph's caption: its date in words, the day of the experiment it was taken on
+// (computed from the served start, never typed), and — on day 1 only — the served start
+// weight, which is the weigh-in of that same morning. "" when the start is not served.
+export function photoCaption(journey, photoDate = DAY1_PHOTO_DATE) {
   const j = journey || {};
-  const n = num(j.day_n);
-  const due = j.started_date ? isoPlus(j.started_date, HORIZON - 1) : "";
-  if (!due) return "";
-  const when = time(due, "journey.started_date + 29 days");
-  return n !== null && n > HORIZON ? ` The first was due ${when} — day ${HORIZON}.` : ` The first is due ${when} — day ${HORIZON}.`;
+  if (!j.started_date || !photoDate) return "";
+  const n = dayNum(photoDate) - dayNum(j.started_date) + 1;
+  if (!Number.isFinite(n) || n < 1) return "";
+  const onStart = String(j.started_date).slice(0, 10) === photoDate;
+  const when = time(photoDate, onStart ? "journey.started_date" : "");
+  const day = `day ${span("journey.started_date → photo date", String(n))}`;
+  const w = num(j.start_weight_lbs);
+  const weight = n === 1 && w !== null ? `, ${span("journey.start_weight_lbs", fmt1(w), "num")} lb` : "";
+  return `${when} — ${day}${weight}`;
 }
 
 export function numberBlock(journey) {
@@ -109,7 +117,7 @@ export function leadSentence(journey, coachCount) {
   }
   const began = start !== null && j.started_date ? ` Matthew weighed ${span("journey.start_weight_lbs", fmt1(start), "num")} lb on ${time(j.started_date, "journey.started_date")}, the day it began.` : "";
   let tail = "";
-  if (n === HORIZON) tail = ` Today is day ${HORIZON} — the first photo is due.`;
+  if (n === HORIZON) tail = ` Today is day ${HORIZON} — the next photo is due.`;
   else if (n < HORIZON && j.started_date) tail = ` Day ${HORIZON} is ${time(isoPlus(j.started_date, HORIZON - 1), "journey.started_date + 29 days")}.`;
   return `<p class="v7h-premise"${src("journey.{day_n,start_weight_lbs,started_date}")}><span class="v7h-earned">Day ${span("journey.day_n", String(n))}</span>${frame}${began}${tail}</p>`;
 }
@@ -434,7 +442,7 @@ export function nextRows(docket, predictions, cadence, journey, coaches) {
   const ch = cadence && cadence.chronicle;
   if (ch && !ch.paused && ch.next_date) rows.push({ date: ch.next_date, html: `<td${src("content_cadence.chronicle.next_date")}>The next write-up — drafted that day, published once Matthew has read it.</td>` });
   const j = journey || {};
-  if (num(j.day_n) !== null && j.day_n < HORIZON && j.started_date) rows.push({ date: isoPlus(j.started_date, HORIZON - 1), html: `<td${src("journey.started_date + 29 days")}>Day ${HORIZON} — and the first photo.</td>` });
+  if (num(j.day_n) !== null && j.day_n < HORIZON && j.started_date) rows.push({ date: isoPlus(j.started_date, HORIZON - 1), html: `<td${src("journey.started_date + 29 days")}>Day ${HORIZON} — and the next photo.</td>` });
   rows.sort((x, y) => String(x.date).localeCompare(String(y.date)));
   return rows;
 }
@@ -521,12 +529,8 @@ export async function mount() {
   const through = (vitals && vitals.vitals && vitals.vitals.as_of_date) || (journey && journey.last_weighin_date) || "";
 
   // the fold
-  const photo = document.getElementById("v7h-photo");
-  const due = photoDue(journey);
-  if (photo && due) {
-    document.getElementById("v7h-photo-due").innerHTML = due;
-    photo.setAttribute("aria-label", photo.querySelector("div").textContent);
-  }
+  const cap = photoCaption(journey);
+  if (cap) put("v7h-photo-cap", cap);
   put("v7h-number", journey ? numberBlock(journey) + thisWeekLine(progress, posts) : pending("The latest weigh-in"));
   put("v7h-lead", journey ? leadSentence(journey, coachesR && coachesR.count) : pending("The lead"));
   put("v7h-alive", aliveLine(through, calibration, cadence));

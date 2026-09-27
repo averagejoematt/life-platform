@@ -4,8 +4,8 @@
    breakpoints from DESIGN_SYSTEM_V5 §10.1). Faces: the self-hosted Fraunces stands in for
    C's Newsreader, Instrument Sans for its IBM Plex Sans; IBM Plex Mono is C's own. The
    spine is --ember-line — the one live accent — because it is the frame's margin, not a
-   claim. The photo frame is honest until #3761 lands: a dashed empty frame, never a
-   silhouette or a stock image. */
+   claim. The photographs are his own, dated (#3761) — never a silhouette or a stock
+   image. */
 
 .v7 {
   --who-margin-w: 50px;
@@ -67,20 +67,32 @@
   gap: var(--sp-4);
   align-items: start;
 }
-.who-photo {
-  width: 116px;
+.who-photo { width: 116px; margin: 0; }
+.who-photo img, .who-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
   aspect-ratio: 3 / 4;
-  border: 1px dashed var(--rule-strong);
+  object-fit: cover;
   background: var(--surface-2);
-  display: flex; align-items: center; justify-content: center;
-  text-align: center;
-  padding: var(--sp-2);
+  border: 1px solid var(--rule);
+}
+.who-cap {
   font-family: var(--font-sans);
   font-size: var(--fs-label);
   line-height: var(--lh-snug);
   color: var(--ink-muted);
+  margin-top: var(--sp-1);
 }
-.who-photo b { color: var(--ink); font-weight: var(--weight-med); display: block; margin-bottom: var(--sp-1); }
+/* ── the photographs: three, dated, in order ── */
+.who-shots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+  max-width: 600px;
+}
+.who-shot { margin: 0; }
+.who-small:empty { display: none; }
 .who-first {
   font-family: var(--font-serif);
   font-size: var(--fs-body-lg);

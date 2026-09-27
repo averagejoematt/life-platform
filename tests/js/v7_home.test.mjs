@@ -68,7 +68,7 @@ test("the lead sentence: the day-only branches, and the day in words", () => {
   assert.match(before, /^Day 21 of an experiment run in public: a 300-plus-pound man, his own numbers, eight AI coaches reading them/);
   assert.match(before, /Matthew weighed 327\.3 lb on Sunday, September 6, the day it began\. Day 30 is Monday, October 5\.$/);
   const on30 = strip(H.leadSentence({ ...journey, day_n: 30 }, 8));
-  assert.match(on30, /Today is day 30 — the first photo is due\.$/);
+  assert.match(on30, /Today is day 30 — the next photo is due\.$/);
   const after = strip(H.leadSentence({ ...journey, day_n: 31 }, 8));
   assert.match(after, /the day it began\.$/);
   assert.doesNotMatch(after, /Day 30 is/);
@@ -77,10 +77,24 @@ test("the lead sentence: the day-only branches, and the day in words", () => {
   assert.match(eve, /It begins Sunday, September 6\./);
 });
 
-test("the photo frame is honest before and after day 30", () => {
-  assert.match(strip(H.photoDue(journey)), /The first is due Monday, October 5 — day 30\./);
-  assert.match(strip(H.photoDue({ ...journey, day_n: 40 })), /The first was due Monday, October 5 — day 30\./);
-  assert.equal(H.photoDue({}), "");
+test("the day-1 photograph's caption: the served start in words, day 1, the served start weight (#3761)", () => {
+  assert.equal(strip(H.photoCaption(journey)), "Sunday, September 6 — day 1, 327.3 lb");
+  const html = H.photoCaption(journey);
+  assert.match(html, /<time datetime="2026-09-06" data-src="journey\.started_date">/);
+  assert.match(html, /data-src="journey\.start_weight_lbs"/);
+  assert.match(html, /data-src="journey\.started_date → photo date">1</);
+  // the day number is computed from the served start, never typed
+  assert.equal(strip(H.photoCaption({ ...journey, started_date: "2026-09-05" })), "Sunday, September 6 — day 2");
+  assert.equal(H.photoCaption({}), "");
+  assert.equal(H.photoCaption({ ...journey, started_date: "2026-09-07" }), "");
+  assert.doesNotMatch(html, /2026-09-06</);
+});
+
+test("no rendered line still says the first photo is due — the next one is", () => {
+  const rows = H.nextRows([], null, cadence, journey, coaches).map((r) => strip(r.html)).join(" ");
+  assert.match(rows, /Day 30 — and the next photo\./);
+  assert.doesNotMatch(rows + strip(H.leadSentence({ ...journey, day_n: 30 }, 8)), /first photo/);
+  assert.equal(H.photoDue, undefined);
 });
 
 test("the this-week line has three states", () => {

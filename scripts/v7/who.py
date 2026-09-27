@@ -1,9 +1,11 @@
 """scripts/v7/who.py — the "Who he is" page body (#4182, plan §2a row 7; Prototype C screen V).
 
-The page is the subject, in the first person: the honest photo frame beside his own
+The page is the subject, in the first person: the day-1 photograph beside his own
 paragraph (VERBATIM from the live about page's `ABOUT_FIRST` in site/assets/js/dispatches.js
 — the site's one first-person page, by name; nothing here is rewritten), then the receipts
-strip in one line, then the weigh-in line since the day it began, then how to check
+strip in one line, then the photographs — three, dated, in order (#3761: the owner chose
+these three and said yes to publishing them on 2026-09-26; each re-saved with no EXIF) — then
+the weigh-in line since the day it began, then how to check
 (the repo, the same four plain sentences Home's "How it works" carries, the email address as
 selectable text), then the dated return line. Every number is poured by
 `site/assets/js/v7_who.js` from the served feeds — this module writes only the skeleton,
@@ -19,6 +21,39 @@ from __future__ import annotations
 
 CSS = "/assets/css/v7_who.css"
 JS = "/assets/js/v7_who.js"
+
+# The photographs (#3761), in order. Each: the file stem, its date (the file name carries it),
+# the alt text, the words after the date in the caption, and the static caption a no-JS
+# reader sees. v7_who.js pours the September captions with the day number computed from the
+# served start date; April 2025 predates the experiment, so its caption is its own date.
+PHOTOS = (
+    (
+        "/assets/images/photo-2025-04-before",
+        "2025-04",
+        "Matthew in April 2025, before the weight came back, sitting on a couch",
+        "April 2025 — before the weight came back",
+    ),
+    ("/assets/images/photo-2026-09-06-day1", "2026-09-06", "Matthew on day 1, Sunday September 6, front view", "Day one, front view."),
+    ("/assets/images/photo-2026-09-24-gym", "2026-09-24", "Matthew in the gym on Thursday September 24, a mirror photo", "In the gym."),
+)
+
+
+def photo_img(stem: str, alt: str, sizes: str, loading: str = "eager") -> str:
+    """One photograph as a responsive <img>: the 480-px `-sm` file and the 1200-px file (3:4, 900×1200)."""
+    return (
+        f'<img src="{stem}-sm.jpg" srcset="{stem}-sm.jpg 360w, {stem}.jpg 900w" sizes="{sizes}"'
+        f' width="360" height="480" alt="{alt}" loading="{loading}" decoding="async">'
+    )
+
+
+def _photo_strip() -> str:
+    figs = "".join(
+        f'<figure class="who-shot">{photo_img(stem, alt, "(min-width: 601px) 180px, 30vw", "lazy")}'
+        f'<figcaption class="who-cap" data-photo-date="{date}">{static}</figcaption></figure>'
+        for stem, date, alt, static in PHOTOS
+    )
+    return f'<div class="who-shots">{figs}</div><p class="who-small" id="who-photo-next"></p>'
+
 
 _PENDING = '<p class="who-note who-pending">Not loaded yet.</p>'
 
@@ -59,7 +94,8 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
     """The inner HTML of `<main>` for /story/about/."""
     fold = (
         '<div class="who-fold-grid">'
-        '<div class="who-photo" id="who-photo" role="img" aria-label="No photo yet."><div><b>No photo yet.</b><span id="who-photo-due"></span></div></div>'
+        f'<figure class="who-photo" id="who-photo">{photo_img(PHOTOS[1][0], PHOTOS[1][2], "116px")}'
+        '<figcaption class="who-cap" id="who-photo-cap" data-photo-date="2026-09-06">Day one, front view.</figcaption></figure>'
         '<div class="who-words">'
         f'<p class="who-first">{FIRST_PERSON}</p>'
         '<p class="who-sig">Matthew, in his own words.</p>'
@@ -75,6 +111,7 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         "    <h1>Who he is</h1>\n"
         '    <p class="v7-job">In his own words, with the photo and the day count.</p>\n'
         + _entry("who-fold", "In his own words", fold, "who-fold")
+        + _entry("who-photos", "The photographs", _photo_strip())
         + _entry("who-since", 'Since <span id="who-since-day" data-src="api_journey.journey.started_date">the day it began</span>')
         + _entry("who-check", "How to check", check)
         + '    <p class="who-return" id="who-return" data-src="api_content_cadence.chronicle.next_date"></p>\n'
