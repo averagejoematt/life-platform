@@ -25,6 +25,11 @@ Post-launch regressions pinned here too:
          same-topic dispute can't silently overwrite a graded outcome.
   #1801  the throttle key is deterministic (pair + metric subdomain), so a
          rephrased topic can't open a parallel docket for the same pair.
+  #4216  a docket resolves ONCE: the resolver skips a recorded resolution, a
+         pre-genesis / prior-cycle docket is voided rather than graded, every
+         derived write refuses a duplicate, one docket's failure never aborts
+         the run. Fixture = the wire (the real 2026-08-10 calories docket row
+         and its real duplicate LEARNING# row, read 2026-09-26).
 """
 
 import os
@@ -74,6 +79,9 @@ class FakeTable:
     def __init__(self):
         self.store = {}
         self.deleted = []
+        # #4216: the evaluator's live role carried no dynamodb:DeleteItem — every
+        # `_finalize` delete raised AccessDeniedException. Flip this to replay the wire.
+        self.deny_delete = False
 
     def put_item(self, Item, ConditionExpression=None, **kw):
         key = (Item["pk"], Item["sk"])
@@ -87,11 +95,31 @@ class FakeTable:
         return {"Item": dict(it)} if it else {}
 
     def delete_item(self, Key):
+        if self.deny_delete:
+            raise ClientError(
+                {"Error": {"Code": "AccessDeniedException", "Message": "not authorized to perform: dynamodb:DeleteItem"}}, "DeleteItem"
+            )
         self.deleted.append((Key["pk"], Key["sk"]))
         self.store.pop((Key["pk"], Key["sk"]), None)
         return {}
 
-    def update_item(self, **kw):
+    def update_item(
+        self, Key=None, UpdateExpression="", ConditionExpression=None, ExpressionAttributeNames=None, ExpressionAttributeValues=None, **kw
+    ):
+        """SET-only, with the one condition the resolver uses (`attribute_exists`) honored —
+        the #4216 marker must never re-create a row a concurrent run already retired."""
+        if Key is None:
+            return {}
+        key = (Key["pk"], Key["sk"])
+        if ConditionExpression and "attribute_exists" in ConditionExpression and key not in self.store:
+            raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "UpdateItem")
+        row = self.store.setdefault(key, {"pk": Key["pk"], "sk": Key["sk"]})
+        names, values = ExpressionAttributeNames or {}, ExpressionAttributeValues or {}
+        assert UpdateExpression.startswith("SET "), UpdateExpression
+        for clause in UpdateExpression[4:].split(","):
+            attr, _eq, ref = clause.strip().partition("=")
+            attr, ref = attr.strip(), ref.strip()
+            row[names.get(attr, attr)] = values[ref]
         return {}
 
     def query(self, **kw):
@@ -107,6 +135,10 @@ class FakeTable:
 def fake_table(monkeypatch):
     t = FakeTable()
     monkeypatch.setattr(dd, "table", t)
+    # #4216: a docket that resolves before EXPERIMENT_START_DATE is VOIDED, not graded.
+    # This module's canonical dockets open 2026-07-20 and resolve in August, so the
+    # genesis is pinned before them here; TestADocketResolvesOnce4216 pins the real one.
+    monkeypatch.setattr(dd, "EXPERIMENT_START_DATE", "2026-07-01")
     return t
 
 
@@ -442,6 +474,7 @@ class TestAC4PublicSurface:
 
         t = FakeTable()
         monkeypatch.setattr(sac, "table", t)
+        monkeypatch.setattr(dd, "EXPERIMENT_START_DATE", "2026-07-01")  # #4216: the seeded August docket must GRADE here, not void
         return sac, t
 
     @staticmethod
@@ -731,15 +764,18 @@ class TestDerivedKeysArePairScoped1798:
                     assert row["pk"].endswith(coach)
                     assert dd.pair_key(*sorted((row["docket_ref"].split("#")[1]).split("__"))) in row["sk"]
 
-    def test_a_key_collision_never_overwrites_silently(self, fake_table):
-        """The belt to #1798's suspenders: even if a future key change reintroduced a
-        collision, the write disambiguates loudly instead of destroying the row."""
+    def test_a_key_collision_is_refused_not_suffixed(self, fake_table):
+        """#1798's belt, re-cut by #4216: a second write to a docket-derived key is the
+        SAME fact re-recorded (the keys are pair-scoped), so it is refused — never
+        overwritten, and never given a `-2` suffix (the suffixing manufactured five
+        PREDICTION# rows for one prediction_id on the wire)."""
         docket = _docket_for("physical_coach", "nutrition_coach", {"physical_coach": True, "nutrition_coach": False})
-        dd._write_docket_learning("physical_coach", "2026-08-03", docket, "confirmed")
-        dd._write_docket_learning("physical_coach", "2026-08-03", docket, "refuted")  # same key by construction
+        first = dd._write_docket_learning("physical_coach", "2026-08-03", docket, "confirmed")
+        second = dd._write_docket_learning("physical_coach", "2026-08-03", docket, "refuted")  # same key by construction
         rows = [v for (pk, sk), v in fake_table.store.items() if pk == "COACH#physical_coach" and sk.startswith("LEARNING#")]
-        assert len(rows) == 2
-        assert sorted(r["outcome"] for r in rows) == ["confirmed", "refuted"]
+        assert first and second is None
+        assert len(rows) == 1 and rows[0]["outcome"] == "confirmed", "the first record must survive intact"
+        assert not any(sk.endswith("-2") for _pk, sk in fake_table.store), "no disambiguation suffix"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1108,3 +1144,235 @@ class TestAbsentCoachDocketServe4217:
         t.put_item(Item=item)
         entry = self._body(sac.handle_coach_docket({}))["resolved"][0]
         assert set(entry["claims"]) == {"glucose_coach", "nutrition_coach"}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #4216 — a docket resolves ONCE. Fixture = the wire: the real 2026-08-10 calories
+# docket's OPEN# row and its real duplicate LEARNING# row, read from ENSEMBLE#docket
+# / COACH#nutrition_coach on 2026-09-26 (Decimals already walked to float, as the
+# resolver sees them). This row was re-graded every day 09-07 → 09-26.
+# ═════════════════════════════════════════════════════════════════════════════
+
+GENESIS = "2026-09-06"  # lambdas/common/constants.EXPERIMENT_START_DATE on the day of the read
+
+WIRE_OPEN_ROW = {
+    "pk": "ENSEMBLE#docket",
+    "sk": "OPEN#explorer_coach__nutrition_coach#calories",
+    "record_type": "dispute_docket",
+    "status": "open",
+    "topic": "Caloric variance interpretation: distribution modeling vs. point estimate",
+    "topic_slug": "caloric-variance-interpretation-distribution-modeling-vs-poi",
+    "coach_a": "explorer_coach",
+    "coach_b": "nutrition_coach",
+    "pair_key": "explorer_coach__nutrition_coach",
+    "claims": {
+        "explorer_coach": "Caloric intake over first seven days must be modeled as distribution; variance itself is informative (0.85 confidence)",
+        "nutrition_coach": "Cannot assess caloric patterns without meal logging data; no basis for variance prediction yet",
+    },
+    "criterion": {
+        "metric": "total_calories_kcal_7day_avg",
+        "condition": "gte",
+        "threshold": 2200.0,
+        "description": "total_calories_kcal_7day_avg >= 2200 on 2026-08-10",
+    },
+    "sides": {"explorer_coach": True, "nutrition_coach": False},
+    "resolution_date": "2026-08-10",
+    "opened_date": "2026-08-03",
+    "opened_at": "2026-08-03T17:41:16.695169+00:00",
+    "stakes": {
+        "explorer_coach": {"subdomain": "calories", "brier": 0.25, "brier_n": 5, "confidence": 0.5},
+        "nutrition_coach": {"subdomain": "calories", "brier": 0.25, "brier_n": 4, "confidence": 0.5},
+    },
+    "subdomain": "calories",
+    "source_sk": "ACTIVE#caloric-variance-interpretation-distribution-modeling-vs-poi",
+    "cycle": 12,
+    "phase": "pilot",
+    "tombstone": True,
+    "tombstoned_at": "2026-08-09T20:58:10.111171+00:00",
+    "tombstoned_reason": "experiment_restart_2026-08-10",
+}
+
+WIRE_DUPLICATE_LEARNING = {
+    "pk": "COACH#nutrition_coach",
+    "sk": "LEARNING#2026-09-07#docket-explorer_coach__nutrition_coach-calories-caloric-variance-interpretation-distribution-modeling-vs-poi",
+    "coach_id": "nutrition_coach",
+    "date": "2026-09-07",
+    "channel": "data",
+    "record_type": "docket_win",
+    "evaluation_type": "dispute_docket",
+    "status": "confirmed",
+    "outcome": "confirmed",
+    "metric": "total_calories_kcal_7day_avg",
+    "threshold": 2200.0,
+    "condition": "gte",
+    "subdomain": "calories",
+    "topic": "Caloric variance interpretation: distribution modeling vs. point estimate",
+    "topic_slug": "caloric-variance-interpretation-distribution-modeling-vs-poi",
+    "docket_ref": "OPEN#explorer_coach__nutrition_coach#calories",
+    "claim": "Cannot assess caloric patterns without meal logging data; no basis for variance prediction yet",
+    "reason": "dispute docket resolved: total_calories_kcal_7day_avg >= 2200 on 2026-08-10",
+    "created_at": "2026-09-07T16:00:40.068769+00:00",
+    "cycle": 17,
+    "phase": "experiment",
+}
+
+WIRE_ACTUAL = 2142.0  # the served actual_value on every one of the five graded RESOLVED# rows
+
+
+def _coach_rows(table, coach_id, prefix):
+    return [v for (pk, sk), v in table.store.items() if pk == f"COACH#{coach_id}" and sk.startswith(prefix)]
+
+
+def _docket_rows(table, prefix):
+    return [v for (pk, sk), v in table.store.items() if pk == dd.DOCKET_PK and sk.startswith(prefix)]
+
+
+def _cycle_17_copy(**over):
+    """The wire row as a docket THIS experiment owns: no tombstone/phase/cycle, resolving
+    after genesis — the shape of the two cycle-17 dockets due 09-30 and 10-07."""
+    row = {k: v for k, v in WIRE_OPEN_ROW.items() if k not in ("cycle", "phase", "tombstone", "tombstoned_at", "tombstoned_reason")}
+    row.update({"resolution_date": "2026-09-10", "opened_date": "2026-09-07"}, **over)
+    return row
+
+
+class TestADocketResolvesOnce4216:
+    @pytest.fixture()
+    def wire(self, fake_table, monkeypatch):
+        monkeypatch.setattr(dd, "EXPERIMENT_START_DATE", GENESIS)
+        fake_table.deny_delete = True  # the live role (no dynamodb:DeleteItem) — the first measured failure
+        confidence_updates = []
+        monkeypatch.setattr(evaluator, "_update_bayesian_confidence", lambda cid, sub, kind: confidence_updates.append((cid, sub, kind)))
+        stub_bundled_module(monkeypatch, "ai.bedrock_client", _PoisonedBedrock())
+        return fake_table, confidence_updates
+
+    def test_a_refused_delete_no_longer_re_grades_the_docket_the_next_day(self, wire, monkeypatch):
+        """The live incident, replayed on a docket this experiment owns: the delete is
+        refused, the OPEN# row stays — and the next two days write NOTHING."""
+        table, confidence_updates = wire
+        table.put_item(Item=_cycle_17_copy())
+        monkeypatch.setattr(evaluator, "_resolve_metric_value", lambda metric, cache, end: WIRE_ACTUAL)
+        day1 = dd.resolve_due("2026-09-10")
+        assert len(day1["resolved"]) == 1 and day1["resolved"][0]["winner"] == "nutrition_coach"
+        open_row = table.store[(dd.DOCKET_PK, WIRE_OPEN_ROW["sk"])]  # the delete was refused...
+        assert open_row["status"] == "resolved" and open_row["resolved_sk"] == day1["resolved"][0]["sk"]  # ...but the row is marked
+        for later in ("2026-09-11", "2026-09-12"):
+            again = dd.resolve_due(later)
+            assert again["resolved"] == [] and again["voided"] == [] and again["failed"] == []
+            assert again["already_recorded"] == [WIRE_OPEN_ROW["sk"]]
+        for coach in ("nutrition_coach", "explorer_coach"):
+            assert len(_coach_rows(table, coach, "LEARNING#")) == 1, f"{coach}: one learning, dated the day it resolved"
+            assert len(_coach_rows(table, coach, "PREDICTION#docket-")) == 1, f"{coach}: one graded call per prediction_id"
+            assert _coach_rows(table, coach, "LEARNING#")[0]["date"] == "2026-09-10"
+        assert len(_docket_rows(table, "RESOLVED#")) == 1
+        assert sorted(confidence_updates) == [("explorer_coach", "calories", "failure"), ("nutrition_coach", "calories", "success")]
+
+    def test_mutation_control_without_the_skip_the_second_day_writes_again(self, wire, monkeypatch):
+        """Remove the recorded-resolution skip and the day-2 run re-records: the test
+        above is sensitive to exactly the guard it claims to hold."""
+        table, _c = wire
+        table.put_item(Item=_cycle_17_copy())
+        monkeypatch.setattr(evaluator, "_resolve_metric_value", lambda metric, cache, end: WIRE_ACTUAL)
+        monkeypatch.setattr(dd, "_resolution_recorded", lambda docket: False)
+        dd.resolve_due("2026-09-10")
+        dd.resolve_due("2026-09-11")
+        assert len(_coach_rows(table, "nutrition_coach", "LEARNING#")) == 2, "the control must show the duplicate the skip prevents"
+
+    def test_a_pre_genesis_docket_is_voided_once_and_never_graded(self, wire, monkeypatch):
+        """The wire row itself: resolution 2026-08-10, genesis 2026-09-06. Closed ONCE as a
+        void — no learning, no prediction, no confidence update, no metric read — and the
+        next day's run skips it."""
+        table, confidence_updates = wire
+        table.put_item(Item=dict(WIRE_OPEN_ROW))
+        table.put_item(Item=WIRE_DUPLICATE_LEARNING)  # one of the 20 already on the partition
+
+        def _never(*a):  # pragma: no cover - reaching this IS the failure
+            raise AssertionError("the resolver read a metric for a pre-genesis docket")
+
+        monkeypatch.setattr(evaluator, "_resolve_metric_value", _never)
+        day1 = dd.resolve_due("2026-09-27")
+        assert day1["resolved"] == [] and day1["failed"] == []
+        assert day1["voided"] == [
+            "RESOLVED#2026-09-27#explorer_coach__nutrition_coach#caloric-variance-interpretation-distribution-modeling-vs-poi"
+        ]
+        (void_row,) = _docket_rows(table, "RESOLVED#")
+        assert void_row["verdict"]["outcome"] == "void_pre_genesis"
+        assert "2026-08-10" in void_row["verdict"]["reason"] and GENESIS in void_row["verdict"]["reason"]
+        assert void_row["tombstone"] is True, "the void keeps the row's prior-cycle provenance — invisible to the reader"
+        assert _coach_rows(table, "nutrition_coach", "LEARNING#") == [WIRE_DUPLICATE_LEARNING], "no NEW learning"
+        assert _coach_rows(table, "explorer_coach", "LEARNING#") == []
+        assert _coach_rows(table, "nutrition_coach", "PREDICTION#") == [] and _coach_rows(table, "explorer_coach", "PREDICTION#") == []
+        assert confidence_updates == []
+        day2 = dd.resolve_due("2026-09-28")
+        assert day2["voided"] == [] and day2["already_recorded"] == [WIRE_OPEN_ROW["sk"]]
+        assert len(_docket_rows(table, "RESOLVED#")) == 1
+
+    def test_a_wiped_prior_cycle_row_with_a_post_genesis_date_is_voided_as_prior_cycle(self, wire, monkeypatch):
+        """The reader hides a tombstoned row through singleton_visible; the resolver must
+        not grade what the reader would never show — even when the date alone passes."""
+        table, confidence_updates = wire
+        table.put_item(Item={**WIRE_OPEN_ROW, "resolution_date": "2026-09-10"})
+        monkeypatch.setattr(evaluator, "_resolve_metric_value", lambda *a: WIRE_ACTUAL)
+        summary = dd.resolve_due("2026-09-10")
+        assert len(summary["voided"]) == 1 and summary["resolved"] == []
+        assert _docket_rows(table, "RESOLVED#")[0]["verdict"]["outcome"] == "void_prior_cycle"
+        assert confidence_updates == [] and _coach_rows(table, "nutrition_coach", "LEARNING#") == []
+
+    def test_the_conditional_put_refuses_a_duplicate_and_keeps_the_first(self, wire):
+        """The real duplicate LEARNING# row, written twice: the second write returns None,
+        the partition holds ONE row, and the first is untouched."""
+        table, _c = wire
+        assert dd._put_unique(dict(WIRE_DUPLICATE_LEARNING), "docket LEARNING#") == WIRE_DUPLICATE_LEARNING["sk"]
+        assert dd._put_unique({**WIRE_DUPLICATE_LEARNING, "created_at": "2026-09-08T16:00:00+00:00"}, "docket LEARNING#") is None
+        rows = _coach_rows(table, "nutrition_coach", "LEARNING#")
+        assert len(rows) == 1 and rows[0]["created_at"] == WIRE_DUPLICATE_LEARNING["created_at"]
+
+    def test_one_failing_docket_does_not_abort_the_run(self, wire, monkeypatch):
+        """For 40 days the protein docket and both cycle-17 dockets sat behind the calories
+        row's exception. A failure is reported in `failed`; the others still resolve."""
+        table, _c = wire
+        table.put_item(Item=_cycle_17_copy())
+        protein = _cycle_17_copy(
+            sk="OPEN#explorer_coach__nutrition_coach#protein",
+            subdomain="protein",
+            topic_slug="lunch-protein",
+            criterion={
+                "metric": "total_protein_g_7day_avg",
+                "condition": "lt",
+                "threshold": 190.0,
+                "description": "total_protein_g_7day_avg < 190 on 2026-09-10",
+            },
+        )
+        table.put_item(Item=protein)
+
+        def _resolve(metric, cache, end):
+            if metric.startswith("total_calories"):
+                raise RuntimeError("boom")
+            return 150.0
+
+        monkeypatch.setattr(evaluator, "_resolve_metric_value", _resolve)
+        summary = dd.resolve_due("2026-09-10")
+        assert [f["sk"] for f in summary["failed"]] == [WIRE_OPEN_ROW["sk"]] and "boom" in summary["failed"][0]["error"]
+        assert len(summary["resolved"]) == 1 and summary["resolved"][0]["sk"].endswith("#lunch-protein")
+
+    def test_a_marked_row_frees_the_throttle_key(self, wire):
+        """A resolved-but-undeleted OPEN# row does not stand: the pair can docket the
+        subdomain again, and the marked row is replaced rather than blocking the key."""
+        table, _c = wire
+        marked = {**_cycle_17_copy(), "status": "resolved", "resolved_sk": "RESOLVED#2026-09-10#explorer_coach__nutrition_coach#x"}
+        table.put_item(Item=marked)
+        assert dd._docket_row_stands(marked) is False
+        ok, _, norm = dd.validate_criterion(
+            {
+                "metric": "total_calories_kcal_7day_avg",
+                "condition": "gte",
+                "threshold": 2300,
+                "resolution_days": 7,
+                "sides": {"explorer_coach": True, "nutrition_coach": False},
+            },
+            "explorer_coach",
+            "nutrition_coach",
+            "2026-09-12",
+        )
+        assert ok
+        result = dd.open_docket("Calories, round two", "explorer_coach", "nutrition_coach", {}, norm, "2026-09-12")
+        assert result["opened"] and table.store[(dd.DOCKET_PK, WIRE_OPEN_ROW["sk"])]["status"] == "open"

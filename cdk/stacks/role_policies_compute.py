@@ -422,11 +422,33 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
     fires) both call coach_checkin.read_cycle(), which was un-granted here and
     fail-softing to no cycle stamp (AccessDeniedException, caught and logged,
     never blocking the write).
+
+    #4216: + dynamodb:DeleteItem scoped by LeadingKeys to ENSEMBLE#docket ONLY.
+    dispute_docket._finalize retires the OPEN# row after writing RESOLVED#; the role
+    never carried DeleteItem, so every daily run from 2026-08-17 wrote the derived
+    LEARNING#/PREDICTION#/RESOLVED# rows and then failed on the delete
+    (CloudWatch: "not authorized to perform: dynamodb:DeleteItem", every run through
+    09-11) — the OPEN# row survived and was re-graded the next day: 20 identical
+    learnings per side. test_role_family_write_scope scans only the HANDLER file, so
+    an imported module's delete_item was invisible to it. The code side is now
+    idempotent without this grant (a resolution marker on the OPEN# row); the grant is
+    what lets the row actually leave /api/coach_docket. Partition-scoped like the MCP
+    role's meal-prune delete — this role can never delete raw health data.
     """
     return _compute_base(
         needs_kms=True,
         needs_s3_config=True,
         extra_statements=[
+            iam.PolicyStatement(
+                sid="DocketRetireOpenRow",
+                actions=["dynamodb:DeleteItem"],
+                resources=[TABLE_ARN],
+                conditions={
+                    "ForAllValues:StringEquals": {
+                        "dynamodb:LeadingKeys": ["ENSEMBLE#docket"],
+                    },
+                },
+            ),
             iam.PolicyStatement(
                 sid="BudgetTierRead",
                 actions=["ssm:GetParameter"],
