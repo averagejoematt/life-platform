@@ -226,9 +226,18 @@ def test_both_consumers_call_the_one_helper():
     """The structural half: an agreement produced by two copies of the same arithmetic drifts
     the moment one is edited (that is literally what 452929f17 → #3257 was). Both modules
     must resolve the frame through common.pacific_time.anchor_day_key."""
-    for rel in ("lambdas/web/site_api_freshness.py", "lambdas/emails/freshness_checker_lambda.py"):
+    # #4217: the public board's row arithmetic moved into health.instrument_presence
+    # .source_liveness (so the coach absence gate and the board run ONE function); the board
+    # therefore reaches the anchor THROUGH that helper, and the helper must hold the anchor.
+    board = (_REPO / "lambdas/web/site_api_freshness.py").read_text(encoding="utf-8")
+    assert (
+        "instrument_presence.source_liveness(" in board
+    ), "site_api_freshness no longer delegates its row arithmetic to instrument_presence (#4217)"
+    for rel in ("lambdas/health/instrument_presence.py", "lambdas/emails/freshness_checker_lambda.py"):
         src = (_REPO / rel).read_text(encoding="utf-8")
         assert "anchor_day_key" in src, f"{rel} no longer resolves its DATE# anchor through the shared helper (#3257)"
+    for rel in ("lambdas/web/site_api_freshness.py", "lambdas/health/instrument_presence.py", "lambdas/emails/freshness_checker_lambda.py"):
+        src = (_REPO / rel).read_text(encoding="utf-8")
         assert 'strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)' not in src, f"{rel} re-grew a bare UTC day anchor (#3257)"
 
 

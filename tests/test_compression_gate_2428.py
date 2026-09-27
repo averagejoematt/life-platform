@@ -151,6 +151,7 @@ def test_handler_skips_the_write_on_a_held_compression(monkeypatch):
     """held => the prior COMPRESSED#latest row stays; this run writes nothing."""
     monkeypatch.setattr(chs, "_gather_coach_state", lambda cid: _state())
     monkeypatch.setattr(chs, "_presence_signal", lambda: None)
+    monkeypatch.setattr(chs, "_absent_coaches", lambda: {})  # #4217: no instrument is dark in this branch test
     monkeypatch.setattr(chs, "_run_stance", lambda *a, **k: {"written": False, "reason": "test"})
     monkeypatch.setattr(chs, "_compress_coach", lambda cid, state, presence_signal=None: {"summary": "prior clean summary", "_held": True})
     writes = []
@@ -165,6 +166,7 @@ def test_handler_skips_the_write_on_a_held_compression(monkeypatch):
 def test_handler_writes_a_gated_compression(monkeypatch):
     monkeypatch.setattr(chs, "_gather_coach_state", lambda cid: _state())
     monkeypatch.setattr(chs, "_presence_signal", lambda: None)
+    monkeypatch.setattr(chs, "_absent_coaches", lambda: {})  # #4217: no instrument is dark in this branch test
     monkeypatch.setattr(chs, "_run_stance", lambda *a, **k: {"written": False, "reason": "test"})
     monkeypatch.setattr(chs, "_compress_coach", lambda cid, state, presence_signal=None: {"summary": "ok", "grounding_gated": True})
     writes = []

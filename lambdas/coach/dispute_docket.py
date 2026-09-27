@@ -458,6 +458,17 @@ def open_docket(topic, coach_a, coach_b, claims, normalized, open_date_str, sour
     return {"opened": True, "sk": sk, "resolution_date": normalized["resolution_date"]}
 
 
+def _absent_coaches():
+    """#4217: {coach_id: instrument_state} for every coach whose domain instrument is DARK
+    — the SAME derivation /api/source_freshness serves (health.instrument_presence over
+    this module's table). A dark coach is not admitted to a NEW docket item: a stake
+    "based on CGM data" from a coach with no CGM is not a position, it is a fiction.
+    Existing items stay (history); the serve side hides the dark side's claim."""
+    from health import instrument_presence
+
+    return instrument_presence.absent_coaches(table)
+
+
 def open_from_disagreements(disagreements, open_date_str):
     """Scan the digest's active disagreements; open a docket for every one whose
     criterion survives the deterministic gate. Non-resolvable disagreements stay
@@ -475,6 +486,14 @@ def open_from_disagreements(disagreements, open_date_str):
     from coach.coach_ensemble_digest import ALL_COACH_IDS
 
     opened, skipped = [], []
+    # #4217: the absence gate, read ONCE per run. Fail-open with a logged warning — the
+    # identity and criterion gates below still stand, and the serve side still hides a
+    # dark coach's claim; the skip reason names the failure so the run summary shows it.
+    try:
+        absent = _absent_coaches() if disagreements else {}
+    except Exception as e:
+        logger.warning("docket instrument presence check failed (fail-open): %s", e)
+        absent = {}
     for d in disagreements or []:
         topic = d.get("topic", "unnamed")
         if len(opened) >= MAX_OPENS_PER_RUN:
@@ -495,6 +514,17 @@ def open_from_disagreements(disagreements, open_date_str):
         non_members = [c for c in pair if c not in ALL_COACH_IDS]
         if non_members:
             skipped.append({"topic": topic, "reason": f"non-member coach id(s) {non_members!r} — dropped (not in ALL_COACH_IDS)"})
+            continue
+        dark = [c for c in pair if c in absent]
+        if dark:
+            skipped.append(
+                {
+                    "topic": topic,
+                    "reason": "instrument dark — "
+                    + "; ".join(f"{c} has {absent[c].get('reason')}" for c in dark)
+                    + " — not admitted (#4217)",
+                }
+            )
             continue
         ok, reason, normalized = validate_criterion(criterion, pair[0], pair[1], open_date_str)
         if not ok:

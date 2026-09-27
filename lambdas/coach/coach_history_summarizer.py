@@ -36,7 +36,6 @@ v1.0.0 — 2026-04-06 (Coach Intelligence)
 import json
 import logging
 import os
-import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -72,8 +71,16 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 # after it drifted to the RETIRED cast, but this hand-typed id LIST survived it;
 # tests/test_coach_roster_set_guard_2334.py now fails any module that grows its
 # own copy.
-from coach import audience_guard  # #4213: the stance read is a public-audience slot
+from coach import (
+    audience_guard,  # #4213: the stance read is a public-audience slot
+    coach_presence_gate,  # #4217: the absent-coach gate's shared glue
+)
 from coach.persona_registry import OPERATIONAL_COACH_IDS
+from coach.stance_lint import (  # noqa: F401 — #4217: the lint moved out (module at its size ceiling); _contains_raw_vitals is re-exported for tests/test_coach_stance_engine.py
+    claims_change as _claims_change,
+    contains_raw_vitals as _contains_raw_vitals,
+    vital_hits as _vital_hits,
+)
 
 ALL_COACH_IDS = list(OPERATIONAL_COACH_IDS)
 
@@ -1130,21 +1137,6 @@ def _write_compressed_state(coach_id, compressed):
 # Patterns the stance must NEVER fabricate — it speaks to *thinking*, not
 # measurements. A hit drives a single strict regeneration; a residual hit sets a
 # grounding flag the render/Sentinel can see.
-_RAW_VITAL_RE = re.compile(
-    r"\b\d{2,3}\s?(?:bpm|ms|mg/?dl|lbs?|kg|kcal|cal)\b"
-    r"|\b(?:rhr|hrv|recovery|resting heart rate|resting hr|deep|rem)\b[^.\n]{0,14}?\b\d"
-    r"|\b\d{1,3}(?:\.\d+)?\s?%",
-    re.IGNORECASE,
-)
-
-# Language that asserts the read has evolved — only allowed when a real signal of
-# change exists (a logged correction or a stage shift vs the prior stance).
-_CHANGE_RE = re.compile(
-    r"\b(?:chang|shift|revis|reconsider|no longer|used to|previously|earlier I|"
-    r"moved (?:on |from )|updated my|come around|changed my mind|where I once)",
-    re.IGNORECASE,
-)
-
 STANCE_SYSTEM_PROMPT = (
     "You maintain the evolving STANCE of one AI health coach toward the person they coach "
     "(Matthew). A stance is the coach's current *read* of him IN THIS COACH'S DOMAIN — what the "
@@ -1194,32 +1186,6 @@ _STANCE_FIELDS = {
     "confidence_note": "",
     "evidence_basis": [],
 }
-
-
-def _contains_raw_vitals(text):
-    """True if the text cites a raw physiological number the stance must not invent."""
-    return bool(_RAW_VITAL_RE.search(text or ""))
-
-
-def _vital_hits(stance):
-    """Count raw-vital citations across the prose fields of a stance dict."""
-    if not isinstance(stance, dict):
-        return 0
-    prose = " ".join(
-        [
-            str(stance.get("headline_read", "")),
-            str(stance.get("how_my_read_changed", "")),
-            str(stance.get("confidence_note", "")),
-            " ".join(str(x) for x in stance.get("focused_on_now", []) or []),
-            " ".join(str(x) for x in stance.get("set_aside_for_now", []) or []),
-        ]
-    )
-    return len(_RAW_VITAL_RE.findall(prose))
-
-
-def _claims_change(text):
-    """True if the prose asserts the read has evolved (needs a real change signal)."""
-    return bool(_CHANGE_RE.search(text or ""))
 
 
 def _gather_learning(coach_id, limit=40):
@@ -1528,6 +1494,16 @@ def _run_stance(coach_id, compressed, state, trigger="weekly", event_context=Non
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _absent_coaches():
+    """#4217: the coaches whose domain instrument is DARK (health.instrument_presence, the
+    SAME derivation /api/source_freshness serves). Such a coach writes NO stance this run
+    (weekly or event-triggered) — STANCE#latest stays; compression (his private memory)
+    still runs. Read fail-open through coach_presence_gate.absent_or_empty."""
+    from health import instrument_presence
+
+    return instrument_presence.absent_coaches(table)
+
+
 def _handle_event_stance_refresh(event):
     """#534: mid-week single-coach STANCE# refresh.
 
@@ -1560,6 +1536,11 @@ def _handle_event_stance_refresh(event):
             return {"statusCode": 200, "coach_id": coach_id, "skipped": "budget_tier"}
     except Exception:
         pass  # fail-open — a budget_guard/SSM blip must not block a rare mid-week refresh
+
+    _absent, _ = coach_presence_gate.absent_or_empty(_absent_coaches, logger, "[event-stance]")  # #4217
+    if coach_id in _absent:
+        logger.info("[event-stance] %s skipped — instrument dark: %s", coach_id, _absent[coach_id].get("reason"))
+        return {"statusCode": 200, "coach_id": coach_id, "skipped": "instrument_dark", "reason": _absent[coach_id].get("reason")}
 
     compressed = _get_item(f"COACH#{coach_id}", "COMPRESSED#latest")
     if not compressed or compressed.get("_fallback"):
@@ -1617,6 +1598,7 @@ def lambda_handler(event, context):
         # single GetItem, not one per coach. Read before the loop so a mid-run write
         # cannot make two coaches see different availability for the same day.
         presence_signal = _presence_signal()
+        absent, _ = coach_presence_gate.absent_or_empty(_absent_coaches, logger, "[stance]")  # #4217: ONE read per batch
 
         for coach_id in coach_ids:
             try:
@@ -1657,7 +1639,13 @@ def lambda_handler(event, context):
 
                 # Stance engine (coach-opinion) — evolving evidence-derived read of
                 # Matthew. Fail-soft: a stance error never aborts the compression run.
-                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state, trigger="weekly", presence_signal=presence_signal)
+                if coach_id in absent:  # #4217: a dark instrument holds the stance
+                    logger.info("[stance] %s skipped — instrument dark: %s", coach_id, absent[coach_id].get("reason"))
+                    results[coach_id]["stance"] = coach_presence_gate.skipped_stance(absent[coach_id])
+                else:
+                    results[coach_id]["stance"] = _run_stance(
+                        coach_id, compressed, state, trigger="weekly", presence_signal=presence_signal
+                    )
 
             except Exception as e:
                 logger.error("Failed to compress %s: %s", coach_id, e, exc_info=True)
