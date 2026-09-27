@@ -26,11 +26,13 @@
   <main id="main" class="v7-main">
     <h1>Under the hood</h1>
     <p class="v7-job">How a number is made, and the corrections column.</p>
+    <noscript><p class="hd-note">Every number on this page is drawn from the site’s served data when scripts run. With scripts off the entries below name what each one holds, not the numbers.</p></noscript>
     <section class="hd-entry" id="hd-how" aria-labelledby="hd-how-h">
       <div class="hd-m" data-margin><span class="d">§</span></div>
       <div class="hd-body">
         <h2 class="hd-h" id="hd-how-h">How a number is made</h2>
         <div id="hd-how-body"><p class="hd-note hd-pending">Loading the numbers — this line fills from the site’s served data.</p></div>
+        <details class="hd-fold hd-explainer" id="hd-score"><summary>The engine’s one score, explained</summary><p class="hd-prose hd-explainer-p">Besides the figures above, the engine keeps one score that tries to answer “is the whole life moving, or just one corner of it?” Each day it scores seven areas of his life — sleep, movement, eating, metabolic health, mind, relationships and consistency — from their own real data, weighs them, and rolls them into one level from 1 to 100. The hundred levels sit in five bands of twenty: Foundation, Momentum, Discipline, Mastery, Elite. A level moves only after a sustained shift — roughly five or more days of real improvement to go up, seven or more of decline to go down — so one great or terrible day cannot swing it, and a rise is earned. It cuts both ways: when the logging goes quiet, what is not happening scores zero and the levels fall. It is a motivational lens on real data, not a medical score. The live number is on the numbers page, never written here.</p></details>
       </div>
     </section>
     <section class="hd-entry" id="hd-corrections" aria-labelledby="hd-corrections-h">
@@ -51,7 +53,8 @@
       <div class="hd-m" data-margin><span class="d">§</span></div>
       <div class="hd-body">
         <h2 class="hd-h" id="hd-gear-h">The gear</h2>
-        <p class="hd-disclosure" id="hd-disclosure" role="note" aria-label="Affiliate disclosure">Some links on this page are affiliate links. If you buy through one, averagejoematt.com may earn a small commission &mdash; at no additional cost to you. Nothing here is a paid placement: every item is a device or app that genuinely feeds this platform&rsquo;s data, pulled straight from its source registry. If it isn&rsquo;t in the pipeline, it isn&rsquo;t on this page.</p>
+        <p class="hd-small" id="hd-gear-lead"><span data-src="source_registry.catalog_entries()">16</span> devices and apps are on this list. <span id="hd-gear-cover" data-src="api_source_freshness.summary.total"></span></p>
+        <details class="hd-fold hd-gear-fold" id="hd-gear-list"><summary>The list, and when each last reported</summary>
         <table class="hd-gear" data-src="source_registry.catalog_entries()">
           <thead><tr><th scope="col">Device or app</th><th scope="col">What it feeds</th><th scope="col">Last reported</th></tr></thead>
           <tbody>
@@ -73,7 +76,8 @@
           <tr data-source="garmin"><td class="hd-gear-name">Garmin</td><td class="hd-gear-feeds">Stress, body battery, steps</td><td class="hd-gear-seen" data-src="api_source_freshness.sources[].last_update">not loaded yet</td></tr>
           </tbody>
         </table>
-        <p class="hd-note">The list is read from the site’s own source registry at build time — if it isn’t in the pipeline, it isn’t here.</p>
+        </details>
+        <p class="hd-note">The list is read from the site’s own list of sources when the page is built — if a device or app does not feed the site, it is not here.</p>
       </div>
     </section>
     <section class="hd-entry" id="hd-return" aria-labelledby="hd-return-h">
@@ -81,6 +85,7 @@
       <div class="hd-body">
         <h2 class="hd-h" id="hd-return-h">Next</h2>
         <div id="hd-return-body"><p class="hd-note hd-pending">Loading the numbers — this line fills from the site’s served data.</p></div>
+        <p class="hd-note hd-through" id="hd-through" data-src="api_vitals.vitals.as_of_date"></p>
       </div>
     </section>
   </main>
