@@ -1291,22 +1291,9 @@ TOOLS = {
                             "'episodic_wins' → what_worked, 'failure_pattern' → failure_patterns."
                         ),
                     },
-                    "content": {
-                        "type": "object",
-                        "description": (
-                            'Key-value dict of data to store, with the readable core in "summary". '
-                            'E.g. {"summary": "work trip Tue-Fri, hotel gym only", "detail": {...}}'
-                        ),
-                    },
+                    "content": {"type": "object", "description": 'Key-value dict; put the readable core in "summary" — what coaches read.'},
                     "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
-                    "replace_key": {
-                        "type": "string",
-                        "description": (
-                            "The exact sk (from read_platform_memory) of the ONE record to rewrite. Without it every write "
-                            "is a NEW row keyed MEMORY#<category>#<date>#<content-hash> (#4171 — a same-day note never erases "
-                            "an earlier one; an identical replay converges). Replacing an absent key is refused."
-                        ),
-                    },
+                    "replace_key": {"type": "string", "description": "Exact sk of the one row to rewrite; default adds a new row (#4171)"},
                     "privacy_tier": {
                         "type": "string",
                         "enum": ["public_ok", "coach_context", "private"],
@@ -1368,13 +1355,7 @@ TOOLS = {
                 "properties": {
                     "category": {"type": "string", "description": "Memory category."},
                     "date": {"type": "string", "description": "Date of the legacy one-row-per-day record to delete (YYYY-MM-DD)."},
-                    "key": {
-                        "type": "string",
-                        "description": (
-                            "The exact sk (from read_platform_memory) of the record to delete — the only handle for a per-note "
-                            "row (MEMORY#<category>#<date>#<hash>, #4171). One of date or key is required."
-                        ),
-                    },
+                    "key": {"type": "string", "description": "Exact sk of the row to delete — the only handle for a per-note row (#4171)"},
                 },
                 "required": ["category"],
             },
