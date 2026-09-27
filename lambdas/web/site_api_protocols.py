@@ -457,7 +457,8 @@ def _movement_name(movement_key, catalog: dict, alias_titles: dict) -> "str | No
 
         entry = _catalog_entry_for(key, catalog or {})
     except Exception as e:  # noqa: BLE001 — the name resolver must not take the route down
-        logger.warning("handle_session catalog lookup failed for %s: %s", key, e)
+        # the key is a routine-record field — never logged (CodeQL py/clear-text-logging-sensitive-data, PR #4318)
+        logger.warning("handle_session catalog lookup failed: %s", type(e).__name__)
         entry = {}
     if entry.get("title"):
         return str(entry["title"])
@@ -638,7 +639,8 @@ def session(*, _g) -> dict:
             )
             ir = _decimal_to_float(resp.get("Item")) or {}
         except Exception as e:
-            logger.warning("handle_session IR read failed for %s: %s", r.get("routine_id"), e)
+            # no record field in the log line — the failure class is enough (CodeQL, PR #4318)
+            logger.warning("handle_session IR read failed: %s", type(e).__name__)
             ir = {}
         if ir:
             irs.append(ir)
