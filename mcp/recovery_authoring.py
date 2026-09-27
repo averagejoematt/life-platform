@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 # contract: `training.routine_generator` pulls no boto3 and no mcp.config at import time
 # (its S3/DDB clients are all lazily constructed inside functions), so this file still
 # unit-tests with no env vars and no AWS. Two copies of a rule is how a rule drifts.
+from training import rep_scheme  # #4065: the program's scheme + the plate-grid floor comparison — pure, no I/O
 from training.routine_generator import SUBTRACT_ONLY_RULE  # noqa: F401  (re-exported: the skill doc + tests read it from here)
 
 # ── Single source of truth: Whoop recovery bands + the rubric (brief §3) ──
@@ -324,12 +325,13 @@ def _field(obj, name, default=None):
     return obj.get(name, default) if isinstance(obj, dict) else getattr(obj, name, default)
 
 
-# #4065 — a load equal to the floor must pass. A floor drawn from Hevy's stored kg
-# (63.50300732) against a draft's lb->kg rounding (140 lb -> 63.5029) differs by 0.0001 kg,
-# and a 1e-6 comparison refused a set AT the floor. 0.05 kg (~0.11 lb) absorbs any kg<->lb
-# round trip and is an order of magnitude under the smallest real plate step (1.25 lb =
-# 0.57 kg), so it cannot let a genuine under-prescription through.
-LOAD_TOLERANCE_KG = 0.05
+# #4065 — a load equal to the floor must pass, and so must every representation of the same bar.
+# A floor drawn from Hevy's stored kg (63.50300732) against a draft's lb->kg rounding (140 lb ->
+# 63.5029) differs at the 4th decimal, and a bare `<` refused a set AT the floor; #4138's 0.05 kg
+# tolerance then still refused a 0.5 kg floor typed back from its lb display (64.5 kg -> "142" ->
+# 64.41). The comparison is now `training.rep_scheme.is_below_floor` — the gap rounded to whole
+# plate steps, below only at >= 1 step — and it is the SAME predicate stage 2's critic clamp
+# (`coach.critics_apply`) holds a change to, so no clamped draft can fail here (#4149).
 
 
 def _is_working(s):
@@ -374,10 +376,13 @@ def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
 
     THE BACK-OFF SEAM (#4090 / #4065). A §3 heavy exposure is [top, back-off, back-off]. A floor
     row may carry `back_off_floor_kg` — written by the generator (#4090) or, on the chat path,
-    by `hevy_prescription_gate.derive_load_floors` from the redline rep scheme (#4065). It
+    by `hevy_prescription_gate.derive_load_floors` from the program's own scheme (#4065). It
     applies to the scheme's back-offs ONLY: the `back_offs` working sets straight after the first
-    working set (`training.rep_scheme`, parsed from the redline prose). A set past that window —
-    an ADDED back-off — meets the top-set floor, so the exemption cannot become a hole.
+    working set (`training.rep_scheme.heavy_back_off_scheme`, read from `program_structure.
+    EXPOSURES["heavy"]` — the dict the generator prescribes from, never a hand list or a second
+    parse). A set past that window — an ADDED back-off — meets the top-set floor, so the
+    exemption cannot become a hole. Loads are compared on the plate grid
+    (`rep_scheme.is_below_floor`): equal-within-half-a-plate passes, one plate step under refuses.
 
     `floors` is optional, and its absence is reported (`floors_checked: False`) rather
     than passed over: an audit that could not see the floors is not a clean audit.
@@ -406,7 +411,8 @@ def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
             w = float(_field(_sets_of(ex)[i], "weight_kg"))
             floor_kg = per_set[i]
             back_offs_checked += i in back_off_idx
-            if w >= floor_kg - LOAD_TOLERANCE_KG:
+            steps_under = rep_scheme.steps_under_floor(w, floor_kg)
+            if not rep_scheme.is_below_floor(w, floor_kg):
                 continue
             note = None
             if back_off_floor_kg and i not in back_off_idx and i != working[0]:
@@ -418,6 +424,8 @@ def audit_prescription(exercises, routine_notes="", floors=None, scheme=None):
                     "set": i + 1,
                     "prescribed_kg": w,
                     "floor_kg": floor_kg,
+                    "steps_under": steps_under,
+                    "plate_step_lb": rep_scheme.PLATE_STEP_LB,
                     "basis": floor.get("basis"),
                     "back_off_note": note,
                     "clause": (

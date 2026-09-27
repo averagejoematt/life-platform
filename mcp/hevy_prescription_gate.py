@@ -197,8 +197,9 @@ def derive_load_floors(
     movements = _catalog_movements() if movements is None else movements
     # #4065: the chat path's half of the #4090 back-off seam. The generator writes
     # `back_off_floor_kg` for the sets it authors; a hand-drafted v0.3 heavy exposure gets the
-    # same field from the redline rep scheme (parsed, never a hand list; −pct off the floor,
-    # rounded DOWN to the rack step). An unparsed scheme writes none, so back-offs fail closed.
+    # same field from the program's own scheme (`program_structure.EXPOSURES["heavy"]`, the dict
+    # the generator prescribes from — never a hand list, never a second parse; −pct off the
+    # floor, rounded DOWN to the rack step). An unreadable scheme writes none: back-offs fail closed.
     from training.rep_scheme import back_off_min_kg, heavy_back_off_scheme
 
     scheme = heavy_back_off_scheme()
@@ -239,7 +240,7 @@ def derive_load_floors(
 
                 row["back_off_floor_kg"] = _floor_half_kg(float(floor["floor_kg"]) * back_off_pct / 100.0)
         if "back_off_floor_kg" not in row and floor.get("floor_kg") and scheme.get("status") == "ok":
-            # #4065: outside the v0.3 load rule the back-off floor comes from the redline rep scheme.
+            # #4065: outside the v0.3 load rule the back-off floor comes from the same program scheme.
             row["back_off_floor_kg"] = back_off_min_kg(float(floor["floor_kg"]), scheme)
         audit["movements"][key] = row
     return audit
