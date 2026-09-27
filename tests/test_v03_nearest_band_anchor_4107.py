@@ -149,7 +149,11 @@ def _completed(n: int) -> list[dict]:
                 "date": d,
                 "source_workout_id": f"W{i}",
                 "title": "Full Body",
-                "exercises": [{"name": "Lat Pulldown (Cable)", "sets": [{"type": "normal", "weight_kg": 50, "reps": 8}]}],
+                # #4312: an upper and a lower set, so each generic session matches the role it takes
+                "exercises": [
+                    {"name": "Lat Pulldown (Cable)", "sets": [{"type": "normal", "weight_kg": 50, "reps": 8}]},
+                    {"name": "Leg Press", "sets": [{"type": "normal", "weight_kg": 90, "reps": 5}]},
+                ],
             }
         )
     return out
