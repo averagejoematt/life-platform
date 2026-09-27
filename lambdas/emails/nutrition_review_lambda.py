@@ -37,6 +37,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from health import nutrient_intake  # #4244: THE food + supplements micronutrient join (shared with the public door)
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -181,7 +182,9 @@ def gather_nutrition_data():
         dexa_items.sort(key=lambda x: x.get("scan_date") or "", reverse=True)
         latest_dexa = dexa_items[0]
 
-    supplements = query_range("supplements", w1_start, w1_end)
+    # #4244: BOTH weeks, so the prior week's micronutrient figures are joined on the same
+    # basis as this week's (extract_daily_nutrition joins per day through health.nutrient_intake).
+    supplements = query_range("supplements", w2_start, w1_end)
 
     # Previous week's nutrition review (for trending)
     prev_review = None
@@ -225,10 +228,17 @@ def gather_nutrition_data():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def extract_daily_nutrition(mf_data):
+def extract_daily_nutrition(mf_data, supplements=None):
+    """One day row per MacroFactor day. `supplements` is the {date: row} map from the
+    supplements partition (#4244): the micronutrient figures below are the food +
+    supplements JOIN (health.nutrient_intake), not the stored food-only number — the
+    panel was told to act on "<50% for 3+ days" over a figure that could not see the
+    5,000 IU of vitamin D the same prompt listed under `supplements`."""
     days = []
+    supplements = supplements or {}
     for date_str in sorted(mf_data.keys()):
         rec = mf_data[date_str]
+        intake = nutrient_intake.nutrient_intake(rec, supplements.get(date_str))
         food_log = rec.get("food_log", [])
         foods = []
         for item in food_log:
@@ -285,8 +295,17 @@ def extract_daily_nutrition(mf_data):
             "meals_above_30g_protein": safe_float(rec, "meals_above_30g_protein"),
             "protein_distribution_score": safe_float(rec, "protein_distribution_score"),
             "total_meals": safe_float(rec, "total_meals"),
-            "micronutrient_sufficiency": rec.get("micronutrient_sufficiency"),
-            "micronutrient_avg_pct": safe_float(rec, "micronutrient_avg_pct"),
+            # #4244: the JOINED figures — per nutrient {actual, target, pct, from_food,
+            # from_supplements, channels_counted[, uncounted_supplements]}; the label fields
+            # ride beside them so the panel knows what each number counted.
+            "micronutrient_sufficiency": intake["sufficiency"] or None,
+            "micronutrient_avg_pct": intake["avg_pct"],
+            "micronutrient_intake_channels": intake["intake_channels"],
+            "micronutrient_avg_pct_basis": intake["avg_pct_basis"],
+            "micronutrient_food_only_avg_pct": intake["food_only_avg_pct"],
+            "supplements_state": intake["supplements_state"],
+            "supplements_counted": intake["counted"],
+            "supplements_unconverted": intake["unconverted"],
             "foods": foods,
         }
         days.append(day)
@@ -512,6 +531,8 @@ Write as three distinct expert voices analyzing the week's nutrition data, follo
 
 {experts_text}
 
+{MICRONUTRIENT_SCOPE_NOTE}
+
 ## UNIFIED TACTICAL SECTION
 
 ### Top 3 Nutrition Priorities This Week
@@ -550,8 +571,23 @@ Write clean HTML with inline styles. Design:
     return prompt
 
 
+# #4244: the deterministic micronutrient numbers in the payload are the food + supplements
+# JOIN, and the panel must be told so — the old prompt said "Any micro <50% for 3+ days" over
+# a food-only figure while listing the same day's 5,000 IU of vitamin D under `supplements`,
+# two halves in one prompt and never reconciled. Rendered into BOTH prompt paths (the S3
+# board config and the hardcoded fallback). Plain text, no braces — the fallback is
+# `.format()`ed at call time.
+MICRONUTRIENT_SCOPE_NOTE = """## MICRONUTRIENT NUMBERS — WHAT EACH ONE COUNTED
+Every `micronutrient_sufficiency` entry in daily_detail is the TOTAL of food (MacroFactor) + the supplement doses recorded as TAKEN that day, with unit conversions (5,000 IU vitamin D = 125 mcg; 2,000 mg magnesium L-threonate = 144 mg elemental). Each entry names its channels: `from_food`, `from_supplements`, `channels_counted`. `micronutrient_avg_pct` averages those totals; `micronutrient_food_only_avg_pct` is the food-only figure for comparison.
+- A nutrient whose `from_supplements` covers the gap is NOT a deficiency that day. Never call vitamin D, magnesium or omega-3 "short" without reading `from_supplements` first.
+- `uncounted_supplements` on an entry names a taken dose whose content is unknown (multivitamin, electrolytes) — the total for that nutrient is a FLOOR; say "at least".
+- `supplements_unconverted` lists taken doses the platform could not count. They are unknown, not zero: name them as uncounted, never as missing.
+- `supplements_state: "absent"` means no supplement record exists for that day — the number is food only and must be labelled food-only, not read as "took nothing".
+- Omega-3: `species` splits ALA (food) from EPA/DHA (food + supplement). Do not credit plant ALA as EPA/DHA."""
+
 # Fallback prompt (original hardcoded version, used if S3 config unavailable)
-_FALLBACK_SYSTEM_PROMPT = """You are the Saturday Nutrition Review panel for Matthew's Life Platform. You write a weekly email arriving Saturday morning before his grocery shopping trip to Metropolitan Market in Seattle.
+_FALLBACK_SYSTEM_PROMPT = (
+    """You are the Saturday Nutrition Review panel for Matthew's Life Platform. You write a weekly email arriving Saturday morning before his grocery shopping trip to Metropolitan Market in Seattle.
 
 ## YOUR PANEL
 
@@ -563,7 +599,7 @@ Tone: Direct, evidence-based. Reference HIS actual food log entries by deduced m
 Principle: "Build from what's working. Don't overhaul - optimize."
 
 ### Dr. Amara Patel - Micronutrients, Genome & Longevity
-Analyze: Cross-reference dietary intake against genome SNPs provided. Vitamin D gap + genetics. FADS2 ALA conversion issue. FADS1 omega-6/inflammation. MTHFR methylfolate. Choline (MTHFD1+MTRR+PEMT triple risk, target 550mg+). Vitamin K (VKORC1). Potassium. Any micro <50% for 3+ days.
+Analyze: Cross-reference dietary intake against genome SNPs provided. Vitamin D gap + genetics. FADS2 ALA conversion issue. FADS1 omega-6/inflammation. MTHFR methylfolate. Choline (MTHFD1+MTRR+PEMT triple risk, target 550mg+). Vitamin K (VKORC1). Potassium. Any micro whose food + supplements TOTAL is <50% for 3+ days (read from_supplements before calling anything a gap — see MICRONUTRIENT NUMBERS below).
 Tone: Scientific but accessible. Connect genes to nutrients to foods.
 Principle: "Genomics tells us WHERE to focus. Food logs tell us what's missing."
 
@@ -571,6 +607,10 @@ Principle: "Genomics tells us WHERE to focus. Food logs tell us what's missing."
 Analyze: Weight trend and rate. CGM data if available. Meal glucose impact. Meal timing vs training. Deficit sustainability. DEXA benchmark context. Carb quality/timing.
 Tone: Strategic, longevity-focused.
 Principle: "Rate of loss matters less than body composition trajectory."
+
+"""
+    + MICRONUTRIENT_SCOPE_NOTE
+    + """
 
 ## UNIFIED TACTICAL SECTION
 
@@ -605,16 +645,23 @@ Write clean HTML with inline styles. Design:
 - Section headers: font-size 15px, font-weight 700, color matching border.
 
 ## CRITICAL: Every recommendation must cite a specific food he ate, a specific number, or a specific gene variant. No generic advice."""
+)
 
 
 def build_user_message(data):
-    days_this = extract_daily_nutrition(data["macrofactor_this"])
-    days_prior = extract_daily_nutrition(data["macrofactor_prior"])
+    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"))
+    days_prior = extract_daily_nutrition(data["macrofactor_prior"], data.get("supplements"))
     summary_this = compute_weekly_summary(days_this)
     summary_prior = compute_weekly_summary(days_prior)
 
     payload = {
-        "this_week": {"summary": summary_this, "daily_detail": days_this},
+        "this_week": {
+            "summary": summary_this,
+            "daily_detail": days_this,
+            # #4244: the label rides with the numbers — what every micronutrient figure counted.
+            "micronutrient_intake_channels": list(nutrient_intake.INTAKE_CHANNELS),
+            "micronutrient_avg_pct_basis": nutrient_intake.AVG_PCT_BASIS,
+        },
         "prior_week_summary": summary_prior,
         "weight": extract_weight_trend(data["withings"]),
         "training": extract_training(data["strava"]),
@@ -671,6 +718,20 @@ def _graded_cell(value, color_of, fmt):
     if value is None:
         return _ABSENT_COLOR, _ABSENT_CELL
     return color_of(value), fmt(value)
+
+
+def _unconverted_note(days):
+    """The footnote's honest tail (#4244): which TAKEN doses the Micro column could not count,
+    DERIVED from the week's rows (health.nutrient_intake's `unconverted[]`), never hand-typed —
+    a hand-typed list would drift the day the stack or the registry changes."""
+    names = sorted({str(u.get("name")) for d in days for u in (d.get("supplements_unconverted") or []) if u.get("name")})
+    absent = sum(1 for d in days if d.get("supplements_state") == "absent")
+    parts = []
+    if names:
+        parts.append("not counted, no cited conversion: " + ", ".join(names))
+    if absent:
+        parts.append(f"{absent} day{'s' if absent != 1 else ''} with no supplement record = food only")
+    return f" ({'; '.join(parts)})" if parts else ""
 
 
 def build_summary_table(days, profile):
@@ -746,11 +807,11 @@ def build_summary_table(days, profile):
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">CARBS</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">FAT</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">FIBER</th>
-            <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">MICRO</th>
+            <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">MICRO (food + supps)</th>
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency %
+            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of food + supplements taken that day{_unconverted_note(days)}
         </td></tr>
     </table>"""
 
@@ -912,7 +973,7 @@ def lambda_handler(event, context):
     dates = data["dates"]
     profile = data["profile"]
 
-    days_this = extract_daily_nutrition(data["macrofactor_this"])
+    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"))
     if not days_this:
         logger.error("No MacroFactor data this week")
         return {"statusCode": 500, "body": "No nutrition data"}

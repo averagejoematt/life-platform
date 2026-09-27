@@ -201,6 +201,8 @@ SOURCE_TIERS: dict[str, int] = {
     "strava": TIER_OWNER_ONLY,  # activity GPS traces (location is never public — DATA_GOVERNANCE PII definition)
     "hevy": TIER_OWNER_ONLY,  # workout details; public training surfaces serve aggregates (muscle volume, PRs)
     "sick_days": TIER_OWNER_ONLY,  # sick-day records
+    # Aggregate carve-out (owner ruling 2026-09-27, #4244/#4333): per-nutrient supplement TOTALS are public on
+    # /api/nutrition_overview via health.nutrient_intake; the rows themselves stay owner-only.
     "supplements": TIER_OWNER_ONLY,  # supplement LOGS (the public protocols page is curated content, not this partition)
     "reading": TIER_OWNER_ONLY,  # ADR-097 retention/recall keyspace; public shelf is reading_visibility.project_public
     "private_intake": TIER_OWNER_ONLY,  # #1405 — phase_taxonomy: NEVER public-served; MCP-only

@@ -146,3 +146,21 @@ def protein_window(series: list, last_n: Optional[int] = None) -> Optional[dict]
     if last_n is not None and last_n > 0:
         vals = vals[-int(last_n) :]
     return mean_ci(vals)
+
+
+def protein_intake(items: Iterable[dict], today: str, experiment_start: str) -> dict:
+    """THE protein-intake average (#4343): the figure `/api/nutrition_overview` serves as
+    `avg_protein_g`, with the window and the n that make it a claim.
+
+    Rows outside the `window_start` window (genesis-floored, ending `today`) and
+    superseded (`tombstone`) rows are dropped, so a producer that fetched a wider range
+    cannot publish a different number. `computed_metrics.protein_g_avg` is written from
+    this — before #4343 it was a 30-calendar-day mean that crossed the genesis (122.7 g on
+    2026-09-27 against the served 153.5 g over 21 logged days), and every coach was told
+    the first while the served-fact check measured the second.
+    """
+    start = window_start(today, experiment_start)
+    end = str(today)[:10]
+    rows = [i for i in items or () if isinstance(i, dict) and not i.get("tombstone") and start <= row_date(i) <= end]
+    win = protein_window(protein_series(rows))
+    return {"avg_g": win["mean"] if win else None, "days": win["n"] if win else 0, "window_start": start}

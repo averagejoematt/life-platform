@@ -487,10 +487,17 @@ def authoritative_facts_block(facts: dict) -> str:
     # #1968: name the night these wake-date-keyed vitals describe (see ai/night_scope.py).
     lines = [ln for ln in (_night_scope.night_label_line(facts),) if ln]
     if facts.get("protein_g_avg") is not None:
+        # #4343: the served figure WITH its window — `/api/nutrition_overview`'s avg_protein_g
+        # over its logged days, the same window the served-fact check measures. A bare
+        # average here was a 30-calendar-day mean the check could not place, so a coach
+        # that obeyed this line was held.
+        _pd = facts.get("protein_g_avg_days")
+        _pwin = f" over the last {int(_pd)} logged days" if _pd else ""
         lines.append(
-            f"  - Protein INTAKE averages {facts['protein_g_avg']:g} g/day "
+            f"  - Protein INTAKE averages {facts['protein_g_avg']:g} g a day{_pwin} "
             f"(target {int(facts.get('protein_g_target') or 190)} g, floor {int(facts.get('protein_g_floor') or 170)} g). "
-            f"His actual intake is ~{facts['protein_g_avg']:g} g — never state intake as the target or floor."
+            f"His actual intake is ~{facts['protein_g_avg']:g} g — never state intake as the target or floor"
+            + (f"; when you cite this average, name its window ({int(_pd)} logged days)." if _pd else ".")
         )
     if facts.get("recovery_pct") is not None:
         lines.append(f"  - Latest Whoop recovery: {facts['recovery_pct']:g}%")

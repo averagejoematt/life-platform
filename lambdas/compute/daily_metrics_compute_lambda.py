@@ -62,6 +62,7 @@ from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
     flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
     milestone_ledger,  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
+    nutrition_logging,  # #4343: THE protein-intake derivation /api/nutrition_overview serves
     personal_baselines,  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
     scoring_engine,
     weight_trend,  # shared weekly-rate + projection (layer module)
@@ -608,6 +609,11 @@ def _deep_dec(obj):
 # ==============================================================================
 
 
+# Phase-3 canonical vitals + the protein window (#4343: its n) — the numeric fields
+# `store_computed_metrics` writes from `vitals`, one tuple for the handler and the writer.
+VITAL_FIELDS = ("recovery_pct", "hrv_ms", "rhr_bpm", "protein_g_avg", "protein_g_avg_days", "protein_g_target", "protein_g_floor")
+
+
 def store_computed_metrics(
     date_str,
     day_grade_score,
@@ -696,16 +702,12 @@ def store_computed_metrics(
     # window protein avg+target+floor, units in the field names. Every surface (brief,
     # AI narrative, website, coaches) reads these — one number, never two ways on a page.
     if vitals:
-        for field, val in [
-            ("recovery_pct", vitals.get("recovery_pct")),
-            ("hrv_ms", vitals.get("hrv_ms")),
-            ("rhr_bpm", vitals.get("rhr_bpm")),
-            ("protein_g_avg", vitals.get("protein_g_avg")),
-            ("protein_g_target", vitals.get("protein_g_target")),
-            ("protein_g_floor", vitals.get("protein_g_floor")),
-        ]:
-            if val is not None:
-                item[field] = _to_dec(val)
+        for field in VITAL_FIELDS:
+            if vitals.get(field) is not None:
+                item[field] = _to_dec(vitals[field])
+
+        if vitals.get("protein_g_avg_since"):
+            item["protein_g_avg_since"] = str(vitals["protein_g_avg_since"])
 
     # Component scores
     cs_dec = {k: Decimal(str(v)) for k, v in component_scores.items() if v is not None}
@@ -1084,10 +1086,13 @@ def assemble_data(yesterday_str, profile):
     # Protein: the window average is what the coaches narrate (the "stuck at ~140g"
     # read); store it here once, with the canonical target/floor from profile, so no
     # surface re-derives or invents the number (kills the 140/170/190 split at source).
-    mf_window = fetch_range("macrofactor", (today - timedelta(days=30)).isoformat(), yesterday_str)
-    _pro_vals = [safe_float(m, "total_protein_g") for m in mf_window]
-    _pro_vals = [v for v in _pro_vals if v is not None]
-    protein_g_avg = round(sum(_pro_vals) / len(_pro_vals), 1) if _pro_vals else None
+    # #4343: through THE derivation /api/nutrition_overview serves (`avg_protein_g`) — the
+    # genesis-floored window ending the Pacific today, with its n. The old 30-calendar-day
+    # mean crossed the genesis (122.7 g vs the served 153.5 g over 21 logged days on 09-27).
+    _pt_today = today.isoformat()
+    _mf_rows = fetch_range("macrofactor", nutrition_logging.window_start(_pt_today, EXPERIMENT_START_DATE), _pt_today)
+    _protein = nutrition_logging.protein_intake(_mf_rows, _pt_today, EXPERIMENT_START_DATE)
+    protein_g_avg = _protein["avg_g"]
     protein_g_target = float(profile.get("protein_target_g", 190))
     protein_g_floor = float(profile.get("protein_floor_g", 170))
 
@@ -1140,6 +1145,8 @@ def assemble_data(yesterday_str, profile):
         "hrv_ms": primary_hrv_ms,
         "rhr_bpm": primary_rhr_bpm,
         "protein_g_avg": protein_g_avg,
+        "protein_g_avg_days": _protein["days"],  # #4343: the n and window the average is over
+        "protein_g_avg_since": _protein["window_start"],
         "protein_g_target": protein_g_target,
         "protein_g_floor": protein_g_floor,
     }
@@ -1310,14 +1317,7 @@ def lambda_handler(event, context):
         weight_traj=data.get("weight_traj"),
         readiness_components=readiness_components,
         diary_sessions=data.get("diary_sessions"),
-        vitals={
-            "recovery_pct": data.get("recovery_pct"),
-            "hrv_ms": data.get("hrv_ms"),
-            "rhr_bpm": data.get("rhr_bpm"),
-            "protein_g_avg": data.get("protein_g_avg"),
-            "protein_g_target": data.get("protein_g_target"),
-            "protein_g_floor": data.get("protein_g_floor"),
-        },
+        vitals={k: data.get(k) for k in VITAL_FIELDS + ("protein_g_avg_since",)},
     )
 
     if day_grade_score is not None:

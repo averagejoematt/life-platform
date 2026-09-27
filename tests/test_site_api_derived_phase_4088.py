@@ -109,6 +109,8 @@ SITE_RULINGS = {
     ("nutrition_overview", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,
     ("nutrition_overview", "_query_source", "'whoop'", "site_api_nutrition.py"): CLAMPED,
     ("nutrition_overview", "_query_source", "'food_delivery'", "site_api_nutrition.py"): CLAMPED,
+    # #4244: one day — `latest_date`, the newest row of the already-clamped macrofactor window
+    ("nutrition_overview", "_query_source", "'supplements'", "site_api_nutrition.py"): CLAMPED,
     ("nutrition_overview", "_query_source", "'training_reference'", "site_api_nutrition.py"): CROSS,
     ("deficit_sustainability", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,

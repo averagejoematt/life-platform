@@ -178,6 +178,12 @@ def _get_micronutrient_report(args):
 
     return {
         "period": {"start_date": start_date, "end_date": end_date, "days_with_data": n},
+        # #4244: this RDA table reads MacroFactor ALONE — the supplement record never reaches it,
+        # so every average, gap and flag above is FOOD intake. The label travels with the numbers;
+        # the food + supplements join for the tracked targets is health.nutrient_intake (served by
+        # /api/nutrition_overview and the weekly nutrition review).
+        "intake_channels": ["food"],
+        "scope": "food only (MacroFactor) — supplement doses are not counted in any figure here",
         "summary": {
             "deficiencies": len(deficiencies),
             "near_gaps": len(near_gaps),

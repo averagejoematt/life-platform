@@ -1000,10 +1000,11 @@ def test_sodium_is_absent_rather_than_zero_when_no_day_recorded_it():
 def test_potassium_sufficiency_is_read_from_the_most_recent_day():
     src = FakeSources(
         macrofactor=[
-            mf("2026-05-06", micronutrient_sufficiency={"potassium_mg": {"pct": 40}}),
-            mf("2026-05-07", micronutrient_sufficiency={"potassium_mg": {"pct": 85}}),
+            mf("2026-05-06", total_potassium_mg=1360),  # 40% of 3,400
+            mf("2026-05-07", total_potassium_mg=2890),  # 85% of 3,400
         ]
     )
+    # #4244: the SAME joined derivation as §micronutrients (health.nutrient_intake).
     assert overview(src)["electrolytes"]["potassium_pct"] == 85
 
 
@@ -1044,14 +1045,45 @@ def test_lean_mass_uses_the_most_recent_scan_that_actually_carries_it():
 def test_micronutrient_sufficiency_is_stamped_with_the_day_it_came_from():
     src = FakeSources(
         macrofactor=[
-            mf("2026-05-06", micronutrient_sufficiency={"iron_mg": {"pct": 50}}, micronutrient_avg_pct=61),
-            mf("2026-05-07", micronutrient_sufficiency={"iron_mg": {"pct": 90}}, micronutrient_avg_pct=77),
+            mf("2026-05-06", total_fiber_g=19),  # 50%
+            mf("2026-05-07", total_fiber_g=34.2),  # 90%
         ]
     )
     m = overview(src)["micronutrients"]
     assert m["as_of"] == "2026-05-07"
-    assert m["sufficiency"] == {"iron_mg": {"pct": 90}}
-    assert m["avg_pct"] == 77
+    assert m["sufficiency"]["fiber_g"]["pct"] == 90.0
+    assert m["avg_pct"] == 90.0
+
+
+def test_the_public_door_joins_the_same_days_supplement_record_and_names_its_channels():
+    """#4244/#4245: the served figure counts food AND the supplement doses TAKEN that day, and
+    the payload names what it counted. Vitamin D 5,000 IU = 125 mcg (÷40) moves the bar off
+    the food-only 5%; the multivitamin is named in `unconverted`, never summed."""
+    src = FakeSources(
+        macrofactor=[mf("2026-05-07", total_vitamin_d_mcg=5, total_fiber_g=19)],
+        supplements=[
+            row(
+                "supplements",
+                "2026-05-07",
+                supplements=[
+                    {"name": "Vitamin D", "dose": 5000, "unit": "IU"},
+                    {"name": "Multivitamin", "dose": 1, "unit": "capsule"},
+                ],
+            )
+        ],
+    )
+    m = overview(src)["micronutrients"]
+    vd = m["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_food"], vd["from_supplements"], vd["pct"]) == (5.0, 125.0, 100.0)
+    assert vd["channels_counted"] == ["food", "supplements"]
+    assert m["intake_channels"] == ["food", "supplements"]
+    assert m["supplements_state"] == "recorded"
+    assert [u["name"] for u in m["unconverted"]] == ["Multivitamin"]
+    assert m["food_only_avg_pct"] == 27.5  # (5% + 50%) / 2 — the old one-channel figure, still visible
+    assert m["avg_pct"] == 75.0  # (100% + 50%) / 2
+    # Nothing but amounts and the unconvertible NAMES leaves the owner-only partition.
+    assert set(m["unconverted"][0]) == {"name", "reason"}
+    assert "counted" not in m
 
 
 def test_micronutrients_report_an_empty_map_and_a_null_average_when_none_were_ingested():
@@ -1460,7 +1492,9 @@ def test_the_public_response_reads_only_the_partitions_the_nutrition_page_needs(
     to this handler fails here rather than shipping."""
     src = FakeSources(macrofactor=[mf("2026-05-09", total_calories_kcal=2000, expenditure_kcal=3000)])
     overview(src)
-    allowed = {"macrofactor", "strava", "withings", "whoop"}
+    # `supplements` (#4244): read ONLY to join the day's per-nutrient amounts into the
+    # micronutrient figure; the stack and its adherence are already public via /api/supplements.
+    allowed = {"macrofactor", "strava", "withings", "whoop", "supplements"}
     assert src.sources_read <= allowed, f"unexpected partition read: {sorted(src.sources_read - allowed)}"
 
 

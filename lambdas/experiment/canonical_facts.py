@@ -29,7 +29,10 @@ FIELD_UNITS = {
     "recovery_pct": "percent (0-100), Whoop recovery",
     "hrv_ms": "milliseconds — NEVER bpm",
     "rhr_bpm": "bpm, resting heart rate",
-    "protein_g_avg": "grams — actual 7-day average INTAKE (not the target/floor)",
+    # #4343: was documented "7-day" while the producer averaged 30 calendar days across the
+    # genesis. It is /api/nutrition_overview's `avg_protein_g`: the mean over the LOGGED days
+    # since `protein_g_avg_since` (the genesis-floored 30-day window), n = `protein_g_avg_days`.
+    "protein_g_avg": "grams — actual average daily INTAKE over the logged days since protein_g_avg_since (not the target/floor)",
     "protein_g_target": "grams — target (not intake)",
     "protein_g_floor": "grams — floor (not intake)",
     "latest_weight": "pounds",
@@ -90,7 +93,10 @@ CONFIGURED_FIELDS = ("protein_g_target", "protein_g_floor")
 # figure, and — because `allowed_numbers()` json.dumps this dict — the night's digits
 # are automatically in every caller's allow-list, so instructing a narrative to cite
 # the date cannot make the number gate flag it as fabricated. Meta, never a metric.
-META_FIELDS = ("as_of", "night_of", "facts_are_pre_genesis", "cycle_genesis")
+# #4343: `protein_g_avg_days` / `protein_g_avg_since` are the average's WINDOW — its n and
+# first day — so a renderer can state "153.5 g a day over 21 logged days" (the served
+# figure, window and n) instead of a bare average the served-fact check cannot place.
+META_FIELDS = ("as_of", "night_of", "facts_are_pre_genesis", "cycle_genesis", "protein_g_avg_days", "protein_g_avg_since")
 
 # The wake-date→night offset, mirroring web.site_api_common.NIGHT_OF_OFFSET_DAYS and
 # ai.grounded_generation.NIGHT_OF_OFFSET_DAYS. tests/test_night_scoped_vitals_1968.py
@@ -210,11 +216,14 @@ def build_canonical_facts(record, genesis=None) -> dict:
     as_of = _record_date(record)
     facts["as_of"] = as_of
     facts["night_of"] = _night_of(as_of)
+    _days = _num(record.get("protein_g_avg_days"))
+    facts["protein_g_avg_days"] = int(_days) if _days is not None else None
+    facts["protein_g_avg_since"] = str(record["protein_g_avg_since"])[:10] if record.get("protein_g_avg_since") else None
     genesis = _resolve_genesis(genesis)
     # Lexicographic compare is exact for ISO dates and needs no parsing.
     pre_genesis = bool(as_of and genesis and as_of < genesis)
     if pre_genesis:
-        for k in OBSERVED_FIELDS:
+        for k in OBSERVED_FIELDS + ("protein_g_avg_days", "protein_g_avg_since"):
             facts[k] = None
     # The two cycle facts travel so a renderer can name the boundary it is
     # enforcing without a second lookup.

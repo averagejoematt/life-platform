@@ -124,12 +124,31 @@
           "avg_pct": {
             "type": "null"
           },
+          "avg_pct_basis": {
+            "type": "string"
+          },
+          "food_only_avg_pct": {
+            "type": "null"
+          },
+          "intake_channels": {
+            "items": null,
+            "length_sample": 2,
+            "type": "array"
+          },
           "protein_distribution_score": {
             "type": "null"
           },
           "sufficiency": {
             "keys": {},
             "type": "object"
+          },
+          "supplements_state": {
+            "type": "string"
+          },
+          "unconverted": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
           }
         },
         "type": "object"

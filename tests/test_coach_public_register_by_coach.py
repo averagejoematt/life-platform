@@ -539,3 +539,92 @@ def test_an_event_refresh_for_an_absent_coach_is_skipped(monkeypatch):
         monkeypatch, cgm_dark=True, event={"mode": "event_stance_refresh", "coach_id": _GLUCOSE, "trigger_event": {"type": "refuted"}}
     )
     assert ran == [] and out["skipped"] == "instrument_dark" and out["reason"] == ABSENT_REASON
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4213 live read (2026-09-27 16:07Z) — the LADDER fallback slots. Five of eight
+# coaches serve the authored weight-band ladder (no STANCE#latest yet), and the page
+# prints its stage headline (`cs-headline`) and graduation gate. The authored configs
+# are written TO Matthew: /coaching/by-coach/ showed nutrition's headline "First, I just
+# need to see what you eat." and sleep's gate "Hitting your duration target…" — and the
+# raw `rung` (sleep's "showing up for sleep the way you show up for the gym") rode the
+# payload whole. Fixture = the repo's own stance configs through the real handler.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class _NoS3:
+    def get_object(self, **kw):  # force coach_stance.load_stance onto the repo config file
+        raise RuntimeError("offline")
+
+
+def _ladder_body(monkeypatch, coach_id):
+    from coach import coach_stance
+
+    coach_stance._cache.clear()
+    monkeypatch.setattr(C, "table", FakeDdbTable(query_hook=lambda t, **kw: {"Items": []}, get_item_hook=lambda t, k, **kw: {}))
+    monkeypatch.setattr(C, "_S3", _NoS3())
+    monkeypatch.setattr(C, "_load_s3_json", lambda key, name: {})
+    resp = C.handle_coach({"rawPath": f"/api/coach/{coach_id}"})
+    assert resp["statusCode"] == 200, resp
+    body = json.loads(resp["body"])
+    assert body["stance"]["source"] == "ladder", body["stance"]
+    return body["stance"]
+
+
+def _stance_strings(stance):
+    for key in ("headline_read", "graduation_gate"):
+        yield key, stance.get(key) or ""
+    for key in ("label", "rationale"):
+        yield f"stage.{key}", (stance.get("stage") or {}).get(key) or ""
+    for key in ("focused_on_now", "set_aside_for_now"):
+        for v in stance.get(key) or []:
+            yield key, v
+    for key, v in (stance.get("rung") or {}).items():
+        for x in v if isinstance(v, list) else [v]:
+            if isinstance(x, str):
+                yield f"rung.{key}", x
+    for s in stance.get("ladder") or []:
+        yield "ladder.headline", s.get("headline") or ""
+
+
+def test_the_live_nutrition_ladder_headline_is_not_served(monkeypatch):
+    """RED before this fix: stage.label == "First, I just need to see what you eat."."""
+    st = _ladder_body(monkeypatch, "nutrition_coach")
+    assert st["rung"]["stage_id"] == "visibility"  # ids survive the guard
+    assert st["stage"]["label"] == ""
+    assert all(not audience_guard.is_owner_directed(v) for _, v in _stance_strings(st))
+
+
+def test_the_live_sleep_graduation_gate_and_rung_are_not_served(monkeypatch):
+    """RED before this fix: graduation_gate "Hitting your duration target…" and the raw
+    rung's cares_most "…the way you show up for the gym" were both served."""
+    st = _ladder_body(monkeypatch, "sleep_coach")
+    assert st["graduation_gate"] == ""
+    assert st["stage"]["label"] == "Get enough hours, regularly."  # a third-person headline is kept
+    assert st["rung"]["stage_id"] == "foundation"
+    assert [k for k, v in _stance_strings(st) if audience_guard.is_owner_directed(v)] == []
+
+
+def test_no_ladder_slot_is_owner_directed_for_any_operational_coach(monkeypatch):
+    """The live-proof query over every coach that can fall back to the authored ladder."""
+    from coach import persona_registry
+
+    hits, covered = [], []
+    for cid in persona_registry.OPERATIONAL_COACH_IDS:
+        try:
+            st = _ladder_body(monkeypatch, cid)
+        except AssertionError:
+            continue  # no ladder / absent coach — nothing served from the scaffold
+        covered.append(cid)
+        hits += [(cid, k, v) for k, v in _stance_strings(st) if audience_guard.is_owner_directed(v)]
+    # the four configs that carried owner-directed ladder text (glucose, mind, nutrition, sleep) must be exercised
+    assert {"glucose_coach", "mind_coach", "nutrition_coach", "sleep_coach"} <= set(covered), covered
+    assert hits == []
+
+
+def test_an_evidence_stance_label_addressed_to_him_is_blanked(monkeypatch):
+    body = _coach_body(monkeypatch, stance=_stance(_PUBLIC_HEADLINE, stage={"label": "This is just who you are now.", "rationale": ""}))
+    assert body["stance"]["stage"]["label"] == ""
+    assert body["stance_history"][0]["stage"]["label"] == ""
+    body = _coach_body(monkeypatch, stance=_stance(_PUBLIC_HEADLINE))
+    assert body["stance"]["stage"]["label"] == "noticing"
