@@ -291,12 +291,31 @@ REDLINES: dict[str, dict[str, Any]] = {
         "missed_days_threshold": 3,
         "window_days": 7,
         "min_measured_days": 4,
-        # Owner ruling 2026-09-25 (#4162): at >= 40 % body fat the gate REPORTS and never moves the served
-        # target — Forbes/Hall 2007 (the lean share of a loss falls as starting fat rises), Sardeli 2018
-        # (resistance training kept 93.5 % of diet-induced lean loss), Wycherley 2012 (high protein +0.43 kg
-        # FFM). The body-fat-scaled tiers and the week-8 DXA override are their own story (#4166).
-        "mode": "report_only",
-        "mode_ruling": "owner 2026-09-25: report_only at >= 40 % body fat; 'enforce' serves the gated target",
+        # Owner ruling 2026-09-25 (#4162 -> #4166): the gate SCALES WITH BODY FAT. `by_body_fat` lets the tier
+        # below decide (`redline_rate.body_fat_tier`); 'enforce' / 'report_only' force one mode at every body fat.
+        "mode": "by_body_fat",
+        "mode_ruling": "owner 2026-09-25 (#4166): the body-fat tier decides; 'enforce' / 'report_only' force one mode at every body fat",
+        "body_fat_tiers": {
+            "source": "the latest DXA's fat-free mass (lean_mass_lb + bone_mineral_content_lb) re-based on today's weight: (weight - FFM) / weight",
+            "unknown": "no readable DXA, or no weight -> tier `unknown`: the gate stays report-only and says so",
+            "tiers": [
+                {"tier": "report_only", "at_or_above_pct": 40, "evidence": ["Hall 2007", "Sardeli 2018", "Wycherley 2012"]},
+                {"tier": "brake", "at_or_above_pct": 30, "brake_lb_wk": 0.5, "evidence": ["Heymsfield 2014", "Hall 2007"]},
+                {"tier": "full", "at_or_above_pct": 0, "evidence": ["Heymsfield 2014", "Wycherley 2012"]},
+            ],
+            "evidence": {
+                "Hall 2007": "Br J Nutr 97:1059 (Forbes's theory revisited): the fat-free share of a loss falls as starting fat rises",
+                "Heymsfield 2014": "10 kg loss in men: 2.9 kg FFM on diet alone, 1.7 kg with exercise; larger restriction, larger FFM share (p = 0.006)",
+                "Sardeli 2018": "Nutrients 10:423: resistance training prevented 93.5 % of the lean loss caloric restriction caused",
+                "Wycherley 2012": "AJCN 96:1281: high protein preserved +0.43 kg FFM",
+            },
+            # pre-registered 2026-09-25: a DXA pair (the latest two, weight FELL between them; FFM = lean + BMC) overrules the
+            # tier with the full gate at any body fat when dFFM / dW is worse than the diet-alone average for obese men
+            # (Heymsfield 2014: 2.9 of 10 kg on diet alone)
+            "dxa_override": {"ffm_share_of_loss_above": 0.25, "first_evaluation": "the week-8 DXA (~2026-11-01)"},
+            "provenance": "owner",
+            "stated": "2026-09-25",
+        },
         # THE one field the owner's pending choice (1.6 vs a middle value) moves: set `fixed_lb_wk` to a number and the gate serves it
         "gated_target": {
             "source": "rate_band_pct_bw_per_wk.low",
@@ -1022,6 +1041,7 @@ def summary() -> dict[str, Any]:
 # cohesive sibling `training.redline_rate` — this module was at the 1,000-line ceiling (#1665). The DATA
 # stays here, one home; every caller still reads `owner_redlines.rate_target_lb_per_wk` & co.
 from training.redline_rate import (  # noqa: E402,F401
+    body_fat_tier,
     gated_target_lb_wk,
     protein_days_missed,
     protein_gate,

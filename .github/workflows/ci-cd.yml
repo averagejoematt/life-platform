@@ -185,6 +185,7 @@ jobs:
   reconcile:
     name: Reconcile derived artifacts
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write   # push the reconcile commit to main
       actions: write    # dispatch site-deploy.yml when the commit touches site/**
@@ -443,6 +444,7 @@ jobs:
   test-critical:
     name: Deploy-critical tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [reconcile, lint]   # #1173: reconcile listed to read build_sha
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -514,6 +516,7 @@ jobs:
   plan:
     name: Plan deployments
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # #416/ADR-117: gate on the fast deploy-critical lane, NOT the exhaustive
     # `test` suite — an unrelated red unit test must not skip deploy + visual-QA.
     needs: [reconcile, lint, test-critical]   # #1173: reconcile listed to read build_sha
@@ -864,6 +867,7 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [reconcile, plan]   # #1173: reconcile listed to read build_sha
     # #2834: an IAM-only merge changes cdk/ alone (has_deploys=false) and must still reach
     # the additive-IAM step below — the code-deploy steps handle an empty matrix already.
@@ -1075,6 +1079,7 @@ jobs:
   smoke-test:
     name: Smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [reconcile, deploy]   # reconcile: read build_sha for the checkout below (#1345 fix)
     steps:
       # The smoke + canary steps call deploy/lib/smoke_oracle_decision.py (#1345 extracted
@@ -1213,6 +1218,7 @@ jobs:
   visual-qa:
     name: Visual + AI-vision QA
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     needs: [reconcile, deploy]   # #1173: reconcile listed to read build_sha
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1288,6 +1294,7 @@ jobs:
   post-deploy-checks:
     name: Post-deploy integration checks (I1/I2/I5)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [reconcile, deploy]   # #1173: reconcile listed to read build_sha
     if: needs.deploy.result == 'success'
     steps:
@@ -1415,6 +1422,7 @@ jobs:
   rollback-on-smoke-failure:
     name: Auto-rollback (smoke failure)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [reconcile, plan, deploy, smoke-test]   # #1173: reconcile listed to read build_sha; plan for fleet_changed (#1859)
     # `always() &&` is REQUIRED: a job whose dependency (smoke-test) failed is
     # skipped by default unless its `if` contains a status-check function — so
@@ -1555,6 +1563,7 @@ jobs:
   notify-failure:
     name: Notify failure
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # #416: include test-critical so a deploy-gating failure also notifies.
     # #1173: include reconcile so a failed reconcile (non-whitelisted dirt,
     # rejected push) also lands in the digest.

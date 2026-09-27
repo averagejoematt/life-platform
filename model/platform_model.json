@@ -5513,6 +5513,13 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
+      "module": "mcp/shared_quantities.py",
+      "partition": "dexa",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_benchmark.py",
       "partition": "strava",
       "via": "seam"
@@ -7446,7 +7453,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 720,
+      "edges": 721,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7461,8 +7468,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 356,
-        "sites_resolved": 893,
-        "sites_total": 1249
+        "sites_resolved": 894,
+        "sites_total": 1250
       },
       "schedule_resolution": {
         "dynamic": 0,

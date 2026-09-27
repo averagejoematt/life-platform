@@ -234,6 +234,16 @@ _GAP_SINCE_DATE = re.compile(
 # A window the sentence names for its protein figure, beyond "N logged days" (which the
 # shared extractor already returns as a `days_logged` claim).
 _NAMED_WINDOW = re.compile(r"\b(\d{1,2})[- ](?:calendar\s+)?days?\b|\b(?:this|past|last)\s+week\b|\b7-day\b", re.IGNORECASE)
+# #4343: the average refutes only a figure the sentence frames as his daily intake or an
+# average of it. "Morning smoothie delivers 15 g, protein shake adds 30 g", "redistribute
+# 40g of protein away from dinner" and "if protein reaches 190g next week" are a serving,
+# a shift and a conditional target — the 09-27 brief held the nutrition, glucose and
+# explorer coaches on exactly those. A day-count window ("across 21 logged days") also frames.
+_INTAKE_FRAME = re.compile(
+    r"\b(?:averag\w*|mean|running|rolling|trailing|ewma|typical(?:ly)?|usual(?:ly)?|daily|per\s+day|a\s+day|each\s+day)\b"
+    r"|/\s*day\b|\bg/d\b",
+    re.IGNORECASE,
+)
 
 
 def _named_windows(sentence: str) -> list:
@@ -318,7 +328,10 @@ def served_fact_findings(text: str, facts: Optional[dict], today: Optional[str] 
                     _finding("days_logged", v, days_logged, f"claims {v} logged days; the served record has {days_logged}", sentence)
                 )
         windows = named + _named_windows(sentence)
-        for v, _cls in claims.get("protein", []):
+        # A day-count window frames the figure as an aggregate; "this week" alone does not
+        # ("One ask this week: redistribute 40g" is a timing, not a window, #4343).
+        framed = bool(named) or bool(_INTAKE_FRAME.search(sentence)) or any(m.group(1) for m in _NAMED_WINDOW.finditer(sentence))
+        for v, _cls in claims.get("protein", []) if framed else []:
             win = _nl.protein_window(series, min(windows)) if windows else _nl.protein_window(series)
             if not win or win["half_width"] is None:
                 continue  # no spread → no tolerance to derive; skipped, never guessed

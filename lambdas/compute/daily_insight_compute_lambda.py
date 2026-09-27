@@ -578,7 +578,7 @@ Return ONLY a JSON array, no preamble:
         method="POST",
     )
     try:
-        # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+        # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
         from common.retry_utils import call_anthropic_raw
 
         resp = call_anthropic_raw(req, timeout=25)

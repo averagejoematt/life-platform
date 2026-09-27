@@ -1066,13 +1066,11 @@ def assemble_data(yesterday_str, profile):
     # this function are deliberately cross-phase (see fetch_range's docstring) — a flat
     # 28-day window reaches across the genesis into the prior cycle's weigh-ins, clearing
     # weight_trajectory's 21-day provisional floor on data the experiment hasn't earned yet.
-    # site_api_journey.journey() clamps the same way (`d120 = max(..., EXPERIMENT_START)`);
-    # mirror it here so the two producers of one number agree.
-    withings_28d = fetch_range("withings", max((today - timedelta(days=28)).isoformat(), EXPERIMENT_START_DATE), yesterday_str)
-    _wt_series = [(w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in withings_28d if safe_float(w, "weight_lbs")]
-    weight_traj = weight_trend.weight_trajectory(
-        _wt_series, latest_weight, float(profile.get("goal_weight_lbs", 185.0)), ref_dt=datetime.now(timezone.utc)
-    )
+    # The window (genesis-clamped, ending TODAY) and the series/current-weight resolution
+    # are weight_trend's, shared with site_api_journey.journey(), so the two producers of
+    # one number cannot drift apart again (the yesterday-ended window did, 2026-09-27).
+    _goal = float(profile.get("goal_weight_lbs", 185.0))
+    weight_traj = weight_trend.fetch_experiment_trajectory(fetch_range, today, EXPERIMENT_START_DATE, _goal, ref_dt=pacific_now())
 
     # Habitify 7-day (tier-2 habit frequency scoring)
     habitify_7d = fetch_range("habitify", (today - timedelta(days=7)).isoformat(), yesterday_str)

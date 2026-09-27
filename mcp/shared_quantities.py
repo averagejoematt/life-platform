@@ -318,3 +318,15 @@ def weekly_loss_rates_from_rows(
     reported by `weekly_loss_rate_weeks_from_rows`. None when no week is counted."""
     rates = [w["rate_lb_wk"] for w in weekly_loss_rate_weeks_from_rows(rows, end, weeks=weeks, genesis=genesis) if w["counted"]]
     return rates or None
+
+
+# #4166: THE DXA read the protein gate's body-fat tier derives from — every scan on or before `end_day`
+# (the partition is CROSS_PHASE, so `query_source` derives no phase filter). The plan and the nutrition
+# critics both call this one reader; `training.redline_rate.body_fat_tier` is the one derivation.
+DXA_EPOCH = "2000-01-01"
+
+
+def dxa_scans(end_day: str) -> list[dict[str, Any]]:
+    """Every DXA scan row dated on or before `end_day`, oldest first. Raises on a failed read (the caller
+    reports it) — an unreadable partition is never an empty one."""
+    return sorted(_core.query_source("dexa", DXA_EPOCH, end_day) or [], key=lambda r: str(r.get("scan_date") or r.get("sk") or ""))

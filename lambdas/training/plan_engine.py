@@ -124,6 +124,7 @@ ENGINE_INPUTS = (
     "hevy_workouts_prescription_window",
     "block_workouts",
     "training_memory_constraints",
+    "dxa_scans",  # #4166: the protein gate's body-fat tier
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -656,6 +657,7 @@ def constraint_block(
     protein_days_missed_7d: int | None = None,
     protein_days_measured_7d: int | None = None,
     protein_window: dict[str, str] | None = None,
+    dxa_scans: list[dict[str, Any]] | None = None,
     readiness_low_streak_days: int | None = None,
     anchor_lift_drop_pct: float | None = None,
     anchor_lift_drop_sessions: int | None = None,
@@ -709,6 +711,7 @@ def constraint_block(
             "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
             "block_workouts": block_workouts,
             "training_memory_constraints": training_memory_constraints,
+            "dxa_scans": dxa_scans,
         },
         input_status,
     )
@@ -864,6 +867,7 @@ def constraint_block(
             protein_missed_7d=protein_days_missed_7d,
             protein_measured_7d=protein_days_measured_7d,
             protein_window_days=protein_window,
+            dxa_scans=dxa_scans,  # #4166: the gate's mode scales with the latest DXA's body fat
         ),
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),

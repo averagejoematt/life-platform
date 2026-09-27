@@ -9,7 +9,11 @@ version: 2
 updates:
   # GitHub Actions — keep the SHA-pinned actions current + patched.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # "/" reaches .github/workflows/ only — NOT the nested composite actions, so
+    # setup-ci sat one release behind its own call sites (#4253). List them too.
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

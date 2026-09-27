@@ -335,3 +335,169 @@ def test_ai_transport_returns_the_outage_sentinel_immediately_on_an_unknown_name
     assert out == at.AI_UNAVAILABLE_SENTINEL
     fake_client.invoke_model.assert_not_called()
     assert fired, "the failure metric must fire — a silent sentinel would hide the misconfiguration again"
+
+
+# ── #4279: ONE retry policy for every Bedrock call ───────────────────────────
+#
+# Before: botocore `{"max_attempts": 2, "mode": "adaptive"}` (= 3 sends — botocore
+# reads client-config max_attempts as RETRIES and adds one) under three app-level
+# 4-attempt loops at 5/15/45 s: 12 invoke_model sends and >= 65 s of sleep per call
+# on a sustained throttle. After: botocore sends once; `invoke_with_retry` is the
+# only loop: 3 sends, <= 20 s of jittered sleep. The tests below drive REAL botocore
+# (a before-send hook answers every send with a 400 ThrottlingException), so the
+# counts are the wire's, not a mock's.
+
+
+class _RawBody:
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def stream(self, **_kw):
+        yield self._data
+
+    def read(self, *_a, **_kw):
+        return self._data
+
+
+def _throttle_every_send(client) -> list:
+    """Answer every InvokeModel send with a Bedrock ThrottlingException; return the send log."""
+    from botocore.awsrequest import AWSResponse
+
+    sends: list = []
+
+    def _answer(request, **_kw):
+        sends.append(request.url)
+        body = b'{"message":"Too many requests, please wait before trying again."}'
+        headers = {"x-amzn-ErrorType": "ThrottlingException:http://internal.amazon.com/coral/", "Content-Type": "application/json"}
+        return AWSResponse(request.url, 400, headers, _RawBody(body))
+
+    client.meta.events.register("before-send.bedrock-runtime.InvokeModel", _answer)
+    return sends
+
+
+@pytest.fixture
+def _fake_aws(monkeypatch):
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "FAKEKEY")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "FAKESECRET")
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+
+
+@pytest.fixture
+def _recorded_sleep(monkeypatch):
+    """Record every sleep (botocore's and the policy's — both call time.sleep); jitter at max."""
+    import time as _time
+
+    slept: list = []
+    monkeypatch.setattr(_time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(bc, "_jitter", lambda: 1.0)
+    return slept
+
+
+def _real_client(monkeypatch):
+    """The production `_client()` construction, fresh (not the cached singleton)."""
+    monkeypatch.setattr(bc, "_BEDROCK", None)
+    client = bc._client()
+    monkeypatch.setattr(bc, "_BEDROCK", client)
+    return client
+
+
+def test_botocore_makes_exactly_one_send_per_invoke(monkeypatch, _fake_aws, _recorded_sleep):
+    """The production client config retries nothing: one throttled send, one raise."""
+    import botocore.exceptions as bce
+
+    sends = _throttle_every_send(_real_client(monkeypatch))
+    with pytest.raises(bce.ClientError):
+        bc._client().invoke_model(modelId="us.anthropic.claude-sonnet-4-6", body=b"{}", contentType="application/json")
+    assert len(sends) == 1, f"botocore sent {len(sends)}x — its retries must be OFF; invoke_with_retry is the one policy"
+
+
+def test_the_old_client_config_sent_three_times_not_two(_fake_aws, _recorded_sleep):
+    """The negative control, and the proof of the stacking arithmetic: the retired
+    `{"max_attempts": 2, "mode": "adaptive"}` config made THREE sends (botocore adds
+    one for the initial request), so each of the old 4-attempt app loops cost up to
+    4 x 3 = 12 sends. If this ever reads 2, the 'before' figure in #4279 is wrong."""
+    import boto3
+    import botocore.exceptions as bce
+    from botocore.config import Config
+
+    old = boto3.client("bedrock-runtime", region_name="us-west-2", config=Config(retries={"max_attempts": 2, "mode": "adaptive"}))
+    sends = _throttle_every_send(old)
+    with pytest.raises(bce.ClientError):
+        old.invoke_model(modelId="us.anthropic.claude-sonnet-4-6", body=b"{}", contentType="application/json")
+    assert len(sends) == 3
+
+
+def _wrapper_calls():
+    from ai import ai_transport as at
+    from common import retry_utils as ru
+
+    return {
+        "ai_transport.call_anthropic": lambda: at.call_anthropic("hello", model="claude-sonnet-4-6"),
+        "retry_utils.call_anthropic_api": lambda: ru.call_anthropic_api("hello", model="claude-sonnet-4-6"),
+        "retry_utils.call_anthropic_raw": lambda: ru.call_anthropic_raw(
+            {"model": "claude-sonnet-4-6", "max_tokens": 5, "messages": [{"role": "user", "content": "hi"}]}
+        ),
+    }
+
+
+@pytest.mark.parametrize("wrapper", sorted(_wrapper_calls()))
+def test_every_wrapper_makes_the_policy_attempts_on_the_wire_and_no_more(monkeypatch, _fake_aws, _recorded_sleep, wrapper):
+    """End to end: wrapper → invoke_with_retry → invoke → REAL botocore → the throttling
+    hook. The count is invoke_model sends on the wire. The mutation control: put a
+    local retry loop back in any wrapper (or turn botocore retries back on) and the
+    count multiplies — this test fails naming that wrapper."""
+    import botocore.exceptions as bce
+    from ai import ai_transport as at
+    from common import retry_utils as ru
+
+    _stub_budget_guard(monkeypatch)
+    monkeypatch.setattr(ru, "_emit_failure_metric", lambda *a, **k: None)
+    monkeypatch.setattr(at, "_emit_failure_metric", lambda *a, **k: None)
+    sends = _throttle_every_send(_real_client(monkeypatch))
+    try:
+        out = _wrapper_calls()[wrapper]()
+        assert out == at.AI_UNAVAILABLE_SENTINEL, f"{wrapper} returned {out!r} on a sustained throttle"
+    except bce.ClientError:  # the raising wrappers re-raise the final ClientError
+        pass
+    assert len(sends) == bc.INVOKE_MAX_ATTEMPTS == 3, (
+        f"{wrapper}: {len(sends)} invoke_model sends on a sustained throttle — the one policy allows "
+        f"{bc.INVOKE_MAX_ATTEMPTS}. A retry loop is stacked on invoke_with_retry (or botocore retries are back on)."
+    )
+    assert sum(_recorded_sleep) == sum(bc.INVOKE_RETRY_BASE_DELAYS) == 20, f"{wrapper}: slept {_recorded_sleep}"
+
+
+def test_retry_delay_is_jittered_and_bounded_by_its_base(monkeypatch):
+    monkeypatch.setattr(bc, "_jitter", lambda: 0.0)
+    assert [bc.retry_delay(a) for a in (1, 2)] == [2.5, 7.5]
+    monkeypatch.setattr(bc, "_jitter", lambda: 1.0)
+    assert [bc.retry_delay(a) for a in (1, 2)] == [5.0, 15.0]
+    assert len(bc.INVOKE_RETRY_BASE_DELAYS) == bc.INVOKE_MAX_ATTEMPTS - 1
+    assert bc.INVOKE_MAX_ATTEMPTS <= 4, "#4279 acceptance: total attempts per call bounded at 4"
+
+
+def test_invoke_with_retry_never_retries_an_unknown_model_name(monkeypatch, _recorded_sleep):
+    """#4306/#4275 kept exactly: a model name that resolves to nothing is a refusal
+    raised before invoke_model — ZERO retries, zero sleep, zero sends."""
+    _stub_budget_guard(monkeypatch)
+    fake_client = MagicMock()
+    monkeypatch.setattr(bc, "_client", lambda: fake_client)
+    with pytest.raises(bc.UnknownModelError):
+        bc.invoke_with_retry({"max_tokens": 5, "messages": []}, model_name="claude-nonsense")
+    fake_client.invoke_model.assert_not_called()
+    assert _recorded_sleep == []
+
+
+def test_invoke_with_retry_does_not_retry_a_non_retryable_code(monkeypatch, _recorded_sleep):
+    import botocore.exceptions as bce
+
+    calls = {"n": 0}
+
+    def _invoke(body, model_name=None):
+        calls["n"] += 1
+        raise bce.ClientError({"Error": {"Code": "ValidationException"}}, "InvokeModel")
+
+    monkeypatch.setattr(bc, "invoke", _invoke)
+    with pytest.raises(bce.ClientError):
+        bc.invoke_with_retry({"messages": []}, model_name="claude-sonnet-4-6")
+    assert calls["n"] == 1 and _recorded_sleep == []

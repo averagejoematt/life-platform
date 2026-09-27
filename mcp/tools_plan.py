@@ -516,6 +516,13 @@ def tool_plan_next_session(args):
     if protein_missed is None and status["protein_days_missed_7d"]["state"] != READ_FAILED:
         status["protein_days_missed_7d"] = st(ABSENT, "no MacroFactor day with protein logged in the trailing 7 days")
 
+    # #4166: the protein gate's body-fat tier reads the latest DXA — a failed read is reported, never "no scan"
+    from mcp.shared_quantities import dxa_scans as _dxa_scans
+
+    dxa, status["dxa_scans"] = _read("dxa_scans", _dxa_scans, target_date)
+    if dxa == [] and status["dxa_scans"]["state"] != READ_FAILED:
+        status["dxa_scans"] = st(ABSENT, "no DXA scan on file — the protein gate's body-fat tier is unknown (report-only)")
+
     # #4072: the readiness_floor tripwire's input. Nothing supplied it before this change.
     streak_pair, streak_status = _read("readiness_low_streak_days", _readiness_low_streak, target_date)
     readiness_streak, status["readiness_low_streak_days"] = streak_pair if streak_pair else (None, streak_status)
@@ -652,6 +659,7 @@ def tool_plan_next_session(args):
         protein_days_missed_7d=protein_missed,
         protein_days_measured_7d=protein_measured,  # #4161 ruling "B": the rate target's protein gate
         protein_window=plan_engine.owner_redlines.protein_window(target_date, pacific_today()),
+        dxa_scans=dxa,  # #4166
         readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],
