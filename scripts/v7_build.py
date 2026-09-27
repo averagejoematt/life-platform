@@ -51,6 +51,7 @@ import v4_chrome  # noqa: E402
 from v7 import (
     coaches,  # noqa: E402
     follow,  # noqa: E402
+    home,  # noqa: E402
     hood,  # noqa: E402
     numbers,  # noqa: E402
     today,  # noqa: E402
@@ -82,6 +83,7 @@ SITE_NAME = "averagejoematt"
 # entry keeps the scaffold body below; each page's lane adds ONE line here.
 BODIES = {
     "cockpit/": today,
+    "": home,
     "story/": week,
     "coaching/": coaches,
     "story/about/": who,

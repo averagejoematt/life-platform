@@ -130,6 +130,8 @@ SWEPT = [
     "v7_hood.css",
     "v7_numbers.css",
     "v7_follow.css",
+    "v7_home.css",
+    "v7_week.css",
 ]
 
 # DESIGN_SYSTEM_V5 §10.1: the six canonical max-width boundaries + their min-width
