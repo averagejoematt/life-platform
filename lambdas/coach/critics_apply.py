@@ -9,8 +9,10 @@ commit gate then refused the draft against its 48 kg subtract-only floor — a r
 that produced an uncommittable routine. `apply_changes(..., set_floors=...)` takes the commit
 gate's own per-set floors (`mcp.hevy_prescription_gate.critic_set_floors`) and holds every
 working set a change touched at that floor, naming the clash on the change record
-(`conflict`). A load change the floor swallows whole is `applied: False` — surfaced, never an
-uncommittable draft.
+(`conflict`, prose) and stating it as data (`clamped_to_floor`, `requested_kg`, `floor_kg`,
+`clamped_sets` — the machine-readable form the #4149 acceptance asks for, so a reader of the
+stored record never has to parse the sentence). A load change the floor swallows whole is
+`applied: False` — surfaced, never an uncommittable draft.
 
 PURE: no I/O, and no import of `coach.critics` (which imports this module).
 """
@@ -89,9 +91,17 @@ def _loads(ir: Any) -> list[tuple[int, list]]:
 
 
 def _hold_at_floors(ir: Any, m: "re.Match[str]", set_floors: Callable[[Any], list], rec: dict[str, Any], before: list, critic: str) -> None:
-    """Raise every working set the change touched back to the gate's floor, naming each clash."""
+    """Raise every working set the change touched back to the gate's floor, naming each clash.
+
+    The clash is recorded twice on purpose: `conflict` is the sentence the Hevy notes carry
+    (`critics.notes_block`); `clamped_to_floor` / `requested_kg` / `floor_kg` / `clamped_sets` are
+    the same fact as data (#4149 acceptance box 2). `requested_kg` is the load the critic asked for
+    (a `weight_lbs` change, converted; None for a set-count or drop change whose survivors sat
+    under the floor), `floor_kg` the highest floor applied (the top set's), `clamped_sets` one row
+    per set held (`set` is 1-based, as the sentence numbers it)."""
     prior = dict(before)
     clashes: list[str] = []
+    rows: list[dict[str, Any]] = []
     for ex in getattr(ir, "exercises", None) or []:
         if [getattr(s, "weight_kg", None) for s in ex.sets] == prior.get(id(ex)):
             continue  # untouched by this change — the coach's own draft is the gate's business, not the clamp's
@@ -102,10 +112,15 @@ def _hold_at_floors(ir: Any, m: "re.Match[str]", set_floors: Callable[[Any], lis
             if f is None or w is None or (getattr(s, "type", "normal") or "normal") == "warmup" or not is_below_floor(float(w), float(f)):
                 continue
             clashes.append(f"{_label(ex)} set {i + 1} {float(w):.1f}kg < floor {float(f):.1f}kg")
+            rows.append({"exercise": _label(ex), "set": i + 1, "requested_kg": round(float(w), 2), "floor_kg": round(float(f), 2)})
             s.weight_kg = float(f)
     if not clashes:
         return
     rec["conflict"] = f"{critic} vs the subtract-only floor: " + "; ".join(clashes) + " — clamped to the floor (#4149)"
+    rec["clamped_to_floor"] = True
+    rec["requested_kg"] = round(float(rec["to"]) / _LBS_PER_KG, 2) if m.group(3) == "weight_lbs" and rec.get("to") is not None else None
+    rec["floor_kg"] = max(r["floor_kg"] for r in rows)
+    rec["clamped_sets"] = rows
     if m.group(3) == "weight_lbs" and dict(_loads(ir)) == prior:
         rec["applied"], rec["why"] = (
             False,
