@@ -11,6 +11,8 @@ MUTATION CONTROL — this class replaced by a no-op — lets every specimen thro
 the test cannot be satisfied by some other class firing.
 """
 
+import re
+
 import reader_checks_corpus as corpus
 from coach import reader_checks
 
@@ -37,3 +39,25 @@ def test_a_denied_trend_is_not_an_average_figure():
 
 def test_a_decimal_does_not_end_the_sentence():
     assert len(reader_checks.unlabeled_window_figure("The EWMA is 81.6% and rising.")) == 1
+
+
+# #4343: verbatim from the glucose coach's held 2026-09-27 final — the 77 belongs to a
+# dated reading in the second clause, not to the average in the first.
+GLUCOSE_0927_TWO_CLAUSES = (
+    "The deep sleep running average has moved modestly, and the recovery reading on the night of "
+    "September 25th was 77% with HRV at 46.5 ms."
+)
+LABS_0927_UNLABELED = "Your running average protein intake is 157.1 g per day — well short of the 190 g daily target, but climbing."
+
+
+def test_the_average_and_the_figure_must_share_a_clause():
+    assert reader_checks.unlabeled_window_figure(GLUCOSE_0927_TWO_CLAUSES) == []
+    # a dash is parenthetical, not a clause join: the labs coach's figure still fails
+    assert len(reader_checks.unlabeled_window_figure(LABS_0927_UNLABELED)) == 1
+    assert len(reader_checks.unlabeled_window_figure("The running average — 157 g — is up.")) == 1
+    assert len(reader_checks.unlabeled_window_figure("Sleep was short, and the running average is 81.6%.")) == 1
+
+
+def test_mutation_control_a_sentence_wide_pairing_fires_on_the_two_clause_sentence(monkeypatch):
+    monkeypatch.setattr(reader_checks, "_CLAUSE_JOIN_RE", re.compile(r"(?!x)x"))
+    assert len(reader_checks.unlabeled_window_figure(GLUCOSE_0927_TWO_CLAUSES)) == 1

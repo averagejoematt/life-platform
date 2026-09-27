@@ -295,22 +295,37 @@ def build_joints_packet(
             if pain.get("pain_flag_any"):
                 dates = pain.get("pain_dates") or []
                 # #4036: did the owner dismiss THIS instance, and does the dismissal still hold?
-                res = training_context_registry.resolve_flag(movement=ex["label"], note_dates=dates, dismissals=dismissals)
-                if res is not None:
+                # #4174: an instance is (movement, SITE) — the registry splits the notes per
+                # site, so a dismissal covers the site it names and a note naming no dismissed
+                # site stays open; the veto stands until every site on the lift is dismissed.
+                instances = training_context_registry.expand_instances(
+                    [{"movement": ex["label"], "note_dates": dates, "notes": pain.get("pain_notes") or []}], dismissals
+                )
+                rows = training_context_registry.resolve_flags(instances, dismissals)
+                held = {(str(r["movement"]), r.get("instance_site")) for r in rows if r.get("dismissed")}
+                open_sites = [inst for inst in instances if (str(inst.get("movement")), inst.get("site")) not in held]
+                for res in rows:
                     dismissed_rows.append({**res, "idx": i})
-                    numbers[f"pain_dismissed[{i}]"] = bool(res.get("dismissed"))
-                if res is not None and res.get("dismissed"):
+                if rows:
+                    numbers[f"pain_dismissed[{i}]"] = not open_sites
+                if rows and not open_sites:
                     # No flag and no violation on a dismissed instance — deliberately. A `flags`
                     # entry here would be an escalation handle: `reconcile` lets the model raise
                     # info -> change on any metric the packet flags, so "carried but not objected
                     # to" has to mean carried OUTSIDE `flags` (see `owner_dismissals` below).
                     continue
                 reason = f"{ex['label']}: pain flag on {', '.join(dates[-2:]) or 'a recent session'} — {CALIBRATION_REDLINES['pain_flag_loaded']}"
-                if res is not None:
+                if rows:
                     # A dismissal exists but does not hold: re-armed by a later note, or
-                    # uncomparable because the flag carries no readable date. Either way the
-                    # veto stands AND says why the override did not save it (#4036).
-                    reason = f"{reason} [{res['detail']}]"
+                    # uncomparable because the flag carries no readable date — or (#4174) it
+                    # covers one site while another note on the lift names none. Either way
+                    # the veto stands AND says why the override did not save it (#4036).
+                    why = [r["detail"] for r in rows if not r.get("dismissed")] + [
+                        f"note(s) {', '.join(inst.get('note_dates') or [])} name no dismissed site — open until their own dismissal (#4174)"
+                        for inst in open_sites
+                        if inst.get("site") is None and inst.get("note_dates")
+                    ]
+                    reason = f"{reason} [{'; '.join(why)}]"
                 violations.append(
                     {
                         "redline": "pain_flag_loaded",

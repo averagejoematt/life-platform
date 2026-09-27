@@ -88,12 +88,11 @@ def journey(*, _g) -> dict:
     pre_start_meta = _g["pre_start_meta"]
 
     today = datetime.now(PT).strftime("%Y-%m-%d")
-    d120 = max((datetime.now(PT) - timedelta(days=120)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    # #4184: the window + series builder daily-metrics-compute (-> public_stats.json) reads too.
+    d120, _ = weight_trend.experiment_rate_window(today, EXPERIMENT_START, lookback_days=120)
 
     withings_all = _query_source("withings", d120, today)
-    weight_series = sorted(
-        [(w["sk"].replace("DATE#", ""), float(w["weight_lbs"])) for w in withings_all if w.get("weight_lbs")], key=lambda x: x[0]
-    )
+    weight_series = weight_trend.withings_series(withings_all)
 
     # #3478: the genesis baseline below is a CONSTANT, not a reading. Downstream it is
     # indistinguishable from a weigh-in (it fills last_weighin_date and counts toward
@@ -123,7 +122,7 @@ def journey(*, _g) -> dict:
     # (travel scale) than the Withings series — same helper as vitals/character.
     try:
         # #4088: genesis DATE clamp — the same "this experiment" frame as the withings series above.
-        _ah_start = max((datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+        _ah_start = weight_trend.experiment_rate_window(today, EXPERIMENT_START, lookback_days=7)[0]
         _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
         # #3478: against a SYNTHETIC anchor the `>` test is wrong twice over — the
         # anchor is the genesis date, so a real Day-1 weigh-in dated ON genesis

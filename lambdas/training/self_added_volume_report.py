@@ -32,7 +32,9 @@ def evaluate_for_digest(hevy_full: list[dict[str, Any]], w1_end: str) -> dict[st
         separation: dict[str, Any] = {"state": "measured"}
     except Exception as e:  # noqa: BLE001 — the report renders; the line names why complements are not separated
         rows, separation = hevy_full, {"state": "read_failed", "error": f"{type(e).__name__}: {e}"}
-    return {**self_added_volume.evaluate(rows, w1_end, threshold), "off_program_separation": separation}
+    # `w1_end` is yesterday — a finished day: on a Monday run the week whose Sunday it is has ENDED and is the
+    # latest complete week the report renders (#4111; before, it read as in progress and the report skipped it)
+    return {**self_added_volume.evaluate(rows, w1_end, threshold, end_day_complete=True), "off_program_separation": separation}
 
 
 def digest_rows(saw: dict[str, Any] | None, row: Callable[..., str], esc: Callable[[str], str]) -> str:

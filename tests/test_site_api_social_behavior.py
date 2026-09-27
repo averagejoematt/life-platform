@@ -1870,6 +1870,7 @@ _FLAG_DRIVERS = {
     "_handle_nudge": lambda: post({"category": "watching"}),
     "_handle_submit_finding": lambda: post(GOOD_FINDING),
     "_handle_page_feedback": lambda: post({"page": "/data/", "made_sense": "yes"}),  # #4182
+    "_handle_morning_note": lambda: post(_signed_morning_note_body()),  # #4189 — the owner's door; the driver carries today's token
     # #2239 — a GET, not a POST, but it goes through the same chokepoint and so
     # joins the derived sweep automatically. Driven with an address that is NOT on
     # the roster: the 404 branch is the one an enumerator actually uses.
@@ -2213,6 +2214,20 @@ def test_every_rate_limited_refusal_emits_the_abuse_metric(monkeypatch):
 # ──────────────────────────────────────────────────────────────────────────────
 # 10. The evening-ritual one-tap link (#769, ADR-124)
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+def _signed_morning_note_body(date_str=TODAY, secret=RITUAL_SECRET) -> dict:
+    """#4189: a valid owner write for the frozen day — the driver the rate-limit sweep needs."""
+    from content.ritual_link import sign_morning_note_token
+
+    return {
+        "sleep_word": "heavy",
+        "body_word": "stiff",
+        "mood_word": "steady",
+        "felt_recovered": False,
+        "date": date_str,
+        "token": sign_morning_note_token(secret, date_str),
+    }
 
 
 def _signed_ritual_params(date_str=TODAY, metric="connection", value=3, secret=RITUAL_SECRET) -> dict:

@@ -333,7 +333,7 @@ def _call_notes_model(prompt, api_key):
             "anthropic-version": "2023-06-01",
         },
     )
-    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+    # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
     from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(req, timeout=60)

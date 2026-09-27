@@ -1768,7 +1768,7 @@ class TestGatherAll:
         threshold = next(
             t for t in __import__("training.owner_redlines", fromlist=["TRIPWIRES"]).TRIPWIRES if t["id"] == "self_added_volume"
         )["threshold_weeks"]
-        expected = {**saw_mod.evaluate([row], W1_END, threshold), "off_program_separation": {"state": "measured"}}  # #4312
+        expected = {**saw_mod.evaluate([row], W1_END, threshold, end_day_complete=True), "off_program_separation": {"state": "measured"}}
         assert data["self_added_volume"] == expected
 
     def test_self_added_volume_tripwire_is_report_only_not_a_veto(self):

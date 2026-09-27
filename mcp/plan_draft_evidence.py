@@ -33,7 +33,7 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
     """Per-draft-exercise evidence for the critics: anchor-lift trend, pain flags, days since.
     Plus the two streaks (#4067) and the lifting-session count from the performed record."""
     from mcp.tools_strength import tool_get_exercise_history
-    from mcp.tools_training_notes import tool_get_exercise_notes
+    from mcp.tools_training_notes import _pain_notes, tool_get_exercise_notes
 
     resolver = _safe(_resolver)
     anchor_ids = _safe(_core_anchor_identities) or {}
@@ -67,6 +67,7 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         if pain and "error" not in pain:
             row["pain_flag_any"] = pain.get("pain_flag_any")
             row["pain_dates"] = pain.get("pain_dates") or []
+            row["pain_notes"] = _pain_notes(pain.get("timeline") or [])  # #4174: per-site instances need the words
             row["pain_layer_status"] = pain.get("layer_status")
         exercises.append(row)
 

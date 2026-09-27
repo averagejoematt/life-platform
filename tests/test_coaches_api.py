@@ -561,10 +561,13 @@ def test_latest_checked_skips_undecided_and_archived_rows_and_degrades_to_null()
 # _write_learning_record` for their learnings, `dispute_docket._write_docket_learning`
 # / `_write_docket_prediction` (through the real `_put_unique`, against a table that
 # enforces its ConditionExpression) for the docket trail — twenty resolver days, in the
-# resolver's own write order, the prediction write raising after the fifth day exactly
-# as #4216 measured. Dates derive from the live genesis (never literals — the #2376
-# dated-fixture timebomb class): the docket opens 34 days before Day 1, its criterion
-# day is 27 days before, the re-writes run Day 1 → Day 20.
+# resolver's own write order. Since #4317 the prediction writer writes once and REFUSES
+# the nineteen re-runs (asserted); the four suffixed PREDICTION# copies the retired
+# writer left on the live table (measured 2026-09-27, still there until #4216's cleanup
+# box) are added as that measured shape, because the consumer must count them once.
+# Dates derive from the live genesis (never literals — the #2376 dated-fixture timebomb
+# class): the docket opens 34 days before Day 1, its criterion day is 27 days before,
+# the re-runs run Day 1 → Day 20.
 
 
 def _day(offset):
@@ -689,17 +692,22 @@ def _write_live_0926_wire(monkeypatch):
     # The docket, resolved by the real resolver path twenty days running (its order:
     # both learnings, then both predictions — #4216's mechanism verbatim).
     docket = _docket_0810()
-    raised_on = []
+    refused = []
     for offset in range(1, 21):
         day = _day(offset)
         dd._write_docket_learning("nutrition_coach", day, docket, "confirmed")
         dd._write_docket_learning("explorer_coach", day, docket, "refuted", concession="CONCESSION — I lost the docket dispute.")
-        try:
-            dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, day)
-            dd._write_docket_prediction("explorer_coach", docket, "refuted", 2310.0, day)
-        except RuntimeError:
-            raised_on.append(day)
-    assert len(raised_on) == 15, "the prediction key should exhaust `_put_unique` after five days, as measured live"
+        w = dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, day)
+        l = dd._write_docket_prediction("explorer_coach", docket, "refuted", 2310.0, day)
+        if offset > 1:
+            refused.append((w, l))
+    assert len(refused) == 19 and all(w is None and l is None for w, l in refused), "#4317: the docket writer refuses every re-run"
+    # The retired writer's trail, as the live table still carries it (2026-09-27): four
+    # suffixed copies of each side's docket row, one later outcome_date per daily re-run.
+    for (pk, sk), row in list(table.store.items()):
+        if str(sk).startswith("PREDICTION#docket-"):
+            for n in (2, 3, 4, 5):
+                table.store[(pk, f"{sk}-{n}")] = dict(row, sk=f"{sk}-{n}", outcome_date=_day(n))
 
     # The reset/reconcile stamp the live docket rows carry (measured 2026-09-27 on all
     # five of Webb's PREDICTION#docket-… rows): phase=pilot, tombstone=true, cycle=16 —
@@ -867,3 +875,47 @@ def test_4220_a_prediction_resolves_once_and_in_the_cycle_it_resolved_in():
         cr.headline({"confirmed": 7, "refuted": 10, "n": 17, "through": _day(20)})
         == f"7 of 17 checked calls right (41%) through {cr.day_words(_day(20))}"
     )
+
+
+@pytest.mark.parametrize("pt_clock", ["23:30", "08:00"])
+def test_4220_pair10_holds_under_a_frozen_pacific_clock(monkeypatch, pt_clock):
+    """#3222-class control for PAIR 10: the contract must hold at 23:30 PT (a UTC day ahead
+    of the Pacific day) and at 08:00 PT alike. Every clock the producer's writers read is
+    frozen — `dispute_docket` / `coach_prediction_evaluator` / `prediction_emission`'s
+    `datetime`, and `common.pacific_time`'s `pacific_today`/`pacific_now` (the names
+    `phase_taxonomy._write_date` imports for the write-time stamp) — and the freeze is
+    proved to have reached the writer through the row's own `resolved_at`. The 2026-09-27
+    red on main was NOT this class (it was #4317 retiring the writer's -N trail); this pins
+    that the pair never becomes one."""
+    from datetime import datetime, timezone
+
+    import pair_contract_registry  # noqa: F401 — populates the registry
+    from coach import coach_prediction_evaluator as ev, dispute_docket as dd, prediction_emission as pe
+    from common import pacific_time
+    from common.pacific_time import PACIFIC
+    from pacific_clock import freeze_pacific
+    from pair_contract import PAIR_CONTRACT_REGISTRY
+
+    pair = next(p for p in PAIR_CONTRACT_REGISTRY if p.name.startswith("coach PREDICTION# resolutions"))
+    hour, minute = (int(x) for x in pt_clock.split(":"))
+    pt_day = datetime.fromisoformat(_day(12)).replace(hour=hour, minute=minute, tzinfo=PACIFIC)
+    frozen_utc = pt_day.astimezone(timezone.utc)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen_utc.astimezone(tz) if tz else frozen_utc.replace(tzinfo=None)
+
+    for mod in (dd, ev, pe):
+        monkeypatch.setattr(mod, "datetime", _FrozenDatetime)
+    pinned = freeze_pacific(monkeypatch, pacific_time, _FrozenDatetime)
+    assert pinned.strftime("%H:%M") == pt_clock and pacific_time.pacific_today() == _day(12)
+    if pt_clock == "23:30":
+        assert frozen_utc.date().isoformat() != _day(12), "the control must sit where the UTC day and the Pacific day disagree"
+
+    produced = pair.produce()
+    consumed = pair.consume(produced)
+    pair.agree(produced, consumed)
+    docket_row = produced["rows"][1]
+    assert str(docket_row["resolved_at"]).startswith(frozen_utc.isoformat()[:16]), "the frozen clock did not reach the writer"
+    assert consumed == {"confirmed": 1, "refuted": 1, "n": 2, "through": _day(9)}

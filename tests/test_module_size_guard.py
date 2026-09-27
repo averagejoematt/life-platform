@@ -392,7 +392,7 @@ BASELINE = {
     # different definitions of "last week's weight" and the compute one was wrong (it took
     # the OLDEST reading in a 14-day window). The single line buys one shared definition —
     # the ratchet's first real bump, and the shape it is meant to allow.
-    "lambdas/compute/daily_metrics_compute_lambda.py": 1048,
+    "lambdas/compute/daily_metrics_compute_lambda.py": 1045,
     # RETIRED by #3537: banked at 1292 PHYSICAL lines, measures 971 LOGICAL lines —
     # under the 1000-line ceiling, so the entry is stale by the registry's own rule
     # (test_baseline_has_no_stale_entries). The ratchet tightened: this file is now

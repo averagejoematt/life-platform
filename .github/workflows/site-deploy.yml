@@ -106,6 +106,7 @@ jobs:
   deploy-site:
     name: Deploy public site
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       superseded: ${{ steps.supersede.outputs.superseded }}
     steps:
@@ -191,7 +192,7 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow pyyaml)
           pip install --quiet $PINS
 
-      # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
+      # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC)
         if: steps.supersede.outputs.superseded != 'true'
         uses: ./.github/actions/setup-ci
@@ -258,6 +259,7 @@ jobs:
   smoke:
     name: Site smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: deploy-site
     if: needs.deploy-site.outputs.superseded != 'true'
     # #3395: the rollback's scope check reads these (the smoke twin of visual-qa's
@@ -312,6 +314,7 @@ jobs:
   visual-qa:
     name: Visual + AI-vision QA
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     needs: deploy-site
     if: needs.deploy-site.outputs.superseded != 'true'
     # #3352: the rollback's scope check reads these. Job outputs survive a FAILED job as
@@ -343,7 +346,7 @@ jobs:
           python -m pip install $PINS
           python -m playwright install --with-deps chromium
 
-      # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
+      # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
         uses: ./.github/actions/setup-ci
         with:
@@ -413,6 +416,7 @@ jobs:
   rollback-site-on-failure:
     name: Auto-rollback site (smoke or visual-QA failure)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # #3352: job-level permissions REPLACE the workflow block, so the OIDC/contents
     # grants are restated. `issues: write` is for the #1447 advisory filer on the
     # decline path — a GitHub token scope, not an IAM change.
@@ -441,7 +445,7 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow)
           pip install --quiet $PINS
 
-      # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
+      # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC)
         uses: ./.github/actions/setup-ci
         with:
@@ -589,6 +593,7 @@ jobs:
   resolve-gate-unreachable-issue:
     name: Resolve out-of-reach gate issue (if any)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write
@@ -615,6 +620,7 @@ jobs:
   notify-deploy-failure:
     name: Notify deploy failure
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: deploy-site
     if: always() && needs.deploy-site.result == 'failure'
     steps:

@@ -199,7 +199,7 @@ def call_haiku(raw_text, date, template, structured_scores):
         "messages": [{"role": "user", "content": user_content}],
     }
 
-    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+    # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
     from common.retry_utils import call_anthropic_raw
 
     result = call_anthropic_raw(body, timeout=30)

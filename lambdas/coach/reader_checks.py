@@ -232,16 +232,29 @@ _WINDOW_RE = re.compile(
 _NEGATED_TREND_RE = re.compile(r"\b(?:not|no|nor)\s+(?:an?\s+)?(?:\w+\s+)?trends?\b", re.IGNORECASE)
 
 
+# #4343: a sentence can join two independent clauses — "the running average has moved
+# modestly, and the recovery reading on the night of September 25th was 77%". The 77 is a
+# dated reading, not the average's value, so the average word and the figure must share a
+# CLAUSE. Split only on a coordinating join (never on a dash, which is usually
+# parenthetical: "the running average — 157 g — is up" is one claim).
+_CLAUSE_JOIN_RE = re.compile(r";\s*|,\s+(?:and|but|while|whereas)\s+", re.IGNORECASE)
+
+
+def _average_figure_clause(sentence: str) -> bool:
+    return any(_AVERAGE_RE.search(_NEGATED_TREND_RE.sub("", c)) and _FIGURE_RE.search(c) for c in _CLAUSE_JOIN_RE.split(sentence))
+
+
 def unlabeled_window_figure(text: str, **_: Any) -> list:
     """An average/trend figure whose sentence names no window (the #1968 shape, generalised).
 
     A window is "over/across N days", "since …", "through …", "N-day", "this/last week".
     A date alone is NOT a window: "1,596 kcal EWMA … on the night of 2026-09-24" still
-    leaves the average's span unnamed.
+    leaves the average's span unnamed. The average word and the figure must share a
+    clause (#4343); the window may sit anywhere in the sentence.
     """
     out = []
     for s in _sentences(text):
-        if _AVERAGE_RE.search(_NEGATED_TREND_RE.sub("", s)) and _FIGURE_RE.search(s) and not _WINDOW_RE.search(s):
+        if _average_figure_clause(s) and not _WINDOW_RE.search(s):
             out.append(
                 _finding(
                     "unlabeled_window_figure",

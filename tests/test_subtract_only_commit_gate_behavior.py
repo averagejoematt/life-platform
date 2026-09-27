@@ -194,6 +194,42 @@ def test_the_below_floor_refusal_carries_the_floors_provenance():
     assert "75 lb" in msg  # what was prescribed
 
 
+# ── #4172: the refusal's suggestions name the set, the floor and the clause — never 'retry' ──
+_RETRY_WORDS = __import__("re").compile(r"retry|try again|system status|temporar", __import__("re").I)
+
+
+def test_4172_the_live_specimen_refusal_suggests_the_clause_to_remove_and_the_floor_to_clear():
+    out = _commit(_wire_ir())
+    assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION" and out["kind"] == "policy", out
+    sugg = out["suggestions"]
+    assert sugg and "Retry or check system status." not in sugg
+    assert not any(_RETRY_WORDS.search(t) for t in sugg), sugg
+    assert any("Remove the conditional up-branch from incline_db_press" in t and "If set 1 is <=7.5 go 80" in t for t in sugg), sugg
+    assert any(
+        t.startswith("Prescribe incline_db_press set ") and "floor of 80 lb" in t and "now 75 lb" in t and "2026-09-11" in t for t in sugg
+    ), sugg
+    assert "plan_next_session" in sugg[-1] and "not overridable from chat" in sugg[-1], sugg[-1]
+    # one suggestion per finding + the closing line — the derivation covers the SET of violations
+    assert len(sugg) >= 3, sugg
+
+
+def test_4172_refusal_suggestions_are_empty_for_a_clean_or_skipped_gate():
+    assert gate.refusal_suggestions(None) == []
+    assert gate.refusal_suggestions({"verdict": "clean"}) == []
+    assert gate.refusal_suggestions({"verdict": "skipped"}) == []
+
+
+def test_4172_mutation_the_default_table_alone_would_not_name_this_set():
+    """Proof the suggestions are DERIVED from the violations, not the generic default:
+    the registry default for SUBTRACT_ONLY_VIOLATION names no exercise; the live refusal does."""
+    from mcp.utils import _default_suggestions
+
+    generic = _default_suggestions("SUBTRACT_ONLY_VIOLATION")
+    assert not any("incline_db_press" in t for t in generic)
+    out = _commit(_only(_wire_ir(), "incline_db_press"))
+    assert out["suggestions"] != generic and any("incline_db_press" in t for t in out["suggestions"]), out["suggestions"]
+
+
 def test_a_set_below_the_prescription_floor_refuses_even_with_clean_prose():
     """Strip the conditional clause entirely — the LOAD alone still refuses."""
     ir = _only(_wire_ir(), "incline_db_press")
@@ -333,7 +369,7 @@ def test_mutation_removing_the_refusal_lets_the_specimen_through():
     routine_id) rather than on the gate. With the refusal removed and NOTHING else
     changed, the same IR commits — so the gate is the only thing stopping it.
     """
-    with patch.object(t, "refusal_message", return_value=None):
+    with patch.object(t, "_gate_refusal", return_value=None):  # #4172: the refusal (message + suggestions) is one helper
         out = _commit(_wire_ir())
     assert out.get("status") == "committed", out
     assert out["_create_called"] is True

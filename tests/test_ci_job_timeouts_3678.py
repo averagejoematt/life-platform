@@ -49,9 +49,15 @@ def test_timeout_minutes_by_job_name_matches_iter_job_timeouts():
     entries = cjt.iter_job_timeouts()
     mapping = cjt.timeout_minutes_by_job_name()
     non_templated = [e for e in entries if not e["templated"]]
-    assert len(mapping) == len(non_templated)
+    # #4253: a check-run name can recur across files ("Visual + AI-vision QA" is a job in
+    # both ci-cd.yml and site-deploy.yml). The map is keyed by name, so a recurring name is
+    # only sound while every copy declares the SAME ceiling — the loop below reds otherwise.
+    assert len(mapping) == len({e["job_name"] for e in non_templated})
     for e in non_templated:
-        assert mapping[e["job_name"]] == e["timeout_minutes"]
+        assert mapping[e["job_name"]] == e["timeout_minutes"], (
+            f"{e['file']}:{e['job_id']} shares the name {e['job_name']!r} with another job at a different "
+            "timeout-minutes — the by-name map would report the wrong ceiling for one of them"
+        )
 
 
 # ── synthetic fixture: templated names are found but excluded (#3678) ──────
@@ -128,3 +134,90 @@ def test_an_empty_workflow_dir_returns_empty_not_an_error():
 
 def test_a_nonexistent_workflow_dir_degrades_to_empty():
     assert cjt.iter_job_timeouts(os.path.join(_REPO, "definitely-not-a-real-directory-3678")) == []
+
+
+# ── #4253: every job in the deploy-path workflows is bounded, and one OIDC pin ──
+#
+# ci-cd, ci-test, ci-lint and site-deploy ran on GitHub's 360-minute default: a hung
+# step held the runner AND the deploy concurrency slot for six hours. Each job now
+# carries a ceiling measured from its own trailing runs (the table is in the #4253 PR
+# body). A job that CALLS a reusable workflow (`uses:`) cannot take `timeout-minutes`
+# at all (GitHub rejects the key there) — the callee's job carries it, so the callee
+# file is in the set.
+
+_BOUNDED_WORKFLOWS = ("ci-cd.yml", "ci-test.yml", "ci-lint.yml", "site-deploy.yml")
+_OIDC_PIN_RE = __import__("re").compile(r"uses:\s*aws-actions/configure-aws-credentials@([0-9a-f]{40})")
+
+
+def _jobs_without_timeout(workflow_dir, files):
+    """`[(file, job_id)]` for every runner job in `files` that declares no `timeout-minutes`."""
+    missing = []
+    for fname in files:
+        with open(os.path.join(workflow_dir, fname), encoding="utf-8") as fh:
+            doc = cjt._load_yaml(fh.read())
+        jobs = doc.get("jobs")
+        assert isinstance(jobs, dict) and jobs, f"{fname} has no jobs — the guard would be vacuous"
+        for job_id, job in jobs.items():
+            if "uses" in job:  # reusable-workflow caller: the callee job carries the ceiling
+                continue
+            if job.get("timeout-minutes") is None:
+                missing.append((fname, job_id))
+    return missing
+
+
+def _oidc_pins(root):
+    """`{sha: [path, ...]}` for every configure-aws-credentials pin under `root`."""
+    pins: dict = {}
+    for dirpath, _dirs, files in os.walk(root):
+        for f in files:
+            if f.endswith((".yml", ".yaml")):
+                path = os.path.join(dirpath, f)
+                with open(path, encoding="utf-8") as fh:
+                    for sha in _OIDC_PIN_RE.findall(fh.read()):
+                        pins.setdefault(sha, []).append(os.path.relpath(path, root))
+    return pins
+
+
+def test_every_job_in_the_four_deploy_path_workflows_declares_timeout_minutes():
+    missing = _jobs_without_timeout(cjt.WORKFLOW_DIR, _BOUNDED_WORKFLOWS)
+    assert missing == [], f"jobs running on GitHub's 360-min default (#4253): {missing}"
+
+
+def test_the_timeout_guard_reds_on_a_job_with_no_ceiling_mutation_control():
+    """Mutation control: strip one real job's `timeout-minutes` and the guard must name it;
+    a reusable-workflow caller without the key must NOT be named."""
+    with open(os.path.join(cjt.WORKFLOW_DIR, "ci-lint.yml"), encoding="utf-8") as fh:
+        real = fh.read()
+    assert "    timeout-minutes:" in real
+    mutated = "\n".join(ln for ln in real.split("\n") if not ln.startswith("    timeout-minutes:"))
+    with tempfile.TemporaryDirectory() as d:
+        _write_workflow(d, "ci-lint.yml", mutated)
+        _write_workflow(d, "caller.yml", "on: push\njobs:\n  lint:\n    uses: ./.github/workflows/ci-lint.yml\n")
+        assert _jobs_without_timeout(d, ("ci-lint.yml", "caller.yml")) == [("ci-lint.yml", "lint")]
+        _write_workflow(d, "ci-lint.yml", real)
+        assert _jobs_without_timeout(d, ("ci-lint.yml", "caller.yml")) == []
+
+
+def test_every_configure_aws_credentials_pin_is_one_sha():
+    """The composite (`.github/actions/setup-ci`) and the hand-rolled OIDC blocks drifted
+    apart (v6.2.2 vs v6.3.0) because Dependabot's `/` directory never reached the composite
+    (#4253). One SHA across `.github/`, composite included."""
+    pins = _oidc_pins(os.path.join(_REPO, ".github"))
+    composite = [s for s, paths in pins.items() if any(p.startswith(os.path.join("actions", "setup-ci")) for p in paths)]
+    assert composite, "the setup-ci composite no longer pins configure-aws-credentials — the guard lost its anchor"
+    assert len(pins) == 1, f"configure-aws-credentials pinned at more than one SHA: {pins}"
+
+
+def test_the_pin_guard_sees_a_drifted_call_site_mutation_control():
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, "actions", "setup-ci"))
+        os.makedirs(os.path.join(d, "workflows"))
+        step = "      - uses: aws-actions/configure-aws-credentials@{} # vX\n"
+        with open(os.path.join(d, "actions", "setup-ci", "action.yml"), "w") as fh:
+            fh.write(step.format("a" * 40))
+        with open(os.path.join(d, "workflows", "x.yml"), "w") as fh:
+            fh.write(step.format("b" * 40))
+        assert len(_oidc_pins(d)) == 2
+        with open(os.path.join(d, "workflows", "x.yml"), "w") as fh:
+            fh.write(step.format("a" * 40))
+        assert len(_oidc_pins(d)) == 1
