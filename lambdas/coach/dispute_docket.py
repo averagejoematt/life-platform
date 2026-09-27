@@ -56,6 +56,27 @@ Resolution — CODE ONLY, no LLM anywhere in the verdict path (AC2, ADR-105):
   cite it (AC3). No data on the date → the entry stays open through a grace
   window; still nothing after NO_DATA_GRACE_DAYS → void_no_data, published in
   the resolved history with the same dignity as a graded verdict (AC4).
+
+A docket resolves ONCE (#4216 — measured 2026-09-26). The pre-genesis calories docket
+(resolution 2026-08-10) was re-graded every day of cycle 17: 20 identical LEARNING# rows
+per side (09-07 → 09-26), 20 obituaries on /method/, five PREDICTION# rows for one
+prediction_id. The CloudWatch record names the two steps that left it OPEN#: first the
+evaluator's role had no `dynamodb:DeleteItem`, so `_finalize` wrote every derived row
+and then failed on the delete (AccessDeniedException, every run 08-17 → 09-11); from
+09-12 `_put_unique` ran out of `-N` suffixes on the date-free PREDICTION# key and raised
+BEFORE `_finalize`, with the two dated LEARNING# rows already written. Three rules now:
+  1. a docket whose resolution is RECORDED is skipped — the OPEN# row carries a marker
+     (`status="resolved"`, `resolved_sk`) written by `_finalize` BEFORE the best-effort
+     delete, so a refused delete cannot re-open the grading; `_docket_row_stands` treats
+     a marked row as absent, so the throttle key frees regardless;
+  2. every derived write is a conditional put that REFUSES a duplicate (no suffixing —
+     a collision on a docket-derived key IS the duplicate); the Bayesian confidence
+     update runs only when the PREDICTION# row was newly written;
+  3. a docket whose resolution_date precedes EXPERIMENT_START_DATE, or whose row the
+     phase filter hides (a wiped prior-cycle row), is closed once as a void — no
+     learning, no prediction, no confidence update — never re-graded in this experiment.
+One docket's failure no longer aborts the run: the protein docket and the two cycle-17
+dockets sat behind the calories row's exception for 40 days.
 """
 
 import importlib
@@ -69,6 +90,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
+from common.constants import EXPERIMENT_START_DATE  # the void rule's genesis (#4216); a re-anchor ships in every bundle (#781)
 from common.numeric import decimals_to_float, floats_to_decimal  # the ONE canonical walker pair (#1207)
 
 logger = logging.getLogger("dispute-docket")
@@ -282,9 +304,22 @@ def _stamped(item):
         return item
 
 
+def _resolution_recorded(docket):
+    """True once a docket's resolution is on its own row (#4216): `_finalize` marks the
+    OPEN# row `status="resolved"` + `resolved_sk` before the best-effort delete, so a row
+    the delete could not remove is still never graded twice and never blocks its key."""
+    if not docket:
+        return False
+    return bool(docket.get("resolved_sk")) or str(docket.get("status") or "open") != "open"
+
+
 def _docket_row_stands(item):
     """True when a row already occupying an OPEN# key is a LIVE docket — i.e. the
     throttle should bite.
+
+    #4216: a row whose resolution is recorded (see `_resolution_recorded`) is not
+    standing either — the delete that retires it is best-effort, and the throttle
+    must not wait on it.
 
     ADR-077: the restart wipe TOMBSTONES ENSEMBLE#docket rows, it does not delete them.
     Under #1801's key that matters: the throttle space is now finite (pair × subdomain),
@@ -295,7 +330,7 @@ def _docket_row_stands(item):
     Fail-safe direction is "don't clobber": if the filter can't be consulted, the row
     counts as standing.
     """
-    if not item:
+    if not item or _resolution_recorded(item):
         return False
     try:
         from experiment.phase_filter import singleton_visible
@@ -306,37 +341,34 @@ def _docket_row_stands(item):
         return True
 
 
-# How many times a derived write may disambiguate a sort-key collision before it
-# gives up loudly. Unreachable once the keys are pair-scoped (#1798) — this is the
-# belt to that suspenders, so a future key change can never resurrect a SILENT
-# overwrite of a graded outcome (ADR-104: no silent data loss).
-_MAX_SK_DISAMBIGUATION = 5
-
-
 def _put_unique(item, what):
-    """put_item that can never silently overwrite an existing row.
+    """put_item that can never overwrite an existing row AND never re-records one.
 
     Every derived record the resolution path writes (the LEARNING# track-record row,
     the graded PREDICTION# row, the RESOLVED# docket entry) is a NEW fact about a
-    specific docket — none of them is ever a legitimate update of another docket's
-    fact. The write is therefore conditional; on the (post-#1798, unreachable)
-    collision it disambiguates with a numeric suffix and LOGS it, rather than
-    destroying the row already there.
+    specific docket, and its key is pair-scoped (#1798) — so a row already on the key
+    is the SAME fact, recorded earlier. The write is conditional and a collision is
+    REFUSED: it logs and returns None, leaving the first record intact.
+
+    #4216 retired the `-N` suffix disambiguation that used to live here. It was meant
+    as a belt against a future key collision; on the wire it manufactured five
+    PREDICTION# rows for one prediction_id (one per daily re-run) and then raised on
+    the sixth day. A conditional put that refuses is the race guard: two concurrent
+    resolvers can each write at most the rows the other did not.
+
+    Returns the sort key on a write, None when the row already existed.
     """
-    base_sk = item["sk"]
-    for attempt in range(_MAX_SK_DISAMBIGUATION):
-        candidate = base_sk if attempt == 0 else f"{base_sk}-{attempt + 1}"
-        try:
-            table.put_item(
-                Item=floats_to_decimal(_stamped({**item, "sk": candidate})),
-                ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
-            )
-            return candidate
-        except ClientError as e:
-            if e.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
-                raise
-            logger.warning("%s sort key %s already exists — disambiguating rather than overwriting", what, candidate)
-    raise RuntimeError(f"{what}: could not find a free sort key for {base_sk!r} after {_MAX_SK_DISAMBIGUATION} attempts")
+    try:
+        table.put_item(
+            Item=floats_to_decimal(_stamped(item)),
+            ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
+        )
+        return item["sk"]
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+            raise
+        logger.warning("%s %s already recorded — refusing the duplicate (#4216)", what, item["sk"])
+        return None
 
 
 # ── stakes (frozen at open) ───────────────────────────────────────────────────
@@ -585,7 +617,7 @@ def _write_docket_learning(coach_id, today_str, docket, outcome, concession=None
     }
     if concession:
         item["concession"] = concession
-    _put_unique(item, "docket LEARNING#")
+    return _put_unique(item, "docket LEARNING#")
 
 
 def _write_docket_prediction(coach_id, docket, outcome, actual, today_str):
@@ -618,12 +650,75 @@ def _write_docket_prediction(coach_id, docket, outcome, actual, today_str):
         "created_at": docket.get("opened_at", ""),
         "resolved_at": datetime.now(timezone.utc).isoformat(),
     }
-    _put_unique(item, "docket PREDICTION#")
+    return _put_unique(item, "docket PREDICTION#")
+
+
+def _mark_resolved(open_item, resolved_sk, today_str):
+    """The resolution marker on the OPEN# row (#4216) — written BEFORE the delete so a
+    refused delete leaves a row `resolve_due` skips and the throttle ignores. The update
+    is conditional on the row still existing: it must never re-create a row a concurrent
+    run already retired."""
+    try:
+        table.update_item(
+            Key={"pk": DOCKET_PK, "sk": open_item["sk"]},
+            UpdateExpression="SET #st = :resolved, resolved_sk = :rsk, resolved_date = :day, resolution_recorded_at = :at",
+            ConditionExpression="attribute_exists(pk) AND attribute_exists(sk)",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={
+                ":resolved": "resolved",
+                ":rsk": resolved_sk,
+                ":day": today_str,
+                ":at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+            raise
+        logger.info("docket %s already retired by another run — marker not needed", open_item["sk"])
+
+
+def _retire_open_row(open_item):
+    """Best-effort delete of the OPEN# row. The marker (`_mark_resolved`) is the
+    idempotence anchor; this is housekeeping for the reader. A refused delete is logged
+    at ERROR — the row it leaves renders as open on /api/coach_docket until the role
+    carries `dynamodb:DeleteItem` on ENSEMBLE#docket (the #4216 grant)."""
+    try:
+        table.delete_item(Key={"pk": DOCKET_PK, "sk": open_item["sk"]})
+        return True
+    except ClientError as e:
+        logger.error(
+            "docket %s: resolution recorded but the OPEN# row could not be retired (%s) — it is marked resolved and will not be re-graded",
+            open_item["sk"],
+            e.response.get("Error", {}).get("Code"),
+        )
+        return False
+
+
+def _void_verdict(docket, genesis):
+    """(outcome, reason) when a due docket must be CLOSED rather than graded (#4216):
+    its resolution date precedes this experiment's start, or the phase filter hides its
+    row (a wiped prior-cycle docket). None when the docket is gradable here."""
+    due = str(docket.get("resolution_date") or "")
+    if due and due < str(genesis):  # ISO dates compare as strings (#3609)
+        return "void_pre_genesis", f"resolution date {due} precedes the experiment start {genesis} — not graded in this experiment"
+    try:
+        from experiment.phase_filter import singleton_visible
+
+        visible = bool(singleton_visible(docket))
+    except Exception as e:  # fail toward grading — the date rule above already caught the live case
+        logger.warning("phase filter unavailable during the docket void check: %s", e)
+        visible = True
+    if not visible:
+        why = docket.get("tombstoned_reason") or "phase filter hides the row"
+        return "void_prior_cycle", f"a prior-cycle docket ({why}) — not graded in this experiment"
+    return None, None
 
 
 def _finalize(open_item, today_str, verdict):
-    """Move OPEN# → RESOLVED#. The resolved entry keeps every field the open one
-    carried — a lost dispute renders with the same shape as a won one (AC4)."""
+    """Record the resolution ONCE (#4216): the RESOLVED# row (conditional — a refused
+    duplicate keeps the sk), then the marker on the OPEN# row, then the best-effort
+    delete. The resolved entry keeps every field the open one carried — a lost dispute
+    renders with the same shape as a won one (AC4)."""
     resolved_sk = f"RESOLVED#{today_str}#{pair_key(open_item['coach_a'], open_item['coach_b'])}#{open_item['topic_slug']}"
     resolved = {
         **{k: v for k, v in open_item.items() if k not in ("pk", "sk")},
@@ -634,8 +729,9 @@ def _finalize(open_item, today_str, verdict):
         "resolved_at": datetime.now(timezone.utc).isoformat(),
         **verdict,
     }
-    resolved_sk = _put_unique(resolved, "docket RESOLVED#")
-    table.delete_item(Key={"pk": DOCKET_PK, "sk": open_item["sk"]})
+    _put_unique(resolved, "docket RESOLVED#")
+    _mark_resolved(open_item, resolved_sk, today_str)
+    _retire_open_row(open_item)
     return resolved_sk
 
 
@@ -664,13 +760,12 @@ def resolve_due(today_str):
     Deterministic end-to-end (ADR-105): the actual value and the verdict come
     from coach_prediction_evaluator's own metric machinery; no LLM is imported,
     called, or consulted anywhere in this path. Runs in the evaluator's daily
-    lane. Returns a summary dict."""
-    _ev = _evaluator_module()
-    _evaluate_condition = _ev._evaluate_condition
-    _resolve_metric_value = _ev._resolve_metric_value
-    _update_bayesian_confidence = _ev._update_bayesian_confidence
+    lane. Returns a summary dict.
 
-    resolved, voided, waiting = [], [], []
+    #4216: a docket whose resolution is recorded is skipped; a pre-genesis or
+    prior-cycle docket is voided once, never graded; one docket's failure is
+    reported in `failed` and the run goes on."""
+    resolved, voided, waiting, already, failed = [], [], [], [], []
     items, kwargs = [], {"KeyConditionExpression": Key("pk").eq(DOCKET_PK) & Key("sk").begins_with("OPEN#")}
     while True:
         resp = table.query(**kwargs)
@@ -683,69 +778,103 @@ def resolve_due(today_str):
     data_cache = {}
     for raw in items:
         docket = decimals_to_float(raw)
+        if _resolution_recorded(docket):  # #4216 rule 1 — recorded once is recorded
+            already.append(docket["sk"])
+            continue
         due_date = str(docket.get("resolution_date") or "")
         if not due_date or due_date > today_str:
             continue
-        criterion = docket.get("criterion") or {}
-        actual = _resolve_metric_value(criterion.get("metric", ""), data_cache, today_str)
-        holds = _evaluate_condition(actual, criterion.get("condition"), criterion.get("threshold"))
-        if holds is None:
-            # No data yet — grace window, then an honest void (never silent limbo).
-            days_over = (datetime.strptime(today_str, "%Y-%m-%d") - datetime.strptime(due_date, "%Y-%m-%d")).days
-            if days_over < NO_DATA_GRACE_DAYS:
-                waiting.append(docket["sk"])
-                continue
-            sk = _finalize(
-                docket,
-                today_str,
-                {"verdict": {"outcome": "void_no_data", "reason": f"no {criterion.get('metric')} data within {NO_DATA_GRACE_DAYS}d grace"}},
-            )
-            voided.append(sk)
-            continue
+        try:
+            _resolve_one(docket, due_date, today_str, data_cache, resolved, voided, waiting)
+        except Exception as e:  # one docket's failure never sinks the rest of the run (#4216)
+            logger.error("docket %s: resolution failed — %s", docket.get("sk"), e)
+            failed.append({"sk": docket.get("sk"), "error": str(e)})
 
-        sides = docket.get("sides") or {}
-        a, b = docket["coach_a"], docket["coach_b"]
-        winner = a if bool(sides.get(a)) == bool(holds) else b
-        loser = b if winner == a else a
-        concession = concession_text(
-            loser,
-            winner,
-            docket["topic"],
-            (docket.get("claims") or {}).get(loser, ""),
-            {**criterion, "resolution_date": due_date, "sides": sides},
-            actual,
-            today_str,
-        )
+    summary = {
+        "resolved": resolved,
+        "voided": voided,
+        "waiting_for_data": waiting,
+        "already_recorded": already,
+        "failed": failed,
+        "open_scanned": len(items),
+    }
+    logger.info(json.dumps(summary, default=str))
+    return summary
 
-        # Both track records update — the evaluator's own paths, reused (AC2).
-        _write_docket_learning(winner, today_str, docket, "confirmed")
-        _write_docket_learning(loser, today_str, docket, "refuted", concession=concession)
-        _write_docket_prediction(winner, docket, "confirmed", actual, today_str)
-        _write_docket_prediction(loser, docket, "refuted", actual, today_str)
-        subdomain = docket.get("subdomain", "general")
-        _update_bayesian_confidence(winner, subdomain, "success")
-        _update_bayesian_confidence(loser, subdomain, "failure")
 
+def _resolve_one(docket, due_date, today_str, data_cache, resolved, voided, waiting):
+    """Resolve ONE due docket into the run's buckets — void, wait, or grade."""
+    _ev = _evaluator_module()
+    _evaluate_condition = _ev._evaluate_condition
+    _resolve_metric_value = _ev._resolve_metric_value
+    _update_bayesian_confidence = _ev._update_bayesian_confidence
+
+    void_outcome, void_reason = _void_verdict(docket, EXPERIMENT_START_DATE)  # #4216 rule 3
+    if void_outcome:
+        sk = _finalize(docket, today_str, {"verdict": {"outcome": void_outcome, "reason": void_reason}})
+        voided.append(sk)
+        logger.info("docket VOIDED %s — %s", sk, void_reason)
+        return
+    criterion = docket.get("criterion") or {}
+    actual = _resolve_metric_value(criterion.get("metric", ""), data_cache, today_str)
+    holds = _evaluate_condition(actual, criterion.get("condition"), criterion.get("threshold"))
+    if holds is None:
+        # No data yet — grace window, then an honest void (never silent limbo).
+        days_over = (datetime.strptime(today_str, "%Y-%m-%d") - datetime.strptime(due_date, "%Y-%m-%d")).days
+        if days_over < NO_DATA_GRACE_DAYS:
+            waiting.append(docket["sk"])
+            return
         sk = _finalize(
             docket,
             today_str,
-            {
-                "verdict": {
-                    "outcome": "graded",
-                    "winner": winner,
-                    "loser": loser,
-                    "actual_value": actual,
-                    "holds": bool(holds),
-                },
+            {"verdict": {"outcome": "void_no_data", "reason": f"no {criterion.get('metric')} data within {NO_DATA_GRACE_DAYS}d grace"}},
+        )
+        voided.append(sk)
+        return
+
+    sides = docket.get("sides") or {}
+    a, b = docket["coach_a"], docket["coach_b"]
+    winner = a if bool(sides.get(a)) == bool(holds) else b
+    loser = b if winner == a else a
+    concession = concession_text(
+        loser,
+        winner,
+        docket["topic"],
+        (docket.get("claims") or {}).get(loser, ""),
+        {**criterion, "resolution_date": due_date, "sides": sides},
+        actual,
+        today_str,
+    )
+
+    # Both track records update — the evaluator's own paths, reused (AC2). Every
+    # write is a conditional put that refuses a duplicate (#4216 rule 2); the
+    # Bayesian update — not idempotent — runs only when the PREDICTION# row is NEW.
+    _write_docket_learning(winner, today_str, docket, "confirmed")
+    _write_docket_learning(loser, today_str, docket, "refuted", concession=concession)
+    winner_pred = _write_docket_prediction(winner, docket, "confirmed", actual, today_str)
+    loser_pred = _write_docket_prediction(loser, docket, "refuted", actual, today_str)
+    subdomain = docket.get("subdomain", "general")
+    if winner_pred:
+        _update_bayesian_confidence(winner, subdomain, "success")
+    if loser_pred:
+        _update_bayesian_confidence(loser, subdomain, "failure")
+
+    sk = _finalize(
+        docket,
+        today_str,
+        {
+            "verdict": {
+                "outcome": "graded",
                 "winner": winner,
                 "loser": loser,
                 "actual_value": actual,
-                "concession": concession,
+                "holds": bool(holds),
             },
-        )
-        resolved.append({"sk": sk, "winner": winner, "loser": loser, "actual_value": actual})
-        logger.info("docket RESOLVED %s — winner=%s loser=%s actual=%s", sk, winner, loser, actual)
-
-    summary = {"resolved": resolved, "voided": voided, "waiting_for_data": waiting, "open_scanned": len(items)}
-    logger.info(json.dumps(summary, default=str))
-    return summary
+            "winner": winner,
+            "loser": loser,
+            "actual_value": actual,
+            "concession": concession,
+        },
+    )
+    resolved.append({"sk": sk, "winner": winner, "loser": loser, "actual_value": actual})
+    logger.info("docket RESOLVED %s — winner=%s loser=%s actual=%s", sk, winner, loser, actual)

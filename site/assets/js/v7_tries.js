@@ -293,7 +293,11 @@ function renderNext(cad) {
 async function getJSON(p) {
   try {
     const r = await fetch(p, { headers: { accept: "application/json" } });
-    return r.ok ? await r.json() : null;
+    if (!r.ok) {
+      await r.text().catch(() => ""); // drain the body: an unread non-2xx response stays "in flight" and networkidle never arrives
+      return null;
+    }
+    return await r.json();
   } catch (e) {
     return null;
   }

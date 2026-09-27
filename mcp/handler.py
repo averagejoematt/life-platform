@@ -26,7 +26,7 @@ import urllib.parse
 import uuid
 from typing import Any, cast
 
-from common.text_guards import has_tool_call_residue, strip_tool_call_residue  # #4190 — shared, bundled (#781)
+from common.text_guards import residue_fragments  # #4190 — shared, bundled (#781)
 
 from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
@@ -91,16 +91,21 @@ def handle_tools_call(params):
     arguments = params.get("arguments", {})
     if name not in TOOLS:
         raise ValueError(f"Unknown tool: {name}")
+    # #4190: the hazard gate runs FIRST — before schema validation, before the
+    # argument log line, before the rate limiter charges the call, before the #753
+    # audit hook hashes the arguments, and long before the tool function runs. A
+    # WRITE tool whose arguments carry tool-call XML residue is REFUSED with a
+    # structured error naming the field and the fragment; nothing is written and
+    # nothing is rewritten. One chokepoint ahead of every classified write tool,
+    # not a per-tool sprinkle a 27th write tool could land without.
+    residue_error = _refuse_tool_call_residue(name, arguments)
+    if residue_error is not None:
+        return {"content": [{"type": "text", "text": json.dumps(residue_error, default=str)}]}
     # SEC-3: Validate arguments before execution
     validation_error = _validate_tool_args(name, arguments)
     if validation_error:
         logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
-    # #4190: strip tool-call XML residue before a WRITE tool ever sees its arguments
-    # (and before this line logs them, or the #753 audit hook hashes them) — one
-    # chokepoint ahead of every classified write tool, not a per-tool sprinkle a
-    # 27th write tool could land without.
-    arguments = _sanitize_write_arguments(name, arguments)
     logger.info(f"Calling tool '{name}' with args: {arguments}")
     # R13-F12: Rate limit write tools before execution
     rate_err = _check_write_rate_limit(name)
@@ -372,39 +377,50 @@ def _emit_tool_metric(tool_name: str, duration_ms: float, success: bool) -> None
 # ── #4190: tool-call XML residue guard ──────────────────────────────────────
 # Every classified WRITE tool (mcp/audit.py::is_write_tool — the same registry-
 # derived classification the #753 audit trail already uses) has its arguments
-# walked and cleaned before the tool function ever runs. A read tool is left
-# untouched: residue there can only affect what THIS call returns, never what
-# gets persisted, so guarding it would be scope creep on a storage-leak fix.
-def _sanitize_write_arguments(name: str, arguments: dict) -> dict:
-    """Strip tool-call XML residue from every string leaf of a WRITE tool's
-    arguments. Returns a NEW structure — the caller's own `arguments` dict is
-    untouched. Non-write tools pass through unchanged."""
+# walked before the tool function ever runs; a string leaf carrying tool-call XML
+# residue REFUSES the whole call. A read tool is left untouched: residue there can
+# only affect what THIS call returns, never what gets persisted, so guarding it
+# would be scope creep on a storage-leak fix.
+#
+# Refuse, never trim (the owner's ruling on #4190): the first cut (#4196) truncated
+# the argument at the residue and wrote the rest. That rewrote a stored argument
+# the owner never saw — and a client bug that echoes its own envelope into one
+# field has usually ALSO dropped the argument that followed (the live specimen
+# swallowed `followed=true` into `decision`, so the row landed with `followed`
+# absent). Bouncing the call lets the client re-issue it whole.
+RESIDUE_ERROR_CODE = "TOOL_CALL_RESIDUE"
+
+
+def _refuse_tool_call_residue(name: str, arguments) -> dict | None:
+    """Return a structured `mcp_error` dict if `name` is a WRITE tool whose
+    arguments carry tool-call XML residue; None when the call may proceed.
+
+    The error names every offending field (dotted path) and the fragment found
+    there, so the caller can see exactly what tripped the door. The caller's
+    `arguments` are never modified."""
     if not mcp_audit.is_write_tool(name):
-        return arguments
-    stripped_any = False
-
-    def _walk(v):
-        nonlocal stripped_any
-        if isinstance(v, str):
-            if has_tool_call_residue(v):
-                stripped_any = True
-            return strip_tool_call_residue(v)
-        if isinstance(v, dict):
-            return {k: _walk(x) for k, x in v.items()}
-        if isinstance(v, list):
-            return [_walk(x) for x in v]
-        return v
-
-    cleaned_arguments = _walk(arguments or {})
-    if stripped_any:
-        logger.warning(f"[#4190] tool-call XML residue stripped from arguments to '{name}'")
-        _emit_residue_metric(name)
-    return cleaned_arguments
+        return None
+    hits = residue_fragments(arguments or {})
+    if not hits:
+        return None
+    fields = [{"field": path, "residue": frag} for path, frag in hits]
+    named = "; ".join(f"{path!s} carries {frag!r}" for path, frag in hits)
+    logger.warning(f"[#4190] tool-call XML residue refused on '{name}': {named}")
+    _emit_residue_metric(name)
+    return mcp_error(
+        message=(
+            f"Refused: the arguments to '{name}' carry tool-call XML residue ({named}). "
+            "Nothing was written. This is the calling client's own tool-call envelope echoed "
+            "into a string argument — re-issue the call with the plain text only."
+        ),
+        error_code=RESIDUE_ERROR_CODE,
+        detail=json.dumps({"tool": name, "fields": fields}),
+    )
 
 
 def _emit_residue_metric(tool_name: str) -> None:
-    """Emit EMF metric when tool-call XML residue is stripped from a write tool's
-    arguments (#4190) — same shape as the two emitters above/below.
+    """Emit EMF metric when a write tool's call is refused for tool-call XML
+    residue (#4190) — same shape as the two emitters above/below.
     Namespace: LifePlatform/MCP  |  Dimension: ToolName."""
     try:
         ts = int(time.time() * 1000)
@@ -415,12 +431,12 @@ def _emit_residue_metric(tool_name: str) -> None:
                     {
                         "Namespace": "LifePlatform/MCP",
                         "Dimensions": [["ToolName"]],
-                        "Metrics": [{"Name": "ToolCallResidueStripped", "Unit": "Count"}],
+                        "Metrics": [{"Name": "ToolCallResidueRefused", "Unit": "Count"}],
                     }
                 ],
             },
             "ToolName": tool_name,
-            "ToolCallResidueStripped": 1,
+            "ToolCallResidueRefused": 1,
         }
         print(json.dumps(emf))
     except Exception as e:

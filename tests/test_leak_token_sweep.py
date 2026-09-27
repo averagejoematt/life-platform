@@ -478,3 +478,26 @@ def test_4191_the_cleaned_prose_carries_neither_token():
     labels = {label for label, _ in lts.check_body("/story/", clean)}
     assert "Chronicle stat-line bracket as prose" not in labels
     assert "Chronicle T0 Streak segment on a page" not in labels
+
+
+def test_tool_call_residue_token_is_the_shared_pattern_object():
+    """#4190 (second cut): the sweep's residue token is DERIVED — it is the very
+    regex object the write-door refuser and the serve-time strip are built on
+    (`common.text_guards.TOOL_CALL_ENVELOPE_RE`), not a second hand-typed copy
+    that drifts the day a new envelope shape is added to one and not the other."""
+    from lambdas.common.text_guards import TOOL_CALL_ENVELOPE_RE
+
+    residue_tokens = [rx for label, rx, _ in lts.FORBIDDEN_TOKENS if label == "Tool-call XML residue"]
+    assert len(residue_tokens) == 1
+    assert residue_tokens[0] is TOOL_CALL_ENVELOPE_RE
+
+
+def test_tool_call_residue_flags_the_namespaced_and_result_envelopes_too():
+    """The pattern set covers more than the one specimen: the namespaced spelling
+    of the Anthropic tool-call XML, and a results envelope. Assembled, not typed
+    as a literal — a literal here reads as a real tool call to the tooling that
+    edits this file."""
+    ns = "antml:"
+    for body in (f'<{ns}invoke name="x">', f"</{ns}parameter>", "<function_results>", "</tool_use>"):
+        hits = lts.check_body("/protocols/experiments/", "prose " + body + " prose")
+        assert any(label == "Tool-call XML residue" for label, _ in hits), body
