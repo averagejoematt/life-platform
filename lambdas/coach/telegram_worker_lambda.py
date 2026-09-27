@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway, telegram_group
+from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway, telegram_group, telegram_reply_gate
 from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
@@ -1215,6 +1215,14 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         # deferral is going out instead. Metric only: the deferral still sends
         # below (#2517), this branch never returns early.
         _emit_hold(coach_id, HOLD_KIND_REPLY, result.status)
+
+    # #4170: the coach never claims a write it cannot make. This persona has NO write
+    # tools, so `wrote_this_turn` is structurally False here; a "Got it." to "remember
+    # this" is swapped for the honest routing line (owner ruling: route to the Claude
+    # chat, never queue, never grant a write). AFTER the grounder, on the text to be sent.
+    result = telegram_reply_gate.enforce(text, result, wrote_this_turn=False)
+    if result.status == telegram_reply_gate.STATUS_ROUTED:
+        _emit_metric("TelegramWriteClaimRefused", coach_id)
 
     # A burst goes out as separate bubbles ~1s apart with the typing indicator
     # between — the texture of a person, not a report renderer. Bounded: at most

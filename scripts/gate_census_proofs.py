@@ -2645,3 +2645,44 @@ REGISTRY_PROOFS.update(
         for name, (mutated, reverted) in _READER_CHECK_OBSERVED.items()
     }
 )
+
+
+# ── #4170: the Telegram coach never claims a write it cannot make ────────────────────────
+#
+# `lambdas/coach/telegram_reply_gate.py` is a `# gate-entrypoint:` module: `enforce()` swaps a
+# write-claiming reply ("Got it." to "remember this") for the honest routing line and the
+# worker sends what comes back. Nothing in it raises (a failed gate must never cost the reply),
+# so the census's exit/raise scan flags `swallowed-exit`; the proof below is what says it CAN fail.
+GUARD_PROOFS.update(
+    {
+        "guard::lambdas/coach/telegram_reply_gate.py": {
+            "gate_name": "lambdas/coach/telegram_reply_gate.py",
+            "command": (
+                "python3 -m pytest tests/test_telegram_transport.py -q -p no:cacheprovider -k 4170   "
+                "# TestWriteClaimGate4170, 16 tests, baseline 16 passed"
+            ),
+            "mutation": (
+                "`enforce()` neutered to a bare `return result` as its first statement in the REAL tracked module "
+                "(the pre-#4170 worker: every reply passes through), md5 134bcb3e4eb5c90c60e0711cbd00dcd3 -> "
+                "9a1ea6f925db412f36b6542ef9bc9bd9; restored from a pre-mutation copy and cmp'd byte-identical."
+            ),
+            "observed": (
+                "2026-09-26. BASELINE 16 passed. MUTATED: 5 failed, 11 passed — "
+                "test_the_worker_sends_the_routing_line_instead_of_the_false_ack[both turns of the 09-25 exchange] "
+                "(the sent text was 'Got it.' / 'Noted.', not the routing line), test_the_stored_record_shows_the_refusal_not_a_gap, "
+                "test_a_regenerated_reply_is_gated_too, test_the_refusal_names_the_claim_and_keeps_the_refused_text. "
+                "The 11 that stayed green are the two-rule predicates, the pass-through controls and the mutation-control "
+                "test itself (which asserts the false ack ships with the gate off — so it is green under this plant by design). "
+                "REVERTED (md5 134bcb3e4eb5c90c60e0711cbd00dcd3): 16 passed."
+            ),
+            "scope": (
+                "Proves the swap is load-bearing on the primary Telegram reply path against the 2026-09-25 exchange verbatim "
+                "and against a synthetic regenerated-status reply. It does not prove recall of WRITE_REQUEST_RE / WRITE_CLAIM_RE "
+                "beyond the fixtures (a phrasing neither rule anticipates passes through — the fail-open direction), and it "
+                "does not cover the three unsolicited-outbound paths (referral/checkin/event), where no inbound request exists "
+                "for the first rule to match."
+            ),
+            "proved_on": "2026-09-26",
+        }
+    }
+)
