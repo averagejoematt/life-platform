@@ -45,7 +45,7 @@ from training import commit_binding  # #4066: the commit is bound to the red-tea
 
 # #3971: the subtract-only rule as a GATE on this path rather than a discipline. Its own
 # module for the same reason — this file sits at the ratchet's ceiling.
-from mcp.hevy_prescription_gate import SUBTRACT_ONLY_ERROR_CODE, prescription_gate, refusal_message, summary as _gate_summary
+from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
 # (the module-size ratchet's own instruction: extract, don't raise the cap).
@@ -982,9 +982,8 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     # provenance; `floor`/`re_entry` are exempt by design and say so. The audit is stamped
     # into inputs_snapshot so the stored IR records what ran (box 4's readback).
     gate = prescription_gate(ir)
-    gate_refusal = refusal_message(gate)
-    if gate_refusal:
-        return mcp_error(gate_refusal, error_code=SUBTRACT_ONLY_ERROR_CODE, detail=gate["audit"]["violations"])
+    if refused := _gate_refusal(gate, mcp_error):  # #4172: message AND suggestions derived from the violations
+        return refused
     # #4066: the commit must be the routine stage 2 verdicted, unchanged since — or an explicit owner override.
     binding_refusal, binding_line, binding_warnings = commit_binding.preflight(ir, args, mcp_error)
     if binding_refusal:

@@ -361,6 +361,78 @@ def test_a_verdict_that_predates_binding_is_refused():
     assert res["error_code"] == "REDTEAM_BINDING" and "predates binding" in res["error"]
 
 
+# ── #4172: the REDTEAM_BINDING refusal's suggestions are derived from the refusal, never 'retry' ──
+_RETRY_WORDS = __import__("re").compile(r"retry|try again|system status|temporar", __import__("re").I)
+
+
+def _assert_policy_suggestions(res):
+    assert res["error_code"] == "REDTEAM_BINDING" and res["kind"] == "policy", res
+    assert res["suggestions"] and not any(_RETRY_WORDS.search(t) for t in res["suggestions"]), res["suggestions"]
+    assert any("owner_override_redteam=true" in t and "override_reason" in t for t in res["suggestions"]), res["suggestions"]
+
+
+def test_4172_not_red_teamed_refusal_suggests_stage_2_on_this_id_and_names_the_red_teamed_sibling():
+    a = _ir("r-A-21bffbdc")
+    _run(a, _evidence())
+    b = _ir("r-B-cdb6ef")
+    res, _ = _commit_via_3752(b, siblings=[a, b])
+    _assert_policy_suggestions(res)
+    assert "plan_next_session with routine_id=r-B-cdb6ef" in res["suggestions"][0], res["suggestions"]
+    assert "r-A-21bffbdc (v2" in res["suggestions"][1] and "already red-teamed" in res["suggestions"][1], res["suggestions"]
+    assert "Retry or check system status." not in res["suggestions"]
+
+
+def test_4172_not_red_teamed_with_no_sibling_offers_stage_2_and_the_override_only():
+    res, _ = _commit_via_3752(_ir("r-B"), siblings=[])
+    _assert_policy_suggestions(res)
+    assert len(res["suggestions"]) == 2 and "never been red-teamed" in res["suggestions"][0], res["suggestions"]
+
+
+def test_4172_a_failed_sibling_lookup_is_not_offered_as_a_routine_to_commit():
+    ir = _ir("r-B")
+    verdict = binding.check(ir, lister=lambda *_: (_ for _ in ()).throw(RuntimeError("ddb down")))
+    assert verdict["siblings"] == ["(lookup failed: RuntimeError)"]
+    out = binding.refusal_suggestions(ir, verdict)
+    assert len(out) == 2 and not any("lookup failed" in t for t in out), out
+
+
+def test_4172_other_routine_refusal_names_the_routine_the_verdict_was_issued_for():
+    a = _ir("r-A")
+    _run(a, _evidence())
+    b = _ir("r-B")
+    b.inputs_snapshot = {"critics": dict(a.inputs_snapshot["critics"])}
+    res, _ = _commit_via_3752(b)
+    _assert_policy_suggestions(res)
+    assert res["suggestions"][0].startswith("Commit routine r-A — "), res["suggestions"]
+    assert "routine_id=r-B" in res["suggestions"][1]
+
+
+def test_4172_content_changed_and_unbound_refusals_send_the_routine_back_through_stage_2():
+    a = _ir("r-A")
+    _run(a, _evidence())
+    a.exercises[1].sets.append(a.exercises[1].sets[-1].__class__(weight_kg=40, reps=12))
+    res, _ = _commit_via_3752(a)
+    _assert_policy_suggestions(res)
+    assert "routine_id=r-A" in res["suggestions"][0] and "content changed since the verdict" in res["suggestions"][0]
+    a = _ir("r-A")
+    _run(a, _evidence())
+    a.inputs_snapshot["critics"].pop("binding")
+    res, _ = _commit_via_3752(a)
+    _assert_policy_suggestions(res)
+    assert "predates binding" in res["suggestions"][0]
+
+
+def test_4172_deleted_routine_refusal_names_both_ids_and_never_says_retry():
+    ir = _ir("r-A")
+    ir.hevy_routine_id = "hevy-9191760b"
+    from mcp.utils import mcp_error
+
+    out = binding.deleted_routine_error(404, '{"error":"Routine not found"}', ir, True, mcp_error)
+    assert out["error_code"] == "HEVY_ROUTINE_DELETED" and out["kind"] == "policy"
+    assert any("routine_id=r-A" in t and "hevy-9191760b" in t for t in out["suggestions"]), out["suggestions"]
+    assert not any(_RETRY_WORDS.search(t) for t in out["suggestions"]), out["suggestions"]
+
+
 def test_the_hash_survives_a_dynamodb_round_trip():
     a = _ir("r-A")
     _run(a, _evidence())
