@@ -678,8 +678,9 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `meals_above_30g_protein` | number | Count of meals meeting ≥30g protein target |
 | `total_meals` | number | Distinct meals detected (eating occasions ≥400 kcal) |
 | `total_snacks` | number | Eating occasions excluded as snacks (<400 kcal) |
-| `micronutrient_sufficiency` | object | Per-nutrient map: {nutrient_key: {actual, target, pct}} — 5 nutrients tracked |
-| `micronutrient_avg_pct` | number | Average sufficiency across tracked nutrients (each capped at 100%) |
+| `micronutrient_sufficiency` | object | Per-nutrient map: {nutrient_key: {actual, target, pct}} — 5 nutrients tracked. **FOOD-ONLY at rest** (#4244): the stored figure counts MacroFactor alone; every published surface serves the food + supplements join from `health.nutrient_intake.nutrient_intake` (adds `from_food`, `from_supplements`, `channels_counted`) |
+| `micronutrient_avg_pct` | number | Average food-only sufficiency across tracked nutrients (each capped at 100%) — served as `food_only_avg_pct` beside the joined `avg_pct` |
+| `micronutrient_intake_channels` | list | `["food"]` — what the stored figure counted (#4244); the label travels with the number |
 
 Note: `food_log` is a nested list within each day record. Access via `get_food_log` tool rather than `get_date_range`.
 

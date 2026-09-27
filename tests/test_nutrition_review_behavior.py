@@ -373,7 +373,12 @@ def test_daily_nutrition_carries_the_logged_totals_verbatim():
     days = m.extract_daily_nutrition({"2026-06-06": _mf_day(cal=1743, protein=187, carbs=142, fat=61, fiber=33.5, micro=71.2)})
     d = days[0]
     assert (d["total_calories"], d["total_protein_g"], d["total_carbs_g"]) == (1743.0, 187.0, 61.0 * 0 + 142.0)
-    assert (d["total_fat_g"], d["total_fiber_g"], d["micronutrient_avg_pct"]) == (61.0, 33.5, 71.2)
+    assert (d["total_fat_g"], d["total_fiber_g"]) == (61.0, 33.5)
+    # #4244: the micro figure is DERIVED from the day's totals (+ the supplement record), not the
+    # stored food-only avg — here fiber alone is logged, 33.5 / 38 = 88.2%, and no supplement row.
+    assert d["micronutrient_avg_pct"] == 88.2
+    assert d["micronutrient_intake_channels"] == ["food", "supplements"]
+    assert d["supplements_state"] == "absent"
 
 
 def test_a_day_with_no_logged_food_reports_absence_not_zero():
@@ -486,10 +491,16 @@ def test_an_unparseable_total_degrades_to_absence_rather_than_crashing():
     assert day["total_protein_g"] == 180.0
 
 
-def test_micronutrient_sufficiency_detail_is_passed_through_untouched():
-    suff = {"vitamin_d": 41, "choline": 33}
-    day = m.extract_daily_nutrition({"2026-06-06": {"micronutrient_sufficiency": suff}})[0]
-    assert day["micronutrient_sufficiency"] == suff
+def test_micronutrient_sufficiency_detail_is_rederived_not_passed_through():
+    """#4244: the stored map was food-only; the day row carries the food + supplements join,
+    rebuilt from the stored per-nutrient `actual` when the `total_*` field is absent. A stored
+    entry for an untracked key or with no amount carries nothing to join and is dropped."""
+    suff = {"vitamin_d_mcg": {"actual": 5, "target": 100, "pct": 5.0}, "choline": 33}
+    supp = {"supplements": [{"name": "Vitamin D", "dose": 5000, "unit": "IU"}]}
+    day = m.extract_daily_nutrition({"2026-06-06": {"micronutrient_sufficiency": suff}}, {"2026-06-06": supp})[0]
+    vd = day["micronutrient_sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_food"], vd["from_supplements"], vd["actual"], vd["pct"]) == (5.0, 125.0, 130.0, 100.0)
+    assert set(day["micronutrient_sufficiency"]) == {"vitamin_d_mcg"}
 
 
 def test_no_macrofactor_days_yields_an_empty_list():
@@ -810,7 +821,8 @@ def test_a_field_no_day_logged_is_reported_absent_not_zero():
 
 
 def test_weekly_summary_averages_micronutrient_sufficiency():
-    days = m.extract_daily_nutrition({"2026-06-06": _mf_day(micro=60), "2026-06-07": _mf_day(micro=80)})
+    # #4244: derived from the totals — fiber 22.8 g = 60%, 30.4 g = 80% of the 38 g target.
+    days = m.extract_daily_nutrition({"2026-06-06": _mf_day(fiber=22.8), "2026-06-07": _mf_day(fiber=30.4)})
     assert m.compute_weekly_summary(days)["avg_micronutrient_pct"] == 70.0
 
 
@@ -856,7 +868,8 @@ def test_a_day_whose_date_cannot_be_parsed_still_appears_labelled_by_its_key():
 def test_the_snapshot_shows_each_days_actual_numbers():
     html = _table({"2026-06-06": _mf_day(cal=1743, protein=187, carbs=142, fat=61, fiber=33, micro=71)})
     row = _day_row(html, "Sat 06/06")
-    assert row[1:] == ["1743", "187g", "142g", "61g", "33g", "71%"]
+    # #4244: MICRO is the derived food + supplements figure (fiber 33 / 38 = 87%), not the stored 71.
+    assert row[1:] == ["1743", "187g", "142g", "61g", "33g", "87%"]
 
 
 def test_the_average_row_is_the_mean_of_the_shown_days():
@@ -866,7 +879,8 @@ def test_the_average_row_is_the_mean_of_the_shown_days():
             "2026-06-07": _mf_day(cal=1900, protein=200, carbs=160, fat=70, fiber=34, micro=80),
         }
     )
-    assert _avg_row(html)[1:] == ["1800", "190g", "150g", "65g", "32g", "75%"]
+    # #4244: MICRO derived per day from fiber (30 -> 78.9%, 34 -> 89.5%), mean 84%.
+    assert _avg_row(html)[1:] == ["1800", "190g", "150g", "65g", "32g", "84%"]
 
 
 def test_the_snapshot_states_the_targets_it_is_grading_against():
@@ -1148,6 +1162,41 @@ def test_a_malformed_board_member_degrades_to_the_fallback_prompt(monkeypatch):
     _with_board(monkeypatch, config)
     result = m._build_nutrition_prompt_from_config(1800, 190)
     assert result is None or isinstance(result, str)
+
+
+def test_both_panel_prompt_paths_state_which_channel_each_micronutrient_number_counted(monkeypatch):
+    """#4244: "Any micro <50% for 3+ days" was applied to a food-only figure while the same
+    prompt listed the day's 5,000 IU vitamin D under `supplements`. Both prompt paths (the S3
+    board config AND the hardcoded fallback) now carry the scope note."""
+    _with_board(monkeypatch, BOARD)
+    board = m._build_nutrition_prompt_from_config(1800, 190)
+    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    for prompt in (board, fallback):
+        assert m.MICRONUTRIENT_SCOPE_NOTE in prompt
+        assert "from_supplements" in prompt
+    assert "Any micro <50% for 3+ days" not in fallback
+
+
+def test_a_supplement_covered_nutrient_is_not_a_gap_in_the_weekly_table():
+    """#4244 contract: a day whose supplement record covers vitamin D does not grade it as a
+    gap, and the MICRO column header + footnote name both channels and what went uncounted."""
+    mf_days = {"2026-06-06": _mf_day(cal=1800, protein=190, fiber=38, total_vitamin_d_mcg=5)}
+    supp = {
+        "2026-06-06": {
+            "supplements": [
+                {"name": "Vitamin D", "dose": 5000, "unit": "IU"},
+                {"name": "Multivitamin", "dose": 1, "unit": "capsule"},
+            ]
+        }
+    }
+    days = m.extract_daily_nutrition(mf_days, supp)
+    assert days[0]["micronutrient_sufficiency"]["vitamin_d_mcg"]["pct"] == 100.0
+    assert days[0]["micronutrient_avg_pct"] == 100.0  # fiber 100% + vitamin D 100%
+    html = m.build_summary_table(days, dict(PROFILE))
+    assert "MICRO (food + supps)" in html
+    assert "food + supplements taken that day" in html
+    assert "not counted, no cited conversion: Multivitamin" in html
+    assert _day_row(html, "Sat 06/06")[-1] == "100%"
 
 
 def test_the_hardcoded_fallback_prompt_renders_the_live_targets():

@@ -357,7 +357,7 @@ _ACHIEVEMENT_PCT_MAX = 1000
 # `blood_glucose_time_in_optimal_pct`, `blood_glucose_time_above_140_pct`,
 # `time_in_range_pct`, `time_in_optimal_pct`, `time_above_140_pct`), a
 # capped-at-the-producer nutrient-sufficiency ratio (`micronutrient_avg_pct`,
-# `potassium_pct` — `macrofactor_lambda.compute_micronutrient_sufficiency` computes
+# `potassium_pct`, `food_only_avg_pct` — `health.nutrient_intake` (#4244) computes
 # `min(actual/target*100, 100.0)`, capped BY THE PRODUCER, unlike z2_pct's deliberately
 # uncapped ratio), a bounded-by-construction reach probability
 # (`p_reach_pct`/`p_reach_ci95_pct`/`p_reach_ceiling_pct`/`p_reach_30_pct`/
@@ -383,6 +383,7 @@ _SHARE_PCT_FIELDS = frozenset(
         "completion_pct",
         "compliance_pct",
         "deep_pct",
+        "food_only_avg_pct",
         "gynoid_fat_pct",
         "habit_completion_pct",
         "habit_pct",

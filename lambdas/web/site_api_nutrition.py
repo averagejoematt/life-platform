@@ -17,6 +17,7 @@ from common import (
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
 from health import (
+    nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
     nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
     tdee as health_tdee,  # ADR-152 / #2310: THE one TDEE definition
 )
@@ -424,7 +425,17 @@ def nutrition_overview(*, _g) -> dict:
                 "reconciliation": {"days": [], "overlap_days": 0, "min_days": 14, "ready": False},
                 "food_delivery": None,
                 "blueprint_benchmark": None,
-                "micronutrients": {"sufficiency": {}, "avg_pct": None, "protein_distribution_score": None, "as_of": None},
+                "micronutrients": {
+                    "sufficiency": {},
+                    "avg_pct": None,
+                    "avg_pct_basis": nutrient_intake.AVG_PCT_BASIS,
+                    "intake_channels": list(nutrient_intake.INTAKE_CHANNELS),
+                    "supplements_state": "absent",
+                    "unconverted": [],
+                    "food_only_avg_pct": None,
+                    "protein_distribution_score": None,
+                    "as_of": None,
+                },
                 "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
                 "eating_window": None,
                 "periodization": {"training_day": dict(_empty_grp), "rest_day": dict(_empty_grp)},
@@ -467,6 +478,23 @@ def nutrition_overview(*, _g) -> dict:
     latest = items[-1] if items else {}
     _log_rec = nutrition_logging.logging_record(items, today)
     latest_date = _log_rec["latest_date"]
+
+    # #4244: the micronutrient figure this door serves is the JOIN of the latest day's food
+    # totals with the same day's supplement record (health.nutrient_intake — one derivation,
+    # shared with the weekly review). The food-only number was published under "Sufficiency
+    # vs daily target" while the supplement partition held Vitamin D 5,000 IU = 125 mcg on
+    # a day the bar read 5%. Privacy posture (field_tiers: the supplements PARTITION is
+    # owner-only; the stack, its doses and adherence % are already public on the protocols
+    # page): nothing here serves a supplement row — only per-nutrient AMOUNTS attributed to
+    # the channel, plus the names of doses that could NOT be converted (stack names the
+    # protocols page already publishes). No timings, no manual notes, no row shape.
+    # Owner ruling 2026-09-27 (on #4333): per-nutrient supplement totals MAY be public on this
+    # endpoint — the projection above is the consented shape, not a pending question.
+    _supp_row = None
+    if latest_date:
+        _supp_rows = _query_source("supplements", latest_date, latest_date)
+        _supp_row = next((r for r in _supp_rows if str(r.get("date") or r.get("sk", "")).replace("DATE#", "") == latest_date), None)
+    _intake = nutrient_intake.nutrient_intake(latest or None, _supp_row)
 
     # 7-day vs 30-day comparison.
     # #2221 fixed the eighth-day bug HERE, in this one filter, by making the lower bound
@@ -742,7 +770,7 @@ def nutrition_overview(*, _g) -> dict:
     # since it's a range not a "more is better" nutrient) + potassium, framed as the
     # water-weight honesty check on a cut. NOT a bare hydration ring (off-brand, out of scope).
     sodium_vals = [v for v in (_num(i.get("total_sodium_mg")) for i in items) if v is not None]
-    _pot = ((latest or {}).get("micronutrient_sufficiency") or {}).get("potassium_mg") or {}
+    _pot = _intake["sufficiency"].get("potassium_mg") or {}  # #4244: the joined figure, same derivation as §micronutrients
     electrolytes = {
         "avg_sodium_mg": round(sum(sodium_vals) / len(sodium_vals)) if sodium_vals else None,
         "sodium_ref_low": 1500,
@@ -992,9 +1020,18 @@ def nutrition_overview(*, _g) -> dict:
             "periodization": periodization,
             # Micronutrient sufficiency + protein-distribution score — rich in the MacroFactor
             # record, surfaced nowhere before (reverse-QA). Genuinely novel + anti-Blueprint.
+            # #4244: `sufficiency` is the food + supplements TOTAL per nutrient, each entry
+            # carrying `from_food` / `from_supplements` / `channels_counted`; the label fields
+            # (`intake_channels`, `avg_pct_basis`, `supplements_state`, `unconverted`) say what
+            # was counted, and `food_only_avg_pct` keeps the old one-channel figure visible.
             "micronutrients": {
-                "sufficiency": (latest or {}).get("micronutrient_sufficiency") or {},
-                "avg_pct": (latest or {}).get("micronutrient_avg_pct"),
+                "sufficiency": _intake["sufficiency"],
+                "avg_pct": _intake["avg_pct"],
+                "avg_pct_basis": _intake["avg_pct_basis"],
+                "intake_channels": _intake["intake_channels"],
+                "supplements_state": _intake["supplements_state"],
+                "unconverted": [{"name": u["name"], "reason": u["reason"]} for u in _intake["unconverted"]],
+                "food_only_avg_pct": _intake["food_only_avg_pct"],
                 "protein_distribution_score": (latest or {}).get("protein_distribution_score"),
                 "as_of": latest_date,
             },
