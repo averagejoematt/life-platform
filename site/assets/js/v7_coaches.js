@@ -116,8 +116,11 @@ const surname = (name) => {
 
 // ── the public-text lint (R6 fix 2) ─────────────────────────────────────────────
 // A served slot is printed on the main screen only when it reads as public prose: no ISO
-// date, no percent sign, no device brand. A hit is not rewritten — it is folded under
-// <details> "as served", where the reader opens it knowingly. Returns the reasons ([] = clean).
+// date, no percent sign, no device brand, no "night of" (the model's log-entry opener —
+// "On the night of 2026-09-23, Whoop logged…" — R6 named all four). A hit is not rewritten —
+// it is folded under <details> "as served", where the reader opens it knowingly. Returns the
+// reasons ([] = clean). Applied to every served coach sentence that would reach the main
+// screen: `position_summary` and `latest_checked.claim`.
 const BRANDS = /\b(Whoop|Hevy|Eight ?Sleep|Withings|Garmin|MacroFactor|Strava|Oura|Apple Health|Habitify|Todoist)\b/;
 export function lintPublic(text) {
   const t = String(text || "");
@@ -125,6 +128,7 @@ export function lintPublic(text) {
   if (/\d{4}-\d{2}-\d{2}/.test(t)) why.push("an ISO date");
   if (/\d\s?%/.test(t)) why.push("a percent sign");
   if (BRANDS.test(t)) why.push("a device brand");
+  if (/\bnight of\b/i.test(t)) why.push("a “night of” log opener");
   return why;
 }
 
@@ -159,10 +163,17 @@ export function ledgerLine(lc, who) {
     const dir = conditionWords(lc.condition) || "move";
     text = `${on}${name} said ${what} would go ${dir} over the checked window — the direction ${right ? "came true" : "did not come true"}.`;
   } else {
+    // a point call ("within" a tolerance of the threshold — the grader's own condition word,
+    // live on every coach's latest_checked) lands NEAR the number; a bound call sits on
+    // one side of it. "would be within 61" is not English (found by render, 2026-09-26).
+    const near = String(lc.condition || "").toLowerCase() === "within" || String(lc.eval_type || "").toLowerCase() === "point";
     const cond = conditionWords(lc.condition);
     const thr = fmtNum(lc.threshold);
     const actual = fmtNum(lc.actual_value);
-    const call = thr ? `would be ${cond} ${thr}` : "made a call on it";
+    // the live latest_checked serves no tolerance (the recent[] reason strings carry ±SD);
+    // "give or take" prints only if a `tolerance` field is ever served, never from elsewhere
+    const give = near && fmtNum(lc.tolerance) ? `, give or take ${fmtNum(lc.tolerance)}` : "";
+    const call = !thr ? "made a call on it" : near ? `would land near ${thr}${give}` : `would be ${cond} ${thr}`;
     const came = actual ? ` — it came in at ${actual}.` : right ? " — it held." : " — it did not.";
     text = `${on}${name} said ${what} ${call}${came}`;
   }
@@ -176,6 +187,18 @@ export function ledgerLine(lc, who) {
 const RE_VALUE = /^(\w+)=([-\d.]+) on (\d{4}-\d{2}-\d{2}) vs predicted ([-\d.]+)(?: ±([\d.]+))?/;
 const RE_TREND = /^(\w+) trend=(\w+) \(slope=([-\d.]+)\), predicted=(\w+)/;
 const RE_DOCKET = /^dispute docket resolved: (.+)$/;
+// The docket criterion as the grader writes it — "total_calories_kcal_7day_avg >= 2200 on
+// 2026-08-10" — into the reader's words: metric in words, the operator in words, the day in
+// words. An unparsed criterion prints NOTHING raw (an ISO date and a snake_case metric on
+// the main screen were found by render, 2026-09-26): the verdict and the metric only.
+const RE_CRIT = /^(\w+)\s*(>=|<=|==|=|>|<)\s*([-\d.]+)(?:\s+on\s+(\d{4}-\d{2}-\d{2}))?\s*$/;
+const OP_WORDS = { ">=": "at or above", "<=": "at most", ">": "over", "<": "under", "=": "at", "==": "at" };
+export function criterionWords(desc) {
+  const m = RE_CRIT.exec(String(desc || "").trim());
+  if (!m) return "";
+  const day = m[4] ? dayInWords(m[4]) : "";
+  return `${metricWords(m[1])} ${OP_WORDS[m[2]]} ${fmtNum(m[3])}${day ? ` on ${day}` : ""}`;
+}
 export function recentLine(row, who) {
   if (!row || !row.status) return null;
   const st = String(row.status).toLowerCase();
@@ -193,7 +216,8 @@ export function recentLine(row, who) {
   } else if ((m = RE_TREND.exec(reason))) {
     text = `${name} said ${metricWords(m[1])} would go ${m[4]} over the checked window — it went ${m[2]}.`;
   } else if ((m = RE_DOCKET.exec(reason))) {
-    text = `A disagreement settled by code: ${m[1].replace(/_/g, " ")}.`;
+    const crit = criterionWords(m[1]);
+    text = crit ? `A disagreement settled by code: ${crit}.` : `A disagreement settled by code, on ${metricWords(row.metric)}.`;
   } else {
     text = `${name}’s call on ${metricWords(row.metric)}.`;
   }
@@ -378,7 +402,15 @@ export function readHTML(pick, profile, now, calibration) {
   const recent = recentLines(profile && profile.report_card && profile.report_card.track_record && profile.report_card.track_record.recent, name);
   if (lc) {
     parts.push(`<p class="v7c-dated">The last call of ${esc(surname(name))}’s that code checked:</p>`);
-    parts.push(`<ul class="v7c-ledger" data-src="api_coach_${esc(pid)}.latest_checked">${lineHTML(lc)}${lc.claim ? `<li class="v7c-claim">In the coach’s words, as served: “${esc(lc.claim)}”</li>` : ""}</ul>`);
+    // the coach's own wording of the call is a served sentence like any other: linted, and on
+    // a hit folded under <details> ("61% tomorrow with 80% confidence" was in the 390 fold)
+    const claimWhy = lintPublic(lc.claim);
+    const claimLine = !lc.claim
+      ? ""
+      : !claimWhy.length
+        ? `<li class="v7c-claim">In the coach’s words, as served: “${esc(lc.claim)}”</li>`
+        : `<li class="v7c-claim"><details class="v7c-details"><summary>The call in the coach’s words, as served</summary><p>“${esc(lc.claim)}”</p><p class="v7c-note">Kept off the main screen: it carries ${esc(claimWhy.join(", "))}. Served without edits.</p></details></li>`;
+    parts.push(`<ul class="v7c-ledger" data-src="api_coach_${esc(pid)}.latest_checked">${lineHTML(lc)}${claimLine}</ul>`);
   } else if (!recent.length) {
     // absence only when the profile served NOTHING checked — a null ledger line above a
     // list of checked calls would contradict the list (R6 fix 1)
