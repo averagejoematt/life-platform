@@ -385,6 +385,36 @@ def _wrong_obituary(coach: str, rec: dict) -> dict:
     }
 
 
+def _obituary_sources(table, coach: str, refuted: list) -> list:
+    """One card source per refuted resolution the record counts (#4220).
+
+    ``refuted`` is the refuted slice of ``coach_record.decided_rows`` — the record's own
+    rows. Each is matched to its EARLIEST live ``LEARNING#`` row by ``prediction_id`` (the
+    learning carries the grader's reason text the card is templated from); a refutation
+    with no learning becomes a card that says only what the ledger row can prove (a dated
+    refuted call — never its ``actual_value``, which is a slope on a directional call,
+    #4218), dated by its ``outcome_date``. A
+    LEARNING# row whose prediction the record does not count — a pre-genesis docket
+    re-recorded daily, an archived cycle's verdict — never becomes a card.
+    """
+    r = table.query(KeyConditionExpression=Key("pk").eq(f"COACH#{coach}_coach") & Key("sk").begins_with("LEARNING#"))
+    # ADR-141 §4 defense-in-depth (2026-07-26 review): conversation-channel learnings are
+    # Matthew-private and outside the verdict vocabulary — excluded explicitly so a future
+    # status writer can't put private reason text on /api/wrong.
+    learned: dict = {}
+    for x in _decimal_to_float(r.get("Items", [])):
+        if x.get("tombstone") or (x.get("channel") or "data") == "conversation" or x.get("status") != "refuted":
+            continue
+        pid = str(x.get("prediction_id") or "").strip()
+        if pid and (pid not in learned or str(x.get("date") or "") < str(learned[pid].get("date") or "")):
+            learned[pid] = x
+    out = []
+    for row in _decimal_to_float(refuted):
+        key = coach_record.prediction_key(row)
+        out.append(learned.get(key) or {"prediction_id": key, "status": "refuted", "date": str(row.get("outcome_date") or "")[:10] or None})
+    return out
+
+
 def wrong(*, _g) -> dict:
     """GET /api/wrong — the public ledger of AI misses."""
     table = _g["table"]
@@ -435,29 +465,27 @@ def wrong(*, _g) -> dict:
         # /api/coaches, /api/calibration and /api/predictions serve. It used to re-count
         # LEARNING# rows here, which is how Webb read 20 confirmed / 5 refuted on /method/
         # while the scorecard read 0 of 5: twenty of those learnings were one docket
-        # re-recorded daily (#4216). The obituary cards below still read LEARNING# — that
-        # is the only row carrying the grader's reason text — so a re-recorded docket still
-        # yields one card per re-write until #4216 stops the writer.
+        # re-recorded daily (#4216).
+        #
+        # The obituary cards are drawn from the SAME decided row-set: one card per refuted
+        # resolution the record counts, so a coach's card count == its record's refuted
+        # count by construction. They used to be a second derivation over every refuted
+        # LEARNING# row, which served 23 explorer obituaries (twenty "settled by the dispute
+        # docket on August 10", dated Day 1 → Day 20) beside a record of 3 refuted (live
+        # 2026-09-27). The LEARNING# row still supplies the card's words — it is the only
+        # row carrying the grader's reason text — joined on prediction_id; a counted
+        # refutation with no learning is templated from the ledger row itself.
         ledger, recent_misses, obituaries = [], [], []
         for c in _WRONG_COACHES:
-            record = coach_record.for_coach(table, f"{c}_coach", genesis=EXPERIMENT_START)
+            record, decided = coach_record.for_coach_with_rows(table, f"{c}_coach", genesis=EXPERIMENT_START)
             if record and record["n"]:
                 ledger.append({"coach": c, **record})
-            r = table.query(
-                KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
-            )
-            recs = _decimal_to_float(r.get("Items", []))
-            # ADR-141 §4 defense-in-depth (2026-07-26 review): conversation-channel
-            # learnings are Matthew-private and outside the verdict vocabulary —
-            # exclude explicitly so a future status writer can't put private reason
-            # text on /api/wrong.
-            live = [x for x in recs if not x.get("tombstone") and (x.get("channel") or "data") != "conversation"]
-            for x in live:
-                if x.get("status") == "refuted":
-                    recent_misses.append(
-                        {"date": x.get("date"), "coach": c, "what": str(x.get("condition") or x.get("reason") or "")[:240]}
-                    )
-                    obituaries.append(_wrong_obituary(c, x))
+            refuted = [row for row in decided if coach_record.graded_status(row) == "refuted"]
+            if not refuted:
+                continue
+            for x in _obituary_sources(table, c, refuted):
+                recent_misses.append({"date": x.get("date"), "coach": c, "what": str(x.get("condition") or x.get("reason") or "")[:240]})
+                obituaries.append(_wrong_obituary(c, x))
         recent_misses.sort(key=lambda m: m.get("date") or "", reverse=True)
         # De-dup by stable id (idempotent re-grades) then sort newest-first.
         obituaries = list({o["id"]: o for o in obituaries}.values())

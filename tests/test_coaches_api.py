@@ -776,7 +776,16 @@ def _assert_one_record(short_id, coaches, calibration, predictions, wrong):
         assert wrong_by[short_id] == {"coach": short_id, **record}, f"{short_id}: /api/wrong.by_coach disagrees"
     else:
         assert short_id not in wrong_by
+    _assert_obituaries_are_the_record(short_id, record, wrong)
     return record
+
+
+def _assert_obituaries_are_the_record(short_id, record, wrong):
+    """#4220 box 2 on the rendered page: /method/'s obituary list is not a second
+    derivation — one card per refuted resolution the record counts, no more, no fewer."""
+    cards = [o for o in wrong["obituaries"] if o["coach"] == short_id]
+    assert len(cards) == record["refuted"], f"{short_id}: {len(cards)} obituaries vs a record of {record['refuted']} refuted"
+    assert wrong["obituary_count"] == len(wrong["obituaries"])
 
 
 def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
@@ -830,6 +839,67 @@ def test_4220_mutation_control_the_learning_count_fails_on_webb(monkeypatch):
             c["confirmed"] = 1
     with pytest.raises(AssertionError):
         _assert_one_record("nutrition", coaches, forged_cal, predictions, wrong)
+
+
+_LIVE_WRONG_4220 = os.path.join(_REPO, "tests", "fixtures", "wrong_obituaries_4220", "live_2026-09-27.json")
+
+
+def _served_wrong_over_live_rows(monkeypatch):
+    """/api/wrong over the captured live partitions (explorer + nutrition), genesis pinned
+    to the capture's own — the fixture is the wire, read-only from DynamoDB 2026-09-27."""
+    from web import site_api_intelligence as intel
+
+    with open(_LIVE_WRONG_4220) as fh:
+        live = json.load(fh)
+    store = FakeDdbTable(rows=live["rows"])
+    monkeypatch.setattr(intel, "table", _route_table(store))
+    monkeypatch.setattr(intel, "EXPERIMENT_START", live["genesis"])
+    return live, _body(intel.handle_wrong())
+
+
+def test_4220_obituaries_are_the_records_refutations_on_the_live_wire(monkeypatch):
+    """The live defect, 2026-09-27T23:09Z: /api/wrong served 23 explorer obituaries — twenty
+    'settled against the call by the dispute docket on August 10', dated Day 1 → Day 20 —
+    beside a record of 3 refuted. Over the same rows the cards now equal the record."""
+    live, wrong = _served_wrong_over_live_rows(monkeypatch)
+    before = live["served_before_fix"]
+    was = {c: sum(1 for o in before["obituaries"] if o["coach"] == c) for c in ("explorer", "nutrition")}
+    assert was == {"explorer": 23, "nutrition": 7}, "the captured defect"
+    assert sum("dispute docket on August 10" in o["what_changed"] for o in before["obituaries"]) == 20
+
+    records = {r["coach"]: r for r in wrong["predictions"]["by_coach"]}
+    # The record itself is unchanged by this fix — it is what the live ledger served.
+    assert {c: records[c] for c in records} == {r["coach"]: r for r in before["by_coach"]}
+    for coach in ("explorer", "nutrition"):
+        _assert_obituaries_are_the_record(coach, records[coach], wrong)
+    assert records["explorer"]["refuted"] == 3
+    assert not any("dispute docket" in o["what_changed"] for o in wrong["obituaries"]), "the 08-10 docket is cycle 16's, never 17's"
+    # Every card is dated in this cycle, and the surviving cards keep their live ids
+    # (the permalink / OG card / RSS entry are keyed on the id).
+    assert all(o["date"] >= live["genesis"] for o in wrong["obituaries"])
+    assert {o["id"] for o in wrong["obituaries"]} <= {o["id"] for o in before["obituaries"]}
+
+
+def test_4220_mutation_control_the_learning_derivation_fails_on_explorer(monkeypatch):
+    """Restore the retired obituary path — every refuted live LEARNING# row is a card —
+    over the SAME live rows: the guard must fail on explorer (23 ≠ 3)."""
+    from web import site_api_foresight as fs
+
+    def _old_path(table, coach, refuted):
+        from boto3.dynamodb.conditions import Key
+
+        r = table.query(KeyConditionExpression=Key("pk").eq(f"COACH#{coach}_coach") & Key("sk").begins_with("LEARNING#"))
+        return [
+            x
+            for x in fs._decimal_to_float(r.get("Items", []))
+            if not x.get("tombstone") and (x.get("channel") or "data") != "conversation" and x.get("status") == "refuted"
+        ]
+
+    monkeypatch.setattr(fs, "_obituary_sources", _old_path)
+    _live, wrong = _served_wrong_over_live_rows(monkeypatch)
+    records = {r["coach"]: r for r in wrong["predictions"]["by_coach"]}
+    with pytest.raises(AssertionError, match="explorer: 23 obituaries vs a record of 3 refuted"):
+        _assert_obituaries_are_the_record("explorer", records["explorer"], wrong)
 
 
 def test_4220_a_prediction_resolves_once_and_in_the_cycle_it_resolved_in():
