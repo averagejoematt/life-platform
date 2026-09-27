@@ -2686,3 +2686,31 @@ GUARD_PROOFS.update(
         }
     }
 )
+
+# #4253: the deploy-path workflow ceilings + the one-OIDC-pin guard. Three REAL-tree
+# mutations, one per assertion family; no synthetic fixture stands in for the armed state.
+STRUCTURAL_HAND_PROOFS["structural::test_ci_job_timeouts_3678.py"] = {
+    "gate_name": "test_ci_job_timeouts_3678.py",
+    "command": "python3 -m pytest tests/test_ci_job_timeouts_3678.py -q   # 12 tests; baseline 12 passed",
+    "mutation": (
+        "Three plants in the REAL tracked files, each restored from a pre-mutation copy: "
+        "M1 `timeout-minutes` deleted from ci-cd.yml's `plan` job; "
+        "M2 .github/actions/setup-ci/action.yml's configure-aws-credentials pin reverted to "
+        "517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2 (its pre-#4253 value); "
+        "M3 ci-cd.yml's `Visual + AI-vision QA` ceiling set to 45 while site-deploy.yml's same-named job stays 50."
+    ),
+    "observed": (
+        "2026-09-27. M1: 1 failed, 11 passed — \"jobs running on GitHub's 360-min default (#4253): "
+        "[('ci-cd.yml', 'plan')]\". M2: 1 failed, 11 passed — \"configure-aws-credentials pinned at more than "
+        "one SHA\" naming the composite's 517a711d against the three e1253824 call sites. M3: 1 failed, 11 passed — "
+        "\"ci-cd.yml:visual-qa shares the name 'Visual + AI-vision QA' with another job at a different "
+        'timeout-minutes". RESTORED: 12 passed.'
+    ),
+    "scope": (
+        "Proves every runner job in ci-cd/ci-test/ci-lint/site-deploy declares a ceiling and that one "
+        "configure-aws-credentials SHA exists across .github/. It does NOT prove the ceilings are sized right — "
+        "that is scripts/check_job_timeout_headroom.py's job against live durations — and it does not check the "
+        "other 22 workflows, several of which still run on the 360-minute default."
+    ),
+    "proved_on": "2026-09-27",
+}
