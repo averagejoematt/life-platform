@@ -1821,5 +1821,7 @@ class TestAbsentCoach4217:
         assert body["_presence_check"]["status"] == "failed"
 
     def test_the_short_key_maps_to_the_roster_id_not_string_surgery(self):
-        assert az._full_coach_id("glucose") == "glucose_coach"
-        assert az._full_coach_id("astrology") is None
+        from coach import coach_presence_gate
+
+        assert coach_presence_gate.full_coach_id("glucose") == "glucose_coach"
+        assert coach_presence_gate.full_coach_id("astrology") is None

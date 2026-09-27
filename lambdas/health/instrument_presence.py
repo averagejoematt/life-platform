@@ -73,7 +73,7 @@ BEHAVIORAL_STALE = "behavioral-stale"
 PAUSED = "paused"
 
 
-def latest_date_str(table: Any, source: str) -> str | None:
+def latest_date_str(table: Any, source: str, *, include_pilot: bool = True) -> str | None:
     """Latest YYYY-MM-DD among a source's DATE# records, or None.
 
     The board's own read (it delegates here): `begins_with('DATE#')` so a non-DATE sort
@@ -81,7 +81,9 @@ def latest_date_str(table: Any, source: str) -> str | None:
     only; `include_pilot=True` because liveness is pipe/behaviour recency regardless
     of experiment phase (#1203 — the phase filter is applied AFTER `Limit`, so
     without it the newest key is fetched, filtered out and the query returns empty:
-    exactly the blindfold, on exactly the source whose lapse is longest).
+    exactly the blindfold, on exactly the source whose lapse is longest). The keyword
+    is explicit so a caller's phase declaration is READABLE at its call site
+    (mcp/surface_index.py grades every surface by counting exactly these keywords).
     """
     kwargs = with_phase_filter(
         {
@@ -90,7 +92,7 @@ def latest_date_str(table: Any, source: str) -> str | None:
             "Limit": 1,
             "ProjectionExpression": "sk",
         },
-        include_pilot=True,
+        include_pilot=include_pilot,
     )
     items = table.query(**kwargs).get("Items", [])
     if not items:

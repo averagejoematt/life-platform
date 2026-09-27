@@ -943,12 +943,12 @@
       "producer": "common.send_ledger::record_sent"
     },
     {
-      "consumer": "site/assets/js/v7_coaches.js::darkCoaches",
+      "consumer": "health.instrument_presence::absent_coaches",
       "enrolled": true,
       "floor": true,
       "mutations": 5,
       "name": "source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
-      "note": "E6 / #4217 / epic #4182: a coach whose domain instrument is dark is absent \u2014 no read, no stance, no docket seat, and the renderer names it without quoting it. Both halves stand on /api/source_freshness; the engine's map is source_registry.coach_instruments() (the `instrument_for` facets), served on /api/coaches as `instrument`.",
+      "note": "E6 / #4217 / epic #4182: a coach whose domain instrument is dark is absent \u2014 no read, no stance, no docket seat, and the renderer names it without quoting it. Both halves stand on /api/source_freshness: the consumer named here is the engine's gate (health.instrument_presence.absent_coaches); `consume` drives the renderer's shipped darkCoaches() from site/assets/js/v7_coaches.js under node and `agree` holds the two equal. The engine's map is source_registry.coach_instruments() (the `instrument_for` facets), served on /api/coaches as `instrument`.",
       "partition": null,
       "producer": "web.site_api_freshness::source_freshness"
     }

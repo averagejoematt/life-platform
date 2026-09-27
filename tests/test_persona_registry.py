@@ -482,9 +482,24 @@ def _instruments():
 
 
 def _instrument_findings(mapping):
-    from ingestion.source_registry import validate_coach_instruments
+    """THE GUARD: every row of a coach -> instrument map names a REAL registry facet and a
+    real staff coach. Lives here (not in the registry module) because its only caller is
+    this test — a def that ships in every bundle with no live caller is dead weight (#3538);
+    the mutation cases below corrupt a COPY of the live map and show it red."""
+    from ingestion.source_registry import SOURCE_REGISTRY
 
-    return validate_coach_instruments(mapping, persona_registry.OPERATIONAL_COACH_IDS)
+    findings = []
+    for coach_id, row in mapping.items():
+        if coach_id not in persona_registry.OPERATIONAL_COACH_IDS:
+            findings.append(f"{coach_id}: not a staff coach id")
+        src = SOURCE_REGISTRY.get(str(row.get("source") or ""))
+        if not src:
+            findings.append(f"{coach_id}: source {row.get('source')!r} is not a source_registry key")
+            continue
+        dt = row.get("datatype")
+        if dt is not None and dt not in {d["key"] for d in src.get("hae_datatypes", []) or []}:
+            findings.append(f"{coach_id}: datatype {dt!r} is not an hae_datatypes key of {row['source']}")
+    return findings
 
 
 def test_every_staff_coach_with_an_instrument_names_a_real_registry_facet():
@@ -529,15 +544,18 @@ def test_a_coach_named_by_no_facet_has_no_instrument_and_is_never_gated():
     from health import instrument_presence
 
     for pid in ("mind_coach", "explorer_coach", persona_registry.LEAD_PERSONA_ID):
-        assert persona_registry.coach_instrument(pid) is None, pid
+        assert pid not in _instruments(), pid
         assert instrument_presence.served_instrument(pid) is None, pid
 
 
-def test_the_accessor_is_the_registry_map_and_personas_json_carries_no_instrument_field():
+def test_the_served_shape_is_the_registry_map_and_personas_json_carries_no_instrument_field():
     """Derived, not hand-typed: the persona JSON (whose S3 copy the owner edits) never
-    grows a parallel `instrument` field for this — the registry facet is the one home."""
+    grows a parallel `instrument` field for this — the registry facet is the one home,
+    and the wire shape (/api/coaches.instrument) is that map and nothing else."""
+    from health import instrument_presence
+
     for pid, row in _instruments().items():
-        assert persona_registry.coach_instrument(pid) == row
+        assert instrument_presence.served_instrument(pid) == {"source": row["source"], "datatype": row["datatype"]}
     for pid, p in _personas().items():
         assert "instrument" not in p, f"{pid}: instrument must be derived from source_registry, not typed here"
 

@@ -259,21 +259,13 @@ def tts_voice(persona_id, s3_client=None, bucket=None):
     return p.get("tts_voice") if p else None
 
 
-# ── #4217: a coach's domain instrument ───────────────────────────────────────
-# NOT a personas.json field. The map is inverted from the source registry's own
-# `instrument_for` facets (ingestion.source_registry.coach_instruments) — the registry
-# owns which sensor is which coach's, so a source gaining or losing a coach there moves
-# every consumer at once, and the owner's S3 copy of personas.json needs no new field.
-# Whether that instrument is DARK is health.instrument_presence (the same liveness
-# /api/source_freshness serves); a coach with no row here has no single instrument and
-# is never absent for want of one (mind, explorer, the lead).
-
-
-def coach_instrument(persona_id):
-    """{source, datatype, label, behavioral} for a coach's domain instrument, or None."""
-    from ingestion.source_registry import coach_instruments
-
-    return coach_instruments().get(persona_id)
+# ── #4217: a coach's domain instrument is NOT a personas.json field. The map is
+# inverted from the source registry's own `instrument_for` facets
+# (ingestion.source_registry.coach_instruments) — the registry owns which sensor is
+# which coach's, so the owner's S3 copy of this JSON needs no new field. Whether that
+# instrument is DARK is health.instrument_presence (the same liveness
+# /api/source_freshness serves); a coach named by no facet has no single instrument
+# and is never absent for want of one (mind, explorer, the lead).
 
 
 # ── Availability voice (#2495) ────────────────────────────────────────────────

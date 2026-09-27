@@ -889,10 +889,11 @@ def _dark_coaches_js_source() -> str:
 
 
 def _absent_coach_table():
+    from common.pacific_time import pacific_today
     from fakes import FakeDdbTable
     from instrument_presence_fixture import dispatching_query_hook, fresh_instrument_rows, sentinel_item
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # the board reads the wall clock; keep every source instrument fresh
+    today = pacific_today()  # the board reads the wall clock; a PT-today DATE# row is fresh under every instrument's window
     return FakeDdbTable(rows=[sentinel_item(cgm_dark=True), *fresh_instrument_rows(today=today)], query_hook=dispatching_query_hook)
 
 
@@ -958,7 +959,11 @@ register(
     PairContract(
         name="source_freshness -> the absent coach (engine gate + v7 darkCoaches)",
         producer="web.site_api_freshness::source_freshness",
-        consumer="site/assets/js/v7_coaches.js::darkCoaches",
+        # The consumer side is named as the ENGINE's gate (a lambdas/ module, as the seam
+        # sweep requires); `consume` runs the RENDERER's half — the shipped darkCoaches()
+        # from site/assets/js/v7_coaches.js under node — and `agree` holds it equal to that
+        # engine gate over the same table. See the note.
+        consumer="health.instrument_presence::absent_coaches",
         partition=None,  # the sentinel + DATE# liveness reads span several USER#…#SOURCE# partitions; the wire is the board payload
         produce=_produce_absent_coach,
         consume=_consume_absent_coach,
@@ -995,7 +1000,9 @@ register(
         ),
         note=(
             "E6 / #4217 / epic #4182: a coach whose domain instrument is dark is absent — no read, no stance, no docket seat, "
-            "and the renderer names it without quoting it. Both halves stand on /api/source_freshness; the engine's map is "
+            "and the renderer names it without quoting it. Both halves stand on /api/source_freshness: the consumer named here "
+            "is the engine's gate (health.instrument_presence.absent_coaches); `consume` drives the renderer's shipped "
+            "darkCoaches() from site/assets/js/v7_coaches.js under node and `agree` holds the two equal. The engine's map is "
             "source_registry.coach_instruments() (the `instrument_for` facets), served on /api/coaches as `instrument`."
         ),
     )

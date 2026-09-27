@@ -47,7 +47,7 @@ def _latest_date_str(source: str, *, _g) -> str | None:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     # #4217: the read itself lives in health.instrument_presence so the coach absence gate
     # and this board answer "when did this source last write?" with ONE function.
-    return instrument_presence.latest_date_str(_g["table"], source)
+    return instrument_presence.latest_date_str(_g["table"], source, include_pilot=True)  # #1203: liveness reads every phase
 
 
 def _apple_health_datatypes(*, _g):

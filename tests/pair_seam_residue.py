@@ -71,7 +71,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "apple_health::lambdas/web/site_api_biomarkers.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_body.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_fingerprint.py::read": SEED_DATE,
-    "apple_health::lambdas/web/site_api_freshness.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_journey.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_meals.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_mind.py::read": SEED_DATE,
@@ -372,6 +371,22 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     # (position_summary, predictions, surprises, …) did not change, so there is no field
     # the two sides could disagree about; a PairContract here would pin the filter, which
     # tests/test_tagger_blind_writers_stamp_3900.py already does from the writer's side.
+    # #4217 (2026-09-26): the apple_health READ that site_api_freshness.py held since the seed
+    # (its `DATATYPE_LIVENESS` sentinel read for the board's `datatypes[]` block) MOVED into
+    # health.instrument_presence.datatype_liveness, which the board now delegates to and the
+    # coach absence gate reads — one function, two callers. The seed row for the old module
+    # left the ledger above (the sweep no longer finds it) and this is that row re-homed, not
+    # a new seam: the writer (freshness_checker_lambda) and the reader agree on the sentinel's
+    # shape through tests/test_hae_datatype_liveness_468.py + tests/test_persona_registry.py's
+    # #4217 block, and the reader's ONLY consumer-facing contract (the absent coach) is the
+    # enrolled PairContract "source_freshness -> the absent coach", which travels over the
+    # board payload rather than this partition (partition=None by design).
+    "apple_health::lambdas/health/instrument_presence.py::read": (
+        "2026-09-26",
+        "#4217 re-homed the seed row `apple_health::lambdas/web/site_api_freshness.py::read`: the DATATYPE_LIVENESS sentinel "
+        "read moved into health.instrument_presence.datatype_liveness (the board delegates to it); the writer/reader shape is "
+        "pinned by test_hae_datatype_liveness_468.py, and the reader's contract is the enrolled #4217 PairContract.",
+    ),
     "coach_thread::lambdas/intelligence/intelligence_common.py::write": (
         "2026-09-20",
         "#3900 added the write-time phase/cycle stamp to write_coach_thread; the MCP reader selects through "
