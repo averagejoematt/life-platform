@@ -115,10 +115,14 @@ def test_v4_doors_link_tokens_first():
 # launch re-anchor, so it is no longer one of the nodes this guard can place. The
 # remaining three are the live ones; the axe finding this guard came from (#1992) was
 # about the .page-hero.cockpit-hero BLOCK's position, which is unchanged.
+# 2026-09-27 (the v7 cut-over, ADR-157): /cockpit/ is the v7 Today page (scripts/v7/today.py).
+# Its hero is the <h1> + the one-line job + the data-through line, and the whole page body is
+# poured inside <main> by scripts/v7_build.py — the #1992 class (a hero block between </header>
+# and <main>) is structurally impossible for a v7 shell, and these markers hold that.
 COCKPIT_HERO_MARKERS = (
-    'class="ph-kicker label"',
-    'class="cockpit-fingerprint"',
-    'class="hero-instruments"',
+    "<h1>Today</h1>",
+    'class="v7-job"',
+    'class="td-through"',
 )
 
 
@@ -144,8 +148,6 @@ def test_cockpit_hero_block_is_first_content_in_main():
     """Matches the established v4 pattern (every other door: .page-hero is the
     first child of <main>) rather than a one-off structure for cockpit."""
     _, main_content = _cockpit_main_span()
-    hero_idx = main_content.index('class="page-hero cockpit-hero"')
-    # Only the sr-only <h1> may precede the hero block inside <main>.
-    prefix = main_content[:hero_idx]
-    assert prefix.count("<h1") <= 1, "unexpected content between <main> and the cockpit hero block"
-    assert "<article" not in prefix, "cockpit hero must precede the main panel content"
+    hero_idx = main_content.index("<h1>Today</h1>")
+    # Nothing but whitespace may precede the page's <h1> inside <main> (v7: the h1 IS the hero).
+    assert main_content[:hero_idx].strip() == "", "unexpected content between <main> and the Today <h1>"

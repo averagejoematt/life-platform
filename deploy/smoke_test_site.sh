@@ -618,29 +618,28 @@ if [[ "$QUICK" != "--quick" ]]; then
   SUB_FILE=$(mktemp);    CURRENT_CHECK="body fetch $BASE/subscribe/"; smoke_curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
-  # Home: cinematic landing + the three doors + interactive constellation
-  check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"' "$BASE/"
-  # #4182: the doors nav speaks the reader's words (TODAY · THE NUMBERS · THE COACHES ·
-  # WHAT HE TRIES · THE STORY). Anchored on the label's own `</svg>…</a>` so page prose that
-  # happens to say "the story" can never pass for the nav; the old builder labels must be gone.
-  check_body_contains "Home: door · today"            "$HOME_FILE"  '</svg>today</a>'         "$BASE/"
-  check_body_contains "Home: door · the numbers"      "$HOME_FILE"  '</svg>the numbers</a>'   "$BASE/"
-  check_body_contains "Home: door · the coaches"      "$HOME_FILE"  '</svg>the coaches</a>'   "$BASE/"
-  check_body_contains "Home: door · what he tries"    "$HOME_FILE"  '</svg>what he tries</a>' "$BASE/"
-  check_body_contains "Home: door · the story"        "$HOME_FILE"  '</svg>the story</a>'     "$BASE/"
-  check_body_not_contains "Home: old door labels gone" "$HOME_FILE" '</svg>the \(cockpit\|data\|coaching\|protocols\)</a>' "$BASE/"
-  # Cockpit: live data wiring
-  check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'             "$BASE/cockpit/"
-  check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'    "$BASE/cockpit/"
-  # Story hub: the writing surfaces
-  check_body_contains "Story: chronicle linked"       "$STORY_FILE" 'chronicle'             "$BASE/story/"
-  check_body_contains "Story: journal linked"         "$STORY_FILE" 'journal'               "$BASE/story/"
-  # Evidence: registry + readout shell + the new live Pipeline-status topic
-  # #3048: the registry ships as the non-executable #page-data JSON island
-  # (the old inline window.__EVIDENCE_REGISTRY__ global is gone with the CSP
-  # hardening) — assert the island marker, not the retired global.
-  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  'id="page-data"' "$BASE/data/"
-  check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'          "$BASE/data/"
+  # ADR-157 (the v7 cut-over): Home is the log — the five-item bar with the reader's labels
+  # (HOME · TODAY · THIS WEEK · HIS NUMBERS · THE COACHES); the v4 constellation and the
+  # `</svg>label</a>` door anchors are gone. A stale anchor here = a smoke FAIL = a rollback,
+  # so every marker below is one the v7 shells (scripts/v7/<page>.py) carry statically.
+  check_body_contains "Home: the v7 bar"               "$HOME_FILE"  'nav class="v7-bar"'      "$BASE/"
+  check_body_contains "Home: bar · Home"               "$HOME_FILE"  '>Home</a>'               "$BASE/"
+  check_body_contains "Home: bar · Today"              "$HOME_FILE"  '>Today</a>'              "$BASE/"
+  check_body_contains "Home: bar · This week"          "$HOME_FILE"  '>This week</a>'          "$BASE/"
+  check_body_contains "Home: bar · His numbers"        "$HOME_FILE"  '>His numbers</a>'        "$BASE/"
+  check_body_contains "Home: bar · The coaches"        "$HOME_FILE"  '>The coaches</a>'        "$BASE/"
+  check_body_contains "Home: the log's fold"           "$HOME_FILE"  'id="v7h-fold"'           "$BASE/"
+  check_body_not_contains "Home: v4 chrome gone"       "$HOME_FILE"  'class="constellation"\|nav class="doors"\|class="site-foot"' "$BASE/"
+  # Today: the three questions + the v7 module
+  check_body_contains "Today: the week entry"          "$NOW_FILE"   'id="td-week"'            "$BASE/cockpit/"
+  check_body_contains "Today: loads v7_today module"   "$NOW_FILE"   'assets/js/v7_today'      "$BASE/cockpit/"
+  # This week: the latest write-up entry + the v7 module
+  check_body_contains "This week: latest write-up"     "$STORY_FILE" 'id="wk-latest"'          "$BASE/story/"
+  check_body_contains "This week: loads v7_week module" "$STORY_FILE" 'assets/js/v7_week'      "$BASE/story/"
+  # His numbers: the weight entry + the v7 module (the v4 #page-data island and data-readout are gone)
+  check_body_contains "His numbers: weight entry"      "$EVID_FILE"  'id="nm-weight"'          "$BASE/data/"
+  check_body_contains "His numbers: loads v7_numbers module" "$EVID_FILE" 'assets/js/v7_numbers' "$BASE/data/"
+  # Method: Pipeline-status topic (an archive page — unchanged by the cut-over)
   check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'        "$BASE/method/pipeline/"
   check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness' "$BASE/method/pipeline/"
   # Subscribe form present

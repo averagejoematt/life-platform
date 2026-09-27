@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
-from v4_proof import apply_og, cockpit_block_html, cockpit_og, load_character  # noqa: E402
+from v4_proof import apply_og, cockpit_block_html, cockpit_og, load_character, unlink  # noqa: E402
 
 NOW = Path("site/cockpit/index.html")
 
@@ -69,7 +69,8 @@ def main() -> int:
     # always safe, falls back to a topical title when no level is available.
     html = apply_og(html, cockpit_og(char))
 
-    block = cockpit_block_html(char)
+    # ADR-157: no page link in a v7 body (the reach rule) — "the method" link is unwrapped.
+    block = unlink(cockpit_block_html(char))
     if not block:
         # No live data AND no snapshot — keep the existing baked block rather
         # than blanking the page's only static content (last-known-good).

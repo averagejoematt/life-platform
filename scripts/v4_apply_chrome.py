@@ -52,6 +52,18 @@ contexts and the two declared-exempt pages.
   python3 scripts/v4_apply_chrome.py --check    # exit 1 if any page would change (CI)
 
 Excludes `site/legacy/**` (the frozen old site — never touched).
+
+THE CUT-OVER (ADR-157, #4182 — `v4_chrome.EDITION = "v7"`). The pass now pours ONE chrome:
+a page carrying the v4 `<nav class="doors">` / `<footer class="site-foot">` OR the v7
+`<nav class="v7-bar">` / `<footer class="v7-foot">` is a chrome-bearing page; its nav and
+footer are replaced by `doors_nav()` / `site_footer()` (the v7 bar and footer tier), the
+`.loop-forward` aside is REMOVED (the bar on every page is the "no dead end" now), and the
+head-chrome and glossary passes run as before. The archive pages keep their bodies and their
+URLs — served, unlisted — under the same bar as the nine. `write_page` additionally refuses
+to let a v4 generator overwrite one of the nine v7 paths with a non-v7 page: the deploy's
+coaching / dispatches / evidence builders still emit their old hubs at `/coaching/`,
+`/story/`, `/story/about/`, `/data/`, `/protocols/`, `/method/`; only `scripts/v7_build.py`
+pours those files.
 """
 
 from __future__ import annotations
@@ -79,6 +91,11 @@ FOOT_RE = re.compile(r'<footer class="site-foot".*?</footer>', re.DOTALL)
 # canonical footer; the regexes stay so a hand-authored regression gets re-flattened.
 VARIANT_FOOT_RE = re.compile(r'<footer class="(?:story-foot|dx-foot-bar)".*?</footer>', re.DOTALL)
 LOOP_FWD_RE = re.compile(r'<aside class="loop-forward".*?</aside>', re.DOTALL)
+# #4182 (the cut-over): the v7 chrome a re-poured page carries — detected so the pass stays
+# idempotent over pages it already poured, and so `--check` keeps seeing them.
+V7_NAV_RE = re.compile(r'<nav class="v7-bar".*?</nav>', re.DOTALL)
+V7_FOOT_RE = re.compile(r'<footer class="v7-foot".*?</footer>', re.DOTALL)
+CHROME_MARKERS = ('<nav class="doors"', '<footer class="site-foot"', '<nav class="v7-bar"', '<footer class="v7-foot"')
 CURRENT_RE = re.compile(r'<a href="([^"]+)"[^>]*aria-current="page"')
 FOLLOW_RE = re.compile(r'class="nav-follow"')
 ASOF_RE = re.compile(r'data-bind="asof"')
@@ -166,47 +183,47 @@ def apply_head_chrome(html: str):
     return new_html, (new_html != html)
 
 
+def page_base(self_path: str | None) -> str:
+    """The viewer prefix a page's chrome links under: "/next/" for a preview shell (the
+    #4182 subtree stays served, noindex, until its removal PR), "/" for everything else."""
+    return "/next/" if self_path and self_path.startswith("/next/") else "/"
+
+
 def rewrite(html: str, self_path: str | None = None):
     """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted,
     lf_changed, head_changed, gloss_changed)."""
     nav_changed = foot_changed = gained_icons = foot_converted = lf_changed = head_changed = gloss_changed = False
     door = None
     follow = False
+    base = page_base(self_path)
 
-    nav_m = NAV_RE.search(html)
-    if NAV_OPEN in html and not nav_m:
+    nav_m = NAV_RE.search(html) or V7_NAV_RE.search(html)
+    if NAV_OPEN in html and not NAV_RE.search(html):
         raise RuntimeError('found a `<nav class="doors"` with no theme-toggle terminator — refusing to guess its boundary')
     if nav_m:
         old_nav = nav_m.group(0)
         door, follow = detect_nav_state(old_nav)
-        new_nav = v4_chrome.doors_nav(door, follow)
+        # ADR-157: the bar marks the page's OWN viewer path (one of the nine, or nothing) —
+        # never the door an archive page's old v4 nav happened to mark. `door` is still
+        # detected for the summary buckets below.
+        new_nav = v4_chrome.doors_nav(self_path if self_path is not None else door, follow, base=base)
         if new_nav != old_nav:
             nav_changed = True
             gained_icons = "ico-door" not in old_nav
             html = html[: nav_m.start()] + new_nav + html[nav_m.end() :]
 
-    # #1468: the loop-forward close, keyed off the same detected door. Every doors-nav
-    # page gets exactly one, inserted immediately before the footer (whichever form the
-    # footer takes below) so no chrome-bearing page can be a dead end.
-    if nav_m:
-        new_lf = v4_chrome.loop_forward(door, self_path=self_path)
-        lf_m = LOOP_FWD_RE.search(html)
-        if lf_m:
-            if lf_m.group(0) != new_lf:
-                lf_changed = True
-                html = html[: lf_m.start()] + new_lf + html[lf_m.end() :]
-        else:
-            anchor_m = FOOT_RE.search(html) or VARIANT_FOOT_RE.search(html)
-            insert_at = anchor_m.start() if anchor_m else html.rfind("</body>")
-            if insert_at == -1:
-                raise RuntimeError("chrome-bearing page has no footer/</body> — refusing to guess the loop-forward insert point")
-            html = html[:insert_at] + new_lf + html[insert_at:]
-            lf_changed = True
+    # #1468 → ADR-157: the loop-forward close is retired. A committed page that still
+    # carries the aside loses it here (the bar on every page is the "no dead end"); a page
+    # a generator emits fresh never gets one (`v4_chrome.loop_forward()` returns "").
+    lf_m = LOOP_FWD_RE.search(html)
+    if lf_m:
+        lf_changed = True
+        html = html[: lf_m.start()] + v4_chrome.loop_forward(door, self_path=self_path) + html[lf_m.end() :]
 
-    foot_m = FOOT_RE.search(html)
+    foot_m = FOOT_RE.search(html) or V7_FOOT_RE.search(html)
     if foot_m:
         old_foot = foot_m.group(0)
-        new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(old_foot)), current_door=door)
+        new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(old_foot)), current_door=door, base=base)
         if new_foot != old_foot:
             foot_changed = True
             html = html[: foot_m.start()] + new_foot + html[foot_m.end() :]
@@ -241,6 +258,11 @@ def rewrite(html: str, self_path: str | None = None):
     html = new_html
 
     return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed, head_changed, gloss_changed
+
+
+def v7_live_paths() -> frozenset:
+    """The viewer paths of the nine (ADR-157), derived from the bar + footer registries."""
+    return frozenset("/" + page for page in v4_chrome.V7_PAGES)
 
 
 def write_page(path, html: str) -> str:
@@ -279,7 +301,17 @@ def write_page(path, html: str) -> str:
     # the VIEWER path ("/method/registry/"); passing the file path ("method/registry/
     # index.html") silently glossed the two exempt pages at generation time, and main()'s
     # later pass then stripped them again — two writers disagreeing about one page.
-    normalized, *_ = rewrite(html, self_path=url_path(rel))
+    viewer = url_path(rel)
+    # ADR-157 (#4182): the nine v7 pages have ONE writer, scripts/v7_build.py. The deploy's
+    # v4 generators (coaching, dispatches, evidence) still build their old hubs at six of
+    # the nine paths; without this they would clobber the live v7 pages on every sync.
+    # Guarded on the REAL tree only (a generator pointed at a tmp root keeps writing, so its
+    # own tests see its output) and on the page's edition mark, so v7_build and the two
+    # proof bakers (which read the v7 page and hand it back) pass through.
+    if v4_chrome.EDITION == "v7" and not rel.startswith("../") and viewer in v7_live_paths() and 'class="v7"' not in html[:400]:
+        print(f"  skipped {rel}: a v7 page (ADR-157) — only scripts/v7_build.py pours it", file=sys.stderr)
+        return open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    normalized, *_ = rewrite(html, self_path=viewer)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(normalized)
@@ -304,12 +336,12 @@ def main() -> int:
 
     for path in iter_html_files(SITE_ROOT):
         original = open(path, encoding="utf-8").read()
-        if '<nav class="doors"' not in original and '<footer class="site-foot"' not in original:
+        if not any(marker in original for marker in CHROME_MARKERS):
             continue
         total += 1
         rel = os.path.relpath(path, SITE_ROOT)
         new, nc, fc, door, follow, gi, conv, lf, hc, gc = rewrite(original, self_path=url_path(rel))
-        if '<nav class="doors"' in original:
+        if '<nav class="doors"' in original or '<nav class="v7-bar"' in original:
             by_door[door] = by_door.get(door, 0) + 1
             if follow:
                 follow_count += 1

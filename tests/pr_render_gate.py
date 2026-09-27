@@ -86,22 +86,22 @@ REPO = os.path.dirname(HERE)
 # (page-hero · loop-ribbon · footer) is present regardless of data, so an honest
 # empty-data state passes; capture_page still enforces no-JS-error, no-overflow,
 # no-blank-section, no-stale-text on every one.
+# ADR-157 (the v7 cut-over, 2026-09-27): the nine v7 pages at their live URLs — every one
+# renders its honest empty state under the catch-all mock (the shells ship one pending line
+# per slot; the modules print absence as absence) — plus two archive pages that still run
+# the v4 engine (evidence.js) so a regression there is seen too.
 GATE_PAGES = [
-    {"path": "/", "name": "Home (constellation)", "wait_for": "body"},
-    {
-        "path": "/cockpit/",
-        "name": "Cockpit",
-        "wait_for": "body",
-        # Exercise the pillar disclosure when data mounted a row; if the mock
-        # yielded no rows it's skipped as a warning, not failed (honest empty state).
-        "interact": {"open": ".engine-sum", "click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens"},
-    },
-    {"path": "/story/", "name": "Story hub", "wait_for": "body"},
-    {"path": "/data/", "name": "Data hub", "wait_for": "body"},
-    {"path": "/data/vitals/", "name": "Evidence · vitals", "wait_for": "body", "charts": ["[data-readout] svg"]},
-    {"path": "/protocols/", "name": "Protocols hub", "wait_for": "body"},
-    {"path": "/coaching/", "name": "Coaching hub", "wait_for": "body"},
-    {"path": "/method/character/", "name": "Method · character", "wait_for": "body"},
+    {"path": "/", "name": "Home (the log)", "wait_for": "body"},
+    {"path": "/cockpit/", "name": "Today", "wait_for": "body"},
+    {"path": "/story/", "name": "This week", "wait_for": "body"},
+    {"path": "/data/", "name": "His numbers", "wait_for": "body"},
+    {"path": "/coaching/", "name": "The coaches", "wait_for": "body"},
+    {"path": "/protocols/", "name": "What he’s trying", "wait_for": "body"},
+    {"path": "/story/about/", "name": "Who he is", "wait_for": "body"},
+    {"path": "/method/", "name": "Under the hood", "wait_for": "body"},
+    {"path": "/subscribe/", "name": "Follow", "wait_for": "body"},
+    {"path": "/data/vitals/", "name": "Evidence · vitals (archive, evidence.js)", "wait_for": "body", "charts": ["[data-readout] svg"]},
+    {"path": "/method/character/", "name": "Method · character (archive, evidence.js)", "wait_for": "body"},
 ]
 
 # ── Realistic-data page set (#1039) ───────────────────────────────────────────
@@ -180,31 +180,18 @@ POPULATED_GATE_PAGES = [
         ],
     },
     {
-        # #1971 (completes #802 on the door's first screen): under a tier >= 2
-        # budget pause the dashboard payload carries regeneration_paused: true and
-        # every roster card's as-of kicker must disclose "refresh paused (budget
-        # guard)" — coaching.js marks that state with .rd-paused. The fixture IS
-        # the paused payload, so this pass renders the disclosure deterministically
-        # (the live site only shows it when the budget guard actually holds).
+        # ADR-157 (the v7 cut-over): The coaches page with the LIVE wire captured 2026-09-27 —
+        # /api/coaches carrying `latest_checked` on all eight rows (#4230), the docket and the
+        # calibration record. The empty pass above renders the same page with `latest_checked`
+        # ABSENT (the catch-all {}), so both shapes of the ledger line are exercised on every PR.
+        # `record{}` and `public_ask` are not on the wire yet (E4 #4304 / E8) — a fixture must be
+        # the wire, so they join here the day the producers serve them, never before.
         "path": "/coaching/",
-        "name": "Coaching hub · paused board [populated]",
+        "name": "The coaches · the ledger lines [populated]",
         "wait_for": "body",
         "checks": [
-            {"selector": ".rd-card", "min_count": 3, "desc": "roster read cards render from the paused dashboard fixture"},
-            {
-                "selector": ".rd-asof.rd-paused",
-                "min_count": 3,
-                "desc": "every card's as-of kicker carries the budget-guard paused disclosure (#1971/#802)",
-            },
-            # #2383 — the tensions band renders its dated argument (coach_team
-            # fixture carries generated_at) AND the band-level as-of stamp, so a
-            # paused week's argument can never read as today's live coaching.
-            {
-                "selector": ".tt-card",
-                "min_count": 1,
-                "desc": "tensions band renders the dated argument from the coach_team fixture (#2383)",
-            },
-            {"selector": ".tt-asof", "min_count": 1, "desc": "the tensions band carries its as-of stamp (#2383 honest dating)"},
+            {"selector": ".v7c-dated", "min_count": 1, "desc": "a dated ledger line renders from latest_checked (#4230)"},
+            {"selector": ".v7c-entry", "min_count": 3, "desc": "the three entries stand under populated data"},
         ],
     },
     {
@@ -239,30 +226,32 @@ POPULATED_GATE_PAGES = [
         ],
     },
     {
-        # #974: the cockpit's levers strip (the Protocols station in the daily
-        # slice) only materializes with supplement-registry/experiment data — the
-        # empty-mock pass renders its honest-hidden state, so this pass asserts
-        # the populated rows (the stack, the experiment under way, and the #1066
-        # training-block row from the routine fixture) actually mount, and
-        # capture_page's mobile pass keeps them inside 390px.
-        # #975: same for the inputs row (manual-channel freshness) — it only
-        # materializes with the /api/presence channels projection; the check holds
-        # in BOTH clock states (pre-genesis it renders the staged marks, after it
-        # the fixture's dated marks), so the gate can't flip at genesis.
+        # ADR-157 (the v7 cut-over): Today with the LIVE wire captured 2026-09-27 — the snapshot
+        # (the three questions + what he skips), the routine counts, the nutrition overview and
+        # the source freshness. The skips strip only materialises with a dark area or channel to
+        # name, so this pass asserts it mounts; the empty pass keeps the honest "not served" line.
         "path": "/cockpit/",
-        "name": "Cockpit · levers + inputs [populated]",
+        "name": "Today · the skips strip [populated]",
         "wait_for": "body",
         "checks": [
             {
-                "selector": ".lever-row",
-                "min_count": 3,
-                "desc": "levers strip renders stack + experiment + training-block rows from their fixtures (#974/#1066)",
+                "selector": ".td-skips li",
+                "min_count": 1,
+                "desc": "what he skips renders from snapshot.character.pillars[].absence + source_freshness",
             },
-            {
-                "selector": ".input-row",
-                "min_count": 3,
-                "desc": "the inputs freshness row renders a mark per manual channel from the presence fixture (#975)",
-            },
+            {"selector": ".td-entry", "min_count": 6, "desc": "the six entries stand under populated data"},
+        ],
+    },
+    {
+        # ADR-157: Home with the served weight — the fold's number and the weigh-in list render
+        # from /api/journey + /api/weight_progress (the same producer, #4184), every figure with
+        # its data-src.
+        "path": "/",
+        "name": "Home · the number in the fold [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": "#v7h-number [data-src]", "min_count": 1, "desc": "the fold's figure carries its served field"},
+            {"selector": ".v7h-entry", "min_count": 8, "desc": "the eight entries stand under populated data"},
         ],
     },
 ]
@@ -299,6 +288,15 @@ POPULATED_API_MOCKS = {
     "**/api/coaching-dashboard": "coaching_dashboard_paused.json",  # #1971 — paused-board disclosure
     "**/api/coach_team": "coach_team.json",  # #2383 — dated tensions → the band's as-of stamp
     "**/api/sleep_detail": "sleep_detail.json",  # #3316 — post-#3023 per-device eightsleep/whoop blocks
+    # ADR-157 (the v7 cut-over) — the live wire captured 2026-09-27 for the nine's populated pass
+    "**/api/coaches": "coaches_v7.json",  # latest_checked ×8 (#4230)
+    "**/api/coach_docket": "coach_docket_v7.json",
+    "**/api/calibration": "calibration_v7.json",
+    "**/api/snapshot": "snapshot_v7.json",
+    "**/api/nutrition_overview": "nutrition_overview_v7.json",
+    "**/api/source_freshness": "source_freshness_v7.json",
+    "**/api/journey": "journey_v7.json",
+    "**/api/weight_progress": "weight_progress_v7.json",
 }
 
 

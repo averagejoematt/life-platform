@@ -180,6 +180,14 @@ def test_the_comparison_story_still_has_a_home_on_the_site():
     index links its pages from the embedded page-data registry, not from static hrefs)."""
     page = os.path.join(_ROOT, "site", "method", "cycles", "index.html")
     assert os.path.isfile(page), "the matched-window comparison must still live at /method/cycles/"
-    method_index = _read(os.path.join(_ROOT, "site", "method", "index.html"))
-    assert '"slug": "cycles"' in method_index, "/method/cycles/ must stay in the method registry"
-    assert '"endpoint": "/api/cycle_compare"' in method_index, "the comparison must still be served by /api/cycle_compare"
+    # 2026-09-27 (ADR-157): /method/ is the v7 Under-the-hood page and embeds no registry
+    # island; the registry is read at its source — and the page's own embedded copy.
+    import sys as _sys
+
+    _sys.path.insert(0, os.path.join(_ROOT, "scripts"))
+    import v4_build_evidence as _ev
+
+    rows = [r for r in _ev.REGISTRY if r[0] == "cycles"]
+    assert rows, "/method/cycles/ must stay in the method registry"
+    assert "/api/cycle_compare" in repr(rows[0]), "the comparison must still be served by /api/cycle_compare"
+    assert '"slug": "cycles"' in _read(page) and '"endpoint": "/api/cycle_compare"' in _read(page)

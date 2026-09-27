@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-26
 
-> **v7 (2026-09-26, ADR-157):** the reachable set below is being rebuilt as ONE serialised investigation on nine pages at the preview path `/next/` — see [SITE_TRANSFORMATION_V7.md](SITE_TRANSFORMATION_V7.md) and [design/v7/](design/v7/). Until the cut-over this registry describes the live site. Two rulings already apply to it: the human first, the counted failures second, the mechanism third, the coaches last and short; and **no cycle count on any reader surface** — `/story/attempts/` and `/method/survival/` are served and unlisted, and the reach ceiling is 24.
+> **v7 is LIVE (cut over 2026-09-27, ADR-157):** the reachable site is the nine pages below plus `/privacy/`, poured by `scripts/v7_build.py` at their original URLs (no 301s, no deletions). Every other page in this document is SERVED at its URL and UNLISTED — reachable by direct link, the sitemap or search, never from the nine (the reach ratchet `NAV_REACH_CEILING = 10`). The v4/v5 door sections further down are the record of what those archive pages are for; they no longer describe the navigation.
 
 > **What each page is for, and why it matters to the platform** — one scannable registry so
 > future redesigns start from intent, not guesswork. Pair with [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md)
@@ -14,37 +14,30 @@
 >
 > Intent-only by design (no counts/dates — those drift). If a page's *purpose* changes, update it here.
 
-## Navigation (v5)
+## Navigation (v7 — ADR-157, the nine)
 
-**Home + 5 doors:** `today · the numbers · the coaches · what he tries · the story` (nav labels since #4182, 2026-09-26; the URLs `/cockpit/ /data/ /coaching/ /protocols/ /story/` and the page kickers are unchanged).
-**Method** is footer-tier (no top-nav door) — the "under the hood" pages, reachable from the
-footer's "How it's built" column (#1110, re-poured #4182: the /method/ hub "Under the hood", the
-build log, /gear/, and "How the score works" = /method/character/). The build log lives at
-`/story/build/` (URL unchanged) but is menu-homed under How it's built, not the story sub-nav.
-Old `/evidence/*` URLs 301 to their new pillar homes.
+**The bar (five, fixed at the bottom of every page — `v4_chrome.V7_BAR`):** `Home` (`/`) · `Today` (`/cockpit/`) · `This week` (`/story/`) · `His numbers` (`/data/`) · `The coaches` (`/coaching/`).
+**The footer tier (one line on every page — `v4_chrome.V7_FOOT` + RSS + Privacy):** `What he’s trying` (`/protocols/`) · `Who he is` (`/story/about/`) · `Under the hood` (`/method/`) · `Follow` (`/subscribe/`) · `RSS` (`/rss.xml`) · `Privacy` (`/privacy/`).
 
-**The reachable set is 25 (#4182, 2026-09-26 panel ruling):** home · the five doors · the five
-topic pages (physical, sleep, training, nutrition, labs) · by-coach, scorecard, lab-notes ·
-experiments · journal, panel, about, attempts · /method/ + /method/character/ · /story/build/ ·
-/gear/ · /subscribe/ · /privacy/. Everything else stays SERVED at its URL but unlinked (registry
-`"unlisted"` flag or dropped footer link) — no URL moves, no 301s, no deletions.
-`tests/site_vocabulary_residue.py::NAV_REACH_CEILING` holds it.
+| # | page · URL | the one job (CONCEPT §3) | template | module |
+|---|---|---|---|---|
+| 1 | **Home** `/` | The case so far — the day-one photograph beside the number, the lead, every weigh-in, in his words, is he okay this week, also on the record, how it works, what resolves next, follow | `scripts/v7/home.py` | `v7_home.js` |
+| 2 | **Today** `/cockpit/` | Matthew’s morning screen, open to anyone — the three questions, the session, the one ask, what he skips, nothing after it | `scripts/v7/today.py` | `v7_today.js` |
+| 3 | **This week** `/story/` | The instalment — the latest write-up, previously, the week so far, his testimony, next | `scripts/v7/week.py` | `v7_week.js` |
+| 4 | **His numbers** `/data/` | The evidence — weight, sleep, eating, training, blood tests; one chart and one sentence each, CSV under every chart, what is not being recorded | `scripts/v7/numbers.py` | `v7_numbers.js` |
+| 5 | **The coaches** `/coaching/` | The witnesses, on the record — today’s read, where two disagree, every checked call right or wrong, the staff one tap down | `scripts/v7/coaches.py` | `v7_coaches.js` |
+| 6 | **What he’s trying** `/protocols/` | What he takes and tests, what each should move, how we’d know; his calls in his words | `scripts/v7/tries.py` | `v7_tries.js` |
+| 7 | **Who he is** `/story/about/` | The subject, in the first person — his paragraph, the photographs, since the day it began, how to check | `scripts/v7/who.py` | `v7_who.js` |
+| 8 | **Under the hood** `/method/` | How a number is made, the corrections column, the build log, the gear, the receipt | `scripts/v7/hood.py` | `v7_hood.js` |
+| 9 | **Follow** `/subscribe/` | The return — the promise in weekdays, the field, the honest count, every line with an empty state | `scripts/v7/follow.py` | `v7_follow.js` |
 
-**Wayfinding (#1475):** every chrome-bearing page's footer opens with the `.wayfinder` —
-this registry's five stations in loop order, with the page's own station marked, the next
-one tagged, and the mega-menu below re-poured on the loop. It is generated from
-`scripts/v4_wayfinding.py` off the same detected door as the doors nav and the
-`.loop-forward` close, so **this registry is the thing the wayfinding mirrors**: change a
-station's loop role here and change it there. Method pages carry the Data station (they
-are a deeper cut of the Data door, not a sixth door). See `docs/DESIGN_SYSTEM_V5.md` §3
-for the component and `docs/design/JOURNEYS.md` for the per-journey path it serves.
+**The rules every page keeps (CONCEPT §2, §10; `docs/SITE_TRANSFORMATION_V7.md`):** served fields only, every figure with its `data-src`; absence as absence, never a promise; no cycle/reset/attempt word; no machine word; dates in words; one "Data through <day>" per page (the `<noscript>` core’s "as of" is the one sanctioned place for that phrase); green means earned; no page link in a body but the repo and `mailto:`; assets flat and root-absolute.
 
-Three pillars (`/data/`, `/protocols/`, `/method/`) are served by **one base-aware engine**
-(`site/assets/js/evidence.js` + `scripts/v4_build_evidence.py`, split by registry group).
-Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
-(`v4_build_coaching.py` / `v4_build_dispatches.py`). Home + Cockpit are hand-authored.
+**How the nine are built and held:** `scripts/v7_build.py --base / --allow-live` is the ONE writer (it runs first in `deploy/sync_site_to_s3.sh`; `v4_apply_chrome.write_page` refuses every other generator at the nine’s paths), `--check` is its drift guard; `v4_chrome.EDITION = "v7"` pours the one chrome onto every page including the archive; the six tier-1 manifest rows (`tests/qa_manifest.py`) name the shells’ own selectors so the post-deploy visual gate holds in the empty-data state; the six door `intent`s are the comprehension judge’s ground truth; `tests/site_vocabulary_residue.py` holds the reach (10) and the per-term vocabulary ledger, shrink-only.
 
-## The doors
+**The archive (served, unlisted):** every page the sections below describe — the topic readouts under `/data/`, `/protocols/`, `/method/`, the coaching sections, the story sections, `/gear/`, `/story/build/`, `/method/character/`, `/story/attempts/` (the owner’s 2026-09-26 ruling: the cycle count is internal) — keeps its URL, its body and the same bar and footer as the nine. Nothing links to them from the nine, by rule; `tests/test_site_orphans.py` records the deliberate exceptions.
+
+## The doors — the v4/v5 record (archive pages since ADR-157; intent only)
 
 ### Home — `/` · the front door
 - **Loop role:** teaches the loop, then routes in. **Audience:** primarily Reddit newcomers + first-time visitors.

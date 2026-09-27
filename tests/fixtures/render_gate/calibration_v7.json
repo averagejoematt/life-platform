@@ -1,0 +1,701 @@
+{
+ "_meta": {
+  "cache_seconds": 300,
+  "generated_at": "2026-09-27T04:20:17.098036+00:00",
+  "request_id": "753f0199ecda4cc7",
+  "served_at": "2026-09-27T04:20:17.098036+00:00"
+ },
+ "as_of": "2026-09-26",
+ "coaches": [
+  {
+   "accuracy_ci95": [
+    21.6,
+    64.0
+   ],
+   "accuracy_pct": 41.2,
+   "brier": 0.25,
+   "brier_skill": -0.0321,
+   "calibration": "not_yet_skillful",
+   "coach_id": "sleep",
+   "coach_name": "Dr. Lisa Park",
+   "confirmed": 7,
+   "label": "not_yet_skillful",
+   "lifetime": {
+    "accuracy_ci95": [
+     17.2,
+     51.6
+    ],
+    "accuracy_pct": 32.0,
+    "brier": 0.2506,
+    "brier_skill": -0.1517,
+    "calibration": "over-confident",
+    "confirmed": 8,
+    "label": "not_yet_skillful",
+    "n": 25,
+    "refuted": 17,
+    "reliability_bins": [
+     {
+      "hi": 0.3,
+      "lo": 0.2,
+      "mean_confidence": 0.2,
+      "n": 1,
+      "observed_rate": 0.0
+     },
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.502,
+      "n": 23,
+      "observed_rate": 0.348
+     },
+     {
+      "hi": 0.7,
+      "lo": 0.6,
+      "mean_confidence": 0.65,
+      "n": 1,
+      "observed_rate": 0.0
+     }
+    ],
+    "score": 45,
+    "skilled": false
+   },
+   "n": 17,
+   "refuted": 10,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 17,
+     "observed_rate": 0.412
+    }
+   ],
+   "retired": false,
+   "score": 45,
+   "skilled": false
+  },
+  {
+   "accuracy_ci95": [
+    0.0,
+    43.4
+   ],
+   "accuracy_pct": 0.0,
+   "brier": 0.25,
+   "brier_skill": null,
+   "calibration": "over-confident",
+   "coach_id": "nutrition",
+   "coach_name": "Dr. Marcus Webb",
+   "confirmed": 0,
+   "label": "developing",
+   "lifetime": {
+    "accuracy_ci95": [
+     30.1,
+     75.2
+    ],
+    "accuracy_pct": 53.3,
+    "brier": 0.25,
+    "brier_skill": -0.0045,
+    "calibration": "not_yet_skillful",
+    "confirmed": 8,
+    "label": "not_yet_skillful",
+    "n": 15,
+    "refuted": 7,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 15,
+      "observed_rate": 0.533
+     }
+    ],
+    "score": 45,
+    "skilled": false
+   },
+   "n": 5,
+   "refuted": 5,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 5,
+     "observed_rate": 0.0
+    }
+   ],
+   "retired": false,
+   "score": 50,
+   "skilled": null
+  },
+  {
+   "accuracy_ci95": [
+    37.6,
+    96.4
+   ],
+   "accuracy_pct": 80.0,
+   "brier": 0.25,
+   "brier_skill": -0.5625,
+   "calibration": "under-confident",
+   "coach_id": "mind",
+   "coach_name": "Dr. Nathan Reeves",
+   "confirmed": 4,
+   "label": "not_yet_skillful",
+   "lifetime": {
+    "accuracy_ci95": [
+     48.7,
+     97.4
+    ],
+    "accuracy_pct": 85.7,
+    "brier": 0.25,
+    "brier_skill": -1.0417,
+    "calibration": "under-confident",
+    "confirmed": 6,
+    "label": "not_yet_skillful",
+    "n": 7,
+    "refuted": 1,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 7,
+      "observed_rate": 0.857
+     }
+    ],
+    "score": 45,
+    "skilled": false
+   },
+   "n": 5,
+   "refuted": 1,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 5,
+     "observed_rate": 0.8
+    }
+   ],
+   "retired": false,
+   "score": 45,
+   "skilled": false
+  },
+  {
+   "accuracy_ci95": [
+    20.8,
+    93.9
+   ],
+   "accuracy_pct": 66.7,
+   "brier": 0.25,
+   "brier_skill": -0.125,
+   "calibration": "insufficient_data",
+   "coach_id": "physical",
+   "coach_name": "Dr. Max Reyes",
+   "confirmed": 2,
+   "label": "not_yet_skillful",
+   "lifetime": {
+    "accuracy_ci95": [
+     18.8,
+     81.2
+    ],
+    "accuracy_pct": 50.0,
+    "brier": 0.25,
+    "brier_skill": 0.0,
+    "calibration": "not_yet_skillful",
+    "confirmed": 3,
+    "label": "not_yet_skillful",
+    "n": 6,
+    "refuted": 3,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 6,
+      "observed_rate": 0.5
+     }
+    ],
+    "score": 45,
+    "skilled": false
+   },
+   "n": 3,
+   "refuted": 1,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 3,
+     "observed_rate": 0.667
+    }
+   ],
+   "retired": false,
+   "score": 45,
+   "skilled": false
+  },
+  {
+   "accuracy_ci95": [
+    9.5,
+    90.5
+   ],
+   "accuracy_pct": 50.0,
+   "brier": 0.25,
+   "brier_skill": 0.0,
+   "calibration": "insufficient_data",
+   "coach_id": "glucose",
+   "coach_name": "Dr. Amara Patel",
+   "confirmed": 1,
+   "label": "nascent",
+   "lifetime": {
+    "accuracy_ci95": [
+     4.6,
+     69.9
+    ],
+    "accuracy_pct": 25.0,
+    "brier": 0.25,
+    "brier_skill": -0.3333,
+    "calibration": "insufficient_data",
+    "confirmed": 1,
+    "label": "not_yet_skillful",
+    "n": 4,
+    "refuted": 3,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 4,
+      "observed_rate": 0.25
+     }
+    ],
+    "score": 45,
+    "skilled": false
+   },
+   "n": 2,
+   "refuted": 1,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 2,
+     "observed_rate": 0.5
+    }
+   ],
+   "retired": false,
+   "score": 30,
+   "skilled": false
+  },
+  {
+   "accuracy_ci95": [
+    20.7,
+    100.0
+   ],
+   "accuracy_pct": 100.0,
+   "brier": 0.25,
+   "brier_skill": null,
+   "calibration": "insufficient_data",
+   "coach_id": "labs",
+   "coach_name": "Dr. James Okafor",
+   "confirmed": 1,
+   "label": "nascent",
+   "lifetime": {
+    "accuracy_ci95": [
+     9.5,
+     90.5
+    ],
+    "accuracy_pct": 50.0,
+    "brier": 0.25,
+    "brier_skill": 0.0,
+    "calibration": "insufficient_data",
+    "confirmed": 1,
+    "label": "nascent",
+    "n": 2,
+    "refuted": 1,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 2,
+      "observed_rate": 0.5
+     }
+    ],
+    "score": 30,
+    "skilled": false
+   },
+   "n": 1,
+   "refuted": 0,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 1,
+     "observed_rate": 1.0
+    }
+   ],
+   "retired": false,
+   "score": 30,
+   "skilled": null
+  },
+  {
+   "accuracy_ci95": [
+    30.1,
+    95.4
+   ],
+   "accuracy_pct": 75.0,
+   "brier": 0.25,
+   "brier_skill": -0.3333,
+   "calibration": "insufficient_data",
+   "coach_id": "explorer",
+   "coach_name": "Dr. Henning Brandt",
+   "confirmed": 3,
+   "label": "not_yet_skillful",
+   "lifetime": {
+    "accuracy_ci95": [
+     10.2,
+     49.5
+    ],
+    "accuracy_pct": 25.0,
+    "brier": 0.25,
+    "brier_skill": -0.3333,
+    "calibration": "over-confident",
+    "confirmed": 4,
+    "label": "not_yet_skillful",
+    "n": 16,
+    "refuted": 12,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 16,
+      "observed_rate": 0.25
+     }
+    ],
+    "score": 45,
+    "skilled": false
+   },
+   "n": 4,
+   "refuted": 1,
+   "reliability_bins": [
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.5,
+     "n": 4,
+     "observed_rate": 0.75
+    }
+   ],
+   "retired": false,
+   "score": 45,
+   "skilled": false
+  },
+  {
+   "accuracy_ci95": null,
+   "accuracy_pct": null,
+   "brier": null,
+   "brier_skill": null,
+   "calibration": "insufficient_data",
+   "coach_id": "training",
+   "coach_name": "Dr. Sarah Chen",
+   "confirmed": 0,
+   "label": "nascent",
+   "lifetime": {
+    "accuracy_ci95": [
+     0.0,
+     29.9
+    ],
+    "accuracy_pct": 0.0,
+    "brier": 0.25,
+    "brier_skill": null,
+    "calibration": "over-confident",
+    "confirmed": 0,
+    "label": "developing",
+    "n": 9,
+    "refuted": 9,
+    "reliability_bins": [
+     {
+      "hi": 0.6,
+      "lo": 0.5,
+      "mean_confidence": 0.5,
+      "n": 9,
+      "observed_rate": 0.0
+     }
+    ],
+    "score": 50,
+    "skilled": null
+   },
+   "n": 0,
+   "refuted": 0,
+   "reliability_bins": [],
+   "retired": true,
+   "score": 30,
+   "skilled": null
+  }
+ ],
+ "cycle": 17,
+ "cycle_start": "2026-09-06",
+ "disclosure": "Self-graded: every prediction here was resolved against the platform's own data by a deterministic evaluator \u2014 no human scoring. Brier score: 0 is perfect, 0.25 is the always-say-50% baseline, lower is better. Calibrated and skilled are different claims: calibrated means stated confidence matches how often calls turn out right (reliability); skilled means beating the base rate (Brier skill > 0). A surface can be reliable without being skillful \u2014 when skill is at or below zero it reads Not Yet Skillful, never Well Calibrated. The platform-wide card scores skill against a STRATIFIED base rate \u2014 coach calls, hypothesis bets and each forecasting MODEL's interval forecasts separately, every one against its own climatology (the daily metric engine and the weekly training prescription are different models and are never counted as one number) \u2014 so pooling strata with different base rates cannot manufacture a skill no stratum has; its over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own n, Brier and skill are served beside it. Voided bets: a reset voids \u2014 never grades \u2014 every still-open pre-registered bet; each is recorded in the ledger and counted in `voided` so the graded denominator is honest. They are excluded from Brier because they never resolved. Every hit rate here carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` \u2014 a hit rate off a small n reads as more precise than it is.",
+ "hypotheses": {
+  "accuracy_ci95": null,
+  "accuracy_pct": null,
+  "brier": null,
+  "brier_skill": null,
+  "calibration": "insufficient_data",
+  "confirmed": 0,
+  "label": "nascent",
+  "lifetime": {
+   "accuracy_ci95": null,
+   "accuracy_pct": null,
+   "brier": null,
+   "brier_skill": null,
+   "calibration": "insufficient_data",
+   "confirmed": 0,
+   "label": "nascent",
+   "n": 0,
+   "refuted": 0,
+   "reliability_bins": [],
+   "score": 30,
+   "skilled": null
+  },
+  "n": 0,
+  "refuted": 0,
+  "reliability_bins": [],
+  "score": 30,
+  "skilled": null
+ },
+ "interval_forecasts": {
+  "accuracy_ci95": [
+   71.1,
+   85.7
+  ],
+  "accuracy_pct": 79.3,
+  "brier": 0.1641,
+  "brier_skill": -0.0003,
+  "calibration": "not_yet_skillful",
+  "confirmed": 92,
+  "label": "not_yet_skillful",
+  "lifetime": {
+   "accuracy_ci95": [
+    73.6,
+    83.6
+   ],
+   "accuracy_pct": 79.1,
+   "brier": 0.1657,
+   "brier_skill": -0.0005,
+   "calibration": "not_yet_skillful",
+   "confirmed": 200,
+   "label": "not_yet_skillful",
+   "n": 253,
+   "refuted": 53,
+   "reliability_bins": [
+    {
+     "hi": 0.9,
+     "lo": 0.8,
+     "mean_confidence": 0.8,
+     "n": 253,
+     "observed_rate": 0.791
+    }
+   ],
+   "score": 45,
+   "skilled": false
+  },
+  "n": 116,
+  "refuted": 24,
+  "reliability_bins": [
+   {
+    "hi": 0.9,
+    "lo": 0.8,
+    "mean_confidence": 0.8,
+    "n": 116,
+    "observed_rate": 0.793
+   }
+  ],
+  "score": 45,
+  "skilled": false
+ },
+ "platform": {
+  "accuracy_ci95": [
+   64.3,
+   78.4
+  ],
+  "accuracy_pct": 71.9,
+  "brier": 0.1849,
+  "brier_skill": -0.0004,
+  "calibration": "not_yet_skillful",
+  "confirmed": 110,
+  "label": "not_yet_skillful",
+  "lifetime": {
+   "accuracy_ci95": [
+    63.4,
+    73.3
+   ],
+   "accuracy_pct": 68.5,
+   "brier": 0.1868,
+   "brier_skill": -0.0241,
+   "calibration": "not_yet_skillful",
+   "confirmed": 231,
+   "label": "not_yet_skillful",
+   "n": 337,
+   "refuted": 106,
+   "reliability_bins": [
+    {
+     "hi": 0.3,
+     "lo": 0.2,
+     "mean_confidence": 0.2,
+     "n": 1,
+     "observed_rate": 0.0
+    },
+    {
+     "hi": 0.6,
+     "lo": 0.5,
+     "mean_confidence": 0.501,
+     "n": 82,
+     "observed_rate": 0.378
+    },
+    {
+     "hi": 0.7,
+     "lo": 0.6,
+     "mean_confidence": 0.65,
+     "n": 1,
+     "observed_rate": 0.0
+    },
+    {
+     "hi": 0.9,
+     "lo": 0.8,
+     "mean_confidence": 0.8,
+     "n": 253,
+     "observed_rate": 0.791
+    }
+   ],
+   "reliability_gap": 0.039,
+   "score": 45,
+   "skill_reference": "stratified",
+   "skilled": false,
+   "strata": {
+    "coaches": {
+     "base_rate": 0.369,
+     "brier": 0.2502,
+     "brier_skill": -0.0744,
+     "calibration": "not_yet_skillful",
+     "confirmed": 31,
+     "n": 84,
+     "reliability_gap": 0.13,
+     "skilled": false
+    },
+    "hypotheses": {
+     "base_rate": null,
+     "brier": null,
+     "brier_skill": null,
+     "calibration": "insufficient_data",
+     "confirmed": 0,
+     "n": 0,
+     "reliability_gap": null,
+     "skilled": null
+    },
+    "interval_forecasts": {
+     "base_rate": 0.791,
+     "brier": 0.1657,
+     "brier_skill": -0.0005,
+     "calibration": "not_yet_skillful",
+     "confirmed": 200,
+     "n": 253,
+     "reliability_gap": 0.009,
+     "skilled": false
+    }
+   },
+   "worst_stratum_gap": {
+    "gap": 0.13,
+    "stratum": "coaches"
+   }
+  },
+  "n": 153,
+  "refuted": 43,
+  "reliability_bins": [
+   {
+    "hi": 0.6,
+    "lo": 0.5,
+    "mean_confidence": 0.5,
+    "n": 37,
+    "observed_rate": 0.486
+   },
+   {
+    "hi": 0.9,
+    "lo": 0.8,
+    "mean_confidence": 0.8,
+    "n": 116,
+    "observed_rate": 0.793
+   }
+  ],
+  "reliability_gap": 0.008,
+  "score": 45,
+  "skill_reference": "stratified",
+  "skilled": false,
+  "strata": {
+   "coaches": {
+    "base_rate": 0.486,
+    "brier": 0.25,
+    "brier_skill": -0.0007,
+    "calibration": "not_yet_skillful",
+    "confirmed": 18,
+    "n": 37,
+    "reliability_gap": 0.014,
+    "skilled": false
+   },
+   "hypotheses": {
+    "base_rate": null,
+    "brier": null,
+    "brier_skill": null,
+    "calibration": "insufficient_data",
+    "confirmed": 0,
+    "n": 0,
+    "reliability_gap": null,
+    "skilled": null
+   },
+   "interval_forecasts": {
+    "base_rate": 0.793,
+    "brier": 0.1641,
+    "brier_skill": -0.0003,
+    "calibration": "not_yet_skillful",
+    "confirmed": 92,
+    "n": 116,
+    "reliability_gap": 0.007,
+    "skilled": false
+   }
+  },
+  "worst_stratum_gap": {
+   "gap": 0.014,
+   "stratum": "coaches"
+  }
+ },
+ "prereg_seal": {
+  "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
+  "genesis": "2026-09-06",
+  "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d",
+  "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
+  "stamped_at": "2026-09-06T02:13:38.690967+00:00",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256"
+ },
+ "voided": {
+  "by_reset": {
+   "2026-07-13": 1433,
+   "2026-07-18": 84,
+   "2026-07-19": 10,
+   "2026-07-20": 112,
+   "2026-07-22": 31,
+   "2026-07-27": 38,
+   "2026-08-03": 149,
+   "2026-08-10": 130,
+   "2026-08-17": 88,
+   "2026-09-01": 118,
+   "2026-09-04": 45,
+   "2026-09-05": 19,
+   "2026-09-06": 23
+  },
+  "hypotheses": 57,
+  "n": 2280,
+  "predictions": 2223
+ }
+}

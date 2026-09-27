@@ -129,8 +129,10 @@ def test_no_dx_read_panel_is_an_article():
 
 
 def test_dx_read_div_count_matches_the_known_seventeen_plus_home():
-    """Not a ceiling forever — a floor with a name: today's known population is
-    17 coaching/story shells + the home-page dispatches beat. If this count
+    """Not a ceiling forever — a floor with a name: the known population was 17
+    coaching/story shells + the home-page dispatches beat (18). Since the v7 cut-over
+    (ADR-157, 2026-09-27) it is 14: the four pages that became v7 shells — `/`,
+    `/coaching/`, `/story/`, `/story/about/` — mount no tabs.js panel. If this count
     moves, it should move because someone looked, not silently."""
     hits = []
     for dirpath, _dirnames, filenames in os.walk(os.path.join(ROOT, "site")):
@@ -143,7 +145,7 @@ def test_dx_read_div_count_matches_the_known_seventeen_plus_home():
             with open(full, encoding="utf-8") as f:
                 if "data-dx-read" in f.read():
                     hits.append(full)
-    assert len(hits) == 18, sorted(hits)
+    assert len(hits) == 14, sorted(hits)
 
 
 def test_generator_source_emits_div_for_dx_read_negative_control():

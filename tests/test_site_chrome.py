@@ -57,68 +57,63 @@ def test_apply_chrome_check_is_green():
 
 
 def test_standardized_pages_embed_canonical_footer():
-    """#1104: the ex-variant pages carry site_footer(); home keeps the live asof stamp."""
+    """#1104 → ADR-157: the ex-variant pages and home carry the one canonical `site_footer()`
+    (the v7 footer tier; home's v4 "updated" asof stamp retired with the v4 footer)."""
     canonical = v4_chrome.site_footer()
-    for rel in ("404.html", "privacy/index.html", "subscribe/index.html", "subscribe/confirm/index.html"):
+    for rel in ("index.html", "404.html", "privacy/index.html", "subscribe/index.html", "subscribe/confirm/index.html"):
         html = _read(rel)
         assert canonical in html, f"{rel} lost the canonical site_footer()"
-    home = _read("index.html")
-    assert v4_chrome.site_footer(with_asof=True) in home, "home lost the canonical footer (with the asof stamp)"
-    assert 'data-bind="asof"' in home, "home lost the live 'updated' stamp (story.js binds it)"
+        assert 'data-bind="asof"' not in html, f"{rel}: the retired v4 asof stamp is back"
 
 
 def test_no_content_page_keeps_a_variant_footer():
-    """The slim variants are retired on content pages — one footer, one source (#1104)."""
+    """The slim variants are retired on content pages — one footer, one source (#1104);
+    since ADR-157 the one footer is `footer.v7-foot` and every bar page carries it."""
     for path in _non_legacy_pages():
         html = path.read_text(encoding="utf-8")
-        if '<nav class="doors"' in html:
-            assert '<footer class="site-foot"' in html, f"{path.relative_to(SITE)}: doors-nav page without the canonical footer"
+        if '<nav class="v7-bar"' in html:
+            assert '<footer class="v7-foot"' in html, f"{path.relative_to(SITE)}: bar page without the canonical footer"
             assert (
-                'class="story-foot"' not in html and 'class="dx-foot-bar"' not in html
-            ), f"{path.relative_to(SITE)}: doors-nav page still carries a variant footer"
+                'class="story-foot"' not in html and 'class="dx-foot-bar"' not in html and 'class="site-foot"' not in html
+            ), f"{path.relative_to(SITE)}: bar page still carries a retired footer"
 
 
 def test_redirect_stubs_stay_chrome_free():
     """The /mind/ and /subscribe.html redirect stubs must never gain chrome (#1104)."""
     for rel in ("mind/index.html", "subscribe.html"):
         html = _read(rel)
-        assert '<nav class="doors"' not in html, f"{rel}: redirect stub grew a doors nav"
+        assert '<nav class="doors"' not in html and '<nav class="v7-bar"' not in html, f"{rel}: redirect stub grew a nav"
         assert "<footer" not in html, f"{rel}: redirect stub grew a footer"
         assert '<aside class="loop-forward"' not in html, f"{rel}: redirect stub grew a loop-forward close"
         assert 'http-equiv="refresh"' in html or "location.replace" in html, f"{rel}: no longer looks like a redirect stub"
 
 
-def test_every_content_page_has_one_loop_forward_close_before_the_footer():
-    """#1468 — zero dead-end pages: every doors-nav page gets exactly one `.loop-forward`
-    close with at least one real, non-self href, positioned before the `.site-foot`."""
+def test_every_content_page_carries_the_bar_and_no_loop_forward_close():
+    """#1468 → ADR-157 — zero dead-end pages, the v7 way: every content page carries the
+    five-item bar (its five real hrefs) and NO `.loop-forward` aside — the close retired
+    with the loop, and `v4_apply_chrome.py` strips any a committed page still carried."""
     checked = 0
     for path in _non_legacy_pages():
         html = path.read_text(encoding="utf-8")
-        if '<nav class="doors"' not in html:
+        if '<nav class="v7-bar"' not in html:
             continue
         checked += 1
-        matches = LOOP_FWD_RE.findall(html)
-        assert len(matches) == 1, f"{path.relative_to(SITE)}: expected exactly one .loop-forward, found {len(matches)}"
-        block = matches[0]
-        hrefs = HREF_RE.findall(block)
-        assert hrefs, f"{path.relative_to(SITE)}: .loop-forward has no forward link"
-        for href in hrefs:
-            assert href not in ("#", ""), f"{path.relative_to(SITE)}: .loop-forward link is not a real destination ({href!r})"
-        lf_pos = html.find(block)
-        foot_pos = html.find('<footer class="site-foot"')
-        assert foot_pos != -1, f"{path.relative_to(SITE)}: doors-nav page missing the canonical footer"
-        assert lf_pos < foot_pos, f"{path.relative_to(SITE)}: .loop-forward must sit before the footer"
-    assert checked > 0, "no doors-nav pages found — the sweep didn't run over anything"
+        assert not LOOP_FWD_RE.search(html), f"{path.relative_to(SITE)}: the retired .loop-forward close is back"
+        bar = html[html.index('<nav class="v7-bar"') :]
+        bar = bar[: bar.index("</nav>")]
+        hrefs = HREF_RE.findall(bar)
+        assert len(hrefs) == 5 and all(
+            h.startswith("/") for h in hrefs
+        ), f"{path.relative_to(SITE)}: the bar must carry five real links, got {hrefs}"
+    assert checked > 0, "no bar pages found — the sweep didn't run over anything"
 
 
-def test_loop_forward_never_self_links_the_return_trigger():
-    """#1468 audit finding: /subscribe/ and /subscribe/confirm/ swap the universal
-    "follow by email" return trigger for a neutral loop link so it never points at
-    the page the reader is already reading."""
+def test_loop_forward_is_the_empty_string():
+    """#1468 audit finding, closed by retirement: the close is gone from every page, so the
+    self-link hazard on /subscribe/ and /subscribe/confirm/ cannot recur."""
+    assert v4_chrome.loop_forward("/story/", self_path="/subscribe/") == ""
     for rel in ("subscribe/index.html", "subscribe/confirm/index.html"):
-        html = _read(rel)
-        block = LOOP_FWD_RE.search(html).group(0)
-        assert 'href="/subscribe/"' not in block, f"{rel}: loop-forward return trigger self-links"
+        assert not LOOP_FWD_RE.search(_read(rel)), f"{rel}: the retired loop-forward close is back"
 
 
 # ── Head chrome (#1639) ─────────────────────────────────────────────────────────
@@ -135,7 +130,7 @@ def test_every_content_page_carries_the_full_head_chrome_block():
     checked = 0
     for path in _non_legacy_pages():
         html = path.read_text(encoding="utf-8")
-        if '<nav class="doors"' not in html and '<footer class="site-foot"' not in html:
+        if '<nav class="v7-bar"' not in html and '<footer class="v7-foot"' not in html:
             continue
         checked += 1
         rel = path.relative_to(SITE)
@@ -152,7 +147,7 @@ def test_svg_favicon_is_declared_after_the_ico_fallback():
     svg = '<link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">'
     for path in _non_legacy_pages():
         html = path.read_text(encoding="utf-8")
-        if '<nav class="doors"' not in html and '<footer class="site-foot"' not in html:
+        if '<nav class="v7-bar"' not in html and '<footer class="v7-foot"' not in html:
             continue
         rel = path.relative_to(SITE)
         assert html.count(ico) == 1, f"{rel}: expected exactly one .ico link, found {html.count(ico)}"
@@ -181,12 +176,22 @@ def test_stub_and_fragment_pages_stay_head_chrome_free():
 # ── #4182: the v7 edition switch and the preview shells ─────────────────────────────
 
 
-def test_v7_edition_default_is_v4_and_the_live_chrome_is_unchanged():
-    """`v4_chrome.EDITION` defaults to "v4": doors_nav()/site_footer() keep emitting the
-    live `.doors` / `.site-foot` chrome until the cut-over PR flips the switch."""
-    assert v4_chrome.EDITION == "v4"
-    assert v4_chrome.doors_nav().startswith('<nav class="doors"')
-    assert v4_chrome.site_footer().startswith('<footer class="site-foot"')
+def test_v7_edition_is_the_default_and_the_v4_chrome_is_retired(monkeypatch):
+    """`v4_chrome.EDITION` is "v7" since the cut-over (ADR-157): doors_nav()/site_footer()
+    emit the bar and the footer tier at the same call sites; flipping the switch back
+    raises rather than pouring a chrome whose pieces (the wayfinder, the mega-menu) no
+    longer exist."""
+    assert v4_chrome.EDITION == "v7"
+    assert v4_chrome.doors_nav().startswith('<nav class="v7-bar"')
+    assert v4_chrome.site_footer().startswith('<footer class="v7-foot"')
+    monkeypatch.setattr(v4_chrome, "EDITION", "v4")
+    for call in (v4_chrome.doors_nav, v4_chrome.site_footer):
+        try:
+            call()
+        except RuntimeError as exc:
+            assert "retired" in str(exc)
+        else:
+            raise AssertionError(f"{call.__name__} poured a v4 chrome that no longer exists")
 
 
 def test_v7_edition_pours_the_bar_and_the_footer_tier_from_the_same_call_sites(monkeypatch):

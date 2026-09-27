@@ -24,7 +24,7 @@ The north star's own bar for the subject is *"a daily instrument he returns to."
 | The coaching door opens on Monday, on Friday | weekly priority `as_of_day_n 16` served on Day 20; two figures stale (316.9 lb / 3.7 lb/wk vs 313.1 / −4.58) | `/api/coaching-dashboard` |
 | Seven of fourteen audited pages open on a tutorial | full-viewport "NEW HERE?" cards on `/cockpit/` and every `/data/*` page | B1 §5 item 3 |
 | Builder vocabulary, undefined | 71 of 88 pages use it with no gloss; zero `<dfn>` site-wide; one "what's a…?" affordance | B3 census |
-| Too many pages | 91 reader-facing pages; 39 reachable from `/` by static links; 52 orphaned from a static crawl | B3 nav reach |
+| Too many pages | 91 reader-facing pages; 39 reachable from `/` by static links; 52 orphaned from a static crawl — *history: 25 → 24 by the 2026-09-26 rulings, 10 at the v7 cut-over (ADR-157, 2026-09-27)* | B3 nav reach |
 | Two numbers for one quantity | weekly rate −4.58 provisional (`/api/journey`) vs −4.36 firm with a 2027-04-20 goal date (`public_stats.json`); protein 106.9 / 141 / 154 / 153.3 / 142 g across coaches and engine; bedtime "4:45 AM" (a UTC instant) vs 10:30 PM | B2 §4, driver-verified |
 | Coach premises the engine contradicts | "six days without logs" against 20/20 days logged, 139–186 g each day | `/api/nutrition_overview` |
 | Machine leaks in public prose | `</decision> <parameter name="followed">true` in `/api/decisions`; `[Weight: 315.0 lbs \| Week Grade: avg 74 \| T0 Streak: 0 days]` opening the chronicle | `/protocols/experiments/`, `/story/` |
@@ -52,7 +52,7 @@ Panel: the Product Board (docs/BOARDS.md §3 — Mara, Sofia, Lena, Raj, Tyrell,
 | iii | **Character level + pillars:** BELOW the fold on `/cockpit/` only, collapsed, plain key, the same-day served count printed beside any "absent" pillar; the level *name* and XP off reader pages (kept on `/method/character/`). Reverses to OFF if a pillar contradicts its served count on >3 of the next 14 days | yes, except the level-name removal (owner's morning "yes", §7) |
 | iv | **Coaching door:** today's read at the top with its written-time in words; the weekly call labelled weekly; a >48 h freshness banner with engine-computed deltas; >7 d → not on the first screen; the docket stays uncollapsed as the return trigger | yes (PR C) |
 | v | **"NEW HERE?" cards** → a one-line strip; the definitions move to inline glosses | yes (PR B) |
-| vi | **Page-count ratchet:** nav-reachable pages capped, everything else unlisted-but-served; ratchet down from 39 | mechanism yes (PR E); the number (24 proposed) is the owner's |
+| vi | **Page-count ratchet:** nav-reachable pages capped, everything else unlisted-but-served; ratchet down from 39 | mechanism yes (PR E); 24 on 2026-09-26; **10 since the v7 cut-over (ADR-157)** |
 | vii | **Vocabulary registry** — the fifteen rulings in §6 | registry + guard yes (PR E); the copy changes land door by door |
 | viii | **Door names:** subtitles become contents ("today, in one screen" / "his numbers" / …); the nav LABELS (TODAY · THE NUMBERS · THE COACHES · WHAT HE TRIES · THE STORY) are a taste swing to render for the owner | subtitles on the three flagship doors; labels wait |
 | ix | Additions: bottom-bar occlusion fixed; the subscribe field in its fold; one canonical weekly rate (#4184); tile titles wrap; dates in words; n beside every percentage; leaks stripped at write/serve (#4190, #4191) | the fixes are filed; the site-side ones ship with their doors |

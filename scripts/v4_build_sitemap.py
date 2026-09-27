@@ -35,6 +35,7 @@ Writes site/sitemap.xml. Run from repo root:  python3 scripts/v4_build_sitemap.p
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -83,7 +84,9 @@ def indexable(p: Path) -> bool:
         html = p.read_text(encoding="utf-8")
     except OSError:
         return False
-    return 'name="robots" content="noindex"' not in html
+    # `noindex` as a directive token, whatever else the content carries: the v4 pages bake
+    # `content="noindex"`, the v7 preview shells (site/next/**, ADR-157) `content="noindex,nofollow"`.
+    return not re.search(r'name="robots" content="[^"]*\bnoindex\b', html)
 
 
 def _fetch_posts() -> list[dict]:

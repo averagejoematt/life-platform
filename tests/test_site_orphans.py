@@ -131,12 +131,14 @@ def test_this_prs_ia_moves_are_live():
     #4182 (2026-09-26 panel ruling) reverses the footer half for /data/ledger/ and
     /story/agents/: both are now served-but-unlinked (the 25-page reach set), and the
     Technology column is re-labelled "How it's built". The other homes still hold."""
+    # 2026-09-27 (ADR-157, the v7 cut-over): the footer is the four-page tier + RSS + Privacy.
+    # /method/ ("Under the hood") keeps its footer home; /story/build/ and /gear/ join the
+    # served-but-unlinked set with /data/ledger/ and /story/agents/ (the ten-page reach set).
     foot = v4_chrome.site_footer()
-    for url in ("/story/build/", "/gear/", "/method/"):
-        assert f'href="{url}"' in foot, f"footer lost {url}"
-    for url in ("/data/ledger/", "/story/agents/"):
-        assert f'href="{url}"' not in foot, f"{url} is back in the footer — it is off the 25-page reach set (#4182)"
-    assert "How it&#x27;s built" in foot, "footer lost the How-it's-built column (#1110, relabelled #4182)"
+    assert 'href="/method/"' in foot, "footer lost /method/"
+    for url in ("/story/build/", "/gear/", "/data/ledger/", "/story/agents/"):
+        assert f'href="{url}"' not in foot, f"{url} is back in the footer — it is off the ten-page reach set (ADR-157)"
+    assert "How it&#x27;s built" not in foot, "the v4 mega-menu column is back (retired ADR-157)"
     dispatches_js = (SITE / "assets" / "js" / "dispatches.js").read_text(encoding="utf-8")
     build_entry = next(line for line in dispatches_js.splitlines() if 'key: "build"' in line)
     assert "unlisted: true" in build_entry, "build log is back in the story sub-nav (#1110)"

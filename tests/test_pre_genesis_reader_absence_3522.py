@@ -229,28 +229,27 @@ def test_weekly_summary_pre_genesis_drops_a_stray_in_window_record(monkeypatch):
 HOME = os.path.join(REPO, "site", "index.html")
 
 
-def test_home_dial_eyebrow_is_bound():
-    """The eyebrow shipped as a static `<span class="label">day</span>` that no branch
-    ever wrote, so launch eve rendered DAY / 1 / DAY TO GO. It must carry a binding —
-    otherwise story.js's dialCopy() has nothing to write to and the guard in
-    tests/js/home_dial_and_figures_3524.test.mjs passes while the page still lies."""
-    html = open(HOME, encoding="utf-8").read()
-    dial = re.search(r'<div class="dial-center">(.*?)</div>', html, re.S)
-    assert dial, "the dial hub must still exist"
-    assert 'data-bind="dayEyebrow"' in dial.group(1), "the eyebrow is unbound — the #3524 defect"
-    for b in ("dayEyebrow", "dayNum", "dayCap"):
-        assert f'data-bind="{b}"' in dial.group(1), f"all three hub glyphs are bound; {b} is not"
+HOME_JS = os.path.join(REPO, "site", "assets", "js", "v7_home.js")
 
 
-def test_home_stat_row_uses_one_placeholder_glyph():
-    """Three figures, three different pre-JS shimmer glyphs ("··" / "···" / "··%") —
-    and because renderNumbers left one of them unwritten, the odd one out survived into
-    the rendered page next to two "—"s. One glyph, and story.js writes all three."""
+def test_home_every_pending_slot_has_a_writer():
+    """#3524's class, re-pinned at the v7 cut-over (ADR-157): the v4 dial eyebrow shipped as a
+    static label no branch ever wrote, so launch eve rendered DAY / 1 / DAY TO GO. The v7
+    Home (scripts/v7/home.py) ships one "Loading the numbers" line per slot; every slot
+    that carries one must be a slot v7_home.js writes — a slot with no writer is the same
+    lie in the new frame (a page that says "loading" forever)."""
     html = open(HOME, encoding="utf-8").read()
-    row = re.search(r'<div class="numbers" data-bind="numbers">(.*?)</div>\s*<p class="beat-note"', html, re.S)
-    assert row, "the numbers beat must still exist"
-    markup = re.sub(r"<!--.*?-->", "", row.group(1), flags=re.S)  # the comments discuss the old glyphs
-    glyphs = re.findall(r'data-bind="(lost|current|progress)"[^>]*>([^<]*)<', markup)
-    assert sorted(g[0] for g in glyphs) == ["current", "lost", "progress"]
-    assert len({g[1] for g in glyphs}) == 1, f"one shimmer glyph across the row, found {glyphs}"
-    assert "\u00b7\u00b7\u00b7" not in markup, "the leaked three-dot placeholder is gone"
+    js = open(HOME_JS, encoding="utf-8").read()
+    slots = re.findall(r'<div id="(v7h-[a-z-]+)">\s*<p class="v7h-pending">', html)
+    assert len(slots) >= 8, f"the v7 Home slots are gone or renamed: {slots}"
+    for slot in slots:
+        assert f'"{slot}"' in js, f"{slot} shows the pending line but v7_home.js never writes it — the #3524 defect"
+
+
+def test_home_pending_lines_use_one_wording():
+    """One pending sentence across the page, never a mix of shimmer glyphs (#3524's second
+    half: three figures, three different placeholders, one left unwritten)."""
+    html = open(HOME, encoding="utf-8").read()
+    lines = set(re.findall(r'<p class="v7h-pending">([^<]*)</p>', html))
+    assert len(lines) == 1, f"one pending wording across the page, found {lines}"
+    assert "\u00b7\u00b7" not in html.split("<main", 1)[1].split("</main>")[0], "a shimmer glyph leaked into the v7 shell"

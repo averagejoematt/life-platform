@@ -42,7 +42,13 @@ def _main(html: str) -> str:
 
 
 def test_first_screen_mount_ships_on_the_hub_and_the_read_shell_only():
-    for rel in ("index.html", "read/index.html"):
+    # 2026-09-27 (ADR-157, the v7 cut-over): /coaching/ is the v7 The coaches page
+    # (scripts/v7/coaches.py) — today's read is its first entry (#v7c-read); the v4 mount
+    # ships on the /coaching/read/ archive shell only.
+    hub = _main((_SITE / "index.html").read_text(encoding="utf-8"))
+    assert 'id="v7c-read"' in hub and hub.index('id="v7c-read"') < hub.index('id="v7c-docket"'), "the v7 hub opens on today's read"
+    assert "data-coach-today" not in hub
+    for rel in ("read/index.html",):
         main = _main((_SITE / rel).read_text(encoding="utf-8"))
         assert "data-coach-today" in main, f"/coaching/{rel}: the first-screen mount is missing"
         hero_end = main.index("</div>", main.index('class="page-hero"'))
@@ -62,12 +68,13 @@ def test_the_promise_is_the_eleven_word_definition_with_a_derived_roster_count()
     word = v4_build_coaching.roster_word()
     expected = f"{word} AI characters, software not people, read his numbers every morning."
     assert len(expected.split()) == 11
-    for rel in ("index.html", "read/index.html", "by-coach/index.html"):
+    for rel in ("read/index.html", "by-coach/index.html"):
         html = (_SITE / rel).read_text(encoding="utf-8")
         assert f'<p class="ph-promise">{expected}</p>' in html, f"/coaching/{rel}: the promise drifted from the registry-derived roster"
-    # the retired tutorial promise is gone
+    # the retired tutorial promise is gone; the v7 hub defines the coaches once, in its intro
     hub = (_SITE / "index.html").read_text(encoding="utf-8")
     assert "Start with <strong>the read</strong>" not in hub
+    assert "software, not people" in hub
 
 
 def test_the_roster_word_is_derived_not_typed(monkeypatch):

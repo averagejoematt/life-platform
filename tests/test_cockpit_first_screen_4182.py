@@ -19,6 +19,11 @@ is checked by the Playwright harness pre-merge and tests/visual_qa.py post-deplo
 Pinned decisions this REVERSES (each named where it is asserted below): #578 ("the big
 score below is the real headline"), #807 (the dismiss-once level hint), #1106 (the
 instrument strip as the first screen), PG-02 (the first-run cards on /cockpit/ and /data/).
+
+2026-09-27, the v7 cut-over (ADR-157): /cockpit/ is the v7 Today page (scripts/v7/today.py
++ site/assets/js/v7_today.js) — the three questions, the session, the one ask, what he
+skips, nothing after it. The shell pins below read the v7 page; the cockpit.js / evidence.js
+pins stay as they were (those modules still drive the archive pages).
 """
 
 import re
@@ -50,25 +55,28 @@ def _code(s: str) -> str:
     return re.sub(r"(?m)(^|\s)//.*$", r"\1", s)
 
 
-def test_three_questions_precede_the_hub_the_rings_and_the_daily_line():
-    """Ruling 2(ii)/(iii). Reverses #578 ("the big score below is the real headline")
-    and #1106 (the ring strip as the first thing under the kicker)."""
+TODAY_ORDER = ["td-week", "td-night", "td-today", "td-ask", "td-skips", "td-return"]
+
+
+def test_three_questions_open_the_page_and_nothing_follows_the_return_line():
+    """Ruling 2(ii)/(iii), in the v7 frame. Reverses #578 ("the big score below is the
+    real headline") and #1106 (the ring strip as the first thing under the kicker): the
+    three questions are the first three entries, the session/ask/skips follow, and the
+    page ends on the dated return line — no rings, no level, no daily line, nothing after."""
     main = _strip_comments(_main())
-    tq = main.index('class="three-q"')
-    assert tq < main.index('class="hero-instruments"'), "the rings are screen two"
-    assert tq < main.index('class="dialogue"'), "the daily line follows the questions"
-    assert tq < main.index('class="hub"'), "the level follows the questions"
-    # …and the hub sits below the daily line too, inside the collapsed engine section.
-    assert main.index('class="dialogue"') < main.index('class="engine"') < main.index('class="hub"')
+    idx = [main.index(f'id="{s}"') for s in TODAY_ORDER]
+    assert idx == sorted(idx), "Today's entries are out of order"
+    for retired in ('class="hero-instruments"', 'class="dialogue"', 'class="hub"', 'class="engine"', 'class="three-q"'):
+        assert retired not in main, f"the v4 cockpit surface is back: {retired}"
+    tail = main[main.index("</section>", main.index('id="td-return"')) + len("</section>") :]
+    assert re.sub(r"<script[^>]*></script>", "", tail).strip() == "", f"content after the return line: {tail.strip()[:120]!r}"
 
 
 def test_the_three_questions_are_labelled_in_plain_words():
     main = _strip_comments(_main())
-    sec = main[main.index('class="three-q"') : main.index("</section>", main.index('class="three-q"'))]
-    heads = re.findall(r'<h2 class="tq-h">([^<]+)</h2>', sec)
-    assert heads == ["How's the week?", "Last night?", "Today?"]
-    for key in ("tq-week", "tq-night", "tq-today", "tq-ask", "tq-fresh"):
-        assert f'data-bind="{key}"' in sec, key
+    heads = re.findall(r'<h2 class="td-h" id="[a-z-]+-h">([^<]+)</h2>', main)
+    assert heads[:3] == ["How’s the week?", "Last night?", "Today?"], heads
+    assert heads[3:] == ["The one ask", "What he skips", "This page"], heads
 
 
 def test_kicker_reads_today_in_one_screen():
@@ -80,24 +88,23 @@ def test_kicker_reads_today_in_one_screen():
     sys.path.insert(0, str(ROOT / "scripts"))
     import v4_glossary
 
-    assert '<p class="ph-kicker label">the cockpit · today, in one screen</p>' in v4_glossary.strip_glossary(HTML)
-    assert "one life, measured live</p>" not in _strip_comments(_main().split("<noscript>")[0])
+    # 2026-09-27 (ADR-157): the kicker is the page's one-line job; the word "cockpit" left
+    # the reader surface with the v4 page (the vocabulary ledger counts it down).
+    assert '<p class="v7-job">Matthew’s morning screen, open to anyone.</p>' in v4_glossary.strip_glossary(HTML)
+    visible = re.sub(r"<[^>]+>", " ", re.sub(r"<noscript>.*?</noscript>", "", _strip_comments(_main()), flags=re.S))
+    assert "one life, measured live" not in visible and not re.search(r"\bcockpit\b", visible, re.I)
 
 
-def test_engine_section_is_collapsed_and_keyed():
-    """Ruling 2(iii): collapsed (<details> without `open`), a plain-English heading, the
-    key printed before the number. Reverses #807's dismiss-once level hint."""
+def test_the_engine_section_is_off_the_page():
+    """Ruling 2(iii) went further at the cut-over (ADR-157): the level, the seven areas and
+    the engine's key are not on Today at all (the number survives in the baked <noscript>
+    proof only; the explainer stays on /method/character/, served and unlisted). Reverses
+    #807's dismiss-once level hint for good."""
     main = _strip_comments(_main())
-    m = re.search(r"<details([^>]*)>", main)
-    assert m and 'class="engine"' in m.group(1) and " open" not in m.group(1)
-    engine = main[m.start() : main.index("</details>", m.start())]
-    assert "The engine&rsquo;s score for yesterday &mdash; what built it" in engine
-    key = engine[engine.index('class="engine-key"') :]
-    assert key.index("Score</strong>") < key.index('class="hub"') if 'class="hub"' in key else True
-    assert "no evidence of the behavior" in engine and "its rule, not him" in engine
-    for inside in ('class="hub"', 'data-bind="level"', 'class="domains"', 'class="band"', 'class="cap label cap-today"'):
-        assert inside in engine, inside
+    for retired in ("<details", 'class="engine"', 'class="engine-key"', 'data-bind="level"', 'class="hub"', 'class="domains"'):
+        assert retired not in main, f"the v4 engine section is back on Today: {retired}"
     assert "data-hub-hint" not in HTML and "wireLevelHint" not in JS
+    assert '<script src="/assets/js/boot_sw.js"></script>' in main, "the PWA island lives on this page only (plan §1b item 6)"
 
 
 def test_the_level_name_is_not_rendered_in_reader_copy():
@@ -168,10 +175,9 @@ def test_only_the_two_named_fetches_are_new():
 def test_third_person_on_the_new_surface():
     """Panel §5: third person — the owner and ~1,100 readers see one page."""
     main = _strip_comments(_main())
-    for chunk in (
-        main[main.index('class="three-q"') : main.index("</section>", main.index('class="three-q"'))],
-        main[main.index('class="engine"') : main.index("</details>")],
-    ):
+    for anchor in ("td-week", "td-night", "td-today", "td-ask", "td-skips"):
+        chunk = main[main.index(f'id="{anchor}"') : main.index("</section>", main.index(f'id="{anchor}"'))]
         visible = re.sub(r"<[^>]+>", " ", chunk)
         assert not re.search(r"\byou(r|rs)?\b", visible, re.I), visible
+    # the one address to the reader is the page's own note ("you’re welcome to look") — never a read
     assert "where you stand" not in main

@@ -1,70 +1,81 @@
 <!DOCTYPE html>
-<html lang="en" data-door="coaching">
+<html lang="en" class="v7">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>The Coaching — averagejoematt</title>
-  <meta name="description" content="What the AI board is saying about the data right now — the read, by coach, the disagreements, and the weekly lab notes.">
+  <title>The coaches — averagejoematt</title>
+  <meta name="description" content="The witnesses, on the record.">
   <link rel="canonical" href="https://averagejoematt.com/coaching/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/coaching/">
-  <meta property="og:title" content="The Coaching — the AI board's live read">
-  <meta property="og:description" content="What the AI board is saying about the data right now — the read, by coach, the disagreements, and the weekly lab notes. As of 2026-09-21.">
+  <meta property="og:title" content="The coaches — averagejoematt">
+  <meta property="og:description" content="The witnesses, on the record.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="The Coaching — the AI board's live read">
-  <meta name="twitter:description" content="What the AI board is saying about the data right now — the read, by coach, the disagreements, and the weekly lab notes. As of 2026-09-21.">
+  <meta name="twitter:site" content="@averagejoematt_">
+  <meta name="twitter:creator" content="@averagejoematt_">
+  <meta name="twitter:title" content="The coaches — averagejoematt">
+  <meta name="twitter:description" content="The witnesses, on the record.">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="The Measured Life — The Panel (podcast)" href="/panelcast/feed.xml">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
   <link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Measured Life">
-  <!-- PWA island (#1020): /coaching/ is INSIDE the cockpit-PWA island (home + /cockpit/ + /coaching/) —
-       the daily check-in loop — so these shells deliberately register sw.js. -->
-  <script src="/assets/js/boot_sw.js"></script>
-  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
-    <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/assets/fonts/v4/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/story.css">
+  <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_coaches.css">
   <script src="/assets/js/boot_theme.js"></script>
-  <script src="/assets/js/boot_motion.js"></script>
 </head>
-<body class="dx-page">
-  <a class="skip" href="#dx">Skip to the coaching</a>
-  <header class="story-top">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the coaches</span></a>
-    <nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today, in one screen — how his week is going, how he slept, what today holds"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>today</a><a href="/data/" title="His numbers — weight, sleep, training, eating and blood tests, as his devices record them"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the numbers</a><a href="/coaching/" title="What his AI coaches say about his data — and how often they have been right" aria-current="page"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaches</a><a href="/protocols/" title="What he takes and what he tries — each with what it should move"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>what he tries</a><a href="/story/" title="The weekly write-up, his own words, and who he is"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>
-  </header>
-  <main id="dx" class="dx-main">
-    <div class="page-hero">
-      <p class="ph-kicker label">the coaching<span data-bind="coachingDay" hidden></span></p>
-      <h1 class="ph-title">The Coaching</h1>
-      <p class="ph-promise">Eight AI characters, software not people, read his numbers every morning.</p>
-      <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/cockpit/">Today</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">The numbers</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><span class="lr-here" aria-current="page">The coaches</span><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">What he tries</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">The story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
-    </div>
-    <noscript><section class="proof-static dx-prose" aria-label="The board's read"><p class="label">The board's read on the data — as of 2026-09-21</p><p class="label">The week's call · Dr. Eli Marsh</p><blockquote>Matthew has logged 29 training sessions in 30 days with zero missed workouts and perfect habit tracking—the kind of mechanical consistency that has to happen before anything else matters in a 12-month cut. At 316.9 pounds after 16 experiment days, he's losing 3.7 pounds per week, which is aggressive and on-target for the Foundation phase. His sleep has stabilized into a predictable rhythm, and his calorie and fiber targets are holding steady. The signal I'm watching most closely right now is protein: his average intake has dropped to 106.9 grams across 14 logged days, well short of the 170-gram floor that preserves lean mass during a deficit. I've asked him to spend the next week identifying which meals are the protein leak and locking one concrete change—a source swap or portion shift—to rebuild density without expanding calories. The infrastructure is solid; now it needs to carry the right load.</blockquote><p class="label">Each coach's read</p><ul><li><strong>Dr. Lisa Park · Sleep &amp; Circadian Rhythm Specialist</strong> — On the night of 2026-09-23, Whoop logged 86% recovery, HRV at 48.2 ms, resting heart rate at 54 bpm, deep sleep at 30.6%, and REM at 25.9% — strong readings on their surface. But I cannot validate…</li><li><strong>Dr. Marcus Webb · Evidence-Based Nutrition</strong> — The food log went dark after September 19th, and that silence tells me I can't verify what happened to his protein intake during the gap. His protein EWMA sits at 154g from 19 logged days, but the…</li><li><strong>Dr. Nathan Reeves · Psychiatrist — Behavioral Patterns</strong> — On the night of 2026-09-23, his recovery came in at 86% with HRV at 48.2 ms and resting heart rate at 54 bpm. His recovery EWMA has climbed from 71.7% to 82.2% over seven days, which looks like…</li><li><strong>Dr. Max Reyes · Performance — Training, Cardio &amp; Mobility</strong> — On the night of 2026-09-23, his Whoop registered 86% recovery, HRV of 48.2 ms, and resting HR of 54 bpm — solid numbers with directional trend pointing the right way. However, I'm holding my…</li><li><strong>Dr. Amara Patel · Metabolic Health &amp; CGM</strong> — I made a mechanistically grounded prediction about his glucose pattern—high-amplitude post-prandial excursions masked by an unremarkable mean—but cannot yet test it because his CGM traces lack meal…</li><li><strong>Dr. James Okafor · Clinical Pathology &amp; Preventive Labs</strong> — I'm watching his protein intake climb to 154 g/day, but the clinical gate I set in September remains in place. At 1,515 kcal/day with a -4.4 lb/week loss rate, his kidneys are handling nitrogen loads…</li><li><strong>Dr. Henning Brandt · Research &amp; Longevity — Evidence Appraisal</strong> — Matthew is at a critical fork. The glucose coach's carb-reduction recommendation is expected within 48 hours, and I'm watching for a specific risk: if carb reduction lands without corresponding…</li></ul><p>The live board (today's read, the disagreements, each coach on top of the actual numbers) needs JavaScript. <a href="/coaching/by-coach/">By coach</a> · <a href="/coaching/by-coach/">who they are</a>.</p></section></noscript>
-    <div class="coach-today" data-coach-today aria-live="polite" hidden></div>
-    <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
-    <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
-    <div class="dx-layout">
-      <ul class="dx-list" data-dx-list aria-label="Entries"></ul>
-      <!-- #3548: div, not article — tabs.js::markActiveTab assigns role="tabpanel" to
-           this element, and <article>'s implicit strong native semantics don't permit
-           that role override (axe aria-allowed-role). A <div> allows any role. -->
-      <div class="dx-read" data-dx-read></div>
-    </div>
+<body class="v7-body">
+  <a class="skip" href="#main">Skip to the page</a>
+  <header class="v7-mast"><a class="v7-brand" href="/">averagejoematt</a><a class="v7-repo" href="https://github.com/averagejoematt/life-platform" rel="noopener">the code</a></header>
+  <main id="main" class="v7-main">
+    <h1>The coaches</h1>
+    <p class="v7-job">The witnesses, on the record.</p>
+    <p class="v7c-intro">Eight AI characters — software, not people — read his numbers each morning. Every dated claim they make is checked later by code, and the misses stay on the record. <span id="v7c-through" data-src="api_calibration.as_of"></span></p>
+    <noscript><p class="v7c-absent">This page pours its numbers with JavaScript; with it off, nothing here is a claim.</p></noscript>
+    <section class="v7c-entry" id="v7c-read" aria-labelledby="v7c-read-h">
+      <div class="v7c-m" id="v7c-read-m" aria-hidden="true"></div>
+      <div class="v7c-body">
+        <h2 id="v7c-read-h" class="v7c-h">Today’s read</h2>
+        <div id="v7c-read-body">
+          <p class="v7c-absent">Loading the numbers…</p>
+        </div>
+      </div>
+    </section>
+    <section class="v7c-entry" id="v7c-docket" aria-labelledby="v7c-docket-h">
+      <div class="v7c-m" id="v7c-docket-m" aria-hidden="true"></div>
+      <div class="v7c-body">
+        <h2 id="v7c-docket-h" class="v7c-h">Where two of them disagree</h2>
+        <div id="v7c-docket-body">
+          <p class="v7c-absent">Loading the numbers…</p>
+        </div>
+      </div>
+    </section>
+    <section class="v7c-entry" id="v7c-record" aria-labelledby="v7c-record-h">
+      <div class="v7c-m" id="v7c-record-m" aria-hidden="true"></div>
+      <div class="v7c-body">
+        <h2 id="v7c-record-h" class="v7c-h">The record</h2>
+        <div id="v7c-record-body">
+          <p class="v7c-absent">Loading the numbers…</p>
+        </div>
+        <p class="v7c-note">Per-coach hit rates are not printed here yet: three scorekeepers disagree on the same day. What is printed above is each checked call, one by one, from the coach’s own ledger — a list a reader can count, not a rate the site cannot yet stand behind.</p>
+        <details class="v7c-details" id="v7c-roster">
+          <summary id="v7c-roster-sum">The staff</summary>
+          <div id="v7c-roster-body"><p class="v7c-absent">Loading the numbers…</p></div>
+        </details>
+      </div>
+    </section>
+    <noscript><section class="proof-static dx-prose" aria-label="The board's read"><p class="label">The board's read on the data — as of 2026-09-21</p><p class="label">The week's call · Dr. Eli Marsh</p><blockquote>Matthew has logged 29 training sessions in 30 days with zero missed workouts and perfect habit tracking—the kind of mechanical consistency that has to happen before anything else matters in a 12-month cut. At 316.9 pounds after 16 experiment days, he's losing 3.7 pounds per week, which is aggressive and on-target for the Foundation phase. His sleep has stabilized into a predictable rhythm, and his calorie and fiber targets are holding steady. The signal I'm watching most closely right now is protein: his average intake has dropped to 106.9 grams across 14 logged days, well short of the 170-gram floor that preserves lean mass during a deficit. I've asked him to spend the next week identifying which meals are the protein leak and locking one concrete change—a source swap or portion shift—to rebuild density without expanding calories. The infrastructure is solid; now it needs to carry the right load.</blockquote><p class="label">Each coach's read</p><ul><li><strong>Dr. Marcus Webb · Evidence-Based Nutrition</strong> — The six-day logging gap since September 19th is blocking my directional read, but today's log tells a clear story: 182g protein, 1,761 kcal, with the steak dinner anchoring 106g in a single sitting.</li><li><strong>Dr. Nathan Reeves · Psychiatrist — Behavioral Patterns</strong> — His recovery metrics are climbing impressively — EWMA at 81.6% with positive slope, and on the night of 2026-09-24 Whoop recorded 99% recovery with an HRV of 56.8 ms and resting heart rate of 52 bpm.</li><li><strong>Dr. Max Reyes · Performance — Training, Cardio &amp; Mobility</strong> — His recovery EWMA climbed to 81.6% over seven days with a 99% reading on the night of 2026-09-24, but I'm treating this as a favorable data point rather than a confirmed trend — autocorrelation analysis shows insufficient consecutive same-direction points.</li><li><strong>Dr. Amara Patel · Metabolic Health &amp; CGM</strong> — His CGM is generating traces, but without meal timestamps those waveforms remain mechanistically uninterpretable — a glucose excursion at 2:00 PM could be post-prandial, stress-driven, or a rebound.</li><li><strong>Dr. Henning Brandt · Research &amp; Longevity — Evidence Appraisal</strong> — Two contingent predictions are now live over the next 4–6 days.</li></ul><p>The live board (today's read, the disagreements, each coach on top of the actual numbers) needs JavaScript. By coach · who they are.</p></section></noscript>
   </main>
-  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/protocols/">what he tries</a> — See what levers get pulled next</p><p class="lf-return"><span class="label">or come back</span> the coaches read his numbers every morning; <span data-next-writeup>a new write-up lands each week</span> — <a href="/subscribe/">follow by email</a><script type="module" src="/assets/js/loop_return.js"></script></p></aside><footer class="site-foot"><form class="page-feedback" hidden><fieldset class="pf-set"><legend class="pf-q">Did this page make sense?</legend><label class="pf-opt"><input type="radio" name="made_sense" value="yes" required> Yes</label><label class="pf-opt"><input type="radio" name="made_sense" value="partly"> Partly</label><label class="pf-opt"><input type="radio" name="made_sense" value="no"> No</label></fieldset><label class="pf-more">What were you looking for? <span class="pf-optional">(optional)</span><textarea name="looking_for" maxlength="500" rows="2"></textarea></label><button class="pf-send" type="submit">Send</button><p class="pf-status" role="status" aria-live="polite"></p></form><nav class="wayfinder" aria-label="The loop"><p class="wf-lede label">you are here on the loop</p><div class="wf-ribbon"><a class="wf-stop is-vantage" data-station="cockpit" href="/cockpit/"><span class="wf-name">Today</span><span class="wf-role">one screen</span></a><span class="wf-sep" aria-hidden="true">&middot;</span><a class="wf-stop is-from" data-station="data" href="/data/"><span class="wf-name">The numbers</span><span class="wf-role">what his devices record</span><span class="wf-tag">from</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><span class="wf-stop is-here" data-station="coaching" aria-current="page"><span class="wf-name">The coaches</span><span class="wf-role">what the AI makes of it</span></span><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop is-next" data-station="protocols" href="/protocols/"><span class="wf-name">What he tries</span><span class="wf-role">what he takes and tests</span><span class="wf-tag">next</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="story" href="/story/"><span class="wf-name">The story</span><span class="wf-role">the weekly write-up</span></a><span class="wf-arrow wf-cycle" aria-hidden="true">&#8635;</span></div></nav><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col" data-station="data"><p class="sf-h label">The numbers</p><a href="/data/physical/">Weight &amp; body</a><a href="/data/sleep/">Sleep</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Eating</a><a href="/data/labs/">Blood tests</a></div><div class="sf-col is-here" data-station="coaching"><p class="sf-h label">The coaches</p><a href="/coaching/">The read</a><a href="/coaching/by-coach/">By coach</a><a href="/coaching/scorecard/">Their record</a><a href="/coaching/lab-notes/">What the AI said, and how it felt</a></div><div class="sf-col" data-station="protocols"><p class="sf-h label">What he tries</p><a href="/protocols/">What he takes</a><a href="/protocols/experiments/">Experiments</a></div><div class="sf-col" data-station="story"><p class="sf-h label">The story</p><a href="/story/">The weekly write-up</a><a href="/story/journal/">In his own words</a><a href="/story/panel/">The podcast</a><a href="/story/about/">Who he is</a></div><div class="sf-col"><p class="sf-h label">How it&#x27;s built</p><a href="/method/">Under the hood</a><a href="/story/build/">The build log</a><a href="/gear/">The gear</a><a href="/method/character/">How the score works</a></div><div class="sf-col"><p class="sf-h label">Follow</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script><script type="module" src="/assets/js/gloss_runtime.js"></script><script type="module" src="/assets/js/page_feedback.js"></script></footer>
-  <script type="application/json" id="page-data">{"start": "read"}</script>
-  <script src="/assets/js/motion.js" defer></script>
-  <script type="module" src="/assets/js/coaching.js"></script>
+  <footer class="v7-foot"><nav aria-label="More"><a href="/protocols/">What he’s trying</a><a href="/story/about/">Who he is</a><a href="/method/">Under the hood</a><a href="/subscribe/">Follow</a><a href="/rss.xml">RSS</a><a href="/privacy/">Privacy</a></nav><script type="module" src="/assets/js/attribution.js"></script><script type="module" src="/assets/js/gloss_runtime.js"></script></footer>
+  <nav class="v7-bar" aria-label="Pages"><a href="/">Home</a><a href="/cockpit/">Today</a><a href="/story/">This week</a><a href="/data/">His numbers</a><a href="/coaching/" aria-current="page">The coaches</a></nav>
+  <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_coaches.js"></script>
 </body>
 </html>

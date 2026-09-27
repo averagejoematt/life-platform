@@ -1,78 +1,56 @@
-"""#407 → #1469 — home teaches the loop in one screen.
+"""#1469 → ADR-157 — the v7 Home fold: the dated photograph beside the number.
 
-#1469 (variant A, "the loop, drawn live" — Matthew's pick from rendered
-screenshots, 2026-07-19): the fold's loop teacher is now the code-drawn loop
-DIAL — the measuring rule bent into a ring, four door-icon stations, verbs on
-the arcs, the live day counter at the hub — plus four scroll verses that light
-their station in sequence. The #407 hero-loop teaser line and the below-fold
-.beat-loop card row are retired (the loop is taught once, properly). The
-constellation keeps its section BELOW the fold — it is a pillar-correlation
-instrument, not a loop teacher.
+The v4 fold was the loop dial (a code-drawn SVG of the four stations with the day counter
+at the hub). Prototype C's screen I — the owner's pick — opens the log on the day-1
+photograph beside the weight with its day and range, then the lead sentence and the alive
+line; the constellation and the dial are retired with the v4 Home. Source-level pins on
+the committed shell (scripts/v7/home.py):
 
-Source-level pins (the geometric render check runs via the local Playwright
-harness pre-merge at 1280 + 390; tests/visual_qa.py's manifest checks are the
-live arbiter).
+  1. the fold entry is the first entry of the log and holds the photograph frame, the
+     number slot, the lead and the alive line, in that order;
+  2. the photograph is the owner-approved day-1 image (#3761), eager-loaded with its
+     intrinsic size (the fold's LCP, no layout shift) and a real alt text;
+  3. the retired v4 fold pieces (loop dial, constellation, the okay beat markup) are gone.
 """
 
 import os
 import re
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HOME = open(os.path.join(_REPO, "site/index.html")).read()
+HOME = open(os.path.join(_REPO, "site/index.html"), encoding="utf-8").read()
+MAIN = HOME[HOME.index('<main id="main"') : HOME.index("</main>")]
 
 
-def test_loop_dial_owns_the_fold():
-    """The dial (with the live day counter at its hub) sits above the arc —
-    the fold teaches the loop before any other beat."""
-    assert 'class="loop-dial"' in HOME
-    assert HOME.find("loop-dial") < HOME.find('id="arc"')
-    # The hub carries the LIVE day counter (the page's one glow — earned).
-    dial = HOME[HOME.find('class="dial"') : HOME.find("</figure>", HOME.find('class="dial"'))]
-    assert 'data-bind="dayNum"' in dial
+def _fold() -> str:
+    start = MAIN.index(">", MAIN.index('id="v7h-fold"')) + 1
+    return MAIN[start : MAIN.rindex("<div", 0, MAIN.index('id="v7h-weighins"'))]
 
 
-def test_dial_names_all_four_stations_in_loop_order():
-    """Stations appear in causal-loop order with the sprite door icons and the
-    four verbs on the arcs — direction is drawn, not implied."""
-    svg = HOME[HOME.find('class="loop-dial"') : HOME.find("</svg>", HOME.find('class="loop-dial"'))]
-    order = re.findall(r'class="st st-(data|coaching|protocols|story)"', svg)
-    assert order == ["data", "coaching", "protocols", "story"]
-    for verb in ("reads", "proposes", "shifts", "narrates"):
-        assert f">{verb}<" in svg
-    # Door icons come from the shared sprite (§8.1) — never bespoke one-offs.
-    assert svg.count('href="/assets/icons/icons.svg#i-door-') == 4
+def test_the_fold_is_the_first_entry_and_holds_the_four_pieces_in_order():
+    first_entry = MAIN.index('class="v7h-entry"')
+    assert MAIN.index('id="v7h-fold"') - first_entry < 40, "the fold is not the first entry of the log"
+    fold = _fold()
+    idx = [fold.index(m) for m in ('id="v7h-photo"', 'id="v7h-number"', 'id="v7h-lead"', 'id="v7h-alive"')]
+    assert idx == sorted(idx), "the fold's pieces are out of order (photo · number · lead · alive)"
 
 
-def test_verses_walk_the_loop_and_close_it():
-    """The four verses follow loop order, each links its door, and the close
-    verse returns to station 01 (the loop closes) with the cockpit CTA."""
-    stations = re.findall(r'<article class="verse[^"]*" data-station="([a-z]+)"', HOME)
-    assert stations == ["data", "coaching", "protocols", "story", "data"]
-    verses = HOME[HOME.find('class="verses"') : HOME.find('class="scroll-rule"')]
-    for door in ("/data/", "/coaching/", "/protocols/", "/story/"):
-        assert f'href="{door}"' in verses
-    close = verses[verses.find("verse-close") :]
-    assert 'href="/cockpit/"' in close  # the loop-forward CTA
-    # #949: the start weight binds to the live baseline — never a hand-coded literal.
-    assert 'data-bind="hero-start"' in close
+def test_the_photograph_is_the_day_one_frame_eager_and_sized():
+    img = re.search(r"<img [^>]*>", _fold()).group(0)
+    assert 'src="/assets/images/photo-2026-09-06-day1-sm.jpg"' in img
+    assert "/assets/images/photo-2026-09-06-day1.jpg 900w" in img
+    assert 'alt="Matthew on day 1, Sunday September 6, front view"' in img
+    assert 'loading="eager"' in img and 'width="360"' in img and 'height="480"' in img
+    for stem in ("photo-2026-09-06-day1-sm.jpg", "photo-2026-09-06-day1.jpg"):
+        assert os.path.isfile(os.path.join(_REPO, "site", "assets", "images", stem)), stem
 
 
-def test_loop_taught_once_teaser_and_card_row_retired():
-    """#1469: the loop is taught by the dial alone — the #407 hero-loop teaser
-    line and the .beat-loop card row are gone, not duplicated."""
-    assert 'class="hero-loop label"' not in HOME
-    assert 'class="loop-node"' not in HOME
+def test_the_caption_and_the_number_slot_carry_no_baked_number():
+    fold = _fold()
+    assert 'id="v7h-photo-cap"' in fold and "Day one, front view." in fold
+    text = re.sub(r"<[^>]+>", " ", fold)
+    assert not re.search(r"\d", text), f"a number baked into the fold: {text.strip()[:160]!r}"
 
 
-def test_constellation_kept_below_the_fold():
-    """The constellation survives as its own beat AFTER the dial — same markup,
-    so story.js drawConstellation and the qa_manifest visual checks hold."""
-    assert HOME.find('class="loop-dial"') < HOME.find('class="constellation"')
-    assert 'class="beat beat-constellation"' in HOME
-
-
-def test_constellation_caption_carries_the_scale():
-    cap = HOME[HOME.find("constellation-desc") : HOME.find("</figcaption>")]
-    assert "out of 100" in cap
-    assert "not broken" in cap  # #590: "a young experiment starts low, not broken" — low reads early, never alarming
-    assert "const-legend" in cap  # the at-a-glance low→high dot legend
+def test_the_v4_fold_is_retired():
+    for retired in ('class="loop-dial"', 'class="constellation"', 'class="beat beat-okay', 'id="arc"', "beat-dispatches"):
+        assert retired not in MAIN, f"the v4 fold is back: {retired}"

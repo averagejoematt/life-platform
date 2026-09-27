@@ -1,0 +1,192 @@
+{
+ "_meta": {
+  "cache_seconds": 300,
+  "generated_at": "2026-09-27T04:20:14.763042+00:00",
+  "request_id": "5223b9ab1c604298",
+  "served_at": "2026-09-27T04:20:14.763042+00:00"
+ },
+ "coaches": [
+  {
+   "board_role": "Principal Investigator \u2014 Program Lead",
+   "color": "#0ea5e9",
+   "domain": "orchestration",
+   "emoji": "\ud83d\udd2c",
+   "headline_stat": "runs the program",
+   "latest_checked": null,
+   "name": "Dr. Eli Marsh",
+   "persona_id": "eli_marsh",
+   "short_bio": "Principal Investigator \u2014 runs the experiment and the coaching staff. A generalist across sleep, training, nutrition, metabolic and mental health who turns his specialists' reads into one coherent plan, and Matthew's single point of contact.",
+   "tier": "lead"
+  },
+  {
+   "board_role": "Sleep Scientist & Circadian Specialist",
+   "color": "#818cf8",
+   "domain": "sleep_science",
+   "emoji": "\ud83d\ude34",
+   "headline_stat": "41% hit-rate \u00b7 n=17",
+   "latest_checked": {
+    "actual_value": 73.0,
+    "claim": "Tomorrow morning's recovery will be around 52.9%",
+    "condition": "within",
+    "created_date": "2026-09-12",
+    "eval_type": "point",
+    "metric": "recovery_score",
+    "outcome_date": "2026-09-26",
+    "pre_registered_at": null,
+    "prediction_id": "pred_20260912_tomorrow_morning_s_recovery_will_be_arou",
+    "status": "refuted",
+    "threshold": 52.9
+   },
+   "name": "Dr. Lisa Park",
+   "persona_id": "sleep_coach",
+   "short_bio": "Sleep scientist & circadian specialist. Reads sleep architecture, timing, and recovery; talks in sleep debt and circadian phase.",
+   "tier": "staff"
+  },
+  {
+   "board_role": "Nutritionist",
+   "color": "#22c55e",
+   "domain": "nutrition_science",
+   "emoji": "\ud83e\udd57",
+   "headline_stat": "80% hit-rate \u00b7 n=25",
+   "latest_checked": {
+    "actual_value": 0.0314,
+    "claim": "One disrupted dinner will cause the daily protein target to collapse entirely given current concentration in that single meal.",
+    "condition": "down",
+    "created_date": "2026-09-12",
+    "eval_type": "directional",
+    "metric": "total_protein_g",
+    "outcome_date": "2026-09-26",
+    "pre_registered_at": null,
+    "prediction_id": "pred_20260912_one_disrupted_dinner_will_cause_the_dail",
+    "status": "refuted",
+    "threshold": null
+   },
+   "name": "Dr. Marcus Webb",
+   "persona_id": "nutrition_coach",
+   "short_bio": "Nutritionist. Protein, adherence, and sustainable deficits; leads with logging and consistency over precision.",
+   "tier": "staff"
+  },
+  {
+   "board_role": "Psychiatrist \u2014 Behavioral Patterns",
+   "color": "#a78bfa",
+   "domain": "behavioral_psychology",
+   "emoji": "\ud83e\udde0",
+   "headline_stat": "80% hit-rate \u00b7 n=5",
+   "latest_checked": {
+    "actual_value": 0.0778,
+    "claim": "Recovery will swing meaningfully from the 24% single-night reading on 2026-09-10 to around 54.7% tomorrow.",
+    "condition": "up",
+    "created_date": "2026-09-12",
+    "eval_type": "directional",
+    "metric": "recovery_score",
+    "outcome_date": "2026-09-26",
+    "pre_registered_at": null,
+    "prediction_id": "pred_20260912_recovery_will_swing_meaningfully_from_th",
+    "status": "confirmed",
+    "threshold": null
+   },
+   "name": "Dr. Nathan Reeves",
+   "persona_id": "mind_coach",
+   "short_bio": "Psychiatrist on behavioral patterns. Self-structure, motivation, and the stories behind the streaks.",
+   "tier": "staff"
+  },
+  {
+   "board_role": "Performance Coach \u2014 Training, Cardio & Mobility",
+   "color": "#f59e0b",
+   "domain": "performance_science",
+   "emoji": "\ud83d\udcca",
+   "headline_stat": "67% hit-rate \u00b7 n=3",
+   "latest_checked": {
+    "actual_value": 24.0,
+    "claim": "Recovery score tomorrow will be 59.5%",
+    "condition": "within",
+    "created_date": "2026-09-10",
+    "eval_type": "point",
+    "metric": "recovery_score",
+    "outcome_date": "2026-09-24",
+    "pre_registered_at": null,
+    "prediction_id": "pred_20260910_recovery_score_tomorrow_will_be_59_5",
+    "status": "refuted",
+    "threshold": 59.5
+   },
+   "name": "Dr. Max Reyes",
+   "persona_id": "physical_coach",
+   "short_bio": "Performance coach \u2014 training, cardio, mobility, and body composition. Sports scientist of the concurrent-training school: keep the identity, adjust the dose; strength and aerobic capacity as complements; the next decade over Tuesday.",
+   "tier": "staff"
+  },
+  {
+   "board_role": "Metabolic Health Researcher",
+   "color": "#2dd4bf",
+   "domain": "metabolic_health",
+   "emoji": "\ud83d\udd2c",
+   "headline_stat": "50% hit-rate \u00b7 n=2",
+   "latest_checked": {
+    "actual_value": 59.0,
+    "claim": "Recovery score will be 52.9% tomorrow based on the night of 2026-09-09 baseline (80% interval 26.7\u201379.2%).",
+    "condition": "within",
+    "created_date": "2026-09-11",
+    "eval_type": "point",
+    "metric": "recovery_score",
+    "outcome_date": "2026-09-25",
+    "pre_registered_at": null,
+    "prediction_id": "pred_20260911_recovery_score_will_be_52_9_tomorrow_ba",
+    "status": "confirmed",
+    "threshold": 52.9
+   },
+   "name": "Dr. Amara Patel",
+   "persona_id": "glucose_coach",
+   "short_bio": "Metabolic-health researcher. CGM patterns, glucose variability, and meal response.",
+   "tier": "staff"
+  },
+  {
+   "board_role": "Longevity & Preventive Medicine",
+   "color": "#5ba4cf",
+   "domain": "clinical_pathology",
+   "emoji": "\ud83e\ude7a",
+   "headline_stat": "100% hit-rate \u00b7 n=1",
+   "latest_checked": {
+    "actual_value": 0.2341,
+    "claim": "With 7.5 hours of nightly sleep (bed 9:00 PM, wake 4:30 AM) held consistently from Day 1 and week-1 training volume deliberately reduced with no failure sets, HRV 7-day average will trend upward over the first 14 days as the nervous system is not acutely overloaded \u2014 progressing toward the stated target of 50 ms.",
+    "condition": "up",
+    "created_date": "2026-09-06",
+    "eval_type": "directional",
+    "metric": "hrv_7day_avg",
+    "outcome_date": "2026-09-20",
+    "pre_registered_at": "2026-09-06T02:13:38.690141+00:00",
+    "prediction_id": "pred_20260906_with_7_5_hours_of_nightly_sleep_bed_9_0",
+    "status": "confirmed",
+    "threshold": null
+   },
+   "name": "Dr. James Okafor",
+   "persona_id": "labs_coach",
+   "short_bio": "Longevity & preventive medicine. Blood panels, biomarkers, and clinical-pathology trends.",
+   "tier": "staff"
+  },
+  {
+   "board_role": "Biostatistician \u2014 N=1 Research",
+   "color": "#e879f9",
+   "domain": "biostatistics_n1_research",
+   "emoji": "\ud83d\udd0d",
+   "headline_stat": "12% hit-rate \u00b7 n=24",
+   "latest_checked": {
+    "actual_value": 64.0,
+    "claim": "Recovery score will reach approximately 61% tomorrow with 80% confidence interval of 33.3\u201388.6%",
+    "condition": "within",
+    "created_date": "2026-09-08",
+    "eval_type": "point",
+    "metric": "recovery_score",
+    "outcome_date": "2026-09-22",
+    "pre_registered_at": null,
+    "prediction_id": "pred_20260908_recovery_score_will_reach_approximately",
+    "status": "confirmed",
+    "threshold": 61
+   },
+   "name": "Dr. Henning Brandt",
+   "persona_id": "explorer_coach",
+   "short_bio": "Biostatistician for N=1 research. Cross-domain correlations, confidence, and what the sample size will and won't support.",
+   "tier": "staff"
+  }
+ ],
+ "count": 8,
+ "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice \u2014 correlative, never causal. The personality is a lens on real numbers, not a real person."
+}

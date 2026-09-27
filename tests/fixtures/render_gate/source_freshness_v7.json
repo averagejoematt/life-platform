@@ -1,0 +1,279 @@
+{
+ "_meta": {
+  "cache_seconds": 300,
+  "generated_at": "2026-09-27T04:20:18.086858+00:00",
+  "request_id": "9006d9f93b264a58",
+  "served_at": "2026-09-27T04:20:18.086858+00:00"
+ },
+ "experiment": {
+  "cycle": 17,
+  "genesis": "2026-09-06"
+ },
+ "pacific_today": "2026-09-26",
+ "sources": [
+  {
+   "age_hours": 28.3,
+   "category": "Wearables",
+   "desc": "Recovery, sleep, HRV",
+   "id": "whoop",
+   "is_behavioral": false,
+   "label": "Whoop",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00+00:00",
+   "stale_hours": 48,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "OAuth API pull, hourly",
+   "absence_caveat": "LAGGING BY DESIGN: the registry expects up to 168h between records before this source counts as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: OAuth API pull, hourly",
+   "absence_status": "lagging",
+   "age_hours": 21.3,
+   "category": "Wearables",
+   "desc": "Weight & body composition",
+   "id": "withings",
+   "is_behavioral": true,
+   "label": "Withings",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00-07:00",
+   "stale_hours": 168,
+   "status": "fresh"
+  },
+  {
+   "age_hours": 21.3,
+   "category": "Wearables",
+   "desc": "Activities & walks",
+   "id": "strava",
+   "is_behavioral": true,
+   "label": "Strava",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00-07:00",
+   "stale_hours": 48,
+   "status": "fresh"
+  },
+  {
+   "age_hours": 21.3,
+   "category": "Wearables",
+   "desc": "Sleep stages, HR, HRV",
+   "id": "eightsleep",
+   "is_behavioral": false,
+   "label": "Eight Sleep",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00-07:00",
+   "stale_hours": 48,
+   "status": "fresh"
+  },
+  {
+   "age_hours": 28.3,
+   "capture_channel": "hae",
+   "category": "Wearables",
+   "dark_datatypes": [
+    {
+     "days_dark": 30.0,
+     "label": "CGM (glucose)",
+     "manual": true
+    },
+    {
+     "days_dark": 17.0,
+     "label": "Blood pressure",
+     "manual": true
+    },
+    {
+     "days_dark": 18.0,
+     "label": "State of Mind",
+     "manual": true
+    }
+   ],
+   "datatypes": [
+    {
+     "age_days": 30.0,
+     "dark": true,
+     "key": "cgm",
+     "label": "CGM (glucose)",
+     "last_seen": "2026-08-27",
+     "manual": true,
+     "stale_days": 3.0
+    },
+    {
+     "age_days": 17.0,
+     "dark": true,
+     "key": "blood_pressure",
+     "label": "Blood pressure",
+     "last_seen": "2026-09-09",
+     "manual": true,
+     "stale_days": 14.0
+    },
+    {
+     "age_days": 18.0,
+     "dark": true,
+     "key": "state_of_mind",
+     "label": "State of Mind",
+     "last_seen": "2026-09-08",
+     "manual": true,
+     "stale_days": 14.0
+    },
+    {
+     "age_days": 0.0,
+     "dark": false,
+     "key": "workouts",
+     "label": "Workouts / recovery",
+     "last_seen": "2026-09-26",
+     "manual": false,
+     "stale_days": 10.0
+    },
+    {
+     "age_days": 0.0,
+     "dark": false,
+     "key": "water",
+     "label": "Water",
+     "last_seen": "2026-09-26",
+     "manual": true,
+     "stale_days": 3.0
+    },
+    {
+     "age_days": 0.0,
+     "dark": false,
+     "key": "steps",
+     "label": "Steps / activity",
+     "last_seen": "2026-09-26",
+     "manual": false,
+     "stale_days": 2.0
+    }
+   ],
+   "desc": "Steps & active energy",
+   "id": "apple_health",
+   "is_behavioral": false,
+   "label": "Apple Health",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00+00:00",
+   "manual": true,
+   "stale_hours": 48,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "API pull, 1x daily (14:00 UTC)",
+   "absence_caveat": "LAGGING BY DESIGN: the registry expects up to 72h between records before this source counts as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: API pull, 1x daily (14:00 UTC)",
+   "absence_status": "lagging",
+   "age_hours": 45.3,
+   "category": "Inputs",
+   "desc": "Tasks completed",
+   "id": "todoist",
+   "is_behavioral": false,
+   "label": "Todoist",
+   "last_update": "2026-09-25",
+   "last_update_ts": "2026-09-25T00:00:00-07:00",
+   "stale_hours": 72,
+   "status": "fresh"
+  },
+  {
+   "age_hours": 21.3,
+   "category": "Inputs",
+   "desc": "Daily habit completions",
+   "id": "habitify",
+   "is_behavioral": false,
+   "label": "Habitify",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00-07:00",
+   "stale_hours": 48,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "Manual CSV export via Dropbox poller, ~24h behind by design",
+   "absence_caveat": "LAGGING BY DESIGN: the registry expects up to 96h between records before this source counts as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: Manual CSV export via Dropbox poller, ~24h behind by design",
+   "absence_status": "lagging",
+   "age_hours": 45.3,
+   "category": "Manual logs",
+   "desc": "Nutrition log \u2014 manual end-of-day upload, ~24h behind by design",
+   "id": "macrofactor",
+   "is_behavioral": true,
+   "label": "MacroFactor",
+   "last_update": "2026-09-25",
+   "last_update_ts": "2026-09-25T00:00:00-07:00",
+   "stale_hours": 96,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "API-key pull, hourly (24h)",
+   "absence_caveat": "LAGGING BY DESIGN: the registry expects up to 168h between records before this source counts as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: API-key pull, hourly (24h)",
+   "absence_status": "lagging",
+   "age_hours": 21.3,
+   "category": "Manual logs",
+   "desc": "Strength sets \u2014 logged when he lifts",
+   "id": "hevy",
+   "is_behavioral": true,
+   "label": "Hevy",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00-07:00",
+   "stale_hours": 168,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "Manual entry via MCP",
+   "absence_caveat": "LAGGING BY DESIGN: the registry expects up to 1440h between records before this source counts as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: Manual entry via MCP",
+   "absence_status": "lagging",
+   "age_hours": 501.3,
+   "capture_channel": "mcp",
+   "category": "Manual logs",
+   "desc": "Body measurements",
+   "id": "measurements",
+   "is_behavioral": true,
+   "label": "Tape measure",
+   "last_update": "2026-09-06",
+   "last_update_ts": "2026-09-06T00:00:00-07:00",
+   "manual": true,
+   "stale_hours": 1440,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "Manual log",
+   "absence_caveat": "LAGGING BY DESIGN: the registry expects up to 336h between records before this source counts as stale, so a recent absence here is the designed cadence, never a sync failure. Registry method: Manual log",
+   "absence_status": "lagging",
+   "age_hours": 4389.3,
+   "capture_channel": "mcp",
+   "carried": true,
+   "carried_from_cycle": null,
+   "category": "Manual logs",
+   "days_dark": 182,
+   "desc": "Delivery behavioral signal",
+   "id": "food_delivery",
+   "is_behavioral": true,
+   "label": "Food delivery",
+   "last_update": "2026-03-28",
+   "last_update_ts": "2026-03-28T00:00:00-07:00",
+   "manual": true,
+   "stale_hours": 336,
+   "status": "behavioral-stale"
+  },
+  {
+   "age_hours": 21.3,
+   "category": "Inputs",
+   "desc": "Seattle daily weather",
+   "id": "weather",
+   "is_behavioral": false,
+   "label": "Weather",
+   "last_update": "2026-09-26",
+   "last_update_ts": "2026-09-26T00:00:00-07:00",
+   "stale_hours": 48,
+   "status": "fresh"
+  },
+  {
+   "absence_cause": "OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+   "absence_caveat": "PAUSED in the source registry: it CANNOT report, so an absence here is a hole in the record, never a fact about Matthew and never a sync failure. Registry method: OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+   "absence_status": "paused",
+   "age_hours": null,
+   "category": "Wearables",
+   "days_dark": 103,
+   "desc": "Biometrics \u2014 paused (vendor anti-automation, ADR-074)",
+   "id": "garmin",
+   "is_behavioral": false,
+   "label": "Garmin",
+   "last_update": "2026-06-15",
+   "status": "paused"
+  }
+ ],
+ "summary": {
+  "fresh": 11,
+  "paused": 1,
+  "stale": 1,
+  "total": 13
+ }
+}

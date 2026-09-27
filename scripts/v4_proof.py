@@ -857,6 +857,51 @@ def protocols_block_html(summary: dict) -> str:
     )
 
 
+# ── the v7 static cores (ADR-157, #4182) ─────────────────────────────────────
+#
+# The nine v7 pages keep the #1395 crawler/no-JS treatment for the four doors the
+# home/cockpit sentinel bakers do not cover: /coaching/, /story/, /data/, /protocols/ are
+# poured by scripts/v7_build.py with the SAME loaders and block builders as before, so the
+# smoke's static-core guard (`class="proof-static` + "as of") and the deploy's freshness
+# guard (check_proof_freshness.py) hold unchanged. Two v7 rules apply on top:
+#   * no page link in a v7 body but the repo and mailto: (the reach rule, ADR-157) — the
+#     blocks' internal links (the topic pages, by-coach, the post permalinks) are unwrapped
+#     to their text, so tests/site_text.static_reach() — which follows <noscript> links —
+#     sees the nine + /privacy/ and nothing else;
+#   * the "as of" stamp is the ONE sanctioned place for that phrase (inside <noscript>,
+#     invisible to the vocabulary census, tests/site_text.py).
+
+_ANCHOR_RE = re.compile(r"<a\b[^>]*>(.*?)</a>", re.DOTALL)
+_MEANWHILE_RE = re.compile(r"<p>Meanwhile:.*?</p>", re.DOTALL)
+
+V7_STATIC_PAGES = ("coaching/", "story/", "data/", "protocols/")
+
+
+def unlink(block: str) -> str:
+    """Drop every <a> wrapper (keep its text) and the coaching block's "Meanwhile:" pointer
+    paragraph — a v7 static core names things, it does not route (the reach rule)."""
+    return _ANCHOR_RE.sub(r"\1", _MEANWHILE_RE.sub("", block))
+
+
+def v7_static_block(page: str) -> str:
+    """The <noscript> static core for one of the four v7 doors, or "" for any other page.
+
+    `page` is the page path under the base ("coaching/", "story/", "data/", "protocols/").
+    Loads live (API) with the committed snapshot as the offline fallback — the same
+    contract as every other proof block; nothing is fabricated (ADR-104)."""
+    if page == "coaching/":
+        block = coaching_read_block_html(load_coaching_read())
+    elif page == "story/":
+        block = chronicle_list_html(load_chronicle(), pending=load_chronicle_pending(), cadence=load_content_cadence())
+    elif page == "data/":
+        block = data_block_html(load_data_sources())
+    elif page == "protocols/":
+        block = protocols_block_html(load_protocols())
+    else:
+        return ""
+    return unlink(block)
+
+
 # ── per-page data-driven OG tags (a dated, falsifiable number, never boilerplate) ──
 #
 # Each door maps to the closest EXISTING og-image card (the og-image lambda draws 14

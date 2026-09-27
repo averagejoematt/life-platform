@@ -338,6 +338,14 @@ async function getJSON(p) {
   }
 }
 
+// Plan E3: the session route does not exist yet. Until it ships this stays null and the
+// page renders the routine's counts ("N exercises, M sets — in Hevy"); the day the route
+// lands, set it to the route's path and the loads render (the branch is tested below).
+// It is null rather than a fetch of an absent path because the post-deploy visual gate
+// counts a 404 on an /api/ fetch as a broken API call — a FAIL that reds the deploy
+// (found by the ADR-157 cut-over rehearsal against /next/cockpit/, 2026-09-27).
+const SESSION_ROUTE = null;
+
 async function main() {
   const [snap, rt, nut, dash, fresh, session] = await Promise.all([
     getJSON("/api/snapshot"),
@@ -345,7 +353,7 @@ async function main() {
     getJSON("/api/nutrition_overview"),
     getJSON("/api/coaching-dashboard"),
     getJSON("/api/source_freshness"),
-    getJSON("/api/session"), // plan E3 — absent today (a 404, drained above); the honest branch
+    SESSION_ROUTE ? getJSON(SESSION_ROUTE) : Promise.resolve(null), // plan E3 — see SESSION_ROUTE
   ]);
   const journey = snap ? unwrap(snap.journey, "journey") : null;
   const vitals = snap ? unwrap(snap.vitals, "vitals") : null;

@@ -205,108 +205,102 @@ def _essay_rows():
 _CURATED = [
     {
         "path": "/",
-        # #1469 (variant A "the loop, drawn live"): the fold is now the loop dial —
-        # a code-drawn SVG with the four door stations + the live day counter at the
-        # hub; the constellation moved below the fold but keeps its section (and these
-        # constellation checks stay true of the page).
-        "name": "Home (loop dial)",
-        # #4182 M4: the newcomer-comprehension judge's ground truth for this door —
-        # from docs/SITE_MAP_AND_INTENT.md's "front door" role + SITE_TRANSFORMATION_V6.md
-        # §5's reader-model amendment. ≤30 words, asserted by tests/test_qa_manifest.py.
-        "intent": (
-            "The front door: introduces Matthew's public weight-loss experiment and its AI "
-            "coaches, then routes a newcomer into one of three doors — the numbers, the "
-            "coaches, or the story."
-        ),
+        "name": "Home (the log)",
+        # ADR-157 (the v7 cut-over): the comprehension judge's ground truth for this door — CONCEPT §3.
+        "intent": "The log's front page: the day-one photograph beside Matthew's current weight, how the experiment is going this week, and whether he is okay — the case so far.",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        # /api/journal_quotes (#1568): the weekly featured line — the beat is dormant
-        # (hidden) without a featured quote, but the endpoint must stay healthy.
-        "api_deps": ["/api/journey", "/api/character", "/api/journal_quotes"],
-        "js_modules": ["home.js"],
+        "api_deps": [
+            "/api/calibration",
+            "/api/coach_docket",
+            "/api/coaches",
+            "/api/content_cadence",
+            "/api/decisions",
+            "/api/journey",
+            "/api/nutrition_overview",
+            "/api/predictions",
+            "/api/pulse",
+            "/api/receipts",
+            "/api/sleep_detail",
+            "/api/source_freshness",
+            "/api/sub_count",
+            "/api/training_overview",
+            "/api/vitals",
+            "/api/weight_progress",
+            "/api/wrong",
+            "/journal/posts.json",
+        ],
+        "js_modules": ["v7_home.js"],
         "visual": {
-            "wait_for": ".constellation svg",
+            "wait_for": ".v7-main",
             "checks": [
+                {"selector": ".v7h-entry", "min_count": 8, "desc": "the eight dated entries of the log (empty-data state included)"},
+                {"selector": "#v7h-photo img", "min_count": 1, "desc": "the day-one photograph frame in the fold (#3761)"},
                 {
-                    "selector": ".loop-dial .st",
-                    "min_count": 4,
-                    "desc": "the 4 loop-dial stations drawn in the fold (#1469)",
+                    "selector": "#v7h-number",
+                    "not_empty": True,
+                    "desc": "the number slot carries text — the served figure or its honest pending line",
                 },
-                {
-                    "selector": ".constellation svg a, .constellation svg .node",
-                    "min_count": 7,
-                    "desc": "7 pillar nodes drawn in the constellation",
-                },
-                {
-                    "selector": "a[href='/cockpit/'], a[href='/story/'], a[href='/data/']",
-                    "min_count": 2,
-                    "desc": "the three door links present",
-                },
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
             ],
-            "charts": [".constellation svg"],
         },
     },
     {
         "path": "/cockpit/",
-        "name": "Cockpit",
-        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "today's
-        # slice of the whole loop" + SITE_TRANSFORMATION_V6.md §4 "the three questions").
-        "intent": (
-            "Today's slice of the loop: answers how the week is going, how last night went, "
-            "and what today holds, then a click into the engine's detailed score."
-        ),
+        "name": "Today",
+        # ADR-157 (the v7 cut-over): the comprehension judge's ground truth for this door — CONCEPT §3.
+        "intent": "Matthew's morning screen, open to anyone: how the week is going, how last night went, what today holds, the session, the one ask, and what he skips.",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        "api_deps": ["/api/character", "/api/pulse", "/api/journey"],
-        "js_modules": ["cockpit.js"],
+        "api_deps": ["/api/coaching-dashboard", "/api/nutrition_overview", "/api/routine", "/api/snapshot", "/api/source_freshness"],
+        "js_modules": ["v7_today.js"],
         "visual": {
-            # #4182: the first screen is the three questions; the level moved into the
-            # collapsed "engine's score" section (visible only once opened).
-            "wait_for": ".three-q .tq-h",
+            "wait_for": ".v7-main",
             "checks": [
+                {"selector": ".td-entry", "min_count": 6, "desc": "the six entries: the three questions, the ask, the skips, this page"},
                 {
-                    "selector": "[data-bind='tq-week'], [data-bind='tq-night'], [data-bind='tq-today']",
+                    "selector": "#td-week",
                     "not_empty": True,
-                    "desc": "the three questions answered",
+                    "desc": "the week entry carries its heading and its served or honest-absent line",
                 },
-                {"selector": "[data-bind='level']", "not_empty": True, "desc": "character level rendered"},
-                {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
-                {"selector": ".site-foot-cols .sf-col", "min_count": 4, "desc": "footer mega-menu (4 columns) present (CC-05)"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
             ],
-            "interact": {
-                "open": ".engine-sum",
-                "click": ".row",
-                "expect": ".pillar-detail",
-                "desc": "engine section opens, then the pillar disclosure opens with the Day-Grade Replay detail",
-            },
         },
     },
     {
         "path": "/story/",
-        "name": "Story hub",
-        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the human
-        # journey narrating the whole loop, week by week").
-        "intent": (
-            "The narration: a weekly AI-written chronicle of the whole experiment, plus "
-            "Matthew's own journal. A reader clicks into the latest write-up to read what "
-            "happened this week."
-        ),
+        "name": "This week",
+        # ADR-157 (the v7 cut-over): the comprehension judge's ground truth for this door — CONCEPT §3.
+        "intent": "The week's instalment: the latest write-up in Matthew's own words, the weeks before it, the week so far in numbers, his testimony, and what comes next.",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "narrative",
-        "api_deps": ["/journal/posts.json"],
-        "js_modules": ["story.js"],
+        "api_deps": [
+            "/api/coach_docket",
+            "/api/coaches",
+            "/api/content_cadence",
+            "/api/field_notes",
+            "/api/journey",
+            "/api/pulse",
+            "/api/sleep_detail",
+            "/api/training_overview",
+            "/api/weight_progress",
+            "/journal/posts.json",
+            "/panelcast/episodes.json",
+        ],
+        "js_modules": ["v7_week.js"],
         "visual": {
-            "wait_for": "[data-dx-tabs], [data-dx-read]",
+            "wait_for": ".v7-main",
             "checks": [
+                {"selector": ".wk-entry", "min_count": 5, "desc": "the five entries: latest · previously · so far · testimony · next"},
                 {
-                    "selector": "[data-dx-tabs], [data-dx-list]",
-                    "min_count": 1,
-                    "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered",
+                    "selector": "#wk-latest",
+                    "not_empty": True,
+                    "desc": "the latest write-up entry carries its heading and its served or honest line",
                 },
-                {"selector": "a[href='/data/'], a[href='/cockpit/']", "min_count": 1, "desc": "door links present"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
             ],
         },
     },
@@ -334,13 +328,33 @@ _CURATED = [
     },
     {
         "path": "/story/about/",
-        "name": "Story · about",
-        "tier": 3,
-        "content_class": "static",
-        "api_deps": [],
-        "js_modules": [],
-        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}]},
-        "structural": {"marker": 'class="ph-title"'},
+        "name": "Who he is",
+        "tier": 2,
+        "content_class": "live-data",
+        "api_deps": [
+            "/api/coaches",
+            "/api/content_cadence",
+            "/api/journey",
+            "/api/receipts",
+            "/api/source_freshness",
+            "/api/sub_count",
+            "/api/weight_progress",
+            "/journal/posts.json",
+        ],
+        "js_modules": ["v7_who.js"],
+        "visual": {
+            "wait_for": ".v7-main",
+            "checks": [
+                {
+                    "selector": ".who-entry",
+                    "min_count": 4,
+                    "desc": "the four entries: in his own words · the photographs · since · how to check",
+                },
+                {"selector": ".who-shot img", "min_count": 3, "desc": "the three dated photographs (#3761)"},
+                {"selector": ".who-first", "not_empty": True, "desc": "his paragraph, first person, verbatim"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
+            ],
+        },
     },
     {
         "path": "/story/attempts/",
@@ -516,52 +530,85 @@ _CURATED = [
     },
     {
         "path": "/data/",
-        "name": "Data hub",
-        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the
-        # engine — every source, now & over time").
-        "intent": (
-            "The engine: every measured source — weight, sleep, training, eating, blood — now "
-            "and over time. A reader clicks into a topic readout for the full trend."
-        ),
+        "name": "His numbers",
+        # ADR-157 (the v7 cut-over): the comprehension judge's ground truth for this door — CONCEPT §3.
+        "intent": "The evidence: weight, sleep, eating, training and blood tests — one chart and one sentence each, a CSV under every chart, and what is not being recorded.",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        "api_deps": [],
-        "js_modules": ["evidence.js"],
+        "api_deps": [
+            "/api/character",
+            "/api/journey",
+            "/api/labs",
+            "/api/nutrition_overview",
+            "/api/pulse",
+            "/api/sleep_detail",
+            "/api/source_freshness",
+            "/api/training_overview",
+            "/api/weight_progress",
+        ],
+        "js_modules": ["v7_numbers.js"],
         "visual": {
-            "wait_for": "[data-readout]",
-            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "data readout rendered"}],
+            "wait_for": ".v7-main",
+            "checks": [
+                {
+                    "selector": ".nm-entry",
+                    "min_count": 6,
+                    "desc": "the six entries: weight · sleep · eating · training · blood tests · not being recorded",
+                },
+                {"selector": "details.nm-engine", "min_count": 1, "desc": "the engine's score folded under a plain key"},
+                {"selector": "#nm-weight", "not_empty": True, "desc": "the weight entry carries its heading and its served or honest line"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
+            ],
         },
     },
     {
         "path": "/protocols/",
-        "name": "Protocols hub",
-        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "the
-        # levers — what gets changed to move the data, and whether it moved").
-        "intent": (
-            "The levers: what Matthew takes and tries, each tied to a hypothesis and its "
-            "measured effect. A reader clicks into one protocol or experiment's evidence."
-        ),
+        "name": "What he’s trying",
+        # ADR-157 (the v7 cut-over): the comprehension judge's ground truth for this door — CONCEPT §3.
+        "intent": "What Matthew takes and tests, what each one should move and how we'd know, plus his own decisions in his words.",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        "api_deps": [],
-        "js_modules": ["evidence.js"],
+        "api_deps": ["/api/content_cadence", "/api/decisions", "/api/experiments", "/api/protocols", "/api/supplements"],
+        "js_modules": ["v7_tries.js"],
         "visual": {
-            "wait_for": "[data-readout]",
-            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "protocols readout rendered"}],
+            "wait_for": ".v7-main",
+            "checks": [
+                {"selector": ".tr-entry", "min_count": 4, "desc": "the four entries: what he takes · what he's testing · his calls · next"},
+                {"selector": "#tr-takes", "not_empty": True, "desc": "the stack entry carries its heading and its served or honest line"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
+            ],
         },
     },
     {
         "path": "/method/",
-        "name": "Method hub",
+        "name": "Under the hood",
         "tier": 2,
         "content_class": "live-data",
-        "api_deps": [],
-        "js_modules": ["evidence.js"],
+        "api_deps": [
+            "/api/coaches",
+            "/api/content_cadence",
+            "/api/platform_stats",
+            "/api/receipts",
+            "/api/source_freshness",
+            "/api/sub_count",
+            "/api/wrong",
+            "/journal/posts.json",
+            "/story/build/beats.json",
+        ],
+        "js_modules": ["v7_hood.js"],
         "visual": {
-            "wait_for": "[data-readout]",
-            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "method readout rendered"}],
+            "wait_for": ".v7-main",
+            "checks": [
+                {
+                    "selector": ".hd-entry",
+                    "min_count": 5,
+                    "desc": "the five entries: how a number is made · corrections · build log · gear · next",
+                },
+                {"selector": "table.hd-gear tbody tr", "min_count": 1, "desc": "the registry-derived gear rows (poured at build time)"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
+            ],
         },
     },
     {
@@ -674,37 +721,32 @@ _CURATED = [
     {
         "path": "/coaching/",
         "ai_surface": True,  # #1441: reader-visible AI narrative — daily screenshot archived
-        "name": "Coaching hub (My Team)",
-        # #4182 M4: comprehension-judge ground truth (docs/SITE_MAP_AND_INTENT.md "AI reads
-        # the data and argues about it").
-        "intent": (
-            "The AI brain: seven coaches read Matthew's data and argue about it. A reader "
-            "clicks the freshest coach read, or one coach's tabbed profile and track record."
-        ),
+        "name": "The coaches",
+        # ADR-157 (the v7 cut-over): the comprehension judge's ground truth for this door — CONCEPT §3.
+        "intent": "The witnesses on the record: eight AI characters read his numbers each morning — today's read, where two disagree, and every checked call, right or wrong.",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
-        # #1386: the Read tab also renders the Dispute Docket band (graceful-empty
-        # until the first docket opens).
-        # #4182: the first screen (coach_today.js) reads the dashboard + the record, the
-        # calibration record (the selection chain's rule 2), and —
-        # only when a read is > 48 h old — the weigh-ins and the 7-day protein average.
         "api_deps": [
-            "/api/coaches",
-            "/api/coach_team",
-            "/api/coach_docket",
-            "/api/coaching-dashboard",
-            "/api/predictions",
             "/api/calibration",
-            "/api/weight_progress",
-            "/api/nutrition_overview",
+            "/api/coach_docket",
+            "/api/coaches",
+            "/api/coaching-dashboard",
+            "/api/sleep_detail",
+            "/api/source_freshness",
         ],
-        "js_modules": ["coaching.js", "coach_today.js"],
+        "js_modules": ["v7_coaches.js"],
         "visual": {
-            "wait_for": "[data-dx-tabs]",
+            "wait_for": ".v7-main",
             "checks": [
-                {"selector": "[data-dx-tabs], [data-dx-list]", "min_count": 1, "desc": "coaching tabs + roster rendered"},
-                {"selector": "[data-dx-read]", "not_empty": True, "desc": "team/coach readout rendered"},
+                {"selector": ".v7c-entry", "min_count": 3, "desc": "the three entries: today's read · where two disagree · the record"},
+                {
+                    "selector": "#v7c-read-body",
+                    "not_empty": True,
+                    "desc": "today's read carries text — the served read, its absence sentence or the loading line",
+                },
+                {"selector": "details#v7c-roster", "min_count": 1, "desc": "the staff folded one tap down"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
             ],
         },
     },
@@ -886,13 +928,20 @@ _CURATED = [
     },
     {
         "path": "/subscribe/",
-        "name": "Subscribe",
+        "name": "Follow",
         "tier": 3,
         "content_class": "static",
-        "api_deps": [],
-        "js_modules": [],
-        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "subscribe page content"}]},
-        "structural": {"marker": 'class="sub-title"'},
+        "api_deps": ["/api/content_cadence", "/api/journey", "/journal/posts.json"],
+        "js_modules": ["v7_follow.js"],
+        "visual": {
+            "wait_for": ".v7-main",
+            "checks": [
+                {"selector": "#form-block", "not_empty": True, "desc": "the double-opt-in form"},
+                {"selector": ".fo-entry", "min_count": 4, "desc": "the four entries: by email · what you'd get · write to him · come back"},
+                {"selector": "nav.v7-bar a", "min_count": 5, "desc": "the five-item bar (ADR-157)"},
+            ],
+        },
+        "structural": {"marker": 'class="fo-promise"'},
     },
     {
         "path": "/subscribe/confirm/",
@@ -977,13 +1026,46 @@ def private_rows():
 # its reason — the completeness gate treats anything else as unregistered.
 EXEMPT = {
     "/legacy/": "verbatim pre-v4 archive, private rollback surface — never QA-swept by policy (ADR-071)",
-    "/next/": "v7 preview subtree (#4182, plan §1b), noindex + unlinked from the live pages; struck at cut-over when the nine get real rows",
     "/index.html": "the '/' entry covers it (directory index)",
 }
 
 
+# ADR-157 (the v7 cut-over): the /next/ preview subtree stays served (noindex, unlinked from
+# the live pages) until its removal PR. Its nine shells are the live nine poured under another
+# base by the same generator (scripts/v7_build.py --base /next/), so they are registered as
+# what they are — tier 4, unlisted, no visual def of their own (the live rows carry the
+# checks), leak-scanned and smoke-checked like any served page. `noindex` keeps them out of
+# the sitemap (scripts/v4_build_sitemap.py::indexable).
+_PREVIEW_PAGES = (
+    ("/next/", "Home"),
+    ("/next/cockpit/", "Today"),
+    ("/next/story/", "This week"),
+    ("/next/data/", "His numbers"),
+    ("/next/coaching/", "The coaches"),
+    ("/next/protocols/", "What he’s trying"),
+    ("/next/story/about/", "Who he is"),
+    ("/next/method/", "Under the hood"),
+    ("/next/subscribe/", "Follow"),
+)
+
+
+def _preview_rows():
+    return [
+        {
+            "path": path,
+            "name": f"Preview · {title} (/next/, ADR-157)",
+            "tier": 4,
+            "content_class": "generated",
+            "api_deps": [],
+            "js_modules": [],
+            "unlisted": True,
+        }
+        for path, title in _PREVIEW_PAGES
+    ]
+
+
 def _build():
-    pages = list(_CURATED) + _archive_entries() + _essay_rows()
+    pages = list(_CURATED) + _archive_entries() + _essay_rows() + _preview_rows()
     for p in pages:
         p.setdefault("leak_scan", True)
         p.setdefault("smoke", "200")

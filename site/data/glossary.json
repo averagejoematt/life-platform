@@ -42,6 +42,7 @@
     {"term": "XP", "kind": "acronym", "match": "exact", "gloss": "Experience points — the character sheet's leveling currency, earned from real daily pillar scores, not from playing a game."},
     {"term": "FDR", "kind": "acronym", "match": "exact", "gloss": "False discovery rate — the statistical correction applied so a batch of correlation tests isn't overstated by chance."},
     {"term": "Brier", "kind": "acronym", "match": "exact", "gloss": "Brier score — a 0 (perfect) to 1 (worst) grade for how well a forecast's stated probability matched what actually happened."},
-    {"term": "EWMA", "kind": "acronym", "match": "exact", "gloss": "Exponentially weighted moving average — a running average that counts recent days more than older ones, so a trend reacts to change without chasing one noisy day."}
+    {"term": "EWMA", "kind": "acronym", "match": "exact", "gloss": "Exponentially weighted moving average — a running average that counts recent days more than older ones, so a trend reacts to change without chasing one noisy day."},
+    {"term": "ASCVD", "kind": "acronym", "match": "exact", "gloss": "Atherosclerotic cardiovascular disease — the ten-year heart-attack-and-stroke risk estimate a standard blood panel supports; a percentage, not a diagnosis."}
   ]
 }

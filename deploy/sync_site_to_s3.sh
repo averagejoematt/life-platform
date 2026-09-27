@@ -83,6 +83,16 @@ if [ "${1:-}" != "--dry-run" ]; then
   # unreachable. Was NOT wired in before, so the sitemap silently drifted post-less.
   run_site_generator "sitemap" "site/sitemap.xml" \
     python3 "$(dirname "$0")/../scripts/v4_build_sitemap.py"
+  # ADR-157 (#4182, the cut-over): pour the nine v7 pages at their live URLs. This is the
+  # ONE writer of the nine (v4_apply_chrome.write_page refuses every other generator at
+  # those paths — the coaching/dispatches/evidence builders below still emit their old
+  # hubs and are skipped there by name). Runs BEFORE the two sentinel bakers so the Home
+  # and Today proof blocks land in freshly poured shells, and it bakes the other four
+  # doors' <noscript> static cores itself (scripts/v4_proof.v7_static_block) with the
+  # current "as of" — the freshness guard below reads that date. Best-effort: the block
+  # builders fall back to the committed proof_snapshot.json when the live API is unreachable.
+  run_site_generator "v7 pages" "the nine v7 pages at their live URLs" \
+    python3 "$(dirname "$0")/../scripts/v7_build.py" --base / --allow-live
   # #788: bake the cockpit's static proof (character level + pillars + as-of stamp)
   # into /cockpit/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
   # effort; keeps the last baked block if the live API is unreachable.

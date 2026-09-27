@@ -32,7 +32,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import v4_wayfinding  # noqa: E402 — the #1475 wayfinding layer (station registry + ribbon)
 
 # The five doors, in loop order: cockpit · data · coaching · protocols · story.
 # (href, label, sprite-key, title) — title becomes the hover tooltip, HTML-escaped.
@@ -187,24 +186,25 @@ def _door_icon(key: str) -> str:
     )
 
 
-def doors_nav(current_door: str | None = None, with_follow: bool = False) -> str:
-    """The canonical doors nav.
+def doors_nav(
+    current_door: str | None = None, with_follow: bool = False, base: str | None = None
+) -> str:  # noqa: ARG001 — the follow pill retired
+    """The canonical page nav — since the cut-over (ADR-157, #4182) the five-item v7 bar.
 
-    `current_door` is the door path ("/cockpit/" "/data/" "/coaching/" "/protocols/"
-    "/story/") to mark `aria-current="page"`, or None for pages under no door.
-    `with_follow` includes the follow pill immediately before the theme toggle.
+    `current_door` marks `aria-current="page"`. Two spellings are accepted, because two
+    writers call this: `scripts/v7_build.py` passes the page path under the base ("" home,
+    "cockpit/" …); `v4_apply_chrome.py` re-detects the door from an existing page's own
+    nav, where the href is the viewer path ("/data/", or "/next/data/" on a preview shell).
+    Every spelling normalises to the page key; a door outside the nine (an archive page
+    whose old nav marked "/data/") marks nothing, never raises — the archive pages are
+    served-but-unlisted and their bar is the same bar as everyone else's.
+
+    `base` is the viewer prefix the bar links under (None → `V7_BASE`): the chrome pass
+    hands "/next/" for a preview shell so its bar keeps pointing into the preview.
     """
-    if EDITION == "v7":
-        # #4182: the v7 bar keys on the page path under V7_BASE ("" home, "cockpit/" …).
-        return v7_bar(current_door)
-    if current_door is not None and current_door not in _VALID_DOORS:
-        raise ValueError(f"current_door must be one of {sorted(_VALID_DOORS)} or None, got {current_door!r}")
-    links = []
-    for href, label, key, title in DOORS:
-        current = ' aria-current="page"' if href == current_door else ""
-        links.append(f'<a href="{href}" title="{_esc(title)}"{current}>{_door_icon(key)}{label}</a>')
-    follow = FOLLOW_PILL if with_follow else ""
-    return f'<nav class="doors" aria-label="Doors">{"".join(links)}{follow}{THEME_TOGGLE}</nav>'
+    if EDITION != "v7":
+        raise RuntimeError("the v4 doors nav was retired at the cut-over (ADR-157, #4182) — EDITION must be 'v7'")
+    return v7_bar(_v7_page_key(current_door, base), base)
 
 
 ASOF_STAMP = '<span class="label asof" data-bind="asof"></span>'
@@ -231,109 +231,21 @@ SOCIAL_LINKS = (
 _SOCIAL_FOOT_HTML = "".join(f'<a href="{href}" target="_blank" rel="me noopener">{label}</a>' for href, label in SOCIAL_LINKS)
 
 
-# The mega-menu, in LOOP ORDER (#1475). Before the wayfinding layer this was six
-# columns in arrival order (Story first) with every heading ember — a directory whose
-# accent carried no information. It is now the loop laid out left-to-right: the four
-# causal stages fill the first grid row (Data → Coaching → Protocols → Story), and the
-# two meta columns that sit OUTSIDE the loop — The Technology and Follow &amp; context —
-# fill the second. Each stage column is keyed to its station (`data-station`) so the
-# wayfinder ribbon above it can light the column it owns, and so the station the reader
-# is currently inside is the one and only ember thing in the menu.
-#
-# (#1475 kept every pre-existing link; #4182 below is the deliberate IA edit that cut it.)
-#
-# The 25-page reach set (#4182, the 2026-09-26 panel ruling): the footer is re-poured from
-# 42 links to the 23 page links below, under the doors' new labels plus FOLLOW. A newcomer
-# meets the REACHABLE set, not the served one, so the pages this drops — /data/ledger/,
-# /data/reading/, /data/glucose/, /coaching/team/ (→ By coach), /protocols/supplements/
-# (pixel-identical to /protocols/), /protocols/challenges/, /story/chronicle/ (→ /story/),
-# /story/timeline/, /story/agents/, /method/platform/ and the /method/{ask,cost,pipeline,…}
-# cuts — stay SERVED at their URLs, just unlinked (no URL moves, no 301s, no deletions).
-# `tests/site_vocabulary_residue.py::NAV_REACH_CEILING` (25) is the ratchet that holds it;
-# `tests/test_wayfinding.py::FOOTER_LINKS_4182` pins the pour.
-#   "How it's built" is the menu home for the platform-itself pages (#1110): the /method/
-# hub, the build log (URL unchanged), the gear, and the score explainer.
-#   FOLLOW keeps the six outbound social marks (#1620) — they are follow destinations, not
-# pages, so they are outside the 23 and outside the reach count.
-#   (station key or None, heading, links HTML)
-FOOTER_COLUMNS = (
-    (
-        "data",
-        "The numbers",
-        '<a href="/data/physical/">Weight &amp; body</a><a href="/data/sleep/">Sleep</a>'
-        '<a href="/data/training/">Training</a><a href="/data/nutrition/">Eating</a>'
-        '<a href="/data/labs/">Blood tests</a>',
-    ),
-    (
-        "coaching",
-        "The coaches",
-        '<a href="/coaching/">The read</a><a href="/coaching/by-coach/">By coach</a>'
-        '<a href="/coaching/scorecard/">Their record</a>'
-        '<a href="/coaching/lab-notes/">What the AI said, and how it felt</a>',
-    ),
-    (
-        "protocols",
-        "What he tries",
-        '<a href="/protocols/">What he takes</a><a href="/protocols/experiments/">Experiments</a>',
-    ),
-    (
-        "story",
-        "The story",
-        '<a href="/story/">The weekly write-up</a><a href="/story/journal/">In his own words</a>'
-        '<a href="/story/panel/">The podcast</a>'
-        '<a href="/story/about/">Who he is</a>',
-    ),
-    (
-        None,
-        "How it&#x27;s built",
-        '<a href="/method/">Under the hood</a><a href="/story/build/">The build log</a>'
-        '<a href="/gear/">The gear</a><a href="/method/character/">How the score works</a>',
-    ),
-    (
-        None,
-        "Follow",
-        f'<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>{_SOCIAL_FOOT_HTML}' '<a href="/privacy/">Privacy</a>',
-    ),
-)
+def site_footer(
+    with_asof: bool = False, current_door: str | None = None, base: str | None = None
+) -> str:  # noqa: ARG001 — generators' call sites
+    """The canonical footer — since the cut-over (ADR-157, #4182) the one-line v7 footer
+    tier (`v7_foot`): the four footer-tier pages, RSS and Privacy, plus the two functional
+    tags every page has always carried (attribution capture, the runtime glossary pass).
 
-
-def site_footer(with_asof: bool = False, current_door: str | None = None) -> str:
-    """The canonical `.site-foot` footer — the wayfinding layer on every page (#1475).
-
-    Three stacked pieces, one source:
-      1. the **wayfinder** (`v4_wayfinding.wayfinder`) — the loop's five stations with
-         this page's station marked, the next one tagged, and the one it came from
-         lifted. This is what makes "no reader is ever more than one interaction from
-         the loop" structural rather than per-page: it ships inside the footer, and
-         `v4_apply_chrome.py` puts the footer on every chrome-bearing page;
-      2. the **mega-menu** (`FOOTER_COLUMNS`) — the same ~30 links as before, re-poured
-         in loop order and keyed to their stations;
-      3. the base line — brand, the optional live stamp, the home link.
-
-    `current_door` is the door href the doors nav marks (`"/data/"`, `"/story/"`, …) —
-    `v4_apply_chrome.py` detects it once per page and hands the SAME value to
-    `doors_nav`, `loop_forward` and here, so the three surfaces can never disagree about
-    where the reader is. `None` renders the unmarked ribbon (home, `/gear/`, utility).
-
-    `with_asof` (home only, #1104) keeps the live "updated YYYY-MM-DD" stamp that
-    home's old slim footer carried: `story.js` binds `data-bind="asof"` from the
-    public-stats metadata, so the stamp rides in the base line between the brand
-    and the home link (the `.sf-base` flex line spaces the three apart).
+    `with_asof` and `current_door` are accepted and ignored: the v4 mega-menu, the #1475
+    wayfinder and home's live "updated" stamp retired with the v4 footer (the wayfinding
+    module `scripts/v4_wayfinding.py` was deleted in the same PR). The generators that
+    still pass them need no edit — the signature is the contract, the pour is the edition's.
     """
-    if EDITION == "v7":
-        return v7_foot()
-    asof = ASOF_STAMP if with_asof else ""
-    here = v4_wayfinding.STATION_BY_DOOR.get(current_door) if current_door else None
-    cols = "".join(
-        v4_wayfinding.menu_column(heading, links, station=station, is_here=bool(station and station == here))
-        for station, heading, links in FOOTER_COLUMNS
-    )
-    return (
-        f'<footer class="site-foot">{PAGE_FEEDBACK_FORM}{v4_wayfinding.wayfinder(current_door)}'
-        f'<nav class="site-foot-cols" aria-label="Site map">{cols}</nav>'
-        f'<p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p>'
-        f"{ATTRIBUTION_TAG}{GLOSS_RUNTIME_TAG}{PAGE_FEEDBACK_TAG}</footer>"
-    )
+    if EDITION != "v7":
+        raise RuntimeError("the v4 footer was retired at the cut-over (ADR-157, #4182) — EDITION must be 'v7'")
+    return v7_foot(base)
 
 
 # #4182 (M2): the runtime half of the glossary — glosses registered terms in JS-rendered
@@ -375,68 +287,19 @@ PAGE_FEEDBACK_TAG = '<script type="module" src="/assets/js/page_feedback.js"></s
 ATTRIBUTION_TAG = '<script type="module" src="/assets/js/attribution.js"></script>'
 
 
-# ── The loop-forward close (#1468) ─────────────────────────────────────────────
+# ── The loop-forward close (#1468) — RETIRED at the cut-over (ADR-157, #4182) ──────────
 #
-# The journey audit (docs/design/JOURNEYS.md) found every door's exit was the mega-menu
-# footer — a directory, not a DECISION. Every page now closes with one deliberate
-# "next station on the loop" before the footer: a single forward link that advances the
-# causal loop (data → coaching → protocols → story → cockpit, cycling — the same order
-# `loop_ribbon` draws) plus one constant return trigger (follow by email — the
-# north-star's return mechanism for all four audiences). Consistency is the point: one
-# shape, everywhere, so no page is a dead end and no page improvises its own close.
-#
-# Keyed by the SAME `current_door` the doors nav already carries (href form), not
-# `loop_ribbon`'s short key — Method/registry/game pages nav-highlight "/data/" (they're
-# a deeper cut of the Data door, not a fifth door of their own; SITE_MAP_AND_INTENT.md),
-# so their loop-forward correctly proposes Coaching next, matching what a reader who came
-# for credibility would want next. `/gear/`, `/privacy/`, home, and the utility pages
-# carry no current door — they fall to DEFAULT_NEXT (start the loop at the cockpit).
-NEXT_STATION = {
-    "/cockpit/": ("/data/", "the numbers", "See what's driving today's read"),
-    "/data/": ("/coaching/", "the coaches", "See what the AI team makes of it"),
-    "/coaching/": ("/protocols/", "what he tries", "See what levers get pulled next"),
-    "/protocols/": ("/story/", "the story", "Follow whether it moved anything"),
-    "/story/": ("/cockpit/", "today", "Check today's live read"),
-}
-DEFAULT_NEXT = ("/cockpit/", "today", "Start with today's live read")
-
-RETURN_TRIGGER = ("/subscribe/", "follow by email", "for the next entry")
-# #4182 (A-grade sweep fix 1): the return trigger now carries a DATE. The static copy names
-# the cadence; `loop_return.js` swaps the `data-next-writeup` span for the served next
-# write-up ("the write-up lands Wednesday, September 30") via entry_age.js — the same
-# /api/content_cadence rule the story door's "Next write-up" line uses. No date is ever
-# baked here: a build-time date goes stale the day after the sync.
-RETURN_LEAD = "the coaches read his numbers every morning; "
-RETURN_FALLBACK = "a new write-up lands each week"
-LOOP_RETURN_TAG = '<script type="module" src="/assets/js/loop_return.js"></script>'
-# The two pages the universal return trigger would self-link on — swap to a neutral
-# "back into the loop" trigger there instead (#1468 audit finding).
-_RETURN_SELF_SWAP = {"/subscribe/", "/subscribe/confirm/"}
+# The "next station on the loop" aside argued one forward step under every v4 page. v7 has
+# no loop to advance: the five-item bar is fixed on every page, so no page is a dead end by
+# construction, and the archive pages (served, unlisted) carry the same bar. `NEXT_STATION`,
+# `DEFAULT_NEXT` and the return trigger went with `scripts/v4_wayfinding.py`.
+# `loop_forward()` stays as the generators' call site and returns nothing; the chrome pass
+# removes any aside a committed page still carries.
 
 
-def loop_forward(current_door: str | None, self_path: str | None = None) -> str:
-    """The canonical closing "next station on the loop" CTA (#1468).
-
-    `current_door` is the same value passed to `doors_nav()` for this page. `self_path`
-    is this page's own viewer path (e.g. "/subscribe/") — only used to avoid the return
-    trigger linking to the page the reader is already on.
-    """
-    href, label, hook = NEXT_STATION.get(current_door, DEFAULT_NEXT)
-    if self_path in _RETURN_SELF_SWAP:
-        return_bit = '<a href="/">keep exploring the loop</a>'
-    else:
-        r_href, r_label, _r_hook = RETURN_TRIGGER
-        return_bit = (
-            f"{_esc(RETURN_LEAD)}<span data-next-writeup>{_esc(RETURN_FALLBACK)}</span> — "
-            f'<a href="{r_href}">{r_label}</a>{LOOP_RETURN_TAG}'
-        )
-    return (
-        '<aside class="loop-forward" aria-label="Continue the loop">'
-        f'<p class="lf-next"><span class="label">next on the loop</span> '
-        f'<a href="{href}">{_esc(label)}</a> — {_esc(hook)}</p>'
-        f'<p class="lf-return"><span class="label">or come back</span> {return_bit}</p>'
-        "</aside>"
-    )
+def loop_forward(current_door: str | None, self_path: str | None = None) -> str:  # noqa: ARG001 — retired close; the call sites stay
+    """Retired (ADR-157): the v7 bar replaces the close. Always the empty string."""
+    return ""
 
 
 # ── The v7 edition (#4182, epic — the rebuild as one serialised investigation) ────────
@@ -452,7 +315,7 @@ def loop_forward(current_door: str | None, self_path: str | None = None) -> str:
 # "/next/" for the preview subtree (plan §1b). Page links carry it; asset and API paths
 # never do (they stay root-absolute — the hasher rewrites `/assets/(js|css)/<name>` and
 # would point a `/next/assets/…` reference at a hash that does not exist under `/next/`).
-EDITION = "v4"
+EDITION = "v7"  # flipped at the cut-over (ADR-157, #4182) — the v4 branches above now raise
 V7_BASE = "/"
 
 # The bottom bar: the five pages a reader reaches with a thumb (CONCEPT §3 rows 1–5).
@@ -474,6 +337,29 @@ V7_FOOT = (
 )
 
 REPO_URL = "https://github.com/averagejoematt/life-platform"
+
+# The nine (ADR-157): the bar's five + the footer tier's four, in CONCEPT §3 order. Derived,
+# not re-listed — `v4_apply_chrome.write_page` refuses to let a v4 generator overwrite one of
+# these paths with a non-v7 page (the deploy's coaching/dispatches/evidence builders still
+# emit the old hubs; `scripts/v7_build.py` is the only writer of the nine).
+V7_PAGES = tuple(p for p, _ in V7_BAR) + tuple(p for p, _ in V7_FOOT)
+
+
+def _v7_page_key(door: str | None, base: str | None = None) -> str | None:
+    """Normalise a door spelling to the page key under `base` (None → `V7_BASE`), or None.
+
+    "" / "cockpit/" (a page key) → itself; "/" → ""; "/data/" → "data/"; "/next/data/"
+    (a preview shell's own href, base "/next/") → "data/". Anything outside the nine → None.
+    """
+    if door is None:
+        return None
+    b = V7_BASE if base is None else base
+    key = door
+    if b != "/" and key.startswith(b):
+        key = key[len(b) :]
+    elif key.startswith("/"):
+        key = key[1:]
+    return key if key in V7_PAGES else None
 
 
 def v7_href(page: str, base: str | None = None) -> str:
@@ -507,4 +393,14 @@ def v7_masthead(base: str | None = None) -> str:
 def v7_foot(base: str | None = None) -> str:
     """The v7 footer: the four footer-tier pages plus privacy, one line."""
     links = "".join(f'<a href="{v7_href(page, base)}">{_esc(label)}</a>' for page, label in V7_FOOT)
-    return f'<footer class="v7-foot"><nav aria-label="More">{links}<a href="/privacy/">Privacy</a></nav></footer>'
+    # RSS stays reachable from every page (cut-over deviation recorded on ADR-157: the v4
+    # footer linked /rss.xml; the feed is real and non-empty, so the link is kept). The two
+    # script tags are invisible chrome the whole site has always carried: #1621 UTM capture
+    # and #4182 M2's runtime glossary pass — dropping them silently would be a regression,
+    # not a design. The #4182 M3 reader form (`PAGE_FEEDBACK_FORM`) is NOT poured here: v7
+    # ships no footer form; its return is a design decision for the driver, recorded in the
+    # cut-over PR.
+    return (
+        f'<footer class="v7-foot"><nav aria-label="More">{links}<a href="/rss.xml">RSS</a><a href="/privacy/">Privacy</a></nav>'
+        f"{ATTRIBUTION_TAG}{GLOSS_RUNTIME_TAG}</footer>"
+    )

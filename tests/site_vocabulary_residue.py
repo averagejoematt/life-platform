@@ -16,23 +16,23 @@ WITHOUT a gloss (<dfn>/<abbr title>) anywhere on the page — the gloss is what 
 move down without the word leaving.
 """
 
-MEASURED_AT = "2026-09-26 · main a0d2afd0b (re-measured with <noscript> bakes excluded — the first landing at 44c77f11c counted them)"
+MEASURED_AT = "2026-09-27 · the v7 cut-over branch (ADR-157) — re-measured after the nine were poured at their live URLs; the earlier ledger: 2026-09-26 · main a0d2afd0b"
 
 BASELINE = {
     "reset": 1,
-    "correlation": 2,
-    "cockpit": 20,
+    "correlation": 1,  # 2 → 1 at the cut-over (ADR-157): the v4 /data/ hub left
+    "cockpit": 3,  # 20 → 3 at the cut-over (ADR-157): the word left every v7 page; the three are unlisted archive pages
     "chronicle": 5,  # 4 → 5 on 2026-09-26 (#4182, v7 Follow): /next/subscribe/ carries the #3564 cadence promise, which names the Chronicle by its product name and is pinned byte for byte to the senders' crons — the rename cannot touch it. Back to 4 at the cut-over, when /next/subscribe/ becomes /subscribe/.
     "model": 10,
     "as of": 3,
     "cycle": 2,  # 6 → 2 on the 2026-09-26 cycle-count ruling (#4182): only unlisted /method/cycles/ + /method/registry/ remain
     "Third Wall": 0,
     "pillar": 1,
-    "protocol": 1,
+    "protocol": 0,  # 1 → 0 at the cut-over (ADR-157): the v4 /protocols/ hub left
     "gate": 5,
     "HRV": 3,
-    "glucose": 2,
-    "Whoop": 3,
+    "glucose": 0,  # 2 → 0 at the cut-over (ADR-157)
+    "Whoop": 2,  # 3 → 2 at the cut-over (ADR-157)
     "Hevy": 0,  # #4182 A-grade sweep: keep-with-gloss ("a workout-logging app"), glossed everywhere it appears at landing
     "character level": 3,
 }
@@ -43,5 +43,8 @@ BASELINE = {
 # moved), measured 25 by tests/site_text.static_reach() on the PR that set it. Going below 25
 # needs the owner to strike pages; until then the count may only fall. 24 since the owner's
 # 2026-09-26 14:10 PT ruling (#4182): the cycle count is internal, so /story/attempts/ left the
-# footer — the owner striking a page, served at its URL, unlinked.
-NAV_REACH_CEILING = 24
+# footer — the owner striking a page, served at its URL, unlinked. 10 at the v7 cut-over
+# (ADR-157, 2026-09-27): the nine of the bar + footer tier and /privacy/ — measured 10 by
+# static_reach() on the cut-over branch (no v7 body links a page but the repo and mailto:;
+# the <noscript> cores are unlinked; /privacy/'s one body link to /gear/ was unwrapped).
+NAV_REACH_CEILING = 10  # the nine of ADR-157 + /privacy/

@@ -47,7 +47,7 @@ def _non_legacy_content_pages():
         if "legacy" in rel.parts:
             continue
         html = path.read_text(encoding="utf-8")
-        if '<nav class="doors"' not in html and '<footer class="site-foot"' not in html:
+        if not any(m in html for m in v4_apply_chrome.CHROME_MARKERS):
             continue  # chrome-free stub/fragment — not in the glossary's scope either
         yield rel, html
 

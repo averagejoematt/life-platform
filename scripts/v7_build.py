@@ -33,6 +33,23 @@ its first commit.
 THE SCAFFOLD (2026-09-26). Each page body is an honest placeholder: the page's one job
 and the day of the build week it is due. No data, no fake copy. The per-page templates
 land with each page's lane.
+
+THE CUT-OVER (ADR-157, 2026-09-27). `--base / --allow-live` is what `deploy/sync_site_to_s3.sh`
+runs on every sync — this is the ONE writer of the nine (`v4_apply_chrome.write_page`
+refuses the v4 generators at those paths). On the live base each page also carries:
+  * its OG/Twitter card (`OG_CARD` — the existing daily cards at their existing URLs; the
+    two sentinel bakers overwrite Home's and Today's title/description with the served
+    numbers at deploy, exactly as they did on v4);
+  * for /coaching/ /story/ /data/ /protocols/, the #1395 <noscript> static core baked by
+    `scripts/v4_proof.v7_static_block` (links unwrapped — the reach rule) with today's
+    "as of" stamp, which `scripts/check_proof_freshness.py` reads fail-closed at deploy;
+  * the empty `<!-- home-proof -->` / `<!-- cockpit-proof -->` sentinel pairs the two
+    bakers fill in place.
+  * the syndication block (`v4_chrome.syndication_links()` — every feed the hook registry
+    has not declared dark, #3615), on every page of the nine as on every v4 shell before.
+`--check` masks those volatile regions (the proof blocks, the sentinel contents, every
+og:/twitter: meta value) on both sides before comparing, so a shell whose numbers moved
+is still "in sync" while a shell whose STRUCTURE drifted is not.
 """
 
 from __future__ import annotations
@@ -40,6 +57,7 @@ from __future__ import annotations
 import argparse
 import html
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -48,6 +66,7 @@ sys.path.insert(0, HERE)
 
 import v4_apply_chrome  # noqa: E402
 import v4_chrome  # noqa: E402
+import v4_proof  # noqa: E402 — the static cores + the OG helpers (ADR-157)
 from v7 import (
     coaches,  # noqa: E402
     follow,  # noqa: E402
@@ -79,6 +98,51 @@ PAGES = (
 
 SITE_NAME = "averagejoematt"
 
+# The OG card each page points its og:image at — the EXISTING daily cards
+# (lambdas/web/og_image_lambda.py PAGES), at their existing URLs; no card is added. Where
+# no bespoke card exists (the numbers, the coaches, who he is, under the hood, follow) the
+# generic og-home card is the honest closest — the same choice the v4 hubs made.
+# tests/test_og_card_coverage.py holds that every drawn card is still referenced by some
+# non-legacy page; the archive topic pages keep serving theirs.
+OG_CARD = {
+    "": "og-home",
+    "cockpit/": "og-character",
+    "story/": "og-chronicle",
+    "data/": "og-home",
+    "coaching/": "og-home",
+    "protocols/": "og-experiments",
+    "story/about/": "og-home",
+    "method/": "og-home",
+    "subscribe/": "og-home",
+}
+
+# The volatile regions `--check` masks (see the module docstring).
+_VOLATILE = (
+    re.compile(r"<!-- home-proof:start -->.*?<!-- home-proof:end -->", re.DOTALL),
+    re.compile(r"<!-- cockpit-proof:start -->.*?<!-- cockpit-proof:end -->", re.DOTALL),
+    re.compile(r'<noscript><section class="proof-static.*?</section></noscript>', re.DOTALL),
+    re.compile(r'(<meta (?:property|name)="(?:og|twitter):[a-z:_]+" content=")[^"]*(")'),
+)
+
+
+def volatile_mask(page_html: str) -> str:
+    """The shell with its data-carrying regions blanked — what `--check` compares."""
+    out = page_html
+    for rx in _VOLATILE[:3]:
+        out = rx.sub("", out)
+    return _VOLATILE[3].sub(r"\1\2", out)
+
+
+def og_tags(page: str, title: str, job: str, canonical: str) -> str:
+    """The page's OG/Twitter meta block (one tag per line, two-space indent)."""
+    og = v4_proof._og_tags(canonical, f"{title} — {SITE_NAME}", job, f"{OG_CARD[page]}.png")
+    lines = []
+    for (kind, key), value in og.items():
+        attr = "property" if kind == "property" else "name"
+        lines.append(f'  <meta {attr}="{key}" content="{_esc(value)}">\n')
+    return "".join(lines)
+
+
 # The per-page body templates (scripts/v7/<page>.py — CSS, JS, body(base)). A page with no
 # entry keeps the scaffold body below; each page's lane adds ONE line here.
 BODIES = {
@@ -108,6 +172,9 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
     foot = v4_chrome.site_footer()
     canonical = f"https://averagejoematt.com{base}{page}"
     mod = BODIES.get(page)
+    # The four doors' static cores ride on the live base only: the preview is noindex and
+    # the smoke's static-core guard reads the six manifest pages at their live URLs.
+    static_core = f"    {v4_proof.v7_static_block(page)}\n" if not preview and page in v4_proof.V7_STATIC_PAGES else ""
     page_css = f'  <link rel="stylesheet" href="{mod.CSS}">\n' if mod else ""
     page_js = f'  <script type="module" src="{mod.JS}"></script>\n' if mod else ""
     main_inner = (
@@ -129,6 +196,8 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         f'  <meta name="description" content="{_esc(job)}">\n'
         f"{robots}"
         f'  <link rel="canonical" href="{canonical}">\n'
+        f"{og_tags(page, title, job, canonical)}"
+        f"{v4_chrome.syndication_links()}\n"
         f"{v4_chrome.head_chrome()}\n"
         '  <link rel="stylesheet" href="/assets/css/fonts.css">\n'
         '  <link rel="stylesheet" href="/assets/css/tokens.css">\n'
@@ -142,6 +211,7 @@ def render_page(page: str, title: str, job: str, due: str, base: str) -> str:
         f"  {mast}\n"
         f'  <main id="main" class="v7-main">\n'
         f"{main_inner}"
+        f"{static_core}"
         "  </main>\n"
         f"  {foot}\n"
         f"  {bar}\n"
@@ -174,12 +244,16 @@ def build(base: str, out: str | None = None, check: bool = False) -> list[str]:
     ) in PAGES:
         path = os.path.join(root, page.replace("/", os.sep), "index.html")
         raw = render_page(page, title, job, due, base)
-        if "/next/assets/" in raw or f"{base}assets/" in raw:
+        # Plan D4: assets are root-absolute. Under a non-root base a `{base}assets/` reference
+        # would be rewritten by the hasher to a hash that does not exist there; under the
+        # root base "/assets/" IS the root-absolute form, so only the preview spelling is
+        # the defect (found the first time --base / ran, at the cut-over).
+        if "/next/assets/" in raw or (base != "/" and f"{base}assets/" in raw):
             raise SystemExit(f"{path}: a v7 page referenced an asset under the base — assets are root-absolute (plan D4)")
         if check:
             expected, *_ = v4_apply_chrome.rewrite(raw, self_path=base + page)
             current = open(path, encoding="utf-8").read() if os.path.exists(path) else None
-            if current != expected:
+            if current is None or volatile_mask(current) != volatile_mask(expected):
                 touched.append(path)
             continue
         v4_apply_chrome.write_page(path, raw)

@@ -19,4 +19,5 @@ export const GLOSSARY_TERMS = [
   {"term": "FDR", "gloss": "False discovery rate — the statistical correction applied so a batch of correlation tests isn't overstated by chance.", "ci": false},
   {"term": "Brier", "gloss": "Brier score — a 0 (perfect) to 1 (worst) grade for how well a forecast's stated probability matched what actually happened.", "ci": false},
   {"term": "EWMA", "gloss": "Exponentially weighted moving average — a running average that counts recent days more than older ones, so a trend reacts to change without chasing one noisy day.", "ci": false},
+  {"term": "ASCVD", "gloss": "Atherosclerotic cardiovascular disease — the ten-year heart-attack-and-stroke risk estimate a standard blood panel supports; a percentage, not a diagnosis.", "ci": false},
 ];

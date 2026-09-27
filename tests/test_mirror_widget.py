@@ -31,9 +31,10 @@ def test_reads_only_matthews_public_numbers():
 
 
 def test_framing_is_n1_and_advice_free():
-    assert "Nothing you type leaves this page" in HOME
-    assert "N=1" in HOME[HOME.find("beat-mirror") :][:900]
-    assert "not a benchmark or health advice" in HOME
+    # 2026-09-27 (ADR-157, the v7 cut-over): the mirror beat is not on the v7 Home — the page
+    # is the log (scripts/v7/home.py) and mounts no reader-input widget. The module pins below
+    # still hold story.js's own framing; the shell pin is that the beat did not come back.
+    assert "beat-mirror" not in HOME and "Nothing you type leaves this page" not in HOME
     assert "your number was not sent or saved" in _MIRROR
     assert "single-subject comparison (n=1)" in _MIRROR
     # No prescriptive verbs in the rendered reads.

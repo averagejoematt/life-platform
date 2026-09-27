@@ -1,0 +1,89 @@
+{
+ "_meta": {
+  "cache_seconds": 300,
+  "generated_at": "2026-09-27T04:20:15.484987+00:00",
+  "request_id": "dae6b8fe6c834e89",
+  "served_at": "2026-09-27T04:20:15.484987+00:00"
+ },
+ "counts": {
+  "open": 2,
+  "resolved": 0
+ },
+ "disclosure": "Standing disagreements between AI coaches, each with skin in the game: the stake is the coach's own Brier record, frozen when the docket opened. The resolution criterion and date are agreed at open and graded by deterministic code against real data \u2014 no AI writes the verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross the same standing privacy filter as the coach dossier before publishing; any hit withholds the whole entry and this payload counts it.",
+ "open": [
+  {
+   "claims": {
+    "glucose_coach": "Evening carb reduction is likely coming based on CGM data; glucose variability (not average) is the primary diagnostic signal in subjects with visceral adiposity",
+    "nutrition_coach": "Any carb reduction that is not calorie-neutral will push intake to a level that degrades recovery and lean mass preservation simultaneously"
+   },
+   "coach_a": "glucose_coach",
+   "coach_b": "nutrition_coach",
+   "criterion": {
+    "condition": "lt",
+    "description": "recovery_score < 70 on 2026-09-30",
+    "metric": "recovery_score",
+    "threshold": 70.0
+   },
+   "opened_date": "2026-09-23",
+   "resolution_date": "2026-09-30",
+   "sides": {
+    "glucose_coach": false,
+    "nutrition_coach": true
+   },
+   "stakes": {
+    "glucose_coach": {
+     "brier": 0.25,
+     "brier_n": 3.0,
+     "confidence": 0.333,
+     "subdomain": "recovery"
+    },
+    "nutrition_coach": {
+     "brier": 0.25,
+     "brier_n": 10.0,
+     "confidence": 0.5,
+     "subdomain": "recovery"
+    }
+   },
+   "topic": "Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?",
+   "topic_slug": "carb-reduction-recommendation-will-it-degrade-recovery-or-im"
+  },
+  {
+   "claims": {
+    "mind_coach": "Recovery rebound from 24% to 94% represents statistical regression toward baseline after a floor event, not a signal of corrective action by the subject",
+    "sleep_coach": "Recovery spike from 24% to 94% is genuine architectural improvement; deep sleep at 28.9% and REM at 32.9% on consecutive nights represent structural signal, not noise"
+   },
+   "coach_a": "mind_coach",
+   "coach_b": "sleep_coach",
+   "criterion": {
+    "condition": "gte",
+    "description": "recovery_score_7day_avg >= 80 on 2026-10-07",
+    "metric": "recovery_score_7day_avg",
+    "threshold": 80.0
+   },
+   "opened_date": "2026-09-23",
+   "resolution_date": "2026-10-07",
+   "sides": {
+    "mind_coach": false,
+    "sleep_coach": true
+   },
+   "stakes": {
+    "mind_coach": {
+     "brier": 0.25,
+     "brier_n": 4.0,
+     "confidence": 0.5,
+     "subdomain": "recovery"
+    },
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 20.0,
+     "confidence": 0.6,
+     "subdomain": "recovery"
+    }
+   },
+   "topic": "Recovery rebound interpretation: mean reversion vs. corrective action",
+   "topic_slug": "recovery-rebound-interpretation-mean-reversion-vs-corrective"
+  }
+ ],
+ "resolved": [],
+ "withheld": 0
+}

@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
-from v4_proof import apply_og, home_block_html, home_og, load_character, load_journey  # noqa: E402
+from v4_proof import apply_og, home_block_html, home_og, load_character, load_journey, unlink  # noqa: E402
 
 HOME = Path("site/index.html")
 
@@ -76,7 +76,9 @@ def main() -> int:
     # Data-driven OG first (always safe — falls back to sensible baseline strings).
     html = apply_og(html, home_og(journey, char))
 
-    block = home_block_html(journey, char)
+    # ADR-157: a v7 body links no page but the repo and mailto: — the block's door links are
+    # unwrapped to their words (tests/site_text.static_reach() follows <noscript> links).
+    block = unlink(home_block_html(journey, char))
     if not block:
         # No numbers at all (API + snapshot both empty) — keep any existing baked
         # block rather than blanking Home's only static content (last-known-good).

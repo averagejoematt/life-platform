@@ -1,23 +1,26 @@
-"""The wayfinding layer — structural guards (#1475).
+"""The wayfinding layer — structural guards, re-pinned at the v7 cut-over (#1475 → ADR-157, #4182).
 
-`scripts/v4_wayfinding.py` renders the footer wayfinder (the loop's five stations, with
-this page's station marked) and `scripts/v4_chrome.site_footer` re-pours the mega-menu on
-the loop around it. These tests hold the three properties the issue actually bought:
+Until the cut-over this file pinned the v4 footer: the #1475 wayfinder ribbon (the loop's
+five stations), the mega-menu re-poured on the loop, and the 22-link `FOOTER_LINKS_4182`
+pour of the 24-page reach set. ADR-157 retired all three with `scripts/v4_wayfinding.py`
+(deleted in the cut-over PR): the site is nine reachable pages, the bar is fixed on every
+page, and no page is a dead end by construction. What this file now holds is the v7 shape
+of the same three properties:
 
-1. **The loop is navigable from anywhere** — every page that carries the canonical footer
-   carries exactly one wayfinder, verified over the real `site/` inventory rather than a
-   hand-maintained list (the same idiom as the `.loop-forward` sweep in #1468).
-2. **One position, one signal** — the station the wayfinder marks is the door the page's
-   own doors nav marks. Nav, `.loop-forward` close and footer are keyed off one detected
-   value in `v4_apply_chrome.py`, so they can never disagree about where the reader is.
-3. **The footer pour is pinned** — since #4182 the mega-menu is exactly the 22 page links
-   of the 24-page reach set (/story/attempts/ left it 2026-09-26, the cycle-count ruling; the pre-#1475 "removed nothing" subset pin was reversed then).
+1. **Navigable from anywhere** — every chrome-bearing page under `site/` (legacy excluded)
+   carries exactly one `nav.v7-bar` and one `footer.v7-foot`, and none of the retired
+   chrome (`.doors`, `.site-foot`, `.wayfinder`, `.loop-forward`), verified over the real
+   inventory rather than a hand-maintained list.
+2. **One position, one signal** — the bar marks `aria-current="page"` on the page's own key
+   for each of the nine, and nothing on an archive page (served, unlisted).
+3. **The footer pour is pinned** — exactly the four footer-tier pages + RSS + Privacy
+   (`FOOTER_LINKS_4182`), an exact set: adding a footer link is an IA decision that must
+   move this pin and `NAV_REACH_CEILING` together.
 
-Plus the two invariants that fail SILENTLY if broken: the station cycle must stay in step
-with `v4_chrome.NEXT_STATION` (otherwise the map and the close propose different next
-stations on the same page), and the footer ribbon must not reuse the `.loop-ribbon` class
-(its `view-transition-name` is unique per document — a second one would kill the
-cross-document transition on the 81 pages carrying both, with nothing to see in CI).
+Plus the retirement itself, asserted so it cannot creep back: the wayfinding module is
+gone, `NEXT_STATION` / `DEFAULT_NEXT` are gone from `v4_chrome`, and `loop_forward()` is
+the empty string (the generators' call sites stay; the chrome pass strips any aside a
+committed page still carries).
 """
 
 import re
@@ -29,55 +32,26 @@ SITE = ROOT / "site"
 
 sys.path.insert(0, str(ROOT / "scripts"))
 import v4_chrome  # noqa: E402
-import v4_wayfinding  # noqa: E402
 
 HREF_RE = re.compile(r'href="([^"]+)"')
-CURRENT_DOOR_RE = re.compile(r'<a href="([^"]+)"[^>]*aria-current="page"')
-FOOT_RE = re.compile(r'<footer class="site-foot".*?</footer>', re.DOTALL)
-WAYFINDER_RE = re.compile(r'<nav class="wayfinder".*?</nav>', re.DOTALL)
-HERE_STOP_RE = re.compile(r'<span class="wf-stop is-here[^"]*" data-station="([^"]+)"')
+BAR_RE = re.compile(r'<nav class="v7-bar".*?</nav>', re.DOTALL)
+FOOT_RE = re.compile(r'<footer class="v7-foot".*?</footer>', re.DOTALL)
+CURRENT_RE = re.compile(r'<a href="([^"]+)" aria-current="page">')
 
-# The footer's page links since #4182 (the 2026-09-26 panel ruling: the reach set is 25,
-# the footer 42 → 23 page links in five columns under the new door labels + FOLLOW). This
-# REVERSES #1475's "never drop a destination" pin on purpose: the pages the pour cut
-# (/data/ledger/, /coaching/team/, /story/timeline/, /story/agents/, /method/platform/, …)
-# stay served at their URLs, unlinked — `tests/test_site_nav_reach_ratchet.py` holds the
-# reachable count. An exact set, not a subset: adding a footer link is an IA decision
-# that must move this pin and the reach ceiling together.
+# The footer's links since the cut-over (ADR-157): the four footer-tier pages, the feed
+# (a deviation recorded on ADR-157 — v7's concept footer had no RSS link; the feed is real
+# and non-empty, so the link stays) and Privacy. An exact set, not a subset.
 FOOTER_LINKS_4182 = {
-    # the numbers
-    "/data/physical/",
-    "/data/sleep/",
-    "/data/training/",
-    "/data/nutrition/",
-    "/data/labs/",
-    # the coaches
-    "/coaching/",
-    "/coaching/by-coach/",
-    "/coaching/scorecard/",
-    "/coaching/lab-notes/",
-    # what he tries
     "/protocols/",
-    "/protocols/experiments/",
-    # the story
-    "/story/",
-    "/story/journal/",
-    "/story/panel/",
-    # "/story/attempts/" left the footer 2026-09-26 (#4182 owner ruling: the cycle count is internal)
     "/story/about/",
-    # how it's built
     "/method/",
-    "/story/build/",
-    "/gear/",
-    "/method/character/",
-    # follow
     "/subscribe/",
     "/rss.xml",
     "/privacy/",
 }
-# The outbound follow marks (#1620) ride in FOLLOW too; they are not pages.
-SOCIAL_HREFS = {href for href, _ in v4_chrome.SOCIAL_LINKS}
-MENU_RE = re.compile(r'<nav class="site-foot-cols".*?</nav>', re.DOTALL)
+BAR_LINKS = ["/", "/cockpit/", "/story/", "/data/", "/coaching/"]
+BAR_LABELS = ["Home", "Today", "This week", "His numbers", "The coaches"]
+RETIRED_CHROME = ('<nav class="doors"', '<footer class="site-foot"', '<nav class="wayfinder"', '<aside class="loop-forward"')
 
 
 def _non_legacy_pages():
@@ -87,135 +61,93 @@ def _non_legacy_pages():
         yield path
 
 
+def _viewer_path(path: Path) -> str:
+    rel = path.relative_to(SITE).as_posix()
+    if rel == "index.html":
+        return "/"
+    if rel.endswith("/index.html"):
+        return "/" + rel[: -len("index.html")]
+    return "/" + rel
+
+
 # ── The registry itself ─────────────────────────────────────────────────────────
 
 
-def test_stations_are_exactly_the_doors():
-    """The wayfinder's stations are the five doors, in loop order — not a parallel IA."""
-    assert [href for _, href, _, _ in v4_wayfinding.STATIONS] == [href for href, _, _, _ in v4_chrome.DOORS]
+def test_the_nine_are_the_bar_plus_the_footer_tier():
+    """`V7_PAGES` derives from the two registries — the bar's five, then the footer's four."""
+    assert v4_chrome.V7_PAGES == ("", "cockpit/", "story/", "data/", "coaching/", "protocols/", "story/about/", "method/", "subscribe/")
+    assert [lbl for _, lbl in v4_chrome.V7_BAR] == BAR_LABELS
 
 
-def test_station_cycle_matches_the_loop_forward_map():
-    """The map and the close must propose the SAME next station on every page.
-
-    `v4_chrome.NEXT_STATION` is the editorial close's map; the wayfinder derives `next`
-    from the station cycle. If these drift a reader sees the ribbon tag one station
-    "next" while the close argues for another, on the same screen.
-    """
-    for key, href, _, _ in v4_wayfinding.STATIONS:
-        _, next_key = v4_wayfinding._neighbours(key)
-        next_href = dict((k, h) for k, h, _, _ in v4_wayfinding.STATIONS)[next_key]
-        assert (
-            v4_chrome.NEXT_STATION[href][0] == next_href
-        ), f"{href}: ribbon says {next_href}, loop-forward says {v4_chrome.NEXT_STATION[href][0]}"
-
-
-def test_doorless_pages_are_invited_to_the_default_next_station():
-    """With no door, nothing is 'here' and the cockpit is tagged — matching DEFAULT_NEXT."""
-    from_key, next_key = v4_wayfinding._neighbours(None)
-    assert from_key is None
-    assert dict((k, h) for k, h, _, _ in v4_wayfinding.STATIONS)[next_key] == v4_chrome.DEFAULT_NEXT[0]
-    html = v4_wayfinding.wayfinder(None)
-    assert "is-here" not in html
-    assert "start here" in html
-
-
-def test_column_stations_are_the_four_causal_stages():
-    """The cockpit is the loop's vantage, not a stage — it has no mega-menu column."""
-    assert v4_wayfinding.COLUMN_STATIONS == tuple(k for k, _, _, _ in v4_wayfinding.STATIONS)[1:]
-    keyed = [station for station, _, _ in v4_chrome.FOOTER_COLUMNS if station]
-    assert keyed == list(v4_wayfinding.COLUMN_STATIONS), "the mega-menu's loop columns drifted from loop order"
-
-
-# ── The rendered footer ─────────────────────────────────────────────────────────
-
-
-def test_wayfinding_kept_every_footer_link():
-    """The mega-menu carries exactly the 22 page links of the #4182 pour (plus the social marks)."""
-    menu = MENU_RE.search(v4_chrome.site_footer()).group(0)
-    hrefs = HREF_RE.findall(menu)
-    pages = [h for h in hrefs if h not in SOCIAL_HREFS]
-    assert len(pages) == len(set(pages)) == 22, f"the footer pour must be 22 distinct page links, got {len(pages)}: {pages}"
+def test_the_footer_pour_is_exactly_the_tier_plus_rss_and_privacy():
+    foot = v4_chrome.site_footer()
+    pages = HREF_RE.findall(foot)
+    assert len(pages) == len(set(pages)) == 6, f"the footer pour must be 6 distinct links, got {len(pages)}: {pages}"
     assert set(pages) == FOOTER_LINKS_4182, (
-        f"footer drifted from the #4182 pour — added {sorted(set(pages) - FOOTER_LINKS_4182)}, "
+        f"footer drifted from the ADR-157 pour — added {sorted(set(pages) - FOOTER_LINKS_4182)}, "
         f"dropped {sorted(FOOTER_LINKS_4182 - set(pages))}"
     )
-    assert SOCIAL_HREFS <= set(hrefs), "the outbound follow marks (#1620) left the footer"
-    headings = re.findall(r'<p class="sf-h label">([^<]+)</p>', menu)
-    assert headings == ["The numbers", "The coaches", "What he tries", "The story", "How it&#x27;s built", "Follow"], headings
+    # the two functional tags every page has always carried ride in the footer (#1621, #4182 M2)
+    assert v4_chrome.ATTRIBUTION_TAG in foot and v4_chrome.GLOSS_RUNTIME_TAG in foot
 
 
-def test_door_labels_are_the_readers_words():
-    """#4182: nav, wayfinder and loop-forward close name the doors in ONE vocabulary."""
-    labels = [label for _, label, _, _ in v4_chrome.DOORS]
-    assert labels == ["today", "the numbers", "the coaches", "what he tries", "the story"]
-    assert [name.lower() for _, _, name, _ in v4_wayfinding.STATIONS] == labels
-    for href, (_nxt, label, _hook) in v4_chrome.NEXT_STATION.items():
-        assert label in labels, f"{href}: loop-forward names a door the nav doesn't ({label!r})"
-    assert v4_chrome.DEFAULT_NEXT[1] == "today"
-    nav = v4_chrome.doors_nav()
-    for old in ("the cockpit", "the data", "the coaching", "the protocols"):
-        assert f"</svg>{old}</a>" not in nav
+def test_the_bar_is_the_five_in_concept_order_and_marks_one_key():
+    bar = v4_chrome.doors_nav()
+    assert HREF_RE.findall(bar) == BAR_LINKS
+    assert re.findall(r">([^<]+)</a>", bar) == BAR_LABELS
+    assert "aria-current" not in bar
+    for key in v4_chrome.V7_PAGES:
+        marked = CURRENT_RE.findall(v4_chrome.doors_nav(key))
+        assert marked == ([f"/{key}"] if key in dict(v4_chrome.V7_BAR) else []), key
+    # both door spellings normalise: the page key and the viewer path (an archive page's old nav)
+    assert CURRENT_RE.findall(v4_chrome.doors_nav("/data/")) == ["/data/"]
+    assert CURRENT_RE.findall(v4_chrome.doors_nav("/data/sleep/")) == []
+    # a preview shell keeps its bar inside the preview
+    assert HREF_RE.findall(v4_chrome.doors_nav("cockpit/", base="/next/"))[0] == "/next/"
 
 
-def test_the_wayfinder_adds_the_first_footer_route_to_the_cockpit():
-    """The cockpit had no footer link at all before the wayfinder — the loop's vantage
-    was reachable only from the top nav. That gap is what 'navigable from anywhere' means
-    concretely, so it gets its own guard rather than riding on the coverage subset."""
-    assert 'href="/cockpit/"' in v4_chrome.site_footer(current_door="/story/")
-
-
-def test_the_marked_station_is_not_a_link_and_its_column_is_marked():
-    for key, href, _, _ in v4_wayfinding.STATIONS:
-        foot = v4_chrome.site_footer(current_door=href)
-        wf = WAYFINDER_RE.search(foot).group(0)
-        assert HERE_STOP_RE.search(wf).group(1) == key, f"{href}: wrong station marked"
-        assert '<a class="wf-stop is-here' not in wf, f"{href}: the station you're on self-links"
-        if key in v4_wayfinding.COLUMN_STATIONS:
-            assert f'<div class="sf-col is-here" data-station="{key}">' in foot, f"{href}: menu column not marked"
-        assert foot.count("is-here") == (2 if key in v4_wayfinding.COLUMN_STATIONS else 1)
-
-
-def test_the_footer_ribbon_never_reuses_the_loop_ribbon_class():
-    """`view-transition-name` must be unique per document (§12b). The page-hero ribbon
-    owns `loop-ribbon`; the footer's must stay `wf-ribbon` or the cross-document
-    transition dies silently on every page that carries both."""
-    for href in [None] + [h for _, h, _, _ in v4_wayfinding.STATIONS]:
-        assert "loop-ribbon" not in v4_chrome.site_footer(current_door=href)
+def test_the_wayfinder_and_the_loop_forward_are_retired():
+    assert not (ROOT / "scripts" / "v4_wayfinding.py").exists(), "the wayfinding module came back (ADR-157 retired it)"
+    for name in ("NEXT_STATION", "DEFAULT_NEXT", "FOOTER_COLUMNS", "RETURN_TRIGGER"):
+        assert not hasattr(v4_chrome, name), f"v4_chrome.{name} came back — the loop close was retired at the cut-over"
+    assert v4_chrome.loop_forward("/data/") == "" and v4_chrome.loop_forward(None, self_path="/subscribe/") == ""
+    assert v4_chrome.EDITION == "v7"
 
 
 # ── The real page inventory ─────────────────────────────────────────────────────
 
 
-def test_every_footer_page_carries_exactly_one_wayfinder():
+def test_every_chrome_bearing_page_carries_one_bar_one_footer_and_none_of_the_retired_chrome():
     checked = 0
     for path in _non_legacy_pages():
         html = path.read_text(encoding="utf-8")
-        if '<footer class="site-foot"' not in html:
+        if '<nav class="v7-bar"' not in html and '<footer class="v7-foot"' not in html:
             continue
         checked += 1
         rel = path.relative_to(SITE)
-        assert html.count('<nav class="wayfinder"') == 1, f"{rel}: expected exactly one wayfinder"
-        assert html.count('class="wf-ribbon"') == 1, f"{rel}: duplicate wf-ribbon — the view-transition name would collide"
-    assert checked > 0, "no footer-bearing pages found — the sweep didn't run over anything"
+        assert html.count('<nav class="v7-bar"') == 1, f"{rel}: expected exactly one v7 bar"
+        assert html.count('<footer class="v7-foot"') == 1, f"{rel}: expected exactly one v7 footer"
+        for marker in RETIRED_CHROME:
+            assert marker not in html, f"{rel}: retired chrome survived the cut-over: {marker}"
+    assert checked >= 90, f"only {checked} chrome-bearing pages found — the sweep ran over too little"
 
 
-def test_the_wayfinder_marks_the_same_station_the_doors_nav_marks():
-    """One detected door drives the nav, the loop-forward close and the wayfinder."""
+def test_the_bar_marks_the_pages_own_key_and_links_under_its_own_base():
     checked = 0
     for path in _non_legacy_pages():
         html = path.read_text(encoding="utf-8")
-        if '<nav class="doors"' not in html:
+        bar_m = BAR_RE.search(html)
+        if not bar_m:
             continue
         rel = path.relative_to(SITE)
-        nav_door = CURRENT_DOOR_RE.search(html)
-        foot = FOOT_RE.search(html)
-        assert foot, f"{rel}: doors-nav page with no canonical footer"
-        marked = HERE_STOP_RE.search(foot.group(0))
-        if nav_door is None:
-            assert marked is None, f"{rel}: nav marks no door but the wayfinder marks {marked.group(1)}"
-            continue
-        checked += 1
-        expected = v4_wayfinding.STATION_BY_DOOR[nav_door.group(1)]
-        assert marked and marked.group(1) == expected, f"{rel}: nav says {expected}, wayfinder says {marked and marked.group(1)}"
-    assert checked > 0, "no door-bearing pages found — the sweep didn't run over anything"
+        viewer = _viewer_path(path)
+        base = "/next/" if viewer.startswith("/next/") else "/"
+        hrefs = HREF_RE.findall(bar_m.group(0))
+        assert hrefs == [base + p for p, _ in v4_chrome.V7_BAR], f"{rel}: the bar links drifted from V7_BAR under {base}"
+        marked = CURRENT_RE.findall(bar_m.group(0))
+        key = viewer[len(base) :] if viewer.startswith(base) else None
+        expect = [viewer] if key in dict(v4_chrome.V7_BAR) else []
+        assert marked == expect, f"{rel}: bar marks {marked}, expected {expect}"
+        if expect:
+            checked += 1
+    assert checked == 10, f"expected the five bar pages live + preview to mark themselves, got {checked}"

@@ -210,12 +210,15 @@ class TestCockpitInjection:
         # level as a grade ("he's a 6 out of 100?!"), so it is replaced by an always-visible
         # key at the top of the collapsed engine section — score, level and "absent" each
         # defined in plain words.
+        # 2026-09-27 (ADR-157, the v7 cut-over): /cockpit/ is the v7 Today page, which prints
+        # no level, no score and no key at all — the three questions, the session, the one ask,
+        # what he skips, nothing after it. The number lives in the baked <noscript> block only
+        # (asserted above); the reader surface carries neither the hint nor the engine section.
         html = (Path(__file__).resolve().parent.parent / "site" / "cockpit" / "index.html").read_text(encoding="utf-8")
         assert "data-hub-hint" not in html and "hub-hint-x" not in html
-        key = html[html.index('class="engine-key"') :]
-        key = key[: key.index("</p>")]
-        for term in ("Score</strong>", "Level</strong>", "Absent"):
-            assert term in key, term
+        main = html[html.index("<main") : html.index("</main>")]
+        for retired in ('class="engine-key"', 'class="engine"', 'data-bind="level"', 'class="hub"'):
+            assert retired not in main, f"the v4 score UI is back on Today: {retired}"
 
 
 class TestCoachingReadBlock:

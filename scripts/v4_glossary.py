@@ -165,9 +165,12 @@ EXCLUDE_RE = re.compile(
     r'|<nav class="doors".*?</nav\b[^>]*>'
     r'|<footer class="site-foot".*?</footer\b[^>]*>'
     r'|<aside class="loop-forward".*?</aside\b[^>]*>'
-    r"|<script\b.*?</script\b[^>]*>"
-    r"|<style\b.*?</style\b[^>]*>"
-    r"|<svg\b.*?</svg\b[^>]*>",
+    # ADR-157 (the v7 cut-over): the v7 chrome partials, owned verbatim by v4_apply_chrome.py.
+    r'|<nav class="v7-bar".*?</nav\b[^>]*>' r'|<footer class="v7-foot".*?</footer\b[^>]*>'
+    # The no-JS copy (SKIP_TAGS already keeps the applier out of it; the acronym scan must
+    # stay out too — a coach's served "2:00 PM" inside a baked <noscript> core is served
+    # text, not builder prose, and the v7 pages carry their cores inside <main>).
+    r"|<noscript\b.*?</noscript\b[^>]*>" r"|<script\b.*?</script\b[^>]*>" r"|<style\b.*?</style\b[^>]*>" r"|<svg\b.*?</svg\b[^>]*>",
     re.DOTALL | re.IGNORECASE,
 )
 

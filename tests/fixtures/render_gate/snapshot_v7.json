@@ -1,0 +1,468 @@
+{
+ "character": {
+  "_meta": {
+   "cache_seconds": 900,
+   "generated_at": "2026-09-27T04:20:17.449021+00:00",
+   "request_id": "b374f4fa36414dc1",
+   "served_at": "2026-09-27T04:20:17.449021+00:00"
+  },
+  "character": {
+   "active_effects": [],
+   "as_of_date": "2026-09-25",
+   "character_mood": "steady",
+   "character_mood_inputs": {
+    "composite_raw": 42.8,
+    "gap_days": 0.0,
+    "presence_class": "present",
+    "trend_7d": 0.1
+   },
+   "composite_delta_1d": 1.8,
+   "composite_note": "composite_score is the mean of 6 of 7 pillars \u2014 1 not yet instrumented pillar(s) are excluded, not averaged in at a neutral score.",
+   "composite_pillar_count": 6,
+   "composite_pillar_total": 7,
+   "composite_score": 41.6,
+   "level": 7.0,
+   "tier": "Foundation",
+   "tier_emoji": "\ud83d\udd28",
+   "time_travel": false,
+   "xp_debt": 83.5,
+   "xp_total": 35.6429
+  },
+  "input_manifest": {
+   "as_of_day": "2026-09-26",
+   "complete": false,
+   "degraded": [
+    "food_delivery",
+    "notion"
+   ],
+   "note": "Computed on partial input \u2014 food_delivery, notion was stale or missing when this ran, so today's numbers are qualified, not complete.",
+   "sources": {
+    "apple_health": {
+     "age_hours": 9.51,
+     "latest_day": "2026-09-26",
+     "stale_after_hours": 48.0,
+     "status": "fresh"
+    },
+    "food_delivery": {
+     "age_hours": 4377.51,
+     "latest_day": "2026-03-28",
+     "stale_after_hours": 336.0,
+     "status": "stale"
+    },
+    "habitify": {
+     "age_hours": 9.51,
+     "latest_day": "2026-09-26",
+     "stale_after_hours": 48.0,
+     "status": "fresh"
+    },
+    "hevy": {
+     "age_hours": 33.51,
+     "latest_day": "2026-09-25",
+     "stale_after_hours": 168.0,
+     "status": "fresh"
+    },
+    "macrofactor": {
+     "age_hours": 33.51,
+     "latest_day": "2026-09-25",
+     "stale_after_hours": 96.0,
+     "status": "fresh"
+    },
+    "notion": {
+     "age_hours": 417.51,
+     "latest_day": "2026-09-09",
+     "stale_after_hours": 336.0,
+     "status": "stale"
+    },
+    "strava": {
+     "age_hours": 33.51,
+     "latest_day": "2026-09-25",
+     "stale_after_hours": 48.0,
+     "status": "fresh"
+    },
+    "todoist": {
+     "age_hours": 33.51,
+     "latest_day": "2026-09-25",
+     "stale_after_hours": 72.0,
+     "status": "fresh"
+    },
+    "whoop": {
+     "age_hours": 9.51,
+     "latest_day": "2026-09-26",
+     "stale_after_hours": 48.0,
+     "status": "fresh"
+    },
+    "withings": {
+     "age_hours": 9.51,
+     "latest_day": "2026-09-26",
+     "stale_after_hours": 168.0,
+     "status": "fresh"
+    }
+   },
+   "status": "partial",
+   "unobserved": []
+  },
+  "pillars": [
+   {
+    "absent_behaviors": [],
+    "coverage_hold": false,
+    "data_coverage": 1.0,
+    "drivers": {
+     "absent": [],
+     "dragging": [],
+     "no_data": [],
+     "top": [
+      "duration_vs_target",
+      "deep_sleep_pct"
+     ]
+    },
+    "emoji": "\ud83d\ude34",
+    "level": 10.0,
+    "name": "sleep",
+    "neglect_decay": null,
+    "not_instrumented": false,
+    "not_instrumented_note": null,
+    "raw_score": 85.2,
+    "score_delta": 12.9,
+    "tier": "Foundation",
+    "xp_debt": 0.0,
+    "xp_delta": 2.0,
+    "xp_earned": 3.0
+   },
+   {
+    "absence": {
+     "absent_behaviors": [],
+     "dark_sources": [],
+     "days_dark": null,
+     "days_since_last_log": 0,
+     "last_log_date": "2026-09-26",
+     "sources": [
+      "hevy",
+      "strava"
+     ],
+     "stale_hours": null,
+     "state": "logged",
+     "transition": "logged"
+    },
+    "absent_behaviors": [],
+    "coverage_hold": false,
+    "data_coverage": 0.75,
+    "drivers": {
+     "absent": [],
+     "dragging": [
+      "zone2_adequacy",
+      "daily_steps"
+     ],
+     "no_data": [
+      "training_load_balance",
+      "progressive_overload"
+     ],
+     "top": [
+      "strength_sessions",
+      "training_frequency"
+     ]
+    },
+    "emoji": "\ud83c\udfcb\ufe0f",
+    "level": 19.0,
+    "name": "movement",
+    "neglect_decay": null,
+    "not_instrumented": false,
+    "not_instrumented_note": null,
+    "raw_score": 55.3,
+    "score_delta": -1.0,
+    "tier": "Foundation",
+    "xp_debt": 0.0,
+    "xp_delta": 0.0,
+    "xp_earned": 1.0
+   },
+   {
+    "absence": {
+     "absent_behaviors": [
+      "calorie_adherence",
+      "protein_total",
+      "protein_distribution",
+      "consistency"
+     ],
+     "dark_sources": [],
+     "days_dark": null,
+     "days_since_last_log": 1,
+     "last_log_date": "2026-09-25",
+     "sources": [
+      "macrofactor"
+     ],
+     "stale_hours": null,
+     "state": "logged",
+     "transition": "paused"
+    },
+    "absent_behaviors": [
+     "calorie_adherence",
+     "protein_total",
+     "protein_distribution",
+     "consistency"
+    ],
+    "coverage_hold": false,
+    "data_coverage": 1.0,
+    "drivers": {
+     "absent": [
+      "calorie_adherence",
+      "protein_total",
+      "protein_distribution",
+      "consistency"
+     ],
+     "dragging": [
+      "body_composition_progress"
+     ],
+     "no_data": [],
+     "top": []
+    },
+    "emoji": "\ud83e\udd57",
+    "level": 1.0,
+    "name": "nutrition",
+    "neglect_decay": null,
+    "not_instrumented": false,
+    "not_instrumented_note": null,
+    "raw_score": 1.6,
+    "score_delta": 0.1,
+    "tier": "Foundation",
+    "xp_debt": 33.5,
+    "xp_delta": -2.0,
+    "xp_earned": -1.0
+   },
+   {
+    "absent_behaviors": [],
+    "coverage_hold": true,
+    "data_coverage": 0.15,
+    "drivers": {
+     "absent": [],
+     "dragging": [],
+     "no_data": [
+      "cgm_glucose_control",
+      "lab_biomarkers",
+      "blood_pressure"
+     ],
+     "top": [
+      "resting_heart_rate"
+     ]
+    },
+    "emoji": "\ud83d\udcca",
+    "level": 1.0,
+    "name": "metabolic",
+    "neglect_decay": null,
+    "not_instrumented": false,
+    "not_instrumented_note": null,
+    "raw_score": 59.4,
+    "score_delta": 0.0,
+    "tier": "Foundation",
+    "xp_debt": 0.0,
+    "xp_delta": 0.0,
+    "xp_earned": 0.0
+   },
+   {
+    "absence": {
+     "absent_behaviors": [
+      "t0_habit_compliance",
+      "t1_habit_compliance"
+     ],
+     "dark_sources": [
+      "notion"
+     ],
+     "days_dark": 17,
+     "days_since_last_log": 17,
+     "last_log_date": "2026-09-09",
+     "sources": [
+      "notion"
+     ],
+     "stale_hours": 336,
+     "state": "dark",
+     "transition": "paused"
+    },
+    "absent_behaviors": [
+     "t0_habit_compliance",
+     "t1_habit_compliance"
+    ],
+    "coverage_hold": false,
+    "data_coverage": 0.7,
+    "drivers": {
+     "absent": [
+      "t0_habit_compliance",
+      "t1_habit_compliance"
+     ],
+     "dragging": [
+      "journal_consistency",
+      "reading_practice"
+     ],
+     "no_data": [
+      "state_of_mind_valence",
+      "vice_control",
+      "values_alignment"
+     ],
+     "top": [
+      "stress_management"
+     ]
+    },
+    "emoji": "\ud83e\udde0",
+    "level": 3.0,
+    "name": "mind",
+    "neglect_decay": null,
+    "not_instrumented": false,
+    "not_instrumented_note": null,
+    "raw_score": 18.6,
+    "score_delta": 1.6,
+    "tier": "Foundation",
+    "xp_debt": 31.5,
+    "xp_delta": -2.0,
+    "xp_earned": -1.0
+   },
+   {
+    "absent_behaviors": [],
+    "coverage_hold": true,
+    "data_coverage": 0.0,
+    "drivers": {
+     "absent": [],
+     "dragging": [],
+     "no_data": [
+      "social_interaction_frequency",
+      "interaction_quality",
+      "social_mood_correlation"
+     ],
+     "top": []
+    },
+    "emoji": "\ud83d\udcac",
+    "level": 1.0,
+    "name": "relationships",
+    "neglect_decay": null,
+    "not_instrumented": true,
+    "not_instrumented_note": "No relationship data source feeds this pillar yet \u2014 tracked as future work (#747).",
+    "raw_score": 50.0,
+    "score_delta": 0.0,
+    "tier": "Foundation",
+    "xp_debt": 0.0,
+    "xp_delta": 0.0,
+    "xp_earned": 0.0
+   },
+   {
+    "absence": {
+     "absent_behaviors": [],
+     "dark_sources": [],
+     "days_dark": null,
+     "days_since_last_log": null,
+     "last_log_date": "2026-09-26",
+     "sources": [
+      "todoist",
+      "habitify"
+     ],
+     "stale_hours": null,
+     "state": "logged",
+     "transition": null
+    },
+    "absent_behaviors": [],
+    "coverage_hold": false,
+    "data_coverage": 1.0,
+    "drivers": {
+     "absent": [],
+     "dragging": [
+      "cross_pillar_variance",
+      "streak_maintenance"
+     ],
+     "no_data": [],
+     "top": [
+      "data_completeness",
+      "weekend_weekday_stability"
+     ]
+    },
+    "emoji": "\ud83c\udfaf",
+    "level": 11.0,
+    "name": "consistency",
+    "neglect_decay": null,
+    "not_instrumented": false,
+    "not_instrumented_note": null,
+    "raw_score": 29.4,
+    "score_delta": -3.0,
+    "tier": "Foundation",
+    "xp_debt": 18.5,
+    "xp_delta": -1.0,
+    "xp_earned": 0.0
+   }
+  ]
+ },
+ "generated_at": "2026-09-27T04:20:17.449704+00:00",
+ "journey": {
+  "_meta": {
+   "cache_seconds": 3600,
+   "generated_at": "2026-09-27T04:20:17.394580+00:00",
+   "request_id": "b374f4fa36414dc1",
+   "served_at": "2026-09-27T04:20:17.394580+00:00"
+  },
+  "journey": {
+   "current_weight_lbs": 313.8,
+   "day_n": 21,
+   "days_to_goal": null,
+   "goal_weight_lbs": 185.0,
+   "height_inches": 69.0,
+   "last_weighin_date": "2026-09-26",
+   "lost_lbs": 13.5,
+   "pre_start": false,
+   "progress_pct": 9.5,
+   "projected_goal_date": null,
+   "projected_goal_date_earliest": null,
+   "projected_goal_date_latest": null,
+   "projection_confidence": 0.8,
+   "rate_provisional": true,
+   "remaining_lbs": 128.8,
+   "start_weight_lbs": 327.3,
+   "started_date": "2026-09-06",
+   "week_n": 3,
+   "weekly_rate_ci_high": -2.75,
+   "weekly_rate_ci_low": -4.74,
+   "weekly_rate_lbs": -4.36,
+   "weighin_count": 13,
+   "weighin_span_days": 20
+  }
+ },
+ "pre_start": false,
+ "readiness": null,
+ "vitals": {
+  "_meta": {
+   "cache_seconds": 300,
+   "generated_at": "2026-09-27T04:20:17.332079+00:00",
+   "request_id": "b374f4fa36414dc1",
+   "served_at": "2026-09-27T04:20:17.332079+00:00"
+  },
+  "page_freshness": {
+   "/character": "2026-09-27T04:20:17.272228+00:00",
+   "/explorer": "2026-09-27T04:20:17.272228+00:00",
+   "/glucose": "2026-09-27T04:20:17.272228+00:00",
+   "/habits": "2026-09-27T04:20:17.272228+00:00",
+   "/live": "2026-09-27T04:20:17.272228+00:00",
+   "/nutrition": "2026-09-25T12:00:00Z",
+   "/physical": "2026-09-26T12:00:00Z",
+   "/sleep": "2026-09-26T12:00:00Z",
+   "/training": "2026-09-27T04:20:17.272228+00:00"
+  },
+  "vitals": {
+   "as_of_date": "2026-09-26",
+   "frame": "last_night",
+   "hrv_30d_avg": null,
+   "hrv_30d_n": null,
+   "hrv_avg_ms": 41.0,
+   "hrv_avg_n": 21,
+   "hrv_avg_window_days": 21,
+   "hrv_ms": 46.5,
+   "hrv_trend": "improving",
+   "night_of": "2026-09-25",
+   "recovery_as_of": "2026-09-26",
+   "recovery_pct": 77.0,
+   "recovery_status": "green",
+   "rhr_bpm": 55.0,
+   "rhr_trend": "improving",
+   "sleep_as_of": "2026-09-26",
+   "sleep_hours": 8.6,
+   "time_travel": false,
+   "weight_as_of": "2026-09-26",
+   "weight_delta_30d": null,
+   "weight_delta_lbs": -13.5,
+   "weight_delta_window_days": 20,
+   "weight_lbs": 314,
+   "window_disclosure": "Today is Day 21 of the cycle that began 2026-09-06, so at most 21 day(s) of data can exist. weight_delta_lbs is the change between two weigh-ins 20 day(s) apart, both inside that window. hrv_avg_ms averages 21 reading(s) spanning 21 day(s). Fields named *_30d stay null until a genuine 30-day window exists; none of the numbers above claims more history than the cycle has."
+  }
+ }
+}

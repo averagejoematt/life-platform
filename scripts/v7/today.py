@@ -53,6 +53,10 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         "    <h1>Today</h1>\n"
         '    <p class="v7-job">Matthew’s morning screen, open to anyone.</p>\n'
         '    <p class="td-through" id="td-through" data-src="api_snapshot.vitals.as_of_date | api_snapshot.journey.last_weighin_date | api_nutrition_overview.nutrition.latest_date"></p>\n'
+        # The cut-over anchor (ADR-157, plan §3c): empty in the preview, filled with the
+        # <noscript> proof bake by scripts/v4_build_cockpit_proof.py when poured at /cockpit/.
+        "    <!-- cockpit-proof:start -->\n"
+        "    <!-- cockpit-proof:end -->\n"
         "    <!-- cockpit-proof:start -->\n"
         "    <!-- cockpit-proof:end -->\n"
         '    <noscript><p class="td-note">Every line on this page is poured from the site’s served data when scripts run. With scripts off, each entry names what it holds, not the numbers.</p></noscript>\n'
