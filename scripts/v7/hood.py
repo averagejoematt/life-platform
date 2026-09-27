@@ -7,7 +7,7 @@ sentences each, *what we said · what happened · what we changed*, the served r
 under a <details>; the build log's last ten titles with their days; the gear — the
 registry-derived device list (`source_registry.catalog_entries()`, the same list
 `scripts/v4_build_gear.py` pours) with what each feeds and, from /api/source_freshness at
-runtime, when it last reported — names only, no affiliate links, so the live gear page's
+runtime, when it last reported — names only, none of them linked, so the live gear page's
 FTC disclosure is NOT carried (it would describe links this page does not have); and the
 dated return line.
 
