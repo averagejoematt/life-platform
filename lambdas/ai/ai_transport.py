@@ -37,10 +37,12 @@ Two behaviours are pinned by tests and must not regress:
 """
 
 import os
-import time
+import time  # noqa: F401 — the retry sleep moved to bedrock_client (#4279); kept so `ai_transport.time` stays patchable
 from typing import Any, Optional, Union
 
 import boto3
+
+from ai.bedrock_client import INVOKE_RETRY_BASE_DELAYS, RETRYABLE_BEDROCK_CODES
 
 # AI model constants — read from env so model can be updated without redeployment
 AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
@@ -51,8 +53,9 @@ _cw = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-we
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
 _CW_NAMESPACE = "LifePlatform/AI"
 
-# Exponential backoff delays (seconds) between retry attempts
-_BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
+# #4279: the retry schedule is owned by bedrock_client.invoke_with_retry — this name is
+# the re-export ai_calls has always carried (#3082), bound to the one schedule, not a copy.
+_BACKOFF_DELAYS = INVOKE_RETRY_BASE_DELAYS
 
 # R17-16 outage sentinel returned by call_anthropic when Bedrock is unreachable
 # or tier-3 BudgetExceeded fires. #952 (ai-content-6): the coach v2 pipeline must
@@ -63,16 +66,8 @@ _BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
 # rendered in the brief.
 AI_UNAVAILABLE_SENTINEL = "[AI_UNAVAILABLE]"
 
-# Bedrock error codes worth another attempt: throttling + transient service issues.
-# Anything else (validation, access denied, a bad model id) will fail identically
-# on attempt 4, so retrying it only burns wall-clock.
-_RETRYABLE_BEDROCK_CODES = (
-    "ThrottlingException",
-    "ModelTimeoutException",
-    "ServiceUnavailableException",
-    "InternalServerException",
-    "ModelNotReadyException",
-)
+# Bedrock error codes worth another attempt: the one set, owned by bedrock_client (#4279).
+_RETRYABLE_BEDROCK_CODES = RETRYABLE_BEDROCK_CODES
 
 # AI-3 middleware: lazy import of output validator (transparent fail-safe)
 try:
@@ -130,9 +125,9 @@ def call_anthropic(
     model: Optional[str] = None,
     cache_system: bool = True,
 ) -> str:
-    """Call Anthropic API with exponential backoff (4 attempts: 5s/15s/45s delays).
+    """Call Claude on Bedrock under the one retry policy (#4279: bedrock_client.invoke_with_retry —
+    3 sends, jittered 5/15 s; was 4 attempts at 5/15/45 s stacked on botocore's 3 sends).
 
-    P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
     P1.9: Token usage emitted to CloudWatch LifePlatform/AI namespace.
     COST-OPT: Prompt caching — 90% discount on cached system message tokens.
     AI-3 middleware: validates output when output_type is specified (transparent fail-safe).
@@ -162,74 +157,48 @@ def call_anthropic(
     # param now ignored — kept for signature compatibility). Prompt caching
     # preserved via cache_control blocks in sys_block. Response shape is
     # identical to the direct API, so parsing/validation below is unchanged.
-    import botocore.exceptions as _bce
-
     from ai.bedrock_client import (
         UnknownModelError as _UnknownModel,
         budget_stop_cls as _budget_stop_cls,
         first_text as _first_text,
-        invoke as _bedrock_invoke,
+        invoke_with_retry as _invoke_with_retry,
     )
 
     _BudgetStop = _budget_stop_cls()
 
-    max_attempts = len(_BACKOFF_DELAYS) + 1  # 4
-    # #2893: ONLY the transport call lives inside the retry `try`. It used to end
-    # `text = resp["content"][0]["text"].strip()` in here, so an empty `content`
-    # list — the exact shape of a max_tokens stop with no emitted text — raised
-    # IndexError, was caught by the generic `except Exception` below, and
-    # re-invoked the model: up to 4 billed calls, zero usable output. Transport
-    # failures retry; a response you have already paid for does not.
-    resp: dict[str, Any] = {}
-    for attempt in range(1, max_attempts + 1):
-        try:
-            resp = _bedrock_invoke(body, model_name=body["model"])
-            # Token usage + estimated spend are now metered centrally at the
-            # bedrock_client.invoke() chokepoint (G1) — no per-caller emit here.
-            break
-        except _BudgetStop as e:
-            # #3084: the tier-3 budget guard REFUSES before invoke_model — nothing
-            # was billed and nothing about the next attempt would differ, so this
-            # must never enter the backoff ladder. It used to fall through to the
-            # generic handler below and sleep 5+15+45 = 65s per call; across the
-            # brief's ~62 AI calls that is ~67 minutes of sleeps against a Lambda
-            # timeout, precisely when the platform is already over budget.
-            print(f"[INFO] AI paused by the budget guard (tier 3) — returning the outage sentinel immediately, no retry: {e}")
-            return AI_UNAVAILABLE_SENTINEL
-        except _UnknownModel as e:
-            # #4275: the model NAME resolved to nothing — a configuration error raised
-            # before invoke_model (nothing billed) that attempt 2 cannot fix. Never the
-            # old silent Haiku fallback, never the backoff ladder: fail the call loudly
-            # (the message names the input and every known name) and let the caller's
-            # existing degrade path run — for the brief that is the sentinel per coach,
-            # exactly the contract a hard Bedrock error already has, only in seconds.
-            _emit_failure_metric()
-            print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
-            return AI_UNAVAILABLE_SENTINEL
-        except _bce.ClientError as e:
-            code = e.response.get("Error", {}).get("Code", "Unknown")
-            retryable = code in _RETRYABLE_BEDROCK_CODES
-            print(f"[WARN] Bedrock {code} attempt {attempt}/{max_attempts}")
-            if retryable and attempt < max_attempts:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                # R17-16: graceful degradation — return sentinel so callers know AI
-                # failed (not just empty output). Callers check for AI_UNAVAILABLE.
-                print(f"[ERROR] Bedrock unavailable after {max_attempts} attempts ({code}).")
-                return AI_UNAVAILABLE_SENTINEL
-        except Exception as e:
-            print(f"[WARN] Bedrock error attempt {attempt}/{max_attempts}: {e}")
-            if attempt < max_attempts:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                print(f"[ERROR] Bedrock unreachable after {max_attempts} attempts: {e}.")
-                return AI_UNAVAILABLE_SENTINEL
+    # #4279: the retry policy is `bedrock_client.invoke_with_retry` — the ONE loop
+    # (3 sends, jittered 5/15 s bases, botocore retries off). This used to be a
+    # 4-attempt 5/15/45 s copy of its own stacked on botocore's 3 sends.
+    # #2893: ONLY the transport call lives inside the `try`. An empty `content` list
+    # (a max_tokens stop with no text) used to raise IndexError in here and re-invoke
+    # the model: up to 4 billed calls, zero usable output. Transport failures retry;
+    # a response you have already paid for does not.
+    try:
+        resp: dict[str, Any] = _invoke_with_retry(body, model_name=body["model"])
+        # Token usage + estimated spend are metered centrally at bedrock_client.invoke() (G1).
+    except _BudgetStop as e:
+        # #3084: the tier-3 budget guard REFUSES before invoke_model — nothing was
+        # billed and nothing about the next attempt would differ, so it never enters
+        # the backoff (invoke_with_retry re-raises it at once). It used to sleep
+        # 5+15+45 = 65s per call; across the brief's ~62 AI calls ~67 minutes.
+        print(f"[INFO] AI paused by the budget guard (tier 3) — returning the outage sentinel immediately, no retry: {e}")
+        return AI_UNAVAILABLE_SENTINEL
+    except _UnknownModel as e:
+        # #4275: the model NAME resolved to nothing — a configuration error raised
+        # before invoke_model (nothing billed) that attempt 2 cannot fix. Never the
+        # old silent Haiku fallback, never the backoff: fail the call loudly (the
+        # message names the input and every known name) and let the caller's existing
+        # degrade path run — for the brief that is the sentinel per coach, exactly the
+        # contract a hard Bedrock error already has, only in seconds.
+        _emit_failure_metric()
+        print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
+        return AI_UNAVAILABLE_SENTINEL
+    except Exception as e:
+        _emit_failure_metric()
+        # R17-16: graceful degradation — return sentinel so callers know AI failed
+        # (not just empty output). Callers check for AI_UNAVAILABLE.
+        print(f"[ERROR] Bedrock unavailable after the retry policy gave up: {e}")
+        return AI_UNAVAILABLE_SENTINEL
 
     text = _first_text(resp)
     if text is None:
