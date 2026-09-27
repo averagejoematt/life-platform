@@ -855,6 +855,140 @@ register(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PAIR 10 — the coach record: K of N through <day> (#4220, epic #4182)
+#   coach.dispute_docket._write_docket_prediction (+ the grader's write-back)
+#     -> coach.coach_record.record_from_rows
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class _ConditionalTable:
+    """A put_item that honours `attribute_not_exists(pk) AND attribute_not_exists(sk)` —
+    so `_put_unique`'s real -2…-5 disambiguation trail is what the consumer reads."""
+
+    def __init__(self):
+        self.items = []
+
+    def put_item(self, Item, ConditionExpression=None, **_kw):  # noqa: N803
+        from botocore.exceptions import ClientError
+
+        if ConditionExpression and any(i["pk"] == Item["pk"] and i["sk"] == Item["sk"] for i in self.items):
+            raise ClientError({"Error": {"Code": "ConditionalCheckFailedException", "Message": "exists"}}, "PutItem")
+        self.items.append(dict(Item))
+        return {}
+
+
+def _produce_coach_record_rows():
+    """The partition the record is counted from: one grader-written call plus the SAME
+    docket resolution written three days running through the real resolver path — the
+    #4216 re-write trail (one prediction_id, three sort keys), so the wire carries the
+    duplicate the consumer must count once."""
+    from coach import coach_prediction_evaluator as ev, dispute_docket as dd
+    from coach.prediction_emission import build_prediction_record
+
+    made, graded_on = _in_cycle_day(4), _in_cycle_day(6)  # graded BEFORE the docket's first resolution day, so `through` is the docket's
+    spec = {"type": "machine", "metric": "total_protein_g_7day_avg", "condition": ">=", "threshold": 170, "window_days": 7}
+    call = build_prediction_record("nutrition_coach", made, "Matthew's 7-day protein average will hold 170 g.", spec, 0.6, "coach_read")
+    grading = _GradingTable(call)
+    real_ev_table = ev.table
+    ev.table = grading
+    try:
+        ev._update_prediction_status(
+            call,
+            {
+                "prediction_id": call["prediction_id"],
+                "status": "refuted",
+                "evaluated_date": graded_on,
+                "actual_value": 151.2,
+                "reason": "r",
+            },
+        )
+    finally:
+        ev.table = real_ev_table
+
+    docket = {
+        "sk": "OPEN#explorer_coach__nutrition_coach#calories",
+        "coach_a": "explorer_coach",
+        "coach_b": "nutrition_coach",
+        "pair_key": "explorer_coach__nutrition_coach",
+        "subdomain": "calories",
+        "topic": "Caloric variance interpretation",
+        "topic_slug": "caloric-variance-interpretation",
+        "criterion": {"metric": "total_calories_kcal_7day_avg", "condition": "gte", "threshold": 2200, "description": "kcal >= 2200"},
+        "claims": {"nutrition_coach": "The 7-day calorie average will hold at or above 2200."},
+        "stakes": {},
+        "opened_date": _in_cycle_day(2),
+        "opened_at": _in_cycle_day(2) + "T17:41:16+00:00",
+    }
+    table = _ConditionalTable()
+    real_dd_table = dd.table
+    dd.table = table
+    try:
+        for offset in (9, 10, 11):  # three resolver runs on one docket (#4216)
+            dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, _in_cycle_day(offset))
+    finally:
+        dd.table = real_dd_table
+    assert len(table.items) == 3 and len({i["prediction_id"] for i in table.items}) == 1, "the re-write trail did not form"
+    # The wire the consumer reads is the partition page — the real fetch is projected and
+    # Decimal-cast, so the rows go through the serving path's own cast.
+    from web.site_api_common import _decimal_to_float
+
+    return {"rows": [_decimal_to_float(dict(grading.row))] + [_decimal_to_float(i) for i in table.items]}
+
+
+def _consume_coach_record_rows(payload):
+    from coach import coach_record
+    from common.constants import EXPERIMENT_START_DATE
+
+    return coach_record.record_from_rows(payload["rows"], genesis=EXPERIMENT_START_DATE)
+
+
+def _agree_coach_record_rows(produced, consumed):
+    rows = produced["rows"]
+    graded = [r for r in rows if r.get("status") in ("confirmed", "refuted")]
+    resolutions = {r["prediction_id"] for r in graded}
+    assert consumed["n"] == len(resolutions) == 2, f"a re-written resolution counted more than once: {consumed}"
+    assert consumed["confirmed"] == 1 and consumed["refuted"] == 1
+    # `through` is the latest outcome_date COUNTED — the docket's FIRST resolution day, never a re-write's.
+    first_docket_day = min(r["outcome_date"] for r in rows if r.get("source") == "dispute_docket")
+    assert consumed["through"] == max(rows[0]["outcome_date"], first_docket_day), consumed
+
+
+register(
+    PairContract(
+        name="coach PREDICTION# resolutions -> the one record (K of N through <day>)",
+        producer="coach.dispute_docket::_write_docket_prediction",
+        consumer="coach.coach_record::record_from_rows",
+        partition=None,  # COACH# rows are outside the ADR-077 USER#…#SOURCE# partition census
+        produce=_produce_coach_record_rows,
+        consume=_consume_coach_record_rows,
+        agree=_agree_coach_record_rows,
+        mutations=(
+            Mutation(
+                ("rows", 2, "prediction_id"),
+                "rename",
+                to="id",
+                why="the identity a re-write shares with its original — lose it on the -2 row and the trail counts twice",
+            ),
+            Mutation(("rows", 0, "status"), "retype", to="pending", why="an undecided call is not a checked one"),
+            Mutation(
+                ("rows", 0, "outcome_date"), "retype", to="2000-01-01", why="a resolution before genesis never enters this cycle's record"
+            ),
+            Mutation(
+                ("rows", 1, "outcome_date"), "drop", why="the day the record reads 'through' — the first resolution's, not a re-write's"
+            ),
+        ),
+        note=(
+            "#4220 / epic #4182: one coach's record was served three ways on 2026-09-26 (LEARNING# re-counts on "
+            "/api/coaches and /api/wrong, PREDICTION# on the scorecard). The record is counted from the PREDICTION# "
+            "ledger alone, one resolution per prediction_id (the `_put_unique` -2…-5 trail of #4216 is one call), in "
+            "the cycle its first graded row is visible in and on/after genesis. /api/coaches, /api/calibration, "
+            "/api/predictions and /api/wrong all derive from coach_record; tests/test_coaches_api.py pins the four agree."
+        ),
+    )
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # THE FLOOR — pairs this platform KNOWS must agree.
 #
 # Sourced from the #2813 follow-up disposition and the two contracts built this
@@ -879,11 +1013,13 @@ KNOWN_MUST_AGREE_PAIRS = (
     "ai_analysis EXPERT# -> observatory card journaling prompt",
     # E1 / #4182 — the v7 coaches page's ledger line.
     "coach PREDICTION# graded row -> ledger line (latest_checked)",
+    # #4220 / #4182 — one record per coach, four endpoints.
+    "coach PREDICTION# resolutions -> the one record (K of N through <day>)",
 )
 
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 9
+ENROLLED_FLOOR = 10
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]

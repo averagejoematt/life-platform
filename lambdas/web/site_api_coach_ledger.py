@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from boto3.dynamodb.conditions import Key
 from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
+    coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
@@ -304,6 +305,11 @@ _PREDICTION_PROJECTION_FIELDS = (
     # with "sealed, instant unrecorded". The ledger table has to distinguish a bet frozen
     # before Day 1 from one logged mid-cycle, and the flag is the thing that says so.
     "pre_registered",
+    # #4220: the record producer's two keys — the identity a re-written row shares with its
+    # original (`prediction_id`, the `_put_unique` -2…-5 trail of #4216 keeps it) and the
+    # resolution date that decides which cycle a graded call belongs to.
+    "prediction_id",
+    "outcome_date",
 )
 
 
@@ -531,10 +537,15 @@ def _score_coach_calibration(cid, records=None, *, _g):
             records = _fetch_prediction_partition(f"COACH#{_CALIB_COACH_ID_MAP[cid]}")
         except Exception as _e:
             logger.warning(f"[calibration] {cid}: {_e}")
+    # #4220: the Brier pairs are built from the SAME row-set the record is counted from —
+    # each prediction's ONE resolution (a re-written docket row never scores twice), and
+    # season = the rows that count in this cycle (phase-visible AND resolved on/after
+    # genesis), so `n`/`confirmed`/`refuted` here and `record` on the payload cannot drift.
+    records = coach_record.resolved_once(records)
     career_pairs = calibration_core.pairs_from_prediction_records(records)
     career_summary = calibration_core.score_pairs(career_pairs)
 
-    season_records = [r for r in records if singleton_visible(r)]  # ADR-058: hide pilot/archived predictions
+    season_records = [r for r in records if coach_record.counts_this_cycle(r, _g["EXPERIMENT_START"])]  # ADR-058 + #4220
     season_pairs = calibration_core.pairs_from_prediction_records(season_records)
     season_summary = calibration_core.score_pairs(season_pairs)
 
@@ -605,7 +616,16 @@ def handle_calibration(event, *, _g):
             platform_pairs.extend(pairs)
             platform_career_pairs.extend(career_pairs)
             per_coach.append(
-                {"coach_id": cid, "coach_name": name, "retired": cid in _RETIRED_SHORT_IDS, **summary, "lifetime": career_summary}
+                {
+                    "coach_id": cid,
+                    "coach_name": name,
+                    "retired": cid in _RETIRED_SHORT_IDS,
+                    **summary,
+                    # #4220: K of N through <day> — the ONE record producer's block, over the
+                    # same rows the Brier numbers beside it were scored on.
+                    "record": coach_record.record_from_rows(fetched[cid], genesis=EXPERIMENT_START),
+                    "lifetime": career_summary,
+                }
             )
         hyp_rows_season = [r for r in hyp_rows if str(r.get("resolved_at") or "")[:10] >= EXPERIMENT_START]
 
@@ -770,6 +790,7 @@ def handle_predictions(event, *, _g):
     _current_cycle = _g["_current_cycle"]
     _fetch_prediction_partition = _g["_fetch_prediction_partition"]
     _parallel_fetch = _g["_parallel_fetch"]
+    EXPERIMENT_START = _g["EXPERIMENT_START"]  # #4220: the genesis a graded row must not predate
     # #1980: computed first (never raises) so the seal is always available to the
     # success payload below — see handle_calibration for the same pattern. NB since
     # #2658 the exception path returns `_error`, not a seal-bearing 200.
@@ -854,10 +875,16 @@ def handle_predictions(event, *, _g):
             try:
                 # ONE unfiltered fetch of the whole PREDICTION# partition (career,
                 # prefetched concurrently above — #1527); season is derived from it
-                # below via singleton_visible, the same predicate with_phase_filter
-                # applies server-side (ADR-058/#946) — so season can never diverge
-                # from or double-count against career.
-                for rec in fetched.get(cid, []):
+                # below via counts_this_cycle — singleton_visible, the same predicate
+                # with_phase_filter applies server-side (ADR-058/#946), plus the #4220
+                # genesis test on a graded row — so season can never diverge from or
+                # double-count against career. #4220: the walk is over `resolved_once`,
+                # the partition with each prediction's re-writes removed, so a docket
+                # row `_put_unique` re-wrote five times (#4216) is one graded call in
+                # career and in season alike — the same row-set `record` is counted from.
+                records = coach_record.resolved_once(fetched.get(cid, []))
+                by_coach[cid]["record"] = coach_record.record_from_rows(records, genesis=EXPERIMENT_START)
+                for rec in records:
                     ev = rec.get("evaluation") or {}
                     ungradeable = not prediction_windows.is_gradeable(ev)
                     p_status = rec.get("status", "pending")
@@ -871,7 +898,7 @@ def handle_predictions(event, *, _g):
                     if p_status in ("confirmed", "refuted"):
                         by_coach[cid]["lifetime"]["decided"] += 1
 
-                    if not singleton_visible(rec):  # archived cycle — career-only, not this season
+                    if not coach_record.counts_this_cycle(rec, EXPERIMENT_START):  # archived cycle / pre-genesis — career-only
                         continue
 
                     by_coach[cid]["total"] += 1

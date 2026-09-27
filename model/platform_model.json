@@ -883,6 +883,16 @@
       "producer": "coach.coach_prediction_evaluator::_update_prediction_status"
     },
     {
+      "consumer": "coach.coach_record::record_from_rows",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 4,
+      "name": "coach PREDICTION# resolutions -> the one record (K of N through <day>)",
+      "note": "#4220 / epic #4182: one coach's record was served three ways on 2026-09-26 (LEARNING# re-counts on /api/coaches and /api/wrong, PREDICTION# on the scorecard). The record is counted from the PREDICTION# ledger alone, one resolution per prediction_id (the `_put_unique` -2\u2026-5 trail of #4216 is one call), in the cycle its first graded row is visible in and on/after genesis. /api/coaches, /api/calibration, /api/predictions and /api/wrong all derive from coach_record; tests/test_coaches_api.py pins the four agree.",
+      "partition": null,
+      "producer": "coach.dispute_docket::_write_docket_prediction"
+    },
+    {
       "consumer": "experiment.canonical_facts::build_canonical_facts",
       "enrolled": true,
       "floor": true,
@@ -7377,10 +7387,10 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 9,
-      "contracts_enrolled": 9,
-      "contracts_known": 9,
-      "contracts_ratchet": 9,
+      "contracts": 10,
+      "contracts_enrolled": 10,
+      "contracts_known": 10,
+      "contracts_ratchet": 10,
       "edges": 715,
       "lambdas": 106,
       "mcp_tool_modules": 34,
