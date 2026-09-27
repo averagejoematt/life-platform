@@ -59,7 +59,10 @@ from grounding_wiring import REPO, SURFACES
 # reference to them is the seam. `invoke` is not unique (boto3 Lambda fan-out uses it
 # too — daily_brief_lambda's `_lambda_client.invoke` is NOT an AI call), so it counts
 # only when it resolves to the `bedrock_client` module or to a name imported FROM it.
-UNIQUE_SEAMS = frozenset({"call_anthropic_raw", "call_anthropic_api"})
+# #4279: `bedrock_client.invoke_with_retry` is the one retry policy the two transports
+# (ai_transport, retry_utils) now relay through — a seam like `invoke`, so a module that
+# imports it directly is a generation site the census must see, never a bypass.
+UNIQUE_SEAMS = frozenset({"call_anthropic_raw", "call_anthropic_api", "invoke_with_retry"})
 SEAM_MODULES = frozenset({"bedrock_client", "retry_utils"})
 SCAN_ROOTS = ("lambdas", "mcp")
 
@@ -226,11 +229,12 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
     ),
     # — seam-def —
     "lambdas/common/retry_utils.py": _ex(
-        SEAM_DEF, "DEFINES call_anthropic_raw/call_anthropic_api and relays to bedrock_client.invoke. A transport, not a generation site."
+        SEAM_DEF,
+        "DEFINES call_anthropic_raw/call_anthropic_api and relays to bedrock_client.invoke_with_retry (#4279). A transport, not a generation site.",
     ),
     "lambdas/ai/ai_transport.py": _ex(
         SEAM_DEF,
-        "DEFINES call_anthropic (the daily brief's only door to Bedrock) and relays to bedrock_client.invoke — the retry ladder, the "
+        "DEFINES call_anthropic (the daily brief's only door to Bedrock) and relays to bedrock_client.invoke_with_retry (#4279) — the "
         "CloudWatch failure series and the AI-3 output hook, and nothing that knows what a coach or a brief is. Split out of ai_calls.py "
         "by #3082; the two grounding surfaces that own this path — ai_calls.py::_ground_legacy_output and ::_run_coach_v2_pipeline — "
         "stayed behind in ai_calls and are still registered in SURFACES, so the extraction moved the transport, not the decision.",

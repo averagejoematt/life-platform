@@ -9,7 +9,8 @@ decisions and the cached-system-block wire shape are deploy-critical. Prior to
 
 Every test asserts real behavior: a controlled fake `bedrock_client.invoke`
 (monkeypatched on the real module, so the real wrapper runs) drives the retry
-ladder; `time.sleep` is stubbed so the 5/15/45s backoff never actually blocks;
+ladder; `time.sleep` is stubbed so the backoff (#4279: the one policy in
+`bedrock_client.invoke_with_retry`) never actually blocks;
 the CloudWatch client is a recorder so failure/token metrics are asserted, not
 sent.
 """
@@ -17,6 +18,7 @@ sent.
 import json
 
 import pytest
+from ai import bedrock_client
 from botocore.exceptions import ClientError
 from common import retry_utils
 
@@ -51,9 +53,12 @@ def cw(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_sleep(monkeypatch):
-    """Never actually sleep the 5/15/45s backoff during tests."""
+    """Never actually sleep the backoff during tests. The jitter is pinned at its
+    maximum (1.0), so the recorded schedule is exactly INVOKE_RETRY_BASE_DELAYS —
+    the worst case the one policy (#4279, `bedrock_client.invoke_with_retry`) allows."""
     slept = []
     monkeypatch.setattr(retry_utils.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(bedrock_client, "_jitter", lambda: 1.0)
     return slept
 
 
@@ -142,7 +147,7 @@ def test_retryable_clienterror_retries_then_succeeds(monkeypatch, cw, _no_sleep)
     out = retry_utils.call_anthropic_api("hi")
     assert out == "recovered"
     assert calls["n"] == 3
-    # Backoff used the first two configured delays, in order.
+    # Backoff used the one policy's two delays, in order (#4279: jitter pinned at max).
     assert _no_sleep == [5, 15]
     # Recovered → no failure metric emitted.
     assert "AnthropicAPIFailure" not in cw.metric_names()
@@ -161,9 +166,10 @@ def test_retryable_clienterror_exhausts_attempts_then_raises(monkeypatch, cw, _n
     calls = _patch_invoke(monkeypatch, lambda n: _client_error("ServiceUnavailableException"))
     with pytest.raises(ClientError):
         retry_utils.call_anthropic_api("hi")
-    assert calls["n"] == retry_utils._MAX_ATTEMPTS == 4
-    # Three backoffs between four attempts.
-    assert _no_sleep == retry_utils._BACKOFF_DELAYS == [5, 15, 45]
+    # #4279: the one policy — 3 sends, 2 backoffs, 20 s worst-case sleep (was 4 sends,
+    # 5/15/45 = 65 s, stacked on botocore's 3 sends each = 12 invoke_model sends).
+    assert calls["n"] == bedrock_client.INVOKE_MAX_ATTEMPTS == 3
+    assert _no_sleep == list(bedrock_client.INVOKE_RETRY_BASE_DELAYS) == [5, 15]
     assert "AnthropicAPIFailure" in cw.metric_names()
 
 
@@ -171,7 +177,7 @@ def test_generic_exception_retries_then_raises(monkeypatch, cw, _no_sleep):
     calls = _patch_invoke(monkeypatch, lambda n: RuntimeError("boom"))
     with pytest.raises(RuntimeError):
         retry_utils.call_anthropic_api("hi")
-    assert calls["n"] == 4
+    assert calls["n"] == bedrock_client.INVOKE_MAX_ATTEMPTS
     assert "AnthropicAPIFailure" in cw.metric_names()
 
 
@@ -205,7 +211,7 @@ def test_call_anthropic_raw_retries_then_emits_failure_on_exhaustion(monkeypatch
     calls = _patch_invoke(monkeypatch, lambda n: _client_error("ModelTimeoutException"))
     with pytest.raises(ClientError):
         retry_utils.call_anthropic_raw({"model": "m", "messages": []})
-    assert calls["n"] == 4
+    assert calls["n"] == bedrock_client.INVOKE_MAX_ATTEMPTS
     assert "AnthropicAPIFailure" in cw.metric_names()
 
 

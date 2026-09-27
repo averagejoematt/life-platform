@@ -414,19 +414,32 @@ def served(item: Optional[dict]) -> Optional[dict]:
     }
 
 
+_LATEST_MAX_PAGES = 8  # x Limit 25 = 200 rows scanned at most — over six months of daily reads
+
+
 def latest_served(table: Any) -> Optional[dict]:
     """The newest current-cycle lead read, served; None on absence or any read error."""
     try:
         from boto3.dynamodb.conditions import Key
         from experiment.phase_filter import with_phase_filter
 
-        resp = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(PK) & Key("sk").begins_with(SK_PREFIX), "ScanIndexForward": False, "Limit": 1}
-            )
+        # DynamoDB applies `Limit` BEFORE the FilterExpression. The old `Limit: 1` read
+        # one row and THEN filtered it, so a newest row from another phase/cycle returned
+        # nothing even with a current-cycle read one row behind it. Page (newest first)
+        # until a phase-visible row appears — bounded, one row a day, so a few pages at most.
+        kwargs = with_phase_filter(
+            {"KeyConditionExpression": Key("pk").eq(PK) & Key("sk").begins_with(SK_PREFIX), "ScanIndexForward": False, "Limit": 25}
         )
-        items = resp.get("Items") or []
-        return served(items[0]) if items else None
+        for _page in range(_LATEST_MAX_PAGES):
+            resp = table.query(**kwargs)
+            items = resp.get("Items") or []
+            if items:
+                return served(items[0])
+            last = resp.get("LastEvaluatedKey")
+            if not last:
+                return None
+            kwargs = dict(kwargs, ExclusiveStartKey=last)
+        return None
     except Exception as e:  # noqa: BLE001 — absence is the honest fallback
         logger.warning("[lead_daily] read failed: %s", e)
         return None

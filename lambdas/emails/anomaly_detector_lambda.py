@@ -475,7 +475,7 @@ def build_context(yesterday_str):
 
 def call_anthropic_with_retry(req, timeout=30, max_attempts=None, backoff_s=None):
     """Phase 3.4 (2026-05-16): delegated to retry_utils.call_anthropic_raw.
-    Was: 2 attempts × 5s fixed backoff. Now: 4 attempts × 5/15/45s exponential.
+    Retry is the one policy, bedrock_client.invoke_with_retry (#4279) — no loop here.
     Also emits per-Lambda CloudWatch token + failure metrics.
     Signature kept for callers; max_attempts/backoff_s args ignored.
     """
