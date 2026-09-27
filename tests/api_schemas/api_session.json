@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-27T16:47:37.837700+00:00",
+  "captured_at": "2026-09-27T22:27:36.527115+00:00",
   "fetch_path": "/api/session",
   "is_prefix_sample": false,
   "path": "/api/session",
@@ -64,6 +64,9 @@
       },
       "reason": {
         "type": "null"
+      },
+      "routine_ref": {
+        "type": "string"
       },
       "session_role": {
         "type": "null"

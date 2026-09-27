@@ -245,3 +245,15 @@ test("a Flex day is named an off-program session; an absent session prints its s
   assert.equal(T.sessionBlockHTML(null), '<p class="td-note">Today’s exercise list is not served right now.</p>');
 });
 
+
+test("getJSON drains a non-2xx body before returning null — the unread /api/session 404 held networkidle open (the visual-QA rollback class)", async () => {
+  const calls = [];
+  const stub = (status, ok, body) => async () => ({ ok, status, json: async () => body, text: async () => { calls.push(`text:${status}`); return ""; } });
+  assert.deepEqual(await T.getJSON("/api/session", stub(200, true, { state: "served" })), { state: "served" });
+  assert.equal(calls.length, 0, "an ok body is read as JSON, not drained twice");
+  assert.equal(await T.getJSON("/api/session", stub(404, false, null)), null);
+  assert.deepEqual(calls, ["text:404"], "the 404 body was read");
+  const throwing = async () => ({ ok: false, status: 502, json: async () => null, text: async () => { throw new Error("gone"); } });
+  assert.equal(await T.getJSON("/api/session", throwing), null);
+  assert.equal(await T.getJSON("/api/session", async () => { throw new Error("offline"); }), null);
+});

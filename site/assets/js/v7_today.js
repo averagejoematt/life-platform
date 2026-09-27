@@ -411,9 +411,9 @@ function renderReturn(journey, through) {
 // 404 for /api/session in flight forever, so Playwright's networkidle (the cut-over
 // visual-QA gate's wait) never arrived on this page while every other /next/ page idled
 // in seconds (driver sweep, build 6cb06c7, 2026-09-26 19:56 PT).
-async function getJSON(p) {
+export async function getJSON(p, fetchImpl = fetch) {
   try {
-    const r = await fetch(p, { headers: { accept: "application/json" } });
+    const r = await fetchImpl(p, { headers: { accept: "application/json" } });
     if (!r.ok) {
       await r.text().catch(() => "");
       return null;
