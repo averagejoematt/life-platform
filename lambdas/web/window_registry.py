@@ -104,7 +104,10 @@ REGISTRY: dict[str, tuple[str, str | None]] = {
     # cross-phase data), so gap=None here would make the live QA gate flag a
     # CORRECT payload as a false positive — the opposite of what #1919 is for.
     # The gap string marks "exempt", not "still under-filling".
-    "avg_30d_g": (INTENSIVE, "#1919 — EXEMPT (not debt): cross-phase RAW_TIMESERIES read (#2109), never genesis-clamped"),
+    # #4343: the producer now averages the genesis-floored window /api/nutrition_overview
+    # serves (the served-fact check's window) and publishes its n as `logged_days` — still
+    # non-null from the first logged day, so the exempt marker (gap not None) stands.
+    "avg_30d_g": (INTENSIVE, "#1919/#4343 — EXEMPT (not debt): the served genesis-floored window, n published as logged_days"),
     # EXEMPT — measured NOT to be genesis-clamped, for the same reason as avg_30d_g:
     # daily_brief_lambda's `fetch_range` reads whoop cross-phase (RAW_TIMESERIES,
     # #2089/#2109) over a hard-coded `today - 30d` window with NO EXPERIMENT_START

@@ -1271,6 +1271,8 @@ def _quality_gate_correction_note(report):
 # the one after it, so the size-ratcheted top-of-module block stays one line per module.
 from coach import coach_input_facts as _ci  # noqa: E402
 
+from ai import regen_deadline as _deadline  # noqa: E402  — #4343: a late coach is held, not regenerated past the budget
+
 # #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
 # helper module beside it", not a baseline raise). Re-exported under its original name so
 # every caller and the #390 tests that monkeypatch `ai_calls._retain_coach_brief_flag`
@@ -1308,7 +1310,7 @@ def _enforce_quality_gate(
     report = _ci.gated(_invoke_quality_gate_sync, lambda_client, coach_id, output_text, generation_brief)
     fired = not report.get("passed", True)
     attempts = 0
-    while not report.get("passed", True) and attempts < max_regenerations:
+    while not report.get("passed", True) and attempts < max_regenerations and _deadline.regeneration_allowed(coach_id):
         attempts += 1
         note = _quality_gate_correction_note(report)
         try:

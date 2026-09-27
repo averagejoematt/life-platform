@@ -175,7 +175,7 @@ except ImportError:
     logger = _log.getLogger("daily-brief")
     logger.setLevel(_log.INFO)
 
-from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
+from ai import ai_calls, regen_deadline  # -- Extracted module imports ---------------------------------------------------
 from common import (
     dry_run,  # #2255: one definition of what DRY_RUN suppresses
     send_ledger,  # DIL-025: the durable replay guard (redrive/async-retry)
@@ -1479,6 +1479,7 @@ def lambda_handler(event, context):
         logger.info("[daily-brief] DRY_RUN mode — generating the brief but writing nothing (no SES, no S3, no DynamoDB)")
 
     _init_output_writers()  # late-bind; safe to call multiple times (idempotent)
+    regen_deadline.arm(context)  # #4343: past the reserved tail a failing coach is HELD, not regenerated
 
     # Regrade mode: recompute day grades without sending email
     regrade_dates = event.get("regrade_dates")

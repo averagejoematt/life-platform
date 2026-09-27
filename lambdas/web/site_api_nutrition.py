@@ -932,7 +932,9 @@ def nutrition_overview(*, _g) -> dict:
         {
             "nutrition": {
                 "avg_calories": round(sum(cal_vals) / len(cal_vals)) if cal_vals else None,
-                "avg_protein_g": round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None,
+                # #4343: THE protein-intake derivation — computed_metrics.protein_g_avg (what every
+                # coach's facts block cites) is written through the same function, over this window.
+                "avg_protein_g": nutrition_logging.protein_intake(items, today, d30)["avg_g"],
                 "avg_carbs_g": round(sum(carb_vals) / len(carb_vals), 1) if carb_vals else None,
                 "avg_fat_g": round(sum(fat_vals) / len(fat_vals), 1) if fat_vals else None,
                 "avg_fiber_g": round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None,

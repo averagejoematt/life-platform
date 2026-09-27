@@ -967,7 +967,9 @@ class TestAssembleData:
         assert data["latest_weight"] == 321.6
         assert data["avatar_weight"] == 321.6
 
-    def test_the_protein_window_average_is_the_one_number_every_surface_reads(self, table, frozen_clock):
+    def test_the_protein_window_average_is_the_one_number_every_surface_reads(self, table, frozen_clock, monkeypatch):
+        # #4343: the window is genesis-floored (the served one) — pin a genesis before the fixture days.
+        monkeypatch.setattr(dmc, "EXPERIMENT_START_DATE", "2026-05-01")
         seed(
             table,
             _date_row("macrofactor", "2026-05-08", total_protein_g=Decimal("140")),
@@ -975,6 +977,7 @@ class TestAssembleData:
         )
         data, _, _ = dmc.assemble_data(YESTERDAY, _profile(protein_target_g=190, protein_floor_g=170))
         assert data["protein_g_avg"] == 150.0
+        assert (data["protein_g_avg_days"], data["protein_g_avg_since"]) == (2, "2026-05-01")
         assert (data["protein_g_target"], data["protein_g_floor"]) == (190.0, 170.0)
 
     def test_strava_multi_device_duplicates_are_collapsed_and_totals_restated(self, table, frozen_clock):
@@ -1208,3 +1211,81 @@ class TestHandlerFullRun:
         assert resp["day_grade_score"] is None
         assert len(stored(scored_day, "computed_metrics")) == 1
         assert stored(scored_day, "day_grade") == []
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4343 — the coaches' protein fact IS the served figure, with its window
+# ──────────────────────────────────────────────────────────────────────────────
+
+# /api/nutrition_overview on 2026-09-27 (read live, public payload): `avg_protein_g` 153.5,
+# `days_logged` 21, and these 21 `nutrition_trend` protein values, genesis 2026-09-06 →
+# 2026-09-26. The 17:00Z brief that day told every coach "Protein INTAKE averages 122.7
+# g/day" — the old producer's 30-calendar-day mean, which crossed the genesis — and the
+# served-fact check (#4227) held the coach that cited it.
+SERVED_0927 = {"avg_protein_g": 153.5, "days_logged": 21}
+LIVE_0927_PROTEIN = [
+    ("2026-09-06", 131), ("2026-09-07", 141), ("2026-09-08", 171), ("2026-09-09", 170), ("2026-09-10", 168),
+    ("2026-09-11", 116), ("2026-09-12", 91), ("2026-09-13", 245), ("2026-09-14", 105), ("2026-09-15", 90),
+    ("2026-09-16", 215), ("2026-09-17", 139), ("2026-09-18", 179), ("2026-09-19", 147), ("2026-09-20", 139),
+    ("2026-09-21", 146), ("2026-09-22", 164), ("2026-09-23", 186), ("2026-09-24", 142), ("2026-09-25", 182),
+    ("2026-09-26", 156),
+]  # fmt: skip
+# SYNTHETIC prior-cycle rows (08-28 → 09-05), sized so the OLD derivation (today-30 →
+# yesterday, every row) reproduces the live 122.7 — the prior cycle's real values are not
+# in the public payload. They are what the served window must exclude.
+PRIOR_CYCLE_SYNTHETIC = (
+    [(f"2026-08-{d}", 51) for d in (28, 29, 30, 31)] + [(f"2026-09-0{d}", 51) for d in (1, 2, 3, 4)] + [("2026-09-05", 50)]
+)
+
+
+class TestProteinFactIsTheServedFigure4343:
+    NOW = datetime(2026, 9, 27, 17, 0, 3, tzinfo=timezone.utc)  # the 09-27 brief's START
+
+    def _seeded(self, table, monkeypatch):
+        monkeypatch.setattr(dmc, "EXPERIMENT_START_DATE", "2026-09-06")
+        freeze_pacific(monkeypatch, dmc, self.NOW)
+        rows = [_date_row("macrofactor", d, total_protein_g=Decimal(str(g))) for d, g in PRIOR_CYCLE_SYNTHETIC + LIVE_0927_PROTEIN]
+        seed(table, *rows)
+        data, _, _ = dmc.assemble_data("2026-09-26", _profile(protein_target_g=190, protein_floor_g=170))
+        return data, rows
+
+    def test_the_fixture_reproduces_the_live_split(self):
+        old = [g for _d, g in PRIOR_CYCLE_SYNTHETIC + LIVE_0927_PROTEIN]
+        assert round(sum(old) / len(old), 1) == 122.7  # what the coaches were told
+        assert round(sum(g for _d, g in LIVE_0927_PROTEIN) / 21, 1) == SERVED_0927["avg_protein_g"]
+
+    def test_the_producer_writes_the_served_figure_window_and_n(self, table, monkeypatch):
+        data, rows = self._seeded(table, monkeypatch)
+        assert (data["protein_g_avg"], data["protein_g_avg_days"], data["protein_g_avg_since"]) == (153.5, 21, "2026-09-06")
+        # ...the SAME figure the site door serves and the served-fact check measures (#4227).
+        from coach import coach_input_facts as ci
+        from health import nutrition_logging as nl
+
+        assert nl.protein_intake(rows, "2026-09-27", "2026-09-06")["avg_g"] == SERVED_0927["avg_protein_g"]
+        in_window = [r for r in rows if r["sk"] >= "DATE#2026-09-06"]
+        rec = ci.nutrition_record(in_window, "2026-09-27")
+        assert (rec["protein_avg_g"], rec["protein_avg_days"]) == (SERVED_0927["avg_protein_g"], SERVED_0927["days_logged"])
+
+    def test_the_facts_block_states_it_with_its_window_and_a_coach_that_obeys_is_not_held(self, table, monkeypatch):
+        """Mutation control: point the producer back at the 30-calendar-day mean (the pre-#4343
+        `protein_g_avg`) and the block says 122.7 with no window — and the obeying coach is held."""
+        data, rows = self._seeded(table, monkeypatch)
+        from ai import grounded_generation as gg
+        from coach import coach_input_facts as ci
+        from experiment.canonical_facts import build_canonical_facts
+        from health import nutrition_logging as nl
+
+        record = {"date": "2026-09-26", **{k: data[k] for k in ("protein_g_avg", "protein_g_avg_days", "protein_g_avg_since")}}
+        block = gg.authoritative_facts_block(build_canonical_facts(record, genesis="2026-09-06"))
+        assert "Protein INTAKE averages 153.5 g a day over the last 21 logged days" in block
+        # A coach that cites exactly what it was handed passes the served-fact check.
+        in_window = [r for r in rows if r["sk"] >= "DATE#2026-09-06"]
+        served = {
+            "data_through": "2026-09-26",
+            "nutrition": ci.nutrition_record(in_window, "2026-09-27"),
+            "protein_series": nl.protein_series(in_window),
+        }
+        obeying = f"Protein intake averages {data['protein_g_avg']:g} g a day over the last {data['protein_g_avg_days']} logged days."
+        assert ci.served_fact_findings(obeying, served, "2026-09-27") == []
+        # ...and the check still discriminates: the 09-27 brief's figure, cited as the average, is held.
+        assert ci.served_fact_findings("Protein intake averages 122.7 g a day.", served, "2026-09-27")

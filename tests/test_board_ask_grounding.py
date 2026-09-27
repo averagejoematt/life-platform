@@ -64,7 +64,8 @@ def test_full_brief_yields_ordered_capped_receipts():
     ac = _ctx_mod()
     receipts = ac.board_grounding_receipts(FULL_CTX)
     assert receipts[0] == {"label": "recovery", "value": "48%"}
-    assert receipts[1] == {"label": "protein", "value": "30d avg 132g"}
+    # #4343: the window is genesis-floored now — the receipt names its n when served, never "30d".
+    assert receipts[1] == {"label": "protein", "value": "132g avg"}
     # priority order is fixed, and the default cap (6) trims the rest
     assert len(receipts) <= 6
     labels = [r["label"] for r in receipts]
