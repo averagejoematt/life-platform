@@ -22,7 +22,7 @@ GUARD ORDER (every refusal before the write):
 """
 
 from coach import morning_note as _mn
-from common.text_guards import has_tool_call_residue
+from common.text_guards import find_tool_call_residue
 
 from web.site_api_social_engage import _salt_unavailable, _salted_ip_hash
 
@@ -65,10 +65,14 @@ def _handle_morning_note(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         return _error(400, "Invalid JSON")
-    if isinstance(body, dict) and any(has_tool_call_residue(body.get(f)) for f in _mn.WORD_FIELDS):
-        # 3a. #4190's refusal FIRST, in its own words: the shape regex below would also refuse
+    if isinstance(body, dict):
+        # 3a. #4190's refusal FIRST, naming the fragment (the same `find_tool_call_residue`
+        # every MCP write door refuses through, #4309): the shape regex below would also refuse
         # the markup, but "1-24 characters" is not the reason, and the guard must be the guard.
-        return _error(400, "tool-call residue in a word — retype it (#4190)")
+        for f in _mn.WORD_FIELDS:
+            frag = find_tool_call_residue(body.get(f))
+            if frag is not None:
+                return _error(400, f"tool-call residue in {f} ({frag!r}) — retype it (#4190)", field=f, fragment=frag)
     fields, reason = _mn.validate_note_body(body)
     if fields is None:
         return _error(400, reason or "invalid note")

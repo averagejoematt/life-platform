@@ -994,7 +994,7 @@ def test_morning_note_tool_call_residue_in_a_word_is_refused_by_the_residue_guar
     _arm_owner(wp, monkeypatch)
     for field in ("sleep_word", "body_word", "mood_word"):
         status, body = wp.call(NOTE_PATH, body=_owner_body(wp, **{field: 'heavy</parameter><parameter name="x">'}))
-        assert status == 400 and "residue" in body["error"], (field, body)
+        assert status == 400 and "residue" in body["error"] and body["field"] == field and body["fragment"] == "</parameter>", (field, body)
     assert _note_rows(wp) == {}
 
 
