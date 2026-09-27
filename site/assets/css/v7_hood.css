@@ -134,6 +134,7 @@
 .hd-fold summary::before { content: "+ "; font-family: var(--font-mono); }
 .hd-fold[open] summary::before { content: "– "; }
 
+.hd-gear-fold { margin-top: 0; }
 .hd-record, .hd-compact, .hd-gear {
   width: 100%;
   border-collapse: collapse;
@@ -192,15 +193,6 @@
 }
 
 /* ── the gear ── */
-.hd-disclosure {
-  font-family: var(--font-sans);
-  font-size: var(--fs-small);
-  line-height: var(--lh-body);
-  color: var(--ink-muted);
-  border-left: 3px solid var(--ember);
-  padding-left: var(--sp-3);
-  margin: 0 0 var(--sp-4);
-}
 .hd-gear th {
   font-family: var(--font-mono);
   font-size: var(--fs-label);
@@ -218,11 +210,26 @@
 }
 .hd-gear-seen[data-status="stale"], .hd-gear-seen[data-status="paused"], .hd-gear-seen[data-status="unknown"] { color: var(--ink-faint); }
 
+/* ── the explainer fold, the through line ── */
+.hd-explainer { margin-top: var(--sp-3); }
+.hd-explainer-p { font-size: var(--fs-body); margin: 0 0 var(--sp-2); }
+.hd-through { margin-top: var(--sp-2); }
+
 @media (max-width: 600px) {
+  /* a row is a two-line card: the name and its last report on one line, what it feeds beneath */
   .hd-gear thead { display: none; }
-  .hd-gear tr { display: block; padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
-  .hd-gear td { display: block; border: 0; padding: 0 0 var(--sp-1); }
+  .hd-gear tbody, .hd-gear tr { display: block; }
+  .hd-gear tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    gap: 0 var(--sp-2);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .hd-gear td { display: block; border: 0; padding: 0; min-width: 0; }
   .hd-gear-name { white-space: normal; }
+  .hd-gear-seen { text-align: right; white-space: normal; overflow-wrap: anywhere; }
+  .hd-gear-feeds { grid-column: 1 / -1; padding-top: var(--sp-1); }
 }
 
 @media (min-width: 601px) {
