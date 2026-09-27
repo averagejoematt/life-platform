@@ -424,6 +424,46 @@ def refusal_message(gate: dict[str, Any] | None) -> str | None:
     )
 
 
+def refusal_suggestions(gate: dict[str, Any] | None) -> list[str]:
+    """The ways forward, one per finding, derived from the refusal itself (#4172).
+
+    A floor violation names the set and the number that clears it; a conditional
+    up-branch names the clause to remove. Every path is a NEW draft — the gate has no
+    chat override, and a retry of the same routine_id refuses identically.
+    """
+    if not gate or gate.get("verdict") != "refuse":
+        return []
+    out: list[str] = []
+    for v in (gate.get("audit") or {}).get("violations") or []:
+        if v.get("kind") == "conditional_up":
+            out.append(
+                f"Remove the conditional up-branch from {v.get('where')}'s notes (\"{v.get('clause')}\") in a new draft "
+                "(draft_custom) — progression is the platform's job, never his to trigger mid-set."
+            )
+        else:
+            out.append(
+                f"Prescribe {v.get('where')} set {v.get('set')} at or above its floor of {_fmt(v.get('floor_kg'))} "
+                f"(now {_fmt(v.get('prescribed_kg'))}; {_provenance(gate, v)}) in a new draft (draft_custom)"
+                + (" — or mark it a prescribed back-off in the set notes if it is one." if not v.get("back_off_note") else ".")
+            )
+    out.append(
+        "Then run plan_next_session with the new routine_id (stage 2) and commit what it verdicts — "
+        "the gate is not overridable from chat, and committing this routine_id again refuses the same way."
+    )
+    return out
+
+
+def refusal(gate: dict[str, Any] | None, err: Any) -> dict[str, Any] | None:
+    """The commit refusal as the caller's error envelope (`mcp.utils.mcp_error`), or None.
+    Message AND suggestions are derived here from the same violations (#4172)."""
+    msg = refusal_message(gate)
+    if not msg or gate is None:
+        return None
+    return err(
+        msg, error_code=SUBTRACT_ONLY_ERROR_CODE, suggestions=refusal_suggestions(gate), detail=(gate.get("audit") or {}).get("violations")
+    )
+
+
 def summary(gate: dict[str, Any] | None) -> str:
     """One line for the commit/dry_run result: what the gate did, in the result itself."""
     if not gate:

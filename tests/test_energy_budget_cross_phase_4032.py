@@ -301,11 +301,13 @@ def test_the_published_tdee_and_calorie_target_are_computed_across_phases(wired)
     # The weigh-in the tool anchors to is itself pre-genesis in this fixture.
     assert out["current_weight_lbs"] == 315.0
     assert out["current_weight_date"] == "2026-09-19"
-    assert out["exercise_kcal_7d_daily_avg"] == 136
-    assert out["exercise_kcal_30d_daily_avg"] == 48
-    assert out["tdee_7d_avg"] == 2477
-    assert out["tdee_30d_avg"] == 2389
-    assert out["calorie_target_based_on_30d"] == 1889
+    # #4178: the fixture's Walk days take the Compendium walk rate (3.5 METs) — before it
+    # they took the 6 kcal/kg/h lifting proxy and these read 136 / 48 / 2477 / 2389 / 1889.
+    assert out["exercise_kcal_7d_daily_avg"] == 85
+    assert out["exercise_kcal_30d_daily_avg"] == 30
+    assert out["tdee_7d_avg"] == 2426
+    assert out["tdee_30d_avg"] == 2371
+    assert out["calorie_target_based_on_30d"] == 1871
 
     # The 7d target is REFUSED here, and that is the fix working rather than a wobble: with
     # three weigh-ins visible instead of one, `implied_deficit_vs_measured_weight_trend`
@@ -396,8 +398,8 @@ def test_the_nutrition_energy_budget_publishes_the_cross_phase_target(wired, hev
 
     assert budget["inputs"]["lifting"]["sets"] == 10
     assert budget["inputs"]["weight_lbs"] == 315.0
-    assert budget["tdee"] == 2477
-    assert budget["target"] == 1977  # tdee - the ADR-152 default 500 kcal deficit
+    assert budget["tdee"] == 2426  # #4178: was 2477 with the Walk days on the 6 kcal/kg/h proxy
+    assert budget["target"] == 1926  # tdee - the ADR-152 default 500 kcal deficit
     assert sorted(r["date"] for r in hevy_seen[0]) == ["2026-09-16", "2026-09-19"]
 
 
@@ -414,7 +416,7 @@ def test_the_deficit_tool_publishes_a_cross_phase_tdee_and_says_so(wired):
     out = tn.tool_get_deficit_sustainability({"end_date": END, "days": 14})
     assert "error" not in out, out
 
-    assert out["deficit"]["estimated_tdee"] == 2477
+    assert out["deficit"]["estimated_tdee"] == 2426  # #4178: was 2477 on the 6 kcal/kg/h walk rate
     assert out["deficit"]["avg_intake_kcal"] == 1800
     assert out["deficit"]["tdee_method"] == "mifflin_bmr_plus_worked_set_exercise"
     scope = out["phase_scope"]["sources"]
@@ -441,19 +443,20 @@ def test_mutation_restoring_the_phase_filter_reproduces_the_bug(wired, hevy_seen
     assert out["calorie_target"]["inputs"]["lifting"]["sets"] == 3
     assert out["calorie_target_30d_basis"]["inputs"]["lifting"]["sets"] == 3
 
-    # …and the published numbers move with it. These are the "before" figures: a TDEE 71
-    # kcal/day low on the 7d window and 33 low on the 30d, off 3 sets instead of 10/15.
-    assert out["exercise_kcal_7d_daily_avg"] == 65
-    assert out["exercise_kcal_30d_daily_avg"] == 15
-    assert out["tdee_7d_avg"] == 2406
-    assert out["tdee_30d_avg"] == 2356
-    assert out["calorie_target_based_on_30d"] == 1856
+    # …and the published numbers move with it. These are the "before" figures: a TDEE 45
+    # kcal/day low on the 7d window and 21 low on the 30d, off 3 sets instead of 10/15 and
+    # one walk instead of two/three (#4178 re-priced the walks: 65/15/2406/2356/1856 before).
+    assert out["exercise_kcal_7d_daily_avg"] == 40
+    assert out["exercise_kcal_30d_daily_avg"] == 9
+    assert out["tdee_7d_avg"] == 2381
+    assert out["tdee_30d_avg"] == 2350
+    assert out["calorie_target_based_on_30d"] == 1850
 
     # The sharpest edge of the defect: with only one weigh-in visible the impossibility
-    # check has no trend to judge against, so it PUBLISHES 1906 kcal/day as "unverified"
+    # check has no trend to judge against, so it PUBLISHES 1881 kcal/day as "unverified"
     # rather than refusing. The truncation did not just move the number — it disarmed the
     # guard that would have caught it.
-    assert out["calorie_target_based_on_7d"] == 1906
+    assert out["calorie_target_based_on_7d"] == 1881
     assert out["calorie_target_published"] is True
     assert out["calorie_target_basis"] == "published_unverified_no_measured_weight_trend"
 
@@ -469,8 +472,8 @@ def test_mutation_also_reproduces_it_through_the_nutrition_caller(wired, monkeyp
     assert [r["date"] for r in tn._hevy_workouts("2026-09-14", END)] == ["2026-09-19"]
     budget = tn._energy_budget(END)
     assert budget["inputs"]["lifting"]["sets"] == 3
-    assert budget["tdee"] == 2406
-    assert budget["target"] == 1906
+    assert budget["tdee"] == 2381
+    assert budget["target"] == 1881
 
     # And the deficit tool stops answering at all — its >=7-day MacroFactor floor is the
     # one place the truncation surfaces as an error instead of as a confident number.

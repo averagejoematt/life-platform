@@ -469,6 +469,16 @@ SOURCE_CLASS: dict[str, str] = {
     "qa_hook_matrix": SYSTEM_STATE,
     "dropbox_tracker": SYSTEM_STATE,
     "hevy_id_map": SYSTEM_STATE,
+    # #4183 RULING (2026-09-26): routine_index + the ROUTINE#<id> IR partition below STAY
+    # SYSTEM_STATE. A reset never tombstoned a prescription and never will (no further
+    # resets, #4037), so re-classing them EXPERIMENT_SCOPED to make "history" disappear would
+    # buy nothing at a reset and cost two things now: every un-stamped ROUTINE# row (none
+    # carries phase/cycle — verified on the wire) would enter the nightly inverse census as a
+    # pre-genesis scoped violation (the #3851 class: members no tool can clear), and
+    # `cycle_read_floor` would bound /api/routine and the readback report to the genesis. A
+    # READER that must not count pre-genesis rows reads the genesis itself, by the row's own
+    # `target_date` — `training.routine_repo.stale_draft_census` is the exemplar; the nightly
+    # orphan-draft leg names the excluded count instead of counting June drafts as orphans.
     "routine_index": SYSTEM_STATE,
     "email_log": SYSTEM_STATE,  # ADR-077 dec E: immutable sent-mail archive, GA on read
     "named_human_contact": SYSTEM_STATE,  # #4063: the named-human contact path's episode de-dup /
@@ -649,7 +659,9 @@ _PK_RULES: list = [
     (lambda pk, sk: pk == "USER#matthew" and sk.startswith("PROFILE#"), CROSS_PHASE),
     # Durable restart-cycle memory (ADR-077 finding 3 — make protection explicit).
     (lambda pk, sk: pk == "USER#matthew#MEMORY", CROSS_PHASE),
-    # Versioned routine IR audit trail + ops state.
+    # Versioned routine IR audit trail + ops state. SYSTEM_STATE by ruling (#4183, see the
+    # routine_index entry in SOURCE_CLASS): pre-genesis drafts are history a genesis-reading
+    # consumer excludes by `target_date`, never a partition the reset tombstones.
     (lambda pk, sk: pk.startswith("USER#matthew#ROUTINE#"), SYSTEM_STATE),
     (lambda pk, sk: pk == "USER#system", SYSTEM_STATE),
     # Presentation/cache/infra.
