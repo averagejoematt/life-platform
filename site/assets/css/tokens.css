@@ -2197,6 +2197,8 @@ li.wk-explain { list-style: none; }
 .mi-cta:hover,
 .mw-pending,
 a.vg-lit:hover,
+.fo-success,
+.v7h-premise .v7h-earned,
 .hspine-gap {
   --ink-faint: var(--ink-faint-on-wash);
   --ink-muted: var(--ink-muted-on-wash);
