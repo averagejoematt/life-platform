@@ -100,6 +100,141 @@ test("a coach whose instrument is dark is named, not quoted: cgm.dark → glucos
   assert.equal(V.darkCoaches(null).size, 0);
 });
 
+// #4217 (E6, the renderer half): the engine's coach → instrument map, served on /api/coaches.
+// The live board 2026-09-26 (scratchpad b2): cgm dark since 2026-08-27, every source fresh.
+const FRESH_LIVE = {
+  sources: [
+    { id: "whoop", status: "fresh" },
+    { id: "withings", status: "fresh" },
+    { id: "apple_health", status: "fresh", datatypes: [{ key: "cgm", dark: true, last_seen: "2026-08-27" }, { key: "blood_pressure", dark: true, last_seen: "2026-09-09" }, { key: "state_of_mind", dark: true, last_seen: "2026-09-08" }, { key: "workouts", dark: false, last_seen: "2026-09-26" }] },
+    { id: "macrofactor", status: "fresh" },
+    { id: "hevy", status: "fresh" },
+    { id: "measurements", status: "fresh" },
+    { id: "labs", status: "behavioral-stale" },
+    { id: "garmin", status: "paused" },
+  ],
+};
+// /api/coaches with PR #4305's fields (`instrument` {source, datatype} | null, `absent`, `reason`) —
+// the engine's rows: whoop → sleep, macrofactor → nutrition, hevy → physical, apple_health/cgm →
+// glucose, labs → labs; mind, explorer and the lead carry null.
+const COACHES_LIVE = {
+  coaches: [
+    { persona_id: "eli_marsh", name: "Dr. Eli Marsh", tier: "lead", instrument: null, absent: false, reason: null },
+    { persona_id: "sleep_coach", name: "Dr. Lisa Park", tier: "staff", instrument: { source: "whoop", datatype: null }, absent: false, reason: null },
+    { persona_id: "nutrition_coach", name: "Dr. Marcus Webb", tier: "staff", instrument: { source: "macrofactor", datatype: null }, absent: false, reason: null },
+    { persona_id: "mind_coach", name: "Dr. Nathan Reeves", tier: "staff", instrument: null, absent: false, reason: null },
+    { persona_id: "physical_coach", name: "Dr. Max Reyes", tier: "staff", instrument: { source: "hevy", datatype: null }, absent: false, reason: null },
+    { persona_id: "glucose_coach", name: "Dr. Amara Patel", tier: "staff", instrument: { source: "apple_health", datatype: "cgm" }, absent: true, reason: "no sensor since 2026-08-27" },
+    { persona_id: "labs_coach", name: "Dr. James Okafor", tier: "staff", instrument: { source: "labs", datatype: null }, absent: false, reason: null },
+    { persona_id: "explorer_coach", name: "Dr. Henning Brandt", tier: "staff", instrument: null, absent: false, reason: null },
+  ],
+};
+// the pre-deploy /api/coaches (the b2 capture): no coach carries an `instrument` key
+const COACHES_PRE = { coaches: COACHES_LIVE.coaches.map(({ persona_id, name, tier }) => ({ persona_id, name, tier })) };
+
+test("#4217: the live shape — the map comes from /api/coaches[].instrument; a null instrument is never dark, even with its old hand-typed source stale", () => {
+  const served = V.servedInstruments(COACHES_LIVE);
+  assert.deepEqual(served.map.sleep_coach, { source: "whoop", datatype: undefined });
+  assert.deepEqual(served.map.glucose_coach, { source: "apple_health", datatype: "cgm" });
+  assert.deepEqual(served.map.labs_coach, { source: "labs", datatype: undefined });
+  assert.equal(served.map.mind_coach, null);
+  assert.equal(served.map.explorer_coach, null);
+  assert.equal(served.map.eli_marsh, null);
+  assert.deepEqual([...V.darkCoaches(FRESH_LIVE, COACHES_LIVE)].sort(), ["glucose_coach"]);
+  // the strap and the scale go stale: Park darks; Reeves (mind), Brandt (explorer) and Marsh — null instruments — do not
+  const stale = { sources: FRESH_LIVE.sources.map((s) => (s.id === "whoop" || s.id === "withings" || s.id === "measurements" ? { ...s, status: "stale" } : s)) };
+  assert.deepEqual([...V.darkCoaches(stale, COACHES_LIVE)].sort(), ["glucose_coach", "sleep_coach"]);
+  // the dashboard's short ids resolve to persona ids too
+  const dash = { coaches: [{ coach_id: "sleep", instrument: { source: "whoop", datatype: null }, absent: false }] };
+  assert.deepEqual([...V.darkCoaches(stale, dash)], ["sleep_coach"]);
+});
+
+test("#4217: the pre-deploy shape (no `instrument` key anywhere) falls back to the hand map — whose four wrong rows now match the engine", () => {
+  assert.equal(V.servedInstruments(COACHES_PRE), null);
+  assert.equal(V.servedInstruments(null), null);
+  assert.equal(V.servedInstruments({ coaches: [] }), null);
+  assert.deepEqual([...V.darkCoaches(FRESH_LIVE, COACHES_PRE)], ["glucose_coach"]);
+  assert.deepEqual([...V.darkCoaches(FRESH_LIVE)], ["glucose_coach"], "one argument — the PairContract's call");
+  // the four rows: mind / explorer / eli_marsh have NO row (engine: null); labs reads `labs`, not `measurements`
+  assert.equal(V.COACH_SOURCE.mind_coach, undefined);
+  assert.equal(V.COACH_SOURCE.explorer_coach, undefined);
+  assert.equal(V.COACH_SOURCE.eli_marsh, undefined);
+  assert.deepEqual(V.COACH_SOURCE.labs_coach, { source: "labs" });
+  // the engine's served rows and the fallback agree row for row
+  for (const c of COACHES_LIVE.coaches) {
+    const hand = V.COACH_SOURCE[c.persona_id];
+    if (c.instrument == null) assert.equal(hand, undefined, `${c.persona_id}: the engine has no instrument, the hand map must not either`);
+    else assert.deepEqual({ source: hand.source, datatype: hand.datatype || null }, c.instrument, c.persona_id);
+  }
+  // under the fallback a stale strap or scale darks ONLY the sleep coach
+  const stale = { sources: FRESH_LIVE.sources.map((s) => (s.id === "whoop" || s.id === "withings" || s.id === "measurements" ? { ...s, status: "stale" } : s)) };
+  assert.deepEqual([...V.darkCoaches(stale, COACHES_PRE)].sort(), ["glucose_coach", "sleep_coach"]);
+  assert.equal(V.INSTRUMENT_WORDS.labs_coach, "the blood-test panel");
+});
+
+test("#4217: a served `absent: true` is the engine's verdict — it darks the coach over a fresh board, and its reason prints with the date in words", () => {
+  const parkOut = { coaches: COACHES_LIVE.coaches.map((c) => (c.persona_id === "sleep_coach" ? { ...c, absent: true, reason: "no sensor since 2026-09-20" } : c)) };
+  const dark = V.darkCoaches(FRESH_LIVE, parkOut);
+  assert.ok(dark.has("sleep_coach"), "whoop is fresh on the board, the engine says absent — the engine wins");
+  assert.ok(dark.has("glucose_coach"));
+  assert.deepEqual(V.absentReasons(parkOut), { sleep_coach: "no sensor since 2026-09-20", glucose_coach: "no sensor since 2026-08-27" });
+  assert.deepEqual(V.absentReasons(COACHES_PRE), {});
+  assert.equal(V.darkWords("glucose_coach", V.absentReasons(parkOut)), "no sensor since Thursday, August 27");
+  assert.equal(V.darkWords("sleep_coach", V.absentReasons(parkOut)), "no sensor since Sunday, September 20");
+  assert.equal(V.darkWords("glucose_coach", {}), "a blood-sugar sensor is not worn", "no served reason → the instrument words");
+  assert.equal(V.darkWords("labs_coach"), "the blood-test panel is not worn");
+  assert.equal(V.darkWords("glucose_coach", { glucose_coach: "no sensor since garbage" }), "a blood-sugar sensor is not worn", "an unparsable reason never prints raw");
+  assert.equal(V.darkWords("mind_coach", {}), "the instrument is not worn");
+});
+
+test("#4217: the docket row carries the engine's reason — the ISO date never reaches the page; the entry's own `absent` block darks a seat too", () => {
+  const item = {
+    topic: "CGM-guided carbohydrate timing",
+    coach_a: "glucose_coach", coach_b: "nutrition_coach",
+    claims: { nutrition_coach: "calories decide it" }, // #4305 omits the dark side's claim
+    criterion: { condition: "lt", metric: "recovery_score", threshold: 70 },
+    sides: { glucose_coach: false, nutrition_coach: true }, resolution_date: "2026-09-30", opened_date: "2026-09-23",
+  };
+  const names = { glucose_coach: "Dr. Amara Patel", nutrition_coach: "Dr. Marcus Webb" };
+  const reasons = V.absentReasons(COACHES_LIVE);
+  const r = V.docketRow(item, names, V.darkCoaches(FRESH_LIVE, COACHES_LIVE), null, reasons);
+  assert.equal(r.no.dark, true);
+  assert.equal(r.no.why, "no sensor since Thursday, August 27");
+  assert.equal(r.yes.why, "");
+  const html = V.docketHTML([r]);
+  assert.ok(html.includes("named, not quoted: no sensor since Thursday, August 27."));
+  assert.ok(html.includes("Dr. Amara Patel is named but not quoted: no sensor since Thursday, August 27."));
+  assert.ok(!html.includes("2026-08-27"), "the ISO string never prints");
+  // no served reason: the instrument words, as before
+  const plain = V.docketRow(item, names, new Set(["glucose_coach"]), null);
+  assert.equal(plain.no.why, "a blood-sugar sensor is not worn");
+  assert.ok(V.docketHTML([plain]).includes("named, not quoted: a blood-sugar sensor is not worn."));
+  // the docket entry's own `absent` block (served when the engine withheld the claim) darks the seat with its reason
+  const withAbsent = { ...item, claims: { glucose_coach: "secret", nutrition_coach: "calories decide it" }, absent: { glucose_coach: { reason: "no sensor since 2026-08-27", instrument: { source: "apple_health", datatype: "cgm" } } } };
+  const a = V.docketRow(withAbsent, names, new Set(), null);
+  assert.equal(a.no.dark, true);
+  assert.equal(a.no.claim, "");
+  assert.equal(a.no.why, "no sensor since Thursday, August 27");
+  assert.ok(!V.docketHTML([a]).includes("secret"));
+});
+
+test("#4217: the PairContract's lift — COACH_SOURCE through darkCoaches, exported verbatim and run alone under node — still evaluates and agrees with the engine's absent set", async () => {
+  const fs = await import("node:fs");
+  const vm = await import("node:vm");
+  const src = fs.readFileSync(new URL("../../site/assets/js/v7_coaches.js", import.meta.url), "utf8");
+  const start = src.indexOf("export const COACH_SOURCE");
+  const fn = src.indexOf("export function darkCoaches");
+  const end = src.indexOf("\n}\n", fn) + 3;
+  assert.ok(start > 0 && fn > start && end > fn, "the three anchors the contract slices on exist in order");
+  const lifted = src.slice(start, end).replaceAll("export ", "");
+  const ctx = vm.createContext({ Object, Array, Set, String, JSON });
+  vm.runInContext(lifted, ctx); // no import between the anchors — nothing here may reach dayInWords or esc
+  const dark = vm.runInContext(`[...darkCoaches(${JSON.stringify(FRESH_LIVE)})].sort()`, ctx);
+  assert.deepEqual([...dark], ["glucose_coach"], "the engine's absent_coaches() over the same board");
+  const map = vm.runInContext("COACH_SOURCE", ctx);
+  assert.deepEqual(Object.keys(map).sort(), ["glucose_coach", "labs_coach", "nutrition_coach", "physical_coach", "sleep_coach"]);
+});
+
 test("the docket row: yes/no sides, the engine's last seven nightly readings between them, settled-by in words; a dark side keeps its claim off the page", () => {
   const item = {
     topic: "Recovery rebound interpretation: mean reversion vs. corrective action",
