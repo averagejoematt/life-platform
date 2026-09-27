@@ -164,7 +164,12 @@ def call_anthropic(
     # identical to the direct API, so parsing/validation below is unchanged.
     import botocore.exceptions as _bce
 
-    from ai.bedrock_client import budget_stop_cls as _budget_stop_cls, first_text as _first_text, invoke as _bedrock_invoke
+    from ai.bedrock_client import (
+        UnknownModelError as _UnknownModel,
+        budget_stop_cls as _budget_stop_cls,
+        first_text as _first_text,
+        invoke as _bedrock_invoke,
+    )
 
     _BudgetStop = _budget_stop_cls()
 
@@ -190,6 +195,16 @@ def call_anthropic(
             # brief's ~62 AI calls that is ~67 minutes of sleeps against a Lambda
             # timeout, precisely when the platform is already over budget.
             print(f"[INFO] AI paused by the budget guard (tier 3) — returning the outage sentinel immediately, no retry: {e}")
+            return AI_UNAVAILABLE_SENTINEL
+        except _UnknownModel as e:
+            # #4275: the model NAME resolved to nothing — a configuration error raised
+            # before invoke_model (nothing billed) that attempt 2 cannot fix. Never the
+            # old silent Haiku fallback, never the backoff ladder: fail the call loudly
+            # (the message names the input and every known name) and let the caller's
+            # existing degrade path run — for the brief that is the sentinel per coach,
+            # exactly the contract a hard Bedrock error already has, only in seconds.
+            _emit_failure_metric()
+            print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
             return AI_UNAVAILABLE_SENTINEL
         except _bce.ClientError as e:
             code = e.response.get("Error", {}).get("Code", "Unknown")
