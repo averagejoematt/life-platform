@@ -130,8 +130,15 @@ test("next: the first bet settling on or after today, both coaches named", () =>
   assert.equal(W.nextBet({}, "2026-09-26", NAMES), null);
 });
 
-test("the next weigh-in is the last one plus a day", () => {
-  assert.equal(W.plusDays("2026-09-26", 1), "2026-09-27");
+test("the next weigh-in line is entry_age's one spelling: due, or the counted silence once that day is past (R6 fix 4)", () => {
+  const journey = { journey: { last_weighin_date: "2026-09-26" } };
+  assert.deepEqual(W.nextWeighInLine(journey, "2026-09-26"), { text: "the next weigh-in is due Sunday, September 27", day: "2026-09-27" });
+  assert.deepEqual(W.nextWeighInLine(journey, "2026-09-27"), { text: "the next weigh-in is due Sunday, September 27", day: "2026-09-27" });
+  // a skipped week: the clock is the served PT day, the line is the silence, the margin the last weigh-in
+  assert.deepEqual(W.nextWeighInLine({ journey: { last_weighin_date: "2026-09-21" } }, "2026-09-26"), { text: "no weigh-in since Monday, September 21 — 5 days", day: "2026-09-21" });
+  assert.deepEqual(W.nextWeighInLine(null, "2026-09-26"), { text: "", day: "" });
+  assert.deepEqual(W.nextWeighInLine({ journey: {} }, "2026-09-26"), { text: "", day: "" });
+  // plusDays stays a pure date helper
   assert.equal(W.plusDays("2026-09-30", 1), "2026-10-01");
   assert.equal(W.plusDays(null, 1), "");
 });

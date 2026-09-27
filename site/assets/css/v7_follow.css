@@ -19,6 +19,27 @@
   max-width: none;
 }
 
+/* the rest of the terms under the fold line, and the exact derived sentence folded away
+   (the nightly #3564 check needs its bytes on the page; a reader meets the plain line first) */
+.fo-terms {
+  color: var(--ink-muted);
+  margin: calc(-1 * var(--sp-4)) 0 var(--sp-3);
+}
+.fo-fold {
+  margin: 0 0 var(--sp-6);
+}
+.fo-fold summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ember);
+  padding: var(--sp-1) 0;
+  list-style: none;
+}
+.fo-fold summary::-webkit-details-marker { display: none; }
+.fo-fold summary::before { content: "+ "; font-family: var(--font-mono); }
+.fo-fold[open] summary::before { content: "– "; }
+
 /* ── one entry: the margin and the body ── */
 .fo-entry {
   position: relative;

@@ -128,6 +128,28 @@ export function loopReturnText(cad, pending) {
   return m ? `the write-up lands ${m[1]}` : t;
 }
 
+// #4182 (R6 fix 4; R5's twenty-week test) — the ONE spelling of the next weigh-in on every
+// v7 page (Home, This week, Today, Follow), so no page can print a past day as "due". The
+// rule: the day after the last weigh-in is the next one, and it is "due" while it is on or
+// after the page's data-through day (`throughDate`, the PT day the page's data runs to) —
+// so a last weigh-in of through − 1 reads "due <the data-through day>", spelled as the day,
+// never as "today". Once that day is BEFORE the data-through day the honest line is the
+// silence, counted: "no weigh-in since <last weigh-in> — N days" (N = through − last, so
+// always ≥ 2). `day` is the ISO the caller puts in <time datetime> and the margin: the due
+// day in the first case, the last weigh-in in the second. Both "" when the last weigh-in is
+// unusable. An unusable `throughDate` cannot judge lateness, so it takes the due branch.
+// Callers name the served field in data-src (…journey.last_weighin_date), never "+ 1 day".
+export function nextWeighInText(lastWeighinDate, throughDate, { capital = false } = {}) {
+  const last = String(lastWeighinDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(last) || !Number.isFinite(_utcNoon(last))) return { text: "", day: "" };
+  const due = new Date(_utcNoon(last) + 86400000).toISOString().slice(0, 10);
+  const through = String(throughDate || "").slice(0, 10);
+  const cap = (t) => (capital ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(through) || due >= through) return { text: cap(`the next weigh-in is due ${dayInWords(due)}`), day: due };
+  const n = Math.round((_utcNoon(through) - _utcNoon(last)) / 86400000);
+  return { text: cap(`no weigh-in since ${dayInWords(last)} — ${n} day${n === 1 ? "" : "s"}`), day: last };
+}
+
 // #4219 — how many Pacific calendar days an open coach ask is past its `due` date. The
 // cockpit served an ask due September 19 as "the one ask" on September 26 with nothing
 // saying it was late. A served `days_overdue` (the issue's server-side box) wins when it

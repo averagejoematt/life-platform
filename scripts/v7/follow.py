@@ -7,11 +7,17 @@ when, the address as selectable text, the repo, and the dated return line. Every
 poured by `site/assets/js/v7_follow.js` from the served feeds; this module writes only the
 skeleton and the honest not-yet-loaded state a no-JS reader sees.
 
-The cadence promise is NOT typed here. It is `subscriber_cadence.promise_sentence()` —
-the one derivation from the senders' live crons that `tests/test_subscriber_cadence_promise_3564.py`
-pins byte for byte on every subscriber surface — rendered at build time, so the preview
-page cannot carry a cadence the senders do not keep. (That sentence names the Chronicle
-by its product name; the vocabulary ledger carries the one page it costs, dated.)
+The cadence promise is NOT typed here. Every weekday and the count come from
+`common.subscriber_cadence` — the one derivation from the senders' live crons that
+`tests/test_subscriber_cadence_promise_3564.py` pins byte for byte on every subscriber
+surface. The fold carries Prototype C's line in reader words, derived from the same
+registry ("The numbers every Sunday; the write-up every Wednesday." + the fallback day and
+the count); the exact `promise_sentence()` sits under "The exact terms", because the
+nightly `qa_check_subscriber_promise` requires those bytes on the live /subscribe/ at the
+cut-over and the sentence names the Chronicle by its product name (the vocabulary ledger
+carries the one page it costs, dated). A driver finding on the live /next/subscribe/
+(2026-09-26 19:56 PT) moved the long sentence off the fold: "Chronicle" and "Weekly
+Signal" are brand words a reader meets first.
 
 No authored copy here counts anything before day 1 or names a restart (the owner's ruling
 on Prototype C, 2026-09-26), and the seven-network follow list is gone (CONCEPT §8).
@@ -81,24 +87,51 @@ def _form(base: str) -> str:
     )
 
 
+def cadence_lines() -> tuple[str, str, str]:
+    """(the fold line, the rest of the terms, the exact derived sentence) — every weekday and the
+    count read from `common.subscriber_cadence`'s sender registry, none typed here, so the fold
+    moves when a sender's cron moves exactly as `promise_sentence()` does."""
+    sc = subscriber_cadence
+    signal = sc.weekday_name(sc.signal_weekday())
+    writeup = sc.weekday_name(sc.chronicle_weekday())
+    fallback = sc.weekday_name(sc.chronicle_autopublish_weekday())
+    note = sc.weekday_name(sc.required_weekday(sc.sender("between-chronicle").cron))
+    lead = f"The numbers every {signal}; the write-up every {writeup}."
+    rest = (
+        f"Or {fallback}, when Matthew has not read the draft by then; now and then a short note on {note} "
+        f"when there is something new. Never more than {sc.weekly_count_word()} emails a week."
+    )
+    return lead, rest, sc.promise_sentence()
+
+
 def body(base: str) -> str:
     """The inner HTML of `<main>` for /subscribe/."""
-    promise = html.escape(subscriber_cadence.promise_sentence(), quote=True)
-    return "    <h1>Follow the experiment.</h1>\n" f'    <p class="fo-promise" data-src="subscriber_cadence.promise_sentence">{promise}</p>\n' + _entry(
-        "fo-form", "By email", _form(base), _static_margin("§", "by", "email")
-    ) + _entry(
-        "fo-get",
-        "What you’d get",
-        '<p class="fo-small" id="fo-writeup">The numbers every Sunday; the write-up every Wednesday.</p>\n'
-        '        <p class="fo-small fo-pending" id="fo-weighin" data-src="api_journey.journey.last_weighin_date + 1 day">Not loaded yet.</p>',
-    ) + _entry(
-        "fo-write",
-        "Write to him",
-        f'<p class="fo-small">The address, to copy: <span class="fo-addr">{EMAIL}</span></p>\n'
-        f'        <p class="fo-note">The code, in full: <a href="{REPO_URL}" rel="noopener">github.com/averagejoematt/life-platform</a></p>',
-        _static_margin("§", "write", "to him"),
-    ) + _entry(
-        "fo-return",
-        "Come back",
-        '<p class="fo-return fo-pending" id="fo-return-line" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>',
+    lead, rest, exact = (html.escape(s, quote=True) for s in cadence_lines())
+    return (
+        (
+            "    <h1>Follow the experiment.</h1>\n"
+            f'    <p class="fo-promise" data-src="subscriber_cadence.{{signal_weekday,chronicle_weekday}}">{lead}</p>\n'
+            f'    <p class="fo-small fo-terms" data-src="subscriber_cadence.{{chronicle_autopublish_weekday,weekly_count_word}}">{rest}</p>\n'
+            '    <details class="fo-fold"><summary>The exact terms</summary>'
+            f'<p class="fo-note" data-src="subscriber_cadence.promise_sentence">{exact}</p></details>\n'
+        )
+        + _entry("fo-form", "By email", _form(base), _static_margin("§", "by", "email"))
+        + _entry(
+            "fo-get",
+            "What you’d get",
+            '<p class="fo-small fo-pending" id="fo-writeup" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>\n'
+            '        <p class="fo-small fo-pending" id="fo-weighin" data-src="api_journey.journey.last_weighin_date">Not loaded yet.</p>',
+        )
+        + _entry(
+            "fo-write",
+            "Write to him",
+            f'<p class="fo-small">The address, to copy: <span class="fo-addr">{EMAIL}</span></p>\n'
+            f'        <p class="fo-note">The code, in full: <a href="{REPO_URL}" rel="noopener">github.com/averagejoematt/life-platform</a></p>',
+            _static_margin("§", "write", "to him"),
+        )
+        + _entry(
+            "fo-return",
+            "Come back",
+            '<p class="fo-return fo-pending" id="fo-return-line" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>',
+        )
     )

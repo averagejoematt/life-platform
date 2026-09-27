@@ -20,7 +20,7 @@ import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { ptDaysAgo, entryAgeSuffix } = await import("../../site/assets/js/entry_age.js");
+const { ptDaysAgo, entryAgeSuffix, nextWeighInText } = await import("../../site/assets/js/entry_age.js");
 
 // 2026-08-23 in Pacific runs from 07:00Z on the 23rd to 07:00Z on the 24th (PDT, UTC-7).
 const PT_MORNING = new Date("2026-08-23T16:00:00Z"); // 09:00 PDT — past the old 12:00Z tip
@@ -128,4 +128,34 @@ test("#4182 loop return trigger: dated from next_date, held/paused keep their se
   assert.equal(loopReturnText(served, { display: "This week's draft is held." }), "This week's draft is held.");
   // Nothing served → "" so the static fallback copy stands; never an invented date.
   assert.equal(loopReturnText(null, null), "");
+});
+
+// #4182 (R6 fix 4; R5's twenty-week test) — the ONE next-weigh-in spelling on every v7 page.
+// The rule: the day after the last weigh-in is due while it is on or after the data-through
+// day; once it is BEFORE that day the line is the counted silence — a past day is never "due".
+test("the next weigh-in is due while the day after the last one is on or after the data-through day", () => {
+  assert.deepEqual(nextWeighInText("2026-09-26", "2026-09-26"), { text: "the next weigh-in is due Sunday, September 27", day: "2026-09-27" });
+  // the boundary: last = through − 1 → the due day IS the data-through day, spelled as the day
+  assert.deepEqual(nextWeighInText("2026-09-25", "2026-09-26"), { text: "the next weigh-in is due Saturday, September 26", day: "2026-09-26" });
+  // a month boundary rolls over, pinned to UTC noon
+  assert.deepEqual(nextWeighInText("2026-09-30", "2026-09-26"), { text: "the next weigh-in is due Thursday, October 1", day: "2026-10-01" });
+  assert.equal(nextWeighInText("2026-09-26", "2026-09-26", { capital: true }).text, "The next weigh-in is due Sunday, September 27");
+});
+
+test("a skipped week reads as the counted silence, never a past day as due", () => {
+  assert.deepEqual(nextWeighInText("2026-09-24", "2026-09-26"), { text: "no weigh-in since Thursday, September 24 — 2 days", day: "2026-09-24" });
+  assert.deepEqual(nextWeighInText("2026-09-21", "2026-09-26", { capital: true }), { text: "No weigh-in since Monday, September 21 — 5 days", day: "2026-09-21" });
+  // twenty weeks of silence: the count is exact, the day is the last weigh-in (for <time> and the margin)
+  const twenty = nextWeighInText("2026-05-09", "2026-09-26");
+  assert.equal(twenty.text, "no weigh-in since Saturday, May 9 — 140 days");
+  assert.equal(twenty.day, "2026-05-09");
+  assert.doesNotMatch(twenty.text, /due/);
+});
+
+test("nothing usable → empty strings; an unusable data-through cannot judge lateness and takes the due branch", () => {
+  assert.deepEqual(nextWeighInText(null, "2026-09-26"), { text: "", day: "" });
+  assert.deepEqual(nextWeighInText("not a date", "2026-09-26"), { text: "", day: "" });
+  assert.deepEqual(nextWeighInText("2026-09-21", ""), { text: "the next weigh-in is due Tuesday, September 22", day: "2026-09-22" });
+  assert.deepEqual(nextWeighInText("2026-09-21", undefined), { text: "the next weigh-in is due Tuesday, September 22", day: "2026-09-22" });
+  for (const r of [nextWeighInText("2026-09-21", "2026-09-26"), nextWeighInText("2026-09-26", "2026-09-26")]) assert.doesNotMatch(r.text, /\d{4}-\d{2}-\d{2}/);
 });
