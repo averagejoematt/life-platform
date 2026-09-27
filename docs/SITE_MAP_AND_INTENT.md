@@ -2,6 +2,8 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-09-26
 
+> **v7 (2026-09-26, ADR-157):** the reachable set below is being rebuilt as ONE serialised investigation on nine pages at the preview path `/next/` — see [SITE_TRANSFORMATION_V7.md](SITE_TRANSFORMATION_V7.md) and [design/v7/](design/v7/). Until the cut-over this registry describes the live site. Two rulings already apply to it: the human first, the counted failures second, the mechanism third, the coaches last and short; and **no cycle count on any reader surface** — `/story/attempts/` and `/method/survival/` are served and unlisted, and the reach ceiling is 24.
+
 > **What each page is for, and why it matters to the platform** — one scannable registry so
 > future redesigns start from intent, not guesswork. Pair with [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md)
 > (the why), [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) (the how-it-looks),

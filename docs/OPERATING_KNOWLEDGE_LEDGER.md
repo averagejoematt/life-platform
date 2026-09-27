@@ -44,9 +44,9 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-25 (Session AT: +4 reference +3 project +1 index — four of them inherited from Sessions AR/AS, whose wraps never landed the rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-22 (Session AQ: +2 reference +1 project this session — the second, the TTL-0 cache-policy constraint, from the attended afternoon; snapshot and counters updated from the rows in the same edit). Prior: 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 493** — feedback 26 · reference 286 · security 1 · project 176 · user 1 · index 3
+**Files in the memory index snapshot: 495** — feedback 28 · reference 286 · security 1 · project 176 · user 1 · index 3
 
-**Rule-class files (feedback + reference + security): 313** — homed-here 82 · already-homed 193 · superseded 7 · narrative 22 · off-repo 9
+**Rule-class files (feedback + reference + security): 315** — homed-here 84 · already-homed 193 · superseded 7 · narrative 22 · off-repo 9
 
 **Program/session files (project): 176** — already-homed 15 · superseded 1 · narrative 157 · off-repo 2 · index 1
 
@@ -79,6 +79,7 @@ feedback_garmin_rate_limit.md
 feedback_hae_water_dedup.md
 feedback_heartbeat_progress.md
 feedback_ideation_include_offsite_channels.md
+feedback_no_cycle_count_on_the_site_2026_09_26.md
 feedback_pacific_time_in_messages.md
 feedback_partial_acceptance_is_not_a_close.md
 feedback_prod_deploy_authorization.md
@@ -87,6 +88,7 @@ feedback_reader_credibility_first.md
 feedback_rest_and_params_multifactor.md
 feedback_review_ritual_model_identity.md
 feedback_sensitive_content.md
+feedback_site_ground_up_rethink_2026_09_26.md
 feedback_site_pacific_time.md
 feedback_site_v6_overnight_authority_2026_09_25.md
 feedback_squash_merge_drops_unpushed_commits.md
@@ -582,6 +584,8 @@ user_who_is_matthew.md
 | `feedback_review_ritual_model_identity.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §3a.5 | homed-here |
 | `feedback_sensitive_content.md` | feedback | the mechanism: `docs/DATA_GOVERNANCE.md` + the content filter in `deploy/sync_site_to_s3.sh`; the vocabulary itself is OFF-repo by design (#2503) | already-homed |
 | `feedback_site_v6_overnight_authority_2026_09_25.md` | feedback | — narrative: a dated one-night owner grant (merge authority on #4182's site PRs, the pillars call delegated, boards standing in for the interview); the durable rule it produced is ADR-156 | narrative |
+| `feedback_site_ground_up_rethink_2026_09_26.md` | feedback | `docs/SITE_TRANSFORMATION_V7.md` (§0 the ruling verbatim, §2 the order rule, §12 the cut-over bar) and ADR-157 — the site is one serialised investigation, nine reachable pages, graded against a Reddit/HN reader and the subject | homed-here |
+| `feedback_no_cycle_count_on_the_site_2026_09_26.md` | feedback | `docs/SITE_TRANSFORMATION_V7.md` §0/§14 and ADR-157 (the cycle count is internal; the public frame is the experiment and the day); the mechanism is the vocabulary ledger's `cycle` row in `tests/site_vocabulary_residue.py` (shrink-only, 2 unlisted pages) | homed-here |
 | `feedback_site_pacific_time.md` | feedback | `docs/CONVENTIONS.md` §7 (DATE# keys and reader-facing dates are Pacific) + `docs/IDEMPOTENCY.md` | homed-here |
 | `feedback_squash_merge_drops_unpushed_commits.md` | feedback | `docs/CONVENTIONS.md` §3 | already-homed |
 | `feedback_subagent_pr_bodies_no_record_identifiers.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §2.11 + `.claude/agents/issue-filer.md` | already-homed |
