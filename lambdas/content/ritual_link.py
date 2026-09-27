@@ -91,3 +91,30 @@ def verify_ritual_token(secret: str, date_str: str, metric: str, value: int, tok
     except Exception:
         return False
     return hmac.compare_digest(token, expected)
+
+
+# #4189: the morning note's OWNER token — the same signed-link secret, a per-PT-day
+# payload. The note's four words are free text the owner types, so the token cannot
+# sign the values (the ritual token's shape); it signs the DAY instead, which makes it
+# the owner's write permission for exactly one morning. Anything holding the secret
+# can mint it (the evening nudge already does for the ritual links; the site lane's
+# Today box will carry it the same way). Nothing else on site-api authenticates the
+# owner (#4207's finding), so this IS the existing owner check, extended by one payload.
+MORNING_NOTE_SIGNING_SCOPE = "morning_note"
+
+
+def sign_morning_note_token(secret: str, date_str: str) -> str:
+    """Deterministic HMAC-SHA256 over (date, "morning_note"), truncated to 32 hex chars."""
+    payload = f"{date_str}:{MORNING_NOTE_SIGNING_SCOPE}"
+    return hmac.new(secret.encode(), payload.encode(), digestmod="sha256").hexdigest()[:32]
+
+
+def verify_morning_note_token(secret: str, date_str: str, token) -> bool:
+    """Constant-time verification of the owner's per-day note token. False on any malformed input (never raises)."""
+    if not token or not isinstance(token, str):
+        return False
+    try:
+        expected = sign_morning_note_token(secret, date_str)
+    except Exception:
+        return False
+    return hmac.compare_digest(token, expected)

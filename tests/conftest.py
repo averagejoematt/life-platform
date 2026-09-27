@@ -607,6 +607,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # `git ls-files` exactly like the pip guard above, so a new workflow with a
         # bare `npm install -g` must red BEFORE the merge, not after.
         "test_npm_pin_consistency_2759.py",
+        # #4253: the same pin class for configure-aws-credentials (os.walk over .github/ —
+        # one SHA, composite included) plus every deploy-path job carrying timeout-minutes;
+        # a drifted pin or a new unbounded job must red BEFORE the merge.
+        "test_ci_job_timeouts_3678.py",
         # ── #2372: the hand-list becomes a derivation — every file
         # tests/premerge_derivation.py finds below, classified in this same PR ──
         "test_blocked_vice_screen_set_2212.py",

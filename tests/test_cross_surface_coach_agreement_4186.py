@@ -262,3 +262,84 @@ def test_mutation_disabling_number_words_reds_fixture_ii(monkeypatch):
     monkeypatch.setattr(wq, "_NUMBER_WORDS", {})
     ok, _msg = wq.assess_cross_surface_coach_vs_engine([WEBB_GAP], nutrition=NUTRITION_09_25, journey=JOURNEY_09_25)
     assert ok, "disabling word-number parsing must silently lose the 'Six days without logs' claim, turning the FAIL into a PASS"
+
+
+# ── the WIRE shape: the lead coach is page-level, not in `coaches[]` ─────────
+#
+# Measured live 2026-09-27 16:12Z on `/api/coaching-dashboard`: Dr. Eli Marsh's
+# 106.9g sentence is served in `weekly_priority.text` (the head coach's weekly read),
+# NOT in `coaches[]` — the fixtures above put him in `coaches[]`, which the wire never
+# does. Reading `coaches[]` alone, both legs extracted 0 claims and passed green
+# against an engine `avg_protein_g` of 153.5. The payload below is that response's
+# shape, its text verbatim (trimmed to the two quantity-bearing sentences).
+
+WIRE_DASHBOARD_09_27 = {
+    "weekly_priority": {
+        "text": (
+            "At 316.9 pounds after 16 experiment days, he's losing 3.7 pounds per week, which is aggressive and "
+            "on-target for the Foundation phase. The signal I'm watching most closely right now is protein: his "
+            "average intake has dropped to 106.9 grams across 14 logged days, well short of the 170-gram floor that "
+            "preserves lean mass during a deficit."
+        ),
+        "coach_name": "Dr. Eli Marsh",
+        "coach_title": "Principal Investigator — Program Lead",
+        "generated_at": "2026-09-21T14:02:56.543529+00:00",
+        "as_of_day_n": 16,
+        "data_through": None,
+    },
+    "lead_daily": None,
+    "coaches": [
+        {"name": "Dr. Lisa Park", "position_summary": ""},
+        {
+            "name": "Dr. Marcus Webb",
+            "position_summary": (
+                "The six-day logging gap since September 19th is blocking my directional read, but today's log tells "
+                "a clear story: 182g protein, 1,761 kcal, with the steak dinner anchoring 106g in a single sitting."
+            ),
+        },
+    ],
+}
+NUTRITION_09_27 = {"avg_protein_g": 153.5, "days_logged": 21, "lag_days": 1}
+JOURNEY_09_27 = {"weekly_rate_lbs": -4.04, "weekly_rate_ci_low": -4.55, "weekly_rate_ci_high": -2.29}
+
+
+def test_served_coach_texts_reads_the_page_level_lead_slots():
+    texts = wq.served_coach_texts(WIRE_DASHBOARD_09_27)
+    names = [t["name"] for t in texts]
+    assert "Dr. Eli Marsh (weekly_priority)" in names
+    # an empty/None slot adds nothing; coaches[] rides through as served
+    assert not any("lead_daily" in n for n in names)
+    assert "Dr. Marcus Webb" in names and len(texts) == 3
+    daily = dict(WIRE_DASHBOARD_09_27, lead_daily={"text": "protein averaged 120g this week", "coach_name": "Dr. Eli Marsh"})
+    assert "Dr. Eli Marsh (lead_daily)" in [t["name"] for t in wq.served_coach_texts(daily)]
+    assert wq.served_coach_texts(None) == [] and wq.served_coach_texts({"coaches": None}) == []
+
+
+def test_checks_fails_the_wire_shaped_09_27_page_naming_both_values_and_the_slot(monkeypatch, capsys):
+    payloads = {
+        "/api/vitals": {"vitals": {}},
+        "/api/coaching-dashboard": WIRE_DASHBOARD_09_27,
+        "/api/sleep_detail": {"sleep_detail": {}},
+        "/api/nutrition_overview": {"nutrition": NUTRITION_09_27},
+        "/api/journey": {"journey": JOURNEY_09_27},
+    }
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen_factory(payloads))
+    by_name = {c.name: c for c in wq.checks(_FakeCheck, "http://example.test", "content_truth")}
+    vs_engine = by_name["cross_surface:coach_vs_engine"]
+    assert vs_engine.passed is False, vs_engine.message
+    assert "Dr. Eli Marsh (weekly_priority) cites 106.9g vs engine 153.5g" in vs_engine.message
+    assert "1 compared" in vs_engine.message
+    # the dead-man: both legs' counts reach the log on every run, not only on a failure
+    out = capsys.readouterr().out
+    assert "[QA] COUNT cross_surface:coach_consistency: " in out and "extracted" in out
+    assert "[QA] COUNT cross_surface:coach_vs_engine: " in out
+
+
+def test_mutation_reading_coaches_only_turns_the_wire_fail_green(monkeypatch):
+    """Mutation control: restore the pre-fix corpus (`coaches[]` only) and the
+    served 106.9g specimen goes unread — 0 compared, green. The fix is the corpus."""
+    monkeypatch.setattr(wq, "_PAGE_LEAD_SLOTS", ())
+    ok, msg = wq.assess_cross_surface_coach_vs_engine(
+        wq.served_coach_texts(WIRE_DASHBOARD_09_27), nutrition=NUTRITION_09_27, journey=JOURNEY_09_27
+    )
+    assert ok and "0 compared" in msg, msg

@@ -28,7 +28,9 @@ import contextlib
 import contextvars
 import json
 import os
+import random
 import threading
+import time
 
 import boto3
 from botocore.config import Config
@@ -699,7 +701,13 @@ def _client():
                     # podcast scripts) → intermittent ReadTimeout. 180s gives headroom.
                     read_timeout=180,
                     connect_timeout=10,
-                    retries={"max_attempts": 2, "mode": "adaptive"},
+                    # #4279: botocore retries OFF. `invoke_with_retry` below is the ONE
+                    # retry policy. The old `{"max_attempts": 2, "mode": "adaptive"}`
+                    # was NOT two attempts: botocore reads client-config `max_attempts`
+                    # as RETRIES and adds one (`total_max_attempts = 3`), and the three
+                    # app-level loops each ran 4 on top — 12 invoke_model sends per call
+                    # worst case. `total_max_attempts` is the unambiguous key.
+                    retries={"total_max_attempts": 1, "mode": "standard"},
                 ),
             )
     return _BEDROCK
@@ -753,8 +761,9 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     Anthropic Messages API (content[], usage{}, role, stop_reason, …).
 
     Raises botocore.exceptions.ClientError on Bedrock errors (ThrottlingException,
-    ModelTimeoutException, ServiceUnavailableException, AccessDeniedException, …)
-    — callers handle retry/backoff.
+    ModelTimeoutException, ServiceUnavailableException, AccessDeniedException, …).
+    ONE attempt, no retry (botocore retries are off, #4279) — a caller that wants the
+    platform's retry policy calls `invoke_with_retry`, never a loop of its own.
     """
     # COST-05: Shadow mode — exercises the pipeline without model calls (for debugging
     # coach regeneration without burning budget). Set BEDROCK_SHADOW_MODE=1 to enable.
@@ -810,6 +819,80 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     # #2888: meter cache_control that asked for caching and got none. Fail-open.
     _note_cache_noop(parsed, bedrock_body, model_id)
     return parsed
+
+
+# ── #4279 — the ONE retry policy for every Bedrock Messages call ─────────────
+#
+# Before: botocore retried each send (config `max_attempts: 2` = 3 sends — see
+# `_client`) AND three app-level loops (`ai_transport.call_anthropic`,
+# `retry_utils.call_anthropic_api`, `retry_utils.call_anthropic_raw`) each made 4
+# attempts with fixed 5/15/45 s sleeps around that: 4 x 3 = 12 invoke_model sends
+# and >= 65 s of sleep per call on a sustained throttle, before a single 180 s read
+# timeout is counted. The helpers that looked like more copies (the digests'
+# `call_anthropic_with_retry`, the `_call_haiku` family) already delegated to
+# `call_anthropic_raw` — they carry no loop of their own.
+#
+# After: botocore sends once; THIS loop is the only retry. App-level rather than
+# botocore-level because (a) the budget stop and the unknown-model refusal are
+# raised before invoke_model and must never be retried — botocore cannot see them,
+# (b) the retryable set is Bedrock-specific (ModelNotReady / ModelTimeout are not in
+# botocore's generic transient list), and (c) every attempt passes through
+# `invoke()`'s metering, so a retried call is visible, not folded into one send.
+INVOKE_MAX_ATTEMPTS = 3
+INVOKE_RETRY_BASE_DELAYS = (5, 15)  # seconds before attempt 2, attempt 3 (equal jitter)
+RETRYABLE_BEDROCK_CODES = frozenset(
+    {
+        "ThrottlingException",
+        "ModelTimeoutException",
+        "ServiceUnavailableException",
+        "InternalServerException",
+        "ModelNotReadyException",
+    }
+)
+_jitter = random.random  # patched by tests for a deterministic schedule
+
+
+def retry_delay(attempt: int) -> float:
+    """Seconds to wait after failed `attempt` (1-based): equal jitter on the base —
+    half fixed, half random — so concurrent Lambdas throttled together do not
+    retry in lock-step, and the worst case stays bounded by the base."""
+    base = float(INVOKE_RETRY_BASE_DELAYS[attempt - 1])
+    return base / 2 + _jitter() * base / 2
+
+
+def invoke_with_retry(body: dict, model_name: str | None = None) -> dict:
+    """`invoke()` under the platform's single retry policy (#4279).
+
+    Worst case: INVOKE_MAX_ATTEMPTS sends and sum(INVOKE_RETRY_BASE_DELAYS) = 20 s of
+    sleep. Never retried: the tier-3 budget stop (#3084) and UnknownModelError
+    (#4275) — both refusals raised before invoke_model, nothing billed, and attempt
+    2 would be identical — and a non-retryable ClientError (validation, access).
+    A non-ClientError exception (connection reset, read timeout) is retried: the
+    send did not return, so nothing was received to re-bill (#2893's rule).
+    The final failure is re-raised unchanged; callers own the degrade path.
+    """
+    import botocore.exceptions as _bce
+
+    refusals = (budget_stop_cls(), UnknownModelError)
+    for attempt in range(1, INVOKE_MAX_ATTEMPTS + 1):
+        try:
+            # Looked up at call time, so a monkeypatched `bedrock_client.invoke` is what runs.
+            return invoke(body, model_name=model_name)
+        except refusals:
+            raise
+        except _bce.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "Unknown")
+            print(f"[WARN] Bedrock {code} attempt {attempt}/{INVOKE_MAX_ATTEMPTS}")
+            if code not in RETRYABLE_BEDROCK_CODES or attempt >= INVOKE_MAX_ATTEMPTS:
+                raise
+        except Exception as e:
+            print(f"[WARN] Bedrock error attempt {attempt}/{INVOKE_MAX_ATTEMPTS}: {e}")
+            if attempt >= INVOKE_MAX_ATTEMPTS:
+                raise
+        delay = retry_delay(attempt)
+        print(f"[INFO] Retrying in {delay:.1f}s...")
+        time.sleep(delay)
+    raise AssertionError("unreachable: the loop returns or raises on its last attempt")
 
 
 def _shadow_embedding(text: str, dims: int) -> list:

@@ -1618,7 +1618,11 @@ def test_no_nutrition_tool_reaches_food_delivery_genome_or_labs(monkeypatch):
     for view in VIEWS:
         tn.tool_get_nutrition({"view": view})
     tn._get_metabolic_adaptation(ADAPT_ARGS)
-    assert not (t.sources_read & {"food_delivery", "genome", "labs", "dexa", "macrofactor_meals"})
+    # #4166: `dexa` left this set — the deficit advocate's protein gate reads the latest DXA's fat-free mass for its
+    # body-fat tier, through the ONE reader `mcp.shared_quantities.dxa_scans` (the plan's). DXA is owner-published
+    # (`privacy.field_tiers` dexa = TIER_OWNER_PUBLISHED, served on the physical surface); only the derived tier and
+    # body-fat % travel on the critic packet. The original exclusion (#2229) was a coverage test, not a privacy ruling.
+    assert not (t.sources_read & {"food_delivery", "genome", "labs", "macrofactor_meals"})
 
 
 def test_every_view_answers_a_quiet_platform_with_an_error_never_a_zero(monkeypatch):

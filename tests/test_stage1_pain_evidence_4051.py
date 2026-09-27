@@ -366,7 +366,16 @@ class TestTheReadBack:
 
     def test_the_flag_instance_carries_its_own_note_date_so_the_re_arm_can_be_computed(self, wired):
         row = _pain_row(_stage1(wired))
-        assert row["instances"] == [{"movement": RDL, "note_dates": [FLAG_NOTE_DATE]}]
+        # #4174: the instance is (movement, SITE) and carries the note's own words — the
+        # dismissal pinned 2026-09-13, so the note is attributed to `right_lower_back`.
+        assert row["instances"] == [
+            {
+                "movement": RDL,
+                "site": "right_lower_back",
+                "note_dates": [FLAG_NOTE_DATE],
+                "notes": [{"date": FLAG_NOTE_DATE, "text": _RDL_PAIN_NOTE["note_raw"]}],
+            }
+        ]
 
     def test_a_second_undismissed_flag_trips_the_aggregate_without_hiding_the_dismissal(self, wired):
         """LIVE SHAPE (2026-09-22): widening the set from a draft's lifts to everything
@@ -509,11 +518,18 @@ class TestTheBatchNoteRead:
         assert got[RDL_TID] == {
             "pain_flag_any": True,
             "pain_dates": [FLAG_NOTE_DATE],
+            "pain_notes": [{"date": FLAG_NOTE_DATE, "text": _RDL_PAIN_NOTE["note_raw"]}],  # #4174: the words tie a note to its site
             "sessions_with_notes": 1,
             "layer_status": "degraded",
         }
         assert got[LAT_TID]["pain_flag_any"] is False
-        assert got[PRESS_TID] == {"pain_flag_any": False, "pain_dates": [], "sessions_with_notes": 0, "layer_status": "degraded"}
+        assert got[PRESS_TID] == {
+            "pain_flag_any": False,
+            "pain_dates": [],
+            "pain_notes": [],
+            "sessions_with_notes": 0,
+            "layer_status": "degraded",
+        }
 
     def test_every_entry_carries_the_layer_status_beside_its_count(self):
         """#3769: no count from a derived layer travels without the layer's own status.
@@ -556,3 +572,195 @@ def test_mutation_control_break_the_derivation_and_the_planted_flag_disappears(w
     assert broken["state"] != "dismissed_by_owner", "the flag survived the derivation being removed — it is not coming from the derivation"
     assert broken.get("observed") in (None, []), broken
     assert broken["state"] == "unknown" and broken["detail"].startswith("evidence: none — ")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. #4174 — a dismissal covers its own SITE, not every note on the movement
+# ══════════════════════════════════════════════════════════════════════════════
+# THE WIRE (read-only, 2026-09-26): Cycling (template D8F7F851) carries two flagged notes on
+# two different sites — 2026-09-09 "saddle sore" and 2026-09-18 "big toe throbbing from
+# ingrown toe" — and the owner's chat wrote two dismissals on 2026-09-25, one per site,
+# each pinning its own note. Pre-#4174 the engine keyed instances per MOVEMENT, so the
+# saddle-sore dismissal alone read the whole movement `dismissed_by_owner`, carrying
+# `latest_note_date 2026-09-18`, and stage 1 never showed the big-toe record.
+CYCLING_TID = "D8F7F851"
+CYCLING = "Cycling"
+CYCLING_WORDS = "Dismiss the Cycling pain flag — it's resolved, no pain cycling now"
+_CYCLING_SESSION_0909 = {
+    "pk": HEVY_PK,
+    "sk": "DATE#2026-09-09#WORKOUT#1f739e9b-908e-44bc-8e94-463b6ea67443",
+    "date": "2026-09-09",
+    "phase": "experiment",
+    "exercises": [
+        {
+            "template_id": CYCLING_TID,
+            "name": CYCLING,
+            "notes": "Level 8 flat - cardio felt ok - more just saddle sore and uncomfortable with compression shorts",
+            "sets": [{"type": "normal", "weight_kg": None, "reps": None, "distance_m": 13132.0, "duration_sec": 2700.0, "set_index": 0}],
+        }
+    ],
+}
+_CYCLING_SESSION_0918 = {
+    "pk": HEVY_PK,
+    "sk": "DATE#2026-09-18#WORKOUT#e9b80b85-4b1f-4350-9d12-4e19adeaba4d",
+    "date": "2026-09-18",
+    "phase": "experiment",
+    "exercises": [
+        {
+            "template_id": CYCLING_TID,
+            "name": CYCLING,
+            "notes": "Level 10 flat - big toe throbbing from ingrown toe so took it easy",
+            "sets": [{"type": "normal", "weight_kg": None, "reps": None, "distance_m": 14967.0, "duration_sec": 3000.0, "set_index": 0}],
+        }
+    ],
+}
+_CYCLING_NOTE_0909 = {
+    "pk": f"USER#matthew#SOURCE#training_notes#EXERCISE#{CYCLING_TID}",
+    "sk": "DATE#2026-09-09#WORKOUT#1f739e9b-908e-44bc-8e94-463b6ea67443#0",
+    "date": "2026-09-09",
+    "workout_uid": "hevy:1f739e9b-908e-44bc-8e94-463b6ea67443",
+    "occurrence": 0,
+    "exercise_template": CYCLING_TID,
+    "exercise_name": CYCLING,
+    "inferred": True,
+    "degraded": False,
+    "degraded_reason": None,
+    "extracted_by": "hybrid",
+    "pain_flag": True,
+    "signals": [
+        {
+            "confidence": 0.9,
+            "summary": "level/load/ROM change",
+            "class": "progression",
+            "block": 0,
+            "value": {"level": 8, "character": "flat"},
+        },
+        {"confidence": 0.85, "class": "pain_discomfort", "summary": "Saddle soreness and compression shorts discomfort during cardio"},
+    ],
+    "sentiment": None,
+    "note_raw": "Level 8 flat - cardio felt ok - more just saddle sore and uncomfortable with compression shorts",
+}
+_CYCLING_NOTE_0918 = {
+    "pk": f"USER#matthew#SOURCE#training_notes#EXERCISE#{CYCLING_TID}",
+    "sk": "DATE#2026-09-18#WORKOUT#e9b80b85-4b1f-4350-9d12-4e19adeaba4d#0",
+    "date": "2026-09-18",
+    "workout_uid": "hevy:e9b80b85-4b1f-4350-9d12-4e19adeaba4d",
+    "occurrence": 0,
+    "exercise_template": CYCLING_TID,
+    "exercise_name": CYCLING,
+    "inferred": True,
+    "degraded": False,
+    "degraded_reason": None,
+    "extracted_by": "hybrid",
+    "pain_flag": True,
+    "signals": [
+        {
+            "class": "progression",
+            "value": {"level": 10, "character": "flat"},
+            "confidence": 0.9,
+            "block": 0,
+            "summary": "level/load/ROM change",
+        },
+        {"confidence": 0.95, "summary": "Big toe throbbing from ingrown toe", "class": "pain_discomfort"},
+        {"class": "deviation", "confidence": 0.9, "summary": "Took it easy due to toe pain"},
+    ],
+    "sentiment": None,
+    "note_raw": "Level 10 flat - big toe throbbing from ingrown toe so took it easy",
+}
+
+
+def _cycling_dismissal(site, flag_note_date):
+    """The live records, built through the registry: `movements` is the chat's lowercase
+    'cycling' — exactly as written — so the label match is exercised, not assumed."""
+    rec = tcr.build_dismissal_record(
+        site=site,
+        dismissed_on="2026-09-25",
+        words=CYCLING_WORDS,
+        movements=["cycling"],
+        flag_note_date=flag_note_date,
+        recorded_at="2026-09-26T02:21:26Z",
+    )
+    return {**rec, "pk": tcr.DISMISSAL_PK}
+
+
+SADDLE_SORE = _cycling_dismissal("saddle sore", "2026-09-09")
+BIG_TOE = _cycling_dismissal("big toe", "2026-09-18")
+
+
+def _cycling_rows(*dismissals):
+    return [
+        copy.deepcopy(_CYCLING_SESSION_0909),
+        copy.deepcopy(_CYCLING_SESSION_0918),
+        copy.deepcopy(_CYCLING_NOTE_0909),
+        copy.deepcopy(_CYCLING_NOTE_0918),
+        *[copy.deepcopy(d) for d in dismissals],
+    ]
+
+
+def _cycling_stage1(monkeypatch, *dismissals):
+    fake = _FakeTable(_cycling_rows(*dismissals))
+    monkeypatch.setattr(core, "table", fake)
+    monkeypatch.setattr(tn, "table", fake)
+    return _stage1(fake, health={"checked": True, "degraded": 0, "records_found": 24, "extractor_dark": False})
+
+
+class TestPerSite4174:
+    def test_the_saddle_sore_dismissal_alone_leaves_the_big_toe_note_open(self, monkeypatch):
+        """The defect, through the live read path: one movement, two sites, one dismissal.
+        The big-toe note (2026-09-18) names no dismissed site, so it is its own OPEN instance
+        and the aggregate stays `tripped` — it must never hide under the saddle-sore record."""
+        out = _cycling_stage1(monkeypatch, SADDLE_SORE)
+        row = _pain_row(out)
+        assert row["state"] == "tripped", row
+        assert row["observed"] == [CYCLING]
+        by_site = {(r["movement"], r["site"]): r for r in row["by_site"]}
+        assert by_site[(CYCLING, "saddle_sore")]["state"] == "dismissed_by_owner"
+        assert by_site[(CYCLING, "saddle_sore")]["dismissal"] == "DISMISSAL#saddle_sore#2026-09-25"
+        assert by_site[(CYCLING, None)] == {
+            "movement": CYCLING,
+            "site": None,
+            "state": "tripped",
+            "note_dates": ["2026-09-18"],
+            "dismissal": None,
+            "dismissal_state": "none",
+        }, "the 2026-09-18 big-toe record must stay visible with no dismissal against it"
+        assert "2026-09-18" in row["detail"] and "#4174" in row["detail"]
+        assert [d["sk"] for d in out["constraint_block"]["owner_dismissals"]] == ["DISMISSAL#saddle_sore#2026-09-25"]
+        assert (
+            out["constraint_block"]["owner_dismissals"][0]["latest_note_date"] == "2026-09-09"
+        ), "the saddle record carries ITS note, not the toe's"
+
+    def test_both_dismissals_read_dismissed_by_owner_and_both_are_listed(self, monkeypatch):
+        """Acceptance box 2: `owner_dismissals` lists every dismissal in play — both 09-25 records."""
+        out = _cycling_stage1(monkeypatch, SADDLE_SORE, BIG_TOE)
+        row = _pain_row(out)
+        assert row["state"] == "dismissed_by_owner", row
+        assert row["by_movement"] == {CYCLING: "dismissed_by_owner"}
+        assert {(r["site"], r["state"], r["dismissal"]) for r in row["by_site"]} == {
+            ("big_toe", "dismissed_by_owner", "DISMISSAL#big_toe#2026-09-25"),
+            ("saddle_sore", "dismissed_by_owner", "DISMISSAL#saddle_sore#2026-09-25"),
+        }
+        listed = sorted(d["sk"] for d in out["constraint_block"]["owner_dismissals"])
+        assert listed == ["DISMISSAL#big_toe#2026-09-25", "DISMISSAL#saddle_sore#2026-09-25"]
+        honesty = [h for h in out["constraint_block"]["honesty"] if "owner dismissal" in h]
+        assert len(honesty) == 2 and any("'big toe'" in h for h in honesty) and any("'saddle sore'" in h for h in honesty)
+
+    def test_a_later_note_that_names_neither_site_re_arms_both_and_stays_open(self, monkeypatch):
+        """Over-inclusive by design: a note dated after both dismissals that names no site
+        lands on BOTH sites (either could be flagged again) and each dismissal reads
+        superseded — the flag is tripped and the aggregate says so."""
+        later = {
+            **copy.deepcopy(_CYCLING_NOTE_0918),
+            "sk": "DATE#2026-09-27#WORKOUT#ffffffff-0000-0000-0000-000000000000#0",
+            "date": "2026-09-27",
+            "workout_uid": "hevy:ffffffff",
+            "note_raw": "Level 12 flat - sore again, took it easy",
+        }
+        fake = _FakeTable(_cycling_rows(SADDLE_SORE, BIG_TOE) + [later])
+        monkeypatch.setattr(core, "table", fake)
+        monkeypatch.setattr(tn, "table", fake)
+        row = _pain_row(
+            _stage1(fake, target_date="2026-09-28", health={"checked": True, "degraded": 0, "records_found": 24, "extractor_dark": False})
+        )
+        assert row["state"] == "tripped"
+        assert {r["state"] for r in row["dismissals"]} == {"re_armed"} and all(r["superseded"] for r in row["dismissals"])

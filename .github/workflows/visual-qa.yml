@@ -122,7 +122,7 @@ jobs:
           python -m pip install $PINS
           python -m playwright install --with-deps chromium
 
-      # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
+      # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
         uses: ./.github/actions/setup-ci
         with:

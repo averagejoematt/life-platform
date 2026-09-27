@@ -52,7 +52,7 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py boto3 botocore)   # versions from requirements-dev.txt (CQ-01/#2609, #2760)
           pip install $PINS
 
-      # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
+      # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
       - name: Configure AWS (read-only harvest role)
         uses: ./.github/actions/setup-ci
         with:

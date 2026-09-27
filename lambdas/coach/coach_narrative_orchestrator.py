@@ -127,10 +127,8 @@ _cw = boto3.client("cloudwatch", region_name=REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "coach-narrative-orchestrator")
 _CW_NAMESPACE = "LifePlatform/AI"
 
-# Backoff delays between retry attempts (seconds)
-_BACKOFF_DELAYS = [5, 15, 45]
-_MAX_ATTEMPTS = len(_BACKOFF_DELAYS) + 1
-_RETRYABLE_CODES = frozenset([429, 500, 502, 503, 504, 529])
+# #4279: no retry schedule here — `_call_haiku` routes through retry_utils.call_anthropic_raw
+# → ai.bedrock_client.invoke_with_retry, the one policy. (A dead 5/15/45 copy lived here.)
 
 # AWS clients
 dynamodb = boto3.resource("dynamodb", region_name=REGION)

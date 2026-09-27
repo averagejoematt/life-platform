@@ -27,6 +27,7 @@ Offline: no AWS. boto3 and call_anthropic are fakes wherever the pipeline runs.
 
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
@@ -349,6 +350,43 @@ def test_a_single_logged_day_is_not_judged_as_an_average():
     assert ci.served_fact_findings("Yesterday you logged 245 g of protein.", facts, today="2026-09-26") == []
 
 
+# #4343: verbatim sentences from the 2026-09-27 17:00Z brief (EVALRET#coach_brief) that
+# the served-fact check held although none of them states his daily intake or its average.
+NUTRITION_0927_SERVINGS = (
+    "Morning smoothie at 9am delivers 15 g, protein shake at noon adds 30 g, buffalo edamame in the afternoon contributes 11 g."
+)
+NUTRITION_0927_SHIFT = "One ask this week: redistribute 40g of protein away from dinner into morning and midday."
+GLUCOSE_0927_CONDITIONAL = (
+    "If protein reaches 190g next week and your fasting glucose still looks elevated, I need you to not read that as non-response."
+)
+PHYSICAL_0927_AVERAGE = "Protein averaging around 122.7 grams per day through the recent logged period is not sufficient substrate."
+
+
+def test_a_serving_a_shift_or_a_conditional_target_is_not_an_intake_claim():
+    """#4343: the 09-27 holds — per-item amounts, a redistribution and a conditional
+    target were each judged against the 21-logged-day average and held their coach."""
+    facts = _facts("2026-09-25", "2026-09-26")
+    for text in (NUTRITION_0927_SERVINGS, NUTRITION_0927_SHIFT, GLUCOSE_0927_CONDITIONAL):
+        assert ci.served_fact_findings(text, facts, today="2026-09-26") == [], text
+
+
+def test_an_average_framed_figure_is_still_judged():
+    """The frame requirement does not loosen the check: the physical coach's 122.7 g
+    "averaging … per day" still fails against the served average (cause B of #4343)."""
+    facts = _facts("2026-09-25", "2026-09-26")
+    found = ci.served_fact_findings(PHYSICAL_0927_AVERAGE, facts, today="2026-09-26")
+    assert [(f["metric"], f["cited"]) for f in found] == [("protein_g", 122.7)], found
+
+
+def test_mutation_control_without_the_intake_frame_the_servings_are_held(monkeypatch):
+    """Revert the frame to "every figure is an intake claim" (the pre-#4343 behaviour):
+    the three 09-27 fragments fail again, so the test above cannot pass by accident."""
+    monkeypatch.setattr(ci, "_INTAKE_FRAME", re.compile(r""))
+    facts = _facts("2026-09-25", "2026-09-26")
+    for text in (NUTRITION_0927_SERVINGS, NUTRITION_0927_SHIFT, GLUCOSE_0927_CONDITIONAL):
+        assert [f["metric"] for f in ci.served_fact_findings(text, facts, today="2026-09-26")], text
+
+
 def test_more_logged_days_than_the_record_holds_fails():
     facts = _facts(BRIEF_DATA_DAY, BRIEF_TODAY)
     found = ci.served_fact_findings("That is 24 logged days of protein data.", facts, today=BRIEF_TODAY)
@@ -531,3 +569,117 @@ def test_the_weekly_integrator_gate_holds_the_106_9_protein_read(monkeypatch):
 def test_mutation_control_the_weekly_gate_without_the_served_check_publishes_it(monkeypatch):
     monkeypatch.setattr(ci, "served_fact_findings", lambda text, facts, today=None: [])
     assert _weekly_gate(monkeypatch, ELI_0921, _rows_through("2026-09-19"), "2026-09-21") == ELI_0921
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4189 — the morning note reaches every coach's input as a served fact
+# ══════════════════════════════════════════════════════════════════════════════
+
+NOTE_ROW = {
+    "pk": "USER#matthew#SOURCE#morning_note",
+    "sk": "MORNING_NOTE#2026-09-26",
+    "date": "2026-09-26",
+    "sleep_word": "heavy",
+    "body_word": "stiff",
+    "mood_word": "steady",
+    "felt_recovered": False,
+    "written_at": "2026-09-26T12:12:00+00:00",
+    "tier": 1,
+    "source": "site_api_morning_note",
+}
+
+
+class _NoteTable:
+    """Answers the note window query with the rows given; records the key condition."""
+
+    def __init__(self, rows):
+        self.rows, self.calls = rows, []
+
+    def query(self, **kw):
+        self.calls.append(kw)
+        return {"Items": [dict(r) for r in self.rows]}
+
+
+def _fresh_note_run():
+    ci._run.clear()
+
+
+def test_every_coach_input_carries_the_morning_note_as_a_served_fact():
+    """The sleep and mind coaches asked for the four words by name; every coach reads the
+    same fact so no two narrate a morning he described differently. Mutation control: hand
+    the raw row (or the raw UTC instant) through instead of coach_fact — the checks below fail."""
+    _fresh_note_run()
+    table = _NoteTable([NOTE_ROW])
+    for coach in ("sleep_coach", "mind_coach", "nutrition_coach", "training_coach"):
+        _fresh_note_run()
+        out = ci.coach_inputs(coach, {"hrv": 50}, {"date": "2026-09-25"}, table=table)
+        fact = out["morning_note"]
+        assert fact["state"] == "measured"
+        assert (fact["sleep_word"], fact["body_word"], fact["mood_word"], fact["felt_recovered"]) == ("heavy", "stiff", "steady", False)
+        assert fact["date"] == fact["data_through"] == "2026-09-26" and fact["day"].startswith("Saturday, September 26")
+        assert fact["written_at_pt"].endswith("PT") and "written_at" not in fact, "the UTC instant never reaches a coach"
+        assert "verbatim" in fact["note"]
+    assert out["hrv"] == 50, "the domain data is carried, not replaced"
+
+
+def test_the_note_is_read_for_today_not_for_the_previous_data_day():
+    """The brief runs after the morning it was written: the window ends on Pacific TODAY, and
+    reaches back exactly COACH_LOOKBACK_DAYS — not to `data_through`'s day, not 14 days."""
+    from boto3.dynamodb.conditions import ConditionExpressionBuilder
+    from coach import morning_note as mn
+
+    _fresh_note_run()
+    table = _NoteTable([])
+    ci.served_run_facts({"date": "2026-09-25"}, table=table, today="2026-09-26")
+    rendered = [(ConditionExpressionBuilder().build_expression(c["KeyConditionExpression"], is_key_condition=True), c) for c in table.calls]
+    note_calls = [(b, c) for b, c in rendered if mn.MORNING_NOTE_PK in b.attribute_value_placeholders.values()]
+    assert len(note_calls) == 1, "exactly one note window read per run (the macrofactor window is the other query)"
+    built, call = note_calls[0]
+    bounds = set(built.attribute_value_placeholders.values()) - {mn.MORNING_NOTE_PK}
+    assert bounds == {mn.sk_for("2026-09-25"), mn.sk_for("2026-09-26") + "~"}, bounds
+    assert call["Limit"] == mn.COACH_LOOKBACK_DAYS == 2
+
+
+def test_no_note_is_absent_and_no_table_is_read_failed_never_an_empty_morning():
+    """ADR-104 at birth: `[]` is "no note" (stated); an unreadable partition is unknown.
+    Mutation control: collapse None into `absent` — the second assertion fails."""
+    _fresh_note_run()
+    fact = ci.coach_inputs("sleep_coach", {}, {"date": "2026-09-25"}, table=_NoteTable([]))["morning_note"]
+    assert fact["state"] == "absent" and "never infer" in fact["note"] and "sleep_word" not in fact
+    _fresh_note_run()
+    fact = ci.coach_inputs("sleep_coach", {}, {"date": "2026-09-25"}, table=None)["morning_note"]
+    assert fact["state"] == "read_failed" and "sleep_word" not in fact
+
+
+def test_the_quality_gate_sees_the_same_note_the_coach_was_given():
+    """`served_run_facts()` with no data returns THIS run's facts — the gate reads the note
+    the coach read, not a fresh query that might have moved."""
+    _fresh_note_run()
+    ci.coach_inputs("mind_coach", {}, {"date": "2026-09-25"}, table=_NoteTable([NOTE_ROW]))
+    assert ci.served_run_facts()["morning_note"]["mood_word"] == "steady"
+
+
+def test_a_presence_only_tier_withholds_the_words_from_the_coach_too():
+    """The stored tier is honoured on EVERY read path, not only the public one."""
+    _fresh_note_run()
+    row = {**NOTE_ROW, "tier": 2}
+    fact = ci.coach_inputs("sleep_coach", {}, {"date": "2026-09-25"}, table=_NoteTable([row]))["morning_note"]
+    assert fact["state"] == "measured" and "sleep_word" not in fact and fact["words"].startswith("withheld")
+
+
+def test_the_reader_checks_do_not_misfire_on_a_coach_quoting_the_note():
+    """#4214's deterministic checks over the sentence a coach would write from the fact: the
+    words are not numbers, the day is in words, the instant is a PT clock label — no finding.
+    Mutation control: quote the ISO `date` or the UTC `written_at` — raw_instant fires."""
+    from coach import morning_note as mn, reader_checks as rc
+
+    fact = mn.coach_fact(NOTE_ROW)
+    sentence = (
+        f"Before he opened the app on {fact['day']}, his four words were {fact['sleep_word']}, {fact['body_word']}, "
+        f"{fact['mood_word']} — and he did not feel recovered ({fact['written_at_pt']})."
+    )
+    assert rc.raw_instant(sentence, facts={}) == []
+    assert rc.unit_number_not_served(sentence) == []
+    assert rc.unlabeled_window_figure(sentence) == []
+    assert rc.raw_instant(f"His note on {fact['date']}: heavy.", facts={}), "control: the ISO date IS a finding"
+    assert rc.raw_instant(f"Written at {NOTE_ROW['written_at']}.", facts={}), "control: the UTC instant IS a finding"

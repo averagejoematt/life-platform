@@ -228,3 +228,33 @@ def test_rate_limited_blocks_before_any_write(monkeypatch):
     r = social._handle_ritual_log(_ev(_valid_qs(_today(), "connection", 2)))
     assert r["statusCode"] == 429
     assert ft.update_args is None
+
+
+# ── #4189: the morning note's per-day OWNER token rides the same secret ──────────────
+# The note's four words are free text, so the token signs the DAY, not the values: it is
+# the owner's write permission for exactly one Pacific morning.
+
+
+def test_morning_note_token_round_trips_for_its_day():
+    from content.ritual_link import sign_morning_note_token, verify_morning_note_token
+
+    tok = sign_morning_note_token(SECRET, "2026-09-27")
+    assert len(tok) == 32 and verify_morning_note_token(SECRET, "2026-09-27", tok)
+
+
+def test_morning_note_token_for_one_day_does_not_open_another():
+    from content.ritual_link import sign_morning_note_token, verify_morning_note_token
+
+    tok = sign_morning_note_token(SECRET, "2026-09-27")
+    assert not verify_morning_note_token(SECRET, "2026-09-28", tok)
+    assert not verify_morning_note_token("other-secret", "2026-09-27", tok)
+
+
+def test_morning_note_token_is_not_a_ritual_token_and_rejects_non_strings():
+    """A ritual tap link for the same day must not double as the note's owner token, and
+    a malformed token (None, a list, an int) is False — never a raise."""
+    from content.ritual_link import sign_ritual_token, verify_morning_note_token
+
+    assert not verify_morning_note_token(SECRET, "2026-09-27", sign_ritual_token(SECRET, "2026-09-27", "connection", 3))
+    for bad in (None, "", 7, ["x"], {"t": 1}):
+        assert verify_morning_note_token(SECRET, "2026-09-27", bad) is False

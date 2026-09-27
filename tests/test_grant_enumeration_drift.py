@@ -61,7 +61,9 @@ from __future__ import annotations
 import ast
 import copy
 import fnmatch
+import functools
 import glob
+import importlib.util
 import json
 import os
 import re
@@ -220,31 +222,49 @@ _CONTENT_FILTER_WATCH: dict[str, str] = {
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Derived state (computed once)
+# Derived state (computed once, LAZILY — #4251)
+#
+# Every name below is a zero-argument cached function, not a value. The fleet sweep
+# is ~17 s of AST work and the CI sweep more on top; computed at import time it was
+# ~58 s of EVERY pytest collection (every xdist worker, every lane, whether or not a
+# test here was selected — #4251's profile). Cached per process, the scan runs once,
+# and only when a test in this module asks for it. `_BASELINE` keeps its module-level
+# binding (a non-literal call) so the gate census's registry id is unchanged.
 # ══════════════════════════════════════════════════════════════════════════════
 
-_BASELINE = ge.helper_baseline()
-_WIRED = ge.wired_lambdas()
+_BASELINE = functools.lru_cache(maxsize=None)(ge.helper_baseline)
+_WIRED = functools.lru_cache(maxsize=None)(ge.wired_lambdas)
 
 
+@functools.lru_cache(maxsize=None)
 def _sweep_fleet():
     """(gaps, refs_by_lambda, dynamic) for every wired Lambda."""
     gaps, refs, dynamic = {}, {}, set()
-    for source_file, wiring in sorted(_WIRED.items()):
+    for source_file, wiring in sorted(_WIRED().items()):
         path = os.path.join(REPO, source_file)
         assert os.path.isfile(path), f"{source_file} is wired by create_platform_lambda but does not exist"
         consumer = ge.consumer_refs(path)
         assert consumer is not None, f"{source_file} could not be parsed — the sweep must not skip a wired handler"
         refs[source_file] = consumer
         dynamic |= consumer["dynamic"]
-        for channel, ref in ge.missing_refs(consumer, ge.granted_for(wiring, _BASELINE)):
+        for channel, ref in ge.missing_refs(consumer, ge.granted_for(wiring, _BASELINE())):
             gaps[(source_file, channel, ref)] = sorted(wiring.policy_fns)
     return gaps, refs, dynamic
 
 
-FLEET_GAPS, FLEET_REFS, FLEET_DYNAMIC = _sweep_fleet()
+def FLEET_GAPS():
+    return _sweep_fleet()[0]
 
 
+def FLEET_REFS():
+    return _sweep_fleet()[1]
+
+
+def FLEET_DYNAMIC():
+    return _sweep_fleet()[2]
+
+
+@functools.lru_cache(maxsize=None)
 def _sweep_ci():
     gaps, seen_roles, dynamic = {}, set(), set()
     for job in ge.ci_jobs():
@@ -263,16 +283,21 @@ def _sweep_ci():
     return gaps, seen_roles, dynamic
 
 
+def CI_GAPS():
+    return _sweep_ci()[0]
+
+
+def CI_DYNAMIC():
+    return _sweep_ci()[2]
+
+
 # PyYAML is a dev dependency; the deploy-critical lane installs no packages and
 # still IMPORTS this module during collection (2026-08-24: it redded the whole
 # fleet lane exactly like the 2026-08-08 undeclared-PyYAML class). Collection
 # must survive; the CI-half tests below skip LOUDLY instead of passing vacuously.
-try:
-    CI_GAPS, CI_ROLES, CI_DYNAMIC = _sweep_ci()
-    _CI_SWEEP_UNAVAILABLE = None
-except ImportError as _e:
-    CI_GAPS, CI_ROLES, CI_DYNAMIC = {}, set(), set()
-    _CI_SWEEP_UNAVAILABLE = f"CI-jobs sweep unavailable: {_e}"
+# The CI sweep's only optional import is `yaml` (grant_enumeration.ci_jobs), so its
+# availability is decided by a find_spec, not by running the sweep at import (#4251).
+_CI_SWEEP_UNAVAILABLE = None if importlib.util.find_spec("yaml") is not None else "CI-jobs sweep unavailable: No module named 'yaml'"
 
 require_ci_sweep = pytest.mark.skipif(
     _CI_SWEEP_UNAVAILABLE is not None,
@@ -288,7 +313,7 @@ require_ci_sweep = pytest.mark.skipif(
 def test_every_lambda_consumer_is_granted_its_channel():
     """The lockstep: a handler that reaches a fail-closed channel must ride a role
     that grants it. Fails on any gap not already recorded in `_OPEN_GAPS`."""
-    new = {key: fns for key, fns in FLEET_GAPS.items() if key not in _OPEN_GAPS}
+    new = {key: fns for key, fns in FLEET_GAPS().items() if key not in _OPEN_GAPS}
     lines = [f"{sf} → rp.{'/'.join(fns) or '<none>'}()  MISSING {channel} {ref}" for (sf, channel, ref), fns in sorted(new.items())]
     assert not new, (
         "These Lambda handlers reach a fail-closed channel their role does not grant. The read "
@@ -303,7 +328,7 @@ def test_every_lambda_consumer_is_granted_its_channel():
 def test_open_gap_ratchet_only_shrinks():
     """A recorded gap that no longer reproduces must be DELETED, not left behind.
     An exemption list nobody prunes is how a gate becomes a graveyard."""
-    stale = sorted(key for key in _OPEN_GAPS if key not in FLEET_GAPS)
+    stale = sorted(key for key in _OPEN_GAPS if key not in FLEET_GAPS())
     assert not stale, (
         "These _OPEN_GAPS entries no longer reproduce — the grant landed, or the consumer moved. "
         "Delete them so the ratchet stays honest (#2824):\n  " + "\n  ".join(f"{sf} {channel} {ref}" for sf, channel, ref in stale)
@@ -313,18 +338,18 @@ def test_open_gap_ratchet_only_shrinks():
 def test_the_sweep_is_non_vacuous():
     """A green run must mean the derivation actually ran. Pins the population, the
     reference floor, and the two named incident subjects."""
-    assert len(_WIRED) >= 100, f"only {len(_WIRED)} wired Lambdas found — the create_platform_lambda scan broke"
-    total = sum(len(refs[c]) for refs in FLEET_REFS.values() for c in ge.CHANNELS)
+    assert len(_WIRED()) >= 100, f"only {len(_WIRED())} wired Lambdas found — the create_platform_lambda scan broke"
+    total = sum(len(refs[c]) for refs in FLEET_REFS().values() for c in ge.CHANNELS)
     assert total >= 120, f"only {total} channel references derived across the fleet — the call graph broke"
 
     # #2503's subject: the site API must be seen reaching the content-filter channel.
-    assert "config/content_filter.json" in FLEET_REFS["lambdas/web/site_api_lambda.py"]["s3config"]
+    assert "config/content_filter.json" in FLEET_REFS()["lambdas/web/site_api_lambda.py"]["s3config"]
     # ADR-125's subject: the public AI endpoint must be seen reaching the budget tier…
-    assert "/life-platform/budget-tier" in FLEET_REFS["lambdas/web/site_api_ai_lambda.py"]["ssm"]
+    assert "/life-platform/budget-tier" in FLEET_REFS()["lambdas/web/site_api_ai_lambda.py"]["ssm"]
     # …and, since #3059, that reference must be a GRANTED one (the fail-closed path is live).
-    assert ("lambdas/web/site_api_ai_lambda.py", "ssm", "/life-platform/budget-tier") not in FLEET_GAPS
+    assert ("lambdas/web/site_api_ai_lambda.py", "ssm", "/life-platform/budget-tier") not in FLEET_GAPS()
     # 2026-05-17's subject: the SES configuration-set the daily brief sends through.
-    assert "life-platform-emails" in FLEET_REFS["lambdas/emails/daily_brief_lambda.py"]["ses"]
+    assert "life-platform-emails" in FLEET_REFS()["lambdas/emails/daily_brief_lambda.py"]["ses"]
 
 
 def test_reachability_is_call_scoped_not_import_closure():
@@ -336,13 +361,13 @@ def test_reachability_is_call_scoped_not_import_closure():
     on nothing real gets disabled. Prove the discrimination survives.
     """
     breakdown = "/life-platform/budget-breakdown"
-    readers = {sf for sf, refs in FLEET_REFS.items() if breakdown in refs["ssm"]}
+    readers = {sf for sf, refs in FLEET_REFS().items() if breakdown in refs["ssm"]}
     assert "lambdas/emails/daily_brief_lambda.py" in readers, "the brief's headroom line calls read_breakdown() — it must be attributed"
     assert (
         len(readers) <= 6
     ), f"{len(readers)} handlers attributed budget-breakdown — attribution has collapsed to import closure: {sorted(readers)}"
     # …while budget-TIER, which ai_calls consults on every AI path, is broadly reached.
-    tier_readers = {sf for sf, refs in FLEET_REFS.items() if "/life-platform/budget-tier" in refs["ssm"]}
+    tier_readers = {sf for sf, refs in FLEET_REFS().items() if "/life-platform/budget-tier" in refs["ssm"]}
     assert len(tier_readers) >= 30, f"only {len(tier_readers)} handlers reach budget-tier — the call graph has collapsed to file-local"
 
 
@@ -350,11 +375,11 @@ def test_helper_baseline_is_derived_and_classified():
     """`create_platform_lambda` grants IAM of its own. It must be read from the real
     helper (not restated here), and every conditional grant must be classified —
     `helper_baseline()` raises otherwise, which is the guard-the-SET half."""
-    ssm_baseline = [b for b in _BASELINE if any(a.startswith("ssm:") for a in b.actions)]
+    ssm_baseline = [b for b in _BASELINE() if any(a.startswith("ssm:") for a in b.actions)]
     assert ssm_baseline, "the helper's budget-tier baseline grant vanished — every role's SSM set just changed"
     resources = {r for b in ssm_baseline for r in b.resources}
     assert any("budget-tier" in r for r in resources), resources
-    assert all(g in ge._KNOWN_HELPER_GUARDS for b in _BASELINE for g in b.guards)
+    assert all(g in ge._KNOWN_HELPER_GUARDS for b in _BASELINE() for g in b.guards)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -391,7 +416,7 @@ def test_every_ci_consumer_is_granted_its_channel():
     """A CI job's OIDC role must grant every fail-closed channel its entrypoints
     reach. #3059 found the diagnosis role's missing budget-tier read by accident,
     four months after the role was written; this is the systematic version."""
-    new = {k: v for k, v in CI_GAPS.items() if k not in _OPEN_CI_GAPS}
+    new = {k: v for k, v in CI_GAPS().items() if k not in _OPEN_CI_GAPS}
     lines = [f"{role} ({where}) running {entry}  MISSING {channel} {ref}" for (role, entry, channel, ref), where in sorted(new.items())]
     assert not new, (
         "These CI jobs run code that reaches a fail-closed channel their OIDC role does not "
@@ -405,7 +430,7 @@ def test_every_ci_consumer_is_granted_its_channel():
 
 @require_ci_sweep
 def test_open_ci_gap_ratchet_only_shrinks():
-    stale = sorted(key for key in _OPEN_CI_GAPS if key not in CI_GAPS)
+    stale = sorted(key for key in _OPEN_CI_GAPS if key not in CI_GAPS())
     assert not stale, "These _OPEN_CI_GAPS entries no longer reproduce — delete them (#2824):\n  " + "\n  ".join(map(str, stale))
 
 
@@ -464,7 +489,7 @@ def test_dynamic_reference_ratchet_does_not_grow():
     """Runtime-computed channel ids cannot be grant-checked statically. Recording
     them is informational — the rule is only that a NEW one is a deliberate entry,
     so an indirection can't be used (accidentally) to slip past the lockstep."""
-    observed = FLEET_DYNAMIC | CI_DYNAMIC
+    observed = FLEET_DYNAMIC() | CI_DYNAMIC()
     unregistered = sorted(observed - set(_DYNAMIC_REFERENCES))
     assert not unregistered, (
         "New unparseable channel references. Each hides a resource id from the grant "
@@ -491,7 +516,7 @@ def test_every_referenced_config_object_has_a_producer():
     that `deploy/config_twin_sync.py` pushes), by a runtime writer, or by a dated
     entry in `_CONFIG_WITHOUT_REPO_FILE` explaining why it is out of band."""
     repo_files = _repo_config_files()
-    written = {ref for refs in FLEET_REFS.values() for ref in refs["s3config"]}
+    written = {ref for refs in FLEET_REFS().values() for ref in refs["s3config"]}
     orphans = []
     for key in sorted(written):
         if key in _CONFIG_WITHOUT_REPO_FILE:
@@ -540,7 +565,7 @@ def _cdk_alarm_names() -> set:
 
 
 def _content_filter_consumers() -> set:
-    return {sf for sf, refs in FLEET_REFS.items() if _CONTENT_FILTER_KEY in refs["s3config"]}
+    return {sf for sf, refs in FLEET_REFS().items() if _CONTENT_FILTER_KEY in refs["s3config"]}
 
 
 def test_content_filter_consumer_set_is_fully_classified():
@@ -760,9 +785,9 @@ def test_mutation_removing_a_grant_from_a_permissions_doc_reds():
 def test_mutation_removing_a_role_policy_grant_reds():
     """Direction 1, fleet side: drop `config/*` from a real role's granted set and the
     lockstep must report the content-filter consumer it strands."""
-    wiring = _WIRED["lambdas/web/site_api_ai_lambda.py"]
-    grants = ge.granted_for(wiring, _BASELINE)
-    consumer = FLEET_REFS["lambdas/web/site_api_ai_lambda.py"]
+    wiring = _WIRED()["lambdas/web/site_api_ai_lambda.py"]
+    grants = ge.granted_for(wiring, _BASELINE())
+    consumer = FLEET_REFS()["lambdas/web/site_api_ai_lambda.py"]
     assert not [g for g in ge.missing_refs(consumer, grants) if g[0] == "s3config"]
 
     mutated = {k: set(v) for k, v in grants.items()}
@@ -793,7 +818,7 @@ def test_mutation_an_unregistered_fail_closed_consumer_reds(tmp_path):
     consumer = ge.consumer_refs(str(root / "handlers" / "new_lambda.py"), roots=roots)
     assert consumer["ssm"] == {"/life-platform/publish-kill-switch"}, consumer["ssm"]
 
-    grants = ge.granted_for(_WIRED["lambdas/web/site_api_ai_lambda.py"], _BASELINE)
+    grants = ge.granted_for(_WIRED()["lambdas/web/site_api_ai_lambda.py"], _BASELINE())
     assert ("ssm", "/life-platform/publish-kill-switch") in ge.missing_refs(consumer, grants)
 
 

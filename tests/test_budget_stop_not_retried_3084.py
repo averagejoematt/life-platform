@@ -133,24 +133,27 @@ def test_retry_utils_raw_raises_the_budget_stop_immediately(tier3):
 
 def test_a_real_transport_error_still_walks_the_backoff_ladder(monkeypatch):
     """The counterweight to every test above: an ordinary Bedrock failure must
-    still get its four attempts. A `BudgetExceeded` clause that accidentally
-    swallowed transport errors would pass the tests above and break production."""
+    still get the retry policy's attempts. A `BudgetExceeded` clause that accidentally
+    swallowed transport errors would pass the tests above and break production.
+    #4279: the policy is `bedrock_client.invoke_with_retry` — 3 sends, jittered 5/15 s
+    (was 4 sends at 5/15/45 s, each stacked on botocore's own 3)."""
     import botocore.exceptions as bce
 
     attempts = {"n": 0}
-    slept: list[int] = []
+    slept: list[float] = []
 
     def _invoke(body, model_name=None):
         attempts["n"] += 1
         raise bce.ClientError({"Error": {"Code": "ThrottlingException"}}, "InvokeModel")
 
     monkeypatch.setattr(bedrock_client, "invoke", _invoke)
+    monkeypatch.setattr(bedrock_client, "_jitter", lambda: 1.0)
     monkeypatch.setattr(ai_transport.time, "sleep", lambda s: slept.append(s))
     monkeypatch.setattr(ai_transport, "_emit_failure_metric", lambda metric_name="AnthropicAPIFailure": None)
 
     assert ai_calls.call_anthropic("hello") == "[AI_UNAVAILABLE]"
-    assert attempts["n"] == 4, "a throttle must still get all four attempts"
-    assert slept == [5, 15, 45], f"the backoff ladder changed: {slept}"
+    assert attempts["n"] == bedrock_client.INVOKE_MAX_ATTEMPTS == 3, "a throttle must still get every attempt the policy allows"
+    assert slept == [5, 15], f"the backoff schedule changed: {slept}"
 
 
 def test_budget_stop_cls_is_the_real_exception_and_fails_open(monkeypatch):
@@ -231,37 +234,56 @@ def _retry_try_blocks(rel: str):
     return blocks
 
 
+def _reads_of_assigned_targets(block: ast.Try) -> set:
+    targets = {t.id for stmt in block.body if isinstance(stmt, ast.Assign) for t in stmt.targets if isinstance(t, ast.Name)}
+    targets |= {stmt.target.id for stmt in block.body if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)}
+    # `return resp` hands the whole response back unparsed — nothing there can raise.
+    inspected = [s for s in block.body if not (isinstance(s, ast.Return) and isinstance(s.value, ast.Name))]
+    return {
+        n.id for stmt in inspected for n in ast.walk(stmt) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id in targets
+    }
+
+
 def test_the_parse_is_outside_the_retry_try_in_both_wrappers():
     """The structural half of the #2893 pin.
 
     Inside a retry `try`, the response variable may only be WRITTEN (the invoke
     call's assignment target). Any read of it in there is, by construction, a
     parse of a response the platform has already paid for — and if that parse
-    raises, the loop re-invokes the model. `call_anthropic_raw` is the sanctioned
+    raises, the retry re-invokes the model. `call_anthropic_raw` is the sanctioned
     exception: it returns the whole response and parses nothing.
+
+    #4279: the retry LOOP moved to `bedrock_client.invoke_with_retry` (the one
+    policy); its `try` may do nothing but return `invoke(...)`. The wrappers own no
+    loop — the `try` around their `invoke_with_retry` call is held to the same
+    write-only rule, so the parse still sits outside anything that retries.
     """
+    loop_blocks = _retry_try_blocks("lambdas/ai/bedrock_client.py")
+    assert loop_blocks, "bedrock_client.py: found no retry loop to check — the guard would pass vacuously"
+    for block in loop_blocks:
+        assert (
+            _reads_of_assigned_targets(block) == set()
+        ), f"bedrock_client.py line {block.lineno}: the retry `try` parses a response (#2893)"
+        calls = {n.func.id for stmt in block.body for n in ast.walk(stmt) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        assert calls <= {"invoke"}, f"bedrock_client.py line {block.lineno}: the retry `try` does more than send ({sorted(calls)})"
     for rel in ("lambdas/ai/ai_transport.py", "lambdas/common/retry_utils.py"):
-        blocks = _retry_try_blocks(rel)
-        assert blocks, f"{rel}: found no retry loop to check — the guard would pass vacuously"
-        checked = 0
-        for block in blocks:
-            targets = {t.id for stmt in block.body if isinstance(stmt, ast.Assign) for t in stmt.targets if isinstance(t, ast.Name)}
-            if not targets:
-                continue
-            checked += 1
-            # `return resp` (call_anthropic_raw) hands the whole response back
-            # unparsed — nothing there can raise, so it is not a re-bill risk.
-            inspected = [s for s in block.body if not (isinstance(s, ast.Return) and isinstance(s.value, ast.Name))]
-            reads = {
-                n.id
-                for stmt in inspected
-                for n in ast.walk(stmt)
-                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id in targets
-            }
+        assert not _retry_try_blocks(
+            rel
+        ), f"{rel}: a retry loop of its own is back — the one policy is bedrock_client.invoke_with_retry (#4279)"
+        tree = ast.parse(open(os.path.join(_REPO, rel), encoding="utf-8").read())
+        sends = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Try)
+            and any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_invoke_with_retry" for s in node.body for n in ast.walk(s))
+        ]
+        assert sends, f"{rel}: no `try` around `_invoke_with_retry` — the guard would pass vacuously"
+        for block in sends:
+            reads = _reads_of_assigned_targets(block)
             assert not reads, (
-                f"{rel} line {block.lineno}: the retry `try` reads back {sorted(reads)} — "
-                "a response you have already paid for is being parsed inside the retry loop (#2893)"
+                f"{rel} line {block.lineno}: the transport `try` reads back {sorted(reads)} — "
+                "a response you have already paid for is being parsed inside the retried call (#2893)"
             )
-        assert checked, f"{rel}: no retry `try` assigns a response — the guard would pass vacuously"
+    for rel in ("lambdas/ai/ai_transport.py", "lambdas/common/retry_utils.py"):
         src = open(os.path.join(_REPO, rel), encoding="utf-8").read()
         assert "first_text" in src, f"{rel} must parse through bedrock_client.first_text (#2893)"

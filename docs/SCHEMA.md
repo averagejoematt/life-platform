@@ -251,6 +251,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#qa_predict_dark` / `STATE#predict_dark` | qa-smoke's predict-the-week dark-streak counter (#1953) — one row (`last_dark_date`, `streak` int, `updated_at`) so a dark widget during a live cycle escalates WARN → FAIL at ≥2 consecutive nightly runs | `lambdas/operational/qa_smoke_lambda.py` | qa_smoke (self) | system_state | empty until first dark live-cycle night |
 | `…SOURCE#pending_writes` / `PENDING#<YYYYMMDDTHHMMSSZ>-<hash8>` | **chat writes queued for Matthew's approval (#4078)** — `pending_id` (the sk suffix), `status` (`pending` → `approving` → `approved`, or → `discarded`; a failed approval returns to `pending` with `last_error`), `target_tool` (a registered WRITE tool, derived via `mcp/audit.py::is_write_tool`), `target_args_json` (the exact arguments as canonical JSON TEXT — not a map, so ints and floats round-trip without a Decimal cast), `content_hash` (sha256 of tool + args; an identical open item is returned instead of duplicated), `summary`, `context`, `enqueued_at` + `enqueued_epoch` (int; age is computed from it, never parsed), and on resolution `resolved_at` / `resolution_note` / `result_excerpt` + a 90-day `ttl`. **Open rows never carry a `ttl`** — a pending row that self-expired would be the silent loss this partition exists to end. **Tier 2 owner-only** (a row carries whatever the target tool accepts). SYSTEM_STATE (ADR-077 ruling 2026-09-23): a workflow buffer; an approved write lands in its target partition under that partition's own class | `mcp/tools_pending_writes.py` (`manage_pending_writes` enqueue/approve/discard) | `get_capture_queues` (`pending_writes` section), `lambdas/operational/pending_writes_qa.py` (qa-smoke `data:pending_writes_age`, WARN past 3 days) | system_state | empty until the first chat enqueue |
 | `…SOURCE#reader_feedback` / `FEEDBACK#<sha256[:12]>` | **the two-question reader door (#4182)** — one row per distinct (reader, page, answer, text): `id` (the sk suffix — `sha256(sha256(idempotency identity)[:16]:page:made_sense:looking_for)[:12]`, never the clock), `page` (a site pathname matching `^/[a-z0-9/_-]{0,80}$`), `made_sense` (`yes`/`partly`/`no`), `looking_for` (HTML-stripped free text ≤500, may be empty, blocked-vice screened at the door), `status` (`unread`), `submitted_at` (ISO UTC, a field — not in the key). Written with `attribute_not_exists(sk)`, so a replay is a no-op. **No email, no ip_hash, no address.** Owner-read only; never served publicly | `lambdas/web/site_api_social_engage.py` (`POST /api/page_feedback`) | owner read via `aws dynamodb query` (an MCP read is a named residual) | system_state | empty until the site form ships |
+| `…SOURCE#morning_note` / `MORNING_NOTE#<PT day>` | **the morning note (#4189)** — the owner's four words before the number, one row per Pacific day: `date` (the PT day, also the sk suffix), `sleep_word` / `body_word` / `mood_word` (1–24 chars each, letters/spaces/hyphens only, blocked-vice + tool-call-residue screened at the door), `felt_recovered` (bool — his call, not the recovery score's), `written_at` (ISO UTC instant, a field), `tier` (the brief's ruling scale: `1` = words + day public; `2` = presence only), `source` (`site_api_morning_note`), `replaced` (only on an explicit `replace: true` overwrite). Written with `attribute_not_exists(sk)` — a second note the same day is REFUSED (409) unless the owner says `replace: true`. **No row = no note that morning; never a default (ADR-104).** Privacy: **public by owner ruling 2026-09-26** (DATA_GOVERNANCE Tier 0; the brief's "Tier 1") — the words and the day are served on `/api/morning_note` | `lambdas/web/site_api_social_note.py` (`POST /api/morning_note`, owner token = `content.ritual_link.sign_morning_note_token`) | `coach.morning_note` (the ONE derivation) → `GET /api/morning_note`, `mcp/tools_coach_packet.py` `morning_note`, `coach.coach_input_facts.coach_inputs` (every coach) | raw_timeseries | empty until the owner's first note |
 | `…SOURCE#{journal_analysis, health_check, dropbox_tracker, hevy_id_map, routine_index, email_log#<type>, google_calendar, composite_scores, sleep_unified}` | caches, trackers, sent-mail archive, dead partitions | various (email_log: email lambdas; hevy_id_map: routine_repo) | various | system_state | ✓ (email_log#daily_brief) |
 | `INGEST_HEALTH#<source>`, `CANARY#<…>`, `ALERTSTATE#<…>`, `ENTITY_REGISTRY#current`, `BEHAVIOR_REGISTRY#current`, `USER#admin#SOURCE#deletion_log` | ingest liveness, synthetic monitors, alert dedup, static registries, deletion audit | ingestion_framework, operational lambdas | freshness checker, monitors | system_state (#951 — INGEST_HEALTH#/ALERTSTATE#/registries are sks on already-classified pks; CANARY#* and `deletion_log` classified directly) | n/v |
 
@@ -266,7 +267,7 @@ The former "families NOT in the phase-taxonomy registry" gap is closed — every
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `habit_causality`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`, `flourishing`, `private_intake`, `felt_probe`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `habit_causality`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`, `flourishing`, `private_intake`, `felt_probe`, `morning_note`
 
 Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `weight_episodes`, `training_reference`, and `macrofactor_meals` are derived/computed partitions, not raw ingested data (the last is a recomputable projection over the raw `macrofactor` food log — see below). `evening_ritual` is reader/self-reported, not device-ingested — see below.
 
@@ -1463,6 +1464,51 @@ which returns aggregate-only: a 7-day trend (dark days render as `null` — hone
 per ADR-104, never a fabricated neutral), a cumulative check-in count, and the current
 streak. The aggregate always publishes, bad weeks included — a channel that goes quiet
 when the story is bad is not evidence.
+
+---
+
+### morning_note (#4189 — four words before the number)
+
+**SOT for:** the owner's own read of a morning, written BEFORE he opens Whoop — the one
+input two coaches asked for on consecutive days (09-24 sleep coach, 09-25 mind coach)
+that the platform could not receive until this record existed.
+
+**Data source:** the owner (only). `POST /api/morning_note`
+(`lambdas/web/site_api_social_note.py::_handle_morning_note`) with a per-day owner token
+signed by the ritual-link secret (`lambdas/content/ritual_link.py::sign_morning_note_token`
+— the same signed-link owner check as `/api/ritual_log`; site-api has no other owner
+identity, #4207). Rate-limited like every write door; every refusal happens before the
+write.
+
+**Key:** `pk = USER#matthew#SOURCE#morning_note`, `sk = MORNING_NOTE#YYYY-MM-DD` (the Pacific day).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | The Pacific day the note is FOR (equals the sk suffix); must be today PT at write time |
+| `sleep_word` / `body_word` / `mood_word` | string | One word each (1–24 chars; letters, single spaces, hyphens), validated raw, blocked-vice + tool-call-residue (#4190) screened |
+| `felt_recovered` | bool | His call, before the number — never coerced from a string |
+| `written_at` | string | ISO-8601 UTC instant of the write (a field, never part of the key) |
+| `tier` | number | The privacy ruling on the brief's two-step scale: `1` = words + day public (the 2026-09-26 ruling); `2` = presence only. `coach.morning_note.public_view` honours the STORED value |
+| `source` | string | Always `"site_api_morning_note"` |
+| `replaced` | bool | Present (true) only when the owner overwrote the day's note with `replace: true` |
+
+**Idempotency:** one note per Pacific day — `attribute_not_exists(sk)`; a second write the
+same day answers **409** naming the day, and only an explicit `replace: true` overwrites
+(#4307's replace-by-key rule). **Absence semantics at birth (ADR-104/154):** no row means
+"no note that morning" — never a default word, never yesterday carried forward; a failed
+read is `read_failed`, never `absent`.
+
+**Consumers (one derivation, `lambdas/coach/morning_note.py`):** `GET /api/morning_note`
+(the latest note, `?days=N` for the window newest first), the coach packet field
+`morning_note` (`mcp/tools_coach_packet.py`), and every coach's input
+(`coach.coach_input_facts.coach_inputs` → `morning_note`, today's or yesterday's, with the
+instruction to quote verbatim or not at all). Pair contract:
+`tests/pair_contract_registry.py` "morning note row -> the coach fact".
+
+**Publication posture:** public by owner ruling (2026-09-26 ~23:15 PT, BUILD_WEEK_BRIEF §5
+item 3 answered "Tier 1"): the words and the day are served and may be quoted verbatim on
+Home and This week. The site half (the owner-only box on Today, the Home line) is a
+follow-up lane after the route is live.
 
 ---
 

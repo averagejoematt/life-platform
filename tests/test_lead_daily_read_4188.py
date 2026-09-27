@@ -374,3 +374,42 @@ def test_the_daily_brief_calls_the_lead_read_once_with_its_persist_flag():
     src = open(os.path.join(_REPO, "lambdas", "emails", "daily_brief_lambda.py")).read()
     calls = re.findall(r"lead_daily_read\.run\(([^)]*)\)", src)
     assert calls == ["data, profile, table=table, persist=persist"]
+
+
+class _LimitBeforeFilterTable:
+    """DynamoDB's real Query order: take `Limit` rows (sk descending), THEN apply the
+    phase filter, and hand back LastEvaluatedKey when rows remain."""
+
+    def __init__(self, rows):
+        self.rows = sorted(rows, key=lambda r: r["sk"], reverse=True)
+        self.queries = []
+
+    def query(self, **kw):
+        self.queries.append(kw)
+        start = 0
+        if kw.get("ExclusiveStartKey"):
+            start = [r["sk"] for r in self.rows].index(kw["ExclusiveStartKey"]["sk"]) + 1
+        page = self.rows[start : start + int(kw.get("Limit") or len(self.rows))]
+        want = kw["ExpressionAttributeValues"][":phase_experiment"]
+        visible = [r for r in page if r.get("phase", want) == want]
+        out = {"Items": [dict(r) for r in visible]}
+        if start + len(page) < len(self.rows):
+            out["LastEvaluatedKey"] = {"pk": page[-1]["pk"], "sk": page[-1]["sk"]}
+        return out
+
+
+def test_latest_served_finds_the_current_cycle_row_behind_newer_prior_phase_rows():
+    """The Limit-before-filter bug: with `Limit: 1`, a newest row from another phase
+    was read, filtered away, and the query returned nothing — hiding the current
+    cycle's read one row behind it. Mutation proof: restore `"Limit": 1` with a single
+    query and this returns None."""
+    from experiment.phase_filter import PHASE_FILTER_VALUES
+
+    current = PHASE_FILTER_VALUES[":phase_experiment"]
+    row = dict(_written_row(), sk="LEAD_DAILY#2026-09-20", phase=current)
+    stale = [dict(row, sk=f"LEAD_DAILY#2026-10-{d:02d}", phase="pilot", text="old cycle") for d in range(1, 31)]
+    table = _LimitBeforeFilterTable([row] + stale)
+    got = LDR.latest_served(table)
+    assert got is not None and got["text"] == GROUNDED, "a newer out-of-phase row hid the current-cycle read"
+    assert len(table.queries) == 2, "paged past the 25 hidden rows, and stopped at the first visible one"
+    assert LDR.latest_served(_LimitBeforeFilterTable(stale)) is None  # none visible anywhere → None

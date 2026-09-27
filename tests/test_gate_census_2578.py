@@ -984,7 +984,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # this lane -> 776 {proven 225, unproven 540, not-applicable 6, attempted-unproven 5}; a `git archive
         # origin/main` export at 3c43af4ce -> 775 {224, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven
         # does NOT move.
-        # Upper bound 225 -> 226 (2026-09-26, #4170 the Telegram false-acknowledgement gate, on top of #4305's 225):
+        # Upper bound 226 -> 227 (2026-09-27, #4253 the deploy-path workflow ceilings + one OIDC pin): ONE entrant,
+        # `structural::test_ci_job_timeouts_3678.py`, arriving PROVEN (a STRUCTURAL_HAND_PROOFS record, three real-tree
+        # plants). Id-set diff vs a `git archive origin/main` export at 0cd0c9c93: main 777 {226, 540, 6, 5} -> this lane
+        # 778 {227, 540, 6, 5}; enters exactly that id, leaves {}, no verdict changes.
+        # PRIOR: Upper bound 225 -> 226 (2026-09-26, #4170 the Telegram false-acknowledgement gate, on top of #4305's 225):
         # `guard::lambdas/coach/telegram_reply_gate.py` arrives PROVEN — a `# gate-entrypoint:` module (nothing in it
         # raises; the worker sends what `enforce()` returns), GUARD_PROOFS in scripts/gate_census_proofs.py: `enforce()`
         # neutered to a bare `return result` in the REAL tracked file (md5 134bcb3e… before and after); baseline 16
@@ -992,7 +996,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # verbatim: "Got it." / "Noted." reached the send), RESTORED 16 passed. Measured by id-set diff with the new file
         # git-added: this lane -> 777 {proven 226, unproven 540, not-applicable 6, attempted-unproven 5}; the untouched
         # tree at c0b264b28 -> 776 {225, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven does NOT move.
-        <= 226
+        <= 227
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

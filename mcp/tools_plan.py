@@ -314,6 +314,7 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
             continue
         r["pain_flag_any"] = bool(f.get("pain_flag_any"))
         r["pain_dates"] = f.get("pain_dates") or []
+        r["pain_notes"] = f.get("pain_notes") or []  # #4174: the words tie a note to its site
         r["sessions_with_notes"] = f.get("sessions_with_notes")
     scope = {
         # `read` is the only value `plan_engine._evidence_scope_read` accepts, and it also
@@ -515,6 +516,13 @@ def tool_plan_next_session(args):
     if protein_missed is None and status["protein_days_missed_7d"]["state"] != READ_FAILED:
         status["protein_days_missed_7d"] = st(ABSENT, "no MacroFactor day with protein logged in the trailing 7 days")
 
+    # #4166: the protein gate's body-fat tier reads the latest DXA — a failed read is reported, never "no scan"
+    from mcp.shared_quantities import dxa_scans as _dxa_scans
+
+    dxa, status["dxa_scans"] = _read("dxa_scans", _dxa_scans, target_date)
+    if dxa == [] and status["dxa_scans"]["state"] != READ_FAILED:
+        status["dxa_scans"] = st(ABSENT, "no DXA scan on file — the protein gate's body-fat tier is unknown (report-only)")
+
     # #4072: the readiness_floor tripwire's input. Nothing supplied it before this change.
     streak_pair, streak_status = _read("readiness_low_streak_days", _readiness_low_streak, target_date)
     readiness_streak, status["readiness_low_streak_days"] = streak_pair if streak_pair else (None, streak_status)
@@ -651,13 +659,18 @@ def tool_plan_next_session(args):
         protein_days_missed_7d=protein_missed,
         protein_days_measured_7d=protein_measured,  # #4161 ruling "B": the rate target's protein gate
         protein_window=plan_engine.owner_redlines.protein_window(target_date, pacific_today()),
+        dxa_scans=dxa,  # #4166
         readiness_low_streak_days=readiness_streak,
         anchor_lift_drop_pct=worst[0],
         anchor_lift_drop_sessions=worst[1],
         pain_flag_sites=[r["label"] for r in flagged],
         # #4036: the flag's own note dates travel with it, because the owner-dismissal rule
         # is a DATE comparison — a flag with no readable date can never read as dismissed.
-        pain_flag_instances=[{"movement": r["label"], "note_dates": r.get("pain_dates") or []} for r in flagged],
+        # #4174: and the notes' own words, because a dismissal covers a SITE — the engine splits
+        # a movement's notes per site and a note naming no dismissed site stays open.
+        pain_flag_instances=[
+            {"movement": r["label"], "note_dates": r.get("pain_dates") or [], "notes": r.get("pain_notes") or []} for r in flagged
+        ],
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
         pain_evidence_scope=pain_scope,

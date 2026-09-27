@@ -102,3 +102,40 @@ def test_main_requires_exactly_one_argument(capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "usage error" in out
+
+
+# ── #4251: the lane runs under xdist, which drops "deselected" from its summary ──
+
+
+def test_xdist_summary_alone_carries_no_deselected_count():
+    """The measured shape of the parallel pass: no deselected term. Documented here so
+    the reason the collection capture is passed in stays visible."""
+    counts = rpd.parse_counts("6 failed, 12174 passed, 42 skipped, 36 xfailed, 1 warning in 405.74s (0:06:45)")
+    assert counts["deselected"] == 0
+
+
+def test_two_passes_plus_the_collection_universe_derive_deselected(tmp_path, capsys):
+    """Measured 2026-09-27: 30,653 collected; parallel pass 12,258 selected; serial pass
+    46 passed with 30,607 deselected (which counts the parallel pass's tests too, so it
+    must NOT be summed)."""
+    collect = tmp_path / "premerge_collect_output.txt"
+    collect.write_text("tests/test_a.py::test_x\n\n30653 tests collected in 86.52s (0:01:26)\n", encoding="utf-8")
+    lane = tmp_path / "premerge_lane_output.txt"
+    lane.write_text(
+        "6 failed, 12174 passed, 42 skipped, 36 xfailed, 1 warning in 405.74s (0:06:45)\n"
+        "46 passed, 30607 deselected in 94.45s (0:01:34)\n",
+        encoding="utf-8",
+    )
+    counts = rpd.parse_counts(collect.read_text() + lane.read_text())
+    assert counts == {"selected": 12304, "deselected": 30653 - 12304, "total": 30653}
+    rc = rpd.main(["report_premerge_deselection.py", str(collect), str(lane)])
+    assert rc == 0
+    assert f"{30653 - 12304} deselected" in capsys.readouterr().out
+
+
+def test_a_marker_filtered_collect_line_is_not_the_universe():
+    """A `-m`-filtered collect prints "46/30653 tests collected" — 46 is the SELECTION, not
+    the universe; reading it as the universe would report the lane deselected nothing."""
+    assert not rpd._COLLECTED_LINE_RE.findall("46/30653 tests collected (30607 deselected) in 86.52s\n")
+    assert rpd._COLLECTED_LINE_RE.findall("30653 tests collected in 86.52s\n") == ["30653"]
+    assert rpd._COLLECTED_LINE_RE.findall("1 test collected in 0.01s\n") == ["1"]

@@ -81,16 +81,16 @@
   },
   "qa-smoke-failures": {
     "added": "2026-09-26",
-    "cause": "cross_surface:vitals",
-    "cause_observed": "2026-09-25",
-    "citation": "#4180 — RE-CITED 2026-09-26 (Session AU): the live cause since the 2026-09-25 18:30Z nightly is `cross_surface:vitals` failing Dr. Nathan Reeves's served trend sentence 'recovery EWMA has climbed from 71.7% to 82' against cockpit 99% — the checker reads a trend's from-value as a current-night claim (the same family as the dated-past-reading exemption). The prior causes (chronicle:manifest_provenance, recall:corpus_freshness) did not fire on 09-25.",
-    "note": "`cause` is declared because the live channel names one (the previous entry's own rule). Prune or re-cite when it clears; never edit the cause to none in place."
+    "cause": "cross_surface:coach_consistency,cross_surface:coach_vs_engine",
+    "cause_observed": "2026-09-27",
+    "citation": "#4343 — RE-CITED 2026-09-27 (Session AW): the live cause since PR 4332 made the coach-agreement legs read the page-level lead slot is `cross_surface:coach_vs_engine` failing Dr. Eli Marsh's served weekly read ('106.9 grams across 14 logged days', generated 2026-09-21) against the engine's /api/nutrition_overview 153.5 g over 21 logged days. That is a TRUE failure: the weekly read was written from the 30-day protein figure the coaches' brief handed them (#4343 cause B, fix PR 4345 open). It clears when the next weekly read is written from the served figure (Monday) or PR 4345 ships. The prior cause (cross_surface:vitals, the Reeves trend sentence) did not fire on 09-27.",
+    "note": "`cause` is declared because the live channel names one. Prune or re-cite when it clears; never edit the cause to none in place."
   },
   "qa-smoke-warnings": {
     "added": "2026-09-21",
-    "cause_observed": "2026-09-25",
-    "cause": "data:orphan_routine_drafts",
-    "citation": "#4183 — RE-CITED 2026-09-26 (Session AV): the 2026-09-21 citation EXPIRED 2026-09-22 by its own rule and the leg still warns — the 2026-09-25 18:30Z nightly reported 24 routine drafts older than 7 days never committed or archived, all pre-genesis (June 2026, e.g. 2af15018… created 2026-06-01). The census widened after the 09-23 pre-genesis-visibility fixes (PRs 4061 and 4088, both closed on live proof 09-23); #4183 carries the owner ruling (archive the 24, or exempt pre-genesis drafts from the leg) and the expired-citation-on-a-lit-alarm class. ALARM since 2026-09-20T18:32Z. Re-cited 2026-09-21 02:1xZ (Session AO). The CURRENT episode began 2026-09-20 on the first nightly after PR 3965 (merged 09-20, deployed at AN's checkpoint 2 from 7e8cf3ec) added the `data:orphan_routine_drafts` qa-smoke leg, which warns on routine drafts older than 7 days that never reached Hevy: it found the one such draft, `8a7a56c6...` (status draft, created 2026-09-08, a soft-timeout orphan). The owner ruled at AO's boot to archive it and it was archived at 17:35Z (`manage_hevy_routine action=archive` -> archived_local_only; issue 3772 closed on that ruling), so the leg's input is cured and NO OPEN ISSUE owns it. Self-clearing: the 2026-09-21 18:30Z nightly should report 0 orphan drafts and the WarnCount datapoint ages out of the 24h Maximum by 2026-09-22T18:31Z — EXPIRES 2026-09-22. If the 2026-09-22 nightly still warns on this leg, the archive did not clear the count and that is a new defect to file, not this citation. The four chronic legs (Phase Stamping FORWARD on the pre-genesis SOURCE rows, etc.) are excluded from the alarmed WarnCount by split_warns and hold no alarm; the Phase Stamping INVERSE census now names every family (PR 3992, deployed 09-21 checkpoint 1). Previous citation (2026-09-18/19, Sessions AK/AL) explained the prior episode's cause pair `data:coach_ensemble_phase_stamp_coverage,ensemble_digest:cycle_rows`, both cured — it is retired here rather than carried, because a count-aggregated alarm does not transition when its cause changes."
+    "cause_observed": "2026-09-27",
+    "cause": "data:orphan_routine_drafts,score:hydration",
+    "citation": "#4183 — RE-DERIVED 2026-09-27 (Session AW): two causes. (1) `data:orphan_routine_drafts`: PR 4324 (merged 2026-09-27) makes the leg count live-cycle orphans only; it still warns on the 6 live orphans until the owner archives them (the one-off is in PR 4324's body). (2) `score:hydration`: 'Hydration = 26 — low, possible HAE sync gap' on the 2026-09-26 row — a single low-water day, self-clearing at the next day's score; if it repeats on 2026-09-28, file it against the HAE water ingest."
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",

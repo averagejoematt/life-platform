@@ -26,8 +26,20 @@ green PR red because of a parsing regression here. tests/test_deploy_critical_
 lane.py-style enforcement (marker membership itself) is conftest.py's job; this
 script only reports on top of it.
 
+#4251 — THE LANE RUNS UNDER XDIST NOW, AND XDIST DROPS THE DESELECTED COUNT. The
+parallel pass (`-n auto --dist loadfile`) deselects on the workers, so the controller's
+summary line reads "12174 passed ... in 405s" with NO "deselected" term — fed that
+alone, this report would claim the lane "ran all" of the suite, the exact false
+reassurance #2692 exists to remove. The lane also runs TWO passes now (parallel +
+the `serial` complement), so their summaries are summed. The universe comes from the
+collection gate's own capture ("30653 tests collected in 86s", the step that already
+runs a whole-tree `--collect-only`): when that line is present, deselected is
+`collected - selected`, and any per-pass "deselected" term is ignored (the serial
+pass's own term counts the parallel pass's tests as deselected — summing it would
+double-count). Without it the old single-summary arithmetic applies unchanged.
+
 USAGE:
-  python3 scripts/report_premerge_deselection.py /tmp/premerge_lane_output.txt >> "$GITHUB_STEP_SUMMARY"
+  python3 scripts/report_premerge_deselection.py [/tmp/premerge_collect_output.txt] /tmp/premerge_lane_output.txt >> "$GITHUB_STEP_SUMMARY"
 """
 
 from __future__ import annotations
@@ -41,6 +53,11 @@ from typing import Optional
 _SELECTED_CATEGORIES = ("passed", "failed", "error", "errors", "skipped", "xfailed", "xpassed")
 
 _SUMMARY_LINE_RE = re.compile(r"(\d+)\s+(passed|failed|errors?|skipped|xfailed|xpassed|deselected)\b")
+
+# The collection gate's whole-tree `--collect-only -q` tail: "30653 tests collected in 86.52s".
+# Anchored at line start with no "N/M" form, so a marker-filtered collect
+# ("46/30653 tests collected (30607 deselected)") is never mistaken for the universe.
+_COLLECTED_LINE_RE = re.compile(r"^(\d+)\s+tests?\s+collected\b", re.M)
 
 
 def parse_counts(summary_text: str) -> Optional[dict]:
@@ -67,6 +84,12 @@ def parse_counts(summary_text: str) -> Optional[dict]:
     if not seen_any:
         return None
 
+    collected = _COLLECTED_LINE_RE.findall(summary_text)
+    if collected:
+        # #4251: the universe is known, so deselected is derived, never summed.
+        universe = int(collected[-1])
+        return {"selected": selected, "deselected": max(universe - selected, 0), "total": max(universe, selected)}
+
     return {"selected": selected, "deselected": deselected, "total": selected + deselected}
 
 
@@ -88,19 +111,22 @@ def format_summary_line(counts: dict) -> str:
 
 
 def main(argv: list) -> int:
-    if len(argv) != 2:
+    if len(argv) < 2:
         print("**Pre-merge lane (#2692):** usage error — no output file given, skipping report.")
         return 0
 
-    path = argv[1]
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            text = f.read()
-    except OSError as exc:
-        # Fail-open (module docstring): a report that can't read its own input
-        # must never fail the PR check over it.
-        print(f"**Pre-merge lane (#2692):** could not read '{path}' ({exc}) — skipping report.")
-        return 0
+    texts = []
+    for path in argv[1:]:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                texts.append(f.read())
+        except OSError as exc:
+            # Fail-open (module docstring): a report that can't read its own input
+            # must never fail the PR check over it.
+            print(f"**Pre-merge lane (#2692):** could not read '{path}' ({exc}) — skipping report.")
+            return 0
+    text = "\n".join(texts)
+    path = ", ".join(argv[1:])
 
     counts = parse_counts(text)
     if counts is None:

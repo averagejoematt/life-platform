@@ -410,27 +410,120 @@ def _assert_the_protein_gate(grams, state, target):
 
 
 def test_report_only_reads_the_gate_and_never_moves_the_target_4162():
-    """Owner ruling 2026-09-25 (#4162): at >= 40 % body fat the gate is REPORT-ONLY. Four misses still
-    read `gated` / would_apply, and the served target stays the step (3.5 at 316 lb) at every site."""
+    """Owner ruling 2026-09-25 (#4162 -> #4166): at >= 40 % body fat the gate is REPORT-ONLY. Four misses still
+    read `gated` / would_apply, and the served target stays the step (3.5 at 316 lb) at every site — here on the
+    LIVE DXA wire (2026-03-30: FFM 178.6 lb -> 43.5 % at 316 lb)."""
     from health import nutrition_critics as nc
 
     g = owner_redlines.REDLINES["rate_protein_gate"]
-    assert g["mode"] == "report_only" and "2026-09-25" in g["mode_ruling"]
+    assert g["mode"] == "by_body_fat" and "2026-09-25" in g["mode_ruling"]
     grams = [150, 150, 150, 150, 190, 190, 190]
     missed, measured = owner_redlines.protein_days_missed(grams)
-    rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured)
+    rt = owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured, dxa_scans=DXA_WIRE)
     gate = rt["protein_gate"]
     assert (gate["state"], gate["would_apply"], gate["applied"], gate["mode"]) == ("gated", True, False, "report_only")
+    assert (gate["tier"], gate["body_fat_pct"], gate["body_fat_source"]["scan_date"]) == ("report_only", 43.5, "2026-03-30")
+    assert gate["body_fat_source"]["ffm_lb"] == 178.6 and "Hall 2007" in gate["tier_evidence"]
     assert rt["target_lb_wk"] == rt["step_target_lb_wk"] == 3.5
     block = plan_engine.constraint_block(
-        date="2026-09-20", weight_lb=WEIGHT, protein_days_missed_7d=missed, protein_days_measured_7d=measured
+        date="2026-09-20", weight_lb=WEIGHT, protein_days_missed_7d=missed, protein_days_measured_7d=measured, dxa_scans=DXA_WIRE
     )
-    assert block["rate_target"]["target_lb_wk"] == 3.5
-    n = nc.build_deficit_advocate_packet({"weight_lb": WEIGHT, "protein_g_by_day": grams})["numbers"]
-    assert (n["rate_target_lb_wk"], n["rate_protein_gate"]) == (3.5, "gated")
+    assert block["rate_target"]["target_lb_wk"] == 3.5 and block["rate_target"]["protein_gate"]["tier"] == "report_only"
+    assert block["inputs"]["dxa_scans"]["state"] == "measured"
+    n = nc.build_deficit_advocate_packet({"weight_lb": WEIGHT, "protein_g_by_day": grams, "dxa_scans": DXA_WIRE})["numbers"]
+    assert (n["rate_target_lb_wk"], n["rate_protein_gate"], n["rate_protein_gate_tier"]) == (3.5, "gated", "report_only")
     # mutation control: the same misses under enforce DO move the target
     with patch.dict(g, {"mode": "enforce"}):
         assert owner_redlines.rate_target_lb_per_wk(WEIGHT, protein_missed_7d=missed, protein_measured_7d=measured)["target_lb_wk"] < 3.5
+
+
+# ── #4166: the gate scales with body fat — tiers, the brake, the DXA override, absence ─────────────
+DXA_WIRE = __import__("json").loads((pathlib.Path(__file__).parent / "fixtures" / "dexa_wire_2026-09-27.json").read_text())["items"]
+BF_WEIGHT = 300.0  # step 3.5; lower band 1.5
+
+
+def _scan(date: str, lean: float, bmc: float = 8.0, total: float = 300.0) -> dict:
+    return {"scan_date": date, "body_composition": {"lean_mass_lb": lean, "bone_mineral_content_lb": bmc, "total_mass_lb": total}}
+
+
+def _served(scans, missed=4, weight=BF_WEIGHT):
+    return owner_redlines.rate_target_lb_per_wk(weight, protein_missed_7d=missed, protein_measured_7d=7, dxa_scans=scans)
+
+
+@pytest.mark.parametrize(
+    "ffm,tier,mode,target",
+    [
+        (180.0, "report_only", "report_only", 3.5),  # 40.0 % — the 40 edge is report-only
+        (180.3, "brake", "brake", 3.0),  # 39.9 % — the step minus 0.5
+        (210.0, "brake", "brake", 3.0),  # 30.0 % — the 30 edge is the brake
+        (210.3, "full", "enforce", 1.5),  # 29.9 % — the full gate, the lower band
+    ],
+    ids=["40.0-report-only", "39.9-brake", "30.0-brake", "29.9-full"],
+)
+def test_the_body_fat_tier_edges_4166(ffm, tier, mode, target):
+    rt = _served([_scan("2026-11-01", ffm - 8.0)])
+    gate = rt["protein_gate"]
+    assert (gate["tier"], gate["mode"], rt["target_lb_wk"], gate["applied"]) == (tier, mode, target, mode != "report_only")
+    assert _served([_scan("2026-11-01", ffm - 8.0)], missed=2)["target_lb_wk"] == 3.5, "a clear week serves the step in every tier"
+
+
+@pytest.mark.parametrize("edge_index,ffm,moved_to", [(0, 180.0, "brake"), (1, 210.0, "full")], ids=["40-edge", "30-edge"])
+def test_mutation_control_a_moved_tier_edge_reds_4166(edge_index, ffm, moved_to):
+    """Moving an edge by 0.1 moves the boundary case to the next tier — the edges are what decide it."""
+    tiers = [dict(t) for t in owner_redlines.REDLINES["rate_protein_gate"]["body_fat_tiers"]["tiers"]]
+    tiers[edge_index]["at_or_above_pct"] += 0.1
+    with patch.dict(owner_redlines.REDLINES["rate_protein_gate"]["body_fat_tiers"], {"tiers": tiers}):
+        assert _served([_scan("2026-11-01", ffm - 8.0)])["protein_gate"]["tier"] == moved_to
+
+
+def test_the_dxa_override_enforces_at_any_body_fat_4166():
+    """Pre-registered: dFFM/dW > 0.25 over a losing DXA pair -> the full gate even at >= 40 % body fat."""
+    week0 = DXA_WIRE[-1]  # the live 2026-03-30 scan: 311.7 lb, FFM 178.6
+    bad = _scan("2026-11-01", 170.6 - 5.2, total=291.7)  # dW 20.0, dFFM 5.2 -> 0.26
+    rt = _served([*DXA_WIRE, bad], weight=292.0)
+    gate = rt["protein_gate"]
+    assert gate["dxa_override"]["pair"] == [week0["scan_date"], "2026-11-01"]
+    assert (gate["dxa_override"]["state"], gate["dxa_override"]["ffm_share_of_loss"]) == ("triggered", 0.26)
+    assert gate["mode"] == "enforce" and "DXA override" in gate["mode_reason"] and rt["target_lb_wk"] == gate["gated_target_lb_wk"]
+    # 0.25 exactly is NOT worse than the diet-alone average: the tier decides (report-only above 40 %)
+    ok = _served([*DXA_WIRE, _scan("2026-11-01", 170.6 - 5.0, total=291.7)], weight=320.0)["protein_gate"]
+    assert (ok["dxa_override"]["state"], ok["mode"]) == ("clear", "report_only")
+    # mutation control: an override that is ignored serves the report-only step at 45 % body fat
+    with patch("training.redline_rate.dxa_override", return_value={"triggered": False, "state": "clear"}):
+        assert _served([*DXA_WIRE, bad], weight=330.0)["protein_gate"]["mode"] == "report_only"
+    # mutation control: a higher threshold stops the same pair triggering
+    with patch.dict(owner_redlines.REDLINES["rate_protein_gate"]["body_fat_tiers"]["dxa_override"], {"ffm_share_of_loss_above": 0.3}):
+        assert _served([*DXA_WIRE, bad], weight=330.0)["protein_gate"]["dxa_override"]["triggered"] is False
+
+
+@pytest.mark.parametrize(
+    "scans,why",
+    [(None, "the DXA read failed"), ([], "no readable DXA scan"), ([_scan("2026-11-01", 170.0, bmc=None)], "no readable DXA scan")],
+    ids=["read-failed", "no-scan", "no-bmc"],
+)
+def test_no_dxa_is_tier_unknown_and_report_only_4166(scans, why):
+    gate = _served(scans)["protein_gate"]
+    assert (gate["tier"], gate["body_fat_pct"], gate["body_fat_source"], gate["mode"], gate["applied"]) == (
+        "unknown",
+        None,
+        None,
+        "report_only",
+        False,
+    )
+    assert why in gate["mode_reason"] and "says so" in gate["mode_reason"]
+
+
+def test_the_plan_reads_dxa_through_one_reader_4166():
+    """tools_plan and the nutrition critics' resolver call `shared_quantities.dxa_scans` — one reader, oldest first."""
+    from mcp import shared_quantities as sq
+
+    with patch("mcp.core.query_source", return_value=list(reversed(DXA_WIRE))) as q:
+        assert [r["scan_date"] for r in sq.dxa_scans("2026-09-27")] == ["2025-05-10", "2026-03-30"]
+    assert q.call_args.args == ("dexa", sq.DXA_EPOCH, "2026-09-27")
+    root = pathlib.Path(__file__).resolve().parents[1]
+    for rel in ("mcp/tools_plan.py", "mcp/nutrition_critics_inputs.py"):
+        src = (root / rel).read_text()
+        assert "dxa_scans" in src and 'query_source("dexa"' not in src, rel
 
 
 def test_mutation_control_a_higher_miss_threshold_stops_gating_four_misses():
