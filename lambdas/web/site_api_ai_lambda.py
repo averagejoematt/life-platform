@@ -396,15 +396,11 @@ def _ask_reads_block(reads: dict) -> str:
         lines.append(f"  Weight trend: {reads['weekly_rate_lbs']:+.1f} lbs/week (computed)")
     pr = reads.get("protein")
     if pr:
-        _pd = pr.get("logged_days")  # #4343: the window is genesis-floored — name its n, not "30-day"
-        seg = (
-            f"  Protein: {pr['avg_30d_g']:.0f}g avg intake over {int(_pd)} logged days"
-            if _pd
-            else f"  Protein: {pr['avg_30d_g']:.0f}g avg intake"
-        )
+        # #4343: the window is genesis-floored — name its n, never "30-day".
+        _pw = f" over {int(pr['logged_days'])} logged days" if pr.get("logged_days") else ""
+        seg = f"  Protein: {pr['avg_30d_g']:.0f}g avg intake{_pw}"
         if pr.get("target_g") is not None:
-            seg += f" (target {pr['target_g']:.0f}g"
-            seg += f", floor {pr['floor_g']:.0f}g)" if pr.get("floor_g") is not None else ")"
+            seg += f" (target {pr['target_g']:.0f}g" + (f", floor {pr['floor_g']:.0f}g)" if pr.get("floor_g") is not None else ")")
         lines.append(seg)
     for d in reads.get("month_deltas", []):
         lines.append(
