@@ -358,7 +358,7 @@ def site_instances(
         day = str(note.get("date") or "")[:10]
         if not _is_iso_date(day):
             continue
-        sites = [s for s, ds in by_site.items() if any(str(d.get("flag_note_date") or "")[:10] == day for d in ds)]
+        sites: list[str | None] = [s for s, ds in by_site.items() if any(str(d.get("flag_note_date") or "")[:10] == day for d in ds)]
         if not sites:
             sites = [s for s in by_site if _note_names_site(note.get("text"), s)]
         if not sites:
@@ -366,7 +366,10 @@ def site_instances(
         for s in sites or [None]:
             buckets.setdefault(s, []).append({"date": day, "text": note.get("text")})
     out: list[dict[str, Any]] = []
-    for site in sorted((s for s in buckets if s is not None)) + ([None] if None in buckets else []):
+    ordered: list[str | None] = sorted(s for s in buckets if s is not None)
+    if None in buckets:
+        ordered.append(None)  # the unattributed notes last, after every named site
+    for site in ordered:
         rows = sorted(buckets[site], key=lambda n: n["date"])
         out.append({"movement": movement, "site": site, "note_dates": [n["date"] for n in rows], "notes": rows})
     return out
