@@ -237,12 +237,12 @@ def activities_on_day(
     return items, removed, record
 
 
-def _ingest_lag_line() -> str:
+def _ingest_lag_line(names: list[str]) -> str:
     """The two sources' cadences, read from the registry — never hand-stated (#2003)."""
     try:
         from ingestion.source_registry import SOURCE_REGISTRY
 
-        cadence = "; ".join(f"{n}: {SOURCE_REGISTRY[n].get('method')}" for n in ("hevy", "strava"))
+        cadence = "; ".join(f"{n}: {SOURCE_REGISTRY[n].get('method')}" for n in sorted(names))
     except Exception:  # noqa: BLE001 — the line degrades to the fact without the cadence
         cadence = "cadence unreadable from source_registry"
     return f"an activity not yet ingested is not here ({cadence})"
@@ -271,7 +271,8 @@ def today_view(
 
     rows: dict[str, list[dict[str, Any]] | None] = {}
     sources: dict[str, dict[str, Any]] = {}
-    for name, reader in (("hevy", read_hevy or read_hevy_day), ("strava", read_strava or read_strava_day)):
+
+    def _read(name: str, reader: RowReader) -> None:
         try:
             got = reader(day)
             rows[name] = list(got or [])
@@ -279,6 +280,12 @@ def today_view(
         except Exception as e:  # noqa: BLE001 — reported by name, never swallowed into an empty day (#4072)
             rows[name] = None
             sources[name] = {"status": "read_failed", "rows": None, "error": error_label(e)}
+
+    # The two sources are the walking layer's own two (`walking_volume.build(strava_items=, hevy_workouts=)`,
+    # #3930/#4068) — read one statement each, as `shared_quantities` does; not a registry-derived list
+    # (`evidence_for: workout` would add apple_health, which the layer refuses by construction).
+    _read("hevy", read_hevy or read_hevy_day)
+    _read("strava", read_strava or read_strava_day)
 
     failed = sorted(n for n, r in rows.items() if r is None)
     items, removed, record = activities_on_day(day, rows["hevy"], rows["strava"])
@@ -321,7 +328,7 @@ def today_view(
         honesty.append(f"{day} is still in progress — every figure here is SO FAR (a floor), never the day's total")
     for n in failed:
         honesty.append(f"{n} could not be read ({sources[n]['error']}) — the list is a floor; an activity on that source is not here")
-    honesty.append(_ingest_lag_line())
+    honesty.append(_ingest_lag_line(list(rows)))
 
     value = {
         "day": day,
