@@ -116,7 +116,7 @@
   color: var(--ink-muted);
   margin-bottom: var(--sp-1);
 }
-.v7c-thread .v7c-late { color: var(--ink); font-weight: 600; }
+.v7c-thread .v7c-late { color: var(--ink-muted); } /* ink, no weight — R6 fix 3: a missing reply is a fact, not a scold */
 .v7c-thread q { font-style: italic; }
 
 /* ── tables ── */

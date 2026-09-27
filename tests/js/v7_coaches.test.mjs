@@ -63,7 +63,7 @@ test("the recent list: the grader's reason strings become right/wrong lines, who
   assert.equal(lines[0].checked, "Checked Friday, September 25.");
   assert.equal(lines[1].text, "Park said the night’s sleep, in hours would go down over the checked window — it went up.");
   assert.ok(!lines[1].text.includes("0.0247"));
-  assert.equal(lines[2].text, "A disagreement settled by code: total calories kcal 7day avg >= 2200 on 2026-08-10.");
+  assert.equal(lines[2].text, "A disagreement settled by code: the seven-day average calories at or above 2200 on Monday, August 10.", "the criterion in words — no ISO date, no snake_case on the main screen");
   assert.deepEqual(V.tally(lines), { right: 1, wrong: 2, n: 3 });
 });
 
@@ -163,7 +163,7 @@ test("the record is K of N so far / all time from platform.strata.coaches — ne
 });
 
 test("readHTML: the ledger line opens the read; a null latest_checked is absence; guarded slots only; no cycle/reset/attempt word", () => {
-  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of September 23 the strap logged 86.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record", reason: "chosen: the best checked record since Day 1 — 7 of 17 held up" };
+  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "Last night the strap logged a recovery of 86.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record", reason: "chosen: the best checked record since Day 1 — 7 of 17 held up" };
   const profile = {
     latest_checked: { claim: null, created_date: "2026-09-12", outcome_date: "2026-09-25", metric: "recovery_score", eval_type: "interval", condition: "gte", threshold: 52.9, actual_value: 59, status: "confirmed" },
     report_card: { track_record: { recent: [{ date: "2026-09-25", status: "confirmed", metric: "recovery_score", reason: "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6" }] } },
@@ -184,14 +184,15 @@ test("readHTML: the ledger line opens the read; a null latest_checked is absence
 });
 
 test("R6 fix 2: the public-text lint flags an ISO date, a percent sign or a brand; a hit folds the read under details, never rewritten", () => {
-  assert.deepEqual(V.lintPublic("On the night of 2026-09-23, Whoop logged 86% recovery"), ["an ISO date", "a percent sign", "a device brand"]);
-  assert.deepEqual(V.lintPublic("On the night of September 23 the strap logged a recovery of 86."), []);
+  assert.deepEqual(V.lintPublic("On the night of 2026-09-23, Whoop logged 86% recovery"), ["an ISO date", "a percent sign", "a device brand", "a “night of” log opener"]);
+  assert.deepEqual(V.lintPublic("On the night of September 23 the strap logged a recovery of 86."), ["a “night of” log opener"], "R6 named the night-of opener by itself");
+  assert.deepEqual(V.lintPublic("Last night the strap logged a recovery of 86."), []);
   assert.deepEqual(V.lintPublic(""), []);
   const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
   const html = V.readHTML(pick, { latest_checked: null }, new Date(), null);
   assert.ok(html.includes("<summary>The read, as served</summary>"), "the linted read is under details");
   assert.ok(html.includes("Whoop logged 86%"), "the served text is not rewritten");
-  assert.ok(html.includes("an ISO date, a percent sign, a device brand"));
+  assert.ok(html.includes("an ISO date, a percent sign, a device brand, a “night of” log opener"));
   assert.ok(!/<blockquote[^>]*>On the night of 2026/.test(html.split("<details")[0]), "nothing raw on the main screen");
 });
 
@@ -224,4 +225,67 @@ test("R6 fix 3: the reason is a sentence with its producer; the late line names 
   assert.ok(html.includes("Nothing has come back yet, and there is no channel yet to receive one."));
   assert.ok(!html.includes("chosen:"), "no debug line");
   assert.ok(html.includes("7 of seventeen calls held up"));
+});
+
+test("found by render 2026-09-26: a point call (condition within) lands NEAR the number — never 'would be within 61'", () => {
+  const lc = { claim: "Recovery score will reach approximately 61% tomorrow", created_date: "2026-09-08", outcome_date: "2026-09-22", metric: "recovery_score", eval_type: "point", condition: "within", threshold: 61.0, actual_value: 64.0, status: "confirmed" };
+  const l = V.ledgerLine(lc, "Dr. Henning Brandt");
+  assert.equal(l.text, "On Tuesday, September 8, Brandt said the night’s recovery would land near 61 — it came in at 64.");
+  assert.ok(!l.text.includes("within"));
+  // the other live shape (api_coach_sleep_coach.latest_checked, 02:47Z 09-27): Park's "around 52.9%"
+  const park = { claim: "Tomorrow morning's recovery will be around 52.9%", created_date: "2026-09-12", outcome_date: "2026-09-26", metric: "recovery_score", eval_type: "point", condition: "within", threshold: 52.9, actual_value: 73.0, status: "refuted" };
+  const pl = V.ledgerLine(park, "Dr. Lisa Park");
+  assert.equal(pl.verdict, "wrong");
+  assert.equal(pl.text, "On Saturday, September 12, Park said the night’s recovery would land near 52.9 — it came in at 73.");
+  // no tolerance is served live → no "give or take"; a served one prints
+  assert.ok(!pl.text.includes("give or take"));
+  assert.ok(V.ledgerLine({ ...park, tolerance: 18.25 }, "Dr. Lisa Park").text.includes("would land near 52.9, give or take 18.3 —"));
+  // a bound call keeps its side
+  const b = V.ledgerLine({ ...lc, eval_type: "interval", condition: "gte" }, "Dr. Henning Brandt");
+  assert.ok(b.text.includes("would be at or above 61"));
+});
+
+test("found by render 2026-09-26: the docket criterion in the recent list is words, never the grader's string; an unparsed one prints nothing raw", () => {
+  assert.equal(V.criterionWords("total_calories_kcal_7day_avg >= 2200 on 2026-08-10"), "the seven-day average calories at or above 2200 on Monday, August 10");
+  assert.equal(V.criterionWords("recovery_score < 70"), "the night’s recovery under 70");
+  assert.equal(V.criterionWords("something the grader wrote in prose 2026-08-10"), "");
+  const odd = V.recentLine({ date: "2026-09-26", status: "refuted", metric: "recovery_score", reason: "dispute docket resolved: prose with a date 2026-08-10" }, "Dr. Henning Brandt");
+  assert.equal(odd.text, "A disagreement settled by code, on the night’s recovery.");
+  assert.ok(!/\d{4}-\d{2}-\d{2}/.test(odd.text));
+});
+
+test("found by render 2026-09-26: the coach's own wording of the checked call is linted like the read — a percent sign folds it under details, unrewritten", () => {
+  const pick = { coach: { coach_id: "explorer", name: "Dr. Henning Brandt", position_summary: "Two contingent predictions are now live.", analysis_generated_at: "2026-09-26T17:08:28Z" }, rule: "freshest" };
+  const lc = { claim: "Recovery score will reach approximately 61% tomorrow with 80% confidence interval of 33.3–88.6%", created_date: "2026-09-08", outcome_date: "2026-09-22", metric: "recovery_score", eval_type: "point", condition: "within", threshold: 61.0, actual_value: 64.0, status: "confirmed" };
+  const html = V.readHTML(pick, { latest_checked: lc }, new Date(), null);
+  const main = html.replace(/<details[\s\S]*?<\/details>/g, "");
+  assert.ok(!main.includes("61%"), "no percent sign on the main screen");
+  assert.ok(html.includes("<summary>The call in the coach’s words, as served</summary>"));
+  assert.ok(html.includes("33.3–88.6%"), "the served text is not rewritten");
+  const clean = V.readHTML(pick, { latest_checked: { ...lc, claim: "Recovery will land near 61 tomorrow." } }, new Date(), null);
+  assert.ok(clean.includes("In the coach’s words, as served: “Recovery will land near 61 tomorrow.”"));
+});
+
+test("R6 fix 3: the late line is ink, no weight — the sheet carries no --alert and no font-weight on .v7c-late", async () => {
+  const fs = await import("node:fs");
+  const css = fs.readFileSync(new URL("../../site/assets/css/v7_coaches.css", import.meta.url), "utf8");
+  const rule = (css.match(/\.v7c-thread \.v7c-late \{[^}]*\}/) || [""])[0];
+  assert.ok(rule, "the rule exists");
+  assert.ok(!/alert|font-weight/.test(rule), rule);
+});
+
+test("getJSON drains a non-2xx body before returning null — an unread body keeps networkidle from ever arriving (rollback class)", async () => {
+  const realFetch = globalThis.fetch;
+  let served;
+  globalThis.fetch = async () => (served = new Response("{}", { status: 404, headers: { "content-type": "application/json" } }));
+  try {
+    assert.equal(await V.getJSON("/api/coach_docket"), null);
+    assert.equal(served.bodyUsed, true, "the 404 body was read, not left in flight");
+    globalThis.fetch = async () => (served = new Response('{"open":[]}', { status: 200, headers: { "content-type": "application/json" } }));
+    assert.deepEqual(await V.getJSON("/api/coach_docket"), { open: [] });
+    globalThis.fetch = async () => { throw new Error("offline"); };
+    assert.equal(await V.getJSON("/api/coach_docket"), null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
