@@ -251,13 +251,16 @@ def test_exercise_energy_does_not_double_count_an_hr_covered_hevy_cardio_block()
     }
     out = tdee.exercise_energy([day], WEIGHT_KG, [_treadmill_workout()])
     assert out["lifting"]["cardio_seconds_hr_covered"] == float(WHOOP_COVERED_SECONDS)
-    # The WHOOP walk's own proxy charge is untouched (still PROXY_KCAL_PER_KG_HOUR — that
-    # is `exercise_energy`'s residual, #4158 review item 2, not changed by this PR). The
-    # Hevy side's uncovered treadmill seconds take WALK_MET, not the lifting proxy.
-    expected_proxy = tdee.PROXY_KCAL_PER_KG_HOUR * WEIGHT_KG * (WHOOP_COVERED_SECONDS / 3600.0)
+    # #4178: the WHOOP walk's own seconds now take WALK_MET too (before #4178 they took
+    # PROXY_KCAL_PER_KG_HOUR — #4158 review item 2's residual, closed by #4178), and the
+    # Hevy side's uncovered treadmill seconds take WALK_MET as they have since #4158 —
+    # so the whole hour is ONE walk at ONE rate, split only by which device saw it.
+    expected_walk = met_energy.WALK_MET_KCAL_PER_KG_HOUR * WEIGHT_KG * (WHOOP_COVERED_SECONDS / 3600.0)
     expected_lift = round(met_energy.WALK_MET_KCAL_PER_KG_HOUR * WEIGHT_KG * (UNCOVERED_SECONDS / 3600.0), 0)
     assert out["lifting"]["kcal"] == expected_lift
-    assert out["kcal"] == round(expected_proxy + expected_lift, 0)
+    assert out["kcal"] == round(expected_walk + expected_lift, 0)
+    assert out["kcal_by_basis"] == {"met:walk": round(expected_walk, 0) + expected_lift}
+    assert out["walk_pace_seconds"] == float(WHOOP_COVERED_SECONDS)
 
 
 def test_mutation_control_the_double_count_would_charge_the_full_block_a_second_time():
@@ -315,3 +318,114 @@ def test_mutation_control_the_6_kcal_per_kg_hour_rate_reds():
     assert six_kcal_per_kg_hour_result == 858.0  # 6 * 143 — the retired, too-high number
     assert out["kcal"] != six_kcal_per_kg_hour_result
     assert out["kcal"] < six_kcal_per_kg_hour_result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. #4178 — the Strava side of the SAME ruling. Before this, `exercise_energy`'s own
+#    no-kJ proxy still charged a Strava/Whoop/Garmin walk at PROXY_KCAL_PER_KG_HOUR
+#    (~6 METs) while the Hevy path above took 3.5 — one walk, two rates. The ONE
+#    predicate (`met_energy.is_walk_pace`) and the ONE rate pair now serve both.
+# ══════════════════════════════════════════════════════════════════════════════
+
+STRAVA_WALK_SECONDS = 3600
+
+
+def _strava_activity(sport_type: str, name: str, seconds: int, distance_m: float = 0.0, device: str = "WHOOP", hr: float = 112.0) -> dict:
+    """One Strava activity as the writer stores it (`ingestion/strava_lambda.py`): a WHOOP
+    walk carries no distance (0), a Garmin one carries metres; both carry average HR."""
+    return {
+        "sport_type": sport_type,
+        "type": sport_type,
+        "name": name,
+        "device_name": device,
+        "start_date": "2026-09-14T17:00:00Z",
+        "moving_time_seconds": seconds,
+        "distance_meters": distance_m,
+        "average_heartrate": hr,
+    }
+
+
+def _strava_day(*activities: dict, date: str = "2026-09-14") -> dict:
+    return {
+        "date": date,
+        "total_moving_time_seconds": sum(a["moving_time_seconds"] for a in activities),
+        "total_kilojoules": 0,
+        "activities": list(activities),
+    }
+
+
+def test_a_one_hour_strava_walk_at_143_kg_charges_about_500_kcal():
+    """THE ACCEPTANCE (#4178). A 3,600 s Strava-logged walk at 143 kg charges 3.5 kcal/kg/h
+    (~500 kcal), the SAME figure the uncovered Hevy treadmill block above charges — not the
+    ~858 the 6 kcal/kg/h lifting proxy produced. Provenance names the basis."""
+    day = _strava_day(_strava_activity("Walk", "Afternoon Walk", STRAVA_WALK_SECONDS))
+    out = tdee.exercise_energy([day], OWNER_FIXTURE_WEIGHT_KG)
+    expected = round(met_energy.WALK_MET_KCAL_PER_KG_HOUR * OWNER_FIXTURE_WEIGHT_KG * (STRAVA_WALK_SECONDS / 3600.0), 0)
+    assert out["kcal"] == expected
+    assert 495 <= out["kcal"] <= 505, out["kcal"]  # the owner's own ~500 kcal
+    assert out["basis"] == "activity_walk_pace_at_3.5_met"
+    assert out["kcal_by_basis"] == {met_energy.BASIS_MET_WALK: expected}
+    assert out["walk_pace_seconds"] == float(STRAVA_WALK_SECONDS)
+    assert out["proxy_seconds"] == 0.0  # nothing on the 6 kcal/kg/h proxy
+
+
+def test_mutation_control_the_strava_walk_on_the_6_kcal_per_kg_hour_rate_reds():
+    """Mutation control (the issue's own box): the retired rate restored on the Strava
+    proxy must fail the fixture above. 6 x 143 = 858 is the number a regression prints."""
+    day = _strava_day(_strava_activity("Walk", "Afternoon Walk", STRAVA_WALK_SECONDS))
+    out = tdee.exercise_energy([day], OWNER_FIXTURE_WEIGHT_KG)
+    six_kcal_per_kg_hour_result = round(tdee.PROXY_KCAL_PER_KG_HOUR * OWNER_FIXTURE_WEIGHT_KG * (STRAVA_WALK_SECONDS / 3600.0), 0)
+    assert six_kcal_per_kg_hour_result == 858.0
+    assert out["kcal"] != six_kcal_per_kg_hour_result
+    assert out["kcal"] < six_kcal_per_kg_hour_result
+    assert "6_kcal_per_kg_hour" not in out["basis"]
+
+
+def test_one_walk_one_rate_whichever_device_logged_it():
+    """The issue's outcome line, as an equality: the same hour of walking priced through
+    the Hevy path (`lifting_energy`, uncovered treadmill block) and through the Strava
+    path (`exercise_energy`, a WHOOP walk) is the SAME kcal, from the SAME constant."""
+    hevy_side = tdee.lifting_energy([_uncovered_treadmill_block(STRAVA_WALK_SECONDS)], OWNER_FIXTURE_WEIGHT_KG)
+    strava_side = tdee.exercise_energy([_strava_day(_strava_activity("Walk", "Lunch Walk", STRAVA_WALK_SECONDS))], OWNER_FIXTURE_WEIGHT_KG)
+    assert hevy_side["kcal"] == strava_side["kcal"] > 0
+    assert hevy_side["kcal_by_basis"] == strava_side["kcal_by_basis"] == {met_energy.BASIS_MET_WALK: hevy_side["kcal"]}
+
+
+def test_strava_activities_classify_by_the_shared_pace_predicate_and_the_lifting_proxy_stays_for_lifting():
+    """The three live shapes in the 2026-08..09 strava partition, plus the one that is not
+    there yet: a Garmin walk WITH distance (08-10's specimen: 4,496.9 m in 3,241 s, 1.39
+    m/s) reads as walk pace by `met_energy.is_walk_pace`; a WeightTraining activity stays
+    on the lifting proxy (the stated 0.25 work fraction, no set log); a no-kJ Ride above
+    walk pace takes the light-cardio MET. Each names itself in `kcal_by_basis`."""
+    garmin_walk = _strava_activity("Walk", "Morning Walk", 3241, distance_m=4496.9, device="Garmin epix (Gen2)", hr=99.6)
+    lift = _strava_activity("WeightTraining", "Foundation - Push - 3 - 8", 3600, device="Hevy", hr=None)
+    ride = _strava_activity("Ride", "Evening Ride", 3600, distance_m=30000.0, device="Garmin epix (Gen2)", hr=135.0)
+    out = tdee.exercise_energy([_strava_day(garmin_walk, lift, ride)], OWNER_FIXTURE_WEIGHT_KG)
+    w = OWNER_FIXTURE_WEIGHT_KG
+    assert out["kcal_by_basis"] == {
+        met_energy.BASIS_MET_WALK: round(met_energy.WALK_MET_KCAL_PER_KG_HOUR * w * (3241 / 3600.0), 0),
+        met_energy.BASIS_MET_CARDIO_LIGHT: round(met_energy.CARDIO_LIGHT_MET_KCAL_PER_KG_HOUR * w * 1.0, 0),
+        tdee.BASIS_PROXY_LIFTING: round(tdee.PROXY_KCAL_PER_KG_HOUR * w * (3600 * tdee.LIFTING_WORK_FRACTION_FALLBACK / 3600.0), 0),
+    }
+    assert out["walk_pace_seconds"] == 3241.0 and out["light_cardio_seconds"] == 3600.0
+    assert out["lifting"]["basis"] == "lifting_duration_x0.25_no_set_log"
+    assert out["basis"] == "activity_walk_pace_at_3.5_met_plus_activity_light_cardio_at_4.0_met_plus_lifting_duration_x0.25_no_set_log"
+    # a walk-typed activity ABOVE walk pace is not walk pace — the pace half of the predicate
+    brisk = _strava_activity("Walk", "Brisk Walk", 3600, distance_m=9000.0)  # 2.5 m/s
+    assert tdee.exercise_energy([_strava_day(brisk)], w)["kcal_by_basis"] == {met_energy.BASIS_MET_CARDIO_LIGHT: round(4.0 * w, 0)}
+
+
+def test_the_walk_met_code_is_pinned_to_the_published_compendium_row_and_the_cardio_code_is_honestly_absent():
+    """#4178 box 2. WALK_MET_CODE was verified against the journal's own supplemental table
+    (Ainsworth 2011, row `17190 3.5 walking, 2.8 to 3.2 mph, level, moderate pace, firm
+    surface`) and is pinned. The published table carries NO stationary-bicycling row at
+    4.0 (02011 is 3.5, 02017 is 4.8), so CARDIO_LIGHT_MET_CODE stays None and the module
+    says why — never a guessed code."""
+    assert met_energy.WALK_MET == 3.5
+    assert met_energy.WALK_MET_CODE == "17190"
+    assert met_energy.WALK_MET_DESCRIPTION == "walking, 2.8 to 3.2 mph, level, moderate pace, firm surface"
+    assert met_energy.CARDIO_LIGHT_MET == 4.0
+    assert met_energy.CARDIO_LIGHT_MET_CODE is None
+    doc = met_energy.__doc__ or ""
+    for fragment in ("17190", "02011", "02017", "No stationary-bicycling row carries 4.0", "sdc1.pdf"):
+        assert fragment in doc, fragment
