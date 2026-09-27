@@ -84,7 +84,7 @@ def _fast_lane_pytest_selections():
     text = _text()
     block = text[text.index("  fast-lane:") : text.index("  full-suite:")]
     out = []
-    for cmd in re.findall(r"(python3 -m pytest tests/[^\n]*)", block):
+    for cmd in re.findall(r"(python3 -m pytest (?:tests/|\$SERIAL_FILES)[^\n]*)", block):
         m = re.search(r'-m "([^"]+)"', cmd.replace("python3 -m pytest", "", 1))
         if m:
             out.append((m.group(1), cmd))
@@ -128,6 +128,27 @@ def test_the_fast_lane_partitions_its_selection_into_a_parallel_and_a_serial_pas
     assert "| tee /tmp/premerge_lane_output.txt || status=$?" in par
     assert "| tee -a /tmp/premerge_lane_output.txt || status=$?" in ser
     assert "exit $status" in block, "the two-pass step no longer exits with its passes' status"
+
+
+def test_the_serial_pass_file_set_is_exactly_the_marked_files():
+    """#4251: the serial pass collects `grep -l 'mark\\.serial' tests/test_*.py`, not the
+    whole tree (a whole-tree collection is ~160s on the runner for 46 tests). That covers every serial test
+    only while `serial` reaches a test ONLY through the literal marker in its own file. If
+    tests/conftest.py ever applied it by hook, those tests would be deselected by the
+    parallel pass and never collected by the serial one — in neither pass, both green."""
+    import re
+
+    conftest = CONFTEST.read_text(encoding="utf-8")
+    assert not re.search(r"""mark\.serial|add_marker\(\s*["']serial""", conftest), (
+        "tests/conftest.py now applies the `serial` marker — the fast lane's serial pass "
+        "greps test files for the literal marker and would miss those tests"
+    )
+    block = _text()[_text().index("  fast-lane:") : _text().index("  full-suite:")]
+    assert "SERIAL_FILES=$(grep -l 'mark\\.serial' tests/test_*.py" in block
+    marked = sorted(p.name for p in (ROOT / "tests").glob("*.py") if "mark.serial" in p.read_text(encoding="utf-8"))
+    assert marked, "no test file carries the serial marker — the serial pass would silently select nothing"
+    outside_glob = [n for n in marked if not n.startswith("test_")]
+    assert not outside_glob, f"serial-marked file(s) outside the lane's tests/test_*.py glob: {outside_glob}"
 
 
 def test_both_lanes_reference_the_same_marker_definition():

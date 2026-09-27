@@ -182,7 +182,15 @@ jobs:
           set -o pipefail
           status=0
           python3 -m pytest tests/ -m "premerge and not integration and not serial" -q --tb=short -n auto --dist loadfile | tee /tmp/premerge_lane_output.txt || status=$?
-          python3 -m pytest tests/ -m "premerge and not integration and serial" -q --tb=short | tee -a /tmp/premerge_lane_output.txt || status=$?
+          # The serial pass collects ONLY the files that carry the marker: a whole-tree
+          # collection costs ~160s on the runner (measured on this PR's first run, where
+          # this pass took 156.59s for 46 tests). `serial` is applied only by the literal
+          # `mark.serial` in a test file — tests/conftest.py never adds it — so the grep
+          # covers every marked test (a superset of files — `-m` still selects); tests/test_premerge_lane.py holds that premise.
+          SERIAL_FILES=$(grep -l 'mark\.serial' tests/test_*.py || true)
+          if [ -n "$SERIAL_FILES" ]; then
+            python3 -m pytest $SERIAL_FILES -m "premerge and not integration and serial" -q --tb=short | tee -a /tmp/premerge_lane_output.txt || status=$?
+          fi
           exit $status
 
       # #2692: the gap this closes is not "the lane is slow", it's that a green PR
