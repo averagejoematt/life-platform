@@ -56,8 +56,8 @@ const _dayFrame = (s) => String(s || "")
 const FIELD_NOTE_LABELS = {};
 
 const SECTIONS = [
-  { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
-  { key: "by-coach", label: "By Coach", kicker: "each coach's read on your data", kind: "bycoach", url: "/api/coaches" },
+  { key: "read", label: "The Read", kicker: "what his board is saying — now", kind: "read" },
+  { key: "by-coach", label: "By Coach", kicker: "each coach's read on his data", kind: "bycoach", url: "/api/coaches" },
   // Scorecard — the board's falsifiable track record: every call graded by the
   // daily evaluator (confirmed/refuted/pending). Honest-empty until calls resolve.
   { key: "scorecard", label: "Scorecard", kicker: "the board's track record", kind: "scorecard", url: "/api/predictions" },
@@ -198,7 +198,7 @@ function coachStanceHTML(st) {
   if (!st || (!st.headline_read && !(st.stage && st.stage.label))) return "";
   const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
   const stage = st.stage || {};
-  let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
+  let h = `<section class="coach-stance"><p class="dx-kicker label">where I think he is · what I'm focused on</p>`;
   if (stage.label) h += `<h3 class="cs-headline">${esc(stage.label)}</h3>`;
   if (st.headline_read) h += `<p class="dx-prose">${esc(st.headline_read)}</p>`;
   if ((st.focused_on_now || []).length) h += `<p class="cs-care"><span class="label">focused on right now</span> ${list(st.focused_on_now)}</p>`;
@@ -786,7 +786,7 @@ async function renderReadExperiment(read) {
   const [fn, syn] = await Promise.all([tryJSON("/api/field_notes"), tryJSON("/api/experiment_synthesis")]);
   const entries = (fn && fn.entries) || [];
   let h = `<p class="dx-kicker label">the experiment · the board's read, week by week</p><h2 class="dx-title">The experiment to date</h2>`;
-  h += `<p class="dx-prose">How the board has read you across the whole run. Each week's lab note is the AI's read against how the week actually felt; the tone is how the board landed that week.</p>`;
+  h += `<p class="dx-prose">How the board has read him across the whole run. Each week's lab note is the AI's read against how the week actually felt; the tone is how the board landed that week.</p>`;
   // The board's cross-week synthesis (C-1) — the lead's read of the whole trajectory,
   // written once >=2 weeks of lab notes exist. Sits above the week-by-week list.
   // #1986: the byline comes from the API (persona registry's single lead), never from
@@ -876,7 +876,7 @@ async function renderByCoach(read, id) {
   let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(coach.board_role || coach.domain || "")}</h2><p class="coach-head-name label">${esc(coach.name || "")}</p></div></div>`;
 
   // 0) THE STANCE — the coach's evolving, evidence-derived read of Matthew (the
-  //    durable "where I think you are", above this week's domain detail).
+  //    durable "where I think he is", above this week's domain detail).
   h += coachStanceHTML(coach.stance);
 
   // 1) THE READ — lead with the coach's actual verdict on the domain.
@@ -1045,7 +1045,7 @@ async function renderTeamRead(read) {
   let d;
   try { d = await getJSON("/api/coach_team"); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h2 class="dx-title">My Team</h2>`;
+  let h = `<p class="dx-kicker label">his team · the collective read on him right now</p><h2 class="dx-title">His team</h2>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   if (d.lead) {
     const L = d.lead;
@@ -1057,7 +1057,7 @@ async function renderTeamRead(read) {
     h += `</section>`;
   }
   if ((d.team_focus || []).length) {
-    h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for you${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
+    h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for him${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
     h += `<ul class="tf-list">${d.team_focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></section>`;
   }
   h += `<section class="team-tension"><p class="dx-kicker label">where the team disagrees</p>`;

@@ -180,11 +180,36 @@ def _stance_held_since(coach_id, current_stage_label, *, _g):
 
 
 def _public_stage(stage):
-    """#4213: a stance `stage` dict with an owner-directed `rationale` blanked."""
+    """#4213: a stance `stage` dict with an owner-directed `label` or `rationale` blanked.
+
+    The label is the stance card's HEADLINE on /coaching/by-coach/ (coaching.js
+    `cs-headline`), so it is a reader slot exactly like the rationale under it."""
     stage = dict(stage) if isinstance(stage, dict) else {}
-    if "rationale" in stage:
-        stage["rationale"] = audience_guard.public_or_empty(stage.get("rationale"))
+    for field in ("label", "rationale"):
+        if field in stage:
+            stage[field] = audience_guard.public_or_empty(stage.get(field))
     return stage
+
+
+def _public_rung(rung):
+    """#4213: the authored ladder rung as served to visitors — every prose field guarded.
+
+    The fallback payload carries the rung whole ("rung": …) and the page prints its
+    headline and graduation gate, and the authored configs are written TO Matthew
+    ("First, I just need to see what you eat.", "Hitting your duration target…"). A
+    string passes `public_or_empty`, a string list `public_items`; ids and numbers
+    (stage_id, band bounds) pass untouched so the ladder resolution stays readable."""
+    out = {}
+    for key, value in (rung or {}).items():
+        if key == "stage_id" or not isinstance(value, (str, list)):
+            out[key] = value
+        elif isinstance(value, str):
+            out[key] = audience_guard.public_or_empty(value)
+        elif all(isinstance(v, str) for v in value):
+            out[key] = audience_guard.public_items(value)
+        else:
+            out[key] = value
+    return out
 
 
 def _stance_from_latest(latest):
@@ -233,16 +258,20 @@ def _stance_block(coach_id, weight_lbs, *, _g):
     metric = stance.get("band_metric")
     value = weight_lbs if metric == "weight_lbs" else None
     rung = (coach_stance.resolve_stage(ladder, value) if coach_stance else None) or (ladder[0] if ladder else None)
-    rung = rung or {}
+    # #4213: the authored ladder is guarded like the stance it stands in for — every
+    # prose field, including the stage headline and the graduation gate the page prints.
+    authored_headline = bool((rung or {}).get("headline"))
+    rung = _public_rung(rung)
     return {
         "source": "ladder",
-        # #4213: the authored ladder is guarded like the stance it stands in for.
-        "headline_read": audience_guard.public_or_empty(rung.get("read_of_him")),
-        "focused_on_now": audience_guard.public_items(rung.get("cares_most", [])),
-        "set_aside_for_now": audience_guard.public_items(rung.get("cares_less_right_now", [])),
+        "headline_read": rung.get("read_of_him") or "",
+        "focused_on_now": rung.get("cares_most") or [],
+        "set_aside_for_now": rung.get("cares_less_right_now") or [],
         "stage": {
-            "label": rung.get("headline") or rung.get("stage_id"),
-            "rationale": audience_guard.public_or_empty(rung.get("read_of_him")),
+            # An owner-directed headline degrades to an empty slot (the stage id stands in
+            # only for a rung authored WITHOUT a headline, as before).
+            "label": rung.get("headline") or ("" if authored_headline else rung.get("stage_id")),
+            "rationale": rung.get("read_of_him") or "",
         },
         "how_my_read_changed": "",
         "confidence_note": "",
@@ -253,7 +282,7 @@ def _stance_block(coach_id, weight_lbs, *, _g):
         "band_metric": metric,
         "current_value": value,
         "rung": rung,
-        "ladder": [{"stage_id": s.get("stage_id"), "headline": s.get("headline")} for s in ladder],
+        "ladder": [{"stage_id": s.get("stage_id"), "headline": audience_guard.public_or_empty(s.get("headline"))} for s in ladder],
     }
 
 
