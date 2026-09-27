@@ -73,13 +73,61 @@ def test_the_premerge_marker_is_registered_and_auto_applied():
     assert "_behavior.py" in conftest, "#2258: the hook no longer keys on the behaviour-suite filename"
 
 
-def test_the_premerge_lane_runs_the_marker_not_a_hand_listed_subset():
+_SELECTION = f"{_MARKER} and not integration"
+
+
+def _fast_lane_pytest_selections():
+    """(marker expression, command) for every marker-selecting pytest command in the
+    `fast-lane` job — the collection gate carries no `-m` and is not one of them."""
+    import re
+
     text = _text()
-    assert f'-m "{_MARKER} and not integration"' in text, (
-        "#2258: pr-checks.yml no longer selects the `premerge` marker. The pre-merge "
-        "lane must not go back to being a strict subset of the post-merge one — that "
-        "gap red-mained main three times in 24h on 2026-08-08."
-    )
+    block = text[text.index("  fast-lane:") : text.index("  full-suite:")]
+    out = []
+    for cmd in re.findall(r"(python3 -m pytest tests/[^\n]*)", block):
+        m = re.search(r'-m "([^"]+)"', cmd.replace("python3 -m pytest", "", 1))
+        if m:
+            out.append((m.group(1), cmd))
+    return out
+
+
+def test_the_premerge_lane_runs_the_marker_not_a_hand_listed_subset():
+    """#2258's property, rewritten for #4251's two-pass lane: every pass selects on the
+    ONE marker expression (plus only the `serial` split), never a hand-listed subset."""
+    sels = _fast_lane_pytest_selections()
+    assert sels, "#2258: pr-checks.yml's fast lane no longer runs a marker-selected pytest"
+    for expr, cmd in sels:
+        assert expr.startswith(_SELECTION), (
+            "#2258: pr-checks.yml no longer selects the `premerge` marker. The pre-merge "
+            "lane must not go back to being a strict subset of the post-merge one — that "
+            f"gap red-mained main three times in 24h on 2026-08-08. Got: {cmd}"
+        )
+
+
+def test_the_fast_lane_partitions_its_selection_into_a_parallel_and_a_serial_pass():
+    """#4251: the lane ran ~12.3k tests in one process and was slower than the 30k-test
+    parallel full suite on the same PR. It now runs the SAME selection as two passes —
+    the full-suite job's idiom (#3025). Two silent failure modes look identical from
+    outside, both green: a test in NEITHER pass stops running; a test in BOTH runs twice
+    (and an in-tree writer races its own twin). The guarantee is structural — the two
+    expressions are exact complements over `serial` on one shared selection — so it
+    cannot drift with the suite's size."""
+    sels = _fast_lane_pytest_selections()
+    assert len(sels) == 2, f"expected a parallel pass and a serial pass in the fast lane, found {len(sels)}: {sels}"
+    (par_expr, par), (ser_expr, ser) = sels
+    assert par_expr == f"{_SELECTION} and not serial", f"the parallel pass must select `{_SELECTION} and not serial`: {par}"
+    assert ser_expr == f"{_SELECTION} and serial", f"the serial pass must select the exact complement `{_SELECTION} and serial`: {ser}"
+    assert "-n auto --dist loadfile" in par, f"the parallel pass lost the full suite's xdist flags: {par}"
+    assert "-n " not in ser, f"the serial pass must be single-process — that is the whole point: {ser}"
+    # Same pin as the full-suite job: the lane that passes -n must install xdist.
+    text = _text()
+    block = text[text.index("  fast-lane:") : text.index("  full-suite:")]
+    assert "pytest-xdist" in block, "the fast lane passes -n auto but does not install pytest-xdist"
+    # Both passes land in the capture the deselection report reads, and a red first pass
+    # must not skip the second (#749) nor be swallowed (#2746).
+    assert "| tee /tmp/premerge_lane_output.txt || status=$?" in par
+    assert "| tee -a /tmp/premerge_lane_output.txt || status=$?" in ser
+    assert "exit $status" in block, "the two-pass step no longer exits with its passes' status"
 
 
 def test_both_lanes_reference_the_same_marker_definition():
