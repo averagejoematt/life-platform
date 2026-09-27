@@ -32,6 +32,19 @@ from mcp import tools_coach_packet as pkt  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 HEVY_FIX = Path(__file__).parent / "fixtures" / "shared_quantities_4068" / "hevy_2026-09-08_22.json"
 STATES = {"measured", "absent", "read_failed"}
+# #4189: a stored morning-note row exactly as the write door puts it (tests/test_e2e_write_paths.py holds the wire).
+MORNING_NOTE_ROW = {
+    "pk": "USER#matthew#SOURCE#morning_note",
+    "sk": "MORNING_NOTE#2026-09-23",
+    "date": "2026-09-23",
+    "sleep_word": "heavy",
+    "body_word": "stiff",
+    "mood_word": "steady",
+    "felt_recovered": False,
+    "written_at": "2026-09-23T12:34:56+00:00",
+    "tier": 1,
+    "source": "site_api_morning_note",
+}
 
 
 def _hevy_rows() -> list[dict]:
@@ -85,6 +98,10 @@ def stub_readers(monkeypatch):
     monkeypatch.setattr(
         tools_plan, "_readiness_low_streak", lambda d: (0, {"state": "measured", "threshold": 50.0, "latest_day": "2026-09-22"})
     )
+    # #4189: the morning note reads through coach.morning_note (the one derivation); stub the row read.
+    from coach import morning_note as mn
+
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=mn.DEFAULT_LOOKBACK_DAYS: [dict(MORNING_NOTE_ROW)])
 
 
 # ── the contract: one tool, every field, three states ─────────────────────────────────
@@ -410,3 +427,67 @@ def test_the_packet_reads_the_routine_index_lookback_from_its_one_home():
     from training import routine_title
 
     assert pkt.ROUTINE_INDEX_LOOKBACK_DAYS == routine_title.ROUTINE_INDEX_LOOKBACK_DAYS == 90
+
+
+# ── #4189: the morning note in the packet ────────────────────────────────────────────
+
+
+def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant(stub_readers):
+    """The field is `coach.morning_note.coach_fact` over the stored row — one derivation with
+    /api/morning_note and the coach input. Mutation: read the partition here directly, or
+    hand the raw UTC `written_at` through (the #4214 raw-instant check would fire on it)."""
+    from coach import morning_note as mn
+
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    f = out["fields"]["morning_note"]
+    assert f["state"] == "measured" and f["source"] == pkt.SOURCES["morning_note"]
+    v = f["value"]
+    assert (v["sleep_word"], v["body_word"], v["mood_word"], v["felt_recovered"]) == ("heavy", "stiff", "steady", False)
+    assert v["date"] == "2026-09-23" and v["day"].startswith("Wednesday, September 23")
+    assert v["written_at_pt"].endswith("PT") and "written_at" not in v
+    expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
+    assert v == expected, "the packet must carry coach_fact's shape verbatim"
+    assert out["packet_version"] == "coach-session-packet@1.2.0"
+
+
+def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):
+    """Absence semantics at birth (ADR-104): no row = no note that morning, stated; a failed
+    read is never an empty morning. Mutation: return `absent` for None."""
+    from coach import morning_note as mn
+
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=2: [])
+    out = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    f = out["fields"]["morning_note"]
+    assert f["state"] == "absent" and f["value"] is None and "2026-09-23" in f["detail"]
+    assert "morning_note" in out["not_measured"]
+
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=2: None)
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["morning_note"]
+    assert f["state"] == "read_failed" and f["value"] is None and "ReadError" in f["error"]
+
+
+def test_morning_note_reads_the_target_morning_with_the_coach_lookback(stub_readers, monkeypatch):
+    """The packet asks for the target date's morning or the one before — COACH_LOOKBACK_DAYS,
+    never the site's 14-day default — so a stale note cannot pose as this morning's."""
+    from coach import morning_note as mn
+
+    seen = {}
+
+    def fake(table, today, days=None):
+        seen.update(today=today, days=days)
+        return [dict(MORNING_NOTE_ROW)]
+
+    monkeypatch.setattr(mn, "read_notes", fake)
+    pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})
+    assert seen == {"today": "2026-09-23", "days": mn.COACH_LOOKBACK_DAYS} and mn.COACH_LOOKBACK_DAYS == 2
+
+
+def test_morning_note_packet_field_never_serves_a_half_note(stub_readers, monkeypatch):
+    """A producer drift that dropped a word must surface as read_failed, not as a note with a
+    blank in it (public_view raises; the packet's _wrap keeps the error by name)."""
+    from coach import morning_note as mn
+
+    broken = {k: v for k, v in MORNING_NOTE_ROW.items() if k != "mood_word"}
+    monkeypatch.setattr(mn, "read_notes", lambda table, today, days=2: [broken])
+    f = pkt.tool_get_coach_session_packet({"target_date": "2026-09-23"})["fields"]["morning_note"]
+    assert f["state"] == "read_failed" and "ValueError" in f["error"]

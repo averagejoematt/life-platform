@@ -923,6 +923,16 @@
       "producer": "common.input_manifest::build_input_manifest"
     },
     {
+      "consumer": "coach.morning_note::coach_fact",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 6,
+      "name": "morning note row -> the coach fact",
+      "note": "the words are the owner's own; the contract is that nothing between the door and the coach can add, drop or retype one",
+      "partition": "morning_note",
+      "producer": "web.site_api_social_note::_handle_morning_note"
+    },
+    {
       "consumer": "content.fingerprint_broadcast::project_public",
       "enrolled": true,
       "floor": true,
@@ -1176,6 +1186,20 @@
       "lambda": null,
       "module": "lambdas/coach/intake_response.py",
       "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/morning_note.py",
+      "partition": "morning_note",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/morning_note.py",
+      "partition": "morning_note",
       "via": "pk"
     },
     {
@@ -5134,6 +5158,20 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_note.py",
+      "partition": "morning_note",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_note.py",
+      "partition": "morning_note",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_status.py",
@@ -7387,15 +7425,15 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 10,
-      "contracts_enrolled": 10,
-      "contracts_known": 10,
-      "contracts_ratchet": 10,
-      "edges": 715,
+      "contracts": 11,
+      "contracts_enrolled": 11,
+      "contracts_known": 11,
+      "contracts_ratchet": 11,
+      "edges": 719,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
-      "partitions": 112,
+      "partitions": 113,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 17,
@@ -7406,8 +7444,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 356,
-        "sites_resolved": 888,
-        "sites_total": 1244
+        "sites_resolved": 892,
+        "sites_total": 1248
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7819,6 +7857,11 @@
       "privacy_tier": "public"
     },
     "mood": {
+      "class": "raw_timeseries",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "morning_note": {
       "class": "raw_timeseries",
       "ingestion": false,
       "privacy_tier": "public"

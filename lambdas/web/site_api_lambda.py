@@ -200,6 +200,7 @@ from web.site_api_social import (
     _handle_experiment_follow,
     _handle_experiment_suggest,
     _handle_experiment_vote,
+    _handle_morning_note,
     _handle_nudge,
     _handle_page_feedback,
     _handle_predict_week,
@@ -216,6 +217,7 @@ from web.site_api_social import (
     handle_experiment_library,
     handle_ladder_counts,
     handle_membrane,
+    handle_morning_note_read,
     handle_predict_week_tally,
     handle_subscriber_count,
 )
@@ -438,6 +440,7 @@ ROUTES = {
     "/api/board_ask": None,
     "/api/submit_finding": None,  # NEW-1: POST handler in lambda_handler
     "/api/page_feedback": None,  # #4182: POST handler in _SIMPLE_ROUTES
+    "/api/morning_note": None,  # #4189: GET read + POST owner write in _SIMPLE_ROUTES
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
     "/api/experiment_library": handle_experiment_library,
     "/api/experiment_vote": None,  # POST handler in lambda_handler
@@ -541,6 +544,12 @@ def _route_predict_week(event):
     return _handle_predict_week(event) if method == "POST" else handle_predict_week_tally(event)
 
 
+def _route_morning_note(event):
+    """#4189: GET → the served note (Tier 1 by the owner's ruling); POST → the owner's write (one path, two verbs)."""
+    method = ((event.get("requestContext", {}).get("http", {}) or {}).get("method") or event.get("httpMethod") or "GET").upper()
+    return _handle_morning_note(event) if method == "POST" else handle_morning_note_read(event)
+
+
 _SIMPLE_ROUTES = {
     "/api/verify_subscriber": ({"GET", "OPTIONS"}, _handle_verify_subscriber),
     "/api/nudge": ({"POST"}, _handle_nudge),
@@ -561,6 +570,7 @@ _SIMPLE_ROUTES = {
     "/api/board_question": ({"POST"}, _handle_board_question),
     "/api/replicate_certify": ({"POST"}, _handle_replicate_certify),  # #1393 — Replicator self-cert
     "/api/page_feedback": ({"POST"}, _handle_page_feedback),  # #4182 — the two-question reader door
+    "/api/morning_note": ({"GET", "POST"}, _route_morning_note),  # #4189 — the morning note: GET served / POST owner write
 }
 
 

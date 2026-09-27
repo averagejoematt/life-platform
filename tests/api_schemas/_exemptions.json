@@ -35,6 +35,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 votes on an experiment (write)"
   },
+  "/api/morning_note": {
+    "category": "capture-failed",
+    "reason": "#4189 (2026-09-27) \u2014 route not deployed yet, no live GET shape to snapshot (the #1373 /api/character_receipt disposition); post-deploy the driver runs deploy/capture_api_schemas.py --only /api/morning_note, commits api_morning_note.json and drops this entry"
+  },
   "/api/nudge": {
     "category": "write-path",
     "reason": "POST-only \u2014 evening nudge action (write)"

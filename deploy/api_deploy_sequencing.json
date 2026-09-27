@@ -21,5 +21,12 @@
     "entry hides a genuinely dead route (same discipline as the old inline set)."
   ],
   "sequenced_routes": [],
-  "pending_deploy_routes": []
+  "pending_deploy_routes": [
+    {
+      "route": "/api/morning_note",
+      "added": "2026-09-27",
+      "pr": "#4189 (Refs #4182)",
+      "reason": "the morning note (GET served note / POST owner write) — new site-api route; the site half is a follow-up lane. Remove once deploy_site_api.sh has landed it and the schema baseline is captured."
+    }
+  ]
 }

@@ -230,14 +230,20 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         "site_api_social_challenges.py",
         "site_api_social_engage.py",
         "site_api_social_experiments.py",
-    }, f"expected _is_blocked_vice call sites in exactly these 11 modules, got {found_files}"
+        # #4189: the morning-note door is its own sibling (the engage module sits under the
+        # #1665 line ceiling); it carries ONE screen over the owner's four words.
+        "site_api_social_note.py",
+    }, f"expected _is_blocked_vice call sites in exactly these 12 modules, got {found_files}"
     # 26 -> 27 by #4182: `_handle_page_feedback` screens its one free-text field
     # (`looking_for`) at the door with an immediate `return _error(400, ...)`;
     # behaviourally mutation-proved in tests/test_page_feedback_4182.py
     # (test_a_blocked_vice_answer_is_refused_with_no_write).
-    assert len(sites) == 27, (
-        f"expected 27 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
-        f"+ 1 from #4182), "
+    # 27 -> 28 by #4189: `_handle_morning_note` screens the owner's four words (joined) at
+    # the door with an immediate `return _error(400, ...)`; behaviourally mutation-proved in
+    # tests/test_e2e_write_paths.py (test_morning_note_a_blocked_vice_word_is_refused_with_no_write).
+    assert len(sites) == 28, (
+        f"expected 28 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
+        f"+ 1 from #4182 + 1 from #4189), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )
