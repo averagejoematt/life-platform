@@ -116,6 +116,17 @@ FORBIDDEN_TOKENS = [
     # sweep backstops) — this sweep scans full page HTML, which is legitimately
     # full of `<div>`/`<span>` markup; only the literal tool-call forms are
     # unambiguous on a rendered page or a JSON body alike.
+    # #4191: the chronicle's bracketed machine header — `[Weight: X lbs | Week Grade: avg X |
+    # T0 Streak: X days]`, the card-engine parsing hook the prompt asks for — printed as
+    # PROSE. The writer stores the whole envelope as content_markdown and, until #4191,
+    # truncated it straight into the manifest excerpt, so /story/ and the home teaser opened
+    # on the bracket. /journal/posts.json is exempt ONLY while its stored excerpts predate the
+    # fix (a stored artifact does not change at deploy); lift the exemption once the manifest
+    # has been re-rendered (deploy/restart_leadin_pages.py --apply, or the next publish).
+    ("Chronicle stat-line bracket as prose", re.compile(r"\[Weight:[^\]]*\]"), ["/journal/posts.json"]),
+    # The builder-only segment of that header on a PAGE. The manifest carries it legitimately
+    # in its `stats_line` data field (the card engine reads it there), so the JSON is exempt.
+    ("Chronicle T0 Streak segment on a page", re.compile(r"\bT0 Streak:"), ["/journal/posts.json"]),
     (
         "Tool-call XML residue",
         re.compile(r"</decision>|<parameter\s+name\s*=|</parameter>|<invoke\b|</invoke>|<function_calls\b|</function_calls>"),

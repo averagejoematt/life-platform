@@ -247,8 +247,8 @@ FORMAT:
 Return the installment as clean markdown with:
 - First line: the title in quotes (your editorial choice for the week — sometimes lyrical, sometimes wry, sometimes just honest)
 - Second line: blank
-- Third line: [Weight: X lbs | Week Grade: avg X | T0 Streak: X days]
-- Then blank line, then body text (~1,200-1,800 words)
+- Third line: the machine header, exactly [Weight: X lbs | Week Grade: avg X | T0 Streak: X days] — this line is parsed into a data field and is never shown to a reader as prose, so the body must not repeat it, restate its three numbers as a line of their own, or repeat the title
+- Then blank line, then body text (~1,200-1,800 words) — the body opens on the installment's first sentence
 - If including a Board interview, format as blockquotes (> )
 - End with: a line break (---) followed by *Week N of The Measured Life*
 

@@ -208,3 +208,123 @@ def test_1803_missing_sk_reproduces_the_pre_fix_bug(monkeypatch):
     }
     entry = _publish_and_get_manifest_entry(monkeypatch, [installment], cover)
     assert entry["image_url"] == ""
+
+
+# ── #4191: the write-up opens on its first sentence; the numbers travel as a field ──
+#
+# Fixture = the live 2026-09-22 installment as stored: content_markdown is the whole
+# ENVELOPE (quoted title, blank, bracketed machine header, blank, body). posts.json's
+# `excerpt` used to be that envelope truncated, so /story/ and the home teaser opened on
+# `"The Silence and the Signal" [Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0
+# days]`. The `stats_line` FIELD is the card engine's and v7_week.js's source and stays
+# byte-exact; only the prose derivation changes.
+
+_LIVE_TITLE = "The Silence and the Signal"
+_LIVE_STATS = "Weight: 315.0 lbs | Week Grade: avg 74 | T0 Streak: 0 days"
+_LIVE_FIRST_SENTENCE = (
+    "On Monday afternoon, Matthew logged what the platform’s daily brief called the biggest training day of the experiment."
+)
+_LIVE_ENVELOPE = f'"{_LIVE_TITLE}"\n\n[{_LIVE_STATS}]\n\n{_LIVE_FIRST_SENTENCE} A second sentence follows it.'
+_LIVE_STATS_ROW = "315.0 lb that week · the engine's week score 74"  # the literal tests/js/chronicle_text_4191.test.mjs pins
+
+
+def _live_installment():
+    return {
+        "title": _LIVE_TITLE,
+        "week_number": 3,
+        "date": "2026-09-22",
+        "sk": "DATE#2026-09-22",
+        "stats_line": _LIVE_STATS,
+        "word_count": 1114,
+        "content_markdown": _LIVE_ENVELOPE,
+        "has_board_interview": True,
+    }
+
+
+def _publish_live(monkeypatch):
+    from content import editorial_image
+
+    monkeypatch.setattr(chron, "s3", _NoS3())
+    monkeypatch.setattr(editorial_image, "enabled", lambda: False)
+    return chron.publish_to_journal(
+        title=_LIVE_TITLE,
+        stats_line=_LIVE_STATS,
+        body_html=f"<p>{_LIVE_FIRST_SENTENCE}</p>",
+        week_num=3,
+        date_str="2026-09-22",
+        all_installments=[_live_installment()],
+        write_to_s3=False,
+    )
+
+
+def test_4191_manifest_excerpt_opens_on_the_first_sentence_and_the_field_stays_exact(monkeypatch):
+    import json as _json
+
+    _key, _html, posts_json_str = _publish_live(monkeypatch)
+    entry = next(p for p in _json.loads(posts_json_str)["posts"] if p["date"] == "2026-09-22")
+    assert entry["excerpt"].startswith("On Monday afternoon"), entry["excerpt"][:80]
+    assert "[Weight:" not in entry["excerpt"]
+    assert "T0 Streak" not in entry["excerpt"]
+    assert _LIVE_TITLE not in entry["excerpt"]  # the title has its own field; the excerpt is prose
+    # The machine line still travels — as the FIELD the card engine + v7_week.js parse, unchanged.
+    assert entry["stats_line"] == _LIVE_STATS
+    assert entry["title"] == _LIVE_TITLE
+
+
+def test_4191_mutation_control_without_the_strip_the_bracket_reaches_the_manifest(monkeypatch):
+    """The strip is load-bearing: with body_markdown made an identity, the pre-fix excerpt
+    (the truncated envelope) comes back — so the test above cannot pass vacuously."""
+    import json as _json
+
+    from content import chronicle_schema
+
+    monkeypatch.setattr(chronicle_schema, "body_markdown", lambda md, title="": md)
+    _key, _html, posts_json_str = _publish_live(monkeypatch)
+    entry = next(p for p in _json.loads(posts_json_str)["posts"] if p["date"] == "2026-09-22")
+    assert "[Weight:" in entry["excerpt"]
+    assert entry["excerpt"].startswith(f'"{_LIVE_TITLE}"')
+
+
+def test_4191_post_dek_and_share_description_read_as_words_never_the_machine_line(monkeypatch):
+    _key, html, _posts = _publish_live(monkeypatch)
+    assert f'<div class="post-header__stats">{_LIVE_STATS_ROW}</div>' in html
+    assert f'property="og:description" content="{_LIVE_STATS_ROW}"' in html
+    assert f'name="twitter:description" content="{_LIVE_STATS_ROW}"' in html
+    assert "T0 Streak" not in html
+    assert "[Weight:" not in html
+    assert _LIVE_FIRST_SENTENCE in html  # the served prose is untouched — a format fix, not a rewrite
+
+
+def test_4191_stats_row_text_is_the_byte_twin_of_chronicle_text_js():
+    """The Python dek and the JS statsRow (story.js / dispatches.js) must print the same
+    words for the same field — pinned by literal against the JS test's own fixtures."""
+    from content import chronicle_schema as cs
+
+    assert cs.stats_row_text(_LIVE_STATS) == _LIVE_STATS_ROW
+    assert cs.stats_row_text("[Weight: 300 lbs | Sleep: 7.1 h]") == "300 lb that week · Sleep: 7.1 h"
+    assert cs.stats_row_text("") == ""
+    assert cs.stats_row_text(None) == ""
+    # a pre-genesis dek's prologue stamp (chronicle_render.display_stats_line) rides through verbatim
+    assert cs.stats_row_text("Weight: — lbs | Prologue — the instrumented weeks before Day 1") == (
+        "Weight: — lbs · Prologue — the instrumented weeks before Day 1"
+    )
+    js_test = open(os.path.join(_REPO, "tests", "js", "chronicle_text_4191.test.mjs"), encoding="utf-8").read()
+    assert _LIVE_STATS_ROW in js_test
+    assert "300 lb that week · Sleep: 7.1 h" in js_test
+
+
+def test_4191_body_markdown_strips_only_the_envelope_head():
+    from content import chronicle_schema as cs
+
+    # the live envelope, with and without the title known
+    assert cs.body_markdown(_LIVE_ENVELOPE, _LIVE_TITLE).startswith("On Monday afternoon")
+    assert cs.body_markdown(_LIVE_ENVELOPE).startswith("On Monday afternoon")
+    # a quoted first line that is NOT the title, with no header after it, is prose and stays
+    assert cs.body_markdown('"Not the title"\n\nBody.', _LIVE_TITLE) == '"Not the title"\n\nBody.'
+    # a bracketed line deep in the body is prose too — only the HEAD is a header
+    deep = "First sentence.\n\n[an aside in brackets]\n\nMore."
+    assert cs.body_markdown(deep, "T") == deep
+    # the old assembled lead-in header (# heading / *By …* / ---) is stripped the same way
+    assert cs.body_markdown("# The Night Before\n\n*By Elena Voss*\n\n---\n\nThe habit tracker logged.") == "The habit tracker logged."
+    assert cs.body_markdown("") == ""
+    assert cs.body_markdown(None) == ""
