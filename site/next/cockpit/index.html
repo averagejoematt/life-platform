@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_today.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body class="v7-body">
@@ -25,10 +26,55 @@
   <main id="main" class="v7-main">
     <h1>Today</h1>
     <p class="v7-job">Matthew’s morning screen, open to anyone.</p>
-    <p class="v7-placeholder">Not built yet — Monday of the build week.</p>
+    <p class="td-through" id="td-through" data-src="api_snapshot.vitals.as_of_date | api_snapshot.journey.last_weighin_date | api_nutrition_overview.nutrition.latest_date"></p>
+    <section class="td-entry" id="td-week" aria-labelledby="td-week-h">
+      <div class="td-m" data-margin></div>
+      <div class="td-body">
+        <h2 class="td-h" id="td-week-h">How’s the week?</h2>
+        <p class="td-note td-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="td-entry" id="td-night" aria-labelledby="td-night-h">
+      <div class="td-m" data-margin></div>
+      <div class="td-body">
+        <h2 class="td-h" id="td-night-h">Last night?</h2>
+        <p class="td-note td-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="td-entry" id="td-today" aria-labelledby="td-today-h">
+      <div class="td-m" data-margin></div>
+      <div class="td-body">
+        <h2 class="td-h" id="td-today-h">Today?</h2>
+        <p class="td-note td-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="td-entry" id="td-ask" aria-labelledby="td-ask-h">
+      <div class="td-m" data-margin></div>
+      <div class="td-body">
+        <h2 class="td-h" id="td-ask-h">The one ask</h2>
+        <p class="td-note td-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="td-entry" id="td-skips" aria-labelledby="td-skips-h">
+      <div class="td-m" data-margin></div>
+      <div class="td-body">
+        <h2 class="td-h" id="td-skips-h">What he skips</h2>
+        <p class="td-note td-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="td-entry" id="td-return" aria-labelledby="td-return-h">
+      <div class="td-m" data-margin></div>
+      <div class="td-body">
+        <h2 class="td-h" id="td-return-h">This page</h2>
+        <p class="td-note">This is Matthew’s morning screen — you’re welcome to look.</p>
+        <p class="td-note td-pending" id="td-return-line">Not loaded yet.</p>
+      </div>
+    </section>
+    <script src="/assets/js/boot_sw.js"></script>
   </main>
   <footer class="v7-foot"><nav aria-label="More"><a href="/next/protocols/">What he’s trying</a><a href="/next/story/about/">Who he is</a><a href="/next/method/">Under the hood</a><a href="/next/subscribe/">Follow</a><a href="/privacy/">Privacy</a></nav></footer>
   <nav class="v7-bar" aria-label="Pages"><a href="/next/">Home</a><a href="/next/cockpit/" aria-current="page">Today</a><a href="/next/story/">This week</a><a href="/next/data/">His numbers</a><a href="/next/coaching/">The coaches</a></nav>
   <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_today.js"></script>
 </body>
 </html>
