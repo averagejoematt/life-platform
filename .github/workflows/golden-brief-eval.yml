@@ -97,7 +97,7 @@ jobs:
         id: judge-creds
         if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_judge) }}
         continue-on-error: true   # role is staged until applied (infra/iam/README.md) — degrade softly
-        # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
+        # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
         uses: ./.github/actions/setup-ci
         with:
           python: 'false'
