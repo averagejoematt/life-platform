@@ -55,6 +55,10 @@
     "category": "write-path",
     "reason": "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC token (ADR-124, #769) \u2014 no read-only variant exists; there is no safe way to probe it that doesn't attempt a write"
   },
+  "/api/session": {
+    "category": "capture-failed",
+    "reason": "E3 #4182 \u2014 new GET route, NOT deployed yet at PR time, so there is no live shape to snapshot (the #1373 /api/character_receipt precedent). Post-deploy the driver runs deploy/capture_api_schemas.py, commits tests/api_schemas/api_session.json, adds /api/session to public_archive_registry.ARCHIVE_ROUTES and drops this entry."
+  },
   "/api/submit_finding": {
     "category": "write-path",
     "reason": "POST-only \u2014 reader-submitted finding, writes to S3 (write)"

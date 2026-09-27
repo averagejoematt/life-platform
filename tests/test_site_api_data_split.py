@@ -141,6 +141,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/replicate_certify": "_handle_replicate_certify",  # #1393 — Replicator self-cert (POST)
     "/api/ritual_log": "_handle_ritual_log",
     "/api/routine": "handle_routine",
+    "/api/session": "handle_session",  # E3 #4182 — today's session, names + sets × reps + load in lb
     "/api/scenarios": "handle_scenarios",
     "/api/sleep_correlations": "handle_sleep_correlations",
     "/api/sleep_detail": "handle_sleep_detail",
