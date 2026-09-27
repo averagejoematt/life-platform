@@ -23,7 +23,12 @@ own served numbers contradicted:
      #4194's extractor (`operational.weight_truth_qa.coach_quantity_claims`) so the
      nightly QA and this generation-time gate read prose ONE way.
 
-Rate / weight figures (the issue's item 4) are NOT checked here — a named residual.
+  3b. **A weight the scale left behind** (the issue's item 4: "316.9 pounds … losing 3.7
+     pounds per week" beside a served 313.8 lb). A bodyweight or loss-rate figure a coach
+     states as current is judged against the served trajectory (`weight_fact`: the
+     computed_metrics `latest_weight` / `weekly_rate_lbs` + its 80% CI, the same
+     `health.weight_trend` computation `/api/journey` serves), read with the nightly QA's
+     own extractors (`weights_cited_in`, `_rate_claims`).
 
   4. **The morning note (#4189).** Every coach's input carries the owner's own four words
      for the morning (`coach.morning_note.coach_fact` — the SAME derivation
@@ -181,10 +186,14 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
     supplied = data.get("macrofactor_window")
     fresh = time.monotonic() - _run.get("at", 0.0) < _RUN_TTL_SECONDS
     if supplied is None and fresh and _run.get("key") == key and _run.get("table") is table:
+        w = weight_fact(data)
+        if w:  # a caller holding the trajectory refreshes it; one without it never erases it
+            _run["facts"] = {**_run["facts"], "weight": w}
         return _run["facts"]
     rows = supplied if supplied is not None else fetch_macrofactor_window(table, today)
     facts = {
         "data_through": data_through(data),
+        "weight": weight_fact(data),
         "nutrition": nutrition_record(rows, today) if rows is not None else None,
         "protein_series": _nl.protein_series(rows) if rows is not None else [],
         # #4189: the note is read for TODAY (Pacific) — the brief runs after the morning it
@@ -195,6 +204,25 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
     # different object that happens to reuse a freed id.
     _run.update(key=key, table=table, at=time.monotonic(), facts=facts)
     return facts
+
+
+# The served weight trajectory's field names — identical in the daily brief's `data`
+# (`daily_brief_lambda` copies them off the day's computed_metrics record) and in
+# `experiment.canonical_facts` (the weekly analyzer's facts), so ONE reader serves both.
+WEIGHT_FACT_KEYS = ("latest_weight", "weekly_rate_lbs", "weekly_rate_ci_low", "weekly_rate_ci_high")
+
+
+def weight_fact(src: Optional[dict]) -> Optional[dict]:
+    """The served weight trajectory from `src`, or None when it carries neither a weight nor
+    a rate (a pre-genesis record withholds both — `canonical_facts` #2113): nothing to judge."""
+    out = {}
+    for k in WEIGHT_FACT_KEYS:
+        try:
+            v = (src or {}).get(k)
+            out[k] = float(v) if v is not None else None
+        except (TypeError, ValueError):
+            out[k] = None
+    return out if out["latest_weight"] is not None or out["weekly_rate_lbs"] is not None else None
 
 
 def coach_inputs(coach_id: str, domain_data: Any, data: Optional[dict], *, table=None) -> Any:
@@ -223,6 +251,29 @@ GAP_TOLERANCE_DAYS = 1
 DAY_VALUE_ROUNDING_G = 1.0
 # Floor under a CI half-width: a coach rounding 152.4 to 152 is not a contradiction.
 MIN_PROTEIN_TOLERANCE_G = 1.0
+# A cited loss rate is a contradiction only OUTSIDE the engine's own 80% CI, widened by a
+# one-decimal rounding ("4.4 lb/week" for -4.36). With no CI served, the nightly QA's
+# documented fallback (`weight_truth_qa._rate_tolerance(None)`, 1.0 lb/wk) applies.
+RATE_ROUNDING_LBS = 0.05
+# A weight named as the ORIGIN of a change or as a GOAL is not a claim about today: "down
+# 13.5 lb from 327.3", "he started at 327 pounds", "the goal of 185 lb", "on the way to 300
+# pounds", "the 300-lb mark". Scoped to the words beside the figure, NOT the sentence:
+# the nightly QA's sentence-wide target rule (`_VITALS_TARGET_SENTENCE`) would let Eli's
+# "At 316.9 pounds …, which is aggressive and on-target" through on the word "on-target".
+_WEIGHT_NOT_NOW_BEFORE = re.compile(
+    r"(?:\bfrom|\bstart(?:ed|ing)?(?:\s+weight)?(?:\s+(?:at|of|was))?|\bbegan\s+at|\bbaseline(?:\s+of)?|\bgoal(?:\s+weight)?"
+    r"(?:\s+(?:of|is|at))?|\btarget(?:\s+weight)?(?:\s+(?:of|is|at))?|\btowards?|\bto\s+reach|\breach(?:es|ing)?|\bhit(?:s|ting)?"
+    r"|\bbelow|\bunder|\bway\s+to|\bdown\s+to\s+(?:a\s+)?(?:goal|target)\s+of)\s+(?:about\s+|roughly\s+|around\s+|the\s+)?$",
+    re.IGNORECASE,
+)
+# A FORECAST is not a claim about today either: the physical coach's 09-27 final carries
+# "The model expects weight of 314.5 lbs tomorrow morning, with the interval running from
+# 310.8 to 318.1" — the #541 forecast block it was handed, cited correctly.
+_WEIGHT_FORECAST_SENTENCE = re.compile(
+    r"\b(?:expects?|expected|expectation|forecasts?|projects?|projected|projection|predict\w*|interval|tomorrow|next\s+week|by\s+(?:the\s+)?end\s+of)\b",
+    re.IGNORECASE,
+)
+_WEIGHT_NOT_NOW_AFTER = re.compile(r"^[\s-]*(?:goal|target|mark|milestone)\b", re.IGNORECASE)
 
 _MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
 # "went dark after September 19th", "no logs since Sep 19", "nothing logged since the 19th of September"
@@ -284,12 +335,13 @@ def _finding(metric: str, cited: Any, canonical: Any, detail: str, sentence: str
 
 
 def served_fact_findings(text: str, facts: Optional[dict], today: Optional[str] = None) -> list:
-    """Every protein / days-logged / logging-gap figure in `text` that disagrees with the
-    served facts. Empty when the facts carry no nutrition record (nothing to judge
+    """Every protein / days-logged / logging-gap / weight / loss-rate figure in `text` that
+    disagrees with the served facts. Empty when the facts carry no nutrition record (nothing to judge
     against is a skip, never a pass-by-default on a made-up number)."""
     nut = (facts or {}).get("nutrition") or {}
     series = (facts or {}).get("protein_series") or []
-    if not text or (not nut and not series):
+    weight = (facts or {}).get("weight") or {}
+    if not text or (not nut and not series and not weight):
         return []
     from operational.weight_truth_qa import _LOG_GAP_PATTERN, _num_token, _sentences, coach_quantity_claims
 
@@ -358,7 +410,72 @@ def served_fact_findings(text: str, facts: Optional[dict], today: Optional[str] 
                     sentence,
                 )
             )
+        findings.extend(weight_findings(sentence, weight))
     return findings
+
+
+def _not_now(sentence: str, value: float) -> bool:
+    """True when every place `value` is written in `sentence` names an origin or a goal."""
+    from operational.weight_truth_qa import _WEIGHT_IN_PROSE
+
+    hits = [m for m in _WEIGHT_IN_PROSE.finditer(sentence) if abs(float(m.group(1)) - value) < 1e-9]
+    return bool(hits) and all(
+        _WEIGHT_NOT_NOW_BEFORE.search(sentence[max(0, m.start() - 40) : m.start()]) or _WEIGHT_NOT_NOW_AFTER.match(sentence[m.end() :])
+        for m in hits
+    )
+
+
+def _rate_ok(v: float, w: dict) -> bool:
+    from operational.weight_truth_qa import _rate_tolerance
+
+    lo, hi, rate = w.get("weekly_rate_ci_low"), w.get("weekly_rate_ci_high"), w["weekly_rate_lbs"]
+    if lo is not None and hi is not None and (lo <= 0) == (hi <= 0):
+        a, b = sorted((abs(lo), abs(hi)))
+        return a - RATE_ROUNDING_LBS <= abs(v) <= b + RATE_ROUNDING_LBS
+    return abs(abs(v) - abs(rate)) <= _rate_tolerance(None)
+
+
+def weight_findings(sentence: str, weight: Optional[dict]) -> list:
+    """#4185 item 4: a bodyweight or weekly loss-rate figure this ONE sentence states as
+    current, judged against the served trajectory. The extractors are the nightly QA's
+    (`weights_cited_in` drops a dated or "at Day 1"-anchored figure, `_rate_claims` a
+    dated or target-framed one), so the two gates read prose one way; this gate also
+    drops a forecast sentence and a goal or a change's origin ("from 327.3") beside the
+    figure, because here a misfire
+    HOLDS a coach (#4343). Rates are compared by magnitude (`weight_truth_qa._rate_value`)."""
+    if not weight:
+        return []
+    from operational.weight_truth_qa import CROSS_SURFACE_WEIGHT_TOL_LBS, _rate_claims, weights_cited_in
+
+    out = []
+    latest = weight.get("latest_weight")
+    if latest is not None and not _WEIGHT_FORECAST_SENTENCE.search(sentence):
+        for v in weights_cited_in(sentence):
+            if abs(v - latest) > CROSS_SURFACE_WEIGHT_TOL_LBS and not _not_now(sentence, v):
+                out.append(
+                    _finding(
+                        "weight_lb",
+                        v,
+                        latest,
+                        f"cites {v:g} lb as his weight; the latest served weigh-in is {latest:g} lb",
+                        sentence,
+                    )
+                )
+    if weight.get("weekly_rate_lbs") is not None:
+        lo, hi = weight.get("weekly_rate_ci_low"), weight.get("weekly_rate_ci_high")
+        ci = f" (80% CI {lo:g} to {hi:g})" if lo is not None and hi is not None else ""
+        for v in _rate_claims(sentence):
+            if not _rate_ok(v, weight):
+                out.append(
+                    _finding(
+                        "weekly_rate_lb",
+                        abs(v),
+                        abs(weight["weekly_rate_lbs"]),
+                        f"cites {abs(v):g} lb/week; the served rate is {weight['weekly_rate_lbs']:g} lb/week{ci}",
+                        sentence,
+                    )
+                )
+    return out
 
 
 SERVED_FACT_REPORT_KEY = "served_fact_violations"

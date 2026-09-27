@@ -1019,8 +1019,8 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
         available_logs = _presence_logs(gen_date_iso)
 
     _served = _ci.served_run_facts(
-        {"date": gen_date_iso}, table=table, today=gen_date_iso
-    )  # #4185: cited protein/days-logged/gap vs served
+        {**facts, "date": gen_date_iso}, table=table, today=gen_date_iso
+    )  # #4185: cited protein/days-logged/gap + weight/rate (the canonical trajectory) vs served
 
     def _findings_fn(_t):
         return _ci.served_fact_findings(_t, _served) + _gg.grounding_findings(

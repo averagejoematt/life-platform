@@ -683,3 +683,174 @@ def test_the_reader_checks_do_not_misfire_on_a_coach_quoting_the_note():
     assert rc.unlabeled_window_figure(sentence) == []
     assert rc.raw_instant(f"His note on {fact['date']}: heavy.", facts={}), "control: the ISO date IS a finding"
     assert rc.raw_instant(f"Written at {NOTE_ROW['written_at']}.", facts={}), "control: the UTC instant IS a finding"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4185 item 4 — weight / loss-rate figures vs the served trajectory; and the
+# #4343 grounding misfire on an age-decade idiom
+# ══════════════════════════════════════════════════════════════════════════════
+
+# The served trajectory beside Eli's read (/api/journey, fetched 2026-09-26 19:32Z — the
+# reader_checks corpus specimen `2026-09-21-eli-weekly-106.9g-316.9lb.json`).
+JOURNEY_0926 = {"latest_weight": 313.8, "weekly_rate_lbs": -4.36, "weekly_rate_ci_low": -4.74, "weekly_rate_ci_high": -2.75}
+# Verbatim from the same served text (weekly_priority, 09-21, the door's top read on 09-26).
+ELI_0921_WEIGHT = (
+    "At 316.9 pounds after 16 experiment days, he's losing 3.7 pounds per week, which is aggressive and on-target "
+    "for the Foundation phase."
+)
+# The physical coach's retained FINAL from the 2026-09-27 17:00Z brief (EVALRET#coach_brief,
+# read-only query): it was held on `fabricated_number 40` ("after your mid-40s") among others.
+with open(os.path.join(os.path.dirname(_FIXTURE), "evalret_coach_brief_physical_2026-09-27.json"), encoding="utf-8") as _fh:
+    PHYSICAL_0927 = json.load(_fh)
+
+
+def _weight_facts(traj=JOURNEY_0926):
+    return {"weight": ci.weight_fact(traj)}
+
+
+def test_eli_0921_weight_fails_against_the_served_weigh_in_and_passes_with_it():
+    """316.9 lb beside a served 313.8 lb is 3.1 lb off (tolerance: the nightly QA's 1.5 lb).
+    The 3.7 lb/week sits INSIDE the served 80% CI (2.75-4.74 lb/week), so the rate is not
+    a contradiction by the engine's own interval — only the weight fails."""
+    found = ci.served_fact_findings(ELI_0921_WEIGHT, _weight_facts(), today="2026-09-26")
+    assert [(f["metric"], f["cited"], f["canonical"]) for f in found] == [("weight_lb", 316.9, 313.8)], found
+    assert "the latest served weigh-in is 313.8 lb" in found[0]["detail"]
+    assert ci.served_fact_findings(ELI_0921_WEIGHT.replace("316.9", "313.8"), _weight_facts(), today="2026-09-26") == []
+
+
+def test_a_rate_outside_the_served_ci_fails_and_one_inside_passes():
+    facts = _weight_facts()
+    found = ci.served_fact_findings("He is losing 7.3 lb/week right now.", facts)
+    assert [(f["metric"], f["cited"]) for f in found] == [("weekly_rate_lb", 7.3)], found
+    assert "80% CI -4.74 to -2.75" in found[0]["detail"]
+    assert ci.served_fact_findings("He is losing 1.9 pounds per week.", facts)  # below the band
+    for honest in ("He is losing 4.4 pounds per week.", "That is 2.8 lb/week.", "A rate of −4.7 lb/week."):
+        assert ci.served_fact_findings(honest, facts) == [], honest
+
+
+def test_no_ci_served_falls_back_to_the_nightly_qa_tolerance():
+    facts = _weight_facts({"weekly_rate_lbs": -4.36})
+    assert ci.served_fact_findings("He is losing 5.2 lb/week.", facts) == []  # within 1.0
+    assert [f["metric"] for f in ci.served_fact_findings("He is losing 5.5 lb/week.", facts)] == ["weekly_rate_lb"]
+
+
+def test_a_goal_an_origin_a_forecast_or_a_dated_weigh_in_is_not_a_claim_about_today():
+    """Here a misfire HOLDS a coach (#4343), so the figures a coach states correctly but
+    not as today's weight are each left alone — and an undated present weight still fails."""
+    facts = _weight_facts()
+    for text in (
+        "Down 13.5 lbs from 327.3 lbs; the goal is 185 lbs.",
+        "He started at 327 pounds.",
+        "The goal of 185 lbs is a long way off.",
+        "On the way to 300 pounds, the first milestone matters.",
+        "Your weight on September 26 is 313.8 lbs, down 13.5 lbs.",
+        "321.1 lbs at Day 1 is the anchor.",
+        "Add 10 lbs to the bar.",
+    ):
+        assert ci.served_fact_findings(text, facts, today="2026-09-27") == [], text
+    assert [f["cited"] for f in ci.served_fact_findings("You weigh 316 lbs and the goal is 185 lbs.", facts)] == [316.0]
+
+
+def test_the_physical_0927_final_raises_no_weight_or_rate_finding():
+    """The live 09-27 physical final cites the weigh-in (dated), the rate (4.4, inside the
+    CI) and the #541 forecast interval (314.5, 310.8-318.1) — all honest. Only its
+    protein figure — cause B of #4343, fixed upstream by #4345 — remains a served-fact finding."""
+    facts = {**_facts("2026-09-25", "2026-09-26"), **_weight_facts(PHYSICAL_0927["facts"])}
+    found = ci.served_fact_findings(PHYSICAL_0927["final"], facts, today="2026-09-27")
+    assert [(f["metric"], f["cited"]) for f in found] == [("protein_g", 122.7)], found
+
+
+# The live forecast sentence writes units only on the point ("314.5 lbs", 0.7 lb off); the
+# same sentence with a unit on each bound is what the forecast frame exists for.
+FORECAST_0927_UNITS = "The model expects weight of 314.5 lbs tomorrow morning, with the interval running from 310.8 lbs to 318.1 lbs."
+
+
+def test_a_forecast_interval_with_units_is_not_a_claim_about_today():
+    assert ci.served_fact_findings(FORECAST_0927_UNITS, _weight_facts(PHYSICAL_0927["facts"]), today="2026-09-27") == []
+
+
+def test_mutation_control_without_the_forecast_frame_the_interval_misfires(monkeypatch):
+    monkeypatch.setattr(ci, "_WEIGHT_FORECAST_SENTENCE", re.compile(r"(?!)"))
+    found = ci.served_fact_findings(FORECAST_0927_UNITS, _weight_facts(PHYSICAL_0927["facts"]), today="2026-09-27")
+    assert [f["cited"] for f in found] == [318.1], found
+
+
+def test_mutation_control_without_the_weight_check_eli_publishes(monkeypatch):
+    monkeypatch.setattr(ci, "weight_findings", lambda sentence, weight: [])
+    assert ci.served_fact_findings(ELI_0921_WEIGHT, _weight_facts(), today="2026-09-26") == []
+
+
+def test_the_daily_run_facts_carry_the_trajectory_the_brief_gathered():
+    """The daily brief's `data` carries computed_metrics' trajectory under the canonical
+    names; the run facts the quality gate reads (`served_run_facts()`) carry it too, and a
+    later caller without it (the weekly nutrition pack's `{"date": …}`) never erases it."""
+    data = {"date": "2026-09-25", "macrofactor_window": _rows_through("2026-09-25"), **JOURNEY_0926}
+    ci.served_run_facts(data, today="2026-09-26")
+    assert ci.served_run_facts()["weight"] == JOURNEY_0926
+    ci._run.pop("at")  # force a re-derive keyed the same
+    ci._run["at"] = __import__("time").monotonic()
+    ci.served_run_facts({"date": "2026-09-25"}, today="2026-09-26")
+    assert ci.served_run_facts()["weight"] == JOURNEY_0926
+    assert ci.weight_fact({"latest_weight": None, "weekly_rate_lbs": None}) is None  # pre-genesis: withheld
+
+
+def test_the_gate_holds_a_daily_draft_on_the_served_weight(monkeypatch):
+    """`served_fact_gate` folds the weight finding into the report ADR-108 regenerates or
+    holds on, with the figure logged and the correction naming the served weigh-in."""
+    ci.served_run_facts({"date": "2026-09-25", "macrofactor_window": _rows_through("2026-09-25"), **JOURNEY_0926}, today="2026-09-26")
+    report = ci.gated(lambda *_a: {"passed": True, "suggestions": []}, None, "physical_coach", ELI_0921_WEIGHT, {})
+    assert report["passed"] is False
+    assert [f["metric"] for f in report[ci.SERVED_FACT_REPORT_KEY]] == ["weight_lb"]
+    assert any("313.8 lb" in s for s in report["suggestions"])
+
+
+def test_the_weekly_gate_holds_the_316_9_weight_read(monkeypatch):
+    """The weekly integrator (09-21) never reaches `_enforce_quality_gate`; its chokepoint
+    `_gate_prose` now hands the canonical trajectory to the same check. A rewrite that
+    repeats 316.9 is held (""); the engine's weight publishes."""
+    from intelligence import ai_expert_analyzer_lambda as az
+
+    rows = _rows_through("2026-09-19")
+    monkeypatch.setattr(az, "_load_canonical_facts", lambda: dict(JOURNEY_0926))
+    monkeypatch.setattr(az._gg, "grounding_findings", lambda *_a, **_k: [])  # isolate the served-fact half
+    assert _weekly_gate_with(monkeypatch, az, ELI_0921_WEIGHT, rows, "2026-09-21") == ""
+    ci._run.clear()
+    honest = ELI_0921_WEIGHT.replace("316.9", "313.8")
+    assert _weekly_gate_with(monkeypatch, az, honest, rows, "2026-09-21") == honest
+
+
+def _weekly_gate_with(monkeypatch, az, text, rows, today):
+    from common import retry_utils
+
+    table = MagicMock()
+    table.query.return_value = {"Items": [dict(r) for r in rows]}
+    monkeypatch.setattr(az, "table", table)
+    monkeypatch.setattr(az, "pacific_today", lambda: today)
+    monkeypatch.setattr(ci, "pacific_today", lambda: today)
+    monkeypatch.setattr(retry_utils, "call_anthropic_raw", lambda req, timeout=None: {"content": [{"type": "text", "text": text}]})
+    return az._gate_prose("weekly_priority", text, text, "sk-test", available_logs=frozenset())
+
+
+def test_an_age_decade_idiom_is_not_a_figure_to_ground():
+    """#4343 (physical, 09-27): "…degrades roughly 1% per year after your mid-40s" was held
+    as `fabricated_number 40`. Against the retained allow-list the final now grounds clean;
+    a decade that is NOT a person's age — a measurement band or a rest interval — still
+    must be earned."""
+    from ai import grounded_generation as gg
+
+    allowed = set(PHYSICAL_0927["allowed"])
+    assert any(f["detail"].startswith("the number 40 ") for f in PHYSICAL_0927["retained_findings"])  # the live hold
+    assert gg.fabricated_numbers(PHYSICAL_0927["final"], allowed) == []
+    for idiom in ("after your mid-40s", "a man in his 40s", "in their late-50s", "your early 30s", "your 40’s"):
+        assert gg.fabricated_numbers(idiom, set()) == [], idiom
+    for measure in ("HRV has sat in the mid-40s", "rest 40s between sets", "40 g of protein"):
+        assert gg.fabricated_numbers(measure, set()) == [40.0], measure
+    # The idiom does not launder the same number written as a measurement elsewhere.
+    assert gg.fabricated_numbers("After your mid-40s, eat 40 g at breakfast.", set()) == [40.0]
+
+
+def test_mutation_control_without_the_idiom_rule_the_physical_final_is_held_on_40(monkeypatch):
+    from ai import grounded_generation as gg
+
+    monkeypatch.setattr(gg, "_AGE_DECADE_RE", re.compile(r"(?!)"))
+    assert gg.fabricated_numbers(PHYSICAL_0927["final"], set(PHYSICAL_0927["allowed"])) == [40.0]
