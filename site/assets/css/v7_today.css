@@ -120,6 +120,31 @@
 .td-skips b { color: var(--ink); font-weight: var(--weight-med); }
 .td-skips .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
+/* ── the ask, as served: folded when it fails the public lint (R6 fix 2) ── */
+.td-details { border-top: 1px solid var(--rule); padding-top: var(--sp-2); margin-top: var(--sp-3); }
+.td-details summary {
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--ember);
+  padding: var(--sp-1) 0 var(--sp-2);
+  list-style: none;
+  min-height: 44px;
+  display: flex; align-items: center;
+}
+.td-details summary::-webkit-details-marker { display: none; }
+.td-details summary::before { content: "+ "; font-family: var(--font-mono); margin-right: var(--sp-1); }
+.td-details[open] summary::before { content: "– "; }
+.td-coach {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  margin: 0 0 var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--rule);
+}
+
 /* ── the session's loads, when /api/session serves them ── */
 .td-loads {
   width: 100%;
