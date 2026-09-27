@@ -328,6 +328,22 @@ DEFAULT_STALE_HOURS = 48
 #                  Read by evidence_field_predicates(); a behavioral source needs no
 #                  entry because its row IS the evidence (that is what `behavioral`
 #                  means), which is why this facet lives on apple_health alone.
+#   instrument_for (#4217) the coach(es) whose DOMAIN INSTRUMENT this source is — the
+#                  sensor without which that coach's reads are ungrounded. Carried on the
+#                  SOURCE (whoop -> sleep_coach) or, where a source is one partition fed by
+#                  several sensors, on the `hae_datatypes` entry (cgm -> glucose_coach).
+#                  Inverted by coach_instruments() into the coach -> instrument map the
+#                  persona registry, the three generation gates (analyzer / stance /
+#                  docket) and the coach serve surfaces all read — the map is DERIVED
+#                  here, never hand-typed at a consumer (the v7 renderer's own
+#                  COACH_SOURCE table is the defence-in-depth twin, held equal by a
+#                  PairContract). A coach absent from every facet has NO single
+#                  instrument (mind, explorer, the lead) and is never gated by absence.
+#                  Whether a facet-bearing source is DARK is decided by
+#                  health.instrument_presence, which reuses the SAME liveness the
+#                  public /api/source_freshness board serves; a `behavioral` source can
+#                  only ever be behavioral-stale, so a lapse in a hand-kept log never
+#                  makes its coach absent — only a sensor that stopped does.
 #                  `reader_surface` (#3204) is a SECOND, tighter threshold answering
 #                  a DIFFERENT question. `stale_days` asks "has the capture habit
 #                  lapsed?" — behavioural, deliberately lenient, it narrates and
@@ -349,6 +365,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Recovery, sleep, HRV",
         "category": "Wearables",
         "behavioral": False,  # worn 24/7 — data flows without participation
+        "instrument_for": ("sleep_coach",),  # #4217: the sleep/recovery sensor — dark => Park is absent
         "stale_hours": None,
         "active_api": True,
         "expected_days": 7,
@@ -753,6 +770,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "fields": ["blood_glucose_avg", "blood_glucose_readings_count"],
                 "stale_days": 3,
                 "manual": True,
+                "instrument_for": ("glucose_coach",),  # #4217: the glucose sensor — dark => Patel is absent
                 "reader_surface": {"endpoint": "/api/glucose", "max_days_behind": 1},
             },
             # BP: spot-checked, not daily — a fortnight is a lenient "haven't cuffed in a while".
@@ -855,6 +873,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Nutrition log — manual end-of-day upload, ~24h behind by design",
         "category": "Manual logs",
         "behavioral": True,  # manual diary export — a skipped upload is a lapse
+        "instrument_for": ("nutrition_coach",),  # #4217: the food log (behavioral — a lapse never darks Webb)
         # Manual-ish upload (not every day) — lenient threshold avoids
         # false-stale; the format-drift check is the real guard.
         "stale_hours": 96,
@@ -945,6 +964,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Strength sets — logged when he lifts",
         "category": "Manual logs",
         "behavioral": True,  # a rest week must not read as an outage
+        "instrument_for": ("physical_coach",),  # #4217: the lifting log (behavioral — a rest week never darks Reyes)
         "stale_hours": 7 * 24,
         "active_api": True,
         "expected_days": None,  # lifting is event-driven — gaps are training structure
@@ -1325,6 +1345,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Blood biomarker panels — drawn and uploaded roughly every 6 months",
         "category": "Clinical",
         "behavioral": True,  # a draw happens when he books one; silence is never breakage
+        "instrument_for": ("labs_coach",),  # #4217: the blood panel (behavioral, ~6-month cadence — never darks Okafor)
         "cadence_months": 6,  # THE cadence — `stale_hours` below is DERIVED from it
         "stale_hours": None,  # computed by _derive_cadence_stale_hours(); never typed here
         # freshness: False — DELIBERATE, and the reason is the instrument's own design.
@@ -2393,6 +2414,70 @@ def manual_hae_datatype_keys() -> set:
     — nudge-eligible, unlike the passive device streams (steps/workouts) which a
     reminder-to-log can't fix (#746)."""
     return {d["key"] for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", [])) if d.get("manual")}
+
+
+# ── #4217: the coach -> instrument map, DERIVED by inverting `instrument_for` ────────
+
+
+def coach_instruments() -> dict:
+    """{coach_id: {"source", "datatype" (or None), "label", "behavioral"}} — every coach
+    that some registry facet names as the coach whose domain instrument it is (#4217).
+
+    Inverted from the `instrument_for` facets (source-level, or on an apple_health
+    `hae_datatypes` entry), so the map exists in ONE place: a source gaining or losing a
+    coach here changes what the analyzer asks for, what the stance writer writes, what
+    the docket admits and what `/api/coaches`/`/api/coach/<id>`/`/api/coaching-dashboard`
+    serve, with no second table to drift. A coach named by NO facet is deliberately
+    absent from the map — it has no single instrument and is never gated by absence.
+    `behavioral` is carried through because a behavioral source can only ever be
+    behavioral-stale (a lapse), never dark (a sensor that stopped) — see
+    health.instrument_presence. Raises on a coach claimed by two facets: one coach, one
+    instrument, or the absence rule has no single answer.
+    """
+    out: dict[str, dict[str, Any]] = {}
+
+    def _claim(coach_id: str, row: dict[str, Any]) -> None:
+        if coach_id in out:
+            raise ValueError(
+                f"coach_instruments: {coach_id!r} is claimed by two instrument_for facets ({out[coach_id]['source']} and {row['source']})"
+            )
+        out[coach_id] = row
+
+    for sid, v in SOURCE_REGISTRY.items():
+        for coach_id in cast("tuple[str, ...]", v.get("instrument_for") or ()):
+            _claim(
+                str(coach_id),
+                {"source": sid, "datatype": None, "label": str(v.get("label") or sid), "behavioral": bool(v.get("behavioral"))},
+            )
+        for d in cast("list[dict[str, Any]]", v.get("hae_datatypes", []) or []):
+            for coach_id in cast("tuple[str, ...]", d.get("instrument_for") or ()):
+                _claim(
+                    str(coach_id), {"source": sid, "datatype": str(d["key"]), "label": str(d.get("label") or d["key"]), "behavioral": False}
+                )
+    return out
+
+
+def validate_coach_instruments(mapping: dict, coach_ids: "set[str] | list[str] | tuple[str, ...]") -> list:
+    """The guard behind `tests/test_persona_registry.py` (#4217): every row of a
+    coach -> instrument map names a REAL registry facet, and every coach it names is a
+    real coach. Returns the findings (empty = clean) so a test can mutate a COPY of the
+    live map (a made-up source, a made-up datatype, a made-up coach) and show the guard
+    reds — a guard that cannot be made to fail is not a guard."""
+    findings: list[str] = []
+    known = set(coach_ids)
+    for coach_id, row in (mapping or {}).items():
+        if coach_id not in known:
+            findings.append(f"{coach_id}: not a staff coach id")
+        src = SOURCE_REGISTRY.get(str((row or {}).get("source") or ""))
+        if not src:
+            findings.append(f"{coach_id}: source {(row or {}).get('source')!r} is not a source_registry key")
+            continue
+        dt = (row or {}).get("datatype")
+        if dt is not None:
+            keys = {d["key"] for d in cast("list[dict[str, Any]]", src.get("hae_datatypes", []) or [])}
+            if dt not in keys:
+                findings.append(f"{coach_id}: datatype {dt!r} is not an hae_datatypes key of {row['source']}")
+    return findings
 
 
 def catalog_entries() -> list:

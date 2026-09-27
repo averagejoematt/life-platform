@@ -100,7 +100,7 @@ AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 # #2334: derived from the persona registry; EXPERT_PERSONAS coverage asserted in the set guard.
 # #3018: the integrator's public-audience register, guarded like #2972's public_summary.
 from coach import audience_guard
-from coach.persona_registry import OPERATIONAL_SHORT_IDS
+from coach.persona_registry import OPERATIONAL_COACH_IDS, OPERATIONAL_SHORT_IDS
 
 from intelligence.expert_personas import BANNED_OPENER_SCAFFOLDS, EXPERT_PERSONAS  # noqa: F401  (re-export, #1654)
 
@@ -1811,6 +1811,27 @@ def generate_month_rollup():
         return None
 
 
+def _absent_coaches():
+    """#4217: {coach_id: instrument_state} for every coach whose domain instrument is DARK
+    right now — the SAME derivation /api/source_freshness serves (health.instrument_presence
+    over this Lambda's own table). Such a coach is not asked for a read at all: no prompt,
+    no Bedrock call, no OUTPUT#/thread row for the day, so nothing downstream can quote a
+    sensor that stopped. Fail-OPEN with a logged warning (a sentinel read failing must
+    not silence eight coaches), and the handler's summary says the check failed."""
+    from health import instrument_presence
+
+    return instrument_presence.absent_coaches(table)
+
+
+def _full_coach_id(expert_key):
+    """The persona id behind an analyzer short key ('glucose' -> 'glucose_coach'), from
+    the roster — never string surgery on the key."""
+    for cid in OPERATIONAL_COACH_IDS:
+        if cid.replace("_coach", "") == expert_key:
+            return cid
+    return None
+
+
 def lambda_handler(event, context):
     try:
         # C-1: refresh just the cross-week arc without re-running the 8 narratives
@@ -1843,9 +1864,29 @@ def lambda_handler(event, context):
         shared_system = _build_shared_system_prompt()
         logger.info("Shared system prompt built: %d chars", len(shared_system))
 
+        # #4217: the absence gate — read ONCE for the run, before any prompt is built.
+        try:
+            absent = _absent_coaches()
+        except Exception as _pe:
+            logger.warning("instrument presence check failed (fail-open, every coach runs): %s", _pe)
+            absent = {}
+            results["_presence_check"] = {"status": "failed", "error": str(_pe)}
+
         for expert_key in experts_to_run:
             if expert_key not in EXPERTS:
                 logger.warning(f"Unknown expert: {expert_key}")
+                continue
+            _cid = _full_coach_id(expert_key)
+            if _cid in absent:
+                # A coach with a dark instrument is ABSENT: no read is generated (and no
+                # Bedrock call is spent). The serve side states the absence in its slot.
+                _st = absent[_cid]
+                logger.info("%s skipped — instrument dark (%s): %s", expert_key, _st.get("label"), _st.get("reason"))
+                results[expert_key] = {
+                    "status": "skipped_absent",
+                    "reason": _st.get("reason"),
+                    "instrument": {"source": _st.get("source"), "datatype": _st.get("datatype")},
+                }
                 continue
             try:
                 text = generate_and_cache(expert_key, shared_system=shared_system)

@@ -1528,6 +1528,26 @@ def _run_stance(coach_id, compressed, state, trigger="weekly", event_context=Non
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _absent_coaches():
+    """#4217: {coach_id: instrument_state} for every coach whose domain instrument is DARK
+    right now — the SAME derivation /api/source_freshness serves (health.instrument_presence
+    over this Lambda's own table). Such a coach writes NO stance this run (weekly or
+    event-triggered): STANCE#latest stays whatever it was, and the serve side states the
+    absence in the stance slot. Compression (the coach's private memory) still runs.
+    Fail-OPEN with a logged warning — a sentinel read failing must not hold eight stances."""
+    from health import instrument_presence
+
+    return instrument_presence.absent_coaches(table)
+
+
+def _absent_or_empty():
+    try:
+        return _absent_coaches()
+    except Exception as e:
+        logger.warning("[stance] instrument presence check failed (fail-open): %s", e)
+        return {}
+
+
 def _handle_event_stance_refresh(event):
     """#534: mid-week single-coach STANCE# refresh.
 
@@ -1560,6 +1580,12 @@ def _handle_event_stance_refresh(event):
             return {"statusCode": 200, "coach_id": coach_id, "skipped": "budget_tier"}
     except Exception:
         pass  # fail-open — a budget_guard/SSM blip must not block a rare mid-week refresh
+
+    # #4217: a coach whose instrument is dark writes no stance, on any trigger.
+    _absent = _absent_or_empty()
+    if coach_id in _absent:
+        logger.info("[event-stance] %s skipped — instrument dark: %s", coach_id, _absent[coach_id].get("reason"))
+        return {"statusCode": 200, "coach_id": coach_id, "skipped": "instrument_dark", "reason": _absent[coach_id].get("reason")}
 
     compressed = _get_item(f"COACH#{coach_id}", "COMPRESSED#latest")
     if not compressed or compressed.get("_fallback"):
@@ -1617,6 +1643,9 @@ def lambda_handler(event, context):
         # single GetItem, not one per coach. Read before the loop so a mid-run write
         # cannot make two coaches see different availability for the same day.
         presence_signal = _presence_signal()
+        # #4217: ONE instrument-presence read for the batch — a dark instrument holds
+        # that coach's stance (compression still runs; it is his private memory).
+        absent = _absent_or_empty()
 
         for coach_id in coach_ids:
             try:
@@ -1657,7 +1686,17 @@ def lambda_handler(event, context):
 
                 # Stance engine (coach-opinion) — evolving evidence-derived read of
                 # Matthew. Fail-soft: a stance error never aborts the compression run.
-                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state, trigger="weekly", presence_signal=presence_signal)
+                if coach_id in absent:
+                    logger.info("[stance] %s skipped — instrument dark: %s", coach_id, absent[coach_id].get("reason"))
+                    results[coach_id]["stance"] = {
+                        "written": False,
+                        "reason": "instrument_dark",
+                        "instrument_reason": absent[coach_id].get("reason"),
+                    }
+                else:
+                    results[coach_id]["stance"] = _run_stance(
+                        coach_id, compressed, state, trigger="weekly", presence_signal=presence_signal
+                    )
 
             except Exception as e:
                 logger.error("Failed to compress %s: %s", coach_id, e, exc_info=True)

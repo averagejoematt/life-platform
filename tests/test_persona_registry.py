@@ -22,6 +22,8 @@ import os
 import re
 import sys
 
+import pytest
+
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LAMBDAS = os.path.join(_REPO, "lambdas")
 _CONFIG = os.path.join(_REPO, "config")
@@ -463,3 +465,136 @@ def test_availability_reply_falls_back_for_unknown_persona():
     assert "3" in text and "budget" in text.lower()
     text2 = persona_registry.availability_reply("not_a_real_persona", "capped", cap=40)
     assert "40" in text2 and "budget" in text2.lower()
+
+
+# ── #4217: the coach -> instrument map is DERIVED from the source registry ─────
+# A coach whose domain instrument is dark is absent from every reader surface. The
+# map that says WHICH sensor is which coach's is inverted from source_registry's own
+# `instrument_for` facets — never a second table in personas.json or a JS file — and
+# this guard holds every row to a real facet. A guard that cannot fail is not a
+# guard, so the mutation cases below corrupt a COPY of the live map and show it red.
+
+
+def _instruments():
+    from ingestion.source_registry import coach_instruments
+
+    return coach_instruments()
+
+
+def _instrument_findings(mapping):
+    from ingestion.source_registry import validate_coach_instruments
+
+    return validate_coach_instruments(mapping, persona_registry.OPERATIONAL_COACH_IDS)
+
+
+def test_every_staff_coach_with_an_instrument_names_a_real_registry_facet():
+    mapping = _instruments()
+    assert mapping, "no instrument_for facet anywhere in the registry"
+    assert _instrument_findings(mapping) == []
+    for cid, row in mapping.items():
+        assert cid in persona_registry.OPERATIONAL_COACH_IDS, cid
+        assert set(row) >= {"source", "datatype", "label", "behavioral"}, row
+
+
+def test_glucose_reads_the_cgm_datatype_of_apple_health():
+    row = _instruments()["glucose_coach"]
+    assert (row["source"], row["datatype"]) == ("apple_health", "cgm")
+    assert row["behavioral"] is False, "the CGM is a sensor — it can be dark"
+
+
+def test_the_instrument_guard_reds_on_a_made_up_source():
+    mutated = {k: dict(v) for k, v in _instruments().items()}
+    mutated["glucose_coach"]["source"] = "dexcom_cloud"  # not a source_registry key
+    findings = _instrument_findings(mutated)
+    assert findings and "dexcom_cloud" in findings[0], findings
+
+
+def test_the_instrument_guard_reds_on_a_made_up_datatype():
+    mutated = {k: dict(v) for k, v in _instruments().items()}
+    mutated["glucose_coach"]["datatype"] = "ketones"  # not an hae_datatypes key
+    findings = _instrument_findings(mutated)
+    assert findings and "ketones" in findings[0], findings
+
+
+def test_the_instrument_guard_reds_on_a_made_up_coach():
+    mutated = dict(_instruments())
+    mutated["astrology_coach"] = {"source": "whoop", "datatype": None, "label": "Whoop", "behavioral": False}
+    findings = _instrument_findings(mutated)
+    assert findings and "astrology_coach" in findings[0], findings
+
+
+def test_a_coach_named_by_no_facet_has_no_instrument_and_is_never_gated():
+    """mind, explorer and the lead read the board, not one sensor — the honest value is
+    None, and health.instrument_presence never marks such a coach absent."""
+    from health import instrument_presence
+
+    for pid in ("mind_coach", "explorer_coach", persona_registry.LEAD_PERSONA_ID):
+        assert persona_registry.coach_instrument(pid) is None, pid
+        assert instrument_presence.served_instrument(pid) is None, pid
+
+
+def test_the_accessor_is_the_registry_map_and_personas_json_carries_no_instrument_field():
+    """Derived, not hand-typed: the persona JSON (whose S3 copy the owner edits) never
+    grows a parallel `instrument` field for this — the registry facet is the one home."""
+    for pid, row in _instruments().items():
+        assert persona_registry.coach_instrument(pid) == row
+    for pid, p in _personas().items():
+        assert "instrument" not in p, f"{pid}: instrument must be derived from source_registry, not typed here"
+
+
+def test_one_coach_one_instrument():
+    """A coach claimed by two facets would give the absence rule two answers — the
+    derivation refuses it rather than picking one."""
+    from ingestion import source_registry as reg
+
+    whoop = reg.SOURCE_REGISTRY["whoop"]
+    original = whoop.get("instrument_for")
+    whoop["instrument_for"] = tuple(original or ()) + ("glucose_coach",)
+    try:
+        with pytest.raises(ValueError):
+            reg.coach_instruments()
+    finally:
+        whoop["instrument_for"] = original
+
+
+# ── #4217: the absence verdict itself — evidence a sensor STOPPED, never its lack ──
+
+
+def _presence_table(rows):
+    from fakes import FakeDdbTable
+    from instrument_presence_fixture import dispatching_query_hook
+
+    return FakeDdbTable(rows=rows, query_hook=dispatching_query_hook)
+
+
+def test_a_known_last_day_beyond_the_window_darks_the_sensor_coach():
+    from datetime import datetime, timezone
+
+    from health import instrument_presence
+
+    now = datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc)
+    table = _presence_table([{"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-09-01"}])
+    state = instrument_presence.instrument_state(table, _instruments()["sleep_coach"], now)
+    assert state["dark"] is True and state["last_seen"] == "2026-09-01" and state["reason"] == "no sensor since 2026-09-01"
+    fresh = _presence_table([{"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-09-26"}])
+    assert instrument_presence.instrument_state(fresh, _instruments()["sleep_coach"], now)["dark"] is False
+
+
+def test_an_empty_partition_is_unknown_not_dark():
+    """Silencing a coach needs evidence the sensor stopped; 'never wrote' is not that
+    (#1971 absent-is-unknown). Every offline harness with no whoop rows relies on it."""
+    from health import instrument_presence
+
+    state = instrument_presence.instrument_state(_presence_table([]), _instruments()["sleep_coach"])
+    assert state["dark"] is False and state["last_seen"] is None and state["reason"] is None
+    assert instrument_presence.absent_coaches(_presence_table([])) == {}
+
+
+def test_a_behavioral_instrument_never_darks_its_coach():
+    from datetime import datetime, timezone
+
+    from health import instrument_presence
+
+    now = datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc)
+    table = _presence_table([{"pk": "USER#matthew#SOURCE#hevy", "sk": "DATE#2026-01-01"}])  # a long rest, not a dead sensor
+    assert instrument_presence.instrument_state(table, _instruments()["physical_coach"], now)["dark"] is False

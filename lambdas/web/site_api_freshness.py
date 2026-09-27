@@ -6,8 +6,12 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import PACIFIC as PT, anchor_day_key, parse_iso_utc  # #1964/#3257: THE one Pacific frame, parser + day-key anchor
+from common.pacific_time import (  # #1964/#3257: THE one Pacific frame + parser (the day-key anchor now runs inside instrument_presence.source_liveness)
+    PACIFIC as PT,
+    parse_iso_utc,
+)
 from experiment.phase_filter import singleton_visible, with_phase_filter
+from health import instrument_presence  # #4217: the ONE liveness derivation — the coach absence gate reads these same functions
 from ingestion.source_registry import availability_facet, caveated_source_ids  # #3615/#3516: one absence story
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
@@ -41,34 +45,17 @@ def _latest_date_str(source: str, *, _g) -> str | None:
     filtered out as phase!=current, and the query returns empty — the exact blindfold.
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
-    table = _g["table"]
-    kwargs = with_phase_filter(
-        {
-            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").begins_with("DATE#"),
-            "ScanIndexForward": False,
-            "Limit": 1,
-            "ProjectionExpression": "sk",
-        },
-        include_pilot=True,
-    )
-    items = table.query(**kwargs).get("Items", [])
-    if not items:
-        return None
-    return str(items[0]["sk"]).replace("DATE#", "")[:10]
+    # #4217: the read itself lives in health.instrument_presence so the coach absence gate
+    # and this board answer "when did this source last write?" with ONE function.
+    return instrument_presence.latest_date_str(_g["table"], source)
 
 
 def _apple_health_datatypes(*, _g):
     """Per-datatype HAE liveness the freshness-checker stores (D-4/#468). None if absent."""
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
-    table = _g["table"]
-    try:
-        rec = table.get_item(Key={"pk": USER_PREFIX + "apple_health", "sk": "DATATYPE_LIVENESS"}).get("Item")
-        if not rec:
-            return None
-        return _decimal_to_float(rec).get("datatypes")
-    except Exception as e:  # never break the feed for a missing sentinel
-        logger.warning("source_freshness: apple_health datatypes read failed: %s", e)
-        return None
+    # #4217: the sentinel read lives in health.instrument_presence — the glucose coach's
+    # absence is decided by the SAME rows this board serves as `datatypes[]`.
+    return instrument_presence.datatype_liveness(_g["table"])
 
 
 def _carried_from_cycle(date_str: str, *, _g) -> int | None:
@@ -184,16 +171,17 @@ def source_freshness(*, _g) -> dict:
                 # per source" is FOR. Measured: 2,249 of 2,249 straddling whoop rows are keyed
                 # by the UTC day (#3677), because whoop's fetch_day turns each Pacific date
                 # LABEL into a UTC WINDOW.
-                last_dt = anchor_day_key(date_str, sid)
-                last_update_ts = last_dt.isoformat()
-                age_hours = round((now - last_dt).total_seconds() / 3600, 1)
+                #
+                # #4217: the arithmetic itself is health.instrument_presence.source_liveness —
+                # the coach absence gate runs the same function, so "stale" here and "dark"
+                # there are one verdict.
                 stale_hours = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
-                if age_hours <= stale_hours:
-                    status = "fresh"
-                elif meta.get("behavioral"):
-                    status = "behavioral-stale"
-                else:
-                    status = "stale"
+                _live = instrument_presence.source_liveness(
+                    date_str, sid, now, stale_hours=stale_hours, behavioral=bool(meta.get("behavioral"))
+                )
+                last_update_ts = _live["last_update_ts"]
+                age_hours = _live["age_hours"]
+                status = _live["status"]
             elif meta.get("behavioral"):
                 status = "behavioral-stale"
         except Exception as e:  # never let one source break the feed
