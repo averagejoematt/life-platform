@@ -13,6 +13,12 @@ are written once:
     and no OUTPUT#/STANCE#/docket row can quote a sensor that stopped.
 """
 
+# gate-entrypoint: the absence gate — `absent_or_empty()` names the coaches whose sensor
+# is dark and the CALLERS do the blocking (the analyzer `continue`s past the coach before any
+# prompt is built; the stance writer skips `_run_stance`; docket admission refuses the pair).
+# Nothing here raises by design (fail-open, #4217), so the census's exit/raise scan cannot see
+# it; the gate can still FAIL — proved in scripts/gate_census_proofs.py (GUARD_PROOFS).
+
 from __future__ import annotations
 
 import logging
