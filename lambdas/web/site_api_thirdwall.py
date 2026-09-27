@@ -231,9 +231,10 @@ def _public_decision_note(text):
     not after — `_scrub_blocked_terms` has no reason to touch a `<parameter name=…>`
     fragment, so an unstripped compare would find scrubbed == raw and let the residue
     sail through as if it were a clean quote. This is the write-time guard's serve-time
-    backstop (defence in depth): the mcp write door now strips it going forward, but an
-    already-stored record (the 2026-09-08 decision this issue was filed on) can only be
-    cleaned here until the owner scrubs the row.
+    backstop (defence in depth): the mcp write door REFUSES residue going forward (the
+    owner's words are never rewritten at the door), but an already-stored record (the
+    2026-09-08 decision this issue was filed on) can only be cleaned here until the
+    owner scrubs the row.
     """
     if not text or not str(text).strip():
         return None

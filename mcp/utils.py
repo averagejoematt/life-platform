@@ -110,6 +110,10 @@ ERROR_CODES = {
     "QUERY_TOO_BROAD": "Query spans too many days — use a narrower date range.",
     "INTERNAL": "Internal processing error.",
     "RATE_LIMIT": "Write tool called too many times in a short window.",
+    # #4190: a WRITE tool's arguments carried the calling client's own tool-call XML
+    # envelope (`</decision>`, `<parameter name=…>`, `<invoke`, …). The call was
+    # refused before anything was written; nothing was trimmed or rewritten.
+    "TOOL_CALL_RESIDUE": "Write refused: an argument carries tool-call XML residue.",
 }
 
 
@@ -170,6 +174,10 @@ def _default_suggestions(error_code: str) -> list[str]:
         ],
         "MISSING_ARG": [
             "Check the tool's required arguments and retry.",
+        ],
+        "TOOL_CALL_RESIDUE": [
+            "Re-issue the call with the plain text of each argument — no `</…>` closers, no `<parameter name=…>`, no `<invoke` markup.",
+            "The residue is your own tool-call envelope echoed into a string argument; check the argument that FOLLOWED the residue too, it was probably swallowed (the live specimen lost `followed=true`).",
         ],
         "SOURCE_UNAVAIL": [
             "Call get_freshness_status to see which sources are current.",

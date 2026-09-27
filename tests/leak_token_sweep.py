@@ -44,6 +44,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
+from lambdas.common.text_guards import TOOL_CALL_ENVELOPE_RE  # noqa: E402  (#4190 — one pattern set, three doors)
 
 # JSON endpoints to fetch and inspect for stale fields. cycle_compare must show
 # the NEW cycle; the two feed indexes must not carry prior-cycle entries.
@@ -106,16 +107,6 @@ FORBIDDEN_TOKENS = [
     ),
     # Tombstone JSON leaking to the public (would mean a tombstoned record made it through)
     ("Tombstone leak", re.compile(r'"tombstone"\s*:\s*true'), []),
-    # #4190: tool-call XML residue — an MCP client's OWN <function_calls>/<invoke>/
-    # <parameter> tool-call envelope, echoed back into a string argument it was
-    # assembling (a client-side parsing bug), later stored and served verbatim. A
-    # 2026-09-08 log_decision record's `decision` field ended
-    # `…</decision>\n<parameter name="followed">true` and rendered as prose on
-    # /protocols/experiments/. Deliberately NOT a bare `<` here (unlike
-    # common.text_guards.TOOL_CALL_RESIDUE_RE, the write-time/serve-time guard this
-    # sweep backstops) — this sweep scans full page HTML, which is legitimately
-    # full of `<div>`/`<span>` markup; only the literal tool-call forms are
-    # unambiguous on a rendered page or a JSON body alike.
     # #4191: the chronicle's bracketed machine header — `[Weight: X lbs | Week Grade: avg X |
     # T0 Streak: X days]`, the card-engine parsing hook the prompt asks for — printed as
     # PROSE. The writer stores the whole envelope as content_markdown and, until #4191,
@@ -127,11 +118,18 @@ FORBIDDEN_TOKENS = [
     # The builder-only segment of that header on a PAGE. The manifest carries it legitimately
     # in its `stats_line` data field (the card engine reads it there), so the JSON is exempt.
     ("Chronicle T0 Streak segment on a page", re.compile(r"\bT0 Streak:"), ["/journal/posts.json"]),
-    (
-        "Tool-call XML residue",
-        re.compile(r"</decision>|<parameter\s+name\s*=|</parameter>|<invoke\b|</invoke>|<function_calls\b|</function_calls>"),
-        [],
-    ),
+    # #4190: tool-call XML residue — an MCP client's OWN <function_calls>/<invoke>/
+    # <parameter> tool-call envelope, echoed back into a string argument it was
+    # assembling (a client-side parsing bug), later stored and served verbatim. A
+    # 2026-09-08 log_decision record's `decision` field ended
+    # `…</decision>\n<parameter name="followed">true` and rendered as prose on
+    # /protocols/experiments/. The pattern is THE SAME OBJECT the write-door refuser
+    # and the serve-time strip use (`common.text_guards.TOOL_CALL_ENVELOPE_RE`) —
+    # derived, not a second hand-typed copy that drifts. It is the envelope set,
+    # not the wider per-argument `TOOL_CALL_RESIDUE_RE`: this sweep scans full page
+    # HTML, which is legitimately full of `<div>`/`<span>` markup, and only the
+    # literal tool-call forms are unambiguous on a rendered page or a JSON body.
+    ("Tool-call XML residue", TOOL_CALL_ENVELOPE_RE, []),
 ]
 
 # The subset of FORBIDDEN_TOKENS that only makes sense while the CURRENT cycle
