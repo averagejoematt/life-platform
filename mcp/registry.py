@@ -1299,7 +1299,14 @@ TOOLS = {
                         ),
                     },
                     "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
-                    "overwrite": {"type": "boolean", "description": "Overwrite if record exists (default true)."},
+                    "replace_key": {
+                        "type": "string",
+                        "description": (
+                            "The exact sk (from read_platform_memory) of the ONE record to rewrite. Without it every write "
+                            "is a NEW row keyed MEMORY#<category>#<date>#<content-hash> (#4171 — a same-day note never erases "
+                            "an earlier one; an identical replay converges). Replacing an absent key is refused."
+                        ),
+                    },
                     "privacy_tier": {
                         "type": "string",
                         "enum": ["public_ok", "coach_context", "private"],
@@ -1360,9 +1367,16 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "category": {"type": "string", "description": "Memory category."},
-                    "date": {"type": "string", "description": "Date of the record to delete (YYYY-MM-DD)."},
+                    "date": {"type": "string", "description": "Date of the legacy one-row-per-day record to delete (YYYY-MM-DD)."},
+                    "key": {
+                        "type": "string",
+                        "description": (
+                            "The exact sk (from read_platform_memory) of the record to delete — the only handle for a per-note "
+                            "row (MEMORY#<category>#<date>#<hash>, #4171). One of date or key is required."
+                        ),
+                    },
                 },
-                "required": ["category", "date"],
+                "required": ["category"],
             },
         },
     },

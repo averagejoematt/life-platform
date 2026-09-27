@@ -2040,7 +2040,9 @@ Monthly "what changed" — real trailing-30d-vs-prior-30d deltas + correlations 
 ## Platform Memory Partition (IC-1, v2.86.0; taxonomy codified #1482)
 
 **pk:** `USER#matthew#SOURCE#platform_memory`  
-**sk:** `MEMORY#<category>#<date>` (e.g. `MEMORY#failure_patterns#2026-03-09`)
+**sk:** `MEMORY#<category>#<date>#<content-hash10>` for every MCP write since #4171 (e.g. `MEMORY#training#2026-09-25#3f9a1c07be`) — **one row per note**; `MEMORY#<category>#<date>` (e.g. `MEMORY#failure_patterns#2026-03-09`) is the legacy one-row-per-category-day key that the compute Lambdas still write and every pre-#4171 row carries. Readers range/prefix on `MEMORY#<category>#<date…>`, so both forms are served together.
+
+**Writes are additive (#4171, 2026-09-26 — P2 data loss).** The old key was one row per category per day with overwrite as the default, so approving a queued training note erased the injury note written 60 s earlier on `MEMORY#training#2026-09-25`. Now `write_platform_memory` puts every note on its own content-keyed row under `attribute_not_exists(sk)` (an identical replay converges — `mcp/idempotency.py` class CONTENT_KEY), and the **only** overwrite path is `replace_key=<exact sk>` under `attribute_exists(sk)` (an absent key is refused, never inserted). `delete_platform_memory` names a per-note row by `key=<exact sk>`. `read_platform_memory` returns each record's `sk` and sorts same-day rows newest-stored first.
 
 Structured key-value memory store for compounding intelligence — computed records (insight/digest/hypothesis Lambdas write directly) **plus, since #1482, conversation-derived records** written from chat via the MCP `write_platform_memory` tool (epic #1476: conversation as the fourth ingestion channel).
 

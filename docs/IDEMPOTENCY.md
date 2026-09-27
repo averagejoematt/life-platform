@@ -227,10 +227,12 @@ the dedup primitive (see the `rate_limiter` row).
 
 `mcp/audit.py::is_write_tool` classifies by leading verb; that yields **26
 write-capable tools** of the 76 in `mcp/registry.py`. Most write on a
-deterministic key and are replay-safe by overwrite — `write_platform_memory`,
+deterministic key and are replay-safe by overwrite —
 `manage_sick_days`, `log_evening_intake`, `end_experiment`,
 `update_insight_outcome`, `update_decision_outcome`, `mark_journal_quote`
-(content-hash key), `manage_diary_claims`, `log_coach_checkin`,
+(content-hash key), `write_platform_memory` (content-hash key since #4171 — a
+replay converges, a distinct same-day note is its own row, and only
+`replace_key` rewrites), `manage_diary_claims`, `log_coach_checkin`,
 `curate_horizon`'s pick, `archive_horizon`, most of `manage_reading`,
 `update_todoist_task`, `log_habit_reflection`, `log_field_note_response`.
 
