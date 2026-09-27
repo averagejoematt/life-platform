@@ -880,10 +880,13 @@ class _ConditionalTable:
 
 
 def _produce_coach_record_rows():
-    """The partition the record is counted from: one grader-written call plus the SAME
-    docket resolution written three days running through the real resolver path — the
-    #4216 re-write trail (one prediction_id, three sort keys), so the wire carries the
-    duplicate the consumer must count once."""
+    """The partition the record is counted from: one grader-written call plus one docket
+    resolution — written by the CURRENT writer (which, since #4317, writes once and refuses a
+    re-run) and still trailed by the FOUR suffixed copies the retired writer left on the live
+    table (measured 2026-09-27 on COACH#nutrition_coach: five PREDICTION#docket-… rows, one
+    prediction_id, sks -2…-5, outcome_dates a day apart). That trail stays on the wire until
+    #4216's cleanup box tombstones it, so the consumer must count it once — and the
+    producer must not manufacture it: the writer's own idempotency is asserted here."""
     from coach import coach_prediction_evaluator as ev, dispute_docket as dd
     from coach.prediction_emission import build_prediction_record
 
@@ -925,16 +928,21 @@ def _produce_coach_record_rows():
     real_dd_table = dd.table
     dd.table = table
     try:
-        for offset in (9, 10, 11):  # three resolver runs on one docket (#4216)
-            dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, _in_cycle_day(offset))
+        first = dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, _in_cycle_day(9))
+        rerun = dd._write_docket_prediction("nutrition_coach", docket, "confirmed", 2310.0, _in_cycle_day(10))
     finally:
         dd.table = real_dd_table
-    assert len(table.items) == 3 and len({i["prediction_id"] for i in table.items}) == 1, "the re-write trail did not form"
+    assert first and rerun is None and len(table.items) == 1, "#4317: the docket writer must write once and refuse the re-run"
+    # The pre-#4317 trail the live table still carries — `_put_unique`'s retired
+    # `f"{sk}-{attempt + 1}"` rule applied to the row the writer just produced, one later
+    # outcome_date per daily re-run, the same prediction_id (the live shape, 2026-09-27).
+    base = table.items[0]
+    trail = [dict(base, sk=f"{base['sk']}-{n}", outcome_date=_in_cycle_day(9 + n - 1)) for n in (2, 3, 4, 5)]
     # The wire the consumer reads is the partition page — the real fetch is projected and
     # Decimal-cast, so the rows go through the serving path's own cast.
     from web.site_api_common import _decimal_to_float
 
-    return {"rows": [_decimal_to_float(dict(grading.row))] + [_decimal_to_float(i) for i in table.items]}
+    return {"rows": [_decimal_to_float(dict(grading.row)), _decimal_to_float(base)] + [_decimal_to_float(r) for r in trail]}
 
 
 def _consume_coach_record_rows(payload):
@@ -1068,7 +1076,7 @@ register(
                 ("rows", 2, "prediction_id"),
                 "rename",
                 to="id",
-                why="the identity a re-write shares with its original — lose it on the -2 row and the trail counts twice",
+                why="the identity a historic re-write shares with its original — lose it on the -2 row and the trail counts twice",
             ),
             Mutation(("rows", 0, "status"), "retype", to="pending", why="an undecided call is not a checked one"),
             Mutation(
@@ -1081,7 +1089,8 @@ register(
         note=(
             "#4220 / epic #4182: one coach's record was served three ways on 2026-09-26 (LEARNING# re-counts on "
             "/api/coaches and /api/wrong, PREDICTION# on the scorecard). The record is counted from the PREDICTION# "
-            "ledger alone, one resolution per prediction_id (the `_put_unique` -2…-5 trail of #4216 is one call), in "
+            "ledger alone, one resolution per prediction_id (the retired `_put_unique` -2…-5 trail of #4216, still on the live "
+            "table until its cleanup box, is one call; the #4317 writer itself now writes once and refuses a re-run), in "
             "the cycle its first graded row is visible in and on/after genesis. /api/coaches, /api/calibration, "
             "/api/predictions and /api/wrong all derive from coach_record; tests/test_coaches_api.py pins the four agree."
         ),
