@@ -5340,6 +5340,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/coach_packet_today.py",
+      "partition": "hevy",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "unknown",
       "lambda": "life-platform-mcp",
       "module": "mcp/config.py",
@@ -7401,7 +7408,7 @@
       "contracts_enrolled": 11,
       "contracts_known": 11,
       "contracts_ratchet": 11,
-      "edges": 715,
+      "edges": 716,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7416,8 +7423,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 357,
-        "sites_resolved": 889,
-        "sites_total": 1246
+        "sites_resolved": 890,
+        "sites_total": 1247
       },
       "schedule_resolution": {
         "dynamic": 0,
