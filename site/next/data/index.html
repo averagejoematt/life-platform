@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/v7.css">
+  <link rel="stylesheet" href="/assets/css/v7_numbers.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
 <body class="v7-body">
@@ -24,11 +25,60 @@
   <header class="v7-mast"><a class="v7-brand" href="/next/">averagejoematt</a><a class="v7-repo" href="https://github.com/averagejoematt/life-platform" rel="noopener">the code</a></header>
   <main id="main" class="v7-main">
     <h1>His numbers</h1>
-    <p class="v7-job">The evidence: weight, sleep, eating, training, blood tests.</p>
-    <p class="v7-placeholder">Not built yet — Tuesday of the build week.</p>
+    <p class="v7-job">The evidence: weight, sleep, eating, training, blood tests — one chart and one sentence each.</p>
+    <p class="nm-through" id="nm-through" data-src="api_journey.journey.last_weighin_date"></p>
+    <section class="nm-entry" id="nm-weight" aria-labelledby="nm-weight-h">
+      <div class="nm-m" data-margin></div>
+      <div class="nm-body">
+        <h2 class="nm-h" id="nm-weight-h">Weight</h2>
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="nm-entry" id="nm-sleep" aria-labelledby="nm-sleep-h">
+      <div class="nm-m" data-margin></div>
+      <div class="nm-body">
+        <h2 class="nm-h" id="nm-sleep-h">Sleep</h2>
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="nm-entry" id="nm-eating" aria-labelledby="nm-eating-h">
+      <div class="nm-m" data-margin></div>
+      <div class="nm-body">
+        <h2 class="nm-h" id="nm-eating-h">Eating</h2>
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="nm-entry" id="nm-training" aria-labelledby="nm-training-h">
+      <div class="nm-m" data-margin></div>
+      <div class="nm-body">
+        <h2 class="nm-h" id="nm-training-h">Training</h2>
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="nm-entry" id="nm-labs" aria-labelledby="nm-labs-h">
+      <div class="nm-m" data-margin></div>
+      <div class="nm-body">
+        <h2 class="nm-h" id="nm-labs-h">Blood tests</h2>
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <section class="nm-entry" id="nm-absent" aria-labelledby="nm-absent-h">
+      <div class="nm-m" data-margin></div>
+      <div class="nm-body">
+        <h2 class="nm-h" id="nm-absent-h">Not being recorded</h2>
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </section>
+    <details class="nm-engine" id="nm-engine">
+      <summary>The engine’s score</summary>
+      <div class="nm-engine-body" id="nm-engine-body">
+        <p class="nm-note nm-pending">Not loaded yet.</p>
+      </div>
+    </details>
   </main>
   <footer class="v7-foot"><nav aria-label="More"><a href="/next/protocols/">What he’s trying</a><a href="/next/story/about/">Who he is</a><a href="/next/method/">Under the hood</a><a href="/next/subscribe/">Follow</a><a href="/privacy/">Privacy</a></nav></footer>
   <nav class="v7-bar" aria-label="Pages"><a href="/next/">Home</a><a href="/next/cockpit/">Today</a><a href="/next/story/">This week</a><a href="/next/data/" aria-current="page">His numbers</a><a href="/next/coaching/">The coaches</a></nav>
   <script type="module" src="/assets/js/v7_shell.js"></script>
+  <script type="module" src="/assets/js/v7_numbers.js"></script>
 </body>
 </html>
