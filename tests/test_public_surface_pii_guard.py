@@ -193,6 +193,50 @@ def test_card_arm_non_json_body_falls_back_and_still_fires_without_a_path():
     assert all(_SIXTEEN_DIGITS not in d for d in hits), f"violation detail leaked the matched value: {hits}"
 
 
+def test_every_endpoint_violation_names_its_path_and_never_its_value():
+    """#4164 box 3, the CLASS behind the request_id red: the scheduled sweep's log is a
+    PUBLIC Actions run, so every endpoint-arm line must be triageable from its JSON
+    path alone and must never echo the matched value — not the vocabulary the vice
+    arm guards, not an address, not an SSN. One payload plants every value arm at a
+    distinct path (plus a tell hiding in a KEY name, and the envelope id that must
+    stay silent); each arm must name its path and the joined output must carry none
+    of the planted values."""
+    kw, email, ssn = "zzzguardedword", "someone.personal@gmail.com", "123-45-6789"
+    payload = json.dumps(
+        {
+            "_meta": {"request_id": _SIXTEEN_DIGITS},
+            "a": {"note": f"an aside about {kw} here"},
+            "b": [{"contact": email}],
+            "c": ssn,
+            "d": "born in 1985",
+            "e": "rs429358",
+            email: 1,
+        }
+    )
+    hits = guard.scan_endpoint_payload(payload, vice=[kw], literals=[])
+    by_arm: dict = {}
+    for arm, detail in hits:
+        by_arm.setdefault(arm, []).append(detail)
+    expected = {"blocked-vice": "$.a.note", "pii-email": "$.b[].contact", "pii-ssn": "$.c", "pii-age": "$.d", "pii-genetic": "$.e"}
+    for arm, path in expected.items():
+        assert any(d.startswith(path + " ") for d in by_arm.get(arm, [])), f"{arm} must name {path}: {by_arm}"
+    assert any(
+        d.startswith("$.<key masked> ") for d in by_arm["pii-email"]
+    ), f"a tell in a KEY must fire at its parent's path, masked: {by_arm}"
+    assert "pii-card" not in by_arm, f"the envelope's request_id must stay silent among real findings: {by_arm}"
+    joined = " ".join(d for _, d in hits)
+    for value in (kw, email, ssn, _SIXTEEN_DIGITS):
+        assert value not in joined, f"a violation line echoed a matched value: {joined}"
+
+
+def test_non_json_body_violations_are_masked_too():
+    """The non-JSON fallback has no path to give, but it still never gives the value."""
+    hits = guard.scan_endpoint_payload("plain text: someone.personal@gmail.com and 123-45-6789", vice=[], literals=[])
+    assert {"pii-email", "pii-ssn"} <= {arm for arm, _ in hits}, hits
+    assert all("non-json" in d for _, d in hits), hits
+    assert all("gmail" not in d and "123-45" not in d for _, d in hits), hits
+
+
 def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     """#1935: an endpoint the arm planned to scan but could not read must land as
     an endpoint-not-scanned violation — fail-closed, no silent pass tally."""
