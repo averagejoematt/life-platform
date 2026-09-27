@@ -51,7 +51,12 @@ matched a committed routine, the sets performed on prescribed movements exceed t
 prescribed for them (net: a set added to one movement is offset by a set skipped on
 another). The tripwire fires when the `threshold_weeks` most recent COMPLETE weeks are all
 above. The week containing `end_date` is in progress and never counts toward the run — it
-is reported beside it. Pure: rows are injected, nothing is fetched.
+is reported beside it — UNLESS the caller says `end_date` is itself a finished day
+(`end_day_complete=True`) and it is that week's Sunday: then the week is over and it is the
+latest complete week. The weekly digest passes it (its `end_date` is yesterday); plan_engine and
+the critic do not (theirs is a day still being planned or lived). Before #4111's fix a Monday
+digest run treated the week that ended the day before as in progress, so the report skipped
+the just-ended week. Pure: rows are injected, nothing is fetched.
 """
 
 from __future__ import annotations
@@ -106,12 +111,13 @@ def _label(movement_key: str, row: dict[str, Any]) -> str:
     return key
 
 
-def _week(start: Any, end_date: Any) -> dict[str, Any]:
+def _week(start: Any, end_date: Any, end_day_complete: bool = False) -> dict[str, Any]:
     end = start + timedelta(days=6)
     return {
         "week_start": start.isoformat(),
         "week_end": end.isoformat(),
-        "complete": end < end_date,
+        # a week is over once its Sunday is: before `end_date`, or `end_date` itself when that day is finished (#4111)
+        "complete": end < end_date or (end_day_complete and end == end_date),
         "sessions_matched": 0,
         "sessions_unmatched": 0,
         "programmed_sets": 0,
@@ -147,14 +153,17 @@ def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: d
             )
 
 
-def weekly_excess(hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = LOOKBACK_WEEKS) -> list[dict[str, Any]]:
-    """Per-week programmed vs performed sets, oldest week first, the in-progress week last."""
+def weekly_excess(
+    hevy_rows: list[dict[str, Any]], end_date: str, weeks: int = LOOKBACK_WEEKS, end_day_complete: bool = False
+) -> list[dict[str, Any]]:
+    """Per-week programmed vs performed sets, oldest week first, the week containing `end_date` last
+    (in progress unless `end_day_complete` and `end_date` is its Sunday)."""
     end = parse_day_key(end_date)
     start_key = window_start(end_date, weeks)
     if end is None or start_key is None:
         return []
     first = parse_day_key(start_key)
-    out = [_week(first + timedelta(days=7 * i), end) for i in range(weeks + 1)]
+    out = [_week(first + timedelta(days=7 * i), end, end_day_complete) for i in range(weeks + 1)]
     from training import session_sequence
     from training.routine_title import routine_archetype
 
@@ -219,14 +228,19 @@ def _week_line(wk: dict[str, Any]) -> str:
     )
 
 
-def evaluate(hevy_rows: list[dict[str, Any]], end_date: str, threshold_weeks: int, weeks: int = LOOKBACK_WEEKS) -> dict[str, Any]:
+def evaluate(
+    hevy_rows: list[dict[str, Any]], end_date: str, threshold_weeks: int, weeks: int = LOOKBACK_WEEKS, end_day_complete: bool = False
+) -> dict[str, Any]:
     """The tripwire verdict: `tripped` / `clear` / `unknown`, with the per-week, per-set evidence.
+
+    `end_day_complete`: `end_date` is a finished day, so the week whose Sunday it is counts as
+    complete (the weekly digest's yesterday). Default False: a planned or in-progress day.
 
     `unknown` when the window holds no session at all (nothing to compare — never `clear`),
     or when a week the verdict depends on held sessions none of which matched a committed
     routine. A week with no sessions is NOT above the prescription, so it breaks the run.
     """
-    wks = weekly_excess(hevy_rows, end_date, weeks)
+    wks = weekly_excess(hevy_rows, end_date, weeks, end_day_complete)
     base: dict[str, Any] = {"rule": RULE, "threshold_weeks": threshold_weeks, "window_end": end_date, "weeks": wks}
     if not wks:
         return {**base, "state": "unknown", "run_weeks": None, "observed": None, "detail": f"unparseable end date {end_date!r}"}
@@ -251,7 +265,8 @@ def evaluate(hevy_rows: list[dict[str, Any]], end_date: str, threshold_weeks: in
     base["run_weeks"] = run
     recent = complete[-threshold_weeks:]
     lines = "; ".join(_week_line(w) for w in recent)
-    now = f" — in progress, {_week_line(current)}" if (current["sessions_matched"] or current["sessions_unmatched"]) else ""
+    in_progress = not current["complete"] and (current["sessions_matched"] or current["sessions_unmatched"])
+    now = f" — in progress, {_week_line(current)}" if in_progress else ""
     if run >= threshold_weeks:
         return {
             **base,
