@@ -119,7 +119,7 @@ test("the weigh-in strip is drawn to the day, and the gaps are counted from the 
 
 test("the alive line carries the ONE data-through, K of N from one producer, the next write-up", () => {
   const html = H.aliveLine("2026-09-26", { platform: { strata: { coaches: { n: 37, confirmed: 18 } } } }, cadence);
-  assert.match(strip(html), /^Data through Saturday, September 26 · the coaches’ checked calls so far, by the site’s scorekeeper: 18 of 37 right · next write-up Wednesday, September 30$/);
+  assert.match(strip(html), /^Data through Saturday, September 26 · the coaches’ checked calls so far, by the site’s own count: 18 of 37 right · next write-up Wednesday, September 30$/);
   assert.match(html, /data-src="calibration\.platform\.strata\.coaches\.confirmed"/);
   assert.match(strip(H.aliveLine("2026-09-26", null, { chronicle: { paused: true } })), /no checked coach call is served yet · the write-up is paused/);
 });
@@ -143,12 +143,16 @@ test("follow: the subscriber states and the next weigh-in as last + 1", () => {
   assert.match(strip(H.followBlock(null, { chronicle: { paused: true } }, journey, "2026-09-26")), /The next write-up is not yet scheduled/);
 });
 
-test("the next weigh-in: due tomorrow, or the honest overdue line when that day has passed", () => {
+test("the next weigh-in: entry_age's one spelling — due through the data-through day, then the counted silence (R6 fix 4)", () => {
   assert.equal(strip(H.nextWeighinText(journey, "2026-09-26")), "the next weigh-in is due Sunday, September 27");
   assert.equal(strip(H.nextWeighinText(journey, "2026-09-27")), "the next weigh-in is due Sunday, September 27");
-  assert.equal(strip(H.nextWeighinText(journey, "2026-09-29")), "the last weigh-in was Saturday, September 26; none since");
-  assert.match(strip(H.followBlock({ count: 1, available: true }, cadence, journey, "2026-09-29")), /; the last weigh-in was Saturday, September 26; none since\./);
-  assert.match(strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches, "2026-09-29")), /The last weigh-in was Saturday, September 26; none since\.$/);
+  assert.equal(strip(H.nextWeighinText(journey, "2026-09-29")), "no weigh-in since Saturday, September 26 — 3 days");
+  assert.match(strip(H.followBlock({ count: 1, available: true }, cadence, journey, "2026-09-29")), /; no weigh-in since Saturday, September 26 — 3 days\./);
+  assert.match(strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches, "2026-09-29")), /No weigh-in since Saturday, September 26 — 3 days\.$/);
+  // the day names its served field, never "+ 1 day"; the due day and the last weigh-in each sit in <time>
+  assert.match(H.nextWeighinText(journey, "2026-09-26"), /<time datetime="2026-09-27" data-src="journey\.last_weighin_date">Sunday, September 27<\/time>/);
+  assert.match(H.nextWeighinText(journey, "2026-09-29"), /<time datetime="2026-09-26" data-src="journey\.last_weighin_date">Saturday, September 26<\/time>/);
+  assert.doesNotMatch(H.followBlock({ count: 1, available: true }, cadence, journey, "2026-09-26"), /\+ 1 day/);
   assert.equal(H.nextWeighinText({}), "");
 });
 
@@ -189,7 +193,7 @@ test("is he okay: the refusals are kept verbatim and absence is stated as absenc
   assert.match(bare, /No training figures are served\./);
 });
 
-test("also on the record: two scorekeepers that disagree are both left up; the skips are counted", () => {
+test("also on the record: two counts that disagree are both left up; the skips are counted", () => {
   const html = H.recordBlock(
     { coaches: [{ coach_id: "nutrition", coach_name: "Dr. Marcus Webb", n: 5, confirmed: 0 }, { coach_id: "sleep", coach_name: "Dr. Lisa Park", n: 17, confirmed: 7 }] },
     { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }, { coach: "sleep", confirmed: 7, refuted: 10 }] } },
@@ -198,8 +202,8 @@ test("also on the record: two scorekeepers that disagree are both left up; the s
     { pulse: { glyphs: { journal: { gap_days: 17 } } } },
   );
   const text = strip(html);
-  assert.match(text, /Dr\. Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s scorekeepers\. A second says 20 of 25\. The two disagree, and both are left up\./);
-  assert.doesNotMatch(text, /Dr\. Lisa Park/, "a coach whose two scorekeepers agree is not on the record");
+  assert.match(text, /Dr\. Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s two counts\. The other says 20 of 25\. The two disagree, and both are left up\./);
+  assert.doesNotMatch(text, /Dr\. Lisa Park/, "a coach whose two counts agree is not on the record");
   assert.match(text, /468 asks expired .* Of the 49 that were checked, he kept 37\./);
   assert.match(text, /What he skips, counted: journal 17 days · blood-sugar sensor 30 days · Garmin 103 days, paused by the platform, not by him\./);
 });
@@ -218,6 +222,8 @@ test("every number carries its served field, dates are words not ISO, and the ru
   ].join("\n");
   const text = strip(all);
   assert.doesNotMatch(text, /\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of|chronicle|cockpit)\b/i);
+  // R5 §d — house jargon a reader meets in the fold: "scorekeeper" and "the engine's count" are gone
+  assert.doesNotMatch(text + strip(H.recordBlock({ coaches: [{ coach_id: "nutrition", coach_name: "Dr. Marcus Webb", n: 5, confirmed: 0 }] }, { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }] } }, null, null, null)), /scorekeeper|engine’s count|engine's count/i);
   assert.doesNotMatch(text, /\d{4}-\d{2}-\d{2}/, "no ISO date reaches the reader");
   // The fold's figures each name their field.
   for (const f of ["journey.current_weight_lbs", "journey.lost_lbs", "journey.day_n", "journey.start_weight_lbs", "journey.weighin_count", "journey.weekly_rate_lbs"]) {
@@ -226,6 +232,15 @@ test("every number carries its served field, dates are words not ISO, and the ru
   assert.match(all, /data-src="receipts\.month_to_date_usd"/);
   assert.match(all, /data-src="sub_count\.count"/);
   assert.match(all, /data-src="pulse\.glyphs\.journal\.gap_days"/);
+  // R5 #2 residue: the note stamps, the eating span, the device count, the 30-day window and the
+  // When column each name a field too — no numeral on Home sits outside a data-src element.
+  assert.match(all, /<p class="v7h-dated" data-src="decisions\[0\]\.note_at">/);
+  assert.match(all, /data-src="source_freshness\.summary\.total"/);
+  assert.match(all, /<td class="v7h-td-d" data-src="predictions\.overall\.due\.earliest_due">/);
+  const okay = H.okayBlock(null, null, { nutrition: { days_logged: 20, latest_date: "2026-09-25", protein_floor_g: 170, protein_floor_hit_days: 7 }, nutrition_trend: [{ date: "2026-09-06" }] }, { training: { strength_sessions_30d: 19 }, walking: { total_walks_30d: 14 } }, null);
+  assert.match(okay, /data-src="nutrition_overview\.nutrition_trend\[0\]\.date">September 6</);
+  assert.match(okay, /data-src="nutrition_overview\.nutrition\.latest_date">Friday, September 25</);
+  assert.match(okay, /in the last <span data-src="training_overview\.training\.strength_sessions_30d">30<\/span> days/);
 });
 
 test("the margin: day, three-letter month, weekday", () => {

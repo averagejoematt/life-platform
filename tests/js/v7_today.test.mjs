@@ -49,9 +49,12 @@ test("data through is the latest of the three served dates the page prints", () 
   assert.equal(T.throughDate({}), "");
 });
 
-test("the return line is the last weigh-in plus a day, in words", () => {
-  assert.deepEqual(T.returnLine(JOURNEY), { date: "2026-09-27", text: "Rewritten every morning. The next weigh-in is due Sunday, September 27." });
-  assert.deepEqual(T.returnLine(null), { date: "", text: "Rewritten every morning." });
+test("the return line: entry_age's one next-weigh-in spelling — due through the data-through day, then the counted silence (R6 fix 4)", () => {
+  assert.deepEqual(T.returnLine(JOURNEY, "2026-09-26"), { date: "2026-09-27", text: "Rewritten every morning. The next weigh-in is due Sunday, September 27." });
+  assert.deepEqual(T.returnLine(JOURNEY, "2026-09-27"), { date: "2026-09-27", text: "Rewritten every morning. The next weigh-in is due Sunday, September 27." });
+  // a skipped week: the data-through day has moved on (the vitals' day), the scale has not
+  assert.deepEqual(T.returnLine(JOURNEY, "2026-10-01"), { date: "2026-09-26", text: "Rewritten every morning. No weigh-in since Saturday, September 26 — 5 days." });
+  assert.deepEqual(T.returnLine(null, "2026-09-26"), { date: "", text: "Rewritten every morning." });
   assert.equal(T.plusDays("2026-09-30", 1), "2026-10-01");
   assert.equal(T.daysBetween("2026-06-15", "2026-09-26"), 103);
   assert.equal(T.daysBetween("x", "2026-09-26"), null);

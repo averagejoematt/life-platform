@@ -14,7 +14,7 @@
 // entry_age.js — the one spelling every v7 page uses. Every rendered figure carries a
 // data-src naming the served field it came from.
 import { cleanExcerpt } from "/assets/js/chronicle_text.js";
-import { dayInWords, dayLabel, dataThrough, nextWriteUpText } from "/assets/js/entry_age.js";
+import { dayInWords, dayLabel, dataThrough, nextWriteUpText, nextWeighInText } from "/assets/js/entry_age.js";
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const num = (v, dp) => (Number.isFinite(Number(v)) ? Number(v).toLocaleString("en-US", { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 }) : "");
@@ -157,6 +157,15 @@ export function nextBet(docket, today, names) {
   return { date: b.resolution_date, a: name(b.coach_a), b: name(b.coach_b), index: open.indexOf(b) };
 }
 
+/** The next weigh-in for "Next", in the ONE spelling every v7 page uses (entry_age.nextWeighInText,
+ *  R6 fix 4): due when the day after the last weigh-in is on or after `clock` (the served PT day —
+ *  this page's own "Data through" IS the last weigh-in, so the pulse's day is the clock that moves),
+ *  else "no weigh-in since <day> — N days". { text, day }; text "" when nothing is served. */
+export function nextWeighInLine(journey, clock) {
+  const lw = journey && journey.journey && journey.journey.last_weighin_date;
+  return nextWeighInText(lw, clock);
+}
+
 /** persona_id → name from /api/coaches. */
 export function coachNames(coaches) {
   const out = {};
@@ -189,8 +198,13 @@ function postLine(p, i, withWeight = true) {
   return bits.join(" · ");
 }
 
-function renderLatest(posts, all) {
+// A posts.json that could not be fetched is NOT an empty list (R6 fix 1's split): "not served
+// right now" for the null fetch, the publishing fact only for a served empty list.
+const NOT_SERVED = '<p class="wk-note">The write-ups are not served right now.</p>';
+
+function renderLatest(posts, all, served) {
   const sec = document.getElementById("wk-latest");
+  if (!served) return fill(sec, NOT_SERVED);
   const p = posts[0];
   if (!p) return fill(sec, '<p class="wk-note">No write-up has been published yet.</p>');
   const i = all.indexOf(p);
@@ -212,8 +226,9 @@ function renderLatest(posts, all) {
   if (h) h.textContent = "The latest write-up";
 }
 
-function renderPreviously(posts, prologue, all) {
+function renderPreviously(posts, prologue, all, served) {
   const sec = document.getElementById("wk-previously");
+  if (!served) return fill(sec, NOT_SERVED);
   const prior = posts.slice(1, 3);
   let html = "";
   if (!prior.length) html += '<p class="wk-note">Nothing before this one yet.</p>';
@@ -265,7 +280,7 @@ function renderTestimony(fieldNotes) {
   fill(sec, `<p class="wk-note" data-src="api_field_notes.entries[].has_matthew_response">${esc(t.text)}</p>`);
 }
 
-function renderNext({ cad, pending, episodes, docket, journey, names, today }) {
+function renderNext({ cad, pending, episodes, docket, journey, names, today, clock }) {
   const sec = document.getElementById("wk-next");
   const lines = [];
   const wu = nextWriteUpLine(cad, pending);
@@ -275,9 +290,9 @@ function renderNext({ cad, pending, episodes, docket, journey, names, today }) {
   const before = [];
   const bet = nextBet(docket, today, names);
   if (bet) before.push(`the ${esc(bet.a)}–${esc(bet.b)} bet settles by code on <span data-src="api_coach_docket.open[${bet.index}].resolution_date">${esc(dayInWords(bet.date))}</span>`);
-  const lw = journey && journey.journey && journey.journey.last_weighin_date;
-  const nw = plusDays(lw, 1);
-  if (nw) before.push(`the next weigh-in is due <time datetime="${esc(nw)}" data-src="api_journey.journey.last_weighin_date + 1 day">${esc(dayInWords(nw))}</time>`);
+  const w = nextWeighInLine(journey, clock);
+  const nw = w.day;
+  if (w.text) before.push(w.text.replace(dayInWords(w.day), `<time datetime="${esc(w.day)}" data-src="api_journey.journey.last_weighin_date">${esc(dayInWords(w.day))}</time>`));
   if (before.length) lines.push(`<p class="wk-small">Before then: ${before.join(", and ")}.</p>`);
   if (!lines.length) return fill(sec, '<p class="wk-note">Nothing is scheduled.</p>');
   fill(sec, lines.join(""));
@@ -289,7 +304,11 @@ function renderNext({ cad, pending, episodes, docket, journey, names, today }) {
 async function getJSON(p) {
   try {
     const r = await fetch(p, { headers: { accept: "application/json" } });
-    return r.ok ? await r.json() : null;
+    if (!r.ok) {
+      await r.text().catch(() => ""); // drain the body: an unread non-2xx response stays "in flight" and networkidle never arrives
+      return null;
+    }
+    return await r.json();
   } catch (e) {
     return null;
   }
@@ -309,17 +328,19 @@ async function main() {
     getJSON("/api/journey"),
     getJSON("/api/coaches"),
   ]);
+  const served = postsJson !== null; // a 404 is null (getJSON); a served page with no posts is []
   const all = (postsJson && postsJson.posts) || [];
   const { instalments, prologue } = splitPosts(all);
   const through = journey && journey.journey && journey.journey.last_weighin_date;
   const thr = document.getElementById("wk-through");
   if (thr) thr.textContent = dataThrough(through);
   const today = through || (pulse && pulse.pulse && pulse.pulse.date) || "";
-  renderLatest(instalments, all);
-  renderPreviously(instalments, prologue, all);
+  const clock = (pulse && pulse.pulse && pulse.pulse.date) || through || "";
+  renderLatest(instalments, all, served);
+  renderPreviously(instalments, prologue, all, served);
   renderSoFar({ latest: instalments[0], weights: weightsJson && weightsJson.weight_progress, training, sleep, pulse, today });
   renderTestimony(fieldNotes);
-  renderNext({ cad, pending: postsJson && postsJson.pending, episodes, docket, journey, names: coachNames(coaches), today });
+  renderNext({ cad, pending: postsJson && postsJson.pending, episodes, docket, journey, names: coachNames(coaches), today, clock });
 }
 
 if (typeof document !== "undefined" && document.getElementById("wk-latest")) {
