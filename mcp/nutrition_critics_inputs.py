@@ -204,6 +204,9 @@ def resolve(
     sev = _metabolic_severity(end_date) if include_metabolic else None
     if include_metabolic and sev is None:
         unresolved["metabolic_adaptation"] = "IC-29 returned an error or could not be read (thin data reads the same as an outage here)"
+    dxa = _safe(shared_quantities.dxa_scans, end_date)  # #4166: the protein gate's body-fat tier, the plan's one reader
+    if dxa is None:
+        unresolved["dexa"] = "the DXA partition read raised — the protein gate's body-fat tier is unknown (report-only)"
     above_weeks, above_raised = _above_prescription_weeks(end_date)
     if above_raised:
         unresolved["self_added_volume"] = "the Hevy prescription-window read raised"
@@ -223,6 +226,7 @@ def resolve(
         # #4081: the run of complete weeks above the committed routine's sets (None → the critic names it unknown)
         "training_above_prescription_weeks": above_weeks,
         "estimated_maintenance_kcal": estimated_maintenance_kcal,
+        "dxa_scans": dxa,
     }
     return {"inputs": inputs, "unresolved": unresolved}
 

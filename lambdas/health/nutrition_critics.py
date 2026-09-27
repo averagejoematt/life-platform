@@ -204,7 +204,11 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
     # v3.3 ruling "B" (#4161): the target this critic argues against is the SERVED one — gated by protein adherence
     p_missed, p_measured = _protein7_counts(inputs)
     target = owner_redlines.rate_target_lb_per_wk(
-        weight, protein_missed_7d=p_missed, protein_measured_7d=p_measured, protein_window_days=_protein7_window(inputs)
+        weight,
+        protein_missed_7d=p_missed,
+        protein_measured_7d=p_measured,
+        protein_window_days=_protein7_window(inputs),
+        dxa_scans=inputs.get("dxa_scans"),  # #4166: the same body-fat tier the plan reads
     )
     loss = _loss_rate(inputs)
     intake14 = _logged(_series(inputs, "intake_kcal_by_day"))
@@ -222,6 +226,7 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
             "rate_target_lb_wk": (target or {}).get("target_lb_wk"),
             "rate_step_target_lb_wk": (target or {}).get("step_target_lb_wk"),
             "rate_protein_gate": ((target or {}).get("protein_gate") or {}).get("state"),
+            "rate_protein_gate_tier": ((target or {}).get("protein_gate") or {}).get("tier"),
             "rate_cap_lb_wk": (target or {}).get("cap_lb_wk"),
             "rate_band_low_lb_wk": (target or {}).get("low_lb_wk"),
             "rate_band_high_lb_wk": (target or {}).get("high_lb_wk"),
@@ -251,7 +256,8 @@ def build_deficit_advocate_packet(inputs: dict[str, Any]) -> dict[str, Any]:
         tgt, cap = target["target_lb_wk"], target["cap_lb_wk"]
         gate = target.get("protein_gate") or {}
         sched_word = (
-            f"PROTEIN-GATED (the lower band — {gate.get('missed_7d')} of {gate.get('measured_7d')} measured days under the floor, ruling B)"
+            f"PROTEIN-GATED ({'the step minus the brake' if gate.get('mode') == 'brake' else 'the lower band'} — "
+            f"{gate.get('missed_7d')} of {gate.get('measured_7d')} measured days under the floor, ruling B, tier {gate.get('tier')})"
             if gate.get("applied")
             else "scheduled"
         )
