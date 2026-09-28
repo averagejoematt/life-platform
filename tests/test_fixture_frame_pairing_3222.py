@@ -163,6 +163,22 @@ _PT_PAIRED_RESIDUE: dict[str, int] = {
     # stamp rather than converted, because converting it would change a published record
     # key for no behavioral reason.
     "tests/judge_calibration.py": 1,
+    # Ruled 2026-09-27 (#4219): already named CORRECT in this file's own header docstring
+    # ("12 of those sites are in test_whoop_reconcile.py, test_strava_reconcile_window.py
+    # and test_receipts_endpoint.py — all three CORRECT (utc-exempt vendor/billing
+    # handlers)") but that ruling lived only in the one-hop blind-spot set below, because
+    # `site_api_lambda.py` had never itself called `pacific_today()` — every PT read it
+    # made was one hop away, through a helper module. #4219 gave `open_actions` its own
+    # `days_overdue` field, computed via `common.pacific_time.pacific_today()` INSIDE
+    # site_api_lambda.py's `/api/coaching-dashboard` branch, so the module's basename now
+    # reads a Pacific clock directly and `test_receipts_endpoint.py` (which imports
+    # `site_api_lambda` at line 582, unrelated to the coaching dashboard) pairs directly
+    # too. Both findings below are `utc-exempt(#2798)`: a billing-MONTH window on the cost
+    # governor (`_TEMP_CEILING_WINDOW`, line 165/567) that reverts with the AWS Budgets
+    # month boundary, not the Pacific calendar day — same exemption already ruled for
+    # `tests/test_budget_headroom.py` above. Moved out of `_ONE_HOP_BLIND_SPOT` below
+    # (the direct pass now catches it, so the wide-only set no longer needs to).
+    "tests/test_receipts_endpoint.py": 2,
 }
 
 
@@ -399,7 +415,10 @@ _ONE_HOP_BLIND_SPOT = {
     # correct — `utc-exempt(#2811)` vendor API windows / `utc-exempt(#2798)` billing month
     "tests/test_whoop_reconcile.py",
     "tests/test_strava_reconcile_window.py",
-    "tests/test_receipts_endpoint.py",
+    # tests/test_receipts_endpoint.py MOVED to `_PT_PAIRED_RESIDUE` above by #4219: it now
+    # pairs on the DIRECT pass (site_api_lambda.py calls `pacific_today()` itself, for the
+    # coaching-dashboard `days_overdue` field), not only the one-hop delegation this set
+    # names. Same ruling, caught by the narrower mechanism now — not a re-derivation.
     # ruled by hand 2026-08-26, run inside the 17:00-PT-to-midnight window: both green,
     # both benign (a fake table that does not enforce the handler's bounds; a day-
     # granularity fallback behind real `ingested_at` instants).
