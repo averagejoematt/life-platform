@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from coach import audience_guard
 from reading import reading_constellation, reading_store, reading_visibility as rv
 
 from web.site_api_common import PT, _ok
@@ -35,8 +36,11 @@ def _public_shelf_item(state: dict) -> dict:
     private highlight never leaks. The front-end renders these as the loudest type."""
     book_id = state.get("bookId", "")
     book = reading_store.get_book(book_id) or {}
+    public_book = rv.project_public(rv.BOOK, book) or {"bookId": book_id}
+    if "themes" in public_book:  # #4392: the one public theme-list seam, shared with /api/coach + /api/journal_analysis
+        public_book["themes"] = audience_guard.public_themes(public_book["themes"])
     item = {
-        "book": rv.project_public(rv.BOOK, book) or {"bookId": book_id},
+        "book": public_book,
         "state": rv.project_public(rv.READING_STATE, state) or {},
     }
     if book_id:
