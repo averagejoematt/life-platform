@@ -745,6 +745,22 @@ read the owner run (named in its step summary) for that.
 
 ### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052/#2590)
 
+**Since ADR-158 (#4256) code ships on green.** The `deploy` job carries no
+`environment:`; the only job behind the `production` click is `deploy-iam` ("Deploy IAM
+(production gate)"), the #2834 additive-IAM `cdk deploy`, offered only on the push that
+changed `cdk/` or `infra/`, and it owns NO concurrency group — so a gate park can no longer
+hold the deploy slot, and states 1 and 3 below are history for code deploys (kept for the
+record and for any run minted before the change). Nothing auto-approves:
+`deploy/watch_deploy_gate.sh` is deleted, and the lease-steward paragraph at the end of this
+section no longer applies. **The one check is the deploy dead-man**
+(`scripts/check_deploy_deadman.py`, the last step of `deploy-wedge-watch.yml`): a green run
+on main whose deploy failed, was cancelled (a newer run's Deploy evicting a pending one — see
+§4's `cancelled` paragraph), was skipped behind a failed/rejected IAM gate, or is still
+running/parked more than 4 h after Plan, and not superseded by a later fleet deploy, alarms
+once per episode. Recovery for every such row: `gh workflow run ci-cd.yml --ref main -f
+deploy_all=true`. An IAM run parked at the gate is the owner's click — approve or reject it
+in Actions; never script it.
+
 Three pipeline states leave main's deploy path wedged while nothing looks obviously
 broken. `scripts/check_main_green.py` (the /wrap gate) classifies all three explicitly —
 never re-diagnose them as ordinary red/green. States 4 and 5 are not wedges: they are the
@@ -770,8 +786,8 @@ where an operator will be standing when they hit them.
    one waiting: a Deploy parked at the gate OCCUPIES the job-level
    `ci-cd-deploy-<ref>` slot, so leave-waiting holds the whole fleet hostage (the
    2026-08-09 all-day wedge — and "GitHub expires them at 30d" was false at day 8).
-   `deploy/watch_deploy_gate.sh` now enforces this posture automatically (stale →
-   reject, logged; the old pin-exclude-and-leave-waiting zombie list is retired). Do
+   (`deploy/watch_deploy_gate.sh` enforced this posture automatically until ADR-158
+   retired it — nothing is left to auto-approve.) Do
    NOT cancel the waiting run: a cancelled run strands its deploy → recover with a
    `deploy_all=true` workflow_dispatch of `ci-cd.yml`. (Observed 2026-07-28: run
    30324990970 held the gate ~15h; the #1653 merge queued behind it and never
@@ -899,7 +915,7 @@ where an operator will be standing when they hit them.
 
 **A dark-flag waiver's reason rots when the reach GROWS (#3315/#3361, 2026-08-31).** A lane that makes a new import reachable from a CI-invoked script must grep `scripts/ci_dark_flag_sweep.py`'s `ALLOWED_ABSENT` entries for that dist and delete or re-scope the waiver in the same PR — the liveness test proves waivers dead (reach gone or dist installed), never reasons true, so a stale reason ships a fallback that prints 'unavailable' on the wire while every run stays green. The sweep's `N stale waiver(s)` line is a finding, not noise.
 
-**One lease steward per session, and it must OUTLIVE the tip (#2467 recurrence, 2026-08-31).** A gate watcher that exits after actioning the current tip leaves the NEXT merge's lease unwatched — measured: 4.9h stranded, caught by deploy-wedge-watch dispatching the remediation agent, not by the operator. Run ONE persistent steward for the whole session (reject any waiting run whose sha is a proper ancestor of origin/main, with a decode; approve the run AT the tip; print anything else as UNKNOWN), and stop it only at wrap after the last lease is disposed. `watch_deploy_gate.sh` alone is not this — it approves by age and would approve an ancestor after the tip.
+**[Superseded by ADR-158 — no code deploy parks at the gate, so no session runs a steward.]** **One lease steward per session, and it must OUTLIVE the tip (#2467 recurrence, 2026-08-31).** A gate watcher that exits after actioning the current tip leaves the NEXT merge's lease unwatched — measured: 4.9h stranded, caught by deploy-wedge-watch dispatching the remediation agent, not by the operator. Run ONE persistent steward for the whole session (reject any waiting run whose sha is a proper ancestor of origin/main, with a decode; approve the run AT the tip; print anything else as UNKNOWN), and stop it only at wrap after the last lease is disposed. `watch_deploy_gate.sh` (deleted by ADR-158) was not this — it approved by age and would have approved an ancestor after the tip.
 
 #### The recurrence ledger — five wedges, four fixes, what each one bought
 

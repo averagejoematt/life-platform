@@ -505,30 +505,21 @@ def test_collect_dedupes_runs_seen_by_both_sweeps(monkeypatch):
     assert [r["id"] for r in in_flight] == [30934111222]
 
 
-# --- watch_deploy_gate.sh — the posture change, text-pinned like the workflow tests
-# (CI installs no PyYAML/shell harness; these are structural invariants). ---
+# --- deploy/watch_deploy_gate.sh was RETIRED by #4256 (ADR-158): code deploys no longer
+# park at the production gate, so nothing needs auto-approving, and the one gate left
+# (the additive-IAM deploy) is a human's click by the owner's ruling. Its two text pins
+# (#2467's reject-not-skip posture) went with it; the reject wrapper stays. ---
 
-_GATE_WATCH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy", "watch_deploy_gate.sh")
-
-
-def test_gate_watch_dropped_the_pin_exclude_zombie_list():
-    """The hardcoded zombie ids and the leave-waiting posture are retired (#2467)."""
-    with open(_GATE_WATCH, encoding="utf-8") as f:
-        body = f.read()
-    for zombie in _ZOMBIES:
-        assert str(zombie) not in body, f"zombie {zombie} must not be pinned — stale runs are rejected, not skipped"
-    assert 'ZOMBIES="' not in body
+_DEPLOY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy")
 
 
-def test_gate_watch_rejects_stale_runs_instead_of_skipping():
-    with open(_GATE_WATCH, encoding="utf-8") as f:
-        body = f.read()
-    assert "reject_deployment.sh" in body
-    assert "GATE_STALE_REJECT_HOURS" in body
+def test_the_session_gate_watcher_stays_retired():
+    """ADR-158: an auto-approver would click the one gate the owner kept for himself."""
+    assert not os.path.exists(os.path.join(_DEPLOY_DIR, "watch_deploy_gate.sh"))
 
 
 def test_reject_wrapper_exists_and_posts_state_rejected():
-    reject = os.path.join(os.path.dirname(_GATE_WATCH), "reject_deployment.sh")
+    reject = os.path.join(_DEPLOY_DIR, "reject_deployment.sh")
     with open(reject, encoding="utf-8") as f:
         body = f.read()
     assert '"state": "rejected"' in body

@@ -207,3 +207,17 @@ jobs:
             echo "an incident: \`python3 scripts/check_main_green.py --head-coverage-check\`."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+      # ADR-158 (#4256): THE deploy dead-man. Code now ships on green with no approval gate,
+      # so the one question left is whether what main merged actually reached AWS: a green
+      # CI/CD run on main whose Deploy failed, was cancelled, was skipped behind a failed or
+      # rejected IAM gate, or is still parked/running past the deadline, and not superseded
+      # by a later fleet deploy. Exit 1 = alarm, 2 = the API was unreadable (never OK);
+      # --alert keeps one `deploy-deadman` issue in step and fires `urgent_alarm` once per
+      # episode. LAST step + `!cancelled()`: a red wedge/head-coverage step above must not
+      # skip it, and it must not skip them.
+      - name: Deploy dead-man — main's green runs reached AWS (#4256)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check_deploy_deadman.py --alert

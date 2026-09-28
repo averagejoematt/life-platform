@@ -933,6 +933,29 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-06",
     },
+    "guard::scripts/check_deploy_deadman.py": {
+        "gate_name": "scripts/check_deploy_deadman.py",
+        "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -k deadman -q   # + the live read-only run below",
+        "mutation": (
+            "verdict()'s alarm list replaced with `alarms = []` in the REAL tracked file (the "
+            "dead-man that never alarms); separately, LIVE and read-only, FLEET_STEP_PREFIX set to a "
+            "never-matching string so the fleet-deploy supersession line never stops the walk."
+        ),
+        "observed": (
+            "BASELINE 10 passed. MUTATED (alarms = []): 3 failed / 7 passed — the undeployed-newer-than-"
+            "fleet alarm, the unknown-age-is-never-fresh control and the three-way exit contract. "
+            "RESTORED (copied back from the pre-mutation backup): 10 passed. LIVE mutation against the "
+            "Actions API: exit 1, 10 alarmed rows reaching run 36360079014 (78a1c9c2f, Deploy "
+            "cancelled); unmutated: exit 0, the walk stopping at b2f3fbb1b's fleet deploy. "
+            "Watched 2026-09-28."
+        ),
+        "scope": (
+            "Job/step conclusions on GitHub only — a deploy made outside CI is invisible to it; the "
+            "`--alert` issue/dispatch half is best-effort and monkeypatch-tested only. The CI step that "
+            "runs it is its own record, ci::deploy-wedge-watch.yml::watch::9."
+        ),
+        "proved_on": "2026-09-28",
+    },
 }
 
 
@@ -2532,6 +2555,64 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
             "declared-advisory CI step in this census."
         ),
         "proved_on": "2026-09-26",
+    },
+    # ── #4256 / ADR-158 — the two gates that route code around the production click ──
+    "ci::ci-cd.yml::deploy::3": {
+        "gate_name": "deploy / Late-approval guard — never ship an older tree over newer code (#4256)",
+        "command": (
+            "The step's own `run:` body, extracted verbatim from ci-cd.yml with "
+            "${{ needs.reconcile.outputs.build_sha }} substituted, executed by bash inside a "
+            "throwaway `git clone --depth=30 https://github.com/averagejoematt/life-platform` "
+            "(main at 5672de8c4) — the real `git fetch --depth=1 origin main` and the real "
+            "`deploy/build_bundle.py --print-bundled-config-paths`."
+        ),
+        "mutation": (
+            "The input the guard exists for: BUILD_SHA set to 80be42a35 (main~3) — an IAM click that "
+            "arrived after three more merges, two of which changed lambdas/."
+        ),
+        "observed": (
+            "MUTATED (BUILD_SHA=80be42a35): exit 1 — '::error title=Late IAM approval (ADR-158)::main "
+            "moved past 80be42a35… and changed deployable code since', naming lambdas/content/"
+            "brief_format.py, lambdas/content/html_builder.py, lambdas/web/site_api_lambda.py. "
+            "CONTROL (BUILD_SHA=5672de8c4, the tip): exit 0 — 'main is still at 5672de8c4… nothing "
+            "newer to overwrite.' Both watched 2026-09-28."
+        ),
+        "scope": (
+            "Runs only after an APPROVED deploy-iam job (the only path by which a code deploy can "
+            "start late). It compares trees, not deploy history: a newer commit that touched a "
+            "deployable path refuses the run even if that path is unrelated to this run's diff — "
+            "fail toward the deploy_all recovery, never toward overwriting newer code."
+        ),
+        "proved_on": "2026-09-28",
+    },
+    "ci::deploy-wedge-watch.yml::watch::9": {
+        "gate_name": "watch / Deploy dead-man — main's green runs reached AWS (#4256)",
+        "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -k deadman -q",
+        "mutation": (
+            "The step is a bare `python3 scripts/check_deploy_deadman.py --alert`, so its exit code IS "
+            "main()'s return. Planted in the real file: verdict()'s alarm list replaced with "
+            "`alarms = []` (the dead-man never alarms). Second, LIVE: FLEET_STEP_PREFIX set to a "
+            "never-matching string (the supersession line removed) and main(['--hours','2']) run "
+            "read-only against the Actions API."
+        ),
+        "observed": (
+            "BASELINE: 10 passed. MUTATED (alarms = []): 3 failed / 7 passed — "
+            "test_deadman_alarms_on_an_undeployed_green_run_newer_than_the_last_fleet_deploy, "
+            "test_deadman_waits_out_the_deadline_and_never_reads_unknown_age_as_fresh, "
+            "test_deadman_main_exit_codes_are_the_three_way_contract. REVERTED: 10 passed. LIVE "
+            "mutation: exit 1, '10 green run(s) on main not deployed within 2h', the walk reaching "
+            "run 36360079014 (78a1c9c2f, Deploy concluded cancelled) and the rejected-lease runs "
+            "behind it; unmutated live run: exit 0 (the fleet deploy at b2f3fbb1b supersedes them). "
+            "Watched 2026-09-28."
+        ),
+        "scope": (
+            "GitHub-side evidence only (job and step conclusions) — a deploy made outside CI "
+            "(`deploy_fleet.sh` from a laptop) is invisible to it, so after one the operator runs the "
+            "deploy_all dispatch the alarm prints. Detection latency is --hours (4) plus the watch "
+            "workflow's real scheduler gap. The --alert issue/dispatch half is best-effort and "
+            "offline-tested only (monkeypatched gh)."
+        ),
+        "proved_on": "2026-09-28",
     },
 }
 
