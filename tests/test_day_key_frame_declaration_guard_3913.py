@@ -55,6 +55,13 @@ It cannot prove a frame is the RIGHT one — only measurement against the live p
 number is in the `day_key_frame_consequence` on the registry entry). What it makes
 impossible is the next one being SILENT.
 
+#4268: leg 2's scope-limited walk (`_own_body`) now delegates to the shared
+`tests/timezone_guard_lib.py::own_scope_nodes` — this file's own boundary tuple passed
+explicitly, so the fold is a pure de-duplication of the traversal `test_pacific_today_
+guard_2414.py` independently re-implemented for the same reason. The domain rule (which
+signatures make a source a UTC-day writer, `FRAME_BLIND_ANCHOR_SITES` and its written
+reasons) is unchanged and stays in this file.
+
 Run:  python3 -m pytest tests/test_day_key_frame_declaration_guard_3913.py -v
 """
 
@@ -70,6 +77,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(ROOT / "lambdas" / "web"))
+
+from timezone_guard_lib import own_scope_nodes as _own_scope_nodes  # noqa: E402
 
 for _k, _v in {
     "S3_BUCKET": "test-bucket",
@@ -309,18 +318,18 @@ def _own_body(fn):
     naive walk attributes the inner function's arithmetic to the outer one and the site
     can never be cleared — the guard would go on reporting a defect after it was fixed,
     which is the fastest way to teach a reader to ignore it.
+
+    Delegates to `tests/timezone_guard_lib.py::own_scope_nodes` (#4268) — this guard's
+    own boundary (no `ast.ClassDef`; a nested class was never a scope boundary here,
+    unlike `test_pacific_today_guard_2414.py`'s independent copy of the same
+    traversal) passed explicitly so the fold changes no behavior. A nested def/lambda
+    node is itself yielded but not descended into; harmless here since neither
+    predicate below (`_is_literal_day_anchor`, the `total_seconds` call check) ever
+    matches a bare `FunctionDef`/`Lambda` node — verified by this file's own leg-2
+    tests, including the mutation/control tests, passing unchanged before and after
+    the swap.
     """
-    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
-    out = []
-    stack = [c for c in ast.iter_child_nodes(fn) if not isinstance(c, nested)]
-    while stack:
-        node = stack.pop()
-        out.append(node)
-        for child in ast.iter_child_nodes(node):
-            if isinstance(child, nested):
-                continue
-            stack.append(child)
-    return out
+    return list(_own_scope_nodes(fn, boundary=(ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)))
 
 
 def hand_anchored_age_sites(roots=RUNTIME_ROOTS) -> dict:

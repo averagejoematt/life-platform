@@ -38,15 +38,27 @@ WHAT IS ALLOWED:
     requires for a genuinely-UTC computation (e.g. a UTC-keyed partition read;
     see site_api_pulse's boundary-widening query bound).
 
+#4268 FOLDED IN `test_pt_date_anchor_guard_1937.py` (the `site_api_vitals`-only
+naked-UTC-day-anchor guard). Measured a strict subset of this file's scan: every
+synthetic case 1937's own textual matcher fired on, `naive_utc_today_sites` below
+fires on too (equal or larger finding count — see PR #4268's pasted diff), and both
+report zero findings on the real `site_api_vitals` family today. Its one assertion
+this file did not already make — the vitals family's instants stay UTC — is now
+`test_site_api_vitals_family_still_anchors_instants_in_utc` below. The scope-limited
+AST walk (`_own_scope_nodes`, now `own_scope_nodes`) and the skip-marker tuple moved to
+`tests/timezone_guard_lib.py`, shared with `test_day_key_frame_declaration_guard_3913.py`'s
+own independent copy of the same traversal.
+
 Run:  python3 -m pytest tests/test_pacific_today_guard_2414.py -v
 """
 
 import ast
 import pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+from site_api_family import family_paths
+from timezone_guard_lib import SKIP_PATH_MARKERS as _SKIP_PATH_MARKERS, own_scope_nodes as _own_scope_nodes, python_files_under
 
-_SKIP_PATH_MARKERS = ("__pycache__", "_staging", "cdk.out", "layer-build")
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # Whole packages OUTSIDE lambdas/web/ that are reader-bound writer code end to
 # end, scanned like lambdas/web/ itself (glob, not a hand-list). lambdas/content/
@@ -96,9 +108,9 @@ def _surface_files() -> list[pathlib.Path]:
     """The DERIVED scan surface: lambdas/web/**/*.py + the additional whole-package
     dirs (lambdas/content/, #2816) + the reader-bound writers + the PT-frame
     instruments + the OUTPUT# frame writers (#2815) — never a hand-list."""
-    files = [p for p in (ROOT / "lambdas" / "web").rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
+    files = python_files_under(ROOT / "lambdas" / "web", _SKIP_PATH_MARKERS)
     for rel_dir in _ADDITIONAL_SURFACE_DIRS:
-        files += [p for p in (ROOT / rel_dir).rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
+        files += python_files_under(ROOT / rel_dir, _SKIP_PATH_MARKERS)
     files += [ROOT / rel for rel in _READER_BOUND_WRITERS + _PT_FRAME_INSTRUMENTS + _OUTPUT_FRAME_WRITERS]
     return sorted(files)
 
@@ -323,22 +335,14 @@ def _tainted_names(tree: ast.AST, aliases: dict) -> set:
     return tainted
 
 
-def _own_scope_nodes(scope):
-    """Every node inside `scope` WITHOUT descending into a nested function/class.
-
-    Scope precision is what keeps the #2811 call-taint from cascading: in
-    `compute/episode_detect_lambda.py`, `build_episode_record` assigns
-    ``item = {..., "computed_at": _now_iso()}`` while a *different* function
-    takes an `item` PARAMETER and slices its stored `DATE#` key. File-wide
-    taint conflates the two and flags correct code; per-scope taint does not.
-    """
-    stack = list(ast.iter_child_nodes(scope))
-    while stack:
-        node = stack.pop()
-        yield node
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
-            continue
-        stack.extend(ast.iter_child_nodes(node))
+# `_own_scope_nodes` (every node inside a scope WITHOUT descending into a nested
+# function/class — what keeps the #2811 call-taint from cascading: in
+# `compute/episode_detect_lambda.py`, `build_episode_record` assigns
+# ``item = {..., "computed_at": _now_iso()}`` while a *different* function takes an
+# `item` PARAMETER and slices its stored `DATE#` key; file-wide taint conflates the
+# two and flags correct code, per-scope taint does not) moved to
+# `tests/timezone_guard_lib.py::own_scope_nodes` (#4268) — imported above as
+# `_own_scope_nodes`, same signature, same default boundary, byte-identical algorithm.
 
 
 def _taint_index(tree: ast.AST, aliases: dict):
@@ -471,6 +475,15 @@ def test_no_naive_utc_today_on_reader_surface():
         "use common.pacific_time (PT/pacific_today), or mark a genuinely-UTC "
         "computation with `# utc-exempt(#NNNN): <reason>`):\n" + "\n".join(hits)
     )
+
+
+def test_site_api_vitals_family_still_anchors_instants_in_utc():
+    """The one #1937 assertion this guard did not already make, migrated on the fold
+    (#4268): a full ISO timestamp (`_today_iso`, `generated_at`) is NOT a day frame and
+    must stay UTC — this fails if a future edit "fixes" an instant into PT too, which
+    would conflate an instant with a day claim (#1937's acceptance criterion #2)."""
+    src = "\n".join(p.read_text() for p in family_paths("site_api_vitals"))
+    assert "datetime.now(timezone.utc).isoformat()" in src
 
 
 # ── mutation proofs: every matcher must FIRE on a reintroduced site ──────────

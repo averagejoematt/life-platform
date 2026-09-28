@@ -85,11 +85,19 @@ for _p in (_LAMBDAS,):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from timezone_guard_lib import SKIP_PATH_MARKERS as _SKIP_MARKERS  # noqa: E402
+
 # ══════════════════════════════════════════════════════════════════════════
 # Discovery — structural, both directions (guard the SET, not the instance)
 # ══════════════════════════════════════════════════════════════════════════
-
-_SKIP_MARKERS = ("__pycache__", "_staging", "cdk.out", "layer-build")
+#
+# _SKIP_MARKERS (#4268): the same value `test_pacific_today_guard_2414.py` defined
+# independently — one canonical tuple, imported from tests/timezone_guard_lib.py.
+# The os.walk-with-dirnames-pruning MECHANISM below is unchanged; only the literal
+# moved.
 
 
 def _iter_python_sources():

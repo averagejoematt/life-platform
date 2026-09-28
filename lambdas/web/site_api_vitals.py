@@ -46,7 +46,9 @@ this module's tests reach further into it:
 
 Source-text guards that used to read this one file now scan the whole family
 (test_public_genetic_privacy_absolute, test_night_of_frame_1923,
-test_achievement_first_earn_1624, test_pt_date_anchor_guard_1937,
+test_achievement_first_earn_1624, test_pacific_today_guard_2414 (which folded
+in the file-scoped test_pt_date_anchor_guard_1937 — #4268, measured a strict
+subset of 2414's scan),
 test_genesis_blind_digest_and_readers_2150, test_character_targets_1412,
 test_vitals_frame, test_gradability_liveness_cross_phase_2023) — guard the SET,
 not the instance, so they keep biting after this split and the next one.
