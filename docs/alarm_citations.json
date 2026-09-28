@@ -88,9 +88,9 @@
   },
   "qa-smoke-warnings": {
     "added": "2026-09-21",
-    "cause_observed": "2026-09-27",
-    "cause": "data:orphan_routine_drafts,score:hydration",
-    "citation": "#4183 — RE-DERIVED 2026-09-27 (Session AW): two causes. (1) `data:orphan_routine_drafts`: PR 4324 (merged 2026-09-27) makes the leg count live-cycle orphans only; it still warns on the 6 live orphans until the owner archives them (the one-off is in PR 4324's body). (2) `score:hydration`: 'Hydration = 26 — low, possible HAE sync gap' on the 2026-09-26 row — a single low-water day, self-clearing at the next day's score; if it repeats on 2026-09-28, file it against the HAE water ingest."
+    "cause_observed": "2026-09-28",
+    "cause": "score:hydration",
+    "citation": "#4183 — RE-CITED 2026-09-28 (Session AY): one live cause. `data:orphan_routine_drafts` no longer fires (PR 4324 scoped the leg to live-cycle orphans; the live run no longer names it). `score:hydration`: 'Hydration = 26 — low, possible HAE sync gap' — still the 2026-09-26 row (every qa-smoke run 03:39Z–05:11Z on 09-28 reads the same 26 on the latest complete PT day), so not yet a repeat. If the 2026-09-27 row (scored at 16:40Z 09-28) also reads low, file it against the HAE water ingest."
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
