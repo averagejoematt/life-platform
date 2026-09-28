@@ -729,6 +729,20 @@ silently delete the literal gate from the reset pipeline's and the wrap battery'
 Classify on the exit code, never on the step's stdout: `--check` prints the drifted doc
 text verbatim, so a grep over it is a text matcher reading content it does not own.
 
+**One unit-test verdict per sha — the run whose own head it is (#4252).** Because
+`reconcile` checks out the branch TIP, every run in a merge train converges on the same
+`build_sha`; each used to re-run the ~33-minute coverage pass on it (2026-09-27: 45
+`test / Unit Tests` jobs covered 21 distinct shas). The `test-owner` job
+(`scripts/find_test_verdict_owner.py`) now skips a run's unit-test pass only when
+`build_sha` is NOT the run's own head AND a push run of ci-cd.yml exists whose head IS
+`build_sha` — that run tests the same sha. No owner run (a GITHUB_TOKEN push mints none:
+440eabc46, the #4350 Dependabot merge) → the run tests it, exactly as before. Lint,
+deploy-critical, Plan and Deploy are untouched. A PR-merge-ref dedup ("the PR already
+tested this tree") was measured and rejected: the squash landed on the base the PR
+tested in 5 of the last 42 merges, and a moved base is what the post-merge pass exists
+for. What a skipping run's green no longer carries: the full suite on its build_sha —
+read the owner run (named in its step summary) for that.
+
 ### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052/#2590)
 
 Three pipeline states leave main's deploy path wedged while nothing looks obviously
