@@ -1525,6 +1525,75 @@ def test_the_v2_coach_roster_is_derived_from_the_build_html_signature():
         assert f"<!-- S:{section_id} -->" in html
 
 
+def test_v2_coach_headers_derive_their_display_name_from_the_persona_registry():
+    """#4360: every V2 coach header must carry `persona_registry`'s CURRENT
+    display name for that coach, upper-cased — never a hand-typed literal.
+
+    `DR. VICTOR REYES — PHYSICAL INTELLIGENCE` survived the 2026-08-10 rename
+    to Dr. Max Reyes for six weeks because the header string was typed, not
+    derived, so nothing pointed at `config/coaches/physical_coach.json`. This
+    reads the expected name LIVE from `persona_registry.display_name` — the
+    same registry `content.brief_format.v2_coach_header_titles` calls —
+    imported independently here (not reached via `hb`) rather than hardcoding
+    "Dr. Max Reyes": a future rename updates the registry and this assertion
+    together, so the test never goes stale the way the header did.
+
+    Mutation control (#4360, run by hand, not part of the suite — restoring a
+    hand-typed literal must fail this test): with the physical_coach header's
+    `v2_coach_header_titles()["physical_coach"]` lookup temporarily replaced by
+    the literal `"\U0001f4aa DR. VICTOR REYES — PHYSICAL INTELLIGENCE"`,
+
+        env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY \
+          AWS_SECRET_ACCESS_KEY=FAKESECRET AWS_DEFAULT_REGION=us-west-2 \
+          python3 -m pytest tests/test_html_builder_behavior.py \
+          -k test_v2_coach_headers_derive_their_display_name_from_the_persona_registry -q
+
+    fails with "physical_coach's header does not carry persona_registry's
+    current display name 'Dr. Max Reyes'" — restoring the real code makes it
+    pass again.
+    """
+    from coach.persona_registry import display_name as _persona_display_name
+
+    assert len(V2_COACH_PARAMS) == 8  # keep in step with the roster-derivation sanity check above
+    for param in V2_COACH_PARAMS:
+        engine_id = param.replace("_v2_text", "")
+        expected_name = _persona_display_name(engine_id)
+        assert expected_name, f"persona_registry has no display_name for {engine_id!r}"
+        marker = f"UNIQUE-COACH-MARKER-{param}"
+        html = _coaches(**{param: marker})
+        assert (
+            expected_name.upper() in html
+        ), f"{engine_id}'s header does not carry persona_registry's current display name {expected_name!r}"
+
+
+# The literals every V2 coach header used to carry (#4360) — the SET this guard
+# closes, not just the one instance (`DR. VICTOR REYES`) the issue found stale.
+# Names that still match the registry today (all but Victor Reyes) are included
+# too: the bug was "hand-typed at all", not "hand-typed AND wrong" — a coach
+# whose typed name happens to still be correct is one rename away from the same
+# drift.
+_RETIRED_OR_CURRENT_HAND_TYPED_V2_COACH_HEADER_NAMES = (
+    "DR. LISA PARK",
+    "DR. MARCUS WEBB",
+    "DR. SARAH CHEN",
+    "DR. NATHAN REEVES",
+    "DR. VICTOR REYES",  # retired 2026-08-10 -> Dr. Max Reyes; the literal this issue found stale
+    "DR. AMARA PATEL",
+    "DR. JAMES OKAFOR",
+    "DR. HENNING BRANDT",
+)
+
+
+def test_no_v2_coach_header_name_is_a_hand_typed_literal():
+    """#4360 acceptance box 3: a grep of `lambdas/` for a hand-typed coach
+    header name returns nothing — every one of these must come from
+    `content.brief_format.v2_coach_header_titles` / `persona_registry`, not a
+    literal in this module's source.
+    """
+    for literal in _RETIRED_OR_CURRENT_HAND_TYPED_V2_COACH_HEADER_NAMES:
+        assert literal not in HB_SOURCE, f"{literal!r} is back as a hand-typed literal in html_builder.py"
+
+
 def test_a_coach_narrative_is_split_into_paragraphs():
     html = _coaches(sleep_coach_v2_text="First paragraph.\n\nSecond paragraph.\n\n   \n\nThird.")
     assert html.count('color:#c7d2fe;font-size:13px;line-height:1.6;margin:0 0 8px 0;">') == 3  # the blank chunk is dropped

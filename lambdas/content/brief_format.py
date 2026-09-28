@@ -16,12 +16,21 @@ Three rules these helpers exist to enforce, all of them ADR-104/105:
     in IEEE-754 and every percentage the reader sees was biased low by it.
   * `weather_context_cells` — the WEATHER CONTEXT card renders the fields
     `lambdas/ingestion/weather_lambda.py` actually writes.
+  * `coach_header_title` / `v2_coach_header_titles` — a V2 coach section
+    header names its coach from `persona_registry`, never a hand-typed
+    literal (#4360: `DR. VICTOR REYES` survived a 2026-08-10 rename to Dr. Max
+    Reyes for six weeks because nothing pointed at the coach's own config).
+    `v2_coach_header_titles()` precomputes the whole `{engine_id: title}` map
+    so each `html_builder.py` call site is a short dict lookup — that is what
+    keeps every header a one-line statement under
+    `tests/test_module_size_guard.py`'s ceiling.
 """
 
 from __future__ import annotations
 
 import html as _html
 
+from coach.persona_registry import display_name as persona_display_name
 from common.digest_utils import safe_float
 
 
@@ -40,6 +49,52 @@ def esc(text):
 def pct_int(frac):
     """Return a 0..1 fraction as a rounded whole percent (never truncated)."""
     return int(round(frac * 100))
+
+
+def coach_header_title(engine_id: str, emoji: str, label: str) -> str:
+    """``"{emoji} {NAME} — {LABEL}"`` for a V2 coach section header.
+
+    #4360: every one of these headers used to be a hand-typed literal, and a
+    rename (Dr. Victor Reyes -> Dr. Max Reyes, 2026-08-10) left the
+    physical-coach header stale for six weeks because nothing pointed at
+    ``config/coaches/physical_coach.json``. The name comes from
+    ``persona_registry`` (the CC-00 registry reconciling coach config keys,
+    engine ids, and board personas) so a future rename updates every header
+    with no code edit. ``engine_id`` is the persona/engine id (e.g.
+    ``"physical_coach"``); falls back to a titleized id if the registry can't
+    be read at all (S3 down AND the bundled local copy missing) rather than
+    rendering an empty name.
+    """
+    name = persona_display_name(engine_id) or engine_id.replace("_", " ").title()
+    return f"{emoji} {name.upper()} — {label}"
+
+
+# (engine_id, emoji, label) for every V2 coach header, in `build_html`'s render
+# order. One table here rather than eight `coach_header_title(...)` call sites
+# in `html_builder.py` — each call site's line was long enough that `black`
+# wrapped it across several physical lines, which is what pushed
+# `html_builder.py` over its `tests/test_module_size_guard.py` ceiling (#4360).
+_V2_COACH_HEADERS = (
+    ("sleep_coach", "\U0001f6cf️", "SLEEP INTELLIGENCE"),
+    ("nutrition_coach", "\U0001f34e", "NUTRITION INTELLIGENCE"),
+    ("training_coach", "\U0001f3cb️", "TRAINING INTELLIGENCE"),
+    ("mind_coach", "\U0001f9e0", "MIND INTELLIGENCE"),
+    ("physical_coach", "\U0001f4aa", "PHYSICAL INTELLIGENCE"),
+    ("glucose_coach", "\U0001f4c9", "GLUCOSE INTELLIGENCE"),
+    ("labs_coach", "\U0001f9ec", "LABS INTELLIGENCE"),
+    ("explorer_coach", "\U0001f50d", "EXPLORER INTELLIGENCE"),
+)
+
+
+def v2_coach_header_titles() -> dict:
+    """``{engine_id: escaped "{emoji} NAME — LABEL"}`` for every V2 coach header.
+
+    Computed once, here, so each `html_builder.py` call site is a short dict
+    lookup (`titles["physical_coach"]`) instead of a `coach_header_title(...)`
+    call — the lookup keeps every header a one-line statement, so a rename or
+    a persona-name length change can never itself trip the module-size gate.
+    """
+    return {engine_id: esc(coach_header_title(engine_id, emoji, label)) for engine_id, emoji, label in _V2_COACH_HEADERS}
 
 
 def _cell(value_html, label, color="#94a3b8", size="12px"):
