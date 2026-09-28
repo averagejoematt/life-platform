@@ -21,7 +21,9 @@ Three checks, each a measured incident class. Advisory by default (see _hooklib)
 
 2. DEPLOY FROM A WORKTREE
    The tell is a deceptive 0-diff: the deploy appears to succeed and ships main's old
-   content. Deploys run from the main checkout, after merge.
+   content. Deploys run from the main checkout, after merge. #4260: fires only when a
+   deploy script is EXECUTED (not when a read-only `grep`/`cat`/`sed` names a deploy/
+   path), and stays silent in a worktree DETACHED at origin/main's tip.
 
 3. FORCE-PUSH TO MAIN
    Distinct from the settings.json `ask` rule, which prompts a human. This names the
@@ -57,11 +59,32 @@ _WATCH_PR = re.compile(r"(?:assert_pr_green\S*|wait_pr_green\S*|gh\s+pr\s+checks
 WATCHERS = "watchers.json"
 WATCHER_KEEP = 20  # the last N watcher calls the guard remembers
 WATCHER_WINDOW_S = 3600  # a verdict older than an hour is not the verdict for this merge
-_DEPLOY = re.compile(r"\b(deploy/(deploy_|cdk_deploy|sync_site_to_s3)[\w.]*\.sh|aws\s+lambda\s+update-function-code)\b")
+#: A deploy the command EXECUTES — the script (or `aws lambda update-function-code`) must be the
+#: command word of a segment: at the start, or after `;` `&` `|` `(` `$(` or a newline, behind
+#: optional `VAR=x` assignments, `env`/`nohup`/`time`/`timeout N`, and `bash`/`sh`/`zsh`/`source`
+#: (with flags), with any path prefix (`./`, an absolute worktree path). #4260: a read-only
+#: `grep -n x deploy/deploy_fleet.sh` / `cat` / `sed -n` merely MENTIONS the path and is silent.
+_DEPLOY = re.compile(
+    r"(?:^|[;&|(\n]|\$\()\s*"
+    r"(?:\w+=\S*\s+)*"
+    r"(?:(?:env|nohup|time|timeout\s+\S+)\s+(?:\w+=\S*\s+)*)*"
+    r"(?:(?:bash|sh|zsh|source|\.)\s+(?:-\S+\s+)*)?"
+    r"(?P<hit>(?:\S*/)?deploy/(?:deploy_|cdk_deploy|sync_site_to_s3)[\w.]*\.sh|aws\s+lambda\s+update-function-code)\b"
+)
 _FORCE = re.compile(r"\bgit\s+push\b.*(--force\b|-f\b)")
 #: A merge that SUPPLIES its own commit text. `--body-file`, `--body`, `--subject` (and the
 #: `-F`/`-b`/`-t` short forms `gh` accepts for them).
 _SUPPLIED_MSG = re.compile(r"(?:^|\s)(--body-file|--body|--subject|-F|-b|-t)(?:[=\s]|$)")
+
+
+def _detached_at_main(where) -> bool:
+    """#4260: a worktree DETACHED at origin/main's tip is the sanctioned deploy posture (a
+    CDK deploy re-bundles from the checkout tip), so it is silent. A lane BRANCH, a detached
+    non-main sha, or an unresolvable origin/main still fires."""
+    detached = git("symbolic-ref", "-q", "HEAD", cwd=where)[0] != 0
+    code, head = git("rev-parse", "HEAD", cwd=where)
+    code2, main_tip = git("rev-parse", "--verify", "-q", "refs/remotes/origin/main", cwd=where)
+    return detached and code == 0 and code2 == 0 and head != "" and head == main_tip
 
 
 def _load_watchers() -> list[dict]:
@@ -153,7 +176,7 @@ def main() -> int:
 
     d = _DEPLOY.search(cmd)
     if d:
-        where = command_cwd(cmd, d.start(), git_c=False)
+        where = command_cwd(cmd, d.start("hit"), git_c=False)
         code, top = git("rev-parse", "--show-toplevel", cwd=where)
         code2, gitdir = git("rev-parse", "--git-dir", cwd=where)
         # `--git-common-dir` ALWAYS resolves to the main checkout's `.git` — from inside a
@@ -161,7 +184,7 @@ def main() -> int:
         # is the one that differs: `.git` (or `.../.git`) in the main checkout, vs.
         # `.../.git/worktrees/<name>` inside a worktree. #4260: asked in the directory the
         # deploy RUNS in (payload cwd, or the command's own `cd`), not the hook's checkout.
-        if code == 0 and code2 == 0 and gitdir not in ("", ".git") and not gitdir.endswith("/.git"):
+        if code == 0 and code2 == 0 and gitdir not in ("", ".git") and not gitdir.endswith("/.git") and not _detached_at_main(where):
             findings.append(
                 (
                     "deploy from a worktree",
