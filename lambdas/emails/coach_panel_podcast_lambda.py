@@ -341,17 +341,8 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     return {"url": f"/panelcast/wk{week}.{ext}", "bytes": len(body), "duration_sec": duration}
 
 
-# The key of week `week`'s published episode audio, or None when there is none.
-# The weekly publisher writes wk{n}.mp3 (compressed since #1018; .wav before
-# that, and still the fail-open fallback). Check every extension ever
-# published so "already published" is never a false negative that
-# re-synthesizes a week (the .mp3-only check silently missed every .wav episode).
-#
-# #4365: a key answering head_object is NOT an episode. A reset overwrites each live
-# wk{n}.* with a ~190-byte tombstone (generated/* cannot be deleted, ADR-046), and
-# week numbers restart at genesis, so the bare head counted the July tombstones for
-# wk1/wk2/wk4 as published and skipped those weeks silently. media_tombstone reads
-# the stored object's own shape; only a real-sized, non-tombstone object counts.
+# Key of week's real episode audio (every extension ever published), or None. #4365: a restart
+# tombstone on the key is NOT an episode — see common/media_tombstone.py.
 def _episode_exists(week) -> str | None:
     return media_tombstone.first_published(s3, S3_BUCKET, [f"{PREFIX}/wk{week}.{ext}" for ext in ("mp3", "wav", "m4a")], logger)
 
@@ -1349,7 +1340,6 @@ def _sweep_held_episodes(dry_run: bool = False) -> dict:
     week = post.get("week")
     hold = _read_hold(week)
     if not hold:
-        # #4365: the Mon/Wed sweep ended in ~0.3 s with ZERO log lines here — indistinguishable from a skipped week.
         logger.info("[panel] hold sweep wk%s: no hold on the current week — nothing to retry", week)
         return {"swept": [], "note": f"no hold for current week {week}"}
 
@@ -1560,7 +1550,6 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     post = _select_week_post()
     week = post["week"]
-    # #4365: this skip used to write no log line — a skipped week read the same as a run that did nothing.
     published_key = None if (force or dry_run) else _episode_exists(week)
     if published_key:
         logger.info("[panel] wk%s already published — %s matched; skipping (outcome=already-published)", week, published_key)
