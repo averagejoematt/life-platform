@@ -1174,14 +1174,16 @@ def test_habits_deep_dive_shows_the_why_only_on_a_miss():
     assert "the whole engine runs on this" in html
 
 
-def test_habits_deep_dive_counts_an_untracked_habit_as_missed():
-    """`h_map.get(h_name, 0)` — a habit Habitify never reported is an ❌.
+def test_habits_deep_dive_marks_an_untracked_habit_unobserved_not_missed():
+    """#4362: a habit Habitify never reported (renamed upstream, archived) is a "·", not an ❌.
 
-    Same ADR-104 class as the Essential Seven xfail; pinned here because this is
-    a separate code path with a separate default.
+    It used to read `h_map.get(h_name, 0)` and draw an ❌ — the ADR-104 absence-as-miss
+    class this pin once documented. A reported 0 is still an ❌.
     """
     reg = {"Sleep 7h": {"tier": 0, "status": "active"}}
     html = _training(data=_data(habitify={"habits": {}}), profile=_profile(habit_registry=reg))
+    assert "❌" not in html and "·" in html
+    html = _training(data=_data(habitify={"habits": {"Sleep 7h": 0}}), profile=_profile(habit_registry=reg))
     assert "❌" in html
 
 

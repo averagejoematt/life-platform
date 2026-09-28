@@ -200,6 +200,32 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     return clamp(round(sum(parts) / sum(weights))), details
 
 
+def habitify_reading(habits_map: dict[str, Any], name: str, meta: Optional[dict[str, Any]] = None) -> Optional[float]:
+    """The day's Habitify value for registry habit `name`, or None when the day never names it.
+
+    #4362: a habit renamed in Habitify ("Walk 5k" -> "Walk Outdoor >2mi") kept arriving
+    under its new name while `habit_registry` still keyed it on the old one, so an exact
+    name lookup found nothing and `.get(name, 0)` scored that absence as a miss — the
+    09-26 recap card listed "Not checked in: Walk 5k" beside "walked 5.2 mi" on a day the
+    habit WAS checked in. Two rules close the class:
+
+      * a registry entry resolves through its own key AND every name in its
+        `habitify_names` list (the names this habit has carried in Habitify, old and new,
+        so history written before a rename still resolves after the key is corrected);
+      * a habit the day's record does not name at all is UNOBSERVED (None), never a miss —
+        the same ruling habit_streaks made for #2221 ("absent is unknown", ADR-104).
+    """
+    names = [name] + [n for n in ((meta or {}).get("habitify_names") or []) if isinstance(n, str) and n != name]
+    for n in names:
+        if n in habits_map:
+            v = habits_map.get(n)
+            try:
+                return float(v) if v is not None else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+    return None
+
+
 def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     """Tier-weighted habit scoring using habit_registry.
 
@@ -232,6 +258,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     tier_weights = {0: 3.0, 1: 1.0, 2: 0.5}
 
     habitify_7d = data.get("habitify_7d") or []
+    unobserved: list[str] = []
 
     for habit_name, meta in registry.items():
         if meta.get("status") != "active":
@@ -246,8 +273,13 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             strava = data.get("strava") or {}
             if not strava.get("activities"):
                 continue
-        done = habits_map.get(habit_name, 0)
-        is_done = float(done) >= 1 if done is not None else False
+        reading = habitify_reading(habits_map, habit_name, meta)
+        if reading is None:
+            # #4362: unobserved (renamed/archived upstream, or not on today's journal) —
+            # named in the details so the drift is visible, never scored as a miss.
+            unobserved.append(habit_name)
+            continue
+        is_done = reading >= 1
         if is_vice:
             vice_status[habit_name] = is_done
         if tier in (0, 1):
@@ -259,8 +291,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             week_count = 1 if is_done else 0
             for day_rec in habitify_7d[-6:]:
                 day_habits = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
-                d = day_habits.get(habit_name, 0)
-                if d is not None and float(d) >= 1:
+                d = habitify_reading(day_habits, habit_name, meta)
+                if d is not None and d >= 1:
                     week_count += 1
             freq_score = min(100.0, round(week_count / max(target_freq, 1) * 100))
             tier_scores[2].append(freq_score * sw)
@@ -297,6 +329,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
         "vices": {"held": vices_held, "total": vices_total},
         "composite_method": "tier_weighted",
     }
+    if unobserved:
+        details["unobserved"] = unobserved
     return composite, details
 
 

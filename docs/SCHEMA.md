@@ -1666,7 +1666,7 @@ a re-run would version (no writes, no model calls).
 | `timezone` | User timezone string |
 | `day_grade_weights` | object | Per-component weights for day grade (sleep_quality, recovery, etc.) |
 | `mvp_habits` | list | Habit names tracked in MVP scorecard (legacy, superseded by habit_registry) |
-| `habit_registry` | map | 65-habit registry with tier/category/mechanism/synergy metadata (v2.47.0) |
+| `habit_registry` | map | 65-habit registry with tier/category/mechanism/synergy metadata (v2.47.0). Optional per-entry `habitify_names` (list): every name the habit has carried in Habitify — a renamed habit resolves through it, and a registry habit the day's Habitify row does not name is UNOBSERVED, never a miss (#4362, `scoring_engine.habitify_reading`) |
 | `weight_loss_phases` | list | Phase objects with start_lbs, end_lbs, weekly_target_lbs |
 | `demo_mode_rules` | object | Rules for demo/share sanitization (see below) |
 | `source_of_truth` | object | Per-domain SOT overrides (see below) |
