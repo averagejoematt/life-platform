@@ -866,6 +866,15 @@ def _governor_cadence_hits(files, step_hours: int | None) -> list[str]:
         except ValueError:
             rel = doc  # scratch file outside the repo (the non-vacuous test)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            # #4135: both GOVERNOR_COMPOUND_RE and GOVERNOR_BARE_RE require the literal
+            # substring "governor" (case-insensitive) to match at all, so a line without
+            # it can never pass `_line_names_the_governor` regardless of HISTORICAL — a
+            # plain `str.lower()` + `in` check is exact, not approximate, and skips the
+            # ~99% of the 911-file governor surface that never mentions the word, at a
+            # fraction of a regex `.search()`'s cost (measured: this was the single
+            # largest re.search consumer in the whole gate, ~330K calls of ~2.3M).
+            if "governor" not in line.lower():
+                continue
             if HISTORICAL.search(line):
                 continue
             if not _line_names_the_governor(line):
