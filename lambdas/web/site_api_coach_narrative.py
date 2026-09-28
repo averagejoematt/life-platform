@@ -25,7 +25,10 @@ This module does NOT import the facade; no import cycle.
 """
 
 from boto3.dynamodb.conditions import Key
-from coach import audience_guard  # #2972 — the public-audience frame (public_read)
+from coach import (
+    audience_guard,  # #2972 — the public-audience frame (public_read)
+    coach_presence_gate,  # #4217 — the absent coach: one derivation, fail-open
+)
 from coach.persona_registry import (  # coaching-team v2: names come from the registry
     OPERATIONAL_SHORT_IDS,  # #3172: the ai_analysis EXPERT# keyspace
     display_map as _registry_display_map,
@@ -266,6 +269,32 @@ def _journaling_prompt_for_domain(table, domain):
     return (item or {}).get("journaling_prompt")
 
 
+def _reader_register(resp, output):
+    """#4213: every prose slot of /api/coach_analysis in the READER register, in place.
+
+    The endpoint is public — /coaching/by-coach/ prints `analysis` under "their read on
+    his <domain>" and `key_recommendation` as "the one thing", the cockpit prints both —
+    but the stored daily-brief read is written TO Matthew ("…something you activated,
+    Matthew"). Same policy as the other by-coach slots (#4225/#4331, coach.audience_guard,
+    no second regex): an owner-directed value serves its PUBLIC twin — `public_summary`
+    for the read, `public_ask` for the one thing — or nothing. Every other free-text slot
+    is reader-safe or withheld.
+    """
+    resp["analysis"] = audience_guard.reader_safe(resp.get("analysis")) or audience_guard.public_read(output)
+    resp["key_recommendation"] = audience_guard.public_ask(output) or audience_guard.reader_safe(resp.get("key_recommendation"))
+    for field in (
+        "elena_quote",
+        "journaling_prompt",
+        "thread_reference",
+        "revision_signal",
+        "cross_coach_reference",
+        "cross_domain_note",
+        "weekly_priority",
+    ):
+        if field in resp:
+            resp[field] = audience_guard.reader_safe(resp.get(field))
+
+
 def handle_coach_analysis(event, *, _g):
     """GET /api/coach_analysis"""
     _integrator_digest = _g["_integrator_digest"]
@@ -325,6 +354,15 @@ def handle_coach_analysis(event, *, _g):
         out_items = out_resp.get("Items", [])
         if not out_items:
             return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=300)
+        # #4217: a coach whose domain instrument is DARK is ABSENT here exactly as on
+        # /api/coaches and /api/coach/<id> — its stored read is not served (it would quote a
+        # sensor that stopped); the payload says why in the engine's own words. Fail-open.
+        absent_state = coach_presence_gate.coach_absence(coach_id, logger, "[/api/coach_analysis]", table=table)
+        if absent_state:
+            return _ok(
+                {"coach_id": coach_id, "domain": domain, "analysis": None, "absent": True, "reason": absent_state.get("reason")},
+                cache_seconds=300,
+            )
 
         output = _decimal_to_float(out_items[0])
         # Prefer observatory_summary over full content
@@ -524,6 +562,7 @@ def handle_coach_analysis(event, *, _g):
         except Exception:
             pass
 
+        _reader_register(resp, output)
         # Strip None values for cleaner JSON
         resp = {k: v for k, v in resp.items() if v is not None}
         return _ok(resp, cache_seconds=300, content_as_of=content_vintage(*_vintage_stamps))
