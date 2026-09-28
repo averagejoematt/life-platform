@@ -351,6 +351,16 @@ class TestFetchHelpers:
         table.query_error = RuntimeError("throttled")
         assert di.fetch_memory_records("what_worked") == []
 
+    def test_memory_records_skip_a_soft_deleted_note(self, table):
+        """#4355: delete_platform_memory tombstones (deleted_at), never dynamodb:DeleteItem
+        (the MCP role has no grant on this partition) — every reader must skip the row."""
+        seed(
+            table,
+            _row("platform_memory", "MEMORY#what_worked#2026-05-01", note="deleted", deleted_at="2026-05-02T00:00:00+00:00"),
+            _row("platform_memory", "MEMORY#what_worked#2026-04-20", note="kept"),
+        )
+        assert [r["note"] for r in di.fetch_memory_records("what_worked", days=30)] == ["kept"]
+
     def test_journal_entries_are_fetched_under_the_dated_journal_prefix(self, table):
         seed(
             table,
@@ -823,6 +833,20 @@ class TestLoadIntentionHistory:
     def test_a_query_failure_degrades_to_no_history(self, table):
         table.query_error = RuntimeError("throttled")
         assert di._load_intention_history(YESTERDAY) == []
+
+    def test_a_soft_deleted_note_is_skipped(self, table):
+        """#4355 sibling: same tombstone class as fetch_memory_records above."""
+        seed(
+            table,
+            _row(
+                "platform_memory",
+                f"MEMORY#intention_tracking#{YESTERDAY}",
+                evaluations="[]",
+                deleted_at="2026-05-09T00:00:00+00:00",
+            ),
+            _row("platform_memory", "MEMORY#intention_tracking#2026-04-25", evaluations="[]"),
+        )
+        assert [r["sk"] for r in di._load_intention_history(YESTERDAY)] == ["MEMORY#intention_tracking#2026-04-25"]
 
 
 class TestAnalyzeIntentionExecutionGap:

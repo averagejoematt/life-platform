@@ -1356,6 +1356,7 @@ TOOLS = {
                     "category": {"type": "string", "description": "Memory category."},
                     "date": {"type": "string", "description": "Date of the legacy one-row-per-day record to delete (YYYY-MM-DD)."},
                     "key": {"type": "string", "description": "Exact sk of the row to delete — the only handle for a per-note row (#4171)"},
+                    "reason": {"type": "string", "description": "Optional short note on why this record was deleted (#4355)."},
                 },
                 "required": ["category"],
             },

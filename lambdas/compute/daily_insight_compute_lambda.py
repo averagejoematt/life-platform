@@ -197,7 +197,7 @@ def fetch_memory_records(category, days=30):
                 }
             )
         )
-        return [d2f(i) for i in resp.get("Items", [])]
+        return [d2f(i) for i in resp.get("Items", []) if not i.get("deleted_at")]  # #4355: skip a tombstoned note
     except Exception as e:
         logger.warning(f"fetch_memory({category}): {e}")
         return []
@@ -613,7 +613,7 @@ def _load_intention_history(yesterday_str):
             )
         )
         records = []
-        for item in resp.get("Items", []):
+        for item in (i for i in resp.get("Items", []) if not i.get("deleted_at")):  # #4355: skip a tombstoned note
             rec = d2f(item)
             evals_raw = rec.get("evaluations", "[]")
             if isinstance(evals_raw, str):

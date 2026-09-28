@@ -458,9 +458,12 @@ LIST_MEMORY_CATEGORIES_DESCRIPTION = (
 )
 
 DELETE_PLATFORM_MEMORY_DESCRIPTION = (
-    "Delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
+    "SOFT-delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
     "category + key (the exact sk from read_platform_memory — the only handle for a per-note row, #4171). "
-    "Use to correct bad memories or remove stale records."
+    "Use to correct bad memories or remove stale records. #4355: this is a tombstone (deleted_at/deleted_reason), "
+    "not a DynamoDB delete — the MCP role has no dynamodb:DeleteItem on this partition. Every reader "
+    "(read_platform_memory, list_memory_categories, the coach's memory block) skips it from that instant on; "
+    "an optional 'reason' is stored alongside."
 )
 
 LOG_DECISION_DESCRIPTION = (
