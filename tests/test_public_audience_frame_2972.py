@@ -197,9 +197,9 @@ def _coach_analysis_body(monkeypatch, output_row):
 def test_coach_analysis_serves_public_read_from_public_summary_only(monkeypatch):
     body = _coach_analysis_body(monkeypatch, _output_row(content=_LISA_PARK, public_summary=_PUBLIC_OK))
     assert body["public_read"] == _PUBLIC_OK
-    # `analysis` stays the coaching register pending the #2959 adjudication —
-    # unchanged behavior, asserted so this test documents the split deliberately.
-    assert body["analysis"] == _LISA_PARK
+    # #4213 (2026-09-28): `analysis` is no longer the coaching register — /coaching/by-coach/
+    # prints it to readers — so an owner-directed read yields to its public twin.
+    assert body["analysis"] == _PUBLIC_OK
 
 
 def test_coach_analysis_omits_public_read_when_no_safe_public_text_exists(monkeypatch):
