@@ -82,11 +82,14 @@ def test_deploy_docs_scanned_for_tombstones():
     scanned = {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=False)}
     assert "deploy/README.md" in scanned
     assert "deploy/OPERATIONAL_RUNBOOK.md" in scanned
-    # dated/deprecated records stay exempt (history may mention history)…
-    assert "deploy/MANIFEST.md" not in scanned
+    # a dated/deprecated record stays exempt (history may mention history)…
     assert "deploy/V2_ROLLBACK.md" not in scanned
-    # …but are still reachable with --all.
-    assert "deploy/MANIFEST.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
+    # …but is still reachable with --all.
+    assert "deploy/V2_ROLLBACK.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
+    # MANIFEST.md was the same shape but has since moved out of deploy/*.md entirely
+    # (deploy/archive/onetime/MANIFEST.md, #4258) — it no longer appears in either set.
+    assert "deploy/MANIFEST.md" not in scanned
+    assert "deploy/MANIFEST.md" not in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
 
 
 def test_makefile_scanned_for_tombstones():

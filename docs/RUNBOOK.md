@@ -1189,7 +1189,7 @@ aws lambda update-function-configuration \
    ```
 3. **Cross-platform builds:** Python deps must use `--platform manylinux2014_x86_64 --only-binary=:all:` (not macOS `.so` files)
 4. **IAM co-location:** If a code change adds new AWS operations (e.g., `dynamodb:Query` for gap-fill), update IAM in the same deploy
-5. **Deploy manifest:** See `deploy/MANIFEST.md` for Lambda → handler → zip mappings
+5. **Deploy manifest:** `deploy/MANIFEST.md` is deprecated (archived #4258); see `docs/ARCHITECTURE.md` + `ci/lambda_map.json` for Lambda → handler → zip mappings
 6. **Smoke test template:** Source `deploy/SMOKE_TEST_TEMPLATE.sh` for reusable test functions
 7. **Wait 10 seconds** between sequential Lambda deploys
 

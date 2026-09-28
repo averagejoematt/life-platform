@@ -830,7 +830,7 @@ user_who_is_matthew.md
 | `reference_two_module_size_guards.md` | reference | `tests/conftest.py` (`_PREMERGE_EXTRA_FILES`: both size gates) + `docs/ENGINEERING_STANDARDS.md` | already-homed |
 | `reference_verify_bundle_boot_is_the_real_gate.md` | reference | `.claude/skills/deploy/SKILL.md` (verify it BOOTS) + `docs/DECISIONS.md` ADR-146 | already-homed |
 | `reference_volatile_timestamp_in_asserted_blob.md` | reference | `docs/TESTING.md` § traps (a substring asserted absent from `json.dumps`) | homed-here |
-| `reference_withings_transient_refresh.md` | reference | `docs/REMEDIATION_TAXONOMY.md` + `deploy/MANIFEST.md` | already-homed |
+| `reference_withings_transient_refresh.md` | reference | `docs/REMEDIATION_TAXONOMY.md` + `deploy/archive/onetime/MANIFEST.md` | already-homed |
 | `reference_workflow_step_deps_and_first_apply.md` | reference | `.claude/skills/prove-it/SKILL.md` § dark: a missing dependency; the first-apply half in `docs/OPERATING_DISCIPLINE.md` §5.8 | already-homed |
 | `reference_worktree_agent_path_reuse.md` | reference | `.claude/agents/worktree-implementer.md` 0b + `scripts/lane_worktree.py` | already-homed |
 | `reference_worktree_case_insensitive_pollution.md` | reference | `docs/CONVENTIONS.md` §7 | already-homed |
