@@ -83,9 +83,10 @@ from typing import Any, Callable
 
 from health import deficit_disclosures
 
-from training import owner_redlines, program_structure, self_added_volume, training_context_registry
+from training import owner_redlines, program_structure, recent_aerobic, self_added_volume, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.8.0"  # #4161: hybrid weeks, the lock-anchored −40 % deload, the protein-gated rate target
+ENGINE_VERSION = "plan-engine@1.9.0"  # #4387: recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
+# plan-engine@1.8.0 (#4161): hybrid weeks, the lock-anchored −40 % deload, the protein-gated rate target
 # plan-engine@1.7.0 (#4110/#4147): the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
 # plan-engine@1.6.0 (#4081): self_added_volume evaluated from adherence's set counts; 1.5.0 #4098: `not_before_week` enforced + rolling e1RM anchor drop
 # plan-engine@1.4.0 (#4072): every input carries measured / absent / read_failed / not_read — a failed read is never "unknown"
@@ -125,6 +126,7 @@ ENGINE_INPUTS = (
     "block_workouts",
     "training_memory_constraints",
     "dxa_scans",  # #4166: the protein gate's body-fat tier
+    "recent_aerobic",  # #4387: per-activity aerobic load, 3 days through target − 1
 )
 _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
@@ -133,6 +135,8 @@ _TRIPWIRE_INPUT = {
     "weight_stall_with_adherence": "weight_stall_days",
     "pain_flag_named_site": "pain_evidence_scope",
     "self_added_volume": "hevy_workouts_prescription_window",
+    "walking_collapse": "recent_aerobic",
+    "walking_overshoot": "recent_aerobic",
 }
 
 
@@ -321,6 +325,7 @@ def _tripwire_states(
     prescription_rows: list[dict[str, Any]] | None = None,
     date: str | None = None,
     week: int | None = None,
+    recent_aerobic_block: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -593,6 +598,14 @@ def _tripwire_states(
             "counts_from": "health.adherence_calc (adherence.movements on each Hevy row: programmed_sets vs performed_sets)",
         }
         out.append(row)
+    # #4387 — walking_collapse and walking_overshoot, REPORT-ONLY the way self_added_volume is
+    # (#4111): a row the coach reads and the Sunday report names, never a veto or a change.
+    reports = recent_aerobic.weekly_reports(recent_aerobic_block, float(by_id["walking_collapse"]["threshold_pct"]))
+    for tid in ("walking_collapse", "walking_overshoot"):
+        state, observed, detail = reports[tid]
+        row = _missing(tid, detail) if recent_aerobic_block is None else _row(tid, state, observed, detail)
+        row["report_only"] = True
+        out.append(row)
     # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
     # never per-tripwire, so a new declaration is read the day it is written.
     for row in out:
@@ -676,6 +689,7 @@ def constraint_block(
     block_workouts: list[dict[str, Any]] | None = None,
     training_memory_constraints: list[dict[str, Any]] | None = None,
     input_status: dict[str, dict[str, Any]] | None = None,
+    recent_aerobic: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The deterministic inputs to tomorrow's session. No model, no I/O, no hidden state.
 
@@ -712,6 +726,7 @@ def constraint_block(
             "block_workouts": block_workouts,
             "training_memory_constraints": training_memory_constraints,
             "dxa_scans": dxa_scans,
+            "recent_aerobic": recent_aerobic,
         },
         input_status,
     )
@@ -807,6 +822,7 @@ def constraint_block(
         prescription_rows=hevy_workouts_prescription_window,
         date=date,
         week=week,
+        recent_aerobic_block=recent_aerobic,
     )
     tripped = [t["id"] for t in tripwires if t["state"] == "tripped"]
     unknown = [t["id"] for t in tripwires if t["state"] == "unknown"]
@@ -861,6 +877,10 @@ def constraint_block(
         # the fixed accessories, the Hevy folder. Third, right after the two safety keys:
         # walking and the standing constraints outrank any single session.
         "session": session,
+        # #4387 — the walking total cannot say "yesterday was 2¾ h on foot". These rows can: one
+        # per activity over the 3 days through target − 1, each flagged against the walking
+        # redlines, with the session's cardio modality picked FROM them (`cardio_pick`).
+        "recent_aerobic": _recent_aerobic_view(recent_aerobic, session.get("archetype"), states.get("recent_aerobic")),
         # v3.3 ruling "B" (#4161): the SERVED target is gated by protein adherence — `rate_target.protein_gate` says which
         "rate_target": owner_redlines.rate_target_lb_per_wk(
             weight_lb,
@@ -1005,6 +1025,13 @@ def constraint_block(
             if s
         ],
     }
+
+
+def _recent_aerobic_view(block: dict[str, Any] | None, archetype: Any, state: dict[str, Any] | None) -> dict[str, Any]:
+    """`constraint_block.recent_aerobic`: the block as read, plus the cardio pick for the served session (#4387)."""
+    base = dict(block) if block else {"state": (state or {}).get("state") or "unknown", "rows": [], "input_state": state}
+    base["cardio_pick"] = recent_aerobic.cardio_pick(block, archetype)
+    return base
 
 
 def gather(readers: dict[str, Callable[[], Any]]) -> dict[str, Any]:

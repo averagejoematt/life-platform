@@ -612,14 +612,17 @@ def build_adherence_packet(inputs: dict[str, Any]) -> dict[str, Any]:
         wow = round((this_wk - last_wk) / last_wk * 100, 1)
         n["walking_wow_pct"] = wow
         if wow < -walk_t["threshold_pct"]:
+            # #4387: walking_collapse is `report_only` now (the self_added_volume branch below, #4111) —
+            # read off the redline's own class, so the row and this flag cannot disagree.
+            walk_report_only = walk_t.get("tripwire_class") == "report_only"
             flags.append(
                 _flag(
                     "walking_wow_pct",
-                    "change",
+                    "info" if walk_report_only else "change",
                     f"walking+cycling {this_wk} hr vs {last_wk} hr last week ({wow}%, tripwire `{walk_t['id']}` at -{walk_t['threshold_pct']}%) — {walk_t['action']}",
                     provenance=walk_t["provenance"],
-                    field="walking",
-                    to="human_contact_and_mode_review",
+                    field=None if walk_report_only else "walking",
+                    to=None if walk_report_only else "human_contact_and_mode_review",
                 )
             )
         else:

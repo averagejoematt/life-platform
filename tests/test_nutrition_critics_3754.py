@@ -286,11 +286,18 @@ def test_logging_dark_one_day_is_not_flagged_and_a_past_gap_is_info():
     assert f["severity"] == "info"
 
 
-def test_walking_collapse_over_thirty_percent_is_the_relapse_prodrome():
+def test_walking_collapse_over_thirty_percent_is_the_relapse_prodrome(monkeypatch):
+    """#4387: walking_collapse is `report_only` (as self_added_volume is, #4111) — the flag names the
+    prodrome and its action as information, never a mechanical change. The other arm (a class that
+    is not report_only) still returns `change`: the branch reads the redline's class, not a constant."""
     p = nc.build_adherence_packet(_inputs(walking_hr_this_wk=6.0, walking_hr_last_wk=10.0))
     (f,) = _flags(p, "walking_wow_pct")
-    assert f["severity"] == "change" and "mandatory human contact" in f["reason"]
+    assert f["severity"] == "info" and f["field"] is None and "mandatory human contact" in f["reason"]
     assert f["provenance"] == TW["walking_collapse"]["provenance"] == "owner-history"
+    assert TW["walking_collapse"]["tripwire_class"] == "report_only"
+    monkeypatch.setitem(TW["walking_collapse"], "tripwire_class", None)
+    (f2,) = _flags(nc.build_adherence_packet(_inputs(walking_hr_this_wk=6.0, walking_hr_last_wk=10.0)), "walking_wow_pct")
+    assert f2["severity"] == "change" and f2["to"] == "human_contact_and_mode_review"
 
 
 def test_walking_down_less_than_thirty_percent_is_info():
