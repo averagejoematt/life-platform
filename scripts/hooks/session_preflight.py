@@ -20,13 +20,19 @@ WHAT IT PRINTS
 
 NEVER BLOCKS
   SessionStart output is context, not a gate. It always exits 0.
+
+HEARD (#4260, verified against the hook contract)
+  Unlike PreToolUse/PostToolUse, SessionStart's plain stdout on exit 0 IS added to the
+  model's context, so this hook keeps printing plain text — it is the one hook in this
+  layer that was never silent. It reads the payload so `branch=` names the checkout the
+  session actually started in (payload `cwd`), not the checkout this script lives in.
 """
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _hooklib import ROOT, gh, git  # noqa: E402
+from _hooklib import ROOT, gh, git, read_payload  # noqa: E402
 
 
 def _main_green() -> str:
@@ -101,6 +107,7 @@ def _boot_brief() -> list[str]:
 
 
 def main() -> int:
+    read_payload()  # records the payload cwd for git(); an empty/garbage stdin is fine
     print("── session pre-flight " + "─" * 46)
     print(f"  main        {_main_green()}")
     print(f"  deploy lease {_waiting_lease()}")

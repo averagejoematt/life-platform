@@ -248,6 +248,13 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(git push *)",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_push_swallow.py\"",
+            "timeout": 40
+          },
+          {
+            "type": "command",
+            "if": "Bash(git -C *)",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_push_swallow.py\"",
             "timeout": 40
           }
