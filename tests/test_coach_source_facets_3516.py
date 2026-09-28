@@ -31,6 +31,8 @@ The two live sentences are the positive controls for the gate.
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from coach import coach_brief_input_gate as gate  # noqa: E402
@@ -206,6 +208,119 @@ def test_the_denial_of_a_sync_failure_is_not_a_finding_and_the_guard_actually_ap
     assert gate.source_facet_findings(denial) == []
     assert gate.source_facet_findings(assertion), "the un-denied sentence must still be a finding — the guard must be narrow"
     assert gate.source_facet_findings(LIVE_GARMIN), "the live misattribution must survive the guard"
+
+
+# ── #4361: hevy/habitify/notion were absent, and a retired signal was still offered ──
+#
+# GUARD THE SET, NOT THE INSTANCE (again). The defect was three specific missing rows
+# plus one stale label, but the interesting guard is not "hevy/habitify/notion are
+# listed" — it is "every registry source that carries a coach-facing facet is listed",
+# derived below, so a FUTURE source gaining `instrument_for`/`engagement_channel`/
+# `evidence_for` is caught the day it does, not the next time a coach reads a live
+# brief and reports a source that "doesn't exist".
+
+
+def _coach_relevant_source_ids():
+    """Registry ids a coach domain pack treats as a live signal (#4361).
+
+    The union of the three registry facets that exist BECAUSE some coach surface reads
+    that source: `engagement_channel` (#914, the presence/quiet-stretch channel),
+    `instrument_for` (#4217, the coach whose domain instrument this source is — checked
+    on `apple_health`'s nested `hae_datatypes` sub-entries too, where the glucose facet
+    actually lives), and `evidence_for` (#3252, ADR-104's "if he had done it, would this
+    source know" facet).
+
+    Two facet-carrying ids are excluded, for reasons that predate #4361 rather than
+    being invented to pass it:
+
+      * `withings` — `ai.ai_context._build_physical_data` reads `data.get("withings")`,
+        but `emails.daily_brief_lambda`'s gather-and-return `data` dict never sets a
+        `withings` key (only `latest_weight`/`weight_recency`) — no coach domain pack
+        reads THIS wire key today. Adding an inventory row keyed to a dead key would be
+        a NEW fixture-is-not-the-wire bug, not a fix for this one.
+      * `labs` — this module's own INVENTORY_ROWS block comment already rules
+        event-cadence sources (DEXA scans, lab draws — `labs.method` is a manual upload
+        "after each draw, ~6-month cadence") carry no ingest pipe and no caveat to
+        state. `labs` already has a "Lab bloodwork" row by name (satisfying "appears in
+        INVENTORY_ROWS"), deliberately left un-linked to a registry id — a design
+        decision #4361 does not reopen.
+    """
+    ids = set()
+    for sid, entry in sr.SOURCE_REGISTRY.items():
+        if sid in ("withings", "labs"):
+            continue
+        if entry.get("instrument_for") or entry.get("engagement_channel") or entry.get("evidence_for"):
+            ids.add(sid)
+        for datatype in entry.get("hae_datatypes", []) or []:
+            if datatype.get("instrument_for") or datatype.get("evidence_for"):
+                ids.add(sid)
+    return ids
+
+
+def _assert_every_coach_relevant_source_is_listed(rows):
+    """The guard itself, factored out so the mutation control below can exercise it
+    against a mutated copy of INVENTORY_ROWS without re-deriving the assertion."""
+    required = _coach_relevant_source_ids()
+    listed = {sid for _n, _k, sid in rows if sid}
+    missing = required - listed
+    assert not missing, f"coach-relevant source(s) missing from INVENTORY_ROWS: {sorted(missing)}"
+
+
+def test_every_live_coach_relevant_source_is_in_the_inventory():
+    """#4361: hevy (strength training), habitify (habits) and notion (journal) were
+    coach-relevant registry sources absent from INVENTORY_ROWS — coaches were told three
+    logged sources did not exist. The derivation covers the issue's own three sources
+    AND is non-vacuous beyond them, and asserts none of the required ids are retired."""
+    required = _coach_relevant_source_ids()
+    assert required, "the derivation is dark"
+    assert {"hevy", "habitify", "notion"} <= required, "the derivation must cover the issue's own three sources"
+    assert required - {"hevy", "habitify", "notion"}, "the guard must not be vacuous once the three named sources are set aside"
+    _assert_every_coach_relevant_source_is_listed(gate.INVENTORY_ROWS)
+    for source_id in required:
+        assert source_id not in sr.RETIRED_SOURCES, f"{source_id} is retired but still claimed coach-relevant"
+
+
+def test_removing_the_hevy_row_fails_the_guard_mutation_control():
+    """Mutation control for the guard above: delete the hevy row and confirm the SET
+    guard — not just a hand check for "hevy" — actually catches it."""
+    mutated = tuple(row for row in gate.INVENTORY_ROWS if row[2] != "hevy")
+    assert len(mutated) == len(gate.INVENTORY_ROWS) - 1, "the mutation removed no row — fixture is stale"
+    _assert_every_coach_relevant_source_is_listed(gate.INVENTORY_ROWS)  # passes on the real rows
+    with pytest.raises(AssertionError, match="hevy"):
+        _assert_every_coach_relevant_source_is_listed(mutated)
+
+
+def test_the_inventory_names_no_retired_eightsleep_signal():
+    """ADR-118 (#489) retired Eight Sleep bed temperature: the `/v2/intervals` fetch
+    404'd for 4+ months and the fetch was deleted (`eightsleep_lambda.fetch_temperature_data`
+    is gone). The inventory row must describe what the source STILL supplies (sleep
+    stages, HR/HRV, restlessness — `sr.SOURCE_REGISTRY['eightsleep']['metrics']`), never
+    the retired field."""
+    names = [name.lower() for name, _keys, _sid in gate.INVENTORY_ROWS]
+    assert not any("bed temp" in n or "temperature" in n for n in names), "a retired Eight Sleep signal is still named"
+    eight = next(name for name, _keys, sid in gate.INVENTORY_ROWS if sid == "eightsleep")
+    assert "temp" not in eight.lower(), f"{eight!r} still references temperature, which ADR-118 retired"
+
+
+def test_the_new_rows_key_off_the_briefs_real_wire_keys():
+    """Fixture must be the wire (#4361): the keys tuple for each new row must be the
+    ACTUAL key `emails.daily_brief_lambda`'s gather-and-return `data` dict carries for
+    that source, not a guessed name. Hevy is keyed `mf_workouts` (its legacy,
+    MacroFactor-shaped name) despite the confusing name — `fetch_hevy_workouts` writes it."""
+    by_source = {sid: keys for _n, keys, sid in gate.INVENTORY_ROWS if sid}
+    assert by_source["hevy"] == ("mf_workouts",)
+    assert by_source["habitify"] == ("habitify",)
+    assert by_source["notion"] == ("journal_entries",)
+    rendered_present = gate.data_inventory(
+        {"mf_workouts": [{"id": "w1"}], "habitify": {"total_possible": 3}, "journal_entries": [{"date": "x"}]}
+    )
+    assert "  - Hevy strength training: AVAILABLE" in rendered_present
+    assert "  - Habitify habits: AVAILABLE" in rendered_present
+    assert "  - Notion journal: AVAILABLE" in rendered_present
+    rendered_absent = gate.data_inventory({})
+    assert "  - Hevy strength training: not available" in rendered_absent
+    assert "  - Habitify habits: not available" in rendered_absent
+    assert "  - Notion journal: not available" in rendered_absent
 
 
 def test_registry_view_freezes_the_caveated_set_instead_of_reading_the_live_registry():
