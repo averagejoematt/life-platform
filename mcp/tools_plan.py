@@ -903,6 +903,8 @@ def _run_stage_2(
         # #4076: every override asked for on this run, applied or not, with his words verbatim.
         "owner_overrides": override_records,
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
+        # #4387: the per-activity rows the joints critic argued from, on the stored record (the live-proof read)
+        "recent_aerobic": {k: (block.get("recent_aerobic") or {}).get(k) for k in ("window", "rows", "totals", "cardio_pick")},
         # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
         "draft_exercises": draft_exercises,
     }

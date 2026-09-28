@@ -365,6 +365,9 @@ def test_stage_2_holds_a_critic_cut_at_the_gate_floor_and_the_commit_gate_is_cle
     assert ir.exercises[0].sets[0].weight_kg == pytest.approx(floor["floor_kg"])
     assert g.prescription_gate(ir)["verdict"] == "clean"
     assert "CONFLICT: blueprint_historian vs the subtract-only floor" in out["critics"]["notes_preview"]
+    # #4387: the stored record carries the recent-aerobic rows the joints critic argued from (the live-proof read)
+    assert set(out["critics"]["recent_aerobic"]) == {"window", "rows", "totals", "cardio_pick"}
+    assert "weight_bearing_hr_48h" in out["critics"]["packet_numbers"]["joints_tendons"]
 
 
 # ── 4. the conditional-up detector reads negation ────────────────────────────────────
