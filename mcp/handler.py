@@ -10,8 +10,18 @@ The remote transport implements MCP Streamable HTTP (spec 2025-06-18):
 - HEAD / — Protocol version discovery
 - GET /  — 405 (no SSE support in Lambda)
 
-OAuth: Minimal auto-approve flow to satisfy Claude's connector requirement.
-Security is provided by the unguessable 40-char Lambda Function URL, not OAuth.
+Auth (#4286 — this replaces a stale claim that the Function URL alone was the
+security boundary; it implements a real OAuth 2.1 + PKCE flow, see below):
+- Remote MCP: OAuth 2.1 + PKCE (RFC 7636). `/authorize` gates on a passcode (or
+  a 90-day remembered-browser cookie, #916) before it will mint anything — the
+  Function URL is no longer sufficient on its own (#893-B). `/token` exchanges
+  the single-use, PKCE-bound code for a short-lived, revocable session Bearer
+  (#893-A). Every `tools/list`/`tools/call` request is then checked by
+  `_validate_bearer()`: the static HMAC-derived key Bearer (constant-time
+  compare) OR a live session Bearer, fail-closed with no API key configured
+  (R13-F05 — see `_get_bearer_token`/`_validate_bearer` below).
+- Local bridge: AWS IAM/SigV4 on the direct `boto3` Lambda invoke — no HTTP,
+  no Bearer token, a completely different mechanism from the remote path above.
 """
 
 import base64
