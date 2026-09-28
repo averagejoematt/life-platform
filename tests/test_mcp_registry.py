@@ -262,6 +262,58 @@ def test_r7_all_tool_modules_parseable():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# R8 — Every tool carries MCP `annotations` (#4286)
+# R9 — mutation control: an AST-provable DynamoDB writer is never readOnlyHint=True
+# ══════════════════════════════════════════════════════════════════════════════
+
+_REQUIRED_ANNOTATION_KEYS = {"readOnlyHint", "destructiveHint", "idempotentHint"}
+
+
+def _live_tools():
+    """Import the real TOOLS dict (post `annotate_tools()`), setting the same
+    env-var defaults every other `from mcp... import` test file sets — importing
+    `mcp.registry` pulls in `mcp.config`, which requires `S3_BUCKET`/`USER_ID`."""
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    os.environ.setdefault("TABLE_NAME", "life-platform")
+    os.environ.setdefault("USER_ID", "matthew")
+    os.environ.setdefault("AWS_REGION", "us-west-2")
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    from mcp.registry import TOOLS
+
+    return TOOLS
+
+
+def test_r8_every_tool_carries_annotations():
+    """R8 (#4286): every tool's schema carries an `annotations` object with the
+    three MCP-spec hint booleans, so a client sees write-vs-read before ever
+    calling `tools/call`. `handle_tools_list` emits `schema` verbatim, so this
+    is also what actually reaches the wire."""
+    tools = _live_tools()
+    missing = [
+        name for name, entry in tools.items() if not (_REQUIRED_ANNOTATION_KEYS <= set(entry.get("schema", {}).get("annotations") or {}))
+    ]
+    assert not missing, f"R8 FAIL: {len(missing)} tool(s) missing one of {_REQUIRED_ANNOTATION_KEYS}: {missing}"
+
+
+def test_r9_ddb_write_tools_are_never_readonly():
+    """R9 (#4286) — mutation control. `tests/mcp_registry_ast.py::ddb_write_tool_names`
+    structurally proves (via AST, following same-module dispatch targets) that a
+    tool's implementing function reaches a DynamoDB put_item/update_item/
+    delete_item/transact_write_items/batch_write_item call. None of those tools
+    may ever advertise `readOnlyHint: true` — a client must never be told a
+    write is safe to auto-approve. This is the guard against a fourth tool
+    landing in the same shape as the three named in mcp/tool_annotations.py
+    (#4401): a read-classified verb with a write hiding behind it."""
+    from mcp_registry_ast import ddb_write_tool_names
+
+    tools = _live_tools()
+    writers = ddb_write_tool_names()
+    assert writers, "R9 FAIL: the AST scan found zero DDB-writing tools — the scan itself is broken"
+    mislabeled = [name for name in writers if (tools.get(name, {}).get("schema", {}).get("annotations") or {}).get("readOnlyHint") is True]
+    assert not mislabeled, f"R9 FAIL: {mislabeled} reach a DynamoDB write (AST) but advertise readOnlyHint=True"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 

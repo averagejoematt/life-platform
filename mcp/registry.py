@@ -5,6 +5,7 @@ Tool registry: maps tool names to their functions and JSON schemas.
 from typing import Any, cast
 
 from mcp.config import RAW_DAY_LIMIT, SOURCES
+from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
@@ -2232,3 +2233,8 @@ def tool_list_available_tools(args=None):
 # (which looks for tool_* names as fn-refs); rebinding here makes the dispatcher
 # resolve to the callable at runtime.
 cast("dict[str, Any]", TOOLS["list_available_tools"])["fn"] = tool_list_available_tools
+
+# #4286: every tool's schema gets its derived `annotations` object here, once, after
+# the dict literal is fully built — `mcp/handler.py::handle_tools_list` already emits
+# `t["schema"]` verbatim, so this is the one place the wire format needs to change.
+annotate_tools(TOOLS)
