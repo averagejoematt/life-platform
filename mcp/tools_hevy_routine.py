@@ -752,6 +752,9 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         pass
 
+    from mcp.plan_cardio_pick import draft_cardio_warnings  # #4387: the modality is picked, not copied
+
+    warnings += draft_cardio_warnings(blocks, archetype, target_date)
     # Title lockdown: the compiler renders Phase - Type - N - Y on commit and
     # ignores any caller title. force_title=true is the explicit escape hatch —
     # only then is the caller's title kept (and a warning logged at commit).

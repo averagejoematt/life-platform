@@ -190,16 +190,24 @@ def test_a_partial_overlap_keeps_only_the_unclaimed_time():
 
 # ── the shared window: every surface reads the same week ───────────────────────────
 def test_the_plan_and_the_adherence_critic_read_the_same_week_and_the_same_hours():
-    """The live-proof shape, offline: on 09-22 a plan for 09-23 and the nutrition critics
-    (window end = the latest complete nutrition day, 09-21) both read 09-15..09-21. Mutation
-    control: make `_walking_volume_last_7d` pass `end_date` instead of the day before — the plan
-    reads a different week and this reds."""
+    """The live-proof shape, offline: on 09-22 the nutrition critics (window end = the latest
+    complete nutrition day, 09-21) read 09-15..09-21, and so does a plan for 09-22 — the same
+    sources, the same de-dup, the same 10.07 h.
+
+    #4387 — THE WINDOW TEST: the plan's walking window ENDS AT target − 1, even when that day
+    is today. A plan made on 09-22 for 09-23 reads 09-16..09-22 and says 09-22 is `partial`;
+    before #4387 it stopped at the last completed day (target − 2), and the plan for 09-28 never
+    saw the 165-min walk of 09-27. Mutation controls: make `_walking_volume_last_7d` pass
+    `end_date` (the plan reads the target day) or drop `through_day_in_progress` (it stops at
+    target − 2) — either reds the window assertion."""
     with patch("mcp.core.query_source_range", side_effect=_reader), patch.object(sq, "pacific_today", return_value=TODAY):
         plan = tp._walking_volume_last_7d("2026-09-23")
         adherence_this = nci._walking_hours(sq.completed_end("2026-09-21"))
         plan_same_day = tp._walking_volume_last_7d(TODAY)
-    assert plan["window"] == {"start": "2026-09-15", "end": "2026-09-21", "days": 7}
-    assert plan["total_hr"] == adherence_this == plan_same_day["total_hr"] == 10.07
+    assert plan["window"] == {"start": "2026-09-16", "end": "2026-09-22", "days": 7}  # target − 1
+    assert plan["partial"] is True
+    assert plan_same_day["window"]["end"] == "2026-09-21" and plan_same_day["partial"] is False
+    assert plan_same_day["total_hr"] == adherence_this == 10.07
 
 
 def test_get_benchmark_walking_hours_are_the_same_definition():

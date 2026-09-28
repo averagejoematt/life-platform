@@ -154,6 +154,8 @@ def draft_summary(ir: Any) -> dict[str, Any]:
                 "top_reps": max(reps) if reps else None,
                 "to_failure": any((getattr(s, "type", "") or "") == "failure" for s in sets) or any(w in notes for w in _FAILURE_WORDS),
                 "axial": _axial_pattern(label) or _axial_pattern(getattr(ex, "movement_key", "")),
+                # #4387: a timed block's length — the joints critic's weight-bearing cardio swap keeps it
+                "duration_seconds": sum(int(getattr(s, "duration_seconds", None) or 0) for s in sets) or None,
             }
         )
     return {
@@ -217,8 +219,13 @@ def build_joints_packet(
     dismissals: list[dict[str, Any]] | None = None,
     stale_by_idx: dict[int, dict[str, Any]] | None = None,
     fatigue: dict[str, Any] | None = None,
+    recent_aerobic: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pain flags on the draft's movements, novelty, and where he is in the week.
+
+    #4387: `recent_aerobic` is `constraint_block.recent_aerobic` — per-activity walking/cycling over
+    the 3 days through target − 1. A lower session's weight-bearing cardio block after a heavy
+    48 h is swapped to cycling (`critics_aerobic`); None reads as unknown and changes nothing.
 
     #4161: `stale_by_idx` is `critics_fatigue.stale_exposure` per drafted lift (the gap and the
     exposure number — the stale-lift cap scales with both); `fatigue` is `critics_fatigue.assess`
@@ -350,6 +357,9 @@ def build_joints_packet(
                 "to": round(AXIAL_HEAVY_LBS * 0.6, 1),
             }
         )
+    from coach.critics_aerobic import aerobic_flags
+
+    aerobic_flags(draft, recent_aerobic, numbers, flags, unknown)  # #4387 — appended LAST: it never displaces a first change
     if not layer_ok:
         flags.append(
             _flag(
@@ -742,7 +752,7 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
     changes = [f for f in packet.get("flags", []) if f["severity"] == "change"]
     if changes:
         f = changes[0]
-        return {
+        out = {
             "verdict": "change",
             "metric": f["metric"],
             "value": packet["numbers"].get(f["metric"]),
@@ -750,6 +760,12 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
             "to": f.get("to"),
             "reason": f["reason"],
         }
+        # #4387: an `independent` change (the weight-bearing cardio swap) rides BESIDE the first
+        # change instead of being dropped by it — a critic's one verdict may carry both.
+        extra = [{k: g.get(k) for k in ("metric", "field", "to", "reason")} for g in changes[1:] if g.get("independent") and g.get("field")]
+        if extra:
+            out["additional_changes"] = extra
+        return out
     return {
         "verdict": "approve",
         "metric": None,

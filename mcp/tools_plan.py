@@ -195,13 +195,16 @@ def _readiness_low_streak(target_date: str) -> tuple[int | None, dict[str, Any]]
 
 
 def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
-    """The derived walking-volume layer for the week BEFORE `end_date`'s session (#3930, #4068).
+    """The derived walking-volume layer for the week BEFORE `end_date`'s session (#3930, #4068, #4387).
 
     A union of Strava and Hevy cardio blocks (#3930), de-duplicated in time across devices and
-    against Hevy sessions, over the 7 COMPLETED days before the session — all of it defined
-    ONCE in `mcp.shared_quantities`, which the nutrition critics and `get_benchmark` read too.
+    against Hevy sessions, over the 7 days ending target − 1 — all of it defined ONCE in
+    `mcp.shared_quantities`, which the nutrition critics and `get_benchmark` read too.
     The window used to END on the target day: a plan for 09-23 read 09-17..09-23 on 09-22 and
-    reported 12.82 h beside the adherence critic's 15.82 h for the same week (#4068).
+    reported 12.82 h beside the adherence critic's 15.82 h for the same week (#4068). It then
+    ended at the last COMPLETED day — target − 2 for a plan made tonight — and the plan for
+    09-28 never saw the 165-min walk of 09-27 (#4387). Target − 1 is included now, marked
+    `partial` while it is still in progress.
 
     Hours, not miles and not steps: the blueprint's floor is stated in hours per week.
     """
@@ -209,7 +212,14 @@ def _walking_volume_last_7d(end_date: str) -> dict[str, Any] | None:
 
     from mcp import shared_quantities
 
-    return shared_quantities.walking_layer(shift_day_key(end_date, -1))
+    return shared_quantities.walking_layer(shift_day_key(end_date, -1), through_day_in_progress=True)
+
+
+def _recent_aerobic(target_date: str) -> dict[str, Any] | None:
+    """Per-activity aerobic load for the 3 days through target − 1 (#4387), through the shared module."""
+    from mcp import shared_quantities
+
+    return shared_quantities.recent_aerobic_layer(target_date)
 
 
 def _pain_dismissals() -> list[dict[str, Any]]:
@@ -368,6 +378,7 @@ def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -
     w["excluded_proxies"] = layer["excluded_proxies"]
     w["derived_steps_estimate"] = layer["derived_steps_estimate"]
     w["window"] = layer["window"]
+    w["window_end_in_progress"] = bool(layer.get("partial"))  # #4387: target − 1 is read even while it is today
     w["volume_layer"] = layer["version"]
     w["total_is_floor"] = layer["total_is_floor"]
     if layer["honesty"]:
@@ -606,6 +617,12 @@ def tool_plan_next_session(args):
         else:
             status["walk_hr_wk_now"] = st(ABSENT, "no walking/treadmill/cycling duration recorded in the trailing 7 days")
 
+    # #4387: the per-activity rows the weekly total cannot show — a 165-min walk yesterday
+    # reads as one line here, flagged against the walking redlines.
+    recent_aerobic, status["recent_aerobic"] = _read("recent_aerobic", _recent_aerobic, target_date)
+    if (recent_aerobic or {}).get("state") == READ_FAILED:
+        status["recent_aerobic"] = st(READ_FAILED, error="SourceReadError: neither Strava nor Hevy could be read for the window")
+
     # #3755: the performed Hevy record over the program's rotation window, so the engine
     # can COMPUTE whether the accessory layer is holding still (v0.3: fixed for the block) instead of assuming the pool.
     rotation_pair, status["hevy_workouts_rotation_window"] = _read("hevy_workouts_rotation_window", _rotation_window, target_date)
@@ -681,6 +698,7 @@ def tool_plan_next_session(args):
         hevy_workouts_prescription_window=prescription_rows,
         block_workouts=block_workouts,
         training_memory_constraints=training_memory,
+        recent_aerobic=recent_aerobic,
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
@@ -696,7 +714,8 @@ def tool_plan_next_session(args):
         "how_to_use": (
             "Stage 1 is the deterministic constraint block. `constraint_block.session` is the NEXT UNDONE session "
             f"of the v{plan_engine.program_structure.PROGRAM_VERSION} sequence (its position, and the completed session that advanced it, #4110) with its prescription — "
-            "start from it. Draft against the block, then say plainly which constraint "
+            "start from it. Its cardio block is `constraint_block.recent_aerobic.cardio_pick` — picked from the last 3 days' "
+            "rows, never copied from the last session (#4387). Draft against the block, then say plainly which constraint "
             "shaped which choice. Every line under `reference.must_say` is required in the answer, verbatim in "
             "substance, not summarised away. Then draft (manage_hevy_routine draft_custom) and call this tool again "
             "WITH routine_id — stage 2, the red team (#3752). A routine that skipped stage 2 is NOT red-teamed and "
@@ -813,6 +832,7 @@ def _run_stage_2(
                 dismissals=dismissals,  # #4036 — the owner's own override of a flag instance
                 stale_by_idx={i: e["stale"] for i, e in by_idx.items() if e.get("stale")},  # #4161: the cap scales with the gap
                 fatigue=evidence.get("fatigue"),  # #4161: performance / readiness, not a loaded-day count
+                recent_aerobic=block.get("recent_aerobic"),  # #4387: what his legs did in the last 48-72 h
             ),
             "rate_advocate": critics.build_rate_advocate_packet(
                 draft,
