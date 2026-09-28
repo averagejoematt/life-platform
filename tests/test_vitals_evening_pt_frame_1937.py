@@ -1,8 +1,11 @@
 """tests/test_vitals_evening_pt_frame_1937.py — #1937 behavioral replay.
 
-The AST guard (test_pt_date_anchor_guard_1937.py) proves NO naked UTC
-day-anchor idiom remains in the source. This file proves the fix actually
-changes handler BEHAVIOR at the exact instant the bug was only observable:
+The AST guard proving no naked UTC day-anchor idiom remains in the source used
+to be test_pt_date_anchor_guard_1937.py; #4268 folded it into
+test_pacific_today_guard_2414.py's fleet-wide reader-surface scan (measured a
+strict subset — every case the file-scoped guard caught, 2414's scan catches
+too). This file proves the fix actually changes handler BEHAVIOR at the exact
+instant the bug was only observable:
 5pm-midnight PT, where the UTC calendar day has already rolled to tomorrow
 while the Pacific day has not (#1936's finding — `/api/vitals` claimed
 "Day 7" on Day 6 at 2026-08-02T02:36Z, which is 2026-08-01 19:36 PDT).
