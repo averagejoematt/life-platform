@@ -219,7 +219,8 @@ def handle_ai_analysis(event, *, _g):
         "analysis": analysis_val,
         "generated_at": ai_item.get("generated_at", ""),
     }
-    if ai_item.get("key_recommendation"):
+    # #4384 set sweep: this EXPERT# slot serves prose too — never a bare identifier.
+    if ai_item.get("key_recommendation") and not audience_guard.is_bare_token(ai_item["key_recommendation"]):
         resp_data["key_recommendation"] = ai_item["key_recommendation"]
     if ai_item.get("journaling_prompt"):
         resp_data["journaling_prompt"] = ai_item["journaling_prompt"]
@@ -278,10 +279,10 @@ def _reader_register(resp, output):
     Matthew"). Same policy as the other by-coach slots (#4225/#4331, coach.audience_guard,
     no second regex): an owner-directed value serves its PUBLIC twin — `public_summary`
     for the read, `public_ask` for the one thing — or nothing. Every other free-text slot
-    is reader-safe or withheld.
+    is reader-safe or withheld, and none of them is ever a bare machine token (#4384).
     """
-    resp["analysis"] = audience_guard.reader_safe(resp.get("analysis")) or audience_guard.public_read(output)
-    resp["key_recommendation"] = audience_guard.public_ask(output) or audience_guard.reader_safe(resp.get("key_recommendation"))
+    resp["analysis"] = audience_guard.reader_prose(resp.get("analysis")) or audience_guard.public_read(output)
+    resp["key_recommendation"] = audience_guard.public_ask(output) or audience_guard.reader_prose(resp.get("key_recommendation"))
     for field in (
         "elena_quote",
         "journaling_prompt",
@@ -292,7 +293,7 @@ def _reader_register(resp, output):
         "weekly_priority",
     ):
         if field in resp:
-            resp[field] = audience_guard.reader_safe(resp.get(field))
+            resp[field] = audience_guard.reader_prose(resp.get(field))
 
 
 def handle_coach_analysis(event, *, _g):
@@ -470,7 +471,6 @@ def handle_coach_analysis(event, *, _g):
         # 6. Confidence language
         confidence_language = "preliminary"
         try:
-            output.get("themes", [])
             # Use the overall confidence from the generation if available
             conf = output.get("confidence")
             if conf is not None:
@@ -520,7 +520,10 @@ def handle_coach_analysis(event, *, _g):
             # coaching-register read pending the #2959 audience-rubric adjudication for
             # the /coaching/* exhibit pages.
             "public_read": audience_guard.public_read(output),
-            "key_recommendation": output.get("key_recommendation") or (output.get("themes", [""])[0] if output.get("themes") else None),
+            # #4384: the coach's own ask or nothing. The old `themes[0]` fallback served a
+            # topic SLUG ("deep_sleep_variability") as "the one thing"; a missing ask is
+            # null, and `_reader_register` refuses a bare token on every prose slot.
+            "key_recommendation": output.get("key_recommendation"),
             "elena_quote": output.get("elena_quote"),
             "journaling_prompt": _journaling_prompt_for_domain(table, domain),  # #3172: real producer is ai_analysis EXPERT#
             "thread_reference": thread_reference,
