@@ -260,7 +260,9 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
     ideal = _generate_upper()[0]
     row = ideal.inputs_snapshot["load_floors"]["movements"]["lat_pulldown"]
     assert row["ramp"]["discount_pct"] == 0 and row["ramp"]["discount"]["anchor_age_days_at_block_1"] == 4
-    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == load_ramp._ceil_half_kg(140 * LB * 0.60)
+    # #4388: a this-cycle anchor ramps on its band e1RM (Epley, 140 lb x 10), not on the set's load
+    assert row["ramp"]["base"] == load_ramp.BASE_BAND_E1RM
+    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == load_ramp._ceil_half_kg(140 * LB * (1 + 10 / 30) * 0.60)
     assert "no detraining discount" in _block(ideal, "lat_pulldown").notes
 
 

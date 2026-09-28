@@ -286,7 +286,7 @@ def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
     for e in session["prescription"]["exposures"]:
         if e["movement_key"] in HEAVY_ANCHORS:
             assert e["load"]["top_kg"] == _top(ideal, e["movement_key"]), "planner and draft disagree"
-            assert 60.0 <= e["load"]["ramp"]["pct_of_discounted_anchor"] <= 65.0
+            assert 60.0 <= e["load"]["ramp"]["pct_of_discounted_base"] <= 65.0
             assert e["load"]["back_off_kg"] == routine_generator._floor_half_kg(e["load"]["top_kg"] * 0.9)
 
 
@@ -317,3 +317,74 @@ def test_without_the_transform_the_floor_is_still_the_band_best():
     )
     assert block.sets[0].weight_kg == pytest.approx(ANCHOR_LB["leg_press"] * LB)
     assert audit["movements"]["leg_press"]["ramp"] is None
+
+
+# ── 9. #4388 — the ramp's percentage is of band e1RM; novel-again keeps the anchor set ─────
+# The live 2026-09-28 inputs (ROUTINE# 4300a686…, LOWER-VOLUME W1, read 2026-09-27): squat
+# 195 lb x 5 on 09-24 at 313.7 lb (88.45 kg, band e1RM 103.19 kg); trap bar 225 lb x 5 on
+# 2025-11-07 in another band (102.06 kg, e1RM 119.07 kg) — the nearest-band fallback, 325 days
+# before, discounted 10 %. The engine wrote squat 53.5 kg (60 % of the SET) and trap bar 55.5 kg.
+SQUAT_TID = MOVEMENTS["squat_barbell"]["hevy_template_id_hint"]
+TRAP_TID = MOVEMENTS["deadlift_trap_bar"]["hevy_template_id_hint"]
+SQUAT_KG, TRAP_KG = 88.45061733994974, 102.05840462301894
+HISTORY_0928 = {
+    SQUAT_TID: [{"date": "2026-09-24", "top_weight_kg": SQUAT_KG, "sets": [{"weight_kg": SQUAT_KG, "reps": 5}]}],
+    TRAP_TID: [{"date": "2025-11-07", "top_weight_kg": TRAP_KG, "sets": [{"weight_kg": TRAP_KG, "reps": 5}]}],
+}
+WEIGHTS_0928 = {"2025-11-07": 332.0, "2026-09-24": 313.7, "2026-09-27": 313.7}
+
+
+def _floor_0928(tid):
+    return load_ramp.v03_floor(tid, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=1)
+
+
+def test_the_0928_squat_floor_is_60_percent_of_band_e1rm_not_of_the_set():
+    """#4388 ruling: `start_pct_of_band_e1rm` means what it says. 60 % x 103.19 kg = 61.92 kg,
+    rounded UP to 62.0 kg (136.7 lb) — not 60 % x 88.45 kg = 53.5 kg (118 lb), the reported
+    defect. The commit gate judges on the same floor through the same `v03_floor` (#4149), so a
+    loadable 137.5 lb passes and the reported 118 lb is refused. (The owner's hand-authored
+    135 lb is 59.3 % of e1RM and one 2.5-lb step under on the gate's round-half-up grid — an
+    open rounding question named in the #4388 PR, not ruled here.)"""
+    from training import rep_scheme
+
+    row = _floor_0928(SQUAT_TID)
+    r = row["ramp"]
+    assert row["status"] == "ok" and row["fallback"] is None and r["discount_pct"] == 0
+    assert r["base"] == load_ramp.BASE_BAND_E1RM and r["band_e1rm_kg"] == pytest.approx(103.192, abs=1e-3)
+    assert row["floor_kg"] == 62.0 == load_ramp._ceil_half_kg(103.19 * 0.60)
+    assert 60.0 <= r["pct_of_band_e1rm"] <= 61.0
+    assert not rep_scheme.is_below_floor(137.5 * LB, row["floor_kg"]), "a loadable 137.5 lb must pass the gate"
+    assert rep_scheme.is_below_floor(118 * LB, row["floor_kg"]), "the reported 118 lb is now under the floor"
+    assert "60% of your band e1RM" in load_ramp.render_ramp_cue(row)
+    # week 6 on the e1RM base reaches the cap exactly — the ramp and the cap share one number
+    w6 = load_ramp.v03_floor(SQUAT_TID, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=6)
+    assert w6["floor_kg"] == load_ramp._floor_half_kg(103.192 * 0.85) and w6["floor_kg"] <= 0.85 * w6["ramp"]["band_e1rm_kg"]
+
+
+def test_the_0928_trap_bar_novel_again_floor_is_unchanged():
+    """#4388 acceptance: the novel-again handling is unchanged. The trap bar's anchor is 325 days
+    old (the discount applies), so the base stays the anchor SET — 102.06 x 0.90 x 0.60 = 55.11,
+    up to 55.5 kg, exactly what the engine wrote for 09-28 and what the owner's final draft held
+    ("Load held at the engine floor"). An e1RM base would have read 64.5 kg."""
+    row = _floor_0928(TRAP_TID)
+    r = row["ramp"]
+    assert row["fallback"] == load_ramp.FALLBACK_NEAREST_BAND and r["discount_pct"] == 10
+    assert r["discount"]["applies"] is True and r["discount"]["anchor_age_days_at_block_1"] == 321
+    assert r["base"] == load_ramp.BASE_ANCHOR_SET and r["base_kg"] == pytest.approx(TRAP_KG, abs=1e-3)
+    assert row["floor_kg"] == 55.5
+    assert "60% of your band anchor after the 10% detraining discount" in load_ramp.render_ramp_cue(row)
+
+
+def test_mutation_control_the_set_weight_base_reproduces_the_reported_118_lb():
+    """Force every anchor onto the #4090 set-weight base and the 09-28 squat reads 53.5 kg
+    (117.9 lb) — the number the owner reported — so the e1RM assertion above reds."""
+    real = load_ramp.anchor_discount
+
+    def _set_base(date, p=None):
+        pct, ruling = real(date, p)
+        return pct, {**ruling, "applies": True}
+
+    with patch.object(load_ramp, "anchor_discount", side_effect=_set_base):
+        row = _floor_0928(SQUAT_TID)
+    assert row["ramp"]["base"] == load_ramp.BASE_ANCHOR_SET and row["floor_kg"] == 53.5
+    assert row["floor_kg"] != 62.0
