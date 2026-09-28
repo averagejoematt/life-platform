@@ -144,4 +144,5 @@ as the `worktree-reap` gate on the machine that actually holds the worktrees. It
 enough to sit there — 140 s over 348 trees became ~19 s (parallel probes, one batched
 ancestry call, a local `git merge-tree` squash check, one batched `gh pr list`) — and the
 budget keeps anything it did not reach. Not a SessionStart hook: session start is when
-concurrent lanes are being created, and the hook surface belongs to `.claude/hooks/`.
+concurrent lanes are being created, and a wrap is the moment the session's own merges and
+releases are known.
