@@ -57,12 +57,23 @@ def gather(table: Any, fetch_range: Callable[[str, str, str], list], today: date
     """
     start = (today - timedelta(days=HEVY_WINDOW_DAYS)).isoformat()
     experiments = _active_experiments(table, user_prefix)
-    return {
-        "hevy_recent": fetch_range("hevy", start, yesterday),
-        "weekly_correlations": _latest_correlations(table, user_prefix),
+    hevy = fetch_range("hevy", start, yesterday)
+    corr = _latest_correlations(table, user_prefix)
+    out = {
+        "hevy_recent": hevy,
+        "weekly_correlations": corr,
         "active_experiments": None if experiments is None else len(experiments),
         "experiment_names": None if experiments is None else experiments[:MAX_EXPERIMENT_NAMES],
     }
+    # The live proof line (#4358/#4359): what the two blocks were handed, greppable in the
+    # daily-brief log group — the coach pipeline does not log its domain_data.
+    dates = sorted({_row_date(r) for r in hevy if isinstance(r, dict)}, reverse=True)
+    print(
+        f"[brief_domain_inputs] hevy_recent={len(hevy)} (dates {dates[:3]}) "
+        f"weekly_correlations={(corr or {}).get('week', 'NOT COMPUTED')} significant={(corr or {}).get('significant_correlations')} "
+        f"active_experiments={out['active_experiments']} names={out['experiment_names']}"
+    )
+    return out
 
 
 def _query_visible(table: Any, pk: str, sk_prefix: str) -> Optional[List[dict]]:
