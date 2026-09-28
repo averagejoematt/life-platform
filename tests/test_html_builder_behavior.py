@@ -1533,15 +1533,15 @@ def test_v2_coach_headers_derive_their_display_name_from_the_persona_registry():
     to Dr. Max Reyes for six weeks because the header string was typed, not
     derived, so nothing pointed at `config/coaches/physical_coach.json`. This
     reads the expected name LIVE from `persona_registry.display_name` — the
-    same registry `content.brief_format.coach_header_title` calls — imported
-    independently here (not reached via `hb`) rather than hardcoding "Dr. Max
-    Reyes": a future rename updates the registry and this assertion together,
-    so the test never goes stale the way the header did.
+    same registry `content.brief_format.v2_coach_header_titles` calls —
+    imported independently here (not reached via `hb`) rather than hardcoding
+    "Dr. Max Reyes": a future rename updates the registry and this assertion
+    together, so the test never goes stale the way the header did.
 
     Mutation control (#4360, run by hand, not part of the suite — restoring a
     hand-typed literal must fail this test): with the physical_coach header's
-    `coach_header_title(...)` call temporarily replaced by the literal
-    `"\U0001f4aa DR. VICTOR REYES — PHYSICAL INTELLIGENCE"`,
+    `v2_coach_header_titles()["physical_coach"]` lookup temporarily replaced by
+    the literal `"\U0001f4aa DR. VICTOR REYES — PHYSICAL INTELLIGENCE"`,
 
         env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY \
           AWS_SECRET_ACCESS_KEY=FAKESECRET AWS_DEFAULT_REGION=us-west-2 \
@@ -1587,8 +1587,8 @@ _RETIRED_OR_CURRENT_HAND_TYPED_V2_COACH_HEADER_NAMES = (
 def test_no_v2_coach_header_name_is_a_hand_typed_literal():
     """#4360 acceptance box 3: a grep of `lambdas/` for a hand-typed coach
     header name returns nothing — every one of these must come from
-    `_coach_header_title` / `persona_registry`, not a literal in this module's
-    source.
+    `content.brief_format.v2_coach_header_titles` / `persona_registry`, not a
+    literal in this module's source.
     """
     for literal in _RETIRED_OR_CURRENT_HAND_TYPED_V2_COACH_HEADER_NAMES:
         assert literal not in HB_SOURCE, f"{literal!r} is back as a hand-typed literal in html_builder.py"

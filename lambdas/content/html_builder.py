@@ -23,7 +23,7 @@ _HAS_CONFIDENCE = True
 
 from common.digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
 
-from content.brief_format import coach_header_title, esc, supplement_timing_label, supplement_timing_order, weather_context_cells
+from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
 
 # S2-T1-10 Weekly Habit Review — compute + render live in their own module (#1654 shape).
 # Re-exported here because `daily_brief_lambda` and the behavior suite both reach for
@@ -1669,7 +1669,7 @@ def _brief_journal_coaches(
             out += (
                 '<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
                 '<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
-                + esc(coach_header_title("sleep_coach", "\U0001f6cf\ufe0f", "SLEEP INTELLIGENCE"))
+                + v2_coach_header_titles()["sleep_coach"]
                 + "</p>"
                 '<div style="background:#16213e;border-left:3px solid #818cf8;border-radius:0 8px 8px 0;'
                 'padding:12px 16px;">' + _sc_body + "</div></div>"
@@ -1691,7 +1691,7 @@ def _brief_journal_coaches(
             out += (
                 '<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
                 '<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
-                + esc(coach_header_title("nutrition_coach", "\U0001f34e", "NUTRITION INTELLIGENCE"))
+                + v2_coach_header_titles()["nutrition_coach"]
                 + "</p>"
                 '<div style="background:#16213e;border-left:3px solid #10b981;border-radius:0 8px 8px 0;'
                 'padding:12px 16px;">' + _nc_body + "</div></div>"
@@ -1713,7 +1713,7 @@ def _brief_journal_coaches(
             out += (
                 '<div style="background:#1e293b;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
                 '<p style="color:#64748b;font-size:10px;margin:0 0 8px 0;font-weight:700;letter-spacing:1px;">'
-                + esc(coach_header_title("training_coach", "\U0001f3cb\ufe0f", "TRAINING INTELLIGENCE"))
+                + v2_coach_header_titles()["training_coach"]
                 + "</p>"
                 '<div style="background:#16213e;border-left:3px solid #3db88a;border-radius:0 8px 8px 0;'
                 'padding:12px 16px;">' + _tc_body + "</div></div>"
@@ -1724,26 +1724,11 @@ def _brief_journal_coaches(
 
     # --- Remaining V2 Coaches (Phase 5) ---
     _v2_coaches = [
-        ("mind_coach_v2", mind_coach_v2_text, esc(coach_header_title("mind_coach", "\U0001f9e0", "MIND INTELLIGENCE")), "#a78bfa"),
-        (
-            "physical_coach_v2",
-            physical_coach_v2_text,
-            esc(coach_header_title("physical_coach", "\U0001f4aa", "PHYSICAL INTELLIGENCE")),
-            "#f59e0b",
-        ),
-        (
-            "glucose_coach_v2",
-            glucose_coach_v2_text,
-            esc(coach_header_title("glucose_coach", "\U0001f4c9", "GLUCOSE INTELLIGENCE")),
-            "#2dd4bf",
-        ),
-        ("labs_coach_v2", labs_coach_v2_text, esc(coach_header_title("labs_coach", "\U0001f9ec", "LABS INTELLIGENCE")), "#5ba4cf"),
-        (
-            "explorer_coach_v2",
-            explorer_coach_v2_text,
-            esc(coach_header_title("explorer_coach", "\U0001f50d", "EXPLORER INTELLIGENCE")),
-            "#e879f9",
-        ),
+        ("mind_coach_v2", mind_coach_v2_text, v2_coach_header_titles()["mind_coach"], "#a78bfa"),
+        ("physical_coach_v2", physical_coach_v2_text, v2_coach_header_titles()["physical_coach"], "#f59e0b"),
+        ("glucose_coach_v2", glucose_coach_v2_text, v2_coach_header_titles()["glucose_coach"], "#2dd4bf"),
+        ("labs_coach_v2", labs_coach_v2_text, v2_coach_header_titles()["labs_coach"], "#5ba4cf"),
+        ("explorer_coach_v2", explorer_coach_v2_text, v2_coach_header_titles()["explorer_coach"], "#e879f9"),
     ]
     for _sec_id, _sec_text, _sec_title, _sec_color in _v2_coaches:
         try:
