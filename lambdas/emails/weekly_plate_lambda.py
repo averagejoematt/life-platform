@@ -123,7 +123,7 @@ def load_plate_history(today_str):
                 }
             )
         )
-        items = [d2f(i) for i in resp.get("Items", [])]
+        items = [d2f(i) for i in resp.get("Items", []) if not i.get("deleted_at")]  # #4355: skip a tombstoned edition
         logger.info(f"Plate history: {len(items)} past plates loaded")
         return items
     except Exception as e:

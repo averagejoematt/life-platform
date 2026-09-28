@@ -397,6 +397,11 @@ def select_conversation_memories(records, coach_id=None, max_items: int = DEFAUL
     for rec in records or []:
         if not isinstance(rec, dict):
             continue
+        if rec.get("deleted_at"):
+            # #4355: delete_platform_memory is a tombstone (the MCP role has no
+            # dynamodb:DeleteItem on this partition) — a soft-deleted note must not
+            # keep steering a coach's chat context after Matthew asked it removed.
+            continue
         if rec.get("channel") != CHANNEL_CONVERSATION:
             continue  # honest provenance: only records STAMPED as chat-derived
         cat = _category_of(rec)
@@ -496,6 +501,9 @@ def _query_conversation_records(table, per_category_limit: int = _PER_CATEGORY_Q
     for prefix in _conversation_sk_prefixes():
         kwargs = {
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(prefix),
+            # #4355: exclude soft-deleted notes at the query itself — deleted_at rows
+            # must not consume one of this bounded per-category window's Limit slots.
+            "FilterExpression": "attribute_not_exists(deleted_at)",
             "ScanIndexForward": False,  # sk suffix is the date → newest-first WITHIN the category
             "Limit": per_category_limit,
         }
