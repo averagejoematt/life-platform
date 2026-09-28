@@ -293,6 +293,20 @@ POST_BAN_HISTORY_OFFENDERS = {
         "same fix-forward: the commit-msg hook refuses the forms, and pr-checks scans every PR "
         "commit's message (PR_COMMITS_FILE_UNDER_TEST)."
     ),
+    "4b3f9511822f": (
+        "2026-09-26 — the squash-merge of PR #4243 (the v7 /next/ integration train). Nine of "
+        "its commits were authored as `integration <claude@mattsusername.com>` (a worktree whose "
+        "git email differed from the merger's), and GitHub itself appends a `Co-authored-by:` "
+        "line per distinct commit author at squash time — no commit or PR body carried it, so "
+        "neither the commit-msg hook nor the PR-commit scan could see it. The owner's address "
+        "contains the substring the email form matches; it is not a tool trailer, but it is "
+        "recorded here rather than weakening the form. Found by Session AY 2026-09-28."
+    ),
+    "2b763c7ea381": (
+        "2026-09-26 — the squash-merge of PR #4236 (the Session AV wrap). Same mechanism as "
+        "4b3f9511822f: two commits authored as `integration <claude@mattsusername.com>`, and the "
+        "GitHub squash appended the co-author line. Found by Session AY 2026-09-28."
+    ),
 }
 
 
