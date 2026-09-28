@@ -239,6 +239,21 @@ class TestProjectionCarriesEveryEmittedField:
         }
         assert body["by_coach"]["sleep"]["lifetime"]["confirmed"] == 1
 
+    def test_by_coach_carries_retired_flag(self, monkeypatch):
+        """#4215: the site's coach_roster.js `retiredSeats()` prefers
+        `by_coach[id].retired` and only falls back to the per-row flag (asserted
+        above) when it's absent — that box stayed open after #4224 shipped the
+        site side. Same registry flag #3520 already stamps onto every prediction
+        row and every /api/calibration per_coach entry (`_RETIRED_SHORT_IDS`) —
+        this is additive, never a second list of retired seats."""
+        fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": []})
+        monkeypatch.setattr(api, "table", fake)
+        body = _body(api.handle_predictions({}))
+        # Dr. Sarah Chen, the retired training seat (2 sealed pre-registered calls
+        # per the issue's live proof) — the live registry, not a fake.
+        assert body["by_coach"]["training"]["retired"] is True
+        assert body["by_coach"]["sleep"]["retired"] is False
+
     def test_every_consumed_field_is_projected(self):
         # The record fields the handlers read, by hand-audit of
         # handle_predictions/_score_coach_calibration/singleton_visible +
