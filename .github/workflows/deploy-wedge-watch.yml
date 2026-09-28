@@ -33,12 +33,13 @@
 # merge (dependabot-automerge, remediation automerge) whose push was swallowed had no
 # detector until a human happened to run it. This cron is the natural scheduled home:
 # read-only, no AWS, same "red scheduled run pages the owner" channel as the wedge check
-# above. `--head-coverage-check` tells a GENUINE swallow apart from an ORDINARY
-# path-filter skip (ci-cd.yml's own `paths:` filter legitimately declining a docs-only or
-# handover-only push) — proven live in the session that added this: main's HEAD 8cbf075f
-# read `uncovered` for ci-cd.yml (neither of its two files is in the filter) while `Docs
-# CI` had run at that exact sha. Wiring the naive "uncovered ⇒ page" version would fire on
-# every docs-only/wrap commit — most of them — and be muted inside a week. Three-way exit
+# above. `--head-coverage-check` was built to tell a GENUINE swallow apart from an
+# ORDINARY path-filter skip (ci-cd.yml's `paths:` filter declining a docs-only or
+# handover-only push — e.g. HEAD 8cbf075f read `uncovered` while `Docs CI` ran at it).
+# Since #3378 (2026-09-01) ci-cd.yml has NO `paths:` filter — every push to main mints a
+# run — so the parsed filter is empty, every changed path "matches", and an `uncovered`
+# HEAD now reads as a genuine swallow. The path-filter-skip branch stays for the day a
+# filter returns (check_main_green names that as a likely cause). Three-way exit
 # code (0 OK / 1 CONFIRMED swallow / 2 indeterminate — an API read failed, so neither
 # verdict was provable) so the check itself cannot fail dark (#2753 class): both 1 and 2
 # fail this job, with visibly DIFFERENT step names and step-summary content, so an
@@ -179,9 +180,9 @@ jobs:
             cat head_coverage_verdict.txt
             echo '```'
             echo
-            echo "This was proven to be the GENUINE #2662 shape, not the DEVOPS-01 path-filter-skip"
-            echo "shape ci-cd.yml's own \`paths:\` block documents (a docs-only/handover-only push is"
-            echo "expected to skip ci-cd.yml and stays silent here — see #2826)."
+            echo "This was proven to be the GENUINE #2662 shape, not a path-filter skip (ci-cd.yml"
+            echo "carries no \`paths:\` filter since #3378, so every push to main should mint a run —"
+            echo "see #2826)."
             echo
             echo "Recovery: \`gh workflow run ci-cd.yml --ref main -f deploy_all=true\` (or re-push) so"
             echo "HEAD earns a real CI/CD verdict."
