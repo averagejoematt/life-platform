@@ -834,10 +834,25 @@ def _dispatch_route(event, path, method):
                                 "evidence_link": _cd_commit.get("evidence_link"),
                             }
                         )
-                # Soonest-due first — a commitment with no due date is unscheduled,
-                # never treated as "sooner" than one that has a date. Cap at 10: this
-                # slot is the door's FIRST screen, not the full dossier.
-                _cd_actions.sort(key=lambda a: (a.get("due") is None, a.get("due") or ""))
+                # #4219: the cockpit served a commitment seven days past due as "the one
+                # ask" with nothing marking it late — soonest-due-first sorted a stale ask
+                # to the top of the door's FIRST screen. `days_overdue` (PT-today minus
+                # `due`, the #2506 clock) is additive on every entry; 0 when due today or
+                # later, None when `due` is unusable (a lateness this endpoint cannot
+                # substantiate is never served as a number). `entry_age.daysOverdue` on the
+                # site prefers this served field over its own client-side fallback.
+                from common.pacific_time import pacific_today, parse_day_key  # local: this file has no other date import
+
+                _cd_pt_today = parse_day_key(pacific_today())
+                for _cd_a in _cd_actions:
+                    _cd_due_dt = parse_day_key(_cd_a.get("due"))
+                    _cd_a["days_overdue"] = max((_cd_pt_today - _cd_due_dt).days, 0) if (_cd_pt_today and _cd_due_dt) else None
+                # Current asks before overdue ones (#4219): an ask past its due date no
+                # longer sorts ahead of one that is still current. Within each group,
+                # soonest-due first — a commitment with no due date is unscheduled, never
+                # treated as sooner than one that has a date. Cap at 10: this slot is the
+                # door's FIRST screen, not the full dossier.
+                _cd_actions.sort(key=lambda a: (1 if (a.get("days_overdue") or 0) > 0 else 0, a.get("due") is None, a.get("due") or ""))
                 _cd_actions = _cd_actions[:10]
             except Exception:
                 pass

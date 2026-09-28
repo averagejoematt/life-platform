@@ -93,12 +93,29 @@ _SLEEP_PENDING_SOONER = {
     "status": "pending",
     "due_date": "2026-09-28",
 }
+# #4219: the exact numbers from the issue's own evidence — asked 2026-09-12, due
+# 2026-09-19, read on the frozen "today" (2026-09-26) below -> 7 days overdue.
+_MIND_PENDING_OVERDUE = {
+    "pk": "COACH#mind_coach",
+    "sk": "COMMITMENT#commit_feeling_scale",
+    "created_date": "2026-09-12",
+    "commitment_natural": "log the daily 1-to-5 subjective feeling scale before checking the app",
+    "public_ask": "I've asked him to log the daily 1-to-5 feeling scale before checking the app.",
+    "status": "pending",
+    "due_date": "2026-09-19",
+}
 
 _ROWS_BY_PK = {
     "COACH#physical_coach": [_PHYSICAL_PENDING],
     "COACH#nutrition_coach": [_NUTRITION_COMPLETED, _NUTRITION_PENDING_NO_DUE],
     "COACH#sleep_coach": [_SLEEP_PENDING_SOONER],
 }
+
+# #4219: this test file's own "today" — every test below reads this frozen PT date via
+# `common.pacific_time.pacific_today`, not the wall clock, so a fixture's expectation
+# cannot silently drift as real time passes (#3222's fixture-frame-pairing rule: a
+# fixture computes its expectation on the handler's own clock, pinned, not read live).
+_TODAY = "2026-09-26"
 
 
 def _cond_parts(cond):
@@ -128,7 +145,7 @@ def _dossier_table():
     return FakeDdbTable(query_hook=_query_hook, get_item_hook=_get_item_hook)
 
 
-def _dashboard_body(monkeypatch):
+def _dashboard_body(monkeypatch, today=_TODAY):
     # `_dossier_block` (imported into site_api_lambda from site_api_coach) reads
     # `table` off site_api_coach's OWN module globals at call time — a SEPARATE
     # name binding from `site_api_lambda.table` in tests (both point at the same
@@ -137,6 +154,12 @@ def _dashboard_body(monkeypatch):
     monkeypatch.setattr(L, "table", FakeDdbTable())
     monkeypatch.setattr(L, "_integrator_digest", lambda: None)
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    # #4219: `days_overdue` is computed against `common.pacific_time.pacific_today()`
+    # (the #2506 PT clock) via a local import inside the handler — patching the
+    # SOURCE module's attribute (not a `site_api_lambda` binding, which does not
+    # exist) is what a local `from common.pacific_time import pacific_today` picks
+    # up at call time, mirroring tests/test_orphan_routine_drafts_3772.py.
+    monkeypatch.setattr("common.pacific_time.pacific_today", lambda: today)
     resp = L.lambda_handler(dict(_DASHBOARD_EVENT), None)
     assert resp["statusCode"] == 200, resp
     return json.loads(resp["body"])
@@ -156,6 +179,7 @@ def test_open_actions_serves_the_pending_commitment_with_every_field(monkeypatch
         "status": "pending",
         "check": {"metric": "protein", "direction": "at_least"},
         "evidence_link": "/data/nutrition/",
+        "days_overdue": 0,  # #4219: due 2026-10-02, "today" (frozen, _TODAY) 2026-09-26 — not due yet
     }
 
 
@@ -228,3 +252,72 @@ def test_a_pending_commitment_with_no_public_twin_is_not_an_open_action(monkeypa
     monkeypatch.setitem(globals(), "_ROWS_BY_PK", rows)
     body = _dashboard_body(monkeypatch)
     assert body["open_actions"] == []
+
+
+# ── #4219: days_overdue + current-before-overdue ordering ───────────────────────────────
+#
+# The cockpit served a commitment due 2026-09-19 as "the one ask" on 2026-09-26 with
+# nothing marking it seven days late (the issue's own evidence, reproduced verbatim in
+# `_MIND_PENDING_OVERDUE` above). `open_actions[].days_overdue` (PT-today minus `due`,
+# the #2506 clock) fixes the missing signal; the sort fixes a stale ask sorting to the top.
+
+
+def test_open_actions_carries_days_overdue_for_a_week_late_ask(monkeypatch):
+    """The issue's own fixture: asked 2026-09-12, due 2026-09-19, read on 2026-09-26 ->
+    `days_overdue == 7`. Pins the acceptance box verbatim."""
+    rows = dict(_ROWS_BY_PK, **{"COACH#mind_coach": [_MIND_PENDING_OVERDUE]})
+    monkeypatch.setitem(globals(), "_ROWS_BY_PK", rows)
+    body = _dashboard_body(monkeypatch, today="2026-09-26")
+    mind_rows = [a for a in body["open_actions"] if a["coach_id"] == "mind"]
+    assert len(mind_rows) == 1, body["open_actions"]
+    assert mind_rows[0]["days_overdue"] == 7
+
+
+def test_open_actions_days_overdue_is_none_when_due_is_unusable(monkeypatch):
+    """A commitment with no due date carries `days_overdue: None` — a lateness this
+    endpoint cannot substantiate is never served as a number (never 0-as-a-lie either)."""
+    body = _dashboard_body(monkeypatch)
+    nutrition = [a for a in body["open_actions"] if a["coach_id"] == "nutrition"]
+    assert len(nutrition) == 1, body["open_actions"]
+    assert nutrition[0]["days_overdue"] is None
+
+
+def test_open_actions_orders_current_asks_before_overdue_ones(monkeypatch):
+    """MUTATION CONTROL (#4219): mixes a genuinely overdue ask (mind, due
+    2026-09-19 — 7 days late on the frozen 2026-09-26 "today") with two current asks
+    (sleep due 2026-09-28, physical due 2026-10-02). Soonest-due-first ALONE (the
+    pre-#4219 sort) would place the overdue mind ask FIRST — its due date is the
+    earliest of the three. Reverting the group-before-tiebreak change in
+    `lambdas/web/site_api_lambda.py`'s `_cd_actions.sort(...)` back to
+    `key=lambda a: (a.get("due") is None, a.get("due") or "")` makes this test fail:
+    `ordered[0]` becomes `("mind", 7)` instead of a current ask, exactly the
+    "coach ask 7 days overdue served as current" the issue is filed against."""
+    rows = dict(_ROWS_BY_PK, **{"COACH#mind_coach": [_MIND_PENDING_OVERDUE]})
+    monkeypatch.setitem(globals(), "_ROWS_BY_PK", rows)
+    body = _dashboard_body(monkeypatch, today="2026-09-26")
+    ordered = [(a["coach_id"], a["days_overdue"]) for a in body["open_actions"]]
+    assert ordered == [
+        ("sleep", 0),
+        ("physical", 0),
+        ("nutrition", None),
+        ("mind", 7),
+    ]
+    # The overdue ask is never the FIRST entry — the exact bug: "the one ask" (whichever
+    # renderer reads index 0) must never be an ask that is already past due when a
+    # current ask exists.
+    assert (ordered[0][1] or 0) == 0, "an overdue ask sorted ahead of a current one"
+
+
+def test_open_actions_days_overdue_at_the_pt_midnight_boundary(monkeypatch):
+    """The PT-midnight boundary (#2506): due exactly today is NOT overdue (0, not a
+    negative count and not "1 day late" from a stale UTC-vs-PT day mismatch); due
+    yesterday is exactly 1; due tomorrow is still current (0)."""
+    rows = {
+        "COACH#physical_coach": [dict(_PHYSICAL_PENDING, due_date="2026-09-26")],  # due today
+        "COACH#nutrition_coach": [dict(_NUTRITION_PENDING_NO_DUE, due_date="2026-09-25")],  # due yesterday
+        "COACH#sleep_coach": [dict(_SLEEP_PENDING_SOONER, due_date="2026-09-27")],  # due tomorrow
+    }
+    monkeypatch.setitem(globals(), "_ROWS_BY_PK", rows)
+    body = _dashboard_body(monkeypatch, today="2026-09-26")
+    by_coach = {a["coach_id"]: a["days_overdue"] for a in body["open_actions"]}
+    assert by_coach == {"physical": 0, "nutrition": 1, "sleep": 0}
