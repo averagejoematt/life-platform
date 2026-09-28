@@ -75,9 +75,11 @@ on:
     #
     # KNOWN CONSEQUENCE: the `reconcile` job's own commit touches docs/** and, if it
     # authenticates via RECONCILE_PUSH_TOKEN (a PAT, unlike GITHUB_TOKEN), now mints one
-    # additional run. That run is WANTED — it is the first time the reconciled tree is
-    # linted and tested — and it terminates: the `[skip-reconcile]` guard no-ops the
-    # reconcile job and the run pushes nothing.
+    # additional run. It terminates: the `[skip-reconcile]` guard no-ops the reconcile job
+    # and the run pushes nothing. (Corrected by #4252: the reconciling run already threads
+    # the reconcile commit as build_sha, so this is NOT the first test of that tree — the
+    # two runs used to unit-test the same sha twice. `test-owner` now leaves the full
+    # suite to the run whose own head it is.)
   workflow_dispatch:
     inputs:
       deploy_all:
@@ -491,6 +493,39 @@ jobs:
           echo "::endgroup::"
 
   # ════════════════════════════════════════════════════════════════
+  # Job 2a': Unit-test verdict owner (#4252) — which run tests build_sha?
+  # ════════════════════════════════════════════════════════════════
+  # Skips THIS run's unit-test pass only when build_sha is a later push that has its
+  # own CI/CD run (that run's reconcile checks out the same tip, so it tests the same
+  # sha and its rollup is what that sha's readers see). A GITHUB_TOKEN push mints no run
+  # (440eabc46, the #4350 Dependabot merge, has none) — then nothing owns it and this
+  # run tests it. Rule, measurement and the rejected PR-merge-ref design:
+  # scripts/find_test_verdict_owner.py. It never exits non-zero; any lookup failure
+  # yields an empty owner and the suite runs. It gates nothing but `test`, which is
+  # non-gating for deploy — lint, test-critical, plan and deploy are untouched.
+  test-owner:
+    name: Unit-test verdict owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: reconcile
+    permissions:
+      actions: read     # list this workflow's runs + their jobs
+      contents: read
+    outputs:
+      owner_run: ${{ steps.owner.outputs.owner_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.reconcile.outputs.build_sha }}
+
+      - name: Find the run that owns this sha's unit-test verdict
+        id: owner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_SHA: ${{ needs.reconcile.outputs.build_sha }}
+        run: python3 scripts/find_test_verdict_owner.py
+
+  # ════════════════════════════════════════════════════════════════
   # Job 2b: Unit Tests — the exhaustive offline suite
   # ════════════════════════════════════════════════════════════════
   # NON-GATING for deploy since #416/ADR-117: nothing downstream `needs`
@@ -506,10 +541,22 @@ jobs:
     # one, it must be declared under workflow_call.secrets and passed HERE; a
     # reusable workflow inherits nothing. tests/test_reusable_workflow_secrets.py
     # fails the day that stops being true.
-    needs: [reconcile, lint]   # #1173: reconcile listed to read build_sha
+    #
+    # #4252: ONE full-suite verdict per sha. `reconcile` tests the branch TIP, so a merge
+    # train's runs all converge on the same build_sha and each re-ran this 33-min pass on
+    # it (45 Unit Tests jobs covered 21 distinct shas on 2026-09-27). `test-owner` below
+    # names the push run whose OWN head is build_sha; when one exists, that run tests the
+    # sha and this one skips. The condition lives INSIDE ci-test.yml (`owner_run` input →
+    # job-level `if:`), NOT on this job: this job stays unconditional, so it is still in
+    # check_main_green's expected-job set (#3608) and a skip still ATTACHES as
+    # `test / Unit Tests = skipped` — present, never absent. test-owner never exits
+    # non-zero; if its runner dies, this job is skipped and the run is red on
+    # test-owner's failure (visible, not silent).
+    needs: [reconcile, lint, test-owner]   # #1173: reconcile listed to read build_sha
     uses: ./.github/workflows/ci-test.yml
     with:
       build_sha: ${{ needs.reconcile.outputs.build_sha }}
+      owner_run: ${{ needs.test-owner.outputs.owner_run }}
 
   # ════════════════════════════════════════════════════════════════
   # Job 3: Plan — validate map, detect changes, build deploy plan
