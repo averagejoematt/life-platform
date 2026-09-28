@@ -38,6 +38,44 @@ def absent_or_empty(read: Callable[[], dict], logger: logging.Logger, label: str
         return {}, str(e)
 
 
+def coach_absence(coach_id: str, logger: logging.Logger, label: str, table: Any = None) -> dict | None:
+    """ONE coach's absence state (its `instrument_state`), or None when it is present,
+    has no instrument, or the read failed (fail-open, logged).
+
+    The same `health.instrument_presence.absent_coaches` derivation every other surface
+    uses, scoped to this coach's registry row so a per-coach caller pays one read, not
+    eight. Two callers the #4305 wiring missed (#4217, found live 2026-09-28): the
+    daily-brief coach loop (`ai_calls._run_coach_v2_pipeline` — the writer of the
+    `daily_brief_<domain>` OUTPUT# rows) and `/api/coach_analysis`, which serves them.
+    """
+    from health import instrument_presence
+    from ingestion.source_registry import coach_instruments
+
+    row = coach_instruments().get(coach_id)
+    if not row:
+        return None
+    if table is None:
+        import os
+
+        import boto3
+
+        table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+    absent, _err = absent_or_empty(lambda: instrument_presence.absent_coaches(table, instruments={coach_id: row}), logger, label)
+    state = absent.get(coach_id)
+    if state:
+        logger.info("%s %s is ABSENT — instrument dark: %s", label, coach_id, state.get("reason"))
+    return state
+
+
+def brief_hold(coach_id: str) -> bool:
+    """#4217: the daily-brief coach loop's question — is this coach absent (skip it BEFORE
+    the computation engine, the change-gate reuse and any Bedrock call)? Fail-open."""
+    state = coach_absence(coach_id, logging.getLogger("coach_presence_gate"), f"[COACH-V2:{coach_id}]")
+    if state:  # print: the brief's COACH-V2 log lines are prints, and the proof greps them
+        print(f"[COACH-V2:{coach_id}] skipped_absent — instrument dark: {state.get('reason')} (#4217)")
+    return bool(state)
+
+
 def full_coach_id(expert_key: str) -> str | None:
     """The persona id behind an analyzer short key ('glucose' -> 'glucose_coach'), from
     the roster — never string surgery on the key."""
