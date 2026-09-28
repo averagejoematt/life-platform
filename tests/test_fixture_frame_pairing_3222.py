@@ -173,11 +173,11 @@ _PT_PAIRED_RESIDUE: dict[str, int] = {
     # site_api_lambda.py's `/api/coaching-dashboard` branch, so the module's basename now
     # reads a Pacific clock directly and `test_receipts_endpoint.py` (which imports
     # `site_api_lambda` at line 582, unrelated to the coaching dashboard) pairs directly
-    # too. Both findings below are `utc-exempt(#2798)`: a billing-MONTH window on the cost
-    # governor (`_TEMP_CEILING_WINDOW`, line 165/567) that reverts with the AWS Budgets
-    # month boundary, not the Pacific calendar day — same exemption already ruled for
-    # `tests/test_budget_headroom.py` above. Moved out of `_ONE_HOP_BLIND_SPOT` below
-    # (the direct pass now catches it, so the wide-only set no longer needs to).
+    # too. Both findings below are `utc-exempt(#2798)`: the cost governor's dated ceiling
+    # window (line 165/567) that reverts with the AWS Budgets month boundary, not the
+    # Pacific calendar day — same exemption already ruled for `tests/test_budget_headroom.py`
+    # above. Moved out of `_ONE_HOP_BLIND_SPOT` below (the direct pass now catches it, so
+    # the wide-only set no longer needs to).
     "tests/test_receipts_endpoint.py": 2,
 }
 
