@@ -29,7 +29,10 @@ from datetime import date as _date_cls, timedelta as _timedelta_cls
 from typing import Any, Optional
 
 import boto3
-from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
+from coach import (
+    coach_brief_input_gate as _in_gate,  # #3107 — the upstream change-gate + the shared data-inventory block
+    coach_presence_gate as _presence,  # #4217 — the absent coach is not asked
+)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_today
 
@@ -1583,6 +1586,10 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     global _comp_results_cache
 
     try:
+        # #4217: an ABSENT coach (its instrument is dark) is not asked — before the computation
+        # engine, the change-gate reuse and any Bedrock call. Terminal like a gate hold (#966).
+        if _presence.brief_hold(coach_id):
+            return CoachHold(coach_id, "instrument_absent")
         lambda_client = boto3.client("lambda", region_name="us-west-2")
         s3 = boto3.client("s3", region_name="us-west-2")
 

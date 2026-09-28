@@ -628,3 +628,175 @@ def test_an_evidence_stance_label_addressed_to_him_is_blanked(monkeypatch):
     assert body["stance_history"][0]["stage"]["label"] == ""
     body = _coach_body(monkeypatch, stance=_stance(_PUBLIC_HEADLINE))
     assert body["stance"]["stage"]["label"] == "noticing"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# /api/coach_analysis — the by-coach READ and "the one thing" (#4213), and the absent
+# coach on that endpoint (#4217). Found live by the Session AX proof lane at
+# 2026-09-28T00:04Z: 16 owner-directed blocks on /coaching/by-coach/ came from this
+# endpoint, and the glucose coach (CGM dark) still served its stale "your CGM is
+# generating traces" read. The fixture is the WIRE: every domain's served prose slots,
+# captured read-only from the live endpoint (tests/fixtures/coach_analysis_live_4213.json).
+# ══════════════════════════════════════════════════════════════════════════════
+
+from coach import coach_presence_gate  # noqa: E402
+from web import site_api_coach_narrative as N  # noqa: E402
+
+_WIRE = json.load(open(os.path.join(_REPO, "tests", "fixtures", "coach_analysis_live_4213.json")))["domains"]
+_PROSE = ("analysis", "key_recommendation", "elena_quote", "journaling_prompt", "thread_reference", "cross_domain_note", "weekly_priority")
+
+
+def _pin_absence_clock(monkeypatch):
+    """`coach_presence_gate.coach_absence` runs the one derivation; pin its clock to the corpus."""
+    from health import instrument_presence
+
+    real = instrument_presence.absent_coaches
+    monkeypatch.setattr(
+        instrument_presence, "absent_coaches", lambda table, now=None, instruments=None: real(table, now=NOW, instruments=instruments)
+    )
+
+
+def _wire_rows(domain, wire):
+    """The stored rows the live payload was served from, rebuilt from the wire: the OUTPUT#
+    row (`observatory_summary` is what `analysis` serves, `public_summary` the twin), the
+    mind coach's EXPERT# journaling prompt, and every instrument fresh (no one absent)."""
+    cid = wire["coach_id"]
+    out = {"pk": f"COACH#{cid}", "sk": "OUTPUT#2026-09-26#daily_brief", "created_at": wire["generated_at"]}
+    for src, dst in (("analysis", "observatory_summary"), ("key_recommendation", "key_recommendation"), ("elena_quote", "elena_quote")):
+        if wire.get(src):
+            out[dst] = wire[src]
+    if wire.get("public_read"):
+        out["public_summary"] = wire["public_read"]
+    rows = [sentinel_item(cgm_dark=False), *fresh_instrument_rows(), out]
+    if wire.get("journaling_prompt"):
+        rows.append({"pk": "USER#matthew#SOURCE#ai_analysis", "sk": f"EXPERT#{domain}", "journaling_prompt": wire["journaling_prompt"]})
+    return rows
+
+
+def _analysis_body(monkeypatch, domain, rows, integrator=None):
+    monkeypatch.setattr(C, "table", FakeDdbTable(rows=rows, query_hook=dispatching_query_hook))
+    monkeypatch.setattr(C, "_integrator_digest", lambda: integrator)
+    monkeypatch.setattr(C, "_latest_cycle_digest", lambda: None)
+    monkeypatch.setattr(C, "_regeneration_paused", lambda feature: False)
+    _pin_absence_clock(monkeypatch)
+    resp = C.handle_coach_analysis({"queryStringParameters": {"domain": domain}})
+    assert resp["statusCode"] == 200, resp
+    return json.loads(resp["body"])
+
+
+def _wire_hits(monkeypatch):
+    hits = []
+    for domain, wire in _WIRE.items():
+        integ = {"cross_domain_notes": {domain: wire.get("cross_domain_note")}, "analysis": wire.get("weekly_priority")}
+        body = _analysis_body(monkeypatch, domain, _wire_rows(domain, wire), integ)
+        assert body.get("absent") is not True, f"{domain}: no instrument is dark in this corpus"
+        hits += [(domain, k, body[k]) for k in _PROSE if isinstance(body.get(k), str) and audience_guard.is_owner_directed(body[k])]
+    return hits
+
+
+def test_the_live_wire_carries_owner_directed_reads():
+    """The corpus is the defect: the live payload DID address Matthew (else the guard test is vacuous)."""
+    hits = [(d, k) for d, w in _WIRE.items() for k in _PROSE if isinstance(w.get(k), str) and audience_guard.is_owner_directed(w[k])]
+    assert len(hits) >= 10, hits
+    assert ("sleep", "analysis") in hits and ("glucose", "key_recommendation") in hits
+
+
+def test_no_coach_analysis_prose_slot_is_owner_directed_for_any_domain(monkeypatch):
+    """RED before #4213's serve seam: 13 slots across 7 domains passed through verbatim."""
+    assert _wire_hits(monkeypatch) == []
+
+
+def test_mutation_control_without_the_reader_register_the_wire_leaks(monkeypatch):
+    monkeypatch.setattr(N, "_reader_register", lambda resp, output: None)
+    assert len(_wire_hits(monkeypatch)) >= 10
+
+
+def test_an_owner_directed_read_serves_its_public_twin_or_nothing(monkeypatch):
+    g = _WIRE["glucose"]
+    body = _analysis_body(monkeypatch, "glucose", _wire_rows("glucose", g))
+    assert body["analysis"] == g["public_read"], "the owner read must yield to the stored public twin"
+    assert "key_recommendation" not in body, "no public_ask on the row: the one thing is withheld, not served to him"
+    s = _WIRE["sleep"]  # no public_summary on the live sleep row → no read at all
+    body = _analysis_body(monkeypatch, "sleep", _wire_rows("sleep", s))
+    assert "analysis" not in body
+    assert body["key_recommendation"] == s["key_recommendation"], "a reader-safe value passes untouched"
+
+
+def test_the_one_thing_prefers_the_public_ask(monkeypatch):
+    rows = _wire_rows("mind", _WIRE["mind"])
+    rows[-2]["public_ask"] = _PUBLIC_ASK
+    assert _analysis_body(monkeypatch, "mind", rows)["key_recommendation"] == _PUBLIC_ASK
+
+
+def _absent_glucose_body(monkeypatch, cgm_dark, domain="glucose"):
+    live = dict(glucose_output_row(), observatory_summary=_WIRE["glucose"]["analysis"], public_summary=_WIRE["glucose"]["public_read"])
+    rows = [sentinel_item(cgm_dark=cgm_dark), *fresh_instrument_rows(), live]
+    return _analysis_body(monkeypatch, domain, rows)
+
+
+def test_the_absent_glucose_coach_serves_no_read_on_coach_analysis(monkeypatch):
+    """#4217, RED before: the 09-26 CGM read was served while the CGM was dark."""
+    for domain in ("glucose", "metabolic"):  # the cockpit asks by pillar name
+        body = _absent_glucose_body(monkeypatch, cgm_dark=True, domain=domain)
+        assert body["absent"] is True and body["reason"] == ABSENT_REASON
+        assert body["analysis"] is None, "the endpoint's honest-empty shape: analysis null, as for a coach with no read"
+        assert "key_recommendation" not in body and "public_read" not in body
+        assert "CGM" not in json.dumps(body)
+
+
+def test_mutation_control_the_glucose_read_serves_when_the_cgm_is_not_dark(monkeypatch):
+    body = _absent_glucose_body(monkeypatch, cgm_dark=False)
+    assert "absent" not in body
+    assert body["analysis"] == _WIRE["glucose"]["public_read"]
+
+
+def test_a_failed_presence_read_keeps_the_read_fail_open(monkeypatch):
+    from health import instrument_presence
+
+    def boom(*a, **k):
+        raise RuntimeError("sentinel unreadable")
+
+    monkeypatch.setattr(
+        C, "table", FakeDdbTable(rows=[sentinel_item(cgm_dark=True), glucose_output_row()], query_hook=dispatching_query_hook)
+    )
+    monkeypatch.setattr(instrument_presence, "absent_coaches", boom)
+    assert coach_presence_gate.coach_absence("glucose_coach", N.logger, "[t]", table=C.table) is None
+
+
+# ── the daily-brief coach loop: an absent coach is not asked (#4217) ──────────────
+
+
+def _brief_run(monkeypatch, cgm_dark):
+    import boto3
+    from ai import ai_calls
+
+    table = FakeDdbTable(rows=[sentinel_item(cgm_dark=cgm_dark), *fresh_instrument_rows()], query_hook=dispatching_query_hook)
+    clients = []
+
+    class _Res:
+        def Table(self, name):
+            return table
+
+    def _client(name, **kw):
+        clients.append(name)
+        raise RuntimeError("the pipeline went past the absence gate")  # → caught, returns None
+
+    monkeypatch.setattr(boto3, "resource", lambda *a, **k: _Res())
+    monkeypatch.setattr(boto3, "client", _client)
+    monkeypatch.setattr(ai_calls.boto3, "client", _client)
+    _pin_absence_clock(monkeypatch)
+    return ai_calls._run_coach_v2_pipeline("glucose_coach", {}, "glucose", {}, ""), clients, ai_calls
+
+
+def test_the_brief_does_not_ask_an_absent_coach(monkeypatch, capsys):
+    """RED before: 09-27 17:07Z `[COACH-V2:glucose_coach] Output: 2647 chars` with the CGM dark."""
+    out, clients, ai_calls = _brief_run(monkeypatch, cgm_dark=True)
+    assert isinstance(out, ai_calls.CoachHold) and out.reason == "instrument_absent"
+    assert clients == [], "the computation engine / orchestrator was invoked for an absent coach"
+    assert "skipped_absent" in capsys.readouterr().out
+
+
+def test_mutation_control_the_brief_asks_the_glucose_coach_when_the_cgm_is_live(monkeypatch):
+    out, clients, ai_calls = _brief_run(monkeypatch, cgm_dark=False)
+    assert not isinstance(out, ai_calls.CoachHold)
+    assert clients, "the pipeline never started for a present coach"

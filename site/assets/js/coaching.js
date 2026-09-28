@@ -899,7 +899,7 @@ async function renderByCoach(read, id) {
     //      week's read, and saying so was the present-tense half of the same lie.
     const regenPaused = regenerationPaused(analysis);
     const asOf = coachAsOf(analysis.generated_at, regenPaused, analysis.as_of_day_n);
-    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)}${regenPaused ? "" : " · this week"}</p>`;
+    h += `<section class="bc-read"><p class="dx-kicker label">their read on his ${esc(dom)}${regenPaused ? "" : " · this week"}</p>`;
     // #1397: asOf is escaped (it is plain text), so the "why is this paused" link is
     // appended OUTSIDE the esc() call — putting it inside would render as literal markup.
     if (asOf) h += `<p class="bc-asof bc-dateline label">${esc(asOf)}${regenPaused ? ' <a href="/method/receipts/">See the live budget and the current tier →</a>' : ""}</p>`;
@@ -1106,7 +1106,7 @@ async function renderTeamCoach(read, id) {
   if (!isLead) h += disclose("their report card", coachReportHTML(d.report_card));
   h += isLead
     ? `<p class="bc-datalink label"><a href="/coaching/by-coach/#${esc(id)}">→ how he runs the program, on the by-coach surface</a></p>`
-    : `<p class="bc-datalink label"><a href="/coaching/by-coach/#${esc(id)}">→ what they're saying about your ${esc(domainOf(id))}</a></p>`;
+    : `<p class="bc-datalink label"><a href="/coaching/by-coach/#${esc(id)}">→ what they're saying about his ${esc(domainOf(id))}</a></p>`;
   read.innerHTML = h;
   enhanceCoachNames(read);
 }
