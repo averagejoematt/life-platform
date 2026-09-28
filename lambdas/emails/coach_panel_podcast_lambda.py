@@ -1349,6 +1349,8 @@ def _sweep_held_episodes(dry_run: bool = False) -> dict:
     week = post.get("week")
     hold = _read_hold(week)
     if not hold:
+        # #4365: the Mon/Wed sweep ended in ~0.3 s with ZERO log lines here — indistinguishable from a skipped week.
+        logger.info("[panel] hold sweep wk%s: no hold on the current week — nothing to retry", week)
         return {"swept": [], "note": f"no hold for current week {week}"}
 
     hold_class = hold.get("hold_class", "safety")
