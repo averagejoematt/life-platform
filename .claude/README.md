@@ -44,9 +44,13 @@ stop re-improvising briefs from memory prose (#796).
   worktree hygiene (three things sessions otherwise guess); a `PreToolUse` guard flags a
   merge with no named-check assertion, a deploy from a worktree, and a force-push to main;
   a `PostToolUse` check records each push and, once runs have had time to appear, reports
-  a sha that minted **zero** — the swallowed-push class. All **advisory** by default:
-  they warn and exit 0 until an operator sets `CLAUDE_HOOK_MODE=block`. Every one fails
-  open on a bad payload, because a hook that can crash can halt a session.
+  a sha that minted **zero** — the swallowed-push class. All **advisory** by default,
+  and **heard** (#4260): a finding is a JSON `additionalContext` the model reads next to
+  the tool result (plus a `systemMessage` for the operator) — stderr on exit 0 reaches only
+  the debug log. `CLAUDE_HOOK_MODE=ask` turns a PreToolUse finding into a permission
+  prompt, `=block` into a `deny`. Git runs in the tool call's cwd (payload `cwd`, or the
+  command's own `cd`/`git -C`), so a lane's push and deploy are judged where they run.
+  Every one fails open on a bad payload, because a hook that can crash can halt a session.
 - **Doc-sync pre-commit hook** (`scripts/install_hooks.sh` → `deploy/sync_doc_metadata.py`) — auto-updates doc headers (tool/Lambda/secret/alarm counts, version) on every commit, so docs can't silently drift from code.
 - **Self-healing remediation agent** (`.github/workflows/remediation-agent.yml`, ADR-064/065) — Claude on a schedule via GitHub Actions + Bedrock: triages alarms/CI/DLQ, auto-fixes the provably-safe class behind a deterministic merge gate, opens PRs for the rest. Read-only AWS role; the gate (not the model) holds merge authority.
 - **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 86 tools that let Claude query the live platform data directly during a session.

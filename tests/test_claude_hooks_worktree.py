@@ -137,8 +137,9 @@ def test_post_push_swallow_records_and_reads_back_a_push_in_a_real_worktree(tmp_
     assert any(row.get("sha") == sha for row in rows), rows
 
     # Read-back: a second invocation must load the existing file without erroring, and
-    # the recorded row must survive the load+save round trip.
-    r2 = _run(script, {"tool_name": "Bash", "tool_input": {"command": "ls -la"}}, cwd=worktree)
+    # the recorded row must survive the load+save round trip. (#4260: a PUSH — a non-push
+    # command no longer touches the state at all.)
+    r2 = _run(script, {"tool_name": "Bash", "tool_input": {"command": "git push origin HEAD"}}, cwd=worktree)
     assert r2.returncode == 0, r2.stderr
     assert "UNVERIFIED" not in r2.stderr, f"read-back failed: {r2.stderr!r}"
     rows2 = json.loads(state_file.read_text())
@@ -161,3 +162,66 @@ def test_post_push_swallow_reports_unverified_when_state_dir_is_unwritable(tmp_p
         assert "could not write hook state" in r.stderr, r.stderr
     finally:
         gitdir.chmod(0o700)
+
+
+# ── #4260: git runs where the TOOL CALL runs, not where the hook script lives ──────
+# The session starts in the main checkout (the hook scripts and their state live there);
+# a lane pushes/deploys with `cd <worktree> && ...`. Before #4260 `_hooklib.git()` ran in
+# ROOT, so the push recorded MAIN's HEAD and the deploy detector could never fire.
+
+
+def _lane_commit(worktree: Path) -> str:
+    (worktree / "lane.txt").write_text("lane work\n")
+    _git("add", "lane.txt", cwd=worktree)
+    _git("commit", "-q", "-m", "lane", cwd=worktree)
+    return _git("rev-parse", "HEAD", cwd=worktree)
+
+
+def test_a_push_from_a_lane_records_the_lanes_sha_not_mains(tmp_path):
+    main, worktree = _make_fixture(tmp_path)
+    lane_sha = _lane_commit(worktree)
+    main_sha = _git("rev-parse", "HEAD", cwd=main)
+    assert lane_sha != main_sha
+    script = str(main / "scripts" / "hooks" / "post_push_swallow.py")
+    r = _run(script, {"cwd": str(main), "tool_name": "Bash", "tool_input": {"command": f"cd {worktree} && git push origin HEAD"}}, cwd=main)
+    assert r.returncode == 0, r.stderr
+    rows = json.loads((_real_gitdir(main) / "claude-hooks" / "pending_pushes.json").read_text())
+    assert [row["sha"] for row in rows] == [lane_sha], f"recorded {rows}, lane={lane_sha}, main={main_sha}"
+
+
+def test_a_git_dash_c_push_records_the_lanes_sha(tmp_path):
+    main, worktree = _make_fixture(tmp_path)
+    lane_sha = _lane_commit(worktree)
+    script = str(main / "scripts" / "hooks" / "post_push_swallow.py")
+    _run(script, {"cwd": str(main), "tool_name": "Bash", "tool_input": {"command": f"git -C {worktree} push origin HEAD"}}, cwd=main)
+    rows = json.loads((_real_gitdir(main) / "claude-hooks" / "pending_pushes.json").read_text())
+    assert [row["sha"] for row in rows] == [lane_sha]
+
+
+def test_the_payload_cwd_is_where_git_runs(tmp_path):
+    """No `cd` in the command: the payload's `cwd` names the checkout."""
+    main, worktree = _make_fixture(tmp_path)
+    lane_sha = _lane_commit(worktree)
+    script = str(main / "scripts" / "hooks" / "post_push_swallow.py")
+    _run(script, {"cwd": str(worktree), "tool_name": "Bash", "tool_input": {"command": "git push origin HEAD"}}, cwd=main)
+    rows = json.loads((_real_gitdir(main) / "claude-hooks" / "pending_pushes.json").read_text())
+    assert [row["sha"] for row in rows] == [lane_sha]
+
+
+def test_a_deploy_from_a_lane_fires_from_a_main_checkout_session(tmp_path):
+    main, worktree = _make_fixture(tmp_path)
+    script = str(main / "scripts" / "hooks" / "guard_bash.py")
+    r = _run(
+        script,
+        {"cwd": str(main), "tool_name": "Bash", "tool_input": {"command": f"cd {worktree} && bash deploy/deploy_lambda.sh x y"}},
+        cwd=main,
+    )
+    spec = json.loads(r.stdout)["hookSpecificOutput"]
+    assert r.returncode == 0 and "deploy from a worktree" in spec["additionalContext"], r.stdout
+    # and the control: the same deploy from the main checkout is silent
+    r2 = _run(
+        script,
+        {"cwd": str(main), "tool_name": "Bash", "tool_input": {"command": f"cd {main} && bash deploy/deploy_lambda.sh x y"}},
+        cwd=main,
+    )
+    assert r2.stdout.strip() == "", r2.stdout

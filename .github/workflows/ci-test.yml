@@ -12,6 +12,14 @@ on:
         description: 'The reconciled tree SHA to check out (#1173).'
         required: true
         type: string
+      owner_run:
+        description: >-
+          #4252: the id of another CI/CD push run whose OWN head is build_sha and which
+          therefore owns this sha's unit-test verdict (scripts/find_test_verdict_owner.py).
+          Empty (the default) = this run tests.
+        required: false
+        type: string
+        default: ''
 
 # Reusable workflows do NOT inherit the caller's permissions — declare our own.
 permissions:
@@ -20,6 +28,9 @@ permissions:
 jobs:
   test:
     name: Unit Tests
+    # #4252: skipped ONLY when another push run owns this exact sha's verdict. The
+    # caller job stays unconditional, so a skip reports as `test / Unit Tests = skipped`.
+    if: inputs.owner_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -205,6 +216,16 @@ jobs:
         # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn --floor
         # below) ever drift or drop below the committed RATCHET_FLOOR (up-only). Keep
         # ratcheting up. Scope: lambdas/ + mcp/ only.
+        #
+        # #4252: COVERAGE_CORE=sysmon — coverage.py's sys.monitoring tracer (PEP 669; the
+        # Python this job pins supports it). Line coverage only, which is all this repo
+        # measures (no `branch = true`). Measured on a quarter of tests/ (336 files, 7,322
+        # tests, the same interpreter and pins, four xdist workers): no coverage 175s,
+        # default ctrace tracer 273s, sysmon 200s — and the per-file report was
+        # byte-identical between the two tracers (577 rows, same TOTAL), so the floor and
+        # the high-water ratchet read the same number, faster.
+        env:
+          COVERAGE_CORE: sysmon
         run: |
           # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
           # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`

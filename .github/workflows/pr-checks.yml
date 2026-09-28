@@ -34,8 +34,11 @@
 # stays post-merge and advisory.
 #
 # The reconcile bot pushes directly to main. A required-status-checks rule DOES
-# block direct pushes, so the ruleset carries a `github-actions` Integration
-# bypass for exactly that push — see ADR-148.
+# block direct pushes, so the ruleset carries a bypass actor for exactly that
+# push — a `User` (the repo owner), NOT a `github-actions` Integration: GitHub
+# 422s an Integration bypass actor on a personal-account repo (#2198), so the
+# reconcile job pushes with the owner's fine-grained PAT (RECONCILE_PUSH_TOKEN).
+# See ci-cd.yml's reconcile job comment and ADR-148's amendment.
 
 name: PR checks
 
