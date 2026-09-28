@@ -242,6 +242,17 @@ def fetch_orchestrator_input_digest(lambda_client, coach_id: str, function_name:
 #: a source becoming paused, or having its cadence loosened, changes this prompt with no
 #: edit here. `None` means the row has no ingest source at all: DEXA scans and lab draws
 #: are events, not pipes, and their absence carries no caveat to state.
+#:
+#: #4361: this list omitted `hevy` (strength training), `habitify` (habits) and `notion`
+#: (journal) — coaches use all three, but were told those sources did not exist. The
+#: `Eight Sleep` row also still named the bed-temperature signal ADR-118 (#489) retired
+#: (the `/v2/intervals` fetch 404'd for 4+ months and was deleted); relabelled to what the
+#: source still supplies (sleep stages, HR/HRV — `source_registry.SOURCE_REGISTRY
+#: ["eightsleep"]["metrics"]`). The brief-data keys below are the ACTUAL wire keys the
+#: `data` dict returned by `emails.daily_brief_lambda`'s gather-and-return carries for
+#: each: `mf_workouts` (Hevy's daily workout list, despite the legacy MacroFactor-shaped
+#: name — see `fetch_hevy_workouts`/`data["mf_workouts"]`), `habitify` (the daily habit
+#: completion dict), `journal_entries` (the Notion journal list).
 INVENTORY_ROWS = (
     ("DEXA body composition", ("dexa",), None),
     ("Lab bloodwork", ("labs",), None),
@@ -250,8 +261,11 @@ INVENTORY_ROWS = (
     ("Whoop recovery/sleep", ("whoop",), "whoop"),
     ("Garmin steps", ("garmin",), "garmin"),
     ("Strava activities", ("strava_7d",), "strava"),
-    ("Eight Sleep bed temp", ("eightsleep",), "eightsleep"),
+    ("Eight Sleep sleep stages/HRV", ("eightsleep",), "eightsleep"),
     ("CGM glucose", ("apple_health", "apple"), "apple_health"),
+    ("Hevy strength training", ("mf_workouts",), "hevy"),
+    ("Habitify habits", ("habitify",), "habitify"),
+    ("Notion journal", ("journal_entries",), "notion"),
 )
 
 #: The rule that travels WITH the inventory rather than in the prompt template, so the

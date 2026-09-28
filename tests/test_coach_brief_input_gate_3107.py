@@ -434,8 +434,11 @@ def test_the_extracted_data_inventory_is_byte_identical_to_the_prompt_it_feeds()
         "  - Whoop recovery/sleep: AVAILABLE",
         "  - Garmin steps: AVAILABLE",
         "  - Strava activities: not available",
-        "  - Eight Sleep bed temp: not available",
+        "  - Eight Sleep sleep stages/HRV: not available",
         "  - CGM glucose: not available",
+        "  - Hevy strength training: not available",
+        "  - Habitify habits: not available",
+        "  - Notion journal: not available",
     ]
     assert sr.availability_facet("garmin")["caveat"] in out, "the caveat must be the registry's sentence, not a local literal"
     assert gate.INVENTORY_RULE in out, "the rule that reads the inventory rides the same bytes as the inventory"
