@@ -19,6 +19,15 @@ THE CONFOUND, HANDLED
   discriminator pages after every merge and gets ignored. This one only records pushes
   made from an interactive session, and reports "unverified" rather than "swallowed" when
   it cannot tell — absence of proof is stated as such, never upgraded to proof of absence.
+
+HEARD, AND NARROW (#4260)
+  Findings reach the model as PostToolUse `additionalContext` (see _hooklib.emit) — the
+  stderr they used to go to is the debug log. settings.json runs this hook only on a
+  `git push` (`if: Bash(git push *)` / `Bash(git -C *)`), and it re-checks the command
+  itself before it reads any state, so an ordinary Bash call costs no state I/O. The
+  deferred check therefore drains at the NEXT push — the natural cadence of a lane. The
+  pushed sha is read in the checkout the push ran in (the command's `cd`/`git -C`, else the
+  payload cwd), not the session's checkout: a lane's push used to record main's HEAD.
 """
 
 import json
@@ -28,9 +37,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _hooklib import bash_command, emit, gh, git, ok, read_payload, state_path  # noqa: E402
+from _hooklib import bash_command, command_cwd, emit, gh, git, ok, read_payload, state_path  # noqa: E402
 
-_PUSH = re.compile(r"\bgit\s+push\b")
+_PUSH = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?push\b")
 SETTLE_SECONDS = 90
 STATE = "pending_pushes.json"
 
@@ -61,16 +70,20 @@ def _save(rows: list[dict]) -> str | None:
 
 
 def main() -> int:
+    cmd = bash_command(read_payload())
+    push = _PUSH.search(cmd)
+    if not push:
+        return ok()  # settings' `if` should already have filtered this; no state I/O either way
+
     now = time.time()
     rows, load_err = _load()
     findings = []
     if load_err:
         findings.append(f"push record UNVERIFIED — could not read hook state ({load_err})")
 
-    if _PUSH.search(bash_command(read_payload())):
-        code, sha = git("rev-parse", "HEAD")
-        if code == 0 and len(sha) == 40 and not any(r.get("sha") == sha for r in rows):
-            rows.append({"sha": sha, "at": now})
+    code, sha = git("rev-parse", "HEAD", cwd=command_cwd(cmd, push.end()))
+    if code == 0 and len(sha) == 40 and not any(r.get("sha") == sha for r in rows):
+        rows.append({"sha": sha, "at": now})
 
     due = [r for r in rows if now - r.get("at", 0) >= SETTLE_SECONDS]
     pending = [r for r in rows if now - r.get("at", 0) < SETTLE_SECONDS]
@@ -91,7 +104,7 @@ def main() -> int:
         findings.append(f"push record UNVERIFIED — could not write hook state ({save_err})")
 
     if findings:
-        return emit("push event check", findings)
+        return emit("push event check", findings, event="PostToolUse")
     return ok()
 
 
