@@ -719,7 +719,12 @@ def test_an_owner_directed_read_serves_its_public_twin_or_nothing(monkeypatch):
     s = _WIRE["sleep"]  # no public_summary on the live sleep row → no read at all
     body = _analysis_body(monkeypatch, "sleep", _wire_rows("sleep", s))
     assert "analysis" not in body
-    assert body["key_recommendation"] == s["key_recommendation"], "a reader-safe value passes untouched"
+    # #4384: the captured sleep "one thing" is the theme slug `deep_sleep_variability` —
+    # an identifier, not prose, and never served (this line used to assert it passed).
+    assert "key_recommendation" not in body, "a bare theme slug is not the one thing"
+    n = _WIRE["nutrition"]
+    body = _analysis_body(monkeypatch, "nutrition", _wire_rows("nutrition", n))
+    assert body["key_recommendation"] == n["key_recommendation"], "a reader-safe sentence passes untouched"
 
 
 def test_the_one_thing_prefers_the_public_ask(monkeypatch):
@@ -800,3 +805,144 @@ def test_mutation_control_the_brief_asks_the_glucose_coach_when_the_cgm_is_live(
     out, clients, ai_calls = _brief_run(monkeypatch, cgm_dark=False)
     assert not isinstance(out, ai_calls.CoachHold)
     assert clients, "the pipeline never started for a present coach"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4384 — "the one thing" was a theme SLUG. Live 2026-09-28T02:11Z:
+# /api/coach_analysis?domain=sleep → key_recommendation "deep_sleep_variability",
+# ?domain=labs → "protein_intake"; /coaching/ printed "the one thing deep_sleep_variability".
+# The stored OUTPUT# rows carry key_recommendation NULL, and the serve path fell back to
+# `themes[0]`. The fixtures below are those rows as boto3's Table resource returns them
+# (read-only query 2026-09-28T02:18Z, the prose slots elided — NULL → None, N → Decimal).
+# ══════════════════════════════════════════════════════════════════════════════
+
+from decimal import Decimal  # noqa: E402
+
+_STORED_4384 = {
+    "sleep": {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-09-26#daily_brief_sleep",
+        "created_at": "2026-09-26T17:01:27.315585+00:00",
+        "phase": "experiment",
+        "cycle": Decimal("17"),
+        "key_recommendation": None,
+        "public_summary": None,
+        "themes": [
+            "deep_sleep_variability",
+            "protocol_redesign",
+            "subjective_sleep_quality",
+            "hrv_recovery",
+            "adenosine_hypothesis",
+            "protein_nutrition",
+            "device_signal_validation",
+            "thermal_environment",
+        ],
+    },
+    "labs": {
+        "pk": "COACH#labs_coach",
+        "sk": "OUTPUT#2026-09-26#daily_brief_labs",
+        "created_at": "2026-09-26T17:07:13.254028+00:00",
+        "phase": "experiment",
+        "cycle": Decimal("17"),
+        "key_recommendation": None,
+        "public_summary": None,
+        "themes": [
+            "protein_intake",
+            "kidney_function",
+            "metabolic_panel",
+            "caloric_restriction",
+            "thyroid_axis",
+            "symptom_baseline",
+            "hrv_recovery",
+            "wearable_validation",
+            "biochemical_anchoring",
+        ],
+    },
+}
+_LIVE_SLUGS_4384 = {"sleep": "deep_sleep_variability", "labs": "protein_intake"}
+
+
+def _stored_body_4384(monkeypatch, domain, **over):
+    row = dict(_STORED_4384[domain], **over)
+    return _analysis_body(monkeypatch, domain, [sentinel_item(cgm_dark=False), *fresh_instrument_rows(), row])
+
+
+def _served_strings(body):
+    return [v for v in body.values() if isinstance(v, str)]
+
+
+def test_a_missing_ask_serves_no_one_thing_and_no_theme_slug(monkeypatch):
+    """RED before #4384: both live rows served themes[0] as key_recommendation."""
+    for domain, slug in _LIVE_SLUGS_4384.items():
+        assert _STORED_4384[domain]["themes"][0] == slug, "the fixture is the row the live slug came from"
+        body = _stored_body_4384(monkeypatch, domain)
+        assert "key_recommendation" not in body, f"{domain}: a missing ask must serve null, got {body.get('key_recommendation')!r}"
+        leaked = [t for t in _STORED_4384[domain]["themes"] if t in _served_strings(body)]
+        assert leaked == [], f"{domain}: theme slugs served as prose: {leaked}"
+
+
+def test_the_themes_fallback_is_gone_not_merely_masked_by_the_guard(monkeypatch):
+    """The FIRST defence on its own: with the token refusal neutered, a missing ask is
+    still null — the serve path no longer reaches for `themes[...]` at all."""
+    monkeypatch.setattr(audience_guard, "is_machine_token", lambda text: False)
+    monkeypatch.setattr(audience_guard, "is_bare_token", lambda text: False)
+    for domain in _LIVE_SLUGS_4384:
+        assert "key_recommendation" not in _stored_body_4384(monkeypatch, domain), domain
+
+
+def test_a_slug_stored_as_the_ask_is_refused_on_the_serve_path(monkeypatch):
+    """The second defence: even a producer that WRITES a slug into key_recommendation (or
+    public_ask) does not reach the reader — reader_safe refuses a bare identifier."""
+    for domain, slug in _LIVE_SLUGS_4384.items():
+        assert "key_recommendation" not in _stored_body_4384(monkeypatch, domain, key_recommendation=slug)
+        assert "key_recommendation" not in _stored_body_4384(monkeypatch, domain, public_ask=slug)
+        assert "public_read" not in _stored_body_4384(monkeypatch, domain, public_summary=slug)
+
+
+def test_mutation_control_without_the_token_refusal_the_stored_slug_leaks(monkeypatch):
+    monkeypatch.setattr(audience_guard, "is_machine_token", lambda text: False)
+    monkeypatch.setattr(audience_guard, "is_bare_token", lambda text: False)
+    for domain, slug in _LIVE_SLUGS_4384.items():
+        assert _stored_body_4384(monkeypatch, domain, key_recommendation=slug)["key_recommendation"] == slug
+
+
+def test_a_real_ask_on_the_same_row_is_still_served(monkeypatch):
+    ask = "Before bed one night this week, write down the time he got into bed."
+    assert _stored_body_4384(monkeypatch, "sleep", key_recommendation=ask)["key_recommendation"] == ask
+
+
+def test_the_token_shapes_name_identifiers_and_pass_prose_and_labels():
+    slugs = [t for row in _STORED_4384.values() for t in row["themes"]]
+    for token in [*slugs, "DEEP_SLEEP", "Deep_Sleep"]:  # an identifier: refused in EVERY reader slot
+        assert audience_guard.is_machine_token(token) and audience_guard.is_bare_token(token), token
+        assert audience_guard.reader_safe(token) is None and audience_guard.reader_prose(token) is None, token
+    for token in ["protein-intake", "sleep.deep", "deepSleepVariability", "hydrate", "noticing"]:  # prose slots only
+        assert audience_guard.is_bare_token(token) and not audience_guard.is_machine_token(token), token
+        assert audience_guard.reader_prose(token) is None, token
+    assert audience_guard.reader_safe("noticing") == "noticing", "a one-word LABEL (a stance stage) is still served"
+    prose = [w["key_recommendation"] for w in _WIRE.values() if w.get("key_recommendation") not in _LIVE_SLUGS_4384.values()]
+    assert prose, "the live wire carries real asks to check against"
+    for text in [*prose, "Hydrate.", "Sleep eight hours", "Log protein at lunch.", "Weigh-ins", "", None, 17]:
+        assert not audience_guard.is_bare_token(text), text
+
+
+def _expert_body_4384(monkeypatch, key_recommendation):
+    row = {
+        "pk": "USER#matthew#SOURCE#ai_analysis",
+        "sk": "EXPERT#sleep",
+        "analysis": "Deep sleep swung widely this week.",
+        "key_recommendation": key_recommendation,
+        "generated_at": "2026-09-26T17:00:00+00:00",
+    }
+    monkeypatch.setattr(C, "table", FakeDdbTable(rows=[row]))
+    monkeypatch.setattr(C, "_current_day_n", lambda: 30)
+    resp = C.handle_ai_analysis({"queryStringParameters": {"expert": "sleep"}})
+    assert resp["statusCode"] == 200, resp
+    return json.loads(resp["body"])
+
+
+def test_ai_analysis_never_serves_a_slug_as_its_recommendation(monkeypatch):
+    """#4384 set sweep: /api/ai_analysis's EXPERT# key_recommendation is the same slot."""
+    assert "key_recommendation" not in _expert_body_4384(monkeypatch, "deep_sleep_variability")
+    ask = "Write down the time he got into bed one night this week."
+    assert _expert_body_4384(monkeypatch, ask)["key_recommendation"] == ask

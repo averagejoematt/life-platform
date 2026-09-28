@@ -225,3 +225,70 @@ def test_a_deploy_from_a_lane_fires_from_a_main_checkout_session(tmp_path):
         cwd=main,
     )
     assert r2.stdout.strip() == "", r2.stdout
+
+
+# ── #4260 follow-up: the advisory fires on an EXECUTED deploy from a non-main lane only ──
+# Once #4366 made it audible it fired on (1) a worktree DETACHED at origin/main's tip — the
+# sanctioned deploy posture — and (2) read-only commands that merely name a deploy/ path.
+
+
+def _advisory(r: subprocess.CompletedProcess) -> bool:
+    return "deploy from a worktree" in (r.stdout + r.stderr)
+
+
+def test_a_command_that_only_mentions_a_deploy_path_is_silent_and_an_executed_one_fires(tmp_path):
+    """Every read-only form is silent in a lane worktree; every executed form fires. One test
+    that reports every offender (a parametrised per-command test would count as N gates)."""
+    main, worktree = _make_fixture(tmp_path)
+    script = str(main / "scripts" / "hooks" / "guard_bash.py")
+    read_only = [
+        "grep -n foo deploy/deploy_fleet.sh",
+        "cat deploy/deploy_lambda.sh",
+        "head -40 deploy/deploy_fleet.sh",
+        "sed -n '1,40p' deploy/cdk_deploy.sh",
+        "git diff origin/main -- deploy/deploy_lambda.sh",
+        "rg update-function-code deploy/deploy_lambda.sh",
+        "grep -c 'aws lambda update-function-code' deploy/deploy_lambda.sh",
+    ]
+    executed = [
+        "bash deploy/deploy_fleet.sh",
+        "bash deploy/deploy_lambda.sh x y",
+        "./deploy/deploy_lambda.sh x y",
+        "deploy/sync_site_to_s3.sh",
+        f"ALLOW=1 bash {worktree}/deploy/deploy_fleet.sh",
+        "git fetch origin && bash deploy/cdk_deploy.sh LifePlatformServe",
+        "aws lambda update-function-code --function-name x --zip-file fileb://x.zip",
+    ]
+    offenders = []
+    for cmd in read_only:
+        r = _run(script, {"cwd": str(worktree), "tool_name": "Bash", "tool_input": {"command": cmd}}, cwd=main)
+        if _advisory(r):
+            offenders.append(f"FALSE POSITIVE on read-only: {cmd!r}")
+    for cmd in executed:
+        r = _run(script, {"cwd": str(worktree), "tool_name": "Bash", "tool_input": {"command": cmd}}, cwd=main)
+        if not _advisory(r):
+            offenders.append(f"MISSED executed deploy: {cmd!r}")
+    assert not offenders, "\n".join(offenders)
+
+
+def test_a_worktree_detached_at_origin_main_is_silent_and_every_other_lane_shape_fires(tmp_path):
+    main, lane = _make_fixture(tmp_path)
+    main_sha = _git("rev-parse", "HEAD", cwd=main)
+    _git("update-ref", "refs/remotes/origin/main", main_sha, cwd=main)  # refs are shared by every worktree
+    at_main = tmp_path / "detached-at-main"
+    _git("worktree", "add", "-q", "--detach", str(at_main), main_sha, cwd=main)
+    lane_sha = _lane_commit(lane)
+    stale = tmp_path / "detached-elsewhere"
+    _git("worktree", "add", "-q", "--detach", str(stale), lane_sha, cwd=main)
+    script = str(main / "scripts" / "hooks" / "guard_bash.py")
+
+    def fires(where: Path) -> bool:
+        cmd = f"cd {where} && bash deploy/deploy_fleet.sh"
+        return _advisory(_run(script, {"cwd": str(main), "tool_name": "Bash", "tool_input": {"command": cmd}}, cwd=main))
+
+    assert not fires(at_main), "false positive: a worktree detached at origin/main's tip is the sanctioned deploy posture"
+    assert fires(stale), "missed: a worktree detached at a NON-main sha"
+    assert fires(lane), "missed: a worktree on a lane branch"
+    # main moves on: the once-sanctioned detached worktree is now stale and must fire
+    _git("update-ref", "refs/remotes/origin/main", lane_sha, cwd=main)
+    assert fires(at_main), "missed: a worktree detached at an OLD origin/main tip"
