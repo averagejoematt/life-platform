@@ -13,7 +13,7 @@ otherwise, in one sentence:
 
 THE RULE, AS ARITHMETIC
 
-    top_kg = base_kg x (1 - discount) x ramp_pct(week)        rounded UP to 0.5 kg
+    top_kg = base_kg x (1 - discount) x ramp_pct(week)        to the NEAREST 5 lb (#4388)
     base_kg = band_e1rm_kg, or anchor_kg when novel-again      (#4388 — see the ruling below)
     top_kg <= cap_pct x band_e1rm_kg                           (the e1RM guard, rounded DOWN)
     ramp_pct(week) = min(start + step x (week - 1), cap_pct)   (held at cap_pct from then on)
@@ -48,15 +48,18 @@ THE RULE, AS ARITHMETIC
     09-28 draft held the trap bar at this engine floor (55.5 kg) as a re-grooving session.
     `ramp.base` names which base a row used ("band_e1rm" | "anchor_set").
 
-Rounding is UP to the 0.5 kg the history renders at, because the week's percentage is the
-bottom of an approved band (60–65 %): rounding down would land week 1 under 60 %, which
-§3 does not license. The e1RM cap is rounded DOWN, so rounding never crosses it.
+Rounding (owner ruling 2026-09-28, #4388) is to the NEAREST 5-lb step in the pound he loads —
+`rep_scheme.load_step_kg`, the ONE rounding helper; the generator, the planner and the chat
+commit gate all read it through this function. 60 % x 103.19 kg = 136.5 lb -> 135 lb, the load
+he wrote by hand, so a week can land up to 2.5 lb under its exact percentage — the owner's call,
+replacing #4090's round-UP-to-0.5-kg (which read 62.0 kg = 136.7 lb and refused his 135). The
+e1RM cap is rounded DOWN on the same grid, so rounding never crosses it.
 
 Week 1 therefore reads 0.90 x 0.60 = 54 % of an old (novel-again) anchor SET's load; week 6
 onward, 0.90 x 0.85 = 76.5 %. A this-cycle anchor takes no discount (#4107) and ramps on its
 band e1RM (#4388): 60 % of e1RM in week 1, 85 % — the cap itself — from week 6. On the
 anchor-set base the e1RM cap cannot bind below the fraction cap by construction; on the e1RM
-base it binds only through rounding (the ramp is rounded UP, the cap DOWN). It is kept as a
+base it binds only through rounding (the ramp rounds to the nearest step, the cap DOWN). It is kept as a
 guard either way, and `cap_bound` says when it did.
 
 Back-offs stay −10 % of the top set (`full_body_session._apply_back_offs`); they are the
@@ -109,8 +112,9 @@ that by AST). Two additions over #4090:
 
 from __future__ import annotations
 
-import math
 from typing import Any
+
+from training.rep_scheme import load_step_kg
 
 ISSUE = "#4090"
 SECTION = "TRAINING_PROGRAM_v0.3.md §3 — 'Start at 60–65 % of the band-matched historical anchor after the 10–15 % detraining discount'"
@@ -173,10 +177,6 @@ def ramp_pct(week: int | None, p: dict[str, Any] | None = None) -> int:
 
 def _floor_half_kg(kg: float) -> float:
     return int(kg * 2) / 2
-
-
-def _ceil_half_kg(kg: float) -> float:
-    return math.ceil(round(kg * 2, 6)) / 2
 
 
 def band_e1rm_kg(best_kg: float, reps: list[int] | None) -> float:
@@ -253,7 +253,8 @@ def ramp_floor(floor: dict[str, Any], week: int | None) -> dict[str, Any]:
     discounted = base * (100 - discount) / 100.0
     raw = discounted * pct / 100.0
     cap_kg = e1rm * p["cap_pct"] / 100.0
-    top = min(_ceil_half_kg(raw), _floor_half_kg(cap_kg))
+    # #4388 owner ruling: NEAREST 5-lb step for the ramp, DOWN for the cap — one helper (rep_scheme)
+    top = min(load_step_kg(raw), load_step_kg(cap_kg, down=True))
     out["floor_kg"] = top
     out["discount_pct"] = discount
     out["layoff_reason"] = None
