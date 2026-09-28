@@ -13,7 +13,8 @@ otherwise, in one sentence:
 
 THE RULE, AS ARITHMETIC
 
-    top_kg = anchor_kg x (1 - discount) x ramp_pct(week)      rounded UP to 0.5 kg
+    top_kg = base_kg x (1 - discount) x ramp_pct(week)        to the NEAREST 5 lb (#4388)
+    base_kg = band_e1rm_kg, or anchor_kg when novel-again      (#4388 — see the ruling below)
     top_kg <= cap_pct x band_e1rm_kg                           (the e1RM guard, rounded DOWN)
     ramp_pct(week) = min(start + step x (week - 1), cap_pct)   (held at cap_pct from then on)
 
@@ -29,17 +30,37 @@ THE RULE, AS ARITHMETIC
   * the discount reads the deep end of `detraining_discount_pct`. #4090 took 15 % (the
     deep end of the owner's 10–15 % band); the owner ruled 10 % on 2026-09-23 (#4107), and
     the redline now carries [10, 10], so the ramp and every other reader see one number.
-  * the redline key says `start_pct_of_band_e1rm`; §3's prose says the start is a share of
-    the band-matched ANCHOR after the discount, and names e1RM only in the cap. This
-    module follows the prose (the approved text) and applies e1RM only as the cap.
+  * #4388 RULING — THE BASE IS BAND e1RM. The redline key says `start_pct_of_band_e1rm`
+    and `max_pct_of_band_e1rm_until_week_8`; §3's prose says "of the band-matched historical
+    anchor". #4090 read the prose as the anchor SET's load and applied e1RM only as the cap,
+    so the 2026-09-28 squat floor was 60 % x 88.45 kg (195 lb x 5 on 09-24) = 53.5 kg
+    (118 lb) for 8–12 reps. The owner reported that as a defect (2026-09-27), and his own
+    hand-authored 09-28 routine loaded squat, leg curl and calf at "60 % of band e1RM"
+    (squat 135 lb against 103.19 kg). The redline is his machine-readable wording and his
+    own authoring follows it, so the ramp's percentage is now a share of the band e1RM —
+    the same number the cap is a share of, so the ramp reaches the cap exactly at week 6
+    (60 + 5 x 5 = 85) instead of stopping short of it.
+  * #4388 — THE NOVEL-AGAIN EXCEPTION IS UNCHANGED. When the detraining discount applies
+    (an anchor >= `DETRAINING_ANCHOR_AGE_DAYS` older than block 1, or undated — the pattern
+    is novel-again), the base stays the anchor SET's load, exactly the #4090/#4107
+    arithmetic. An Epley e1RM extrapolated from a set months old (the 09-28 trap bar: 225 lb
+    x 5 on 2025-11-07, 325 days before) is not his current capacity, and the owner's own
+    09-28 draft held the trap bar at this engine floor (55.5 kg) as a re-grooving session.
+    `ramp.base` names which base a row used ("band_e1rm" | "anchor_set").
 
-Rounding is UP to the 0.5 kg the history renders at, because the week's percentage is the
-bottom of an approved band (60–65 %): rounding down would land week 1 under 60 %, which
-§3 does not license. The e1RM cap is rounded DOWN, so rounding never crosses it.
+Rounding (owner ruling 2026-09-28, #4388) is to the NEAREST 5-lb step in the pound he loads —
+`rep_scheme.load_step_kg`, the ONE rounding helper; the generator, the planner and the chat
+commit gate all read it through this function. 60 % x 103.19 kg = 136.5 lb -> 135 lb, the load
+he wrote by hand, so a week can land up to 2.5 lb under its exact percentage — the owner's call,
+replacing #4090's round-UP-to-0.5-kg (which read 62.0 kg = 136.7 lb and refused his 135). The
+e1RM cap is rounded DOWN on the same grid, so rounding never crosses it.
 
-Week 1 therefore reads 0.90 x 0.60 = 54 % of an old anchor's load; week 6 onward,
-0.90 x 0.85 = 76.5 %. A this-cycle anchor takes no discount (#4107): 60 % and 85 %. The e1RM cap (85 % of Epley e1RM from the anchor set) cannot bind below the
-fraction cap by construction; it is kept as a guard, and `cap_bound` says when it did.
+Week 1 therefore reads 0.90 x 0.60 = 54 % of an old (novel-again) anchor SET's load; week 6
+onward, 0.90 x 0.85 = 76.5 %. A this-cycle anchor takes no discount (#4107) and ramps on its
+band e1RM (#4388): 60 % of e1RM in week 1, 85 % — the cap itself — from week 6. On the
+anchor-set base the e1RM cap cannot bind below the fraction cap by construction; on the e1RM
+base it binds only through rounding (the ramp rounds to the nearest step, the cap DOWN). It is kept as a
+guard either way, and `cap_bound` says when it did.
 
 Back-offs stay −10 % of the top set (`full_body_session._apply_back_offs`); they are the
 one sanctioned set under the top-set floor, and `back_off_floor_kg` records it so the
@@ -91,8 +112,9 @@ that by AST). Two additions over #4090:
 
 from __future__ import annotations
 
-import math
 from typing import Any
+
+from training.rep_scheme import load_step_kg
 
 ISSUE = "#4090"
 SECTION = "TRAINING_PROGRAM_v0.3.md §3 — 'Start at 60–65 % of the band-matched historical anchor after the 10–15 % detraining discount'"
@@ -104,6 +126,12 @@ SECTION = "TRAINING_PROGRAM_v0.3.md §3 — 'Start at 60–65 % of the band-matc
 DETRAINING_ANCHOR_AGE_DAYS = 28
 
 FALLBACK_NEAREST_BAND = "nearest_band"
+
+# #4388: what the week's percentage is a share of. Band e1RM is the rule; the anchor set's own
+# load is the novel-again exception (the detraining discount applies), unchanged from #4090.
+BASE_BAND_E1RM = "band_e1rm"
+BASE_ANCHOR_SET = "anchor_set"
+_BASE_LABEL = {BASE_BAND_E1RM: "band e1RM", BASE_ANCHOR_SET: "band anchor set (novel-again: an old anchor's e1RM is not today's)"}
 
 
 def params() -> dict[str, Any]:
@@ -141,7 +169,7 @@ def params() -> dict[str, Any]:
 
 
 def ramp_pct(week: int | None, p: dict[str, Any] | None = None) -> int:
-    """The week's share of the discounted anchor, in whole percent. Week < 1 (or unknown) is week 1."""
+    """The week's share of the ramp's base (band e1RM, or a novel-again anchor set — #4388), in whole percent. Week < 1 (or unknown) is week 1."""
     p = p or params()
     w = max(1, int(week or 1))
     return min(p["start_pct"] + p["step_pct_per_wk"] * (w - 1), p["cap_pct"])
@@ -149,10 +177,6 @@ def ramp_pct(week: int | None, p: dict[str, Any] | None = None) -> int:
 
 def _floor_half_kg(kg: float) -> float:
     return int(kg * 2) / 2
-
-
-def _ceil_half_kg(kg: float) -> float:
-    return math.ceil(round(kg * 2, 6)) / 2
 
 
 def band_e1rm_kg(best_kg: float, reps: list[int] | None) -> float:
@@ -204,6 +228,9 @@ def anchor_discount(anchor_date: str | None, p: dict[str, Any] | None = None) ->
 def ramp_floor(floor: dict[str, Any], week: int | None) -> dict[str, Any]:
     """A `prescription_floor` result, re-based onto the week's ramp. Pure; returns a copy.
 
+    #4388: the week's percentage is of band e1RM, except for a novel-again anchor (the
+    detraining discount applies), which keeps the anchor-set base — `ramp.base` says which.
+
     Recomputes from `best_kg` (the undiscounted band anchor), so a layoff discount the floor
     may already have taken is never applied twice. A floor without a band-matched anchor
     passes through unchanged — no anchor, no ramp, and the status says which absence.
@@ -217,11 +244,17 @@ def ramp_floor(floor: dict[str, Any], week: int | None) -> dict[str, Any]:
     anchor = float(out["best_kg"])
     basis = out.get("basis") or {}
     discount, discount_ruling = anchor_discount(basis.get("date"), p)
-    discounted = anchor * (100 - discount) / 100.0
     e1rm = band_e1rm_kg(anchor, basis.get("reps"))
+    # #4388: the percentage is of band e1RM (the redline's wording and the owner's own 09-28
+    # authoring); a novel-again anchor — one the detraining discount applies to — keeps the
+    # anchor-set base, unchanged from #4090/#4107 (see the module docstring).
+    base_kind = BASE_ANCHOR_SET if discount_ruling["applies"] else BASE_BAND_E1RM
+    base = anchor if base_kind == BASE_ANCHOR_SET else e1rm
+    discounted = base * (100 - discount) / 100.0
     raw = discounted * pct / 100.0
     cap_kg = e1rm * p["cap_pct"] / 100.0
-    top = min(_ceil_half_kg(raw), _floor_half_kg(cap_kg))
+    # #4388 owner ruling: NEAREST 5-lb step for the ramp, DOWN for the cap — one helper (rep_scheme)
+    top = min(load_step_kg(raw), load_step_kg(cap_kg, down=True))
     out["floor_kg"] = top
     out["discount_pct"] = discount
     out["layoff_reason"] = None
@@ -231,15 +264,18 @@ def ramp_floor(floor: dict[str, Any], week: int | None) -> dict[str, Any]:
         "discount_pct": discount,
         "discount": discount_ruling,
         "anchor_kg": anchor,
-        "discounted_anchor_kg": round(discounted, 3),
         "band_e1rm_kg": round(e1rm, 3),
+        "base": base_kind,
+        "base_kg": round(base, 3),
+        "discounted_base_kg": round(discounted, 3),
         "cap_kg": round(cap_kg, 3),
         "cap_bound": cap_kg < raw,
         "top_kg": top,
         "pct_of_anchor": round(100.0 * top / anchor, 1),
-        "pct_of_discounted_anchor": round(100.0 * top / discounted, 1),
+        "pct_of_band_e1rm": round(100.0 * top / e1rm, 1),
+        "pct_of_discounted_base": round(100.0 * top / discounted, 1),
         "rule": (
-            f"v0.3 §3 entry ramp: {pct}% of the band anchor after a {discount}% detraining discount "
+            f"v0.3 §3 entry ramp: {pct}% of the {_BASE_LABEL[base_kind]} after a {discount}% detraining discount "
             f"(start {p['start_pct']}%, +{p['step_pct_per_wk']}%/wk to week {p['ramp_to_week']}, <= {p['cap_pct']}% of band e1RM, "
             f"then {p['then']})"
         ),
@@ -389,8 +425,12 @@ def render_ramp_cue(floor: dict[str, Any]) -> str:
     fb = floor.get("fallback_detail") or {}
     if floor.get("fallback") == FALLBACK_NEAREST_BAND and fb:
         where += f", nearest band you have lifted in: {fb.get('anchor_band')} — none yet at {fb.get('band_requested')}"
+    if r.get("base") == BASE_BAND_E1RM:
+        share = f"{r['ramp_pct']}% of your band e1RM {_fmt_load(float(r['band_e1rm_kg']))}"
+    else:
+        share = f"{r['ramp_pct']}% of your band anchor"
     return (
-        f"Week {r['week']} load {_fmt_load(float(floor['floor_kg']))} — {r['ramp_pct']}% of your band anchor {discount} "
+        f"Week {r['week']} load {_fmt_load(float(floor['floor_kg']))} — {share} {discount} "
         f"(anchor {got} on {basis.get('date')} {where}; v0.3 §3). "
         "Down on the day if you must, never up."
     )

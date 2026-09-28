@@ -197,14 +197,15 @@ def full_body_routines(
         rationale.append(f"UNRESOLVED — {line}")
 
     history_index, weight_index, _cardio, _whoop = note_indexes
-    # #4090: v0.3 §3's entry ramp — the week's share of the discounted band anchor, never 100 %
+    # #4090: v0.3 §3's entry ramp — the week's share of band e1RM (#4388; a novel-again anchor's set), never 100 %
     # of the band best. The week is the session sequence's (#4110 — completed sessions, not
     # calendar weeks); a day with no program week (before the block start) ramps as week 1.
     ramp_week = int(day_entry.get("week") or 1)
     ramp_p = load_ramp.params()
     rationale.append(
-        f"loads: v0.3 §3 entry ramp, week {ramp_week} = {load_ramp.ramp_pct(ramp_week, ramp_p)}% of the band anchor after the "
-        f"{ramp_p['discount_pct']}% detraining discount on anchors >= {load_ramp.DETRAINING_ANCHOR_AGE_DAYS} d older than block 1 "
+        f"loads: v0.3 §3 entry ramp, week {ramp_week} = {load_ramp.ramp_pct(ramp_week, ramp_p)}% of band e1RM — of the anchor set, "
+        f"after the {ramp_p['discount_pct']}% detraining discount, on novel-again anchors >= {load_ramp.DETRAINING_ANCHOR_AGE_DAYS} d "
+        "older than block 1 (#4388) "
         f"(cap {ramp_p['cap_pct']}% of band e1RM; no in-band history -> the nearest band he has lifted in); back-offs −10 % of the top set"
     )
     load_floors = _enforce_load_floors(
