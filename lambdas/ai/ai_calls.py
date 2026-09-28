@@ -29,10 +29,8 @@ from datetime import date as _date_cls, timedelta as _timedelta_cls
 from typing import Any, Optional
 
 import boto3
-from coach import (
-    coach_brief_input_gate as _in_gate,  # #3107 — the upstream change-gate + the shared data-inventory block
-    coach_presence_gate as _presence,  # #4217 — the absent coach is not asked
-)
+import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
+from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_today
 
