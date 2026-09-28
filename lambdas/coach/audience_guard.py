@@ -254,6 +254,64 @@ def public_items(values) -> list:
     return [v for v in values if isinstance(v, str) and v.strip() and not is_owner_directed(v) and not is_machine_token(v)]
 
 
+# #4392: a theme TAG is a label, not prose — the coach extraction stores them as slugs
+# ("deep_sleep_variability", "hrv_recovery") and /coaching/ printed them verbatim. The
+# tag carries meaning, so the public seam HUMANISES rather than drops: underscores become
+# spaces and an acronym word takes its display form. Casing is otherwise left as stored —
+# the coaching tag row is a `.label` (uppercased by CSS) and the reading/journal themes
+# are deliberately lowercase phrases, so sentence-casing would fight both surfaces.
+_THEME_WORD_LABELS = {
+    "a1c": "A1C",
+    "apob": "ApoB",
+    "bmi": "BMI",
+    "bp": "BP",
+    "cgm": "CGM",
+    "dexa": "DEXA",
+    "dxa": "DXA",
+    "hdl": "HDL",
+    "hrv": "HRV",
+    "ldl": "LDL",
+    "rem": "REM",
+    "rhr": "RHR",
+    "tdee": "TDEE",
+    "vo2": "VO2",
+    "vo2max": "VO2 max",
+}
+
+
+def reader_theme(value):
+    """One stored theme tag as a reader label, or None (#4392).
+
+    `"cgm_data_interpretation"` → `"CGM data interpretation"`; a phrase that is already
+    words passes unchanged apart from acronym words. Non-string, empty and owner-directed
+    tags return None.
+    """
+    if not isinstance(value, str):
+        return None
+    words = value.replace("_", " ").split()
+    label = " ".join(_THEME_WORD_LABELS.get(w.lower(), w) for w in words)
+    if not label or is_owner_directed(label):
+        return None
+    return label
+
+
+def public_themes(values) -> list:
+    """The ONE seam every public `themes` / `*_themes` list is served through (#4392).
+
+    Each tag via `reader_theme`, unusable ones dropped, order kept, case-insensitive
+    duplicates collapsed (`deep_sleep` and `deep sleep` are one tag once humanised).
+    """
+    if not isinstance(values, list):
+        return []
+    out, seen = [], set()
+    for v in values:
+        label = reader_theme(v)
+        if label and label.lower() not in seen:
+            seen.add(label.lower())
+            out.append(label)
+    return out
+
+
 def public_ask(record):
     """The record's PUBLIC ask (`public_ask`, extraction task 13 / task 11) or None.
 
