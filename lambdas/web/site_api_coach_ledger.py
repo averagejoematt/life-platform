@@ -891,6 +891,11 @@ def handle_predictions(event, *, _g):
             # #1376: career (all cycles, tombstoned archives included) beside this
             # season — same sports-card pattern as /api/calibration.
             by_coach[cid]["lifetime"] = dict(_LIFETIME_ZERO)
+            # #4215: same registry flag /api/calibration's per_coach rows and this
+            # endpoint's own per-row `retired` (below) already read — the site's
+            # coach_roster.js `retiredSeats()` prefers this box and falls back to the
+            # per-row flag only when it's absent, so this is additive, not a new source.
+            by_coach[cid]["retired"] = cid in _RETIRED_SHORT_IDS
 
             try:
                 # ONE unfiltered fetch of the whole PREDICTION# partition (career,
