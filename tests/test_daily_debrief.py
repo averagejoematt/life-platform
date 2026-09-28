@@ -66,17 +66,32 @@ def _FakeTable(items=None, latest_date="2026-07-07"):
 
 
 class _FakeS3:
-    def __init__(self, existing_index=None, mp3_exists=False):
+    # #4365: the head is the wire shape — a real debrief mp3 is ~1-2 MB (audio/mpeg); a
+    # reset leaves a ~199-byte application/json tombstone on the same key.
+    _TOMBSTONE = b'{"tombstone": true, "tombstoned_at": "2026-09-05T19:00:47+00:00", "archived_to": "generated/podcast/debrief/archive/pilot/2026-07-07.mp3", "tombstoned_reason": "experiment_restart_2026-09-06"}'
+
+    def __init__(self, existing_index=None, mp3_exists=False, mp3_tombstoned=False):
         self.puts = {}
         self._index = existing_index
         self._mp3_exists = mp3_exists
+        self._mp3_tombstoned = mp3_tombstoned
 
     def head_object(self, Bucket, Key):
+        if Key.endswith(".mp3") and self._mp3_tombstoned:
+            return {"ContentLength": len(self._TOMBSTONE), "ContentType": "application/json", "Metadata": {}}
         if Key.endswith(".mp3") and not self._mp3_exists:
             raise RuntimeError("404")
-        return {"ContentLength": 1234}
+        return {"ContentLength": 1_800_000, "ContentType": "audio/mpeg", "Metadata": {}}
 
     def get_object(self, Bucket, Key):
+        if Key.endswith(".mp3") and self._mp3_tombstoned:
+            body_t = self._TOMBSTONE
+
+            class _T:
+                def read(self_inner, amt=None):
+                    return body_t
+
+            return {"Body": _T()}
         if Key.endswith("episodes.json") and self._index is not None:
             body = json.dumps({"episodes": self._index}).encode()
 
@@ -269,6 +284,13 @@ class TestHandler:
         monkeypatch.setattr(dd, "s3", _FakeS3(mp3_exists=True))
         out = dd.lambda_handler({}, None)
         assert json.loads(out["body"]).get("already_published") is True
+
+    def test_a_tombstoned_day_is_not_already_published(self, monkeypatch):
+        # #4365: the reset's tombstone on the day's key must not short-circuit the run.
+        monkeypatch.setattr(dd, "s3", _FakeS3(mp3_tombstoned=True))
+        assert dd._episode_exists("2026-07-07") is False
+        monkeypatch.setattr(dd, "s3", _FakeS3(mp3_exists=True))
+        assert dd._episode_exists("2026-07-07") is True
 
     def test_dry_run_writes_nothing(self, monkeypatch):
         fake = _FakeS3(mp3_exists=False)

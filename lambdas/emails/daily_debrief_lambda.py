@@ -42,6 +42,7 @@ from ai.behavior_logs import available_logs_from_presence  # #2056 — the #1699
 from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings  # ADR-104 gate
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
 from boto3.dynamodb.conditions import Key
+from common import media_tombstone  # #4365: a restart tombstone is not a published episode
 from common.numeric import decimals_to_float
 from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
 
@@ -342,12 +343,11 @@ def _episode_key(date_str: str) -> str:
     return f"{PREFIX}/{date_str}.mp3"
 
 
+# True only for a real published episode. #4365: the reset overwrites each live
+# debrief mp3 with a ~200-byte tombstone (generated/* cannot be deleted, ADR-046),
+# which a bare head_object counted as published.
 def _episode_exists(date_str: str) -> bool:
-    try:
-        s3.head_object(Bucket=S3_BUCKET, Key=_episode_key(date_str))
-        return True
-    except Exception:
-        return False
+    return media_tombstone.first_published(s3, S3_BUCKET, [_episode_key(date_str)], logger) is not None
 
 
 def _xml(s: str) -> str:
@@ -452,6 +452,7 @@ def lambda_handler(event: dict, context) -> dict:
         return {"statusCode": 200, "body": json.dumps({"skipped": "no computed_metrics"})}
 
     if not force and not dry_run and _episode_exists(date_str):
+        logger.info("[debrief] %s already published — %s matched; skipping", date_str, _episode_key(date_str))
         return {"statusCode": 200, "body": json.dumps({"date": date_str, "already_published": True})}
 
     facts = gather_facts(date_str)
