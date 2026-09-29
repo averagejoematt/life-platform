@@ -277,15 +277,23 @@ def is_error_payload(result: Any) -> bool:
     return isinstance(result, dict) and isinstance(result.get("error"), str) and bool(result["error"])
 
 
-_TYPE_CHECKS = {
-    "object": lambda v: isinstance(v, dict),
-    "array": lambda v: isinstance(v, list),
-    "string": lambda v: isinstance(v, str),
-    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
-    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
-    "boolean": lambda v: isinstance(v, bool),
-    "null": lambda v: v is None,
-}
+def _is_type(value: Any, json_type: str) -> bool:
+    """JSON-Schema type membership (bool is not a number)."""
+    if json_type == "object":
+        return isinstance(value, dict)
+    if json_type == "array":
+        return isinstance(value, list)
+    if json_type == "string":
+        return isinstance(value, str)
+    if json_type == "boolean":
+        return isinstance(value, bool)
+    if json_type == "null":
+        return value is None
+    if json_type == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if json_type == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    raise ValueError(f"unsupported JSON-Schema type {json_type!r}")
 
 
 def conformance_errors(value: Any, schema: dict[str, Any], path: str = "$") -> list[str]:
@@ -298,7 +306,7 @@ def conformance_errors(value: Any, schema: dict[str, Any], path: str = "$") -> l
     t = schema.get("type")
     if t is not None:
         types = t if isinstance(t, list) else [t]
-        if not any(_TYPE_CHECKS[x](value) for x in types):
+        if not any(_is_type(value, x) for x in types):
             return [f"{path}: expected {'|'.join(types)}, got {type(value).__name__}"]
     errs: list[str] = []
     if isinstance(value, dict):
