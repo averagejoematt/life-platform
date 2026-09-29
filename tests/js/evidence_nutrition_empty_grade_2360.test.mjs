@@ -98,3 +98,101 @@ test("a healthy payload is untouched by the guard", () => {
   assert.ok(/lead-ok/.test(html));
   assert.ok(/cleared 10\/10 days/.test(html));
 });
+
+/* ── #4244: the micronutrient section's label derives from the channels counted ── */
+// The API half of #4244 (PR #4333) made `sufficiency` the food + supplements TOTAL, each
+// entry carrying `channels_counted`. The page kept the header "Micronutrients — what the food
+// is short on" above that total — food-only copy over a figure that counted the supplement
+// stack. The label is now derived from the entries' own channels. Guard the SET of labels in
+// the section (header, avg figure, bar label, caption), not the one header.
+
+const { nutritionMicronutrients, micronutrientChannels } = await import("../../site/assets/js/evidence_nutrition.js");
+
+// The shape /api/nutrition_overview served on 2026-09-29 (as_of 2026-09-26), trimmed.
+const LIVE_JOINED_MICROS = {
+  sufficiency: {
+    fiber_g: { actual: 24.4, target: 38, pct: 64.2, from_food: 24.4, from_supplements: 0.0, channels_counted: ["food", "supplements"] },
+    potassium_mg: { actual: 4823.4, target: 3400, pct: 100.0, from_food: 4823.4, from_supplements: null, channels_counted: ["food"], uncounted_supplements: ["Multivitamin", "Electrolytes"] },
+    magnesium_mg: { actual: 351.9, target: 420, pct: 83.8, from_food: 207.9, from_supplements: 144.0, channels_counted: ["food", "supplements"], uncounted_supplements: ["Multivitamin", "Electrolytes"] },
+    vitamin_d_mcg: { actual: 125.4, target: 100, pct: 100.0, from_food: 0.4, from_supplements: 125.0, channels_counted: ["food", "supplements"], uncounted_supplements: ["Multivitamin"] },
+    omega3_total_g: { actual: 2.4, target: 3, pct: 80.0, from_food: 0.4, from_supplements: 2.0, channels_counted: ["food", "supplements"] },
+  },
+  avg_pct: 85.6,
+  avg_pct_basis: "average of per-nutrient TOTALS (food + supplements), each capped at 100%",
+  intake_channels: ["food", "supplements"],
+  supplements_state: "recorded",
+  unconverted: [{ name: "Multivitamin", reason: "x" }, { name: "Basic B Complex", reason: "x" }, { name: "Electrolytes", reason: "x" }],
+  food_only_avg_pct: 45.5,
+  as_of: "2026-09-26",
+};
+
+// The same day with no supplement record: the API serves food-only totals, entries carry
+// channels_counted ["food"], BUT intake_channels still lists both (it names the join).
+const ABSENT_SUPPS_MICROS = {
+  sufficiency: {
+    fiber_g: { actual: 24.4, target: 38, pct: 64.2, from_food: 24.4, from_supplements: null, channels_counted: ["food"] },
+    vitamin_d_mcg: { actual: 0.4, target: 100, pct: 0.4, from_food: 0.4, from_supplements: null, channels_counted: ["food"] },
+  },
+  avg_pct: 32.3,
+  intake_channels: ["food", "supplements"],
+  supplements_state: "absent",
+  unconverted: [],
+  food_only_avg_pct: 32.3,
+  as_of: "2026-09-26",
+};
+
+const _text = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+test("#4244 a food + supplements total is never headed as what the food is short on", () => {
+  const html = nutritionMicronutrients(LIVE_JOINED_MICROS);
+  assert.ok(!/what the food is short on/.test(html), "food-only header over a joined figure");
+  assert.ok(/Micronutrients — what food and supplements cover/.test(html));
+  assert.ok(/micronutrient avg, food \+ supplements/.test(html), "the avg figure names both channels");
+  assert.ok(/Food \+ supplements vs daily target/.test(html), "the bar label names both channels");
+  assert.ok(!/from logged food,/.test(html), "the caption must not scope a joined figure to food");
+});
+
+test("#4244 the food-only average stays visible beside the joined one", () => {
+  const t = _text(nutritionMicronutrients(LIVE_JOINED_MICROS));
+  assert.ok(/85\.6% micronutrient avg, food \+ supplements/.test(t), t);
+  assert.ok(/45\.5% from food alone/.test(t), t);
+});
+
+test("#4244 per-nutrient rows honour channels_counted and name what the supplements added", () => {
+  const html = nutritionMicronutrients(LIVE_JOINED_MICROS);
+  assert.ok(/Potassium \(food only\)/.test(html), "a nutrient no dose was counted into says food only");
+  assert.ok(!/Vitamin D \(food only\)/.test(html));
+  const t = _text(html);
+  assert.ok(/From supplements on Saturday, September 26: Magnesium 144 mg, Vitamin D 125 mcg, Omega-3 2 g\./.test(t), t);
+  assert.ok(/not counted — no record of what they contain: Multivitamin, Basic B Complex, Electrolytes\./.test(t), t);
+  assert.ok(/Potassium, Magnesium, Vitamin D are therefore floors — the true amount may be higher\./.test(t), t);
+});
+
+test("#4244 a supplement-covered nutrient is not drawn as a gap (the contract fixture)", () => {
+  const html = nutritionMicronutrients(LIVE_JOINED_MICROS);
+  assert.ok(/aria-label="Vitamin D: 100 percent of target"/.test(html), "vitamin D reads covered, not short");
+});
+
+test("#4244 channels come from the entries, not intake_channels (which names the join)", () => {
+  assert.deepEqual(micronutrientChannels(LIVE_JOINED_MICROS), { food: true, supplements: true });
+  assert.deepEqual(micronutrientChannels(ABSENT_SUPPS_MICROS), { food: true, supplements: false });
+});
+
+test("#4244 a day with no supplement record reads food-only and says absent, not zero", () => {
+  const html = nutritionMicronutrients(ABSENT_SUPPS_MICROS);
+  const t = _text(html);
+  assert.ok(/Micronutrients — from food alone/.test(t), t);
+  assert.ok(!/supplements cover|Food \+ supplements/.test(t), "no channel claim the record cannot back");
+  assert.ok(/No supplement record on Saturday, September 26 — these are food alone\. The supplement doses are absent from the record, not zero\./.test(t), t);
+  assert.ok(!/\(food only\)/.test(html), "no per-row suffix when the whole section is food only");
+});
+
+test("#4244 a pre-#4244 cached body (no channels_counted) reads food-only", () => {
+  const legacy = { sufficiency: { vitamin_d_mcg: { actual: 5, target: 100, pct: 5 } }, avg_pct: 36.4 };
+  assert.ok(/from food alone/.test(nutritionMicronutrients(legacy)));
+});
+
+test("#4244 an empty micronutrient block renders nothing", () => {
+  assert.equal(nutritionMicronutrients({}), "");
+  assert.equal(nutritionMicronutrients(null), "");
+});

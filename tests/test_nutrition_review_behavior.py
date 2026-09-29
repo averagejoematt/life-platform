@@ -1199,6 +1199,19 @@ def test_a_supplement_covered_nutrient_is_not_a_gap_in_the_weekly_table():
     assert _day_row(html, "Sat 06/06")[-1] == "100%"
 
 
+def test_a_week_with_no_supplement_record_labels_the_micro_column_food_only():
+    """#4244: the MICRO header is derived from the week's rows. With no supplement record on any
+    day the join counted food alone, so a "food + supps" header would claim a channel nothing was
+    counted from; the column says food only and the footnote names the absent record."""
+    days = m.extract_daily_nutrition({"2026-06-06": _mf_day(cal=1800, fiber=38), "2026-06-07": _mf_day(cal=1800, fiber=19)}, {})
+    assert {d["supplements_state"] for d in days} == {"absent"}
+    html = m.build_summary_table(days, dict(PROFILE))
+    assert "MICRO (food only)" in html
+    assert "food + supps" not in html and "food + supplements" not in html
+    assert "logged food (no supplement record this week)" in html
+    assert "2 days with no supplement record = food only" in html
+
+
 def test_the_hardcoded_fallback_prompt_renders_the_live_targets():
     rendered = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1650, protein_target_g=205)
     assert "1650 kcal" in rendered

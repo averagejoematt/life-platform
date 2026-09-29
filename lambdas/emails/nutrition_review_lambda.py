@@ -734,6 +734,15 @@ def _unconverted_note(days):
     return f" ({'; '.join(parts)})" if parts else ""
 
 
+def _micro_column_scope(days):
+    """(header scope, footnote basis) for the MICRO column, DERIVED from the week's rows (#4244).
+    The join counts supplements only on days with a supplement record; a week with none is food
+    only, and a header saying "food + supps" over it claims a channel nothing was counted from."""
+    if any(d.get("supplements_state") == "recorded" for d in days):
+        return "food + supps", "food + supplements taken that day"
+    return "food only", "logged food (no supplement record this week)"
+
+
 def build_summary_table(days, profile):
     if not days:
         return ""
@@ -799,6 +808,7 @@ def build_summary_table(days, profile):
         <td style="padding:8px;color:#4cc9f0;font-size:13px;font-weight:700;">AVG</td>{avg_html}
     </tr>"""
 
+    micro_scope, micro_basis = _micro_column_scope(days)
     return f"""<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
         <tr style="background:#0f1127;">
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:left;">DAY</th>
@@ -807,11 +817,11 @@ def build_summary_table(days, profile):
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">CARBS</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">FAT</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">FIBER</th>
-            <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">MICRO (food + supps)</th>
+            <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">MICRO ({micro_scope})</th>
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of food + supplements taken that day{_unconverted_note(days)}
+            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
         </td></tr>
     </table>"""
 
