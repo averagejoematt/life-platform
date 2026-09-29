@@ -493,10 +493,16 @@ class TestCallHaikuParsing:
         """
         import common.retry_utils as retry_utils
 
-        holder = {"text": "{}"}
+        holder = {"text": "{}", "bodies": [], "reject_schema": False}
 
         def _fake(req):
-            return {"content": [{"text": holder["text"]}]}
+            holder["bodies"].append(req)
+            if holder["reject_schema"] and "output_config" in req:
+                raise RuntimeError(
+                    "An error occurred (ValidationException) when calling the InvokeModel operation: "
+                    "output_config.format.schema: unsupported"
+                )
+            return {"content": [{"text": holder["text"]}], "stop_reason": "end_turn"}
 
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", _fake)
         return holder
@@ -522,6 +528,42 @@ class TestCallHaikuParsing:
     def test_a_broken_fence_falls_back_to_text_rather_than_raising(self, raw):
         raw["text"] = "```json\n{not valid json\n```"
         assert isinstance(gate._call_haiku("sys", "msg"), str)
+
+    # #4276: the verdict is requested under a JSON schema (`output_config.format`).
+    def test_the_judge_call_carries_the_verdict_schema(self, raw):
+        raw["text"] = '{"passed": true, "score": 80}'
+        gate._call_haiku("sys", "msg")
+        (body,) = raw["bodies"]
+        assert body["output_config"]["format"] == {"type": "json_schema", "schema": gate.QUALITY_GATE_OUTPUT_SCHEMA}
+        assert body["temperature"] == 0.1 and body["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+    def test_a_schema_refusal_falls_back_once_to_the_old_path(self, raw, capsys):
+        raw["text"] = '```json\n{"passed": true, "score": 80}\n```'
+        raw["reject_schema"] = True
+        assert gate._call_haiku("sys", "msg") == {"passed": True, "score": 80}
+        assert ["output_config" in b for b in raw["bodies"]] == [True, False]
+        assert "fallback=schema_rejected" in capsys.readouterr().out
+
+    def test_a_non_schema_error_is_not_absorbed(self, monkeypatch):
+        import common.retry_utils as retry_utils
+
+        def _boom(req):
+            raise RuntimeError("ThrottlingException: slow down")
+
+        monkeypatch.setattr(retry_utils, "call_anthropic_raw", _boom)
+        with pytest.raises(RuntimeError, match="Throttling"):
+            gate._call_haiku("sys", "msg")
+
+
+def test_the_output_schema_names_every_prompt_key():
+    """The schema lives beside the prompt's Output Format; a key in one and not the other fails here."""
+    import re
+
+    fmt = gate.QUALITY_GATE_SYSTEM_PROMPT.split("## Output Format", 1)[1]
+    top = set(re.findall(r'^\s{2}"(\w+)":', fmt, re.MULTILINE))
+    schema = gate.QUALITY_GATE_OUTPUT_SCHEMA
+    assert top == set(schema["properties"]) == set(schema["required"])
+    assert schema["additionalProperties"] is False
 
 
 # ──────────────────────────────────────────────────────────────────────────────

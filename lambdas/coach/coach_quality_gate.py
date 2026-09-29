@@ -75,8 +75,6 @@ v1.3.0 — 2026-09-01 (#3414): callee-side verdict capture for ASYNC callers —
 import json
 import logging
 import os
-import urllib.error
-import urllib.request
 
 import boto3
 
@@ -104,7 +102,6 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # Quality gate thresholds
@@ -284,49 +281,14 @@ def _call_haiku(system, user_message, max_tokens=QUALITY_GATE_MAX_TOKENS, temper
         # still a no-op is the `PromptCacheNoOp` metric (#2888), not this line.
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
-
-    # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw, which
-    # now executes via Bedrock (was urllib → api.anthropic.com). It handles
-    # backoff + token metrics + failure metric, so the old per-attempt loop +
-    # urllib except handlers are gone. `req` is still built above; call_anthropic_raw
-    # extracts its JSON body and forwards to bedrock_client.invoke().
+    # ADR-062: executes via Bedrock through retry_utils.call_anthropic_raw (backoff + token and
+    # failure metrics), handed the Messages body directly (#505/J-2 shape).
+    # #4276: the verdict is requested under QUALITY_GATE_OUTPUT_SCHEMA (`output_config.format`);
+    # the fence-tolerant parse stays as the fallback, in ai/structured_json.py.
+    from ai.structured_json import call_json
     from common.retry_utils import call_anthropic_raw
 
-    resp = call_anthropic_raw(req)
-    text = resp["content"][0]["text"].strip()
-    # Try to parse as JSON
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # Try extracting JSON from markdown code block
-        if "```json" in text:
-            start = text.find("```json") + 7
-            end = text.find("```", start)
-            if end > start:
-                try:
-                    return json.loads(text[start:end].strip())
-                except json.JSONDecodeError:
-                    pass
-        elif "```" in text:
-            start = text.find("```") + 3
-            end = text.find("```", start)
-            if end > start:
-                try:
-                    return json.loads(text[start:end].strip())
-                except json.JSONDecodeError:
-                    pass
-        return text
+    return call_json(call_anthropic_raw, body, schema=QUALITY_GATE_OUTPUT_SCHEMA, label="coach_quality_gate")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -695,6 +657,35 @@ QUALITY_GATE_SYSTEM_PROMPT = (
     "  ],\n"
     '  "suggestions": ["actionable suggestions for improvement"]\n'
     "}\n"
+)
+
+
+# #4276: the Output Format above as a JSON schema, sent as `output_config.format` so Bedrock
+# returns schema-valid JSON (Haiku 4.5 on Bedrock, verified live 2026-09-29). Every object is
+# closed (`additionalProperties: false` is the only form Bedrock accepts) and every key is
+# required, so a verdict can never arrive without `passed`/`score`. Keep it beside the prompt:
+# a key added to one and not the other is caught by
+# tests/test_coach_quality_gate_behavior.py::test_the_output_schema_names_every_prompt_key.
+def _obj(props: dict) -> dict:
+    return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
+
+
+def _list_of(props: dict) -> dict:
+    return {"type": "array", "items": _obj(props)}
+
+
+_S = {"type": "string"}
+QUALITY_GATE_OUTPUT_SCHEMA = _obj(
+    {
+        "passed": {"type": "boolean"},
+        "score": {"type": "integer"},
+        "anti_pattern_violations": _list_of({"phrase": _S, "context": _S}),
+        "decision_class_violations": _list_of({"expected_max": _S, "found": _S, "excerpt": _S}),
+        "voice_distinctiveness_score": {"type": "integer"},
+        "cross_coach_similarity_flags": _list_of({"similar_to": _S, "reason": _S}),
+        "number_grounding_violations": _list_of({"detail": _S}),
+        "suggestions": {"type": "array", "items": _S},
+    }
 )
 
 
