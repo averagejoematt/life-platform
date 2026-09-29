@@ -81,16 +81,15 @@
   },
   "qa-smoke-failures": {
     "added": "2026-09-26",
-    "cause": "cross_surface:coach_consistency,cross_surface:coach_vs_engine",
-    "cause_observed": "2026-09-27",
-    "citation": "#4343 — RE-CITED 2026-09-27 (Session AW): the live cause since PR 4332 made the coach-agreement legs read the page-level lead slot is `cross_surface:coach_vs_engine` failing Dr. Eli Marsh's served weekly read ('106.9 grams across 14 logged days', generated 2026-09-21) against the engine's /api/nutrition_overview 153.5 g over 21 logged days. That is a TRUE failure: the weekly read was written from the 30-day protein figure the coaches' brief handed them (#4343 cause B, fix PR 4345 open). It clears when the next weekly read is written from the served figure (Monday) or PR 4345 ships. The prior cause (cross_surface:vitals, the Reeves trend sentence) did not fire on 09-27.",
+    "cause_observed": "2026-09-29",
+    "citation": "#4343 — RE-CITED 2026-09-29 (Session AZ): the live cause channel names NO failing leg — the 2026-09-28 18:31Z qa-smoke run reported 0 failures (both coach-agreement legs pass: 5 extracted, 1 and 3 compared; issue 4186 closed on that read). The alarm is lit on an earlier datapoint and should clear at the next nightly (~18:30Z 2026-09-29); if it is still lit after a 0-failure run, the alarm's evaluation window — not a leg — is the defect. Prior cite (09-27): cross_surface:coach_vs_engine on Eli Marsh's 106.9 g weekly read (#4343 cause B, PR 4345 shipped).",
     "note": "`cause` is declared because the live channel names one. Prune or re-cite when it clears; never edit the cause to none in place."
   },
   "qa-smoke-warnings": {
     "added": "2026-09-21",
-    "cause_observed": "2026-09-28",
-    "cause": "score:hydration",
-    "citation": "#4183 — RE-CITED 2026-09-28 (Session AY): one live cause. `data:orphan_routine_drafts` no longer fires (PR 4324 scoped the leg to live-cycle orphans; the live run no longer names it). `score:hydration`: 'Hydration = 26 — low, possible HAE sync gap' — still the 2026-09-26 row (every qa-smoke run 03:39Z–05:11Z on 09-28 reads the same 26 on the latest complete PT day), so not yet a repeat. If the 2026-09-27 row (scored at 16:40Z 09-28) also reads low, file it against the HAE water ingest."
+    "cause_observed": "2026-09-29",
+    "cause": "data:orphan_routine_drafts,reader_truth:confirm,reader_truth:verdict",
+    "citation": "#4183 + #4220 — RE-CITED 2026-09-29 (Session AZ): three live causes. `data:orphan_routine_drafts` = draft 78dd2da5… (created 2026-09-21) aged past 7 days on 09-28 — owner act: archive or commit it (#4183, comment 2026-09-29). `reader_truth:confirm` + `reader_truth:verdict` = one finding e8f2c1 on /api/coaches: the judge reads Dr. Lisa Park's headline_stat '8 of 19 checked calls right (42%) through September 27' as a temporal contradiction at Day 23/24 (confirm-pass demoted it high→WARN, the issue-2741 flake class; the ruling ledger also adjudicates the same finding ADVISORY in a sibling leg). Owned by the coach-record single-producer surface, #4220. `score:hydration` no longer fires."
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -125,5 +124,10 @@
     "cause_observed": "2026-09-24T22:13:53Z",
     "citation": "#4084 (closed 2026-09-25 on live proof). The dead-man was created by the LifePlatformMcp CDK deploy (2026-09-24T14:42Z) with treat-missing=breaching over 24x1h, so it went ALARM at 14:43Z BEFORE the job's first ever run could emit — expected, and stated at deploy time. It cleared ALARM->OK at 2026-09-24T22:13:53Z on the manual trigger's PredraftOutcome=1 (22:12Z, outcome=drafted), and the first scheduled run (2026-09-25T02:00:33Z, outcome=exists) emitted again. One episode, cause known, not a flap.",
     "note": "Birth-state episode of a new dead-man; a later ALARM means a night with no PredraftOutcome — a real miss."
+  },
+  "daily-brief-duration-high": {
+    "added": "2026-09-29",
+    "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the #4345 budget box) was not exercised.",
+    "note": "Session AZ wrap citation for a fired-and-cleared episode (#2912)."
   }
 }
