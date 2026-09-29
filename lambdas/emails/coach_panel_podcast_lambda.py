@@ -161,14 +161,12 @@ def _elena_host_state() -> str:
     writes — her editorial stance (receipts-gated) + a couple of open threads
     she may call back to on-air. Volatile → user turn. Fail-soft ""."""
     try:
-        from boto3.dynamodb.conditions import Key as _Key
-
         bits = []
         st = table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {}
         if st.get("headline_stance") and not st.get("grounding_flag"):
             bits.append(f"Elena's current editorial read (her own, persistent): {str(st['headline_stance'])[:300]}")
         resp = table.query(
-            KeyConditionExpression=_Key("pk").eq("PERSONA#elena") & _Key("sk").begins_with("THREAD#"),
+            KeyConditionExpression=Key("pk").eq("PERSONA#elena") & Key("sk").begins_with("THREAD#"),
             ScanIndexForward=False,
             Limit=20,
         )
@@ -1281,12 +1279,13 @@ HOLD_MAX_RETRIES = int(os.environ.get("PANELCAST_HOLD_MAX_RETRIES", "3"))  # bou
 
 
 def _read_hold(week) -> dict:
-    """The hold record for a week, or {} if none."""
+    """The hold record for a week, or {} if none. #4365: an UNREADABLE hold is logged, not passed off as none."""
     try:
-        raw = s3.get_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json")["Body"].read()
-        d = json.loads(raw)
+        d = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json")["Body"].read())
         return d if isinstance(d, dict) else {}
-    except Exception:
+    except Exception as e:
+        if getattr(e, "response", {}).get("Error", {}).get("Code") not in ("NoSuchKey", "404"):
+            logger.warning("[panel] hold read wk%s FAILED — %s; the sweep cannot see this week's hold", week, e)
         return {}
 
 
@@ -1550,9 +1549,11 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     post = _select_week_post()
     week = post["week"]
-    published_key = None if (force or dry_run) else _episode_exists(week)
+    published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
     if published_key:
         logger.info("[panel] wk%s already published — %s matched; skipping (outcome=already-published)", week, published_key)
+        if dry_run:
+            return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
         _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
 

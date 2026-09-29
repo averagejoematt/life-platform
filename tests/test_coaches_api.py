@@ -725,20 +725,26 @@ def _route_table(store_table):
 
     def _pk_sk(kw):
         expr = kw["KeyConditionExpression"].get_expression()
-        pk = prefix = None
+        pk = prefix = span = None
         if expr["operator"] == "AND":
             left, right = expr["values"]
             pk = left.get_expression()["values"][1]
             r = right.get_expression()
             if r["operator"] == "begins_with":
                 prefix = r["values"][1]
+            elif r["operator"] == "BETWEEN":  # the MCP reader's LEARNING#{cutoff}..LEARNING#z window
+                span = (r["values"][1], r["values"][2])
         else:
             pk = expr["values"][1]
-        return pk, prefix
+        return pk, prefix, span
 
     def _hook(table, **kw):
-        pk, prefix = _pk_sk(kw)
-        rows = [dict(r) for (p, s), r in store_table.store.items() if p == pk and (prefix is None or str(s).startswith(prefix))]
+        pk, prefix, span = _pk_sk(kw)
+        rows = [
+            dict(r)
+            for (p, s), r in store_table.store.items()
+            if p == pk and (prefix is None or str(s).startswith(prefix)) and (span is None or span[0] <= str(s) <= span[1])
+        ]
         rows.sort(key=lambda r: str(r.get("sk") or ""), reverse=not kw.get("ScanIndexForward", True))
         return {"Items": rows}
 
@@ -839,6 +845,74 @@ def test_4220_mutation_control_the_learning_count_fails_on_webb(monkeypatch):
             c["confirmed"] = 1
     with pytest.raises(AssertionError):
         _assert_one_record("nutrition", coaches, forged_cal, predictions, wrong)
+
+
+def _mcp_track_record(monkeypatch, table, short_id):
+    """The owner-facing MCP reader over the SAME wire the four endpoints read."""
+    import mcp.tools_coach_intelligence as tci
+
+    monkeypatch.setattr(tci, "table", _route_table(table))
+    # A window wide enough to hold every fixture day for as long as this genesis stands
+    # (the fixture dates derive from genesis; a 30-day default would age them out).
+    return tci.tool_get_coach_track_record({"coach_id": short_id, "days": 36500})
+
+
+def _assert_mcp_is_the_record(short_id, coaches, mcp_out):
+    """#4220 box 4: get_coach_track_record prints the record /api/coaches prints."""
+    record = {c["persona_id"]: c for c in coaches["coaches"]}[f"{short_id}_coach"]["record"]
+    assert mcp_out["record"] == record, f"{short_id}: MCP record {mcp_out['record']} vs /api/coaches {record}"
+    assert mcp_out["decided_count"] == record["n"], f"{short_id}: MCP decided {mcp_out['decided_count']} vs {record['n']}"
+    expected_pct = round(100 * record["confirmed"] / record["n"], 1) if record["n"] else None
+    assert mcp_out["hit_rate_pct"] == expected_pct, short_id
+
+
+def test_4220_the_mcp_track_record_reads_the_one_record(monkeypatch):
+    """Box 4. Measured 2026-09-27 before the docket learnings were re-stamped pilot: the
+    MCP reader said Webb 74.1 % (20/27) and Brandt 11.5 % (3/26) while /api/predictions
+    said 0 of 7 and 3 of 6. Over the live-shaped wire (twenty blank-prediction_id docket
+    learnings per side, in-cycle, NOT phase-stamped) it now prints the one record."""
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    coaches, _cal, _pred, _wrong = _served_four(monkeypatch, table)
+    for short_id in ("nutrition", "explorer"):
+        _assert_mcp_is_the_record(short_id, coaches, _mcp_track_record(monkeypatch, table, short_id))
+
+    webb = _mcp_track_record(monkeypatch, table, "nutrition")
+    assert webb["headline"] == {c["persona_id"]: c for c in coaches["coaches"]}["nutrition_coach"]["headline_stat"]
+    # The breakdowns count one result per prediction; the docket trail names none.
+    assert webb["by_outcome"] == {"refuted": 5}, webb["by_outcome"]
+    assert webb["excluded_learnings"] == {"no_prediction_id": 20, "repeat_result_for_a_prediction": 0}
+    assert all(r["prediction_id"] for r in webb["recent_evaluations"])
+    brandt = _mcp_track_record(monkeypatch, table, "explorer")
+    assert brandt["by_outcome"] == {"confirmed": 3, "refuted": 1}, brandt["by_outcome"]
+
+
+def test_4220_mcp_track_record_a_repeated_result_counts_once_and_a_failed_ledger_read_is_absence(monkeypatch):
+    import mcp.tools_coach_intelligence as tci
+
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    # A second result for an already-resolved prediction (a re-grade on a later day).
+    for (pk, sk), row in list(table.store.items()):
+        if pk == "COACH#explorer_coach" and str(sk).startswith("LEARNING#") and row.get("prediction_id"):
+            later = f"LEARNING#{_day(25)}#{str(sk).split('#', 2)[2]}-regrade"
+            table.store[(pk, later)] = dict(row, sk=later, date=_day(25), status="confirmed")
+            break
+    out = _mcp_track_record(monkeypatch, table, "explorer")
+    assert out["excluded_learnings"]["repeat_result_for_a_prediction"] == 1
+    assert sum(out["by_outcome"].values()) == 4
+
+    # The ledger read fails -> no record, no rate; never a zero that reads as a clean slate.
+    routed = _route_table(table)
+
+    def _ledger_down(t, **kw):
+        sk_cond = kw["KeyConditionExpression"].get_expression()["values"][1].get_expression()
+        if sk_cond["operator"] == "begins_with" and sk_cond["values"][1] == "PREDICTION#":
+            raise RuntimeError("throttled")
+        return routed._query_hook(t, **kw)
+
+    monkeypatch.setattr(tci, "table", FakeDdbTable(query_hook=_ledger_down))
+    down = tci.tool_get_coach_track_record({"coach_id": "explorer", "days": 36500})
+    assert down["record"] is None and down["decided_count"] is None and down["hit_rate_pct"] is None
+    assert down["headline"] == "record unavailable"
 
 
 _LIVE_WRONG_4220 = os.path.join(_REPO, "tests", "fixtures", "wrong_obituaries_4220", "live_2026-09-27.json")

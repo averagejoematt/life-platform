@@ -404,7 +404,7 @@ def test_the_wrap_batterys_only_omission_is_the_declared_mutating_set():
 def test_the_wrap_battery_runs_doc_index_strict():
     """The fifth discrepancy #3531 found, and the cheapest to regress: bare vs `--strict`."""
     wg = _wrap_gates_module()
-    (gate,) = [g for g in wg.GATHER if "check_doc_index.py" in " ".join(g.cmd)]
+    (gate,) = [g for g in wg.VERIFY if "check_doc_index.py" in " ".join(g.cmd)]  # #4262: the doc leg runs once, in VERIFY
     assert "--strict" in gate.cmd, "Docs CI runs check_doc_index --strict; a bare local run is the 2026-07-27 incident"
 
 
