@@ -946,3 +946,84 @@ def test_ai_analysis_never_serves_a_slug_as_its_recommendation(monkeypatch):
     assert "key_recommendation" not in _expert_body_4384(monkeypatch, "deep_sleep_variability")
     ask = "Write down the time he got into bed one night this week."
     assert _expert_body_4384(monkeypatch, ask)["key_recommendation"] == ask
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4392 — the output trail's tag row printed the stored theme SLUGS. Live 2026-09-28
+# 03:06Z: /api/coach/sleep_coach recent_outputs[0].themes == _STORED_4384["sleep"]
+# ["themes"] verbatim; /coaching/ (coaching.js ce-themes) printed up to four of them.
+# The set of public endpoints serving a theme list (grep lambdas/web for "themes"):
+#   /api/coach/<id>          recent_outputs[].themes   (site_api_coach_profile)
+#   /api/journal_analysis    daily_themes[].themes + top_themes[].theme (site_api_mind)
+#   /api/reading_shelf + /api/reading_overview  book.themes (site_api_reading — pinned
+#                            in tests/test_site_api_reading.py)
+# All three go through audience_guard.public_themes.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _coach_themes_4392(monkeypatch):
+    row = dict(_STORED_4384["sleep"], pk=_PK, sk="OUTPUT#2026-09-26#daily_brief_sleep")
+    return _coach_body(monkeypatch, outputs=[row])["recent_outputs"]
+
+
+def test_the_coach_output_trail_serves_reader_labels_not_theme_slugs(monkeypatch):
+    """RED before #4392: recent_outputs[0].themes was the stored slug list verbatim."""
+    outs = _coach_themes_4392(monkeypatch)
+    assert outs, "the stored OUTPUT# row is served in the trail"
+    themes = outs[0]["themes"]
+    assert themes[:4] == ["deep sleep variability", "protocol redesign", "subjective sleep quality", "HRV recovery"], themes
+    assert len(themes) == len(_STORED_4384["sleep"]["themes"]), "humanised, not dropped — the tags carry meaning"
+    assert [t for t in themes if "_" in t or audience_guard.is_machine_token(t)] == [], themes
+
+
+def test_mutation_control_without_public_themes_the_trail_serves_the_slugs(monkeypatch):
+    monkeypatch.setattr(audience_guard, "public_themes", lambda values: values)
+    assert _coach_themes_4392(monkeypatch)[0]["themes"] == _STORED_4384["sleep"]["themes"]
+
+
+def test_reader_theme_humanises_slugs_and_keeps_phrases():
+    assert audience_guard.reader_theme("cgm_data_interpretation") == "CGM data interpretation"
+    assert audience_guard.reader_theme("resting_heart_rate") == "resting heart rate"
+    assert audience_guard.reader_theme("rem_sleep") == "REM sleep"
+    # already-prose themes (the live journal + reading shapes) pass unchanged
+    for phrase in ["cycles of relapse and reset", "work-life balance and pattern recognition", "identity and belonging"]:
+        assert audience_guard.reader_theme(phrase) == phrase
+    for junk in [None, "", "   ", "__", 17, "your_sleep_debt"]:
+        assert audience_guard.reader_theme(junk) is None, junk
+    assert audience_guard.public_themes(["deep_sleep", "deep sleep", "Deep Sleep", None, "hrv"]) == ["deep sleep", "HRV"]
+    assert audience_guard.public_themes("deep_sleep") == [] and audience_guard.public_themes(None) == []
+
+
+def _journal_body_4392(monkeypatch):
+    from web import site_api_mind as M
+
+    rows = [
+        {
+            "pk": "USER#matthew#SOURCE#journal_analysis",
+            "sk": f"DATE#2026-09-2{d}",
+            "date": f"2026-09-2{d}",
+            "themes": themes,
+            "dominant_theme": "health_body",
+            "sentiment_score": Decimal("0.2"),
+            "sentiment_label": "neutral",
+            "word_count": Decimal("120"),
+        }
+        for d, themes in ((5, ["protein_metabolism_cognition_link", "journaling_silence"]), (6, ["journaling silence", "grief"]))
+    ]
+    resp = M.journal_analysis(_g={"table": FakeDdbTable(rows=rows), "_experiment_date": lambda n: "2026-09-06"})
+    return json.loads(resp["body"])
+
+
+def test_journal_analysis_serves_reader_labels_in_both_theme_lists(monkeypatch):
+    body = _journal_body_4392(monkeypatch)
+    daily = [t for d in body["daily_themes"] for t in d["themes"]]
+    top = [t["theme"] for t in body["top_themes"]]
+    assert daily == ["protein metabolism cognition link", "journaling silence", "journaling silence", "grief"], daily
+    assert top[0] == "journaling silence" and body["top_themes"][0]["count"] == 2, "counted by the reader label"
+    assert [t for t in daily + top if "_" in t] == []
+
+
+def test_mutation_control_journal_analysis_without_public_themes_serves_slugs(monkeypatch):
+    monkeypatch.setattr(audience_guard, "public_themes", lambda values: values or [])
+    body = _journal_body_4392(monkeypatch)
+    assert "protein_metabolism_cognition_link" in body["daily_themes"][0]["themes"]

@@ -397,3 +397,141 @@ def test_emit_outcome_is_fail_open_and_normalizes(monkeypatch):
     # an unknown reason is coerced to "error", never raises
     panel._emit_outcome("bogus")
     assert calls[1]["MetricData"][0]["Dimensions"][0]["Value"] == "error"
+
+
+# ── #4365: a restart tombstone is not a published episode ─────────────────────
+#
+# Fixtures are the WIRE: the tombstone body below is the byte-exact object read from
+# s3://matthew-life-platform/generated/panelcast/wk1.wav on 2026-09-27 (head-object:
+# ContentLength 186, ContentType application/json, Metadata {}), and the real-sized
+# object mirrors the live wk0.mp3 head (ContentLength 3465600, ContentType audio/mpeg).
+
+import io  # noqa: E402
+
+import pytest  # noqa: E402
+from common import media_tombstone  # noqa: E402
+
+_LIVE_WK1_TOMBSTONE = (
+    b'{"tombstone": true, "tombstoned_at": "2026-07-11T04:53:15.352998+00:00", '
+    b'"archived_to": "generated/panelcast/archive/pilot/wk1.wav", "tombstoned_reason": "experiment_restart_2026-07-12"}'
+)
+
+
+class _WireS3:
+    """head_object/get_object with the shape boto3 returns (ContentLength/ContentType/Body)."""
+
+    def __init__(self, objects):
+        self.objects = objects  # key -> (bytes_or_None_for_large, content_length, content_type)
+        self.gets = []
+
+    def head_object(self, Bucket, Key, **kw):
+        if Key not in self.objects:
+            raise Exception("An error occurred (404) when calling the HeadObject operation: Not Found")
+        _body, size, ctype = self.objects[Key]
+        return {"ContentLength": size, "ContentType": ctype, "Metadata": {}}
+
+    def get_object(self, Bucket, Key, **kw):
+        self.gets.append(Key)
+        body, size, _ctype = self.objects[Key]
+        return {"Body": io.BytesIO(body if body is not None else b"\xff\xfb" * (size // 2))}
+
+
+class _LogRecorder:
+    def __init__(self):
+        self.lines = []
+
+    def _rec(self, msg, *args, **kw):
+        self.lines.append(msg % args if args else msg)
+
+    info = warning = error = debug = _rec
+
+
+def test_live_tombstone_fixture_is_the_186_byte_wire_object():
+    assert len(_LIVE_WK1_TOMBSTONE) == 186
+
+
+def test_tombstone_key_is_not_a_published_episode(monkeypatch):
+    fs = _WireS3({f"{panel.PREFIX}/wk1.wav": (_LIVE_WK1_TOMBSTONE, 186, "application/json")})
+    log = _LogRecorder()
+    monkeypatch.setattr(panel, "s3", fs)
+    monkeypatch.setattr(panel, "logger", log)
+    assert panel._episode_exists(1) is None
+    assert any("restart tombstone" in ln and "wk1.wav" in ln and "experiment_restart_2026-07-12" in ln for ln in log.lines), log.lines
+
+
+def test_real_sized_episode_is_published_without_reading_its_body(monkeypatch):
+    fs = _WireS3({f"{panel.PREFIX}/wk0.mp3": (None, 3465600, "audio/mpeg")})
+    monkeypatch.setattr(panel, "s3", fs)
+    assert panel._episode_exists(0) == f"{panel.PREFIX}/wk0.mp3"
+    assert fs.gets == []  # a real episode is decided on its head alone — no multi-MB read
+
+
+def test_small_non_tombstone_stub_is_not_published(monkeypatch):
+    fs = _WireS3({f"{panel.PREFIX}/wk4.wav": (b"RIFF\x00\x00", 6, "audio/wav")})
+    log = _LogRecorder()
+    monkeypatch.setattr(panel, "s3", fs)
+    monkeypatch.setattr(panel, "logger", log)
+    assert panel._episode_exists(4) is None
+    assert any("6-byte stub" in ln for ln in log.lines), log.lines
+
+
+def test_real_episode_beside_a_tombstone_still_counts(monkeypatch):
+    # wk2.wav tombstoned, wk2.mp3 real → published (every extension is checked).
+    fs = _WireS3(
+        {
+            f"{panel.PREFIX}/wk2.mp3": (None, 2_000_000, "audio/mpeg"),
+            f"{panel.PREFIX}/wk2.wav": (_LIVE_WK1_TOMBSTONE, 186, "application/json"),
+        }
+    )
+    monkeypatch.setattr(panel, "s3", fs)
+    assert panel._episode_exists(2) == f"{panel.PREFIX}/wk2.mp3"
+
+
+def test_restart_writer_output_is_recognised_by_the_reader():
+    # The pair: deploy/restart_media_reset.py writes media_tombstone.tombstone_body; the
+    # producers' existence checks read it through media_presence. Round-trip the writer's
+    # own bytes, and pin that the live July object parses the same way.
+    body = media_tombstone.tombstone_body(
+        "2026-07-11T04:53:15Z", "generated/panelcast/archive/pilot/wk4.wav", "experiment_restart_2026-07-12"
+    )
+    fs = _WireS3({"k": (body, len(body), "application/json")})
+    status, doc = media_tombstone.media_presence(fs, "b", "k")
+    assert status == media_tombstone.TOMBSTONE and doc["archived_to"].endswith("wk4.wav")
+    assert media_tombstone.parse_tombstone(_LIVE_WK1_TOMBSTONE)["tombstoned_reason"] == "experiment_restart_2026-07-12"
+    assert media_tombstone.media_presence(fs, "b", "missing") == (media_tombstone.ABSENT, {})
+
+
+def test_already_published_skip_logs_the_week_and_the_matched_key(monkeypatch):
+    fs = _WireS3({f"{panel.PREFIX}/wk3.mp3": (None, 3_000_000, "audio/mpeg")})
+    log = _LogRecorder()
+    outcomes = []
+    monkeypatch.setattr(panel, "s3", fs)
+    monkeypatch.setattr(panel, "logger", log)
+    monkeypatch.setattr(panel, "_select_week_post", lambda: {"week": 3, "date": "2026-09-25", "title": "Week 3"})
+    monkeypatch.setattr(panel, "_emit_outcome", outcomes.append)
+    out = panel._run_weekly(force=False)
+    assert '"already_published": true' in out["body"]
+    assert outcomes == ["already-published"]
+    assert any("wk3 already published" in ln and f"{panel.PREFIX}/wk3.mp3" in ln for ln in log.lines), log.lines
+
+
+def test_tombstoned_week_is_not_skipped_by_the_weekly_run(monkeypatch):
+    # The specimen: week 1 of the current cycle, only a July tombstone on the key.
+    # The run must go PAST the already-published gate (here it stops at _load_bible).
+    fs = _WireS3({f"{panel.PREFIX}/wk1.wav": (_LIVE_WK1_TOMBSTONE, 186, "application/json")})
+    outcomes = []
+    monkeypatch.setattr(panel, "s3", fs)
+    monkeypatch.setattr(panel, "logger", _LogRecorder())
+    monkeypatch.setattr(panel, "_select_week_post", lambda: {"week": 1, "date": "2026-09-11", "title": "Week 1"})
+    monkeypatch.setattr(panel, "_emit_outcome", outcomes.append)
+
+    class _PastTheGate(Exception):
+        pass
+
+    def _stop():
+        raise _PastTheGate()
+
+    monkeypatch.setattr(panel, "_load_bible", _stop)
+    with pytest.raises(_PastTheGate):
+        panel._run_weekly(force=False)
+    assert "already-published" not in outcomes
