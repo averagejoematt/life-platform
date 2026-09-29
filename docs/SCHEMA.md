@@ -1552,6 +1552,18 @@ Singleton computed source (ADR-089). Readers take the newest in-range record (th
 | `derived_at` | string | ISO timestamp of the compute |
 | `confidence` | string | `low` |
 | `n_episodes_with_covariates` | number | episodes contributing covariates |
+| `reference_schema` | number | `3` since #4427 (activities are distinct sessions); `2` = the twin-counted table, kept as history |
+| `proven_bands` | map | the `bands` computation restricted to days inside a detected loss episode (#3709) |
+| `cut_bands` / `cut_window` | map / string | the same computation restricted to the 2024–25 cut alone, `2024-09-04..2025-05-10` (#4427) |
+| `method` | map | the session rule the activities rest on (`training.blueprint_rederive.method()`: cluster rule, hours, miles, heart-rate plausibility band) |
+| `n` | map | per kind (`walk`, `run`) over the cut: raw device `records`, distinct `sessions`, hours both ways, rejected HR records |
+| `supersedes` | map | the newest earlier record (`sk`, `reference_schema`, `method`); `status: superseded` + `reason` when that record was built by another method |
+
+The strava read opts out of the #4419 seam (`keep_duplicates`) because the derivation
+clusters every device's record itself (overlap ≥ half the shorter or starts within 5 min;
+hours = the longest member's moving time; HR = the highest member average inside
+70–220 bpm, else absent). `episode-detect` with `{"dry_run": true}` derives and returns
+the table without writing anything.
 
 Access via `get_benchmark(view="pace"/"maintenance")`. PRIVATE.
 
