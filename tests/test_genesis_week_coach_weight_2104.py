@@ -174,11 +174,17 @@ def test_the_brief_coach_generator_also_withholds_the_bare_latest_weight():
 
 
 def test_todays_own_row_is_still_served_when_it_exists():
-    """`weight_lbs` is today's row and is in-cycle by construction — suppressing it
-    would hide the true current weight, which is the opposite defect."""
+    """`weight_lbs` is the subject day's own row — an in-cycle one is served, dated;
+    suppressing it would hide the true current weight, which is the opposite defect.
+
+    #4373: the row is the wire's shape (sk-dated, as `fetch_range` returns it) and the
+    brief's subject day is YESTERDAY, so on genesis day it is the PREVIOUS cycle's
+    weigh-in — withheld by its own date, the same boundary `latest_weight` takes."""
     facts = weight_recency.summarize_weight_readings(_AT_COACH_RUN, GENESIS, genesis=GENESIS)
-    built = ai_context._build_physical_data({"withings": {"weight_lbs": 321.6}, "latest_weight": 316.97, "weight_recency": facts})
-    assert built["weight_lbs"] == 321.6
+    built = ai_context._build_physical_data({"withings": _rec(GENESIS, 321.6), "latest_weight": 316.97, "weight_recency": facts})
+    assert built["weight_lbs"] == 321.6 and built["weight_lbs_date"] == GENESIS
+    pre = ai_context._build_physical_data({"withings": _rec("2026-08-01", 316.97), "latest_weight": 316.97, "weight_recency": facts})
+    assert pre["weight_lbs"] is None and pre["weight_lbs_date"] is None
 
 
 def test_a_mid_cycle_latest_weight_is_untouched():

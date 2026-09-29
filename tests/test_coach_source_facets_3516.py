@@ -233,11 +233,13 @@ def _coach_relevant_source_ids():
     Two facet-carrying ids are excluded, for reasons that predate #4361 rather than
     being invented to pass it:
 
-      * `withings` — `ai.ai_context._build_physical_data` reads `data.get("withings")`,
-        but `emails.daily_brief_lambda`'s gather-and-return `data` dict never sets a
-        `withings` key (only `latest_weight`/`weight_recency`) — no coach domain pack
-        reads THIS wire key today. Adding an inventory row keyed to a dead key would be
-        a NEW fixture-is-not-the-wire bug, not a fix for this one.
+      * `withings` — until #4373 `ai.ai_context._build_physical_data` read
+        `data.get("withings")` and the brief never set it. The brief now sets it (the
+        subject day's own row, None on a day without a weigh-in), so the key is live —
+        but an inventory row keyed on it alone would say "not available" on every
+        un-weighed day while `latest_weight` still carries a dated reading. Which keys
+        that row should read is a prompt change for every coach, left to its own issue
+        rather than folded into #4373's reader fix.
       * `labs` — this module's own INVENTORY_ROWS block comment already rules
         event-cadence sources (DEXA scans, lab draws — `labs.method` is a manual upload
         "after each draw, ~6-month cadence") carry no ingest pipe and no caveat to

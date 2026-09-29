@@ -1268,7 +1268,6 @@ def _social_mind_signals(posts):
 
 def _build_physical_data(data):
     """Extract physical-domain data for the physical coach."""
-    withings = data.get("withings") or {}
     dexa = data.get("dexa") or {}
     meas = data.get("measurements") or {}
     recency = data.get("weight_recency") or {}
@@ -1276,12 +1275,14 @@ def _build_physical_data(data):
     # right after a reset, contains ONLY pre-genesis readings. Dating it is not enough
     # there — a weigh-in from the previous cycle is not this cycle's weight at any age,
     # so it is withheld from the fact set entirely (weight_recency.summarize_weight_readings
-    # does the same for `current_weight_lb`). `weight_lbs` above is today's own row and
-    # is left alone: when it exists it IS in-cycle by construction.
+    # does the same for `current_weight_lb`). `weight_lbs` is the subject day's own row
+    # (YESTERDAY, #4373), so it takes the same guard by its own date in withings_block.
     latest_weight = None if recency.get("current_weight_is_pre_genesis") else data.get("latest_weight")
     return {
-        "weight_lbs": _safe_float(withings, "weight_lbs"),
-        "body_fat_pct": _safe_float(dexa, "body_fat_pct") or _safe_float(withings, "body_fat_pct"),
+        # #4373: the subject day's Withings weigh-in, dated + genesis-guarded (weight only —
+        # Withings body fat is owner-only; see brief_domain_inputs.withings_block).
+        **brief_domain_inputs.withings_block(data),
+        "body_fat_pct": _safe_float(dexa, "body_fat_pct"),
         "lean_mass_lb": _safe_float(dexa, "lean_mass_lb"),
         "visceral_fat_lb": _safe_float(dexa, "visceral_fat_lb"),
         "waist_height_ratio": _safe_float(meas, "waist_height_ratio"),

@@ -947,9 +947,9 @@ def gather_daily_data(profile, yesterday):
         "dexa": dexa,
         "measurements": measurements,
         "labs": labs_draws,  # #3792: the full draw LIST — see gather_daily_data above
-        # #4358/#4359: the keys the physical (Hevy 14d) and explorer (correlations, experiments)
-        # blocks read — the builders read keys this dict never set, so both blocks were empty.
-        **brief_domain_inputs.gather(table, fetch_range, today, yesterday, USER_PREFIX),
+        # #4358/#4359/#4373: the keys the physical (Hevy 14d, the subject day's Withings row) and
+        # explorer (correlations, experiments) blocks read — the builders read keys this dict never set, so both blocks were empty.
+        **brief_domain_inputs.gather(table, fetch_range, today, yesterday, USER_PREFIX, withings_recent),
     }
 
 
