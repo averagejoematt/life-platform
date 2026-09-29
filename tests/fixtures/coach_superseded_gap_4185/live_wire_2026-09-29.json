@@ -1,0 +1,638 @@
+{
+ "_provenance": "Public /api/coach/{nutrition_coach,physical_coach} recent_outputs and /api/nutrition_overview, read 2026-09-29 ~17:30Z from averagejoematt.com (already-public wire; projected to the fields the filter reads).",
+ "coaches": {
+  "nutrition_coach": [
+   {
+    "date": "2026-09-29",
+    "summary": "I've asked him to confirm whether dinner was disrupted between September 19th and 26th.",
+    "themes": [
+     "protein distribution",
+     "meal timing",
+     "caloric intake",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "macronutrient balance",
+     "logging compliance",
+     "zone 2 training"
+    ],
+    "generated_at": "2026-09-29T17:03:36.780048+00:00",
+    "data_through": "2026-09-28"
+   },
+   {
+    "date": "2026-09-28",
+    "summary": "I've asked him to verify the tortilla fiber label this week to confirm a potential logging error.",
+    "themes": [
+     "protein intake",
+     "meal logging",
+     "dinner structure",
+     "caloric deficit",
+     "evening carbs",
+     "fiber tracking",
+     "cross coach coordination"
+    ],
+    "generated_at": "2026-09-28T17:03:12.134576+00:00",
+    "data_through": "2026-09-27"
+   },
+   {
+    "date": "2026-09-26",
+    "summary": "The six-day logging gap since September 19th is blocking my directional read, but today's log tells a clear story: 182g protein, 1,761 kcal, with the steak dinner anchoring 106g in a single sitting.",
+    "themes": [
+     "protein intake",
+     "caloric deficit",
+     "logging compliance",
+     "meal architecture",
+     "fiber intake",
+     "recovery protection",
+     "zone 2 training prep",
+     "glucose management"
+    ],
+    "generated_at": "2026-09-26T17:02:28.839633+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-25",
+    "summary": "The food log went dark after September 19th, and that silence tells me I can't verify what happened to his protein intake during the gap.",
+    "themes": [
+     "protein tracking",
+     "logging gap",
+     "caloric deficit",
+     "dinner protein distribution",
+     "ewma trend",
+     "cross coach coordination",
+     "glucose management",
+     "recovery signal",
+     "lean mass preservation"
+    ],
+    "generated_at": "2026-09-25T17:03:18.396163+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-24",
+    "summary": "Nothing was logged since September 19th, and that silence is blocking my analysis. I can't reason about his protein, calories, or meal timing without data.",
+    "themes": [
+     "protein tracking",
+     "caloric deficit",
+     "logging compliance",
+     "macronutrient balance",
+     "recovery fuel",
+     "carbohydrate strategy",
+     "cross coach coordination"
+    ],
+    "generated_at": "2026-09-24T17:02:50.148827+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-23",
+    "summary": "His food logging went silent after September 19th \u2014 multiple days without entries in MacroFactor.",
+    "themes": [
+     "protein logging gap",
+     "protein target tracking",
+     "dinner structure dependency",
+     "caloric deficit management",
+     "carbohydrate reduction coordination",
+     "fiber data validation",
+     "recovery preservation",
+     "lean mass preservation"
+    ],
+    "generated_at": "2026-09-23T17:02:27.959024+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-22",
+    "summary": "His protein EWMA has declined from 158g to 145g over seven days, and a two-day logging gap since September 19th has left the picture unclear.",
+    "themes": [
+     "protein intake",
+     "meal logging",
+     "dinner structure",
+     "caloric deficit",
+     "macronutrient balance",
+     "fiber tracking",
+     "cross coach coordination",
+     "recovery nutrition"
+    ],
+    "generated_at": "2026-09-22T17:02:32.915680+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-20",
+    "summary": "His protein EWMA sits at 145.4g, down from 158g seven days ago \u2014 tracking exactly as predicted.",
+    "themes": [
+     "protein distribution",
+     "meal timing",
+     "dinner structure",
+     "caloric floor",
+     "recovery demand",
+     "backup planning",
+     "data hygiene"
+    ],
+    "generated_at": "2026-09-20T17:02:34.071862+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-19",
+    "summary": "",
+    "themes": [
+     "protein distribution",
+     "caloric deficit",
+     "macronutrient tracking",
+     "dinner dependency",
+     "metabolic floor",
+     "training load nutrition",
+     "data verification"
+    ],
+    "generated_at": "2026-09-19T17:03:05.041952+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-18",
+    "summary": "I'm watching a structural fragility in his nutrition that's becoming harder to ignore.",
+    "themes": [
+     "protein distribution",
+     "daily protein total",
+     "meal timing",
+     "caloric intake",
+     "metabolic constraint",
+     "logging accuracy",
+     "training volume",
+     "recovery fueling"
+    ],
+    "generated_at": "2026-09-18T17:02:47.632221+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-17",
+    "summary": "I'm watching a protein intake that hit 200g today but reveals a structural vulnerability: nearly all of it came from dinner. Strip that meal and the daily total collapses to 46g.",
+    "themes": [
+     "protein distribution",
+     "caloric intake",
+     "meal structure",
+     "recovery fueling",
+     "zone 2 training prep",
+     "data quality",
+     "ewma tracking"
+    ],
+    "generated_at": "2026-09-17T17:02:50.929935+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-16",
+    "summary": "His protein intake is running at 95g daily against a 190g target \u2014 a structural shortfall. The problem is architectural: dinner is his single load-bearing beam.",
+    "themes": [
+     "protein architecture",
+     "macronutrient distribution",
+     "dinner dependency",
+     "caloric intake",
+     "recovery fuel",
+     "glucose carb optimization",
+     "data hygiene",
+     "cross coach coordination"
+    ],
+    "generated_at": "2026-09-16T17:02:57.748392+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-14",
+    "summary": "His protein total of 245g clears the 190g target, but I'm watching a structural vulnerability: 138g arrived in a single dinner sitting, creating a meal plan that collapses if that dinner disrupts.",
+    "themes": [
+     "protein distribution",
+     "meal architecture",
+     "caloric floor",
+     "recovery risk",
+     "data integrity",
+     "glucose management"
+    ],
+    "generated_at": "2026-09-14T17:02:14.634474+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-13",
+    "summary": "The nutrition coach is watching a protein distribution problem that hinges on missing data.",
+    "themes": [
+     "protein distribution",
+     "caloric intake",
+     "logging compliance",
+     "meal timing",
+     "data quality",
+     "carbohydrate management",
+     "fiber tracking"
+    ],
+    "generated_at": "2026-09-13T17:02:55.407165+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-12",
+    "summary": "I'm watching a structural vulnerability in his protein distribution. Across five days of MacroFactor data, protein is arriving almost entirely at dinner \u2014 158g EWMA against a 190g target.",
+    "themes": [
+     "protein distribution",
+     "meal timing",
+     "caloric intake",
+     "fiber logging",
+     "glucose management",
+     "cross coach coordination",
+     "recovery metrics"
+    ],
+    "generated_at": "2026-09-12T17:02:16.131337+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-11",
+    "summary": "I'm working with four days of MacroFactor data on his nutrition.",
+    "themes": [
+     "protein distribution",
+     "meal timing",
+     "caloric deficit",
+     "macronutrient tracking",
+     "data quality",
+     "cross coach coordination"
+    ],
+    "generated_at": "2026-09-11T17:02:10.494435+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-10",
+    "summary": "I'm tracking whether his current meal architecture is actually delivering on the 190g protein target, and whether any macro recommendations from the glucose coach would compromise caloric adequacy.",
+    "themes": [
+     "protein target tracking",
+     "meal architecture",
+     "macrofactor data sync",
+     "caloric adequacy",
+     "macro coordination",
+     "fiber logging",
+     "evening carbohydrate hypothesis",
+     "recovery fueling"
+    ],
+    "generated_at": "2026-09-10T17:02:13.000559+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-06",
+    "summary": "I flagged lunch as a potential weak point for his 190g daily protein target, but MacroFactor hasn't synced yet, so the prediction remains unresolved.",
+    "themes": [
+     "protein distribution",
+     "lunch protein gap",
+     "macrofactor logging",
+     "meal timing",
+     "caloric adequacy",
+     "cross coach coordination"
+    ],
+    "generated_at": "2026-09-06T17:02:13.076670+00:00",
+    "data_through": null
+   }
+  ],
+  "physical_coach": [
+   {
+    "date": "2026-09-26",
+    "summary": "His recovery EWMA climbed to 81.6% over seven days with a 99% reading on the night of 2026-09-24, but I'm treating this as a favorable data point rather than a confirmed trend \u2014 autocorrelation analysis shows insufficient consecutive same-direction points.",
+    "themes": [
+     "recovery score",
+     "HRV monitoring",
+     "resting heart rate",
+     "step tracking",
+     "protein intake",
+     "weight loss",
+     "lean mass preservation",
+     "caloric intake",
+     "thyroid adaptation",
+     "zone 2 training",
+     "body composition"
+    ],
+    "generated_at": "2026-09-26T17:04:22.734728+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-25",
+    "summary": "On the night of 2026-09-23, his Whoop registered 86% recovery, HRV of 48.2 ms, and resting HR of 54 bpm \u2014 solid numbers with directional trend pointing the right way.",
+    "themes": [
+     "step tracking",
+     "movement contraction",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "protein intake",
+     "caloric deficit",
+     "lean mass preservation",
+     "thyroid function",
+     "zone 2 training",
+     "data reliability"
+    ],
+    "generated_at": "2026-09-25T17:05:56.896879+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-24",
+    "summary": "His step count contracted by roughly one-third over the past seven days, and I cannot distinguish from the data alone whether this is deliberate rest, logistical disruption, or baseline shift \u2014 so I've asked him directly.",
+    "themes": [
+     "step count contraction",
+     "weight loss trajectory",
+     "lean mass preservation",
+     "protein intake",
+     "recovery score",
+     "HRV trend",
+     "resting heart rate",
+     "zone 2 training",
+     "body composition",
+     "caloric deficit"
+    ],
+    "generated_at": "2026-09-24T17:05:22.433047+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-23",
+    "summary": "I'm grading two pre-registered predictions. Weight loss is confirmed\u2014his EWMA moved from 321.7 to 316.9 lbs over the past seven days, current scale 315.0 lbs as of 2026-09-22.",
+    "themes": [
+     "weight loss",
+     "caloric deficit",
+     "protein intake",
+     "lean mass preservation",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "step tracking",
+     "zone 2 training",
+     "thyroid health",
+     "cortisol glucose dynamics"
+    ],
+    "generated_at": "2026-09-23T17:04:44.454449+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-22",
+    "summary": "",
+    "themes": [
+     "step volume contraction",
+     "weight loss trajectory",
+     "protein intake deficit",
+     "lean mass preservation",
+     "recovery score analysis",
+     "HRV stability",
+     "thyroid adaptation risk",
+     "caloric deficit management",
+     "body composition risk"
+    ],
+    "generated_at": "2026-09-22T17:04:33.251512+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-21",
+    "summary": "His weight is 316.9 lbs as of September 20th, down 10.4 lbs over 14 days and tracking the directional prediction from September 6th.",
+    "themes": [
+     "weight loss",
+     "step tracking",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "protein intake",
+     "lean mass preservation",
+     "training volume",
+     "metabolic health",
+     "thyroid function"
+    ],
+    "generated_at": "2026-09-21T17:05:41.324218+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-20",
+    "summary": "I'm watching two structural problems in the data.",
+    "themes": [
+     "step tracking",
+     "protein intake",
+     "lean mass preservation",
+     "weight loss rate",
+     "recovery score",
+     "HRV autocorrelation",
+     "thyroid function",
+     "caloric deficit",
+     "nocturnal glucose",
+     "zone 2 training"
+    ],
+    "generated_at": "2026-09-20T17:04:40.505854+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-18",
+    "summary": "I'm watching a significant contraction in his step volume\u2014down 36% over seven days to a 2,168-step EWMA\u2014and I need clarity on whether this is deliberate rest or something else before we can proceed with Zone 2 training.",
+    "themes": [
+     "step volume",
+     "movement tracking",
+     "protein intake",
+     "lean mass preservation",
+     "rapid weight loss",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "zone 2 training",
+     "nocturnal glucose",
+     "cortisol regulation"
+    ],
+    "generated_at": "2026-09-18T17:05:03.353175+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-17",
+    "summary": "On the night of September 15th, his Whoop recorded a 92% recovery score and a 56 bpm resting heart rate \u2014 solid numbers, but I'm treating them as signals rather than evidence of a true trend.",
+    "themes": [
+     "recovery score",
+     "HRV monitoring",
+     "resting heart rate",
+     "step volume",
+     "protein intake",
+     "weight loss rate",
+     "lean mass preservation",
+     "sleep architecture",
+     "zone 2 training",
+     "glucose stability",
+     "cortisol regulation",
+     "waist to height ratio",
+     "cardiometabolic risk"
+    ],
+    "generated_at": "2026-09-17T17:05:37.836267+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-16",
+    "summary": "The Garmin pause has created a data blind spot.",
+    "themes": [
+     "movement volume",
+     "protein intake",
+     "lean mass preservation",
+     "body composition",
+     "caloric deficit",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "sensor reliability",
+     "nocturnal glucose",
+     "cortisol regulation"
+    ],
+    "generated_at": "2026-09-16T17:05:26.628883+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-15",
+    "summary": "",
+    "themes": [
+     "protein intake",
+     "body composition",
+     "lean mass preservation",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "activity tracking",
+     "caloric deficit",
+     "waist to height ratio"
+    ],
+    "generated_at": "2026-09-15T17:05:15.069962+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-14",
+    "summary": "On September 12th, his Whoop recorded 73% recovery, 36.4 ms HRV, and 60 bpm resting heart rate \u2014 solid single-night readings, though I'm treating them as observations rather than trend signals given the limited history.",
+    "themes": [
+     "movement baseline",
+     "protein intake",
+     "body composition",
+     "lean mass preservation",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "weight tracking",
+     "waist to height ratio",
+     "caloric deficit",
+     "nocturnal glucose"
+    ],
+    "generated_at": "2026-09-14T17:04:51.015633+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-13",
+    "summary": "His food log went silent after September 10th, though the wearables kept running. On the night of 2026-09-11, WHOOP recorded 59% recovery and 60 bpm resting heart rate.",
+    "themes": [
+     "food logging compliance",
+     "movement baseline",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "protein intake",
+     "body composition",
+     "lean mass preservation",
+     "waist to height ratio",
+     "nocturnal glucose",
+     "cortisol regulation"
+    ],
+    "generated_at": "2026-09-13T17:05:00.012583+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-12",
+    "summary": "I'm establishing his waist-to-height ratio of 0.754 as the north star metric \u2014 it predicts cardiometabolic risk over 20 years, and the target of 0.6 requires roughly a 90-pound reduction.",
+    "themes": [
+     "body composition",
+     "waist to height ratio",
+     "visceral adiposity",
+     "protein intake",
+     "lean mass preservation",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "sleep architecture",
+     "nocturnal glucose",
+     "cardiometabolic risk",
+     "caloric deficit"
+    ],
+    "generated_at": "2026-09-12T17:04:31.590993+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-10",
+    "summary": "I'm anchoring this cycle to his waist-to-height ratio of 0.8043, the single metric that most reliably predicts cardiometabolic risk over the next two decades.",
+    "themes": [
+     "body composition",
+     "waist to height ratio",
+     "protein intake",
+     "muscle preservation",
+     "sleep glucose interaction",
+     "recovery score",
+     "HRV",
+     "thyroid function",
+     "caloric deficit",
+     "cardiometabolic risk",
+     "nocturnal glucose",
+     "cortisol regulation"
+    ],
+    "generated_at": "2026-09-10T17:04:02.440496+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-08",
+    "summary": "His waist-to-height ratio stands at 0.754, well above the 0.6 threshold where cardiometabolic risk changes structurally.",
+    "themes": [
+     "waist to height ratio",
+     "cardiometabolic risk",
+     "recovery score",
+     "HRV",
+     "resting heart rate",
+     "sleep architecture",
+     "deep sleep",
+     "REM sleep",
+     "movement tracking",
+     "protein intake",
+     "body composition",
+     "sleep glucose interaction",
+     "baseline validation",
+     "measurement pipeline"
+    ],
+    "generated_at": "2026-09-08T17:04:33.618036+00:00",
+    "data_through": null
+   },
+   {
+    "date": "2026-09-06",
+    "summary": "I'm anchoring this cycle to his waist-to-height ratio of 0.754, which sits well above the 0.6 threshold associated with elevated cardiometabolic risk.",
+    "themes": [
+     "waist to height ratio",
+     "central adiposity",
+     "cardiometabolic risk",
+     "body composition",
+     "movement volume",
+     "recovery architecture",
+     "resistance training",
+     "caloric deficit"
+    ],
+    "generated_at": "2026-09-06T17:04:03.196891+00:00",
+    "data_through": null
+   }
+  ]
+ },
+ "nutrition_overview": {
+  "nutrition": {
+   "days_logged": 21,
+   "latest_date": "2026-09-26",
+   "lag_days": 3,
+   "stalled": false,
+   "today_pending": true
+  },
+  "trend_dates": [
+   "2026-09-06",
+   "2026-09-07",
+   "2026-09-08",
+   "2026-09-09",
+   "2026-09-10",
+   "2026-09-11",
+   "2026-09-12",
+   "2026-09-13",
+   "2026-09-14",
+   "2026-09-15",
+   "2026-09-16",
+   "2026-09-17",
+   "2026-09-18",
+   "2026-09-19",
+   "2026-09-20",
+   "2026-09-21",
+   "2026-09-22",
+   "2026-09-23",
+   "2026-09-24",
+   "2026-09-25",
+   "2026-09-26"
+  ]
+ }
+}
