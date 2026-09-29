@@ -158,7 +158,7 @@ def rate_schedule_hits(files, schedule_map: dict, exempt) -> list[str]:
                 continue
             if exempt(line):
                 continue
-            named = [n for n, rx in name_res.items() if rx.search(line)]
+            named = [n for n, rx in name_res.items() if n in line and rx.search(line)]  # rx needs n verbatim
             if len(named) != 1:
                 continue  # no CDK function named, or ambiguous multi-function line
             name = named[0]
@@ -472,9 +472,14 @@ def alarm_route_hits(files, routing: dict, exempt) -> list[str]:
         except ValueError:
             rel = path  # scratch file outside the repo (the non-vacuous test)
         try:
-            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        # #4135: every per-name regex needs its name verbatim, so a file containing none of
+        # them cannot hit — a plain substring test per name skips ~all files before any regex.
+        if not any(n in text for n in digest):
+            continue
+        lines = text.splitlines()
         for i, line in enumerate(lines):
             if not any_name.search(line):
                 continue
