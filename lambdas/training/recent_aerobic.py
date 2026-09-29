@@ -29,12 +29,12 @@ be read — never zero hours.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from common.pacific_time import parse_day_key, shift_day_key
 
-from training import owner_redlines, walking_volume
+from training import cardio_hr, owner_redlines, walking_volume
 
 RECENT_AEROBIC_VERSION = "recent-aerobic@1.0.0"
 
@@ -120,27 +120,28 @@ def _strava_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
-def _overlap_s(a0: datetime, a1: datetime, b0: datetime, b1: datetime) -> float:
-    return max(0.0, (min(a1, b1) - max(a0, b0)).total_seconds())
+def _block_hr(w: dict[str, Any], idx: int, activities: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The block's OWN heart rate (#4412): the stored `cardio_hr` join when it is joined, else the same
+    pure join over the Strava activities in hand (the stored copy may predate the wearable's arrival)."""
+    stored = cardio_hr.block_for(w, idx)
+    if stored is not None and stored.get("state") == "joined":
+        return dict(stored)
+    for b in cardio_hr.join_workout(w, activities)["blocks"]:
+        if b["exercise_index"] == idx:
+            return b
+    return None
 
 
-def _hevy_rows(workouts: list[dict[str, Any]], strava: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """One row per counted Hevy cardio block. Hevy carries no heart rate; when a wrist-sensor
-    Strava activity was recorded over the SAME session (the #4068 overlap), its HR is borrowed
-    and labelled as the session's, never as the block's own."""
+def _hevy_rows(workouts: list[dict[str, Any]], strava_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One row per counted Hevy cardio block. Hevy carries no heart rate; the block's own minutes
+    (inferred from the session tail) are joined to the wearable HR over them (`training.cardio_hr`,
+    #4412). Below the coverage threshold, or no overlap, the HR is None — unknown, never 0."""
+    activities = [a for item in strava_items or [] for a in item.get("activities") or []]
     rows: list[dict[str, Any]] = []
     for w in workouts or []:
         day = (w.get("date") or str(w.get("sk", "")).replace("DATE#", ""))[:10]
         start, end = walking_volume._parse_utc(w.get("start_time")), walking_volume._parse_utc(w.get("end_time"))
-        hr_from = None
-        if start is not None and end is not None and end > start:
-            timed = [s for s in strava if s.get("start") and s.get("end") and s.get("avg_hr") is not None]
-            best = max(timed, key=lambda s: _overlap_s(start, end, s["start"], s["end"]), default=None)
-            # the same minutes: at least half of the shorter of the two records overlaps
-            if best is not None:
-                shorter = min((end - start).total_seconds(), (best["end"] - best["start"]).total_seconds())
-                hr_from = best if shorter > 0 and _overlap_s(start, end, best["start"], best["end"]) >= shorter / 2 else None
-        for ex in w.get("exercises") or []:
+        for idx, ex in enumerate(w.get("exercises") or []):
             name = (ex.get("name") or ex.get("exercise_name") or "").strip()
             modality = _hevy_modality(name)
             sets = ex.get("sets") or []
@@ -148,6 +149,8 @@ def _hevy_rows(workouts: list[dict[str, Any]], strava: list[dict[str, Any]]) -> 
             if not modality or not seconds:
                 continue
             dist_m = sum(walking_volume._float(s.get("distance_m")) for s in sets)
+            hr = _block_hr(w, idx, activities) or {}
+            joined = hr.get("state") == "joined"
             rows.append(
                 {
                     "date": day,
@@ -160,11 +163,16 @@ def _hevy_rows(workouts: list[dict[str, Any]], strava: list[dict[str, Any]]) -> 
                     "end": end,
                     "distance_mi": round(dist_m / _M_PER_MI, 2) if dist_m else None,
                     "elevation_ft": None,
-                    "avg_hr": hr_from.get("avg_hr") if hr_from else None,
-                    "max_hr": hr_from.get("max_hr") if hr_from else None,
+                    "avg_hr": _num(hr.get("avg_hr")) if joined else None,
+                    "max_hr": _num(hr.get("max_hr")) if joined else None,
                     "hr_source": (
-                        f"the session's minutes, from a {hr_from.get('device')} Strava record (#4068 overlap)" if hr_from else None
+                        f"the block's inferred minutes ({(hr.get('window') or {}).get('timing')}), from a {hr.get('hr_source')} "
+                        f"Strava record, coverage {hr.get('hr_coverage')} (#4412 join)"
+                        if joined
+                        else None
                     ),
+                    "hr_coverage": _num(hr.get("hr_coverage")),
+                    "hr_state": hr.get("state") or "unknown",
                 }
             )
     return rows
@@ -193,6 +201,8 @@ def _public_row(r: dict[str, Any]) -> dict[str, Any]:
     }
     if r.get("hr_source"):
         out["hr_source"] = r["hr_source"]
+    if r["source"] == "hevy":  # #4412: the join's verdict rides every Hevy row — joined or unknown, never a silent 0
+        out["hr_state"], out["hr_coverage"] = r.get("hr_state"), r.get("hr_coverage")
     if r.get("seconds_removed"):
         out["dedup_seconds_removed"] = int(round(r["seconds_removed"]))
     return out
@@ -227,7 +237,7 @@ def build(
     w = window(target_date)
     end = w["end"]
     s_raw = _strava_rows(strava_items or [])
-    h_rows = _hevy_rows(hevy_workouts or [], s_raw)
+    h_rows = _hevy_rows(hevy_workouts or [], strava_items or [])
     s_kept, dedup = walking_volume.dedup_strava(s_raw, walking_volume.hevy_cardio_intervals(hevy_workouts or []))
     for r in s_kept:  # dedup_strava copies each row it keeps, with `seconds` cut to the unclaimed part
         r["seconds_removed"] = max(0.0, r["seconds_as_recorded"] - r["seconds"])
@@ -299,6 +309,24 @@ def aerobic_minutes_7d(block: dict[str, Any] | None) -> float | None:
         return None
     hours = ((block.get("totals") or {}).get("trailing_7d") or {}).get("hours")
     return None if hours is None else round(float(hours) * 60.0, 1)
+
+
+def last_cardio_block_hr(block: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The most recent Hevy cardio block in the block's rows WITH its joined heart rate (#4412), or None.
+
+    None = no Hevy cardio block in the window, or none whose HR joined — unknown, never a 0 bpm."""
+    rows = [r for r in (block or {}).get("rows") or [] if r.get("source") == "hevy" and r.get("hr_state") == "joined"]
+    if not rows:
+        return None
+    r = max(rows, key=lambda x: (x.get("date") or "", x.get("start_utc") or ""))
+    return {
+        "date": r["date"],
+        "modality": r["modality"],
+        "avg_hr": r["avg_hr"],
+        "max_hr": r.get("max_hr"),
+        "hr_coverage": r.get("hr_coverage"),
+        "over_ceiling": r["avg_hr"] is not None and float(r["avg_hr"]) > HR_CEILING_BPM,
+    }
 
 
 def legs_loaded(block: dict[str, Any] | None) -> tuple[bool | None, str]:

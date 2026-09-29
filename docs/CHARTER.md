@@ -75,7 +75,7 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
    derivation-guard primitive: an AST sweep of `lambdas/ mcp/ cdk/` keyed on the
    live registry vocabularies (sources, personas, lambda names, alarm names),
    with every pre-existing site carried as a dated exemption in the shrink-only
-   ledger `tests/conformance_residue.py`. Editing an exempted hand-list re-reds
+   ledger `ledgers/conformance_residue.py`. Editing an exempted hand-list re-reds
    it by construction; the only green path is deriving from the registry.
 2. **Debt counts only ratchet down.**
 3. **Every new "must agree" pair gets a contract test at birth**, on the real wire
@@ -85,7 +85,7 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
    `(partition, module, direction)` is derived from the #2845 model's edge plane
    (built live, never read from the commit), seams covered by an enrolled
    `PairContract` drop out, and everything else must sit in the dated shrink-only
-   ledger `tests/pair_seam_residue.py`. So enrolling a contract is the only way a
+   ledger `ledgers/pair_seam_residue.py`. So enrolling a contract is the only way a
    row leaves, and a module joining a shape someone else already depends on is a
    decision made on the PR that makes it. The contracts themselves are
    `tests/pair_contract_registry.py` (#2847), driven two-sided by

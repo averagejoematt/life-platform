@@ -1,4 +1,4 @@
-"""tests/obligation_residue_3597.py — the #3597 obligation-carrier residue ledger.
+"""ledgers/obligation_residue_3597.py — the #3597 obligation-carrier residue ledger.
 
 THE dated, shrink-only record of every obligation block (`revisit …`, `fast-follow`,
 `owner decides`, a deferral to later/step N) on a governed surface

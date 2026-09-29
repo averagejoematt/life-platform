@@ -1,11 +1,25 @@
 name: Dependabot Auto-merge
-# SS-04 (self-sustainability): after "Dependabot Validate" passes, approve + squash-
-# merge the in-scope dev-tooling bump so the PR backlog can't pile up and block the
-# eventual `cdk deploy` during a hands-off stretch (the 6-month foresight risk).
+# SS-04 (self-sustainability): after the PR's own checks pass, approve + squash-merge
+# the in-scope dev-tooling bump so the PR backlog can't pile up and block the eventual
+# `cdk deploy` during a hands-off stretch (the 6-month foresight risk).
+#
+# #4252: this keyed off "Dependabot Validate", a PR job that ran black/ruff/flake8 and the
+# offline suite because PRs once got no Python validation. pr-checks.yml now runs the
+# required fast lane AND the full suite on every PR, at the pins the bump itself edits
+# (the lanes resolve their pins from requirements-dev.txt), so the validate job was a third copy
+# and is deleted. This workflow now fires on a completed "PR checks" run.
+#
+# FULL-SUITE GREEN IS REQUIRED HERE, not only the required fast lane. The ruleset
+# requires just `Collect + deploy-critical + format` + gitleaks; `Full unit suite
+# (pre-merge, issue 3025)` is advisory. A merge that waited only on the required
+# contexts could land a bump whose behaviour tests are red. Two checks hold it:
+#   1. the workflow_run conclusion is `success`, which pr-checks.yml reports only
+#      when EVERY job in it succeeded (fast lane + full suite + the sequencing check);
+#   2. the merge step re-reads the check-runs on the PR's CURRENT head sha and requires
+#      each name in REQUIRED_GREEN to be `success`. A newer push to the branch (a head
+#      that is not the one that went green) is left alone.
 #
 # Safe-by-construction — no repo-settings / branch-protection dependency:
-#   • Fires ONLY on a *successful* "Dependabot Validate" run (workflow_run), so it can
-#     never merge on a red bump. The validate gate ran the enforced lint + offline tests.
 #   • Re-checks the scope here (actor + the dev-tooling branch prefix). It NEVER touches
 #     /cdk, github-actions, or runtime deps — those branches don't match the prefix.
 #   • Merge ≠ deploy: CI/CD's production approval gate is untouched. A merged bump lands
@@ -19,12 +33,13 @@ name: Dependabot Auto-merge
 # untrusted-code-with-privileged-token exposure.
 on:
   workflow_run:
-    workflows: ["Dependabot Validate"]
+    workflows: ["PR checks"]
     types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
+  checks: read
 
 jobs:
   automerge:
@@ -34,30 +49,54 @@ jobs:
       github.event.workflow_run.actor.login == 'dependabot[bot]' &&
       startsWith(github.event.workflow_run.head_branch, 'dependabot/pip/dev-tooling')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Approve + squash-merge the validated dev-tooling bump
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
+          GREEN_SHA: ${{ github.event.workflow_run.head_sha }}
           REPO: ${{ github.repository }}
+          # The PR-check names that must be `success` on the head before a merge. The
+          # first two are the ruleset's required contexts; the third is the one the
+          # ruleset does NOT require (see the header).
+          REQUIRED_GREEN: |
+            Collect + deploy-critical + format
+            gitleaks (PR commit range only, not full history)
+            Full unit suite (pre-merge, issue 3025)
         run: |
           set -euo pipefail
-          PR_JSON=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number,author --jq '.[0] // empty')
+          PR_JSON=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number,author,headRefOid --jq '.[0] // empty')
           if [ -z "$PR_JSON" ]; then
             echo "No open PR for branch $BRANCH — nothing to merge."
             exit 0
           fi
           NUM=$(echo "$PR_JSON" | jq -r '.number')
           AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
+          HEAD=$(echo "$PR_JSON" | jq -r '.headRefOid')
           # Defense in depth: the head_branch + workflow_run.actor are dependabot, but
           # re-confirm the PR author is the bot before approving anything.
           case "$AUTHOR" in
             dependabot\[bot\]|app/dependabot) : ;;
             *) echo "PR #$NUM author is '$AUTHOR', not dependabot — skipping."; exit 0 ;;
           esac
+          if [ "$HEAD" != "$GREEN_SHA" ]; then
+            echo "PR #$NUM head is $HEAD but the green PR checks run was for $GREEN_SHA — a newer push is unvalidated; leaving it."
+            exit 0
+          fi
+          RUNS=$(gh api "repos/$REPO/commits/$HEAD/check-runs?per_page=100" --jq '[.check_runs[] | {name, conclusion}]')
+          while IFS= read -r NAME; do
+            [ -z "$NAME" ] && continue
+            CONC=$(echo "$RUNS" | jq -r --arg n "$NAME" '[.[] | select(.name == $n) | .conclusion] | if length == 0 then "missing" elif all(. == "success") then "success" else "not-green" end')
+            if [ "$CONC" != "success" ]; then
+              echo "PR #$NUM: check '$NAME' is $CONC on $HEAD — not merging; leaving it for a human."
+              exit 0
+            fi
+            echo "  ✅ $NAME"
+          done <<< "$REQUIRED_GREEN"
           echo "Approving + squash-merging dev-tooling PR #$NUM ($BRANCH)…"
           gh pr review --repo "$REPO" --approve "$NUM" || echo "approve step non-fatal: $?"
-          if ! gh pr merge --repo "$REPO" --squash --delete-branch "$NUM"; then
+          if ! gh pr merge --repo "$REPO" --squash --delete-branch --match-head-commit "$HEAD" "$NUM"; then
             echo "Auto-merge blocked for PR #$NUM (likely a branch-protection review gate the bot can't satisfy)."
             echo "Leaving it open for a human merge — this is the safe fallback, not a failure."
             exit 0

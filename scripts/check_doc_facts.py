@@ -39,9 +39,11 @@ USAGE
 
 # `ast` and `datetime` are imported function-locally where they are used — the last
 # module-level users left with the ceiling parse (#2898, now scripts/budget_ceilings.py).
+import functools
 import importlib.util
 import re
 import sys
+import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -65,7 +67,17 @@ def _ground_truth() -> dict:
     spec = importlib.util.spec_from_file_location("_syncmeta", ROOT / "deploy" / "sync_doc_metadata.py")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
-    facts = m._apply_auto_discovered(dict(m.PLATFORM_FACTS))
+    # #4135: no rule below reads gate_census_count — that fact is sync_doc_metadata --check's
+    # (Docs CI's literal-drift step builds it), so this gate does not pay the census build.
+    held = sys.modules.get("sync_census_fact")
+    sys.modules["sync_census_fact"] = types.SimpleNamespace(apply=lambda *_a, **_k: None)
+    try:
+        facts = m._apply_auto_discovered(dict(m.PLATFORM_FACTS))
+    finally:
+        if held is None:
+            sys.modules.pop("sync_census_fact", None)
+        else:
+            sys.modules["sync_census_fact"] = held
     return {
         "tool_count": facts.get("tool_count"),
         "lambda_count": facts.get("lambda_count"),
@@ -221,6 +233,7 @@ HISTORICAL = re.compile(
     re.I,
 )
 APPROX = ("~", "≈", "+", "about ", "around ", "roughly ")
+_HAS_DIGIT = re.compile(r"\d")
 
 
 def _match_is_approx(line: str, mo: "re.Match") -> bool:
@@ -255,6 +268,14 @@ def line_is_exempt(line: str) -> bool:
     Passed into the #1957 operational checks (scripts/doc_facts_ops.py) so both halves of
     the gate share one definition of "this line is allowed to say that".
     """
+    return _is_historical(line)
+
+
+# #4135: every rule asks the SAME pure question of the SAME doc lines (the docs are
+# scanned by ~8 rules), so the answer is memoized per distinct line — identical result,
+# one HISTORICAL regex run per distinct line instead of one per rule per line.
+@functools.lru_cache(maxsize=None)
+def _is_historical(line: str) -> bool:
     return bool(HISTORICAL.search(line))
 
 
@@ -405,6 +426,10 @@ def _source_hits(files) -> list[str]:
         except ValueError:
             rel = src  # scratch file outside the repo (the non-vacuous test)
         for lineno, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
+            # #4135: exact prefilter — CEILING_LITERAL needs the literal `ceiling`, and every
+            # _budget_offenders pattern (BUDGET_NEAR, the retired `$NN` set) needs a `$`.
+            if "$" not in line and "ceiling" not in line:
+                continue
             stripped = line.lstrip()
             if stripped.startswith("#"):
                 continue
@@ -412,7 +437,7 @@ def _source_hits(files) -> list[str]:
             # The CEILING_LITERAL half keeps the per-LINE exemption: a code literal
             # like `"budget_ceiling_usd": 75` is a single assignment, so a historical
             # frame anywhere on that line really does describe that one value.
-            if not HISTORICAL.search(line):
+            if not _is_historical(line):
                 for mo in CEILING_LITERAL.finditer(line):
                     amt = _to_int(mo.group(1))
                     if amt is not None and amt not in BUDGET_OK and amt >= 50:
@@ -463,7 +488,7 @@ def _anchor_hits(files, genesis: str, cycle: int) -> list[str]:
         except ValueError:
             rel = doc  # scratch file outside the repo (the non-vacuous test)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
-            if HISTORICAL.search(line):
+            if "currently" not in line.lower() or _is_historical(line):  # #4135: both anchors need it (re.I)
                 continue
             for mo in GENESIS_ANCHOR.finditer(line):
                 if mo.group(1) != genesis:
@@ -564,12 +589,12 @@ def _cron_hits(files, cdk_map: dict) -> list[str]:
         except ValueError:
             rel = doc  # scratch file outside the repo (the non-vacuous test)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
-            if HISTORICAL.search(line):
+            if "cron(" not in line or _is_historical(line):  # #4135: exact — CRON_RE needs it
                 continue
             crons = CRON_RE.findall(line)
             if len(crons) != 1:
                 continue  # 0 crons, or ambiguous multi-cron line — can't pair reliably
-            named = [n for n, rx in name_res.items() if rx.search(line)]
+            named = [n for n, rx in name_res.items() if n in line and rx.search(line)]
             if len(named) != 1:
                 continue  # no CDK function named, or ambiguous multi-function line
             name, doc_cron, cdk_crons = named[0], crons[0], cdk_map[named[0]]
@@ -875,7 +900,7 @@ def _governor_cadence_hits(files, step_hours: int | None) -> list[str]:
             # largest re.search consumer in the whole gate, ~330K calls of ~2.3M).
             if "governor" not in line.lower():
                 continue
-            if HISTORICAL.search(line):
+            if _is_historical(line):
                 continue
             if not _line_names_the_governor(line):
                 continue
@@ -994,6 +1019,29 @@ def _off(claim: int, truth: int, tol: float, approx: bool) -> bool:
     return abs(claim - truth) > round(truth * eff)
 
 
+def _fact_spec_hits(rel, lineno: int, line: str, truth: dict) -> list[str]:
+    """FACT_SPECS claims on one doc line that disagree with `truth` (exposed for the test)."""
+    # #4135: every FACT_SPECS claim is a digit run (_to_int drops a bare-comma match),
+    # so a digit-free line cannot yield one — exact, and it skips most prose lines.
+    if not _HAS_DIGIT.search(line) or _is_historical(line):
+        return []
+    hits = []
+    for key, patterns, tol in FACT_SPECS:
+        for pat in patterns:
+            for mo in re.finditer(pat, line):
+                claim = _to_int(mo.group(1))
+                if claim is None:
+                    continue
+                # #3162: approx is per-MATCH, not per-line — see _match_is_approx.
+                if _off(claim, truth[key], tol, _match_is_approx(line, mo)):
+                    hits.append(
+                        f"{rel}:{lineno}: {key} claims {claim}, truth is {truth[key]}"
+                        f"{' (±%d%%)' % round(tol*100) if tol else ''}\n"
+                        f"      | {line.strip()[:120]}"
+                    )
+    return hits
+
+
 def main():
     truth = _ground_truth()
     if "--list" in sys.argv:
@@ -1022,21 +1070,7 @@ def main():
                     f"{rel}:{lineno}: budget ceiling claims ${amt}, allowed is ${sorted(BUDGET_OK)} ({BUDGET_PROVENANCE})\n"
                     f"      | {line.strip()[:120]}"
                 )
-            if HISTORICAL.search(line):
-                continue
-            for key, patterns, tol in FACT_SPECS:
-                for pat in patterns:
-                    for mo in re.finditer(pat, line):
-                        claim = _to_int(mo.group(1))
-                        if claim is None:
-                            continue
-                        # #3162: approx is per-MATCH, not per-line — see _match_is_approx.
-                        if _off(claim, truth[key], tol, _match_is_approx(line, mo)):
-                            hits.append(
-                                f"{rel}:{lineno}: {key} claims {claim}, truth is {truth[key]}"
-                                f"{' (±%d%%)' % round(tol*100) if tol else ''}\n"
-                                f"      | {line.strip()[:120]}"
-                            )
+            hits += _fact_spec_hits(rel, lineno, line, truth)
 
     # #1230: same ground truth, now over the SOURCE tree — no hardcoded ceiling in code.
     hits += _source_hits(_scan_source_files())

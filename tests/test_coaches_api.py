@@ -725,20 +725,26 @@ def _route_table(store_table):
 
     def _pk_sk(kw):
         expr = kw["KeyConditionExpression"].get_expression()
-        pk = prefix = None
+        pk = prefix = span = None
         if expr["operator"] == "AND":
             left, right = expr["values"]
             pk = left.get_expression()["values"][1]
             r = right.get_expression()
             if r["operator"] == "begins_with":
                 prefix = r["values"][1]
+            elif r["operator"] == "BETWEEN":  # the MCP reader's LEARNING#{cutoff}..LEARNING#z window
+                span = (r["values"][1], r["values"][2])
         else:
             pk = expr["values"][1]
-        return pk, prefix
+        return pk, prefix, span
 
     def _hook(table, **kw):
-        pk, prefix = _pk_sk(kw)
-        rows = [dict(r) for (p, s), r in store_table.store.items() if p == pk and (prefix is None or str(s).startswith(prefix))]
+        pk, prefix, span = _pk_sk(kw)
+        rows = [
+            dict(r)
+            for (p, s), r in store_table.store.items()
+            if p == pk and (prefix is None or str(s).startswith(prefix)) and (span is None or span[0] <= str(s) <= span[1])
+        ]
         rows.sort(key=lambda r: str(r.get("sk") or ""), reverse=not kw.get("ScanIndexForward", True))
         return {"Items": rows}
 
@@ -819,13 +825,27 @@ def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
     assert "%" not in roster["nutrition_coach"]["headline_stat"]
 
 
+def _retired_learning_count(table, coach_id):
+    """The retired producer, kept as the mutation: `_track_record`'s pre-#4220 LEARNING#
+    re-count (every data row with a confirmed/refuted status, no identity check)."""
+    rows = [r for (pk, sk), r in table.store.items() if pk == f"COACH#{coach_id}" and str(sk).startswith("LEARNING#")]
+    data = [r for r in rows if (r.get("channel") or "data") != "conversation"]
+    confirmed = sum(1 for r in data if r.get("status") == "confirmed")
+    refuted = sum(1 for r in data if r.get("status") == "refuted")
+    return {"confirmed": confirmed, "refuted": refuted, "decided": confirmed + refuted}
+
+
 def test_4220_mutation_control_the_learning_count_fails_on_webb(monkeypatch):
     """Restore the retired producer — `_track_record`'s LEARNING# count — over the SAME
     wire and hand its numbers to the guard: it must fail on Webb (25 ≠ 5)."""
     table, _rows = _write_live_0926_wire(monkeypatch)
     coaches, calibration, predictions, wrong = _served_four(monkeypatch, table)
-    old = api._track_record("nutrition_coach")
+    old = _retired_learning_count(table, "nutrition_coach")
     assert old["decided"] == 25 and old["confirmed"] == 20, old  # the live headline's numbers, reproduced
+    # And the report card, which re-counted LEARNING# until #4220's box 3 slice, now prints the record.
+    card = api._track_record("nutrition_coach")
+    roster = {c["persona_id"]: c for c in coaches["coaches"]}["nutrition_coach"]
+    assert (card["record"], card["headline"], card["decided"]) == (roster["record"], roster["headline_stat"], 5), card
     forged = json.loads(json.dumps(coaches))
     for c in forged["coaches"]:
         if c["persona_id"] == "nutrition_coach":
@@ -839,6 +859,201 @@ def test_4220_mutation_control_the_learning_count_fails_on_webb(monkeypatch):
             c["confirmed"] = 1
     with pytest.raises(AssertionError):
         _assert_one_record("nutrition", coaches, forged_cal, predictions, wrong)
+
+
+def _mcp_track_record(monkeypatch, table, short_id):
+    """The owner-facing MCP reader over the SAME wire the four endpoints read."""
+    import mcp.tools_coach_intelligence as tci
+
+    monkeypatch.setattr(tci, "table", _route_table(table))
+    # A window wide enough to hold every fixture day for as long as this genesis stands
+    # (the fixture dates derive from genesis; a 30-day default would age them out).
+    return tci.tool_get_coach_track_record({"coach_id": short_id, "days": 36500})
+
+
+def _assert_mcp_is_the_record(short_id, coaches, mcp_out):
+    """#4220 box 4: get_coach_track_record prints the record /api/coaches prints."""
+    record = {c["persona_id"]: c for c in coaches["coaches"]}[f"{short_id}_coach"]["record"]
+    assert mcp_out["record"] == record, f"{short_id}: MCP record {mcp_out['record']} vs /api/coaches {record}"
+    assert mcp_out["decided_count"] == record["n"], f"{short_id}: MCP decided {mcp_out['decided_count']} vs {record['n']}"
+    expected_pct = round(100 * record["confirmed"] / record["n"], 1) if record["n"] else None
+    assert mcp_out["hit_rate_pct"] == expected_pct, short_id
+
+
+def test_4220_the_mcp_track_record_reads_the_one_record(monkeypatch):
+    """Box 4. Measured 2026-09-27 before the docket learnings were re-stamped pilot: the
+    MCP reader said Webb 74.1 % (20/27) and Brandt 11.5 % (3/26) while /api/predictions
+    said 0 of 7 and 3 of 6. Over the live-shaped wire (twenty blank-prediction_id docket
+    learnings per side, in-cycle, NOT phase-stamped) it now prints the one record."""
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    coaches, _cal, _pred, _wrong = _served_four(monkeypatch, table)
+    for short_id in ("nutrition", "explorer"):
+        _assert_mcp_is_the_record(short_id, coaches, _mcp_track_record(monkeypatch, table, short_id))
+
+    webb = _mcp_track_record(monkeypatch, table, "nutrition")
+    assert webb["headline"] == {c["persona_id"]: c for c in coaches["coaches"]}["nutrition_coach"]["headline_stat"]
+    # The breakdowns count one result per prediction; the docket trail names none.
+    assert webb["by_outcome"] == {"refuted": 5}, webb["by_outcome"]
+    assert webb["excluded_learnings"] == {"no_prediction_id": 20, "repeat_result_for_a_prediction": 0}
+    assert all(r["prediction_id"] for r in webb["recent_evaluations"])
+    brandt = _mcp_track_record(monkeypatch, table, "explorer")
+    assert brandt["by_outcome"] == {"confirmed": 3, "refuted": 1}, brandt["by_outcome"]
+
+
+def test_4220_mcp_track_record_a_repeated_result_counts_once_and_a_failed_ledger_read_is_absence(monkeypatch):
+    import mcp.tools_coach_intelligence as tci
+
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    # A second result for an already-resolved prediction (a re-grade on a later day).
+    for (pk, sk), row in list(table.store.items()):
+        if pk == "COACH#explorer_coach" and str(sk).startswith("LEARNING#") and row.get("prediction_id"):
+            later = f"LEARNING#{_day(25)}#{str(sk).split('#', 2)[2]}-regrade"
+            table.store[(pk, later)] = dict(row, sk=later, date=_day(25), status="confirmed")
+            break
+    out = _mcp_track_record(monkeypatch, table, "explorer")
+    assert out["excluded_learnings"]["repeat_result_for_a_prediction"] == 1
+    assert sum(out["by_outcome"].values()) == 4
+
+    # The ledger read fails -> no record, no rate; never a zero that reads as a clean slate.
+    routed = _route_table(table)
+
+    def _ledger_down(t, **kw):
+        sk_cond = kw["KeyConditionExpression"].get_expression()["values"][1].get_expression()
+        if sk_cond["operator"] == "begins_with" and sk_cond["values"][1] == "PREDICTION#":
+            raise RuntimeError("throttled")
+        return routed._query_hook(t, **kw)
+
+    monkeypatch.setattr(tci, "table", FakeDdbTable(query_hook=_ledger_down))
+    down = tci.tool_get_coach_track_record({"coach_id": "explorer", "days": 36500})
+    assert down["record"] is None and down["decided_count"] is None and down["hit_rate_pct"] is None
+    assert down["headline"] == "record unavailable"
+
+
+# ── #4220: a graded call's reason is served in reader words ──────────────────
+# Wire strings: `outcome_notes` exactly as /api/predictions served them 2026-09-29 16:24Z
+# (build_outcome_notes' JSON blob), beside the evaluation spec the same rows carry.
+
+
+def _pred_row(status, ev, **notes):
+    return {"status": status, "evaluation": ev, "outcome_notes": json.dumps({"algo_version": "1.0", "beats_null": False, **notes})}
+
+
+_DIR_UP = {"type": "directional", "metric": "hrv_7day_avg", "condition": "up", "threshold": None}
+_DIR_DOWN = {"type": "directional", "metric": "recovery_score", "condition": "down", "threshold": None}
+_POINT = {"type": "point", "metric": "sleep_duration_hours", "condition": "within", "threshold": 7.1}
+
+
+@pytest.mark.parametrize(
+    "row,expected",
+    [
+        (
+            _pred_row("confirmed", _DIR_UP, actual_value=0.2341, reason="hrv_7day_avg trend=up (slope=0.2341), predicted=up"),
+            ("Heart-rate variability (7-day average) went up, as called", True),
+        ),
+        (
+            _pred_row("refuted", _DIR_DOWN, actual_value=0.1439, reason="recovery_score trend=up (slope=0.1439), predicted=down"),
+            ("Morning recovery score went up — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _DIR_DOWN,
+                actual_value=-0.0037,
+                reason="predicted down, metric flat (slope=-0.0037, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+            ),
+            ("Morning recovery score held flat — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _POINT,
+                actual_value=4.7,
+                reason="sleep_duration_hours=4.70 on 2026-09-11 vs predicted 7.1 ±1.1708; |Δ|=2.40 → outside tolerance",
+            ),
+            ("Sleep time came in at 4.7 hours against a call of 7.1 hours — outside its usual day-to-day range", True),
+        ),
+        (
+            _pred_row(
+                "inconclusive",
+                {"type": "directional", "metric": "blood_glucose_avg", "condition": "down"},
+                actual_value=None,
+                reason="Insufficient data to determine trend for 'blood_glucose_avg'",
+                grading_open=True,
+            ),
+            ("not gradable yet — not enough average blood glucose data to read it", False),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                {"type": "machine", "metric": "total_calories_kcal", "condition": "gt", "threshold": None},
+                actual_value=-0.0346,
+                reason="[null-threshold machine spec re-routed to directional] total_calories_kcal trend=down (slope=-0.0346), predicted=up",
+            ),
+            ("Calories eaten went down — the call was for it to go up", True),
+        ),
+        (
+            _pred_row(
+                "expired",
+                {"type": "qualitative"},
+                actual_value=None,
+                reason="Retired unevaluated at window end (14d): eval_type=qualitative has no deterministic grading path",
+            ),
+            ("retired ungraded — a call like this has no measurable test", False),
+        ),
+        # A metric with no reader words: the grader's own sentence, unwrapped — never a guess.
+        (
+            _pred_row(
+                "refuted", {"type": "directional", "metric": "strain", "condition": "up"}, actual_value=-0.5, reason="strain trend=down"
+            ),
+            ("strain trend=down", True),
+        ),
+        # No reason written -> none served (ADR-104); nothing came back yet -> the flag is None.
+        (_pred_row("inconclusive", _DIR_UP, actual_value=None, reason=None), (None, False)),
+        ({"status": "pending", "evaluation": _DIR_UP, "outcome_notes": ""}, (None, None)),
+        ({"status": "confirmed", "evaluation": _DIR_UP, "outcome_notes": "plain grader note"}, ("plain grader note", True)),
+    ],
+)
+def test_4220_prediction_reason_in_reader_words(row, expected):
+    from web import prediction_reason
+
+    assert prediction_reason.reason_words(row) == expected
+
+
+def test_4220_every_measurable_metric_has_reader_words():
+    from experiment.measurable_metrics import METRIC_SOURCES, base_metric
+    from web import prediction_reason
+
+    assert {base_metric(k) for k in METRIC_SOURCES} == set(prediction_reason.METRIC_WORDS)
+
+
+def test_4220_predictions_serve_reason_and_graded_on_data_beside_the_raw_notes(monkeypatch):
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    _coaches, _cal, predictions, _wrong = _served_four(monkeypatch, table)
+    from web import prediction_reason
+
+    served = predictions["predictions"]
+    webb = [p for p in served if p["coach_id"] == "nutrition" and p["status"] == "refuted"]
+    assert len(webb) == 5, "the wire serves Webb's five refuted calls"
+    for p in webb:
+        assert p["outcome_notes"].startswith("{"), "outcome_notes stays the grader's blob (compatibility)"
+        assert p["graded_on_data"] is True
+        # The wire's grader wrote reason "r" on a machine spec with no reader-word shape:
+        # the grader's own text is served, unwrapped — never the blob, never a guess.
+        assert p["reason"] == "r", p["reason"]
+    # Every served row's reason is the one function's answer over its stored row.
+    stored = {
+        (row.get("claim_natural"), row.get("created_date")): row
+        for (_pk, sk), row in table.store.items()
+        if str(sk).startswith("PREDICTION#") and not str(sk).startswith("PREDICTION#docket-")
+    }
+    checked = 0
+    for p in served:
+        row = stored.get((p["text"], p["date"]))
+        if row is None:
+            continue
+        assert (p["reason"], p["graded_on_data"]) == prediction_reason.reason_words({**row, "status": p["status"]}), p
+        checked += 1
+    assert checked >= 9
 
 
 _LIVE_WRONG_4220 = os.path.join(_REPO, "tests", "fixtures", "wrong_obituaries_4220", "live_2026-09-27.json")
@@ -989,3 +1204,86 @@ def test_4220_pair10_holds_under_a_frozen_pacific_clock(monkeypatch, pt_clock):
     docket_row = produced["rows"][1]
     assert str(docket_row["resolved_at"]).startswith(frozen_utc.isoformat()[:16]), "the frozen clock did not reach the writer"
     assert consumed == {"confirmed": 1, "refuted": 1, "n": 2, "through": _day(9)}
+
+
+# ── #4185: a stored pre-fix read whose dated logging gap the served record contradicts ──
+# The live wire (public /api/coach/{nutrition,physical}_coach recent_outputs + /api/nutrition_overview,
+# read 2026-09-29): the nutrition coach's 09-23/24/25 reads say logging stopped after September 19th
+# and the physical coach's 09-13 read says after September 10th — the served record has a log on every
+# day through 09-26. Rebuilt into the stored OUTPUT# shape and served through the REAL _recent_outputs.
+_GAP_FX = json.load(open(os.path.join(os.path.dirname(__file__), "fixtures", "coach_superseded_gap_4185", "live_wire_2026-09-29.json")))
+
+
+def _gap_rows(coach_id):
+    rows = []
+    for o in _GAP_FX["coaches"][coach_id]:
+        row = {"pk": f"COACH#{coach_id}", "sk": f"OUTPUT#{o['date']}#daily_brief", "created_at": o["generated_at"]}
+        if o.get("summary"):
+            row["public_summary"] = o["summary"]
+        if o.get("data_through"):
+            row["data_through"] = o["data_through"]
+        rows.append(row)
+    return rows
+
+
+def _served_recent(monkeypatch, coach_id, *, macrofactor=True):
+    mf = [{"pk": "USER#matthew#SOURCE#macrofactor", "sk": f"DATE#{d}", "date": d} for d in _GAP_FX["nutrition_overview"]["trend_dates"]]
+    routes = {f"COACH#{coach_id}": _gap_rows(coach_id), "USER#matthew#SOURCE#macrofactor": mf if macrofactor else []}
+    monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=lambda _t, **kw: _fake_query_by_pk(routes)(**kw)))
+    return api._recent_outputs(coach_id)
+
+
+def test_the_six_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monkeypatch):
+    """Exactly the six live reads — nutrition 09-22/23/24/25/26, physical 09-13 — lose their false summary and
+    carry `superseded`; every other read (including the post-fix 09-28/29 reads that mention September 19th)
+    is served byte-for-byte. Mutation controls: drop the `served_last_log > d` comparison or the pre-fix
+    condition — more reads supersede and the set assertion reds; remove the `apply` call — none do."""
+    assert _GAP_FX["nutrition_overview"]["nutrition"]["latest_date"] == "2026-09-26"
+    hit = {}
+    for cid in ("nutrition_coach", "physical_coach"):
+        served = _served_recent(monkeypatch, cid)
+        wire = _GAP_FX["coaches"][cid]
+        assert [o["date"] for o in served] == [o["date"] for o in wire]
+        for o, w in zip(served, wire):
+            if o.get("superseded"):
+                hit[(cid, o["date"])] = o["superseded"]["claimed_logging_stopped_after"]
+                assert o["summary"] is None and o["superseded"]["served_last_log"] == "2026-09-26"
+                assert o["superseded"]["note"] == "superseded — generated before the logging-record fix"
+            else:
+                assert o["summary"] == (w["summary"] or ""), (cid, o["date"])
+    # 09-26 and 09-22 say "N-day logging gap since September 19th" — read since the #4185 follow-up widened
+    # `coach_input_facts._GAP_SINCE_DATE`; the other four use "went dark / silent / nothing logged".
+    assert hit == {
+        ("nutrition_coach", "2026-09-26"): "2026-09-19",
+        ("nutrition_coach", "2026-09-22"): "2026-09-19",
+        ("nutrition_coach", "2026-09-25"): "2026-09-19",
+        ("nutrition_coach", "2026-09-24"): "2026-09-19",
+        ("nutrition_coach", "2026-09-23"): "2026-09-19",
+        ("physical_coach", "2026-09-13"): "2026-09-10",
+    }
+
+
+def test_an_unread_or_uncontradicting_record_supersedes_nothing(monkeypatch):
+    """ADR-104: no macrofactor rows (an unread/empty record) contradicts no claim — every read passes
+    through; and a claimed stop the record agrees with (last log ON the claimed date) is not superseded."""
+    served = _served_recent(monkeypatch, "nutrition_coach", macrofactor=False)
+    assert not any(o.get("superseded") for o in served)
+    from web import superseded_gap_reads as g
+
+    wire = _GAP_FX["coaches"]["nutrition_coach"]
+    assert not any(o.get("superseded") for o in g.mark(wire, "2026-09-19"))
+    assert sum(1 for o in g.mark(wire, "2026-09-20") if o.get("superseded")) == 5
+
+
+def test_only_a_pre_fix_read_is_superseded_a_post_fix_one_is_left_to_the_gate():
+    """The same 09-25 sentence written AFTER #4227 (stamped `data_through`, or generated after the fix
+    instant) is not superseded here: a post-fix read was produced against the served record and judged by
+    the #4227 served-fact gate — this filter only repairs the stored past. Mutation control: make
+    `_before_fix` return True — both reds."""
+    from web import superseded_gap_reads as g
+
+    (dark,) = [o for o in _GAP_FX["coaches"]["nutrition_coach"] if o["date"] == "2026-09-25"]
+    assert g.mark([dark], "2026-09-26")[0].get("superseded")
+    stamped = {**dark, "data_through": "2026-09-24"}
+    later = {**dark, "generated_at": "2026-09-28T17:03:12.000000+00:00"}
+    assert [o.get("superseded") for o in g.mark([stamped, later], "2026-09-26")] == [None, None]

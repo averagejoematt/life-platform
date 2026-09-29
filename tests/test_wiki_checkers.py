@@ -335,6 +335,17 @@ def test_doc_facts_gate_is_not_vacuous():
     assert any(re.search(p, "the server exposes 143 MCP tools") for p in tool_pats)
 
 
+def test_fact_spec_line_scan_flags_a_planted_stale_count():
+    """#4135: the FACT_SPECS per-line scan (with its digit prefilter) still reds on a planted
+    stale count, passes the true one, and exempts historical framing."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = {"tool_count": 86, "cdk_stacks": 10, "test_count": 3644, "eventbridge_rules": 90, "account_concurrency_limit": 100}
+    assert facts._fact_spec_hits("x.md", 1, "the platform runs 9 CDK stacks today", truth)
+    assert facts._fact_spec_hits("x.md", 1, "the server exposes 143 MCP tools", truth)
+    assert facts._fact_spec_hits("x.md", 1, "the platform runs 10 CDK stacks today", truth) == []
+    assert facts._fact_spec_hits("x.md", 1, "it was 9 CDK stacks before the backup stack", truth) == []
+
+
 def test_experiment_anchor_ground_truth_is_discovered():
     """#1235: genesis + cycle resolve from the real source (constants.py / CYCLE_GENESES),
     not a stale literal — proves the fact the anchor gate polices is live."""

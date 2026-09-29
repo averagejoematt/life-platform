@@ -1,0 +1,80 @@
+# The served coach corpus against the served facts, nightly (#4185 box 4, #4343).
+#
+# `coach.coach_input_facts.served_fact_findings` gates a coach DRAFT at generation time. Text
+# that is already served — the lead read, stored output summaries, a coach page's voice
+# example — never passes through it again. `scripts/check_served_coach_facts.py` re-reads
+# every string over 40 characters on /api/coach/<id> (every roster persona),
+# /api/coaching-dashboard, /api/coach_team and /api/coaches, builds the facts through the
+# gate's own `served_run_facts` from /api/nutrition_overview and /api/journey, and names each
+# contradiction by JSON path, cited figure and served value.
+#
+# Read-only GETs against the public site — no AWS, no IAM, no secret. A red run files (or
+# updates) ONE auto-filed tracker through the #1447 action; the next green run closes it.
+# Exit 2 (UNEVALUABLE — a fetch failed or the facts could not be built) is a red too: a probe
+# that could not look is not a clean corpus.
+#
+# After the 17:00 UTC daily brief writes the day's coach outputs, before visual-qa's slot.
+
+name: Served coach facts
+
+on:
+  schedule:
+    - cron: '40 17 * * *' # 10:40 PT (PDT) — after the daily brief lands
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write # the auto-filed tracker
+
+concurrency:
+  group: served-coach-facts
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Served coach texts vs served facts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-ci
+
+      # The probe imports coach.coach_input_facts, whose reachable closure includes a lazy,
+      # guarded boto3 import (the table read this probe never makes — table=None). The
+      # dark-flag sweep (#3315) walks the closure regardless of the branch taken, so the pin
+      # is installed from requirements-dev.txt via ci_pins.py (#2760), never a bare version.
+      - name: Install probe dependencies (boto3, botocore)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
+
+      - name: Served coach facts probe (read-only, blocking)
+        # Unpiped: the script's own exit code is the verdict (the #3103 class).
+        run: |
+          set -u
+          OUT="$(mktemp)"
+          rc=0
+          python3 scripts/check_served_coach_facts.py > "$OUT" 2>&1 || rc=$?
+          cat "$OUT"
+          {
+            echo "## Served coach facts (#4343)"
+            echo ""
+            echo '```'
+            cat "$OUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
+      - name: File or resolve the tracker
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: served-coach-facts
+          workflow-name: Served coach facts
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            A served coach text contradicts a served fact (or the probe could not look). Each
+            finding line in the job log names the JSON path, the cited figure and the served
+            value; re-run `python3 scripts/check_served_coach_facts.py` locally for the list.
