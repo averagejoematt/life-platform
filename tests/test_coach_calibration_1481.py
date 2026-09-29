@@ -458,10 +458,27 @@ def test_public_track_record_filters_conversation_learnings(monkeypatch):
         # adversarial: a conversation learning that ALSO carries a decided-looking status
         {"pk": "COACH#sleep_coach", **_conv_learning(), "status": "confirmed", "reason": ANSWER},
     ]
-    fake = FakeDdbTable(rows=rows)
-    monkeypatch.setattr(capi, "table", fake)
+    rows[0]["prediction_id"] = "pred_a"  # #4220: recent lists named graded calls only
+    # #4220: the counts are the PREDICTION# ledger's (coach.coach_record) — the ledger row
+    # the learning above archives; the conversation learning has none.
+    ledger = [
+        {
+            "pk": "COACH#sleep_coach",
+            "sk": "PREDICTION#pred_a",
+            "prediction_id": "pred_a",
+            "status": "confirmed",
+            "outcome_date": "2099-01-01",
+        }
+    ]
+
+    def _by_partition(_t, **kw):
+        prefix = kw["KeyConditionExpression"].get_expression()["values"][1].get_expression()["values"][1]
+        return {"Items": [dict(r) for r in rows + ledger if r["sk"].startswith(prefix)]}
+
+    monkeypatch.setattr(capi, "table", FakeDdbTable(query_hook=_by_partition))
     out = capi._track_record("sleep_coach")
     assert out["confirmed"] == 1 and out["decided"] == 1
+    assert len(out["recent"]) == 1
     assert all("doomscrolled" not in str(r) for r in out["recent"])
 
 
