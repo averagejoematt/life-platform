@@ -87,7 +87,7 @@ class GeneratorInputs:
         recovery_tier: str = "yellow",  # green | yellow | red
         acwr_flag: str = "safe",  # safe | caution | high | very_high
         volume_7d: dict[str, int] | None = None,  # muscle -> sets completed in last 7d
-        z2_minutes_7d: float = 0.0,
+        z2_minutes_7d: float | None = None,  # #4410: None = UNKNOWN (ADR-104) — callers derive it from recent_aerobic, never 0
         days_since_last_workout: int = 1,
         history_last_dates: dict[str, str] | None = None,  # movement_key -> last YYYY-MM-DD
         add_load_enabled: bool = False,  # SSM gate — default false until N>=30
@@ -701,9 +701,15 @@ def _enforce_load_floors(
     return audit
 
 
-def _portfolio_guard(z2_minutes_7d: float, z2_floor: float) -> bool:
-    """Returns True if aerobic base is healthy; False means cap strength budget."""
-    return z2_minutes_7d >= z2_floor
+def _portfolio_guard(z2_minutes_7d: float | None, z2_floor: float) -> bool:
+    """Returns True if aerobic base is healthy; False means cap strength budget.
+
+    #4410: None is UNKNOWN (the recent-aerobic read failed) and never trips the guard — an
+    unread week is not a zero-minute week (ADR-104), so no "walk more" note and no trim."""
+    return z2_minutes_7d is None or z2_minutes_7d >= z2_floor
+
+
+Z2_UNKNOWN_NOTE = "z2 7d unknown (the recent-aerobic read failed or a source was unreadable) — no aerobic-floor note; unknown is not 0"
 
 
 def _new_routine_id(*identity: object) -> str:
@@ -851,6 +857,8 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         rationale.append(f"OPTIONAL session — {day_entry.get('gate') or 'not required this week'}")
     if not z2_ok:
         rationale.append(f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {week_cfg['z2_floor_minutes']}; portfolio guard active")
+    elif inputs.z2_minutes_7d is None:
+        rationale.append(Z2_UNKNOWN_NOTE)
 
     skill_ceiling = week_cfg.get("skill_ceiling", 2)
     notes_mode = week_cfg.get("exercise_notes_mode", "one_best_line")

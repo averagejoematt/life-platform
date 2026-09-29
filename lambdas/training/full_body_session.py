@@ -187,6 +187,8 @@ def full_body_routines(
             f"z2 7d={inputs.z2_minutes_7d:.0f} < floor {z2_floor}: the §3 session is already the minimum effective dose, "
             "so the strength budget is NOT trimmed further — walk more instead"
         )
+    elif inputs.z2_minutes_7d is None:
+        rationale.append(_rg.Z2_UNKNOWN_NOTE)
 
     notes_mode = week_cfg.get("exercise_notes_mode", "one_best_line")
     # through the module attribute, so ONE patch point (routine_generator._load_note_indexes)

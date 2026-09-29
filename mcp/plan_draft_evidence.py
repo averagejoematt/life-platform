@@ -85,8 +85,9 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         layer_status = next(s for s in statuses if s in ("dark", "unknown"))
     return {
         "exercises": exercises,
-        # #4067: two streaks, both context since #4161 (the fatigue trigger is performance or readiness).
-        "active_day_streak": streaks.get("active_day_streak"),
+        # #4067/#4161: the loaded-lifting streak is context (the fatigue trigger is performance or readiness).
+        # #4411: it is the ONLY streak a critic input carries; the active-day count stays on the
+        # measured `streaks` record for the evidence trail and reaches no packet and no note.
         "loaded_lifting_streak": streaks.get("loaded_lifting_streak"),
         "streaks": streaks,
         "lifting_sessions_7d": lifting_7d,
@@ -172,6 +173,7 @@ def _training_streaks(target_date: str) -> dict[str, Any]:
     out = training_streaks.streaks(hevy, strava, target_date, window_start=start)
     out["window"] = {"start": start, "end": end}
     out["loaded_streak_role"] = "context only — no rest-day ask since #4161 (the fatigue trigger is performance or readiness)"
+    out["active_streak_role"] = "activity context only — NEVER a fatigue or rest signal, in no critic packet and no routine note (#4411)"
     return out
 
 

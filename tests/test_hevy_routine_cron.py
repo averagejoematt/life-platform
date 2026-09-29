@@ -8,12 +8,14 @@ import pytest
 
 
 @pytest.fixture
-def cron_module():
+def cron_module(monkeypatch):
     import importlib
     import sys
 
     sys.modules.pop("operational.hevy_routine_cron_lambda", None)
     mod = importlib.import_module("operational.hevy_routine_cron_lambda")
+    # #4410: `_gather_inputs` now READS the recent-aerobic partitions; no test here reaches DynamoDB
+    monkeypatch.setattr(mod, "_read_partition", lambda source, start, end: [])
     return mod
 
 

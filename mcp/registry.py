@@ -1688,7 +1688,6 @@ TOOLS = {
                     },
                     "acwr_flag": {"type": "string", "description": "safe | caution | high | very_high."},
                     "volume_7d": {"type": "object", "description": "Optional map of muscle->sets completed in last 7d."},
-                    "z2_minutes_7d": {"type": "number"},
                     "days_since_last_workout": {"type": "integer"},
                 },
                 "required": ["action"],

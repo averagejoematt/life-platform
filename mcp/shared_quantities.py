@@ -223,6 +223,16 @@ def recent_aerobic_layer(
     return block
 
 
+def z2_minutes_7d(
+    target_date: str, *, today: str | None = None, read: Callable[[str, str, str], list[dict[str, Any]]] | None = None
+) -> float | None:
+    """The routine generator's `z2_minutes_7d` for a session on `target_date` (#4410): the trailing
+    7 days through target − 1 of `recent_aerobic_layer`, in minutes. None = unknown, never 0."""
+    from training import recent_aerobic
+
+    return recent_aerobic.aerobic_minutes_7d(recent_aerobic_layer(target_date, today=today, read=read))
+
+
 def weekly_walking_hours(end_day: str, *, today: str | None = None) -> float | None:
     """Hours in the 7 completed days ending `completed_end(end_day)`. None = unknown."""
     layer = walking_layer(end_day, today=today)
