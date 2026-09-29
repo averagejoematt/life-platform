@@ -882,3 +882,37 @@ def test_mutation_control_without_the_idiom_rule_the_physical_final_is_held_on_4
 
     monkeypatch.setattr(gg, "_AGE_DECADE_RE", re.compile(r"(?!)"))
     assert gg.fabricated_numbers(PHYSICAL_0927["final"], set(PHYSICAL_0927["allowed"])) == [40.0]
+
+
+# ── #4185 follow-up: the "N-day logging gap since <date>" phrasing ─────────────────────────
+# The two served nutrition reads the original matcher could not read (the public wire, read
+# 2026-09-29 — tests/fixtures/coach_superseded_gap_4185/). Only the DATE is judged: the last log
+# the sentence implies against the served record's `latest_log_date`.
+with open(os.path.join(os.path.dirname(__file__), "fixtures", "coach_superseded_gap_4185", "live_wire_2026-09-29.json")) as _fh:
+    _GAP_WIRE = {o["date"]: o["summary"] for o in json.load(_fh)["coaches"]["nutrition_coach"]}
+NUTRITION_0926 = _GAP_WIRE["2026-09-26"]  # "The six-day logging gap since September 19th is blocking my directional read, …"
+NUTRITION_0922 = _GAP_WIRE["2026-09-22"]  # "… a two-day logging gap since September 19th has left the picture unclear."
+
+
+def test_the_n_day_logging_gap_phrasings_are_judged_against_the_served_last_log():
+    """09-26 (record through 09-25) and 09-22 (record through 09-21): each claims logging stopped after
+    09-19 while the served record has later logs → one `last_log_date` finding each. Mutation control:
+    drop the `log(?:ging)? gap` alternative from `_GAP_SINCE_DATE` — both come back empty and this reds."""
+    assert "six-day logging gap since September 19th" in NUTRITION_0926
+    assert "two-day logging gap since September 19th" in NUTRITION_0922
+    for text, day, today, latest in (
+        (NUTRITION_0926, "2026-09-25", "2026-09-26", "2026-09-25"),
+        (NUTRITION_0922, "2026-09-21", "2026-09-22", "2026-09-21"),
+    ):
+        found = [f for f in ci.served_fact_findings(text, _facts(day, today), today=today) if f["metric"] == "last_log_date"]
+        assert [(f["cited"], f["canonical"]) for f in found] == [("2026-09-19", latest)], (today, found)
+
+
+def test_a_true_logging_gap_the_served_record_agrees_with_is_never_flagged():
+    """The negative: the same 09-22 sentence against a record whose last log IS 09-19 (the gap is real)
+    raises NO finding of any kind — the new-draft gate must not start holding a correct read. Mutation
+    control: flag on `claimed_last <= latest` instead of `<` — this reds."""
+    agreeing = _facts("2026-09-19", "2026-09-22")
+    assert agreeing["nutrition"]["latest_log_date"] == "2026-09-19"
+    assert ci.served_fact_findings(NUTRITION_0922, agreeing, today="2026-09-22") == []
+    assert ci.served_fact_findings("The food log has a two-day logging gap since September 19th.", agreeing, today="2026-09-22") == []
