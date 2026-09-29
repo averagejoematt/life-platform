@@ -391,7 +391,8 @@ MANAGE_SICK_DAYS_DESCRIPTION = (
     "Manage sick and rest day flags. Sick day flags suppress streak breaks, habit alerts, and anomaly noise. "
     "'list' (default) = show all logged sick/rest days in a date range. "
     "'log' = flag a date as sick/rest day (requires date=). Accepts dates= list for multiple days. "
-    "'clear' = remove a sick day flag logged in error (requires date=). "
+    "'clear' = remove a sick day flag logged in error (requires date=) — a tombstone (cleared_at), not a delete: "
+    "no reader counts the date as sick from then on, and re-logging the date restores it (#4378). "
     "Use for: 'log a sick day', 'I'm sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
 )
 
@@ -481,7 +482,8 @@ MARK_JOURNAL_QUOTE_DESCRIPTION = (
     "names — the ELENA brief's omit list, enforced in code), any paraphrase that isn't verbatim in that "
     "day's entry (ADR-104 grounding), and a third line on a day (cap 0–2). Marked lines surface on the "
     "story hub archive + at most one featured line per week on home, dated, with a receipts link. "
-    "action='unmark' revokes a line (consent is revocable); action='list' shows what's marked. "
+    "action='unmark' revokes a line (consent is revocable) — a tombstone (revoked_at) that also erases the "
+    "stored text; every reader skips it (#4377); action='list' shows what's marked. "
     "The chronicle's never-quote rule is untouched — never quote unmarked journal text anywhere."
 )
 

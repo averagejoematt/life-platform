@@ -55,6 +55,22 @@ PUBLIC_LABEL = "from the journal, in his words"
 # this set must never reach DDB or the public API — callers coerce to "journal".
 CHANNELS = ("journal", "video_diary", "solo_recording")
 
+# #4377: revocation is a TOMBSTONE, not a DynamoDB delete — the MCP role holds no
+# dynamodb:DeleteItem on this partition (its one scoped grant is macrofactor_meals). An
+# unmark stamps `revoked_at` and REMOVEs the verbatim `quote` + `grounding` in the same
+# conditional UpdateItem, so the revoked words are gone from the row itself and the stub
+# is fail-closed at every serve path twice over (no text, no grounding="verified"). Every
+# reader of the partition skips a row for which `is_revoked` is true — including the
+# per-day cap and the "withheld" counts, so a revoked line is not even disclosed as a
+# count. A re-mark is a put_item that overwrites the stub whole (fresh consent).
+REVOKED_AT_FIELD = "revoked_at"
+
+
+def is_revoked(item):
+    """True iff this consent record was revoked (unmark tombstone, #4377)."""
+    return bool((item or {}).get(REVOKED_AT_FIELD))
+
+
 # ── The mark-time taboo vocabulary (ELENA_PREQUEL_BRIEF "abstract / omit") ────
 # Substances: privacy_guard.VICE_KEYWORDS is the enforced base (superset invariant
 # tested), plus the alcohol family — deliberately soft at serve time for nutrition

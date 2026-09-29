@@ -211,6 +211,8 @@ def _quotes_by_day():
 
     served, withheld = {}, {}
     for item in items:
+        if jq.is_revoked(item):
+            continue  # #4377: a revoked line is not "withheld" — it is not a marked line at all, not even a count
         channel = item.get("channel") if item.get("channel") in jq.CHANNELS else "journal"
         if channel not in DIARY_CHANNELS:
             continue  # a typed-journal line belongs on /story/journal/, not the shelf
