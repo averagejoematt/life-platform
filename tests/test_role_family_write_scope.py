@@ -218,17 +218,39 @@ class Enrolment:
     policy_fn: str
 
 
-def _kw_str(keywords: dict, name: str):
+def _kw_str(keywords: dict, name: str, consts: dict | None = None):
+    """A keyword's string value — a literal, or (#4439) a module-level `NAME = "..."` constant."""
     node = keywords.get(name)
+    if isinstance(node, ast.Name) and consts:
+        return consts.get(node.id)
     return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
 
 
-def derive_role_family(stack_glob: str | None = None) -> list:
-    """Every `create_platform_lambda(...)` in the CDK stacks, as (function, module, policy)."""
+def _module_str_consts(tree) -> dict:
+    """{NAME: value} for every top-level `NAME = "literal"` in a stack module."""
+    out = {}
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            for target in stmt.targets:
+                if isinstance(target, ast.Name):
+                    out[target.id] = stmt.value.value
+    return out
+
+
+def derive_role_family(stack_glob: str | None = None, dropped: list | None = None) -> list:
+    """Every `create_platform_lambda(...)` in the CDK stacks, as (function, module, policy).
+
+    #4439: a site passing `custom_policies=` that cannot be resolved to all three fields is
+    appended to `dropped` (stack:line) instead of vanishing. Before, `function_name=
+    MCP_FUNCTION_NAME` (a module constant, not a literal) silently took both MCP Lambdas out
+    of every guard built on this family — including #3563's invoke-implies-record parity,
+    which is how the MCP role billed Bedrock with no cloudwatch:PutMetricData for weeks.
+    """
     rows: list = []
     for path in sorted(glob.glob(stack_glob or os.path.join(CDK_STACKS, "*_stack.py"))):
         with open(path, encoding="utf-8") as fh:
             tree = ast.parse(fh.read(), filename=path)
+        consts = _module_str_consts(tree)
         for node in ast.walk(tree):
             if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda"):
                 continue
@@ -238,13 +260,16 @@ def derive_role_family(stack_glob: str | None = None) -> list:
             if isinstance(policy, ast.Call):
                 f = policy.func
                 policy_fn = f.attr if isinstance(f, ast.Attribute) else (f.id if isinstance(f, ast.Name) else None)
-            fn, src = _kw_str(kw, "function_name"), _kw_str(kw, "source_file")
+            fn, src = _kw_str(kw, "function_name", consts), _kw_str(kw, "source_file", consts)
             if fn and src and policy_fn:
                 rows.append(Enrolment(os.path.basename(path), fn, src, policy_fn))
+            elif policy is not None and dropped is not None:
+                dropped.append(f"{os.path.basename(path)}:{node.lineno}")
     return rows
 
 
-ROLE_FAMILY = derive_role_family()
+UNRESOLVED_SITES: list = []
+ROLE_FAMILY = derive_role_family(dropped=UNRESOLVED_SITES)
 ENROLLED_MODULES = {e.source_file for e in ROLE_FAMILY}
 
 
@@ -419,6 +444,30 @@ def test_the_role_family_is_derived_and_substantial():
         assert policy_is_defined(
             e.policy_fn
         ), f"{e.stack} wires {e.function_name} to {e.policy_fn}(), which no role_policies* member defines"
+
+
+def test_no_custom_policies_site_is_silently_dropped():
+    """#4439: every `create_platform_lambda(..., custom_policies=...)` enrols, or reds by site.
+
+    A site the extractor cannot resolve used to vanish from the family, and with it from every
+    guard derived from the family — the two MCP Lambdas did, for want of a literal name."""
+    assert not UNRESOLVED_SITES, (
+        "these create_platform_lambda sites pass custom_policies but did not resolve to a "
+        "(function_name, source_file, policy fn) enrolment — extend _kw_str:\n  " + "\n  ".join(UNRESOLVED_SITES)
+    )
+    assert {"life-platform-mcp", "life-platform-mcp-warmer"} <= {e.function_name for e in ROLE_FAMILY}
+
+
+def test_MUTATION_an_unresolvable_site_is_reported_not_dropped(tmp_path):
+    """Positive control: a site whose name is not statically resolvable lands in `dropped`."""
+    stack = tmp_path / "probe_stack.py"
+    stack.write_text("create_platform_lambda(self, 'X', function_name=make_name(), source_file='a.py', custom_policies=rp.p())\n")
+    dropped: list = []
+    assert derive_role_family(str(tmp_path / "*_stack.py"), dropped=dropped) == []
+    assert dropped == ["probe_stack.py:1"], dropped
+    const = tmp_path / "const_stack.py"
+    const.write_text("NAME = 'fn-x'\ncreate_platform_lambda(self, 'X', function_name=NAME, source_file='a.py', custom_policies=rp.p())\n")
+    assert [e.function_name for e in derive_role_family(str(const))] == ["fn-x"]
 
 
 def test_the_write_extractor_reads_the_two_incident_modules():
