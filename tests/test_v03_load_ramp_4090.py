@@ -609,3 +609,145 @@ def test_4408_generator_planner_and_chat_gate_read_one_held_number():
     assert gate["verdict"] == "clean", gate["audit"]
     assert gate["load_floors"]["movements"][BENCH]["floor_kg"] == _top(ideal, BENCH)
     assert gate["load_floors"]["movements"]["lat_pulldown"]["floor_kg"] == _top(ideal, "lat_pulldown") == pytest.approx(155 * LB)
+
+
+# ── #4397: the ramp's cap is rep-aware — a volume day never carries his 5-rep weight ─────────────
+# On the #4417 wire rows (squat 195 lb x 5 on 09-24 -> band e1RM 227.5 lb; 135 lb x 10 on 09-28),
+# week 6's 85 % of band e1RM is 193.4 lb -> 190 lb: roughly his 5-rep weight, prescribed for 8–12.
+SQUAT_WIRE_TID = MOVEMENTS["squat_barbell"]["hevy_template_id_hint"]
+
+
+def _squat_wire(week, slot, as_of="2026-09-29"):
+    history, _ = _wire_history()
+    return load_ramp.v03_floor(SQUAT_WIRE_TID, history, WIRE_WEIGHTS, 313.7, as_of=as_of, week=week, slot=slot)
+
+
+def test_4397_the_rep_table_is_inverse_epley_on_reps_plus_rir():
+    """The table (population-derived, ADR-105): 5 reps 85.7 %, 8 = 78.9 %, 10 = 75 %, 12 = 71.4 % at RIR 0;
+    the program's slots at their RPE ceilings: volume 73.2, moderate 75.0, accessory 71.4, heavy 81.1."""
+    assert [round(load_ramp.rep_ceiling_pct(n, 10), 1) for n in (1, 5, 8, 10, 12)] == [96.8, 85.7, 78.9, 75.0, 71.4]
+    slots = {i: load_ramp.slot_of([{"reps": program_structure.EXPOSURES[i]["reps"]}], i) for i in program_structure.EXPOSURES}
+    got = {i: round(load_ramp.rep_ceiling_pct(s["target_reps"], s["rpe_ceiling"]), 1) for i, s in slots.items()}
+    assert got == {"heavy": 81.1, "moderate": 75.0, "volume": 73.2, "accessory": 71.4}
+    # the inverse of the hold's own e1RM: a load moved for (reps, RPE) is exactly its own ceiling at those reps/RPE
+    assert load_ramp.rpe_adjusted_e1rm_kg(100.0, 8, 8) * load_ramp.rep_ceiling_pct(8, 8) / 100 == pytest.approx(100.0)
+    assert "population-derived" in load_ramp.REP_TABLE_SOURCE and load_ramp.lowest_program_rpe_ceiling() == 8
+
+
+def test_4397_volume_squat_week_1_and_week_6_sit_under_the_rep_table():
+    """Week 1: 60 % of 227.5 lb = 135 lb (the ramp; 73.2 % does not bind). Week 6: the ramp's 85 % (190 lb)
+    is capped at 73.2 % — 10 reps at RPE <= 9 — = 166.5 lb -> 165 lb, rounded DOWN."""
+    w1, w6 = _squat_wire(1, VOLUME_SLOT), _squat_wire(6, VOLUME_SLOT)
+    assert w1["floor_kg"] == pytest.approx(135 * LB, abs=0.01) and w1["ramp"]["rep_cap"]["binds"] is False
+    rc = w6["ramp"]["rep_cap"]
+    e1rm = w6["ramp"]["band_e1rm_kg"]
+    assert rc["applies"] is True and rc["binds"] is True and rc["governed_by"] == "rep_cap"
+    assert (rc["target_reps"], rc["rpe_ceiling"], rc["rir"], rc["pct_of_band_e1rm"]) == (10, 9, 1, 73.2)
+    assert rc["ramp_top_kg"] == pytest.approx(190 * LB, abs=0.01)
+    assert w6["floor_kg"] == pytest.approx(165 * LB, abs=0.01) == rc["cap_kg"] and w6["floor_kg"] <= e1rm * 0.732
+    assert w6["ramp"]["top_kg"] == w6["floor_kg"] and w6["ramp"]["pct_of_band_e1rm"] < 73.2
+    assert "capped at 73.2% of your band e1RM" in load_ramp.render_ramp_cue(w6) and "10 reps at RPE <= 9" in load_ramp.render_ramp_cue(w6)
+    # the ramp binds at week 3 (70 %), the rep table from week 4 (75 % > 73.2 %)
+    assert (
+        _squat_wire(3, VOLUME_SLOT)["ramp"]["rep_cap"]["binds"] is False and _squat_wire(4, VOLUME_SLOT)["ramp"]["rep_cap"]["binds"] is True
+    )
+
+
+def test_4397_mutation_control_without_the_rep_cap_week_6_volume_is_his_5_rep_weight():
+    with patch.object(load_ramp, "_apply_rep_cap", lambda *_a: None):
+        w6 = _squat_wire(6, VOLUME_SLOT)
+    assert w6["floor_kg"] == pytest.approx(190 * LB, abs=0.01) and "rep_cap" not in w6["ramp"]
+
+
+def test_4397_a_5_rep_anchor_on_the_ramp_week_1_and_week_6():
+    """After a layoff (no hold — the ramp re-enters) the 4–6 top set: week 1 = 60 % of the 239.2 lb bench
+    e1RM = 145 lb; week 6 = the ramp's 85 % (203 lb -> 205) capped at 81.1 % (5 reps @ RPE <= 8) -> 190 lb."""
+    from common.pacific_time import shift_day_key
+
+    history, _ = _wire_history()
+    after = shift_day_key("2026-09-28", load_ramp.DETRAINING_ANCHOR_AGE_DAYS)
+    w1, w6 = (load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=after, week=w, slot=HEAVY_SLOT) for w in (1, 6))
+    assert w1["ramp"]["hold"]["layoff"] is True and w1["floor_kg"] == pytest.approx(145 * LB)
+    assert w6["floor_kg"] == pytest.approx(190 * LB) and w6["ramp"]["rep_cap"]["pct_of_band_e1rm"] == 81.1
+    assert w6["ramp"]["rep_cap"]["governed_by"] == "rep_cap"
+
+
+def test_4397_the_hold_and_the_cap_never_disagree_the_final_load_is_under_the_one_table():
+    """The hold governs when it applies (it runs after the cap and only raises) — the same `rep_ceiling_kg`
+    on the RPE-adjusted e1RM of a set moved this cycle at this band. So at every week and every slot, the
+    final load <= the table's % of the larger of the two e1RMs, and a held load is never above its own."""
+    history, _ = _wire_history()
+    seen = set()
+    for tid in sorted(history):
+        for slot in (HEAVY_SLOT, MODERATE_SLOT, VOLUME_SLOT):
+            for week in range(1, 10):
+                row = load_ramp.v03_floor(tid, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=week, slot=slot)
+                r = row.get("ramp")
+                if not r:
+                    continue
+                pct = load_ramp.rep_ceiling_pct(slot["target_reps"], slot["rpe_ceiling"]) / 100
+                a = r["hold"].get("achieved") or {}
+                hold_e1 = a.get("e1rm_rpe_adjusted") or (
+                    load_ramp.rpe_adjusted_e1rm_kg(a["weight_kg"], a["reps"], slot["rpe_ceiling"]) if a else 0.0
+                )
+                # 0.01 kg: the recorded e1RMs are rounded to 3 dp; a real breach is a 5-lb step (2.27 kg)
+                assert row["floor_kg"] <= max(r["band_e1rm_kg"], hold_e1) * pct + 0.01, (tid, slot, week, row["floor_kg"])
+                if a:
+                    assert a["held_kg"] <= hold_e1 * pct + 0.01
+                seen.add(r["rep_cap"]["governed_by"])
+    assert seen == {"ramp", "rep_cap", "hold"}, seen
+
+
+def test_4397_an_absent_rpe_set_below_the_target_reps_is_read_at_the_ceiling():
+    """160 x 6 with no RPE into a 6–10 slot (target 8, RPE <= 8): read at RPE 8 -> e1RM 160 x (1 + 8/30) = 202.7 lb
+    -> 8 reps @ 8 = 152 lb -> 150 lb, not the 160 he moved for 6. At or past the target it is the load itself."""
+    row = _held(_one_set(160, 6, None), MODERATE_SLOT)
+    assert row["ramp"]["hold"]["rpe_basis"] == "absent" and row["floor_kg"] == pytest.approx(150 * LB)
+    assert _held(_one_set(160, 8, None), MODERATE_SLOT)["floor_kg"] == pytest.approx(160 * LB)
+
+
+def test_4397_generator_planner_and_chat_gate_read_one_rep_capped_number_at_week_6():
+    """#4149: at week 6 the generator writes the rep-capped loads, the planner shows them, and the chat gate
+    derives the same floors — and a hand draft with no rationale tag (intensity unknown -> the lowest program
+    ceiling) floors at or under them, so the generator's draft still commits."""
+    import types
+
+    from mcp.hevy_prescription_gate import prescription_gate
+
+    real = load_ramp.ramp_floor
+    history, rows = _wire_history()
+    with ExitStack() as st:
+        st.enter_context(patch.object(load_ramp, "ramp_floor", side_effect=lambda f, _w: real(f, 6)))
+        st.enter_context(patch.object(routine_generator, "_load_note_indexes", return_value=(history, WIRE_WEIGHTS, {}, {})))
+        ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
+        floors = ideal.inputs_snapshot["load_floors"]["movements"]
+        capped = {k: m["ramp"]["rep_cap"] for k, m in floors.items() if (m.get("ramp") or {}).get("rep_cap", {}).get("binds")}
+        assert capped, "week 6 must bind the rep table on at least one movement of the 09-29 session"
+        rx = program_structure.planned_session("2026-09-29", block_workouts=rows, catalog_movements=MOVEMENTS)["prescription"]
+        load_ramp.annotate_prescription(rx, MOVEMENTS, history, WIRE_WEIGHTS, target_date="2026-09-29", week=6)
+        planned = {e["movement_key"]: e["load"]["top_kg"] for e in rx["exposures"]}
+        for key in capped:
+            assert planned[key] == _top(ideal, key) == floors[key]["floor_kg"], key
+        custom = types.SimpleNamespace(
+            variant="ideal", target_date="2026-09-29", notes="", inputs_snapshot={"authored": "custom"}, exercises=ideal.exercises
+        )
+        st.enter_context(patch("mcp.plan_hevy_windows._block_workouts", return_value=rows))
+        gate = prescription_gate(custom, movements=MOVEMENTS, history_index=history, weight_index=WIRE_WEIGHTS)
+        assert gate["verdict"] == "clean", gate["audit"]
+        gate_rows = gate["load_floors"]["movements"]
+        for key in capped:
+            if gate_rows[key]["status"] == "no_template_id":
+                # pre-existing, not #4397: the chat gate resolves a template only from the catalog hint, so the
+                # #4409 in-block variant the generator carries on the exposure has NO gate floor (permissive)
+                assert key == "db_shoulder_press" and gate_rows[key]["floor_kg"] is None
+                continue
+            assert gate_rows[key]["floor_kg"] == floors[key]["floor_kg"], key
+        assert {"lat_pulldown"} <= set(capped) - {"db_shoulder_press"}, capped  # 6–10 @ <= 8: 75 % < the ramp's 85 %
+        import copy
+
+        untagged = copy.deepcopy(ideal.exercises)
+        for ex in untagged:
+            ex.rationale_tag = None
+        bare = types.SimpleNamespace(**{**vars(custom), "exercises": untagged})
+        gate2 = prescription_gate(bare, movements=MOVEMENTS, history_index=history, weight_index=WIRE_WEIGHTS)
+        assert gate2["verdict"] == "clean", gate2["audit"]
