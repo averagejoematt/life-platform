@@ -84,14 +84,17 @@ deleted). It enforces rules 1–3 below rather than asking you to recall them.
    (`git help worktree` §DETAILS) and need no special care.
 
 **Release when the lane is done** (after the PR merges — not when the PR opens; a pushed
-branch awaiting merge is still live work):
+branch awaiting merge is still live work). The driver does this in `/land` §5, after a
+verified merge:
 
 ```bash
-python3 scripts/lane_worktree.py release <path>    # == git worktree unlock <path>
+python3 scripts/lane_worktree.py release <path|issue-N>    # == git worktree unlock <path>
 ```
 
 Until it is released the reaper keeps the worktree, by design, and prints this command on
-the kept row.
+the kept row. The `worktree-reap` wrap gate (#4259) removes released lanes at every `/wrap`,
+and treats a lane lock idle for 7 days as a forgotten release — unlocked and removed only if
+it passes every other check.
 
 ## Mode: `list`
 
@@ -112,7 +115,8 @@ python3 scripts/worktree_reaper.py --apply    # remove only the reapable ones
 Every check fails closed. A worktree is a candidate only when it is not the main working
 tree or the current tree, is **not locked**, has been **idle longer than the floor**
 (`--min-idle-minutes`, default 120), has **no** uncommitted changes, and every commit is
-either already in `origin/main` or belongs to a PR GitHub reports as `MERGED`. A `CLOSED`
+either already in `origin/main`, or its content is (merging the branch into `origin/main`
+would change nothing — `git merge-tree`, local), or belongs to a PR GitHub reports as `MERGED`. A `CLOSED`
 PR is *not* merged and is kept; an ambiguous or unknowable verdict is kept; a detached HEAD
 is kept.
 
@@ -128,8 +132,17 @@ Read the kept list before applying — the reasons are the point, and a row you 
 with is a bug in the classifier, not a nuisance to override. There is no flag that skips
 the checks.
 
-## Not a CI gate, deliberately
+## Not a CI gate, deliberately — a WRAP gate instead (#4259)
 
 `--check` is for a session pre-flight, not for CI. A CI runner has no worktrees, so a gate
 there would be green forever without measuring anything — the vacuous-gate class this repo
 has already paid for (#2578).
+
+The reaper's one scheduled caller is `/wrap`: `scripts/wrap_gates.py` runs
+`worktree_reaper.py --apply --quiet --release-locks-older-than-days 7 --budget-seconds 240`
+as the `worktree-reap` gate on the machine that actually holds the worktrees. It is fast
+enough to sit there — 140 s over 348 trees became ~19 s (parallel probes, one batched
+ancestry call, a local `git merge-tree` squash check, one batched `gh pr list`) — and the
+budget keeps anything it did not reach. Not a SessionStart hook: session start is when
+concurrent lanes are being created, and a wrap is the moment the session's own merges and
+releases are known.

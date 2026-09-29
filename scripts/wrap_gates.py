@@ -138,6 +138,25 @@ GATHER = [
     Gate("main-green", "e2", ["python3", "scripts/check_main_green.py"], marker="Main"),
     Gate("stash", "e5", ["git", "stash", "list"], marker="Stash/hooks", ok_when=_stash_ok),
     Gate("hooks", "e5", ["python3", "deploy/session_postflight.py"], marker="Stash/hooks", ok_when=_hooks_ok),
+    # #4259: the lane reaper — the one scheduled caller `scripts/worktree_reaper.py` has. It
+    # removes every lane that is released (or lane-locked and idle 7 d), clean, and merged,
+    # and prints every dirty tree by name without touching it. Every check fails closed and
+    # the budget keeps what it did not reach, so a slow or offline run reaps LESS, never
+    # more. Red only if the reaper itself errors; a dirty tree is a report, not a failure.
+    Gate(
+        "worktree-reap",
+        "e5",
+        [
+            "python3",
+            "scripts/worktree_reaper.py",
+            "--apply",
+            "--quiet",
+            "--release-locks-older-than-days",
+            "7",
+            "--budget-seconds",
+            "240",
+        ],
+    ),
     Gate("backlog-hygiene", "e7", ["python3", "scripts/check_backlog_hygiene.py"]),
     Gate("alarm-citations", "e10", ["python3", "scripts/check_alarm_citations.py"], marker="Alarms"),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),

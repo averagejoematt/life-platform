@@ -71,19 +71,39 @@ SAFETY
       that left the tip unreachable still counts as unmerged and is KEPT.
   Anything failing a check is listed with the reason and never touched. `--apply` is
   required to remove; there is no flag that skips the checks.
+
+WIRED, AND FAST (#4259, measured 2026-09-27)
+  The tool existed and nothing called it: 348 worktrees, 97 still locked, because no step
+  ever released a lane. Two changes close that loop:
+    * `--release-locks-older-than-days N` — a lock carrying `lane_worktree.py`'s own reason
+      whose lane has been idle N days is treated as a forgotten release: the row is judged
+      on every OTHER check above, and only if it passes is it unlocked and removed (and
+      re-locked if the removal fails). A dirty stale lane is printed by name and never
+      touched. A bare or hand-set lock is always honoured.
+    * `scripts/wrap_gates.py` runs `--apply --quiet --release-locks-older-than-days 7
+      --budget-seconds …` as the `worktree-reap` gate, so every wrap reaps what its session
+      merged and released.
+  The dry run took 140 s over 348 trees (one `git log` + one `gh pr list` per tree, in
+  series). Now: probes run in parallel, ancestry is one `git branch --merged`, squash-merge
+  detection is first a LOCAL `git merge-tree` content check (merging the branch into
+  origin/main would change nothing) and only then ONE batched `gh pr list`, and
+  `--budget-seconds` keeps whatever it did not reach.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from lane_worktree import LOCK_REASON_PREFIX  # noqa: E402  (the ONE lane-lock reason, set at creation)
 from worktree_paths import canonical_parent, is_canonical, is_ephemeral  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -95,6 +115,10 @@ DEFAULT_MIN_IDLE_MINUTES = 120
 # `git status --porcelain` (this tool's own dirtiness probe) rewrites it, so an index-based
 # floor would report every worktree as active — a check that cannot fail.
 _ADMIN_ACTIVITY_FILES = ("HEAD", "logs/HEAD", "ORIG_HEAD", "gitdir")
+
+# Parallel probes (#4259): each row is a handful of independent git subprocesses, so the
+# probe phase is subprocess-latency-bound, not CPU-bound.
+PROBE_WORKERS = 8
 
 
 def _git(*args: str, cwd: Path | None = None) -> tuple[int, str]:
@@ -209,17 +233,98 @@ def _is_dirty(path: Path) -> bool:
     return code != 0 or bool(out.strip())
 
 
-def _unmerged_commits(branch: str | None) -> int | None:
+def _merged_by_ancestry() -> set[str]:
+    """Every local branch whose tip origin/main already contains — ONE git call (#4259).
+
+    The per-tree `git log origin/main..<branch>` this replaces was one subprocess per
+    worktree; at 340 worktrees the dry run took minutes. A failure returns the empty set,
+    which only sends every branch down the slower per-branch count — never a false "merged".
+    """
+    code, out = _git("branch", "--merged", "origin/main", "--format=%(refname:short)")
+    if code != 0:
+        return set()
+    return {ln.strip() for ln in out.splitlines() if ln.strip()}
+
+
+def _unmerged_commits(branch: str | None, merged: set[str] | None = None) -> int | None:
     """Commits on `branch` that origin/main does not already contain. None if unknowable."""
     if not branch:
         return None
-    code, out = _git("log", "--oneline", f"origin/main..{branch}")
+    if merged is not None and branch in merged:
+        return 0
+    code, out = _git("rev-list", "--count", f"origin/main..{branch}")
     if code != 0:
         return None
-    return len([ln for ln in out.splitlines() if ln.strip()])
+    try:
+        return int(out.strip().splitlines()[0])
+    except (ValueError, IndexError):
+        return None
+
+
+def _main_tree() -> str | None:
+    code, out = _git("rev-parse", "origin/main^{tree}")
+    line = out.strip().splitlines()[0].strip() if out.strip() else ""
+    return line if code == 0 and len(line) >= 40 else None
+
+
+def _content_merged(branch: str | None, main_tree: str | None) -> bool:
+    """True iff merging `branch` into origin/main would change NOTHING — gh-free (#4259).
+
+    A squash merge leaves the branch tip unreachable, so ancestry says "unmerged" for every
+    branch that ever shipped. `git merge-tree --write-tree` answers the question that
+    actually matters for a deletion — is any of this branch's content absent from main? —
+    with no network: if the three-way merge of the branch into origin/main produces
+    origin/main's own tree, every change the branch makes is already there. A conflict
+    (main has since moved the same lines again), an error, or a different tree is False,
+    and the row falls through to GitHub's verdict — so this can only ADD certainty.
+    """
+    if not branch or not main_tree:
+        return False
+    code, out = _git("merge-tree", "--write-tree", "origin/main", branch)
+    if code != 0:
+        return False
+    first = out.strip().splitlines()[0].strip() if out.strip() else ""
+    return first == main_tree
 
 
 _PR_CACHE: dict[str, str | None] = {}
+
+# One `gh pr list` returns every PR's head + state; a branch whose PR is older than this
+# window simply has no verdict and is KEPT (fail closed), never guessed.
+_PR_BATCH_LIMIT = 5000
+
+
+def _prime_pr_states(branches) -> None:
+    """GitHub's verdict for every branch that still needs one, in ONE call (#4259).
+
+    Replaces one `gh pr list --head <b>` per branch (~1 s each, ~250 of them). The
+    semantics are _pr_state's exactly: one PR on the head -> its state; zero or several ->
+    None. If the batch call fails, every requested branch is cached None — fail closed, and
+    no per-branch retry storm against a network that just failed.
+    """
+    need = sorted({b for b in branches if b and b not in _PR_CACHE})
+    if not need:
+        return
+    data = None
+    try:
+        res = subprocess.run(
+            ["gh", "pr", "list", "--state", "all", "--limit", str(_PR_BATCH_LIMIT), "--json", "headRefName,state"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        data = json.loads(res.stdout) if res.returncode == 0 else None
+    except Exception:
+        data = None
+    by_head: dict[str, list[str]] = {}
+    if isinstance(data, list):
+        for pr in data:
+            if isinstance(pr, dict) and pr.get("headRefName"):
+                by_head.setdefault(pr["headRefName"], []).append(str(pr.get("state") or ""))
+    for b in need:
+        states = by_head.get(b, [])
+        _PR_CACHE[b] = states[0] if len(states) == 1 and states[0] else None
 
 
 def _pr_state(branch: str | None) -> str | None:
@@ -249,12 +354,42 @@ def _pr_state(branch: str | None) -> str | None:
     return _PR_CACHE[branch]
 
 
-def probe(wt: dict, main_path: Path, cwd: Path, git_main: Path | None = None) -> dict:
+def _stale_lane_lock(wt: dict, last_activity: float | None, now: float, stale_lock_seconds: float | None) -> bool:
+    """A lock `lane_worktree.py new` set, on a lane idle past the stale-lock floor (#4259).
+
+    Only a lock carrying lane_worktree's own reason prefix is ever eligible: a bare lock, or
+    one a human set with any other reason, is a deliberate "keep" this tool does not second-
+    guess. Eligibility is not reaping — the row still has to pass every check an unlocked
+    row passes (clean, merged, not the main/current tree).
+    """
+    if stale_lock_seconds is None or not wt.get("locked") or last_activity is None:
+        return False
+    if not str(wt.get("lock_reason") or "").startswith(LOCK_REASON_PREFIX):
+        return False
+    return now - last_activity >= stale_lock_seconds
+
+
+def probe(
+    wt: dict,
+    main_path: Path,
+    cwd: Path,
+    git_main: Path | None = None,
+    *,
+    now: float | None = None,
+    merged: set[str] | None = None,
+    main_tree: str | None = None,
+    stale_lock_seconds: float | None = None,
+    deadline: float | None = None,
+) -> dict:
     """Gather every fact about one worktree row. No decision is taken here.
 
     The main working tree and rows whose directory is gone are never probed further: there
     is nothing to measure and the probes (`git status`) would be run in the shared checkout.
+    A live-locked row stops after its activity time — nothing will be done to it, so its
+    status is not worth a subprocess. A row reached after `deadline` is marked `unprobed`
+    and kept.
     """
+    now = time.time() if now is None else now
     p = Path(wt["path"])
     row = dict(
         wt,
@@ -269,7 +404,11 @@ def probe(wt: dict, main_path: Path, cwd: Path, git_main: Path | None = None) ->
         last_activity=None,
         dirty=None,
         unmerged=None,
+        content_merged=False,
         pr_state=None,
+        stale_lock=False,
+        release_lock=False,
+        unprobed=False,
     )
     if row["is_main"]:
         return row
@@ -284,17 +423,23 @@ def probe(wt: dict, main_path: Path, cwd: Path, git_main: Path | None = None) ->
     row["in_repo"] = _is_within(p, main_path)
     if not row["exists"]:
         return row
+    if deadline is not None and time.monotonic() > deadline:
+        row["unprobed"] = True
+        return row
     # Activity BEFORE dirtiness: `git status` rewrites the admin index.
     row["last_activity"] = _last_activity(p)
+    row["stale_lock"] = _stale_lane_lock(wt, row["last_activity"], now, stale_lock_seconds)
+    if wt.get("locked") and not row["stale_lock"]:
+        return row
     row["dirty"] = _is_dirty(p)
     if not row["dirty"] and not wt["detached"]:
-        row["unmerged"] = _unmerged_commits(wt["branch"])
+        row["unmerged"] = _unmerged_commits(wt["branch"], merged)
         if row["unmerged"]:
-            row["pr_state"] = _pr_state(wt["branch"])
+            row["content_merged"] = _content_merged(wt["branch"], main_tree)
     return row
 
 
-def decide(row: dict, now: float, min_idle_seconds: float) -> dict:
+def decide(row: dict, now: float, min_idle_seconds: float, stale_lock_seconds: float | None = None) -> dict:
     """Turn the probed facts into reapable/KEEP + the reasons. Pure — this is the contract.
 
     Ordered most-protective first, and every branch that is not the final "reapable" one
@@ -313,10 +458,17 @@ def decide(row: dict, now: float, min_idle_seconds: float) -> dict:
     if not row["exists"]:
         reasons.append("directory is gone — `git worktree prune` clears this row")
         return row
+    if row.get("unprobed"):
+        reasons.append("not probed — the run's time budget was spent first — KEEP")
+        return row
     if row["locked"]:
         why = f" ({row['lock_reason']})" if row["lock_reason"] else ""
-        reasons.append(f"LOCKED{why} — in use; release with `git worktree unlock {row['path']}` — KEEP")
-        return row
+        if not row.get("stale_lock"):
+            reasons.append(f"LOCKED{why} — in use; release with `git worktree unlock {row['path']}` — KEEP")
+            return row
+        days = (now - row["last_activity"]) / 86400 if row["last_activity"] else 0
+        floor = f" ≥ the {stale_lock_seconds / 86400:g} d stale-lock floor" if stale_lock_seconds else ""
+        reasons.append(f"LOCKED{why} but idle {days:.0f} d{floor} — a forgotten release; judged on the checks below")
     if row["last_activity"] is None:
         reasons.append("activity time unknowable — KEEP")
         return row
@@ -336,10 +488,13 @@ def decide(row: dict, now: float, min_idle_seconds: float) -> dict:
         # A SQUASH merge (this repo's default) rewrites the work into one new commit, so
         # the branch tip is never reachable from main and the ancestry test above says
         # "unmerged" for every branch that ever shipped. Measured: it reported 0 of 93
-        # reapable, which is a tool that cannot be used. GitHub's own merge verdict is the
-        # authority for that case; ancestry stays the authority when it says yes.
+        # reapable, which is a tool that cannot be used. Two authorities settle that case:
+        # merge-tree content containment (local, #4259), then GitHub's own merge verdict.
         state = row["pr_state"]
-        if state == "MERGED":
+        if row.get("content_merged"):
+            row["reapable"] = True
+            reasons.append(f"content already in origin/main (merging it would change nothing); {n} unreachable commit(s) is expected")
+        elif state == "MERGED":
             row["reapable"] = True
             reasons.append(f"squash-merged (PR MERGED); {n} unreachable commit(s) is expected")
         elif state is None:
@@ -349,19 +504,57 @@ def decide(row: dict, now: float, min_idle_seconds: float) -> dict:
     else:
         row["reapable"] = True
         reasons.append("every commit already in origin/main")
+    if row["reapable"] and row["locked"]:
+        row["release_lock"] = True
+        reasons.append("unlock + remove")
     return row
 
 
-def classify(main_path: Path, cwd: Path, now: float | None = None, min_idle_seconds: float | None = None) -> list[dict]:
+def classify(
+    main_path: Path,
+    cwd: Path,
+    now: float | None = None,
+    min_idle_seconds: float | None = None,
+    stale_lock_seconds: float | None = None,
+    budget_seconds: float | None = None,
+    workers: int = PROBE_WORKERS,
+) -> list[dict]:
     """Probe every worktree and decide its fate. `main_path` is a hint — the main working
-    tree is also derived from git itself, so a case-twin spelling cannot smuggle it in."""
+    tree is also derived from git itself, so a case-twin spelling cannot smuggle it in.
+
+    #4259: the per-row probes run in parallel, the ancestry and PR-verdict lookups are
+    batched (one git call, one gh call), and an optional `budget_seconds` bounds the probe
+    phase — any row not reached in time is kept with that reason.
+    """
     now = time.time() if now is None else now
     min_idle_seconds = DEFAULT_MIN_IDLE_MINUTES * 60 if min_idle_seconds is None else min_idle_seconds
+    deadline = None if budget_seconds is None else time.monotonic() + budget_seconds
     git_main = main_worktree_path()
-    rows = []
-    for wt in worktrees():
-        rows.append(decide(probe(wt, main_path, cwd, git_main), now=now, min_idle_seconds=min_idle_seconds))
-    return rows
+    merged = _merged_by_ancestry()
+    main_tree = _main_tree()
+
+    def one(wt: dict) -> dict:
+        return probe(
+            wt,
+            main_path,
+            cwd,
+            git_main,
+            now=now,
+            merged=merged,
+            main_tree=main_tree,
+            stale_lock_seconds=stale_lock_seconds,
+            deadline=deadline,
+        )
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        probed = list(pool.map(one, worktrees()))
+
+    need = [x for x in probed if x.get("unmerged") and not x.get("content_merged")]
+    if need and (deadline is None or time.monotonic() < deadline):
+        _prime_pr_states([x["branch"] for x in need])
+        for x in need:
+            x["pr_state"] = _pr_state(x["branch"])
+    return [decide(x, now=now, min_idle_seconds=min_idle_seconds, stale_lock_seconds=stale_lock_seconds) for x in probed]
 
 
 def case_twins(rows: list[dict]) -> list[tuple[str, str]]:
@@ -388,7 +581,7 @@ def parents(rows: list[dict]) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Inventory and safely retire git worktrees.")
     ap.add_argument("--apply", action="store_true", help="actually remove the reapable ones (default: dry run)")
     ap.add_argument("--check", action="store_true", help="exit 1 if any worktree is INSIDE the repo")
@@ -399,18 +592,41 @@ def main() -> int:
         default=DEFAULT_MIN_IDLE_MINUTES,
         help=f"keep anything touched within this many minutes (default {DEFAULT_MIN_IDLE_MINUTES}); backstops a forgotten lock",
     )
-    args = ap.parse_args()
+    ap.add_argument(
+        "--release-locks-older-than-days",
+        type=float,
+        default=None,
+        help="also unlock + reap a lane whose `lane_worktree.py` lock is older (idle) than this many days — "
+        "only if it passes every other check (clean, merged). Default: never (a lock is always honoured).",
+    )
+    ap.add_argument(
+        "--budget-seconds",
+        type=float,
+        default=None,
+        help="wall-clock budget for the whole run; rows not probed and removals not reached in time are kept",
+    )
+    args = ap.parse_args(argv)
+    started = time.monotonic()
+    deadline = None if args.budget_seconds is None else started + args.budget_seconds
+    stale_lock_seconds = None if args.release_locks_older_than_days is None else args.release_locks_older_than_days * 86400
 
     # Git's answer, not this file's location: invoked from inside a linked worktree, ROOT is
     # that worktree rather than the main tree.
     main_path = main_worktree_path() or ROOT.resolve()
     cwd = Path.cwd().resolve()
     _git("fetch", "origin", "main", "-q")
-    rows = classify(main_path, cwd, min_idle_seconds=args.min_idle_minutes * 60)
+    rows = classify(
+        main_path,
+        cwd,
+        min_idle_seconds=args.min_idle_minutes * 60,
+        stale_lock_seconds=stale_lock_seconds,
+        budget_seconds=None if deadline is None else max(0.0, deadline - time.monotonic()),
+    )
 
-    # The candidate set. A locked or main-tree row can never reach it — belt and braces on
-    # top of `decide`, because this is the list `--apply` deletes.
-    reapable = [r for r in rows if r["reapable"] and not r["is_main"] and not r["locked"]]
+    # The candidate set. A main-tree row can never reach it, and a locked row only when
+    # `decide` judged it a stale lane lock that passed every other check — belt and braces
+    # on top of `decide`, because this is the list `--apply` deletes.
+    reapable = [r for r in rows if r["reapable"] and not r["is_main"] and (not r["locked"] or r.get("release_lock"))]
     reaped_ids = {id(r) for r in reapable}
     kept = [r for r in rows if id(r) not in reaped_ids]
     in_repo = [r for r in rows if r["in_repo"]]
@@ -445,10 +661,27 @@ def main() -> int:
             print(f"     {r['path']}")
 
     locked = [r for r in rows if r["locked"]]
-    print(f"\nliveness: {len(locked)} locked (in use, never candidates); idle floor {args.min_idle_minutes} min")
+    stale_note = (
+        f"; lane locks idle ≥ {args.release_locks_older_than_days:g} d are released when clean + merged"
+        if args.release_locks_older_than_days is not None
+        else " (never candidates)"
+    )
+    print(f"\nliveness: {len(locked)} locked{stale_note}; idle floor {args.min_idle_minutes} min")
+
+    # #4259: every dirty tree by NAME, in every mode (including --quiet, which is how the
+    # wrap gate runs). A dirty tree is never touched; this list is the human's to act on.
+    dirty = [r for r in rows if r.get("dirty") and not r["is_main"]]
+    if dirty:
+        print(f"\n{len(dirty)} dirty worktree(s) — uncommitted work, reported by name and NEVER touched:")
+        for r in dirty:
+            tag = " [LOCKED]" if r["locked"] else ""
+            print(f"  {r['branch'] or '(detached)':55} {r['path']}{tag}")
+    unprobed = [r for r in rows if r.get("unprobed")]
+    if unprobed:
+        print(f"\n{len(unprobed)} worktree(s) not probed inside the {args.budget_seconds:g}s budget — kept; the next run reaches them")
 
     if not args.quiet:
-        print(f"\nreapable ({len(reapable)}) — unlocked, idle, clean, and every commit already in origin/main:")
+        print(f"\nreapable ({len(reapable)}) — unlocked (or a stale lane lock), idle, clean, and every change already in origin/main:")
         for r in reapable:
             print(f"  {r['branch'] or '(detached)':55} {r['path']}")
         print(f"\nkept ({len(kept)}):")
@@ -465,20 +698,42 @@ def main() -> int:
         print("\n✅ no worktree inside the repo; every lane in the canonical parent.")
         return 0
 
+    def summary(removed: int, released: int, deferred: int) -> str:
+        return (
+            f"REAPER-SUMMARY worktrees={len(rows)} reapable={len(reapable)} removed={removed} released={released} "
+            f"deferred={deferred} dirty={len(dirty)} unprobed={len(unprobed)} elapsed={time.monotonic() - started:.1f}s"
+        )
+
     if not args.apply:
         print(f"\nDRY RUN — nothing removed. {len(reapable)} would be. Re-run with --apply.")
+        print(summary(0, 0, 0))
         return 0
 
-    removed = 0
+    removed = released = deferred = 0
     for r in reapable:
+        if deadline is not None and time.monotonic() > deadline:
+            deferred += 1
+            continue
+        if r.get("release_lock"):
+            code, out = _git("worktree", "unlock", r["path"])
+            if code != 0:
+                print(f"  FAILED  unlock {r['path']}: {out.strip().splitlines()[-1] if out.strip() else code}")
+                continue
+            released += 1
         code, out = _git("worktree", "remove", r["path"])
         if code == 0:
             removed += 1
             print(f"  removed {r['path']}")
         else:
             print(f"  FAILED  {r['path']}: {out.strip().splitlines()[-1] if out.strip() else code}")
+            if r.get("release_lock"):
+                # Leave it exactly as found: a lane we could not remove keeps its lock.
+                _git("worktree", "lock", r["path"], "--reason", r["lock_reason"] or LOCK_REASON_PREFIX)
     _git("worktree", "prune")
+    if deferred:
+        print(f"\n{deferred} removal(s) deferred — the {args.budget_seconds:g}s budget ran out; the next run reaches them")
     print(f"\nremoved {removed} of {len(reapable)}; {len(kept)} kept untouched.")
+    print(summary(removed, released, deferred))
     return 0
 
 

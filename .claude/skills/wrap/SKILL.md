@@ -160,6 +160,13 @@ Every residual/next-picks bullet cites an issue `#N` (file it, ADR-099 shape) or
   and re-check before closing the wrap.
 - The handover carries one line either way: `**Stash/hooks:** clean` or
   `**Stash/hooks:** <what was found + what you did about it>`.
+- The Phase 1 batch also runs the `worktree-reap` gate (#4259):
+  `python3 scripts/worktree_reaper.py --apply --quiet --release-locks-older-than-days 7 --budget-seconds 240`.
+  It removes every lane that `/land` released (or whose lane lock has sat idle 7 days) once it
+  is clean and merged, and lists every **dirty** worktree by name without touching it. Its
+  last line is `REAPER-SUMMARY …`; a dirty lane it names is yours to commit, park as a patch,
+  or explain — the reaper never decides that for you. It was 348 worktrees / 97 locked on
+  2026-09-27 because nothing released a lane; this gate is the one scheduled caller.
 
 ### (e7) Backlog-hygiene gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5) (#1870, blocking since #1872)
 
