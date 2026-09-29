@@ -196,3 +196,32 @@ test("#4244 an empty micronutrient block renders nothing", () => {
   assert.equal(nutritionMicronutrients({}), "");
   assert.equal(nutritionMicronutrients(null), "");
 });
+
+/* ── #4245: omega-3 as two labelled targets, and a scheduled supplement miss ── */
+const SCHEDULED_MISS_MICROS = {
+  sufficiency: {
+    fiber_g: { label: "Fiber", total: 24.4, actual: 24.4, target: 38, pct: 64.2, from_food: 24.4, from_supplements: 0.0, channels_counted: ["food", "supplements"] },
+    vitamin_d_mcg: { label: "Vitamin D", total: 0.4, actual: 0.4, target: 100, pct: 0.4, from_food: 0.4, from_supplements: 0.0, channels_counted: ["food", "supplements"], missed_supplements: ["Vitamin D"] },
+    omega3_epa_dha_g: { label: "Omega-3 EPA+DHA", total: 0.0, actual: 0.0, target: 0.5, pct: 0.0, from_food: null, from_supplements: 0.0, channels_counted: ["supplements"], missed_supplements: ["Omega 3"] },
+    omega3_ala_g: { label: "Omega-3 ALA", total: 3.7, actual: 3.7, target: 1.6, pct: 100.0, from_food: 3.7, from_supplements: 0.0, channels_counted: ["food", "supplements"] },
+  },
+  avg_pct: 41.2,
+  intake_channels: ["food", "supplements"],
+  supplements_state: "scheduled_miss",
+  unconverted: [],
+  not_taken: [{ name: "Vitamin D", status: "failed", miss_source: "vendor" }, { name: "Omega 3", status: "failed", miss_source: "platform" }],
+  food_only_avg_pct: 41.2,
+  as_of: "2026-09-24",
+};
+
+test("#4245 omega-3 renders as two named targets from the served label", () => {
+  const html = nutritionMicronutrients(SCHEDULED_MISS_MICROS);
+  assert.ok(/Omega-3 EPA\+DHA/.test(html) && /Omega-3 ALA/.test(html), html);
+  assert.ok(!/Omega3 Epa Dha/.test(html), "the key-derived fallback must not show when a label is served");
+});
+
+test("#4245 a scheduled supplement miss reads as a named zero, not an absent record", () => {
+  const t = _text(nutritionMicronutrients(SCHEDULED_MISS_MICROS));
+  assert.ok(/Scheduled but not taken on Thursday, September 24: Vitamin D, Omega 3 — counted as zero\./.test(t), t);
+  assert.ok(!/No supplement record/.test(t), "a scheduled miss is not an absent record");
+});

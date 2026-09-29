@@ -302,7 +302,9 @@ export function weekdayWeekendTable(ww) {
 // supplements are absent, not zero (ADR-104). The food-only average stays visible beside the
 // total so what the food alone covers is not lost.
 const _NUT_UNIT = /_(mg|mcg|ug|g)$/i;
-const _nutName = (k) => ttl(String(k).replace(_NUT_UNIT, "").replace(/_total$/i, "")).replace(/^Omega3$/, "Omega-3");
+// #4245: the API serves each entry's own `label` ("Omega-3 EPA+DHA", "Omega-3 ALA"); the key-derived
+// name is the fallback for a cached body that predates it.
+const _nutName = (k, v) => (v && v.label) || ttl(String(k).replace(_NUT_UNIT, "").replace(/_total$/i, "")).replace(/^Omega3$/, "Omega-3");
 export function micronutrientChannels(mn) {
   const suf = (mn && mn.sufficiency) || {};
   const seen = new Set();
@@ -325,7 +327,7 @@ export function nutritionMicronutrients(mn) {
     // A row names its source only where it differs from the section's: in a food + supplements
     // section, a nutrient no supplement dose could be counted into is food only.
     const suffix = ch.supplements && own && !own.includes("supplements") ? " (food only)" : "";
-    return { label: _nutName(k) + suffix, pct: v && v.pct, actual: v && v.actual, target: v && v.target, unit: m ? m[1] : "" };
+    return { label: _nutName(k, v) + suffix, pct: v && v.pct, actual: v && v.actual, target: v && v.target, unit: m ? m[1] : "" };
   });
   const both = ch.supplements;
   const head = both ? "Micronutrients — what food and supplements cover" : "Micronutrients — from food alone";
@@ -340,10 +342,13 @@ export function nutritionMicronutrients(mn) {
   if (both) {
     const fromSupp = Object.entries(suf)
       .filter(([, v]) => v && Number(v.from_supplements) > 0)
-      .map(([k, v]) => { const u = _NUT_UNIT.exec(k); return `${_nutName(k)} ${fmt(v.from_supplements)} ${u ? u[1] : ""}`.trim(); });
+      .map(([k, v]) => { const u = _NUT_UNIT.exec(k); return `${_nutName(k, v)} ${fmt(v.from_supplements)} ${u ? u[1] : ""}`.trim(); });
     if (fromSupp.length) lines.push(`From supplements${onDay}: ${fromSupp.join(", ")}.`);
-    const floors = Object.entries(suf).filter(([, v]) => v && Array.isArray(v.uncounted_supplements) && v.uncounted_supplements.length).map(([k]) => _nutName(k));
+    const floors = Object.entries(suf).filter(([, v]) => v && Array.isArray(v.uncounted_supplements) && v.uncounted_supplements.length).map(([k, v]) => _nutName(k, v));
     const names = [...new Set((mn.unconverted || []).map((u) => u && u.name).filter(Boolean))];
+    // #4245: a supplement scheduled and NOT taken is a recorded zero — named, never an absence.
+    const missed = [...new Set((mn.not_taken || []).map((m) => m && m.name).filter(Boolean))];
+    if (missed.length) lines.push(`Scheduled but not taken${onDay}: ${missed.join(", ")} — counted as zero.`);
     if (names.length) lines.push(`Taken but not counted — no record of what they contain: ${names.join(", ")}.` + (floors.length ? ` ${floors.join(", ")} ${floors.length === 1 ? "is therefore a floor" : "are therefore floors"} — the true amount may be higher.` : ""));
   } else if (mn.supplements_state === "absent") {
     lines.push(`No supplement record${onDay} — these are food alone. The supplement doses are absent from the record, not zero.`);
