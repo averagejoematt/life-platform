@@ -29,6 +29,7 @@ from datetime import date, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from boto3.dynamodb.conditions import Key
+from common import constants as _constants
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 #: The Hevy window. Mirrors ``coach_domain_facts._physical_pack`` (14 days), so the seat's
@@ -47,8 +48,18 @@ _M_PER_MILE = 1609.34
 _HEVY_MIRROR_DEVICE = "hevy"
 
 
-def gather(table: Any, fetch_range: Callable[[str, str, str], list], today: date, yesterday: str, user_prefix: str) -> Dict[str, Any]:
+def gather(
+    table: Any,
+    fetch_range: Callable[[str, str, str], list],
+    today: date,
+    yesterday: str,
+    user_prefix: str,
+    withings_rows: Optional[list] = None,
+) -> Dict[str, Any]:
     """The keys the physical and explorer blocks read, for ``gather_daily_data`` to spread.
+
+    ``withings_rows`` is the brief's own 30-day Withings window (#4373) — the subject day's
+    row is picked from it, not re-read.
 
     ``fetch_range`` is the brief's own phase-aware DATE# window reader (reused, not a third
     Hevy reader — #4358's acceptance). The correlation and experiment partitions are keyed
@@ -59,8 +70,10 @@ def gather(table: Any, fetch_range: Callable[[str, str, str], list], today: date
     experiments = _active_experiments(table, user_prefix)
     hevy = fetch_range("hevy", start, yesterday)
     corr = _latest_correlations(table, user_prefix)
+    withings = subject_day_row(withings_rows, yesterday)
     out = {
         "hevy_recent": hevy,
+        "withings": withings,
         "weekly_correlations": corr,
         "active_experiments": None if experiments is None else len(experiments),
         "experiment_names": None if experiments is None else experiments[:MAX_EXPERIMENT_NAMES],
@@ -71,7 +84,8 @@ def gather(table: Any, fetch_range: Callable[[str, str, str], list], today: date
     print(
         f"[brief_domain_inputs] hevy_recent={len(hevy)} (dates {dates[:3]}) "
         f"weekly_correlations={(corr or {}).get('week', 'NOT COMPUTED')} significant={(corr or {}).get('significant_correlations')} "
-        f"active_experiments={out['active_experiments']} names={out['experiment_names']}"
+        f"active_experiments={out['active_experiments']} names={out['experiment_names']} "
+        f"withings={(withings or {}).get('date', 'NO ROW')} weight_lbs={(withings or {}).get('weight_lbs')}"
     )
     return out
 
@@ -164,6 +178,37 @@ def _active_experiments(table: Any, user_prefix: str) -> Optional[List[str]]:
 
 def _row_date(row: dict) -> str:
     return str(row.get("date") or str(row.get("sk", ""))[len("DATE#") :])[:10]
+
+
+def subject_day_row(rows: Optional[list], day: str) -> Optional[Dict[str, Any]]:
+    """#4373: the ``day`` row of a DATE#-keyed window, or None — the brief's
+    ``fetch_date`` convention (whoop/strava/apple are the subject day's row), applied to a
+    window already in hand."""
+    return next((r for r in rows or [] if isinstance(r, dict) and _row_date(r) == day), None)
+
+
+def withings_block(data: Dict[str, Any]) -> Dict[str, Any]:
+    """#4373: the subject day's own Withings weigh-in, DATED.
+
+    ``_build_physical_data`` read ``data["withings"]`` for years and the brief never set it,
+    so ``weight_lbs`` was None every day. It now carries the reading's own date (#1924: a
+    bare weight gets narrated as current), and a pre-genesis row is withheld (#2104: the
+    brief's subject day is YESTERDAY, so on genesis day this row is the previous cycle's).
+
+    Body fat is deliberately NOT read from this row: the live field is ``fat_ratio_pct``
+    (never ``body_fat_pct``), and it is TIER_OWNER_ONLY in ``privacy.field_tiers`` — the
+    physical coach's text is a reader surface. DEXA's owner-published ``body_fat_pct`` is
+    the builder's only body-fat source.
+    """
+    row = data.get("withings") or {}
+    row_date = _row_date(row) if row else None
+    weight = _num(row.get("weight_lbs"))
+    # ONE boundary with the dated weight facts beside it (weight_recency's `cycle_genesis`),
+    # else the constants MODULE read at call time — never an import-time-frozen value.
+    genesis = str((data.get("weight_recency") or {}).get("cycle_genesis") or _constants.EXPERIMENT_START_DATE)
+    if weight is None or not row_date or row_date < genesis:
+        return {"weight_lbs": None, "weight_lbs_date": None}
+    return {"weight_lbs": round(weight, 1), "weight_lbs_date": row_date}
 
 
 def _strava_activities(day_rows: list) -> List[Dict[str, Any]]:
