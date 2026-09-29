@@ -816,62 +816,21 @@ RULES = [
         r"\*\*Last updated:\*\* \d{4}-\d{2}-\d{2} \([^\)]+\)",
         "**Last updated:** {date} ({version} — {tool_count} MCP tools, {data_sources} data sources, {lambda_count} Lambdas, 12 cached tools)",
     ),
-    # ── CLAUDE.md ────────────────────────────────────────────────────────────
-    # The doc every session reads first quotes these two counts inline (not just
-    # in a header) — #389: they rot exactly like the ones below and a stale one
-    # is a fresh session's very first false fact.
-    (
-        "CLAUDE.md",
-        r"~\d+ Lambdas \(CDK-defined",
-        "~{lambda_count} Lambdas (CDK-defined",
-    ),
-    (
-        "CLAUDE.md",
-        r"~\d+ tools across ~\d+ domain modules",
-        "~{tool_count} tools across ~{tool_module_count} domain modules",
-    ),
-    (
-        "CLAUDE.md",
-        r"ADRs \(ADR-001 through ADR-\d+\)",
-        "ADRs (ADR-001 through ADR-{adr_max})",
-    ),
-    # The two #973 discovered literals — live drift instances found by the
-    # 2026-07-11 sweep (the hypothesis cadence + the 27-vs-40-page verify count
-    # both drifted in prose while their sources moved).
-    (
-        "CLAUDE.md",
-        r"`hypothesis-engine` runs weekly \([A-Za-z]{3} \d{1,2}:\d{2} UTC\)",
-        "`hypothesis-engine` runs weekly ({hypothesis_cadence})",
-    ),
-    (
-        "CLAUDE.md",
-        r"verifies the \d+-URL v4 surface \(\d+ pages \+ \d+ JSON endpoints",
-        "verifies the {restart_url_count}-URL v4 surface ({restart_page_count} pages + {restart_endpoint_count} JSON endpoints",
-    ),
-    # #1235: the experiment anchor line — "(currently **<genesis>**, cycle N —". Drifted a
-    # full reset behind (cycle 5 / 2026-07-12) three days after the cycle-6 re-anchor because
-    # nothing synced it; restart_pipeline runs this sync, so it now self-heals every reset.
-    (
-        "CLAUDE.md",
-        r"\(currently \*\*\d{4}-\d{2}-\d{2}\*\*, cycle \d+ —",
-        "(currently **{experiment_genesis}**, cycle {experiment_cycle} —",
-    ),
-    # #1235: SCHEMA.md phase-taxonomy note quoting the same anchor as a parenthetical.
+    # ── CLAUDE.md: NO rules (#4271) ─────────────────────────────────────────
+    # Seven rules used to re-stamp counts CLAUDE.md quoted inline (Lambdas, tools/modules,
+    # ADR max, the hypothesis cadence, the restart verify surface, the experiment anchor,
+    # the site-api endpoint count). The file now POINTS at their sources
+    # (`scripts/boot_brief.py`, the generated ADR index, the CDK schedule, the restart
+    # verifier's PAGES/JSON_ENDPOINTS, constants.py, ROUTES) instead of quoting them, so
+    # it stops conflicting on every count-moving merge. Do not add a CLAUDE.md rule back:
+    # point at the number's home instead.
+    # #1235: SCHEMA.md phase-taxonomy note quoting the experiment anchor as a parenthetical.
     (
         "docs/SCHEMA.md",
         r"Record dated on or after EXPERIMENT_START_DATE \(currently \d{4}-\d{2}-\d{2}\)",
         "Record dated on or after EXPERIMENT_START_DATE (currently {experiment_genesis})",
     ),
-    # #1437: the site-api Lambda's public endpoint count — hand-typed "60+ endpoints"
-    # was ~2x under reality (~118 estimate / 115 AST-derived vs. docs' stale 60+).
-    # Pattern matches BOTH the old "60+" shape and this rule's own "~115" output so
-    # re-running --apply/--check after a prior sync stays idempotent (see #wiki-pr1:
-    # a rule whose pattern can't match its own prior output is silent drift-in-waiting).
-    (
-        "CLAUDE.md",
-        r"with ~?\d+\+? endpoints including",
-        "with ~{endpoint_count} endpoints including",
-    ),
+    # #1437's site-api endpoint count: ONBOARDING.md carries it (rule below); CLAUDE.md no longer does (#4271).
     (
         "docs/RUNBOOK.md",
         r"hard gate over the \d+-URL v4 surface",

@@ -1,4 +1,4 @@
-"""tests/scoped_writer_residue_3599.py — the dated waiver ledger for #3599 box 2.
+"""ledgers/scoped_writer_residue_3599.py — the dated waiver ledger for #3599 box 2.
 
 WHAT A LINE HERE MEANS
   "This writer lands a row on an EXPERIMENT_SCOPED `USER#matthew#SOURCE#*` partition

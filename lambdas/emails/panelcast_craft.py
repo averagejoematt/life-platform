@@ -27,6 +27,8 @@ import os
 import re
 from typing import TYPE_CHECKING
 
+from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+
 try:  # bundle stages lambdas/ at the zip root; tests add lambdas/emails/ to sys.path
     from emails.panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_WORDS_PER_TURN
 except ImportError:
@@ -34,7 +36,7 @@ except ImportError:
         from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_WORDS_PER_TURN
 
 # Narrative tier (ADR-049): the script doctor is a creative rewrite → Sonnet, env-overridable.
-PUNCH_UP_MODEL = os.environ.get("AI_MODEL_SONNET", "claude-sonnet-4-6")
+PUNCH_UP_MODEL = os.environ.get("AI_MODEL_SONNET", NARRATIVE_MODEL)
 
 # Any run of digits is a "number" for the lock — the punch-up must not add or drop one.
 _NUM_RE = re.compile(r"\d+")
