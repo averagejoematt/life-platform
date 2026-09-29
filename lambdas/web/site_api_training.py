@@ -114,6 +114,10 @@ def training_overview(*, _g) -> dict:
     # floor rather than extrapolating a day or two out to a week.
     _win_days = max((datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(d30, "%Y-%m-%d")).days, 0)
     _win_weeks = _win_days / 7.0 if _win_days >= _MIN_WEEKLY_WINDOW_DAYS else None
+    # #4370: the `_30d` counts are honest (a short window understates), but a reader
+    # label "in 30 days" is not — Day 22 cannot have 30 days behind it. Publish the
+    # real inclusive span of [d30, today] so the front end names the window it has.
+    _win_span = _window_span(d30, today, 30)
 
     # Strava activities (90 days)
     strava_items = _query_source("strava", d90, today)
@@ -621,6 +625,10 @@ def training_overview(*, _g) -> dict:
         {
             "training": {
                 "workouts_30d": total_workouts_30d,
+                # #4370: the real span every `_30d` count here covers (genesis-clamped),
+                # and whether it is the full 30 days yet.
+                "window_days": _win_span["actual_days"],
+                "window_full": _win_span["full"],
                 "workouts_90d": total_workouts_90d,
                 "weekly_avg": weekly_avg,
                 "total_minutes_30d": round(total_minutes_30d),

@@ -9,7 +9,7 @@
 // The pure builders are exported so the node tests can drive them from fixtures; mount()
 // is the only thing that touches the DOM, and only when the Home slots are on the page.
 import { tryJSON, esc, todayPT } from "/assets/js/evidence_shared.js";
-import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText } from "/assets/js/entry_age.js";
+import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText, servedWindow } from "/assets/js/entry_age.js";
 
 const HORIZON = 30; // the day the next photo is due (the first, day 1, is on the fold — #3761)
 const DAY1_PHOTO_DATE = "2026-09-06"; // the day the fold's photograph was taken (its file name carries the same date)
@@ -291,9 +291,12 @@ export function okayBlock(sleep, vitals, nutrition, training, pulse) {
   const lifts = num(t.strength_sessions_30d);
   const walks = num(w.total_walks_30d);
   let tr = "";
-  const window30 = (field) => `in the last ${span(field, "30")} days`;
-  if (lifts !== null) tr += `${span("training_overview.training.strength_sessions_30d", countWord(lifts, { capital: true }))} lifting session${lifts === 1 ? "" : "s"} ${window30("training_overview.training.strength_sessions_30d")}, by the strength-session count`;
-  if (walks !== null) tr += `${tr ? ", and " : ""}${span("training_overview.walking.total_walks_30d", countWord(walks))} walk${walks === 1 ? "" : "s"}${tr ? "" : ` ${window30("training_overview.walking.total_walks_30d")}`}`;
+  // #4370: the window the counts were taken over, never a flat 30 the experiment lacks
+  // ("in the 22 days since the experiment began" before Day 30). No served window → no window named.
+  const tw = servedWindow(t, 30);
+  const wsp = tw ? ` ${tw.full ? `in the last ${span("training_overview.training.window_days", "30")} days` : `in the ${span("training_overview.training.window_days", String(tw.days))} day${tw.days === 1 ? "" : "s"} since the experiment began`}` : "";
+  if (lifts !== null) tr += `${span("training_overview.training.strength_sessions_30d", countWord(lifts, { capital: true }))} lifting session${lifts === 1 ? "" : "s"}${wsp}, by the strength-session count`;
+  if (walks !== null) tr += `${tr ? ", and " : ""}${span("training_overview.walking.total_walks_30d", countWord(walks))} walk${walks === 1 ? "" : "s"}${tr ? "" : wsp}`;
   if (tr) tr += ".";
   const sessions = (training && training.cardio_sessions) || [];
   if (sessions.length && sessions[0].date) {
