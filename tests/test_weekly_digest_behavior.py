@@ -2565,6 +2565,17 @@ class TestLambdaHandler:
         wd.lambda_handler({"dry_run": True}, None)
         assert wired["ses"].sent == []
 
+    def test_a_dry_run_persists_no_insight_and_says_it_did_not_send(self, wired):
+        """#4448: a dry run filed the Board commentary into the IC-15 ledger — which
+        build_insights_context replays into NEXT week's real prompt — and returned
+        "Digest v4.0 sent.". Under dry run: zero put_item calls, zero insights, and a
+        return that says DRY_RUN. The positive control is the sibling test above
+        (a real run files exactly one insight), so this cannot pass on a dead writer."""
+        resp = wd.lambda_handler({"dry_run": True}, None)
+        assert wired["writer"].written == []
+        assert wired["table"].puts == []
+        assert resp["body"] == "Digest v4.0 generated (DRY_RUN, not sent)."
+
 
 class TestRecordEmailSend:
     def test_the_completion_record_is_keyed_to_the_configured_user(self, table):

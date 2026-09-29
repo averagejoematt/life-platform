@@ -34,14 +34,14 @@ THE RULE — three parts, one module, each part a registry with a derivation gua
      history, not an obligation, and is not a cue.
 
      Pre-existing unhomed obligations are pinned, content-keyed and shrink-only, in
-     `tests/obligation_residue_3597.py::OBLIGATION_RESIDUE` (the conformance-residue
+     `ledgers/obligation_residue_3597.py::OBLIGATION_RESIDUE` (the conformance-residue
      precedent): editing a pinned block re-keys it, and the only green path is a home.
 
   1b. THE DEMOTE FIELD. Every `Load-bearing` row of `docs/PROPORTIONALITY.md` carries
      `demote_by: YYYY-MM-DD` (the calendar reds a row past it) or `demote_when: <condition>`.
      A free-text **Demote trigger:** is read at a quarterly re-read; that is how two of them
      fired unnoticed for a month. The 81 rows that predate the rule are pinned in
-     `tests/obligation_residue_3597.py::DEMOTE_FIELD_RESIDUE`; the drain is #4122.
+     `ledgers/obligation_residue_3597.py::DEMOTE_FIELD_RESIDUE`; the drain is #4122.
 
   2. THE RESIDUE REGISTRY (`RESIDUE_LEDGERS`). Every residue/allowlist ledger — a
      dated, shrink-only record of accepted debt — is registered with a `carrier` (#N, the
@@ -299,7 +299,7 @@ def live_unhomed_obligations(root: Path = ROOT) -> List[Tuple[str, str, str]]:
 # `demote_by: YYYY-MM-DD` is read by the calendar every day. So a Load-bearing row carries
 # `demote_by: <day>` (probed: past it, `operating_calendar.py --due` exits 5) or
 # `demote_when: <measurable condition>` (a condition, homed like any obligation). Rows that
-# predate the rule are pinned shrink-only in `tests/obligation_residue_3597.py::
+# predate the rule are pinned shrink-only in `ledgers/obligation_residue_3597.py::
 # DEMOTE_FIELD_RESIDUE`, keyed on the digit-masked subsystem cell; the drain is #4122.
 PROPORTIONALITY = "docs/PROPORTIONALITY.md"
 DEMOTE_BY_RE = re.compile(r"\bdemote_by:\**\s*`?(\d{4}-\d{2}-\d{2})")
@@ -357,8 +357,8 @@ RESIDUE_NAME_RE = re.compile(r"^_?[A-Z][A-Z0-9_]*_RESIDUE$")
 # holds response SNAPSHOTS, not accepted debt. A new file matching these globs must register.
 DATA_LEDGER_GLOBS: Tuple[str, ...] = ("tests/*_baseline.json", "tests/*residue*.json")
 # "ledgers" added #4270 slice 1 — the first residue ledger (conformance_residue.py) moved
-# out of tests/ into its own top-level ``ledgers/`` package; more residue ledgers will
-# follow in later #4270 slices, so this root stays even though only one file lives there yet.
+# out of tests/ into its own top-level ``ledgers/`` package; slice 2 moved pair_seam_residue,
+# obligation_residue_3597 and scoped_writer_residue_3599 beside it.
 DISCOVERY_ROOTS: Tuple[str, ...] = ("tests", "scripts", "lambdas", "deploy", "mcp", "cdk", "ledgers")
 REQUIRED_FIELDS: Tuple[str, ...] = ("carrier", "condition", "declared", "expires", "consumer")
 
@@ -375,7 +375,7 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_conformance_guard_2844.py",
     },
-    "tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE": {
+    "ledgers/pair_seam_residue.py::PAIR_SEAM_RESIDUE": {
         "carrier": _DRAIN_CARRIER,
         "condition": "a row leaves when its seam disappears or a PairContract covers it (#2847)",
         "declared": _SEEDED,
@@ -403,7 +403,7 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_truth_baseline_audit.py",
     },
-    "tests/obligation_residue_3597.py::DEMOTE_FIELD_RESIDUE": {
+    "ledgers/obligation_residue_3597.py::DEMOTE_FIELD_RESIDUE": {
         "carrier": _DRAIN_CARRIER,
         "condition": "a pinned Load-bearing row leaves when it gains `demote_by: YYYY-MM-DD` or `demote_when: …`",
         "declared": _SEEDED,
@@ -417,7 +417,7 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_gate_census_lane_3000.py",
     },
-    "tests/scoped_writer_residue_3599.py::SCOPED_WRITER_RESIDUE": {
+    "ledgers/scoped_writer_residue_3599.py::SCOPED_WRITER_RESIDUE": {
         "carrier": _DRAIN_CARRIER,
         "condition": "a writer leaves when it stamps phase provenance at write time (#3599)",
         "declared": _SEEDED,
@@ -452,7 +452,7 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_utc_day_fleet_ratchet_2811.py",
     },
-    "tests/obligation_residue_3597.py::OBLIGATION_RESIDUE": {
+    "ledgers/obligation_residue_3597.py::OBLIGATION_RESIDUE": {
         "carrier": _DRAIN_CARRIER,
         "condition": "a pinned obligation leaves when its block gains a home (#N / not-work / a probed date)",
         "declared": _SEEDED,

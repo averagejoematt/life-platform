@@ -85,7 +85,7 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
    `(partition, module, direction)` is derived from the #2845 model's edge plane
    (built live, never read from the commit), seams covered by an enrolled
    `PairContract` drop out, and everything else must sit in the dated shrink-only
-   ledger `tests/pair_seam_residue.py`. So enrolling a contract is the only way a
+   ledger `ledgers/pair_seam_residue.py`. So enrolling a contract is the only way a
    row leaves, and a module joining a shape someone else already depends on is a
    decision made on the PR that makes it. The contracts themselves are
    `tests/pair_contract_registry.py` (#2847), driven two-sided by
