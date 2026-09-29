@@ -744,8 +744,8 @@ def test_the_hourly_rejoin_heals_an_unknown_block_once_the_wearable_lands_and_th
     store.attach(t, "matthew", rec)
     assert rec["cardio_hr"]["blocks"][0]["state"] == "unknown"
     t.strava["DATE#2026-09-28"]["activities"].append(_whoop("2026-09-28T23:59:00Z", 2400))
-    first = store.rejoin_recent(t, "matthew", "hevy", "2026-09-29")
+    first = store.rejoin_recent(t, "matthew", "2026-09-29")
     assert first == {"considered": 1, "updated": 1, "joined": 1, "errors": 0}
     assert rec["cardio_hr"]["blocks"][0]["state"] == "joined"
-    second = store.rejoin_recent(t, "matthew", "hevy", "2026-09-29")
+    second = store.rejoin_recent(t, "matthew", "2026-09-29")
     assert second["updated"] == 0 and len(t.updates) == 1

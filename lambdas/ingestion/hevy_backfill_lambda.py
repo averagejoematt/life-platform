@@ -126,7 +126,7 @@ def _rejoin_cardio_hr() -> dict:
     try:
         from common.pacific_time import pacific_now
 
-        return cardio_hr_store.rejoin_recent(_table, USER_ID, SOURCE, pacific_now().date().isoformat())
+        return cardio_hr_store.rejoin_recent(_table, USER_ID, pacific_now().date().isoformat())
     except Exception as e:  # noqa: BLE001
         logger.warning("cardio-hr rejoin failed (non-fatal): %s: %s", type(e).__name__, e)
         return {"errors": 1}

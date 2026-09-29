@@ -202,7 +202,7 @@ def join_workout(workout: Mapping[str, Any], activities: Optional[Iterable[Mappi
         row: dict[str, Any] = {
             "exercise_index": i,
             "name": ex.get("name"),
-            "template_id": ex.get("template_id") or ex.get("exercise_template_id"),
+            "template_id": ex.get("template_id"),  # the NORMALIZED record (hevy_compiler owns the raw Hevy schema)
             "modality": modality,
             "duration_s": int(_block_seconds(ex)),
             "window": {"start_utc": w["start"].isoformat(), "end_utc": w["end"].isoformat(), "timing": w["timing"]} if w else None,

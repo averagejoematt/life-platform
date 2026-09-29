@@ -23,6 +23,7 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from common.pacific_time import parse_day_key, shift_day_key
+from common.strava_read_seam import strava_read_seam
 
 from training import cardio_hr
 
@@ -30,6 +31,7 @@ logger = logging.getLogger("hevy-backfill")
 
 REJOIN_DAYS = 2  # today + yesterday (Pacific): long enough for the WHOOP → Strava lag, short enough to stay cheap
 _STRAVA_PK = "USER#{user}#SOURCE#strava"
+_HEVY_PK = "USER#{user}#SOURCE#hevy"  # the rejoin reads ONLY Hevy workouts — never a caller-chosen partition
 
 
 def _strava_activities(table: Any, user: str, day: str) -> Optional[list[dict[str, Any]]]:
@@ -38,6 +40,7 @@ def _strava_activities(table: Any, user: str, day: str) -> Optional[list[dict[st
     try:
         for d in (day, shift_day_key(day, 1)):
             item = table.get_item(Key={"pk": _STRAVA_PK.format(user=user), "sk": f"DATE#{d}"}).get("Item") or {}
+            item = strava_read_seam("strava", item) or {}  # #4419: one WHOOP+Garmin session, one activity
             acts.extend(item.get("activities") or [])
     except Exception as e:  # noqa: BLE001 — a failed read is `unknown`, never a failed ingest
         logger.warning("cardio-hr strava read failed for %s: %s: %s", day, type(e).__name__, e)
@@ -83,7 +86,7 @@ def _same(a: Any, b: Any) -> bool:
     return json.dumps(_plain(a), sort_keys=True) == json.dumps(_plain(b), sort_keys=True)
 
 
-def rejoin_recent(table: Any, user: str, source: str, today: str) -> dict[str, int]:
+def rejoin_recent(table: Any, user: str, today: str) -> dict[str, int]:
     """Re-derive `cardio_hr` for the last REJOIN_DAYS Pacific days; write only what changed."""
     from boto3.dynamodb.conditions import Key
     from common.numeric import floats_to_decimal
@@ -92,7 +95,7 @@ def rejoin_recent(table: Any, user: str, source: str, today: str) -> dict[str, i
     out = {"considered": 0, "updated": 0, "joined": 0, "errors": 0}
     try:
         items = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#{user}#SOURCE#{source}") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
+            KeyConditionExpression=Key("pk").eq(_HEVY_PK.format(user=user)) & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
         ).get("Items", [])
     except Exception as e:  # noqa: BLE001
         logger.warning("cardio-hr rejoin query failed: %s: %s", type(e).__name__, e)
