@@ -13,6 +13,7 @@ Exports:
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.digest_utils import compute_confidence
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
+from health.scoring_engine import habitify_reading  # #4362
 
 _HAS_CONFIDENCE = True
 
@@ -985,9 +986,9 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                     continue
                 out += '<p style="color:' + tier_color + ';font-size:9px;margin:8px 0 4px;font-weight:700;">' + tier_label + "</p>"
                 for h_name, meta in sorted(tier_habits, key=lambda x: x[0]):
-                    done = h_map.get(h_name, 0)
-                    completed = done is not None and float(done) >= 1
-                    icon = "✅" if completed else "❌"
+                    done = habitify_reading(h_map, h_name, meta)  # #4362: rename-aware
+                    completed = done is not None and done >= 1
+                    icon = "✅" if completed else ("·" if done is None else "❌")
                     why = meta.get("why_matthew", "")
                     out += (
                         '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;">'
@@ -1006,8 +1007,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
                 sg = meta.get("synergy_group")
                 if not sg:
                     continue
-                done = h_map.get(h_name, 0)
-                if not (done is not None and float(done) >= 1):
+                if (done := habitify_reading(h_map, h_name, meta)) is not None and done < 1:  # #4362: unobserved is not a miss
                     synergy_misses.setdefault(sg, []).append(h_name)
             for sg, misses in synergy_misses.items():
                 total = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")
