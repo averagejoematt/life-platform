@@ -355,6 +355,34 @@ The honest bounds: this is client-side — a bare `git push origin main` is not 
 and the docs stand-in is a superset of Docs CI, not of CI/CD's Unit Tests, which also run on a
 docs push.
 
+**What a push to `main` does NOT re-run (#4252).** A push to main re-proves only what no
+required PR check already proved. The decisions:
+
+- **black / ruff / mypy in `ci-lint.yml` are CONDITIONAL, not removed.** They are skipped
+  only when the push is exactly one GitHub squash merge of a PR: a push event, the pushed
+  sha is the tree under test (no reconcile commit on top), one commit with one parent
+  whose parent is `github.event.before`, committed by `noreply@github.com`, and a subject
+  ending `(#N)`. The `Install black + ruff` step decides and prints its reason; a step
+  that cannot decide leaves the gates on. Every other push runs them: the reconcile
+  bot, the reset pipeline, a direct docs push, a dispatch. Residue, stated: the
+  ruleset's owner bypass can merge past a red required check, and a mypy break that
+  exists only in the union of two PRs (strict status checks are off) is not re-checked
+  on main. It reds the next PR's fast lane, which type-checks the merged tree.
+  The decision is folded into an existing step on purpose: a new step would slide every
+  positional `ci::ci-lint.yml::lint::N` census id after it.
+- **gitleaks in `ci-lint.yml` stays unconditional.** `secret-scan.yml` is
+  `pull_request`-only, so this is the one scan of a direct push, and it costs about 3s.
+- **`ci-test.yml`'s eleven single-file pytest steps are gone.** Every one of those files
+  also ran in the coverage passes. The labels survive as named sections that
+  `scripts/ci_test_sections.py` prints from the passes' JUnit XML, with a failure
+  annotated by its old step name.
+- **`dependabot-validate.yml` is gone.** `dependabot-automerge.yml` fires on a completed
+  `PR checks` run. It merges only when that run concluded `success`, which needs every
+  pr-checks job including the full suite. It also checks that the PR head is still the
+  sha that went green and that the required contexts plus `Full unit suite (pre-merge,
+  issue 3025)` are `success` on it. The full suite is not a required context, so a
+  merge path that waited only on the ruleset would miss a red behaviour suite.
+
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
 Since ADR-117, `plan` (and therefore `deploy` + the reader-facing visual-QA gate)

@@ -68,6 +68,30 @@ jobs:
           flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Install black + ruff
+        # #4252: this step ALSO decides whether black/ruff/mypy run at all. Folded in
+        # here rather than added as a step: a new step slides every positional census id
+        # after it (`ci::ci-lint.yml::lint::<index>`), and the proofs are keyed on them.
+        #
+        # pr-checks.yml's REQUIRED fast lane already ran the same black/ruff/mypy commands
+        # at the same pins on the PR's merge ref. A push that is exactly one GitHub squash
+        # merge of a PR re-proves nothing by running them again (~110s of this job on
+        # run 36528570677). `pr_proven=true` needs ALL of:
+        #   - a push event, and the pushed sha IS the tree under test (no reconcile commit
+        #     on top — `inputs.build_sha == github.sha`);
+        #   - the push introduced exactly one commit (`<sha>^ == github.event.before`),
+        #     with one parent;
+        #   - GitHub committed it (`noreply@github.com`, the web-flow identity every PR
+        #     merge carries) and its subject ends `(#N)`, the squash-merge form.
+        # Everything else runs the gates: the reconcile bot, the reset pipeline, a
+        # direct docs push, a manual dispatch. When the decision cannot be made, the
+        # gates run.
+        # RESIDUE, stated (docs/CONVENTIONS.md §4): the ruleset's owner bypass can merge
+        # a PR whose required check is red, and a mypy break that exists only in the
+        # union of two PRs (strict status checks are off) is not re-checked here. It
+        # reds the NEXT PR's fast lane, which type-checks the merged tree.
+        # gitleaks is NOT skipped. It is the only scan of direct pushes (secret-scan.yml
+        # is pull_request-only) and costs ~3s.
+        id: proven
         # if: always() (here + on every gate below) — #749: the lint gates used to
         # run strictly sequentially, so the FIRST red gate stopped the job and MASKED
         # every gate after it (fix black → discover ruff was also red → fix → discover
@@ -76,20 +100,46 @@ jobs:
         # unchanged: any red gate still fails the job (each step's own non-zero exit),
         # which still skips test-critical → plan → deploy.
         if: always()
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSHED_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BUILD_SHA: ${{ inputs.build_sha }}
         run: |
+          set -o pipefail
           PINS=$(python3 scripts/ci_pins.py black ruff)   # versions from requirements-dev.txt (CQ-01, #2609)
           pip install $PINS
+          PROVEN=false
+          WHY="not a push event ($EVENT_NAME)"
+          if [ "$EVENT_NAME" = "push" ]; then
+            PARENTS=$(git rev-list --parents -n 1 "$PUSHED_SHA" 2>/dev/null | wc -w | tr -d ' ')
+            PARENT=$(git rev-parse "${PUSHED_SHA}^" 2>/dev/null || echo none)
+            COMMITTER=$(git log -1 --format=%ce "$PUSHED_SHA" 2>/dev/null || echo none)
+            SUBJECT=$(git log -1 --format=%s "$PUSHED_SHA" 2>/dev/null || echo "")
+            if [ "$BUILD_SHA" != "$PUSHED_SHA" ]; then WHY="a reconcile commit sits on top ($BUILD_SHA != $PUSHED_SHA)"
+            elif [ "$PARENTS" != "2" ]; then WHY="the pushed commit is not a single-parent commit"
+            elif [ "$PARENT" != "$BEFORE_SHA" ]; then WHY="the push carried more than one commit ($BEFORE_SHA..$PUSHED_SHA)"
+            elif [ "$COMMITTER" != "noreply@github.com" ]; then WHY="not committed by GitHub ($COMMITTER): not a PR merge"
+            elif ! [[ "$SUBJECT" =~ \(#[0-9]+\)$ ]]; then WHY="the subject is not a squash-merge subject"
+            else PROVEN=true; WHY="one GitHub squash merge of a PR: pr-checks.yml's required fast lane ran black/ruff/mypy on it"
+            fi
+          fi
+          echo "pr_proven=$PROVEN" >> "$GITHUB_OUTPUT"
+          echo "black/ruff/mypy pr_proven=$PROVEN: $WHY"
+          if [ "$PROVEN" = "true" ]; then
+            echo "::notice title=black/ruff/mypy skipped (#4252)::$WHY"
+          fi
 
       - name: Format gate (black — ENFORCED, config in pyproject.toml)
-        if: always()
+        if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
         run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
       - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
-        if: always()
+        if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
         run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
-        if: always()
+        if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
         run: |
           PINS=$(python3 scripts/ci_pins.py mypy)   # version from requirements-dev.txt (CQ-01, #1963/#2609)
           pip install $PINS
