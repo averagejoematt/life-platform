@@ -290,6 +290,68 @@ export function weekdayWeekendTable(ww) {
   return `<table class="rd-tbl"><thead><tr><th></th><th>weekdays</th><th>weekends</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+// #4244 — the micronutrient section's label DERIVES from what the API counted. The served
+// `sufficiency` is the food + supplements total per nutrient (each entry carries its own
+// `channels_counted`), so a hard-coded "what the food is short on" header sat above a figure
+// that included the supplement stack — wrong in the opposite direction to the food-only bug.
+// The channels come from the entries themselves (their union), never from `intake_channels`:
+// that field lists the channels the derivation JOINS and reads [food, supplements] even on a
+// day with no supplement record. A day whose record is absent reads food-only and says the
+// supplements are absent, not zero (ADR-104). The food-only average stays visible beside the
+// total so what the food alone covers is not lost.
+const _NUT_UNIT = /_(mg|mcg|ug|g)$/i;
+const _nutName = (k) => ttl(String(k).replace(_NUT_UNIT, "").replace(/_total$/i, "")).replace(/^Omega3$/, "Omega-3");
+export function micronutrientChannels(mn) {
+  const suf = (mn && mn.sufficiency) || {};
+  const seen = new Set();
+  for (const v of Object.values(suf)) for (const c of (v && Array.isArray(v.channels_counted) ? v.channels_counted : [])) seen.add(String(c));
+  // A pre-#4244 cached body carries no channels_counted — it was food-only by construction.
+  if (!seen.size && Object.keys(suf).length) seen.add("food");
+  const supps = seen.has("supplements") && mn.supplements_state !== "absent";
+  return { food: seen.has("food"), supplements: supps };
+}
+export function nutritionMicronutrients(mn) {
+  mn = mn || {};
+  const suf = mn.sufficiency || {};
+  if (!Object.keys(suf).length && mn.avg_pct == null) return "";
+  const ch = micronutrientChannels(mn);
+  const day = dayInWords(mn.as_of);
+  const onDay = day ? ` on ${day}` : "";
+  const items = Object.entries(suf).map(([k, v]) => {
+    const m = _NUT_UNIT.exec(k);
+    const own = (v && Array.isArray(v.channels_counted)) ? v.channels_counted : null;
+    // A row names its source only where it differs from the section's: in a food + supplements
+    // section, a nutrient no supplement dose could be counted into is food only.
+    const suffix = ch.supplements && own && !own.includes("supplements") ? " (food only)" : "";
+    return { label: _nutName(k) + suffix, pct: v && v.pct, actual: v && v.actual, target: v && v.target, unit: m ? m[1] : "" };
+  });
+  const both = ch.supplements;
+  const head = both ? "Micronutrients — what food and supplements cover" : "Micronutrients — from food alone";
+  const avgK = both ? "micronutrient avg, food + supplements" : "micronutrient avg, from food";
+  const f = [mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", avgK)];
+  if (both && mn.food_only_avg_pct != null) f.push(fig(fmt(mn.food_only_avg_pct) + "%", "from food alone"));
+  const barLabel = both ? "Food + supplements vs daily target" : "Food vs daily target";
+  const cap = both
+    ? "100% = daily target · worst first · logged food plus the supplement doses recorded as taken, not blood levels."
+    : "100% = daily target · worst first · logged food only, not blood levels.";
+  const lines = [];
+  if (both) {
+    const fromSupp = Object.entries(suf)
+      .filter(([, v]) => v && Number(v.from_supplements) > 0)
+      .map(([k, v]) => { const u = _NUT_UNIT.exec(k); return `${_nutName(k)} ${fmt(v.from_supplements)} ${u ? u[1] : ""}`.trim(); });
+    if (fromSupp.length) lines.push(`From supplements${onDay}: ${fromSupp.join(", ")}.`);
+    const floors = Object.entries(suf).filter(([, v]) => v && Array.isArray(v.uncounted_supplements) && v.uncounted_supplements.length).map(([k]) => _nutName(k));
+    const names = [...new Set((mn.unconverted || []).map((u) => u && u.name).filter(Boolean))];
+    if (names.length) lines.push(`Taken but not counted — no record of what they contain: ${names.join(", ")}.` + (floors.length ? ` ${floors.join(", ")} ${floors.length === 1 ? "is therefore a floor" : "are therefore floors"} — the true amount may be higher.` : ""));
+  } else if (mn.supplements_state === "absent") {
+    lines.push(`No supplement record${onDay} — these are food alone. The supplement doses are absent from the record, not zero.`);
+  } else if (day) {
+    lines.push(`Logged food${onDay}.`);
+  }
+  const meta = lines.length ? `<p class="rd-meta label">${esc(lines.join(" "))}</p>` : "";
+  return sec(head, figs(f) + (items.length ? sufficiencyBars(items, { label: barLabel, caveat: cap }) : "") + meta);
+}
+
 export async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
@@ -429,22 +491,14 @@ export async function renderNutrition(d) {
   // Micronutrient sufficiency + protein-distribution score — beyond macros, the part almost
   // no transformation site shows (reverse-QA: rich in the data, surfaced nowhere).
   const mn = (d && d.micronutrients) || {};
-  const suf = mn.sufficiency || {};
   // P0.3 — the protein-"timing" score is killed: it's a distribution score with no
   // per-meal timestamps behind it, it can't fall, and a "100" sitting over a 0% protein
   // hit congratulated the spacing of a thing he isn't eating enough of. Relabel as not-yet-
   // measured (P1.1 revives a real one once per-meal timestamps land).
-  if (Object.keys(suf).length || mn.avg_pct != null) {
-    // P0.4 — horizontal sufficiency bars 0→100%, worst-first, value-labelled, ember
-    // reserved for the worst offenders (a deficiency is what to look at, not a win).
-    const items = Object.entries(suf).map(([k, v]) => {
-      const m = /_(mg|mcg|ug|g)$/i.exec(k);
-      return { label: ttl(k.replace(/_(mg|mcg|ug|g)$/i, "")), pct: v && v.pct, actual: v && v.actual, target: v && v.target, unit: m ? m[1] : "" };
-    });
-    parts.push(sec("Micronutrients — what the food is short on",
-      figs([mn.avg_pct != null && fig(fmt(mn.avg_pct) + "%", "micronutrient avg")]) +
-      (items.length ? sufficiencyBars(items, { label: "Sufficiency vs daily target" }) : "")));
-  }
+  // P0.4 — horizontal sufficiency bars 0→100%, worst-first, value-labelled, ember reserved
+  // for the worst offenders; #4244 — every label derives from the channels the API counted.
+  const mnHtml = nutritionMicronutrients(mn);
+  if (mnHtml) parts.push(mnHtml);
   // §5 — Hydration & electrolytes (P1.2): sodium + potassium framed as the water-weight
   // honesty check on a cut (NOT a bare hydration ring). Week-one "the drop is water" caveat.
   const el = (d && d.electrolytes) || {};
