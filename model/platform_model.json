@@ -1647,6 +1647,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "episode-detect",
+      "module": "lambdas/compute/episode_detect_lambda.py",
+      "partition": "training_reference",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": "episode-detect",
       "module": "lambdas/compute/episode_detect_lambda.py",
@@ -3817,6 +3824,34 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/training/exercise_history.py",
@@ -5675,13 +5710,6 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_hevy_routine.py",
-      "partition": "hevy",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_hevy_routine.py",
       "partition": "whoop",
       "via": "pk"
     },
@@ -7460,7 +7488,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 722,
+      "edges": 726,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7474,9 +7502,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 357,
-        "sites_resolved": 893,
-        "sites_total": 1250
+        "sites_dynamic": 359,
+        "sites_resolved": 897,
+        "sites_total": 1256
       },
       "schedule_resolution": {
         "dynamic": 0,

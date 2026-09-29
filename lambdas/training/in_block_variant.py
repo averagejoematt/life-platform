@@ -150,6 +150,51 @@ def prefer(
     return {"keys": [hit["movement_key"]] + [k for k in keys if k != hit["movement_key"]], "performed": {**hit, "basis": basis}}
 
 
+def template_id_for(
+    movement_key: str | None, catalog_movements: dict[str, Any] | None, performed: list[dict[str, Any]] | None = None
+) -> tuple[str | None, str | None]:
+    """THE slot template resolver (#4431) — `(template_id, source)`, in-block first for a title-only key.
+
+    ONE function, three callers, so every movement the generator floors the chat gate floors
+    identically: the generator (`with_performed_template_ids` -> the load catalog its floor pass
+    reads), the planner (`stamp_template_ids` -> the exposure's `template_id`, which
+    `load_ramp.annotate_prescription` loads from) and the chat commit gate
+    (`hevy_prescription_gate.derive_load_floors`). Before #4431 the gate read the catalog hint only,
+    so `db_shoulder_press` — title-only on purpose (ADR-069), floored by the generator from its
+    performed record since #4409 — reached the gate as `no_template_id` with no floor at all.
+
+    Order: a `tmpl:<id>` key carries its own id (ADR-069 index-resolved / auto-created) -> the
+    catalog's `hevy_template_id_hint` -> the id Hevy served on the most recent in-block performance of
+    the key (`performed_in_block` rows: the latest date, that day's first position). No network
+    resolve, never a guess: none of the three -> `(None, None)`, which the floor reports as
+    `no_template_id`."""
+    if not movement_key:
+        return None, None
+    if movement_key.startswith("tmpl:"):
+        return (movement_key[len("tmpl:") :] or None), "movement_key"
+    hint = ((catalog_movements or {}).get(movement_key) or {}).get("hevy_template_id_hint")
+    if hint:
+        return str(hint), "catalog_hint"
+    hits = [p for p in performed or [] if p.get("movement_key") == movement_key and p.get("template_id")]
+    if not hits:
+        return None, None
+    last = max(p["date"] for p in hits)
+    hit = min((p for p in hits if p["date"] == last), key=lambda p: p["position"])
+    return str(hit["template_id"]), f"in-block performed record {hit['date']} ({ISSUE})"
+
+
+def stamp_template_ids(
+    exposures: list[dict[str, Any]], catalog_movements: dict[str, Any] | None, performed: list[dict[str, Any]] | None
+) -> None:
+    """The planner's half of the one resolver (#4431), IN PLACE: every exposure whose key the catalog
+    cannot resolve but the block's own record can carries that record's `template_id` (+ its source).
+    Hinted keys are left alone — `annotate_prescription` reads the hint first, the same order."""
+    for e in exposures:
+        tid, source = template_id_for(e.get("movement_key"), catalog_movements, performed)
+        if tid and source not in ("catalog_hint", "movement_key"):
+            e["template_id"], e["template_id_source"] = tid, source
+
+
 def exposure_fields(pref: dict[str, Any] | None, resolved: str | None) -> dict[str, Any]:
     """What an exposure records about its in-block variant: kept, or the listed swap and why."""
     if not pref:
@@ -166,19 +211,23 @@ def exposure_fields(pref: dict[str, Any] | None, resolved: str | None) -> dict[s
             "rule": f"within a block a slot keeps the variant performed in it; a change is only the pattern's listed swap ({ISSUE})",
         }
     }
-    if kept and p.get("template_id"):
-        out["template_id"] = p["template_id"]
+    # the kept variant's template id is stamped by `stamp_template_ids` — the one resolver (#4431)
     return out
 
 
-def with_performed_template_ids(catalog: dict[str, Any], rx: dict[str, Any]) -> dict[str, Any]:
-    """`catalog` with the wire template id of every kept in-block variant whose entry carries no
-    `hevy_template_id_hint` (title-only, ADR-069), so the load floor and the history note can read
-    its record. A shallow copy — the catalog itself (and its hash on the snapshot) is untouched."""
+def with_performed_template_ids(
+    catalog: dict[str, Any], rx: dict[str, Any], performed: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """`catalog` with the wire template id of every prescribed movement whose entry carries no
+    `hevy_template_id_hint` (title-only, ADR-069) but whose in-block record does, so the load floor
+    and the history note can read it. A shallow copy — the catalog itself (and its hash on the
+    snapshot) is untouched. The id is `template_id_for`'s over `performed` (#4431 — the resolver the
+    chat gate calls); without `performed`, the exposure's stamped `template_id`."""
     movements = dict((catalog or {}).get("movements") or {})
     changed = False
     for e in (rx or {}).get("exposures") or []:
-        key, tid = e.get("movement_key"), e.get("template_id")
+        key = e.get("movement_key")
+        tid = template_id_for(key, movements, performed)[0] if performed is not None else e.get("template_id")
         if key and tid and key in movements and not (movements[key] or {}).get("hevy_template_id_hint"):
             movements[key] = {
                 **movements[key],

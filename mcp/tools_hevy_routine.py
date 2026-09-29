@@ -110,14 +110,19 @@ def _make_resolver():
 
 
 def _generator_inputs(args: dict[str, Any]):
+    """#4410: every draft path (chat, floor, re-entry, the nightly pre-draft) reads the aerobic minutes
+    from `mcp.shared_quantities.z2_minutes_7d` — None when unread, never a hard-coded or caller-typed 0."""
     from training.routine_generator import GeneratorInputs
 
+    from mcp.shared_quantities import z2_minutes_7d
+
+    target_date = args.get("target_date") or pacific_today()
     return GeneratorInputs(
-        target_date=args.get("target_date") or pacific_today(),
+        target_date=target_date,
         recovery_tier=args.get("recovery_tier", "yellow"),
         acwr_flag=args.get("acwr_flag", "safe"),
         volume_7d=args.get("volume_7d") or {},
-        z2_minutes_7d=float(args.get("z2_minutes_7d") or 0),
+        z2_minutes_7d=z2_minutes_7d(target_date),
         days_since_last_workout=int(args.get("days_since_last_workout") or 2),
         add_load_enabled=False,  # never permitted from chat; SSM-gated only
     )
@@ -173,27 +178,18 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
 
 
 def _gather_training_context(target_date: str) -> dict[str, Any]:
-    """Recent-streak / deficit / tissue context → ceiling+floor modulation (brief §4)."""
+    """Loaded-lifting streak / deficit / tissue context → ceiling+floor modulation (brief §4).
+
+    #4411: the streak is the LOADED-lifting streak (`plan_draft_evidence._training_streaks`, the
+    critics' own read) — never a count of days with any Hevy row. A failed read is None (unknown)."""
+    from mcp.plan_draft_evidence import _training_streaks
     from mcp.recovery_authoring import derive_training_context
 
-    workout_dates: list[str] = []
+    loaded_streak = None
     try:
-        from boto3.dynamodb.conditions import Key as _K
-
-        from mcp.config import table
-
-        start = (datetime.strptime(target_date, "%Y-%m-%d").date() - timedelta(days=14)).isoformat()
-        r = table.query(
-            KeyConditionExpression=_K("pk").eq("USER#matthew#SOURCE#hevy") & _K("sk").between(f"DATE#{start}", f"DATE#{target_date}~"),
-            ProjectionExpression="sk",
-        )
-        for it in r.get("Items", []):
-            sk = it.get("sk", "")
-            if sk.startswith("DATE#"):
-                workout_dates.append(sk.split("DATE#", 1)[1][:10])
-        workout_dates = sorted(set(workout_dates))
+        loaded_streak = _training_streaks(target_date).get("loaded_lifting_streak")
     except Exception as e:  # noqa: BLE001
-        logger.warning("training context: workout history read failed: %s", e)
+        logger.warning("training context: loaded-lifting streak read failed: %s", e)
 
     deficit_state = "moderate"
     try:
@@ -207,7 +203,7 @@ def _gather_training_context(target_date: str) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("training context: deficit read failed: %s", e)
 
-    return derive_training_context(workout_dates, deficit_state, target_date)
+    return derive_training_context(loaded_streak, deficit_state, target_date)
 
 
 def _apply_recovery_adaptation(ir: Any, ctx: dict[str, Any], inputs_current_through: str | None) -> dict[str, Any]:
@@ -285,7 +281,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
         "freshness_gate": {"ok": gate.get("ok"), "gaps": gate.get("gaps", []), "inputs_current_through": inputs_current_through},
         "recovery_adaptation": {
             "applied": bool(adaptation),
-            "consecutive_days": ctx.get("consecutive_days"),
+            "loaded_lifting_streak": ctx.get("loaded_lifting_streak"),
             "deficit_state": ctx.get("deficit_state"),
             "green_ceiling_quality": ctx.get("green_ceiling_quality"),
             "branched_lifts": list(adaptation.get("exercises", {}).keys()),
@@ -1201,20 +1197,11 @@ def _action_floor(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
-    from training.routine_generator import GeneratorInputs, generate_routines
+    from training.routine_generator import generate_routines
     from training.routine_repo import draft_versioned  # #3115
 
-    base = _generator_inputs(args)
-    inputs = GeneratorInputs(
-        target_date=base.target_date,
-        recovery_tier=base.recovery_tier,
-        acwr_flag=base.acwr_flag,
-        volume_7d=base.volume_7d,
-        z2_minutes_7d=base.z2_minutes_7d,
-        days_since_last_workout=max(base.days_since_last_workout, 7),
-        history_last_dates=base.history_last_dates,
-        add_load_enabled=False,
-    )
+    inputs = _generator_inputs(args)  # add_load_enabled is already False on every chat path
+    inputs.days_since_last_workout = max(inputs.days_since_last_workout, 7)
     routines = generate_routines(inputs)
     re_entry = next((r for r in routines if r.variant == "re_entry"), None)
     if not re_entry:

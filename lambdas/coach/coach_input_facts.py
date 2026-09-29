@@ -276,9 +276,14 @@ _WEIGHT_FORECAST_SENTENCE = re.compile(
 _WEIGHT_NOT_NOW_AFTER = re.compile(r"^[\s-]*(?:goal|target|mark|milestone)\b", re.IGNORECASE)
 
 _MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
-# "went dark after September 19th", "no logs since Sep 19", "nothing logged since the 19th of September"
+# "went dark after September 19th", "no logs since Sep 19", "nothing logged since the 19th of September",
+# and (#4185 follow-up) "the six-day logging gap since September 19th" / "a two-day food-log gap since
+# Sep 19" — the served 09-26 and 09-22 nutrition reads. Only the DATE is read from that phrasing (the
+# last log it implies); its day count is not a `log_gap_days` claim, so a correct read whose N is off by
+# the upload lag is never held on the count.
 _GAP_SINCE_DATE = re.compile(
-    r"\b(?:went\s+(?:dark|quiet|silent)|stopped|no\s+(?:food\s+)?logs?|nothing\s+(?:was\s+)?logged|hasn't\s+logged|haven't\s+logged)"
+    r"\b(?:went\s+(?:dark|quiet|silent)|stopped|no\s+(?:food\s+)?logs?|nothing\s+(?:was\s+)?logged|hasn't\s+logged|haven't\s+logged"
+    r"|(?:food[-\s]?)?log(?:ging)?\s+gap)"
     r"\s+(?:after|since)\s+(?:the\s+)?([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b",
     re.IGNORECASE,
 )
@@ -295,6 +300,29 @@ _INTAKE_FRAME = re.compile(
     r"|/\s*day\b|\bg/d\b",
     re.IGNORECASE,
 )
+
+
+# #4343 (09-28 brief, labs): a figure the sentence names as a target, floor or the level an
+# escalation moves TO is a goal, not his intake — "against a target of 190 grams", "protein
+# escalation to 190 grams per day is authorized", "the 190-gram target". The average cannot
+# refute a goal, so a protein figure is skipped when EVERY place it is written is framed so.
+_TARGET_BEFORE = re.compile(
+    r"(?:\b(?:target|floor|goal|ceiling|minimum)\s+(?:of\s+)?|\bescalat\w*\s+(?:\w+\s+){0,2}?to\s+|\btowards?\s+)"
+    r"(?:about\s+|around\s+|roughly\s+)?$",
+    re.IGNORECASE,
+)
+_TARGET_AFTER = re.compile(
+    r"^\s*-?\s*(?:g|grams?)?\s*-?\s*(?:(?:daily|protein|a\s+day|per\s+day)\s+)?(?:target|floor|goal)\b", re.IGNORECASE
+)
+
+
+def _target_framed(sentence: str, value: float) -> bool:
+    """True when every occurrence of `value` in `sentence` is written as a target/floor/goal."""
+    num = f"{value:g}"
+    hits = list(re.finditer(r"(?<![\d.,])" + re.escape(num) + r"(?:\.0+)?(?![\d])", sentence))
+    return bool(hits) and all(
+        _TARGET_BEFORE.search(sentence[max(0, m.start() - 40) : m.start()]) or _TARGET_AFTER.match(sentence[m.end() :]) for m in hits
+    )
 
 
 def _named_windows(sentence: str) -> list:
@@ -389,6 +417,8 @@ def served_fact_findings(text: str, facts: Optional[dict], today: Optional[str] 
                 continue  # no spread → no tolerance to derive; skipped, never guessed
             tol = max(float(win["half_width"]), MIN_PROTEIN_TOLERANCE_G)
             if abs(v - win["mean"]) <= tol:
+                continue
+            if _target_framed(sentence, v):
                 continue
             if not windows:
                 recent = _nl.protein_window(series, 7)

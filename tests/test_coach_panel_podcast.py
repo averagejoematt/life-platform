@@ -407,6 +407,7 @@ def test_emit_outcome_is_fail_open_and_normalizes(monkeypatch):
 # object mirrors the live wk0.mp3 head (ContentLength 3465600, ContentType audio/mpeg).
 
 import io  # noqa: E402
+import json  # noqa: E402
 
 import pytest  # noqa: E402
 from common import media_tombstone  # noqa: E402
@@ -535,3 +536,58 @@ def test_tombstoned_week_is_not_skipped_by_the_weekly_run(monkeypatch):
     with pytest.raises(_PastTheGate):
         panel._run_weekly(force=False)
     assert "already-published" not in outcomes
+
+
+# #4365 follow-up: a dry run used to skip the published check entirely, so an attended
+# {"dry_run": true} invoke could not show the tombstone fix reading wk4 as absent. The
+# check is read-only (head + a <=4 KB get), so the dry run now runs it and REPORTS the skip.
+def test_dry_run_reports_an_already_published_week_without_emitting(monkeypatch):
+    fs = _WireS3({f"{panel.PREFIX}/wk3.mp3": (None, 3_000_000, "audio/mpeg")})
+    outcomes = []
+    monkeypatch.setattr(panel, "s3", fs)
+    monkeypatch.setattr(panel, "logger", _LogRecorder())
+    monkeypatch.setattr(panel, "_select_week_post", lambda: {"week": 3, "date": "2026-09-25", "title": "Week 3"})
+    monkeypatch.setattr(panel, "_emit_outcome", outcomes.append)
+    body = json.loads(panel._run_weekly(force=False, dry_run=True)["body"])
+    assert body == {"dry_run": True, "week": 3, "would": "SKIP", "stage": "already-published", "matched_key": f"{panel.PREFIX}/wk3.mp3"}
+    assert outcomes == []  # a dry run emits no metric
+
+
+def test_dry_run_goes_past_a_tombstoned_week(monkeypatch):
+    fs = _WireS3({f"{panel.PREFIX}/wk4.wav": (_LIVE_WK1_TOMBSTONE, 186, "application/json")})
+    monkeypatch.setattr(panel, "s3", fs)
+    monkeypatch.setattr(panel, "logger", _LogRecorder())
+    monkeypatch.setattr(panel, "_select_week_post", lambda: {"week": 4, "date": "2026-10-02", "title": "Week 4"})
+
+    class _PastTheGate(Exception):
+        pass
+
+    monkeypatch.setattr(panel, "_load_bible", lambda: (_ for _ in ()).throw(_PastTheGate()))
+    with pytest.raises(_PastTheGate):
+        panel._run_weekly(force=False, dry_run=True)
+
+
+class _DeniedS3:
+    """get_object as boto3 raises it when the role lacks s3:GetObject (the live panel role, 2026-09-29)."""
+
+    def __init__(self, code):
+        self.code = code
+
+    def get_object(self, Bucket, Key, **kw):
+        err = Exception(f"An error occurred ({self.code}) when calling the GetObject operation")
+        err.response = {"Error": {"Code": self.code}}
+        raise err
+
+
+def test_an_unreadable_hold_is_logged_not_passed_off_as_none(monkeypatch):
+    # Live 2026-09-28: panelcast-holds/wk3.json existed (14,519 B, quality hold) and the sweep
+    # logged "no hold on the current week" — the role has PutObject there but no GetObject.
+    log = _LogRecorder()
+    monkeypatch.setattr(panel, "logger", log)
+    monkeypatch.setattr(panel, "s3", _DeniedS3("AccessDenied"))
+    assert panel._read_hold(3) == {}
+    assert any("hold read wk3 FAILED" in ln and "AccessDenied" in ln for ln in log.lines), log.lines
+    log.lines.clear()
+    monkeypatch.setattr(panel, "s3", _DeniedS3("NoSuchKey"))
+    assert panel._read_hold(3) == {}
+    assert log.lines == []  # a genuinely absent hold is quiet

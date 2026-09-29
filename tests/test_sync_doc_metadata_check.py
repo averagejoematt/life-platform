@@ -594,20 +594,18 @@ def test_endpoint_count_none_when_lambda_handler_missing(tmp_path, monkeypatch):
 
 
 def test_endpoint_count_docs_match_discovered_value():
-    """CLAUDE.md and docs/ONBOARDING.md must quote the SAME endpoint count the
-    AST discoverer finds — this is the literal that used to say a stale "60+"
-    against a real count over 100 (#1437). Mirrors the rule --check enforces,
-    but asserts it directly against repo HEAD so a future non-doc-sync edit to
-    either file can't quietly reintroduce a mismatched number."""
+    """docs/ONBOARDING.md must quote the SAME endpoint count the AST discoverer
+    finds — this is the literal that used to say a stale "60+" against a real
+    count over 100 (#1437). Mirrors the rule --check enforces, but asserts it
+    directly against repo HEAD. CLAUDE.md quoted it too until #4271, which made it
+    POINT at `ROUTES` instead — so CLAUDE.md must now carry no endpoint count at all."""
     import re as _re
 
     count = sync._auto_discover_endpoint_count()
     assert count is not None
 
     claude_md = (sync.ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    m = _re.search(r"with ~(\d+) endpoints including", claude_md)
-    assert m, "CLAUDE.md's Site API Lambda bullet no longer matches the expected 'with ~N endpoints including' shape"
-    assert int(m.group(1)) == count
+    assert not _re.search(r"~?\d+\+? endpoints including", claude_md), "CLAUDE.md quotes an endpoint count again — point at ROUTES (#4271)"
 
     onboarding_md = (sync.ROOT / "docs" / "ONBOARDING.md").read_text(encoding="utf-8")
     m2 = _re.search(r"site-api Lambda \(~(\d+) endpoints, primarily read-only — ADR-037\)", onboarding_md)

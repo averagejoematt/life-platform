@@ -224,6 +224,10 @@ class TestProjectionCarriesEveryEmittedField:
             "metric": "sleep_duration_hours",
             "eval_type": "threshold",
             "outcome_notes": "cleared Wednesday",
+            # #4220: the reason in reader words — a plain-text note is the grader's own
+            # sentence, served as-is — and whether a verdict came back from the data.
+            "reason": "cleared Wednesday",
+            "graded_on_data": True,
             "subdomain": "recovery",
             # #3480: the freeze instant rides the projection too — dropped from
             # _PREDICTION_PROJECTION_FIELDS it would silently serve None for every row.

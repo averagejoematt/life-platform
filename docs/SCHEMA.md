@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-09-27 (v8.6.0 — 86 MCP tools, 20 data sources, 106 Lambdas, 12 cached tools)
+**Last updated:** 2026-09-29 (v8.6.0 — 86 MCP tools, 20 data sources, 106 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -408,6 +408,8 @@ Note: `search_activities` searches both `name` and `enriched_name` — keyword s
 The per-type decision table is `lambdas/ingestion/strava_population.py`; its type set is checked against the machine-generated census `config/strava_activity_type_census.json` (regenerate with `python3 scripts/strava_type_census.py --write`). The raw `distance_meters` / `total_elevation_gain_meters` are always stored verbatim, so the derivation can be redone at any time — `scripts/reconcile_strava_measured_zero.py` does exactly that for historical rows.
 
 This population is the denominator of every all-time "top N%" distance/elevation claim (`enrichment_lambda.build_percentile_lookup`, `search_activities`). The day-level `total_*` sums are unaffected: an absent value and a measured `0` both contribute nothing.
+
+**Multi-device duplicates are STORED, and removed at the read seam (#4419).** When WHOOP and a Garmin (or Hevy's own push) both sent one session to Strava, the day row holds both copies and its stored `activity_count` / `total_*` sum them — 2024-09-04 → 2025-05-10 holds 394 walk records for ~211 walks. Readers never see that: every DynamoDB reader that can be handed this partition returns its rows through `common.strava_read_seam.strava_read_seam`, which drops the duplicate copies (`dedup_activities` — same sport and a start within 15 min, or different devices with ≥ 80% of the shorter one's interval inside the other), keeps the copy with the measured distance, takes its heart-rate family from the other copy when its own average is missing or < 70 bpm (the 2024 Garmin walk copies read 49–57), and recomputes the totals the writer carries with the writer's formula (`day_totals`, pinned to `strava_lambda.transform` by a parity test). Read-time only fields: `activities_deduped` (row), `duplicate_activity_count` (row, when something was dropped), `hr_from_strava_id` (activity, when its HR came from the dropped copy). `data_export_lambda` opts out by name and exports the partition verbatim. Garmin is paused (ADR-074), so live days are single-device and the seam is a no-op on them.
 
 ### todoist
 | Field | Type | Description |
@@ -1550,6 +1552,18 @@ Singleton computed source (ADR-089). Readers take the newest in-range record (th
 | `derived_at` | string | ISO timestamp of the compute |
 | `confidence` | string | `low` |
 | `n_episodes_with_covariates` | number | episodes contributing covariates |
+| `reference_schema` | number | `3` since #4427 (activities are distinct sessions); `2` = the twin-counted table, kept as history |
+| `proven_bands` | map | the `bands` computation restricted to days inside a detected loss episode (#3709) |
+| `cut_bands` / `cut_window` | map / string | the same computation restricted to the 2024–25 cut alone, `2024-09-04..2025-05-10` (#4427) |
+| `method` | map | the session rule the activities rest on (`training.blueprint_rederive.method()`: cluster rule, hours, miles, heart-rate plausibility band) |
+| `n` | map | per kind (`walk`, `run`) over the cut: raw device `records`, distinct `sessions`, hours both ways, rejected HR records |
+| `supersedes` | map | the newest earlier record (`sk`, `reference_schema`, `method`); `status: superseded` + `reason` when that record was built by another method |
+
+The strava read opts out of the #4419 seam (`keep_duplicates`) because the derivation
+clusters every device's record itself (overlap ≥ half the shorter or starts within 5 min;
+hours = the longest member's moving time; HR = the highest member average inside
+70–220 bpm, else absent). `episode-detect` with `{"dry_run": true}` derives and returns
+the table without writing anything.
 
 Access via `get_benchmark(view="pace"/"maintenance")`. PRIVATE.
 

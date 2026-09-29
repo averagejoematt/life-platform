@@ -44,6 +44,7 @@ from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchor
 from boto3.dynamodb.conditions import Key
 from common import media_tombstone  # #4365: a restart tombstone is not a published episode
 from common.numeric import decimals_to_float
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.er03_gate import BANNED_CAUSAL  # the platform's one banned-causal-connective list
 
 try:
@@ -103,7 +104,7 @@ def _latest_computed_date() -> str | None:
 def _fetch(source: str, date_str: str) -> dict:
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return decimals_to_float(r.get("Item") or {})
+        return strava_read_seam(source, decimals_to_float(r.get("Item") or {}))
     except Exception as e:
         logger.warning("[debrief] fetch %s %s failed — %s", source, date_str, e)
         return {}

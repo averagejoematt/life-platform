@@ -152,6 +152,7 @@ _PILLAR_WEIGHTS = {
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def fetch_profile():
@@ -185,7 +186,7 @@ def query_source(source, start_date, end_date, include_pilot=None):
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return sorted(items, key=lambda x: x.get("date", ""))
+    return strava_read_seam(source, sorted(items, key=lambda x: x.get("date", "")))
 
 
 def query_source_latest(source, include_pilot=None):
@@ -204,7 +205,7 @@ def query_source_latest(source, include_pilot=None):
         )
     )
     items = resp.get("Items", [])
-    return d2f(items[0]) if items else {}
+    return strava_read_seam(source, d2f(items[0]) if items else {})
 
 
 def load_project_pillar_map():

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_day_n
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import PT, USER_PREFIX, _decimal_to_float, _ok, logger
@@ -133,7 +134,7 @@ def fulfillment_index(*, _g) -> dict:
         }
         try:
             resp = table.query(**with_phase_filter(kwargs))  # ADR-058: current-cycle reads
-            return _decimal_to_float(resp.get("Items", []))
+            return strava_read_seam(source, _decimal_to_float(resp.get("Items", [])))
         except Exception as _e:
             logger.warning(f"[fulfillment_index] {source}: {_e}")
             return []
@@ -147,6 +148,7 @@ def fulfillment_index(*, _g) -> dict:
                 KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").begins_with("DATE#"),
                 ScanIndexForward=True,
                 Limit=1,
+                ProjectionExpression="sk",  # #4419: the key is the whole answer — a projected read never sees `activities`
             )
             items = resp.get("Items", [])
             if not items:

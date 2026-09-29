@@ -37,6 +37,7 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
     pacific_day_n,
     parse_iso_utc,
 )
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
 
 from web.bundle_counts import load_bundle_counts
@@ -704,7 +705,7 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
         kwargs["ExclusiveStartKey"] = last_key
     if derived:
         items = [i for i in items if not i.get("tombstone")]
-    return _decimal_to_float(items)
+    return strava_read_seam(source, _decimal_to_float(items))
 
 
 def _latest_item(source: str, include_pilot: bool | None = None, *, since: str | None = None) -> dict | None:
@@ -732,7 +733,7 @@ def _latest_item(source: str, include_pilot: bool | None = None, *, since: str |
         },
         include_pilot=include_pilot,
     )
-    return _newest_visible(kwargs, derived)
+    return strava_read_seam(source, _newest_visible(kwargs, derived))
 
 
 def _latest_item_asof(source: str, date: str, include_pilot: bool | None = None) -> dict | None:
@@ -751,7 +752,7 @@ def _latest_item_asof(source: str, date: str, include_pilot: bool | None = None)
         },
         include_pilot=include_pilot,
     )
-    return _newest_visible(kwargs, derived)
+    return strava_read_seam(source, _newest_visible(kwargs, derived))
 
 
 def nutrition_delivery_public() -> bool:

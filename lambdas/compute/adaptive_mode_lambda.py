@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -54,7 +55,7 @@ def fetch_record(source, date_str):
                 "sk": f"DATE#{date_str}",
             }
         )
-        return resp.get("Item", {})
+        return strava_read_seam(source, resp.get("Item", {}))
     except Exception as e:
         logger.warning(f"fetch_record({source}, {date_str}) failed: {e}")
         return {}

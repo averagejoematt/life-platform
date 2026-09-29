@@ -8,6 +8,8 @@ packet carried pain flags, novelty and the fatigue trigger, and nothing about we
 THE RULE (computed here, never by the model — the #4149 determinism ruling)
   trigger   weight-bearing hours (walks + treadmill) in the last 48 h >= 3.0, OR any walk in the
             last 48 h flagged `over_75_min` (`training.recent_aerobic`);
+            (#4412: the numbers also carry the last Hevy cardio block's own joined HR,
+            `last_cardio_block_avg_hr` — None/unknown when no wearable covered its minutes);
   AND       the draft is a LOWER session carrying a weight-bearing cardio block (treadmill/walk);
   THEN      `change`: that block becomes cycling (recumbent), the same duration, HR < 105 bpm.
   The 75-min and 105-bpm lines are OWNER-HISTORY (`owner_redlines.walking_floor_hr_wk`). The
@@ -49,9 +51,22 @@ def aerobic_flags(
     totals = (block or {}).get("totals") or {}
     numbers[METRIC] = totals.get("weight_bearing_hr_48h") if loaded is not None else None
     numbers["walks_over_75_min_48h"] = totals.get("walks_over_75_min_48h") if loaded is not None else None
+    # #4412: the last Hevy cardio block's OWN heart rate, joined from the wearable over its minutes
+    last = recent_aerobic.last_cardio_block_hr(block)
+    numbers["last_cardio_block_avg_hr"] = last["avg_hr"] if last else None
+    numbers["last_cardio_block_over_hr_ceiling"] = last["over_ceiling"] if last else None
+    if last is None and any(r.get("source") == "hevy" for r in (block or {}).get("rows") or []):
+        # a Hevy cardio block WAS logged, and no wearable covered its minutes: unread, not "no cardio"
+        unknown.extend(["last_cardio_block_avg_hr", "last_cardio_block_over_hr_ceiling"])
     if loaded is None:
         unknown.extend([METRIC, "walks_over_75_min_48h"])
         return
+    hr_note = (
+        f" His last Hevy {last['modality']} block ({last['date']}) ran at {last['avg_hr']:g} bpm avg — wearable HR joined over "
+        f"its inferred minutes, coverage {last['hr_coverage']} (#4412)."
+        if last
+        else ""
+    )
     lower = recent_aerobic.is_lower(draft.get("archetype"))
     for ex in draft.get("exercises") or []:
         if not (loaded and lower and _weight_bearing_cardio(ex)):
@@ -64,7 +79,7 @@ def aerobic_flags(
                 f"{ex['label']} {minutes} min on a lower session after {why} — swap to cycling (recumbent), same {minutes} min, "
                 f"HR < {recent_aerobic.HR_CEILING_BPM} bpm. The {recent_aerobic.WALK_MAX_MIN}-min / {recent_aerobic.HR_CEILING_BPM}-bpm "
                 f"walking lines are owner-history; the {recent_aerobic.WEIGHT_BEARING_48H_TRIGGER_HR} h / 48 h trigger is "
-                "POPULATION-DERIVED, not his variance (ADR-105, #4387)"
+                "POPULATION-DERIVED, not his variance (ADR-105, #4387)" + hr_note
             ),
             provenance="owner-history",
             field=f"exercises[{ex['idx']}].movement_key",

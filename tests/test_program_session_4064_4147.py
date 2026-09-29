@@ -525,3 +525,92 @@ def test_4409_the_generator_draft_keeps_the_db_row_and_press_with_a_current_load
     assert floors["db_shoulder_press"]["template_id"] == "878CD1D0" and floors["db_shoulder_press"]["fallback"] is None
     # the snapshot's catalog hash is the catalog's own — the wire id is an overlay, not an edit
     assert ideal.inputs_snapshot["catalog_hash"] == routine_generator._config_hash(CATALOG)
+
+
+# ── 6. #4431: generator, planner and chat gate resolve a slot's template through ONE resolver ──
+# Before #4431 the chat commit gate read the catalog hint only, so `db_shoulder_press` (title-only on
+# purpose, ADR-069) — which the generator floors from its in-block performed record since #4409 —
+# reached the gate as `no_template_id`: no floor, nothing refused, two numbers for one set.
+def _wire_history_4431():
+    import datetime
+
+    from training import exercise_history
+
+    class _Table:
+        def query(self, **_kw):
+            return {"Items": _wire_rows()}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        history, _cardio = exercise_history.load_history_indexes(lookback_days=30, today=datetime.date(2026, 9, 28))
+    return history, {"2026-09-23": 315.4, "2026-09-24": 313.7, "2026-09-25": 313.1, "2026-09-28": 313.7}
+
+
+def _three_resolutions_4431(day="2026-09-29"):
+    """{role: {movement_key: (generator, planner, gate)}} for every movement of every week-1 session
+    on the wire record — each path read exactly where it loads from."""
+    from training import in_block_variant
+
+    from mcp import hevy_prescription_gate as gate
+
+    movements = CATALOG["movements"]
+    perf = _performed(day)
+    with patch("mcp.plan_hevy_windows._block_workouts", return_value=_wire_rows()):
+        gate_perf, status = gate._in_block_performed(day, movements)
+    assert status["status"] == "read" and gate_perf == perf
+    out: dict[str, dict[str, tuple]] = {}
+    for role in program_structure.SESSION_SEQUENCE["session_roles"]:
+        rx = _rx(role, in_block=perf)
+        load_movements = in_block_variant.with_performed_template_ids(CATALOG, rx, perf)["movements"]  # the generator's floor pass
+        out[role] = {}
+        for e in rx["exposures"]:
+            key = e["movement_key"]
+            if not key:
+                continue
+            generator = (load_movements.get(key) or {}).get("hevy_template_id_hint")
+            planner = (movements.get(key) or {}).get("hevy_template_id_hint") or e.get("template_id")  # annotate_prescription's order
+            out[role][key] = (generator, planner, gate._template_id_for(key, movements, gate_perf)[0])
+    return out
+
+
+def test_4431_generator_planner_and_gate_resolve_every_week1_movement_identically():
+    res = _three_resolutions_4431()
+    disagree = {f"{role}/{k}": v for role, rows in res.items() for k, v in rows.items() if len(set(v)) != 1}
+    assert not disagree, f"the three paths disagree on a slot's template: {disagree}"
+    assert sum(len(r) for r in res.values()) >= 16  # the whole week, not a sample
+    assert res[UH]["db_shoulder_press"] == ("878CD1D0",) * 3
+
+
+def test_4431_db_shoulder_press_generator_floor_equals_gate_floor_and_the_mutation_reds():
+    """The chat gate derives the same floor the generator wrote for the in-block DB press — and the
+    pre-#4431 catalog-only resolver (the mutation) leaves the gate with `no_template_id`."""
+    import types
+
+    from mcp import hevy_prescription_gate as gate
+
+    history, weights = _wire_history_4431()
+    rows = _wire_rows()
+    with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
+        ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
+    gen = ideal.inputs_snapshot["load_floors"]["movements"]["db_shoulder_press"]
+    assert gen["floor_kg"] and gen["template_id"] == "878CD1D0"
+    custom = types.SimpleNamespace(
+        variant="ideal", target_date="2026-09-29", notes="", inputs_snapshot={"authored": "custom"}, exercises=ideal.exercises
+    )
+
+    def _gate_row():
+        with patch("mcp.plan_hevy_windows._block_workouts", return_value=rows):
+            g = gate.prescription_gate(custom, movements=CATALOG["movements"], history_index=history, weight_index=weights)
+        return g, g["load_floors"]["movements"]["db_shoulder_press"]
+
+    g, row = _gate_row()
+    assert g["verdict"] == "clean", g["audit"]
+    assert row["floor_kg"] == gen["floor_kg"] and row["template_id"] == gen["template_id"]
+    assert row["template_id_source"].startswith("in-block performed record 2026-09-25")
+    # mutation control: the gate's pre-#4431 resolver (catalog hint only) — no template id, no floor
+    catalog_only = lambda key, movements, performed=None: (  # noqa: E731
+        ((movements or {}).get(key) or {}).get("hevy_template_id_hint"),
+        "catalog_hint",
+    )
+    with patch.object(gate, "_template_id_for", side_effect=catalog_only):
+        _g, mutated = _gate_row()
+    assert mutated["status"] == "no_template_id" and not mutated["floor_kg"]

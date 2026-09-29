@@ -69,6 +69,7 @@ _s3 = boto3.client("s3", region_name=REGION)
 # re-typed (#2334; guard: tests/test_coach_roster_set_guard_2334.py) — this file
 # held THREE hand-typed copies, two of them in different orders.
 from coach.persona_registry import OPERATIONAL_COACH_IDS, OPERATIONAL_SHORT_IDS
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 COACH_IDS = list(OPERATIONAL_COACH_IDS)
 EXPERTS = list(OPERATIONAL_SHORT_IDS)
@@ -102,7 +103,7 @@ def _decimal(o):
 def _latest(source):
     resp = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source}"), ScanIndexForward=False, Limit=1)
     items = _decimal(resp.get("Items", []))
-    return items[0] if items else {}
+    return strava_read_seam(source, items[0] if items else {})
 
 
 def _get_json(path):

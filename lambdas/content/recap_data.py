@@ -59,6 +59,7 @@ from typing import Any
 
 from common.digest_utils import d2f
 from common.pacific_time import pacific_day_n
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ def _get_day(table, source: str, date: str) -> dict[str, Any] | None:
     except Exception:  # noqa: BLE001
         return None
     item = resp.get("Item")
-    return d2f(item) if item else None
+    return strava_read_seam(source, d2f(item) if item else None)
 
 
 def _query_prefix(table, source: str, sk_prefix: str) -> list[dict[str, Any]]:
@@ -88,7 +89,7 @@ def _query_prefix(table, source: str, sk_prefix: str) -> list[dict[str, Any]]:
         resp = table.query(**kwargs)
     except Exception:  # noqa: BLE001
         return []
-    return [d2f(i) for i in resp.get("Items", [])]
+    return strava_read_seam(source, [d2f(i) for i in resp.get("Items", [])])
 
 
 def _query_range(table, source: str, start: str, end: str) -> list[dict[str, Any]]:
@@ -101,7 +102,7 @@ def _query_range(table, source: str, start: str, end: str) -> list[dict[str, Any
         resp = table.query(**kwargs)
     except Exception:  # noqa: BLE001
         return []
-    return [d2f(i) for i in resp.get("Items", [])]
+    return strava_read_seam(source, [d2f(i) for i in resp.get("Items", [])])
 
 
 @dataclass

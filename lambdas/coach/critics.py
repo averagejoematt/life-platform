@@ -12,7 +12,7 @@ THE FOUR CRITICS AND WHAT EACH ONE HOLDS
 
   muscle_defense       anchor-lift strength trend + protein vs the floor
   joints_tendons       pain flags per movement, novelty (days since), the loaded-lifting streak
-                       beside the active-day streak (both context only since #4161), the fatigue trigger
+                       (context only since #4161; the active-day streak left the packet, #4411), the fatigue trigger
                        (performance or readiness, `critics_fatigue`) and the 48 h same-region guard
   rate_advocate        the owner's redlines + which tripwires are CLEAR — argues for MORE, adds no sets (#4161)
   blueprint_historian  the weight-band reference + the #3717 attestation, LABELLED
@@ -213,7 +213,6 @@ def build_joints_packet(
     *,
     pain_by_idx: dict[int, dict[str, Any]] | None,
     days_since_by_idx: dict[int, int | None] | None,
-    active_day_streak: int | None,
     loaded_lifting_streak: int | None,
     pain_layer_status: str | None,
     dismissals: list[dict[str, Any]] | None = None,
@@ -242,12 +241,13 @@ def build_joints_packet(
     critic must argue from what happened, not from a cleaned-up version of it. A note dated
     AFTER the dismissal re-arms the veto on its own (`training_context_registry`, one rule,
     shared with `plan_engine`)."""
-    # #4067: TWO streaks, both named (#4161: both context now). The rest-day ask keyed on the LOADED one — the old
-    # single `consecutive_training_days` counted Engine (cardio-only) and walk days, read 16
-    # against a loaded streak of 4 and asked for rest. The active streak is context, carried in
-    # `numbers` and deliberately never flagged: a flag is the model's escalation handle.
+    # #4067 → #4411: the LOADED-lifting streak is the only streak the critic holds. The old single
+    # `consecutive_training_days` counted Engine (cardio-only) and walk days, read 16 against a
+    # loaded streak of 4 and asked for rest; #4067 kept the active-day count beside it as unflagged
+    # context, and the model still read "day 18 of a streak" as fatigue in its sentence. An
+    # active-day count is not a fatigue signal for a man active on 97 % of his days
+    # (TRAINING_CALIBRATION), so it is no longer an input here at all.
     numbers: dict[str, Any] = {
-        "active_day_streak": active_day_streak,
         "loaded_lifting_streak": loaded_lifting_streak,
         "pain_layer_status": pain_layer_status,
     }
@@ -255,8 +255,6 @@ def build_joints_packet(
     violations: list[dict[str, Any]] = []
     unknown: list[str] = []
     layer_ok = pain_layer_status not in (None, "dark", "unknown")
-    if active_day_streak is None:
-        unknown.append("active_day_streak")
     if loaded_lifting_streak is None:
         unknown.append("loaded_lifting_streak")
     # #4161: the loaded streak is CONTEXT now (numbers only, never a flag) — a day count is not a

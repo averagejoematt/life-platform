@@ -48,6 +48,7 @@ from decimal import Decimal
 from typing import Optional
 
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 from coach import coach_team_texture
 
@@ -76,7 +77,7 @@ def _query_source(table, source: str, start: str, end: str) -> list:
             ":hi": f"DATE#{end}~",
         },
     )
-    return resp.get("Items") or []
+    return strava_read_seam(source, resp.get("Items") or [])
 
 
 def _latest(items: list) -> dict:

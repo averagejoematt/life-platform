@@ -332,3 +332,12 @@ class TestTheEngine:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, tp, "plan_next_session")

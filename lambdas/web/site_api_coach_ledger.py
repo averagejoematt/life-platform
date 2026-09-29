@@ -32,6 +32,7 @@ from coach import (
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
+from web import prediction_reason  # #4220: a graded call's reason in reader words
 from web.site_api_common import (
     PT,
     USER_PREFIX,
@@ -940,6 +941,7 @@ def handle_predictions(event, *, _g):
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
+                    _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
                     all_predictions.append(
                         {
                             "coach_id": cid,
@@ -965,7 +967,11 @@ def handle_predictions(event, *, _g):
                             "gradeable": not ungradeable,
                             "metric": ev.get("metric"),
                             "eval_type": ev.get("type"),
-                            "outcome_notes": rec.get("outcome_notes") or "",
+                            "outcome_notes": rec.get("outcome_notes") or "",  # kept for compatibility — the grader's raw blob
+                            # #4220: the reason in reader words (None when the grader wrote none)
+                            # and whether a verdict came back from the data at all.
+                            "reason": _reason,
+                            "graded_on_data": _graded_on_data,
                             "subdomain": rec.get("subdomain", ""),
                         }
                     )
@@ -1056,6 +1062,8 @@ def handle_predictions(event, *, _g):
                     },
                 },
                 "by_coach": by_coach,
+                # #4220: below this many decided calls a rendered record prints counts, not a %.
+                "percent_floor": coach_record.PERCENT_FLOOR,
                 "predictions": all_predictions,
                 # #3553: the follow-through half of the same record. Fail-soft — the
                 # prediction scorecard must not go dark because the commitment read did.

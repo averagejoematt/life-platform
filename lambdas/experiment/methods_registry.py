@@ -644,7 +644,11 @@ REGISTRY = {
         # Re-recorded again 2026-09-23: NO source change. The fingerprint now hashes a
         # module-level runtime object (`table`) by type, not by its env-bearing repr, so
         # this entry no longer depends on TABLE_NAME or test order (see `_value_repr`).
-        "fe4ebc90e3fc",
+        # Re-recorded 2026-09-28 (#4419). METHOD unchanged, prose re-read: same EWMA, same
+        # ±2% band, same 9-observation floor. What moved is `_fetch_range`'s return: it goes
+        # through `strava_read_seam`, a no-op for every source but strava, where it drops
+        # multi-device duplicate activities and recomputes the day totals.
+        "f5c734515863",
         min_n=9,
         used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
     ),

@@ -107,7 +107,7 @@ DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_
 # ==============================================================================
 
 
-from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float, strava_read_seam  # shared bundled helpers (#970); #4419 the strava read seam
 
 
 def _are_consecutive_days(date_strs):
@@ -131,7 +131,7 @@ def _t0_rate(rec):
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception as e:
         logger.warning(f"fetch_date({source}, {date_str}): {e}")
         return None
@@ -167,7 +167,7 @@ def fetch_range(source, start, end):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning(f"fetch_range({source}): {e}")
         return []

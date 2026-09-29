@@ -386,7 +386,6 @@ def _joints(draft: dict, block: dict | None, days_since: dict | None = None) -> 
         draft,
         pain_by_idx={},
         days_since_by_idx=days_since or {e["idx"]: 3 for e in draft["exercises"]},
-        active_day_streak=3,
         loaded_lifting_streak=2,
         pain_layer_status="ok",
         recent_aerobic=block,
@@ -515,3 +514,238 @@ def test_draft_custom_names_a_copied_treadmill_the_pick_would_not_draft():
     with patch.object(shared_quantities, "recent_aerobic_layer", side_effect=RuntimeError("boom")):
         (w,) = plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET)
     assert "could not be computed (RuntimeError)" in w
+
+
+# ── #4410: every draft path reads the aerobic minutes; an unread week is unknown, never 0 ────
+# The cron passed `z2_minutes_7d=0.0` and the chat / nightly pre-draft path passed the caller's
+# value or 0, so `full_body_session` wrote "z2 7d=0 < floor 90 … walk more" into the note of a
+# week the recent-aerobic block read at 9+ h. The fixture week (09-21..09-27, the wire above)
+# reads 10.19 h of walking + cycling.
+RA_MINUTES = 611.4  # 10.19 h × 60 — the trailing 7 days through target − 1 of the fixture block
+
+
+def _fixture_read(source: str, start: str, end: str) -> list[dict]:
+    data = {"strava": _ra_rows("strava"), "hevy": _ra_rows("hevy")}
+    return [r for r in data[source] if start <= r["date"] <= end]
+
+
+def _full_body_rationale(monkeypatch, z2: float | None) -> list[str]:
+    """The ideal §3 session for 09-28 (two lifts done → week 1's lower-volume), as the generator
+    builds it — the same stubs as `test_a_full_body_week_generates_through_the_module_grid`."""
+    from training import exercise_history, routine_generator as rg
+
+    monkeypatch.setattr(rg, "CONFIG_DIR", str(Path(__file__).resolve().parents[1] / "config"))
+    monkeypatch.setattr(exercise_history, "load_history_indexes", lambda **kw: ({}, {}))
+    monkeypatch.setattr(exercise_history, "load_bodyweight_index", lambda **kw: {})
+    monkeypatch.setattr(exercise_history, "load_whoop_workout_index", lambda **kw: {})
+    lift = [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}, {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]}]
+    done = [{"date": d, "exercises": lift} for d in ("2026-09-24", "2026-09-26")]
+    inputs = rg.GeneratorInputs(
+        target_date=RA_TARGET, volume_7d={}, recovery_tier="green", acwr_flag="safe", z2_minutes_7d=z2, block_workouts=done
+    )
+    ideal = next(r for r in rg.generate_routines(inputs) if r.variant == "ideal")
+    assert ideal.inputs_snapshot["z2_minutes_7d"] == z2  # the record the live proof reads
+    return ideal.rationale
+
+
+def test_the_draft_path_reads_the_real_aerobic_minutes_and_writes_no_walk_more_note(monkeypatch):
+    """The nightly pre-draft's path (`_action_draft` → `_generator_inputs`) over the fixture partitions.
+    Mutation control: restore `z2_minutes_7d=float(args.get("z2_minutes_7d") or 0)` in
+    `tools_hevy_routine._generator_inputs` — the inputs read 0 and the note says walk more."""
+    from mcp import shared_quantities, tools_hevy_routine as thr
+
+    with patch.object(shared_quantities._core, "query_source_range", side_effect=_fixture_read):
+        inputs = thr._generator_inputs({"target_date": RA_TARGET})
+    assert inputs.z2_minutes_7d == RA_MINUTES
+    assert not any("walk more" in r for r in _full_body_rationale(monkeypatch, inputs.z2_minutes_7d))
+    # the in-test control: the old literal 0 is exactly what wrote the note
+    assert any("walk more" in r for r in _full_body_rationale(monkeypatch, 0.0))
+
+
+def test_the_cron_reads_the_same_quantity_as_the_mcp_path():
+    """Two draft paths, one number. Mutation control: put `z2_minutes_7d=0.0` back in the cron's
+    `_gather_inputs` — this reds."""
+    import importlib
+
+    cron = importlib.import_module("operational.hevy_routine_cron_lambda")
+    assert cron._z2_minutes_7d(RA_TARGET, read=_fixture_read) == RA_MINUTES
+    with patch.object(cron, "_read_partition", side_effect=_fixture_read):
+        assert cron._gather_inputs(RA_TARGET, False).z2_minutes_7d == RA_MINUTES
+
+
+def test_an_unreadable_aerobic_read_is_unknown_and_writes_no_walk_more_note(monkeypatch):
+    """ADR-104: both sources raising → None, and a floor (one source unreadable) → None too — a floor
+    below 90 min cannot say he is below it. None writes the unknown line, never the walk-more note.
+    Mutation control: make `_portfolio_guard` return `(z2_minutes_7d or 0) >= z2_floor` — this reds."""
+    import importlib
+
+    from training import recent_aerobic, routine_generator as rg
+
+    from mcp import shared_quantities, tools_hevy_routine as thr
+
+    with patch.object(shared_quantities._core, "query_source_range", side_effect=RuntimeError("ddb down")):
+        assert thr._generator_inputs({"target_date": RA_TARGET}).z2_minutes_7d is None
+    cron = importlib.import_module("operational.hevy_routine_cron_lambda")
+
+    def strava_down(source: str, start: str, end: str) -> list[dict]:
+        if source == "strava":
+            raise RuntimeError("strava down")
+        return _fixture_read(source, start, end)
+
+    assert cron._z2_minutes_7d(RA_TARGET, read=strava_down) is None
+    assert recent_aerobic.aerobic_minutes_7d(None) is None
+    rationale = _full_body_rationale(monkeypatch, None)
+    assert rg.Z2_UNKNOWN_NOTE in rationale and not any("walk more" in r for r in rationale)
+
+
+# ── #4412: a Hevy cardio block joined to the wearable HR over its OWN minutes ─────────────
+# Wire SHAPES of the live rows (the driver's 2026-09-29 read of the 09-28 session): a lower session
+# whose tail is Cycling (the recumbent — Hevy's template is named "Cycling") then Stretching, and the
+# WHOOP activity as it reaches the platform, a Strava row with `device_name: WHOOP`. Values are
+# PERTURBED and rounded (public repo). Hevy sets carry no timestamps: the block's minutes are the
+# session end minus the Stretching after it.
+def _j_session(tail_first: str = "Cycling") -> dict:
+    return {
+        "pk": "USER#matthew#SOURCE#hevy",
+        "sk": "DATE#2026-09-28#WORKOUT#w4412",
+        "date": "2026-09-28",
+        "start_time": "2026-09-28T23:00:00+00:00",
+        "end_time": "2026-09-29T00:50:00+00:00",
+        "exercises": [
+            {"name": "Squat (Barbell)", "template_id": "T-SQ", "sets": [{"reps": 8, "weight_kg": 60.0}, {"reps": 8, "weight_kg": 60.0}]},
+            {"name": tail_first, "template_id": "T-CY", "sets": [{"duration_sec": 2400, "distance_m": 15000}]},
+            {"name": "Stretching", "template_id": "T-ST", "sets": [{"duration_sec": 900, "distance_m": None}]},
+        ],
+    }
+
+
+def _whoop(start: str, secs: int, avg: float = 101.0, sport: str = "Ride", device: str = "WHOOP") -> dict:
+    return {
+        "type": sport,
+        "sport_type": sport,
+        "device_name": device,
+        "start_date": start,
+        "elapsed_time_seconds": secs,
+        "moving_time_seconds": secs,
+        "has_heartrate": True,
+        "average_heartrate": avg,
+        "max_heartrate": avg + 20,
+        "zone1_seconds": secs // 2,
+        "zone2_seconds": secs - secs // 2,
+    }
+
+
+# block = 23:55:00 → 00:35:00 (session end 00:50 − 15 min stretching − 40 min cycling)
+_HEVY_ECHO = {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-28T23:00:00Z",
+    "elapsed_time_seconds": 6600,
+    "average_heartrate": True,
+}  # a flattened DDB NULL — absent, never 1 bpm
+_LIFT_WHOOP = _whoop("2026-09-28T23:02:00Z", 2100, avg=126.0, sport="WeightTraining")
+
+
+def test_a_recumbent_block_joins_the_whoop_hr_over_its_inferred_minutes():
+    """Joined: WHOOP covered 36 of the block's 40 min → coverage 0.9, the block's avg/max from that
+    activity, zone seconds prorated by overlap. The lift-labelled WHOOP row and the Hevy echo never
+    lend their HR (the de-dup's own `hr_intervals` filter). Mutation control: make `join_workout` join
+    the SESSION's minutes instead of `block_windows`'s — coverage of the 110-min session drops under
+    HR_COVERAGE_MIN and the block reads unknown (run: red)."""
+    from training import cardio_hr
+
+    acts = [_HEVY_ECHO, _LIFT_WHOOP, _whoop("2026-09-28T23:59:00Z", 2400)]
+    (b,) = cardio_hr.join_workout(_j_session(), acts)["blocks"]
+    assert b["window"] == {"start_utc": "2026-09-28T23:55:00+00:00", "end_utc": "2026-09-29T00:35:00+00:00", "timing": "inferred_tail"}
+    assert b["state"] == "joined" and b["hr_source"] == "WHOOP" and b["hr_coverage"] == 0.9
+    assert (b["avg_hr"], b["max_hr"]) == (101.0, 121.0)
+    assert b["zone_seconds"]["zone1_seconds"] == 1080 and b["zone_basis"] == "prorated_by_overlap"
+    assert b["hr_drift"] is None and b["hr_recovery_60s"] is None  # no per-second series on the wire — said, not faked
+
+
+def test_no_overlap_or_thin_coverage_is_unknown_never_zero():
+    """The live 09-28 shape: the only WHOOP row is the lift, which ended before the bike began →
+    unknown, coverage 0.0, every HR field None. And a WHOOP row covering 19 of 40 min (0.475) sits
+    under HR_COVERAGE_MIN → unknown too. Mutation control: set HR_COVERAGE_MIN = 0 — the thin case
+    joins at 0.475 and this reds; drop the `not used` guard — the avg divides by zero."""
+    from training import cardio_hr
+
+    (b,) = cardio_hr.join_workout(_j_session(), [_HEVY_ECHO, _LIFT_WHOOP])["blocks"]
+    assert (b["state"], b["hr_coverage"], b["avg_hr"], b["max_hr"], b["zone_seconds"]) == ("unknown", 0.0, None, None, None)
+    (thin,) = cardio_hr.join_workout(_j_session(), [_whoop("2026-09-29T00:16:00Z", 1800)])["blocks"]
+    assert thin["hr_coverage"] == 0.475 and thin["state"] == "unknown" and thin["avg_hr"] is None
+    assert cardio_hr.COVERAGE_PROVENANCE["provenance"] == "convention"  # ADR-105: the threshold says what it is
+    (unread,) = cardio_hr.join_workout(_j_session(), None)["blocks"]
+    assert unread["state"] == "unknown" and unread["hr_coverage"] is None and "could not be read" in unread["reason"]
+    # a cardio block with a lift on BOTH sides cannot be placed — unknown, never a guessed window
+    s = _j_session()
+    s["exercises"].append({"name": "Leg Curl", "sets": [{"reps": 10, "weight_kg": 30.0}]})
+    (mid,) = cardio_hr.join_workout(s, [_whoop("2026-09-28T23:59:00Z", 2400)])["blocks"]
+    assert mid["window"] is None and mid["state"] == "unknown" and mid["avg_hr"] is None
+
+
+def test_the_0925_treadmill_replays_joined_on_the_live_fixture():
+    """The 09-25 treadmill (RA_FIX, the live rows): its inferred minutes 23:40:31 → 00:40:31 sit 3088 s
+    inside the WHOOP walk → coverage 0.858, 116.9 bpm — and recent_aerobic's row carries the block's
+    own verdict, which the joints critic reads as `last_cardio_block_avg_hr`."""
+    from training import cardio_hr, recent_aerobic
+
+    (w,) = [r for r in _ra_rows("hevy") if r["date"] == "2026-09-25"]
+    acts = [a for r in _ra_rows("strava") if r["date"] in ("2026-09-25", "2026-09-26") for a in r.get("activities") or []]
+    (b,) = cardio_hr.join_workout(w, acts)["blocks"]
+    assert (b["state"], b["hr_coverage"], b["avg_hr"], b["hr_source"]) == ("joined", 0.858, 116.9, "WHOOP")
+    block = _ra_block()
+    (tread,) = [r for r in block["rows"] if r["modality"] == "treadmill"]
+    assert (tread["hr_state"], tread["hr_coverage"], tread["avg_hr"]) == ("joined", 0.858, 116.9) and "#4412" in tread["hr_source"]
+    last = recent_aerobic.last_cardio_block_hr(block)
+    assert last == {
+        "date": "2026-09-25",
+        "modality": "treadmill",
+        "avg_hr": 116.9,
+        "max_hr": 150.0,
+        "hr_coverage": 0.858,
+        "over_ceiling": True,
+    }
+    packet = _joints(critics.draft_summary(_lower_volume_draft()), block)
+    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and packet["numbers"]["last_cardio_block_over_hr_ceiling"] is True
+    verdict = critics.deterministic_verdict(packet)
+    assert "116.9 bpm avg" in verdict["reason"] and "coverage 0.858" in verdict["reason"]
+
+
+class _FakeTable:
+    """The two DDB calls the store makes, over dicts — the wire shapes, no boto3."""
+
+    def __init__(self, workouts: list[dict], strava: dict[str, dict]):
+        self.workouts, self.strava, self.updates = workouts, strava, []
+
+    def get_item(self, Key):
+        return {"Item": self.strava[Key["sk"]]} if Key["sk"] in self.strava else {}
+
+    def query(self, **_kw):
+        return {"Items": self.workouts}
+
+    def update_item(self, Key, UpdateExpression, ConditionExpression, ExpressionAttributeValues):
+        self.updates.append((Key["sk"], ExpressionAttributeValues[":c"]))
+        for w in self.workouts:
+            if w["sk"] == Key["sk"]:
+                w["cardio_hr"] = ExpressionAttributeValues[":c"]
+
+
+def test_the_hourly_rejoin_heals_an_unknown_block_once_the_wearable_lands_and_then_writes_nothing():
+    """At ingest the WHOOP ride has not reached Strava: the record is stored `unknown`. The next poll
+    finds it and UpdateItems once; the poll after writes NOTHING (a Decimal-stored record compares
+    equal to its re-derivation). Mutation control: drop the `_same` short-circuit — the third run
+    writes again and `len(updates) == 1` reds."""
+    from training import cardio_hr_store as store
+
+    rec = _j_session()
+    t = _FakeTable([rec], {"DATE#2026-09-28": {"activities": [_HEVY_ECHO, _LIFT_WHOOP]}})
+    store.attach(t, "matthew", rec)
+    assert rec["cardio_hr"]["blocks"][0]["state"] == "unknown"
+    t.strava["DATE#2026-09-28"]["activities"].append(_whoop("2026-09-28T23:59:00Z", 2400))
+    first = store.rejoin_recent(t, "matthew", "2026-09-29")
+    assert first == {"considered": 1, "updated": 1, "joined": 1, "errors": 0}
+    assert rec["cardio_hr"]["blocks"][0]["state"] == "joined"
+    second = store.rejoin_recent(t, "matthew", "2026-09-29")
+    assert second["updated"] == 0 and len(t.updates) == 1
