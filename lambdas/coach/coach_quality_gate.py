@@ -85,6 +85,7 @@ import boto3
 from ai.quality_gate_contract import AUTHORITATIVE_FACTS_KEY, EMIT_VERDICT_KEY, GROUNDING_ALLOWLIST_KEY, report_findings
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
+from coach import rubric_scope  # #4343: which judge arms apply to which surface
 from coach.judge_hit_filter import drop_unfounded_hits  # #4343
 
 # Structured logger
@@ -938,6 +939,8 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
         if result.get("voice_distinctiveness_score", 100) < VOICE_DISTINCTIVENESS_MINIMUM:
             if "Voice distinctiveness below minimum threshold" not in result.get("suggestions", []):
                 result["suggestions"].append("Voice distinctiveness below minimum threshold")
+        # #4343: the lead read's rubric has no persona arms (coach/rubric_scope.py) — a scoping, not a threshold drop.
+        rubric_scope.apply(result, generation_brief, pass_threshold=PASS_SCORE_THRESHOLD, coach_id=coach_id, logger=logger)
 
         logger.info(
             "Quality gate for %s: passed=%s, score=%s, violations=%d, " "voice_score=%s, similarity_flags=%d",
@@ -945,7 +948,7 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
             result["passed"],
             result["score"],
             len(result.get("anti_pattern_violations", [])) + len(result.get("decision_class_violations", [])),
-            result["voice_distinctiveness_score"],
+            result.get("voice_distinctiveness_score"),
             len(result.get("cross_coach_similarity_flags", [])),
         )
 
@@ -1018,7 +1021,7 @@ def lambda_handler(event, context):
         generation_brief = event.get("generation_brief")
 
         # Cross-coach comparison outputs
-        skip_cross_coach = event.get("skip_cross_coach", False)
+        skip_cross_coach = event.get("skip_cross_coach", False) or rubric_scope.skips_cross_coach(generation_brief)
         other_outputs = None
 
         if not skip_cross_coach:

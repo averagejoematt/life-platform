@@ -719,3 +719,83 @@ class TestPhantomJudgeHits4343:
             {"coach_id": "explorer_coach", "event": "judge_hit_dropped", "phrase": "mechanistically", "reason": "not_in_text"},
             {"coach_id": "explorer_coach", "event": "judge_hit_dropped", "phrase": "autocorrelation", "reason": "not_in_text"},
         ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4343: the lead read's rubric (coach/rubric_scope.py) — a scoping, not a threshold drop
+# ──────────────────────────────────────────────────────────────────────────────
+
+# The 2026-09-28 17:00Z brief's lead read (EVALRET#coach_brief, eli_marsh, score 18), verbatim:
+# every figure cited, no reader or served-fact finding — held on persona arms only.
+LEAD_0928 = (
+    "Matthew has lost 12.8 pounds since Sunday, September 6, settling into a weekly loss rate of 3.9 pounds per week, "
+    "likely between 2.2 and 4.4. His most recent weigh-in on Sunday, September 27 brought him to 314.5 pounds. This "
+    "morning he slept 7.8 hours, logged a recovery score of 64, heart-rate variability of 43 milliseconds, and a "
+    "resting heart rate of 57 beats per minute."
+)
+# The 2026-09-29 read (score 15).
+LEAD_0929 = (
+    "Matthew has lost 14.2 pounds since Sunday, September 6, bringing his weight to 313.2 pounds as of Monday, "
+    "September 28, with a settled weekly loss rate of 3.8 pounds per week, likely between 2.1 and 4.3. His recovery "
+    "score this morning is 54, his heart-rate variability is 40 milliseconds, his resting heart rate is 58 beats per "
+    "minute, and he slept 8.7 hours last night."
+)
+_NARRATING = "Narrating the dashboard (listing metrics without interpreting them)"
+
+
+def _judge_0928():
+    return {
+        "passed": False,
+        "score": 18,
+        "anti_pattern_violations": [{"phrase": _NARRATING, "context": "whole output"}],
+        "decision_class_violations": [],
+        "voice_distinctiveness_score": 5,
+        "cross_coach_similarity_flags": [
+            {"similar_to": "physical_coach", "reason": "Both outputs open with metric recitation."},
+            {"similar_to": "glucose_coach", "reason": "Both adopt a data-listing structure without coaching substance."},
+        ],
+        "suggestions": ["Interpret the metrics instead of listing them."],
+    }
+
+
+_LEAD_BRIEF = {"surface": "lead_daily", "cited": []}
+
+
+class TestLeadReadRubricScope:
+    @pytest.mark.parametrize("text", [LEAD_0928, LEAD_0929])
+    def test_the_held_lead_reads_pass_on_their_own_rubric(self, wired, haiku, text):
+        haiku.result = _judge_0928()
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": text, "generation_brief": _LEAD_BRIEF}, None)
+        assert r["passed"] is True
+        assert r["score"] == gate.PASS_SCORE_THRESHOLD  # the threshold itself is unchanged
+        assert r["rubric_scope"]["prior_score"] == 18 and r["rubric_scope"]["verdict"] == "restored"
+        aside = r["out_of_rubric"]
+        assert set(aside) == {"anti_pattern_violations", "cross_coach_similarity_flags", "voice_distinctiveness_score"}
+        assert "anti_pattern_violations" not in r and "cross_coach_similarity_flags" not in r
+
+    def test_a_domain_coach_is_still_held_on_the_same_judge_report(self, wired, haiku):
+        haiku.result = _judge_0928()
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "skip_cross_coach": True}, None)
+        assert r["passed"] is False and r["score"] == 18 and "rubric_scope" not in r
+
+    def test_an_honesty_finding_still_holds_the_lead_read(self, wired, haiku):
+        rep = _judge_0928()
+        rep["decision_class_violations"] = [{"expected_max": "observational", "found": "causal", "excerpt": "because"}]
+        haiku.result = rep
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF}, None)
+        assert r["passed"] is False and r["rubric_scope"]["verdict"] == "unchanged"
+
+    def test_the_lead_read_fetches_no_peer_outputs(self, wired, haiku, monkeypatch):
+        monkeypatch.setattr(gate, "_fetch_other_coaches_recent_outputs", lambda *a, **k: pytest.fail("peers fetched"))
+        haiku.result = {"passed": True, "score": 90}
+        gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF}, None)
+
+    def test_mutation_control_without_the_scope_the_lead_read_is_held(self, wired, haiku, monkeypatch):
+        from coach import rubric_scope
+
+        monkeypatch.setattr(rubric_scope, "OUT_OF_RUBRIC", {})
+        haiku.result = _judge_0928()
+        r = gate.lambda_handler(
+            {"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF, "skip_cross_coach": True}, None
+        )
+        assert r["passed"] is False and r["score"] == 18
