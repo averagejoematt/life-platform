@@ -12,7 +12,7 @@ comma-joined string constants, the env-default idiom) whose members are drawn
 from a registry vocabulary. A literal enumeration of registry vocabulary is
 hand-typed by construction — a derived enumeration is a call, not a literal.
 Each hit must appear in the dated, shrink-only ledger
-(``tests/conformance_residue.py``); the guard test asserts both directions.
+(``ledgers/conformance_residue.py``); the guard test asserts both directions.
 
 Vocabularies (v1 — the ones with executable registries today):
   sources   — ``ingestion.source_registry.SOURCE_REGISTRY`` keys

@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 import boto3
 from ai.grounded_generation import allowed_dates, allowed_numbers, correction_prompt, grounding_findings  # ADR-104 gate (#2423)
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
+from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
 from common import (
     digest_utils,  # shared query_range implementations (#970)
     send_ledger,  # #3113 / DIL-025: the durable replay guard
@@ -506,7 +507,7 @@ def _call_model(prompt):
     """One call through the shared retry seam (V2 P1.4 + P2.8: 4-attempt backoff +
     token telemetry + env-overridable model). Deliberately the module's ONLY model
     seam — the #2390 census asserts it stays that way."""
-    model = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
+    model = os.environ.get("AI_MODEL", NARRATIVE_MODEL)
     payload = json.dumps(
         {
             "model": model,

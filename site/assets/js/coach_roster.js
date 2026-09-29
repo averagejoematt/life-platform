@@ -99,3 +99,22 @@ export function retiredSeatNote(cid, data) {
   }
   return "retired seat · career record kept on file";
 }
+
+/** #4220 box 3: a coach's rate as a reader sees it. Below the record producer's floor
+ *  (coach.coach_record.PERCENT_FLOOR, served as /api/predictions `percent_floor`) it is
+ *  counts — "0 of 9" — never a percentage: "0%" on nine calls reads as a verdict the
+ *  sample cannot carry. At or above the floor it is the served percentage. No decided
+ *  call → "—" (nothing to rate, never a zero). The fallback floor is used only when the
+ *  response predates the served field. */
+export const RATE_FLOOR_FALLBACK = 10;
+export function rateText(confirmed, decided, pct, floor) {
+  const n = Number(decided) || 0;
+  if (!n) return "—";
+  const f = Number(floor) || RATE_FLOOR_FALLBACK;
+  if (n < f || pct == null) return `${Number(confirmed) || 0} of ${n}`;
+  return `${pct}%`;
+}
+/** The word under a `rateText` figure: "came true" beside counts, "hit rate" beside a %. */
+export function rateWord(decided, floor) {
+  return (Number(decided) || 0) < (Number(floor) || RATE_FLOOR_FALLBACK) ? "came true" : "hit rate";
+}

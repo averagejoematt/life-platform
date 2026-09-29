@@ -75,7 +75,7 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
    derivation-guard primitive: an AST sweep of `lambdas/ mcp/ cdk/` keyed on the
    live registry vocabularies (sources, personas, lambda names, alarm names),
    with every pre-existing site carried as a dated exemption in the shrink-only
-   ledger `tests/conformance_residue.py`. Editing an exempted hand-list re-reds
+   ledger `ledgers/conformance_residue.py`. Editing an exempted hand-list re-reds
    it by construction; the only green path is deriving from the registry.
 2. **Debt counts only ratchet down.**
 3. **Every new "must agree" pair gets a contract test at birth**, on the real wire

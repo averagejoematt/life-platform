@@ -387,6 +387,34 @@ def test_mutation_control_without_the_intake_frame_the_servings_are_held(monkeyp
         assert [f["metric"] for f in ci.served_fact_findings(text, facts, today="2026-09-26")], text
 
 
+# #4343 (09-28 brief, request 15d734b8): the labs coach was held on 190 g — a TARGET and the
+# level an escalation moves to, both "per day"-framed, so #4344's intake frame let them through.
+LABS_0928_TARGET = (
+    "Now, on protein: your intake is averaging 153.5 grams a day over the last 21 logged days, "
+    "against a target of 190 grams and a floor of 170 grams."
+)
+LABS_0928_ESCALATION = "The reset is: kidney function clears on the next panel, then protein escalation to 190 grams per day is authorized."
+MIND_0928_TARGET = (
+    "Your protein average over the last 21 logged days is 153.5 grams — still well short of the 190-gram target, but genuinely rising."
+)
+
+
+def test_a_target_floor_or_escalation_level_is_not_an_intake_claim():
+    facts = _facts("2026-09-25", "2026-09-26")
+    for text in (LABS_0928_TARGET, LABS_0928_ESCALATION, MIND_0928_TARGET):
+        assert [f["cited"] for f in ci.served_fact_findings(text, facts, today="2026-09-26") if f["metric"] == "protein_g"] == [], text
+    # the same figure stated as what he ATE is still judged
+    ate = "You averaged 190 g of protein a day, above the 170 g floor."
+    assert [f["cited"] for f in ci.served_fact_findings(ate, facts, today="2026-09-26")] == [190.0]
+
+
+def test_mutation_control_without_the_target_frame_the_labs_coach_is_held(monkeypatch):
+    monkeypatch.setattr(ci, "_target_framed", lambda _s, _v: False)
+    facts = _facts("2026-09-25", "2026-09-26")
+    for text in (LABS_0928_ESCALATION,):
+        assert 190.0 in [f["cited"] for f in ci.served_fact_findings(text, facts, today="2026-09-26")], text
+
+
 def test_more_logged_days_than_the_record_holds_fails():
     facts = _facts(BRIEF_DATA_DAY, BRIEF_TODAY)
     found = ci.served_fact_findings("That is 24 logged days of protein data.", facts, today=BRIEF_TODAY)

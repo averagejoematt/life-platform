@@ -984,7 +984,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # this lane -> 776 {proven 225, unproven 540, not-applicable 6, attempted-unproven 5}; a `git archive
         # origin/main` export at 3c43af4ce -> 775 {224, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven
         # does NOT move.
-        # Upper bound 229 -> 230 (2026-09-29, #4419 the strava read seam, merged on top of #4418's 229): ONE entrant,
+        # Upper bound 230 -> 231 (2026-09-29, #4270 slice 1 re-merged onto #4419's 230): ONE entrant,
+        # `registry::tests/test_root_clutter_guard.py::ALLOWLIST::ledgers` (the new `ledgers/` top-level dir, the first
+        # residue ledger moved out of tests/), arriving PROVEN via a REGISTRY_PROOFS record in scripts/gate_census_proofs.py
+        # (the entry's own line deleted from the REAL tracked tests/test_root_clutter_guard.py: ARMED 1 failed / 3 passed
+        # naming `['ledgers']`; REVERTED 4 passed). Id-set diff vs a `git archive origin/main` export at 481019497: main 781
+        # {230, 539, 7, 5} -> this lane 782 {231, 539, 7, 5}; enters exactly that id, leaves {}, no verdict changes.
+        # PRIOR: Upper bound 229 -> 230 (2026-09-29, #4419 the strava read seam, merged on top of #4418's 229): ONE entrant,
         # `structural::test_shared_modules.py` (it became a tree-sweeping structural test when #4419 added the
         # strava-reader SET guard), arriving PROVEN (a STRUCTURAL_HAND_PROOFS record, three real-tree plants: a reader
         # stripped of the seam -> 1 failed / 73 passed; the HR graft off -> 3 failed / 71; the containment rule off ->
@@ -1013,7 +1019,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # verbatim: "Got it." / "Noted." reached the send), RESTORED 16 passed. Measured by id-set diff with the new file
         # git-added: this lane -> 777 {proven 226, unproven 540, not-applicable 6, attempted-unproven 5}; the untouched
         # tree at c0b264b28 -> 776 {225, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven does NOT move.
-        <= 230
+        <= 231
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

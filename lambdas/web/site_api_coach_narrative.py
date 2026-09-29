@@ -98,7 +98,10 @@ def handle_experiment_synthesis(*, _g):
     ai_pk = f"{USER_PREFIX}ai_analysis"
     item = table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item")
     if not singleton_visible(item):  # #946: honest-null while tombstoned from a reset
-        return _ok({"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None}, cache_seconds=300)
+        return _ok(
+            {"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None, "data_through": None},
+            cache_seconds=300,
+        )
     item = _decimal_to_float(item)
     # #1986: the arc is signed by the same board lead as the weekly call and the
     # month rollup. Served here so the front-end renders the registry's lead
@@ -111,6 +114,7 @@ def handle_experiment_synthesis(*, _g):
             "chapters": item.get("chapters", []),
             "week_count": int(item.get("week_count") or 0),
             "generated_at": item.get("generated_at"),
+            "data_through": item.get("data_through"),  # #4185 box 3: the last data day, beside the write instant (null = unstamped)
             "coach_name": _lead_name,
             "coach_title": _lead_title,
         },
@@ -185,7 +189,7 @@ def handle_ai_analysis(event, *, _g):
     # #946: singleton_visible closes the tombstone gap the days_in_experiment
     # guard below can't see (a wiped record whose day count is <= today's).
     if not singleton_visible(ai_item):
-        return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
+        return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None, "data_through": None}, cache_seconds=300)
     ai_item = _decimal_to_float(ai_item)
     # Stage0 Fix 3 (2026-05-30): freshness guard. The Brandt block on /explorer/
     # was rendering "still 268 lbs over fifty-five days" because a pre-restart
@@ -205,6 +209,7 @@ def handle_ai_analysis(event, *, _g):
                         "expert_key": expert_key,
                         "analysis": None,
                         "generated_at": None,
+                        "data_through": None,
                         "stale": True,
                     },
                     cache_seconds=300,
@@ -218,6 +223,7 @@ def handle_ai_analysis(event, *, _g):
         "expert_key": expert_key,
         "analysis": analysis_val,
         "generated_at": ai_item.get("generated_at", ""),
+        "data_through": ai_item.get("data_through"),  # #4185 box 3 (null = a record written before the stamp)
     }
     # #4384 set sweep: this EXPERT# slot serves prose too — never a bare identifier.
     if ai_item.get("key_recommendation") and not audience_guard.is_bare_token(ai_item["key_recommendation"]):
@@ -537,6 +543,7 @@ def handle_coach_analysis(event, *, _g):
             "confidence_language": confidence_language,
             "data_availability": data_availability,
             "generated_at": _generated_at,
+            "data_through": output.get("data_through"),  # #4185 box 3: OUTPUT#.data_through (coach_state_updater)
             "as_of_day_n": as_of_day_n(_generated_at, _g["EXPERIMENT_START"]),
             "week_number": output.get("week_number"),
             "days_in_experiment": output.get("days_in_experiment"),
@@ -791,6 +798,7 @@ def handle_weekly_priority(event, *, _g):
                 "weekly_priority": _int_item.get("analysis", ""),
                 "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
                 "generated_at": _wp_generated_at,
+                "data_through": _int_item.get("data_through"),  # #4185 box 3: the same stamp the dashboard serves
                 "as_of_day_n": as_of_day_n(_wp_generated_at, _g["EXPERIMENT_START"]),
                 "week_number": _int_item.get("week_number"),
                 "coach_name": _lead_name,
@@ -844,6 +852,7 @@ def handle_month_rollup(*, _g):
                 "week_count": item.get("week_count"),
                 "window_label": item.get("window_label") or None,
                 "generated_at": item.get("generated_at", ""),
+                "data_through": item.get("data_through"),  # #4185 box 3
                 "coach_name": _lead_name,
                 "coach_title": _lead_title,
                 "pre_start": False,

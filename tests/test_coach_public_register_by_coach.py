@@ -1027,3 +1027,19 @@ def test_mutation_control_journal_analysis_without_public_themes_serves_slugs(mo
     monkeypatch.setattr(audience_guard, "public_themes", lambda values: values or [])
     body = _journal_body_4392(monkeypatch)
     assert "protein_metabolism_cognition_link" in body["daily_themes"][0]["themes"]
+
+
+def test_coach_analysis_serves_the_output_rows_data_through_beside_generated_at(monkeypatch):
+    """#4185 box 3: /api/coach_analysis serves the OUTPUT# row's `data_through` (stamped by
+    coach_state_updater since #4227) beside `generated_at`; an unstamped row serves no value — this
+    endpoint strips None keys by its own convention, so absent IS its unknown, never a back-fill.
+    Mutation control: drop the `data_through` key from handle_coach_analysis — both asserts red."""
+    domain, wire = next(iter(_WIRE.items()))
+    rows = _wire_rows(domain, wire)
+    out = next(r for r in rows if str(r.get("sk", "")).startswith("OUTPUT#"))
+    out["data_through"] = "2026-09-25"
+    body = _analysis_body(monkeypatch, domain, rows)
+    assert body["generated_at"] and body["data_through"] == "2026-09-25"
+    del out["data_through"]
+    body = _analysis_body(monkeypatch, domain, rows)
+    assert body.get("data_through") is None and body["generated_at"]
