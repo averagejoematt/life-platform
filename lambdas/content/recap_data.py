@@ -214,6 +214,13 @@ class DayFacts:
     # habit + vice DETAIL. These carry NAMES, so they travel through item_labels() and the
     # privacy gate — "which habit" is the interesting half and also the risky half.
     missed_tier0: list[str] = field(default_factory=list)
+    #: #4362: tier-0 habits not checked in that a measurement on the same card proves met
+    #: (a ≥2 mi outdoor walk for "Walk Outdoor >2mi"). Credited here, never listed in
+    #: `missed_tier0` beside the number that contradicts it — and never written to Habitify.
+    met_by_measurement: list[str] = field(default_factory=list)
+    #: The longest single OUTDOOR walk of the day in miles (Strava, #4068 de-dup), the
+    #: evidence a walk habit's definition is tested against. None when unmeasured.
+    longest_outdoor_walk_mi: float | None = None
     vice_streaks: dict[str, float] = field(default_factory=dict)
     # the throughline: where he started, where he is, where he is going
     baseline_weight_lb: float | None = None
@@ -469,6 +476,7 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
                 except (TypeError, ValueError):
                     continue
         facts.walk_miles = round(miles, 2)
+        facts.longest_outdoor_walk_mi = longest_outdoor_walk_mi(strava.get("activities") or [], hevy_rows)
 
     mf = _get_day(table, "macrofactor", date)
     if mf is None:
@@ -504,7 +512,72 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
     # what he wrote.
     facts.journal_templates = [t for t in (j.get("template") for j in journal) if t]
 
+    facts.met_by_measurement = [m for m in facts.missed_tier0 if measured_twin_met(m, facts)]
+    facts.missed_tier0 = [m for m in facts.missed_tier0 if m not in facts.met_by_measurement]
     return facts
+
+
+# ── #4362: a habit the card's own measurement proves met is not "not checked in" ─────
+#: A quantity stated in a habit's NAME — "Walk Outdoor >2mi", "Walk 5k", "Hydrate 3L".
+#: The name is the owner's own definition of the habit; a name with no parseable quantity
+#: has no measurable twin and is never credited (fail-safe: it stays listed).
+_NAME_QUANTITY = re.compile(r"(\d+(?:\.\d+)?)\s*(mi|km|k|l)\b", re.IGNORECASE)
+_MI_PER = {"mi": 1.0, "km": 0.621371, "k": 0.621371}
+
+
+def longest_outdoor_walk_mi(activities: list[dict[str, Any]], hevy_rows: list[dict[str, Any]]) -> float | None:
+    """The longest single outdoor walk/hike of the day, in miles. None when there is none.
+
+    Outdoor = a Strava Walk/Hike not flagged `trainer`, and — the #4068 de-dup ruling —
+    not overlapping a Hevy session that carries a cardio block: WHOOP posts the treadmill
+    block inside a Hevy session to Strava as its own `Walk`, and that is not an outdoor
+    walk. A SINGLE activity, never a sum: Garmin and WHOOP can both record one walk, and
+    "a >2 mi walk" is one walk.
+    """
+    from common.pacific_time import parse_iso_utc
+    from training.walking_volume import hevy_cardio_intervals
+
+    claimed = hevy_cardio_intervals(hevy_rows)
+    best = None
+    for a in activities or []:
+        if (a.get("type") or a.get("sport_type") or "").lower() not in ("walk", "hike") or a.get("trainer") is True:
+            continue
+        try:
+            miles = float(a.get("distance_miles") or 0)
+            start = parse_iso_utc(a.get("start_date")) if a.get("start_date") else None
+            elapsed = float(a.get("elapsed_time_seconds") or 0)
+        except (TypeError, ValueError):
+            continue
+        if start is not None and elapsed > 0:
+            end_ts = start.timestamp() + elapsed
+            if any(c0.timestamp() < end_ts and c1.timestamp() > start.timestamp() for c0, c1 in claimed):
+                continue  # a Hevy treadmill block seen twice, not an outdoor walk
+        if miles > 0 and (best is None or miles > best):
+            best = miles
+    return round(best, 2) if best is not None else None
+
+
+def measured_twin_met(habit: str, facts: DayFacts) -> bool:
+    """True when a measurement on this card proves `habit`'s own stated definition met.
+
+    The SET (tier-0 habits with a measured twin the card draws): a WALK habit with a
+    distance in its name ↔ the longest outdoor walk; a HYDRATE habit with litres in its
+    name ↔ water_oz. Everything else — "Primary Exercise", "Calorie Goal", sunlight, the
+    vices — states no quantity a card measurement can test, so it is never credited.
+    One-way by construction: a measurement can credit a habit, never debit one (the water
+    channel logged 26 oz on a day "Hydrate 3L" was checked in).
+    """
+    m = _NAME_QUANTITY.search(habit or "")
+    if not m:
+        return False
+    qty, unit = float(m.group(1)), m.group(2).lower()
+    name = habit.lower()
+    if "walk" in name and unit in _MI_PER:
+        walk = facts.longest_outdoor_walk_mi
+        return walk is not None and walk >= qty * _MI_PER[unit]
+    if "hydrat" in name and unit == "l":
+        return facts.water_oz is not None and float(facts.water_oz) >= qty * 33.814
+    return False
 
 
 # ── the coach line: selected, never generated (#3749) ─────────────────────────

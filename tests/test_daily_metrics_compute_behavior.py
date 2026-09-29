@@ -516,11 +516,19 @@ class TestHabitStreaks:
             _date_row("habitify", "2026-05-08", habits={"work": 1}),
         )
         registry = {"work": {"status": "active", "tier": 0, "applicable_days": "weekdays"}}
-        assert dmc.compute_habit_streaks(_profile(registry), "2026-05-09")["tier0_streak"] == 2
+        # Not required, and — since the #4362 delegate to health.habit_streaks — not COUNTED
+        # either: a day with no applicable habit proves nothing (#2221), so the Saturday is
+        # skipped rather than extending the streak for free. It still does not break it.
+        assert dmc.compute_habit_streaks(_profile(registry), "2026-05-09")["tier0_streak"] == 1
 
     def test_a_post_training_habit_is_excluded_from_the_combined_streak(self, table, frozen_clock):
         _habit_days(table, 3, lambda i: {"stretch": 0})
         registry = {"stretch": {"status": "active", "tier": 1, "applicable_days": "post_training"}}
+        # Excluded — the unmet "stretch": 0 never breaks it. With nothing else in the set the
+        # streak is over an empty set, which #2221 ruled is not a streak (0, not 3).
+        assert dmc.compute_habit_streaks(_profile(registry), YESTERDAY)["tier01_streak"] == 0
+        registry["sleep"] = {"status": "active", "tier": 0}
+        _habit_days(table, 3, lambda i: {"stretch": 0, "sleep": 1})
         assert dmc.compute_habit_streaks(_profile(registry), YESTERDAY)["tier01_streak"] == 3
 
     def test_vice_streaks_are_tracked_per_habit_and_break_independently(self, table, frozen_clock):
@@ -535,6 +543,15 @@ class TestHabitStreaks:
     def test_an_empty_registry_falls_back_to_the_mvp_habit_list(self, table, frozen_clock):
         _habit_days(table, 3, lambda i: {"sleep": 1})
         assert dmc.compute_habit_streaks(_profile({}, mvp=["sleep"]), YESTERDAY)["tier0_streak"] == 3
+
+    def test_a_habit_renamed_upstream_does_not_zero_the_tier0_streak(self, table, frozen_clock):
+        """#4362: this module's own pre-#2221 copy read a habit Habitify stopped naming as a
+        break, so after "Walk 5k" was renamed the stored t0_perfect_streak sat at 0."""
+        _habit_days(table, 4, lambda i: {"sleep": 1, "Walk Outdoor >2mi": 1})
+        registry = {"sleep": {"status": "active", "tier": 0}, "Walk 5k": {"status": "active", "tier": 0}}
+        assert dmc.compute_habit_streaks(_profile(registry), YESTERDAY)["tier0_streak"] == 4
+        registry["Walk 5k"]["habitify_names"] = ["Walk Outdoor >2mi"]
+        assert dmc.compute_habit_streaks(_profile(registry), YESTERDAY)["tier0_streak"] == 4
 
     def test_the_lookback_is_capped_at_ninety_days(self, table, frozen_clock):
         _habit_days(table, 120, lambda i: {"sleep": 1})

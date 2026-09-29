@@ -387,12 +387,10 @@ BASELINE = {
     # /api/labs labs block (139 lines) to content/labs_scope.py took it 1116 -> 990, under
     # the 1000-line ceiling, so it is governed by the normal rule now and needs no entry.
     # #2816 had previously taken it to 1113 by extracting _dedup_activities.
-    # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
-    # import. That module exists because the compute Lambda and the daily brief had two
-    # different definitions of "last week's weight" and the compute one was wrong (it took
-    # the OLDEST reading in a 14-day window). The single line buys one shared definition —
-    # the ratchet's first real bump, and the shape it is meant to allow.
-    "lambdas/compute/daily_metrics_compute_lambda.py": 1045,
+    # lambdas/compute/daily_metrics_compute_lambda.py LEFT this registry at #4362: its private
+    # pre-#2221 habit-streak scan became a delegate to health.habit_streaks (the one the daily
+    # brief already used), 1045 -> 977, under the ceiling. (#2299 had bumped it 1369 -> 1370
+    # for one shared week-ago-weight import — the same one-definition move.)
     # RETIRED by #3537: banked at 1292 PHYSICAL lines, measures 971 LOGICAL lines —
     # under the 1000-line ceiling, so the entry is stale by the registry's own rule
     # (test_baseline_has_no_stale_entries). The ratchet tightened: this file is now
