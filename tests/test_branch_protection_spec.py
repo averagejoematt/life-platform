@@ -81,11 +81,16 @@ def test_preflight_rejects_a_path_filtered_workflow(tmp_path, monkeypatch):
 
 
 def test_preflight_rejects_an_if_gated_job():
-    # dependabot-validate.yml's `validate` job is `if:`-gated to dependabot[bot] — it
-    # reports `skipped` on every human PR, and a skipped check never satisfies a
-    # required check. This is the exact class the issue's review flagged.
+    # An `if:`-gated job reports `skipped` on the PR classes it does not match, and a
+    # skipped check never satisfies a required check. This is the exact class the issue's
+    # review flagged. The original example, dependabot-validate.yml's `validate` job, was
+    # deleted by #4252; v4-gate.yml's render gate is the live `if:`-gated PR job.
     pytest.importorskip("yaml")
-    bad = {"required_status_checks": [{"context": "validate", "workflow": "dependabot-validate.yml", "job": "validate"}]}
+    bad = {
+        "required_status_checks": [
+            {"context": "Render + accuracy gate (local render)", "workflow": "v4-gate.yml", "job": "render-accuracy-gate"}
+        ]
+    }
     problems = abp.preflight_contexts(bad)
     assert any("`if:`-gated" in p for p in problems), problems
 

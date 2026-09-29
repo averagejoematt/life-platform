@@ -493,10 +493,16 @@ class TestCallHaikuParsing:
         """
         import common.retry_utils as retry_utils
 
-        holder = {"text": "{}"}
+        holder = {"text": "{}", "bodies": [], "reject_schema": False}
 
         def _fake(req):
-            return {"content": [{"text": holder["text"]}]}
+            holder["bodies"].append(req)
+            if holder["reject_schema"] and "output_config" in req:
+                raise RuntimeError(
+                    "An error occurred (ValidationException) when calling the InvokeModel operation: "
+                    "output_config.format.schema: unsupported"
+                )
+            return {"content": [{"text": holder["text"]}], "stop_reason": "end_turn"}
 
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", _fake)
         return holder
@@ -522,6 +528,48 @@ class TestCallHaikuParsing:
     def test_a_broken_fence_falls_back_to_text_rather_than_raising(self, raw):
         raw["text"] = "```json\n{not valid json\n```"
         assert isinstance(gate._call_haiku("sys", "msg"), str)
+
+    # #4276: the verdict is requested under a JSON schema (`output_config.format`).
+    def test_the_judge_call_carries_the_verdict_schema(self, raw):
+        raw["text"] = '{"passed": true, "score": 80}'
+        gate._call_haiku("sys", "msg")
+        (body,) = raw["bodies"]
+        assert body["output_config"]["format"] == {"type": "json_schema", "schema": gate.QUALITY_GATE_OUTPUT_SCHEMA}
+        assert body["temperature"] == 0.1 and body["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+    def test_a_schema_refusal_falls_back_once_to_the_old_path(self, raw, capsys):
+        raw["text"] = '```json\n{"passed": true, "score": 80}\n```'
+        raw["reject_schema"] = True
+        assert gate._call_haiku("sys", "msg") == {"passed": True, "score": 80}
+        assert ["output_config" in b for b in raw["bodies"]] == [True, False]
+        assert "fallback=schema_rejected" in capsys.readouterr().out
+
+    def test_a_non_schema_error_is_not_absorbed(self, monkeypatch):
+        import common.retry_utils as retry_utils
+
+        sent = []
+
+        def _boom(req):
+            sent.append(req)
+            if "output_config" in req:  # the schema call fails for a reason that is NOT the schema
+                raise RuntimeError("ThrottlingException: slow down")
+            return {"content": [{"text": '{"passed": true, "score": 90}'}]}
+
+        monkeypatch.setattr(retry_utils, "call_anthropic_raw", _boom)
+        with pytest.raises(RuntimeError, match="Throttling"):
+            gate._call_haiku("sys", "msg")
+        assert len(sent) == 1  # never silently re-sent without the schema
+
+
+def test_the_output_schema_names_every_prompt_key():
+    """The schema lives beside the prompt's Output Format; a key in one and not the other fails here."""
+    import re
+
+    fmt = gate.QUALITY_GATE_SYSTEM_PROMPT.split("## Output Format", 1)[1]
+    top = set(re.findall(r'^\s{2}"(\w+)":', fmt, re.MULTILINE))
+    schema = gate.QUALITY_GATE_OUTPUT_SCHEMA
+    assert top == set(schema["properties"]) == set(schema["required"])
+    assert schema["additionalProperties"] is False
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -719,3 +767,83 @@ class TestPhantomJudgeHits4343:
             {"coach_id": "explorer_coach", "event": "judge_hit_dropped", "phrase": "mechanistically", "reason": "not_in_text"},
             {"coach_id": "explorer_coach", "event": "judge_hit_dropped", "phrase": "autocorrelation", "reason": "not_in_text"},
         ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# #4343: the lead read's rubric (coach/rubric_scope.py) — a scoping, not a threshold drop
+# ──────────────────────────────────────────────────────────────────────────────
+
+# The 2026-09-28 17:00Z brief's lead read (EVALRET#coach_brief, eli_marsh, score 18), verbatim:
+# every figure cited, no reader or served-fact finding — held on persona arms only.
+LEAD_0928 = (
+    "Matthew has lost 12.8 pounds since Sunday, September 6, settling into a weekly loss rate of 3.9 pounds per week, "
+    "likely between 2.2 and 4.4. His most recent weigh-in on Sunday, September 27 brought him to 314.5 pounds. This "
+    "morning he slept 7.8 hours, logged a recovery score of 64, heart-rate variability of 43 milliseconds, and a "
+    "resting heart rate of 57 beats per minute."
+)
+# The 2026-09-29 read (score 15).
+LEAD_0929 = (
+    "Matthew has lost 14.2 pounds since Sunday, September 6, bringing his weight to 313.2 pounds as of Monday, "
+    "September 28, with a settled weekly loss rate of 3.8 pounds per week, likely between 2.1 and 4.3. His recovery "
+    "score this morning is 54, his heart-rate variability is 40 milliseconds, his resting heart rate is 58 beats per "
+    "minute, and he slept 8.7 hours last night."
+)
+_NARRATING = "Narrating the dashboard (listing metrics without interpreting them)"
+
+
+def _judge_0928():
+    return {
+        "passed": False,
+        "score": 18,
+        "anti_pattern_violations": [{"phrase": _NARRATING, "context": "whole output"}],
+        "decision_class_violations": [],
+        "voice_distinctiveness_score": 5,
+        "cross_coach_similarity_flags": [
+            {"similar_to": "physical_coach", "reason": "Both outputs open with metric recitation."},
+            {"similar_to": "glucose_coach", "reason": "Both adopt a data-listing structure without coaching substance."},
+        ],
+        "suggestions": ["Interpret the metrics instead of listing them."],
+    }
+
+
+_LEAD_BRIEF = {"surface": "lead_daily", "cited": []}
+
+
+class TestLeadReadRubricScope:
+    @pytest.mark.parametrize("text", [LEAD_0928, LEAD_0929])
+    def test_the_held_lead_reads_pass_on_their_own_rubric(self, wired, haiku, text):
+        haiku.result = _judge_0928()
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": text, "generation_brief": _LEAD_BRIEF}, None)
+        assert r["passed"] is True
+        assert r["score"] == gate.PASS_SCORE_THRESHOLD  # the threshold itself is unchanged
+        assert r["rubric_scope"]["prior_score"] == 18 and r["rubric_scope"]["verdict"] == "restored"
+        aside = r["out_of_rubric"]
+        assert set(aside) == {"anti_pattern_violations", "cross_coach_similarity_flags", "voice_distinctiveness_score"}
+        assert "anti_pattern_violations" not in r and "cross_coach_similarity_flags" not in r
+
+    def test_a_domain_coach_is_still_held_on_the_same_judge_report(self, wired, haiku):
+        haiku.result = _judge_0928()
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "skip_cross_coach": True}, None)
+        assert r["passed"] is False and r["score"] == 18 and "rubric_scope" not in r
+
+    def test_an_honesty_finding_still_holds_the_lead_read(self, wired, haiku):
+        rep = _judge_0928()
+        rep["decision_class_violations"] = [{"expected_max": "observational", "found": "causal", "excerpt": "because"}]
+        haiku.result = rep
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF}, None)
+        assert r["passed"] is False and r["rubric_scope"]["verdict"] == "unchanged"
+
+    def test_the_lead_read_fetches_no_peer_outputs(self, wired, haiku, monkeypatch):
+        monkeypatch.setattr(gate, "_fetch_other_coaches_recent_outputs", lambda *a, **k: pytest.fail("peers fetched"))
+        haiku.result = {"passed": True, "score": 90}
+        gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF}, None)
+
+    def test_mutation_control_without_the_scope_the_lead_read_is_held(self, wired, haiku, monkeypatch):
+        from coach import rubric_scope
+
+        monkeypatch.setattr(rubric_scope, "OUT_OF_RUBRIC", {})
+        haiku.result = _judge_0928()
+        r = gate.lambda_handler(
+            {"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF, "skip_cross_coach": True}, None
+        )
+        assert r["passed"] is False and r["score"] == 18

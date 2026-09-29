@@ -293,3 +293,72 @@ def test_every_postmerge_pass_keeps_pipefail_in_its_step():
         "a coverage pass is not piped to tail — harmless on its own, but this step's whole "
         "history is about a pipe swallowing an exit code; keep the shape uniform (#2259)"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4252 — no single-file pytest step beside the coverage passes; the labels survive
+# ══════════════════════════════════════════════════════════════════════════════
+# ci-test.yml ran eleven files one at a time and then ran them again in the coverage
+# passes (the whole tests/ tree). The single-file steps are gone and their labels are
+# printed as sections by scripts/ci_test_sections.py from the passes' JUnit XML.
+
+
+def _ci_test_job_pytest_commands():
+    src = _read(CI_TEST)
+    return re.findall(r"python3 -m pytest ([^\n\\]*)", src)
+
+
+def test_ci_test_runs_no_single_file_pytest_step():
+    """Every pytest command in the Unit Tests job selects the whole tests/ tree. A
+    `python3 -m pytest tests/test_x.py` step would run that file twice per push again."""
+    cmds = _ci_test_job_pytest_commands()
+    assert cmds, "ci-test.yml runs no pytest command at all"
+    single = [c for c in cmds if re.match(r"tests/test_\S+\.py", c.strip())]
+    assert not single, f"#4252: a single-file pytest step is back in ci-test.yml (it also runs in the coverage passes): {single}"
+
+
+def test_both_coverage_passes_write_the_junit_the_sections_read():
+    lines = _coverage_gate_pytest_lines()
+    assert len(lines) == 2
+    assert "--junitxml=/tmp/junit_parallel.xml" in lines[0] and "--junitxml=/tmp/junit_serial.xml" in lines[1], lines
+    src = _read(CI_TEST)
+    drift = src[src.index("      - name: Coverage regression gate") :]
+    assert "python3 scripts/ci_test_sections.py /tmp/junit_parallel.xml /tmp/junit_serial.xml" in drift
+    assert "if: always()" in drift[: drift.index("run: |")], "the sections report must run when a coverage pass is red"
+
+
+def test_every_section_label_names_a_real_test_file():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ci_test_sections", os.path.join(REPO, "scripts", "ci_test_sections.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert len(mod.SECTIONS) == 11, "the eleven former single-file steps each keep a label"
+    missing = [p for p in mod.SECTIONS.values() if not os.path.isfile(os.path.join(REPO, p))]
+    assert not missing, f"#4252: section label(s) point at test files that no longer exist: {missing}"
+
+
+def test_sections_report_names_a_failure_by_its_label_and_never_exits_non_zero(tmp_path, capsys):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ci_test_sections", os.path.join(REPO, "scripts", "ci_test_sections.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    xml = (
+        '<testsuites><testsuite name="pytest">'
+        '<testcase classname="tests.test_role_policies" name="test_a"/>'
+        '<testcase classname="tests.test_role_policies.TestX" name="test_b"><failure message="boom"/></testcase>'
+        '<testcase classname="tests.test_upstream_contracts" name="test_c"><skipped/></testcase>'
+        "</testsuite></testsuites>"
+    )
+    p = tmp_path / "j.xml"
+    p.write_text(xml, encoding="utf-8")
+    assert mod.main(["x", str(p), str(tmp_path / "absent.xml")]) == 0
+    out = capsys.readouterr().out
+    assert "::error title=IAM policy linter (test_role_policies.py)::1 failed in tests/test_role_policies.py" in out
+    assert "IAM policy linter (test_role_policies.py): 1 passed, 1 failed, 0 skipped" in out
+    assert "Upstream-API contract tests (test_upstream_contracts.py): 0 passed, 0 failed, 1 skipped" in out
+    assert "::warning title=Run unit tests::tests/test_shared_modules.py ran no tests" in out
+    bad = tmp_path / "bad.xml"
+    bad.write_text("<not closed", encoding="utf-8")
+    assert mod.main(["x", str(bad)]) == 0

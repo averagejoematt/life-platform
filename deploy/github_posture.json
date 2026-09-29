@@ -82,7 +82,7 @@
     ],
     "advisory_not_required": [
       "CodeQL analysis (python) / (javascript-typescript) — codeql.yml is unfiltered on PRs but its `analyze` step never exits non-zero on a finding, so requiring it buys latency and no verdict (ADR-148).",
-      "Dependabot Validate / validate — job-level `if:` restricts it to dependabot[bot] dev-tooling branches, so it reports `skipped` on every human PR; a skipped required check never satisfies the rule.",
+      "Dependabot Auto-merge / automerge — a workflow_run job `if:`-gated to dependabot[bot] dev-tooling branches, so it reports `skipped` on every human PR; a skipped required check never satisfies the rule. (Dependabot Validate was deleted by #4252: pr-checks.yml validates every PR.)",
       "Wiki drift gates (docs-ci.yml), Surface-drift gate (surface-drift.yml), Migration coverage + HTML well-formedness / Render + accuracy gate (v4-gate.yml) — all PATH-FILTERED, so they simply do not report on PRs outside their globs and would block those PRs forever.",
       "Unit Tests / Lint + Syntax Check (ci-cd.yml) and Visual + AI-vision QA — post-merge (push/scheduled) only; they emit no PR check-run to require."
     ],

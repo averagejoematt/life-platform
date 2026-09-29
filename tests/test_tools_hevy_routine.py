@@ -707,3 +707,12 @@ def test_create_missing_refuses_a_template_without_an_explicit_muscle_group():
     assert create_calls == [], "a template was created with a GUESSED muscle group"
     errors = " ".join(out.get("creation_errors") or []) + " " + str(out.get("error") or "")
     assert "Calf Press on Leg Press Machine" in errors and "muscle_group" in errors and "#3770" in errors, out
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, t, "manage_hevy_routine")
