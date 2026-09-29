@@ -222,3 +222,134 @@ def clean_snippet(text) -> str:
     s = _STAT_LINE_INLINE_RE.sub(" ", s)
     s = _SNIPPET_HEAD_RE.sub("", s)
     return " ".join(s.split()).strip()
+
+
+# ── #4363: the narrator is an AI character, and she has no real-world career ────
+#
+# "Before the Numbers" (Prologue · Part I) had Elena Voss introduce herself with pieces
+# in Harper's, The Ringer and Wired — invented bylines at real publications, stated as
+# fact, on a page that never said she was an AI. Two halves of one fix live here so the
+# Lambda writer (emails/chronicle_render.py) and the restart re-renderer
+# (deploy/restart_leadin_pages.py) cannot drift: the ONE disclosure every post page
+# carries, and the deterministic check the chronicle's grounding gate runs on every
+# draft (emails/chronicle_prompt.installment_grounding_findings).
+
+# The disclosure rendered in every chronicle post header (+ its one style rule, spliced
+# into the page <style> block as a VALUE, so its braces are literal, never f-string escapes) — on the post page itself, so a
+# reader who lands from search, a share or the RSS feed meets it without an index page.
+AI_NARRATOR_NOTE_HTML = (
+    '<p class="post-header__ai-note" data-ai-narrator>'
+    "<strong>A note on the narrator:</strong> Elena Voss is this site&rsquo;s AI narrator &mdash; "
+    "a character written by an AI model from Matthew&rsquo;s own data, not a real journalist. "
+    "She has no bylines, employers or credentials anywhere else."
+    "</p>"
+)
+AI_NARRATOR_NOTE_CSS = (
+    ".post-header__ai-note { font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-muted);"
+    "margin:0 0 var(--sp-4);padding:var(--sp-2) var(--sp-3);border-left:2px solid var(--ember);background:var(--ember-wash); }"
+)
+
+# Real publications an invented career reaches for. A NAME alone is never a finding —
+# only a credit cue in the same sentence plus a preposition binding it to the name
+# ("a piece in Harper's", "for The Ringer", "22 years at the Times"). Case-sensitive on
+# the name so ordinary words ("for the first time", "outside") never match.
+REAL_PUBLICATIONS = (
+    "Harper's",
+    "Harper's Magazine",
+    "The Ringer",
+    "Ringer",
+    "Wired",
+    "The Atlantic",
+    "Atlantic",
+    "The New Yorker",
+    "New Yorker",
+    "The New York Times",
+    "New York Times",
+    "The Times",
+    "Times",
+    "The Washington Post",
+    "Washington Post",
+    "The Wall Street Journal",
+    "Wall Street Journal",
+    "The Guardian",
+    "Guardian",
+    "Los Angeles Times",
+    "Outside",
+    "Esquire",
+    "GQ",
+    "Rolling Stone",
+    "Vanity Fair",
+    "Vox",
+    "Slate",
+    "The Verge",
+    "Men's Health",
+    "Runner's World",
+    "Scientific American",
+    "National Geographic",
+    "Time",
+    "Newsweek",
+    "Bloomberg",
+    "The Economist",
+    "Economist",
+    "BuzzFeed",
+    "Vice",
+    "NPR",
+    "ESPN",
+    "Sports Illustrated",
+    "The Paris Review",
+    "Paris Review",
+    "Longreads",
+    "The Believer",
+    "Pitchfork",
+    "Fast Company",
+    "MIT Technology Review",
+    "Popular Science",
+    "The Athletic",
+    "Politico",
+    "Reuters",
+    "Associated Press",
+    "the AP",
+)
+_CREDIT_CUE_RE = re.compile(
+    r"\b(?:piece|pieces|story|stories|profile[ds]?|feature[sd]?|essay|essays|article|articles|column|columnist|"
+    r"byline|bylines|assignment|wrote|written|writing|reported|reporting|reporter|filed|pitched|commissioned|"
+    r"published|staff|editor|editors|writer|contributor|contributing|correspondent|career|years?|worked|work|"
+    r"followed|covered|embedded|interviewed|spent|freelanced?|stint|gig|joined|hired|masthead)\b",
+    re.I,
+)
+_PUB_ALT = "|".join(re.escape(p) for p in sorted(REAL_PUBLICATIONS, key=len, reverse=True))
+_CREDIT_BINDING_RE = re.compile(r"\b(?:[Ff]or|[Ii]n|[Aa]t|[Ww]ith|[Tt]o|[Ff]rom)\s+(?:[Tt]he\s+)?(?P<pub>" + _PUB_ALT + r")(?![\w-])")
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def real_publication_credit_findings(text) -> list:
+    """Deterministic ($0, no AI) scan for a credit, byline or career claimed at a real
+    publication — "a piece in Harper's", "followed him for The Ringer", "22 years at the
+    Times". The chronicle's narrator and its editor are fictional characters: any such
+    sentence is an invented credential stated as fact (ADR-104). HTML tags are stripped
+    first so a stored page or ``content_html`` scans the same as markdown.
+
+    Returns grounded-generation-shaped findings (``type`` / ``detail`` / ``claim``);
+    [] means no credit phrasing was found. A publication named WITHOUT a credit cue in
+    the same sentence (a reader's podcast, "the kind of story Wired would run") is not
+    a finding — the claim is the career, not the name."""
+    plain = _TAG_RE.sub(" ", str(text or "")).replace("&rsquo;", "'").replace("’", "'")
+    findings: list = []
+    for sentence in _SENTENCE_SPLIT_RE.split(plain):
+        s = " ".join(sentence.split())
+        if not s or not _CREDIT_CUE_RE.search(s):
+            continue
+        for m in _CREDIT_BINDING_RE.finditer(s):
+            findings.append(
+                {
+                    "type": "real_publication_credit",
+                    "publication": m.group("pub"),
+                    "claim": s[:240],
+                    "detail": (
+                        f"claims a credit at a real publication ({m.group('pub')!r}) — the narrator is an AI character "
+                        "with no real-world bylines, employers or affiliations; remove the credit"
+                    ),
+                }
+            )
+    return findings

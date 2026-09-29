@@ -984,13 +984,18 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # this lane -> 776 {proven 225, unproven 540, not-applicable 6, attempted-unproven 5}; a `git archive
         # origin/main` export at 3c43af4ce -> 775 {224, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven
         # does NOT move.
-        # Upper bound 227 -> 228 (2026-09-28, #4410 the literal-z2 caller guard): ONE entrant,
+        # Upper bound 228 -> 229 (2026-09-29, #4410 the literal-z2 caller guard): ONE entrant,
         # `structural::test_routine_generator.py` (it joined _PREMERGE_EXTRA_FILES with its new rglob sweep), arriving
         # PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS in scripts/gate_census_mutations.py,
         # ARMED 1/1: baseline 16 passed | mutated 1 failed | reverted 16 passed). Id-set diff vs a `git archive
-        # origin/main` export at ea9fec281: main 778 {227, 539, 7, 5} -> this lane 779 {228, 539, 7, 5}; enters exactly
-        # that id, leaves {}, no verdict changes.
-        # Upper bound 226 -> 227 (2026-09-27, #4253 the deploy-path workflow ceilings + one OIDC pin): ONE entrant,
+        # origin/main` export at dea856d35 (after #4413/#4417): main 779 {228, 539, 7, 5} -> this lane 780 {229, 539, 7, 5};
+        # enters exactly that id, leaves {}, no verdict changes. BASELINE_TOTAL_GATES stays 780 (main measures 779).
+        # PRIOR: Upper bound 227 -> 228 (2026-09-28, #4377/#4378 the journal-quote revoke + sick-day clear tombstones): ONE
+        # entrant, `structural::test_singleton_tombstone_guards.py` (it became a tree sweep when two reader-set guards
+        # joined it), arriving PROVEN (a STRUCTURAL_HAND_PROOFS record, two real-tree plants, each 1 failed / 95 passed,
+        # restored 96 passed). Id-set diff vs a `git archive origin/main` export at 6285e7913: main 779 {227, 540, 7, 5}
+        # -> this lane 780 {228, 540, 7, 5}; enters exactly that id, leaves {}, no verdict changes.
+        # PRIOR: Upper bound 226 -> 227 (2026-09-27, #4253 the deploy-path workflow ceilings + one OIDC pin): ONE entrant,
         # `structural::test_ci_job_timeouts_3678.py`, arriving PROVEN (a STRUCTURAL_HAND_PROOFS record, three real-tree
         # plants). Id-set diff vs a `git archive origin/main` export at 0cd0c9c93: main 777 {226, 540, 6, 5} -> this lane
         # 778 {227, 540, 6, 5}; enters exactly that id, leaves {}, no verdict changes.
@@ -1002,7 +1007,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # verbatim: "Got it." / "Noted." reached the send), RESTORED 16 passed. Measured by id-set diff with the new file
         # git-added: this lane -> 777 {proven 226, unproven 540, not-applicable 6, attempted-unproven 5}; the untouched
         # tree at c0b264b28 -> 776 {225, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven does NOT move.
-        <= 228
+        <= 229
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

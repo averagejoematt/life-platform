@@ -828,27 +828,22 @@ _ROLE_POLICIES_SERVE = os.path.join(_REPO, "cdk", "stacks", "role_policies_serve
 # hand-verified against the actual USER_ID='matthew' this deploys with). An expression
 # this doesn't recognise resolves to None, and the closure test below treats "None" as
 # UNRESOLVED, never as "covered" — no guess ever reads as a pass.
-_KNOWN_PK_LITERALS: dict[tuple[str, str], str] = {
-    ("tools_journal.py", "_quotes_pk()"): "USER#matthew#SOURCE#journal_quotes",
-    ("tools_sick_days.py", "SICK_DAYS_PK"): "USER#matthew#SOURCE#sick_days",
-}
+_KNOWN_PK_LITERALS: dict[tuple[str, str], str] = {}
 
-# The residual this sweep found and is NOT fixing here (different tools, out of #4355's
-# scope — filed as #4377/#4378). Pinned by (file, pk-expression) so a change to EITHER
-# side is visible: if the set shrinks, close the matching issue and shrink this pin; if it
-# grows, a NEW unauthorized delete_item call needs a look before merge.
-_KNOWN_DELETE_ITEM_IAM_GAPS: dict[tuple[str, str], str] = {
-    ("tools_journal.py", "_quotes_pk()"): "#4377 — mark_journal_quote(action='unmark')",
-    ("tools_sick_days.py", "SICK_DAYS_PK"): "#4378 — manage_sick_days clear action",
-}
+# The residual this sweep found in #4355 — mark_journal_quote(unmark) (#4377) and
+# manage_sick_days clear (#4378) — was closed by the same tombstone pattern, so the pin is
+# now EMPTY: every mcp/*.py delete_item call site must be IAM-covered. A NEW entry here
+# needs a filed follow-up issue; a new uncovered call site with no entry reds the closure.
+_KNOWN_DELETE_ITEM_IAM_GAPS: dict[tuple[str, str], str] = {}
 
 
-def _mcp_delete_item_sites():
-    """(file, lineno, pk_source) for every `<table>.delete_item(` call across mcp/*.py."""
+def _delete_item_sites_in(sources):
+    """(file, lineno, pk_source) for every `<table>.delete_item(` call in the given
+    (basename, source) pairs — the scanner, separated from the file walk so the
+    guard-the-guard test can prove it still finds a call on a synthetic source."""
     out = []
-    for path in sorted(_glob.glob(os.path.join(_MCP_DIR, "*.py"))):
-        src = open(path, encoding="utf-8").read()
-        for node in ast.walk(ast.parse(src, filename=path)):
+    for name, src in sources:
+        for node in ast.walk(ast.parse(src, filename=name)):
             if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "delete_item"):
                 continue
             pk_source = "<unresolved>"
@@ -857,8 +852,14 @@ def _mcp_delete_item_sites():
                     for k, v in zip(kw.value.keys, kw.value.values):
                         if isinstance(k, ast.Constant) and k.value == "pk":
                             pk_source = ast.unparse(v)
-            out.append((os.path.basename(path), node.lineno, pk_source))
+            out.append((name, node.lineno, pk_source))
     return out
+
+
+def _mcp_delete_item_sites():
+    """(file, lineno, pk_source) for every `<table>.delete_item(` call across mcp/*.py."""
+    paths = sorted(_glob.glob(os.path.join(_MCP_DIR, "*.py")))
+    return _delete_item_sites_in((os.path.basename(p), open(p, encoding="utf-8").read()) for p in paths)
 
 
 def _mcp_server_delete_item_leading_keys():
@@ -887,15 +888,19 @@ def _mcp_server_delete_item_leading_keys():
 
 
 def test_issue_4355_delete_item_scan_finds_the_known_mcp_sites():
-    """Guard the guard: if this finds nothing, the AST scan silently stopped working."""
-    sites = _mcp_delete_item_sites()
-    files = {f for f, _ln, _pk in sites}
-    assert files == {"tools_journal.py", "tools_sick_days.py"}, (
-        f"expected exactly the two known-uncovered delete_item sites (mark_journal_quote, "
-        f"manage_sick_days), found files={sorted(files)} — delete_platform_memory should have "
-        "left this scan by tombstoning instead (#4355); a NEW file appearing here needs the "
-        "same IAM-coverage look this test gives the other two."
-    )
+    """Guard the guard: the live tree now has ZERO mcp delete_item sites (#4355, #4377,
+    #4378 all tombstone), so an empty scan is a legitimate answer — prove the scanner
+    still SEES a call on a synthetic source, so "empty" can't mean "scan broke"."""
+    probe = 'def f():\n    table.delete_item(Key={"pk": SICK_DAYS_PK, "sk": "DATE#x"})\n'
+    assert _delete_item_sites_in([("probe.py", probe)]) == [("probe.py", 2, "SICK_DAYS_PK")]
+    assert len(_glob.glob(os.path.join(_MCP_DIR, "tools_*.py"))) > 20, "the mcp/ walk found no tool modules"
+    # The live answer (every site covered, today: none at all) is the closure test's job below.
+
+
+def test_issue_4377_4378_journal_quote_and_sick_day_tools_no_longer_call_delete_item():
+    """#4377/#4378 seen from the census side: neither file carries a delete_item site."""
+    files = {f for f, _ln, _pk in _mcp_delete_item_sites()}
+    assert not files & {"tools_journal.py", "tools_sick_days.py"}
 
 
 def test_issue_4355_delete_platform_memory_no_longer_calls_delete_item():
@@ -924,6 +929,89 @@ def test_issue_4355_every_mcp_delete_item_call_is_iam_covered_or_a_named_residua
         "A NEW entry means a handler calls dynamodb:DeleteItem the MCP role cannot perform — "
         "either grant it (cdk/stacks/role_policies_serve.py::mcp_server(), scoped by "
         "dynamodb:LeadingKeys) or stop calling delete_item (the #4355 tombstone pattern). A "
-        "MISSING entry means a known gap (#4377/#4378) was fixed — shrink _KNOWN_DELETE_ITEM_IAM_GAPS "
+        "MISSING entry means a known gap was fixed — shrink _KNOWN_DELETE_ITEM_IAM_GAPS "
         "and _KNOWN_PK_LITERALS to match, or close the issue."
     )
+
+
+# ── #4378: manage_sick_days clear is a tombstone, and every reader honours it ──
+# The same IAM class as #4355, on the sick_days partition. The wire below refuses
+# delete_item exactly as the live MCP role does (AccessDeniedException), and honours the
+# one conditional UpdateItem the clear sends. The READERS are the real shared ones —
+# sick_day_checker.check_sick_day (character-sheet, daily-metrics, anomaly, daily-brief,
+# coach-prediction evaluator) and get_sick_days_range (freshness, adaptive-mode) — plus the
+# MCP list action, all run against the same wire after the clear.
+
+from health import sick_day_checker as _sdc  # noqa: E402
+
+from mcp import tools_sick_days as _tsd  # noqa: E402
+
+
+class _SickDaysWireTable:
+    def __init__(self):
+        self.store: dict[tuple, dict] = {}
+
+    def put_item(self, Item):
+        self.store[(Item["pk"], Item["sk"])] = dict(Item)
+
+    def get_item(self, Key):
+        item = self.store.get((Key["pk"], Key["sk"]))
+        return {"Item": dict(item)} if item else {}
+
+    def delete_item(self, **_kw):
+        raise Exception("AccessDeniedException: not authorized to perform: dynamodb:DeleteItem on SOURCE#sick_days (#4378)")
+
+    def update_item(self, Key, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None):
+        assert ConditionExpression == "attribute_exists(sk) AND attribute_not_exists(cleared_at)", ConditionExpression
+        item = self.store.get((Key["pk"], Key["sk"]))
+        if item is None or item.get("cleared_at"):
+            raise _ConditionalCheckFailedException("ConditionalCheckFailedException: The conditional request failed")
+        assert UpdateExpression.startswith("SET "), UpdateExpression
+        for assignment in UpdateExpression[len("SET ") :].split(","):
+            field, _, ref = assignment.strip().partition("=")
+            item[field.strip()] = ExpressionAttributeValues[ref.strip()]
+        return {}
+
+    def query(self, KeyConditionExpression=None, ExpressionAttributeValues=None, **_kw):
+        assert "BETWEEN" in KeyConditionExpression, KeyConditionExpression
+        eav = ExpressionAttributeValues
+        rows = [dict(v) for (p, s), v in sorted(self.store.items()) if p == eav[":pk"] and eav[":s"] <= s <= eav[":e"]]
+        return {"Items": rows}
+
+
+def _sick_wire(monkeypatch):
+    wire = _SickDaysWireTable()
+    monkeypatch.setattr(_tsd, "table", wire)
+    return wire
+
+
+def test_issue_4378_clear_tombstones_and_no_reader_counts_the_day_as_sick(monkeypatch):
+    wire = _sick_wire(monkeypatch)
+    assert _tsd.tool_manage_sick_days({"action": "log", "dates": ["2026-09-20", "2026-09-21"], "reason": "flu"})["status"] == "logged"
+    out = _tsd.tool_manage_sick_days({"action": "clear", "date": "2026-09-21", "reason": "logged in error"})
+    assert out["status"] == "cleared" and out["cleared_at"]
+    row = wire.store[(_tsd.SICK_DAYS_PK, "DATE#2026-09-21")]
+    assert row["cleared_at"] == out["cleared_at"] and row["cleared_reason"] == "logged in error"
+    assert row["reason"] == "flu"  # the original record survives as the audit trail
+    # every reader, against the same wire:
+    assert _sdc.check_sick_day(wire, "matthew", "2026-09-21") is None
+    assert _sdc.check_sick_day(wire, "matthew", "2026-09-20")["reason"] == "flu"
+    assert [r["date"] for r in _sdc.get_sick_days_range(wire, "matthew", "2026-09-01", "2026-09-30")] == ["2026-09-20"]
+    listed = _tsd.tool_manage_sick_days({"action": "list", "start_date": "2026-09-01", "end_date": "2026-09-30"})
+    assert listed["dates"] == ["2026-09-20"] and listed["count"] == 1
+
+
+def test_issue_4378_clear_twice_or_absent_is_honest_not_found(monkeypatch):
+    _sick_wire(monkeypatch)
+    assert _tsd.tool_manage_sick_days({"action": "clear", "date": "2026-09-21"})["status"] == "not_found"
+    _tsd.tool_manage_sick_days({"action": "log", "date": "2026-09-21"})
+    assert _tsd.tool_manage_sick_days({"action": "clear", "date": "2026-09-21"})["status"] == "cleared"
+    assert _tsd.tool_manage_sick_days({"action": "clear", "date": "2026-09-21"})["status"] == "not_found"
+
+
+def test_issue_4378_relogging_a_cleared_day_restores_it(monkeypatch):
+    wire = _sick_wire(monkeypatch)
+    _tsd.tool_manage_sick_days({"action": "log", "date": "2026-09-21"})
+    _tsd.tool_manage_sick_days({"action": "clear", "date": "2026-09-21"})
+    _tsd.tool_manage_sick_days({"action": "log", "date": "2026-09-21", "reason": "actually sick"})
+    assert _sdc.check_sick_day(wire, "matthew", "2026-09-21")["reason"] == "actually sick"

@@ -328,3 +328,126 @@ def test_4191_body_markdown_strips_only_the_envelope_head():
     assert cs.body_markdown("# The Night Before\n\n*By Elena Voss*\n\n---\n\nThe habit tracker logged.") == "The habit tracker logged."
     assert cs.body_markdown("") == ""
     assert cs.body_markdown(None) == ""
+
+
+# ── #4363: the narrator is disclosed on the post page, and has no invented career ──
+#
+# The live week-01 paragraph verbatim — the specimen the detector must trip on.
+_WEEK01_CREDITS = (
+    "My name is Elena Voss. I'm a freelance journalist based in Brooklyn, and for the past decade I've made a career "
+    "out of embedding myself in worlds I don't fully understand and staying long enough to find the story underneath "
+    "the story. I spent six months in a longevity clinic in Marin for a piece in Harper's. I followed a competitive "
+    "eater through three Nathan's qualifiers for The Ringer. I profiled a man who hadn't slept more than four hours a "
+    "night in six years for Wired, and what I found had almost nothing to do with sleep."
+)
+
+
+def _load_deploy(name):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(name, os.path.join(_REPO, "deploy", f"{name}.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_4363_every_post_template_carries_the_ai_narrator_note(monkeypatch):
+    """Both writers of a chronicle post page — the weekly Lambda and the restart re-renderer —
+    render the ONE shared narrator note in the post header, with its style rule."""
+    from content import chronicle_schema as cs
+
+    _key, lambda_html = _render(monkeypatch)
+    leadin_html = _load_deploy("restart_leadin_pages").render_post_html(
+        "Before the Numbers", "Prologue | Before Day 1", "<p>Body.</p>", "Prologue · Part I", "2026-08-31", 1
+    )
+    for name, html in (("chronicle_render", lambda_html), ("restart_leadin_pages", leadin_html)):
+        assert cs.AI_NARRATOR_NOTE_HTML in html, name
+        assert cs.AI_NARRATOR_NOTE_CSS in html, name
+        header = html[html.find('class="post-header"') : html.find('class="post-body"')]
+        assert "data-ai-narrator" in header and "AI narrator" in header, f"{name}: the note must sit in the post header"
+
+
+def test_4363_credit_detector_trips_on_the_week01_paragraph_and_the_live_gate_surfaces_it():
+    import chronicle_prompt
+    from content import chronicle_schema as cs
+
+    found = cs.real_publication_credit_findings(_WEEK01_CREDITS)
+    assert sorted(f["publication"] for f in found) == ["Harper's", "Ringer", "Wired"], found
+    assert cs.real_publication_credit_findings(f"<p>{_WEEK01_CREDITS.replace(chr(39), '&rsquo;')}</p>")  # stored html scans too
+    gate = chronicle_prompt.installment_grounding_findings("prompt", "packet", _WEEK01_CREDITS)
+    assert [f for f in gate if f["type"] == "real_publication_credit"], gate
+    # Names without a career claim, and ordinary words that collide with a masthead, are prose.
+    for clean in (
+        "For the first time in years, he slept eight hours. Outside, the rain kept on.",
+        "He listens to a podcast from The Ringer on the treadmill.",
+        "It was time to work.",
+    ):
+        assert cs.real_publication_credit_findings(clean) == [], clean
+
+
+def test_4363_mutation_control_without_the_binding_the_week01_paragraph_passes():
+    """The detector is load-bearing: with the publication binding neutralised, the week-01
+    paragraph comes back clean — so the test above cannot pass vacuously."""
+    import re
+
+    from content import chronicle_schema as cs
+
+    real = cs._CREDIT_BINDING_RE
+    try:
+        cs._CREDIT_BINDING_RE = re.compile(r"(?!x)x(?P<pub>)")
+        assert cs.real_publication_credit_findings(_WEEK01_CREDITS) == []
+    finally:
+        cs._CREDIT_BINDING_RE = real
+    assert cs.real_publication_credit_findings(_WEEK01_CREDITS)
+
+
+def test_4363_no_persona_or_prompt_claims_a_real_publication_credit():
+    """Guard the SET: every persona the board config defines (coaches, the narrator, the
+    editor, board members), Margaret's in-code fallback, and both Elena prompts. Margaret's
+    voice read '22 years at the Times, before that the Atlantic' — the same invented-career
+    pattern, one hop from her signed editor's notes."""
+    import json
+
+    from content import chronicle_schema as cs
+
+    offenders = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, f"{path}/{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                walk(v, f"{path}/{i}")
+        elif isinstance(node, str):
+            offenders.extend((path, f["claim"]) for f in cs.real_publication_credit_findings(node))
+
+    with open(os.path.join(_REPO, "config", "board_of_directors.json"), encoding="utf-8") as fh:
+        walk(json.load(fh).get("members", {}), "board_of_directors.json:members")
+    from ai import margaret_editor_pass
+
+    walk(margaret_editor_pass._FALLBACK_NARRATOR, "margaret_editor_pass._FALLBACK_NARRATOR")
+    for rel in ("lambdas/emails/chronicle_prompt.py", "lambdas/emails/wednesday_chronicle_lambda.py"):
+        with open(os.path.join(_REPO, rel), encoding="utf-8") as fh:
+            src = fh.read()
+        assert "NO INVENTED CAREER (#4363)" in src, f"{rel}: the prompt must forbid invented real-world credits"
+        walk(src, rel)
+    assert offenders == [], "\n".join(f"{p}: {c}" for p, c in offenders)
+
+
+def test_4363_prologue_repair_drops_the_credits_adds_the_note_and_is_idempotent():
+    from content import chronicle_schema as cs
+
+    fix = _load_deploy("fix_prologue_part1_narrator_credits")
+    page = (
+        "<html><head><style>\n  .x { }\n  </style></head><body>"
+        '<div class="post-header__series">The Measured Life &middot; Prologue · Part I &middot; By Elena Voss</div>'
+        f"<h1>t</h1><p>I'm not making fun of him.</p><hr><p>{_WEEK01_CREDITS}</p><p>I pitched this series.</p></body></html>"
+    )
+    repaired = fix.repair_page(page)
+    assert cs.real_publication_credit_findings(repaired) == []
+    assert repaired.count("data-ai-narrator") == 1 and cs.AI_NARRATOR_NOTE_CSS in repaired
+    assert "an AI" in repaired and "<p>I pitched this series.</p>" in repaired
+    assert fix.repair_page(repaired) == repaired
+    md = fix.rewrite_paragraph(f"Before.\n\n{_WEEK01_CREDITS}\n\nAfter.", html_entities=False)
+    assert "&mdash;" not in md and cs.real_publication_credit_findings(md) == [] and md.endswith("\n\nAfter.")

@@ -1164,7 +1164,10 @@ TOOLS = {
                     },
                     "date": {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
                     "dates": {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
-                    "reason": {"type": "string", "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel')."},
+                    "reason": {
+                        "type": "string",
+                        "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel'). [clear] Optional note on why it was cleared.",
+                    },
                     "start_date": {"type": "string", "description": "[list] Start of range (default: 30 days ago)."},
                     "end_date": {"type": "string", "description": "[list] End of range (default: today)."},
                 },

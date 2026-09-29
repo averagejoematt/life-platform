@@ -235,6 +235,42 @@ def sources(monkeypatch):
     return _install
 
 
+@pytest.fixture(autouse=True)
+def streak_reads(monkeypatch):
+    """#4416: the recommendation's tier floor + rest warning read the SHARED streak
+    (`plan_draft_evidence._training_streaks`), which reads Hevy through
+    `tools_strength._read_hevy_all_phases` and Strava through `core.query_source_range`.
+    Both are routed onto whichever FakeSourceReader `sources` installed (its `hevy` and
+    `strava` rows), so one fixture feeds the load model and the streak read alike."""
+    import mcp.core as core_mod
+    import mcp.tools_strength as ts_mod
+
+    def _fake():
+        return tt.query_source if isinstance(tt.query_source, FakeSourceReader) else FakeSourceReader()
+
+    def _hevy(start, end):
+        rows = [r for r in _fake().data.get("hevy", []) if start <= (r.get("date") or "") <= end]
+        return [dict(r) for r in rows], ["experiment"]
+
+    monkeypatch.setattr(ts_mod, "_read_hevy_all_phases", _hevy)
+    monkeypatch.setattr(core_mod, "query_source_range", lambda source, start, end, include_pilot=None: _fake()(source, start, end))
+
+
+def hevy_lift(date: str, i: int = 0) -> dict:
+    """One per-workout Hevy row carrying LOAD (a working set with weight > 0) — the shape
+    `training_streaks.is_loaded_session` reads, as in tests/test_training_streaks_4067.py."""
+    return {
+        "sk": f"DATE#{date}#WORKOUT#{i}",
+        "date": date,
+        "exercises": [{"name": "Squat (Barbell)", "sets": [{"type": "normal", "weight_kg": 80, "reps": 5}]}],
+    }
+
+
+def _lifting_days(n: int) -> list[dict]:
+    """A loaded-lifting streak of `n` days immediately before TODAY."""
+    return [hevy_lift(_d(-i), i) for i in range(1, n + 1)]
+
+
 def call(tool_name: str, args: dict):
     """Drive a tool through its REAL registered entry point."""
     return TOOLS[tool_name]["fn"](args)
@@ -738,13 +774,13 @@ def test_recommendation_should_not_invent_a_readiness_score_from_no_signals(sour
 def test_recommendation_unknown_tier_is_not_promoted_by_the_consecutive_day_floor(sources):
     """The Meeusen 5-consecutive-day guard is a FLOOR on an existing verdict. Applied
     to UNKNOWN it would manufacture a YELLOW — asserting a readiness level nothing
-    measured — so it is skipped, and the measured fact rides as a warning instead."""
-    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
-    sources(whoop=[], eightsleep=[], garmin=[], strava=strava, macrofactor_workouts=[], computed_metrics=[])
+    measured — so it is skipped, and the measured fact rides as a warning instead.
+    #4416: the streak is the LOADED-lifting one (7 loaded Hevy days here)."""
+    sources(whoop=[], eightsleep=[], garmin=[], strava=[], hevy=_lifting_days(7), macrofactor_workouts=[], computed_metrics=[])
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["training_context"]["consecutive_training_days"] >= 5
+    assert out["training_context"]["loaded_lifting_streak"] == 7
     assert out["readiness_tier"] == "UNKNOWN"
-    assert any("consecutive training days" in w for w in out["warnings"])
+    assert any("consecutive loaded-lifting days" in w for w in out["warnings"])
 
 
 def test_recommendation_measured_acwr_override_still_fires_with_no_recovery_signals(sources):
@@ -862,18 +898,19 @@ def test_five_consecutive_training_days_demotes_green_to_yellow(sources):
     or heavy compounds — the exact scenario the guard exists to prevent. The fix
     ranks tiers by an explicit severity map (`_TIER_SEVERITY`) instead of
     comparing the strings. This test fails against the pre-fix code (asserts
-    GREEN survives) and passes now that the demotion actually fires."""
-    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
+    GREEN survives) and passes now that the demotion actually fires.
+    #4416: the days are LOADED-lifting days (Hevy), not Strava activity days."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=95)],
         eightsleep=[{"date": TODAY, "sleep_score": 95}],
         garmin=[{"date": TODAY, "body_battery_high": 95}],
-        strava=strava,
+        strava=[],
+        hevy=_lifting_days(5),
         macrofactor_workouts=[],
         computed_metrics=[],
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["training_context"]["consecutive_training_days"] >= 5
+    assert out["training_context"]["loaded_lifting_streak"] == 5
     assert out["readiness_tier"] == "YELLOW"
 
 
@@ -882,17 +919,17 @@ def test_five_consecutive_training_days_does_not_promote_red_to_yellow(sources):
     (e.g. from #1.5 ACWR or, here, uniformly poor recovery/sleep/battery signals)
     must stay RED under the same 5+ consecutive-training-day condition — the
     Meeusen guard should never accidentally IMPROVE a worse verdict."""
-    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
     sources(
         whoop=[_recovery_day(TODAY, recovery=10)],
         eightsleep=[{"date": TODAY, "sleep_score": 10}],
         garmin=[{"date": TODAY, "body_battery_high": 10}],
-        strava=strava,
+        strava=[],
+        hevy=_lifting_days(7),
         macrofactor_workouts=[],
         computed_metrics=[],
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["training_context"]["consecutive_training_days"] >= 5
+    assert out["training_context"]["loaded_lifting_streak"] >= 5
     assert out["readiness_tier"] == "RED"
 
 
@@ -900,7 +937,58 @@ def test_recommendation_warning_agrees_with_its_own_tier(sources):
     """FIXED (#2247) — before the fix this scenario shipped a self-contradictory
     payload: 'GREEN, go hard' next to '⚠️ 7 consecutive training days'. Now the
     tier the warning attaches to actually reflects the risk it names."""
-    strava = [strava_day(_d(-i), activities=[activity("Run", minutes=60, avg_hr=140)], activity_count=1) for i in range(1, 8)]
+    sources(
+        whoop=[_recovery_day(TODAY, recovery=95)],
+        eightsleep=[{"date": TODAY, "sleep_score": 95}],
+        garmin=[{"date": TODAY, "body_battery_high": 95}],
+        strava=[],
+        hevy=_lifting_days(7),
+        macrofactor_workouts=[],
+        computed_metrics=[],
+    )
+    out = call("get_training", {"view": "recommendation", "date": TODAY})
+    assert out["readiness_tier"] == "YELLOW"
+    assert any("7 consecutive loaded-lifting days" in w for w in out["warnings"])
+
+
+def test_an_active_day_streak_is_not_a_fatigue_signal_4416(sources):
+    """#4416 (the #4411 class): 15 consecutive active days (Strava walks and runs >= 10 min)
+    under a 4-day loaded-lifting streak. He was active on 97 % of his 2024-25 days
+    (`training_streaks.CALIBRATION`), so the active-day count is context, never a reason to
+    rest: no demotion (GREEN stands), no rest warning. The active streak still rides as
+    context. Mutation control: key the floor/warning on `active_day_streak` again (or on the
+    old Strava-day count) and this reds — 15 >= 5 demotes to YELLOW and warns."""
+    strava = [
+        strava_day(_d(-i), activities=[activity("Walk" if i % 2 else "Run", minutes=45, avg_hr=110)], activity_count=1)
+        for i in range(1, 16)
+    ]
+    sources(
+        whoop=[_recovery_day(TODAY, recovery=95)],
+        eightsleep=[{"date": TODAY, "sleep_score": 95}],
+        garmin=[{"date": TODAY, "body_battery_high": 95}],
+        strava=strava,
+        hevy=_lifting_days(4),
+        macrofactor_workouts=[],
+        computed_metrics=[],
+    )
+    out = call("get_training", {"view": "recommendation", "date": TODAY})
+    ctx = out["training_context"]
+    assert ctx["active_day_streak"] == 15 and ctx["loaded_lifting_streak"] == 4
+    assert "consecutive_training_days" not in ctx  # the ambiguous active-day count is gone
+    assert out["readiness_tier"] == "GREEN"
+    assert not any("rest day" in w for w in out["warnings"])
+
+
+def test_an_unreadable_lifting_streak_never_demotes_4416(sources, monkeypatch):
+    """ADR-104: a Hevy read that raises leaves the streak UNKNOWN (None), never 0 and never a
+    reason to rest — even over 15 active Strava days."""
+    import mcp.tools_strength as ts_mod
+
+    def _boom(start, end):
+        raise RuntimeError("hevy partition unreadable")
+
+    monkeypatch.setattr(ts_mod, "_read_hevy_all_phases", _boom)
+    strava = [strava_day(_d(-i), activities=[activity("Walk", minutes=45)], activity_count=1) for i in range(1, 16)]
     sources(
         whoop=[_recovery_day(TODAY, recovery=95)],
         eightsleep=[{"date": TODAY, "sleep_score": 95}],
@@ -910,8 +998,9 @@ def test_recommendation_warning_agrees_with_its_own_tier(sources):
         computed_metrics=[],
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
-    assert out["readiness_tier"] == "YELLOW"
-    assert any("consecutive training days" in w for w in out["warnings"])
+    assert out["training_context"]["loaded_lifting_streak"] is None
+    assert out["readiness_tier"] == "GREEN"
+    assert not any("rest day" in w for w in out["warnings"])
 
 
 def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):

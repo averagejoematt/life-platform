@@ -316,7 +316,8 @@ def tool_mark_journal_quote(args):
             if "LastEvaluatedKey" not in resp:
                 break
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-        items = [decimal_to_float(i) for i in items]
+        # #4377: a revoked line (unmark tombstone) is not a marked line — never listed.
+        items = [decimal_to_float(i) for i in items if not jq.is_revoked(i)]
         # ADR-104 re-verification (2026-07-26 review): marks made before the day's
         # Notion ingestion are grounding=pending_ingestion and WITHHELD from the
         # public serve path. Each list call re-checks pendings against the now-
@@ -381,23 +382,44 @@ def tool_mark_journal_quote(args):
         return {"error": "quote is required — the exact verbatim line."}
 
     if action == "unmark":
-        # #1802: revocation must be VERIFIED, never asserted. A DDB delete on a
-        # missing key is a successful no-op, and the sk is a content hash — one
-        # smart quote or trailing period between the typed text and the frozen
-        # bytes means "revoked" while the line keeps serving. ALL_OLD proves the
-        # delete; a miss answers honestly with that date's actual marked lines.
+        # #1802: revocation must be VERIFIED, never asserted. The sk is a content hash —
+        # one smart quote or trailing period between the typed text and the frozen bytes
+        # derives a different key — so a miss answers honestly with that date's actual
+        # marked lines. #4377: the MCP role holds no dynamodb:DeleteItem on this partition
+        # (AccessDeniedException), so revocation is a conditional UpdateItem tombstone:
+        # stamp revoked_at and REMOVE the verbatim quote + grounding in one write. The
+        # condition (row exists, not already revoked) is what "verified" means now — a
+        # conditional-check failure is the honest not_found, never a silent no-op.
         sk = args.get("sk") or jq.quote_sk(date, quote)
-        resp = table.delete_item(Key={"pk": _quotes_pk(), "sk": sk}, ReturnValues="ALL_OLD")
-        if resp.get("Attributes"):
-            return {"status": "revoked", "sk": sk, "note": "The line is private again; the public surface drops it on next fetch."}
-        candidates = table.query(
-            KeyConditionExpression=Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(f"{jq.SK_PREFIX}{date}#"),
-        ).get("Items", [])
+        revoked_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            table.update_item(
+                Key={"pk": _quotes_pk(), "sk": sk},
+                UpdateExpression=f"SET {jq.REVOKED_AT_FIELD} = :ra REMOVE quote, grounding",
+                ConditionExpression=f"attribute_exists(sk) AND attribute_not_exists({jq.REVOKED_AT_FIELD})",
+                ExpressionAttributeValues={":ra": revoked_at},
+            )
+            return {
+                "status": "revoked",
+                "sk": sk,
+                "revoked_at": revoked_at,
+                "note": "The line is private again: its text was removed from the consent record and the public surface drops it on next fetch.",
+            }
+        except Exception as e:  # noqa: BLE001 — only a lost condition is a miss; anything else is surfaced
+            if "ConditionalCheckFailed" not in f"{type(e).__name__} {e}":
+                return {"error": f"revoke failed — NOTHING was revoked: {e}", "sk": sk}
+        candidates = [
+            c
+            for c in table.query(
+                KeyConditionExpression=Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(f"{jq.SK_PREFIX}{date}#"),
+            ).get("Items", [])
+            if not jq.is_revoked(c)
+        ]
         return {
             "status": "not_found",
             "sk": sk,
             "error": "NOTHING was revoked — no marked line matches that exact text/date (the sk is a hash of the frozen bytes; "
-            "a punctuation or date mismatch derives a different key).",
+            "a punctuation or date mismatch derives a different key), or that line was already revoked.",
             "marked_lines_for_date": [{"sk": c.get("sk"), "quote": c.get("quote")} for c in candidates],
             "how_to_revoke": "call again with the exact sk from the list above (sk is THE revoke handle).",
         }
@@ -441,9 +463,15 @@ def tool_mark_journal_quote(args):
         grounding = "pending_ingestion"
 
     # 4) The per-day nomination cap (0–2 lines per close).
-    existing = table.query(
-        KeyConditionExpression=Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(f"{jq.SK_PREFIX}{date}#"),
-    ).get("Items", [])
+    existing = [
+        e
+        for e in table.query(
+            KeyConditionExpression=Key("pk").eq(_quotes_pk()) & Key("sk").begins_with(f"{jq.SK_PREFIX}{date}#"),
+        ).get("Items", [])
+        # #4377: a revoked stub neither holds a cap slot nor lends its marked_at to a
+        # re-mark — re-marking a revoked line is fresh consent, stamped now.
+        if not jq.is_revoked(e)
+    ]
     sk = jq.quote_sk(date, quote)
     if len([e for e in existing if e.get("sk") != sk]) >= jq.MAX_QUOTES_PER_DAY:
         return {"error": f"refused: {jq.MAX_QUOTES_PER_DAY} lines are already marked for {date} — the cap is 0–2 per entry."}

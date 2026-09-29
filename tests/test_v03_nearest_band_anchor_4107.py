@@ -262,8 +262,12 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
     assert row["ramp"]["discount_pct"] == 0 and row["ramp"]["discount"]["anchor_age_days_at_block_1"] == 4
     # #4388: a this-cycle anchor ramps on its band e1RM (Epley, 140 lb x 10), not on the set's load
     assert row["ramp"]["base"] == load_ramp.BASE_BAND_E1RM
-    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == load_ramp.load_step_kg(140 * LB * (1 + 10 / 30) * 0.60)
-    assert "no detraining discount" in _block(ideal, "lat_pulldown").notes
+    assert row["ramp"]["hold"]["ramp_top_kg"] == load_ramp.load_step_kg(140 * LB * (1 + 10 / 30) * 0.60)
+    # #4408: seven days on, same band, no layoff (the discount line is 28 d) — the ramp never goes under
+    # the 140 lb x 10 he moved; the fixture logs no RPE, so the hold is the load itself (rpe_basis absent)
+    assert row["ramp"]["hold"]["applies"] is True and row["ramp"]["hold"]["rpe_basis"] == "absent"
+    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == pytest.approx(140 * LB)
+    assert "no RPE logged" in _block(ideal, "lat_pulldown").notes
 
 
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():
@@ -336,7 +340,10 @@ def test_mutation_control_the_100_percent_floor_refuses_the_generator_own_loads(
     generator wrote would refuse at commit on the in-band anchor."""
     from mcp import hevy_prescription_gate
 
-    ideal = _generate_upper()[0]
+    # #4408: a this-cycle in-band anchor is now HELD at the band best, so the ramp-only session is
+    # reproduced by switching the hold off — its ramped pulldown is what the 100 % floor refuses
+    with patch.object(load_ramp, "achieved_hold", return_value=None):
+        ideal = _generate_upper()[0]
     with patch.object(hevy_prescription_gate, "v03_load_rule", return_value=None):
         gate = _gate(ideal)
     assert gate["verdict"] == "refuse" and "lat_pulldown" in {v["where"] for v in gate["audit"]["violations"]}

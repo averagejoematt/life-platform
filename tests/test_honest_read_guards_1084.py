@@ -196,6 +196,20 @@ def test_weekly_avgs_null_below_window_floor(monkeypatch):
     assert t["z2_trailing_7d_min"] == 60  # the trailing SUM stays — it is not a mean
 
 
+def test_training_publishes_the_real_window_behind_its_30d_counts(monkeypatch):
+    """#4370: `workouts_30d` on Day 22 is an honest count over 22 days — the front end
+    printed it as "N sessions in 30 days", a span the experiment did not have. The
+    handler now names the window it counted over, inclusively, and says when it is whole."""
+    strava = [_strava_day(i) for i in range(1, 4)]
+    young = _training_body(monkeypatch, {"strava": strava}, genesis_days_ago=21)["training"]
+    assert young["window_days"] == 22  # [genesis, today] inclusive — Day 22
+    assert young["window_full"] is False
+    assert young["workouts_30d"] == 3
+    whole = _training_body(monkeypatch, {"strava": strava})["training"]  # genesis 400 days ago
+    assert whole["window_full"] is True
+    assert whole["window_days"] >= 30
+
+
 # ── 1c. avg_strain sibling guard ─────────────────────────────────────────────
 
 

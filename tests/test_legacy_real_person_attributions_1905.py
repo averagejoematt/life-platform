@@ -166,3 +166,17 @@ def test_scan_counts_so_growth_next_to_an_allowlisted_citation_is_caught(tmp_pat
     key = ("protocols/index.html", "huberman")
     assert found[key] == 3
     assert ALLOWED_CITATIONS[key] != found[key], "count pin failed to distinguish growth"
+
+
+def test_4363_no_invented_real_publication_credits_in_legacy():
+    """#4363: the same /legacy tree carried Elena Voss's invented Harper's / Ringer / Wired
+    bylines (chronicle week-00). The narrator is an AI character; no page may state a
+    credit at a real publication as fact. One test that reports every offender."""
+    from content import chronicle_schema
+
+    offenders = []
+    for path in _iter_text_files(LEGACY_ROOT):
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for finding in chronicle_schema.real_publication_credit_findings(f.read()):
+                offenders.append(f"{os.path.relpath(path, LEGACY_ROOT)}: {finding['claim']}")
+    assert not offenders, "\n".join(offenders)
