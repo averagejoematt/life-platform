@@ -356,7 +356,10 @@ RESIDUE_NAME_RE = re.compile(r"^_?[A-Z][A-Z0-9_]*_RESIDUE$")
 # `truth_baseline.json`) or any `*residue*.json`. Non-recursive on purpose: tests/api_schemas/
 # holds response SNAPSHOTS, not accepted debt. A new file matching these globs must register.
 DATA_LEDGER_GLOBS: Tuple[str, ...] = ("tests/*_baseline.json", "tests/*residue*.json")
-DISCOVERY_ROOTS: Tuple[str, ...] = ("tests", "scripts", "lambdas", "deploy", "mcp", "cdk")
+# "ledgers" added #4270 slice 1 — the first residue ledger (conformance_residue.py) moved
+# out of tests/ into its own top-level ``ledgers/`` package; more residue ledgers will
+# follow in later #4270 slices, so this root stays even though only one file lives there yet.
+DISCOVERY_ROOTS: Tuple[str, ...] = ("tests", "scripts", "lambdas", "deploy", "mcp", "cdk", "ledgers")
 REQUIRED_FIELDS: Tuple[str, ...] = ("carrier", "condition", "declared", "expires", "consumer")
 
 _SEEDED = "2026-09-23"
@@ -365,7 +368,7 @@ _DRAIN_CARRIER = "#4122"  # the residue-drain carrier filed with this rule (#359
 
 # key = `path::SYMBOL` for a Python ledger, or the file path for a data-file ledger.
 RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
-    "tests/conformance_residue.py::CONFORMANCE_RESIDUE": {
+    "ledgers/conformance_residue.py::CONFORMANCE_RESIDUE": {
         "carrier": _DRAIN_CARRIER,
         "condition": "empties when every exempted hand-typed enumeration is a registry projection (#2844)",
         "declared": _SEEDED,
