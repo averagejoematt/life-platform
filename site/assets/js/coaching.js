@@ -40,7 +40,7 @@ import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment p
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { daysOverdue, lateWords } from "/assets/js/entry_age.js"; // #4219 — an overdue ask says it is late
-import { rosterEntries, scorecardSeats, retiredSeatNote } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping; #4215 retired seats apart
+import { rosterEntries, scorecardSeats, retiredSeatNote, rateText, rateWord } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping; #4215 retired seats apart
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 import { instantDayInWords } from "/assets/js/entry_age.js"; // #4182 sweep fix 2 — the lab-note card's date in words
 import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
@@ -177,7 +177,7 @@ function entriesFor(s, data) {
       const cl = c.lifetime || {};
       // #1376: fresh slate this season never disappears — it reads the career rate instead.
       const rate = c.total
-        ? (c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : `${c.decided || 0} decided`)
+        ? (c.decided ? rateText(c.confirmed, c.decided, c.hit_rate_pct, data && data.percent_floor) : "0 decided") // #4220: counts below the floor
         : `fresh slate · career ${cl.decided || 0} decided`;
       out.push({ id: cid, title: names[cid] || cid, date: rate });
     });
@@ -211,7 +211,10 @@ function coachStanceHTML(st) {
 function coachReportHTML(rc) {
   const tr = (rc && rc.track_record) || {};
   let h = `<section class="coach-report"><p class="dx-kicker label">report card</p>`;
-  h += `<p class="cr-rate">${tr.hit_rate_pct == null ? `Score unlocks as predictions resolve <span class="label">— first calls land in the coming weeks</span>` : esc(tr.hit_rate_pct) + "% hit-rate" + ` <span class="label">${esc(tr.n_note || "")}</span>`}</p>`;
+  // #4220: the served headline is the ONE record's own sentence ("0 of 9 checked calls right
+  // through September 28" — counts, not a percentage, below n = 10).
+  if (tr.headline && tr.decided) h += `<p class="cr-rate">${esc(tr.headline)}</p>`;
+  else h += `<p class="cr-rate">${tr.hit_rate_pct == null ? `Score unlocks as predictions resolve <span class="label">— first calls land in the coming weeks</span>` : esc(tr.hit_rate_pct) + "% hit-rate" + ` <span class="label">${esc(tr.n_note || "")}</span>`}</p>`;
   if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
   else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
   if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
@@ -982,7 +985,9 @@ async function renderByCoach(read, id) {
   h += coachHypothesesHTML(coach.working_hypotheses);
   const tr = (coach.report_card && coach.report_card.track_record) || {};
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
-    h += `<p class="bc-track label">track record: ${tr.hit_rate_pct != null ? esc(tr.hit_rate_pct) + "% hit-rate " + esc(tr.n_note || "") : "accruing"}</p>`;
+    // #4220: the ONE record's headline when served; the legacy rate line only for an older response.
+    const trLine = tr.headline && tr.decided ? tr.headline : tr.hit_rate_pct != null ? tr.hit_rate_pct + "% hit-rate " + (tr.n_note || "") : "accruing";
+    h += `<p class="bc-track label">track record: ${esc(trLine)}</p>`;
   }
   // 3.2) CONVERSATIONS WITH MATTHEW (#1483, ADR-142 theme-referenceable tier) — the
   // coach ALLUDES to private check-in conversations. The payload carries ONLY the
@@ -1426,7 +1431,7 @@ async function renderScorecard(read, id) {
     // The headline tiles — this season.
     h += `<p class="dx-kicker label sc-sub">this season · since Day 1</p>`;
     h += `<div class="sc-tiles">` +
-      `<div class="sc-tile"><span class="sc-n">${decided ? `${o.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${decided ? ` · ${decided} decided` : ""}</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${rateText(o.confirmed, decided, o.accuracy_pct, data.percent_floor)}</span><span class="sc-l label">${rateWord(decided, data.percent_floor)}${decided ? ` · ${decided} decided` : ""}</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.pending || 0}</span><span class="sc-l label">still open</span></div>` +
@@ -1447,7 +1452,7 @@ async function renderScorecard(read, id) {
       // #1376: a fresh cycle reads "fresh slate — career: n=X", never a bare
       // "none have resolved yet" that hides the record a reset didn't actually erase.
       const freshCareer = life.decided > 0
-        ? ` Fresh slate — career: n=${life.decided} decided (${life.accuracy_pct}% hit rate) across the whole record so far.`
+        ? ` Fresh slate — career: n=${life.decided} decided (${rateText(life.confirmed, life.decided, life.accuracy_pct, data.percent_floor)} ${rateWord(life.decided, data.percent_floor)}) across the whole record so far.`
         : "";
       const falsifiableN = Math.max(0, (o.total || 0) - (o.observational || 0));
       h += `<p class="dx-prose sc-note">The board has made <strong>${falsifiableN}</strong> falsifiable calls so far in this experiment; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""}${freshCareer} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
@@ -1462,7 +1467,7 @@ async function renderScorecard(read, id) {
     if (life.total > 0) {
       h += `<p class="dx-kicker label sc-sub">career · all time</p>`;
       h += `<div class="sc-tiles">` +
-        `<div class="sc-tile"><span class="sc-n">${life.decided ? `${life.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${life.decided ? ` · ${life.decided} decided` : ""}</span></div>` +
+        `<div class="sc-tile"><span class="sc-n">${rateText(life.confirmed, life.decided, life.accuracy_pct, data.percent_floor)}</span><span class="sc-l label">${rateWord(life.decided, data.percent_floor)}${life.decided ? ` · ${life.decided} decided` : ""}</span></div>` +
         `<div class="sc-tile"><span class="sc-n">${life.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
         `<div class="sc-tile"><span class="sc-n">${life.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
         `<div class="sc-tile"><span class="sc-n">${life.pending || 0}</span><span class="sc-l label">still open</span></div>` +
@@ -1480,7 +1485,7 @@ async function renderScorecard(read, id) {
       for (const cid of rows) {
         const c = byc[cid];
         const cl = c.lifetime || {};
-        const rate = c.total ? (c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : "—") : "fresh slate";
+        const rate = c.total ? rateText(c.confirmed, c.decided, c.hit_rate_pct, data.percent_floor) : "fresh slate"; // #4220: counts below the floor
         const mix = c.total
           ? `${c.confirmed || 0}✓ · ${c.refuted || 0}✗ · ${c.pending || 0} open`
           : `career: ${cl.confirmed || 0}✓ · ${cl.refuted || 0}✗ · ${cl.total || 0} total`;
@@ -1543,13 +1548,13 @@ async function renderScorecard(read, id) {
   if (scorecardSeats(data).retired.includes(String(id))) h += `<p class="dx-prose sc-note label">${esc(retiredSeatNote(String(id), data))} — this seat is no longer on the team.</p>`;
   h += `<p class="dx-kicker label sc-sub">this season</p>`;
   h += `<div class="sc-tiles">` +
-    `<div class="sc-tile"><span class="sc-n">${decidedC ? `${c.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${decidedC ? ` · ${decidedC} decided` : ""}</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${rateText(c.confirmed, decidedC, c.hit_rate_pct, data.percent_floor)}</span><span class="sc-l label">${rateWord(decidedC, data.percent_floor)}${decidedC ? ` · ${decidedC} decided` : ""}</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.pending || 0}</span><span class="sc-l label">still open</span></div>` +
     `</div>`;
   if (!decidedC) {
-    const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${cl.hit_rate_pct}% hit rate) across the whole record so far.` : "";
+    const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${rateText(cl.confirmed, cl.decided, cl.hit_rate_pct, data.percent_floor)} ${rateWord(cl.decided, data.percent_floor)}) across the whole record so far.` : "";
     // #3046: count only falsifiable calls; observational claims are labeled in the list below.
     const falsifiableC = Math.max(0, (c.total || 0) - (c.observational || 0));
     const obsNote = c.observational ? ` ${c.observational} more ${c.observational === 1 ? "claim is" : "claims are"} observational — on the record, no grading path.` : "";
@@ -1558,7 +1563,7 @@ async function renderScorecard(read, id) {
   if (cl.total > 0) {
     h += `<p class="dx-kicker label sc-sub">career · all time</p>`;
     h += `<div class="sc-tiles">` +
-      `<div class="sc-tile"><span class="sc-n">${cl.decided ? `${cl.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${cl.decided ? ` · ${cl.decided} decided` : ""}</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${rateText(cl.confirmed, cl.decided, cl.hit_rate_pct, data.percent_floor)}</span><span class="sc-l label">${rateWord(cl.decided, data.percent_floor)}${cl.decided ? ` · ${cl.decided} decided` : ""}</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${cl.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${cl.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${cl.pending || 0}</span><span class="sc-l label">still open</span></div>` +
