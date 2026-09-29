@@ -2854,3 +2854,26 @@ CI_PROOFS["ci::wrap-nightly.yml::check::2"] = {
     ),
     "proved_on": "2026-09-29",
 }
+
+# #4276 box 2: test_bedrock_client.py became a tree sweep (lambdas/**/*.py rglob) when the raw-model-text
+# json.loads guard joined it. Two REAL-tree plants, each restored by copying the pre-mutation file back.
+STRUCTURAL_HAND_PROOFS["structural::test_bedrock_client.py"] = {
+    "gate_name": "test_bedrock_client.py",
+    "command": "python3 -m pytest tests/test_bedrock_client.py -q -p no:cacheprovider   # 47 tests; baseline 47 passed",
+    "mutation": (
+        "M1: a `_planted_fence_parse(resp)` appended to lambdas/coach/coach_quality_gate.py — `resp['content'][0]['text']`, a "
+        "fence strip, `json.loads` (md5 9a229858… -> 41c688b1…). M2: one of the two ledgered `json.loads(text)` in "
+        "lambdas/emails/elena_state_updater.py::_call_haiku replaced (md5 8cbe495e… -> 2eab8510…) — the ledger now over-counts."
+    ),
+    "observed": (
+        "2026-09-29. M1: 1 failed, 46 passed — test_no_module_hand_parses_raw_model_text_outside_structured_json names "
+        "`lambdas/coach/coach_quality_gate.py::_planted_fence_parse (1 site(s))`. M2: 1 failed, 46 passed — the same test's "
+        "stale-ledger leg names `lambdas/emails/elena_state_updater.py::_call_haiku`. RESTORED (md5s back): 47 passed."
+    ),
+    "scope": (
+        "Proves the guard reds on a new hand parse of raw model text and on a ledger that out-counts the tree. The taint is "
+        "followed within ONE function from the `['content']…['text']` subscript through local assignments; model text "
+        "returned by a helper (ai_calls' IC-3 pass, enrichment, reading, remediation/agent.py) is a known, stated gap."
+    ),
+    "proved_on": "2026-09-29",
+}
