@@ -220,9 +220,10 @@ def derive_load_floors(
 
     for ex in getattr(ir, "exercises", None) or []:
         key = getattr(ex, "movement_key", None) or "?"
-        # #4408: under v0.3 the floor holds an achieved this-cycle load at the drafted sets' rep floor —
-        # the same `min_reps` the generator passes, so a draft carrying the generator's loads commits
-        extra = {"min_reps": load_ramp.min_reps_of(getattr(ex, "sets", None))} if v03 is not None else {}
+        # #4408: under v0.3 the floor holds an achieved this-cycle load RPE-adjusted to the slot — the same
+        # `slot_of` the generator uses (sets + rationale tag), so a draft carrying the generator's loads commits
+        slot = load_ramp.slot_of(getattr(ex, "sets", None), getattr(ex, "rationale_tag", None)) if v03 is not None else None
+        extra = {"slot": slot} if v03 is not None else {}
         floor = floor_fn(
             _template_id_for(key, movements),
             history_index,

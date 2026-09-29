@@ -651,7 +651,7 @@ def _enforce_load_floors(
     was missing.
     """
     from training.exercise_history import nearest_bodyweight
-    from training.load_ramp import min_reps_of
+    from training.load_ramp import slot_of
 
     current_lb = nearest_bodyweight(target_date, weight_index)
     audit: dict[str, Any] = {
@@ -668,8 +668,8 @@ def _enforce_load_floors(
 
     for block in exercises:
         template_id = catalog.get("movements", {}).get(block.movement_key, {}).get("hevy_template_id_hint")
-        # #4408: the v0.3 floor holds an achieved load at the set's own rep floor, so it is told the reps
-        extra = {"min_reps": min_reps_of(block.sets)} if floor_fn is not None else {}
+        # #4408: the v0.3 floor holds an achieved load RPE-adjusted to the slot (reps + RPE ceiling from the tag)
+        extra = {"slot": slot_of(block.sets, block.rationale_tag)} if floor_fn is not None else {}
         floor = (floor_fn or prescription_floor)(
             template_id,
             history_index,

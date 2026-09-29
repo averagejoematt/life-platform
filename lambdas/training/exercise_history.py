@@ -125,7 +125,7 @@ def load_history_indexes(
     """ONE batched Query over the SOURCE#hevy partition → (weighted, cardio).
 
     **weighted** — keyed by Hevy template_id → session dicts ordered most-recent first,
-    each {date, sets: [{weight_kg, reps}], top_weight_kg}. Unchanged since ADR-068.
+    each {date, sets: [{weight_kg, reps, rpe}], top_weight_kg}. ADR-068's shape; `rpe` added by #4408 (None = not logged).
 
     **cardio** (#3700) — keyed the same way, each {date, name, note, duration_sec,
     distance_m, session_start, session_end}. It exists because the weighted index
@@ -202,10 +202,12 @@ def load_history_indexes(
                             "sibling_block_seconds": [v for k, v in block_secs_by_pos.items() if k != pos and v > 0],
                         }
                     )
-                sets = [
+                sets: list[dict[str, Any]] = [
                     {
                         "weight_kg": _to_float(s.get("weight_kg")),
                         "reps": _to_int(s.get("reps")),
+                        # #4408 review: the logged RPE (None when he logged none) — the v0.3 hold is RPE-aware
+                        "rpe": _to_float(s.get("rpe")) if s.get("rpe") is not None else None,
                     }
                     for s in sets_raw
                     if _to_int(s.get("reps")) > 0
