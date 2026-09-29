@@ -547,12 +547,18 @@ class TestCallHaikuParsing:
     def test_a_non_schema_error_is_not_absorbed(self, monkeypatch):
         import common.retry_utils as retry_utils
 
+        sent = []
+
         def _boom(req):
-            raise RuntimeError("ThrottlingException: slow down")
+            sent.append(req)
+            if "output_config" in req:  # the schema call fails for a reason that is NOT the schema
+                raise RuntimeError("ThrottlingException: slow down")
+            return {"content": [{"text": '{"passed": true, "score": 90}'}]}
 
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", _boom)
         with pytest.raises(RuntimeError, match="Throttling"):
             gate._call_haiku("sys", "msg")
+        assert len(sent) == 1  # never silently re-sent without the schema
 
 
 def test_the_output_schema_names_every_prompt_key():
