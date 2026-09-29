@@ -20,9 +20,30 @@ from mcp.tools_correlation import tool_get_zone2_breakdown
 _TIER_SEVERITY = {"GREEN": 0, "YELLOW": 1, "RED": 2}
 
 
+# Meeusen 2013 floor on consecutive LOADED-lifting days (#4416) — the tier demotion and the rest
+# warning share it, so the warning never fires on a day the tier does not reflect.
+_LOADED_STREAK_FLOOR = 5
+
+
 def _demote_tier(tier, floor):
     """Return the more severe of ``tier`` and ``floor`` (never re-promotes)."""
     return floor if _TIER_SEVERITY[floor] > _TIER_SEVERITY[tier] else tier
+
+
+def _training_streaks_or_unknown(target_date):
+    """The shared streak read (`plan_draft_evidence._training_streaks`, #4067) — or both None.
+
+    #4416: the rest-day warning and the Meeusen tier floor below key on the LOADED-lifting
+    streak alone. They used to count consecutive days with ANY Strava activity >= 10 min
+    (walks included) — an active-day streak, and he was active on 97 % of his 2024-25 days
+    (`training_streaks.CALIBRATION`), so it read being active as fatigue (the #4411 class).
+    A read that raises is unknown, never 0 (ADR-104): no demotion, no warning."""
+    from mcp.plan_draft_evidence import _training_streaks
+
+    try:
+        return _training_streaks(target_date)
+    except Exception:  # noqa: BLE001 — an unreadable Hevy partition is unknown, not a rest day
+        return {"active_day_streak": None, "loaded_lifting_streak": None}
 
 
 def _get_training_load(args):
@@ -703,7 +724,6 @@ def _get_training_recommendation(args):
     last_strength_date = None
     last_hard_date = None
     consecutive_rest_days = 0
-    consecutive_training_days = 0
 
     cardio_types = {"run", "ride", "swim", "hike", "walk", "rowing", "elliptical", "virtualrun", "virtualride", "trailrun"}
     strength_types = {"weighttraining", "crossfit", "workout"}
@@ -742,7 +762,7 @@ def _get_training_recommendation(args):
                 }
             )
 
-    # Consecutive rest/training days
+    # Consecutive rest days (Strava). The training streak is the shared loaded-lifting read (#4416).
     check_date = datetime.strptime(target_date, "%Y-%m-%d")
     for i in range(7):
         d = (check_date - timedelta(days=i + 1)).strftime("%Y-%m-%d")
@@ -750,19 +770,8 @@ def _get_training_recommendation(args):
         acts = day_data.get("activities", [])
         real_acts = [a for a in acts if (_sf(a.get("elapsed_time_seconds")) or 0) >= 600]
         if real_acts:
-            if i == 0:
-                consecutive_training_days = 1
-            elif consecutive_training_days > 0:
-                consecutive_training_days += 1
-            else:
-                break
-        else:
-            if i == 0:
-                consecutive_rest_days = 1
-            elif consecutive_rest_days > 0:
-                consecutive_rest_days += 1
-            else:
-                break
+            break
+        consecutive_rest_days += 1
 
     # Days since last activities
     def _days_since(d):
@@ -822,10 +831,13 @@ def _get_training_recommendation(args):
     # the recovery signals) so it still fires when the recovery side is dark.
     if acwr is not None and acwr > 1.5:
         tier = "RED"
-    # Meeusen 2013: non-functional overreaching risk after 5+ consecutive training days.
+    # Meeusen 2013: non-functional overreaching risk after 5+ consecutive training days —
+    # LOADED-lifting days (#4416), never active days; an unread streak (None) never demotes.
     # A floor on an existing verdict — it cannot manufacture one out of UNKNOWN, since
     # "YELLOW" would then be asserting a readiness level nothing measured.
-    if consecutive_training_days >= 5 and tier in _TIER_SEVERITY:
+    streaks = _training_streaks_or_unknown(target_date)
+    loaded_streak = streaks.get("loaded_lifting_streak")
+    if loaded_streak is not None and loaded_streak >= _LOADED_STREAK_FLOOR and tier in _TIER_SEVERITY:
         tier = _demote_tier(tier, "YELLOW")
 
     # ── 6. Generate recommendation ───────────────────────────────────────────
@@ -964,8 +976,11 @@ def _get_training_recommendation(args):
     warnings = []
     if acwr is not None and acwr > 1.3:
         warnings.append(f"⚠️ ACWR is {acwr} — above 1.3 injury threshold. Reduce training load this week.")
-    if consecutive_training_days >= 4:
-        warnings.append(f"⚠️ {consecutive_training_days} consecutive training days. Consider a rest day soon.")
+    # One threshold with the tier floor above (#4416): 4 loaded days is inside his 2024-25 rhythm
+    # (4+ loaded streaks: 11 of 59, `training_streaks.CALIBRATION`), so the warning no longer fires a
+    # day before the floor it explains.
+    if loaded_streak is not None and loaded_streak >= _LOADED_STREAK_FLOOR:
+        warnings.append(f"⚠️ {loaded_streak} consecutive loaded-lifting days. Consider a rest day soon.")
     if readiness.get("sleep_duration") and readiness["sleep_duration"] < 6:
         warnings.append(
             f"⚠️ Only {readiness['sleep_duration']}h sleep — short sleep impairs muscle protein synthesis and injury risk. Reduce intensity."
@@ -1048,7 +1063,10 @@ def _get_training_recommendation(args):
             "days_since_strength": days_since_strength,
             "days_since_hard_session": days_since_hard,
             "consecutive_rest_days": consecutive_rest_days,
-            "consecutive_training_days": consecutive_training_days,
+            # #4416: the tier floor + rest warning read loaded_lifting_streak; the active-day
+            # streak rides as context only — it is never a fatigue signal for him.
+            "loaded_lifting_streak": loaded_streak,
+            "active_day_streak": streaks.get("active_day_streak"),
             "training_load": training_context,
         },
         "muscle_recovery": muscle_recovery,
