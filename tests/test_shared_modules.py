@@ -270,7 +270,7 @@ print("\n-- sick_day_checker ---------------------------------------------")
 
 from health.sick_day_checker import (
     check_sick_day,
-    delete_sick_day,
+    clear_sick_day,
     get_sick_days_range,
     write_sick_day,
 )
@@ -332,10 +332,46 @@ def test_write_sick_day_no_reason():
     assert "reason" not in item
 
 
-def test_delete_sick_day():
+def test_clear_sick_day_tombstones_via_update_never_delete():
+    """#4378: the MCP role has no dynamodb:DeleteItem on sick_days — clear is a
+    conditional UpdateItem tombstone."""
     t = MagicMock()
-    delete_sick_day(t, "matthew", "2026-03-10")
-    t.delete_item.assert_called_once_with(Key={"pk": "USER#matthew#SOURCE#sick_days", "sk": "DATE#2026-03-10"})
+    cleared_at = clear_sick_day(t, "matthew", "2026-03-10", reason="logged in error")
+    assert cleared_at
+    t.delete_item.assert_not_called()
+    kw = t.update_item.call_args.kwargs
+    assert kw["Key"] == {"pk": "USER#matthew#SOURCE#sick_days", "sk": "DATE#2026-03-10"}
+    assert kw["ConditionExpression"] == "attribute_exists(sk) AND attribute_not_exists(cleared_at)"
+    assert kw["ExpressionAttributeValues"] == {":ca": cleared_at, ":cr": "logged in error"}
+
+
+def test_clear_sick_day_lost_condition_is_none_other_errors_raise():
+    t = MagicMock()
+    t.update_item.side_effect = Exception("ConditionalCheckFailedException: The conditional request failed")
+    assert clear_sick_day(t, "matthew", "2026-03-10") is None
+    t.update_item.side_effect = Exception("AccessDeniedException")
+    try:
+        clear_sick_day(t, "matthew", "2026-03-10")
+    except Exception as e:  # noqa: BLE001
+        assert "AccessDenied" in str(e)
+    else:
+        raise AssertionError("a non-conditional failure must propagate, never read as 'nothing to clear'")
+
+
+def test_check_sick_day_cleared_row_is_not_sick():
+    item = {"pk": "X", "sk": "Y", "date": "2026-03-10", "cleared_at": "2026-03-11T00:00:00+00:00"}
+    assert check_sick_day(_mock_table(item), "matthew", "2026-03-10") is None
+
+
+def test_get_sick_days_range_skips_cleared_rows():
+    t = _mock_table()
+    t.query.return_value = {
+        "Items": [
+            {"date": "2026-03-09"},
+            {"date": "2026-03-10", "cleared_at": "2026-03-11T00:00:00+00:00", "cleared_reason": "logged_in_error"},
+        ]
+    }
+    assert [r["date"] for r in get_sick_days_range(t, "matthew", "2026-03-01", "2026-03-10")] == ["2026-03-09"]
 
 
 _run("check_sick_day: None when not found", test_check_sick_day_none)
@@ -346,7 +382,10 @@ _run("get_sick_days_range: empty -> []", test_get_sick_days_range_empty)
 _run("get_sick_days_range: DDB error -> []", test_get_sick_days_range_error)
 _run("write_sick_day: correct fields in item", test_write_sick_day_fields)
 _run("write_sick_day: no reason field if not provided", test_write_sick_day_no_reason)
-_run("delete_sick_day: calls delete_item with right key", test_delete_sick_day)
+_run("clear_sick_day: tombstones via update_item, never delete_item", test_clear_sick_day_tombstones_via_update_never_delete)
+_run("clear_sick_day: lost condition -> None, other errors raise", test_clear_sick_day_lost_condition_is_none_other_errors_raise)
+_run("check_sick_day: a cleared row is not a sick day", test_check_sick_day_cleared_row_is_not_sick)
+_run("get_sick_days_range: skips cleared rows", test_get_sick_days_range_skips_cleared_rows)
 
 
 # ======================================================================

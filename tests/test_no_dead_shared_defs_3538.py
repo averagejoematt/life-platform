@@ -303,9 +303,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/health/adherence_calc.py:find_alias_candidates": (
         "#3609 box 2 widen: exercised by tests/test_adherence_calc.py; named only in a COMMENT in deploy/config_ownership_audit.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
     ),
-    "lambdas/health/sick_day_checker.py:delete_sick_day": (
-        "#3609 box 2 widen: exercised only by tests/test_shared_modules.py (also named in docs/archive/CHANGELOG_v341.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
     "lambdas/health/sick_day_checker.py:write_sick_day": (
         "#3609 box 2 widen: exercised by tests/test_shared_modules.py; named only in a COMMENT in mcp/layer_status.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
     ),
