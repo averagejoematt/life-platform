@@ -12,6 +12,7 @@ from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
+from health.scoring_engine import habitify_reading  # #4362: rename-aware habit lookup
 from intelligence import (
     brief_domain_inputs,  # #4358/#4359: the physical training block + the explorer block, one seam with the brief
     labs_facts,  # #3792: the labs window framing has ONE home — see _build_labs_data
@@ -404,8 +405,8 @@ def _build_habit_outcome_context(data, profile):
     for day_rec in habitify_7d[-7:]:
         date_str = day_rec.get("sk", "").replace("DATE#", "")
         habits_map = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
-        t0_done = sum(1 for h in tier0_names if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
-        t1_done = sum(1 for h in tier1_names if habits_map.get(h) is not None and float(habits_map.get(h, 0)) >= 1)
+        t0_done = sum(1 for h in tier0_names if (habitify_reading(habits_map, h, registry.get(h)) or 0) >= 1)  # #4362
+        t1_done = sum(1 for h in tier1_names if (habitify_reading(habits_map, h, registry.get(h)) or 0) >= 1)
         trend_lines.append(f"  {date_str}: T0 {t0_done}/{len(tier0_names)}, T1 {t1_done}/{len(tier1_names)}")
 
     # Known habit-outcome relationships to surface to the AI
