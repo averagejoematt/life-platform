@@ -409,7 +409,13 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
             )
     except Exception:
         pass
-    return out
+    # #4185: a stored pre-#4227 read whose dated logging gap the served record contradicts is
+    # served superseded (summary withheld, reason named) — read-side only, nothing is rewritten.
+    from common.pacific_time import pacific_today
+
+    from web import superseded_gap_reads
+
+    return superseded_gap_reads.apply(out, table, pacific_today())
 
 
 def _dossier_block(coach_id, *, _g):
