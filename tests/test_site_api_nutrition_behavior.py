@@ -1086,6 +1086,29 @@ def test_the_public_door_joins_the_same_days_supplement_record_and_names_its_cha
     assert "counted" not in m
 
 
+def test_the_public_door_serves_a_scheduled_supplement_miss_as_a_zero_and_leaks_no_other_habit():
+    """#4245 box 4 on the public door: no supplement row, and Habitify resolved the vitamin D
+    habit `failed` — the channel is a recorded zero, named. A non-supplement habit on the same
+    record never leaves the endpoint (only registry supplement names are read)."""
+    habits = {
+        "Vitamin D": {"status": "failed", "miss_source": "vendor"},
+        "Private Habit": {"status": "failed", "miss_source": "vendor"},
+    }
+    src = FakeSources(
+        macrofactor=[mf("2026-05-07", total_vitamin_d_mcg=5, total_fiber_g=19)],
+        habitify=[row("habitify", "2026-05-07", habit_statuses=habits)],
+    )
+    m = overview(src)["micronutrients"]
+    assert m["supplements_state"] == "scheduled_miss"
+    vd = m["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_supplements"], vd["total"], vd["missed_supplements"]) == (0.0, 5.0, ["Vitamin D"])
+    assert m["not_taken"] == [{"name": "Vitamin D", "status": "failed", "miss_source": "vendor"}]
+    assert "Private Habit" not in json.dumps(m)
+    # Without the Habitify row the same day is absent, not zero.
+    m = overview(FakeSources(macrofactor=[mf("2026-05-07", total_vitamin_d_mcg=5)]))["micronutrients"]
+    assert (m["supplements_state"], m["not_taken"], m["sufficiency"]["vitamin_d_mcg"]["from_supplements"]) == ("absent", [], None)
+
+
 def test_micronutrients_report_an_empty_map_and_a_null_average_when_none_were_ingested():
     src = FakeSources(macrofactor=[mf("2026-05-06", total_calories_kcal=2000)])
     m = overview(src)["micronutrients"]
@@ -1494,7 +1517,9 @@ def test_the_public_response_reads_only_the_partitions_the_nutrition_page_needs(
     overview(src)
     # `supplements` (#4244): read ONLY to join the day's per-nutrient amounts into the
     # micronutrient figure; the stack and its adherence are already public via /api/supplements.
-    allowed = {"macrofactor", "strava", "withings", "whoop", "supplements"}
+    # `habitify` (#4245): read ONLY for the day's supplement-habit statuses (a scheduled miss is a
+    # zero, no record is absent); nutrient_intake reads registry supplement names and nothing else.
+    allowed = {"macrofactor", "strava", "withings", "whoop", "supplements", "habitify"}
     assert src.sources_read <= allowed, f"unexpected partition read: {sorted(src.sources_read - allowed)}"
 
 

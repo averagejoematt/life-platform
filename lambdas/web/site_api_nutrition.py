@@ -432,6 +432,7 @@ def nutrition_overview(*, _g) -> dict:
                     "intake_channels": list(nutrient_intake.INTAKE_CHANNELS),
                     "supplements_state": "absent",
                     "unconverted": [],
+                    "not_taken": [],
                     "food_only_avg_pct": None,
                     "protein_distribution_score": None,
                     "as_of": None,
@@ -490,11 +491,16 @@ def nutrition_overview(*, _g) -> dict:
     # protocols page already publishes). No timings, no manual notes, no row shape.
     # Owner ruling 2026-09-27 (on #4333): per-nutrient supplement totals MAY be public on this
     # endpoint — the projection above is the consented shape, not a pending question.
-    _supp_row = None
+    # #4245 box 4: the same day's Habitify record tells a SCHEDULED miss (a zero) from no record
+    # (absent) — the supplement partition alone cannot, since the bridge writes no row on a day
+    # with no tick. nutrient_intake reads only supplement-habit statuses from it, by registry name.
+    _supp_row = _habit_row = None
     if latest_date:
         _supp_rows = _query_source("supplements", latest_date, latest_date)
         _supp_row = next((r for r in _supp_rows if str(r.get("date") or r.get("sk", "")).replace("DATE#", "") == latest_date), None)
-    _intake = nutrient_intake.nutrient_intake(latest or None, _supp_row)
+        _habit_rows = _query_source("habitify", latest_date, latest_date)
+        _habit_row = next((r for r in _habit_rows if str(r.get("date") or r.get("sk", "")).replace("DATE#", "") == latest_date), None)
+    _intake = nutrient_intake.nutrient_intake(latest or None, _supp_row, _habit_row)
 
     # 7-day vs 30-day comparison.
     # #2221 fixed the eighth-day bug HERE, in this one filter, by making the lower bound
@@ -1031,6 +1037,8 @@ def nutrition_overview(*, _g) -> dict:
                 "intake_channels": _intake["intake_channels"],
                 "supplements_state": _intake["supplements_state"],
                 "unconverted": [{"name": u["name"], "reason": u["reason"]} for u in _intake["unconverted"]],
+                # #4245: supplement habits scheduled and not taken (registry names only) — their zero.
+                "not_taken": [{k: m.get(k) for k in ("name", "status", "miss_source")} for m in _intake["not_taken"]],
                 "food_only_avg_pct": _intake["food_only_avg_pct"],
                 "protein_distribution_score": (latest or {}).get("protein_distribution_score"),
                 "as_of": latest_date,
