@@ -129,9 +129,11 @@ carries no rep qualifier, so the cap now takes the lower of the two:
     `band_e1rm_kg` — the same number the 85 % is a share of.
   * the slot's TARGET reps (the middle of its range) and its RPE CEILING come from `slot_of` — the
     same slot the hold reads. Volume 8–12 @ <= 9 -> 10 reps + 1 RIR = 73.2 %; moderate 6–10 @ <= 8
-    -> 75.0 %; accessory 8–15 @ <= 9 -> 71.4 %; heavy 4–6 @ <= 8 -> 81.1 %. So the volume ramp binds
-    from week 4 (75 % > 73.2 %), and a heavy top set tops out at 81 %, not 85 % — 85 % at RPE 8 would
-    be a triple, and the slot says 4–6.
+    -> 75.0 %; accessory 8–15 @ <= 9 -> 71.4 %. So the volume ramp binds from week 4 (75 % > 73.2 %).
+  * THE HEAVY SLOT IS EXEMPT (owner ruling 2026-09-29, option (b)): the 4–6 @ <= 8 top set keeps the
+    ramp's 85 %-of-band-e1RM week-6 redline. The table would read 81.1 % for it (85 % at RPE 8 is
+    nearer a triple); the owner chose the redline. `ramp.rep_cap` still records the row, with
+    `applies: False` and the ruling as its reason (`HEAVY_SLOT_RULING_4397`).
   * rounded DOWN on the one 5-lb grid (`rep_scheme.load_step_kg`), like the 85 % cap.
   * ONE helper, `rep_ceiling_kg`: the cap and the hold both call it, so they are the same function
     of an e1RM. The hold governs when it applies (it runs after the cap and only ever raises): its
@@ -344,6 +346,12 @@ def rep_ceiling_kg(e1rm_kg: float, target_reps: int, rpe_ceiling: float) -> floa
     """THE rep-aware load ceiling (#4397) — `rep_ceiling_pct` of `e1rm_kg`, rounded DOWN on the one
     5-lb grid. The ramp's cap and the #4408 hold both call it, so they cannot disagree on the table."""
     return load_step_kg(float(e1rm_kg) * rep_ceiling_pct(target_reps, rpe_ceiling) / 100.0, down=True)
+
+
+HEAVY_SLOT_RULING_4397 = (
+    "owner ruling 2026-09-29 (b): the heavy slot keeps the ramp's 85% week-6 redline; the rep-aware cap "
+    "applies to the moderate, volume and accessory slots only (#4397)"
+)
 
 
 def lowest_program_rpe_ceiling() -> int:
@@ -659,6 +667,18 @@ def _apply_rep_cap(ramped: dict[str, Any], slot: dict[str, Any] | None) -> None:
     of band e1RM (`rep_ceiling_kg`; module docstring). Records `ramp.rep_cap` on every ramped row."""
     r = ramped.get("ramp")
     if not r:
+        return
+    if (slot or {}).get("intensity") == "heavy":
+        # Owner ruling 2026-09-29, option (b): the heavy top set (4–6 @ <= 8) keeps the ramp's own
+        # ceiling, the 85 %-of-band-e1RM week-6 redline, and is NOT rep-capped (the table would read
+        # 81.1 %). The rep-aware cap governs the moderate, volume and accessory slots only.
+        r["rep_cap"] = {
+            "applies": False,
+            "binds": False,
+            "slot": slot,
+            "governed_by": "ramp",
+            "reason": HEAVY_SLOT_RULING_4397,
+        }
         return
     target = int((slot or {}).get("target_reps") or 0)
     if target <= 0:

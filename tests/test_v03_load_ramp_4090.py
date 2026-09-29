@@ -659,33 +659,60 @@ def test_4397_mutation_control_without_the_rep_cap_week_6_volume_is_his_5_rep_we
     assert w6["floor_kg"] == pytest.approx(190 * LB, abs=0.01) and "rep_cap" not in w6["ramp"]
 
 
-def test_4397_a_5_rep_anchor_on_the_ramp_week_1_and_week_6():
-    """After a layoff (no hold — the ramp re-enters) the 4–6 top set: week 1 = 60 % of the 239.2 lb bench
-    e1RM = 145 lb; week 6 = the ramp's 85 % (203 lb -> 205) capped at 81.1 % (5 reps @ RPE <= 8) -> 190 lb."""
+def _bench_after_layoff(week, slot):
     from common.pacific_time import shift_day_key
 
     history, _ = _wire_history()
     after = shift_day_key("2026-09-28", load_ramp.DETRAINING_ANCHOR_AGE_DAYS)
-    w1, w6 = (load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=after, week=w, slot=HEAVY_SLOT) for w in (1, 6))
+    return load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=after, week=week, slot=slot)
+
+
+def test_4397_a_heavy_5_rep_anchor_keeps_the_85_percent_redline_owner_ruling_b():
+    """Owner ruling 2026-09-29, option (b): the heavy 4–6 top set is NOT rep-capped. After a layoff (no hold —
+    the ramp re-enters): week 1 = 60 % of the 239.2 lb bench e1RM = 145 lb; week 6 = the ramp's 85 %
+    (203.3 lb) rounded DOWN = 200 lb — not the 190 lb the rep table (81.1 %) would give."""
+    w1, w6 = _bench_after_layoff(1, HEAVY_SLOT), _bench_after_layoff(6, HEAVY_SLOT)
     assert w1["ramp"]["hold"]["layoff"] is True and w1["floor_kg"] == pytest.approx(145 * LB)
-    assert w6["floor_kg"] == pytest.approx(190 * LB) and w6["ramp"]["rep_cap"]["pct_of_band_e1rm"] == 81.1
-    assert w6["ramp"]["rep_cap"]["governed_by"] == "rep_cap"
+    rc = w6["ramp"]["rep_cap"]
+    assert rc["applies"] is False and rc["binds"] is False and rc["governed_by"] == "ramp"
+    assert rc["reason"] == load_ramp.HEAVY_SLOT_RULING_4397 and "2026-09-29 (b)" in rc["reason"]
+    assert w6["floor_kg"] == pytest.approx(200 * LB) and w6["floor_kg"] <= w6["ramp"]["band_e1rm_kg"] * 0.85
+
+
+def test_4397_mutation_control_a_heavy_slot_without_the_exemption_is_rep_capped_at_81():
+    """The exemption is keyed on the slot's intensity: the same 4–6 @ <= 8 slot under any other name is
+    rep-capped to 81.1 % -> 190 lb at week 6 — the number option (b) declined."""
+    unexempt = {**HEAVY_SLOT, "intensity": "heavy-without-the-ruling"}
+    w6 = _bench_after_layoff(6, unexempt)
+    assert w6["floor_kg"] == pytest.approx(190 * LB) and w6["ramp"]["rep_cap"]["governed_by"] == "rep_cap"
+    assert w6["ramp"]["rep_cap"]["pct_of_band_e1rm"] == 81.1
+
+
+ACCESSORY_SLOT = load_ramp.slot_of([{"reps": [8, 15]}], "accessory")  # 8–15 @ RPE <= 9, target 11
 
 
 def test_4397_the_hold_and_the_cap_never_disagree_the_final_load_is_under_the_one_table():
     """The hold governs when it applies (it runs after the cap and only raises) — the same `rep_ceiling_kg`
-    on the RPE-adjusted e1RM of a set moved this cycle at this band. So at every week and every slot, the
-    final load <= the table's % of the larger of the two e1RMs, and a held load is never above its own."""
+    on the RPE-adjusted e1RM of a set moved this cycle at this band. So at every week, the final load <=
+    the slot's ceiling share of the larger of the two e1RMs, and a held load is never above its own table
+    ceiling. The slot's ceiling share (owner ruling 2026-09-29, option (b)): HEAVY is pinned at the ramp's
+    85 % redline; moderate, volume and accessory at their rep-table percentage."""
     history, _ = _wire_history()
-    seen = set()
+    cap_pct = load_ramp.params()["cap_pct"] / 100
+    assert cap_pct == 0.85
+    seen, heavy_seen = set(), set()
     for tid in sorted(history):
-        for slot in (HEAVY_SLOT, MODERATE_SLOT, VOLUME_SLOT):
+        for slot in (HEAVY_SLOT, MODERATE_SLOT, VOLUME_SLOT, ACCESSORY_SLOT):
             for week in range(1, 10):
                 row = load_ramp.v03_floor(tid, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=week, slot=slot)
                 r = row.get("ramp")
                 if not r:
                     continue
-                pct = load_ramp.rep_ceiling_pct(slot["target_reps"], slot["rpe_ceiling"]) / 100
+                table_pct = load_ramp.rep_ceiling_pct(slot["target_reps"], slot["rpe_ceiling"]) / 100
+                pct = cap_pct if slot["intensity"] == "heavy" else table_pct
+                if slot["intensity"] == "heavy" and r["rep_cap"]["governed_by"] == "ramp":
+                    # a heavy row the RAMP governs (no hold raised it) above the 81.1 % table share: (b) at work
+                    heavy_seen.add(row["floor_kg"] > r["band_e1rm_kg"] * table_pct + 0.01)
                 a = r["hold"].get("achieved") or {}
                 hold_e1 = a.get("e1rm_rpe_adjusted") or (
                     load_ramp.rpe_adjusted_e1rm_kg(a["weight_kg"], a["reps"], slot["rpe_ceiling"]) if a else 0.0
@@ -693,9 +720,10 @@ def test_4397_the_hold_and_the_cap_never_disagree_the_final_load_is_under_the_on
                 # 0.01 kg: the recorded e1RMs are rounded to 3 dp; a real breach is a 5-lb step (2.27 kg)
                 assert row["floor_kg"] <= max(r["band_e1rm_kg"], hold_e1) * pct + 0.01, (tid, slot, week, row["floor_kg"])
                 if a:
-                    assert a["held_kg"] <= hold_e1 * pct + 0.01
+                    assert a["held_kg"] <= hold_e1 * table_pct + 0.01  # a hold is its own table ceiling, heavy too
                 seen.add(r["rep_cap"]["governed_by"])
     assert seen == {"ramp", "rep_cap", "hold"}, seen
+    assert True in heavy_seen, "no heavy row ever sat above the 81.1 % table share — the (b) exemption was never exercised"
 
 
 def test_4397_an_absent_rpe_set_below_the_target_reps_is_read_at_the_ceiling():
