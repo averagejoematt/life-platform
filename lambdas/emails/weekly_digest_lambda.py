@@ -1783,14 +1783,17 @@ def lambda_handler(event, context):
     )
     if not dry_run:  # DIL-025: record HERE — the ~40 lines of insight-writing
         record_email_send(table, LEDGER_NAME, period_key)  # below used to sit between the send and its only record
-    logger.info("Sent.")
+    logger.info("DRY_RUN, not sent." if dry_run else "Sent.")
 
     # IC-15: Persist insights from this digest — genuine Board output only (#2221).
     # insight_writer.build_insights_context replays what lands here into NEXT week's
     # prompt as PREVIOUS INSIGHTS, so filing the AI-failure stub (or the validator's
     # safe_fallback) with confidence="high", actionable=True fed the model its own
     # outage back as last week's coaching.
-    if _HAS_INSIGHT_WRITER and commentary and commentary_ok:
+    # #4448: a dry run writes NO insight — a rehearsal row would be replayed into next week's real prompt.
+    if dry_run and _HAS_INSIGHT_WRITER and commentary and commentary_ok:
+        logger.info("[DRY_RUN] IC-15: would have persisted 1 insights — not written")
+    elif _HAS_INSIGHT_WRITER and commentary and commentary_ok:
         try:
             insights = []
             # Write the full Board commentary as a coaching insight
@@ -1811,4 +1814,4 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 insight write failed (non-fatal): {e}")
 
-    return {"statusCode": 200, "body": "Digest v4.0 sent."}
+    return {"statusCode": 200, "body": "Digest v4.0 generated (DRY_RUN, not sent)." if dry_run else "Digest v4.0 sent."}

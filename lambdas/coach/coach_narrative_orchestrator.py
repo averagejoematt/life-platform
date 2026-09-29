@@ -276,26 +276,11 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
 
     resp = call_anthropic_raw(req)
     text = resp["content"][0]["text"].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        if "```json" in text:
-            start = text.find("```json") + 7
-            end = text.find("```", start)
-            if end > start:
-                try:
-                    return json.loads(text[start:end].strip())
-                except json.JSONDecodeError:
-                    pass
-        elif "```" in text:
-            start = text.find("```") + 3
-            end = text.find("```", start)
-            if end > start:
-                try:
-                    return json.loads(text[start:end].strip())
-                except json.JSONDecodeError:
-                    pass
-        return text
+    # #4276: the fence-tolerant parse is one shared copy now (ai/structured_json.py). This site does
+    # not yet send `output_config.format`: its output needs its own JSON schema first (see #4276).
+    from ai.structured_json import parse_json_text
+
+    return parse_json_text(text)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

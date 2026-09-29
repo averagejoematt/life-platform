@@ -1,4 +1,4 @@
-"""tests/pair_seam_residue.py — the #2847 must-agree-seam ledger (box 4, epic #2842).
+"""ledgers/pair_seam_residue.py — the #2847 must-agree-seam ledger (box 4, epic #2842).
 
 The dated, shrink-only companion to ``tests/pair_seam_guard_lib.py``, in the shape
 ``ledgers/conformance_residue.py`` (#2844) and ``tests/lambda_enrollment_ledger.py``

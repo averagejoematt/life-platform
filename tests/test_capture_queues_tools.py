@@ -15,6 +15,8 @@ other five.
 import os
 import sys
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform-test")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("S3_BUCKET", "test-bucket")
@@ -245,8 +247,18 @@ def test_registered_in_mcp_registry():
 
     assert "get_capture_queues" in registry.TOOLS
     entry = registry.TOOLS["get_capture_queues"]
-    assert entry["fn"] is tc.tool_get_capture_queues
+    # `__wrapped__`: the #4286 autouse fixture wraps the module attribute to validate its outputSchema.
+    assert entry["fn"] is getattr(tc.tool_get_capture_queues, "__wrapped__", tc.tool_get_capture_queues)
     schema = entry["schema"]
     assert schema["name"] == "get_capture_queues"
     assert schema["description"]
     assert "inputSchema" in schema
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, tc, "get_capture_queues")

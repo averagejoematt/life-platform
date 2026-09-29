@@ -929,6 +929,133 @@ def test_4220_mcp_track_record_a_repeated_result_counts_once_and_a_failed_ledger
     assert down["headline"] == "record unavailable"
 
 
+# ── #4220: a graded call's reason is served in reader words ──────────────────
+# Wire strings: `outcome_notes` exactly as /api/predictions served them 2026-09-29 16:24Z
+# (build_outcome_notes' JSON blob), beside the evaluation spec the same rows carry.
+
+
+def _pred_row(status, ev, **notes):
+    return {"status": status, "evaluation": ev, "outcome_notes": json.dumps({"algo_version": "1.0", "beats_null": False, **notes})}
+
+
+_DIR_UP = {"type": "directional", "metric": "hrv_7day_avg", "condition": "up", "threshold": None}
+_DIR_DOWN = {"type": "directional", "metric": "recovery_score", "condition": "down", "threshold": None}
+_POINT = {"type": "point", "metric": "sleep_duration_hours", "condition": "within", "threshold": 7.1}
+
+
+@pytest.mark.parametrize(
+    "row,expected",
+    [
+        (
+            _pred_row("confirmed", _DIR_UP, actual_value=0.2341, reason="hrv_7day_avg trend=up (slope=0.2341), predicted=up"),
+            ("Heart-rate variability (7-day average) went up, as called", True),
+        ),
+        (
+            _pred_row("refuted", _DIR_DOWN, actual_value=0.1439, reason="recovery_score trend=up (slope=0.1439), predicted=down"),
+            ("Morning recovery score went up — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _DIR_DOWN,
+                actual_value=-0.0037,
+                reason="predicted down, metric flat (slope=-0.0037, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+            ),
+            ("Morning recovery score held flat — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _POINT,
+                actual_value=4.7,
+                reason="sleep_duration_hours=4.70 on 2026-09-11 vs predicted 7.1 ±1.1708; |Δ|=2.40 → outside tolerance",
+            ),
+            ("Sleep time came in at 4.7 hours against a call of 7.1 hours — outside its usual day-to-day range", True),
+        ),
+        (
+            _pred_row(
+                "inconclusive",
+                {"type": "directional", "metric": "blood_glucose_avg", "condition": "down"},
+                actual_value=None,
+                reason="Insufficient data to determine trend for 'blood_glucose_avg'",
+                grading_open=True,
+            ),
+            ("not gradable yet — not enough average blood glucose data to read it", False),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                {"type": "machine", "metric": "total_calories_kcal", "condition": "gt", "threshold": None},
+                actual_value=-0.0346,
+                reason="[null-threshold machine spec re-routed to directional] total_calories_kcal trend=down (slope=-0.0346), predicted=up",
+            ),
+            ("Calories eaten went down — the call was for it to go up", True),
+        ),
+        (
+            _pred_row(
+                "expired",
+                {"type": "qualitative"},
+                actual_value=None,
+                reason="Retired unevaluated at window end (14d): eval_type=qualitative has no deterministic grading path",
+            ),
+            ("retired ungraded — a call like this has no measurable test", False),
+        ),
+        # A metric with no reader words: the grader's own sentence, unwrapped — never a guess.
+        (
+            _pred_row(
+                "refuted", {"type": "directional", "metric": "strain", "condition": "up"}, actual_value=-0.5, reason="strain trend=down"
+            ),
+            ("strain trend=down", True),
+        ),
+        # No reason written -> none served (ADR-104); nothing came back yet -> the flag is None.
+        (_pred_row("inconclusive", _DIR_UP, actual_value=None, reason=None), (None, False)),
+        ({"status": "pending", "evaluation": _DIR_UP, "outcome_notes": ""}, (None, None)),
+        ({"status": "confirmed", "evaluation": _DIR_UP, "outcome_notes": "plain grader note"}, ("plain grader note", True)),
+    ],
+)
+def test_4220_prediction_reason_in_reader_words(row, expected):
+    from web import prediction_reason
+
+    assert prediction_reason.reason_words(row) == expected
+
+
+def test_4220_every_measurable_metric_has_reader_words():
+    from experiment.measurable_metrics import METRIC_SOURCES, base_metric
+    from web import prediction_reason
+
+    assert {base_metric(k) for k in METRIC_SOURCES} == set(prediction_reason.METRIC_WORDS)
+
+
+def test_4220_predictions_serve_reason_and_graded_on_data_beside_the_raw_notes(monkeypatch):
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    _coaches, _cal, predictions, _wrong = _served_four(monkeypatch, table)
+    from web import prediction_reason
+
+    served = predictions["predictions"]
+    webb = [p for p in served if p["coach_id"] == "nutrition" and p["status"] == "refuted"]
+    assert len(webb) == 5, "the wire serves Webb's five refuted calls"
+    for p in webb:
+        assert p["outcome_notes"].startswith("{"), "outcome_notes stays the grader's blob (compatibility)"
+        assert p["graded_on_data"] is True
+        # The wire's grader wrote reason "r" on a machine spec with no reader-word shape:
+        # the grader's own text is served, unwrapped — never the blob, never a guess.
+        assert p["reason"] == "r", p["reason"]
+    # Every served row's reason is the one function's answer over its stored row.
+    stored = {
+        (row.get("claim_natural"), row.get("created_date")): row
+        for (_pk, sk), row in table.store.items()
+        if str(sk).startswith("PREDICTION#") and not str(sk).startswith("PREDICTION#docket-")
+    }
+    checked = 0
+    for p in served:
+        row = stored.get((p["text"], p["date"]))
+        if row is None:
+            continue
+        assert (p["reason"], p["graded_on_data"]) == prediction_reason.reason_words({**row, "status": p["status"]}), p
+        checked += 1
+    assert checked >= 9
+
+
 _LIVE_WRONG_4220 = os.path.join(_REPO, "tests", "fixtures", "wrong_obituaries_4220", "live_2026-09-27.json")
 
 
@@ -1182,8 +1309,6 @@ def test_every_per_coach_record_surface_is_record_from_rows(monkeypatch):
 _RECORD_SWEEP_FILES = ("lambdas/web/*.py", "lambdas/coach/coach_observatory_renderer.py", "mcp/tools_coach_intelligence.py")
 _LEARNING_TALLY_READERS_EXEMPT = {
     # path::function -> why it may read LEARNING# AND name confirmed/refuted without being a record
-    "lambdas/web/site_api_coach_profile.py::_track_record": "the report card's `recent` list (the reason text lives only on "
-    "LEARNING#), one row per named prediction; its record is coach_record.for_coach",
     "lambdas/coach/coach_observatory_renderer.py::_tally_learning_statuses": "conversation-provenance (#1481, ADR-141): only "
     "conversation_count is read; the card's record is coach_record.for_coach",
     "mcp/tools_coach_intelligence.py::tool_get_coach_track_record": "conversation-provenance split + by_subdomain/by_metric "
@@ -1205,15 +1330,34 @@ def _learning_tally_readers(root):
         return out
 
     def _tallies(fn):
-        names = _strs(fn)
-        if not {"confirmed", "refuted"} <= names:
+        """A numeric count keyed on a graded status: an `x += <int>` / `sum(...)` / `Counter(...)` in the
+        same function as a "confirmed"/"refuted" literal used as a comparand or a zero-initialised counter key."""
+        counters = {
+            n.target.value.id
+            for n in ast.walk(fn)
+            if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Subscript) and isinstance(n.target.value, ast.Name)
+        }
+        status_keyed = False
+        for n in ast.walk(fn):
+            if isinstance(n, ast.Compare):
+                status_keyed |= bool(_strs(n) & {"confirmed", "refuted"})
+            elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "get":
+                # counts.get("confirmed", 0) where `counts[...] += 1` elsewhere in the function
+                owner = getattr(n.func.value, "id", None)
+                if owner in counters and _strs(n) & {"confirmed", "refuted"}:
+                    status_keyed = True
+            elif isinstance(n, ast.Dict):  # a counter initialised per status: {"confirmed": 0, ...}
+                status_keyed |= any(
+                    isinstance(k, ast.Constant) and k.value in ("confirmed", "refuted") and isinstance(v, ast.Constant) and v.value == 0
+                    for k, v in zip(n.keys, n.values)
+                )
+        if not status_keyed:
             return False
         for n in ast.walk(fn):
-            if isinstance(n, ast.AugAssign):
+            if isinstance(n, ast.AugAssign) and isinstance(n.value, ast.Constant) and isinstance(n.value.value, int):
                 return True
-            if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("sum", "Counter", "len"):
-                if _strs(n) & {"confirmed", "refuted"}:
-                    return True
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("sum", "Counter"):
+                return True
         return False
 
     hits = set()
@@ -1230,6 +1374,7 @@ def _learning_tally_readers(root):
                 if name in talliers and reads_learning:
                     hits.add(f"{rel}::{name}")
                 elif reads_learning:
+                    # A reader that hands its LEARNING# rows to a same-module tallier: the tallier is the finding.
                     hits.update(f"{rel}::{t}" for t in calls & talliers)
     return hits
 
@@ -1243,3 +1388,82 @@ def test_no_record_surface_tallies_learning_rows():
     )
     stale = sorted(set(_LEARNING_TALLY_READERS_EXEMPT) - hits)
     assert not stale, f"exemptions whose function no longer tallies LEARNING# — delete them: {stale}"
+
+
+# ── #4185: a stored pre-fix read whose dated logging gap the served record contradicts ──
+# The live wire (public /api/coach/{nutrition,physical}_coach recent_outputs + /api/nutrition_overview,
+# read 2026-09-29): the nutrition coach's 09-23/24/25 reads say logging stopped after September 19th
+# and the physical coach's 09-13 read says after September 10th — the served record has a log on every
+# day through 09-26. Rebuilt into the stored OUTPUT# shape and served through the REAL _recent_outputs.
+_GAP_FX = json.load(open(os.path.join(os.path.dirname(__file__), "fixtures", "coach_superseded_gap_4185", "live_wire_2026-09-29.json")))
+
+
+def _gap_rows(coach_id):
+    rows = []
+    for o in _GAP_FX["coaches"][coach_id]:
+        row = {"pk": f"COACH#{coach_id}", "sk": f"OUTPUT#{o['date']}#daily_brief", "created_at": o["generated_at"]}
+        if o.get("summary"):
+            row["public_summary"] = o["summary"]
+        if o.get("data_through"):
+            row["data_through"] = o["data_through"]
+        rows.append(row)
+    return rows
+
+
+def _served_recent(monkeypatch, coach_id, *, macrofactor=True):
+    mf = [{"pk": "USER#matthew#SOURCE#macrofactor", "sk": f"DATE#{d}", "date": d} for d in _GAP_FX["nutrition_overview"]["trend_dates"]]
+    routes = {f"COACH#{coach_id}": _gap_rows(coach_id), "USER#matthew#SOURCE#macrofactor": mf if macrofactor else []}
+    monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=lambda _t, **kw: _fake_query_by_pk(routes)(**kw)))
+    return api._recent_outputs(coach_id)
+
+
+def test_the_four_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monkeypatch):
+    """Exactly the four live reads — nutrition 09-23/24/25, physical 09-13 — lose their false summary and
+    carry `superseded`; every other read (including the post-fix 09-28/29 reads that mention September 19th)
+    is served byte-for-byte. Mutation controls: drop the `served_last_log > d` comparison or the pre-fix
+    condition — more reads supersede and the set assertion reds; remove the `apply` call — none do."""
+    assert _GAP_FX["nutrition_overview"]["nutrition"]["latest_date"] == "2026-09-26"
+    hit = {}
+    for cid in ("nutrition_coach", "physical_coach"):
+        served = _served_recent(monkeypatch, cid)
+        wire = _GAP_FX["coaches"][cid]
+        assert [o["date"] for o in served] == [o["date"] for o in wire]
+        for o, w in zip(served, wire):
+            if o.get("superseded"):
+                hit[(cid, o["date"])] = o["superseded"]["claimed_logging_stopped_after"]
+                assert o["summary"] is None and o["superseded"]["served_last_log"] == "2026-09-26"
+                assert o["superseded"]["note"] == "superseded — generated before the logging-record fix"
+            else:
+                assert o["summary"] == (w["summary"] or ""), (cid, o["date"])
+    assert hit == {
+        ("nutrition_coach", "2026-09-25"): "2026-09-19",
+        ("nutrition_coach", "2026-09-24"): "2026-09-19",
+        ("nutrition_coach", "2026-09-23"): "2026-09-19",
+        ("physical_coach", "2026-09-13"): "2026-09-10",
+    }
+
+
+def test_an_unread_or_uncontradicting_record_supersedes_nothing(monkeypatch):
+    """ADR-104: no macrofactor rows (an unread/empty record) contradicts no claim — every read passes
+    through; and a claimed stop the record agrees with (last log ON the claimed date) is not superseded."""
+    served = _served_recent(monkeypatch, "nutrition_coach", macrofactor=False)
+    assert not any(o.get("superseded") for o in served)
+    from web import superseded_gap_reads as g
+
+    wire = _GAP_FX["coaches"]["nutrition_coach"]
+    assert not any(o.get("superseded") for o in g.mark(wire, "2026-09-19"))
+    assert sum(1 for o in g.mark(wire, "2026-09-20") if o.get("superseded")) == 3
+
+
+def test_only_a_pre_fix_read_is_superseded_a_post_fix_one_is_left_to_the_gate():
+    """The same 09-25 sentence written AFTER #4227 (stamped `data_through`, or generated after the fix
+    instant) is not superseded here: a post-fix read was produced against the served record and judged by
+    the #4227 served-fact gate — this filter only repairs the stored past. Mutation control: make
+    `_before_fix` return True — both reds."""
+    from web import superseded_gap_reads as g
+
+    (dark,) = [o for o in _GAP_FX["coaches"]["nutrition_coach"] if o["date"] == "2026-09-25"]
+    assert g.mark([dark], "2026-09-26")[0].get("superseded")
+    stamped = {**dark, "data_through": "2026-09-24"}
+    later = {**dark, "generated_at": "2026-09-28T17:03:12.000000+00:00"}
+    assert [o.get("superseded") for o in g.mark([stamped, later], "2026-09-26")] == [None, None]
