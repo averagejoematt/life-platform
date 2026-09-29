@@ -1077,3 +1077,82 @@ def test_4220_pair10_holds_under_a_frozen_pacific_clock(monkeypatch, pt_clock):
     docket_row = produced["rows"][1]
     assert str(docket_row["resolved_at"]).startswith(frozen_utc.isoformat()[:16]), "the frozen clock did not reach the writer"
     assert consumed == {"confirmed": 1, "refuted": 1, "n": 2, "through": _day(9)}
+
+
+# ── #4185: a stored pre-fix read whose dated logging gap the served record contradicts ──
+# The live wire (public /api/coach/{nutrition,physical}_coach recent_outputs + /api/nutrition_overview,
+# read 2026-09-29): the nutrition coach's 09-23/24/25 reads say logging stopped after September 19th
+# and the physical coach's 09-13 read says after September 10th — the served record has a log on every
+# day through 09-26. Rebuilt into the stored OUTPUT# shape and served through the REAL _recent_outputs.
+_GAP_FX = json.load(open(os.path.join(os.path.dirname(__file__), "fixtures", "coach_superseded_gap_4185", "live_wire_2026-09-29.json")))
+
+
+def _gap_rows(coach_id):
+    rows = []
+    for o in _GAP_FX["coaches"][coach_id]:
+        row = {"pk": f"COACH#{coach_id}", "sk": f"OUTPUT#{o['date']}#daily_brief", "created_at": o["generated_at"]}
+        if o.get("summary"):
+            row["public_summary"] = o["summary"]
+        if o.get("data_through"):
+            row["data_through"] = o["data_through"]
+        rows.append(row)
+    return rows
+
+
+def _served_recent(monkeypatch, coach_id, *, macrofactor=True):
+    mf = [{"pk": "USER#matthew#SOURCE#macrofactor", "sk": f"DATE#{d}", "date": d} for d in _GAP_FX["nutrition_overview"]["trend_dates"]]
+    routes = {f"COACH#{coach_id}": _gap_rows(coach_id), "USER#matthew#SOURCE#macrofactor": mf if macrofactor else []}
+    monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=lambda _t, **kw: _fake_query_by_pk(routes)(**kw)))
+    return api._recent_outputs(coach_id)
+
+
+def test_the_four_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monkeypatch):
+    """Exactly the four live reads — nutrition 09-23/24/25, physical 09-13 — lose their false summary and
+    carry `superseded`; every other read (including the post-fix 09-28/29 reads that mention September 19th)
+    is served byte-for-byte. Mutation controls: drop the `served_last_log > d` comparison or the pre-fix
+    condition — more reads supersede and the set assertion reds; remove the `apply` call — none do."""
+    assert _GAP_FX["nutrition_overview"]["nutrition"]["latest_date"] == "2026-09-26"
+    hit = {}
+    for cid in ("nutrition_coach", "physical_coach"):
+        served = _served_recent(monkeypatch, cid)
+        wire = _GAP_FX["coaches"][cid]
+        assert [o["date"] for o in served] == [o["date"] for o in wire]
+        for o, w in zip(served, wire):
+            if o.get("superseded"):
+                hit[(cid, o["date"])] = o["superseded"]["claimed_logging_stopped_after"]
+                assert o["summary"] is None and o["superseded"]["served_last_log"] == "2026-09-26"
+                assert o["superseded"]["note"] == "superseded — generated before the logging-record fix"
+            else:
+                assert o["summary"] == (w["summary"] or ""), (cid, o["date"])
+    assert hit == {
+        ("nutrition_coach", "2026-09-25"): "2026-09-19",
+        ("nutrition_coach", "2026-09-24"): "2026-09-19",
+        ("nutrition_coach", "2026-09-23"): "2026-09-19",
+        ("physical_coach", "2026-09-13"): "2026-09-10",
+    }
+
+
+def test_an_unread_or_uncontradicting_record_supersedes_nothing(monkeypatch):
+    """ADR-104: no macrofactor rows (an unread/empty record) contradicts no claim — every read passes
+    through; and a claimed stop the record agrees with (last log ON the claimed date) is not superseded."""
+    served = _served_recent(monkeypatch, "nutrition_coach", macrofactor=False)
+    assert not any(o.get("superseded") for o in served)
+    from web import superseded_gap_reads as g
+
+    wire = _GAP_FX["coaches"]["nutrition_coach"]
+    assert not any(o.get("superseded") for o in g.mark(wire, "2026-09-19"))
+    assert sum(1 for o in g.mark(wire, "2026-09-20") if o.get("superseded")) == 3
+
+
+def test_only_a_pre_fix_read_is_superseded_a_post_fix_one_is_left_to_the_gate():
+    """The same 09-25 sentence written AFTER #4227 (stamped `data_through`, or generated after the fix
+    instant) is not superseded here: a post-fix read was produced against the served record and judged by
+    the #4227 served-fact gate — this filter only repairs the stored past. Mutation control: make
+    `_before_fix` return True — both reds."""
+    from web import superseded_gap_reads as g
+
+    (dark,) = [o for o in _GAP_FX["coaches"]["nutrition_coach"] if o["date"] == "2026-09-25"]
+    assert g.mark([dark], "2026-09-26")[0].get("superseded")
+    stamped = {**dark, "data_through": "2026-09-24"}
+    later = {**dark, "generated_at": "2026-09-28T17:03:12.000000+00:00"}
+    assert [o.get("superseded") for o in g.mark([stamped, later], "2026-09-26")] == [None, None]
