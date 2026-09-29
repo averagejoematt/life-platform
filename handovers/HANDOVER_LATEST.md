@@ -43,7 +43,7 @@
 - #4183 — archive or commit orphan draft `78dd2da5…`.
 - #4219 — the verifier proved it; my own re-read of `/api/coaching-dashboard` was classifier-denied (PII) — owner or an attended session re-reads and closes.
 
-## Residual queue
+## Residual / next picks
 
 - #4412 (Hevy cardio HR join) — two lanes each stalled with zero commits (likely a permission prompt); run it attended or pre-paste a wire day (comment on the issue).
 - #4427 (TB-7, re-derive the blueprint band table on the #4428 seam) — P1, the first v0.5 story to start.
