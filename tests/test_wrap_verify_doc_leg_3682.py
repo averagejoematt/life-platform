@@ -132,7 +132,7 @@ def test_verify_reruns_the_whole_derived_doc_leg_generically_not_a_special_case(
         if " ".join(cmd[1:]) in rvg.MUTATING_GATES:
             continue
         checked += 1
-        assert " ".join(cmd) in verify_cmds, f"{' '.join(cmd)} runs in Phase 1 GATHER but is missing from Phase 3 VERIFY"
+        assert " ".join(cmd) in verify_cmds, f"{' '.join(cmd)} is a Docs CI gate missing from Phase 3 VERIFY — its only run since #4262"
     assert checked >= 10, "too few non-mutating docs-ci.yml gates derived — the source list has gone blind"
 
 
