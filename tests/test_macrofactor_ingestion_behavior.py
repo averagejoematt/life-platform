@@ -697,9 +697,11 @@ def test_every_target_in_the_registry_is_scored_when_present():
 
 
 def test_every_micronutrient_target_names_a_real_nutrient_field():
-    """A target keyed on a field the parser never produces can never score."""
-    unknown = set(mf.MICRONUTRIENT_TARGETS) - mf.NUTRIENT_FIELD_NAMES
-    assert unknown == set()
+    """A target keyed on a field the parser never produces can never score. A composite target
+    (#4245: EPA+DHA) names the real fields it sums instead."""
+    for key, cfg in mf.MICRONUTRIENT_TARGETS.items():
+        fields = set(cfg.get("food_fields") or {key})
+        assert fields and fields <= mf.NUTRIENT_FIELD_NAMES, (key, fields - mf.NUTRIENT_FIELD_NAMES)
 
 
 def test_every_micronutrient_target_has_a_positive_goal_and_a_label():
@@ -1470,15 +1472,17 @@ def test_the_live_wire_row_joins_the_supplement_record_into_vitamin_d():
     assert vd["uncounted_supplements"] == ["Multivitamin"]  # a floor, and it says so
     assert out["intake_channels"] == ["food", "supplements"]
     assert out["supplements_state"] == "recorded"
-    # Omega 3 is EPA/DHA (2.0 g) and is kept apart from the food's ALA.
-    o3 = out["sufficiency"]["omega3_total_g"]
-    assert (o3["from_food"], o3["from_supplements"]) == (0.1, 2.0)
-    assert o3["species"] == {"ala_g": {"food": 0.1}, "epa_dha_g": {"food": None, "supplements": 2.0}}
+    # #4245 box 3: Omega 3 is EPA/DHA (2.0 g) against its OWN target, never summed with the food's ALA.
+    epa_dha, ala = out["sufficiency"]["omega3_epa_dha_g"], out["sufficiency"]["omega3_ala_g"]
+    assert (epa_dha["from_food"], epa_dha["from_supplements"], epa_dha["total"], epa_dha["pct"]) == (None, 2.0, 2.0, 100.0)
+    assert (ala["from_food"], ala["from_supplements"], ala["total"], ala["pct"]) == (0.1, 0.0, 0.1, 6.2)
+    assert "omega3_total_g" not in out["sufficiency"]
     # No L-Threonate ticked on 09-25; the multivitamin/electrolytes MAY carry Mg — food-only, named.
     mg = out["sufficiency"]["magnesium_mg"]
     assert (mg["from_supplements"], mg["channels_counted"]) == (None, ["food"])
     assert sorted(mg["uncounted_supplements"]) == ["Electrolytes", "Multivitamin"]
-    assert out["food_only_avg_pct"] == 36.4  # matches what ingest stored
+    # Ingest stored 36.4 under the retired single omega-3 target (3.3%); the ALA target scores 6.2%.
+    assert out["food_only_avg_pct"] == 37.0
     assert out["avg_pct"] > out["food_only_avg_pct"]
 
 
@@ -1532,6 +1536,77 @@ def test_a_day_with_no_supplement_record_is_absent_not_zero():
     vd = out["sufficiency"]["vitamin_d_mcg"]
     assert (vd["from_supplements"], vd["channels_counted"], vd["pct"]) == (None, ["food"], 5.0)
     assert out["supplements_state"] == "absent"
+
+
+def test_omega3_epa_dha_and_ala_are_two_targets_never_one_sum():
+    """#4245 box 3, the issue's own day (2026-09-24): ALA 3.7 g, EPA 0, DHA 0. The retired single
+    3 g target read this as a well-covered omega-3 day; split, the food's EPA+DHA is 0 and only
+    the supplement dose can close it."""
+    day = {"total_omega3_ala_g": _D("3.7"), "total_omega3_epa_g": _D("0"), "total_omega3_dha_g": _D("0"), "total_omega3_total_g": _D("3.7")}
+    food_only = ni.nutrient_intake(day, None)["sufficiency"]
+    assert (food_only["omega3_ala_g"]["pct"], food_only["omega3_epa_dha_g"]["pct"]) == (100.0, 0.0)
+    joined = ni.nutrient_intake(day, _wire_supp("2026-09-24", [("Omega 3", 2000, "mg")]))["sufficiency"]
+    assert (joined["omega3_epa_dha_g"]["from_food"], joined["omega3_epa_dha_g"]["from_supplements"]) == (0.0, 2.0)
+    assert joined["omega3_ala_g"]["total"] == 3.7  # the fish-oil dose never lands on ALA
+    for key in ("omega3_epa_dha_g", "omega3_ala_g"):
+        assert ni.MICRONUTRIENT_TARGETS[key]["source"].strip() and ni.MICRONUTRIENT_TARGETS[key]["label"].startswith("Omega-3")
+
+
+def test_every_served_entry_carries_total_and_keeps_actual_as_its_alias():
+    """#4245 box 2 names the field `total`; `actual` is what /api/nutrition_overview and the site
+    already read. Both are served, always equal."""
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-26"], _WIRE_SUPP["2026-09-26"])
+    for key, e in out["sufficiency"].items():
+        assert e["total"] == e["actual"], key
+        assert e["label"] == ni.MICRONUTRIENT_TARGETS[key]["label"]
+    assert out["sufficiency"]["magnesium_mg"]["total"] == 351.9
+
+
+def _habit_row(**statuses):
+    return {"habit_statuses": {name: dict(st) for name, st in statuses.items()}}
+
+
+def test_a_scheduled_supplement_miss_is_a_zero_and_no_record_stays_absent():
+    """#4245 box 4. The bridge writes no supplement row on a day with no tick, so "no row" alone
+    cannot say whether anything was scheduled. Habitify can: a supplement habit resolved
+    `failed` was scheduled and not taken, so its nutrients are a recorded ZERO. The shape is the
+    live Habitify record's (`habit_statuses[name].{status, miss_source}`, e.g. 2026-09-06/07/10)."""
+    missed = _habit_row(
+        **{
+            "Vitamin D": {"status": "failed", "miss_source": "vendor"},
+            "Omega 3": {"status": "failed", "miss_source": "platform"},
+            "Walk 10k": {"status": "failed", "miss_source": "vendor"},  # not a supplement: never read
+        }
+    )
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-25"], None, missed)
+    assert out["supplements_state"] == "scheduled_miss"
+    vd = out["sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_supplements"], vd["channels_counted"], vd["missed_supplements"]) == (0.0, ["food", "supplements"], ["Vitamin D"])
+    # No food EPA/DHA and the fish oil scheduled but missed: a stated zero, not an omission.
+    o3 = out["sufficiency"]["omega3_epa_dha_g"]
+    assert (o3["from_food"], o3["from_supplements"], o3["total"], o3["pct"]) == (None, 0.0, 0.0, 0.0)
+    assert [m["name"] for m in out["not_taken"]] == ["Vitamin D", "Omega 3"]
+    assert out["not_taken"][1]["miss_source"] == "platform"
+
+    # The two absences stay absent: no Habitify row, and a still-open (pending) day.
+    for habit_row in (None, _habit_row(**{"Vitamin D": {"status": "pending"}})):
+        out = ni.nutrient_intake(_WIRE_MF["2026-09-25"], None, habit_row)
+        assert out["supplements_state"] == "absent" and out["not_taken"] == []
+        assert out["sufficiency"]["vitamin_d_mcg"]["from_supplements"] is None
+        assert "omega3_epa_dha_g" not in out["sufficiency"]
+    # A TICKED supplement habit with no supplement row is a bridge gap, never a zero.
+    gap = _habit_row(**{"Vitamin D": {"status": "completed"}, "Omega 3": {"status": "failed", "miss_source": "vendor"}})
+    assert ni.nutrient_intake(_WIRE_MF["2026-09-25"], None, gap)["supplements_state"] == "absent"
+
+
+def test_a_miss_beside_a_recorded_day_names_the_dose_it_did_not_take():
+    """A day with some doses ticked: the record is consulted as before, and a nutrient whose dose
+    was scheduled but missed says so instead of reading as a bare 0."""
+    row = _wire_supp("2026-09-25", [("Omega 3", 2000, "mg")])
+    out = ni.nutrient_intake(_WIRE_MF["2026-09-25"], row, _habit_row(**{"Vitamin D": {"status": "skipped"}}))
+    vd = out["sufficiency"]["vitamin_d_mcg"]
+    assert (out["supplements_state"], vd["from_supplements"], vd["missed_supplements"]) == ("recorded", 0.0, ["Vitamin D"])
+    assert "missed_supplements" not in out["sufficiency"]["omega3_epa_dha_g"]  # it was taken
 
 
 def test_every_conversion_and_every_counted_supplement_cites_its_source():
