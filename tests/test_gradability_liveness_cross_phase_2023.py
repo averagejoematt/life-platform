@@ -451,6 +451,14 @@ _KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
 # per call or per source rather than fixed at the site. Recording them here is a
 # claim that the deciding expression is sound — cite where that soundness is pinned.
 _PER_SOURCE_READS: dict[str, str] = {
+    "lambdas/operational/hevy_routine_cron_lambda.py::_read_partition": (
+        "#4410: the cron's aerobic-minutes read (the bundled twin of mcp.core.query_source's derived read — "
+        "the cron cannot import mcp/). include_pilot=source_reads_cross_phase(source), the #2109 idiom, "
+        "tombstoned rows dropped. It is only ever called for strava and hevy (RAW_TIMESERIES, so cross-phase), "
+        "over recent_aerobic.window — 14 days through target − 1 — which a prior cycle must not truncate: the "
+        "walking a man did the week before a reset still loaded his legs. Pinned by "
+        "tests/test_walking_volume_3930.py::test_the_cron_reads_the_same_quantity_as_the_mcp_path."
+    ),
     "lambdas/health/instrument_presence.py::latest_date_str": (
         "#4217: the ONE DATE# 'newest day' read behind both the public freshness board and the "
         "coach absence gate. include_pilot is an explicit keyword (default True) so the decision is "
