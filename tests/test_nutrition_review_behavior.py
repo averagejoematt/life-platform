@@ -1760,6 +1760,11 @@ def test_a_dry_run_reports_the_micro_column_and_the_served_prompts_scope(handler
     assert resp["micro_column"] == "MICRO (food only)"  # handler_env serves no supplement rows
     assert resp["prompt_source"] == "fallback"  # handler_env serves no board config
     assert resp["prompt_micro_scoped"] is True
+    # The opposite direction: a served prompt that still carries the food-only rule reads False.
+    stale = "BOARD PROMPT. Any micro <50% for 3+ days."
+    handler_env["monkeypatch"].setattr(m, "_build_nutrition_prompt_from_config", lambda cal, pro: stale)
+    resp = m.lambda_handler({"dry_run": True}, None)
+    assert (resp["prompt_source"], resp["prompt_micro_scoped"]) == ("board_config", False)
 
 
 def test_a_dry_run_writes_no_durable_row(handler_env):
