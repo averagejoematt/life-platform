@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Derived from the canonical persona registry, never re-typed (#2334; guard:
 # tests/test_coach_roster_set_guard_2334.py). The coach package is on the MCP
 # bundle's path already (tools_coach_checkin imports persona_registry the same way).
+from coach import coach_record  # #4220: the ONE per-coach record producer every public surface reads
 from coach.persona_registry import OPERATIONAL_SHORT_IDS, short_id_names as _short_id_names
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
@@ -333,12 +334,49 @@ def _learning_layer(learnings: list) -> dict:
     return layer_fields(status, reason, producer=DERIVED_LAYERS["LEARNING#"]["producer"], newest_date=newest)
 
 
+def _one_result_per_prediction(learnings: list) -> tuple[list, int, int]:
+    """#4220: ``(kept, n_unkeyed, n_repeats)`` — the data learnings with every row that names
+    no ``prediction_id`` dropped and, per prediction, only its EARLIEST result kept (the
+    re-graded 08-10 docket wrote one blank-id row a day for twenty days, #4216). Input order
+    (newest first) is preserved for the survivors."""
+    keyed = [l for l in learnings if str(l.get("prediction_id") or "").strip()]
+    earliest: dict = {}
+    for l in keyed:
+        pid = str(l["prediction_id"]).strip()
+        held = earliest.get(pid)
+        if held is None or _learning_date(l) < _learning_date(held):
+            earliest[pid] = l
+    survivors = {id(l) for l in earliest.values()}
+    kept = [l for l in keyed if id(l) in survivors]
+    return kept, len(learnings) - len(keyed), len(keyed) - len(kept)
+
+
+def _learning_date(l: dict) -> str:
+    return str(l.get("date") or str(l.get("sk", "")).replace("LEARNING#", "").split("#")[0])
+
+
+def _cycle_record(cid: str):
+    """#4220: the coach's current-cycle record from the ONE producer, or None on a failed read."""
+    from common.constants import EXPERIMENT_START_DATE
+
+    return coach_record.for_coach(table, cid, genesis=str(EXPERIMENT_START_DATE))
+
+
 def tool_get_coach_track_record(args):
     """Hit-rate track record for a coach over a time window.
 
     Reads the new `COACH#{coach_id}` partition (post-ADR-047) where the daily
     `coach-prediction-evaluator` Lambda writes verdicts (PREDICTION# records
     get a status update, LEARNING# records archive the audit trail).
+
+    #4220: the headline (``record`` / ``decided_count`` / ``hit_rate_pct``) is the ONE
+    producer every public surface prints — ``coach.coach_record`` over the PREDICTION#
+    ledger, this cycle, one resolution per prediction. It used to be a LEARNING# re-count:
+    on 2026-09-27 it said Webb 74.1 % (20/27) and Brandt 11.5 % (3/26) while
+    ``/api/predictions`` said 0 of 7 and 3 of 6 — twenty blank-``prediction_id`` rows
+    per side were one pre-genesis docket re-recorded daily (#4216). The LEARNING#
+    breakdowns stay (subdomain / metric / reason text live only there) but count one
+    result per prediction and exclude rows with no ``prediction_id``.
 
     Args:
         coach_id: e.g. "glucose" or "glucose_coach" — accepts either form
@@ -405,6 +443,9 @@ def tool_get_coach_track_record(args):
         else:
             data_learnings.append(l)
 
+    # #4220: one result per prediction; a row that names no prediction is not a checked call.
+    data_learnings, unkeyed, rewrites = _one_result_per_prediction(data_learnings)
+
     by_outcome = defaultdict(int)
     by_subdomain = defaultdict(lambda: defaultdict(int))
     by_metric = defaultdict(lambda: defaultdict(int))
@@ -416,8 +457,20 @@ def tool_get_coach_track_record(args):
         by_subdomain[subdomain][status] += 1
         by_metric[metric][status] += 1
 
-    decided = by_outcome.get("confirmed", 0) + by_outcome.get("refuted", 0)
-    hit_rate_pct = round(100 * by_outcome.get("confirmed", 0) / decided, 1) if decided else None
+    # #4220: the record is the single producer's; only a subdomain-filtered read (the ledger
+    # carries no subdomain) falls back to the de-duplicated LEARNING# breakdown, and says so.
+    record = _cycle_record(cid)
+    if subdomain_filter:
+        decided = by_outcome.get("confirmed", 0) + by_outcome.get("refuted", 0)
+        confirmed = by_outcome.get("confirmed", 0)
+        hit_rate_source = "LEARNING# (subdomain filter; one result per prediction, window-scoped)"
+    elif record is not None:
+        decided, confirmed = record["n"], record["confirmed"]
+        hit_rate_source = "coach_record (PREDICTION# ledger, this cycle, one resolution per prediction)"
+    else:
+        decided, confirmed = None, 0
+        hit_rate_source = "unavailable (the PREDICTION# ledger could not be read)"
+    hit_rate_pct = round(100 * confirmed / decided, 1) if decided else None
 
     # Calibration (#538): a hit rate says how OFTEN the coach is right; the Brier score
     # says how well its stated confidence matches reality. LEARNING# has no confidence,
@@ -472,6 +525,12 @@ def tool_get_coach_track_record(args):
         "by_outcome": dict(by_outcome),
         "decided_count": decided,
         "hit_rate_pct": hit_rate_pct,
+        "hit_rate_source": hit_rate_source,
+        # #4220: the same {confirmed, refuted, n, through} /api/coaches, /api/calibration,
+        # /api/predictions and /api/wrong serve; None = the read failed (never a zero).
+        "record": record,
+        "headline": coach_record.headline(record),
+        "excluded_learnings": {"no_prediction_id": unkeyed, "repeat_result_for_a_prediction": rewrites},
         **_learning_layer(learnings),
         "calibration": calibration,
         "by_subdomain": {k: dict(v) for k, v in by_subdomain.items()},

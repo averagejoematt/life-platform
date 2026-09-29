@@ -297,6 +297,29 @@ _INTAKE_FRAME = re.compile(
 )
 
 
+# #4343 (09-28 brief, labs): a figure the sentence names as a target, floor or the level an
+# escalation moves TO is a goal, not his intake — "against a target of 190 grams", "protein
+# escalation to 190 grams per day is authorized", "the 190-gram target". The average cannot
+# refute a goal, so a protein figure is skipped when EVERY place it is written is framed so.
+_TARGET_BEFORE = re.compile(
+    r"(?:\b(?:target|floor|goal|ceiling|minimum)\s+(?:of\s+)?|\bescalat\w*\s+(?:\w+\s+){0,2}?to\s+|\btowards?\s+)"
+    r"(?:about\s+|around\s+|roughly\s+)?$",
+    re.IGNORECASE,
+)
+_TARGET_AFTER = re.compile(
+    r"^\s*-?\s*(?:g|grams?)?\s*-?\s*(?:(?:daily|protein|a\s+day|per\s+day)\s+)?(?:target|floor|goal)\b", re.IGNORECASE
+)
+
+
+def _target_framed(sentence: str, value: float) -> bool:
+    """True when every occurrence of `value` in `sentence` is written as a target/floor/goal."""
+    num = f"{value:g}"
+    hits = list(re.finditer(r"(?<![\d.,])" + re.escape(num) + r"(?:\.0+)?(?![\d])", sentence))
+    return bool(hits) and all(
+        _TARGET_BEFORE.search(sentence[max(0, m.start() - 40) : m.start()]) or _TARGET_AFTER.match(sentence[m.end() :]) for m in hits
+    )
+
+
 def _named_windows(sentence: str) -> list:
     out = []
     for m in _NAMED_WINDOW.finditer(sentence):
@@ -389,6 +412,8 @@ def served_fact_findings(text: str, facts: Optional[dict], today: Optional[str] 
                 continue  # no spread → no tolerance to derive; skipped, never guessed
             tol = max(float(win["half_width"]), MIN_PROTEIN_TOLERANCE_G)
             if abs(v - win["mean"]) <= tol:
+                continue
+            if _target_framed(sentence, v):
                 continue
             if not windows:
                 recent = _nl.protein_window(series, 7)
