@@ -12,7 +12,7 @@ reader that can be handed the `strava` partition (the MCP `query_source` chokepo
 shared `digest_utils.query_range*`, the site-api `_query_source`, and each module's local
 `fetch_range`/`fetch_date`); it is a no-op for any other source. For `strava` it dedupes
 each day row's `activities` and recomputes the day totals the ingest writer derives from
-them (`day_totals`, which the writer itself calls — one formula, not two). The per-consumer
+them (`day_totals`, pinned to the writer's formula by a parity test). The per-consumer
 `dedup_activities` calls that predate the seam still run; the rule is idempotent, so they
 are redundant and harmless. `tests/test_shared_modules.py` holds the guard over the SET of
 readers (an AST sweep): a new reader that can see `activities` and skips the seam reds CI.
@@ -55,6 +55,8 @@ CONTAINMENT_SHARE = 0.8
 PLAUSIBLE_ACTIVITY_AVG_HR = 70.0
 #: Sport tokens that name the same kind of session (a Zwift ride and a WHOOP-detected ride).
 _SPORT_ALIASES = {"virtualride": "ride", "virtualrun": "run"}
+#: Totals the seam writes onto a deduped row even when the stored row lacked them.
+_ALWAYS_RESTATED = frozenset({"activity_count", "total_moving_time_seconds"})
 #: Day-row marker: the row's `activities` already went through the seam.
 DEDUPED_MARKER = "activities_deduped"
 
@@ -166,8 +168,11 @@ def dedup_activities(activities):
 def day_totals(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
     """The day-row totals derived from its activities — the ingest writer's formula (#4419).
 
-    `ingestion.strava_lambda.transform` builds the row with this, and the seam recomputes
-    the same keys after a dedupe, so the two can never disagree.
+    Mirrors `ingestion.strava_lambda.transform` key for key (the writer keeps its literal
+    dict because `tests/test_freshness_completeness_writer_contract.py` derives the emitted
+    field set from the writer's own source). The two cannot drift silently:
+    `tests/test_shared_modules.py::test_the_ingest_writer_and_the_seam_share_one_totals_formula`
+    runs both over a real 2024 day and asserts they agree.
     """
     return {
         "activity_count": len(activities),
@@ -184,8 +189,10 @@ def day_totals(activities: List[Dict[str, Any]]) -> Dict[str, Any]:
 def dedup_strava_day(item):
     """One `strava` day row with its duplicate activities removed and its totals recomputed.
 
-    Returns a NEW dict (the input is not mutated). Only totals the row already carries are
-    recomputed — a legacy row is never given keys its writer did not produce. The row gains
+    Returns a NEW dict (the input is not mutated). Totals the row carries are recomputed; of
+    the ones it lacks, only `activity_count` / `total_moving_time_seconds` are added (the two
+    every pre-seam consumer dedupe already restated) — a legacy row is never handed a
+    `total_kilojoules` its writer did not produce, where absent and 0 mean different things. The row gains
     `activities_deduped: True` and, when something was dropped, `duplicate_activity_count`.
     """
     if not isinstance(item, dict) or item.get(DEDUPED_MARKER):
@@ -203,7 +210,7 @@ def dedup_strava_day(item):
     keep = set(kept)
     new_acts = [eff.get(i, a) for i, a in enumerate(acts) if i in keep]  # the writer's order, not start order
     out["activities"] = new_acts
-    out.update({k: v for k, v in day_totals(new_acts).items() if k in item})
+    out.update({k: v for k, v in day_totals(new_acts).items() if k in item or k in _ALWAYS_RESTATED})
     out["duplicate_activity_count"] = len(acts) - len(new_acts)
     return out
 

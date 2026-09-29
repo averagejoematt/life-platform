@@ -635,7 +635,8 @@ def test_the_ingest_writer_and_the_seam_share_one_totals_formula(monkeypatch):
 
     acts = _real_day_2024_10_01()["activities"]
     (row,) = strava_lambda.transform({"activities": acts}, "2024-10-01")
-    assert {k: row[k] for k in day_totals(acts)} == day_totals(acts)
+    writer_totals = {k: v for k, v in row.items() if k not in ("source", "date", "activities")}
+    assert writer_totals == day_totals(acts), "the seam's day_totals drifted from strava_lambda.transform — one formula, two copies"
 
 
 # The SET guard (#4419). A "strava-capable reader" is any function under lambdas/ (ingestion

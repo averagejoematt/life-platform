@@ -35,8 +35,6 @@ except ImportError:
     logger = logging.getLogger("strava")
     logger.setLevel(logging.INFO)
 
-from common.strava_read_seam import day_totals  # #4419: one day-totals formula, shared with the read seam
-
 from ingestion import strava_population
 from ingestion.ingestion_framework import IngestionConfig, run_ingestion
 
@@ -316,12 +314,31 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     if not raw or not raw.get("activities"):
         return []
     activities = raw["activities"]
-    # #4419: the totals formula lives in `common.strava_read_seam.day_totals`, so the read
-    # seam that drops multi-device duplicates recomputes the SAME keys the same way. It
-    # carries `total_kilojoules` (the day-level kJ rollup four MCP readers use) and
-    # `kilojoules_moving_time_seconds` (how much moving time that kJ covers — only
-    # power-equipped activities report kilojoules).
-    return [{"source": "strava", "date": date_str, "activities": activities, **day_totals(activities)}]
+    return [
+        {
+            "source": "strava",
+            "date": date_str,
+            "activity_count": len(activities),
+            "activities": activities,
+            "total_distance_miles": round(sum(a.get("distance_miles") or 0 for a in activities), 2),
+            "total_moving_time_seconds": sum(a.get("moving_time_seconds") or 0 for a in activities),
+            # Day-level kJ rollup. `_normalize` has always captured the per-activity
+            # `kilojoules`, but nothing summed it — while four readers
+            # (mcp/tools_health, tools_nutrition, helpers, tools_lifestyle) all read
+            # a day-level `total_kilojoules` that no writer produced. The result was
+            # a permanently-dark branch: every TDEE those tools returned came from
+            # the 6 kcal/kg/h duration proxy, even on rides with a power meter.
+            "total_kilojoules": round(sum(a.get("kilojoules") or 0 for a in activities), 1),
+            # How much of the day's moving time that kJ figure actually covers —
+            # only power-equipped activities report kilojoules, so without this a
+            # reader cannot tell a fully-measured day from a ride-plus-run day and
+            # would silently drop the run.
+            "kilojoules_moving_time_seconds": sum(a.get("moving_time_seconds") or 0 for a in activities if a.get("kilojoules")),
+            "total_elevation_gain_feet": round(sum(a.get("total_elevation_gain_feet") or 0 for a in activities), 1),
+            "sport_types": sorted(set(a.get("sport_type", "") for a in activities)),
+            "total_zone2_seconds": sum(a.get("zone2_seconds") or 0 for a in activities),
+        }
+    ]
 
 
 # ── Enrichment carry-forward (#2250) ──────────────────────────────────────────
