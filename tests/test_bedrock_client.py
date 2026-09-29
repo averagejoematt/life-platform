@@ -26,6 +26,7 @@ Run:  python3 -m pytest tests/test_bedrock_client.py -v
 import importlib
 import json
 import os
+import re
 import sys
 import types
 from unittest.mock import MagicMock
@@ -501,3 +502,45 @@ def test_invoke_with_retry_does_not_retry_a_non_retryable_code(monkeypatch, _rec
     with pytest.raises(bce.ClientError):
         bc.invoke_with_retry({"messages": []}, model_name="claude-sonnet-4-6")
     assert calls["n"] == 1 and _recorded_sleep == []
+
+
+# ── #4275 box 4: ONE Sonnet default ─────────────────────────────────────────────────────
+_SONNET_LITERAL_RE = re.compile(r"(?:us\.|global\.)?(?:anthropic\.)?claude-sonnet-[\w.:-]+")
+# The resolution map (names → profile ids) is the one place model names MUST be spelled out.
+_SONNET_LITERAL_HOMES = {"lambdas/ai/bedrock_client.py", "lambdas/ai/model_defaults.py"}
+
+
+def _sonnet_literals_outside_the_homes(root):
+    import ast
+    import pathlib
+
+    root = pathlib.Path(root)
+    found = []
+    for p in sorted([*root.glob("lambdas/**/*.py"), *root.glob("mcp/**/*.py")]):
+        rel = p.relative_to(root).as_posix()
+        if rel in _SONNET_LITERAL_HOMES:
+            continue
+        for node in ast.walk(ast.parse(p.read_text())):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and _SONNET_LITERAL_RE.fullmatch(node.value):
+                found.append(f"{rel}:{node.lineno} {node.value}")
+    return found
+
+
+def test_no_module_carries_a_sonnet_default_outside_the_one_constant():
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    assert _sonnet_literals_outside_the_homes(root) == []
+
+
+def test_the_one_constant_is_a_mapped_name_and_its_value_is_unchanged():
+    from ai.model_defaults import NARRATIVE_MODEL
+
+    assert NARRATIVE_MODEL == "claude-sonnet-4-6"  # moving it is #4278 (gate:owner), not #4275
+    assert bc.resolve_model_id(NARRATIVE_MODEL) == "us.anthropic.claude-sonnet-4-6"
+
+
+def test_mutation_control_a_planted_default_literal_is_found(tmp_path):
+    (tmp_path / "lambdas" / "emails").mkdir(parents=True)
+    (tmp_path / "lambdas" / "emails" / "x.py").write_text('import os\nM = os.environ.get("AI_MODEL", "claude-sonnet-4-6")\n')
+    assert _sonnet_literals_outside_the_homes(tmp_path) == ["lambdas/emails/x.py:2 claude-sonnet-4-6"]

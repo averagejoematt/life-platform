@@ -61,6 +61,9 @@ PRODUCER_DIRS = [ROOT / "lambdas", ROOT / "mcp", ROOT / "deploy", ROOT / "script
 EXCLUDED_DIRS = [ROOT / "deploy" / "archive"]  # retired one-shots, same exclusion as #2119
 CENSUS_ARTIFACT = ROOT / "deploy" / "generated" / "pk_family_census.json"
 
+import sys  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "ledgers"))  # the residue ledger lives in ledgers/ since #4270 slice 2
 from scoped_writer_residue_3599 import SCOPED_WRITER_RESIDUE, SEED_DATE  # noqa: E402
 
 # The stamping calls that satisfy the contract. Same vocabulary as the #2119 guard plus
@@ -303,7 +306,7 @@ def findings(writers: list, residue: dict, today: str) -> list:
         if entry is None:
             out.append(
                 f"UNRESIDUED {w.key} writes EXPERIMENT_SCOPED {list(w.sources)} with provenance={w.provenance!r} — "
-                "stamp it via experiment_stamp_for/tag_record, or add a dated line to tests/scoped_writer_residue_3599.py"
+                "stamp it via experiment_stamp_for/tag_record, or add a dated line to ledgers/scoped_writer_residue_3599.py"
             )
             continue
         if entry["expires"] < today:
@@ -378,7 +381,7 @@ def test_the_waiver_condition_is_re_derived_from_the_tagger_constant():
 
     assert TAGGER_REACHABLE_PREFIX.endswith(SOURCE_MARKER), (
         f"the reset-time tagger no longer reaches {SOURCE_MARKER} partitions "
-        f"({TAGGER_REACHABLE_PREFIX!r}) — every line in tests/scoped_writer_residue_3599.py rests on that and must be re-decided"
+        f"({TAGGER_REACHABLE_PREFIX!r}) — every line in ledgers/scoped_writer_residue_3599.py rests on that and must be re-decided"
     )
 
 
@@ -400,7 +403,7 @@ def test_every_residue_line_is_dated_reasoned_and_expiring():
             defects.append(f"{key}: reason too short to be a decision")
         if entry.get("provenance") not in ("none", "hand-stamped"):
             defects.append(f"{key}: provenance {entry.get('provenance')!r} is not a waivable class")
-    assert not defects, "tests/scoped_writer_residue_3599.py is malformed:\n  " + "\n  ".join(defects)
+    assert not defects, "ledgers/scoped_writer_residue_3599.py is malformed:\n  " + "\n  ".join(defects)
     assert SCOPED_WRITER_RESIDUE, "the ledger is empty — delete it and this gate's residue clauses rather than keeping a dead ledger"
 
 

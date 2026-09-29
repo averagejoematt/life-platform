@@ -1062,6 +1062,8 @@ def handle_predictions(event, *, _g):
                     },
                 },
                 "by_coach": by_coach,
+                # #4220: below this many decided calls a rendered record prints counts, not a %.
+                "percent_floor": coach_record.PERCENT_FLOOR,
                 "predictions": all_predictions,
                 # #3553: the follow-through half of the same record. Fail-soft — the
                 # prediction scorecard must not go dark because the commitment read did.
