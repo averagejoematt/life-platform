@@ -320,7 +320,7 @@ def test_the_live_residue_registry_meets_its_contract():
 def test_the_registry_names_the_four_ledgers_the_issue_lists():
     keys = set(oc.RESIDUE_LEDGERS)
     for must in (
-        "tests/conformance_residue.py::CONFORMANCE_RESIDUE",
+        "ledgers/conformance_residue.py::CONFORMANCE_RESIDUE",
         "tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE",
         "tests/mypy_clean_set.py::DIRTY",
         "tests/a11y_baseline.json",
@@ -337,7 +337,7 @@ def test_an_entry_without_an_expiry_is_red(discovered):
 
 def test_an_entry_past_ninety_days_or_without_an_issue_carrier_is_red(discovered):
     reg = {k: dict(v) for k, v in oc.RESIDUE_LEDGERS.items()}
-    reg["tests/conformance_residue.py::CONFORMANCE_RESIDUE"].update(expires="2031-01-01")
+    reg["ledgers/conformance_residue.py::CONFORMANCE_RESIDUE"].update(expires="2031-01-01")
     reg["tests/mypy_clean_set.py::DIRTY"].update(carrier="someday")
     problems = oc.registry_findings(registry=reg, discovered=discovered)
     assert any("CONFORMANCE_RESIDUE" in p and "90 days" in p for p in problems)
