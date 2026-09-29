@@ -446,3 +446,145 @@ def test_reaper_row_carries_both_placement_facts_separately():
     assert 'row["ephemeral"] = is_ephemeral(p)' in src
     assert 'not row["ephemeral"] and not is_canonical' in src
     assert hasattr(reaper, "is_ephemeral")
+
+
+# ── #4259: the reaper is CALLED, releases forgotten lane locks, and is fast ───
+#
+# 348 worktrees / 97 locked on 2026-09-27: `lane_worktree.py new` locks every lane and no
+# step ever released one, and the reaper itself was wired to nothing. Everything below runs
+# in the throwaway `sandbox` repo — never the real worktree set, which has live lanes in it.
+
+_WEEK = 7 * 86400
+
+
+def _lane_commit(path: Path, name: str, text: str = "x\n") -> None:
+    (path / name).write_text(text, encoding="utf-8")
+    _run(["git", "add", "-A"], path)
+    _run(["git", "commit", "--quiet", "-m", f"add {name}"], path)
+
+
+def _squash_into_main(sandbox: Path, branch: str) -> None:
+    """What a GitHub squash merge leaves behind: one new commit on main, the tip unreachable."""
+    _run(["git", "merge", "--quiet", "--squash", branch], sandbox)
+    _run(["git", "commit", "--quiet", "-m", f"squash {branch}"], sandbox)
+    (sandbox / "later.txt").write_text("main moved on\n", encoding="utf-8")  # main keeps moving
+    _run(["git", "add", "-A"], sandbox)
+    _run(["git", "commit", "--quiet", "-m", "later"], sandbox)
+    _run(["git", "push", "--quiet", "origin", "main"], sandbox)
+
+
+@pytest.fixture
+def no_github(monkeypatch):
+    """GitHub unreachable: every PR verdict is unknowable, so only LOCAL evidence can reap."""
+    monkeypatch.setattr(r, "_prime_pr_states", lambda branches: None)
+    monkeypatch.setattr(r, "_pr_state", lambda branch: None)
+
+
+def test_a_stale_lane_lock_on_a_clean_merged_lane_is_released_only_when_asked(sandbox):
+    path = lane.new_lane("4259", "stale", repo=sandbox)
+    _backdate(path, 8 * 86400)
+
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert not row["reapable"], "without the stale-lock floor, a lock must ALWAYS be honoured"
+
+    row = _row(r.classify(sandbox, Path(os.getcwd()), stale_lock_seconds=_WEEK), path)
+    assert row["reapable"] and row["release_lock"], f"an 8-day-idle clean merged lane lock must be released: {row['reasons']}"
+
+
+def test_a_lane_lock_inside_the_floor_is_still_honoured(sandbox):
+    path = lane.new_lane("4259", "recent", repo=sandbox)
+    _backdate(path, 3 * 86400)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), stale_lock_seconds=_WEEK), path)
+    assert not row["reapable"] and not row["release_lock"], row["reasons"]
+    assert row["dirty"] is None, "a live-locked row must not even be status-probed"
+
+
+def test_a_hand_set_lock_is_never_released_however_old(sandbox):
+    """Only lane_worktree.py's own lock reason is eligible — an owner's lock is a decision."""
+    path = sandbox.parent / "owner-kept"
+    _run(["git", "worktree", "add", "--quiet", "-b", "owner-kept", str(path), "origin/main"], sandbox)
+    _run(["git", "worktree", "lock", str(path), "--reason", "owner: keep for the vlog"], sandbox)
+    _backdate(path, 90 * 86400)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), stale_lock_seconds=_WEEK), path)
+    assert not row["reapable"] and not row["release_lock"], row["reasons"]
+
+
+def test_a_stale_dirty_lane_is_kept(sandbox):
+    path = lane.new_lane("4259", "dirty", repo=sandbox)
+    (path / "wip.txt").write_text("uncommitted afternoon\n", encoding="utf-8")
+    _backdate(path, 8 * 86400)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), stale_lock_seconds=_WEEK), path)
+    assert row["dirty"] is True and not row["reapable"] and not row["release_lock"], row["reasons"]
+
+
+def test_a_squash_merged_lane_is_reapable_with_github_unreachable(sandbox, no_github):
+    """The gh-free squash check: merging the branch into origin/main would change nothing."""
+    path = lane.new_lane("4259", "squashed", repo=sandbox)
+    _lane_commit(path, "feature.txt")
+    _squash_into_main(sandbox, "issue-4259-squashed")
+    lane.release_lane(path, repo=sandbox)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert row["unmerged"] == 1, "fixture invalid: a squash merge must leave the tip unreachable"
+    assert row["reapable"] and row["content_merged"], row["reasons"]
+
+
+def test_an_unmerged_lane_is_kept_with_github_unreachable(sandbox, no_github):
+    """The negative control for the content check: real unmerged work must never read merged."""
+    path = lane.new_lane("4259", "unmerged", repo=sandbox)
+    _lane_commit(path, "feature.txt")
+    lane.release_lane(path, repo=sandbox)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert row["unmerged"] == 1 and not row["content_merged"] and not row["reapable"], row["reasons"]
+
+
+def test_an_exhausted_budget_keeps_every_row(sandbox):
+    path = lane.new_lane("4259", "budget", repo=sandbox)
+    lane.release_lane(path, repo=sandbox)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd()), budget_seconds=0), path)
+    assert row["unprobed"] and not row["reapable"], row["reasons"]
+    assert any("budget" in x for x in row["reasons"]), row["reasons"]
+
+
+def test_apply_reaps_the_stale_clean_lane_and_names_the_dirty_one(sandbox, capsys):
+    """The wrap gate's exact invocation, end to end, over real git."""
+    clean = lane.new_lane("4259", "apply-clean", repo=sandbox)
+    dirty = lane.new_lane("4259", "apply-dirty", repo=sandbox)
+    (dirty / "wip.txt").write_text("keep me\n", encoding="utf-8")
+    for p in (clean, dirty):
+        _backdate(p, 8 * 86400)
+
+    rc = r.main(["--apply", "--quiet", "--release-locks-older-than-days", "7", "--budget-seconds", "120"])
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert not clean.exists(), f"the stale clean merged lane was not reaped:\n{out}"
+    assert dirty.exists() and (dirty / "wip.txt").read_text(encoding="utf-8") == "keep me\n"
+    assert "issue-4259-apply-dirty" in out, "a dirty lane must be reported by NAME"
+    porcelain = _run(["git", "worktree", "list", "--porcelain"], sandbox)
+    block = [b for b in porcelain.split("\n\n") if str(dirty) in b or os.path.realpath(dirty) in b]
+    assert block and "locked" in block[0], "the dirty lane's lock must be left exactly as found"
+    assert "REAPER-SUMMARY" in out and "removed=1" in out and "released=1" in out, out
+
+
+def test_release_resolves_a_bare_issue_number(sandbox):
+    path = lane.new_lane("4259", "by-number", repo=sandbox)
+    assert os.path.realpath(lane.resolve_lane("4259", repo=sandbox)) == os.path.realpath(path)
+    with pytest.raises(SystemExit):
+        lane.resolve_lane("999999", repo=sandbox)  # no such lane: an error, never a guess
+    lane.new_lane("4259", "second", repo=sandbox)
+    with pytest.raises(SystemExit):
+        lane.resolve_lane("4259", repo=sandbox)  # ambiguous: an error, never a guess
+
+
+def test_the_wrap_battery_runs_the_reaper_and_the_release_step_is_named():
+    wg = _load("wrap_gates", "_wrap_gates_4259")
+    (gate,) = [g for g in wg.GATHER if "scripts/worktree_reaper.py" in g.cmd]
+    for flag in ("--apply", "--release-locks-older-than-days", "--budget-seconds"):
+        assert flag in gate.cmd, f"the wrap reaper must pass {flag}"
+    assert gate.cmd[gate.cmd.index("--release-locks-older-than-days") + 1] == "7"
+    assert float(gate.cmd[gate.cmd.index("--budget-seconds") + 1]) < wg.TIMEOUT, "the budget must end before the runner kills it"
+    for rel in (".claude/skills/land/SKILL.md", ".claude/agents/worktree-implementer.md"):
+        body = Path(REPO, rel).read_text(encoding="utf-8")
+        assert "lane_worktree.py release" in body, f"{rel} must name the release step"
