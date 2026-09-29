@@ -160,7 +160,7 @@ def full_body_routines(
         role, deload=deload, catalog_movements=catalog.get("movements") or {}, skill_ceiling=skill_ceiling, in_block=in_block
     )
     # a kept title-only variant (ADR-069) loads from its wire template id; the snapshot keeps the catalog's own hash
-    load_catalog = in_block_variant.with_performed_template_ids(catalog, rx)
+    load_catalog = in_block_variant.with_performed_template_ids(catalog, rx, in_block)  # #4431: the one resolver
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     rationale: list[str] = [
         f"week grid source={resolved_week.source} ({resolved_week.detail})",
