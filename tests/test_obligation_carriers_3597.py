@@ -51,7 +51,7 @@ cal = _load("_operating_calendar_for_3597", SCRIPTS / "operating_calendar.py")
 cc = _load("closure_contract_3597", SCRIPTS / "closure_contract.py")
 sweep = _load("closure_sweep_3597", SCRIPTS / "closure_sweep.py")
 cac = _load("_check_alarm_citations_3597", SCRIPTS / "check_alarm_citations.py")
-residue = _load("_obligation_residue_3597", ROOT / "tests" / "obligation_residue_3597.py")
+residue = _load("_obligation_residue_3597", ROOT / "ledgers" / "obligation_residue_3597.py")
 
 ADR = "docs/DECISIONS.md"
 
@@ -320,8 +320,8 @@ def test_the_live_residue_registry_meets_its_contract():
 def test_the_registry_names_the_four_ledgers_the_issue_lists():
     keys = set(oc.RESIDUE_LEDGERS)
     for must in (
-        "tests/conformance_residue.py::CONFORMANCE_RESIDUE",
-        "tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE",
+        "ledgers/conformance_residue.py::CONFORMANCE_RESIDUE",
+        "ledgers/pair_seam_residue.py::PAIR_SEAM_RESIDUE",
         "tests/mypy_clean_set.py::DIRTY",
         "tests/a11y_baseline.json",
     ):
@@ -330,14 +330,14 @@ def test_the_registry_names_the_four_ledgers_the_issue_lists():
 
 def test_an_entry_without_an_expiry_is_red(discovered):
     reg = {k: dict(v) for k, v in oc.RESIDUE_LEDGERS.items()}
-    reg["tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE"].pop("expires")
+    reg["ledgers/pair_seam_residue.py::PAIR_SEAM_RESIDUE"].pop("expires")
     problems = oc.registry_findings(registry=reg, discovered=discovered)
     assert any("PAIR_SEAM_RESIDUE" in p and "expires" in p for p in problems), problems
 
 
 def test_an_entry_past_ninety_days_or_without_an_issue_carrier_is_red(discovered):
     reg = {k: dict(v) for k, v in oc.RESIDUE_LEDGERS.items()}
-    reg["tests/conformance_residue.py::CONFORMANCE_RESIDUE"].update(expires="2031-01-01")
+    reg["ledgers/conformance_residue.py::CONFORMANCE_RESIDUE"].update(expires="2031-01-01")
     reg["tests/mypy_clean_set.py::DIRTY"].update(carrier="someday")
     problems = oc.registry_findings(registry=reg, discovered=discovered)
     assert any("CONFORMANCE_RESIDUE" in p and "90 days" in p for p in problems)
@@ -362,7 +362,7 @@ def test_a_new_data_file_ledger_not_in_the_registry_is_red(tmp_path):
 
 def test_a_phantom_registration_is_red(discovered):
     reg = dict(oc.RESIDUE_LEDGERS)
-    reg["tests/nowhere.py::GHOST_RESIDUE"] = dict(oc.RESIDUE_LEDGERS["tests/pair_seam_residue.py::PAIR_SEAM_RESIDUE"])
+    reg["tests/nowhere.py::GHOST_RESIDUE"] = dict(oc.RESIDUE_LEDGERS["ledgers/pair_seam_residue.py::PAIR_SEAM_RESIDUE"])
     assert any("GHOST_RESIDUE" in p and "phantom" in p for p in oc.registry_findings(registry=reg, discovered=discovered))
 
 

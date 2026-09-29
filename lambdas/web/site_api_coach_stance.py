@@ -356,6 +356,7 @@ def _team_tensions(*, _g):
                         or ""
                     ),
                     "generated_at": gen,
+                    "data_through": item.get("data_through"),  # #4185 box 3: the digest's last data day
                 }
             )
         return out

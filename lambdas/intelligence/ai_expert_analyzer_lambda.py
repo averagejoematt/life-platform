@@ -333,21 +333,24 @@ def gather_data_for_expert(expert_key):
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
         _f_since, _f_14 = _recency_stats(_item_dates(items), today)
+        # #4185 box 1: ONE logging record. The served derivation (paginated, tombstones dropped) owns
+        # days-logged and last-log; this pack's own unpaginated count survives only when it is unread.
+        _lr = (_ci.served_run_facts({"date": today}, table=table, today=today) or {}).get("nutrition")
         return {
             "expert_key": "nutrition",
             "period": _frame.period,
-            "days_since_last_food_log": _f_since,
+            "days_since_last_food_log": _lr["lag_days"] if _lr else _f_since,
             "food_logs_last_14d": _f_14,
             "avg_calories": avg_cal,
             "avg_protein_g": avg_pro,
             "avg_fiber_g": avg_fiber,
             "protein_target_g": protein_target,
             "protein_adherence_pct": adherence,
-            "days_tracked": len(items),
+            "days_tracked": _lr["days_logged"] if _lr else len(items),
             "zero_calorie_days": zero_cal_days,
             "recency_note": _recency_note,
             # #4185: the SERVED logging record (/api/nutrition_overview's own derivation) — authoritative over the counts above.
-            "logging_record": (_ci.served_run_facts({"date": today}, table=table, today=today) or {}).get("nutrition"),
+            "logging_record": _lr,
         }
 
     elif expert_key == "training":
@@ -1176,6 +1179,7 @@ def generate_and_cache(expert_key, shared_system=None):
         "expert_key": expert_key,
         "analysis": analysis_text,
         "generated_at": now.isoformat(),
+        "data_through": pacific_today(),  # #4185 box 3: the window end (PT) the pack read — same stamp as EXPERT#integrator
         "data_snapshot": json.dumps(data, default=str)[:5000],
         "week_number": _gframe.week_num,
         "days_in_experiment": _gframe.days_in,
@@ -1646,6 +1650,7 @@ def generate_experiment_arc():
             "chapters": parsed.get("chapters", []),
             "week_count": len(weeks),
             "generated_at": now.isoformat(),
+            "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
             "ttl": int((now + timedelta(days=10)).timestamp()),
         }
         table.put_item(Item=item)
@@ -1770,6 +1775,7 @@ def generate_month_rollup():
             "window_label": window_label,
             "days_in_experiment": day_n,
             "generated_at": now.isoformat(),
+            "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
             "ttl": int((now + timedelta(days=10)).timestamp()),
         }
         table.put_item(Item=item)

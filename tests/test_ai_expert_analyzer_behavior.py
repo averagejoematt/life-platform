@@ -559,6 +559,37 @@ class TestNutritionSnapshot:
         assert data["days_tracked"] == 2 and data["zero_calorie_days"] == 1
         assert data["avg_calories"] == 1100
 
+    def test_the_weekly_nutrition_pack_states_the_served_logging_record_not_its_own_count(self, table, monkeypatch):
+        """#4185 box 1 on the WEEKLY path: the pack carried three counters — its own unpaginated
+        `days_since_last_food_log` / `days_tracked` beside the served `logging_record` — so a model
+        could ground "six days without logs" on the one that disagreed. Replay: the 09-25 served
+        record (the saved /api/nutrition_overview rows through 09-24, the brief's data day) says
+        19 days, last log 09-24, lag 1; the pack's own read sees a partition that stops at 09-19
+        (the premise the coach carried). Mutation control: restore `_f_since` / `len(items)` in the
+        pack — the stale 6-day gap and 14-day count come back and this reds."""
+        from coach import coach_input_facts as ci
+
+        fx = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "coach_input_premises_4185")
+        with open(os.path.join(fx, "api_nutrition_overview_2026-09-26.json")) as fh:
+            trend = json.load(fh)["nutrition_trend"]
+        rows = [
+            {"pk": az.USER_PREFIX + "macrofactor", "sk": f"DATE#{r['date']}", "date": r["date"], "total_protein_g": r["protein_g"]}
+            for r in trend
+        ]
+        served = ci.nutrition_record([r for r in rows if r["date"] <= "2026-09-24"], "2026-09-25")
+        assert (served["days_logged"], served["latest_log_date"], served["lag_days"]) == (19, "2026-09-24", 1)
+        for r in rows:  # the pack's own view: the partition as the carried thread saw it
+            if r["date"] <= "2026-09-19":
+                table.add("macrofactor", r["date"], total_protein_g=Decimal(str(r["total_protein_g"])))
+        monkeypatch.setattr(az, "pacific_today", lambda: "2026-09-25")
+        monkeypatch.setattr(az._ci, "served_run_facts", lambda *a, **k: {"nutrition": served})
+        data = az.gather_data_for_expert("nutrition")
+        assert data["logging_record"] is served
+        assert (data["days_since_last_food_log"], data["days_tracked"]) == (1, 19), "the pack must state the served record"
+        monkeypatch.setattr(az._ci, "served_run_facts", lambda *a, **k: None)  # the served read failed
+        unread = az.gather_data_for_expert("nutrition")
+        assert unread["logging_record"] is None and unread["days_since_last_food_log"] == 6  # its own count, only when unread
+
 
 class TestTrainingSnapshot:
     def test_hevy_is_the_primary_training_stimulus_signal(self, table):

@@ -636,3 +636,13 @@ def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():
         out2, _, _ = _run(ir, ev, invoke=cut_by_4)
     assert out2["critics"]["recheck"]["total_sets"] == 14, "a re-run must land on the same cut, not cut again"
     assert sum(len(e.sets) for e in ir.exercises) == 14
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, tp, "plan_next_session")
+    check_output_schema(monkeypatch, t, "manage_hevy_routine")
