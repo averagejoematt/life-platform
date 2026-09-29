@@ -2794,3 +2794,27 @@ STRUCTURAL_HAND_PROOFS["structural::test_singleton_tombstone_guards.py"] = {
     ),
     "proved_on": "2026-09-28",
 }
+
+# #4262 box 2: wrap-nightly's run step — the matrix job's ONE CI-step gate (five legs share it).
+CI_PROOFS["ci::wrap-nightly.yml::check::2"] = {
+    "gate_name": "check / Run the wrap-only check (a degrade is a red)",
+    "command": "python3 -m pytest tests/test_advisory_failure_issue.py -k wrap_nightly -q -p no:cacheprovider   # 3 tests; baseline 3 passed",
+    "mutation": (
+        "The tests run the step's own `run:` text from the REAL tracked .github/workflows/wrap-nightly.yml under "
+        "`bash -eo pipefail`, with CHECK_CMD pointed at a stand-in script. M1: the UNVERIFIED / 'skipping (advisory)' "
+        'grep block deleted from the workflow file. M2: the final `exit "$rc"` replaced by `exit 0`. Each restored '
+        "by copying the pre-mutation file back (md5 65d73724… before and after)."
+    ),
+    "observed": (
+        "2026-09-29. M1: 1 failed, 2 passed — test_wrap_nightly_step_reds_a_check_that_declined_to_look (both degrade "
+        "shapes exit 0 and pass). M2: 1 failed, 2 passed — test_wrap_nightly_step_keeps_the_checks_own_exit_code (a "
+        "check that exits 1 or 2 reads green). RESTORED: 3 passed."
+    ),
+    "scope": (
+        "Proves the step's exit contract: the check's own rc is kept, and a check that declines to look is a red. It "
+        "does not prove each leg's check can fail — those are the scripts' own census rows. unlinked-closures and "
+        "merge-text-closures are advisory by their closure_contract posture and exit 0 on findings, so their legs can "
+        "red only on a crash or a degrade line until that posture is re-armed."
+    ),
+    "proved_on": "2026-09-29",
+}
