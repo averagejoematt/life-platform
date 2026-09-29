@@ -1419,8 +1419,8 @@ def _served_recent(monkeypatch, coach_id, *, macrofactor=True):
     return api._recent_outputs(coach_id)
 
 
-def test_the_four_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monkeypatch):
-    """Exactly the four live reads — nutrition 09-23/24/25, physical 09-13 — lose their false summary and
+def test_the_six_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monkeypatch):
+    """Exactly the six live reads — nutrition 09-22/23/24/25/26, physical 09-13 — lose their false summary and
     carry `superseded`; every other read (including the post-fix 09-28/29 reads that mention September 19th)
     is served byte-for-byte. Mutation controls: drop the `served_last_log > d` comparison or the pre-fix
     condition — more reads supersede and the set assertion reds; remove the `apply` call — none do."""
@@ -1437,7 +1437,11 @@ def test_the_four_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monke
                 assert o["superseded"]["note"] == "superseded — generated before the logging-record fix"
             else:
                 assert o["summary"] == (w["summary"] or ""), (cid, o["date"])
+    # 09-26 and 09-22 say "N-day logging gap since September 19th" — read since the #4185 follow-up widened
+    # `coach_input_facts._GAP_SINCE_DATE`; the other four use "went dark / silent / nothing logged".
     assert hit == {
+        ("nutrition_coach", "2026-09-26"): "2026-09-19",
+        ("nutrition_coach", "2026-09-22"): "2026-09-19",
         ("nutrition_coach", "2026-09-25"): "2026-09-19",
         ("nutrition_coach", "2026-09-24"): "2026-09-19",
         ("nutrition_coach", "2026-09-23"): "2026-09-19",
@@ -1454,7 +1458,7 @@ def test_an_unread_or_uncontradicting_record_supersedes_nothing(monkeypatch):
 
     wire = _GAP_FX["coaches"]["nutrition_coach"]
     assert not any(o.get("superseded") for o in g.mark(wire, "2026-09-19"))
-    assert sum(1 for o in g.mark(wire, "2026-09-20") if o.get("superseded")) == 3
+    assert sum(1 for o in g.mark(wire, "2026-09-20") if o.get("superseded")) == 5
 
 
 def test_only_a_pre_fix_read_is_superseded_a_post_fix_one_is_left_to_the_gate():

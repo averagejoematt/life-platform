@@ -3824,6 +3824,34 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/training/exercise_history.py",
@@ -7460,7 +7488,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 722,
+      "edges": 726,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7475,8 +7503,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 359,
-        "sites_resolved": 893,
-        "sites_total": 1252
+        "sites_resolved": 897,
+        "sites_total": 1256
       },
       "schedule_resolution": {
         "dynamic": 0,

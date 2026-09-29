@@ -882,3 +882,125 @@ def test_mutation_control_without_the_idiom_rule_the_physical_final_is_held_on_4
 
     monkeypatch.setattr(gg, "_AGE_DECADE_RE", re.compile(r"(?!)"))
     assert gg.fabricated_numbers(PHYSICAL_0927["final"], set(PHYSICAL_0927["allowed"])) == [40.0]
+
+
+# ── #4343 / #4185 box 4: the SERVED corpus against the served facts (scripts/check_served_coach_facts.py) ──
+# The generation-time gate sees drafts only; this probe re-reads what is already served. The
+# fixture text is the live /api/coaching-dashboard lead read of 2026-09-29 (4.4 lb/week beside
+# a served rate of -3.8, 80% CI -4.32..-2.12).
+_SERVED_LEAD_4343 = (
+    "Matthew has dropped 13.5 pounds in three weeks, running at a provisional early pace of 4.4 pounds per "
+    "week—the kind of momentum that suggests his daily choices are clicking into place."
+)
+
+
+def _probe():
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import check_served_coach_facts as probe
+
+    return probe
+
+
+def _served_4343(rate, lo, hi):
+    trend = [{"date": f"2026-09-{d:02d}", "protein_g": 150.0 + (d % 5) * 4} for d in range(6, 27)]
+    return {"nutrition_trend": trend}, {
+        "journey": {"current_weight_lbs": 312.3, "weekly_rate_lbs": rate, "weekly_rate_ci_low": lo, "weekly_rate_ci_high": hi}
+    }
+
+
+def _payloads_4343():
+    return {
+        "/api/coaches": {"coaches": [{"persona_id": "eli_marsh", "headline_stat": "no checked call yet"}]},
+        "/api/coaching-dashboard": {"lead_daily": {"text": _SERVED_LEAD_4343}},
+        "/api/coach_team": {},
+        "/api/coach/eli_marsh": {"daily": _SERVED_LEAD_4343},
+    }
+
+
+def test_4343_served_probe_names_the_path_figure_and_served_value():
+    probe = _probe()
+    facts = probe.facts_from_served(*_served_4343(-3.8, -4.32, -2.12), today="2026-09-29")
+    hits = probe.findings(probe.served_texts(_payloads_4343()), facts, today="2026-09-29")
+    paths = sorted(p for p, _f in hits)
+    assert paths == ["/api/coach/eli_marsh $.daily", "/api/coaching-dashboard $.lead_daily.text"], paths
+    assert all(f["cited"] == 4.4 for _p, f in hits), hits
+
+
+def test_4343_mutation_control_facts_from_the_texts_own_figures_go_green():
+    """The control: serve the rate the text cites and the same corpus is clean — the probe
+    reds on the DISAGREEMENT, not on the presence of a figure."""
+    probe = _probe()
+    facts = probe.facts_from_served(*_served_4343(-4.4, -4.9, -3.9), today="2026-09-29")
+    assert probe.findings(probe.served_texts(_payloads_4343()), facts, today="2026-09-29") == []
+
+
+def test_4343_served_probe_exit_codes(monkeypatch, capsys):
+    probe = _probe()
+    nut, jr = _served_4343(-3.8, -4.32, -2.12)
+    routes = {**_payloads_4343(), "/api/nutrition_overview": nut, "/api/journey": jr}
+    monkeypatch.setattr(probe, "_fetch", lambda base, path: routes[path])
+    assert probe.main([]) == 1
+    out = capsys.readouterr().out
+    assert "/api/coaching-dashboard $.lead_daily.text" in out and "cites 4.4" in out and "findings=2" in out
+
+    def _down(base, path):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(probe, "_fetch", _down)
+    assert probe.main([]) == 2, "a probe that could not look is UNEVALUABLE, never a clean corpus"
+    monkeypatch.setattr(probe, "_fetch", lambda base, path: {"coaches": []} if path == "/api/coaches" else {})
+    assert probe.main([]) == 2
+
+
+def test_4343_served_probe_workflow_step_keeps_the_scripts_exit_code(tmp_path):
+    """The nightly step is the REAL `run:` text from served-coach-facts.yml, executed as GitHub
+    runs it (`bash -eo pipefail`) with the script swapped for a stand-in: findings (1) and
+    UNEVALUABLE (2) are reds, a clean corpus (0) is green."""
+    import subprocess
+
+    import yaml
+
+    wf = os.path.join(os.path.dirname(__file__), "..", ".github", "workflows", "served-coach-facts.yml")
+    with open(wf, encoding="utf-8") as fh:
+        steps = yaml.safe_load(fh)["jobs"]["probe"]["steps"]
+    run = next(s["run"] for s in steps if "check_served_coach_facts.py" in (s.get("run") or ""))
+    (tmp_path / "scripts").mkdir()
+    for code in (0, 1, 2):
+        (tmp_path / "scripts" / "check_served_coach_facts.py").write_text(f"raise SystemExit({code})\n", encoding="utf-8")
+        env = {**os.environ, "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.md")}
+        got = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", run], cwd=tmp_path, env=env, capture_output=True)
+        assert got.returncode == code, f"script exit {code} -> step exit {got.returncode}"
+
+
+# ── #4185 follow-up: the "N-day logging gap since <date>" phrasing ─────────────────────────
+# The two served nutrition reads the original matcher could not read (the public wire, read
+# 2026-09-29 — tests/fixtures/coach_superseded_gap_4185/). Only the DATE is judged: the last log
+# the sentence implies against the served record's `latest_log_date`.
+with open(os.path.join(os.path.dirname(__file__), "fixtures", "coach_superseded_gap_4185", "live_wire_2026-09-29.json")) as _fh:
+    _GAP_WIRE = {o["date"]: o["summary"] for o in json.load(_fh)["coaches"]["nutrition_coach"]}
+NUTRITION_0926 = _GAP_WIRE["2026-09-26"]  # "The six-day logging gap since September 19th is blocking my directional read, …"
+NUTRITION_0922 = _GAP_WIRE["2026-09-22"]  # "… a two-day logging gap since September 19th has left the picture unclear."
+
+
+def test_the_n_day_logging_gap_phrasings_are_judged_against_the_served_last_log():
+    """09-26 (record through 09-25) and 09-22 (record through 09-21): each claims logging stopped after
+    09-19 while the served record has later logs → one `last_log_date` finding each. Mutation control:
+    drop the `log(?:ging)? gap` alternative from `_GAP_SINCE_DATE` — both come back empty and this reds."""
+    assert "six-day logging gap since September 19th" in NUTRITION_0926
+    assert "two-day logging gap since September 19th" in NUTRITION_0922
+    for text, day, today, latest in (
+        (NUTRITION_0926, "2026-09-25", "2026-09-26", "2026-09-25"),
+        (NUTRITION_0922, "2026-09-21", "2026-09-22", "2026-09-21"),
+    ):
+        found = [f for f in ci.served_fact_findings(text, _facts(day, today), today=today) if f["metric"] == "last_log_date"]
+        assert [(f["cited"], f["canonical"]) for f in found] == [("2026-09-19", latest)], (today, found)
+
+
+def test_a_true_logging_gap_the_served_record_agrees_with_is_never_flagged():
+    """The negative: the same 09-22 sentence against a record whose last log IS 09-19 (the gap is real)
+    raises NO finding of any kind — the new-draft gate must not start holding a correct read. Mutation
+    control: flag on `claimed_last <= latest` instead of `<` — this reds."""
+    agreeing = _facts("2026-09-19", "2026-09-22")
+    assert agreeing["nutrition"]["latest_log_date"] == "2026-09-19"
+    assert ci.served_fact_findings(NUTRITION_0922, agreeing, today="2026-09-22") == []
+    assert ci.served_fact_findings("The food log has a two-day logging gap since September 19th.", agreeing, today="2026-09-22") == []
