@@ -850,3 +850,48 @@ def test_live_role_policies_match_the_checked_in_documents():
     assert not stale, "these KNOWN_LIVE_DRIFT lines no longer describe live drift — the deploy landed; delete them:\n" + "\n".join(
         f"  {k}" for k in stale
     )
+
+
+# ── #4449: the podcast's panelcast-holds/ verbs, derived from the code, granted by the role ──
+# The DDB legs above cannot see S3. The SS-02 hold sweep put_object'd holds under a PutObject-only
+# grant and then get_object'd them back: every read AccessDenied inside a fail-soft `except`, so a
+# quality hold read as "no hold" and was never retried (live 2026-09-28, wk3). One prefix, derived
+# both ways: the S3 verbs the module calls with a HOLD_PREFIX key, and the role that must grant them.
+_S3_METHOD_ACTION = {
+    "get_object": "s3:GetObject",
+    "head_object": "s3:GetObject",
+    "put_object": "s3:PutObject",
+    "delete_object": "s3:DeleteObject",
+}
+
+
+def _hold_prefix_s3_actions(source: str) -> set:
+    actions = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _S3_METHOD_ACTION:
+            key = next((k.value for k in node.keywords if k.arg == "Key"), None)
+            if key is not None and "HOLD_PREFIX" in ast.unparse(key):
+                actions.add(_S3_METHOD_ACTION[node.func.attr])
+    return actions
+
+
+def _granted_on(statements, resource_suffix: str) -> set:
+    return {a for s in statements for a in s.actions if any(r.endswith(resource_suffix) for r in s.resources)}
+
+
+def test_the_podcast_role_grants_every_verb_its_hold_sweep_calls_on_panelcast_holds():
+    with open(os.path.join(ROOT, "lambdas", "emails", "coach_panel_podcast_lambda.py"), encoding="utf-8") as fh:
+        called = _hold_prefix_s3_actions(fh.read())
+    assert called == {"s3:GetObject", "s3:PutObject", "s3:DeleteObject"}, called  # the extractor sees all three
+    granted = _granted_on(policy_statements("email_coach_panel_podcast"), "/panelcast-holds/*")
+    assert called <= granted, f"coach-panel-podcast calls {sorted(called - granted)} on panelcast-holds/* with no grant"
+
+
+def test_MUTATION_a_put_only_grant_reds_on_the_hold_read():
+    """The pre-#4449 role: S3Write PutObject on panelcast-holds/* and nothing else."""
+    put_only = [types.SimpleNamespace(actions=["s3:PutObject"], resources=["arn:aws:s3:::b/panelcast-holds/*"])]
+    called = {"s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
+    assert called - _granted_on(put_only, "/panelcast-holds/*") == {"s3:GetObject", "s3:DeleteObject"}
+    assert _hold_prefix_s3_actions('s3.get_object(Bucket=B, Key=f"{HOLD_PREFIX}/wk1.json")\ns3.get_object(Key="other/x")') == {
+        "s3:GetObject"
+    }
