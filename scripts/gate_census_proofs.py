@@ -2794,3 +2794,40 @@ STRUCTURAL_HAND_PROOFS["structural::test_singleton_tombstone_guards.py"] = {
     ),
     "proved_on": "2026-09-28",
 }
+
+# #4343 / #4185 box 4: the served-coach-facts probe — the script (family 2) and its nightly step (family 1).
+GUARD_PROOFS["guard::scripts/check_served_coach_facts.py"] = {
+    "gate_name": "scripts/check_served_coach_facts.py",
+    "command": "python3 -m pytest tests/test_coach_input_premises_4185.py -k 4343 -q -p no:cacheprovider   # 4 tests; baseline 4 passed",
+    "mutation": (
+        "Three plants in the REAL tracked script (md5 46f834df… before and after): M1 main()'s `return 1 if hits else 0` -> "
+        "`return 0`; M2 the fetch-failure branch's `return 2` -> `return 0`; M3 facts_from_served drops the served "
+        "weekly_rate_lbs (the rate the fixture's live 4.4 lb/week text contradicts)."
+    ),
+    "observed": (
+        "2026-09-29. M1: 1 failed / 2 passed (test_4343_served_probe_exit_codes). M2: 1 failed / 2 passed (same test — "
+        "an unreachable site read as a clean corpus). M3: 2 failed / 1 passed (the path/figure test and the exit-code test). "
+        "RESTORED: 3 passed, then the full module 55 passed. LIVE the same day: exit 1, 8 findings over 1,321 texts."
+    ),
+    "scope": (
+        "Proves the probe reds on a served contradiction and on a failed look, and that the mutation control (facts built "
+        "from the texts' own figures) goes green. The judgement itself is coach_input_facts.served_fact_findings, whose "
+        "own tests carry its precision; a stored summary judged against today's facts reds even when it was true when written."
+    ),
+    "proved_on": "2026-09-29",
+}
+CI_PROOFS["ci::served-coach-facts.yml::probe::3"] = {
+    "gate_name": "probe / Served coach facts probe (read-only, blocking)",
+    "command": "python3 -m pytest tests/test_coach_input_premises_4185.py -k workflow_step -q -p no:cacheprovider",
+    "mutation": (
+        "The test executes the step's REAL `run:` text from .github/workflows/served-coach-facts.yml under `bash -eo pipefail` "
+        'with the script swapped for a stand-in exiting 0/1/2. Planted: the step\'s final `exit "$rc"` -> `exit 0` '
+        "(md5 72f0946f… before and after)."
+    ),
+    "observed": (
+        "2026-09-29. MUTATED: 1 failed / 3 passed — test_4343_served_probe_workflow_step_keeps_the_scripts_exit_code "
+        "(findings and UNEVALUABLE both read green). RESTORED: 4 passed."
+    ),
+    "scope": "Proves the step's exit contract only; the script's own can-fail proof is the guard record above.",
+    "proved_on": "2026-09-29",
+}

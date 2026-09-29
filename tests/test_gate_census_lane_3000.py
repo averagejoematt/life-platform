@@ -509,7 +509,12 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 782  # 781 -> 782 (2026-09-29, #4270 slice 1 re-merged onto #4419's 781): ONE real entrant —
+BASELINE_TOTAL_GATES = 784  # 782 -> 784 (2026-09-29, #4343 the served-coach-facts probe, on origin/main 4fde80713): TWO real entrants —
+# `guard::scripts/check_served_coach_facts.py` and `ci::served-coach-facts.yml::probe::3`. Both arrive PROVEN (GUARD_PROOFS + CI_PROOFS
+# in scripts/gate_census_proofs.py: three script plants 1-2 failed each, the step's `exit 0` plant 1 failed / 3 passed, restored green).
+# MEASURED by id-set diff on `scripts/gate_census.py --json` vs a `git archive origin/main` export at 4fde80713: main 782 {proven 231,
+# unproven 539, not-applicable 7, attempted-unproven 5} -> this lane 784 {233, 539, 7, 5}; exactly those two ids enter, {} leaves.
+# PRIOR: 781 -> 782 (2026-09-29, #4270 slice 1 re-merged onto #4419's 781): ONE real entrant —
 # `registry::tests/test_root_clutter_guard.py::ALLOWLIST::ledgers`, the D1 root-clutter entry for the new `ledgers/`
 # top-level dir. It arrives PROVEN (REGISTRY_PROOFS record in scripts/gate_census_proofs.py; ARMED 1 failed / 3 passed
 # naming `['ledgers']`; REVERTED 4 passed). MEASURED by id-set diff on `scripts/gate_census.py --json`, merged tree vs a

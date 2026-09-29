@@ -950,3 +950,23 @@ def test_4343_served_probe_exit_codes(monkeypatch, capsys):
     assert probe.main([]) == 2, "a probe that could not look is UNEVALUABLE, never a clean corpus"
     monkeypatch.setattr(probe, "_fetch", lambda base, path: {"coaches": []} if path == "/api/coaches" else {})
     assert probe.main([]) == 2
+
+
+def test_4343_served_probe_workflow_step_keeps_the_scripts_exit_code(tmp_path):
+    """The nightly step is the REAL `run:` text from served-coach-facts.yml, executed as GitHub
+    runs it (`bash -eo pipefail`) with the script swapped for a stand-in: findings (1) and
+    UNEVALUABLE (2) are reds, a clean corpus (0) is green."""
+    import subprocess
+
+    import yaml
+
+    wf = os.path.join(os.path.dirname(__file__), "..", ".github", "workflows", "served-coach-facts.yml")
+    with open(wf, encoding="utf-8") as fh:
+        steps = yaml.safe_load(fh)["jobs"]["probe"]["steps"]
+    run = next(s["run"] for s in steps if "check_served_coach_facts.py" in (s.get("run") or ""))
+    (tmp_path / "scripts").mkdir()
+    for code in (0, 1, 2):
+        (tmp_path / "scripts" / "check_served_coach_facts.py").write_text(f"raise SystemExit({code})\n", encoding="utf-8")
+        env = {**os.environ, "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.md")}
+        got = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", run], cwd=tmp_path, env=env, capture_output=True)
+        assert got.returncode == code, f"script exit {code} -> step exit {got.returncode}"
