@@ -200,7 +200,7 @@ class TestOgSweep:
 
         monkeypatch.setattr(og_moments.urllib.request, "urlopen", lambda *a, **k: _Resp())
         s3 = FakeS3()
-        out = og_moments._sweep_wrong(s3)
+        out, _ledger = og_moments._sweep_wrong(s3)
         assert out == {"abc123def456": "/moments/wrong/abc123def456/"}
         # The card + shell land at the paths the API already published (no drift).
         assert "generated/moments/assets/wrong-abc123def456.png" in s3.puts
@@ -209,6 +209,104 @@ class TestOgSweep:
         shell = s3.puts[shell_key]["Body"].decode()
         assert "sleep hours would come in at or above 7.5" in shell
         assert "/method/wrong/#obit-abc123def456" in shell  # deep-link back to the live feed
+
+    # ── #4404: an obituary that left /api/wrong is RETIRED, not left serving 200 ──
+    # The fixture is the wire: the /api/wrong obituary is the real row the feed served at
+    # 2026-09-29 03:0xZ (3b404dd9e871, live), and the /moments/index.json shape is the one
+    # the previous run wrote (generated_at + a ``wrong`` id→permalink map). aa98dbbed1dd
+    # is one of the 20 #4216 docket obituaries whose record left the feed.
+    _LIVE = {
+        "id": "3b404dd9e871",
+        "date": "2026-09-28",
+        "coach": "nutrition",
+        "believed": "total protein would trend down",
+        "number": "measured rising: the smoothed average of total protein rose 3.6% across its last 7 readings — the call was falling",
+        "what_changed": "The trend ran up, the opposite of the call, so it was graded refuted.",
+        "verdict": "refuted",
+        "permalink": "/moments/wrong/3b404dd9e871/",
+        "og_image": "/moments/assets/wrong-3b404dd9e871.png",
+    }
+    _RETIRED = "aa98dbbed1dd"
+
+    def _route(self, monkeypatch, feed, index):
+        """urlopen by URL: /api/wrong → ``feed``, /moments/index.json → ``index``.
+        ``None`` for either makes that fetch raise, the way a failed read does live."""
+        from web import og_moments
+
+        def _open(req, timeout=8):
+            url = req.full_url
+            body = feed if url.endswith("/api/wrong") else index if url.endswith("/moments/index.json") else None
+            if body is None:
+                raise OSError(f"unreachable: {url}")
+
+            class _Resp:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *a):
+                    return False
+
+                def read(self):
+                    return json.dumps(body).encode()
+
+            return _Resp()
+
+        monkeypatch.setattr(og_moments.urllib.request, "urlopen", _open)
+        return og_moments
+
+    @staticmethod
+    def _redirects(s3):
+        return {k: v["WebsiteRedirectLocation"] for k, v in s3.puts.items() if "WebsiteRedirectLocation" in v}
+
+    def test_a_retired_id_redirects_and_a_live_id_is_untouched(self, monkeypatch):
+        index = {"generated_at": "2026-09-28T19:30:11+00:00", "wrong": {self._LIVE["id"]: self._LIVE["permalink"]}}
+        om = self._route(monkeypatch, {"data": {"obituaries": [self._LIVE], "obituary_count": 1}}, index)
+        s3 = FakeS3()
+        out, ledger = om._sweep_wrong(s3)
+        redirects = self._redirects(s3)
+        assert redirects[f"generated/moments/wrong/{self._RETIRED}/index.html"] == "/method/wrong/"
+        assert redirects[f"generated/moments/assets/wrong-{self._RETIRED}.png"] == "/assets/images/og-home.png"
+        live_keys = {"generated/moments/wrong/3b404dd9e871/index.html", "generated/moments/assets/wrong-3b404dd9e871.png"}
+        assert live_keys <= set(s3.puts) and not live_keys & set(redirects)  # never touches a live id
+        assert out == {"3b404dd9e871": "/moments/wrong/3b404dd9e871/"}
+        assert self._RETIRED in ledger["retired"] and "3b404dd9e871" not in ledger["retired"]
+        assert {self._RETIRED, "3b404dd9e871"} <= set(ledger["published"])
+        assert len(redirects) == 2 * len(ledger["retired"])  # a shell AND a card per retired id
+
+    def test_the_sweep_is_idempotent(self, monkeypatch):
+        om = self._route(monkeypatch, {"obituaries": [self._LIVE]}, {"wrong": {}})
+        first, second = FakeS3(), FakeS3()
+        ledger_1 = om._sweep_wrong(first)[1]
+        ledger_2 = om._sweep_wrong(second)[1]
+        assert ledger_1 == ledger_2 and self._redirects(first) == self._redirects(second)
+
+    def test_an_id_that_leaves_later_is_retired_from_the_carried_ledger(self, monkeypatch):
+        """The class, not the specimen: an id the seed never named, published by an
+        earlier run (so it rides in the index's ``wrong_published``), is retired once it
+        leaves the feed."""
+        index = {"wrong": {}, "wrong_published": ["0123456789ab", self._LIVE["id"]]}
+        om = self._route(monkeypatch, {"obituaries": [self._LIVE]}, index)
+        s3 = FakeS3()
+        _out, ledger = om._sweep_wrong(s3)
+        assert "0123456789ab" in ledger["retired"]
+        assert self._redirects(s3)["generated/moments/wrong/0123456789ab/index.html"] == "/method/wrong/"
+
+    def test_a_failed_or_empty_feed_retires_nothing_and_keeps_the_ledger(self, monkeypatch):
+        index = {"wrong": {}, "wrong_published": ["0123456789ab"]}
+        for feed in (None, {"obituaries": []}):
+            om = self._route(monkeypatch, feed, index)
+            s3 = FakeS3()
+            out, ledger = om._sweep_wrong(s3)
+            assert out == {} and ledger["retired"] == [] and self._redirects(s3) == {}
+            assert {"0123456789ab", self._RETIRED} <= set(ledger["published"])  # carried, not dropped
+
+    def test_the_index_carries_the_ledger_forward(self):
+        import inspect
+
+        from web import og_moments
+
+        src = inspect.getsource(og_moments.sweep_moments)
+        assert '"wrong_published"' in src and '"wrong_retired"' in src
 
     def test_sweep_is_registered_in_the_index(self):
         import inspect

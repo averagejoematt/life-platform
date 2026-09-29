@@ -290,14 +290,114 @@ def _sweep_predictions(s3):
     return out
 
 
-def _sweep_wrong(s3):
-    """#1377 (The Wrong Feed): one shareable obituary per GRADED failure — fetched from
-    the PUBLIC /api/wrong payload so a card can never say more than the site publishes.
+# ── #4404: retiring an obituary whose record left /api/wrong ────────────────
+#
+# The sweep used to only ADD: an obituary that left the feed (the 20 re-graded 08-10
+# docket obituaries #4216 tombstoned, six earlier ones) kept a public shell and card that
+# still answered 200. Retirement is a WEBSITE REDIRECT written with the one S3 action the
+# og-image-generator role holds (``s3:PutObject`` on ``generated/moments/*`` —
+# ``cdk/stacks/role_policies_operational.py::operational_og_image_generator``; it has no
+# DeleteObject, no ListBucket and no GetObject on this prefix). CloudFront's
+# S3GeneratedOrigin is the S3 WEBSITE endpoint, which answers an object carrying
+# ``x-amz-website-redirect-location`` with a 301, so the retired permalink lands on the
+# live feed and the retired card on the site's default card. Re-sweeping writes the same
+# redirect again (idempotent), and an id that comes back to the feed is re-published by
+# the ordinary put above it, which replaces the redirect object — reversible by
+# construction.
+#
+# Without ListBucket the sweep cannot see what it published before, so the set of
+# published ids travels in the index it already writes (``wrong_published``, read back
+# over the public viewer path on the next run). The ids below were published BEFORE that
+# ledger existed and had already left /api/wrong when this landed — measured 2026-09-29
+# 03:0xZ from ``aws s3api list-objects-v2 --prefix generated/moments/wrong/`` (58
+# shells) against /api/wrong (32 obituaries): 26 shells with no live record.
+_WRONG_PUBLISHED_BEFORE_LEDGER = frozenset(
+    {
+        # the 08-10 calorie docket, re-graded daily 09-07..09-26 (#4216) — written 2026-09-27
+        "083335eb9bfb",
+        "0cd229d2e84d",
+        "16158919edec",
+        "1785b8755064",
+        "29cedc543062",
+        "2ff9fb8af9bd",
+        "44ed81df0500",
+        "498689084147",
+        "4c4d595911e7",
+        "54ac38a33e05",
+        "566d479b73c3",
+        "838142063466",
+        "89d11f92b6e2",
+        "9fa395f01e74",
+        "a25d1f933993",
+        "aa98dbbed1dd",
+        "af8379b7b19a",
+        "b48f0f27eebc",
+        "b5fa99579144",
+        "e9be568575a3",
+        # earlier obituaries last written 2026-08-31 that the feed no longer serves
+        "06d946009470",
+        "2783a79ac934",
+        "3bcf4f94460a",
+        "3bed4057f444",
+        "4493f1d453e5",
+        "a436a5df6237",
+    }
+)
+RETIRED_WRONG_SHELL_TARGET = "/method/wrong/"  # the live feed the obituary belonged to
+RETIRED_WRONG_CARD_TARGET = "/assets/images/og-home.png"  # the feed page's own og:image
 
-    The obituary id / permalink / og_image are read straight off the payload (the API
-    already computed the stable slug), so the permalink shell, the OG card, and the
-    front-end card all agree by construction. Sourced only from deterministic verdicts —
-    never AI-asserted wrongness. Idempotent; an empty feed writes nothing."""
+
+def _previous_wrong_ledger():
+    """The ids the previous run published, read from the index it wrote.
+
+    Read over the PUBLIC viewer path (the role holds no GetObject on
+    ``generated/moments/index.json``). Returns ``None`` when the index cannot be read,
+    so the caller can say so rather than silently treating "unknown" as "none"."""
+    try:
+        req = urllib.request.Request(f"{SITE_BASE}/moments/index.json", headers={"accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            index = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[moments] previous moments index unreadable ({e}); retirement uses the seed ledger only")
+        return None
+    ids = {str(i) for i in (index.get("wrong_published") or []) if str(i).strip()}
+    ids |= {str(i) for i in (index.get("wrong") or {}) if str(i).strip()}
+    return ids
+
+
+def _put_redirect(s3, key, target):
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=key,
+        Body=b"",
+        ContentType="text/html; charset=utf-8",
+        CacheControl="max-age=300",
+        WebsiteRedirectLocation=target,
+    )
+
+
+def _retire_wrong(s3, live_ids, previous_ids):
+    """#4404: redirect every published obituary shell + card whose id left /api/wrong.
+
+    ``live_ids`` is EVERY id the feed served this run (``None`` when the fetch failed).
+    Returns ``(published, retired)`` — the ledger the index carries forward, and the ids
+    retired this run. Never touches a live id; retires nothing on a failed or empty feed
+    (an empty list is likelier a degraded read than every record leaving at once)."""
+    known = set(_WRONG_PUBLISHED_BEFORE_LEDGER) | set(previous_ids or ())
+    if not live_ids:
+        why = "feed fetch failed" if live_ids is None else "feed served no obituaries"
+        print(f"[moments] wrong-feed retirement held: {why}; retired 0 page(s)")
+        return sorted(known | set(live_ids or ())), []
+    retired = sorted(known - set(live_ids))
+    for oid in retired:
+        _put_redirect(s3, f"{MOMENTS_PREFIX}wrong/{oid}/index.html", RETIRED_WRONG_SHELL_TARGET)
+        _put_redirect(s3, f"{MOMENTS_PREFIX}assets/wrong-{oid}.png", RETIRED_WRONG_CARD_TARGET)
+    print(f"[moments] retired {len(retired)} wrong-feed page(s) + card(s) whose record left /api/wrong")
+    return sorted(known | set(live_ids)), retired
+
+
+def _fetch_wrong_feed():
+    """The public /api/wrong payload, or ``None`` when it cannot be read."""
     try:
         req = urllib.request.Request(f"{SITE_BASE}/api/wrong", headers={"accept": "application/json"})
         with urllib.request.urlopen(req, timeout=8) as resp:
@@ -306,9 +406,31 @@ def _sweep_wrong(s3):
             data = data["data"]
     except Exception as e:
         print(f"[moments] wrong feed fetch skipped: {e}")
-        return {}
+        return None
+    return data
+
+
+def _sweep_wrong(s3):
+    """#1377 (The Wrong Feed): one shareable obituary per GRADED failure — fetched from
+    the PUBLIC /api/wrong payload so a card can never say more than the site publishes.
+
+    The obituary id / permalink / og_image are read straight off the payload (the API
+    already computed the stable slug), so the permalink shell, the OG card, and the
+    front-end card all agree by construction. Sourced only from deterministic verdicts —
+    never AI-asserted wrongness. Idempotent; an empty feed writes nothing.
+
+    #4404: returns ``(out, ledger)`` — ``ledger`` is ``{"published": [...], "retired":
+    [...]}`` from ``_retire_wrong``, which the index carries so the next run knows every
+    id it ever published."""
+    previous = _previous_wrong_ledger()
+    data = _fetch_wrong_feed()
+    if data is None:
+        published, retired = _retire_wrong(s3, None, previous)
+        return {}, {"published": published, "retired": retired}
+    obituaries = data.get("obituaries") or []
+    live_ids = {str(o.get("id", "")).strip() for o in obituaries} - {""}
     out = {}
-    for o in data.get("obituaries") or []:
+    for o in obituaries:
         oid = str(o.get("id", "")).strip()
         believed = (o.get("believed") or "").strip()
         if not oid or not believed:
@@ -336,7 +458,8 @@ def _sweep_wrong(s3):
         )
         out[oid] = _put_moment(s3, "wrong", oid, card, shell)
     print(f"[moments] swept {len(out)} wrong-feed obituary card(s)")
-    return out
+    published, retired = _retire_wrong(s3, live_ids, previous)
+    return out, {"published": published, "retired": retired}
 
 
 def _post_slug(url):
@@ -480,13 +603,16 @@ def _sweep_fingerprint(s3, stats):
 
 def sweep_moments(s3, stats):
     """Run all moment classes; write the index the share buttons read."""
+    wrong, wrong_ledger = _sweep_wrong(s3)  # #1377 — the graded-failure obituary feed (+ #4404 retirement)
     index = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "week": _sweep_week_recap(s3, stats),
         "qa": _sweep_board_answers(s3),
         "predictions": _sweep_predictions(s3),
         "chronicles": _sweep_chronicles(s3),
-        "wrong": _sweep_wrong(s3),  # #1377 — the graded-failure obituary feed
+        "wrong": wrong,
+        "wrong_published": wrong_ledger["published"],  # #4404 — every id ever published; the next run's retirement input
+        "wrong_retired": wrong_ledger["retired"],  # #4404 — ids whose shell + card now redirect
         "fingerprint": _sweep_fingerprint(s3, stats),  # #1402 — the day's dated mark + caption
     }
     _put(s3, f"{MOMENTS_PREFIX}index.json", json.dumps(index).encode("utf-8"), "application/json", cache="max-age=300")
