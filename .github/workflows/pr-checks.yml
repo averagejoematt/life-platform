@@ -3,9 +3,10 @@
 # Fast checks (~2 min total) on every PR, killing the documented agent-merge
 # failure classes at the door:
 #   1. pytest --collect-only  — the #1297 collection-error class
-#   2. the `premerge` marker lane — the behaviour suite + deploy_critical + (since
-#      2026-08-09) the structural gates, all selected by ONE marker defined in
-#      tests/conftest.py so the two lanes cannot drift
+#   2. the `deploy_critical` marker lane (ADR-117's deploy-gating subset, ~2k tests)
+#      under xdist. Since #4251 the wider `premerge` selection (the behaviour suite +
+#      the structural gates) runs in this workflow's `full-suite` job only, which runs
+#      the whole tree on the same PR — the fast lane no longer runs it a second time
 #   3. mypy on the tier-2 clean set — same command + pin as ci-lint.yml
 #   4. black --check and ruff check — the format/lint gates (same pins as ci-lint.yml)
 #
@@ -126,23 +127,25 @@ jobs:
           set -o pipefail
           python3 -m pytest tests/ --collect-only -q | tee /tmp/premerge_collect_output.txt
 
-      # #2258: the pre-merge lane must not be a strict SUBSET of the post-merge one.
-      # `premerge` is applied automatically by tests/conftest.py to every
-      # tests/*_behavior.py test PLUS everything deploy_critical — so this is a strict
-      # superset of the old ADR-117 subset, not a swap. #3608 box 4 removed the dated
-      # test-count-and-seconds literal that sat here: a 2026-08-21 reading (#2924)
-      # against a timeout-minutes that has since moved twice, and the second of three
-      # numbers for this lane that nothing reconciled. The lane now measures ITSELF
-      # (LANE_START above, the `lane-wallclock` ::notice:: below) and
-      # deploy/write_lane_posture.py writes the result into deploy/github_posture.json,
-      # where tests/test_lane_wallclock_ratchet_3608.py ratchets it.
+      # #2258 bought one property: nothing that main checks goes unchecked on the PR. Since
+      # #3025 the `full-suite` job below runs the WHOLE tree on every PR, so that property
+      # no longer needs this job to carry the `premerge` selection (the behaviour suite +
+      # tests/conftest.py's `_PREMERGE_EXTRA_FILES` structural gates + deploy_critical).
+      # #4251 moved it out: this job ran ~12.5k premerge tests that the full-suite job ran
+      # again on the same PR, and took 12-13 min for it. The `premerge` marker is NOT
+      # retired — deploy/merge_train.sh, the reset pipeline and docs-ci still select on it,
+      # and tests/test_premerge_lane.py asserts the full-suite job's two passes still
+      # select every premerge test. The lane measures ITSELF (LANE_START above, the
+      # `lane-wallclock` ::notice:: below) and deploy/write_lane_posture.py writes the
+      # result into deploy/github_posture.json, where
+      # tests/test_lane_wallclock_ratchet_3608.py ratchets it.
       #
-      # The marker's THIRD source (2026-08-09) is tests/conftest.py's
-      # `_PREMERGE_EXTRA_FILES` — the structural gates (both size ceilings, the two
-      # registries a new module must join, the mypy clean set) that ran nowhere until
-      # after a merge and red-mained main four times on 2026-08-08. They cost 1.98s
-      # locally for all 66 tests. No workflow edit was needed to add them: one marker,
-      # one selection, which is exactly the property #2258 bought.
+      # WHAT THIS COSTS, STATED: `full-suite` is not a required check (ADR-148), so a PR
+      # whose behaviour or structural tests are red now shows this required context green.
+      # scripts/assert_pr_green.py (the merge checklist) still blocks on ANY not-green
+      # check, but GitHub auto-merge keys only on required contexts. Making the full-suite
+      # context required is an owner change to deploy/github_posture.json +
+      # `scripts/apply_branch_protection.py --apply` (docs/CONVENTIONS.md §4).
       # #3005: a PR checkout is the merge commit at depth 1, so `git log` cannot see the
       # branch's own commits — the attribution test reads them from this file instead.
       # The repo squashes with COMMIT_MESSAGES, so a trailer in any commit lands on main.
@@ -157,16 +160,20 @@ jobs:
           echo "PR_COMMITS_FILE_UNDER_TEST=/tmp/pr_commits_3005.txt" >> "$GITHUB_ENV"
           echo "collected $(grep -c '^---$' /tmp/pr_commits_3005.txt || true) separator(s)"
 
-      # #4251: TWO PASSES over the unchanged `premerge and not integration` selection, the
-      # same idiom and the same xdist flags as the full-suite job below (#3025). The lane ran
-      # its ~12.3k tests in ONE process and took longer than the 30k-test parallel full suite
-      # on the same PR (21 min vs 19, run 36273477305). The parallel pass takes
-      # `-n auto --dist loadfile` (a file's tests stay on one worker, so intra-file ordering
-      # holds); the 46 premerge tests marked `serial` — the in-tree writers that mutate the
-      # checkout (tests/test_suite_parallel_safety_3025.py is their registry) — run
-      # afterwards in one process. The two `-m` expressions are exact complements over
-      # `serial`, so every selected test runs exactly once;
-      # tests/test_premerge_lane.py asserts that partition.
+      # #4251: the required lane runs `deploy_critical` (ADR-117's deploy-gating subset)
+      # with the full-suite job's xdist flags (#3025 idiom). TWO PASSES, exact complements
+      # over `serial`: `-n auto --dist loadfile` (a file's tests stay on one worker, so
+      # intra-file ordering holds), then any deploy_critical test marked `serial` (an
+      # in-tree writer, tests/test_suite_parallel_safety_3025.py is their registry) in one
+      # process. No deploy_critical test is serial today, so the second pass selects
+      # nothing and pytest exits 5 ("no tests collected") — that ONE code is accepted for
+      # the serial pass only; every other non-zero still fails the step.
+      # tests/test_premerge_lane.py asserts the partition and the exit-5 carve-out.
+      #
+      # The step LABEL still reads "premerge marker — behaviour + ..." ON PURPOSE: a CI
+      # step's census key is `<job> / <label>` (tests/gate_census_unproven_residue.py), so
+      # relabelling it is a census entrant, and census changes land in their own PR.
+      # The selection is `deploy_critical`; the label is stale until that PR relabels it.
       - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)
         if: always()
         # `set -o pipefail` is LOAD-BEARING (#2746 class, caught by
@@ -184,15 +191,17 @@ jobs:
         run: |
           set -o pipefail
           status=0
-          python3 -m pytest tests/ -m "premerge and not integration and not serial" -q --tb=short -n auto --dist loadfile | tee /tmp/premerge_lane_output.txt || status=$?
-          # The serial pass collects ONLY the files that carry the marker: a whole-tree
-          # collection costs ~160s on the runner (measured on this PR's first run, where
-          # this pass took 156.59s for 46 tests). `serial` is applied only by the literal
+          python3 -m pytest tests/ -m "deploy_critical and not integration and not serial" -q --tb=short -n auto --dist loadfile | tee /tmp/premerge_lane_output.txt || status=$?
+          # The serial pass collects ONLY the files that carry the marker (a whole-tree
+          # collection costs minutes on the runner). `serial` is applied only by the literal
           # `mark.serial` in a test file — tests/conftest.py never adds it — so the grep
           # covers every marked test (a superset of files — `-m` still selects); tests/test_premerge_lane.py holds that premise.
           SERIAL_FILES=$(grep -l 'mark\.serial' tests/test_*.py || true)
           if [ -n "$SERIAL_FILES" ]; then
-            python3 -m pytest $SERIAL_FILES -m "premerge and not integration and serial" -q --tb=short | tee -a /tmp/premerge_lane_output.txt || status=$?
+            serial_rc=0
+            python3 -m pytest $SERIAL_FILES -m "deploy_critical and not integration and serial" -q --tb=short | tee -a /tmp/premerge_lane_output.txt || serial_rc=$?
+            # 5 = "no tests collected": an empty serial complement is the expected case.
+            if [ "$serial_rc" -ne 0 ] && [ "$serial_rc" -ne 5 ]; then status=$serial_rc; fi
           fi
           exit $status
 

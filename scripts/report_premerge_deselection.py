@@ -2,6 +2,9 @@
 """scripts/report_premerge_deselection.py — #2692: state what a green PR check
 did NOT run.
 
+#4251: the required lane now selects `deploy_critical`, not `premerge`; the report
+reads the same two captures and states the same arithmetic.
+
 THE PROBLEM: pr-checks.yml's `premerge` marker lane is a deliberate SUBSET of the
 full suite (tests/conftest.py's docstring on `_PREMERGE_EXTRA_FILES` spells out
 why: affordability against a 10-minute lane budget). That subset is invisible on
@@ -104,9 +107,9 @@ def format_summary_line(counts: dict) -> str:
         return f"**Pre-merge lane (#2692):** ran all {selected} lane-visible tests (0 deselected)."
     return (
         f"**Pre-merge lane (#2692):** ran {selected}/{total} tests ({pct:.0f}%) — "
-        f"**{deselected} deselected**, not checked until they run post-merge in `Unit Tests` "
-        f"(ci-test.yml). A structural/derivation-guard test that belongs pre-merge goes in "
-        f"`_PREMERGE_EXTRA_FILES` (tests/conftest.py)."
+        f"**{deselected} deselected** from this required check. They run in this PR's "
+        f"`Full unit suite` job, which is NOT a required check, and post-merge in `Unit Tests` "
+        f"(ci-test.yml). A test that must gate every merge carries `deploy_critical` (#4251)."
     )
 
 

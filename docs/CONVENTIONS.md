@@ -298,6 +298,14 @@ class including docs-only. Everything else (full `Unit Tests`, `Lint + Syntax Ch
 CodeQL, visual QA, and the path-filtered gates) stays **advisory / post-merge**.
 Auto-merge is on: arm the PR once, GitHub lands it when those two go green.
 
+**What the required fast lane runs (#4251):** collection + `deploy_critical` under xdist
++ mypy/black/ruff + bundle-boot. The wider `premerge` selection (behaviour suite +
+structural gates) runs on the same PR in `Full unit suite (pre-merge, issue 3025)` —
+which is **not required**. So auto-merge can land a PR whose full suite is red; the
+merge checklist (`scripts/assert_pr_green.py`) cannot, because it blocks on any
+not-green check. Merge by the checklist, not by auto-merge, until the owner decides
+whether the full-suite context joins the ruleset (`deploy/github_posture.json`).
+
 The trap to know: a required check matches by check-run *name*, and "never reported"
 is not distinguishable from "failed". Adding a `paths:` filter to either workflow,
 `if:`-gating its job, or renaming the job leaves PRs stuck on "Expected — Waiting for
@@ -399,22 +407,22 @@ after any change: `python3 -m pytest tests/ -m "deploy_critical and not integrat
 python3 -m pytest tests/ -m "premerge and not integration" -q
 ```
 
-That is the *same selection* `pr-checks.yml` runs as `Collect + deploy-critical + format` —
-the required merge gate from §4a0. One marker, named by both, so a local green here and
-the PR check cannot drift apart by construction (#2258). Membership is **derived**, not
-listed: `tests/conftest.py` applies `premerge` to every `tests/*_behavior.py` file, to
-everything `deploy_critical`, and to the structural gates in `_PREMERGE_EXTRA_FILES`.
-**8,813 tests in 155s** (measured locally 2026-08-21) against the job's 10-minute timeout.
+That is the *merge-relevant* selection: since #4251 it is split across `pr-checks.yml`'s
+two jobs. The **required** `Collect + deploy-critical + format` runs only its
+`deploy_critical` part (`-m "deploy_critical and not integration and not serial" -n auto
+--dist loadfile`, then the `serial` complement in one process — empty today, so that pass
+exits 5 and the step forgives exactly that code). The rest of `premerge` runs in the same
+PR's `Full unit suite` job, which runs the whole tree and is **not** required (§4a0).
+Before #4251 the fast lane ran all ~12.5k premerge tests and the full-suite job ran them
+again; the fast lane took 12–13 min for it (`gh run view <id> --json jobs`).
+`tests/test_premerge_lane.py` holds both halves: the fast lane's partition over
+`serial`, and the full-suite passes selecting every premerge test.
 
-**On the runner it is two passes over that one selection (#4251)** — the full-suite job's
-idiom: `-m "premerge and not integration and not serial" -n auto --dist loadfile`, then
-`-m "premerge and not integration and serial"` in one process for the in-tree writers.
-The expressions are exact complements, so no test runs twice inside the lane
-(`tests/test_premerge_lane.py` holds the partition). Run serially, it had grown to ~21 min
-on the runner — slower than the 30k-test parallel full suite on the same PR. Locally the
-one-pass command above is still the same selection; add `-n auto --dist loadfile -m
-"premerge and not integration and not serial"` for the lane's speed (12,258 tests in
-406s on 12 cores, 2026-09-27, plus 46 serial in 94s).
+Membership is **derived**, not listed: `tests/conftest.py` applies `premerge` to every
+`tests/*_behavior.py` file, to everything `deploy_critical`, and to the structural gates
+in `_PREMERGE_EXTRA_FILES`. The marker stays: `deploy/merge_train.sh`, the reset
+pipeline and `docs-ci.yml` still name it. To reproduce only the required check locally:
+`python3 -m pytest tests/ -m "deploy_critical and not integration" -n auto --dist loadfile -q`.
 
 **What it does NOT do: predict main.** It covers the *merge* gate. The lane that reds
 `main` is the full `Unit Tests` job — ~1,320s (#2692) — and no cheap local subset honestly
