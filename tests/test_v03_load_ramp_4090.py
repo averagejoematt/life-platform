@@ -541,14 +541,36 @@ def test_4408_the_hold_is_at_the_sets_rep_floor_never_a_heavier_lower_rep_load()
     assert _bench_0929(slot=load_ramp.slot_of([{"reps": [4, 6]}], None))["floor_kg"] == pytest.approx(145 * LB)
 
 
-def test_4408_the_ramp_still_fires_after_a_layoff():
-    """Twelve days after the last loaded session (the record's gap, whatever the caller passes —
-    the cron hands the generator a constant 2) there IS something to re-enter from."""
+def test_4408_a_missed_week_is_not_a_layoff_the_load_is_still_held():
+    """Driver review #2: a layoff is the detraining discount's own line (`DETRAINING_ANCHOR_AGE_DAYS`,
+    #4107), not the 7-day re-entry threshold — ten days after the last loaded session (09-28 -> 10-08)
+    there is nothing to re-enter from, so the bench is still held, never back to the 60 % ramp."""
     history, _ = _wire_history()
     row = load_ramp.v03_floor(
-        BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-10", week=1, slot=HEAVY_SLOT, days_since_last_workout=2
+        BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-08", week=1, slot=HEAVY_SLOT, days_since_last_workout=10
     )
-    assert row["ramp"]["hold"]["layoff"] is True and row["ramp"]["hold"]["layoff_evidence"]["record_gap_days"] == 12
+    ev = row["ramp"]["hold"]["layoff_evidence"]
+    assert ev["record_gap_days"] == 10 and ev["threshold_days"] == load_ramp.DETRAINING_ANCHOR_AGE_DAYS
+    assert row["ramp"]["hold"]["layoff"] is False and row["floor_kg"] == pytest.approx(205 * LB)
+
+
+def test_4408_mutation_control_a_7_day_layoff_line_re_prescribes_the_ramp_after_one_missed_week():
+    with patch.object(load_ramp, "DETRAINING_ANCHOR_AGE_DAYS", 7):
+        history, _ = _wire_history()
+        row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-08", week=1, slot=HEAVY_SLOT)
+    assert row["ramp"]["hold"]["layoff"] is True and row["floor_kg"] == pytest.approx(145 * LB)
+
+
+def test_4408_the_ramp_still_fires_after_a_layoff():
+    """Past the detraining line — the record's gap, whatever the caller passes (the cron hands the
+    generator a constant 2) — there IS something to re-enter from, and the ramp stands."""
+    history, _ = _wire_history()
+    gap_day = __import__("common.pacific_time", fromlist=["shift_day_key"]).shift_day_key(
+        "2026-09-28", load_ramp.DETRAINING_ANCHOR_AGE_DAYS
+    )
+    row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=gap_day, week=1, slot=HEAVY_SLOT, days_since_last_workout=2)
+    assert row["ramp"]["hold"]["layoff"] is True
+    assert row["ramp"]["hold"]["layoff_evidence"]["record_gap_days"] == load_ramp.DETRAINING_ANCHOR_AGE_DAYS
     assert row["floor_kg"] == pytest.approx(145 * LB) and row["ramp"]["hold"]["applies"] is False
 
 

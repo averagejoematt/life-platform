@@ -97,8 +97,11 @@ now, `achieved_hold`:
   * a set with NO logged RPE is read as at the ceiling: its hold is the achieved load, and the row
     says so (`hold.rpe_basis: "absent"`). `hold.rpe_basis` / `hold.e1rm_rpe_adjusted` record the
     basis on every row.
-  * no hold under a layoff — `days_since_last_workout >= layoff_days` as the caller says OR as the
-    record says (`_lifting_gap_days`: the cron hands the generator a constant 2), on a nearest-band
+  * no hold under a layoff — a gap of at least `DETRAINING_ANCHOR_AGE_DAYS`, the SAME line the #4107
+    detraining discount starts at (driver review #2: #4408's rule is "a detraining discount > 0 (a
+    layoff) or a novel-again pattern"; a 7-day line would re-prescribe the 60 % ramp after one missed
+    week), read from the caller's days OR the record (`_lifting_gap_days`: the cron hands the
+    generator a constant 2) — on a nearest-band
     fallback anchor (nothing at this band), or when the caller cannot say the slot (`slot` None or
     no RPE ceiling — the ramp alone, the lower number, so a caller that knows less can never refuse
     a draft that knows more: #4149).
@@ -623,9 +626,10 @@ def _apply_hold(
             "reason": "nearest-band anchor: nothing lifted at this band",
         }
         return
-    from training.routine_generator import LAYOFF_DAYS_DEFAULT
-
-    threshold = LAYOFF_DAYS_DEFAULT if layoff_days is None else int(layoff_days)
+    # driver review #2: a "layoff" here IS the detraining discount's own line (#4107), not the 7-day
+    # re-entry routine's threshold — one missed week is not something to re-enter from. `layoff_days`
+    # (the generator's re-entry threshold) is accepted and deliberately NOT used for the hold.
+    threshold = DETRAINING_ANCHOR_AGE_DAYS
     gap = _lifting_gap_days(history_index, as_of)
     layoff = any(d is not None and int(d) >= threshold for d in (days_since_last_workout, gap))
     hold = (
@@ -644,7 +648,12 @@ def _apply_hold(
         "rpe_basis": hold["rpe_basis"] if hold else None,
         "e1rm_rpe_adjusted": hold["e1rm_rpe_adjusted"] if hold else None,
         "layoff": layoff,
-        "layoff_evidence": {"caller_days_since_last_workout": days_since_last_workout, "record_gap_days": gap, "threshold_days": threshold},
+        "layoff_evidence": {
+            "caller_days_since_last_workout": days_since_last_workout,
+            "record_gap_days": gap,
+            "threshold_days": threshold,
+            "threshold_source": "load_ramp.DETRAINING_ANCHOR_AGE_DAYS — the #4107 detraining-discount line",
+        },
         "ramp_top_kg": ramped.get("floor_kg"),
         "rule": (
             "a load already moved for the slot's rep floor at this bodyweight band, this cycle, with no layoff, is never ramped "
