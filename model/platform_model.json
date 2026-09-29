@@ -5675,13 +5675,6 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_hevy_routine.py",
-      "partition": "hevy",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_hevy_routine.py",
       "partition": "whoop",
       "via": "pk"
     },
@@ -7460,7 +7453,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 722,
+      "edges": 721,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7474,8 +7467,8 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 357,
-        "sites_resolved": 893,
+        "sites_dynamic": 358,
+        "sites_resolved": 892,
         "sites_total": 1250
       },
       "schedule_resolution": {
