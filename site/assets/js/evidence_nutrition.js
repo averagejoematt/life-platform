@@ -94,7 +94,9 @@ export function nutritionHero(n) {
   // #4182: when the engine refuses to publish a deficit, the spine can't shade one either —
   // its "N kcal/day deficit (shaded)" caption was the refused number, drawn anyway.
   const spine = (n.avg_calories != null && n.tdee != null && n.avg_deficit_published !== false)
-    ? intakeSpine(n.avg_calories, n.tdee, { label: "30-day average intake vs estimated maintenance" })
+    // #4370: avg_calories is the mean over the LOGGED days of a genesis-clamped window —
+    // "30-day average" claimed a span the experiment did not have before Day 30.
+    ? intakeSpine(n.avg_calories, n.tdee, { label: "average intake per logged day vs estimated maintenance" })
     : "";
   const v = nutritionVerdict(n);
   const voice = v ? `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(v.machine)}</p><p class="tv-human">${esc(v.human)}</p></div>` : "";

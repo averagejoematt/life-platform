@@ -116,3 +116,42 @@ test("#3523 a real rest day inside the window still reads 0, not '—'", () => {
   const rest = [{ date: "2026-10-18", day_of_week: "Sun", steps: 1400, activities: [], total_active_minutes: 0, pre_genesis: false }];
   assert.deepEqual(rowsOf(movementWeekBody(rest))[0], ["Sun", "1400", "0"]);
 });
+
+/* ── #4370: the training fold names the window it has, never a flat 30 ────── */
+//
+// Live on Day 22 (visual-qa-standalone run 36347649677): "35 sessions in 30 days" —
+// an honest, genesis-clamped count under a window label the experiment could not yet
+// have. The reader-truth judge filed it HIGH temporal_contradiction two days running.
+
+const { trainingFold } = await import("../../site/assets/js/evidence_body.js");
+const { servedWindow, windowPhrase } = await import("../../site/assets/js/entry_age.js");
+
+const FOLD_DATA = (training) => ({ training: { workouts_30d: 35, strength_sessions_30d: 20, ...training }, walking: { total_walks_30d: 15 } });
+const DAY_22 = new Date("2026-09-27T19:00:00Z"); // PT noon, Day 22 of the 2026-09-06 genesis
+
+test("#4370 a young window is named by its real length", () => {
+  const f = trainingFold(FOLD_DATA({ window_days: 22, window_full: false }), null, DAY_22);
+  assert.match(f.text, /^35 sessions in the 22 days since the experiment began — 20 in the gym, 15 walks\./);
+  assert.doesNotMatch(f.text, /30 days/);
+});
+
+test("#4370 a whole window reads as the last 30 days", () => {
+  const f = trainingFold(FOLD_DATA({ window_days: 30, window_full: true }), null, DAY_22);
+  assert.match(f.text, /^35 sessions in the last 30 days —/);
+});
+
+test("#4370 a payload without window_days falls back to the PT day count since Day 1", () => {
+  const f = trainingFold(FOLD_DATA({}), null, DAY_22);
+  assert.match(f.text, /^35 sessions in the 22 days since the experiment began/);
+});
+
+test("#4370 the label never exceeds the clamped span, on any day of a young cycle", () => {
+  for (let day = 1; day <= 40; day++) {
+    const win = servedWindow({ window_days: Math.min(day, 30), window_full: day >= 30 }, 30);
+    const phrase = windowPhrase(win);
+    const claimed = Number((phrase.match(/(\d+) days?/) || [])[1]);
+    assert.ok(claimed <= day, `Day ${day}: "${phrase}" claims ${claimed} days`);
+  }
+  assert.equal(servedWindow({}, 30), null, "no window known → none named");
+  assert.equal(windowPhrase(null), "");
+});
