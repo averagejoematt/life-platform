@@ -826,7 +826,6 @@ def _run_stage_2(
                 draft,
                 pain_by_idx={i: e for i, e in by_idx.items() if "pain_flag_any" in e},
                 days_since_by_idx={i: e.get("days_since") for i, e in by_idx.items()},
-                active_day_streak=evidence.get("active_day_streak"),
                 loaded_lifting_streak=evidence.get("loaded_lifting_streak"),
                 pain_layer_status=evidence.get("pain_layer_status"),
                 dismissals=dismissals,  # #4036 — the owner's own override of a flag instance

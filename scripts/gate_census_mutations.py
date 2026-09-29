@@ -548,6 +548,15 @@ _PRIVATE_WALKING_LAYER_PY = (
     "    return walking_volume.build(window_start=start, window_end=end, strava_items=[], hevy_workouts=[])\n"
 )
 
+# #4410: a draft caller that hands the generator a LITERAL aerobic-minutes value — the cron's
+# `z2_minutes_7d=0.0`, which wrote "walk more" after 9 h of walking + cycling.
+_LITERAL_Z2_CALLER_PY = (
+    '"""probe."""\n\n'
+    "from training.routine_generator import GeneratorInputs\n\n\n"
+    "def probe(day):\n"
+    "    return GeneratorInputs(target_date=day, z2_minutes_7d=0.0)\n"
+)
+
 # #4107: a SECOND v0.3 load derivation — a module that re-bases a floor onto the ramp itself
 # instead of calling load_ramp.v03_floor, which is how the chat path drifted from the generator.
 _SECOND_V03_LOAD_PATH_PY = (
@@ -604,6 +613,16 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("mcp/_census_probe_4068.py", _PRIVATE_WALKING_LAYER_PY),),
         track=False,  # the guard rglobs mcp/ + lambdas/ on disk, so an untracked module is in scope
+    ),
+    "structural::test_routine_generator.py": MutationSpec(
+        gate_id="structural::test_routine_generator.py",
+        target="tests/test_routine_generator.py",
+        detects=(
+            "a GeneratorInputs caller passing a literal (or no) z2_minutes_7d — the #4410 class: the cron "
+            "passed 0.0 and the routine note said 'walk more' after 9 h of walking + cycling"
+        ),
+        plants=(("mcp/_census_probe_4410.py", _LITERAL_Z2_CALLER_PY),),
+        track=False,  # the guard rglobs lambdas/ mcp/ scripts/ deploy/ on disk, so an untracked module is in scope
     ),
     "structural::test_nutrition_critics_3754.py": MutationSpec(
         gate_id="structural::test_nutrition_critics_3754.py",
@@ -1163,6 +1182,16 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "Strava moving-time sum, a hand-rolled slope) — the named-site list is what catches those, and only for the "
         "sites it names; a NEW surface reporting either quantity has to be added to CALL_SITES by its author.",
         proved_on="2026-09-22",
+    ),
+    "structural::test_routine_generator.py": _proof(
+        "structural::test_routine_generator.py",
+        "ARMED 1/1 — baseline: 16 passed in 3.47s | mutated: 1 failed, 15 passed in 3.46s :: "
+        "test_no_draft_caller_hands_the_generator_a_literal_z2_minutes | reverted: 16 passed in 3.39s",
+        "lambdas/ mcp/ scripts/ deploy/ **/*.py on disk (rglob), each parsed with `ast` for a call named "
+        "`GeneratorInputs` (bare or attribute); each must pass `z2_minutes_7d=` as a non-Constant expression. "
+        "Invisible: a caller that reads a literal through a variable (`z = 0.0; GeneratorInputs(z2_minutes_7d=z)`), "
+        "a GeneratorInputs built via `**kwargs`, and a post-construction attribute write (`inputs.z2_minutes_7d = 0`).",
+        proved_on="2026-09-28",
     ),
     "structural::test_nutrition_critics_3754.py": _proof(
         "structural::test_nutrition_critics_3754.py",

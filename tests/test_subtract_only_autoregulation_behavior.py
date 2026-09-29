@@ -271,7 +271,7 @@ def test_down_branches_and_prohibitions_are_not_flagged(text):
 def test_the_emitted_session_block_carries_the_rule_and_no_conditional_up():
     """The block this module writes into every adaptive routine is itself emitted prose,
     so it is held to the same bar it enforces."""
-    block = render_session_block(derive_training_context(["2026-09-18"], "moderate", "2026-09-19"))
+    block = render_session_block(derive_training_context(1, "moderate", "2026-09-19"))
     assert SUBTRACT_ONLY_RULE in block
     assert find_conditional_up(block) == []
 

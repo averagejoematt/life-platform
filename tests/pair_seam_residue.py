@@ -220,7 +220,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "hevy::lambdas/training/training_notes.py::read": SEED_DATE,
     "hevy::lambdas/web/site_api_pulse.py::read": SEED_DATE,
     "hevy::lambdas/web/site_api_training.py::read": SEED_DATE,
-    "hevy::mcp/tools_hevy_routine.py::read": SEED_DATE,
     "hevy::mcp/tools_strength.py::read": SEED_DATE,
     "hevy::mcp/tools_training_notes.py::read": SEED_DATE,
     "hypotheses::lambdas/compute/hypothesis_engine_lambda.py::write": SEED_DATE,
