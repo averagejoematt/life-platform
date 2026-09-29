@@ -880,3 +880,13 @@ def test_owner_correction_signals_failure_does_not_blank_the_validator_report(qu
     assert out["owner_correction_signals"]["ranking"] == []
     assert out["owner_correction_signals"]["corrections_read"] is None
     assert "ledger unreadable" in out["owner_correction_signals"]["error"]
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, td, "get_sources")
+    check_output_schema(monkeypatch, td, "get_date_range")
