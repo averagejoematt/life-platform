@@ -857,6 +857,8 @@ _RC_RULESET = {  # the #1662/ADR-148 fast-lane required-checks ruleset, as scrip
                 "do_not_enforce_on_create": True,
                 "required_status_checks": [
                     {"context": "Collect + deploy-critical + format", "integration_id": 15368},
+                    # #4251 (owner ruling 2026-09-29, option (a)): the full suite is required.
+                    {"context": "Full unit suite (pre-merge, issue 3025)", "integration_id": 15368},
                     {"context": "gitleaks (PR commit range only, not full history)", "integration_id": 15368},
                 ],
             },

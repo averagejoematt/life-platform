@@ -31,8 +31,8 @@
 # GitHub-side settings silently drop on repo-visibility flips, which is exactly
 # why the required-ness is declared in deploy/github_posture.json and
 # GET-verified weekly by drift_sentinel rather than trusted to stay set.
-# ADR-139's advisory posture is superseded for THIS lane only; the full suite
-# stays post-merge and advisory.
+# ADR-139's advisory posture is superseded for this lane AND, since #4251 (owner
+# ruling 2026-09-29), for the `full-suite` job below: both contexts are required.
 #
 # The reconcile bot pushes directly to main. A required-status-checks rule DOES
 # block direct pushes, so the ruleset carries a bypass actor for exactly that
@@ -140,12 +140,11 @@ jobs:
       # result into deploy/github_posture.json, where
       # tests/test_lane_wallclock_ratchet_3608.py ratchets it.
       #
-      # WHAT THIS COSTS, STATED: `full-suite` is not a required check (ADR-148), so a PR
-      # whose behaviour or structural tests are red now shows this required context green.
-      # scripts/assert_pr_green.py (the merge checklist) still blocks on ANY not-green
-      # check, but GitHub auto-merge keys only on required contexts. Making the full-suite
-      # context required is an owner change to deploy/github_posture.json +
-      # `scripts/apply_branch_protection.py --apply` (docs/CONVENTIONS.md §4).
+      # OWNER RULING 2026-09-29 (#4251, option (a)): because the behaviour suite and the
+      # structural gates now run pre-merge only in `full-suite`, that job's context is
+      # REQUIRED too (deploy/github_posture.json). Its `name:`, trigger and lack of a
+      # job-level `if:` are therefore load-bearing exactly like this job's — see the
+      # header. tests/test_branch_protection_spec.py reds if they drift.
       # #3005: a PR checkout is the merge commit at depth 1, so `git log` cannot see the
       # branch's own commits — the attribution test reads them from this file instead.
       # The repo squashes with COMMIT_MESSAGES, so a trailer in any commit lands on main.
@@ -278,12 +277,14 @@ jobs:
   # ci-test.yml. UNPIPED on purpose: `pytest ... | tail` exits with tail's
   # status (the gate-that-cannot-fail class).
   #
-  # Blocking-by-rollup on landing (any red blocks the driver's merge discipline
-  # and remediation automerge alike). Promotion to a REQUIRED check in the
-  # main-required-fast-lane ruleset (deploy/github_posture.json +
-  # apply_branch_protection --apply, the ADR-148 path) is deliberately deferred
-  # until it has run clean across the #3025 observation window — a 16-minute
-  # required check earns required-ness by not flaking first.
+  # REQUIRED since the owner's 2026-09-29 ruling on #4251 (option (a)): the
+  # fast lane now runs only `deploy_critical`, so this job is the one pre-merge
+  # home of the behaviour suite and the structural gates. It is in
+  # deploy/github_posture.json's main-required-fast-lane set (the ADR-148 path;
+  # the driver runs apply_branch_protection --apply after the merge). Renaming
+  # this job's `name:`, path-filtering the trigger or adding a job-level `if:`
+  # would leave every PR stuck on "Expected — Waiting for status to be reported";
+  # tests/test_branch_protection_spec.py reds on all three.
   # ════════════════════════════════════════════════════════════════
   full-suite:
     # #3117: an unquoted `#` preceded by whitespace is a YAML COMMENT START, so

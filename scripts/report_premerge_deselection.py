@@ -108,7 +108,7 @@ def format_summary_line(counts: dict) -> str:
     return (
         f"**Pre-merge lane (#2692):** ran {selected}/{total} tests ({pct:.0f}%) — "
         f"**{deselected} deselected** from this required check. They run in this PR's "
-        f"`Full unit suite` job, which is NOT a required check, and post-merge in `Unit Tests` "
+        f"`Full unit suite` job, a separate required check (#4251), and post-merge in `Unit Tests` "
         f"(ci-test.yml). A test that must gate every merge carries `deploy_critical` (#4251)."
     )
 

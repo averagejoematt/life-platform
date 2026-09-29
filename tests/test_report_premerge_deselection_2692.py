@@ -54,7 +54,7 @@ def test_format_summary_line_reports_deselection():
     line = rpd.format_summary_line({"selected": 8077, "deselected": 11417, "total": 19494})
     assert "8077/19494" in line
     assert "11417 deselected" in line
-    assert "Full unit suite" in line and "NOT a required check" in line and "deploy_critical" in line
+    assert "Full unit suite" in line and "a separate required check" in line and "deploy_critical" in line
 
 
 def test_format_summary_line_zero_deselected():
