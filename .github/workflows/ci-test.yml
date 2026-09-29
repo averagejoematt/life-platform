@@ -68,55 +68,14 @@ jobs:
         # for something this job would have caught.
         run: python3 scripts/playwright_gated_tests.py
 
-      - name: Run unit tests
-        run: |
-          echo "::group::Running tests/test_shared_modules.py"
-          python3 -m pytest tests/test_shared_modules.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: IAM policy linter (test_role_policies.py)
-        run: |
-          echo "::group::IAM policy linter"
-          python3 -m pytest tests/test_role_policies.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: CDK handler consistency linter (test_cdk_handler_consistency.py)
-        run: |
-          echo "::group::CDK handler consistency linter"
-          python3 -m pytest tests/test_cdk_handler_consistency.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: CDK S3 path linter (test_cdk_s3_paths.py)
-        run: |
-          echo "::group::CDK S3 path linter"
-          python3 -m pytest tests/test_cdk_s3_paths.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Safety module wiring linter (test_wiring_coverage.py)
-        run: |
-          echo "::group::Wiring coverage linter"
-          python3 -m pytest tests/test_wiring_coverage.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: DynamoDB pattern linter (test_ddb_patterns.py)
-        run: |
-          echo "::group::DynamoDB pattern linter"
-          python3 -m pytest tests/test_ddb_patterns.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: MCP registry integrity linter (test_mcp_registry.py)
-        run: |
-          echo "::group::MCP registry integrity linter"
-          python3 -m pytest tests/test_mcp_registry.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Lambda handler integration linter (test_lambda_handlers.py)
-        # TB7-24: I1-I6 — file existence, syntax, handler signature, try/except, orphans, MCP entry point
-        run: |
-          echo "::group::Lambda handler integration linter"
-          python3 -m pytest tests/test_lambda_handlers.py -v --tb=short
-          echo "::endgroup::"
-
+      # #4252: ELEVEN single-file pytest steps used to sit around the secrets scan below
+      # ("Run unit tests" = test_shared_modules.py, then ten "... linter" / contract steps).
+      # Each file then ran AGAIN in the coverage passes, which select the whole tests/
+      # tree. They are gone; their labels survive as named sections that
+      # scripts/ci_test_sections.py prints from the coverage passes' JUnit XML (in the
+      # drift-warnings step below, which runs `if: always()`). A red file is annotated
+      # with its old step name. tests/test_full_suite_premerge_3025.py holds the label
+      # list against the files and keeps any single-file pytest step from coming back.
       - name: Deprecated secrets scan
         run: |
           echo "::group::Deprecated secrets scan"
@@ -147,32 +106,6 @@ jobs:
             exit 1
           fi
           echo "✅ Deprecated secrets scan passed"
-
-      - name: IAM/secrets consistency linter (test_iam_secrets_consistency.py)
-        # R8-8: Cross-refs IAM secret ARN patterns against known-secrets list
-        run: |
-          echo "::group::IAM/secrets consistency linter"
-          python3 -m pytest tests/test_iam_secrets_consistency.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Secret references linter (test_secret_references.py)
-        # R13-F04: Validates Lambda source secret name literals against known-secrets list.
-        # Prevents Todoist-style 2-day outage caused by wrong SECRET_NAME default value.
-        run: |
-          echo "::group::Secret references linter"
-          python3 -m pytest tests/test_secret_references.py -v --tb=short
-          echo "::endgroup::"
-
-      - name: Upstream-API contract tests (test_upstream_contracts.py)
-        # ER-02: assert each active source's transform contract against committed,
-        # scrubbed fixtures (tests/fixtures/upstream/**). Catches vendor payload
-        # drift (field rename/renest/retype) before it corrupts data at 4 AM.
-        # Fully offline — no live AWS/vendor calls; the live-refresh path is
-        # deploy/refresh_upstream_fixtures.py (run by hand, with creds).
-        run: |
-          echo "::group::Upstream-API contract tests (ER-02)"
-          python3 -m pytest tests/test_upstream_contracts.py -v --tb=short
-          echo "::endgroup::"
 
       # #2259: the standalone "Full test suite" step that used to sit here ran the
       # EXACT same selection as the coverage gate below (`tests/` minus
@@ -269,6 +202,7 @@ jobs:
               --cov-report= \
               --durations=25 \
               -n auto --dist loadfile -m "not serial" \
+              --junitxml=/tmp/junit_parallel.xml \
               -q 2>&1 | tail -60
           echo "::endgroup::"
           echo "::group::Coverage report + gate — serial pass (-m serial, appends)"
@@ -280,6 +214,7 @@ jobs:
               --cov-fail-under=80 \
               --durations=25 \
               -m serial \
+              --junitxml=/tmp/junit_serial.xml \
               -q 2>&1 | tail -160
           echo "::endgroup::"
 
@@ -379,6 +314,8 @@ jobs:
         #      loses --fail-on-regression.
         if: always()
         run: |
+          # #4252: the former single-file steps' labels, as sections (report only, exit 0).
+          python3 scripts/ci_test_sections.py /tmp/junit_parallel.xml /tmp/junit_serial.xml || true
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 80 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \
