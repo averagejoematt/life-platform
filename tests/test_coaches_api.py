@@ -915,6 +915,133 @@ def test_4220_mcp_track_record_a_repeated_result_counts_once_and_a_failed_ledger
     assert down["headline"] == "record unavailable"
 
 
+# ── #4220: a graded call's reason is served in reader words ──────────────────
+# Wire strings: `outcome_notes` exactly as /api/predictions served them 2026-09-29 16:24Z
+# (build_outcome_notes' JSON blob), beside the evaluation spec the same rows carry.
+
+
+def _pred_row(status, ev, **notes):
+    return {"status": status, "evaluation": ev, "outcome_notes": json.dumps({"algo_version": "1.0", "beats_null": False, **notes})}
+
+
+_DIR_UP = {"type": "directional", "metric": "hrv_7day_avg", "condition": "up", "threshold": None}
+_DIR_DOWN = {"type": "directional", "metric": "recovery_score", "condition": "down", "threshold": None}
+_POINT = {"type": "point", "metric": "sleep_duration_hours", "condition": "within", "threshold": 7.1}
+
+
+@pytest.mark.parametrize(
+    "row,expected",
+    [
+        (
+            _pred_row("confirmed", _DIR_UP, actual_value=0.2341, reason="hrv_7day_avg trend=up (slope=0.2341), predicted=up"),
+            ("Heart-rate variability (7-day average) went up, as called", True),
+        ),
+        (
+            _pred_row("refuted", _DIR_DOWN, actual_value=0.1439, reason="recovery_score trend=up (slope=0.1439), predicted=down"),
+            ("Morning recovery score went up — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _DIR_DOWN,
+                actual_value=-0.0037,
+                reason="predicted down, metric flat (slope=-0.0037, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+            ),
+            ("Morning recovery score held flat — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _POINT,
+                actual_value=4.7,
+                reason="sleep_duration_hours=4.70 on 2026-09-11 vs predicted 7.1 ±1.1708; |Δ|=2.40 → outside tolerance",
+            ),
+            ("Sleep time came in at 4.7 hours against a call of 7.1 hours — outside its usual day-to-day range", True),
+        ),
+        (
+            _pred_row(
+                "inconclusive",
+                {"type": "directional", "metric": "blood_glucose_avg", "condition": "down"},
+                actual_value=None,
+                reason="Insufficient data to determine trend for 'blood_glucose_avg'",
+                grading_open=True,
+            ),
+            ("not gradable yet — not enough average blood glucose data to read it", False),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                {"type": "machine", "metric": "total_calories_kcal", "condition": "gt", "threshold": None},
+                actual_value=-0.0346,
+                reason="[null-threshold machine spec re-routed to directional] total_calories_kcal trend=down (slope=-0.0346), predicted=up",
+            ),
+            ("Calories eaten went down — the call was for it to go up", True),
+        ),
+        (
+            _pred_row(
+                "expired",
+                {"type": "qualitative"},
+                actual_value=None,
+                reason="Retired unevaluated at window end (14d): eval_type=qualitative has no deterministic grading path",
+            ),
+            ("retired ungraded — a call like this has no measurable test", False),
+        ),
+        # A metric with no reader words: the grader's own sentence, unwrapped — never a guess.
+        (
+            _pred_row(
+                "refuted", {"type": "directional", "metric": "strain", "condition": "up"}, actual_value=-0.5, reason="strain trend=down"
+            ),
+            ("strain trend=down", True),
+        ),
+        # No reason written -> none served (ADR-104); nothing came back yet -> the flag is None.
+        (_pred_row("inconclusive", _DIR_UP, actual_value=None, reason=None), (None, False)),
+        ({"status": "pending", "evaluation": _DIR_UP, "outcome_notes": ""}, (None, None)),
+        ({"status": "confirmed", "evaluation": _DIR_UP, "outcome_notes": "plain grader note"}, ("plain grader note", True)),
+    ],
+)
+def test_4220_prediction_reason_in_reader_words(row, expected):
+    from web import prediction_reason
+
+    assert prediction_reason.reason_words(row) == expected
+
+
+def test_4220_every_measurable_metric_has_reader_words():
+    from experiment.measurable_metrics import METRIC_SOURCES, base_metric
+    from web import prediction_reason
+
+    assert {base_metric(k) for k in METRIC_SOURCES} == set(prediction_reason.METRIC_WORDS)
+
+
+def test_4220_predictions_serve_reason_and_graded_on_data_beside_the_raw_notes(monkeypatch):
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    _coaches, _cal, predictions, _wrong = _served_four(monkeypatch, table)
+    from web import prediction_reason
+
+    served = predictions["predictions"]
+    webb = [p for p in served if p["coach_id"] == "nutrition" and p["status"] == "refuted"]
+    assert len(webb) == 5, "the wire serves Webb's five refuted calls"
+    for p in webb:
+        assert p["outcome_notes"].startswith("{"), "outcome_notes stays the grader's blob (compatibility)"
+        assert p["graded_on_data"] is True
+        # The wire's grader wrote reason "r" on a machine spec with no reader-word shape:
+        # the grader's own text is served, unwrapped — never the blob, never a guess.
+        assert p["reason"] == "r", p["reason"]
+    # Every served row's reason is the one function's answer over its stored row.
+    stored = {
+        (row.get("claim_natural"), row.get("created_date")): row
+        for (_pk, sk), row in table.store.items()
+        if str(sk).startswith("PREDICTION#") and not str(sk).startswith("PREDICTION#docket-")
+    }
+    checked = 0
+    for p in served:
+        row = stored.get((p["text"], p["date"]))
+        if row is None:
+            continue
+        assert (p["reason"], p["graded_on_data"]) == prediction_reason.reason_words({**row, "status": p["status"]}), p
+        checked += 1
+    assert checked >= 9
+
+
 _LIVE_WRONG_4220 = os.path.join(_REPO, "tests", "fixtures", "wrong_obituaries_4220", "live_2026-09-27.json")
 
 
