@@ -147,6 +147,8 @@ from datetime import (
     timedelta as _timedelta,  # noqa: E402
 )
 
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+
 MIN_SWING_LB = 12.0
 MIN_EPISODE_LB = 15.0
 SMOOTH_WINDOW_DAYS = 21
@@ -967,7 +969,7 @@ def _read_all_history(source: str, start: str = "2010-01-01", end: str = None) -
         if "LastEvaluatedKey" not in r:
             break
         kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-    return items
+    return strava_read_seam(source, items)
 
 
 def _sk_date(item: dict) -> str:

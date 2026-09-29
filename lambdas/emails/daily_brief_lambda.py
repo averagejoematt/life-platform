@@ -211,6 +211,7 @@ ai_calls.init(
 # HELPERS
 # ==============================================================================
 from common.digest_utils import coerce_int, d2f, get_food_delivery_streak_state, rhr_trend_str, safe_float  # shared helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 from emails.daily_brief_signals import (  # noqa: F401,E402
     avg,
@@ -226,7 +227,7 @@ from emails.daily_brief_signals import (  # noqa: F401,E402
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception:
         return None
 
@@ -389,7 +390,7 @@ def _latest_item(source):
         )
         r = table.query(**kwargs)
         items = r.get("Items", [])
-        return d2f(items[0]) if items else None
+        return strava_read_seam(source, d2f(items[0]) if items else None)
     except Exception:
         return None
 
@@ -409,7 +410,7 @@ def fetch_range(source, start, end):
             include_pilot=_source_reads_cross_phase(source),
         )
         r = table.query(**kwargs)
-        return [d2f(i) for i in r.get("Items", [])]
+        return strava_read_seam(source, [d2f(i) for i in r.get("Items", [])])
     except Exception:
         return []
 

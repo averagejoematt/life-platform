@@ -409,6 +409,8 @@ The per-type decision table is `lambdas/ingestion/strava_population.py`; its typ
 
 This population is the denominator of every all-time "top N%" distance/elevation claim (`enrichment_lambda.build_percentile_lookup`, `search_activities`). The day-level `total_*` sums are unaffected: an absent value and a measured `0` both contribute nothing.
 
+**Multi-device duplicates are STORED, and removed at the read seam (#4419).** When WHOOP and a Garmin (or Hevy's own push) both sent one session to Strava, the day row holds both copies and its stored `activity_count` / `total_*` sum them — 2024-09-04 → 2025-05-10 holds 394 walk records for ~211 walks. Readers never see that: every DynamoDB reader that can be handed this partition returns its rows through `common.strava_read_seam.strava_read_seam`, which drops the duplicate copies (`dedup_activities` — same sport and a start within 15 min, or different devices with ≥ 80% of the shorter one's interval inside the other), keeps the copy with the measured distance, takes its heart-rate family from the other copy when its own average is missing or < 70 bpm (the 2024 Garmin walk copies read 49–57), and recomputes the totals the writer carries with the writer's own formula (`day_totals`). Read-time only fields: `activities_deduped` (row), `duplicate_activity_count` (row, when something was dropped), `hr_from_strava_id` (activity, when its HR came from the dropped copy). `data_export_lambda` opts out by name and exports the partition verbatim. Garmin is paused (ADR-074), so live days are single-device and the seam is a no-op on them.
+
 ### todoist
 | Field | Type | Description |
 |-------|------|-------------|

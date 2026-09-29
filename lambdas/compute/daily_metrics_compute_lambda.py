@@ -102,6 +102,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def latest_weight_lbs(records):
@@ -126,7 +127,7 @@ def clamp(val, lo=0, hi=100):
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception as e:
         logger.warning(f"fetch_date({source}, {date_str}) failed: {e}")
         return None
@@ -166,7 +167,7 @@ def fetch_range(source, start, end):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning(f"fetch_range({source}, {start}→{end}) failed: {e}")
         return []

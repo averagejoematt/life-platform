@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta, timezone
 import boto3
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
@@ -77,7 +78,7 @@ def _get_latest(table, source, days_back=2):
             )
         )
         items = resp.get("Items", [])
-        return dict(items[0]) if items else {}
+        return strava_read_seam(source, dict(items[0]) if items else {})
     except Exception as e:
         print(f"[WARN] DynamoDB read failed ({source}): {e}")
         return {}
@@ -266,7 +267,7 @@ def lambda_handler(event, context):
                 }
             )
         )
-        _tr_items = _tr_resp.get("Items", [])
+        _tr_items = strava_read_seam("strava", _tr_resp.get("Items", []))  # #4419: one session, one count
         total_min = 0
         for ti in _tr_items:
             acts = ti.get("activities") or ti.get("activities_list") or []
