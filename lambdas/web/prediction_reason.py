@@ -129,7 +129,8 @@ def reason_words(record: dict) -> tuple[str | None, bool | None]:
     if not grader:
         return None, flag  # ADR-104: no reason written -> none served
 
-    ev = record.get("evaluation") if isinstance(record.get("evaluation"), dict) else {}
+    spec = record.get("evaluation")
+    ev: dict = spec if isinstance(spec, dict) else {}
     kind = str(ev.get("type") or "").strip().lower()
     rerouted = kind == "machine" and grader.startswith(_REROUTED)
     if rerouted:
