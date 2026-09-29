@@ -108,6 +108,7 @@ from common.digest_utils import (
     d2f as _d2f,  # shared bundled helpers (#970)
     filter_day_rows,  # #3442: day rows only — never a #WORKOUT# fragment
 )
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def _fetch_range(source: str, start: str, end: str) -> list:
@@ -139,7 +140,7 @@ def _fetch_range(source: str, start: str, end: str) -> list:
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as exc:
         logger.warning("_fetch_range(%s, %s to %s) failed: %s", source, start, end, exc)
-    return records
+    return strava_read_seam(source, records)
 
 
 def _rolling_avg(items: list, field: str, n_days: int, end_date: str):

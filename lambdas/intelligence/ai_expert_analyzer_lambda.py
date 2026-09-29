@@ -143,7 +143,7 @@ def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
     start_date = _phase_taxonomy.cycle_read_floor(pk, start_date)  # #2113: genesis floor, EXPERIMENT_SCOPED only
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"))
-    return _decimal_to_float(resp.get("Items", []))
+    return strava_read_seam(source, _decimal_to_float(resp.get("Items", [])))
 
 
 def _latest_item(source):
@@ -154,7 +154,7 @@ def _latest_item(source):
         kce = kce & Key("sk").between(f"DATE#{floor}", "DATE#9999-12-31")
     resp = table.query(KeyConditionExpression=kce, ScanIndexForward=False, Limit=1)
     items = _decimal_to_float(resp.get("Items", []))
-    return items[0] if items else None
+    return strava_read_seam(source, items[0] if items else None)
 
 
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
@@ -227,6 +227,7 @@ from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
 from coach import coach_input_facts as _ci  # #4185: the served logging record, PT sleep instants, the served-fact check
 from common.digest_utils import filter_day_rows  # #3442: day rows only — nights_tracked counted #WORKOUT# fragments
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
 
 from intelligence import weight_recency

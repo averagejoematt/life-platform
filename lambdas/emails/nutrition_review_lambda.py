@@ -102,6 +102,7 @@ except ImportError:
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def query_range(source, start_date, end_date):
@@ -125,7 +126,7 @@ def query_all(source):
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return [d2f(i) for i in items]
+    return strava_read_seam(source, [d2f(i) for i in items])
 
 
 def fetch_profile():

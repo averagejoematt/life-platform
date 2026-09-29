@@ -984,7 +984,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # this lane -> 776 {proven 225, unproven 540, not-applicable 6, attempted-unproven 5}; a `git archive
         # origin/main` export at 3c43af4ce -> 775 {224, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven
         # does NOT move.
-        # Upper bound 228 -> 229 (2026-09-29, #4410 the literal-z2 caller guard): ONE entrant,
+        # Upper bound 229 -> 230 (2026-09-29, #4419 the strava read seam, merged on top of #4418's 229): ONE entrant,
+        # `structural::test_shared_modules.py` (it became a tree-sweeping structural test when #4419 added the
+        # strava-reader SET guard), arriving PROVEN (a STRUCTURAL_HAND_PROOFS record, three real-tree plants: a reader
+        # stripped of the seam -> 1 failed / 73 passed; the HR graft off -> 3 failed / 71; the containment rule off ->
+        # 1 failed / 73; restored 74 passed). Id-set diff vs a `git archive origin/main` export at 776ab6fe0: main 780
+        # {229, 539, 7, 5} -> this lane 781 {230, 539, 7, 5}; enters exactly that id, leaves {}, no verdict changes.
+        # PRIOR: Upper bound 228 -> 229 (2026-09-29, #4410 the literal-z2 caller guard): ONE entrant,
         # `structural::test_routine_generator.py` (it joined _PREMERGE_EXTRA_FILES with its new rglob sweep), arriving
         # PROVEN via the re-runnable harness (MutationSpec + STRUCTURAL_PROOFS in scripts/gate_census_mutations.py,
         # ARMED 1/1: baseline 16 passed | mutated 1 failed | reverted 16 passed). Id-set diff vs a `git archive
@@ -1007,7 +1013,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # verbatim: "Got it." / "Noted." reached the send), RESTORED 16 passed. Measured by id-set diff with the new file
         # git-added: this lane -> 777 {proven 226, unproven 540, not-applicable 6, attempted-unproven 5}; the untouched
         # tree at c0b264b28 -> 776 {225, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven does NOT move.
-        <= 229
+        <= 230
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

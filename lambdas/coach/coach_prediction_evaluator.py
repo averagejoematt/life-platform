@@ -159,6 +159,7 @@ _NEVER_DECIDED_DAYS = 999
 
 
 from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def _scalar_to_decimal(val):
@@ -209,11 +210,7 @@ def _fetch_range(source, start_date, end_date, include_pilot=False):
         records = []
         kwargs = {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + source,
-                ":s": "DATE#" + start_date,
-                ":e": "DATE#" + end_date + "~",
-            },
+            "ExpressionAttributeValues": {":pk": USER_PREFIX + source, ":s": "DATE#" + start_date, ":e": "DATE#" + end_date + "~"},
         }
         while True:
             r = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
@@ -221,7 +218,7 @@ def _fetch_range(source, start_date, end_date, include_pilot=False):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning("fetch_range(%s, %s -> %s) failed: %s", source, start_date, end_date, e)
         return []

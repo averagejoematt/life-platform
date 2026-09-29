@@ -82,13 +82,14 @@ RITUAL_METRIC_TITLES = {
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def _fetch_date(source: str, date_str: str) -> dict | None:
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
         item = r.get("Item")
-        return _d2f(item) if item else None
+        return strava_read_seam(source, _d2f(item) if item else None)
     except Exception as e:
         logger.warning(f"[nudge] fetch_date({source}, {date_str}) failed: {e}")
         return None

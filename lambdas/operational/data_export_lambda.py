@@ -31,6 +31,7 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today  # #2798: the export is named for the Pacific day it covers
+from common.strava_read_seam import strava_read_seam  # #4419: the read seam (opted out here, by name)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -97,7 +98,8 @@ def query_partition(source):
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
-    return items
+    # #4419: the export is a verbatim backup — both device copies of a session stay in it.
+    return strava_read_seam(source, items, keep_duplicates="data export is a verbatim partition backup")
 
 
 def export_to_s3(source, items, export_date):

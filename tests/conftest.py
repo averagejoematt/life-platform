@@ -366,6 +366,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # caller must red BEFORE the merge, because after it the dead code is already
         # riding ~104 Lambda zips and reads as API to the next reader.
         "test_no_dead_shared_defs_3538.py",
+        # #4419: os.walk AST sweep of lambdas/ + mcp/ — every DynamoDB reader that can be handed
+        # the strava partition goes through `strava_read_seam`. A new reader that skips it must
+        # red BEFORE the merge; after it, every history read through it counts duplicates twice.
+        "test_shared_modules.py",
         # #2986: the derived-artifact registry. Verdict is pure repo shape — a new
         # generator writing a committed artifact must be classified BEFORE the merge,
         # and a guard placed in the wrong lane must red on the PR that placed it there.

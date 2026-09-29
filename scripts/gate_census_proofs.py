@@ -2715,6 +2715,35 @@ STRUCTURAL_HAND_PROOFS["structural::test_ci_job_timeouts_3678.py"] = {
     "proved_on": "2026-09-27",
 }
 
+# #4419: the strava read-seam SET guard (and the pair-rule fixture beside it) turned
+# tests/test_shared_modules.py into a tree-sweeping structural test. Three REAL-tree
+# mutations, each restored by copying the pre-mutation file back.
+STRUCTURAL_HAND_PROOFS["structural::test_shared_modules.py"] = {
+    "gate_name": "test_shared_modules.py",
+    "command": "python3 -m pytest tests/test_shared_modules.py -q -p no:cacheprovider   # 74 tests; baseline 74 passed",
+    "mutation": (
+        "M1 lambdas/web/site_api_common.py `_query_source` returns `_decimal_to_float(items)` instead of "
+        "`strava_read_seam(source, _decimal_to_float(items))` (a reader bypassing the seam); "
+        "M2 lambdas/common/strava_read_seam.py `_dedup_plan`'s HR-graft condition replaced by `if False:` "
+        "(the implausible 49 bpm Garmin copy keeps its HR); "
+        "M3 the same module's `_same_session` containment branch returns False (the 15-minute start window alone)."
+    ),
+    "observed": (
+        "2026-09-28. M1: 1 failed, 73 passed — test_every_strava_capable_reader_goes_through_the_read_seam names "
+        "`lambdas/web/site_api_common.py:677 _query_source()`. M2: 3 failed, 71 passed — the 2024-10-01 walk pair, the "
+        "2024-10-01 day row and the 2024-10-05 day each keep a <70 bpm walk average. M3: 1 failed, 73 passed — "
+        "test_dedup_real_2024_containment_chunk_is_the_same_walk (the WHOOP 11:51 chunk survives). RESTORED: 74 passed."
+    ),
+    "scope": (
+        "Proves the SET guard reds on a reader that skips the seam and that the pair rule's two #4419 changes are "
+        "load-bearing on the real 2024 fixture. The guard's detection is syntactic: a reader whose key is built from a "
+        "parameter not named source/src/partition/source_name, or from a pk handed in by its caller, is not seen; "
+        "lambdas/ingestion/ (the writer) and scripts/ + deploy/ are out of scope. It does not prove the live partition "
+        "holds only the duplicate shapes the fixture carries."
+    ),
+    "proved_on": "2026-09-28",
+}
+
 # #4377/#4378: test_singleton_tombstone_guards.py became a tree sweep (its two new reader-set
 # guards walk lambdas/**.py + mcp/*.py), so it entered the structural family here. Two REAL-tree
 # mutations, one per new guard, each md5-checked different before the verdict was read.

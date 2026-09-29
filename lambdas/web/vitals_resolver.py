@@ -32,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import PACIFIC  # #1964: THE Pacific frame — never a local ZoneInfo
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from ingestion.source_registry import day_key_frame_for  # #3257: which calendar a source's DATE# key names
 
 # Recovery/sleep lookback: generous enough to survive a multi-day sync gap —
@@ -125,7 +126,7 @@ def _daily_records(table, user_prefix, source, start, end, limit):
         ScanIndexForward=False,
         Limit=limit,
     )
-    return [i for i in resp.get("Items", []) if "#WORKOUT#" not in str(i.get("sk", ""))]
+    return strava_read_seam(source, [i for i in resp.get("Items", []) if "#WORKOUT#" not in str(i.get("sk", ""))])
 
 
 def resolve_vitals(table, user_prefix, now=None):

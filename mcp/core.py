@@ -14,6 +14,7 @@ from boto3.dynamodb.conditions import Key
 
 # ── Serialisation ──
 from common.digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the chokepoint
 
 from mcp.config import (
     _DEFAULT_SOURCE_OF_TRUTH,
@@ -363,7 +364,7 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=None):
         logger.info(f"query_source paginating {source}: {len(items)} items so far")
     if derived:
         items = [i for i in items if not i.get("tombstone")]
-    raw = decimal_to_float(items)
+    raw = strava_read_seam(source, decimal_to_float(items))  # #4419: every MCP history read of strava is deduped here
     if lean:
         return [{k: v for k, v in item.items() if k not in _LEAN_STRIP} for item in raw]
     return raw

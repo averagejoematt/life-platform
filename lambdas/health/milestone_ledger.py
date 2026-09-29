@@ -97,6 +97,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, NamedTuple
 
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+
 from health import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
 
 # ── DDB coordinates ───────────────────────────────────────────────────────────
@@ -578,9 +580,12 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         # DATE#{today}~ also captures DATE#{today}#WORKOUT#… items. #4129: unconditional —
         # on a partition with no suffixed rows the `~` admits nothing extra, so an opt-in
         # flag only ever bought the chance to forget it (scripts/date_range_read_census.py).
-        return _query_all(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{start}", ":e": f"DATE#{today}~"},
+        return strava_read_seam(
+            source,
+            _query_all(
+                KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+                ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{start}", ":e": f"DATE#{today}~"},
+            ),
         )
 
     end = datetime.strptime(today, "%Y-%m-%d")

@@ -487,6 +487,306 @@ def test_dedup_empty():
     assert dedup_activities([]) == []
 
 
+# ── #4419: the ONE multi-device dedupe, applied at the strava read seam ──────────────────
+#
+# Fixture = two REAL days read from DDB 2026-09-28 (`USER#matthew#SOURCE#strava`,
+# DATE#2024-10-01 and DATE#2024-10-05), trimmed to the fields the rule reads; the GPS
+# polyline is replaced by a stub (only its presence is scored). WHOOP + Garmin both pushed
+# each walk to Strava; the Garmin copies carry a 49–54 bpm "walk" average.
+
+
+def _act(sid, sport, device, start, moving, elapsed=None, dist_m=0.0, miles=None, hr=None, hr_max=None, poly=False, kj=None, elev=None):
+    return {
+        "strava_id": sid,
+        "sport_type": sport,
+        "device_name": device,
+        "start_date_local": start,
+        "moving_time_seconds": moving,
+        "elapsed_time_seconds": elapsed if elapsed is not None else moving,
+        "distance_meters": dist_m,
+        "distance_miles": miles,
+        "average_heartrate": hr,
+        "max_heartrate": hr_max,
+        "has_heartrate": hr is not None,
+        "kilojoules": kj,
+        "total_elevation_gain_feet": elev,
+        "summary_polyline": "<stub>" if poly else "",
+    }
+
+
+def _real_day_2024_10_01():
+    acts = [
+        _act("12553313491", "Ride", "WHOOP", "2024-10-01T17:58:39Z", 1992.0, hr=121.2, hr_max=145.0),
+        _act(
+            "12553030728",
+            "VirtualRide",
+            "Zwift",
+            "2024-10-01T17:58:39Z",
+            1992.0,
+            dist_m=11524.4,
+            miles=7.16,
+            hr=53.0,
+            hr_max=146.0,
+            poly=True,
+            kj=200.3,
+            elev=210.0,
+        ),
+        _act("12553059781", "WeightTraining", "WHOOP", "2024-10-01T16:38:19Z", 3772.0, hr=107.6, hr_max=139.0),
+        _act("12552802174", "WeightTraining", "Hevy", "2024-10-01T16:38:19Z", 3772.0),
+        _act("12551326552", "Walk", "WHOOP", "2024-10-01T12:13:30Z", 3599.0, hr=103.5, hr_max=121.0),
+        _act(
+            "12551278752",
+            "Walk",
+            "Garmin Epix Gen2",
+            "2024-10-01T12:12:43Z",
+            3656.0,
+            dist_m=4825.2,
+            miles=3.0,
+            hr=49.3,
+            hr_max=124.0,
+            poly=True,
+            elev=39.4,
+        ),
+    ]
+    # the stored totals, as written (they sum BOTH copies of every session)
+    return {
+        "pk": "USER#matthew#SOURCE#strava",
+        "sk": "DATE#2024-10-01",
+        "date": "2024-10-01",
+        "activities": acts,
+        "activity_count": 6,
+        "total_moving_time_seconds": 18783.0,
+        "total_distance_miles": 10.16,
+        "total_elevation_gain_feet": 249.4,
+        "sport_types": ["Ride", "VirtualRide", "Walk", "WeightTraining"],
+    }
+
+
+def _real_day_2024_10_05():
+    acts = [
+        _act("12584142709", "Walk", "WHOOP", "2024-10-05T11:51:00Z", 6389.0, hr=116.4, hr_max=145.0),
+        _act("12582923905", "Walk", "WHOOP", "2024-10-05T08:46:30Z", 6749.0, hr=114.5, hr_max=153.0),
+        _act(
+            "12583986726",
+            "Walk",
+            "Garmin Epix Gen2",
+            "2024-10-05T08:45:58Z",
+            12605.0,
+            elapsed=17194.0,
+            dist_m=16588.5,
+            miles=10.31,
+            hr=54.1,
+            hr_max=156.0,
+            poly=True,
+            elev=744.8,
+        ),
+        _act("12581225231", "WeightTraining", "WHOOP", "2024-10-05T06:39:42Z", 3149.0, hr=85.5, hr_max=124.0),
+        _act("12581011274", "WeightTraining", "Hevy", "2024-10-05T06:39:42Z", 3149.0),
+    ]
+    return {
+        "pk": "USER#matthew#SOURCE#strava",
+        "sk": "DATE#2024-10-05",
+        "date": "2024-10-05",
+        "activities": acts,
+        "activity_count": 5,
+        "total_moving_time_seconds": 32041.0,
+        "total_distance_miles": 10.31,
+        "total_elevation_gain_feet": 744.8,
+        "sport_types": ["Walk", "WeightTraining"],
+    }
+
+
+def test_dedup_real_2024_walk_pair_keeps_the_measured_distance_and_the_plausible_hr():
+    """The WHOOP + Garmin copies of the 2024-10-01 walk are ONE walk: Garmin's distance, WHOOP's HR."""
+    walks = [a for a in _real_day_2024_10_01()["activities"] if a["sport_type"] == "Walk"]
+    out = dedup_activities(walks)
+    assert len(out) == 1, out
+    (walk,) = out
+    assert walk["strava_id"] == "12551278752" and walk["distance_meters"] == 4825.2  # the device that measured distance
+    assert walk["average_heartrate"] == 103.5 and walk["max_heartrate"] == 121.0  # not the 49.3 bpm "walk"
+    assert walk["hr_from_strava_id"] == "12551326552"
+
+
+def test_dedup_real_2024_day_row_through_the_read_seam():
+    """The whole stored day: 6 activities -> 3 sessions, and the day totals follow."""
+    from common.strava_read_seam import strava_read_seam
+
+    day = _real_day_2024_10_01()
+    before = json.dumps(day, sort_keys=True)
+    (out,) = strava_read_seam("strava", [day])
+    assert json.dumps(day, sort_keys=True) == before, "the seam must not mutate the row it was handed"
+    assert [a["strava_id"] for a in out["activities"]] == ["12553030728", "12553059781", "12551278752"]  # writer order kept
+    assert out["activity_count"] == 3 and out["duplicate_activity_count"] == 3
+    assert out["total_moving_time_seconds"] == 1992.0 + 3772.0 + 3656.0
+    assert out["total_distance_miles"] == 10.16 and out["total_elevation_gain_feet"] == 249.4
+    assert out["sport_types"] == ["VirtualRide", "Walk", "WeightTraining"]
+    assert all(a["average_heartrate"] >= 70 for a in out["activities"]), "no implausible-HR copy survives"
+    assert "total_kilojoules" not in out, "a total the stored row never carried is not invented"
+    # idempotent: the seam, and every pre-seam per-consumer dedup_activities call, are no-ops on its output
+    assert strava_read_seam("strava", [out]) == [out]
+    assert dedup_activities(out["activities"]) == sorted(out["activities"], key=lambda a: a["start_date_local"])
+
+
+def test_dedup_real_2024_containment_chunk_is_the_same_walk():
+    """2024-10-05: Garmin logged one 4.8 h walk; WHOOP auto-detected it as two chunks, the second
+    starting 3 h after the Garmin's start — the 15-minute start window alone kept that chunk."""
+    from common.strava_read_seam import strava_read_seam
+
+    out = strava_read_seam("strava", {"2024-10-05": _real_day_2024_10_05()})["2024-10-05"]
+    assert [a["strava_id"] for a in out["activities"]] == ["12583986726", "12581225231"]
+    assert out["activities"][0]["average_heartrate"] == 114.5
+    assert out["activity_count"] == 2 and out["total_moving_time_seconds"] == 12605.0 + 3149.0
+    assert out["total_distance_miles"] == 10.31
+
+
+def test_dedup_keeps_two_real_sessions_apart():
+    """Rule (b) needs different devices AND real containment; one device's back-to-back walks stay two."""
+    a = _act("A", "Walk", "WHOOP", "2024-10-06T12:04:30Z", 2789.0, hr=104.7)
+    b = _act("B", "Walk", "WHOOP", "2024-10-06T15:54:00Z", 2429.0, hr=103.9)
+    c = _act("C", "Walk", "Garmin Epix Gen2", "2024-10-06T13:10:00Z", 600.0, dist_m=800.0, hr=98.0)  # 20 min after A ended
+    assert len(dedup_activities([a, b, c])) == 3
+
+
+def test_strava_read_seam_passes_other_sources_and_the_named_opt_out():
+    from common.strava_read_seam import strava_read_seam
+
+    day = _real_day_2024_10_01()
+    assert strava_read_seam("hevy", [day]) == [day]
+    assert strava_read_seam("strava", [day], keep_duplicates="verbatim export") == [day]
+    assert strava_read_seam("strava", None) is None and strava_read_seam("strava", []) == []
+    bare = {"pk": "x", "sk": "DATE#2024-10-01"}  # a row with no activities list passes through as-is
+    assert strava_read_seam("strava", bare) == bare
+
+
+def test_query_range_is_the_seam_for_every_digest_reader():
+    from common import digest_utils
+
+    table = _FakePagingTable([{"Items": [_real_day_2024_10_01()]}])
+    out = digest_utils.query_range(table, "strava", "2024-10-01", "2024-10-01")
+    assert out["2024-10-01"]["activity_count"] == 3
+
+
+def test_the_ingest_writer_and_the_seam_share_one_totals_formula(monkeypatch):
+    for k, v in (("S3_BUCKET", "test-bucket"), ("TABLE_NAME", "test-table"), ("USER_ID", "matthew")):
+        monkeypatch.setenv(k, os.environ.get(k, v))
+    from common.strava_read_seam import day_totals
+    from ingestion import strava_lambda
+
+    acts = _real_day_2024_10_01()["activities"]
+    (row,) = strava_lambda.transform({"activities": acts}, "2024-10-01")
+    writer_totals = {k: v for k, v in row.items() if k not in ("source", "date", "activities")}
+    assert writer_totals == day_totals(acts), "the seam's day_totals drifted from strava_lambda.transform — one formula, two copies"
+
+
+# The SET guard (#4419). A "strava-capable reader" is any function under lambdas/ (ingestion
+# excluded — it is the writer) or mcp/ that reads DynamoDB (`.query`/`.get_item`/
+# `.batch_get_item`/`.scan`, directly or through a same-module helper) and EITHER builds its
+# partition key from a source parameter (`source`/`src`/`partition`/`source_name`) OR names
+# the strava partition literally. Each must call `strava_read_seam` — or read structurally
+# blind to `activities` (a ProjectionExpression that does not name it, or `Select: COUNT`).
+# The one sanctioned opt-out is IN the call: `strava_read_seam(..., keep_duplicates="<why>")`.
+_SEAM_READ_ATTRS = {"query", "get_item", "batch_get_item", "scan"}
+_SEAM_SOURCE_PARAMS = {"source", "src", "partition", "source_name"}
+
+
+def _seam_names(node):
+    import ast
+
+    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+
+
+def _seam_strs(node):
+    import ast
+
+    return [n.value for n in ast.walk(node) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+
+
+def _strava_capable_readers(root):
+    import ast
+    import re
+
+    key_name = re.compile(r"(?i)prefix|_pk$|^pk$")
+    out = []
+    for top in ("lambdas", "mcp"):
+        for d, _dirs, files in os.walk(os.path.join(root, top)):
+            rel_d = os.path.relpath(d, root)
+            if rel_d.startswith(os.path.join("lambdas", "ingestion")) or "__pycache__" in rel_d:
+                continue
+            for f in sorted(files):
+                if not f.endswith(".py"):
+                    continue
+                path = os.path.join(d, f)
+                tree = ast.parse(open(path, encoding="utf-8").read())
+                fns = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+                raw = {
+                    fn.name
+                    for fn in fns
+                    if any(
+                        isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in _SEAM_READ_ATTRS
+                        for n in ast.walk(fn)
+                    )
+                }
+                for fn in fns:
+                    local = {n.func.id for n in ast.walk(fn) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+                    if fn.name not in raw and not (local & raw):
+                        continue
+                    params = {a.arg for a in fn.args.args + fn.args.kwonlyargs} & _SEAM_SOURCE_PARAMS
+                    keys = [
+                        n
+                        for n in ast.walk(fn)
+                        if isinstance(n, (ast.JoinedStr, ast.BinOp))
+                        or (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "format")
+                    ]
+                    generic = any(
+                        (_seam_names(k) & params)
+                        and (any("SOURCE#" in s for s in _seam_strs(k)) or any(key_name.search(x) for x in _seam_names(k)))
+                        for k in keys
+                    )
+                    literal = any("SOURCE#strava" in s for s in _seam_strs(fn)) or any(
+                        "strava" in _seam_strs(k) and any(key_name.search(x) for x in _seam_names(k)) for k in keys
+                    )
+                    if not (generic or literal):
+                        continue
+                    blind = []
+                    for n in ast.walk(fn):
+                        pairs = [(k.arg, k.value) for k in n.keywords] if isinstance(n, ast.Call) else []
+                        if isinstance(n, ast.Dict):
+                            pairs = [(k.value, v) for k, v in zip(n.keys, n.values) if isinstance(k, ast.Constant)]
+                        for k, v in pairs:
+                            if k == "ProjectionExpression":
+                                blind.append(not any("activities" in s for s in _seam_strs(v)))
+                            elif k == "Select" and isinstance(v, ast.Constant) and v.value == "COUNT":
+                                blind.append(True)
+                    if blind and all(blind):
+                        continue
+                    seamed = any(
+                        isinstance(n, ast.Call) and "strava_read_seam" in {getattr(n.func, "id", None), getattr(n.func, "attr", None)}
+                        for n in ast.walk(fn)
+                    )
+                    out.append((os.path.relpath(path, root), fn.name, fn.lineno, seamed))
+    return out
+
+
+def test_every_strava_capable_reader_goes_through_the_read_seam():
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    readers = _strava_capable_readers(root)
+    found = {(p, n) for p, n, _, _ in readers}
+    # non-vacuity: the three chokepoints the issue names, and the set's measured size (55 on 2026-09-28)
+    for must in (
+        ("mcp/core.py", "query_source"),
+        ("lambdas/common/digest_utils.py", "query_range"),
+        ("lambdas/web/site_api_common.py", "_query_source"),
+    ):
+        assert must in found, f"the sweep no longer sees {must} — the detector is broken, not the tree"
+    assert len(readers) >= 50, f"only {len(readers)} strava-capable readers found — the AST walk is not seeing the tree"
+    bypass = [f"{p}:{ln} {n}()" for p, n, ln, seamed in readers if not seamed]
+    assert not bypass, (
+        "a DynamoDB reader that can be handed the strava partition skips the #4419 read seam — its callers would "
+        "count every WHOOP+Garmin duplicate twice. Return `strava_read_seam(source, rows)` (a no-op for other sources), "
+        "or project the read so it cannot see `activities`:\n  " + "\n  ".join(bypass)
+    )
+
+
 def test_normalize_whoop_sleep():
     item = {
         "sleep_quality_score": 78,

@@ -103,6 +103,7 @@ def _read_partition(source: str, start: str, end: str) -> list[dict[str, Any]]:
     """Every row of `source` in [start, end] — the bundled twin of `mcp.core.query_source`'s derived
     read: the phase decision from the taxonomy, full pagination, superseded (tombstoned) rows out."""
     from boto3.dynamodb.conditions import Key
+    from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
     from experiment.phase_filter import source_reads_cross_phase, with_phase_filter
     from training import exercise_history
 
@@ -116,7 +117,7 @@ def _read_partition(source: str, start: str, end: str) -> list[dict[str, Any]]:
         resp = exercise_history._table().query(**kwargs)
         rows.extend(i for i in resp.get("Items", []) if not i.get("tombstone"))
         if not resp.get("LastEvaluatedKey"):
-            return rows
+            return strava_read_seam(source, rows)
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
