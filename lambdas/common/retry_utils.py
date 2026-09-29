@@ -17,6 +17,7 @@ import urllib.request
 from typing import Any, Optional, Union
 
 import boto3
+from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
 
 # CloudWatch
 _cw = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2"))
@@ -29,7 +30,7 @@ _CW_NAMESPACE = "LifePlatform/AI"
 # `common/` keeps no import-time dependency on `ai/` (see `budget_stop_cls`).
 
 # AI model constants — override via env to avoid silent deprecation failures
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 

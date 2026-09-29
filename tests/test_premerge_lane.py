@@ -17,6 +17,7 @@ Deliberately stdlib-only (string asserts, no yaml dep) — the guard for the
 collection-error killer must never itself be a collection error.
 """
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -326,3 +327,58 @@ def test_the_coverage_gate_can_actually_fail_the_build():
         "its exit code is tail's (always 0). --cov-fail-under=74 and any test failure "
         "are silently swallowed and the step reports success unconditionally."
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4252 — a push to main re-runs black/ruff/mypy only when no required PR check did
+# ══════════════════════════════════════════════════════════════════════════════
+DEPENDABOT_AUTOMERGE = ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
+
+
+def _ci_lint_step(name_prefix):
+    text = CI_LINT.read_text(encoding="utf-8")
+    start = text.index(f"      - name: {name_prefix}")
+    nxt = text.find("\n      - ", start + 10)
+    return text[start : nxt if nxt != -1 else len(text)]
+
+
+def test_ci_lint_skips_the_pr_proven_gates_only_on_a_single_squash_merge():
+    """The three gates pr-checks.yml's required lane already ran carry the skip condition;
+    the decision lives in the install step (no new step: the census ids are positional)
+    and requires every clause of the squash-merge shape. A clause dropped from the
+    decision would let a reconcile / reset / multi-commit push skip them."""
+    decide = _ci_lint_step("Install black + ruff")
+    assert "id: proven" in decide
+    for clause in (
+        '"$EVENT_NAME" = "push"',
+        '"$BUILD_SHA" != "$PUSHED_SHA"',
+        '"$PARENTS" != "2"',
+        '"$PARENT" != "$BEFORE_SHA"',
+        '"$COMMITTER" != "noreply@github.com"',
+        '[[ "$SUBJECT" =~ \\(#[0-9]+\\)$ ]]',
+        'echo "pr_proven=$PROVEN" >> "$GITHUB_OUTPUT"',
+    ):
+        assert clause in decide, f"#4252: the PR-proven decision lost a clause: {clause}"
+    assert decide.index("PROVEN=false") < decide.index("PROVEN=true"), "the decision must default to running the gates"
+    for gate in ("Format gate (black", "Lint gate (ruff", "Mypy gate (ENFORCED"):
+        assert "if: always() && steps.proven.outputs.pr_proven != 'true'" in _ci_lint_step(gate), gate
+    # gitleaks is the one scan of a direct push (secret-scan.yml is pull_request-only).
+    assert "steps.proven" not in _ci_lint_step("Secret scan (gitleaks")
+
+
+def test_dependabot_automerge_keys_off_pr_checks_and_requires_the_full_suite():
+    """#4252 box 3: dependabot-validate.yml is deleted; automerge fires on the PR checks
+    workflow and must see the full suite green. The full suite is NOT a ruleset-required
+    context, so an automerge that waited only on the required ones could land a bump
+    whose behaviour tests are red."""
+    assert not (ROOT / ".github" / "workflows" / "dependabot-validate.yml").exists()
+    text = DEPENDABOT_AUTOMERGE.read_text(encoding="utf-8")
+    assert 'workflows: ["PR checks"]' in text and "name: PR checks" in _text()
+    assert "github.event.workflow_run.conclusion == 'success'" in text
+    required = text[text.index("REQUIRED_GREEN: |") : text.index("run: |")]
+    for ctx in ("Collect + deploy-critical + format", "gitleaks (PR commit range only, not full history)"):
+        assert ctx in required, ctx
+    full = re.search(r"^\s+name: (Full unit suite[^\n]*)$", _text(), re.M).group(1).strip()
+    assert full in required, f"automerge does not require the full-suite check by its exact name ({full})"
+    assert '"$HEAD" != "$GREEN_SHA"' in text, "a newer, unvalidated head could be merged"
+    assert "--match-head-commit" in text

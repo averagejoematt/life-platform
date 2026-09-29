@@ -1,7 +1,7 @@
-"""tests/pair_seam_residue.py — the #2847 must-agree-seam ledger (box 4, epic #2842).
+"""ledgers/pair_seam_residue.py — the #2847 must-agree-seam ledger (box 4, epic #2842).
 
 The dated, shrink-only companion to ``tests/pair_seam_guard_lib.py``, in the shape
-``tests/conformance_residue.py`` (#2844) and ``tests/lambda_enrollment_ledger.py``
+``ledgers/conformance_residue.py`` (#2844) and ``tests/lambda_enrollment_ledger.py``
 (#2846) established: **an entry may only ever come OUT.** A row the sweep no longer
 finds is a red, so the ratchet is forced to count down; a new seam is a red, never a
 new baseline row you add to make the red go away.

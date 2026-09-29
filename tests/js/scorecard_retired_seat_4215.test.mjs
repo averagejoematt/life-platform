@@ -9,7 +9,7 @@ import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { scorecardSeats, retiredSeats, retiredSeatNote } = await import("../../site/assets/js/coach_roster.js");
+const { scorecardSeats, retiredSeats, retiredSeatNote, rateText, rateWord } = await import("../../site/assets/js/coach_roster.js");
 
 const bc = (total, decided, lifeTotal, lifeDecided) => ({ total, decided, pending: total - decided, lifetime: { total: lifeTotal, decided: lifeDecided } });
 const BY_COACH = {
@@ -57,4 +57,25 @@ test("guard: the untagged scorecard names are /api/coaches' names (minus the lea
   const missing = API_COACHES.filter((n) => !untagged.has(n));
   assert.deepEqual(missing, ["Dr. Eli Marsh"]);
   for (const c of scorecardSeats(DATA).retired) assert.ok(!roster.has(NAMES[c]));
+});
+
+// #4220 box 3 (it rides this file: the same scorecard, the same pure roster module). Live
+// 2026-09-29 16:24Z: /api/predictions by_coach served Webb 0/9 (0.0), Brandt 3/7 (42.9),
+// Park 8/19 (42.1), labs 2/2 (100.0), percent_floor 10. The scorecard printed "0%",
+// "42.9%" and "100%" on nine, seven and two calls.
+test("#4220: below the served floor a coach's rate is counts, never a percentage", () => {
+  assert.equal(rateText(0, 9, 0.0, 10), "0 of 9");
+  assert.equal(rateText(3, 7, 42.9, 10), "3 of 7");
+  assert.equal(rateText(2, 2, 100.0, 10), "2 of 2");
+  assert.equal(rateWord(9, 10), "came true");
+  // at or above the floor the served percentage rides
+  assert.equal(rateText(8, 19, 42.1, 10), "42.1%");
+  assert.equal(rateWord(19, 10), "hit rate");
+  assert.equal(rateText(4, 10, 40.0, 10), "40%");
+  // nothing decided is "—", never "0%"; a missing floor falls back to 10, never to "always %"
+  assert.equal(rateText(0, 0, null, 10), "—");
+  assert.equal(rateText(0, 9, 0.0, undefined), "0 of 9");
+  // a decided count with no served percentage still prints counts rather than "null%"
+  assert.equal(rateText(12, 20, null, 10), "12 of 20");
+  for (const [k, n, p] of [[0, 9, 0], [3, 7, 42.9], [2, 2, 100], [5, 7, 71.4]]) assert.ok(!rateText(k, n, p, 10).includes("%"));
 });

@@ -148,6 +148,15 @@ from datetime import (
 )
 
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training.blueprint_rederive import (  # noqa: E402 - #4427: the band table's session basis
+    CUT_WINDOW,
+    distinct_sessions,
+    method as rederive_method,
+    session_basis,
+    supersedes_label,
+)
+
+_STRAVA_RAW_REASON = "#4427: the band table clusters every device's record itself (training.blueprint_rederive)"
 
 MIN_SWING_LB = 12.0
 MIN_EPISODE_LB = 15.0
@@ -347,6 +356,15 @@ def classify_activity(sport_type: str):
     return None
 
 
+def _time_weighted_bpm(pairs: list):
+    """[(bpm, hours)] -> the hours-weighted mean bpm, rounded; None when there is none (ADR-104).
+    A pair with no recorded hours still counts, at a nominal minute, rather than vanishing."""
+    if not pairs:
+        return None
+    w = [(bpm, max(hours, 1 / 60)) for bpm, hours in pairs]
+    return round(sum(b * h for b, h in w) / sum(h for _, h in w))
+
+
 def weekly_covariates(
     activities: list,
     start_date: str,
@@ -395,13 +413,13 @@ def weekly_covariates(
             walk_hr += float(a.get("hours") or 0.0)
             walk_mi += float(a.get("miles") or 0.0)
             if a.get("hr"):
-                walk_bpm.append(float(a["hr"]))
+                walk_bpm.append((float(a["hr"]), float(a.get("hours") or 0.0)))
         elif k == "cycle":
             cycles += 1
             cycle_hr += float(a.get("hours") or 0.0)
             cycle_mi += float(a.get("miles") or 0.0)
             if a.get("hr"):
-                cycle_bpm.append(float(a["hr"]))
+                cycle_bpm.append((float(a["hr"]), float(a.get("hours") or 0.0)))
         elif k == "run":
             runs += 1
         elif k == "lift":
@@ -427,7 +445,7 @@ def weekly_covariates(
         "cycles_wk": round(cycles / weeks, 2),
         "cycle_hr_wk": round(cycle_hr / weeks, 2),
         "cycle_mi_wk": round(cycle_mi / weeks, 2),
-        "cycle_bpm": round(sum(cycle_bpm) / len(cycle_bpm)) if cycle_bpm else None,
+        "cycle_bpm": _time_weighted_bpm(cycle_bpm),
         "n_cycle_bpm": len(cycle_bpm),
         # #3716 — the honest denominator for "how much cardio was he doing".
         # Walking alone understates it by up to half at some weights.
@@ -438,7 +456,8 @@ def weekly_covariates(
         "tonnage_lb_wk": round(tonnage / weeks),
         "n_days": days,
         # Absence is reported as absence, never as 0 bpm (ADR-104).
-        "walk_bpm": round(sum(walk_bpm) / len(walk_bpm)) if walk_bpm else None,
+        # #4427 — time-weighted by session hours (a 4-hour walk outweighs a 10-minute one).
+        "walk_bpm": _time_weighted_bpm(walk_bpm),
         "n_walk_bpm": len(walk_bpm),
         "sess_bpm": round(sum(sess_bpm) / len(sess_bpm)) if sess_bpm else None,
         "n_sess_bpm": len(sess_bpm),
@@ -518,6 +537,7 @@ def build_reference(
     hevy_sets_by_date: dict,
     hevy_by_date: dict | None = None,
     whoop_hr_by_date: dict | None = None,
+    session_n: dict | None = None,
 ) -> dict:
     """Build the training_reference singleton: by-band volumes + the proven curve.
     Cross-phase, confidence low.
@@ -624,6 +644,16 @@ def build_reference(
         cov = _finish(band, dset, restrict=losing_days)
         if cov:
             proven_bands[band] = cov
+    # #4427 — the 2024–25 cut ALONE, the table the owner's blueprint cites ("what he did at
+    # this weight in the cut that worked"). `proven_bands` pools every loss episode since
+    # 2012; this one is the blueprint's own window, so its rates can be read against it.
+    c0, c1 = CUT_WINDOW
+    cut_days = {d for dset in band_days.values() for d in dset if c0 <= d <= c1}
+    cut_bands = {}
+    for band, dset in band_days.items():
+        cov = _finish(band, dset, restrict=cut_days)
+        if cov:
+            cut_bands[band] = cov
     # Proven curve: weekly samples along the reference window.
     # #3711 — the boundary need not BE a weigh-in day. `pos.get(rstart)` is an
     # exact-match lookup, so a window edge that falls on a day he did not weigh
@@ -655,9 +685,16 @@ def build_reference(
         # period. Without this the prescription view reports "nothing to
         # prescribe from" for a stale reference, which reads as a finding about
         # his history when it is a deploy problem.
-        "reference_schema": 2,
+        # #4427 — 3: activities are distinct SESSIONS (device twins clustered once, HR
+        # artefacts rejected), and the record says so in `method` + `n`. A schema-2 record
+        # is the twin-counted table: history, superseded, never a prescription basis.
+        "reference_schema": 3,
+        "method": rederive_method(),
+        "n": session_n or {},
         "bands": bands,
         "proven_bands": proven_bands,
+        "cut_bands": cut_bands,
+        "cut_window": f"{c0}..{c1}",
         "proven_curve": proven_curve,
         "source_window": f"{rstart}..{rend}",
         "derived_at": _now_iso(),
@@ -691,13 +728,32 @@ def build_training_reference_record(ref: dict) -> dict:
         "reference_schema": _to_dec(ref.get("reference_schema", 1)),
         "bands": _deep_dec(ref["bands"]),
         "proven_bands": _deep_dec(ref.get("proven_bands") or {}),
+        "cut_bands": _deep_dec(ref.get("cut_bands") or {}),
+        "cut_window": ref.get("cut_window"),
         "proven_curve": _deep_dec(ref["proven_curve"]),
         "source_window": ref["source_window"],
         "derived_at": derived_at,
         "confidence": ref.get("confidence", "low"),
         "n_episodes_with_covariates": _to_dec(ref.get("n_episodes_with_covariates", 0)),
+        # #4427 — the method, its n and the record it replaces travel ON the record (the
+        # #3735 lesson: a field the builder drops is a field no reader can ever see).
+        "method": _deep_dec(ref.get("method") or {}),
+        "n": _deep_dec(ref.get("n") or {}),
+        "supersedes": _deep_dec(ref.get("supersedes")) if ref.get("supersedes") else None,
     }
     return {k: v for k, v in item.items() if v is not None}
+
+
+def _newest_reference() -> dict | None:
+    """The newest stored training_reference (read-only), or None."""
+    r = table.query(
+        KeyConditionExpression="pk = :pk",
+        ExpressionAttributeValues={":pk": USER_PREFIX + TRAINING_REFERENCE_SOURCE},
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = r.get("Items") or []
+    return items[0] if items else None
 
 
 # ==============================================================================
@@ -953,10 +1009,13 @@ def run_prescription_forecast(weigh_ins: list, activities: list, ref: dict, toda
 # ==============================================================================
 
 
-def _read_all_history(source: str, start: str = "2010-01-01", end: str = None) -> list:
+def _read_all_history(source: str, start: str = "2010-01-01", end: str = None, keep_duplicates: str = "") -> list:
     """Paginate a source's full DATE# range. NOTE: deliberately does NOT apply the
     ADR-058 phase filter — episode detection spans 14 years, so it MUST include
-    pre-genesis (phase=pilot) records, unlike the nightly compute path."""
+    pre-genesis (phase=pilot) records, unlike the nightly compute path.
+
+    `keep_duplicates` is the read seam's opt-out (#4427): the strava read passes it so
+    `training.blueprint_rederive` can cluster every device's record by its own stated rule."""
     end = end or pacific_today()
     items = []
     kwargs = {
@@ -969,7 +1028,7 @@ def _read_all_history(source: str, start: str = "2010-01-01", end: str = None) -
         if "LastEvaluatedKey" not in r:
             break
         kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-    return strava_read_seam(source, items)
+    return strava_read_seam(source, items, keep_duplicates=keep_duplicates)
 
 
 def _sk_date(item: dict) -> str:
@@ -981,7 +1040,7 @@ def _f(v):
 
 
 def _load_inputs() -> tuple:
-    """Adapt DDB withings/strava/hevy → normalized algorithm inputs.
+    """Adapt DDB withings/strava/hevy → normalized algorithm inputs (+ the #4427 session basis).
 
     Documented field assumptions (SCHEMA.md): withings.weight_lbs; strava per-activity
     sport_type + moving_time_seconds (falls back to a daily record's own sport_type, or
@@ -993,18 +1052,23 @@ def _load_inputs() -> tuple:
         if w:
             weigh_ins.append((_sk_date(it), w))
 
-    activities = []
-    for it in _read_all_history("strava"):
+    # #4427 (TB-7) — every device's record, clustered into sessions by the stated rule in
+    # training.blueprint_rederive. Before it, a 2024–25 walk the Garmin and WHOOP both
+    # pushed counted twice, and a Garmin copy's 44–57 bpm artefact pulled band HR down.
+    records = []
+    for it in _read_all_history("strava", keep_duplicates=_STRAVA_RAW_REASON):
         d = _sk_date(it)
         rows = it.get("activities") if isinstance(it.get("activities"), list) else [it]
         for a in rows:
             kind = classify_activity(a.get("sport_type") or a.get("type"))
             if kind:
-                activities.append(
+                records.append(
                     {
                         "date": d,
                         "kind": kind,
-                        "hours": (_f(a.get("moving_time_seconds")) or 0.0) / 3600.0,
+                        "start": a.get("start_date_local") or a.get("start_date"),
+                        "elapsed_s": _f(a.get("elapsed_time_seconds")),
+                        "moving_s": _f(a.get("moving_time_seconds")),
                         # #3709 — miles and heart rate are what a prescription is
                         # actually written in. `has_heartrate` is absent on older
                         # rows, so we key off the value itself.
@@ -1012,6 +1076,8 @@ def _load_inputs() -> tuple:
                         "hr": _f(a.get("average_heartrate")),
                     }
                 )
+    activities = distinct_sessions(records)
+    basis = session_basis(records, activities)
 
     hevy_sets_by_date: dict[str, float] = {}
     hevy_by_date: dict[str, dict] = {}
@@ -1043,25 +1109,46 @@ def _load_inputs() -> tuple:
         if hr:
             whoop_hr_by_date.setdefault(_sk_date(it), []).append(hr)
 
-    return weigh_ins, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date
+    return weigh_ins, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date, basis
 
 
 def lambda_handler(event, context):
-    """Weekly (Sun) + manual. Detects weight episodes + writes the training reference."""
+    """Weekly (Sun) + manual. Detects weight episodes + writes the training reference.
+
+    `{"dry_run": true}` (#4427) reads and derives exactly as a real run does and writes
+    NOTHING — no episode, no reference, no forecast — returning the reference's method, n,
+    what it would supersede and its band table, so the rebuild can be checked first."""
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
+    dry_run = bool(event.get("dry_run"))
     try:
-        weigh_ins, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date = _load_inputs()
+        weigh_ins, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date, basis = _load_inputs()
         idx, vals = smooth_weight(weigh_ins)
         if not idx:
             logger.warning("episode-detect: insufficient weight history (%d weigh-ins)", len(weigh_ins))
             return {"statusCode": 200, "body": "insufficient weight history", "weigh_ins": len(weigh_ins)}
 
         episodes = enrich_episodes(idx, vals, detect_episodes(idx, vals), activities, hevy_sets_by_date)
+        ref = build_reference(idx, vals, episodes, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date, session_n=basis)
+        prior = d2f(_newest_reference() or {})
+        if prior.get("sk") == "DATE#" + ref["derived_at"][:10]:
+            # A same-day re-run overwrites that record; carry forward what IT replaced.
+            ref["supersedes"] = prior.get("supersedes")
+        else:
+            ref["supersedes"] = supersedes_label(prior, ref)
+        if dry_run:
+            return {
+                "statusCode": 200,
+                "dry_run": True,
+                "method": ref["method"],
+                "n": ref["n"],
+                "supersedes": ref["supersedes"],
+                "bands": ref["bands"],
+                "proven_bands": ref["proven_bands"],
+                "cut_bands": ref["cut_bands"],
+            }
         for ep in episodes:
             table.put_item(Item=build_episode_record(ep))
-
-        ref = build_reference(idx, vals, episodes, activities, hevy_sets_by_date, hevy_by_date, whoop_hr_by_date)
         table.put_item(Item=build_training_reference_record(ref))
 
         # #3712 — the week's prescription, registered as a graded forecast. Fail-soft

@@ -825,13 +825,27 @@ def test_4220_the_four_endpoints_serve_one_record_per_coach(monkeypatch):
     assert "%" not in roster["nutrition_coach"]["headline_stat"]
 
 
+def _retired_learning_count(table, coach_id):
+    """The retired producer, kept as the mutation: `_track_record`'s pre-#4220 LEARNING#
+    re-count (every data row with a confirmed/refuted status, no identity check)."""
+    rows = [r for (pk, sk), r in table.store.items() if pk == f"COACH#{coach_id}" and str(sk).startswith("LEARNING#")]
+    data = [r for r in rows if (r.get("channel") or "data") != "conversation"]
+    confirmed = sum(1 for r in data if r.get("status") == "confirmed")
+    refuted = sum(1 for r in data if r.get("status") == "refuted")
+    return {"confirmed": confirmed, "refuted": refuted, "decided": confirmed + refuted}
+
+
 def test_4220_mutation_control_the_learning_count_fails_on_webb(monkeypatch):
     """Restore the retired producer — `_track_record`'s LEARNING# count — over the SAME
     wire and hand its numbers to the guard: it must fail on Webb (25 ≠ 5)."""
     table, _rows = _write_live_0926_wire(monkeypatch)
     coaches, calibration, predictions, wrong = _served_four(monkeypatch, table)
-    old = api._track_record("nutrition_coach")
+    old = _retired_learning_count(table, "nutrition_coach")
     assert old["decided"] == 25 and old["confirmed"] == 20, old  # the live headline's numbers, reproduced
+    # And the report card, which re-counted LEARNING# until #4220's box 3 slice, now prints the record.
+    card = api._track_record("nutrition_coach")
+    roster = {c["persona_id"]: c for c in coaches["coaches"]}["nutrition_coach"]
+    assert (card["record"], card["headline"], card["decided"]) == (roster["record"], roster["headline_stat"], 5), card
     forged = json.loads(json.dumps(coaches))
     for c in forged["coaches"]:
         if c["persona_id"] == "nutrition_coach":

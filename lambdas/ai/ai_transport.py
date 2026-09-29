@@ -43,9 +43,10 @@ from typing import Any, Optional, Union
 import boto3
 
 from ai.bedrock_client import INVOKE_RETRY_BASE_DELAYS, RETRYABLE_BEDROCK_CODES
+from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
 
 # AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # CloudWatch client for token usage + failure metrics (P1.8/P1.9)

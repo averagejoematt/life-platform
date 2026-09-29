@@ -24,6 +24,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
@@ -665,7 +666,7 @@ def call_haiku_monthly(data, goals):
     # verdict over 30 days of data, read once a month. The misnomer is the
     # function's name (kept for its call sites), not the model.
     payload = json.dumps(
-        {"model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"), "max_tokens": 2500, "messages": [{"role": "user", "content": prompt}]}
+        {"model": os.environ.get("AI_MODEL", NARRATIVE_MODEL), "max_tokens": 2500, "messages": [{"role": "user", "content": prompt}]}
     ).encode()
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",

@@ -2715,6 +2715,29 @@ STRUCTURAL_HAND_PROOFS["structural::test_ci_job_timeouts_3678.py"] = {
     "proved_on": "2026-09-27",
 }
 
+# #4270 slice 1: a new top-level root dir, `ledgers/` (the first residue ledger moved out
+# of tests/), adds one new ALLOWLIST entrant to the D1 root-clutter ratchet.
+REGISTRY_PROOFS.update(
+    {
+        "registry::tests/test_root_clutter_guard.py::ALLOWLIST::ledgers": {
+            "gate_name": "ALLOWLIST[ledgers]",
+            "command": "python3 -m pytest tests/test_root_clutter_guard.py -q   # 4 tests",
+            "mutation": "the entry's own line deleted from ALLOWLIST, leaving the tracked `ledgers/` dir unlisted.",
+            "observed": (
+                "2026-09-27 on this branch: ARMED (entry removed) — 1 failed, 3 passed, "
+                "`test_no_unlisted_top_level_dir` naming `['ledgers']` exactly. REVERTED (entry restored): "
+                "4 passed."
+            ),
+            "scope": (
+                "Proves the entry is load-bearing for the D1 ratchet given the real tracked `ledgers/` dir "
+                "(ledgers/conformance_residue.py). It does not prove the reason text is accurate beyond matching "
+                "docs/REPO_STRUCTURE.md's own row for the same directory."
+            ),
+            "proved_on": "2026-09-27",
+        }
+    }
+)
+
 # #4419: the strava read-seam SET guard (and the pair-rule fixture beside it) turned
 # tests/test_shared_modules.py into a tree-sweeping structural test. Three REAL-tree
 # mutations, each restored by copying the pre-mutation file back.
