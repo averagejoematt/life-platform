@@ -384,13 +384,11 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_journal_archive_notice_3512.py::BASELINE": "2026-09-05 seal (#3536)",
     "registry::tests/test_journey_day1_synthetic_baseline_3478.py::BASELINE": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::deploy/archive/onetime/daily_brief_lambda.py": "2026-09-05 seal (#3536)",
-    "registry::tests/test_module_size_guard.py::BASELINE::deploy/sync_doc_metadata.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/ai/ai_calls.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/ai/ai_context.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/coach/coach_history_summarizer.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/coach/coach_prediction_evaluator.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/daily_insight_compute_lambda.py": "2026-09-05 seal (#3536)",
-    "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/daily_metrics_compute_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/compute/hypothesis_engine_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_module_size_guard.py::BASELINE::lambdas/content/html_builder.py": "2026-09-05 seal (#3536)",
     # lambdas/content/output_writers.py DELETED (#3731, 2026-09-19, ratchet-down): the

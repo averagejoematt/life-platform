@@ -581,7 +581,6 @@ JSON_HAND_PARSE_LEDGER = {
 def _model_text_json_loads(root):
     """{path::function: n} for every json.loads whose argument derives from ["content"]…["text"]."""
     import ast
-    import glob
     from collections import Counter
 
     def _is_source(node):
@@ -596,7 +595,9 @@ def _model_text_json_loads(root):
         return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
 
     hits: Counter = Counter()
-    for path in sorted(glob.glob(os.path.join(root, "lambdas", "**", "*.py"), recursive=True)):
+    from pathlib import Path as _P
+
+    for path in sorted(str(x) for x in _P(root, "lambdas").rglob("*.py")):
         rel = os.path.relpath(path, root).replace(os.sep, "/")
         if rel in _JSON_PARSE_HOMES:
             continue
