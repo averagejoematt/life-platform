@@ -292,9 +292,9 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     squat = ideal.exercises[0]
     assert squat.movement_key == "squat_barbell"
     top = squat.sets[0].weight_kg
-    # week 1 of the entry ramp (load_ramp, unchanged by #4147) — 60 % of the in-band anchor, no
-    # discount (09-20 is inside the 28 d detraining age)
-    assert top == 54.5  # ceil-to-0.5 kg of 200 lb x 0.60 = 54.43 kg
+    # week 1 of the entry ramp (load_ramp, unchanged by #4147) — 60 % of the in-band anchor's band
+    # e1RM (#4388), no discount (09-20 is inside the 28 d detraining age)
+    assert top == pytest.approx(150 * 0.45359237)  # 200 lb x (1 + 8/30) x 0.60 = 152 lb -> nearest 5 lb (#4388) = 150 lb
     assert [s.weight_kg for s in squat.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     assert "HEAVY: 1 top set of 4–6 @ RPE 7–8" in squat.notes

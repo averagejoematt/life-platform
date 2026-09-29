@@ -501,6 +501,38 @@ class _MemoryWireTable(FakeDdbTable):
             raise AssertionError(f"unexpected condition {cond!r}")
         return super().put_item(Item=Item, **kwargs)
 
+    def update_item(self, Key=None, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None, **kwargs):
+        """#4355: the ONLY update this wire needs to honour is delete_platform_memory's
+        tombstone — attribute_exists(sk) AND attribute_not_exists(deleted_at), a generic
+        `SET a = :x, b = :y`. A different shape is a caller error, not a silent no-op."""
+        self.updates.append(
+            {
+                "Key": Key,
+                "UpdateExpression": UpdateExpression,
+                "ConditionExpression": ConditionExpression,
+                "ExpressionAttributeValues": ExpressionAttributeValues,
+            }
+        )
+        item = self.store.get(self._key_of(Key))
+        if ConditionExpression == "attribute_exists(sk) AND attribute_not_exists(deleted_at)":
+            if item is None or item.get("deleted_at"):
+                raise _ConditionalCheckFailedException(
+                    "The conditional request failed: attribute_exists(sk) AND attribute_not_exists(deleted_at)"
+                )
+        elif ConditionExpression is not None:
+            raise AssertionError(f"unexpected update condition {ConditionExpression!r}")
+        assert UpdateExpression and UpdateExpression.startswith("SET "), f"unexpected UpdateExpression {UpdateExpression!r}"
+        for assignment in UpdateExpression[len("SET ") :].split(","):
+            field, _, value_ref = assignment.strip().partition("=")
+            item[field.strip()] = ExpressionAttributeValues[value_ref.strip()]
+        return {}
+
+    def delete_item(self, **kwargs):  # pragma: no cover — proves the tool never reaches this
+        raise AssertionError(
+            "delete_platform_memory must never call dynamodb:DeleteItem (#4355) — the MCP "
+            "role has no grant on the platform_memory partition; use update_item (a tombstone)"
+        )
+
     def query(self, **kwargs):
         self.query_calls.append(kwargs)
         eav = kwargs["ExpressionAttributeValues"]
@@ -683,4 +715,215 @@ def test_issue_4171_delete_by_exact_key_and_the_legacy_date_form_both_work(monke
     assert out["status"] == "deleted" and out["sk"] == note["sk"] and out["date"] == "2026-09-25"
     legacy = tm.tool_delete_platform_memory({"category": "training", "date": "2026-09-24"})
     assert legacy["status"] == "deleted" and legacy["sk"] == "MEMORY#training#2026-09-24"
-    assert fake.store == {}
+    # #4355: SOFT delete — the MCP role has no dynamodb:DeleteItem on this partition, so
+    # both rows survive in the store, tombstoned, never removed.
+    assert len(fake.store) == 2
+    assert fake.deletes == []
+
+
+# ── #4355: delete_platform_memory is refused by IAM — the MCP role has no ────────────
+# dynamodb:DeleteItem on platform_memory. Fix: an UpdateItem tombstone (deleted_at /
+# deleted_reason) that every reader of the partition skips, never a DynamoDB delete.
+
+
+def test_issue_4355_delete_is_a_tombstone_not_a_dynamodb_delete(monkeypatch):
+    fake = _wire_0925(monkeypatch, _T_INJURY, datetime(2026, 9, 26, 2, 20, 0, tzinfo=timezone.utc))
+    note = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    out = tm.tool_delete_platform_memory({"category": "training", "key": note["sk"], "reason": "typo"})
+    assert out["status"] == "deleted" and out["sk"] == note["sk"] and "deleted_at" in out
+    row = fake.store[("USER#matthew#SOURCE#platform_memory", note["sk"])]
+    assert row["deleted_at"] == out["deleted_at"]
+    assert row["deleted_reason"] == "typo"
+    assert row["summary"] == _INJURY, "a tombstone marks the row, it does not erase its content"
+    assert fake.deletes == [], "dynamodb:DeleteItem must never be called (#4355)"
+    # Every update the tool sent was conditional — never an unconditional tombstone that
+    # could clobber a race.
+    assert all(u["ConditionExpression"] for u in fake.updates)
+
+
+def test_issue_4355_delete_defaults_reason_and_is_idempotently_not_found_on_replay(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    note = tm.tool_write_platform_memory({"category": "training", "content": {"summary": _INJURY}})
+    first = tm.tool_delete_platform_memory({"category": "training", "key": note["sk"]})
+    assert first["status"] == "deleted"
+    row = fake.store[("USER#matthew#SOURCE#platform_memory", note["sk"])]
+    assert row["deleted_reason"] == "mcp_delete", "an unstated reason still leaves an honest default trail"
+    again = tm.tool_delete_platform_memory({"category": "training", "key": note["sk"]})
+    assert again["status"] == "not_found", "a second delete of an already-tombstoned row removes nothing"
+    assert row["deleted_at"] == first["deleted_at"], "the replay must not restamp the tombstone's own instant"
+
+
+def test_issue_4355_delete_of_a_never_written_row_is_not_found(monkeypatch):
+    _wire_0925(monkeypatch)
+    out = tm.tool_delete_platform_memory({"category": "training", "date": "2026-09-01"})
+    assert out["status"] == "not_found"
+
+
+def test_issue_4355_the_delete_path_never_calls_delete_item():
+    """Derivation guard (mutation control): restoring `table.delete_item(...)` — the
+    IAM-refused call the live incident reported — is caught here even before the wire's
+    own AssertionError would fire. Mutation-proved: reintroducing a `table.delete_item(`
+    call into this function makes this assertion fail (see the PR's pasted VERIFY run)."""
+    tree = ast.parse(inspect.getsource(tm.tool_delete_platform_memory))
+    calls = {n.func.attr for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+    assert "delete_item" not in calls, "delete_platform_memory must tombstone via update_item, never dynamodb:DeleteItem (#4355)"
+    assert "update_item" in calls
+
+
+def test_issue_4355_read_platform_memory_skips_a_soft_deleted_note(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    fake._seed(_mem("training", "2026-09-20", summary="gone", deleted_at="2026-09-21T00:00:00+00:00", deleted_reason="x"))
+    fake._seed(_mem("training", "2026-09-21", summary="kept"))
+    read = tm.tool_read_platform_memory({"category": "training", "days": 30})
+    assert read["count"] == 1
+    assert [r["summary"] for r in read["records"]] == ["kept"]
+
+
+def test_issue_4355_list_memory_categories_does_not_census_a_soft_deleted_note(monkeypatch):
+    fake = _wire_0925(monkeypatch)
+    fake._seed(_mem("training", "2026-09-20", summary="gone", deleted_at="2026-09-21T00:00:00+00:00"))
+    fake._seed(_mem("training", "2026-09-21", summary="kept"))
+    census = tm.tool_list_memory_categories({"days": 365})
+    (training,) = [c for c in census["categories"] if c["category"] == "training"]
+    assert training["count"] == 1 and training["latest_date"] == "2026-09-21"
+
+
+def test_issue_4355_coach_memory_selector_skips_a_soft_deleted_note():
+    """The stage-1 / coach chat-context reader (ai.platform_memory.select_conversation_memories,
+    which mcp.tools_plan._training_memory_constraints and the coach prompt block both read
+    through) must not keep quoting a tombstoned note."""
+    gone = _mem("training", "2026-09-20", summary="gone")
+    gone["deleted_at"] = "2026-09-21T00:00:00+00:00"
+    kept = _mem("training", "2026-09-21", summary="kept")
+    picked = pm.select_conversation_memories([gone, kept], coach_id="training", today=date(2026, 9, 22))
+    assert [p["record"]["summary"] for p in picked] == ["kept"]
+
+
+def test_issue_4355_a_reader_that_ignores_the_tombstone_would_red_here(monkeypatch):
+    """Mutation control (pasted in the PR): commenting out the `deleted_at` skip in
+    `select_conversation_memories` (or in `tool_read_platform_memory`) makes the two tests
+    above fail, because THIS is the only place either checks it — proving the guard is
+    load-bearing rather than redundant with some other filter."""
+    src = inspect.getsource(pm.select_conversation_memories)
+    assert "deleted_at" in src, "select_conversation_memories must skip deleted_at rows (#4355)"
+    src2 = inspect.getsource(tm.tool_read_platform_memory)
+    assert "deleted_at" in src2 or "_DELETED_AT_FIELD" in src2
+
+
+# ── #4355 acceptance box 2 — "guard the SET": every MCP tool handler that calls
+# dynamodb:DeleteItem must either have that action in the MCP role's synthesized IAM
+# policy for the partition it targets, or must not call delete_item at all. Both sides
+# are DERIVED (AST), never hand-enumerated — a new delete_item call anywhere in mcp/*.py
+# joins the scan the day it's written, and the granted LeadingKeys set is read straight
+# out of cdk/stacks/role_policies_serve.py, never copied by hand.
+
+import glob as _glob  # noqa: E402
+
+_MCP_DIR = os.path.join(_REPO, "mcp")
+_ROLE_POLICIES_SERVE = os.path.join(_REPO, "cdk", "stacks", "role_policies_serve.py")
+
+# Best-effort resolution of a `pk=<expr>` source to its literal partition string, for the
+# handful of idioms mcp/*.py's delete_item call sites actually use today (a zero-arg
+# helper returning an f-string, or a module-level constant built the same way — both
+# hand-verified against the actual USER_ID='matthew' this deploys with). An expression
+# this doesn't recognise resolves to None, and the closure test below treats "None" as
+# UNRESOLVED, never as "covered" — no guess ever reads as a pass.
+_KNOWN_PK_LITERALS: dict[tuple[str, str], str] = {
+    ("tools_journal.py", "_quotes_pk()"): "USER#matthew#SOURCE#journal_quotes",
+    ("tools_sick_days.py", "SICK_DAYS_PK"): "USER#matthew#SOURCE#sick_days",
+}
+
+# The residual this sweep found and is NOT fixing here (different tools, out of #4355's
+# scope — filed as #4377/#4378). Pinned by (file, pk-expression) so a change to EITHER
+# side is visible: if the set shrinks, close the matching issue and shrink this pin; if it
+# grows, a NEW unauthorized delete_item call needs a look before merge.
+_KNOWN_DELETE_ITEM_IAM_GAPS: dict[tuple[str, str], str] = {
+    ("tools_journal.py", "_quotes_pk()"): "#4377 — mark_journal_quote(action='unmark')",
+    ("tools_sick_days.py", "SICK_DAYS_PK"): "#4378 — manage_sick_days clear action",
+}
+
+
+def _mcp_delete_item_sites():
+    """(file, lineno, pk_source) for every `<table>.delete_item(` call across mcp/*.py."""
+    out = []
+    for path in sorted(_glob.glob(os.path.join(_MCP_DIR, "*.py"))):
+        src = open(path, encoding="utf-8").read()
+        for node in ast.walk(ast.parse(src, filename=path)):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "delete_item"):
+                continue
+            pk_source = "<unresolved>"
+            for kw in node.keywords:
+                if kw.arg == "Key" and isinstance(kw.value, ast.Dict):
+                    for k, v in zip(kw.value.keys, kw.value.values):
+                        if isinstance(k, ast.Constant) and k.value == "pk":
+                            pk_source = ast.unparse(v)
+            out.append((os.path.basename(path), node.lineno, pk_source))
+    return out
+
+
+def _mcp_server_delete_item_leading_keys():
+    """LeadingKeys values `dynamodb:DeleteItem` is scoped to for the mcp_server() IAM role,
+    derived from cdk/stacks/role_policies_serve.py's own source — never hand-copied.
+    Returns None if an UNCONDITIONAL DeleteItem grant is found (covers every partition)."""
+    tree = ast.parse(open(_ROLE_POLICIES_SERVE, encoding="utf-8").read(), filename=_ROLE_POLICIES_SERVE)
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "mcp_server")
+    leading_keys: set[str] = set()
+    for node in ast.walk(fn):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "PolicyStatement"):
+            continue
+        kw = {k.arg: k.value for k in node.keywords if k.arg}
+        actions_node = kw.get("actions")
+        actions = [a.value for a in getattr(actions_node, "elts", []) if isinstance(a, ast.Constant)]
+        if "dynamodb:DeleteItem" not in actions:
+            continue
+        cond = kw.get("conditions")
+        if cond is None:
+            return None  # an unconditional DeleteItem grant — covers everything
+        for _c_key, c_val in zip(getattr(cond, "keys", []), getattr(cond, "values", [])):
+            for kk, vv in zip(getattr(c_val, "keys", []), getattr(c_val, "values", [])):
+                if isinstance(kk, ast.Constant) and kk.value == "dynamodb:LeadingKeys":
+                    leading_keys |= {e.value for e in getattr(vv, "elts", []) if isinstance(e, ast.Constant)}
+    return leading_keys
+
+
+def test_issue_4355_delete_item_scan_finds_the_known_mcp_sites():
+    """Guard the guard: if this finds nothing, the AST scan silently stopped working."""
+    sites = _mcp_delete_item_sites()
+    files = {f for f, _ln, _pk in sites}
+    assert files == {"tools_journal.py", "tools_sick_days.py"}, (
+        f"expected exactly the two known-uncovered delete_item sites (mark_journal_quote, "
+        f"manage_sick_days), found files={sorted(files)} — delete_platform_memory should have "
+        "left this scan by tombstoning instead (#4355); a NEW file appearing here needs the "
+        "same IAM-coverage look this test gives the other two."
+    )
+
+
+def test_issue_4355_delete_platform_memory_no_longer_calls_delete_item():
+    """The specific #4355 fix, seen from the census side: tools_memory.py must have ZERO
+    delete_item call sites left (it tombstones via update_item now)."""
+    sites = _mcp_delete_item_sites()
+    assert "tools_memory.py" not in {f for f, _ln, _pk in sites}
+
+
+def test_issue_4355_every_mcp_delete_item_call_is_iam_covered_or_a_named_residual():
+    """The closure: an uncovered delete_item call site must be EITHER absent, OR named in
+    `_KNOWN_DELETE_ITEM_IAM_GAPS` with a filed follow-up issue — never silently passing."""
+    granted = _mcp_server_delete_item_leading_keys()
+    assert granted, "expected the mcp_server() role's scoped DynamoDBMealPrune DeleteItem grant to still exist"
+    uncovered = []
+    for file_name, lineno, pk_source in _mcp_delete_item_sites():
+        literal = _KNOWN_PK_LITERALS.get((file_name, pk_source))
+        covered = literal is not None and literal in granted
+        if not covered:
+            uncovered.append((file_name, pk_source, lineno))
+    uncovered_keys = {(f, pk) for f, pk, _ln in uncovered}
+    assert uncovered_keys == set(_KNOWN_DELETE_ITEM_IAM_GAPS), (
+        "the set of IAM-uncovered delete_item call sites in mcp/*.py changed:\n"
+        f"  now:      {sorted(uncovered_keys)}\n"
+        f"  expected: {sorted(_KNOWN_DELETE_ITEM_IAM_GAPS)}\n"
+        "A NEW entry means a handler calls dynamodb:DeleteItem the MCP role cannot perform — "
+        "either grant it (cdk/stacks/role_policies_serve.py::mcp_server(), scoped by "
+        "dynamodb:LeadingKeys) or stop calling delete_item (the #4355 tombstone pattern). A "
+        "MISSING entry means a known gap (#4377/#4378) was fixed — shrink _KNOWN_DELETE_ITEM_IAM_GAPS "
+        "and _KNOWN_PK_LITERALS to match, or close the issue."
+    )

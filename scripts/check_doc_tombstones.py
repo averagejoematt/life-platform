@@ -16,8 +16,9 @@ SCOPE:
   Makefile (#1323 — the Makefile is a second, un-audited entry-point system that
   can route an operator onto a retired script exactly like a stale doc can),
   .claude/skills/*/SKILL.md, deploy/*.md (#1322 — the deploy directory's own runbooks
-  steered operators onto the retired boot-broken manual MCP zip; MANIFEST.md and
-  V2_ROLLBACK.md are exempt as dated/deprecated records).
+  steered operators onto the retired boot-broken manual MCP zip; V2_ROLLBACK.md is
+  exempt as a dated/deprecated record; MANIFEST.md was the same shape but has since
+  moved out of deploy/*.md entirely, into deploy/archive/onetime/, #4258).
   ALSO scans SOURCE docstrings/comments: lambdas/**/*.py + mcp/**/*.py (#781 taught
   us the shared-layer retirement reached tests + 2 docs but left 35+ stale "part of
   the shared layer" claims in code — the docs-only scan never opened lambdas/).
@@ -77,7 +78,6 @@ EXEMPT_FILES = {
     "docs/INCIDENT_LOG.md",
     "docs/BACKLOG.md",
     "docs/MCP_TOOL_AUDIT.md",
-    "deploy/MANIFEST.md",  # deprecated inventory (superseded) — history may mention history
     "deploy/V2_ROLLBACK.md",  # dated completed-operation record (2026-05-31)
 }
 

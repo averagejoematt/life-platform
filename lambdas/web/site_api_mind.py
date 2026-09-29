@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import cast
 
 from boto3.dynamodb.conditions import Key
+from coach import audience_guard  # #4392: public theme lists go through public_themes
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -49,7 +50,7 @@ def journal_analysis(*, _g) -> dict:
     # Build theme frequency counts
     theme_counts: dict[str, int] = {}
     for item in items:
-        for theme in item.get("themes", []):
+        for theme in audience_guard.public_themes(item.get("themes")):  # #4392: count the reader label
             theme_counts[theme] = theme_counts.get(theme, 0) + 1
 
     total = len(items)
@@ -79,7 +80,7 @@ def journal_analysis(*, _g) -> dict:
             {
                 "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
                 "dominant_theme": item.get("dominant_theme", "other"),
-                "themes": item.get("themes", []),
+                "themes": audience_guard.public_themes(item.get("themes")),  # #4392
                 "sentiment_score": float(item.get("sentiment_score", 0)),
                 "sentiment_label": item.get("sentiment_label", "neutral"),
                 "word_count": item.get("word_count", 0),
