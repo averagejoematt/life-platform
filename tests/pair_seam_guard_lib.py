@@ -14,7 +14,7 @@ gets a contract test at birth* — and the peer of #2844, which is the fleet-wid
 form of standing rule 1. Same three mechanics, different derivation:
 
     #2844   derivation = AST sweep for hand-typed registry vocabulary
-            ledger     = tests/conformance_residue.py (dated, shrink-only)
+            ledger     = ledgers/conformance_residue.py (dated, shrink-only)
             verdict    = a NEW hand-typed enumeration reds
 
     this    derivation = the #2845 model's edge plane -> must-agree seams

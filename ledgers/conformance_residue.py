@@ -1,4 +1,10 @@
-"""tests/conformance_residue.py — the #2844 conformance-guard exemption ledger.
+"""ledgers/conformance_residue.py — the #2844 conformance-guard exemption ledger.
+
+Moved from tests/conformance_residue.py 2026-09-27 (#4270 slice 1 — a ledger is data,
+not a test or fixture; the derivation guard's DISCOVERY_ROOTS in
+scripts/obligation_carriers.py now includes ``ledgers``, and this key's identity in
+RESIDUE_LEDGERS is content-keyed on the SITE it exempts, not on its own path, so the
+move does not re-key anything).
 
 THE dated, shrink-only record of every hand-typed enumeration of registry
 vocabulary that predates the guard (charter standing rule 1, docs/CHARTER.md).
