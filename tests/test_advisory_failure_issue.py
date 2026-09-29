@@ -202,3 +202,60 @@ def test_exit_code_for_error_file_mode_is_nonzero():
 
 def test_exit_code_for_error_recover_mode_is_zero():
     assert afi.exit_code_for_error("recover") == 0
+
+
+# ── #4262 box 2: wrap-nightly's run step — a degrade is a red, and the check's rc is kept ──
+# The step is executed as GitHub runs it (`bash -eo pipefail`), with CHECK_CMD swapped for a
+# stand-in, so these pin the step text itself, not a paraphrase of it.
+_WRAP_NIGHTLY = os.path.join(os.path.dirname(__file__), "..", ".github", "workflows", "wrap-nightly.yml")
+
+
+def _wrap_nightly_step() -> str:
+    import yaml
+
+    with open(_WRAP_NIGHTLY, encoding="utf-8") as fh:
+        steps = yaml.safe_load(fh)["jobs"]["check"]["steps"]
+    return next(s["run"] for s in steps if "CHECK_CMD" in (s.get("run") or ""))
+
+
+def _run_wrap_step(tmp_path, body: str) -> int:
+    """Run the step with CHECK_CMD pointing at a stand-in script whose body is `body`."""
+    import subprocess
+
+    stand_in = tmp_path / "stand_in.sh"
+    stand_in.write_text(body + "\n", encoding="utf-8")
+    env = {**os.environ, "CHECK_CMD": f"bash {stand_in}"}
+    return subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", _wrap_nightly_step()], env=env, capture_output=True
+    ).returncode
+
+
+def test_wrap_nightly_step_keeps_the_checks_own_exit_code(tmp_path):
+    assert _run_wrap_step(tmp_path, "echo OK; exit 0") == 0
+    assert _run_wrap_step(tmp_path, "echo 'UNGATED residual bullets'; exit 1") == 1
+    assert _run_wrap_step(tmp_path, "exit 2") == 2
+
+
+def test_wrap_nightly_step_reds_a_check_that_declined_to_look(tmp_path):
+    """Both degrade shapes exit 0 from the check itself; nobody reads them at night."""
+    assert _run_wrap_step(tmp_path, "echo 'alarm citations UNVERIFIED this run'; exit 0") == 1
+    assert _run_wrap_step(tmp_path, "echo 'check_backlog_hygiene: gh issue list exited 4: auth; skipping (advisory).'; exit 0") == 1
+
+
+def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
+    """Each leg is a real wrap_gates.py gate command, and the two left out are named in the file."""
+    import re
+
+    import yaml
+
+    with open(_WRAP_NIGHTLY, encoding="utf-8") as fh:
+        text = fh.read()
+    legs = yaml.safe_load(text)["jobs"]["check"]["strategy"]["matrix"]["include"]
+    import wrap_gates
+
+    gate_cmds = {" ".join(g.cmd) for g in wrap_gates.GATHER + wrap_gates.VERIFY}
+    assert len({leg["slug"] for leg in legs}) == len(legs) == 5
+    for leg in legs:
+        assert leg["cmd"] in gate_cmds, f"{leg['slug']} runs {leg['cmd']!r}, which is not a wrap_gates.py gate"
+    for left_out in ("proportionality-ledger", "alarm-citations"):
+        assert re.search(rf"{left_out}\s+NOT a leg", text), f"{left_out} must be named, with its reason, as deliberately left out"
