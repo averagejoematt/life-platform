@@ -10,9 +10,13 @@ THE PROBLEM
 
 WALL CLOCK (#4262 — replaces the old '~10s', which was a 12-gate battery on 2026-08-22)
   Measured on a Session BA lane tree, 2026-09-29, n=3 each, network-bound gates live:
-    before #4262 (doc leg in BOTH phases)  gather 47.3 / 57.0 / 26.6 s   verify 19.1 / 20.2 / 26.1 s
-    after  #4262 (doc leg in verify only)  see the PR body for the paired n=3 run
-  Each gate now prints its own elapsed seconds, so the slow one is named, not guessed.
+    before #4262 (38 gate runs: doc leg in BOTH phases)  gather 47.3 / 57.0 / 26.6 s   verify 19.1 / 20.2 / 26.1 s
+    after  #4262 (27 gate runs: doc leg in verify only)  gather 40.0 / 44.7 / 50.8 s   verify 21.0 / 19.4 / 25.7 s
+  Both phases together: 53-77 s before, 61-77 s after — under two minutes, and NOT faster:
+  the gather wall is set by the network-bound gates (backlog-hygiene 15-51 s, ci-warnings
+  23-43 s, postflight 22-36 s, closure-dod 3-45 s), which ran in parallel with the doc leg.
+  The dedup saves 11 gate runs of CPU and noise, not wall clock. Each gate now prints its
+  own elapsed seconds and the run ends with a `WRAP-GATES-TIMING` line naming the slowest.
 
 THE SHAPE (gather → write → verify → commit)
   --gather (default)  Run every gate that does NOT read the finished handover, in
