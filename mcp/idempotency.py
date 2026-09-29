@@ -309,4 +309,17 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         READ_BEFORE_WRITE,
         "enqueue returns the open row with the same sha256(tool, args); approve/discard are conditional puts on status, so a replay performs nothing twice",
     ),
+    # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
+    "get_exercise_notes": (
+        DETERMINISTIC_KEY,
+        "action=dismiss puts training_constraints sk=dismissal_sk(site, dismissed_on) — a replay rewrites the same dismissal",
+    ),
+    "get_coach_checkin_queue": (
+        READ_BEFORE_WRITE,
+        "reads the open queue first and returns it unchanged when non-empty; only an EMPTY queue is refilled (uuid CHECKIN# sks)",
+    ),
+    "plan_next_session": (
+        DETERMINISTIC_KEY,
+        "stage 2 puts SOURCE#coach_thread#training#{today}#critics — one critics row per day, a replay overwrites it",
+    ),
 }

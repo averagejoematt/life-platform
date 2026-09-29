@@ -8,8 +8,10 @@ only — a client had no way to tell a read from a write without calling
 from facts the registry already carries, rather than hand-typing 86 literals:
 
   * readOnlyHint / destructiveHint — from `mcp.audit.is_write_tool`, the SAME
-    write/read classification the R13-F12 rate limiter gates on and the #753
-    audit trail records against. destructiveHint mirrors is_write_tool exactly
+    write/read classification the #753 audit trail records against and the
+    #4190 residue guard refuses on. (The R13-F12 rate limiter is NOT derived
+    from it — `mcp/handler.py::_RATE_LIMITED_TOOLS` is its own explicit
+    five-tool set, a subset of the write tools.) destructiveHint mirrors is_write_tool exactly
     (True for every write tool): that is the MCP spec's own default when
     annotations are absent, so stating it explicitly is a no-op for a
     conservative client, not a demotion. A finer split (e.g. an
@@ -20,29 +22,15 @@ from facts the registry already carries, rather than hand-typing 86 literals:
     CLAIM_LEDGER / READ_BEFORE_WRITE) is True; APPEND_BY_DESIGN / RESIDUAL (or
     an undeclared write) is False. A read tool is always idempotent.
 
-THE THREE OVERRIDES (found running #4286's own AST mutation-control check,
-`tests/mcp_registry_ast.py::ddb_write_tool_names`, against every registered
-tool — see that check's docstring):
-
-`mcp.audit.is_write_tool` classifies by the tool's NAME VERB, and three
-registered tools carry a real DynamoDB write behind a read-classified verb:
-
-  * `get_exercise_notes` — #4036 deliberately put an owner-only `action=dismiss`
-    write on this existing tool rather than mint a new one (see its docstring
-    in mcp/tools_training_notes.py); `_dismiss_pain_flag` calls `table.put_item`.
-  * `get_coach_checkin_queue` — self-heals an empty question queue by
-    generating and PERSISTING fresh questions (`_table_ref.put_item`, directly
-    in `tool_get_coach_checkin_queue`'s own body) before returning them.
-  * `plan_next_session` — stage 2 (`routine_id` supplied) runs `_run_stage_2` ->
-    `_write_thread`, which `table.put_item`s the critics' verdicts as a coach
-    thread row. This contradicts `mcp/audit.py`'s own READ_VERBS comment
-    ("plan_next_session ... touches no partition") — filed as #4401.
-
-An annotation must track the REAL capability, not the verb, so these three are
-force-corrected here. This module does NOT change `is_write_tool` itself — that
-would also change R13-F12 rate-limiting and #753 audit-trail behavior for
-three tools that have never had either, which is a materially different,
-higher-risk change than "add annotations" and belongs to its own issue (#4401).
+THE THREE READ-VERB WRITERS (#4401): #4286's own AST mutation-control check
+(`tests/mcp_registry_ast.py::ddb_write_tool_names`) found `get_exercise_notes`,
+`get_coach_checkin_queue` and `plan_next_session` carrying a real DynamoDB write
+behind a read-classified name verb. #4286 first corrected only their annotation
+here, with a local override set; #4401 then moved the correction to its root —
+`mcp.audit.WRITE_TOOLS_BEHIND_READ_VERB` — so `is_write_tool` itself now says
+True for them. This module therefore derives readOnlyHint from `is_write_tool`
+ALONE: the annotation, the #753 audit trail and the #4190 residue guard can no
+longer disagree about which tools write.
 """
 
 from __future__ import annotations
@@ -58,16 +46,10 @@ from mcp.idempotency import CLAIM_LEDGER, CONTENT_KEY, DETERMINISTIC_KEY, READ_B
 # read-before-write guard suppresses the duplicate before it happens.
 _IDEMPOTENT_MECHANISMS = frozenset({DETERMINISTIC_KEY, CONTENT_KEY, CLAIM_LEDGER, READ_BEFORE_WRITE})
 
-# #4286/#4401: read-verb-classified tools with a real DDB write behind them —
-# see the module docstring for the AST evidence on each. `is_write_tool` still
-# says False for these (unchanged here); only the ANNOTATION is corrected.
-WRITES_DESPITE_READ_VERB = frozenset({"get_exercise_notes", "get_coach_checkin_queue", "plan_next_session"})
-
 
 def annotations_for(tool_name: str) -> dict[str, bool]:
     """The MCP `annotations` object for one registered tool name."""
-    write = is_write_tool(tool_name) or tool_name in WRITES_DESPITE_READ_VERB
-    if not write:
+    if not is_write_tool(tool_name):
         return {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True}
     mechanism, _reason = REPLAY_SEMANTICS.get(tool_name, (RESIDUAL, "undeclared"))
     return {

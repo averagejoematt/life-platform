@@ -237,10 +237,14 @@ test("every number carries its served field, dates are words not ISO, and the ru
   assert.match(all, /<p class="v7h-dated" data-src="decisions\[0\]\.note_at">/);
   assert.match(all, /data-src="source_freshness\.summary\.total"/);
   assert.match(all, /<td class="v7h-td-d" data-src="predictions\.overall\.due\.earliest_due">/);
-  const okay = H.okayBlock(null, null, { nutrition: { days_logged: 20, latest_date: "2026-09-25", protein_floor_g: 170, protein_floor_hit_days: 7 }, nutrition_trend: [{ date: "2026-09-06" }] }, { training: { strength_sessions_30d: 19 }, walking: { total_walks_30d: 14 } }, null);
+  const okay = H.okayBlock(null, null, { nutrition: { days_logged: 20, latest_date: "2026-09-25", protein_floor_g: 170, protein_floor_hit_days: 7 }, nutrition_trend: [{ date: "2026-09-06" }] }, { training: { strength_sessions_30d: 19, window_days: 22, window_full: false }, walking: { total_walks_30d: 14 } }, null);
   assert.match(okay, /data-src="nutrition_overview\.nutrition_trend\[0\]\.date">September 6</);
   assert.match(okay, /data-src="nutrition_overview\.nutrition\.latest_date">Friday, September 25</);
-  assert.match(okay, /in the last <span data-src="training_overview\.training\.strength_sessions_30d">30<\/span> days/);
+  // #4370: the window is the one the counts were taken over — Day 22 has 22 days behind it, not 30.
+  assert.match(okay, /in the <span data-src="training_overview\.training\.window_days">22<\/span> days since the experiment began/);
+  assert.doesNotMatch(okay, />30<\/span> days/);
+  const whole = H.okayBlock(null, null, null, { training: { strength_sessions_30d: 19, window_days: 30, window_full: true } }, null);
+  assert.match(whole, /in the last <span data-src="training_overview\.training\.window_days">30<\/span> days/);
 });
 
 test("the margin: day, three-letter month, weekday", () => {

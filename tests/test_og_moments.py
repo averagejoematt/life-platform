@@ -47,8 +47,8 @@ class _FakeS3:
 
         return {"Body": _B(json.dumps(self.objects[Key]).encode())}
 
-    def put_object(self, Bucket, Key, Body, ContentType, CacheControl=None):
-        self.puts[Key] = {"body": Body, "type": ContentType}
+    def put_object(self, Bucket, Key, Body, ContentType, CacheControl=None, **kw):
+        self.puts[Key] = {"body": Body, "type": ContentType, **kw}
 
 
 def test_week_recap_moment_written_with_iso_week_permalink():
@@ -202,7 +202,11 @@ def test_fingerprint_thin_day_is_published_but_not_offered():
     assert f"generated/moments/fingerprint/{out['date']}/index.html" in s3.puts  # archive has no holes
 
 
-def test_fingerprint_sweep_is_fail_soft_and_lands_in_the_index():
+def test_fingerprint_sweep_is_fail_soft_and_lands_in_the_index(monkeypatch):
+    def _offline(req, timeout=8):
+        raise OSError("offline")  # the HTTP-fed classes must not reach the live site from a unit test
+
+    monkeypatch.setattr(om.urllib.request, "urlopen", _offline)
     s3 = _FakeS3()
     index = om.sweep_moments(s3, _FP_STATS)
     assert index["fingerprint"] and index["fingerprint"]["automated_syndication"].startswith("denied")

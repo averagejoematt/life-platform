@@ -454,4 +454,5 @@ def test_tools_are_registered_with_known_audit_verbs():
         assert name in TOOLS
         assert TOOLS[name]["schema"]["name"] == name
     assert audit.is_write_tool("log_coach_checkin") is True
-    assert audit.is_write_tool("get_coach_checkin_queue") is False  # documented trade-off (#915)
+    # #4401: the verb is 'get' but an empty queue is refilled and PERSISTED — a write by capability.
+    assert audit.is_write_tool("get_coach_checkin_queue") is True

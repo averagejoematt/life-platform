@@ -19,9 +19,11 @@ a WRITE tool records the answer verbatim.
 Store: pk COACH#{coach_id}_coach / sk CHECKIN#{date}#{uuid8} — the shared
 deterministic core is lambdas/coach_checkin.py.
 
-NB: get_coach_checkin_queue classifies as a READ in mcp/audit.py (verb 'get')
-but persists the questions it generates — a deliberate trade-off documented in
-PR #915 (the write is system-generated question text, never user data).
+NB: get_coach_checkin_queue carries a read verb ('get') but persists the
+questions it generates, so mcp/audit.py names it in WRITE_TOOLS_BEHIND_READ_VERB
+(#4401) and it is audited/annotated as a write. (PR #915 had left it classified
+READ as a trade-off — the write is system-generated question text, never user
+data — which also left the one persisting path outside the #753 trail.)
 """
 
 from datetime import datetime

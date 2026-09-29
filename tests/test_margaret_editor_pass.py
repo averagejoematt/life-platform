@@ -404,3 +404,13 @@ def test_bundle_carries_the_new_module():
 
 def test_budget_guard_pauses_chronicle_editor_at_tier_one():
     assert '"chronicle_editor": 1' in BUDGET_SRC
+
+
+def test_4363_apply_revision_rejects_an_invented_real_publication_credit():
+    """Margaret revises AFTER Elena's grounding gate; a credit she invents must not ride through."""
+    credited = SAMPLE_INSTALLMENT.replace("Matthew logged", "Elena, who once filed a piece for The Atlantic, watched as Matthew logged")
+    assert credited != SAMPLE_INSTALLMENT
+    allowed = _allowed_numbers(SAMPLE_INSTALLMENT)  # same numbers — only the credit should trip
+    text, applied, reason = mep.apply_revision(SAMPLE_INSTALLMENT, CLEAN_CRITIQUE, allowed, revise_fn=lambda s, u: credited)
+    assert (text, applied) == (SAMPLE_INSTALLMENT, False)
+    assert reason.startswith("real_publication_credit"), reason

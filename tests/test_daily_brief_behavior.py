@@ -2385,9 +2385,27 @@ def _seed(table, *rows):
         table.store[(r["pk"], r["sk"])] = r
 
 
+def withings_wire(date_str, weight_lbs, fat_ratio_pct="36.101"):
+    """#4373: a trimmed copy of a live `withings` DATE# row (read-only query, 2026-09-28 —
+    the 2026-09-27 BodyScan row). Body fat is `fat_ratio_pct` on the wire, never
+    `body_fat_pct`, and it is TIER_OWNER_ONLY."""
+    return withings_row(
+        date_str,
+        weight_lbs,
+        weight_kg=Decimal("142.657"),
+        fat_ratio_pct=Decimal(fat_ratio_pct),
+        fat_mass_lbs=Decimal("113.54"),
+        measurement_time_utc=f"{date_str}T15:50:07+00:00",
+        phase="experiment",
+        schema_version=Decimal("1"),
+    )
+
+
 def _seed_the_wire(table):
     _seed(
         table,
+        withings_wire("2026-08-04", "315.84"),
+        withings_wire(YESTERDAY, "314.5"),
         hevy_row("2026-08-04", "fb535f38", "Foundation - Pull - 4 - 14"),
         hevy_row(YESTERDAY, "9fe128bd", "Foundation - Engine - 3 - 15", total_volume_kg=Decimal("0"), set_count=Decimal("3")),
         hevy_row("2026-07-10", "old00000", "Outside the 14-day window"),
@@ -2440,6 +2458,34 @@ class TestCoachDomainBlocksFromTheWire:
         assert empty["last_strength_session_date"] is None and empty["strength_sessions_14d"] == []
         assert "absence of logs, not proof of rest days" in empty["training_note"]
 
+    def test_the_physical_block_carries_the_subject_days_withings_weigh_in_dated(self, table, monkeypatch, capsys):
+        """#4373: `_build_physical_data` read `data["withings"]` and the brief never set it,
+        so `weight_lbs` was None every day. Driven through the REAL gather_daily_data."""
+        from ai import ai_context
+        from common import constants
+
+        monkeypatch.setattr(constants, "EXPERIMENT_START_DATE", "2026-08-03")
+        _seed_the_wire(table)
+        data = brief.gather_daily_data(PROFILE, YESTERDAY)
+        built = ai_context._build_physical_data(data)
+        assert built["weight_lbs"] == 314.5 and built["weight_lbs_date"] == YESTERDAY
+        # the live-proof line names what the block was handed
+        assert f"withings={YESTERDAY} weight_lbs=314.5" in capsys.readouterr().out
+        # privacy: Withings body fat (fat_ratio_pct, TIER_OWNER_ONLY) never reaches the coach
+        assert built["body_fat_pct"] is None and 36.101 not in built.values()
+
+        # a day without a weigh-in is ABSENCE: no subject-day row, the dated latest carries it
+        table.store.pop((brief.USER_PREFIX + "withings", "DATE#" + YESTERDAY))
+        quiet = ai_context._build_physical_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        assert quiet["weight_lbs"] is None and quiet["weight_lbs_date"] is None
+        assert quiet["latest_weight"] == 315.84 and quiet["current_weight_as_of"] == "2026-08-04"
+
+        # genesis day: the subject day (YESTERDAY) is the previous cycle's — withheld by its own date
+        monkeypatch.setattr(constants, "EXPERIMENT_START_DATE", TODAY)
+        _seed_the_wire(table)
+        pre = ai_context._build_physical_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        assert pre["weight_lbs"] is None and pre["latest_weight"] is None
+
     def test_the_explorer_block_reads_the_computed_partitions(self, table):
         from ai import ai_context
 
@@ -2491,17 +2537,14 @@ class _RecordingDict(dict):
 
 
 #: Keys a builder reads that the brief deliberately does not set — each a FALLBACK alias
-#: behind a key it does set, or (withings) a named dead read. A key here must say why.
+#: behind a key it does set. A key here must say why.
 _OPTIONAL_READS = {
     "eightsleep": "_build_sleep_data falls back to it behind `sleep`/`whoop` — Eight Sleep is not a brief source",
     "nutrition": "_build_nutrition_data's alias behind `macrofactor`, which the brief sets",
     "som": "_build_mind_data's alias behind `state_of_mind`, which lambda_handler sets",
     "apple_health": "the glucose/training builders' alias behind `apple`, which the brief sets",
-    "withings": (
-        "_build_physical_data's `weight_lbs`/`body_fat_pct` read — DEAD (the brief never set it; "
-        "test_coach_source_facets_3516 names it too). `latest_weight` + `weight_recency` carry the "
-        "same reading WITH its date (#1924), so it is declared here, not fed a second undated weight"
-    ),
+    # `withings` LEFT this set at #4373: the brief now sets it (the subject day's own row), and
+    # the block carries it dated, so it is a guarded read like any other.
 }
 
 
@@ -2549,11 +2592,15 @@ class TestEveryBuilderReadIsSetByTheBrief:
         assert _unset_builder_reads(data, set_keys) == {}
 
     def test_mutation_control_dropping_one_assignment_is_caught(self, table):
-        """Remove what the brief sets for #4358 and for #4359 — the guard must name the builder."""
+        """Remove what the brief sets for #4358, #4359 and #4373 — the guard must name the builder."""
         _seed_the_wire(table)
         data = brief.gather_daily_data(PROFILE, YESTERDAY)
         set_keys = set(data) | _keys_lambda_handler_sets()
-        for dropped, builder in (("hevy_recent", "_build_physical_data"), ("weekly_correlations", "_build_explorer_data")):
+        for dropped, builder in (
+            ("hevy_recent", "_build_physical_data"),
+            ("weekly_correlations", "_build_explorer_data"),
+            ("withings", "_build_physical_data"),
+        ):
             found = _unset_builder_reads({k: v for k, v in data.items() if k != dropped}, set_keys - {dropped})
             assert found.get(builder) == [dropped], f"dropping {dropped} went unseen: {found}"
         for key, reason in _OPTIONAL_READS.items():

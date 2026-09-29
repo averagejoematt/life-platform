@@ -79,7 +79,7 @@ _FALLBACK_NARRATOR = {
     "voice": {
         "tone": "Exacting, unsentimental, deeply respectful of the reader's time",
         "style": (
-            "22 years at the Times, before that the Atlantic. Edits narrative nonfiction the way a "
+            "A fictional longform editor with no real-world masthead (#4363). Edits narrative nonfiction the way a "
             "surgeon operates — removes what doesn't belong, strengthens what does, never leaves "
             "fingerprints. She reads once slowly, then marks three things: what works, what's doing "
             "double duty, and what's missing."
@@ -343,6 +343,16 @@ def _deterministic_ok(text, allowed_numbers):
 
         if not privacy_guard.is_clean(text):
             return False, "privacy_violation"
+    except ImportError:  # pragma: no cover
+        pass
+    # #4363: Margaret revises AFTER Elena's grounding gate and signs the editor's note, so
+    # an invented credit at a real publication she writes would reach the page ungated.
+    try:
+        from content.chronicle_schema import real_publication_credit_findings
+
+        credits = real_publication_credit_findings(text)
+        if credits:
+            return False, f"real_publication_credit:{[c['publication'] for c in credits]}"
     except ImportError:  # pragma: no cover
         pass
     return True, "ok"

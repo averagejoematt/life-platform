@@ -290,6 +290,18 @@ def test_a_line_only_the_narrower_filter_would_alter_is_withheld_and_counted(she
     assert card["quotes_withheld"] == 1
 
 
+def test_4377_a_revoked_line_is_neither_served_nor_counted_as_withheld(shelf):
+    """#4377: unmark tombstones the row (revoked_at; text + grounding REMOVEd). A revoked
+    line is not a withheld marked line — counting it would disclose that a line once
+    existed. The legacy-shaped stub below (text still present) proves the reader keys on
+    revoked_at itself, not on the text having been removed."""
+    sd, ft = shelf
+    ft.put_item(Item=_entry(public_reaction_consent="quote"))
+    ft.put_item(Item={**_quote("2026-07-27", CLEAN_LINE), "revoked_at": "2026-07-28T00:00:00Z"})
+    card = _call(sd)["entries"][0]
+    assert card["quotes"] == [] and card["quotes_withheld"] == 0
+
+
 def test_a_line_whose_grounding_is_not_verified_is_withheld(shelf):
     """ADR-104: a mark made before the day's entry was ingested is honestly
     `pending_ingestion` and does not serve until it is re-verified."""

@@ -168,3 +168,28 @@ export function lateWords(days) {
   const n = Number(days);
   return Number.isFinite(n) && n > 0 ? `${n} day${n === 1 ? "" : "s"} late` : "";
 }
+
+// #4370 — the real span behind a genesis-clamped `_30d` count. The count is honest (a
+// short window understates, never overstates); a fixed "in 30 days" beside it is not —
+// on Day 22 there are not 30 days behind it, and the reader-truth judge rightly calls
+// that a temporal contradiction. The API names the window (`window_days` + `window_full`
+// on /api/training_overview's `training` block). `dayN` is the caller's fallback for a
+// payload served before that field existed: the PT day count since Day 1, capped at the
+// requested length. Returns null when neither is known — callers then name NO window.
+export function servedWindow(block, requested = 30, dayN = null) {
+  const wd = Number(block && block.window_days);
+  if (block && block.window_days != null && Number.isFinite(wd) && wd > 0) {
+    return { days: Math.min(wd, requested), full: block.window_full === true || wd >= requested };
+  }
+  const dn = Number(dayN);
+  if (dayN != null && Number.isFinite(dn) && dn > 0) return { days: Math.min(dn, requested), full: dn >= requested };
+  return null;
+}
+
+// "in the last 30 days" once the window is whole; "in the 22 days since the experiment
+// began" before it.
+export function windowPhrase(win, requested = 30) {
+  if (!win) return "";
+  if (win.full) return `in the last ${requested} days`;
+  return `in the ${win.days} day${win.days === 1 ? "" : "s"} since the experiment began`;
+}

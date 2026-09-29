@@ -2743,3 +2743,31 @@ STRUCTURAL_HAND_PROOFS["structural::test_shared_modules.py"] = {
     ),
     "proved_on": "2026-09-28",
 }
+
+# #4377/#4378: test_singleton_tombstone_guards.py became a tree sweep (its two new reader-set
+# guards walk lambdas/**.py + mcp/*.py), so it entered the structural family here. Two REAL-tree
+# mutations, one per new guard, each md5-checked different before the verdict was read.
+STRUCTURAL_HAND_PROOFS["structural::test_singleton_tombstone_guards.py"] = {
+    "gate_name": "test_singleton_tombstone_guards.py",
+    "command": "python3 -m pytest tests/test_singleton_tombstone_guards.py -q   # 96 tests; baseline 96 passed",
+    "mutation": (
+        "M1: lambdas/web/site_api_diary.py `_quotes_by_day`'s `if jq.is_revoked(item): continue` replaced by "
+        "`if False:` (md5 86e4aa5e… -> 6843a734…) — a journal_quotes reader that serves/counts a revoked line. "
+        "M2: mcp/tools_sick_days.py `_get_sick_days`'s `if not _sdc.is_cleared(i)` replaced by `if i` "
+        "(md5 2af13149… -> c583746f…) — a direct SOURCE#sick_days reader that lists a cleared day as sick."
+    ),
+    "observed": (
+        "2026-09-28. M1: 1 failed, 95 passed — test_issue_4377_every_journal_quote_reader_honours_the_revoke_"
+        "tombstone names ['lambdas/web/site_api_diary.py']. M2: 1 failed, 95 passed — test_issue_4378_every_"
+        "sick_day_reader_goes_through_the_cleared_predicate names ['mcp/tools_sick_days.py']. RESTORED (md5s "
+        "back to 86e4aa5e… / 2af13149…): 96 passed."
+    ),
+    "scope": (
+        "Proves the two #4377/#4378 reader-set sweeps can fail. The detection is TEXTUAL (a file that builds "
+        "the partition key and queries must name `is_revoked(` / `is_cleared`), so a reader that mentions the "
+        "predicate without applying it passes — the behavioural tests in test_journal_quotes_1568.py, "
+        "test_diary_shelf_1846.py and test_platform_memory_block.py carry that half. The file's older #946 "
+        "restart-tombstone tests were not re-mutated here; they were not a structural gate before this change."
+    ),
+    "proved_on": "2026-09-28",
+}

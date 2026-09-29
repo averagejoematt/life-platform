@@ -62,6 +62,54 @@ anchor-set base the e1RM cap cannot bind below the fraction cap by construction;
 base it binds only through rounding (the ramp rounds to the nearest step, the cap DOWN). It is kept as a
 guard either way, and `cap_bound` says when it did.
 
+#4408 — THE RAMP IS A RE-ENTRY; A THIS-CYCLE LOAD AT THIS BAND IS HELD, NOT RAMPED UNDER
+
+The ramp exists to bring him back to a load after time away from it. On 2026-09-29 it drafted
+the bench top set (4–6 @ RPE 7–8) at 145 lb — 60 % of a band e1RM of 239 lb — six days after he
+benched 205 x 5 @ RPE 8 at the same bodyweight band, with no discount (the anchor was this
+cycle's) and no layoff: nothing to re-enter from. The routine's own note says the opposite rule
+("a load below one already achieved at this bodyweight band, with no layoff, is a bug"). One rule
+now, `achieved_hold`:
+
+    top_kg = max(ramp top_kg, held_kg)
+    held_kg = max over the qualifying sets of
+              min(load_step_kg(e1RM_rpe / (1 + (target_reps + (10 - rpe_ceiling)) / 30), down=True), achieved_kg)
+    e1RM_rpe = achieved_kg x (1 + (reps + RIR) / 30),  RIR = 10 - logged RPE
+
+  * a QUALIFYING set: this cycle (`anchor_discount`'s own line — the detraining discount would
+    NOT apply, < `DETRAINING_ANCHOR_AGE_DAYS` older than block 1; an older session is exactly what
+    the ramp re-enters from), at the CURRENT band, before the session, and for at least the slot's
+    rep floor. 205 x 5 qualifies for a 4–6 top set, not for an 8–12 set (205 lb was never moved for
+    8): the 2026-09-28 squat (8–12) holds from 135 lb x 10, the load the owner wrote by hand — not
+    from 195 lb x 5.
+  * RPE-AWARE (driver review, PR #4417 — the owner's v0.5 brief, defect 3: RPE ceilings breached
+    as the norm). A load he moved at RPE 9–10 is not a load he can move inside a slot capped at
+    RPE 8, so holding it would re-prescribe the breach. The achieved set is converted to an
+    RPE-adjusted e1RM with Epley on (reps + RIR) — the reps-in-reserve reading of RPE (Zourdos
+    et al. 2016, J Strength Cond Res 30(1):267; Helms et al. 2016, Strength Cond J 38(4):42) — and
+    the held load is what that e1RM allows at the slot's TARGET reps (the middle of its range) and
+    its RPE CEILING (`slot_rpe_ceiling`, read off `program_structure.EXPOSURES`: heavy top_rpe 8,
+    moderate "leave 2–3" -> 8, volume "leave 1–3" -> 9, accessory RIR 1–2 -> 9), rounded DOWN on
+    the engine's one 5-lb grid (`rep_scheme.load_step_kg`), and never above the achieved load
+    (it is a hold, not a progression). The one helper is Epley here because the repo's e1RM
+    helpers (`band_e1rm_kg`, `stall_detector._e1rm_lb`) take no RPE. 205 x 5 @ RPE 8 into the 4–6
+    top set @ <= 8 holds 205; 160 x 8 @ RPE 10 into a 6–10 slot @ <= 8 holds 150, not 160.
+  * a set with NO logged RPE is read as at the ceiling: its hold is the achieved load, and the row
+    says so (`hold.rpe_basis: "absent"`). `hold.rpe_basis` / `hold.e1rm_rpe_adjusted` record the
+    basis on every row.
+  * no hold under a layoff — a gap of at least `DETRAINING_ANCHOR_AGE_DAYS`, the SAME line the #4107
+    detraining discount starts at (driver review #2: #4408's rule is "a detraining discount > 0 (a
+    layoff) or a novel-again pattern"; a 7-day line would re-prescribe the 60 % ramp after one missed
+    week), read from the caller's days OR the record (`_lifting_gap_days`: the cron hands the
+    generator a constant 2) — on a nearest-band
+    fallback anchor (nothing at this band), or when the caller cannot say the slot (`slot` None or
+    no RPE ceiling — the ramp alone, the lower number, so a caller that knows less can never refuse
+    a draft that knows more: #4149).
+
+The generator (`_enforce_load_floors`, the block's sets + its rationale tag), the planner
+(`annotate_prescription`, the exposure) and the chat gate (`derive_load_floors`, the drafted sets
++ tag) all build the slot with `slot_of`, so the three still read one number.
+
 Back-offs stay −10 % of the top set (`full_body_session._apply_back_offs`); they are the
 one sanctioned set under the top-set floor, and `back_off_floor_kg` records it so the
 commit gate (`recovery_authoring.audit_prescription`) checks them against their own floor.
@@ -183,6 +231,124 @@ def band_e1rm_kg(best_kg: float, reps: list[int] | None) -> float:
     """Epley e1RM of the anchor set. No reps recorded -> the load itself (the conservative read)."""
     r = max([int(x) for x in (reps or []) if x] or [0])
     return float(best_kg) * (1 + r / 30.0) if r > 0 else float(best_kg)
+
+
+def _rep_range_of(sets: list[Any] | None) -> tuple[int, int] | None:
+    """(lowest rep floor, highest rep ceiling) among an exercise's working sets, or None.
+
+    Reads an IR `Set` / wire dict (`rep_range_start`/`rep_range_end`, else `reps`) and a
+    `program_structure` exposure set (`reps: [lo, hi]`). Warm-ups are not working sets."""
+    lows: list[int] = []
+    highs: list[int] = []
+    for s in sets or []:
+        get = s.get if isinstance(s, dict) else (lambda k, _s=s: getattr(_s, k, None))
+        if str(get("type") or "normal").lower() == "warmup":
+            continue
+        reps = get("reps")
+        pair = list(reps) if isinstance(reps, (list, tuple)) and reps else [reps, reps]
+        lo = get("rep_range_start") if get("rep_range_start") is not None else pair[0]
+        hi = get("rep_range_end") if get("rep_range_end") is not None else pair[-1]
+        try:
+            lo_n, hi_n = int(lo), int(hi if hi is not None else lo)
+        except (TypeError, ValueError):
+            continue
+        if lo_n > 0:
+            lows.append(lo_n)
+            highs.append(max(lo_n, hi_n))
+    return (min(lows), max(highs)) if lows else None
+
+
+def slot_rpe_ceiling(intensity: str | None) -> int | None:
+    """The RPE ceiling of a program exposure, read off `program_structure.EXPOSURES` (#4408 review).
+
+    heavy: the top set's `top_rpe` upper end; accessory: 10 - the fewest reps in reserve (`rir`);
+    moderate / volume carry their RIR only in the cue ("leave 2–3 in the tank") -> 10 - its lower
+    end. None for an unknown intensity — the caller then gets no hold (the ramp alone)."""
+    import re
+
+    from training import program_structure
+
+    spec = program_structure.EXPOSURES.get(str(intensity or "")) or {}
+    if spec.get("top_rpe"):
+        return int(max(spec["top_rpe"]))
+    if spec.get("rir"):
+        return 10 - int(min(spec["rir"]))
+    m = re.search(r"leave (\d+)\s*[–-]\s*\d+ in the tank", str(spec.get("cue") or ""))
+    return 10 - int(m.group(1)) if m else None
+
+
+def slot_of(sets: list[Any] | None, intensity_or_tag: str | None) -> dict[str, Any] | None:
+    """The slot a hold is computed for: rep floor, target reps (the middle of the range) and the
+    RPE ceiling. `intensity_or_tag` is an exposure intensity or an IR `rationale_tag`
+    ("anchor:row:heavy" — its last field). None when the sets say no reps."""
+    rng = _rep_range_of(sets)
+    if rng is None:
+        return None
+    intensity = str(intensity_or_tag or "").split(":")[-1] or None
+    return {"min_reps": rng[0], "target_reps": (rng[0] + rng[1]) // 2, "rpe_ceiling": slot_rpe_ceiling(intensity), "intensity": intensity}
+
+
+def rpe_adjusted_e1rm_kg(weight_kg: float, reps: int, rpe: float) -> float:
+    """Epley on (reps + RIR), RIR = 10 - RPE (floored at 0): the reps-in-reserve reading of RPE."""
+    return float(weight_kg) * (1 + (int(reps) + max(0.0, 10.0 - float(rpe))) / 30.0)
+
+
+def achieved_hold(
+    template_id: str | None,
+    history_index: dict[str, list],
+    weight_index: dict[str, float] | None,
+    current_weight_lb: float | None,
+    *,
+    slot: dict[str, Any] | None,
+    as_of: str | None = None,
+    tolerance_days: int | None = None,
+    p: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """The best RPE-adjusted hold over the sets moved for >= the slot's rep floor at the current band
+    this cycle, before `as_of` — or None (#4408; module docstring for the arithmetic)."""
+    from training.band_reference import band_key
+    from training.exercise_history import BODYWEIGHT_TOLERANCE_DAYS, nearest_bodyweight
+
+    if not template_id or not current_weight_lb or not slot or not slot.get("min_reps") or not slot.get("rpe_ceiling"):
+        return None
+    min_reps, target, ceiling = int(slot["min_reps"]), int(slot["target_reps"]), int(slot["rpe_ceiling"])
+    p = p or params()
+    band = band_key(float(current_weight_lb))
+    tol = BODYWEIGHT_TOLERANCE_DAYS if tolerance_days is None else tolerance_days
+    best: dict[str, Any] | None = None
+    for s in (history_index or {}).get(template_id) or []:
+        d = str(s.get("date") or "")
+        if (as_of and d >= as_of) or anchor_discount(d, p)[1]["applies"]:
+            continue
+        lbs = nearest_bodyweight(d, weight_index, tol)
+        if lbs is None or band_key(lbs) != band:
+            continue
+        for st in s.get("sets") or []:
+            w, r = float(st.get("weight_kg") or 0), int(st.get("reps") or 0)
+            if w <= 0 or r < min_reps:
+                continue
+            rpe = st.get("rpe")
+            if rpe is None:
+                e1, held, basis = None, w, "absent"  # no RPE logged: read as at the ceiling, hold the load itself
+            else:
+                e1 = rpe_adjusted_e1rm_kg(w, r, float(rpe))
+                held = min(load_step_kg(e1 / (1 + (target + (10 - ceiling)) / 30.0), down=True), w)
+                basis = "rpe_adjusted"
+            if best is None or (held, d) > (best["held_kg"], best["date"]):
+                best = {
+                    "weight_kg": w,
+                    "reps": r,
+                    "rpe": float(rpe) if rpe is not None else None,
+                    "date": d,
+                    "bodyweight_lb": round(float(lbs), 1),
+                    "band": band,
+                    "held_kg": held,
+                    "rpe_basis": basis,
+                    "e1rm_rpe_adjusted": round(e1, 3) if e1 is not None else None,
+                    "target_reps": target,
+                    "rpe_ceiling": ceiling,
+                }
+    return best
 
 
 def block_1_start() -> str:
@@ -373,11 +539,13 @@ def v03_floor(
     tolerance_days: int | None = None,
     *,
     week: int | None,
+    slot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """THE v0.3 load for one movement (#4090 + #4107): band anchor -> nearest-band fallback ->
-    the week's ramp. Same leading signature as `routine_generator.prescription_floor`, so
-    `_enforce_load_floors` takes either; the layoff arguments are accepted and ignored,
-    because the ramp re-bases from the undiscounted anchor and applies its own discount.
+    """THE v0.3 load for one movement (#4090 + #4107 + #4408): band anchor -> nearest-band
+    fallback -> the week's ramp -> the achieved-load hold. Same leading signature as
+    `routine_generator.prescription_floor`, so `_enforce_load_floors` takes either. The ramp
+    re-bases from the undiscounted anchor and applies its own discount; the layoff arguments
+    decide only whether the #4408 hold applies (a layoff is something to re-enter from).
 
     Every returned row names its anchor: `anchor_band`, `anchor_date`, and `fallback`
     (None when the current band answered, "nearest_band" when it did not)."""
@@ -402,10 +570,100 @@ def v03_floor(
             floor["fallback"] = FALLBACK_NEAREST_BAND
             floor["fallback_detail"] = {**near["fallback"], "current_band_counts": in_band}
     ramped = ramp_floor(floor, week)
+    _apply_hold(
+        ramped,
+        template_id,
+        history_index,
+        weight_index,
+        current_weight_lb,
+        days_since_last_workout,
+        layoff_days,
+        as_of,
+        tolerance_days,
+        slot,
+    )
     basis = ramped.get("basis") or {}
     ramped["anchor_band"] = (ramped.get("fallback_detail") or {}).get("anchor_band") or (ramped.get("band") if basis else None)
     ramped["anchor_date"] = basis.get("date")
     return ramped
+
+
+def _lifting_gap_days(history_index: dict[str, list], as_of: str | None) -> int | None:
+    """Days from the last loaded session on record to `as_of` — the layoff read from the evidence,
+    whatever a caller passes (the cron hands the generator a constant). None: nothing on record."""
+    from common.pacific_time import parse_day_key
+
+    latest = max(
+        (str(s.get("date") or "") for ss in (history_index or {}).values() for s in ss or [] if str(s.get("date") or "") < (as_of or "~")),
+        default="",
+    )
+    a, b = parse_day_key(str(as_of or "")), parse_day_key(latest)
+    return (a - b).days if (a is not None and b is not None) else None
+
+
+def _apply_hold(
+    ramped: dict[str, Any],
+    template_id: str | None,
+    history_index: dict[str, list],
+    weight_index: dict[str, float] | None,
+    current_weight_lb: float | None,
+    days_since_last_workout: int | None,
+    layoff_days: int | None,
+    as_of: str | None,
+    tolerance_days: int | None,
+    slot: dict[str, Any] | None,
+) -> None:
+    """#4408, IN PLACE: raise a ramped floor to the achieved this-cycle load at this band (module docstring)."""
+    r = ramped.get("ramp")
+    if not r:
+        return
+    if ramped.get("fallback"):
+        r["hold"] = {
+            "applies": False,
+            "achieved": None,
+            "slot": slot,
+            "rpe_basis": None,
+            "reason": "nearest-band anchor: nothing lifted at this band",
+        }
+        return
+    # driver review #2: a "layoff" here IS the detraining discount's own line (#4107), not the 7-day
+    # re-entry routine's threshold — one missed week is not something to re-enter from. `layoff_days`
+    # (the generator's re-entry threshold) is accepted and deliberately NOT used for the hold.
+    threshold = DETRAINING_ANCHOR_AGE_DAYS
+    gap = _lifting_gap_days(history_index, as_of)
+    layoff = any(d is not None and int(d) >= threshold for d in (days_since_last_workout, gap))
+    hold = (
+        None
+        if layoff
+        else achieved_hold(
+            template_id, history_index, weight_index, current_weight_lb, slot=slot, as_of=as_of, tolerance_days=tolerance_days
+        )
+    )
+    applies = hold is not None and float(hold["held_kg"]) > float(ramped.get("floor_kg") or 0) + 1e-9
+    r["hold"] = {
+        "applies": applies,
+        "achieved": hold,
+        "slot": slot,
+        "held_kg": hold["held_kg"] if hold else None,
+        "rpe_basis": hold["rpe_basis"] if hold else None,
+        "e1rm_rpe_adjusted": hold["e1rm_rpe_adjusted"] if hold else None,
+        "layoff": layoff,
+        "layoff_evidence": {
+            "caller_days_since_last_workout": days_since_last_workout,
+            "record_gap_days": gap,
+            "threshold_days": threshold,
+            "threshold_source": "load_ramp.DETRAINING_ANCHOR_AGE_DAYS — the #4107 detraining-discount line",
+        },
+        "ramp_top_kg": ramped.get("floor_kg"),
+        "rule": (
+            "a load already moved for the slot's rep floor at this bodyweight band, this cycle, with no layoff, is never ramped "
+            "under — held at what its RPE-adjusted e1RM allows at the slot's target reps and RPE ceiling, never above the load "
+            "itself; the ramp applies only when there is something to re-enter from (#4408)"
+        ),
+    }
+    if applies and hold:
+        ramped["floor_kg"] = float(hold["held_kg"])
+        r["top_kg"] = ramped["floor_kg"]
 
 
 def render_ramp_cue(floor: dict[str, Any]) -> str:
@@ -415,6 +673,20 @@ def render_ramp_cue(floor: dict[str, Any]) -> str:
     r = (floor or {}).get("ramp") or {}
     if not r or not floor.get("floor_kg"):
         return ""
+    hold = r.get("hold") or {}
+    if hold.get("applies"):
+        a = hold["achieved"]
+        moved = f"{_fmt_load(float(a['weight_kg']))} x {a['reps']}" + (f" @ RPE {a['rpe']:g}" if a.get("rpe") is not None else "")
+        if a["rpe_basis"] == "absent":
+            why = "no RPE logged, so held at the load itself"
+        else:
+            why = f"what that allows for {a['target_reps']} reps at RPE <= {a['rpe_ceiling']} (RPE-adjusted e1RM {_fmt_load(float(a['e1rm_rpe_adjusted']))})"
+        return (
+            f"Week {r['week']} load {_fmt_load(float(floor['floor_kg']))} — held from what you already moved: {moved} on {a['date']} "
+            f"at {a['bodyweight_lb']} lb, this band, no layoff; {why}. The entry ramp "
+            f"({r['ramp_pct']}% = {_fmt_load(float(hold['ramp_top_kg']))}) is for re-entry and never goes under an achieved load. "
+            "Down on the day if you must, never up."
+        )
     basis = floor.get("basis") or {}
     reps = "/".join(str(x) for x in (basis.get("reps") or []))
     got = _fmt_load(float(basis.get("weight_kg") or r["anchor_kg"])) + (f" x {reps}" if reps else "")
@@ -463,12 +735,15 @@ def annotate_prescription(
     summary["current_bodyweight_lb"] = round(float(current), 1) if current else None
     for e in rx.get("exposures") or []:
         key = e.get("movement_key")
-        tid = ((catalog_movements or {}).get(key) or {}).get("hevy_template_id_hint") if key else None
+        # #4409: a kept title-only in-block variant carries its wire template id on the exposure
+        tid = (((catalog_movements or {}).get(key) or {}).get("hevy_template_id_hint") or e.get("template_id")) if key else None
         if not current:
             e["load"] = {"status": "no_current_bodyweight"}
             continue
         # the ONE v0.3 load path (#4107) — the generator and the chat gate call the same function
-        ramped = v03_floor(tid, history_index, weight_index, current, as_of=target_date, week=week)
+        ramped = v03_floor(
+            tid, history_index, weight_index, current, as_of=target_date, week=week, slot=slot_of(e.get("sets"), e.get("intensity"))
+        )
         load: dict[str, Any] = {"status": ramped.get("status"), "template_id": tid, "top_kg": None}
         load.update(_provenance_fields(ramped))
         if ramped.get("ramp"):
