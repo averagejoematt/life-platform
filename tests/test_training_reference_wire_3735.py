@@ -98,13 +98,14 @@ def test_every_computed_field_survives_the_write():
     )
 
 
-def test_the_schema_marker_is_stored_and_is_v2():
+def test_the_schema_marker_is_stored_and_is_v3():
     """The specific field whose absence made the prescription view permanently wrong.
     Asserted as a VALUE, not just presence — a stored `reference_schema: 1` would read
-    as an honest stale record and be just as wrong."""
+    as an honest stale record and be just as wrong. #4427 moved it 2 -> 3: a schema-2
+    record is the twin-counted table (history, superseded)."""
     item = ed.build_training_reference_record(_reference())
-    assert "reference_schema" in item, "the v1/v2 discriminator is not on the record at all"
-    assert int(item["reference_schema"]) == 2, f"stored schema is {item['reference_schema']}, expected 2"
+    assert "reference_schema" in item, "the v1/v2/v3 discriminator is not on the record at all"
+    assert int(item["reference_schema"]) == 3, f"stored schema is {item['reference_schema']}, expected 3"
 
 
 def test_the_proven_table_is_stored():
@@ -152,3 +153,161 @@ def test_no_phase_attribute_keeps_the_reference_cross_phase():
     so a `phase` attribute would let an experiment restart hide it (ADR-058/#2109)."""
     item = ed.build_training_reference_record(_reference())
     assert "phase" not in item, "a phase attribute would make the reference experiment-scoped"
+
+
+# ── #4427 (TB-7): the band table counts each 2024–25 session once ─────────────────────────
+#
+# The wire is the two REAL day rows #4419 read from DDB (2024-10-01, 2024-10-05), reused
+# from tests/test_shared_modules.py so there is one copy of them: WHOOP and the Garmin both
+# pushed each walk, the Garmin copies read 49–54 bpm, and on 10-05 WHOOP split one long
+# Garmin walk into two chunks (a triple). They reach the band builder through the lambda's
+# own `_load_inputs`, with only the DynamoDB read replaced.
+
+from training import blueprint_rederive as br  # noqa: E402
+
+
+def _load_inputs_over(monkeypatch, strava_rows):
+    from tests.test_shared_modules import _real_day_2024_10_01, _real_day_2024_10_05  # noqa: F401
+
+    seen = {}
+
+    def fake_read(source, start="2010-01-01", end=None, keep_duplicates=""):
+        seen[source] = keep_duplicates
+        return list(strava_rows) if source == "strava" else []
+
+    monkeypatch.setattr(ed, "_read_all_history", fake_read)
+    out = ed._load_inputs()
+    return out, seen
+
+
+def _real_rows():
+    from tests.test_shared_modules import _real_day_2024_10_01, _real_day_2024_10_05
+
+    return [_real_day_2024_10_01(), _real_day_2024_10_05()]
+
+
+def test_4427_real_2024_days_count_each_session_once_with_a_plausible_hr(monkeypatch):
+    """11 device records on the two real days are 5 sessions: the 10-01 walk (twin), ride
+    (WHOOP + Zwift), lift (WHOOP + Hevy), and on 10-05 one long walk (Garmin + two WHOOP
+    chunks) and one lift. Hours are the longest member's moving time; HR is the highest
+    plausible member average (the Garmin's 49.3 / 54.1 and Zwift's 53.0 are rejected)."""
+    (_w, activities, *_rest, basis), seen = _load_inputs_over(monkeypatch, _real_rows())
+    assert seen["strava"], "the strava read must opt out of the seam and cluster every device's record here"
+    walks = [a for a in activities if a["kind"] == "walk"]
+    assert [(a["date"], a["n_records"]) for a in walks] == [("2024-10-01", 2), ("2024-10-05", 3)]
+    assert round(walks[0]["hours"], 4) == round(3656.0 / 3600, 4) and walks[0]["hr"] == 103.5 and walks[0]["miles"] == 3.0
+    assert round(walks[1]["hours"], 4) == round(12605.0 / 3600, 4) and walks[1]["hr"] == 116.4 and walks[1]["miles"] == 10.31
+    rides = [a for a in activities if a["kind"] == "cycle"]
+    assert len(rides) == 1 and rides[0]["hr"] == 121.2 and rides[0]["miles"] == 7.16
+    assert sorted(a["kind"] for a in activities) == ["cycle", "lift", "lift", "walk", "walk"]
+    assert basis["walk"] == {
+        "records": 5,
+        "sessions": 2,
+        "hours_records_summed": round((3599 + 3656 + 6389 + 6749 + 12605) / 3600, 1),
+        "hours_sessions": round((3656 + 12605) / 3600, 1),
+        "hr_rejected_records": 2,
+        "sessions_with_hr": 2,
+    }
+
+
+def test_4427_the_band_rates_halve_and_the_hr_artefact_leaves_the_band(monkeypatch):
+    """The same records through `weekly_covariates`: twin-counted (every record an activity,
+    as before #4427) vs clustered. Walks and hours drop to the distinct sessions; the band
+    walking HR is the time-weighted plausible reading, not dragged below 100 by the Garmin."""
+    (_w, sessions, *_rest), _seen = _load_inputs_over(monkeypatch, _real_rows())
+    twin_counted = [
+        {
+            "date": r["date"],
+            "kind": ed.classify_activity(a["sport_type"]),
+            "hours": a["moving_time_seconds"] / 3600,
+            "miles": a["distance_miles"] or 0.0,
+            "hr": a["average_heartrate"],
+        }
+        for r in _real_rows()
+        for a in r["activities"]
+    ]
+    week = {f"2024-10-0{d}" for d in range(1, 8)}  # day-set mode: exactly one week, as a band sums
+    old = ed.weekly_covariates(twin_counted, "2024-10-01", "2024-10-07", day_set=week)
+    new = ed.weekly_covariates(sessions, "2024-10-01", "2024-10-07", day_set=week)
+    assert old["walks_wk"] == 5.0 and new["walks_wk"] == 2.0
+    assert new["walk_hr_wk"] < 0.6 * old["walk_hr_wk"]
+    assert old["walk_bpm"] < 100, "the fixture must carry the artefact the rule removes"
+    expected = round((103.5 * 3656 + 116.4 * 12605) / (3656 + 12605))
+    assert new["walk_bpm"] == expected, (new["walk_bpm"], expected)
+
+
+def test_4427_implausible_device_averages_are_rejected_never_averaged():
+    lo, hi = br.PLAUSIBLE_AVG_HR_BPM
+    assert br.plausible_hr(lo - 0.1) is None and br.plausible_hr(hi + 1) is None and br.plausible_hr(None) is None
+    assert br.plausible_hr(lo) == lo
+    only_artefact = br.distinct_sessions(
+        [{"date": "2024-10-02", "kind": "walk", "start": "2024-10-02T08:00:00Z", "elapsed_s": 3600, "moving_s": 3500, "hr": 52.0}]
+    )
+    assert only_artefact[0]["hr"] is None, "absence, never the artefact and never 0 (ADR-104)"
+
+
+def test_4427_separate_walks_on_one_day_stay_separate():
+    """The rule must not merge two real walks: 07:00 for 60 min and 18:00 for 45 min."""
+    rec = [
+        {"date": "2024-10-03", "kind": "walk", "start": "2024-10-03T07:00:00Z", "elapsed_s": 3600, "moving_s": 3600, "hr": 105.0},
+        {"date": "2024-10-03", "kind": "walk", "start": "2024-10-03T18:00:00Z", "elapsed_s": 2700, "moving_s": 2700, "hr": 101.0},
+        {"date": "2024-10-03", "kind": "walk", "start": "2024-10-03T07:40:00Z", "elapsed_s": 3600, "moving_s": 3600, "hr": 99.0},
+    ]
+    out = br.distinct_sessions(rec)
+    # 07:40 overlaps the 07:00 walk by 20 min of the shorter 60 -> < half -> a separate walk.
+    assert len(out) == 3
+
+
+def test_4427_method_n_and_supersedes_travel_on_the_record():
+    """The #3735 lesson for the three #4427 fields: computed AND stored."""
+    ref = _reference()
+    ref["supersedes"] = br.supersedes_label({"sk": "DATE#2026-09-27", "reference_schema": 2}, ref)
+    item = ed.build_training_reference_record(ref)
+    assert item["method"]["id"] == br.METHOD_ID
+    assert "n" in item and "cut_bands" in item and item["cut_window"] == "..".join(br.CUT_WINDOW)
+    assert item["supersedes"]["sk"] == "DATE#2026-09-27" and item["supersedes"]["status"] == "superseded"
+
+
+def test_4427_supersedes_labels_only_a_different_method():
+    new = {"reference_schema": 3, "method": br.method()}
+    assert br.supersedes_label(None, new) is None
+    old = br.supersedes_label({"sk": "DATE#2026-09-27", "reference_schema": 2}, new)
+    assert old["status"] == "superseded" and "twin" in old["reason"]
+    same = br.supersedes_label({"sk": "DATE#2026-10-04", "reference_schema": 3, "method": br.method()}, new)
+    assert "status" not in same, "a weekly re-derivation by the same method is not a supersession"
+
+
+class _FakeTable:
+    def __init__(self, newest=None):
+        self.puts, self.newest = [], newest
+
+    def put_item(self, Item):
+        self.puts.append(Item)
+
+    def query(self, **kw):
+        return {"Items": [self.newest] if self.newest else []}
+
+
+def test_4427_dry_run_writes_nothing_and_reports_the_rebuild(monkeypatch):
+    weigh_ins, activities = _history()
+    basis = {"window": "x", "walk": {"sessions": 1}}
+    monkeypatch.setattr(ed, "_load_inputs", lambda: (weigh_ins, activities, {}, {}, {}, basis))
+    fake = _FakeTable(newest={"sk": "DATE#2026-09-27", "reference_schema": 2})
+    monkeypatch.setattr(ed, "table", fake)
+    monkeypatch.setattr(ed, "run_prescription_forecast", lambda *a, **k: (_ for _ in ()).throw(AssertionError("dry run forecast")))
+    out = ed.lambda_handler({"dry_run": True}, None)
+    assert fake.puts == [], "a dry run wrote to DynamoDB"
+    assert out["dry_run"] is True and out["n"] == basis and out["method"]["id"] == br.METHOD_ID
+    assert out["supersedes"]["status"] == "superseded" and out["cut_bands"] is not None
+
+
+def test_4427_a_real_run_stamps_supersedes_on_the_written_reference(monkeypatch):
+    weigh_ins, activities = _history()
+    monkeypatch.setattr(ed, "_load_inputs", lambda: (weigh_ins, activities, {}, {}, {}, {"window": "x"}))
+    fake = _FakeTable(newest={"sk": "DATE#2026-09-27", "reference_schema": 2})
+    monkeypatch.setattr(ed, "table", fake)
+    monkeypatch.setattr(ed, "run_prescription_forecast", lambda *a, **k: {"issued": False})
+    ed.lambda_handler({}, None)
+    refs = [p for p in fake.puts if p["pk"].endswith("#training_reference")]
+    assert len(refs) == 1 and refs[0]["supersedes"]["sk"] == "DATE#2026-09-27"
+    assert refs[0]["supersedes"]["status"] == "superseded" and int(refs[0]["reference_schema"]) == 3
