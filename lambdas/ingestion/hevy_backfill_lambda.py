@@ -39,6 +39,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from training import cardio_hr_store
 from training.hevy_common import (
     INITIAL_SINCE,
     SOURCE,
@@ -118,6 +119,17 @@ def _attach_adherence(rec: dict, raw_workout: dict) -> None:
             logger.info("hevy adherence %s: status=%s pct=%s", rec.get("workout_uid"), adh.get("status"), adh.get("overall_pct"))
     except Exception as e:  # noqa: BLE001
         logger.warning("adherence attach failed (non-fatal) %s: %s", rec.get("workout_uid"), e)
+
+
+def _rejoin_cardio_hr() -> dict:
+    """#4412: re-derive the cardio-HR join for recent workouts (guarded — never fails the run)."""
+    try:
+        from common.pacific_time import pacific_now
+
+        return cardio_hr_store.rejoin_recent(_table, USER_ID, SOURCE, pacific_now().date().isoformat())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("cardio-hr rejoin failed (non-fatal): %s: %s", type(e).__name__, e)
+        return {"errors": 1}
 
 
 def _record_health(*, attempted: bool, succeeded: bool, exc) -> None:
@@ -342,6 +354,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
                         archive_raw(wid, ev)
                         rec = normalize_workout(ev)  # accepts {workout:{...}} wrapper
                         _attach_adherence(rec, ev.get("workout") or ev)  # #412 pushed-vs-performed (guarded, pre-write)
+                        cardio_hr_store.attach(_table, USER_ID, rec)  # #4412 cardio block ↔ wearable HR (guarded, pre-write)
                         write_normalized(rec)
                         _derive_training_notes(rec)  # on-ingest note-signal projection (guarded)
                         ingested += 1
@@ -409,6 +422,9 @@ def lambda_handler(event: dict, context: Any) -> dict:
     # failure leaves the marker unresolved for the next poll and never blocks
     # the cursor (marker state is independent of the events window).
     tombstones = resolve_tombstones()
+    # #4412: the wearable usually lands AFTER the Hevy session (WHOOP → Strava → hourly pull), so
+    # the join is re-derived every run over the last two Pacific days — written only when it changed.
+    cardio_rejoin = _rejoin_cardio_hr()
     _record_health(attempted=True, succeeded=(errors == 0), exc=None if errors == 0 else "parse")
 
     summary = {
@@ -423,6 +439,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         "total_pages": total_pages_observed,
         "truncated": truncated,
         "tombstones": tombstones,
+        "cardio_hr_rejoin": cardio_rejoin,
         "failed_ids": failed_ids[:10],
     }
     logger.info("hevy backfill complete: %s", json.dumps(summary, default=str))

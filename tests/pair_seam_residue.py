@@ -573,6 +573,20 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "field is `read_failed` naming both errors — never `absent`, never an empty day. Pinned by "
         "tests/test_coach_session_packet_4082.py::test_today_is_read_failed_when_neither_source_reads_and_a_floor_when_one_does.",
     ),
+    # #4412 (2026-09-29): the cardio-HR join reads the Strava day item's `activities[]`.
+    "strava::lambdas/training/cardio_hr_store.py::read": (
+        "2026-09-29",
+        "#4412: the store hands the Strava day item's `activities` list, unparsed, to the pure join "
+        "`training.cardio_hr`, which reads the HR-covered minutes ONLY through `common.activity_overlap.hr_intervals` "
+        "(`start_date`, `elapsed_time_seconds`, `average_heartrate`, the `is_hevy_echo` filter) — the SAME reader the "
+        "Hevy-vs-Strava load and calorie de-dup already depend on (#4075/#4158), so there is no second parse of the "
+        "time shape to drift. Its own keys are `average_heartrate`/`max_heartrate`/`zone{n}_seconds`/`device_name`, "
+        "exactly the names `strava_lambda._normalize` + `_fetch_activity_zones` write. VERIFIED, not assumed: a drift "
+        "cannot fabricate a number — an unmatched field makes the activity non-HR-bearing, coverage 0.0 and the block "
+        "`state: unknown` with avg/max None (never 0), a visible flip on the stored `cardio_hr` record. Pinned by "
+        "tests/test_walking_volume_3930.py::test_no_overlap_or_thin_coverage_is_unknown_never_zero and "
+        "::test_the_0925_treadmill_replays_joined_on_the_live_fixture (the live-row fixture).",
+    ),
 }
 
 __all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]
