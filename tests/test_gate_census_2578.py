@@ -1019,7 +1019,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # verbatim: "Got it." / "Noted." reached the send), RESTORED 16 passed. Measured by id-set diff with the new file
         # git-added: this lane -> 777 {proven 226, unproven 540, not-applicable 6, attempted-unproven 5}; the untouched
         # tree at c0b264b28 -> 776 {225, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven does NOT move.
-        <= 231
+        # Upper bound 231 -> 232 (2026-09-29, #4220): structural::test_coaches_api.py, PROVEN (STRUCTURAL_HAND_PROOFS).
+        <= 232
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

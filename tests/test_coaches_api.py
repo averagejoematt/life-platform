@@ -1306,8 +1306,8 @@ def test_every_per_coach_record_surface_is_record_from_rows(monkeypatch):
 
 
 # The companion SET guard: no reader in these files may re-derive a record from LEARNING#.
-_RECORD_SWEEP_FILES = ("lambdas/web/*.py", "lambdas/coach/coach_observatory_renderer.py", "mcp/tools_coach_intelligence.py")
-_LEARNING_TALLY_READERS_EXEMPT = {
+_RECORD_SWEEP_FILES = ("lambdas/coach/coach_observatory_renderer.py", "mcp/tools_coach_intelligence.py")  # + lambdas/web/** (rglob)
+_LEARNING_TALLY_READER_REASONS = {
     # path::function -> why it may read LEARNING# AND name confirmed/refuted without being a record
     "lambdas/coach/coach_observatory_renderer.py::_tally_learning_statuses": "conversation-provenance (#1481, ADR-141): only "
     "conversation_count is read; the card's record is coach_record.for_coach",
@@ -1320,7 +1320,6 @@ def _learning_tally_readers(root):
     """path::function for every function that reads LEARNING# and tallies confirmed/refuted —
     directly, or by calling a same-module function that does."""
     import ast
-    import glob
 
     def _strs(node):
         out = set()
@@ -1360,33 +1359,36 @@ def _learning_tally_readers(root):
                 return True
         return False
 
+    from pathlib import Path as _P
+
     hits = set()
-    for pattern in _RECORD_SWEEP_FILES:
-        for path in sorted(glob.glob(os.path.join(root, pattern))):
-            rel = os.path.relpath(path, root).replace(os.sep, "/")
-            with open(path, encoding="utf-8") as fh:
-                tree = ast.parse(fh.read())
-            fns = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
-            talliers = {name for name, fn in fns.items() if _tallies(fn)}
-            for name, fn in fns.items():
-                reads_learning = any(s.startswith("LEARNING#") for s in _strs(fn))
-                calls = {getattr(c.func, "id", None) for c in ast.walk(fn) if isinstance(c, ast.Call)}
-                if name in talliers and reads_learning:
-                    hits.add(f"{rel}::{name}")
-                elif reads_learning:
-                    # A reader that hands its LEARNING# rows to a same-module tallier: the tallier is the finding.
-                    hits.update(f"{rel}::{t}" for t in calls & talliers)
+    paths = sorted(str(x) for x in _P(root, "lambdas", "web").rglob("*.py"))
+    paths += [os.path.join(root, f) for f in _RECORD_SWEEP_FILES if os.path.exists(os.path.join(root, f))]
+    for path in paths:
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
+        with open(path, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        fns = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        talliers = {name for name, fn in fns.items() if _tallies(fn)}
+        for name, fn in fns.items():
+            reads_learning = any(s.startswith("LEARNING#") for s in _strs(fn))
+            calls = {getattr(c.func, "id", None) for c in ast.walk(fn) if isinstance(c, ast.Call)}
+            if name in talliers and reads_learning:
+                hits.add(f"{rel}::{name}")
+            elif reads_learning:
+                # A reader that hands its LEARNING# rows to a same-module tallier: the tallier is the finding.
+                hits.update(f"{rel}::{t}" for t in calls & talliers)
     return hits
 
 
 def test_no_record_surface_tallies_learning_rows():
     hits = _learning_tally_readers(_REPO)
-    unexempt = sorted(hits - set(_LEARNING_TALLY_READERS_EXEMPT))
+    unexempt = sorted(hits - set(_LEARNING_TALLY_READER_REASONS))
     assert not unexempt, (
         "these functions read COACH#…/LEARNING# and tally confirmed/refuted — a second producer of a coach's record "
         "(#4220: Webb read 20 of 25 there beside the record's 0 of 5). Read coach.coach_record instead:\n  " + "\n  ".join(unexempt)
     )
-    stale = sorted(set(_LEARNING_TALLY_READERS_EXEMPT) - hits)
+    stale = sorted(set(_LEARNING_TALLY_READER_REASONS) - hits)
     assert not stale, f"exemptions whose function no longer tallies LEARNING# — delete them: {stale}"
 
 

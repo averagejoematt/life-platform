@@ -2794,3 +2794,29 @@ STRUCTURAL_HAND_PROOFS["structural::test_singleton_tombstone_guards.py"] = {
     ),
     "proved_on": "2026-09-28",
 }
+
+# #4220: test_coaches_api.py became a tree sweep (lambdas/web/** rglob) when the seven-surface record guard and its
+# companion LEARNING#-tally sweep joined it. One REAL-tree plant, restored by copying the pre-mutation file back.
+STRUCTURAL_HAND_PROOFS["structural::test_coaches_api.py"] = {
+    "gate_name": "test_coaches_api.py",
+    "command": "python3 -m pytest tests/test_coaches_api.py -q -p no:cacheprovider   # 50 tests; baseline 50 passed",
+    "mutation": (
+        "lambdas/web/site_api_coach_profile.py::_track_record re-grown ONE LEARNING# tally — `if st == 'confirmed': lc += 1 / "
+        "elif st == 'refuted': lr += 1` over every LEARNING# row, and the report card's record replaced by {lc, lr, lc+lr} "
+        "(md5 a83472a0… -> 36bbad46…)."
+    ),
+    "observed": (
+        "2026-09-29. MUTATED: 3 failed / 47 passed — test_every_per_coach_record_surface_is_record_from_rows "
+        "(`nutrition_coach: /api/coach/{id} .report_card.track_record.record serves {'confirmed': 21, 'refuted': 5, 'n': 26 …}, "
+        "record_from_rows says {'confirmed': 0, 'refuted': 5, 'n': 5 …}` — Webb 26 vs 5: the twenty docket learnings plus the "
+        "pre-genesis call), test_no_record_surface_tallies_learning_rows (names lambdas/web/site_api_coach_profile.py::_track_record), "
+        "and the older test_4220_mutation_control_the_learning_count_fails_on_webb. RESTORED (md5 back): 50 passed."
+    ),
+    "scope": (
+        "Proves the seven surfaces (four endpoints, the /api/coach report card, the MCP track record, the observatory card) are "
+        "held to coach_record.record_from_rows over the wire's PREDICTION# rows, and that a LEARNING# status tally in "
+        "lambdas/web/**, the observatory renderer or the MCP coach-intelligence module reds by function. The sweep is AST-textual: "
+        "a tally keyed on a status read through a helper, or outside those files, is not seen."
+    ),
+    "proved_on": "2026-09-29",
+}
