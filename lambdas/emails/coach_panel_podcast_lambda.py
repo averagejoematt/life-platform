@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 import boto3
 from ai import google_tts
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common import media_tombstone  # #4365: a restart tombstone is not a published episode
@@ -537,7 +538,7 @@ _INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
 # two speakers to Gemini prebuilt voices; Elena = host (breezy), Eli = guest (informative).
 # Episode 0 is the flagship trailer — use Sonnet (follows the multi-step arc + hard
 # requirements far better than Haiku, which kept dropping Elena's self-intro).
-INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", "claude-sonnet-4-6")
+INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", NARRATIVE_MODEL)
 INTRO_GEMINI_VOICES = {"Elena": "Aoede", "Eli": "Charon"}
 INTRO_STYLE = (
     "Perform this as a real, warm two-person podcast — NOT a formal reading. Two people who like each other, "
