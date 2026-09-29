@@ -355,9 +355,79 @@ class TestScoreHabitsRegistry:
         registry = {"work": {"status": "active", "tier": 0, "applicable_days": "weekdays"}}
         assert se.score_habits_registry(_habit_data({}, date="2026-05-10"), {"habit_registry": registry}) == (None, {})
 
-    def test_an_untracked_habit_counts_as_not_done_rather_than_crashing(self):
-        registry = {"ghost": {"status": "active", "tier": 0}}
-        assert se.score_habits_registry(_habit_data({}), {"habit_registry": registry})[0] == 0
+    def test_a_habit_the_day_never_names_is_unobserved_not_missed(self):
+        """#4362 (was: "counts as not done"): absent is unknown (ADR-104, #2221's streak ruling)."""
+        registry = {"ghost": {"status": "active", "tier": 0}, "real": {"status": "active", "tier": 0}}
+        score, details = se.score_habits_registry(_habit_data({"real": 1}), {"habit_registry": registry})
+        assert score == 100 and details["tier_status"][0] == {"real": True}
+        assert details["unobserved"] == ["ghost"]
+        assert se.score_habits_registry(_habit_data({}), {"habit_registry": {"ghost": registry["ghost"]}}) == (None, {})
+
+    def test_a_null_reading_on_a_named_habit_is_still_a_miss(self):
+        registry = {"a": {"status": "active", "tier": 0}}
+        assert se.score_habits_registry(_habit_data({"a": None}), {"habit_registry": registry})[1]["tier_status"][0] == {"a": False}
+
+
+# ── #4362: a habit renamed in Habitify. Rows are the live 2026-09-26 day, read-only from
+# DynamoDB 2026-09-27 and cut to the seven tier-0 habits (vice names kept only where they
+# are tier-0 registry keys already public on /api/habit_registry). The registry still held
+# "Walk 5k"; Habitify reported the same habit, checked in, as "Walk Outdoor >2mi".
+_T0 = {"status": "active", "tier": 0}
+REGISTRY_0926 = {
+    n: dict(_T0)
+    for n in (
+        "Walk 5k",
+        "No marijuana",
+        "Primary Exercise",
+        "Hydrate 3L",
+        "Morning Sunlight / Luminette Glasses",
+        "No alcohol",
+        "Calorie Goal",
+    )
+}
+HABITIFY_0926 = {
+    "Walk Outdoor >2mi": 1,
+    "No marijuana": 1,
+    "Primary Exercise": 1,
+    "Hydrate 3L": 1,
+    "Morning Sunlight / Luminette Glasses": 0,
+    "No alcohol": 1,
+    "Calorie Goal": 1,
+}
+
+
+def _missed_t0(details):
+    return sorted(n for n, done in details["tier_status"][0].items() if not done)
+
+
+class TestRenamedHabit4362:
+    def test_the_0926_stale_registry_no_longer_reports_the_renamed_habit_as_missed(self):
+        """Stored habit_scores for 09-26 read missed_tier0 = [Walk 5k, Morning Sunlight]."""
+        _, details = se.score_habits_registry(_habit_data(HABITIFY_0926, date="2026-09-26"), {"habit_registry": REGISTRY_0926})
+        assert _missed_t0(details) == ["Morning Sunlight / Luminette Glasses"]
+        assert details["unobserved"] == ["Walk 5k"]
+
+    def test_a_check_in_under_the_new_name_counts_for_the_old_registry_key(self):
+        """Acceptance: registry holds the old name, the check-in arrives under the new one."""
+        registry = {**REGISTRY_0926, "Walk 5k": {**_T0, "habitify_names": ["Walk Outdoor >2mi"]}}
+        _, details = se.score_habits_registry(_habit_data(HABITIFY_0926, date="2026-09-26"), {"habit_registry": registry})
+        assert details["tier_status"][0]["Walk 5k"] is True
+        assert details["tier0"] == {"done": 6, "total": 7}
+        assert "unobserved" not in details
+
+    def test_a_corrected_key_still_reads_history_written_under_the_old_name(self):
+        registry = {"Walk Outdoor >2mi": {"status": "active", "tier": 2, "target_frequency": 2, "habitify_names": ["Walk 5k"]}}
+        week = [{"habits": {"Walk 5k": 1}}]
+        score, _ = se.score_habits_registry(_habit_data({"Walk Outdoor >2mi": 1}, habitify_7d=week), {"habit_registry": registry})
+        assert score == 100
+
+    def test_the_streak_scan_resolves_the_renamed_habit_too(self):
+        from health import habit_streaks
+
+        profile = {"habit_registry": {"Walk 5k": {**_T0, "habitify_names": ["Walk Outdoor >2mi"]}}}
+        rows = {f"2026-09-{d:02d}": {"habits": {"Walk Outdoor >2mi": 1}} for d in range(20, 27)}
+        out = habit_streaks.compute_habit_streaks(profile, "2026-09-26", lambda _s, d: rows.get(d))
+        assert out["tier0_streak"] == 7
 
     def test_the_details_advertise_the_tier_weighted_method_the_writers_key_off(self):
         """`store_habit_scores` refuses to write unless this marker is present."""
