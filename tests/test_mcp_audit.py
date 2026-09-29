@@ -84,6 +84,30 @@ def test_unknown_verb_defaults_to_write():
     assert audit.is_write_tool("frobnicate_the_record")
 
 
+def test_read_verb_writers_are_exactly_the_named_set():
+    """#4401 — guard the SET. Every registered tool whose implementing function
+    structurally reaches a DynamoDB write (#4286's AST reachability check) must
+    classify as a write; the ones whose NAME verb is a read are exactly
+    WRITE_TOOLS_BEHIND_READ_VERB — both directions, so a fourth read-verb writer
+    fails here AND a stale entry (a tool that stopped writing, or was renamed or
+    retired) fails here too. Scope limit inherited from the AST helper: a write
+    delegated to another package is not traced (see its docstring)."""
+    from mcp_registry_ast import ddb_write_tool_names
+
+    writers = ddb_write_tool_names()
+    assert writers, "the AST scan found zero DDB-writing tools — the scan itself is broken"
+    unclassified = sorted(n for n in writers if not audit.is_write_tool(n))
+    assert unclassified == [], f"DDB-writing tools classified READ (add to WRITE_TOOLS_BEHIND_READ_VERB): {unclassified}"
+    read_verb_writers = {n for n in writers if audit.classify_verb(n) in audit.READ_VERBS}
+    assert read_verb_writers == set(audit.WRITE_TOOLS_BEHIND_READ_VERB), (
+        f"WRITE_TOOLS_BEHIND_READ_VERB drifted from the AST: missing={sorted(read_verb_writers - audit.WRITE_TOOLS_BEHIND_READ_VERB)} "
+        f"stale={sorted(audit.WRITE_TOOLS_BEHIND_READ_VERB - read_verb_writers)}"
+    )
+    for name in audit.WRITE_TOOLS_BEHIND_READ_VERB:
+        assert name in TOOLS, f"{name} is named in WRITE_TOOLS_BEHIND_READ_VERB but not registered"
+        assert TOOLS[name]["schema"]["annotations"]["readOnlyHint"] is False, f"{name} still advertises readOnlyHint=True"
+
+
 def test_every_rate_limited_tool_is_classified_write():
     """The R13-F12 rate-limited set is by definition write tools — the audit
     classification must agree (it is a superset)."""
