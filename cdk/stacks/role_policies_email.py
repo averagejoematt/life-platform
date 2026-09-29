@@ -259,6 +259,12 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
         extra_secrets=["life-platform/google-tts", "life-platform/pexels", "life-platform/subscriber-token-secret"],
         extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
+            # #4449: the SS-02 hold sweep READS a week's hold and deletes it once the week publishes.
+            # S3Write grants PutObject only, so every hold read AccessDenied and read as "no hold" —
+            # a quality hold was never auto-retried. Not under generated/, so no bucket-policy read.
+            iam.PolicyStatement(
+                sid="PanelcastHoldsReadDelete", actions=["s3:GetObject", "s3:DeleteObject"], resources=_s3("panelcast-holds/*")
+            ),
             # Loud HOLD + new-episode notify: SNS to life-platform-alerts.
             iam.PolicyStatement(
                 sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]
