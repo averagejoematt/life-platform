@@ -33,6 +33,7 @@ import coach.coach_presence_gate as _presence  # #4217 — the absent coach is n
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_today
+from health.scoring_engine import habitify_reading  # #4362
 
 # God-module split slices 2+3: pure context/scoring + domain-data builders moved
 # to ai_context.py. Re-exported so callers + the coach functions keep working.
@@ -663,8 +664,8 @@ def call_board_of_directors(
     for h_name, meta in registry.items():
         if meta.get("status") != "active" or meta.get("tier", 2) > 1:
             continue
-        done = h_map.get(h_name, 0)
-        if not (done is not None and float(done) >= 1):
+        done = habitify_reading(h_map, h_name, meta)  # #4362: rename-aware; unobserved is not a miss
+        if done is not None and done < 1:
             why = meta.get("why_matthew", "")
             tier = meta.get("tier", 2)
             if tier == 0:
@@ -685,8 +686,8 @@ def call_board_of_directors(
         sg = meta.get("synergy_group")
         if not sg:
             continue
-        done = h_map.get(h_name, 0)
-        if not (done is not None and float(done) >= 1):
+        done = habitify_reading(h_map, h_name, meta)  # #4362
+        if done is not None and done < 1:
             synergy_misses.setdefault(sg, []).append(h_name)
     for sg, misses in synergy_misses.items():
         total_in_group = sum(1 for _, m in registry.items() if m.get("synergy_group") == sg and m.get("status") == "active")
@@ -875,8 +876,8 @@ def call_tldr_and_guidance(
         for h_name, meta in registry.items():
             if meta.get("status") != "active" or meta.get("tier", 2) > 1:
                 continue
-            done = habits_map.get(h_name, 0)
-            if not (done is not None and float(done) >= 1):
+            done = habitify_reading(habits_map, h_name, meta)  # #4362: rename-aware; unobserved is not a miss
+            if done is not None and done < 1:
                 missed_mvp.append(h_name)
                 why = meta.get("why_matthew", "")
                 if why:

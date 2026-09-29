@@ -114,6 +114,17 @@ def test_unknown_hold_class_defaults_to_safety(monkeypatch):
 # ── sweep decision matrix ──────────────────────────────────────────────────────
 
 
+def test_sweep_with_no_hold_still_writes_a_log_line(monkeypatch):
+    # #4365: a no-hold sweep used to end with zero application log lines.
+    fs = _FakeS3()
+    _wire(monkeypatch, fs, week=4)
+    lines = []
+    monkeypatch.setattr(panel.logger, "info", lambda msg, *a, **k: lines.append(msg % a))
+    out = panel._sweep_held_episodes()
+    assert out["swept"] == [] and "no hold" in out["note"]
+    assert any("hold sweep wk4" in ln and "no hold" in ln for ln in lines), lines
+
+
 def test_sweep_skips_safety_hold(monkeypatch):
     fs = _FakeS3()
     _wire(monkeypatch, fs, week=3)

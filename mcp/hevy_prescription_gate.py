@@ -95,18 +95,36 @@ def _catalog_movements() -> dict[str, Any]:
     return (_load_json("movement_catalog.json") or {}).get("movements", {})
 
 
-def _template_id_for(movement_key: str | None, movements: dict[str, Any]) -> str | None:
-    """movement_key -> Hevy template id, WITHOUT any network resolve.
+def _template_id_for(
+    movement_key: str | None, movements: dict[str, Any], performed: list[dict[str, Any]] | None = None
+) -> tuple[str | None, str | None]:
+    """movement_key -> `(Hevy template id, source)`, WITHOUT any network resolve.
 
-    `tmpl:<id>` keys (ADR-069 index-resolved / auto-created movements) already carry
-    the id; curated keys carry a catalog hint. A key with neither yields None, which
-    `prescription_floor` reports as `no_template_id` — an absence, never a guess.
+    #4431: this is `in_block_variant.template_id_for` — the ONE slot-template resolver the
+    generator and the planner also call — never a second reading. `tmpl:<id>` keys carry the
+    id; curated keys carry a catalog hint; a title-only key (ADR-069, `db_shoulder_press`)
+    takes the id Hevy served on its in-block performed record (`performed`), exactly as the
+    generator floors it. None of the three yields None, which `prescription_floor` reports
+    as `no_template_id` — an absence, never a guess.
     """
-    if not movement_key:
-        return None
-    if movement_key.startswith("tmpl:"):
-        return movement_key[len("tmpl:") :]
-    return ((movements or {}).get(movement_key) or {}).get("hevy_template_id_hint")
+    from training import in_block_variant
+
+    return in_block_variant.template_id_for(movement_key, movements, performed)
+
+
+def _in_block_performed(target_date: str, movements: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """The block's performed record for the resolver (#4431) + its read status. Fail-soft: a read
+    that fails resolves from the catalog alone and says so by name (`in_block.status`)."""
+    from training import in_block_variant
+
+    from mcp.plan_hevy_windows import _block_workouts
+
+    try:
+        rows = _block_workouts(target_date)
+    except Exception as e:  # noqa: BLE001 — reported on the audit, never a silent catalog-only resolve
+        return [], {"status": "read_failed", "error": f"{type(e).__name__}: {e}"}
+    performed = in_block_variant.performed_in_block(rows, movements, target_date)
+    return performed, {"status": "read", "performed_keys": sorted({p["movement_key"] for p in performed})}
 
 
 def _days_since_last_workout(history_index: dict[str, list], target_date: str) -> int | None:
@@ -217,18 +235,29 @@ def derive_load_floors(
         floor_fn = functools.partial(load_ramp.v03_floor, week=v03["week"])
         back_off_pct = v03["back_off_pct_of_top"]
         audit["load_rule"] = v03
+        # #4431: under v0.3 a slot's template resolves in-block first, the generator's own order
+        performed, audit["in_block"] = _in_block_performed(target_date, movements)
+    else:
+        performed = []
 
     for ex in getattr(ir, "exercises", None) or []:
         key = getattr(ex, "movement_key", None) or "?"
+        # #4408: under v0.3 the floor holds an achieved this-cycle load RPE-adjusted to the slot — the same
+        # `slot_of` the generator uses (sets + rationale tag), so a draft carrying the generator's loads commits
+        slot = load_ramp.slot_of(getattr(ex, "sets", None), getattr(ex, "rationale_tag", None)) if v03 is not None else None
+        extra = {"slot": slot} if v03 is not None else {}
+        tid, tid_source = _template_id_for(key, movements, performed)
         floor = floor_fn(
-            _template_id_for(key, movements),
+            tid,
             history_index,
             weight_index,
             current_lb,
             days_since_last_workout=dslw,
             as_of=target_date,
+            **extra,
         )
         row = {k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")}
+        row["template_id_source"] = tid_source
         if v03 is not None:
             row.update({k: floor.get(k) for k in ("ramp", "anchor_band", "anchor_date", "fallback", "fallback_detail")})
             if floor.get("floor_kg") and back_off_pct is not None:

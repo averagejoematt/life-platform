@@ -72,6 +72,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def _fetch_source(source, start, end):
@@ -101,7 +102,7 @@ def _fetch_source(source, start, end):
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as exc:
         logger.warning("_fetch_source(%s, %s..%s) failed: %s", source, start, end, exc)
-    return records
+    return strava_read_seam(source, records)
 
 
 def _fetch_computed_metrics(start, end):

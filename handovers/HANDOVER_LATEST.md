@@ -1,55 +1,71 @@
-# Handover — Session AW: the v7 build week's first night, and a day of engine debt (2026-09-26 19:30 PT → 2026-09-27 ~14:30 PT)
+# Handover — Session AZ: the overnight burn-down, and the owner's v0.5 training red team (2026-09-28 19:13 PT → 2026-09-29 ~07:30 PT)
 
-**Driver brief (owner, 19:30 PT):** "Session AW — the v7 build week, from tonight… run the brief's W1 in order: The coaches page's three R6 fixes; Today / Under the hood / Follow polish against R6; E4 one record producer (#4220); E6 the absent coach (#4217)." Owner additions through the night: "i approve all of the deploys" (20:25 PT); "is there other stuff we could be doing in parallel" → a backlog sweep; two bug reports (the Flex session advancing the v0.4 sequence; the packet's missing "today so far" view); rulings E3 loads **public (a)**, the morning note **Tier 1 (public)**; approval to upload the five coach config JSONs to S3. **Model:** Fable 5.1 until the weekly Fable limit (~00:15 PT, ~8 h idle), then **Opus 5.5** from ~09:00 PT on the owner's call ("switch to Opus"). Fable-only work was filed as issues (#4329, #4330) rather than done on Opus — the review's model is part of its validity.
+**Driver brief:** `~/.claude/plans/overnight-az-2026-09-28.md` (harvest proofs first, build lanes second, target 88 → ≤ 55 open, no AskUserQuestion). **Mid-session owner brief (19:28 PT):** `~/Desktop/training_v05_redteam_brief.md` — an elite red team of TRAINING_PROGRAM v0.4 and a v0.5 proposal for block 2 (lock to 2026-11-04), plus engine PRs for the ten live defects. **Model:** Opus 5.5. Grants: merge green PRs through the checklist, close on live proof only, deploys via CI. Not granted: CDK, `aws s3` writes to `config/`, `aws lambda invoke`, DDB writes, IAM, `worktree_reaper.py --apply`.
 
-## What shipped — 37 PRs merged
+## Headline
 
-| area | PRs | state |
-|---|---|---|
-| **v7 site (W1, `/next/`)** | #4300 coaches R6 fixes proven by render · #4302 Today (empty vs unreachable, noscript, sources, the ask linted; the networkidle hang — an unread 404 body — fixed) · #4301 Under the hood · #4303 the cross-page fixes (one next-weigh-in helper, four pages) · #4315 the coaches read the engine's instrument map | **all live** (build `73956b3`, attempt 3 — see incidents) |
-| **E-series engine** | #4304 E4 one record producer · #4305 E6 the absent coach · #4318 E3 `/api/session` (loads public) · #4322 E2 the morning note (Tier 1) · #4340 one routine picker (#4338) | E6 **live-proven** (#4217, both halves); E3 route live (200); E2 route **merged, write blocked on the owner's CDK line**; #4340 site-api deployed 17:48Z |
-| **Owner's two reports** | #4314 Flex never advances the sequence (#4312) · #4313 the packet's "today" view (#4311) | #4312 **live-proven** (packet reads lower-volume, session 3 of 4, the Flex session `not_credited`) |
-| **Backlog** | #4306 #4275 model resolution · #4307 #4171 additive memory · #4308 #4065 commit gate back-offs · #4309 #4190 tool-call residue refused · #4310 #4191 the write-up opens on its first sentence · #4317 #4216 a docket resolves once · #4319 #4177 adherence by routine id · #4320 #4170 Telegram never claims a write · #4321 #4164 PII sweep names paths not values · #4323 #4174 pain dismissal per site · #4324 #4183 pre-genesis drafts are history · #4325 #4149 joints critic record shape · #4327 #4178 walks on Compendium METs · #4328 #4172 policy refusals never say retry · #4332 #4186 coach-truth legs read the lead slot · #4335 #4111 weekly self-added report · #4341 #4184 one weekly-rate window · #4344 + #4343 two gate misfires · #4346 #4279 one AI retry policy (12 sends → 3) · #4347 #4166 protein gate by body fat (43 % → report-only) | fleet deploy from main's tip at the wrap (see Gotchas) |
-| **CI / harness** | #4326 the main-red fix (PAIR 10) · #4334 fast lane parallel (15–25 min → 12.7) · #4336 measured timeouts on four workflows · #4339 READINESS.md re-verify · #4342 lazy collection scans (84.5 s → 18.5 s) | CI-only, in effect on merge |
+- **Open count: 88 → 94 (REST, 14:21Z).** 7 closed on live proof, 13 filed. The ≤ 55 target was not reachable honestly: #4395/#4390 were not merged at boot, the owner added the v0.5 brief (which filed 11 issues/epics), and most of tonight's shipped fixes prove on runs after this wrap (below). No issue was closed on a merge.
+- **The v0.5 red team is done** — private deliverables in `~/Desktop/training_v05/` (README first; never the repo, #3052). **F1:** the 2024–25 PROVEN_BLUEPRINT counted every walk twice (WHOOP + Garmin copies): true walking at 270–299 lb was 8.5–9.8 h/wk, not 16–19. Confirmed in production by #4419 (below).
+- **15 PRs merged** (all green through `merge_pr.sh`; CI deployed every one; gate watcher approved the leases): #4399 #4415 #4400 #4406 #4407 #4414 #4426 #4421 #4422 #4420 #4417 #4413 #4432 #4418 #4428.
 
-**Live proofs posted:** #4217 (engine 06:30Z + renderer 16:33Z) · #4312 (packet 06:31Z) · #4076 (the owner-override path, already on main, proven from the 09-26 routine rows; one box left) · #4188 closed (the first daily lead read, 17:11Z) · #4218 closed (no slope as a level, 16:09Z) · #4213 read (no owner-register slot; #4331 open for the ladder fallback).
+## Closed on live proof (7)
 
-**Config:** the five coach config JSONs uploaded to S3 by the driver under the owner's approval (06:04Z); four were already identical, only `personas.json` was stale; prior copies backed up in the session scratchpad.
+- **#4253** — CI timeouts + one pinned OIDC version (box 2 on its "or the composite exposes a role input" clause) · #4336 #4367.
+- **#4184** — `/api/journey` ≡ `public_stats.journey` on all five rate fields, 02:37:26Z · #4341.
+- **#4186** — both coach-agreement legs emit counts, 0 failures, qa-smoke 2026-09-28T18:31:06Z · #4332.
+- **#4217** — `[COACH-V2:glucose_coach] skipped_absent` at 17:06:29Z, the only glucose line · #4375.
+- **#4370** — rendered `/data/training/` reads "38 sessions in the 23 days since the experiment began", 05:08:18Z · #4407.
+- **#4416** — `get_training(recommendation)` carries `loaded_lifting_streak`, GREEN with a 23-day active streak, 07:29:41Z · #4420.
+- **#4419** — `search_activities` 2024-10-01..07 walks = 8 / 9.81 h (was 15 / 18.20 h), 10:42:40Z · #4428.
 
-## Gotchas (each now a memory line)
+## Proof-due (shipped, deployed, awaiting a scheduled run — read these next)
 
-- **An unread non-2xx fetch body keeps Playwright's networkidle from ever arriving** — `/next/cockpit/` hung 60 s on a 404 of `/api/session`; the visual gate waits on networkidle. Every v7 `getJSON` now drains the body.
-- **Two green PRs, main red after both** — #4304 pinned the docket writer's re-write trail in a PairContract; #4317 retired the trail. Three lanes blamed the PT-evening clock first; the captured log named the real cause. Merge the first, re-run the pair sweep on the second's merged tree.
-- **A CDK line inside a code PR strands every deploy** — #4322's one LeadingKey line made CI's Plan job OWNER-REQUIRED from 17:45Z; nothing deployed for ~3 h and no watcher saw it (the gate watcher only sees runs that reach the gate). Worked around with `deploy_fleet.sh`; the owner's CDK run clears it.
-- **`gh run rerun --failed` after a site rollback re-checks the rolled-back site** — the deploy job isn't re-run, so the smoke test waits for a build that is never synced. Re-run the whole workflow.
-- **A PR re-run reuses its original merge commit** — after main's fix merged, `gh pr update-branch` was needed for honest re-runs (used ~15 times).
-- **The Fable weekly limit stops every lane at once** — 12 lanes in flight at 21:55 PT burned the 5-hour cap; the second cap at ~00:15 PT idled the session ~8 h. ≤5 lanes held the rest of the night.
+- #4358 / #4359 / #4373 — the 2026-09-29 **17:00Z** brief: `/aws/lambda/daily-brief` `[brief_domain_inputs]` line (Performance/explorer keys set; `withings=<date> weight_lbs=…`), read PAGINATED.
+- #4343 — same run: ≤ 2 coaches HELD, every hold's finding quotes text in the final (09-28 FAILED: 6 holds; regeneration introduces banned jargon — see the issue).
+- #4362 — the **19:30Z** recap card credits the renamed walk habit.
+- #4404 — the **19:30Z** `og-image-generator` run logs `[moments] retired 26 …`; then `curl -sI /moments/wrong/aa98dbbed1dd/` → 301.
+- #4408 / #4409 / #4410 / #4411 / #4431 — the **2026-09-30 02:00Z** `nightly_predraft` (`life-platform-mcp-warmer`): `ROUTINE#<id>` `VERSION#current` — `ramp.hold.applies`, `in_block.kept`, `inputs_snapshot.z2_minutes_7d` numeric, loaded-lifting streak, gate `template_id_source`.
+- #4244 — page box proven (06:50:29Z render); still owes a `nutrition-review` dry_run (invoke → owner) and the panel-prompt box.
+- #4215 / #4183 / #4191 / #4111 / #4388 / #4365 — proof-due lines are in each issue's latest comment (#4191 Wed 09-30 15:00Z; #4111 Sun 10-04 16:00Z; #4365 Fri 10-02 18:00Z).
 
-## Owner decides next
+## Held for the owner (not merged)
 
-1. `cd ~/dev/life-platform && git pull -q origin main && bash deploy/cdk_deploy.sh LifePlatformServe` — clears the strand (every ci-cd Plan is red until then) and lets the morning note write. — not-work — an owner-only IaC apply
-2. #4333 (vitamin D sufficiency joins the supplements): may per-nutrient supplement totals be public on `/api/nutrition_overview`? The doses are already public on `/api/supplements`. PR open, conflicting until re-synced. — #4244
-3. #4343 cause A: may the 18 reader-jargon terms leave the judge's list in the S3 `config/coaches/_shared_standard.json`? The code check still blocks them; the judge hallucinates them and the rewrite then uses them. — #4343
-4. #4347 merged with DXA opened to the deficit critic (an owner-only MCP path); confirm or revert. — #4166
-5. The v7 cut-over "go" waits for the Fable-held R7 red team and scorecard. — #4329, #4330
+- **#4395** (ADR-158) and **#4390** (the reaper wrap gate) — still open; the gate watcher (`watch_deploy_gate.sh`, 12 h from 02:14Z, ended 14:14Z) was armed in their absence. So #4256 and #4259 could not close.
+- **#4430** (#4397 rep-aware cap) — a heavy 4–6 @RPE ≤ 8 slot would top out at 81.1 % of band e1RM from week 6, not 85 %. Options (a/b/c) are on the PR; the red team recommends (a).
+
+## Owner acts
+
+- Rule on the v0.5 decisions OD1–OD8 (`~/Desktop/training_v05/TRAINING_PROGRAM_v0.5_REDTEAM.md` §6) — not-work — owner decision, carried on the private record; the engine-side follow-ups are epics #4423 #4424 #4425.
+- Merge #4395 then #4390 (#4256, #4259); answer #4430 (#4397).
+- #4363 — run `python3 deploy/fix_prologue_part1_narrator_credits.py` then `--apply` (DDB + S3 write), then curl `/journal/posts/week-01/`.
+- #4401 — one real `get_exercise_notes` call, then `aws s3 ls s3://matthew-life-platform/mcp-audit/2026/…/` shows an object for it (my own call was classifier-denied as a shared-resource write).
+- #4377 / #4378 — the tombstone proof is an MCP write (log → clear a sick day; unmark a quote) — attended.
+- #4183 — archive or commit orphan draft `78dd2da5…`.
+- #4219 — the verifier proved it; my own re-read of `/api/coaching-dashboard` was classifier-denied (PII) — owner or an attended session re-reads and closes.
 
 ## Residual / next picks
 
-- Open PRs: #4345 (the coaches get the served protein figure + the brief's time guard; wiki-drift red — the docs re-verify it needs) — #4343; #4331 (ladder-fallback stance guard; two reds) — #4213; #4337 (Today prints the session; merge after the #4340 site-api deploy is confirmed) — #4182; #4333 — #4244; #4316 the cut-over, parked — #4330.
-- Live proofs owed after the fleet deploy: #4220 (four endpoints agree), #4171, #4065 (the next 5 am commit), #4191 (after the 09-30 publish), #4275, #4190, #4177, #4174, #4311, #4178, #4111, #4166, #4184 (the next 09:40 PT compute), #4186 (the 18:30Z nightly should FAIL naming Eli's 106.9 g — the check working), #4183 (the owner archives 6 live orphan drafts), #4189 (the owner's first morning note, after the CDK run), #4338.
-- The morning note's site half (Home "in his words this week", This week's testimony) — #4189.
-- Two AV merge commits carry co-author trailers (`4b3f95118` #4243, `2b763c7ea` #4236); `test_no_tool_attribution_3005` reds locally on reachable history. — #3005
-- The fast lane is 12.7 min, not < 10; #4342 should take ~60 s off per worker — re-measure. — #4251
-- The v4 `/coaching/` docket cards still print raw resolver strings; superseded by v7 at cut-over. — #4330
+- #4412 (Hevy cardio HR join) — two lanes each stalled with zero commits (likely a permission prompt); run it attended or pre-paste a wire day (comment on the issue).
+- #4427 (TB-7, re-derive the blueprint band table on the #4428 seam) — P1, the first v0.5 story to start.
+- #4383 (the Sonnet lane's #4270 slice) conflicts with main — not-work — left for its own session to `git merge origin/main`.
+- #4403 (the Architect routine) carries filing-contract violations this session did not touch — not-work — pre-existing, not this session's filing.
 
-**Build beat:** none — the v7 pages are still an unlisted preview and the engine fixes await their live proofs; the public story is the cut-over (#4330)
-**Docs:** docs/engines/READINESS.md re-verified (#4339); docs/engines/SCORING.md re-verified (#4341); SCHEMA / DATA_GOVERNANCE / IDEMPOTENCY / CONVENTIONS §4a1 / PHASE_TAXONOMY updated in-PR by their lanes; docs/alarm_citations.json re-cited; docs/INCIDENT_LOG.md +3 rows; CLAUDE.md status block
-**Decisions:** none needed — every ruling tonight is an owner ruling recorded on its issue and in memory (E3 loads public, E2 Tier 1, the config upload); no architecture posture changed
-**Main:** stranded — every ci-cd run since 17:45Z fails at `Plan deployments` on `LifePlatformServe` OWNER-REQUIRED (#4322's LeadingKey line, R8-ST6/#2834); code deployed by `deploy_fleet.sh` from main's tip at the wrap; clears when the owner runs `bash deploy/cdk_deploy.sh LifePlatformServe`
-**Incidents:** 3 rows added — the owner-required IAM strand; main's full suite red ~10 h on two same-night merges (#4304 + #4317, fixed by #4326); the #4315 site auto-rollback on the API-before-frontend convergence race
+## Gotchas (new tonight)
+
+- **Closing keywords in prose auto-close even negated.** "Live proof that closes #4401" and "does not close #4362" each set `closingIssuesReferences`; the checklist refused both merges. Lane rules now say so (scratchpad `lane_rules_full.txt`).
+- **Engine-doc `Verified:` stamps written with the Pacific date** red Docs CI when the merge commit is the next UTC day (incident row). Stamp with the UTC date.
+- **Three PRs claimed the same census slot** (#4413 #4418 #4428 each 227→228): merge one, send the next lane back to re-derive by id-set diff. Worked cleanly, three times.
+- **The 4 Pacific-midnight date tests** redded main's Unit Tests at 06:55–07:07Z; re-run after 08:00Z, green.
+- **Waiting on a stalled lane cost ~3.5 h of idle driver time** (10:45Z → 14:16Z): no heartbeat check on the lane between notifications.
+
+**Build beat:** none — the night's headline (a doubled walking history under the owner's private coaching blueprint) needs the owner's framing before it is public; the rest is engine plumbing.
+**Docs:** `docs/engines/CHARACTER.md` restamped (UTC date, no content change); `docs/alarm_citations.json` (3 re-cites); `docs/INCIDENT_LOG.md` (+2 rows, Patterns regenerated). Lanes updated SCHEMA / engine docs in their own PRs.
+**Decisions:** none needed — the v0.5 ADRs are drafts on the private record pending the owner's rulings (ADR_DRAFT.md, provisional ADR-159…168).
+**Main:** green (37508774)
+**Incidents:** 2 row(s) added — the 06:00Z qa-smoke read-timeout auto-rollback; Docs CI red ~4h on a Pacific-dated engine-doc stamp
 **Stash/hooks:** clean
-**Closures:** #4188, #4218 commented (live proof + outcome) · DoD: scanned=2 window=closed>=2026-09-27 hits=0 findings=0 mode=warn blocking=none
-**Backlog:** Now live at 10 opus-startable (floor 3, 0 short); no stale Later issues; filed #4311 #4312 #4329 #4330 #4338 #4343 and rowed them into their epics; 6 blocking hygiene violations fixed (epic story rows, acceptance counts, labels, two outcome sections)
-**Alarms:** 2 red, both re-cited to their live causes — `qa-smoke-failures` → #4343 (the coach-vs-engine leg failing Eli's stale weekly read, a true failure), `qa-smoke-warnings` → #4183 (live orphan drafts + one low-water day)
-**CI warnings:** unverified — no green completed main run to read (the strand); re-check after the owner's CDK run
-**Ledger:** none — no new standing subsystem; #4336's timeouts and #4332's COUNT lines extend existing gates
+**Closures:** #4253, #4184, #4186, #4217, #4370, #4416, #4419 commented · DoD: scanned 8, hits 0 — #4253's residual homed not-work; the #4416/#4419 instants corrected to parseable UTC
+**Backlog:** Now live at 8 opus-startable stories (floor 3, 0 short; `backlog_next.py --refill-now --lane opus`); filing-contract repairs on #4373 #4377 #4378 #4401 #4408 #4409 #4410 #4411 #4412 #4431 (+ the #3742 and #4249 epic rosters); the only blocking (e7) findings left are #4403's 4, an issue this session did not file or touch; Later sweep — no calls made (not-work — no Later issue was touched and the rule is advisory)
+**Alarms:** 0 uncited — re-cited qa-smoke-failures (no live cause) and qa-smoke-warnings (#4183 + #4220), cited the daily-brief-duration-high flap (#4343)
+**CI warnings:** none
+**Ledger:** none — no standing machinery shipped

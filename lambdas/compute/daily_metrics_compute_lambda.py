@@ -61,6 +61,7 @@ from experiment.phase_filter import source_reads_cross_phase, with_phase_filter 
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live (shared with site_api_vitals)
     flourishing,  # #1843: entry_channel() — single source of truth for video_diary/solo_recording provenance
+    habit_streaks,  # #4362: THE streak scan, shared with the daily brief
     milestone_ledger,  # #1626: the durable MILESTONE# event ledger (write-once, global cooldown)
     nutrition_logging,  # #4343: THE protein-intake derivation /api/nutrition_overview serves
     personal_baselines,  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
@@ -101,6 +102,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def latest_weight_lbs(records):
@@ -125,7 +127,7 @@ def clamp(val, lo=0, hi=100):
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception as e:
         logger.warning(f"fetch_date({source}, {date_str}) failed: {e}")
         return None
@@ -165,7 +167,7 @@ def fetch_range(source, start, end):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning(f"fetch_range({source}, {start}→{end}) failed: {e}")
         return []
@@ -495,84 +497,14 @@ def compute_readiness(data, baselines=None):
 
 
 def compute_habit_streaks(profile, yesterday_str):
-    """Compute tier0 streak, tier0+1 streak, and per-vice streaks (up to 90-day lookback)."""
-    registry = profile.get("habit_registry", {})
-    mvp_list = profile.get("mvp_habits", [])
+    """Thin delegate to THE streak scan, `health.habit_streaks` (#2221) — as the daily brief does.
 
-    tier0_habits = []
-    tier01_habits = []
-    vice_habits = []
-    for name, meta in registry.items():
-        if meta.get("status") != "active":
-            continue
-        tier = meta.get("tier", 2)
-        if tier == 0:
-            tier0_habits.append(name)
-            tier01_habits.append(name)
-        elif tier == 1:
-            tier01_habits.append(name)
-        if meta.get("vice", False):
-            vice_habits.append(name)
-
-    if not tier0_habits:
-        tier0_habits = mvp_list
-        tier01_habits = mvp_list
-
-    tier0_streak = 0
-    tier01_streak = 0
-    t0_broken = False
-    t01_broken = False
-    vice_streaks = {v: 0 for v in vice_habits}
-    vice_broken = {v: False for v in vice_habits}
-
-    for i in range(0, 90):
-        dt = datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=i)
-        date_str = dt.strftime("%Y-%m-%d")
-        is_weekday = dt.weekday() < 5
-        rec = fetch_date("habitify", date_str)
-        if not rec:
-            break
-        habits_map = rec.get("habits", {})
-
-        if not t0_broken:
-            all_t0 = all(
-                float(habits_map.get(h, 0) or 0) >= 1
-                for h in tier0_habits
-                if not (registry.get(h, {}).get("applicable_days") == "weekdays" and not is_weekday)
-            )
-            if all_t0:
-                tier0_streak += 1
-            else:
-                t0_broken = True
-
-        if not t01_broken:
-            all_t01 = all(
-                float(habits_map.get(h, 0) or 0) >= 1
-                for h in tier01_habits
-                if not (registry.get(h, {}).get("applicable_days") == "weekdays" and not is_weekday)
-                and registry.get(h, {}).get("applicable_days") != "post_training"
-            )
-            if all_t01:
-                tier01_streak += 1
-            else:
-                t01_broken = True
-
-        for v in vice_habits:
-            if not vice_broken[v]:
-                done = habits_map.get(v, 0)
-                if done is not None and float(done) >= 1:
-                    vice_streaks[v] += 1
-                else:
-                    vice_broken[v] = True
-
-        if t0_broken and t01_broken and all(vice_broken.values()):
-            break
-
-    return {
-        "tier0_streak": tier0_streak,
-        "tier01_streak": tier01_streak,
-        "vice_streaks": vice_streaks,
-    }
+    #4362: this module carried its own pre-#2221 copy, which scored a habit the day's
+    Habitify record did not name as a break. After "Walk 5k" was renamed upstream every
+    day read as a tier-0 miss, so the stored `t0_perfect_streak` the recap card draws sat
+    at 0. One definition now, rename-aware through `scoring_engine.habitify_reading`.
+    """
+    return habit_streaks.compute_habit_streaks(profile, yesterday_str, fetch_date)
 
 
 # ==============================================================================

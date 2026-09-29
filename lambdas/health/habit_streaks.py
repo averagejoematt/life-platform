@@ -12,6 +12,8 @@ detail. See the block comment inside `compute_habit_streaks`.
 
 from datetime import datetime, timedelta
 
+from health.scoring_engine import habitify_reading
+
 # #2221: a run of missing habitify days longer than this is treated as the end of
 # available history rather than as a gap inside a live streak.
 STREAK_GAP_TOLERANCE_DAYS = 3
@@ -76,11 +78,13 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
                 continue
             if skip_post_training and applicable == "post_training":
                 continue
-            if h not in habits_map:
+            # #4362: resolved through the registry's `habitify_names` too, so a habit
+            # renamed in Habitify still reads under its registry key.
+            done = habitify_reading(habits_map, h, meta)
+            if done is None:
                 continue  # no reading — not evidence of a miss
             any_reading = True
-            done = habits_map.get(h)
-            if not (done is not None and float(done) >= 1):
+            if done < 1:
                 return True, False
         return any_reading, True
 
@@ -115,10 +119,10 @@ def compute_habit_streaks(profile, yesterday_str, fetch_date):
                     t01_broken = True
 
         for v in vice_habits:
-            if vice_broken[v] or v not in habits_map:
+            done = None if vice_broken[v] else habitify_reading(habits_map, v, registry.get(v))
+            if done is None:
                 continue
-            done = habits_map.get(v)
-            if done is not None and float(done) >= 1:
+            if done >= 1:
                 vice_streaks[v] += 1
             else:
                 vice_broken[v] = True

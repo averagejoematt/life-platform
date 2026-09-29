@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-09-27 (v8.6.0 — 86 MCP tools, 63-module package, 106 Lambdas, 20 data sources)
+Last updated: 2026-09-29 (v8.6.0 — 86 MCP tools, 65-module package, 106 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 106 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1189,7 +1189,7 @@ aws lambda update-function-configuration \
    ```
 3. **Cross-platform builds:** Python deps must use `--platform manylinux2014_x86_64 --only-binary=:all:` (not macOS `.so` files)
 4. **IAM co-location:** If a code change adds new AWS operations (e.g., `dynamodb:Query` for gap-fill), update IAM in the same deploy
-5. **Deploy manifest:** See `deploy/MANIFEST.md` for Lambda → handler → zip mappings
+5. **Deploy manifest:** `deploy/MANIFEST.md` is deprecated (archived #4258); see `docs/ARCHITECTURE.md` + `ci/lambda_map.json` for Lambda → handler → zip mappings
 6. **Smoke test template:** Source `deploy/SMOKE_TEST_TEMPLATE.sh` for reusable test functions
 7. **Wait 10 seconds** between sequential Lambda deploys
 

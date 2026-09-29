@@ -2737,3 +2737,60 @@ REGISTRY_PROOFS.update(
         }
     }
 )
+
+# #4419: the strava read-seam SET guard (and the pair-rule fixture beside it) turned
+# tests/test_shared_modules.py into a tree-sweeping structural test. Three REAL-tree
+# mutations, each restored by copying the pre-mutation file back.
+STRUCTURAL_HAND_PROOFS["structural::test_shared_modules.py"] = {
+    "gate_name": "test_shared_modules.py",
+    "command": "python3 -m pytest tests/test_shared_modules.py -q -p no:cacheprovider   # 74 tests; baseline 74 passed",
+    "mutation": (
+        "M1 lambdas/web/site_api_common.py `_query_source` returns `_decimal_to_float(items)` instead of "
+        "`strava_read_seam(source, _decimal_to_float(items))` (a reader bypassing the seam); "
+        "M2 lambdas/common/strava_read_seam.py `_dedup_plan`'s HR-graft condition replaced by `if False:` "
+        "(the implausible 49 bpm Garmin copy keeps its HR); "
+        "M3 the same module's `_same_session` containment branch returns False (the 15-minute start window alone)."
+    ),
+    "observed": (
+        "2026-09-28. M1: 1 failed, 73 passed — test_every_strava_capable_reader_goes_through_the_read_seam names "
+        "`lambdas/web/site_api_common.py:677 _query_source()`. M2: 3 failed, 71 passed — the 2024-10-01 walk pair, the "
+        "2024-10-01 day row and the 2024-10-05 day each keep a <70 bpm walk average. M3: 1 failed, 73 passed — "
+        "test_dedup_real_2024_containment_chunk_is_the_same_walk (the WHOOP 11:51 chunk survives). RESTORED: 74 passed."
+    ),
+    "scope": (
+        "Proves the SET guard reds on a reader that skips the seam and that the pair rule's two #4419 changes are "
+        "load-bearing on the real 2024 fixture. The guard's detection is syntactic: a reader whose key is built from a "
+        "parameter not named source/src/partition/source_name, or from a pk handed in by its caller, is not seen; "
+        "lambdas/ingestion/ (the writer) and scripts/ + deploy/ are out of scope. It does not prove the live partition "
+        "holds only the duplicate shapes the fixture carries."
+    ),
+    "proved_on": "2026-09-28",
+}
+
+# #4377/#4378: test_singleton_tombstone_guards.py became a tree sweep (its two new reader-set
+# guards walk lambdas/**.py + mcp/*.py), so it entered the structural family here. Two REAL-tree
+# mutations, one per new guard, each md5-checked different before the verdict was read.
+STRUCTURAL_HAND_PROOFS["structural::test_singleton_tombstone_guards.py"] = {
+    "gate_name": "test_singleton_tombstone_guards.py",
+    "command": "python3 -m pytest tests/test_singleton_tombstone_guards.py -q   # 96 tests; baseline 96 passed",
+    "mutation": (
+        "M1: lambdas/web/site_api_diary.py `_quotes_by_day`'s `if jq.is_revoked(item): continue` replaced by "
+        "`if False:` (md5 86e4aa5e… -> 6843a734…) — a journal_quotes reader that serves/counts a revoked line. "
+        "M2: mcp/tools_sick_days.py `_get_sick_days`'s `if not _sdc.is_cleared(i)` replaced by `if i` "
+        "(md5 2af13149… -> c583746f…) — a direct SOURCE#sick_days reader that lists a cleared day as sick."
+    ),
+    "observed": (
+        "2026-09-28. M1: 1 failed, 95 passed — test_issue_4377_every_journal_quote_reader_honours_the_revoke_"
+        "tombstone names ['lambdas/web/site_api_diary.py']. M2: 1 failed, 95 passed — test_issue_4378_every_"
+        "sick_day_reader_goes_through_the_cleared_predicate names ['mcp/tools_sick_days.py']. RESTORED (md5s "
+        "back to 86e4aa5e… / 2af13149…): 96 passed."
+    ),
+    "scope": (
+        "Proves the two #4377/#4378 reader-set sweeps can fail. The detection is TEXTUAL (a file that builds "
+        "the partition key and queries must name `is_revoked(` / `is_cleared`), so a reader that mentions the "
+        "predicate without applying it passes — the behavioural tests in test_journal_quotes_1568.py, "
+        "test_diary_shelf_1846.py and test_platform_memory_block.py carry that half. The file's older #946 "
+        "restart-tombstone tests were not re-mutated here; they were not a structural gate before this change."
+    ),
+    "proved_on": "2026-09-28",
+}

@@ -100,9 +100,9 @@ IN (4) — verdict computed here, blocking consumer elsewhere, no covering row:
                                           derives from the #2845 model), so nothing
                                           else counts the seam ratchet at all.
 
-OUT (6) — and each for a stated reason, not by omission. This block is the ADMISSION
+OUT (7) — and each for a stated reason, not by omission. This block is the ADMISSION
 ruling (Q1/Q2: why the file is not in the can-fail population). Since #3329 the same
-six also carry an executable one-line REASON in `NOT_APPLICABLE_REASONS` below —
+seven also carry an executable one-line REASON in `NOT_APPLICABLE_REASONS` below —
 that dict is the operative artifact the census prints; this is the reasoning behind
 it. Two homes, two different questions, and the code only ever reads the dict:
 
@@ -127,6 +127,11 @@ it. Two homes, two different questions, and the code only ever reads the dict:
                                         the reader-truth sweep fails on, and that sweep
                                         is the census row `visual-qa / Run visual +
                                         AI-vision QA sweep`, which is PROVEN can-fail.
+  tests/timezone_guard_lib.py           Q1 no. Pure AST/path helpers (#4268) — yields
+                                        nodes, returns a file list; the guards that
+                                        import it own every verdict. Q2 COVERED anyway,
+                                        twice — `test_pacific_today_guard_2414.py` and
+                                        `test_day_key_frame_declaration_guard_3913.py`.
 
 The asymmetry between the two `*_guard_lib.py` peers is the point, not an oversight:
 one has a covering row and one does not, and Q2 is the only thing that separates them.
@@ -252,6 +257,15 @@ NOT_APPLICABLE_REASONS: dict[str, str] = {
         "raises or exits; the reader-truth sweep is what turns a 'new' into a red. Q2 COVERED — that sweep is the "
         "census row `visual-qa / Run visual + AI-vision QA sweep`, which is itself PROVEN can-fail, so this "
         "module's verdict is already reported by a row that was watched failing."
+    ),
+    "tests/timezone_guard_lib.py": (
+        "#4268's shared AST helper for the timezone/day-frame guards: `own_scope_nodes()` yields nodes, "
+        "`python_files_under()` returns a file list, `SKIP_PATH_MARKERS` is a data tuple — none raises, exits or "
+        "answers a pass/fail verdict; every judgment about what counts as a naive/UTC clock stays in the guard "
+        "that imports it. Q2 COVERED, twice over — a break here fails BOTH `structural::"
+        "test_pacific_today_guard_2414.py` and `structural::test_day_key_frame_declaration_guard_3913.py`, each "
+        "already a census row in its own right (its `_own_scope_nodes`/`_own_body` call proved unchanged before "
+        "and after the fold, PR #4268)."
     ),
 }
 

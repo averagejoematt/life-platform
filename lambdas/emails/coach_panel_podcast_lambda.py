@@ -28,6 +28,7 @@ from ai import google_tts
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
+from common import media_tombstone  # #4365: a restart tombstone is not a published episode
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
@@ -340,18 +341,10 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     return {"url": f"/panelcast/wk{week}.{ext}", "bytes": len(body), "duration_sec": duration}
 
 
-def _episode_exists(week) -> bool:
-    # The weekly publisher writes wk{n}.mp3 (compressed since #1018; .wav before
-    # that, and still the fail-open fallback). Check every extension ever
-    # published so "already published" is never a false negative that
-    # re-synthesizes a week (the .mp3-only check silently missed every .wav episode).
-    for ext in ("mp3", "wav", "m4a"):
-        try:
-            s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}")
-            return True
-        except Exception:
-            continue
-    return False
+# Key of week's real episode audio (every extension ever published), or None. #4365: a restart
+# tombstone on the key is NOT an episode — see common/media_tombstone.py.
+def _episode_exists(week) -> str | None:
+    return media_tombstone.first_published(s3, S3_BUCKET, [f"{PREFIX}/wk{week}.{ext}" for ext in ("mp3", "wav", "m4a")], logger)
 
 
 def _xml(s: str) -> str:
@@ -1347,6 +1340,7 @@ def _sweep_held_episodes(dry_run: bool = False) -> dict:
     week = post.get("week")
     hold = _read_hold(week)
     if not hold:
+        logger.info("[panel] hold sweep wk%s: no hold on the current week — nothing to retry", week)
         return {"swept": [], "note": f"no hold for current week {week}"}
 
     hold_class = hold.get("hold_class", "safety")
@@ -1556,7 +1550,9 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     post = _select_week_post()
     week = post["week"]
-    if not force and not dry_run and _episode_exists(week):
+    published_key = None if (force or dry_run) else _episode_exists(week)
+    if published_key:
+        logger.info("[panel] wk%s already published — %s matched; skipping (outcome=already-published)", week, published_key)
         _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
 

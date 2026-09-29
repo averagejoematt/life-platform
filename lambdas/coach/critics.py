@@ -12,7 +12,7 @@ THE FOUR CRITICS AND WHAT EACH ONE HOLDS
 
   muscle_defense       anchor-lift strength trend + protein vs the floor
   joints_tendons       pain flags per movement, novelty (days since), the loaded-lifting streak
-                       beside the active-day streak (both context only since #4161), the fatigue trigger
+                       (context only since #4161; the active-day streak left the packet, #4411), the fatigue trigger
                        (performance or readiness, `critics_fatigue`) and the 48 h same-region guard
   rate_advocate        the owner's redlines + which tripwires are CLEAR — argues for MORE, adds no sets (#4161)
   blueprint_historian  the weight-band reference + the #3717 attestation, LABELLED
@@ -154,6 +154,8 @@ def draft_summary(ir: Any) -> dict[str, Any]:
                 "top_reps": max(reps) if reps else None,
                 "to_failure": any((getattr(s, "type", "") or "") == "failure" for s in sets) or any(w in notes for w in _FAILURE_WORDS),
                 "axial": _axial_pattern(label) or _axial_pattern(getattr(ex, "movement_key", "")),
+                # #4387: a timed block's length — the joints critic's weight-bearing cardio swap keeps it
+                "duration_seconds": sum(int(getattr(s, "duration_seconds", None) or 0) for s in sets) or None,
             }
         )
     return {
@@ -211,14 +213,18 @@ def build_joints_packet(
     *,
     pain_by_idx: dict[int, dict[str, Any]] | None,
     days_since_by_idx: dict[int, int | None] | None,
-    active_day_streak: int | None,
     loaded_lifting_streak: int | None,
     pain_layer_status: str | None,
     dismissals: list[dict[str, Any]] | None = None,
     stale_by_idx: dict[int, dict[str, Any]] | None = None,
     fatigue: dict[str, Any] | None = None,
+    recent_aerobic: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pain flags on the draft's movements, novelty, and where he is in the week.
+
+    #4387: `recent_aerobic` is `constraint_block.recent_aerobic` — per-activity walking/cycling over
+    the 3 days through target − 1. A lower session's weight-bearing cardio block after a heavy
+    48 h is swapped to cycling (`critics_aerobic`); None reads as unknown and changes nothing.
 
     #4161: `stale_by_idx` is `critics_fatigue.stale_exposure` per drafted lift (the gap and the
     exposure number — the stale-lift cap scales with both); `fatigue` is `critics_fatigue.assess`
@@ -235,12 +241,13 @@ def build_joints_packet(
     critic must argue from what happened, not from a cleaned-up version of it. A note dated
     AFTER the dismissal re-arms the veto on its own (`training_context_registry`, one rule,
     shared with `plan_engine`)."""
-    # #4067: TWO streaks, both named (#4161: both context now). The rest-day ask keyed on the LOADED one — the old
-    # single `consecutive_training_days` counted Engine (cardio-only) and walk days, read 16
-    # against a loaded streak of 4 and asked for rest. The active streak is context, carried in
-    # `numbers` and deliberately never flagged: a flag is the model's escalation handle.
+    # #4067 → #4411: the LOADED-lifting streak is the only streak the critic holds. The old single
+    # `consecutive_training_days` counted Engine (cardio-only) and walk days, read 16 against a
+    # loaded streak of 4 and asked for rest; #4067 kept the active-day count beside it as unflagged
+    # context, and the model still read "day 18 of a streak" as fatigue in its sentence. An
+    # active-day count is not a fatigue signal for a man active on 97 % of his days
+    # (TRAINING_CALIBRATION), so it is no longer an input here at all.
     numbers: dict[str, Any] = {
-        "active_day_streak": active_day_streak,
         "loaded_lifting_streak": loaded_lifting_streak,
         "pain_layer_status": pain_layer_status,
     }
@@ -248,8 +255,6 @@ def build_joints_packet(
     violations: list[dict[str, Any]] = []
     unknown: list[str] = []
     layer_ok = pain_layer_status not in (None, "dark", "unknown")
-    if active_day_streak is None:
-        unknown.append("active_day_streak")
     if loaded_lifting_streak is None:
         unknown.append("loaded_lifting_streak")
     # #4161: the loaded streak is CONTEXT now (numbers only, never a flag) — a day count is not a
@@ -350,6 +355,9 @@ def build_joints_packet(
                 "to": round(AXIAL_HEAVY_LBS * 0.6, 1),
             }
         )
+    from coach.critics_aerobic import aerobic_flags
+
+    aerobic_flags(draft, recent_aerobic, numbers, flags, unknown)  # #4387 — appended LAST: it never displaces a first change
     if not layer_ok:
         flags.append(
             _flag(
@@ -742,7 +750,7 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
     changes = [f for f in packet.get("flags", []) if f["severity"] == "change"]
     if changes:
         f = changes[0]
-        return {
+        out = {
             "verdict": "change",
             "metric": f["metric"],
             "value": packet["numbers"].get(f["metric"]),
@@ -750,6 +758,12 @@ def deterministic_verdict(packet: dict[str, Any]) -> dict[str, Any]:
             "to": f.get("to"),
             "reason": f["reason"],
         }
+        # #4387: an `independent` change (the weight-bearing cardio swap) rides BESIDE the first
+        # change instead of being dropped by it — a critic's one verdict may carry both.
+        extra = [{k: g.get(k) for k in ("metric", "field", "to", "reason")} for g in changes[1:] if g.get("independent") and g.get("field")]
+        if extra:
+            out["additional_changes"] = extra
+        return out
     return {
         "verdict": "approve",
         "metric": None,

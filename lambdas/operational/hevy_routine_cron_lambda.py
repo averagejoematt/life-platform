@@ -99,12 +99,55 @@ def _gates(event: dict[str, Any]) -> dict[str, str | bool | int]:
     }
 
 
+def _read_partition(source: str, start: str, end: str) -> list[dict[str, Any]]:
+    """Every row of `source` in [start, end] — the bundled twin of `mcp.core.query_source`'s derived
+    read: the phase decision from the taxonomy, full pagination, superseded (tombstoned) rows out."""
+    from boto3.dynamodb.conditions import Key
+    from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+    from experiment.phase_filter import source_reads_cross_phase, with_phase_filter
+    from training import exercise_history
+
+    pk = f"USER#{exercise_history.USER_ID}#SOURCE#{source}"
+    kwargs: dict[str, Any] = with_phase_filter(
+        {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start}", f"DATE#{end}~")},
+        include_pilot=source_reads_cross_phase(source),
+    )
+    rows: list[dict[str, Any]] = []
+    while True:
+        resp = exercise_history._table().query(**kwargs)
+        rows.extend(i for i in resp.get("Items", []) if not i.get("tombstone"))
+        if not resp.get("LastEvaluatedKey"):
+            return strava_read_seam(source, rows)
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def _z2_minutes_7d(target_date: str, read=None) -> float | None:
+    """#4410: the generator's aerobic minutes from the ONE recent-aerobic quantity
+    (`training.recent_aerobic`, the block `mcp.shared_quantities.recent_aerobic_layer` builds) —
+    never a hard-coded 0. A source that cannot be read reaches the block as None, and the
+    minutes come back None (UNKNOWN, ADR-104): no "walk more" note on an unread week."""
+    from training import recent_aerobic
+
+    w = recent_aerobic.window(target_date)
+
+    def _safe(source: str) -> list[dict[str, Any]] | None:
+        try:
+            return (read or _read_partition)(source, w["start"], w["end"])
+        except Exception as e:  # noqa: BLE001 — unreadable is unknown, never zero hours
+            logger.warning(f"recent-aerobic read failed for {source}: {e}")
+            return None
+
+    block = recent_aerobic.build(target_date=target_date, today=pacific_today(), strava_items=_safe("strava"), hevy_workouts=_safe("hevy"))
+    return recent_aerobic.aerobic_minutes_7d(block)
+
+
 def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs":
     """Pull recovery / acwr / volume / z2 / last-workout state for the generator.
 
-    Day one: returns conservative defaults so the deterministic engine ships
-    safely without a live tools_strength/get_muscle_volume integration. Phase 2
-    swaps the placeholders for direct DDB reads.
+    Day one: returns conservative defaults for recovery / acwr / volume so the
+    deterministic engine ships safely without a live tools_strength/get_muscle_volume
+    integration. The aerobic minutes are READ (#4410) — a placeholder 0 there wrote
+    "walk more" into the note after 9 h of walking + cycling.
     """
     from training.routine_generator import GeneratorInputs
 
@@ -113,7 +156,7 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
         recovery_tier="yellow",
         acwr_flag="safe",
         volume_7d={},
-        z2_minutes_7d=0.0,
+        z2_minutes_7d=_z2_minutes_7d(target_date),
         days_since_last_workout=2,
         add_load_enabled=add_load_enabled,
     )

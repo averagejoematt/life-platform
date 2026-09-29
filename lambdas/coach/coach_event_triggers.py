@@ -72,6 +72,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Callable, Optional
 
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from health.personal_baselines import percentile
 
 from coach import coach_outbound
@@ -466,7 +467,7 @@ def _query_source(table, source: str, start: str, end: str) -> list:
             ":hi": f"DATE#{end}~",
         },
     )
-    return resp.get("Items") or []
+    return strava_read_seam(source, resp.get("Items") or [])
 
 
 def gather_signals(table, today: str) -> dict:

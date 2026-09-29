@@ -71,7 +71,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-from common.digest_utils import d2f, get_food_delivery_streak_state  # shared bundled helpers (#970)
+from common.digest_utils import d2f, get_food_delivery_streak_state, strava_read_seam  # shared helpers (#970); #4419 read seam
 
 
 def fetch_date(source, date_str):
@@ -100,7 +100,7 @@ def fetch_date(source, date_str):
             return None
         if item and "phase" in item and item["phase"] != EXPERIMENT_PHASE_CURRENT:
             return None
-        return d2f(item) if item else None
+        return strava_read_seam(source, d2f(item) if item else None)
     except Exception as e:
         logger.warning(f"[character] fetch_date({source}, {date_str}) failed: {e}")
         return None
@@ -127,7 +127,7 @@ def fetch_range(source, start_date, end_date):
             if "LastEvaluatedKey" not in resp:
                 break
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning(f"[character] fetch_range({source}, {start_date}→{end_date}) failed: {e}")
         return []

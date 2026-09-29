@@ -1089,3 +1089,57 @@ def test_every_generation_get_item_guarded_or_exempt():
         + "\nApply experiment.phase_filter.singleton_visible near the call site, "
         "or add a documented entry to _GENERATION_GET_ITEM_EXEMPT."
     )
+
+
+# ── #4378: the sick-day CLEAR tombstone (cleared_at) — every reader honours it ──
+
+
+def test_issue_4378_every_sick_day_reader_goes_through_the_cleared_predicate():
+    """#4378 — a sibling tombstone, NOT the restart one: manage_sick_days clear stamps
+    `cleared_at` (the MCP role has no DeleteItem on sick_days). Guard the SET of readers:
+    every production module that reads SOURCE#sick_days does
+    so through sick_day_checker's two readers (which skip cleared rows) or calls
+    `is_cleared` itself. A new direct reader of the partition reds here until it honours
+    the tombstone. Derived: every lambdas/**.py + mcp/*.py file naming the partition."""
+    import inspect
+    import pathlib
+
+    from health import sick_day_checker as _sdc
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    direct = []
+    for path in sorted([*root.joinpath("lambdas").rglob("*.py"), *root.joinpath("mcp").glob("*.py")]):
+        src = path.read_text(encoding="utf-8")
+        if "SOURCE#sick_days" not in src and "SICK_DAYS_SOURCE" not in src:
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel == "lambdas/health/sick_day_checker.py":
+            continue
+        if ("table.query(" in src or "get_item(" in src) and "is_cleared" not in src:
+            direct.append(rel)
+    assert direct == [], f"direct SOURCE#sick_days readers that ignore the #4378 cleared tombstone: {direct}"
+    checker = inspect.getsource(_sdc.check_sick_day) + inspect.getsource(_sdc.get_sick_days_range)
+    assert checker.count("is_cleared") == 2
+
+
+def test_issue_4377_every_journal_quote_reader_honours_the_revoke_tombstone():
+    """#4377 — mark_journal_quote(unmark) stamps `revoked_at` (the MCP role has no
+    DeleteItem on journal_quotes). Every production module that builds the partition key
+    (`…journal_quotes"`) and queries the table must call `jq.is_revoked`, or a revoked
+    line keeps serving / keeps holding a cap slot / keeps counting as withheld."""
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    pk_literal = re.compile(r'(?:SOURCE#|\})journal_quotes"')  # the pk, not a route path
+    readers, unguarded = [], []
+    for path in sorted([*root.joinpath("lambdas").rglob("*.py"), *root.joinpath("mcp").glob("*.py")]):
+        src = path.read_text(encoding="utf-8")
+        if not pk_literal.search(src) or "table.query(" not in src:
+            continue
+        rel = path.relative_to(root).as_posix()
+        readers.append(rel)
+        if "is_revoked(" not in src:
+            unguarded.append(rel)
+    assert len(readers) >= 3, f"the journal_quotes reader scan found too few readers — did the scan break? {readers}"
+    assert unguarded == [], f"journal_quotes readers that ignore the #4377 revoke tombstone: {unguarded}"

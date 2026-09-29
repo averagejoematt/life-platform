@@ -391,7 +391,8 @@ MANAGE_SICK_DAYS_DESCRIPTION = (
     "Manage sick and rest day flags. Sick day flags suppress streak breaks, habit alerts, and anomaly noise. "
     "'list' (default) = show all logged sick/rest days in a date range. "
     "'log' = flag a date as sick/rest day (requires date=). Accepts dates= list for multiple days. "
-    "'clear' = remove a sick day flag logged in error (requires date=). "
+    "'clear' = remove a sick day flag logged in error (requires date=) — a tombstone (cleared_at), not a delete: "
+    "no reader counts the date as sick from then on, and re-logging the date restores it (#4378). "
     "Use for: 'log a sick day', 'I'm sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
 )
 
@@ -458,9 +459,12 @@ LIST_MEMORY_CATEGORIES_DESCRIPTION = (
 )
 
 DELETE_PLATFORM_MEMORY_DESCRIPTION = (
-    "Delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
+    "SOFT-delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
     "category + key (the exact sk from read_platform_memory — the only handle for a per-note row, #4171). "
-    "Use to correct bad memories or remove stale records."
+    "Use to correct bad memories or remove stale records. #4355: this is a tombstone (deleted_at/deleted_reason), "
+    "not a DynamoDB delete — the MCP role has no dynamodb:DeleteItem on this partition. Every reader "
+    "(read_platform_memory, list_memory_categories, the coach's memory block) skips it from that instant on; "
+    "an optional 'reason' is stored alongside."
 )
 
 LOG_DECISION_DESCRIPTION = (
@@ -478,7 +482,8 @@ MARK_JOURNAL_QUOTE_DESCRIPTION = (
     "names — the ELENA brief's omit list, enforced in code), any paraphrase that isn't verbatim in that "
     "day's entry (ADR-104 grounding), and a third line on a day (cap 0–2). Marked lines surface on the "
     "story hub archive + at most one featured line per week on home, dated, with a receipts link. "
-    "action='unmark' revokes a line (consent is revocable); action='list' shows what's marked. "
+    "action='unmark' revokes a line (consent is revocable) — a tombstone (revoked_at) that also erases the "
+    "stored text; every reader skips it (#4377); action='list' shows what's marked. "
     "The chronicle's never-quote rule is untouched — never quote unmarked journal text anywhere."
 )
 

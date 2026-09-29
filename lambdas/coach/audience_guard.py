@@ -78,6 +78,36 @@ _VOCATIVE_RE = re.compile(
 )
 
 
+# A bare machine identifier is not text for ANY reader (#4384: /api/coach_analysis
+# served the `themes[0]` slug "deep_sleep_variability" as the coach's "one thing" and
+# /coaching/ printed it). Two shapes, two strengths:
+#   * an IDENTIFIER — one whitespace-free token carrying an underscore
+#     ("deep_sleep_variability", "DEEP_SLEEP"). Never a word of English, so every
+#     reader slot refuses it (`reader_safe`), labels included.
+#   * a BARE TOKEN — additionally any whitespace-free lowercase token ("protein-intake",
+#     "hydrate", "sleep.deep") or camelCase key ("deepSleep"). A one-word LABEL is a
+#     legitimate value ("noticing" is a stance stage), so only the PROSE slots — the
+#     read, the one thing, the quoted lines — refuse this wider shape (`reader_prose`).
+_IDENTIFIER_RE = re.compile(r"^\S*_\S*$")
+_BARE_TOKEN_RE = re.compile(r"^(?:[a-z0-9]+(?:[_.:/-][a-z0-9]+)*|[A-Za-z0-9]*_[A-Za-z0-9_]*|[a-z]+[A-Z][A-Za-z0-9]*)$")
+
+
+def is_machine_token(text) -> bool:
+    """True if `text` is an identifier (a whitespace-free token with an underscore). Falsy → False."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    return bool(_IDENTIFIER_RE.match(text.strip()))
+
+
+def is_bare_token(text) -> bool:
+    """True if `text` is any machine-shaped single token — `is_machine_token`, a lowercase
+    word/slug, or camelCase. Prose slots refuse it; a capitalised word ("Hydrate.") passes."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    t = text.strip()
+    return is_machine_token(t) or bool(_BARE_TOKEN_RE.match(t))
+
+
 def is_owner_directed(text) -> bool:
     """True if `text` addresses the owner directly — second person, or vocative name.
 
@@ -96,11 +126,17 @@ def reader_safe(text, coach_id=None, logger=None):
     Owner-directed text returns None — the slot is held empty rather than
     published — and the rejection is logged when a logger is supplied, so a
     producer that keeps drifting into second person is visible in the run logs.
-    Falsy input returns None (an absent candidate, not a rejection).
+    An identifier (`is_machine_token`, #4384) is not text for any audience and
+    returns None too. Falsy input returns None (an absent
+    candidate, not a rejection).
     """
     if not text or not str(text).strip():
         return None
     text = str(text).strip()
+    if is_machine_token(text):
+        if logger is not None:
+            logger.warning("public slot rejected for %s (an identifier, not text) — held empty (#4384)", coach_id or "unknown-coach")
+        return None
     if is_owner_directed(text):
         if logger is not None:
             logger.warning(
@@ -109,6 +145,18 @@ def reader_safe(text, coach_id=None, logger=None):
             )
         return None
     return text
+
+
+def reader_prose(text, coach_id=None, logger=None):
+    """`reader_safe` for a PROSE slot (#4384): additionally refuses any bare token.
+
+    The read, the one thing and the quoted lines are sentences; a single machine-shaped
+    token there ("protein_intake", "hydrate") is a key that leaked, not a sentence.
+    """
+    value = reader_safe(text, coach_id, logger)
+    if value is None or is_bare_token(value):
+        return None
+    return value
 
 
 def public_read(output_item):
@@ -123,7 +171,7 @@ def public_read(output_item):
     if not isinstance(value, str) or not value.strip():
         return None
     value = value.strip()
-    if is_owner_directed(value):  # belt for rows written before the write-side seam
+    if is_owner_directed(value) or is_bare_token(value):  # belt for rows written before the write-side seam
         return None
     return value
 
@@ -203,7 +251,65 @@ def public_items(values) -> list:
     """The list form of `public_or_empty`: owner-directed entries are dropped."""
     if not isinstance(values, list):
         return []
-    return [v for v in values if isinstance(v, str) and v.strip() and not is_owner_directed(v)]
+    return [v for v in values if isinstance(v, str) and v.strip() and not is_owner_directed(v) and not is_machine_token(v)]
+
+
+# #4392: a theme TAG is a label, not prose — the coach extraction stores them as slugs
+# ("deep_sleep_variability", "hrv_recovery") and /coaching/ printed them verbatim. The
+# tag carries meaning, so the public seam HUMANISES rather than drops: underscores become
+# spaces and an acronym word takes its display form. Casing is otherwise left as stored —
+# the coaching tag row is a `.label` (uppercased by CSS) and the reading/journal themes
+# are deliberately lowercase phrases, so sentence-casing would fight both surfaces.
+_THEME_WORD_LABELS = {
+    "a1c": "A1C",
+    "apob": "ApoB",
+    "bmi": "BMI",
+    "bp": "BP",
+    "cgm": "CGM",
+    "dexa": "DEXA",
+    "dxa": "DXA",
+    "hdl": "HDL",
+    "hrv": "HRV",
+    "ldl": "LDL",
+    "rem": "REM",
+    "rhr": "RHR",
+    "tdee": "TDEE",
+    "vo2": "VO2",
+    "vo2max": "VO2 max",
+}
+
+
+def reader_theme(value):
+    """One stored theme tag as a reader label, or None (#4392).
+
+    `"cgm_data_interpretation"` → `"CGM data interpretation"`; a phrase that is already
+    words passes unchanged apart from acronym words. Non-string, empty and owner-directed
+    tags return None.
+    """
+    if not isinstance(value, str):
+        return None
+    words = value.replace("_", " ").split()
+    label = " ".join(_THEME_WORD_LABELS.get(w.lower(), w) for w in words)
+    if not label or is_owner_directed(label):
+        return None
+    return label
+
+
+def public_themes(values) -> list:
+    """The ONE seam every public `themes` / `*_themes` list is served through (#4392).
+
+    Each tag via `reader_theme`, unusable ones dropped, order kept, case-insensitive
+    duplicates collapsed (`deep_sleep` and `deep sleep` are one tag once humanised).
+    """
+    if not isinstance(values, list):
+        return []
+    out, seen = [], set()
+    for v in values:
+        label = reader_theme(v)
+        if label and label.lower() not in seen:
+            seen.add(label.lower())
+            out.append(label)
+    return out
 
 
 def public_ask(record):
@@ -214,7 +320,7 @@ def public_ask(record):
     and `commitment_natural` are the imperative owner register by design.
     """
     item = record or {}
-    return reader_safe(item.get("public_ask"))
+    return reader_prose(item.get("public_ask"))
 
 
 def public_timeline_summary(output_item, limit=200) -> str:

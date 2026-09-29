@@ -176,7 +176,7 @@ def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nea
     top = _block(ideal, "squat_barbell").sets[0].weight_kg
     # 2024-11-03 is > 28 d before block 1, so the 10 % detraining discount applies; week 1 = 60 %
     discounted = 265 * LB * 0.90
-    assert 0.60 <= top / discounted <= 0.65, top / discounted
+    assert top == load_ramp.load_step_kg(discounted * 0.60), top / discounted  # nearest 5 lb (#4388)
     assert row["ramp"]["discount_pct"] == 10 and row["ramp"]["ramp_pct"] == 60
     assert "nearest band you have lifted in: 270-279" in _block(ideal, "squat_barbell").notes
 
@@ -188,7 +188,7 @@ def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_ban
         band, day, lb = NEAREST[key]
         assert (rows[key]["anchor_band"], rows[key]["anchor_date"], rows[key]["fallback"]) == (band, day, "nearest_band"), key
         top = _block(ideal, key).sets[0].weight_kg
-        assert top and 0.60 <= top / (lb * LB * 0.90) <= 0.65, key
+        assert top and top == load_ramp.load_step_kg(lb * LB * 0.90 * 0.60), key  # nearest 5 lb (#4388)
         assert [s.weight_kg for s in _block(ideal, key).sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
 
 
@@ -260,8 +260,14 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
     ideal = _generate_upper()[0]
     row = ideal.inputs_snapshot["load_floors"]["movements"]["lat_pulldown"]
     assert row["ramp"]["discount_pct"] == 0 and row["ramp"]["discount"]["anchor_age_days_at_block_1"] == 4
-    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == load_ramp._ceil_half_kg(140 * LB * 0.60)
-    assert "no detraining discount" in _block(ideal, "lat_pulldown").notes
+    # #4388: a this-cycle anchor ramps on its band e1RM (Epley, 140 lb x 10), not on the set's load
+    assert row["ramp"]["base"] == load_ramp.BASE_BAND_E1RM
+    assert row["ramp"]["hold"]["ramp_top_kg"] == load_ramp.load_step_kg(140 * LB * (1 + 10 / 30) * 0.60)
+    # #4408: seven days on, same band, no layoff (the discount line is 28 d) — the ramp never goes under
+    # the 140 lb x 10 he moved; the fixture logs no RPE, so the hold is the load itself (rpe_basis absent)
+    assert row["ramp"]["hold"]["applies"] is True and row["ramp"]["hold"]["rpe_basis"] == "absent"
+    assert _block(ideal, "lat_pulldown").sets[0].weight_kg == pytest.approx(140 * LB)
+    assert "no RPE logged" in _block(ideal, "lat_pulldown").notes
 
 
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():
@@ -334,7 +340,10 @@ def test_mutation_control_the_100_percent_floor_refuses_the_generator_own_loads(
     generator wrote would refuse at commit on the in-band anchor."""
     from mcp import hevy_prescription_gate
 
-    ideal = _generate_upper()[0]
+    # #4408: a this-cycle in-band anchor is now HELD at the band best, so the ramp-only session is
+    # reproduced by switching the hold off — its ramped pulldown is what the 100 % floor refuses
+    with patch.object(load_ramp, "achieved_hold", return_value=None):
+        ideal = _generate_upper()[0]
     with patch.object(hevy_prescription_gate, "v03_load_rule", return_value=None):
         gate = _gate(ideal)
     assert gate["verdict"] == "refuse" and "lat_pulldown" in {v["where"] for v in gate["audit"]["violations"]}

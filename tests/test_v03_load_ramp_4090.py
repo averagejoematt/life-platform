@@ -53,7 +53,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from training import load_ramp, owner_redlines, program_structure, routine_generator  # noqa: E402
+from training import load_ramp, owner_redlines, program_structure, rep_scheme, routine_generator  # noqa: E402
 
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
 MOVEMENTS = CATALOG["movements"]
@@ -176,7 +176,10 @@ def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_th
 def test_moderate_anchors_ride_the_same_ramp():
     ideal = _generate()[0]
     pulldown = next(b for b in ideal.exercises if b.movement_key == "lat_pulldown")
-    assert all(0.60 <= s.weight_kg / _discounted("lat_pulldown") <= 0.65 for s in pulldown.sets)
+    # #4388: rounded to the NEAREST 5 lb (owner ruling) — within half a step of the exact 60 %
+    expect = rep_scheme.load_step_kg(_discounted("lat_pulldown") * 0.60)
+    assert all(s.weight_kg == expect for s in pulldown.sets)
+    assert abs(expect - _discounted("lat_pulldown") * 0.60) <= 2.5 * LB + 1e-9
 
 
 # ── 3. week 9 ────────────────────────────────────────────────────────────────
@@ -187,20 +190,23 @@ def test_week_9_is_capped_at_85_percent():
     assert ideal.inputs_snapshot["calendar"]["week"] == 9 and ideal.title.startswith("UPPER-HEAVY")
     for key in HEAVY_ANCHORS:
         top = _top(ideal, key)
-        share = top / _discounted(key)
-        assert 0.85 <= share <= 0.86, (key, share)
         e1rm = load_ramp.band_e1rm_kg(ANCHOR_LB[key] * LB, [ANCHOR_REPS[key]])
+        # held at 85 % of the discounted anchor set (novel-again fixture), nearest 5 lb (#4388)
+        assert top == min(rep_scheme.load_step_kg(_discounted(key) * 0.85), rep_scheme.load_step_kg(0.85 * e1rm, down=True)), key
+        assert abs(top - _discounted(key) * 0.85) <= 2.5 * LB + 1e-9, key
         assert top <= 0.85 * e1rm, key
 
 
 def test_rounding_never_crosses_the_e1rm_cap():
-    """Rounding is UP (so week 1 never lands under 60 %), but the e1RM cap is rounded DOWN
-    and wins: with no discount and no reps recorded, e1RM == the anchor, so the cap and the
-    week-9 fraction coincide at 85 % and the result may not exceed it."""
+    """Rounding is to the NEAREST 5 lb (#4388), but the e1RM cap is rounded DOWN and wins: with
+    no discount and no reps recorded, e1RM == the anchor, so the cap and the week-9 fraction
+    coincide at 85 % (85.255 kg = 187.95 lb). Nearest would read 190 lb, over the cap; the cap's
+    round-down reads 185 lb, and the result may not exceed 85 %."""
     floor = {"status": "ok", "best_kg": 100.3, "floor_kg": 100.3, "basis": {"reps": []}}
     with unittest.mock.patch.dict(owner_redlines.REDLINES["load_anchoring"], {"detraining_discount_pct": [0, 0]}):
         r = load_ramp.ramp_floor(floor, 9)
-    assert r["floor_kg"] <= 0.85 * 100.3 and r["floor_kg"] == 85.0
+    assert r["floor_kg"] <= 0.85 * 100.3 and r["floor_kg"] == pytest.approx(185 * LB)
+    assert r["floor_kg"] < rep_scheme.load_step_kg(0.85 * 100.3), "the cap's round-down must win over nearest (190 lb)"
 
 
 # ── 4. mutation control ──────────────────────────────────────────────────────
@@ -286,7 +292,7 @@ def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
     for e in session["prescription"]["exposures"]:
         if e["movement_key"] in HEAVY_ANCHORS:
             assert e["load"]["top_kg"] == _top(ideal, e["movement_key"]), "planner and draft disagree"
-            assert 60.0 <= e["load"]["ramp"]["pct_of_discounted_anchor"] <= 65.0
+            assert 60.0 <= e["load"]["ramp"]["pct_of_discounted_base"] <= 65.0
             assert e["load"]["back_off_kg"] == routine_generator._floor_half_kg(e["load"]["top_kg"] * 0.9)
 
 
@@ -317,3 +323,289 @@ def test_without_the_transform_the_floor_is_still_the_band_best():
     )
     assert block.sets[0].weight_kg == pytest.approx(ANCHOR_LB["leg_press"] * LB)
     assert audit["movements"]["leg_press"]["ramp"] is None
+
+
+# ── 9. #4388 — the ramp's percentage is of band e1RM; novel-again keeps the anchor set ─────
+# The live 2026-09-28 inputs (ROUTINE# 4300a686…, LOWER-VOLUME W1, read 2026-09-27): squat
+# 195 lb x 5 on 09-24 at 313.7 lb (88.45 kg, band e1RM 103.19 kg); trap bar 225 lb x 5 on
+# 2025-11-07 in another band (102.06 kg, e1RM 119.07 kg) — the nearest-band fallback, 325 days
+# before, discounted 10 %. The engine wrote squat 53.5 kg (60 % of the SET) and trap bar 55.5 kg.
+SQUAT_TID = MOVEMENTS["squat_barbell"]["hevy_template_id_hint"]
+TRAP_TID = MOVEMENTS["deadlift_trap_bar"]["hevy_template_id_hint"]
+SQUAT_KG, TRAP_KG = 88.45061733994974, 102.05840462301894
+HISTORY_0928 = {
+    SQUAT_TID: [{"date": "2026-09-24", "top_weight_kg": SQUAT_KG, "sets": [{"weight_kg": SQUAT_KG, "reps": 5}]}],
+    TRAP_TID: [{"date": "2025-11-07", "top_weight_kg": TRAP_KG, "sets": [{"weight_kg": TRAP_KG, "reps": 5}]}],
+}
+WEIGHTS_0928 = {"2025-11-07": 332.0, "2026-09-24": 313.7, "2026-09-27": 313.7}
+
+
+def _floor_0928(tid):
+    return load_ramp.v03_floor(tid, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=1)
+
+
+def test_the_0928_squat_floor_is_60_percent_of_band_e1rm_not_of_the_set():
+    """#4388 rulings: `start_pct_of_band_e1rm` means what it says, and the floor rounds to the
+    NEAREST 5 lb (owner, 2026-09-28). 60 % x 103.19 kg = 61.92 kg = 136.5 lb -> 135 lb
+    (61.235 kg) — not 60 % x 88.45 kg = 53.5 kg (118 lb), the reported defect. The commit gate
+    (`recovery_authoring.audit_prescription`, the comparator `hevy_prescription_gate` feeds) takes
+    the owner's own hand-written 3 x 135 lb against that floor, and refuses the reported 118 lb."""
+    from training.routine_ir import ExerciseBlock, Set
+
+    from mcp import recovery_authoring as ra
+
+    row = _floor_0928(SQUAT_TID)
+    r = row["ramp"]
+    assert row["status"] == "ok" and row["fallback"] is None and r["discount_pct"] == 0
+    assert r["base"] == load_ramp.BASE_BAND_E1RM and r["band_e1rm_kg"] == pytest.approx(103.192, abs=1e-3)
+    assert row["floor_kg"] == pytest.approx(61.235, abs=1e-3) == pytest.approx(135 * LB)
+    assert row["floor_kg"] == rep_scheme.load_step_kg(103.19 * 0.60)
+
+    def _audit(lb):
+        sets = [Set(type="normal", weight_kg=lb * LB, rep_range_start=8, rep_range_end=12) for _ in range(3)]
+        block = ExerciseBlock(movement_key="squat_barbell", sets=sets, rest_seconds=120, notes="")
+        return ra.audit_prescription([block], floors={"squat_barbell": row})
+
+    assert _audit(135)["ok"] is True, "the owner's own 135 lb must commit"
+    refused = _audit(118)
+    assert refused["ok"] is False and {v["kind"] for v in refused["violations"]} == {"below_floor"}
+    assert "60% of your band e1RM" in load_ramp.render_ramp_cue(row)
+    # week 6 on the e1RM base reaches the cap exactly — the ramp and the cap share one number
+    w6 = load_ramp.v03_floor(SQUAT_TID, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=6)
+    assert w6["floor_kg"] == rep_scheme.load_step_kg(103.192 * 0.85, down=True) and w6["floor_kg"] <= 0.85 * w6["ramp"]["band_e1rm_kg"]
+
+
+def test_the_0928_trap_bar_novel_again_floor_is_unchanged():
+    """#4388 acceptance: the novel-again handling is unchanged. The trap bar's anchor is 325 days
+    old (the discount applies), so the base stays the anchor SET — 102.06 x 0.90 x 0.60 = 55.11 kg
+    = 121.5 lb. Only the owner's rounding ruling moves it: nearest 5 lb = 120 lb (54.43 kg; the
+    engine wrote 55.5 kg on the old round-up), and the owner's final 09-28 draft, which held the
+    trap bar at 55.5 kg, still commits against it. An e1RM base would have read 140 lb."""
+    from training.routine_ir import ExerciseBlock, Set
+
+    from mcp import recovery_authoring as ra
+
+    row = _floor_0928(TRAP_TID)
+    r = row["ramp"]
+    assert row["fallback"] == load_ramp.FALLBACK_NEAREST_BAND and r["discount_pct"] == 10
+    assert r["discount"]["applies"] is True and r["discount"]["anchor_age_days_at_block_1"] == 321
+    assert r["base"] == load_ramp.BASE_ANCHOR_SET and r["base_kg"] == pytest.approx(TRAP_KG, abs=1e-3)
+    assert row["floor_kg"] == pytest.approx(120 * LB) == rep_scheme.load_step_kg(TRAP_KG * 0.90 * 0.60)
+    block = ExerciseBlock(movement_key="deadlift_trap_bar", sets=[Set(type="normal", weight_kg=55.5)] * 2, rest_seconds=120, notes="")
+    assert ra.audit_prescription([block], floors={"deadlift_trap_bar": row})["ok"] is True
+    assert "60% of your band anchor after the 10% detraining discount" in load_ramp.render_ramp_cue(row)
+
+
+def test_mutation_control_the_set_weight_base_reproduces_the_reported_118_lb():
+    """Force every anchor onto the #4090 set-weight base and the 09-28 squat reads 60 % of the
+    88.45 kg set = 117 lb (115 lb on the ruled grid; 118 lb on the old round-up, the number the
+    owner reported) — so the e1RM assertion above reds."""
+    real = load_ramp.anchor_discount
+
+    def _set_base(date, p=None):
+        pct, ruling = real(date, p)
+        return pct, {**ruling, "applies": True}
+
+    with patch.object(load_ramp, "anchor_discount", side_effect=_set_base):
+        row = _floor_0928(SQUAT_TID)
+    assert row["ramp"]["base"] == load_ramp.BASE_ANCHOR_SET and row["floor_kg"] == pytest.approx(115 * LB)
+    assert row["floor_kg"] != pytest.approx(135 * LB)
+
+
+# ── #4408: the ramp is a RE-ENTRY — a this-cycle load at this band is held, never ramped under ──
+# The wire: the block-1 Hevy rows as stored (read-only 2026-09-28), indexed by the real
+# `exercise_history.load_history_indexes` — bench 205 lb x 5 @ RPE 7.5 on 09-23 at 315.4 lb.
+WIRE_WEIGHTS = {"2026-09-23": 315.4, "2026-09-24": 313.7, "2026-09-25": 313.1, "2026-09-28": 313.7}
+BENCH_TID = MOVEMENTS[BENCH]["hevy_template_id_hint"]
+BENCH_205_KG = 92.98654643430615  # the stored weight_kg of 205 lb
+
+
+def _wire_history():
+    import datetime
+    from decimal import Decimal
+
+    from training import exercise_history
+
+    rows = json.loads(
+        (REPO / "tests" / "fixtures" / "training_block1_wire_4408_4409" / "hevy_rows.json").read_text(),
+        parse_float=Decimal,
+        parse_int=Decimal,
+    )["items"]
+
+    class _Table:
+        def query(self, **_kw):
+            return {"Items": rows}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        return exercise_history.load_history_indexes(lookback_days=30, today=datetime.date(2026, 9, 28))[0], rows
+
+
+HEAVY_SLOT = load_ramp.slot_of([{"reps": [4, 6]}], "heavy")  # the top set: 4–6 @ RPE <= 8, target 5
+MODERATE_SLOT = load_ramp.slot_of([{"reps": [6, 10]}], "moderate")  # 6–10, leave 2–3 -> RPE <= 8, target 8
+VOLUME_SLOT = load_ramp.slot_of([{"reps": [8, 12]}], "volume")  # 8–12, leave 1–3 -> RPE <= 9, target 10
+
+
+def _bench_0929(**kw):
+    kw.setdefault("slot", HEAVY_SLOT)
+    return load_ramp.v03_floor(BENCH_TID, _wire_history()[0], WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, **kw)
+
+
+def test_4408_the_0929_bench_is_held_at_205_not_ramped_to_60_percent_of_e1rm():
+    """The reported draft: 145 lb (60 % of a 239.2 lb band e1RM) six days after 205 x 5 at the same
+    band, no discount, no layoff. The top set is now the achieved load, exactly as stored."""
+    row = _bench_0929()
+    r = row["ramp"]
+    assert r["discount_pct"] == 0 and r["base"] == load_ramp.BASE_BAND_E1RM and row["fallback"] is None
+    assert r["hold"]["applies"] is True and r["hold"]["layoff"] is False
+    assert r["hold"]["ramp_top_kg"] == pytest.approx(145 * LB)  # what the ramp alone wrote on 09-29
+    assert row["floor_kg"] == pytest.approx(205 * LB, abs=0.01) and r["top_kg"] == row["floor_kg"]
+    a = r["hold"]["achieved"]
+    assert (a["weight_kg"], a["reps"], a["rpe"], a["date"], a["bodyweight_lb"]) == (BENCH_205_KG, 5, 8.0, "2026-09-23", 315.4)
+    # 205 x 5 @ RPE 8 -> e1RM (5 + 2 RIR) = 252.8 lb -> 5 reps at RPE <= 8 = 205 lb: the achieved load, not above it
+    assert r["hold"]["rpe_basis"] == "rpe_adjusted" and r["hold"]["e1rm_rpe_adjusted"] == pytest.approx(
+        BENCH_205_KG * (1 + 7 / 30), abs=1e-3
+    )
+    cue = load_ramp.render_ramp_cue(row)
+    assert "205 lb x 5 @ RPE 8 on 2026-09-23" in cue and "RPE <= 8" in cue and "never goes under an achieved load" in cue
+
+
+def test_4408_mutation_control_without_the_hold_the_bench_reads_the_reported_145_lb():
+    with patch.object(load_ramp, "achieved_hold", return_value=None):
+        row = _bench_0929()
+    assert row["floor_kg"] == pytest.approx(145 * LB) and row["ramp"]["hold"]["applies"] is False
+
+
+def _one_set(lb, reps, rpe, day="2026-09-23"):
+    st = {"weight_kg": lb * LB, "reps": reps, "rpe": rpe}
+    return {"X": [{"date": day, "top_weight_kg": lb * LB, "sets": [st]}]}
+
+
+def _held(history, slot):
+    return load_ramp.v03_floor("X", history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, slot=slot)
+
+
+def test_4408_review_the_hold_is_rpe_aware_a_breach_set_is_not_re_prescribed():
+    """Driver review (the owner's defect 3: RPE ceilings breached as the norm). 205 x 5 @ 8 into the
+    4–6 top set @ <= 8 holds 205; 160 x 8 @ RPE 10 into a 6–10 slot @ <= 8 holds 150 — what its
+    RPE-adjusted e1RM (160 x (1 + 8/30) = 202.7 lb) allows for 8 reps at RPE 8, rounded DOWN to 5 lb."""
+    assert _held(_one_set(205, 5, 8), HEAVY_SLOT)["floor_kg"] == pytest.approx(205 * LB)
+    row = _held(_one_set(160, 8, 10), MODERATE_SLOT)
+    h = row["ramp"]["hold"]
+    assert row["floor_kg"] == pytest.approx(150 * LB) and row["floor_kg"] < 160 * LB
+    assert (
+        h["applies"] is True
+        and h["rpe_basis"] == "rpe_adjusted"
+        and h["e1rm_rpe_adjusted"] == pytest.approx(160 * LB * (1 + 8 / 30), abs=1e-3)
+    )
+    # never ABOVE the achieved load: an easy set (RPE 6) still holds only what he moved
+    assert _held(_one_set(160, 8, 6), MODERATE_SLOT)["floor_kg"] == pytest.approx(160 * LB)
+
+
+def test_4408_review_mutation_control_without_the_rpe_adjustment_the_pulldown_holds_the_breach():
+    """Drop the adjustment (the e1RM reads as if every set had room to spare) and the RPE-10
+    pulldown holds 160 again — the assertion above reds."""
+    with patch.object(load_ramp, "rpe_adjusted_e1rm_kg", side_effect=lambda w, r, rpe: float(w) * 10):
+        row = _held(_one_set(160, 8, 10), MODERATE_SLOT)
+    assert row["floor_kg"] == pytest.approx(160 * LB)
+
+
+def test_4408_review_a_set_with_no_logged_rpe_holds_the_load_itself_and_says_absent():
+    row = _held(_one_set(160, 8, None), MODERATE_SLOT)
+    h = row["ramp"]["hold"]
+    assert row["floor_kg"] == pytest.approx(160 * LB) and h["rpe_basis"] == "absent" and h["e1rm_rpe_adjusted"] is None
+    assert "no RPE logged" in load_ramp.render_ramp_cue(row)
+    # the RPE ceilings are read off program_structure.EXPOSURES, not typed here
+    assert [load_ramp.slot_rpe_ceiling(i) for i in ("heavy", "moderate", "volume", "accessory", "unknown")] == [8, 8, 9, 9, None]
+
+
+def test_4408_the_wire_pulldown_is_held_under_its_rpe_9_10_sets():
+    """On the stored record the 09-23 pulldown sets were 160 x 8 @ 9 and @ 10: the 6–10 moderate slot
+    (@ <= 8) holds 155 (from the @ 9 set), not the 160 the unadjusted hold wrote."""
+    history, _ = _wire_history()
+    tid = MOVEMENTS["lat_pulldown"]["hevy_template_id_hint"]
+    row = load_ramp.v03_floor(tid, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, slot=MODERATE_SLOT)
+    assert row["floor_kg"] == pytest.approx(155 * LB) and row["ramp"]["hold"]["achieved"]["rpe"] == 9.0
+
+
+def test_4408_the_hold_is_at_the_sets_rep_floor_never_a_heavier_lower_rep_load():
+    """205 x 5 does not hold an 8–12 set (205 was never moved for 8): the 09-28 squat 135 lb x 10
+    holds an 8–12 squat, not the 195 lb x 5 of 09-24 — the load the owner wrote by hand (#4388)."""
+    history, _ = _wire_history()
+    squat = MOVEMENTS["squat_barbell"]["hevy_template_id_hint"]
+    vol = load_ramp.v03_floor(squat, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, slot=VOLUME_SLOT)
+    assert vol["floor_kg"] == pytest.approx(135 * LB, abs=0.01) and vol["floor_kg"] < 195 * LB
+    heavy = load_ramp.v03_floor(squat, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, slot=HEAVY_SLOT)
+    assert heavy["floor_kg"] == pytest.approx(195 * LB, abs=0.01) and heavy["ramp"]["hold"]["achieved"]["date"] == "2026-09-24"
+    # a caller that cannot say the slot gets the ramp alone — the lower number (#4149)
+    assert _bench_0929(slot=None)["floor_kg"] == pytest.approx(145 * LB)
+    assert _bench_0929(slot=load_ramp.slot_of([{"reps": [4, 6]}], None))["floor_kg"] == pytest.approx(145 * LB)
+
+
+def test_4408_a_missed_week_is_not_a_layoff_the_load_is_still_held():
+    """Driver review #2: a layoff is the detraining discount's own line (`DETRAINING_ANCHOR_AGE_DAYS`,
+    #4107), not the 7-day re-entry threshold — ten days after the last loaded session (09-28 -> 10-08)
+    there is nothing to re-enter from, so the bench is still held, never back to the 60 % ramp."""
+    history, _ = _wire_history()
+    row = load_ramp.v03_floor(
+        BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-08", week=1, slot=HEAVY_SLOT, days_since_last_workout=10
+    )
+    ev = row["ramp"]["hold"]["layoff_evidence"]
+    assert ev["record_gap_days"] == 10 and ev["threshold_days"] == load_ramp.DETRAINING_ANCHOR_AGE_DAYS
+    assert row["ramp"]["hold"]["layoff"] is False and row["floor_kg"] == pytest.approx(205 * LB)
+
+
+def test_4408_mutation_control_a_7_day_layoff_line_re_prescribes_the_ramp_after_one_missed_week():
+    with patch.object(load_ramp, "DETRAINING_ANCHOR_AGE_DAYS", 7):
+        history, _ = _wire_history()
+        row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-08", week=1, slot=HEAVY_SLOT)
+    assert row["ramp"]["hold"]["layoff"] is True and row["floor_kg"] == pytest.approx(145 * LB)
+
+
+def test_4408_the_ramp_still_fires_after_a_layoff():
+    """Past the detraining line — the record's gap, whatever the caller passes (the cron hands the
+    generator a constant 2) — there IS something to re-enter from, and the ramp stands."""
+    history, _ = _wire_history()
+    gap_day = __import__("common.pacific_time", fromlist=["shift_day_key"]).shift_day_key(
+        "2026-09-28", load_ramp.DETRAINING_ANCHOR_AGE_DAYS
+    )
+    row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=gap_day, week=1, slot=HEAVY_SLOT, days_since_last_workout=2)
+    assert row["ramp"]["hold"]["layoff"] is True
+    assert row["ramp"]["hold"]["layoff_evidence"]["record_gap_days"] == load_ramp.DETRAINING_ANCHOR_AGE_DAYS
+    assert row["floor_kg"] == pytest.approx(145 * LB) and row["ramp"]["hold"]["applies"] is False
+
+
+def test_4408_the_ramp_still_fires_on_a_novel_again_anchor():
+    """An anchor the detraining discount applies to (>= 28 d before block 1) is exactly what the ramp
+    re-enters from — in band or not, it holds nothing up. The 09-28 trap bar stays at 120 lb."""
+    row = load_ramp.v03_floor(TRAP_TID, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=1, slot=HEAVY_SLOT)
+    assert row["floor_kg"] == pytest.approx(120 * LB) and row["ramp"]["hold"]["applies"] is False
+    in_band_old = {BENCH_TID: [{"date": "2026-08-01", "top_weight_kg": 100.0, "sets": [{"weight_kg": 100.0, "reps": 5}]}]}
+    old = load_ramp.v03_floor(
+        BENCH_TID, in_band_old, {"2026-08-01": 314.0, "2026-09-28": 313.7}, 313.7, as_of="2026-09-29", week=1, slot=HEAVY_SLOT
+    )
+    assert old["ramp"]["discount_pct"] == 10 and old["ramp"]["hold"]["achieved"] is None and old["floor_kg"] < 100.0
+
+
+def test_4408_generator_planner_and_chat_gate_read_one_held_number():
+    """#4149: the generator writes the held load, the planner shows it, and the chat gate derives
+    the same floor from the drafted sets — so the generator's own draft commits."""
+    import types
+
+    from mcp.hevy_prescription_gate import prescription_gate
+
+    history, rows = _wire_history()
+    with patch.object(routine_generator, "_load_note_indexes", return_value=(history, WIRE_WEIGHTS, {}, {})):
+        ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
+    assert _top(ideal, BENCH) == pytest.approx(205 * LB)
+    rx = program_structure.planned_session("2026-09-29", block_workouts=rows, catalog_movements=MOVEMENTS)["prescription"]
+    load_ramp.annotate_prescription(rx, MOVEMENTS, history, WIRE_WEIGHTS, target_date="2026-09-29", week=1)
+    planned = {e["movement_key"]: e["load"]["top_kg"] for e in rx["exposures"]}
+    assert planned[BENCH] == _top(ideal, BENCH) and planned["db_shoulder_press"] == pytest.approx(52.5 * LB, abs=0.01)
+    custom = types.SimpleNamespace(
+        variant="ideal", target_date="2026-09-29", notes="", inputs_snapshot={"authored": "custom"}, exercises=ideal.exercises
+    )
+    with patch("mcp.plan_hevy_windows._block_workouts", return_value=rows):
+        gate = prescription_gate(custom, movements=MOVEMENTS, history_index=history, weight_index=WIRE_WEIGHTS)
+    assert gate["verdict"] == "clean", gate["audit"]
+    assert gate["load_floors"]["movements"][BENCH]["floor_kg"] == _top(ideal, BENCH)
+    assert gate["load_floors"]["movements"]["lat_pulldown"]["floor_kg"] == _top(ideal, "lat_pulldown") == pytest.approx(155 * LB)

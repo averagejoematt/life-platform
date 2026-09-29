@@ -33,6 +33,7 @@ from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 / #946 / #2109
 
 from web.site_api_common import PT, _decimal_to_float
@@ -165,7 +166,7 @@ def _latest_item(source: str) -> dict | None:
     # #2667: record WHEN this row is from, so downstream renderers can date the
     # metric instead of implying it is today's. Internal key, prompt-side only.
     items[0][_AS_OF] = _sk_date(items[0])
-    return items[0]
+    return strava_read_seam(source, items[0])
 
 
 def _soft_block(label: str, block) -> None:

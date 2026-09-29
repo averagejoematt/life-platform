@@ -5,6 +5,7 @@ Tool registry: maps tool names to their functions and JSON schemas.
 from typing import Any, cast
 
 from mcp.config import RAW_DAY_LIMIT, SOURCES
+from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
@@ -1163,7 +1164,10 @@ TOOLS = {
                     },
                     "date": {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
                     "dates": {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
-                    "reason": {"type": "string", "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel')."},
+                    "reason": {
+                        "type": "string",
+                        "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel'). [clear] Optional note on why it was cleared.",
+                    },
                     "start_date": {"type": "string", "description": "[list] Start of range (default: 30 days ago)."},
                     "end_date": {"type": "string", "description": "[list] End of range (default: today)."},
                 },
@@ -1356,6 +1360,7 @@ TOOLS = {
                     "category": {"type": "string", "description": "Memory category."},
                     "date": {"type": "string", "description": "Date of the legacy one-row-per-day record to delete (YYYY-MM-DD)."},
                     "key": {"type": "string", "description": "Exact sk of the row to delete — the only handle for a per-note row (#4171)"},
+                    "reason": {"type": "string", "description": "Optional short note on why this record was deleted (#4355)."},
                 },
                 "required": ["category"],
             },
@@ -1686,7 +1691,6 @@ TOOLS = {
                     },
                     "acwr_flag": {"type": "string", "description": "safe | caution | high | very_high."},
                     "volume_7d": {"type": "object", "description": "Optional map of muscle->sets completed in last 7d."},
-                    "z2_minutes_7d": {"type": "number"},
                     "days_since_last_workout": {"type": "integer"},
                 },
                 "required": ["action"],
@@ -2231,3 +2235,8 @@ def tool_list_available_tools(args=None):
 # (which looks for tool_* names as fn-refs); rebinding here makes the dispatcher
 # resolve to the callable at runtime.
 cast("dict[str, Any]", TOOLS["list_available_tools"])["fn"] = tool_list_available_tools
+
+# #4286: every tool's schema gets its derived `annotations` object here, once, after
+# the dict literal is fully built — `mcp/handler.py::handle_tools_list` already emits
+# `t["schema"]` verbatim, so this is the one place the wire format needs to change.
+annotate_tools(TOOLS)

@@ -87,6 +87,7 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 from common.digest_utils import d2f  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def fetch_series(source, field, start, end):
@@ -128,7 +129,7 @@ def fetch_series(source, field, start, end):
             out.append((item["sk"].replace("DATE#", ""), float(v)))
         except (TypeError, ValueError):
             continue
-    return out
+    return strava_read_seam(source, out)
 
 
 def query_forecast_rows(sk_lo, sk_hi):

@@ -164,6 +164,7 @@ from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def _safe_float(item, field, default=None):
@@ -209,7 +210,7 @@ def _fetch_range(source, start_date, end_date):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning("fetch_range(%s, %s -> %s) failed: %s", source, start_date, end_date, e)
         return []

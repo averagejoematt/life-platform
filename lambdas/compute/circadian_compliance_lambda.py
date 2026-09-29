@@ -86,12 +86,13 @@ def _to_dec(val):
 
 
 from common.digest_utils import d2f  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def fetch_source_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception as e:
         logger.warning("fetch(%s, %s): %s", source, date_str, e)
         return None
@@ -121,7 +122,7 @@ def fetch_range(source, start, end):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning("fetch_range(%s): %s", source, e)
         return []

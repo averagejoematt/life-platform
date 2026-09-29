@@ -94,3 +94,110 @@ def registered_tool_names(src: str) -> list[str]:
 def read_registry_source() -> str:
     with open(REGISTRY_PATH, encoding="utf-8") as fh:
         return fh.read()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4286: which registered tools structurally reach a DynamoDB write call.
+#
+# Used by test_mcp_registry.py's mutation-control check — a tool the registry
+# derives `annotations.readOnlyHint` for must never claim True while its own
+# implementing function can still run `table.put_item`/`update_item`/`delete_item`/
+# `transact_write_items`/`batch_write_item`.
+#
+# The naive approach — walk only the tool's own FunctionDef — misses the
+# `manage_*` fat-tool shape used across mcp/tools_{sick_days,pending_writes,
+# reading,hevy_routine}.py: the tool body dispatches through a dict (either a
+# local `VALID_ACTIONS = {...}` or a module-level `_DISPATCH = {...}` referenced
+# by name), and the actual `.put_item(...)` etc. call lives in a per-action
+# private helper the dict points at, not in the dispatcher's own AST.
+#
+# This resolves that by treating EVERY top-level symbol in a file — function
+# defs AND simple-name assignments (`_DISPATCH = {...}`) alike — as a node with
+# a "body" of referenced names, and taking the reachability closure from the
+# tool's own function. Over-inclusive by design (a mere reference, not
+# necessarily a call, counts) — the same fail-safe direction `is_write_tool`
+# already takes ("unknown verb classifies as WRITE").
+# ══════════════════════════════════════════════════════════════════════════════
+
+_DDB_WRITE_METHODS = frozenset({"put_item", "update_item", "delete_item", "transact_write_items", "batch_write_item"})
+
+
+def _module_symbol_bodies(tree: ast.Module) -> dict[str, ast.AST]:
+    """Every top-level function def AND every top-level `NAME = <expr>` RHS in
+    one module, keyed by name — the two shapes a same-module dispatch target
+    takes in this codebase (a private helper function, or a dispatch dict
+    bound to a module constant)."""
+    bodies: dict[str, ast.AST] = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            bodies[node.name] = node
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    bodies[target.id] = node.value
+    return bodies
+
+
+def _referenced_names(node: ast.AST) -> set[str]:
+    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+
+
+def _has_ddb_write_call(node: ast.AST) -> bool:
+    return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in _DDB_WRITE_METHODS for n in ast.walk(node))
+
+
+def _reaches_ddb_write(start: str, bodies: dict[str, ast.AST]) -> bool:
+    """BFS closure from `start` over same-module symbol references, stopping
+    the first time a reachable body contains a direct DDB write call."""
+    seen = {start}
+    frontier = [start]
+    while frontier:
+        name = frontier.pop()
+        body = bodies.get(name)
+        if body is None:
+            continue
+        if _has_ddb_write_call(body):
+            return True
+        for ref in _referenced_names(body) - seen:
+            seen.add(ref)
+            frontier.append(ref)
+    return False
+
+
+def ddb_write_tool_names() -> set[str]:
+    """Registered tool names whose implementing function structurally reaches
+    a DynamoDB write call, directly or via a same-module dispatch target.
+
+    Scoped to `mcp/*.py` only — a tool that delegates to a write in a
+    different package (e.g. `lambdas/privacy/diary_claims.py`) is not traced
+    here. That is a real limitation, not a silent one: this function is a
+    soundness check for the tools it CAN see into, not a completeness claim
+    over the whole codebase.
+    """
+    entries = parse_tool_entries(read_registry_source())
+    mcp_dir = os.path.join(ROOT, "mcp")
+    fn_to_file: dict[str, str] = {}
+    file_bodies: dict[str, dict[str, ast.AST]] = {}
+    for fname in sorted(os.listdir(mcp_dir)):
+        if not fname.endswith(".py"):
+            continue
+        fpath = os.path.join(mcp_dir, fname)
+        try:
+            with open(fpath, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read(), filename=fpath)
+        except SyntaxError:
+            continue
+        bodies = _module_symbol_bodies(tree)
+        file_bodies[fpath] = bodies
+        for name, node in bodies.items():
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                fn_to_file.setdefault(name, fpath)
+
+    result: set[str] = set()
+    for entry in entries:
+        fpath = fn_to_file.get(entry.fn_name)
+        if fpath is None:
+            continue
+        if _reaches_ddb_write(entry.fn_name, file_bodies[fpath]):
+            result.add(entry.name)
+    return result

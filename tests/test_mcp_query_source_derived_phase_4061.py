@@ -471,3 +471,40 @@ def test_search_activities_fully_measured_answer_carries_no_block(wired, monkeyp
 def test_find_days_row_says_what_its_distance_total_leaves_out(wired):
     out = TOOLS["find_days"]["fn"]({"source": "strava", "start_date": "2024-09-15", "end_date": "2025-05-10"})
     assert out[0]["activities_without_distance"] == 1
+
+
+# ── 6. #4419: the chokepoint also removes multi-device duplicates ─────────────────────
+#
+# The same live day, WITH the start instants and heart rates the stored row carries (read
+# 2026-09-28): WHOOP and the Garmin both pushed the 12:12 walk. The Garmin copy's 49.3 bpm
+# average is not a walk. Every MCP history tool reads through `query_source`, so the pair
+# must reach them as ONE walk — Garmin's measured distance, WHOOP's heart rate.
+
+
+def _strava_pilot_day_timed():
+    day = _strava_pilot_day()
+    garmin, whoop = (dict(a) for a in day["activities"])
+    garmin.update(start_date_local="2024-10-01T12:12:43Z", distance_meters=4825.2, average_heartrate=49.3, summary_polyline="<stub>")
+    whoop.update(start_date_local="2024-10-01T12:13:30Z", distance_meters=0.0, average_heartrate=103.5)
+    day["activities"] = [whoop, garmin]
+    return day
+
+
+def _check_one_walk_through_the_mcp():
+    out = TOOLS["search_activities"]["fn"]({"start_date": "2024-09-15", "end_date": "2025-05-10", "sport_type": "walk"})
+    assert [a["strava_id"] for a in out["activities"]] == ["PILOT-GARMIN"], out["activities"]
+    assert out["activities"][0]["average_heartrate"] == 103.5
+    days = TOOLS["find_days"]["fn"]({"source": "strava", "start_date": "2024-09-15", "end_date": "2025-05-10"})
+    assert days[0]["activity_count"] == 1, days
+
+
+def test_a_whoop_garmin_pair_reaches_the_mcp_history_tools_as_one_walk(wired):
+    wired.rows = [_strava_pilot_day_timed()]
+    _check_one_walk_through_the_mcp()
+
+
+def test_mutation_bypassing_the_read_seam_double_counts_the_walk(wired, monkeypatch):
+    wired.rows = [_strava_pilot_day_timed()]
+    monkeypatch.setattr(core, "strava_read_seam", lambda source, rows, keep_duplicates="": rows)
+    with pytest.raises(AssertionError):
+        _check_one_walk_through_the_mcp()

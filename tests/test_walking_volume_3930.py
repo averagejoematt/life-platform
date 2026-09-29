@@ -318,3 +318,281 @@ def test_an_unreadable_source_reaches_the_critic_as_unknown_never_as_zero_hours(
     assert packet["numbers"]["walking_hr_wk_strava"] is None
     assert "walking_hr_wk_strava" in packet["unknown"]
     assert any("strava unreadable" in f["reason"] and "a FLOOR" in f["reason"] for f in packet["flags"])
+
+
+# ── #4387: what his legs did in the last three days, per activity ────────────────────
+# `tests/fixtures/recent_aerobic_4387/*.json` are field-projected copies of the LIVE rows
+# (`USER#matthew#SOURCE#strava` / `#hevy`, DATE#2026-09-14..27, read 2026-09-27): only the
+# fields the code reads — no polylines, no names, no notes. The weekend walks are the Garmin
+# 102- and 165-min walks of 09-26 and 09-27; the 09-25 treadmill sits inside its Hevy session
+# with a WHOOP walk recorded over the same minutes (#4068).
+RA_FIX = Path(__file__).parent / "fixtures" / "recent_aerobic_4387"
+RA_TARGET, RA_TODAY = "2026-09-28", "2026-09-27"  # planned the night of 09-27 for Mon 09-28
+
+
+def _ra_rows(name: str, drop_weekend_walks: bool = False) -> list[dict]:
+    rows = json.loads((RA_FIX / f"{name}_2026-09-14_27.json").read_text())
+    if drop_weekend_walks:
+        rows = [
+            {
+                **r,
+                "activities": [
+                    a for a in r.get("activities") or [] if a.get("device_name", "").split()[0] != "Garmin" or r["date"] < "2026-09-26"
+                ],
+            }
+            for r in rows
+        ]
+    return rows
+
+
+def _ra_block(drop_weekend_walks: bool = False) -> dict:
+    """The block exactly as stage 1 builds it: through `shared_quantities.recent_aerobic_layer`, with
+    the fixture as the partition reader (the wire), so the window arithmetic is the shipped one."""
+    from mcp import shared_quantities
+
+    data = {"strava": _ra_rows("strava", drop_weekend_walks), "hevy": _ra_rows("hevy")}
+
+    def read(source: str, start: str, end: str) -> list[dict]:
+        return [r for r in data[source] if start <= r["date"] <= end]
+
+    return shared_quantities.recent_aerobic_layer(RA_TARGET, today=RA_TODAY, read=read)
+
+
+def _lower_volume_draft(trap_bar_sets: int = 2):
+    """The 2026-09-28 lower-volume draft the coach built (routine 30e24cca, v2): trap bar, squat, leg curl,
+    calf raise, machine crunch — and the 60-min treadmill copied from the last session."""
+    from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+    def lift(key, n, kg):
+        return ExerciseBlock(movement_key=key, rationale_tag="custom", sets=[Set(weight_kg=kg, reps=8) for _ in range(n)])
+
+    return RoutineSpec(
+        routine_id="r4387",
+        target_date=RA_TARGET,
+        archetype="lower",
+        exercises=[
+            lift("deadlift_trap_bar", trap_bar_sets, 55.5),
+            lift("squat_barbell", 3, 61.235),
+            lift("leg_curl", 2, 34.02),
+            lift("calf_raise_machine", 2, 131.54),
+            ExerciseBlock(movement_key="machine_crunch", rationale_tag="custom", sets=[Set(reps=12), Set(reps=12)]),
+            ExerciseBlock(movement_key="treadmill", rationale_tag="custom", sets=[Set(duration_seconds=3600)]),
+        ],
+    )
+
+
+def _joints(draft: dict, block: dict | None, days_since: dict | None = None) -> dict:
+    return critics.build_joints_packet(
+        draft,
+        pain_by_idx={},
+        days_since_by_idx=days_since or {e["idx"]: 3 for e in draft["exercises"]},
+        loaded_lifting_streak=2,
+        pain_layer_status="ok",
+        recent_aerobic=block,
+    )
+
+
+def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_treadmill_to_cycling():
+    """The incident, replayed on the wire rows: the plan for 09-28 sees Saturday's and Sunday's walks,
+    both over 75 min and over the 105-bpm ceiling, and the joints critic CHANGEs the lower draft's
+    treadmill to cycling — same 60 min, HR < 105. Mutation controls: drop `aerobic_flags` from
+    `build_joints_packet`, or make `recent_aerobic.window` end at target − 2 — this reds."""
+    block = _ra_block()
+    walks = [r for r in block["rows"] if r["modality"] == "walk"]
+    assert [(r["date"], r["moving_min"], r["device"]) for r in walks] == [
+        ("2026-09-26", 101.8, "Garmin epix (Gen2)"),
+        ("2026-09-27", 164.8, "Garmin epix (Gen2)"),
+    ]
+    assert all(r["flags"] == {"over_75_min": True, "avg_hr_over_ceiling": True} for r in walks)
+    assert [(r["avg_hr"], r["max_hr"]) for r in walks] == [(116.8, 171.0), (116.1, 176.0)]
+    # the Hevy treadmill Strava cannot see is a row; the WHOOP walk over its minutes is not a second one (#4068)
+    (tread,) = [r for r in block["rows"] if r["modality"] == "treadmill"]
+    assert tread["date"] == "2026-09-25" and tread["source"] == "hevy" and tread["moving_min"] == 60.0 and "WHOOP" in tread["hr_source"]
+    assert block["window"] == {"start": "2026-09-25", "end": "2026-09-27", "days": 3, "end_in_progress": True}
+    assert block["totals"]["weight_bearing_hr_48h"] == 4.44 and block["totals"]["weight_bearing_hr_72h"] == 5.44
+    assert block["totals"]["walks_over_75_min_48h"] == 2
+
+    ir = _lower_volume_draft()
+    draft = critics.draft_summary(ir)
+    verdict = critics.deterministic_verdict(_joints(draft, block))
+    assert verdict["verdict"] == "change" and verdict["field"] == "exercises[5].movement_key" and verdict["to"] == "cycling"
+    assert "POPULATION-DERIVED" in verdict["reason"] and "HR < 105" in verdict["reason"]
+    (rec,) = critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
+    assert rec["applied"] is True
+    assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
+    assert "HR < 105" in ir.exercises[5].notes
+    # re-evaluated, the revised draft carries nothing left to swap
+    assert critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))["verdict"] == "approve"
+
+
+def test_without_the_weekend_walks_the_treadmill_stands():
+    """The same wire rows minus the two Garmin walks: 1.0 h weight-bearing in 48 h, no walk over 75 min —
+    no change, and the treadmill stands. Mutation control: drop the `loaded` condition — this reds."""
+    block = _ra_block(drop_weekend_walks=True)
+    assert not [r for r in block["rows"] if r["modality"] == "walk"]
+    assert block["totals"]["weight_bearing_hr_48h"] < 3.0 and block["totals"]["walks_over_75_min_48h"] == 0
+    ir = _lower_volume_draft()
+    verdict = critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))
+    assert verdict["verdict"] == "approve"
+    critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
+    assert ir.exercises[5].movement_key == "treadmill"
+
+
+def test_the_swap_rides_beside_a_first_change_and_never_displaces_it():
+    """A critic returns ONE verdict. With a novel-again set cap on the trap bar (the packet's first change)
+    the treadmill swap rides as an `additional_changes` entry, and both are applied. Mutation control:
+    drop `additional_changes` from `deterministic_verdict` — the treadmill survives and this reds."""
+    ir = _lower_volume_draft(trap_bar_sets=4)
+    draft = critics.draft_summary(ir)
+    verdict = critics.deterministic_verdict(
+        _joints(draft, _ra_block(), days_since={e["idx"]: (60 if e["idx"] == 0 else 3) for e in draft["exercises"]})
+    )
+    assert verdict["field"] == "exercises[0].set_count"
+    assert [a["field"] for a in verdict["additional_changes"]] == ["exercises[5].movement_key"]
+    recs = critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
+    assert [r["applied"] for r in recs] == [True, True]
+    assert len(ir.exercises[0].sets) == critics.NOVEL_AGAIN_MAX_WORKING_SETS and ir.exercises[5].movement_key == "cycling"
+
+
+def test_an_unread_recent_block_changes_nothing_and_is_named_unknown():
+    draft = critics.draft_summary(_lower_volume_draft())
+    p = _joints(draft, None)
+    assert "weight_bearing_hr_48h" in p["unknown"] and critics.deterministic_verdict(p)["verdict"] == "approve"
+
+
+def test_the_swap_refuses_a_block_that_is_not_timed_cardio():
+    ir = _lower_volume_draft()
+    (rec,) = critics.apply_changes(
+        ir, [{"critic": "joints_tendons", "verdict": "change", "field": "exercises[1].movement_key", "to": "cycling"}]
+    )
+    assert rec["applied"] is False and ir.exercises[1].movement_key == "squat_barbell"
+
+
+def test_the_cardio_pick_is_derived_from_the_rows_never_from_the_last_session():
+    from training import recent_aerobic
+
+    heavy, fresh = _ra_block(), _ra_block(drop_weekend_walks=True)
+    assert recent_aerobic.cardio_pick(heavy, "lower")["movement_key"] == "cycling"
+    assert recent_aerobic.cardio_pick(fresh, "lower")["movement_key"] == "cycling"  # a lower session always
+    assert recent_aerobic.cardio_pick(heavy, "upper")["movement_key"] == "cycling"  # a heavy walking weekend
+    assert recent_aerobic.cardio_pick(fresh, "upper")["movement_key"] == "treadmill"  # the legs are fresh
+    assert recent_aerobic.cardio_pick(None, "upper")["movement_key"] == "cycling"  # unread is never fresh
+    # the redline numbers are read, not retyped
+    assert f"none over {recent_aerobic.WALK_MAX_MIN} min" in owner_redlines.REDLINES["walking_floor_hr_wk"]["walks"]
+    assert recent_aerobic.HR_CEILING_BPM == owner_redlines.REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
+
+
+def test_walking_collapse_and_overshoot_are_report_only_rows_on_the_block():
+    """#4387: both evaluated, both report-only — a row, never a veto or a change. Mutation control:
+    drop the `weekly_reports` loop in `_tripwire_states` — the rows vanish and this reds."""
+    block = _ra_block()
+    big = json.loads(json.dumps(block))
+    big["totals"]["week_to_date"].update(hours=14.0, over_target=True, over_ramp=True)
+    cb = plan_engine.constraint_block(date=RA_TARGET, recent_aerobic=big)
+    rows = {t["id"]: t for t in cb["tripwires"]}
+    assert rows["walking_overshoot"]["state"] == "tripped" and rows["walking_overshoot"]["report_only"] is True
+    assert "above the 13 h target" in rows["walking_overshoot"]["detail"]
+    assert rows["walking_collapse"]["state"] == "clear" and rows["walking_collapse"]["report_only"] is True
+    assert cb["recent_aerobic"]["rows"] == big["rows"] and cb["recent_aerobic"]["cardio_pick"]["movement_key"] in ("cycling", "treadmill")
+    none = plan_engine.constraint_block(date=RA_TARGET)
+    assert {t["id"]: t["state"] for t in none["tripwires"]}["walking_overshoot"] == "unknown"
+    assert none["recent_aerobic"]["cardio_pick"]["movement_key"] == "cycling"
+
+
+def test_draft_custom_names_a_copied_treadmill_the_pick_would_not_draft():
+    """The 09-28 treadmill came through `draft_custom` (the coach copied the last session's block). The
+    draft now says so by name — a warning, never a rewrite; the swap is stage 2's. Mutation control:
+    make `draft_cardio_warnings` return [] — this reds."""
+    from mcp import plan_cardio_pick, shared_quantities
+
+    ir = _lower_volume_draft()
+    with patch.object(shared_quantities, "recent_aerobic_layer", return_value=_ra_block()):
+        (w,) = plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET)
+    assert w.startswith("cardio: treadmill drafted") and "cycling (recumbent)" in w
+    with patch.object(shared_quantities, "recent_aerobic_layer", return_value=_ra_block(drop_weekend_walks=True)):
+        assert plan_cardio_pick.draft_cardio_warnings(ir.exercises, "upper", RA_TARGET) == []  # fresh legs, upper day
+    with patch.object(shared_quantities, "recent_aerobic_layer", side_effect=RuntimeError("boom")):
+        (w,) = plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET)
+    assert "could not be computed (RuntimeError)" in w
+
+
+# ── #4410: every draft path reads the aerobic minutes; an unread week is unknown, never 0 ────
+# The cron passed `z2_minutes_7d=0.0` and the chat / nightly pre-draft path passed the caller's
+# value or 0, so `full_body_session` wrote "z2 7d=0 < floor 90 … walk more" into the note of a
+# week the recent-aerobic block read at 9+ h. The fixture week (09-21..09-27, the wire above)
+# reads 10.19 h of walking + cycling.
+RA_MINUTES = 611.4  # 10.19 h × 60 — the trailing 7 days through target − 1 of the fixture block
+
+
+def _fixture_read(source: str, start: str, end: str) -> list[dict]:
+    data = {"strava": _ra_rows("strava"), "hevy": _ra_rows("hevy")}
+    return [r for r in data[source] if start <= r["date"] <= end]
+
+
+def _full_body_rationale(monkeypatch, z2: float | None) -> list[str]:
+    """The ideal §3 session for 09-28 (two lifts done → week 1's lower-volume), as the generator
+    builds it — the same stubs as `test_a_full_body_week_generates_through_the_module_grid`."""
+    from training import exercise_history, routine_generator as rg
+
+    monkeypatch.setattr(rg, "CONFIG_DIR", str(Path(__file__).resolve().parents[1] / "config"))
+    monkeypatch.setattr(exercise_history, "load_history_indexes", lambda **kw: ({}, {}))
+    monkeypatch.setattr(exercise_history, "load_bodyweight_index", lambda **kw: {})
+    monkeypatch.setattr(exercise_history, "load_whoop_workout_index", lambda **kw: {})
+    lift = [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}, {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]}]
+    done = [{"date": d, "exercises": lift} for d in ("2026-09-24", "2026-09-26")]
+    inputs = rg.GeneratorInputs(
+        target_date=RA_TARGET, volume_7d={}, recovery_tier="green", acwr_flag="safe", z2_minutes_7d=z2, block_workouts=done
+    )
+    ideal = next(r for r in rg.generate_routines(inputs) if r.variant == "ideal")
+    assert ideal.inputs_snapshot["z2_minutes_7d"] == z2  # the record the live proof reads
+    return ideal.rationale
+
+
+def test_the_draft_path_reads_the_real_aerobic_minutes_and_writes_no_walk_more_note(monkeypatch):
+    """The nightly pre-draft's path (`_action_draft` → `_generator_inputs`) over the fixture partitions.
+    Mutation control: restore `z2_minutes_7d=float(args.get("z2_minutes_7d") or 0)` in
+    `tools_hevy_routine._generator_inputs` — the inputs read 0 and the note says walk more."""
+    from mcp import shared_quantities, tools_hevy_routine as thr
+
+    with patch.object(shared_quantities._core, "query_source_range", side_effect=_fixture_read):
+        inputs = thr._generator_inputs({"target_date": RA_TARGET})
+    assert inputs.z2_minutes_7d == RA_MINUTES
+    assert not any("walk more" in r for r in _full_body_rationale(monkeypatch, inputs.z2_minutes_7d))
+    # the in-test control: the old literal 0 is exactly what wrote the note
+    assert any("walk more" in r for r in _full_body_rationale(monkeypatch, 0.0))
+
+
+def test_the_cron_reads_the_same_quantity_as_the_mcp_path():
+    """Two draft paths, one number. Mutation control: put `z2_minutes_7d=0.0` back in the cron's
+    `_gather_inputs` — this reds."""
+    import importlib
+
+    cron = importlib.import_module("operational.hevy_routine_cron_lambda")
+    assert cron._z2_minutes_7d(RA_TARGET, read=_fixture_read) == RA_MINUTES
+    with patch.object(cron, "_read_partition", side_effect=_fixture_read):
+        assert cron._gather_inputs(RA_TARGET, False).z2_minutes_7d == RA_MINUTES
+
+
+def test_an_unreadable_aerobic_read_is_unknown_and_writes_no_walk_more_note(monkeypatch):
+    """ADR-104: both sources raising → None, and a floor (one source unreadable) → None too — a floor
+    below 90 min cannot say he is below it. None writes the unknown line, never the walk-more note.
+    Mutation control: make `_portfolio_guard` return `(z2_minutes_7d or 0) >= z2_floor` — this reds."""
+    import importlib
+
+    from training import recent_aerobic, routine_generator as rg
+
+    from mcp import shared_quantities, tools_hevy_routine as thr
+
+    with patch.object(shared_quantities._core, "query_source_range", side_effect=RuntimeError("ddb down")):
+        assert thr._generator_inputs({"target_date": RA_TARGET}).z2_minutes_7d is None
+    cron = importlib.import_module("operational.hevy_routine_cron_lambda")
+
+    def strava_down(source: str, start: str, end: str) -> list[dict]:
+        if source == "strava":
+            raise RuntimeError("strava down")
+        return _fixture_read(source, start, end)
+
+    assert cron._z2_minutes_7d(RA_TARGET, read=strava_down) is None
+    assert recent_aerobic.aerobic_minutes_7d(None) is None
+    rationale = _full_body_rationale(monkeypatch, None)
+    assert rg.Z2_UNKNOWN_NOTE in rationale and not any("walk more" in r for r in rationale)

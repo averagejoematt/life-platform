@@ -236,3 +236,29 @@ def test_emit_branch_model_branch_carries_its_own_exercises():
     easier = next(b for b in primary.branches if b.label == "easier")
     floor = next(r for r in routines if r.variant == "floor")
     assert [e.movement_key for e in easier.exercises] == [e.movement_key for e in floor.exercises]
+
+
+def test_no_draft_caller_hands_the_generator_a_literal_z2_minutes():
+    """#4410 — guard the SET of callers, not the one call site that was caught. Every
+    `GeneratorInputs(...)` built in shipped code (lambdas/ mcp/ scripts/ deploy/) must pass `z2_minutes_7d` as a
+    READ value (`shared_quantities.z2_minutes_7d`, the cron's `_z2_minutes_7d`) — never a literal,
+    and never omitted where a draft path is concerned (the default is None = unknown, not 0).
+    Mutation control: put `z2_minutes_7d=0.0` back in `hevy_routine_cron_lambda._gather_inputs` — this reds."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    offenders, seen = [], 0
+    for base in ("lambdas", "mcp", "scripts", "deploy"):
+        for path in sorted((root / base).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not (isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) == "GeneratorInputs"):
+                    continue
+                seen += 1
+                kw = {k.arg: k.value for k in node.keywords}
+                val = kw.get("z2_minutes_7d")
+                if val is None or isinstance(val, ast.Constant):
+                    offenders.append(f"{path.relative_to(root)}:{node.lineno} z2_minutes_7d={ast.unparse(val) if val else '(omitted)'}")
+    assert seen >= 2, f"the sweep found {seen} GeneratorInputs call sites — the guard is not reading the tree"
+    assert offenders == [], "draft callers must pass the READ aerobic minutes (#4410):\n" + "\n".join(offenders)

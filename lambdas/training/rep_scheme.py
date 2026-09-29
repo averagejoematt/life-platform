@@ -69,6 +69,13 @@ PLATE_STEP_LB = 2.5
 BACK_OFF_ROUNDING_LB = 5.0
 """platform-proposed: the −pct back-off target rounds DOWN to this load step (see module doc)."""
 
+FLOOR_ROUNDING_LB = 5.0
+"""owner ruling 2026-09-28 (#4388): the v0.3 entry-ramp floor rounds to the NEAREST loadable step
+in the pound he loads — 60 % x 103.19 kg = 136.5 lb -> 135 lb, the squat he wrote by hand. Only a
+5-lb step reproduces that (a 2.5-lb nearest step reads 137.5 lb); it is the same 5 lb as
+`BACK_OFF_ROUNDING_LB`, the common barbell/dumbbell/stack step. The commit gate's own slack
+(`PLATE_STEP_LB`) is unchanged and applies to every equipment type alike."""
+
 SCHEME_SOURCE = "program_structure.EXPOSURES['heavy']"
 PROSE_SOURCE = "owner_redlines.REDLINES['lifting_sessions_per_wk']['rep_scheme']"
 
@@ -159,6 +166,16 @@ def back_off_min_kg(top_kg: float, scheme: dict[str, Any]) -> float:
     target_lb = float(top_kg) / LB_IN_KG * (1.0 - float(scheme["back_off_pct"]) / 100.0)
     step = float(scheme.get("rounding_lb") or BACK_OFF_ROUNDING_LB)
     return math.floor(target_lb / step + 1e-9) * step * LB_IN_KG
+
+
+def load_step_kg(kg: float, *, down: bool = False) -> float:
+    """THE one rounding helper for a v0.3 ramped load (#4388): `kg` expressed in the pound he
+    loads, rounded to a whole `FLOOR_ROUNDING_LB` step — NEAREST (half up) by default, DOWN when
+    `down` (the e1RM cap, so rounding never crosses it) — and returned in kg. The generator, the
+    planner and the chat commit gate all reach it through `load_ramp.ramp_floor`."""
+    steps = float(kg) / LB_IN_KG / FLOOR_ROUNDING_LB
+    whole = math.floor(steps + 1e-9) if down else math.floor(steps + 0.5 + 1e-9)
+    return whole * FLOOR_ROUNDING_LB * LB_IN_KG
 
 
 def steps_under_floor(weight_kg: float, floor_kg: float) -> int:

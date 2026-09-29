@@ -40,6 +40,7 @@ follow-up (tracked on #1627 / epic #1619).
 
 from datetime import date, datetime, timedelta
 
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from health.personal_baselines import percentile
 
 try:  # structured JSON logging (logger-discipline gate: never print() in lambdas/)
@@ -525,7 +526,7 @@ def _query_window(table, source, start_day, end_day):
         if not last:
             break
         kwargs["ExclusiveStartKey"] = last
-    return items
+    return strava_read_seam(source, items)
 
 
 def _midpoint_pacific_hour(sleep_start, sleep_end):

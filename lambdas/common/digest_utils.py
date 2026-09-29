@@ -15,7 +15,7 @@ Contents:
   - Pure scalar helpers: d2f, avg, fmt, fmt_num, safe_float
   - DDB range queries: query_range, query_range_list (paginated, phase-scoped — #970)
   - get_food_delivery_streak_state (#2235 — the one read path for STREAK#current)
-  - dedup_activities
+  - dedup_activities (re-exported from common.strava_read_seam, #4419)
   - _normalize_whoop_sleep
   - List-based extractors: ex_whoop_from_list, ex_whoop_sleep_from_list, ex_withings_from_list
   - Banister: compute_banister_from_list, compute_banister_from_dict
@@ -30,6 +30,7 @@ from ingestion.source_registry import stale_hours_overrides  # #2235: one stalen
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 from common.pacific_time import pacific_now, parse_iso_utc  # #2811 pacific_now; #3609 the canonical ISO-8601 parser
+from common.strava_read_seam import dedup_activities, strava_read_seam  # noqa: F401 — #4419: the one dedupe + the read seam
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS
@@ -149,7 +150,7 @@ def query_range(table, source, start_date, end_date, user_id="matthew", include_
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    return strava_read_seam(source, records)  # #4419: multi-device duplicates removed once, here
 
 
 def query_range_list(table, source, start_date, end_date, user_id="matthew", include_pilot: bool = False):
@@ -183,7 +184,7 @@ def query_range_list(table, source, start_date, end_date, user_id="matthew", inc
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    return strava_read_seam(source, records)  # #4419
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -252,59 +253,8 @@ def get_food_delivery_streak_state(table, user_id="matthew", now=None):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def dedup_activities(activities):
-    """Remove duplicate activities within a 15-minute window.
-
-    Keeps the richer record (higher richness score). Records without a parseable
-    start_date_local are kept unconditionally. Handles Garmin->Strava auto-sync
-    duplicates where the same session appears twice with different metadata.
-    """
-    if not activities or len(activities) <= 1:
-        return activities
-
-    def parse_start(a):
-        # #1964: the canonical parser. Same None-on-failure contract as the inline
-        # fork it replaces, plus the UTC backfill — which matters here because the
-        # results are COMPARED below, and a naive/aware mix raises TypeError.
-        from common.pacific_time import parse_iso_utc
-
-        return parse_iso_utc(a.get("start_date_local") or a.get("start_date") or "")
-
-    def richness(a):
-        score = 0
-        if float(a.get("distance_meters") or 0) > 0:
-            score += 1000
-        score += float(a.get("moving_time_seconds") or 0)
-        if a.get("summary_polyline"):
-            score += 500
-        return score
-
-    indexed = [(i, a, parse_start(a)) for i, a in enumerate(activities)]
-    indexed = [(i, a, t) for i, a, t in indexed if t is not None]
-    indexed.sort(key=lambda x: x[2])
-
-    remove = set()
-    for j in range(len(indexed)):
-        if j in remove:
-            continue
-        _, a_j, t_j = indexed[j]
-        sport_j = (a_j.get("sport_type") or "").lower()
-        for k in range(j + 1, len(indexed)):
-            if k in remove:
-                continue
-            _, a_k, t_k = indexed[k]
-            if (a_k.get("sport_type") or "").lower() != sport_j:
-                continue
-            if abs((t_k - t_j).total_seconds()) / 60 > 15:
-                break
-            if richness(a_j) >= richness(a_k):
-                remove.add(k)
-            else:
-                remove.add(j)
-
-    kept = [a for i, (_, a, _) in enumerate(indexed) if i not in remove]
-    no_time = [a for a in activities if parse_start(a) is None]
-    return kept + no_time
+# `dedup_activities` — the pair rule moved to `common/strava_read_seam.py` (#4419), re-exported
+# at the top of this module for its pre-seam callers (redundant and harmless: it is idempotent).
 
 
 def dedup_activities_multidevice(activities):

@@ -53,12 +53,13 @@ s3 = boto3.client("s3", region_name=_REGION)
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception:
         return None
 
@@ -86,7 +87,7 @@ def fetch_range(source, start, end):
                 include_pilot=source_reads_cross_phase(source),
             )
         )
-        return [d2f(i) for i in r.get("Items", [])]
+        return strava_read_seam(source, [d2f(i) for i in r.get("Items", [])])
     except Exception:
         return []
 

@@ -4,7 +4,7 @@ Sick day MCP tools: log, view, and clear sick/rest days.
 Tools:
   log_sick_day  — flag one or more dates as sick/rest days
   get_sick_days — list sick days within a date range
-  clear_sick_day — remove a sick day flag (if logged in error)
+  clear_sick_day — remove a sick day flag (if logged in error) — a tombstone, #4378
 
 DDB partition: SOURCE#sick_days
   pk = USER#<id>#SOURCE#sick_days
@@ -30,6 +30,7 @@ SICK_DAYS_PK = f"USER#{USER_ID}#SOURCE#sick_days"
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from health import sick_day_checker as _sdc  # #4378: THE clear (tombstone) + the cleared-row predicate every reader shares
 
 # ── Tool: log_sick_day ────────────────────────────────────────────────────────
 
@@ -107,7 +108,8 @@ def _get_sick_days(args):
                 include_pilot=True,
             )
         )
-        items = [_d2f(i) for i in resp.get("Items", [])]
+        # #4378: a cleared (tombstoned) row is not a sick day — never listed.
+        items = [_d2f(i) for i in resp.get("Items", []) if not _sdc.is_cleared(i)]
     except Exception as e:
         logger.error(f"[sick_days] get_sick_days query failed: {e}")
         return {"error": str(e)}
@@ -133,22 +135,26 @@ def _clear_sick_day(args):
     except ValueError:
         return {"error": f"Invalid date format: '{date}'. Use YYYY-MM-DD."}
 
-    resp = table.get_item(Key={"pk": SICK_DAYS_PK, "sk": f"DATE#{date}"})
-    if not resp.get("Item"):
+    # #4378: the MCP role holds no dynamodb:DeleteItem on this partition — clear is a
+    # conditional UpdateItem tombstone (cleared_at/cleared_reason) that every reader
+    # (sick_day_checker.check_sick_day / get_sick_days_range, the list action above)
+    # treats as "not a sick day". None = there was no live flag (absent or already cleared).
+    reason = (args.get("reason") or "").strip() or None
+    cleared_at = _sdc.clear_sick_day(table, USER_ID, date, reason=reason)
+    if cleared_at is None:
         return {
             "status": "not_found",
             "date": date,
-            "message": f"No sick day record found for {date}.",
+            "message": f"No sick day record found for {date} (or it was already cleared).",
         }
-
-    table.delete_item(Key={"pk": SICK_DAYS_PK, "sk": f"DATE#{date}"})
     logger.info(f"[sick_days] Cleared sick day: {date}")
 
     return {
         "status": "cleared",
         "date": date,
+        "cleared_at": cleared_at,
         "message": (
-            f"Sick day flag removed for {date}. "
+            f"Sick day flag removed for {date} (tombstoned — no reader counts it as sick from now on). "
             "Re-run character-sheet-compute and daily-metrics-compute with "
             "force=true to recompute affected records."
         ),

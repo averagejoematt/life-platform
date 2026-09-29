@@ -1,0 +1,400 @@
+[
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-14",
+  "date": "2026-09-14",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-14T12:02:00Z",
+    "moving_time_seconds": 8764,
+    "elapsed_time_seconds": 8764
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-14T13:04:00Z",
+    "moving_time_seconds": 3539,
+    "elapsed_time_seconds": 3539,
+    "average_heartrate": 113.4,
+    "max_heartrate": 120
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "Garmin epix (Gen2)",
+    "start_date": "2026-09-14T23:24:37Z",
+    "moving_time_seconds": 3253,
+    "elapsed_time_seconds": 3281,
+    "average_heartrate": 114.3,
+    "max_heartrate": 139,
+    "distance_miles": 2.48,
+    "total_elevation_gain_feet": 183.7
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-15",
+  "date": "2026-09-15",
+  "activities": [
+   {
+    "type": "Workout",
+    "sport_type": "Workout",
+    "device_name": "Hevy",
+    "start_date": "2026-09-15T22:34:26Z",
+    "moving_time_seconds": 7500,
+    "elapsed_time_seconds": 7500
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-15T23:19:00Z",
+    "moving_time_seconds": 3659,
+    "elapsed_time_seconds": 3659,
+    "average_heartrate": 114.4,
+    "max_heartrate": 139
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-16",
+  "date": "2026-09-16",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-16T12:05:56Z",
+    "moving_time_seconds": 8619,
+    "elapsed_time_seconds": 8619
+   },
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-16T12:38:00Z",
+    "moving_time_seconds": 1799,
+    "elapsed_time_seconds": 1799,
+    "average_heartrate": 110.6,
+    "max_heartrate": 145
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "Garmin epix (Gen2)",
+    "start_date": "2026-09-17T01:53:28Z",
+    "moving_time_seconds": 870,
+    "elapsed_time_seconds": 870,
+    "average_heartrate": 114.1,
+    "max_heartrate": 133,
+    "distance_miles": 0.67,
+    "total_elevation_gain_feet": 65.6
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-17",
+  "date": "2026-09-17",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-17T12:10:49Z",
+    "moving_time_seconds": 7862,
+    "elapsed_time_seconds": 7862
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-17T13:03:00Z",
+    "moving_time_seconds": 3479,
+    "elapsed_time_seconds": 3479,
+    "average_heartrate": 115,
+    "max_heartrate": 139
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-18",
+  "date": "2026-09-18",
+  "activities": [
+   {
+    "type": "Workout",
+    "sport_type": "Workout",
+    "device_name": "Hevy",
+    "start_date": "2026-09-18T21:20:19Z",
+    "moving_time_seconds": 3900,
+    "elapsed_time_seconds": 3900
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-19",
+  "date": "2026-09-19",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-19T15:50:36Z",
+    "moving_time_seconds": 12600,
+    "elapsed_time_seconds": 12600
+   },
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-19T16:23:00Z",
+    "moving_time_seconds": 2639,
+    "elapsed_time_seconds": 2639,
+    "average_heartrate": 106.7,
+    "max_heartrate": 140
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-19T18:01:00Z",
+    "moving_time_seconds": 3539,
+    "elapsed_time_seconds": 3539,
+    "average_heartrate": 113.2,
+    "max_heartrate": 124
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-20",
+  "date": "2026-09-20",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-20T18:18:09Z",
+    "moving_time_seconds": 12325,
+    "elapsed_time_seconds": 12325
+   },
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-20T18:48:00Z",
+    "moving_time_seconds": 2099,
+    "elapsed_time_seconds": 2099,
+    "average_heartrate": 116.7,
+    "max_heartrate": 153
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-20T20:15:00Z",
+    "moving_time_seconds": 3779,
+    "elapsed_time_seconds": 3779,
+    "average_heartrate": 111.8,
+    "max_heartrate": 128
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-21",
+  "date": "2026-09-21",
+  "activities": [
+   {
+    "type": "Workout",
+    "sport_type": "Workout",
+    "device_name": "Hevy",
+    "start_date": "2026-09-21T22:35:14Z",
+    "moving_time_seconds": 7808,
+    "elapsed_time_seconds": 7808
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-21T22:38:00Z",
+    "moving_time_seconds": 6239,
+    "elapsed_time_seconds": 6239,
+    "average_heartrate": 127.8,
+    "max_heartrate": 152
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-22",
+  "date": "2026-09-22",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-22T22:35:06Z",
+    "moving_time_seconds": 9482,
+    "elapsed_time_seconds": 9482
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-23",
+  "date": "2026-09-23",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-23T12:11:01Z",
+    "moving_time_seconds": 8874,
+    "elapsed_time_seconds": 8874
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-23T13:14:00Z",
+    "moving_time_seconds": 3779,
+    "elapsed_time_seconds": 3779,
+    "average_heartrate": 114.8,
+    "max_heartrate": 131
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-24",
+  "date": "2026-09-24",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-24T12:12:06Z",
+    "moving_time_seconds": 9077,
+    "elapsed_time_seconds": 9077
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-24T13:21:00Z",
+    "moving_time_seconds": 3719,
+    "elapsed_time_seconds": 3719,
+    "average_heartrate": 113.3,
+    "max_heartrate": 139
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-25",
+  "date": "2026-09-25",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-25T22:08:50Z",
+    "moving_time_seconds": 10001,
+    "elapsed_time_seconds": 10001
+   },
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-25T22:40:00Z",
+    "moving_time_seconds": 1379,
+    "elapsed_time_seconds": 1379,
+    "average_heartrate": 121.4,
+    "max_heartrate": 150
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-25T23:20:00Z",
+    "moving_time_seconds": 4319,
+    "elapsed_time_seconds": 4319,
+    "average_heartrate": 116.9,
+    "max_heartrate": 150
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-26",
+  "date": "2026-09-26",
+  "activities": [
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "Hevy",
+    "start_date": "2026-09-26T17:59:23Z",
+    "moving_time_seconds": 3937,
+    "elapsed_time_seconds": 3937
+   },
+   {
+    "type": "WeightTraining",
+    "sport_type": "WeightTraining",
+    "device_name": "WHOOP",
+    "start_date": "2026-09-26T18:28:00Z",
+    "moving_time_seconds": 1019,
+    "elapsed_time_seconds": 1019,
+    "average_heartrate": 106.6,
+    "max_heartrate": 136
+   },
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "Garmin epix (Gen2)",
+    "start_date": "2026-09-26T20:09:22Z",
+    "moving_time_seconds": 6108,
+    "elapsed_time_seconds": 6175,
+    "average_heartrate": 116.8,
+    "max_heartrate": 171,
+    "distance_miles": 5.16,
+    "total_elevation_gain_feet": 328.1
+   }
+  ]
+ },
+ {
+  "pk": "USER#matthew#SOURCE#strava",
+  "sk": "DATE#2026-09-27",
+  "date": "2026-09-27",
+  "activities": [
+   {
+    "type": "Walk",
+    "sport_type": "Walk",
+    "device_name": "Garmin epix (Gen2)",
+    "start_date": "2026-09-27T17:35:26Z",
+    "moving_time_seconds": 9888,
+    "elapsed_time_seconds": 10459,
+    "average_heartrate": 116.1,
+    "max_heartrate": 176,
+    "distance_miles": 8.2,
+    "total_elevation_gain_feet": 380.6
+   },
+   {
+    "type": "Workout",
+    "sport_type": "Workout",
+    "device_name": "Hevy",
+    "start_date": "2026-09-27T20:31:13Z",
+    "moving_time_seconds": 1690,
+    "elapsed_time_seconds": 1690
+   }
+  ]
+ }
+]

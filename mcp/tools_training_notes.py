@@ -189,7 +189,9 @@ def tool_get_exercise_notes(args):
     — the stale-number gate would red this PR on six doc headers the reconcile job owns. The
     issue's acceptance sanctions "a new action on an existing owner tool", and this is the
     tool that owns the pain-flag surface: its own `note` is the sentence the action answers.
-    `action` defaults to `read`, so every existing caller is unchanged."""
+    `action` defaults to `read`, so every existing caller is unchanged. Because the write rides
+    a read verb, `mcp/audit.py::WRITE_TOOLS_BEHIND_READ_VERB` names this tool (#4401): every
+    call — read or dismiss — is classified a write, so the dismissal lands in the #753 trail."""
     args = args or {}
     action = str(args.get("action") or "read").strip().lower()
     if action == "dismiss":

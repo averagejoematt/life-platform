@@ -245,3 +245,103 @@ def test_the_missed_row_says_what_it_measures():
 def test_the_vice_denominator_is_the_tracked_count():
     f = _facts(vice_streaks={"a": 7, "b": 7}, vices_total=8)
     assert L._vice_summary(f).startswith("2 of 8")
+
+
+# ── #4362: "Not checked in: Walk 5k" beside "walked 5.2 mi" ─────────────────────────
+# The live 2026-09-26 rows, read-only from DynamoDB 2026-09-27, cut to the fields the card
+# reads (no names, notes, polylines or ids). habit_scores is the row AS STORED before the
+# scorer fix: it still lists the renamed "Walk 5k" as missed.
+ROWS_0926 = {
+    "computed_metrics": {"component_details": {"hydration": {"water_oz": 26.1, "target_oz": 100}}},
+    "habit_scores": {"tier0_done": 5, "tier0_total": 7, "missed_tier0": ["Walk 5k", "Morning Sunlight / Luminette Glasses"]},
+    "strava": {
+        "activities": [
+            {
+                "type": "WeightTraining",
+                "trainer": True,
+                "start_date": "2026-09-26T17:59:23Z",
+                "elapsed_time_seconds": 3937,
+                "device_name": "Hevy",
+            },
+            {
+                "type": "WeightTraining",
+                "trainer": True,
+                "start_date": "2026-09-26T18:28:00Z",
+                "elapsed_time_seconds": 1019,
+                "device_name": "WHOOP",
+            },
+            {
+                "type": "Walk",
+                "trainer": False,
+                "distance_miles": 5.16,
+                "start_date": "2026-09-26T20:09:22Z",
+                "elapsed_time_seconds": 6175,
+                "device_name": "Garmin epix (Gen2)",
+            },
+        ]
+    },
+}
+HEVY_0926 = [
+    {
+        "start_time": "2026-09-26T17:59:23+00:00",
+        "end_time": "2026-09-26T19:05:00+00:00",
+        "exercises": [
+            {"name": "Suitcase Carry", "sets": [{"reps": 10, "weight_lbs": 50}]},
+            {"name": "Stretching", "sets": [{"duration_sec": 900}]},
+        ],
+    }
+]
+
+
+def _facts_0926(monkeypatch, rows=None, hevy=None):
+    rows = ROWS_0926 if rows is None else rows
+    monkeypatch.setattr(recap_data, "_get_day", lambda _t, source, _d: rows.get(source))
+    monkeypatch.setattr(
+        recap_data, "_query_prefix", lambda _t, source, _p: (HEVY_0926 if hevy is None else hevy) if source == "hevy" else []
+    )
+    return recap_data.day_facts(None, "2026-09-26")
+
+
+def test_the_0926_card_credits_the_walk_it_measured_instead_of_listing_it_missed(monkeypatch):
+    f = _facts_0926(monkeypatch)
+    assert f.walk_miles == 5.16 and f.longest_outdoor_walk_mi == 5.16
+    assert f.met_by_measurement == ["Walk 5k"]
+    assert f.missed_tier0 == ["Morning Sunlight / Luminette Glasses"]
+    caption = L.caption_for_beat("scorecard", f, day_label="Day 21", date_label="Sat 26 Sep")
+    drawn = " | ".join(_strings(L.scorecard(f, date_label="x")))
+    assert "Walk 5k" not in caption and "Walk 5k" not in drawn
+    assert "Morning Sunlight" in caption and "Morning Sunlight" in drawn
+
+
+def test_a_measured_twin_is_credited_only_when_the_habits_own_definition_is_met(monkeypatch):
+    """The SET: every tier-0 habit a card measurement could stand in for, and the ones it cannot."""
+    f = _facts_0926(monkeypatch)
+    f.water_oz = 102.0
+    assert recap_data.measured_twin_met("Walk Outdoor >2mi", f)
+    assert recap_data.measured_twin_met("Walk 5k", f)  # 5 km = 3.11 mi <= 5.16
+    assert recap_data.measured_twin_met("Hydrate 3L", f)  # 3 L = 101.4 oz
+    f.water_oz = 26.1  # the real 09-26 channel: 26 oz on a day "Hydrate 3L" was checked in
+    assert not recap_data.measured_twin_met("Hydrate 3L", f)  # a partial channel never credits
+    for no_quantity in ("Primary Exercise", "Calorie Goal", "Morning Sunlight / Luminette Glasses", "No alcohol"):
+        assert not recap_data.measured_twin_met(no_quantity, f), no_quantity
+    f.longest_outdoor_walk_mi = 1.9
+    assert not recap_data.measured_twin_met("Walk Outdoor >2mi", f)
+    f.longest_outdoor_walk_mi = None
+    assert not recap_data.measured_twin_met("Walk Outdoor >2mi", f)
+
+
+def test_a_treadmill_walk_is_not_an_outdoor_walk(monkeypatch):
+    """#4068: WHOOP posts the treadmill block inside a Hevy session as its own Strava Walk."""
+    whoop = {
+        "type": "Walk",
+        "distance_miles": 3.4,
+        "start_date": "2026-09-26T18:10:00Z",
+        "elapsed_time_seconds": 3000,
+        "device_name": "WHOOP",
+    }
+    treadmill = [{**HEVY_0926[0], "exercises": [{"name": "Treadmill", "sets": [{"duration_sec": 3000}]}]}]
+    rows = {**ROWS_0926, "strava": {"activities": [whoop]}}
+    f = _facts_0926(monkeypatch, rows=rows, hevy=treadmill)
+    assert f.longest_outdoor_walk_mi is None and f.missed_tier0 == ["Walk 5k", "Morning Sunlight / Luminette Glasses"]
+    rows = {**ROWS_0926, "strava": {"activities": [{**whoop, "trainer": True, "start_date": "2026-09-26T22:00:00Z"}]}}
+    assert _facts_0926(monkeypatch, rows=rows, hevy=[]).longest_outdoor_walk_mi is None

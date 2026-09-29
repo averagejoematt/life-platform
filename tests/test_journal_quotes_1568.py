@@ -149,15 +149,28 @@ class FakeTable:
         self.store[(Item["pk"], Item["sk"])] = dict(Item)
 
     def delete_item(self, Key, ReturnValues=None):
-        old = self.store.pop((Key["pk"], Key["sk"]), None)
-        return {"Attributes": old} if (ReturnValues == "ALL_OLD" and old is not None) else {}
+        # #4377: the wire — the MCP role holds no dynamodb:DeleteItem on journal_quotes
+        # (its one scoped grant is macrofactor_meals), so live this raises. Modelled here so
+        # a regression to delete_item reds instead of passing against a permissive fake.
+        raise Exception("AccessDeniedException: not authorized to perform: dynamodb:DeleteItem")
 
     def update_item(self, Key, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None):
-        # Enough for the list re-verify upgrade: SET grounding = :v IF grounding = :p
         item = self.store.get((Key["pk"], Key["sk"]))
+        vals = ExpressionAttributeValues or {}
+        if "revoked_at" in (UpdateExpression or ""):
+            # #4377's unmark tombstone: SET revoked_at = :ra REMOVE quote, grounding,
+            # conditional on the row existing and not already being revoked.
+            assert ConditionExpression == "attribute_exists(sk) AND attribute_not_exists(revoked_at)", ConditionExpression
+            if item is None or item.get("revoked_at"):
+                raise Exception("ConditionalCheckFailedException: The conditional request failed")
+            assert UpdateExpression == "SET revoked_at = :ra REMOVE quote, grounding", UpdateExpression
+            item["revoked_at"] = vals[":ra"]
+            item.pop("quote", None)
+            item.pop("grounding", None)
+            return {}
+        # Enough for the list re-verify upgrade: SET grounding = :v IF grounding = :p
         if item is None:
             raise Exception("ConditionalCheckFailedException")
-        vals = ExpressionAttributeValues or {}
         if ConditionExpression and item.get("grounding") != vals.get(":p"):
             raise Exception("ConditionalCheckFailedException")
         item["grounding"] = vals.get(":v")
@@ -234,8 +247,13 @@ def test_unmark_revokes_consent(fake_table):
     out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
     assert out.get("status") == "marked"
     out2 = tj.tool_mark_journal_quote({"action": "unmark", "date": "2026-07-25", "quote": CLEAN_LINE})
-    assert out2["status"] == "revoked"
-    assert not any(pk == QUOTES_PK for pk, _ in fake_table.store)
+    assert out2["status"] == "revoked" and out2["revoked_at"]
+    # #4377: a tombstone, not a delete — the row survives as a stub with the verbatim
+    # text REMOVED (consent withdrawn means the words leave the consent record too).
+    stub = fake_table.store[(QUOTES_PK, out["sk"])]
+    assert stub["revoked_at"] == out2["revoked_at"]
+    assert "quote" not in stub and "grounding" not in stub
+    assert tj.tool_mark_journal_quote({"action": "list"})["count"] == 0
 
 
 # ── The public serve path (AC2) ──────────────────────────────────────────────
@@ -556,7 +574,72 @@ def test_1802_unmark_by_sk_needs_no_quote(fake_table):
     sk = out["sk"]
     out2 = tj.tool_mark_journal_quote({"action": "unmark", "sk": sk})
     assert out2["status"] == "revoked" and out2["sk"] == sk
-    assert not any(pk == QUOTES_PK for pk, _ in fake_table.store)
+    assert fake_table.store[(QUOTES_PK, sk)].get("revoked_at")  # #4377: tombstoned, text gone
+    assert "quote" not in fake_table.store[(QUOTES_PK, sk)]
+
+
+# ── #4377: unmark is a tombstone (the MCP role has no DeleteItem here) and every
+# reader of the partition honours it ─────────────────────────────────────────
+
+
+def test_4377_unmark_never_calls_delete_item():
+    """Derivation guard: the IAM-refused call (delete_item) must not come back."""
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(tj.tool_mark_journal_quote))
+    calls = {n.func.attr for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+    assert "delete_item" not in calls and "update_item" in calls
+
+
+def test_4377_second_unmark_is_honest_not_found(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    assert tj.tool_mark_journal_quote({"action": "unmark", "sk": out["sk"]})["status"] == "revoked"
+    again = tj.tool_mark_journal_quote({"action": "unmark", "sk": out["sk"]})
+    assert again["status"] == "not_found" and "NOTHING was revoked" in again["error"]
+    assert again["marked_lines_for_date"] == []  # the revoked stub is not offered as a marked line
+
+
+def test_4377_a_non_conditional_update_failure_is_surfaced_not_read_as_revoked(fake_table, monkeypatch):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+
+    def _denied(**_kw):
+        raise Exception("AccessDeniedException: not authorized")
+
+    monkeypatch.setattr(fake_table, "update_item", _denied)
+    res = tj.tool_mark_journal_quote({"action": "unmark", "sk": out["sk"]})
+    assert "error" in res and "NOTHING was revoked" in res["error"] and res.get("status") != "revoked"
+
+
+def test_4377_revoked_line_frees_the_cap_and_remark_is_fresh_consent(fake_table):
+    fake_table.put_item(Item={"pk": ENTRY_PK, "sk": "DATE#2026-07-25#journal#morning", "raw_text": "Second line here. Third line too."})
+    first = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": "Second line here.", "approved": True})
+    tj.tool_mark_journal_quote({"action": "unmark", "sk": first["sk"]})
+    third = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": "Third line too.", "approved": True})
+    assert third.get("status") == "marked"  # the revoked stub held no cap slot
+    fake_table.store[(QUOTES_PK, first["sk"])]["marked_at"] = "2020-01-01T00:00:00Z"  # stub's stale instant
+    fake_table.store.pop((QUOTES_PK, third["sk"]))
+    again = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    row = fake_table.store[(QUOTES_PK, again["sk"])]
+    assert "revoked_at" not in row and row["quote"] == CLEAN_LINE
+    assert row["marked_at"] != "2020-01-01T00:00:00Z"  # re-mark after revoke = fresh consent, fresh instant
+
+
+def test_4377_endpoint_never_serves_a_revoked_line_even_with_legacy_text(coach_module):
+    """A stub that somehow still carries its text + grounding (e.g. a hand-restored row)
+    must still be withheld — the reader keys on revoked_at, not on the text being gone."""
+    sc, ft = coach_module
+    base = {"pk": QUOTES_PK, "date": "2026-07-21", "marked_at": "2026-07-21T20:00:00Z", "grounding": "verified"}
+    ft.put_item(Item={**base, "sk": jq.quote_sk("2026-07-21", CLEAN_LINE), "quote": CLEAN_LINE, "revoked_at": "2026-07-22T00:00:00Z"})
+    body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
+    assert body["quotes"] == [] and body["featured"] is None
+
+
+def test_4377_list_skips_revoked_rows(fake_table):
+    out = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": CLEAN_LINE, "approved": True})
+    fake_table.store[(QUOTES_PK, out["sk"])]["revoked_at"] = "2026-07-26T00:00:00Z"
+    assert tj.tool_mark_journal_quote({"action": "list"})["count"] == 0
 
 
 def test_1802_mark_advertises_sk_as_the_revoke_handle(fake_table):

@@ -34,5 +34,6 @@ programmed variable, tightened over weeks. Warm-up cues before key lifts.
 | engine | `engine/foundation_engine_w1.md` | 997d764a-d41d-4b4a-b7c3-7565105b78c1 | committed (2026-06-19) |
 | push | `push/foundation_push_w1.md` | 7f906e65-3362-4fef-bd86-52fbbf665eb3 | committed (2026-09-08) |
 | pull | `pull/foundation_pull_w4.md` | 720eee53-8e43-49c7-9b56-25e991b5cdea | committed (2026-09-19) — first red-teamed routine (#3752) |
+| lower | `lower/lower_volume_w1_s3.md` | 9347cff2-0fca-4cab-a1fc-b89898851a1b | committed (2026-09-27, target 09-28) — bike over treadmill after a 4.4 h walking weekend (#4387) |
 
 *(append as routines are built)*

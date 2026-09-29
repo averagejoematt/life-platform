@@ -185,7 +185,7 @@ from content import html_builder, output_writers
 from experiment import phase_taxonomy  # ADR-077: the class registry the reads derive from (#2089)
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from ingestion import source_registry  # #2003: the canonical freshness set + thresholds
-from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
+from intelligence import brief_domain_inputs, weight_recency  # #1894/#1924: a weigh-in carries its own date; #4358/#4359 coach blocks
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
@@ -211,6 +211,7 @@ ai_calls.init(
 # HELPERS
 # ==============================================================================
 from common.digest_utils import coerce_int, d2f, get_food_delivery_streak_state, rhr_trend_str, safe_float  # shared helpers (#970)
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 from emails.daily_brief_signals import (  # noqa: F401,E402
     avg,
@@ -226,7 +227,7 @@ from emails.daily_brief_signals import (  # noqa: F401,E402
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception:
         return None
 
@@ -389,7 +390,7 @@ def _latest_item(source):
         )
         r = table.query(**kwargs)
         items = r.get("Items", [])
-        return d2f(items[0]) if items else None
+        return strava_read_seam(source, d2f(items[0]) if items else None)
     except Exception:
         return None
 
@@ -409,7 +410,7 @@ def fetch_range(source, start, end):
             include_pilot=_source_reads_cross_phase(source),
         )
         r = table.query(**kwargs)
-        return [d2f(i) for i in r.get("Items", [])]
+        return strava_read_seam(source, [d2f(i) for i in r.get("Items", [])])
     except Exception:
         return []
 
@@ -947,6 +948,9 @@ def gather_daily_data(profile, yesterday):
         "dexa": dexa,
         "measurements": measurements,
         "labs": labs_draws,  # #3792: the full draw LIST — see gather_daily_data above
+        # #4358/#4359/#4373: the keys the physical (Hevy 14d, the subject day's Withings row) and
+        # explorer (correlations, experiments) blocks read — the builders read keys this dict never set, so both blocks were empty.
+        **brief_domain_inputs.gather(table, fetch_range, today, yesterday, USER_PREFIX, withings_recent),
     }
 
 

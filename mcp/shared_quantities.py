@@ -119,13 +119,20 @@ def walking_layer(
     days: int = WALK_WINDOW_DAYS,
     today: str | None = None,
     read: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
+    through_day_in_progress: bool = False,
 ) -> dict[str, Any] | None:
     """THE walking read: the de-duplicated union over the `days` completed days ending
     `completed_end(end_day)`. None only for an unparseable day key. A partition read that
     RAISES reaches the layer as None — unreadable, never zero hours. `read(source, start, end)`
     is the caller's partition reader (default `mcp.core.query_source_range`); the DEFINITION
-    — window, sources, de-dup — is not injectable."""
-    end = completed_end(end_day, today)
+    — window, sources, de-dup — is not injectable.
+
+    `through_day_in_progress` (#4387) is the PLAN's window: it ends at `end_day` itself even when
+    that is today, so a plan made tonight for tomorrow sees today's walks. On 2026-09-27 the plan
+    for 09-28 read 09-20..26 and never saw a 165-min Sunday walk. The layer then carries
+    `partial: True` — the day's hours so far — and the sources, counting and de-dup are unchanged.
+    The nutrition critics and `get_benchmark` keep the completed-days window."""
+    end = min(str(end_day)[:10], today or pacific_today()) if through_day_in_progress else completed_end(end_day, today)
     start = shift_day_key(end, -(days - 1))
     if start == end and days > 1:  # unparseable day key — shift_day_key returns it unchanged
         return None
@@ -141,6 +148,8 @@ def walking_layer(
     total = layer.get("total_hr")
     layer["hr_wk"] = round(float(total) * 7.0 / days, 2) if total is not None else None
     layer["definition"] = SHARED_QUANTITIES_VERSION + ": weekly walking hours (see mcp/shared_quantities.py)"
+    if through_day_in_progress:
+        layer["partial"] = end >= (today or pacific_today())
     return layer
 
 
@@ -179,6 +188,49 @@ def walking_layer_for_day(
         "de-dup, never extrapolated to a week (see mcp/shared_quantities.py, #4311)"
     )
     return layer
+
+
+def recent_aerobic_layer(
+    target_date: str,
+    *,
+    today: str | None = None,
+    read: Callable[[str, str, str], list[dict[str, Any]]] | None = None,
+) -> dict[str, Any] | None:
+    """What his legs did in the days before `target_date`'s session, per activity (#4387) — the
+    weekly walking definition's sources and time de-dup (`training.walking_volume`), read over
+    `training.recent_aerobic.READ_DAYS` through target − 1 (today included) and shaped by
+    `training.recent_aerobic.build`. None only for an unparseable day key; a partition read
+    that RAISES reaches the block as None — unreadable, never zero hours."""
+    from common.pacific_time import parse_day_key
+    from training import recent_aerobic
+
+    if parse_day_key(target_date) is None:
+        return None
+    w = recent_aerobic.window(target_date)
+
+    def _read(source: str) -> list[dict[str, Any]] | None:
+        try:
+            return (read or _core.query_source_range)(source, w["start"], w["end"])
+        except Exception:  # noqa: BLE001 — unreadable is reported by the block, never raised past it
+            return None
+
+    block = recent_aerobic.build(
+        target_date=target_date, today=today or pacific_today(), strava_items=_read("strava"), hevy_workouts=_read("hevy")
+    )
+    block["definition"] = (
+        SHARED_QUANTITIES_VERSION + ": the weekly walking sources and de-dup, per activity (see mcp/shared_quantities.py, #4387)"
+    )
+    return block
+
+
+def z2_minutes_7d(
+    target_date: str, *, today: str | None = None, read: Callable[[str, str, str], list[dict[str, Any]]] | None = None
+) -> float | None:
+    """The routine generator's `z2_minutes_7d` for a session on `target_date` (#4410): the trailing
+    7 days through target − 1 of `recent_aerobic_layer`, in minutes. None = unknown, never 0."""
+    from training import recent_aerobic
+
+    return recent_aerobic.aerobic_minutes_7d(recent_aerobic_layer(target_date, today=today, read=read))
 
 
 def weekly_walking_hours(end_day: str, *, today: str | None = None) -> float | None:

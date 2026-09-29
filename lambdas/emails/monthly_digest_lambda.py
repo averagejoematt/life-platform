@@ -91,6 +91,7 @@ from common.digest_utils import (
     filter_day_rows,
 )
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 # ── The letter RENDERER (#1654) ───────────────────────────────────────────────
 # build_html + its section-header classifier live in the sibling
@@ -169,7 +170,7 @@ def fetch_range(source, start, end):
             include_pilot=source_reads_cross_phase(source),
         )
     )
-    return [d2f(i) for i in r.get("Items", [])]
+    return strava_read_seam(source, [d2f(i) for i in r.get("Items", [])])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
