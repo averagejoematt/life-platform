@@ -200,6 +200,18 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "#3621's own pricing note (12 consecutive clean monthly runs) — re-derive "
         "grace/basis from that cadence's own cron line at that point.",
     },
+    "wrap-nightly.yml": {
+        "watched": True,
+        "grace_hours": 24.0,
+        "basis": "newly added (#4262 box 2) — no fire history of its own yet. Daily (13:20 UTC) -> "
+        "derived 24h cadence; 24h grace carried forward from the other newborn daily rows as a "
+        "floor until check_cron_freshness's live derivation has the sample to re-derive its own.",
+        "reason": "The /wrap-only checks (backlog hygiene, handover lines, residual queue, the two "
+        "closure detectors) ran only when a session remembered /wrap; this is their one "
+        "scheduled home. Each leg's #1447 filer is armed on a run's RESULT, so a cron that "
+        "stops leaves five trackers silently closed — the armed-on-result defect this "
+        "registry exists for.",
+    },
     "remediation-agent.yml": {
         "watched": True,
         "grace_hours": 12.0,
