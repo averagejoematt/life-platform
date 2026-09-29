@@ -220,6 +220,10 @@ def derive_load_floors(
 
     for ex in getattr(ir, "exercises", None) or []:
         key = getattr(ex, "movement_key", None) or "?"
+        # #4408: under v0.3 the floor holds an achieved this-cycle load RPE-adjusted to the slot — the same
+        # `slot_of` the generator uses (sets + rationale tag), so a draft carrying the generator's loads commits
+        slot = load_ramp.slot_of(getattr(ex, "sets", None), getattr(ex, "rationale_tag", None)) if v03 is not None else None
+        extra = {"slot": slot} if v03 is not None else {}
         floor = floor_fn(
             _template_id_for(key, movements),
             history_index,
@@ -227,6 +231,7 @@ def derive_load_floors(
             current_lb,
             days_since_last_workout=dslw,
             as_of=target_date,
+            **extra,
         )
         row = {k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")}
         if v03 is not None:
