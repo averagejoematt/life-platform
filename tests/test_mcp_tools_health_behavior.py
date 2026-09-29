@@ -1606,3 +1606,12 @@ def test_no_health_tool_reaches_the_genome_or_labs_partitions(monkeypatch):
     for view in _declared_views("get_daily_metrics"):
         th.tool_get_daily_metrics({"view": view})
     assert not (t.sources_read & {"genome", "labs", "dexa"})
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, th, "get_weight_loss_progress")

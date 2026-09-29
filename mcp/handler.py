@@ -34,6 +34,7 @@ import os
 import time
 import urllib.parse
 import uuid
+from decimal import Decimal
 from typing import Any, cast
 
 from common.text_guards import residue_fragments  # #4190 — shared, bundled (#781)
@@ -49,6 +50,7 @@ from mcp.core import (
     session_token_valid,
 )
 from mcp.registry import TOOLS
+from mcp.tool_output_schemas import conformance_errors, is_error_payload, output_schema_for  # #4286 box 2
 from mcp.utils import mcp_error, validate_date_range, validate_single_date
 from mcp.warmer import nightly_cache_warmer
 
@@ -96,6 +98,69 @@ def _audit_tool_call(name, arguments, status, duration_ms):
         logger.warning(f"[#753] audit hook failed for '{name}' (tool call unaffected): {e}")
 
 
+def _json_safe(value):
+    """`value` as plain JSON types — DynamoDB Decimals as numbers (not the strings
+    `default=str` would make them), anything else unknown as its str()."""
+
+    def _default(o):
+        if isinstance(o, Decimal):
+            return int(o) if o == o.to_integral_value() else float(o)
+        return str(o)
+
+    return json.loads(json.dumps(value, default=_default))
+
+
+def _call_result(name, payload, is_error=False):
+    """The `tools/call` result for one tool's return value (#4286 box 2).
+
+    Every tool answers with its JSON as text, exactly as before. A tool that declares an
+    `outputSchema` (mcp/tool_output_schemas.py) also carries `structuredContent` — the MCP
+    spec requires it to conform, and clients validate it. So an error (a handler-side
+    refusal, a timeout, an exception, or the tool's own `{"error": ...}` return) is flagged
+    `isError` and carries no structured content, which the spec exempts from validation;
+    and a success that does NOT conform is still returned in full as text, flagged
+    `isError`, logged and counted, rather than failing client-side validation silently.
+    Tools without a schema are unchanged."""
+    text = {"type": "text", "text": json.dumps(payload, default=str)}
+    schema = output_schema_for(name)
+    if schema is None:
+        return {"content": [text]}
+    if is_error or is_error_payload(payload):
+        return {"content": [text], "isError": True}
+    structured = _json_safe(payload)
+    problems = conformance_errors(structured, schema)
+    if problems:
+        logger.error(f"[#4286] '{name}' result does not match its outputSchema: {problems[:5]}")
+        _emit_output_schema_mismatch(name)
+        return {"content": [text], "isError": True}
+    return {"content": [text], "structuredContent": structured}
+
+
+def _emit_output_schema_mismatch(tool_name):
+    """EMF count of a declared-schema miss (namespace LifePlatform/MCP), fail-open."""
+    try:
+        print(
+            json.dumps(
+                {
+                    "_aws": {
+                        "Timestamp": int(time.time() * 1000),
+                        "CloudWatchMetrics": [
+                            {
+                                "Namespace": "LifePlatform/MCP",
+                                "Dimensions": [["ToolName"]],
+                                "Metrics": [{"Name": "OutputSchemaMismatch", "Unit": "Count"}],
+                            }
+                        ],
+                    },
+                    "ToolName": tool_name,
+                    "OutputSchemaMismatch": 1,
+                }
+            )
+        )
+    except Exception:  # noqa: BLE001 — a metric must never fail the response
+        pass
+
+
 def handle_tools_call(params):
     name = params.get("name")
     arguments = params.get("arguments", {})
@@ -110,7 +175,7 @@ def handle_tools_call(params):
     # not a per-tool sprinkle a 27th write tool could land without.
     residue_error = _refuse_tool_call_residue(name, arguments)
     if residue_error is not None:
-        return {"content": [{"type": "text", "text": json.dumps(residue_error, default=str)}]}
+        return _call_result(name, residue_error, is_error=True)
     # SEC-3: Validate arguments before execution
     validation_error = _validate_tool_args(name, arguments)
     if validation_error:
@@ -120,7 +185,7 @@ def handle_tools_call(params):
     # R13-F12: Rate limit write tools before execution
     rate_err = _check_write_rate_limit(name)
     if rate_err:
-        return {"content": [{"type": "text", "text": json.dumps(mcp_error(message=rate_err, error_code="RATE_LIMIT"), default=str)}]}
+        return _call_result(name, mcp_error(message=rate_err, error_code="RATE_LIMIT"), is_error=True)
     _t0 = time.time()
     # R6: per-tool soft timeout — returns a structured error instead of hanging
     # the Lambda until the 300s hard limit. 30s is the default; query-too-broad
@@ -165,21 +230,11 @@ def handle_tools_call(params):
             else:
                 message = f"Tool '{name}' timed out after {_TOOL_TIMEOUT_SECS}s. The query is likely scanning too much data."
                 code = "QUERY_TOO_BROAD"
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(
-                            mcp_error(message=message, error_code=code),
-                            default=str,
-                        ),
-                    }
-                ]
-            }
+            return _call_result(name, mcp_error(message=message, error_code=code), is_error=True)
         _pool.shutdown(wait=False)
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         _audit_tool_call(name, arguments, "success", (time.time() - _t0) * 1000)  # #753
-        return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
+        return _call_result(name, result)
     except Exception as e:
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)
         _audit_tool_call(name, arguments, "error", (time.time() - _t0) * 1000)  # #753
@@ -190,7 +245,7 @@ def handle_tools_call(params):
             error_code="INTERNAL",
             detail=str(e),
         )
-        return {"content": [{"type": "text", "text": json.dumps(error_response, default=str)}]}
+        return _call_result(name, error_response, is_error=True)
 
 
 # ── SEC-3: MCP input validation ─────────────────────────────────────────────
