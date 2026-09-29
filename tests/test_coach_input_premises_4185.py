@@ -882,3 +882,71 @@ def test_mutation_control_without_the_idiom_rule_the_physical_final_is_held_on_4
 
     monkeypatch.setattr(gg, "_AGE_DECADE_RE", re.compile(r"(?!)"))
     assert gg.fabricated_numbers(PHYSICAL_0927["final"], set(PHYSICAL_0927["allowed"])) == [40.0]
+
+
+# ── #4343 / #4185 box 4: the SERVED corpus against the served facts (scripts/check_served_coach_facts.py) ──
+# The generation-time gate sees drafts only; this probe re-reads what is already served. The
+# fixture text is the live /api/coaching-dashboard lead read of 2026-09-29 (4.4 lb/week beside
+# a served rate of -3.8, 80% CI -4.32..-2.12).
+_SERVED_LEAD_4343 = (
+    "Matthew has dropped 13.5 pounds in three weeks, running at a provisional early pace of 4.4 pounds per "
+    "week—the kind of momentum that suggests his daily choices are clicking into place."
+)
+
+
+def _probe():
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    import check_served_coach_facts as probe
+
+    return probe
+
+
+def _served_4343(rate, lo, hi):
+    trend = [{"date": f"2026-09-{d:02d}", "protein_g": 150.0 + (d % 5) * 4} for d in range(6, 27)]
+    return {"nutrition_trend": trend}, {
+        "journey": {"current_weight_lbs": 312.3, "weekly_rate_lbs": rate, "weekly_rate_ci_low": lo, "weekly_rate_ci_high": hi}
+    }
+
+
+def _payloads_4343():
+    return {
+        "/api/coaches": {"coaches": [{"persona_id": "eli_marsh", "headline_stat": "no checked call yet"}]},
+        "/api/coaching-dashboard": {"lead_daily": {"text": _SERVED_LEAD_4343}},
+        "/api/coach_team": {},
+        "/api/coach/eli_marsh": {"daily": _SERVED_LEAD_4343},
+    }
+
+
+def test_4343_served_probe_names_the_path_figure_and_served_value():
+    probe = _probe()
+    facts = probe.facts_from_served(*_served_4343(-3.8, -4.32, -2.12), today="2026-09-29")
+    hits = probe.findings(probe.served_texts(_payloads_4343()), facts, today="2026-09-29")
+    paths = sorted(p for p, _f in hits)
+    assert paths == ["/api/coach/eli_marsh $.daily", "/api/coaching-dashboard $.lead_daily.text"], paths
+    assert all(f["cited"] == 4.4 for _p, f in hits), hits
+
+
+def test_4343_mutation_control_facts_from_the_texts_own_figures_go_green():
+    """The control: serve the rate the text cites and the same corpus is clean — the probe
+    reds on the DISAGREEMENT, not on the presence of a figure."""
+    probe = _probe()
+    facts = probe.facts_from_served(*_served_4343(-4.4, -4.9, -3.9), today="2026-09-29")
+    assert probe.findings(probe.served_texts(_payloads_4343()), facts, today="2026-09-29") == []
+
+
+def test_4343_served_probe_exit_codes(monkeypatch, capsys):
+    probe = _probe()
+    nut, jr = _served_4343(-3.8, -4.32, -2.12)
+    routes = {**_payloads_4343(), "/api/nutrition_overview": nut, "/api/journey": jr}
+    monkeypatch.setattr(probe, "_fetch", lambda base, path: routes[path])
+    assert probe.main([]) == 1
+    out = capsys.readouterr().out
+    assert "/api/coaching-dashboard $.lead_daily.text" in out and "cites 4.4" in out and "findings=2" in out
+
+    def _down(base, path):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(probe, "_fetch", _down)
+    assert probe.main([]) == 2, "a probe that could not look is UNEVALUABLE, never a clean corpus"
+    monkeypatch.setattr(probe, "_fetch", lambda base, path: {"coaches": []} if path == "/api/coaches" else {})
+    assert probe.main([]) == 2
