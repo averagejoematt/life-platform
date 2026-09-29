@@ -431,3 +431,92 @@ def test_no_dateline_call_site_hardcodes_a_day_number():
             if len(args) > 1 and re.fullmatch(r"\d+|true|false|null|undefined", args[1]):
                 offenders.append(f"{fn}: weeklyAsOf({m.group(1)}) — day number hardcoded as a literal")
     assert not offenders, "\n".join(offenders)
+
+
+# ── 11. #4185 box 3 — every coach read carries `data_through` beside `generated_at` ──
+#
+# A weekly read served under only its write instant cannot be labelled weekly by the door:
+# Eli's 09-21 read was served on 09-25 as the top read, unlabelled. #4227 stamped the daily
+# OUTPUT# row and EXPERT#integrator and served both on /api/coaching-dashboard and
+# /api/coach/{id}; these are the SIBLING reads of the same records (and of the three EXPERT#
+# rows the weekly analyzer writes beside it), each of which served `generated_at` alone.
+_DT = "2026-08-27"
+_EXPERT_ROWS = {
+    "EXPERT#sleep": {"expert_key": "sleep", "analysis": "Sleep held steady across the week.", "week_number": 2, "days_in_experiment": 11},
+    "EXPERT#experiment_arc": {"arc": "Two weeks in.", "throughline": "Steady.", "chapters": [], "week_count": 2},
+    "EXPERT#integrator_month": {"narrative": "The month so far.", "headline": "Steady", "week_count": 2, "days_in_experiment": 11},
+}
+
+
+def _stamped(sk, fields, data_through=_DT):
+    row = {"pk": "USER#matthew#SOURCE#ai_analysis", "sk": sk, "generated_at": "2026-08-27T14:02:46.793290+00:00", **fields}
+    if data_through:
+        row["data_through"] = data_through
+    return row
+
+
+def _coach_reads(monkeypatch, data_through=_DT):
+    """(name, served body) for every EXPERT#-backed coach read, through the real handlers."""
+    from web import site_api_coach_narrative as _narr
+
+    rows = [_stamped(sk, f, data_through) for sk, f in _EXPERT_ROWS.items()]
+    integ = dict(LIVE_INTEGRATOR, disagreements=[{"topic": "sleep vs load", "coaches": ["a", "b"], "lead_call": "Hold."}])
+    if data_through:
+        integ["data_through"] = data_through
+    monkeypatch.setattr(C, "table", FakeDdbTable(store_items=rows + [integ]))
+    monkeypatch.setattr(C, "EXPERIMENT_START", GENESIS)
+    monkeypatch.setattr(_narr, "pre_start_meta", lambda: None)
+    monkeypatch.setattr(C, "_integrator_digest", lambda: integ)
+    out = {
+        "/api/ai_analysis": C.handle_ai_analysis({"queryStringParameters": {"expert": "sleep"}}),
+        "/api/experiment_synthesis": C.handle_experiment_synthesis(),
+        "/api/month_rollup": C.handle_month_rollup(),
+        "/api/weekly_priority": C.handle_weekly_priority({"queryStringParameters": {}}),
+    }
+    bodies = {}
+    for name, resp in out.items():
+        assert resp["statusCode"] == 200, (name, resp)
+        bodies[name] = json.loads(resp["body"])
+    for t in C._team_tensions():
+        bodies.setdefault("/api/coach_team tensions[]", t)
+    return bodies
+
+
+def test_every_expert_backed_coach_read_serves_data_through_beside_generated_at(monkeypatch):
+    """The SET: each served read carries the record's own `data_through` next to its `generated_at`.
+    Mutation control: drop the `data_through` line from any one handler — its row reds by name."""
+    bodies = _coach_reads(monkeypatch)
+    assert set(bodies) == {
+        "/api/ai_analysis",
+        "/api/experiment_synthesis",
+        "/api/month_rollup",
+        "/api/weekly_priority",
+        "/api/coach_team tensions[]",
+    }
+    missing = {n: b.get("data_through") for n, b in bodies.items() if b.get("data_through") != _DT or not b.get("generated_at")}
+    assert not missing, f"coach reads serving generated_at without the record's data_through: {missing}"
+
+
+def test_an_unstamped_record_serves_data_through_null_never_a_guess(monkeypatch):
+    """Records written before the stamp serve `data_through: null` (unknown) — the key is present, the
+    value is never back-filled from `generated_at` or the clock (ADR-104)."""
+    bodies = _coach_reads(monkeypatch, data_through=None)
+    assert {n: ("data_through" in b, b.get("data_through")) for n, b in bodies.items()} == {n: (True, None) for n in bodies}
+
+
+def test_the_weekly_analyzer_stamps_data_through_on_every_expert_row_it_writes():
+    """The writer side: every `EXPERT#` put in the analyzer that stamps `generated_at` also stamps
+    `data_through` (AST over the dict literals, so a new EXPERT# writer is in the set by construction).
+    Mutation control: delete one `"data_through": pacific_today()` line — that writer reds by its sk."""
+    import ast
+
+    src = open(os.path.join(_REPO, "lambdas", "intelligence", "ai_expert_analyzer_lambda.py")).read()
+    writers = {}
+    for node in ast.walk(ast.parse(src)):
+        if not isinstance(node, ast.Dict):
+            continue
+        keys = {k.value: v for k, v in zip(node.keys, node.values) if isinstance(k, ast.Constant)}
+        if "generated_at" in keys and "sk" in keys and "EXPERT#" in ast.unparse(keys["sk"]):
+            writers[ast.unparse(keys["sk"])] = "data_through" in keys
+    assert len(writers) >= 4, writers  # EXPERT#{key}, integrator, experiment_arc, integrator_month
+    assert all(writers.values()), {sk: ok for sk, ok in writers.items() if not ok}
