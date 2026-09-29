@@ -23,6 +23,7 @@ from stacks.role_policies_base import (
     SES_SITE_IDENTITY,
     TABLE_ARN,
     _bedrock_statement,
+    _bedrock_telemetry_statement,
     _s3,
     _secret_arn,
 )
@@ -517,6 +518,9 @@ def mcp_server() -> list[iam.PolicyStatement]:
         # fail-soft to empty (un-tagged books, no taste hypothesis). Same scoped grant
         # every AI-calling role gets (ADR-062).
         _bedrock_statement(),
+        # #4439: invoke implies record (#3563) — without it every MCP Bedrock call's
+        # EstimatedCostUSD is dropped AccessDenied and the cost governor never sees it.
+        _bedrock_telemetry_statement(),
     ]
 
 
