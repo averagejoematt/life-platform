@@ -799,6 +799,7 @@ def session_prescription_for_role(
                 "cue": acc["cue"],
             }
         )
+    in_block_variant.stamp_template_ids(exposures, catalog_movements, in_block)  # #4431: the one slot-template resolver
     deload_info = None
     if deload:
         deload_info = _deload_trim(exposures, int(_deload_cfg()["sets_pct"]))
