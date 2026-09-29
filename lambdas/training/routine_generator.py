@@ -651,6 +651,7 @@ def _enforce_load_floors(
     was missing.
     """
     from training.exercise_history import nearest_bodyweight
+    from training.load_ramp import min_reps_of
 
     current_lb = nearest_bodyweight(target_date, weight_index)
     audit: dict[str, Any] = {
@@ -667,6 +668,8 @@ def _enforce_load_floors(
 
     for block in exercises:
         template_id = catalog.get("movements", {}).get(block.movement_key, {}).get("hevy_template_id_hint")
+        # #4408: the v0.3 floor holds an achieved load at the set's own rep floor, so it is told the reps
+        extra = {"min_reps": min_reps_of(block.sets)} if floor_fn is not None else {}
         floor = (floor_fn or prescription_floor)(
             template_id,
             history_index,
@@ -675,6 +678,7 @@ def _enforce_load_floors(
             days_since_last_workout=days_since_last_workout,
             layoff_days=layoff_days,
             as_of=target_date,
+            **extra,
         )
         corrections = apply_prescription_floor(block.sets, floor)
         cue = render_floor_cue(floor)
@@ -838,7 +842,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         # `session_role`; the JSON grid's upper/lower days still take the muscle-budget path.
         from training.full_body_session import full_body_routines
 
-        return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets)
+        return full_body_routines(inputs, day_entry, week_cfg, landmarks, catalog, resolved_week, targets, block_workouts=block_workouts)
 
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     z2_ok = _portfolio_guard(inputs.z2_minutes_7d, week_cfg.get("z2_floor_minutes", 90))

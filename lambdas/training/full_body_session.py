@@ -24,7 +24,7 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import load_ramp, program_structure, routine_generator as _rg
+from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
     GeneratorInputs,
@@ -145,6 +145,7 @@ def full_body_routines(
     catalog: dict[str, Any],
     resolved_week: Any,
     targets: list[str],
+    block_workouts: list[dict[str, Any]] | None = None,
 ) -> list[RoutineSpec]:
     """The program session for `day_entry['session_role']` — ideal + Minimum Viable Session
     floor (+ re-entry after a layoff). Pure apart from the same config/history reads as the
@@ -153,9 +154,13 @@ def full_body_routines(
     archetype = program_structure.SESSION_TEMPLATES[role]["archetype"]
     deload = bool(day_entry.get("deload"))
     skill_ceiling = int(week_cfg.get("skill_ceiling", 2))
+    # #4409: within a block a slot keeps the variant he performed in it (`in_block_variant`)
+    in_block = in_block_variant.performed_in_block(block_workouts, catalog.get("movements") or {}, inputs.target_date)
     rx = program_structure.session_prescription_for_role(
-        role, deload=deload, catalog_movements=catalog.get("movements") or {}, skill_ceiling=skill_ceiling
+        role, deload=deload, catalog_movements=catalog.get("movements") or {}, skill_ceiling=skill_ceiling, in_block=in_block
     )
+    # a kept title-only variant (ADR-069) loads from its wire template id; the snapshot keeps the catalog's own hash
+    load_catalog = in_block_variant.with_performed_template_ids(catalog, rx)
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
     rationale: list[str] = [
         f"week grid source={resolved_week.source} ({resolved_week.detail})",
@@ -192,7 +197,7 @@ def full_body_routines(
     # through the module attribute, so ONE patch point (routine_generator._load_note_indexes)
     # stubs the history read for both paths
     note_indexes = _rg._load_note_indexes(week_cfg, notes_mode)
-    blocks, used, unresolved = _blocks_from_prescription(rx, catalog, note_indexes, notes_mode, anchors_only=drop_accessories)
+    blocks, used, unresolved = _blocks_from_prescription(rx, load_catalog, note_indexes, notes_mode, anchors_only=drop_accessories)
     for line in unresolved:
         rationale.append(f"UNRESOLVED — {line}")
 
@@ -206,11 +211,13 @@ def full_body_routines(
         f"loads: v0.3 §3 entry ramp, week {ramp_week} = {load_ramp.ramp_pct(ramp_week, ramp_p)}% of band e1RM — of the anchor set, "
         f"after the {ramp_p['discount_pct']}% detraining discount, on novel-again anchors >= {load_ramp.DETRAINING_ANCHOR_AGE_DAYS} d "
         "older than block 1 (#4388) "
-        f"(cap {ramp_p['cap_pct']}% of band e1RM; no in-band history -> the nearest band he has lifted in); back-offs −10 % of the top set"
+        f"(cap {ramp_p['cap_pct']}% of band e1RM; no in-band history -> the nearest band he has lifted in); "
+        "a load already moved at the set's rep floor at this band this cycle, no layoff, is held — never ramped under (#4408); "
+        "back-offs −10 % of the top set"
     )
     load_floors = _enforce_load_floors(
         blocks,
-        catalog,
+        load_catalog,
         history_index,
         weight_index,
         target_date=inputs.target_date,

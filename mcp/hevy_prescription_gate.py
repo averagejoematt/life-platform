@@ -220,6 +220,9 @@ def derive_load_floors(
 
     for ex in getattr(ir, "exercises", None) or []:
         key = getattr(ex, "movement_key", None) or "?"
+        # #4408: under v0.3 the floor holds an achieved this-cycle load at the drafted sets' rep floor —
+        # the same `min_reps` the generator passes, so a draft carrying the generator's loads commits
+        extra = {"min_reps": load_ramp.min_reps_of(getattr(ex, "sets", None))} if v03 is not None else {}
         floor = floor_fn(
             _template_id_for(key, movements),
             history_index,
@@ -227,6 +230,7 @@ def derive_load_floors(
             current_lb,
             days_since_last_workout=dslw,
             as_of=target_date,
+            **extra,
         )
         row = {k: floor.get(k) for k in ("status", "template_id", "floor_kg", "best_kg", "basis", "discount_pct", "layoff_reason")}
         if v03 is not None:

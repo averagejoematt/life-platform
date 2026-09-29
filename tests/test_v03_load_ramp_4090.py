@@ -410,3 +410,114 @@ def test_mutation_control_the_set_weight_base_reproduces_the_reported_118_lb():
         row = _floor_0928(SQUAT_TID)
     assert row["ramp"]["base"] == load_ramp.BASE_ANCHOR_SET and row["floor_kg"] == pytest.approx(115 * LB)
     assert row["floor_kg"] != pytest.approx(135 * LB)
+
+
+# ── #4408: the ramp is a RE-ENTRY — a this-cycle load at this band is held, never ramped under ──
+# The wire: the block-1 Hevy rows as stored (read-only 2026-09-28), indexed by the real
+# `exercise_history.load_history_indexes` — bench 205 lb x 5 @ RPE 7.5 on 09-23 at 315.4 lb.
+WIRE_WEIGHTS = {"2026-09-23": 315.4, "2026-09-24": 313.7, "2026-09-25": 313.1, "2026-09-28": 313.7}
+BENCH_TID = MOVEMENTS[BENCH]["hevy_template_id_hint"]
+BENCH_205_KG = 92.98654643430615  # the stored weight_kg of 205 lb
+
+
+def _wire_history():
+    import datetime
+    from decimal import Decimal
+
+    from training import exercise_history
+
+    rows = json.loads(
+        (REPO / "tests" / "fixtures" / "training_block1_wire_4408_4409" / "hevy_rows.json").read_text(),
+        parse_float=Decimal,
+        parse_int=Decimal,
+    )["items"]
+
+    class _Table:
+        def query(self, **_kw):
+            return {"Items": rows}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        return exercise_history.load_history_indexes(lookback_days=30, today=datetime.date(2026, 9, 28))[0], rows
+
+
+def _bench_0929(**kw):
+    kw.setdefault("min_reps", 4)  # the heavy top set's 4–6
+    return load_ramp.v03_floor(BENCH_TID, _wire_history()[0], WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, **kw)
+
+
+def test_4408_the_0929_bench_is_held_at_205_not_ramped_to_60_percent_of_e1rm():
+    """The reported draft: 145 lb (60 % of a 239.2 lb band e1RM) six days after 205 x 5 at the same
+    band, no discount, no layoff. The top set is now the achieved load, exactly as stored."""
+    row = _bench_0929()
+    r = row["ramp"]
+    assert r["discount_pct"] == 0 and r["base"] == load_ramp.BASE_BAND_E1RM and row["fallback"] is None
+    assert r["hold"]["applies"] is True and r["hold"]["layoff"] is False
+    assert r["hold"]["ramp_top_kg"] == pytest.approx(145 * LB)  # what the ramp alone wrote on 09-29
+    assert row["floor_kg"] == BENCH_205_KG and r["top_kg"] == BENCH_205_KG
+    assert r["hold"]["achieved"] == {"weight_kg": BENCH_205_KG, "reps": 5, "date": "2026-09-23", "bodyweight_lb": 315.4, "band": "310-319"}
+    cue = load_ramp.render_ramp_cue(row)
+    assert "205 lb x 5 on 2026-09-23" in cue and "never goes under an achieved load" in cue
+
+
+def test_4408_mutation_control_without_the_hold_the_bench_reads_the_reported_145_lb():
+    with patch.object(load_ramp, "achieved_hold", return_value=None):
+        row = _bench_0929()
+    assert row["floor_kg"] == pytest.approx(145 * LB) and row["ramp"]["hold"]["applies"] is False
+
+
+def test_4408_the_hold_is_at_the_sets_rep_floor_never_a_heavier_lower_rep_load():
+    """205 x 5 does not hold an 8–12 set (205 was never moved for 8): the 09-28 squat 135 lb x 10
+    holds an 8–12 squat, not the 195 lb x 5 of 09-24 — the load the owner wrote by hand (#4388)."""
+    history, _ = _wire_history()
+    squat = MOVEMENTS["squat_barbell"]["hevy_template_id_hint"]
+    vol = load_ramp.v03_floor(squat, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, min_reps=8)
+    assert vol["floor_kg"] == pytest.approx(135 * LB, abs=0.01) and vol["floor_kg"] < 195 * LB
+    heavy = load_ramp.v03_floor(squat, history, WIRE_WEIGHTS, 313.7, as_of="2026-09-29", week=1, min_reps=4)
+    assert heavy["floor_kg"] == pytest.approx(195 * LB, abs=0.01) and heavy["ramp"]["hold"]["achieved"]["date"] == "2026-09-24"
+    # a caller that cannot say the reps gets the ramp alone — the lower number (#4149)
+    assert _bench_0929(min_reps=None)["floor_kg"] == pytest.approx(145 * LB)
+
+
+def test_4408_the_ramp_still_fires_after_a_layoff():
+    """Twelve days after the last loaded session (the record's gap, whatever the caller passes —
+    the cron hands the generator a constant 2) there IS something to re-enter from."""
+    history, _ = _wire_history()
+    row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-10", week=1, min_reps=4, days_since_last_workout=2)
+    assert row["ramp"]["hold"]["layoff"] is True and row["ramp"]["hold"]["layoff_evidence"]["record_gap_days"] == 12
+    assert row["floor_kg"] == pytest.approx(145 * LB) and row["ramp"]["hold"]["applies"] is False
+
+
+def test_4408_the_ramp_still_fires_on_a_novel_again_anchor():
+    """An anchor the detraining discount applies to (>= 28 d before block 1) is exactly what the ramp
+    re-enters from — in band or not, it holds nothing up. The 09-28 trap bar stays at 120 lb."""
+    row = load_ramp.v03_floor(TRAP_TID, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=1, min_reps=4)
+    assert row["floor_kg"] == pytest.approx(120 * LB) and row["ramp"]["hold"]["applies"] is False
+    in_band_old = {BENCH_TID: [{"date": "2026-08-01", "top_weight_kg": 100.0, "sets": [{"weight_kg": 100.0, "reps": 5}]}]}
+    old = load_ramp.v03_floor(
+        BENCH_TID, in_band_old, {"2026-08-01": 314.0, "2026-09-28": 313.7}, 313.7, as_of="2026-09-29", week=1, min_reps=4
+    )
+    assert old["ramp"]["discount_pct"] == 10 and old["ramp"]["hold"]["achieved"] is None and old["floor_kg"] < 100.0
+
+
+def test_4408_generator_planner_and_chat_gate_read_one_held_number():
+    """#4149: the generator writes the held load, the planner shows it, and the chat gate derives
+    the same floor from the drafted sets — so the generator's own draft commits."""
+    import types
+
+    from mcp.hevy_prescription_gate import prescription_gate
+
+    history, rows = _wire_history()
+    with patch.object(routine_generator, "_load_note_indexes", return_value=(history, WIRE_WEIGHTS, {}, {})):
+        ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
+    assert _top(ideal, BENCH) == BENCH_205_KG
+    rx = program_structure.planned_session("2026-09-29", block_workouts=rows, catalog_movements=MOVEMENTS)["prescription"]
+    load_ramp.annotate_prescription(rx, MOVEMENTS, history, WIRE_WEIGHTS, target_date="2026-09-29", week=1)
+    planned = {e["movement_key"]: e["load"]["top_kg"] for e in rx["exposures"]}
+    assert planned[BENCH] == BENCH_205_KG and planned["db_shoulder_press"] == pytest.approx(52.5 * LB, abs=0.01)
+    custom = types.SimpleNamespace(
+        variant="ideal", target_date="2026-09-29", notes="", inputs_snapshot={"authored": "custom"}, exercises=ideal.exercises
+    )
+    with patch("mcp.plan_hevy_windows._block_workouts", return_value=rows):
+        gate = prescription_gate(custom, movements=MOVEMENTS, history_index=history, weight_index=WIRE_WEIGHTS)
+    assert gate["verdict"] == "clean", gate["audit"]
+    assert gate["load_floors"]["movements"][BENCH]["floor_kg"] == BENCH_205_KG
