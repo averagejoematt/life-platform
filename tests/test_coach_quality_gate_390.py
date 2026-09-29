@@ -148,7 +148,7 @@ class TestQualityGateNoteRevisesTheDraft:
         assert "(jargon) threshold language" in note
 
     def test_mutation_control_an_unscrubbed_note_primes_autocorrelation(self, monkeypatch):
-        from ai import quality_gate_note as qgn
+        from ai import rewrite_note as qgn
 
         monkeypatch.setattr(qgn, "_banned_patterns", lambda: ())
         note = ai_calls._quality_gate_correction_note(SLEEP_0928_REPORT, SLEEP_0928_DRAFT)
@@ -167,7 +167,7 @@ class TestQualityGateNoteRevisesTheDraft:
         assert report["passed"] is True
 
     def test_the_revision_share_is_logged(self, capsys):
-        from ai import quality_gate_note as qgn
+        from ai import rewrite_note as qgn
 
         share = qgn.log_revision("sleep_coach", SLEEP_0928_DRAFT, SLEEP_0928_DRAFT.replace("methodological footnote", "footnote"))
         assert 0.0 < share < 1.0

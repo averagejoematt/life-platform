@@ -1,4 +1,4 @@
-"""quality_gate_note.py — the N-06 corrective note REVISES the draft it judged (#4343).
+"""rewrite_note.py — the N-06 corrective note REVISES the draft it judged (#4343).
 
 `ai_calls._enforce_quality_gate` turns a failing report into one corrective note and hands
 it to the caller's `regenerate_fn`. Until #4343 the note carried the findings but NOT the

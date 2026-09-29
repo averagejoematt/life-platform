@@ -1234,7 +1234,7 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
 
 def _quality_gate_correction_note(report, draft=None):
     """The corrective note for a failing gate report. #4343: the body lives in
-    `ai/quality_gate_note.py` — with the draft it asks for a REVISION of that draft (not a
+    `ai/rewrite_note.py` — with the draft it asks for a REVISION of that draft (not a
     fresh sample), and judge prose never hands the rewrite a banned term the draft lacked."""
     return _qgn.correction_note(report, draft)
 
@@ -1244,9 +1244,9 @@ def _quality_gate_correction_note(report, draft=None):
 # the one after it, so the size-ratcheted top-of-module block stays one line per module.
 from coach import coach_input_facts as _ci  # noqa: E402
 
-from ai import (
-    quality_gate_note as _qgn,  # noqa: E402  — #4343: the rewrite revises the draft
-    regen_deadline as _deadline,  # noqa: E402  — #4343: a late coach is held, not regenerated past the budget
+from ai import (  # noqa: E402
+    regen_deadline as _deadline,  # #4343: a late coach is held, not regenerated past the budget
+    rewrite_note as _qgn,  # #4343: the N-06 rewrite revises the draft it judged
 )
 
 # #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
