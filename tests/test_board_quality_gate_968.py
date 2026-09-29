@@ -254,7 +254,7 @@ def _wire(ai, monkeypatch, table):
         @staticmethod
         def invoke(req):
             last = req["messages"][-1]["content"]
-            txt = CORRECTED_TEXT if "QUALITY GATE FEEDBACK" in last else FLAGGED_TEXT
+            txt = CORRECTED_TEXT if "REVIEW FEEDBACK" in last else FLAGGED_TEXT
             return {"content": [{"type": "text", "text": txt}], "usage": {}}
 
     stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)

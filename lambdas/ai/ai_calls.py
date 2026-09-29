@@ -1232,40 +1232,11 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
         return {"passed": True, "score": None, "suggestions": [], "_fail_open": True}
 
 
-def _quality_gate_correction_note(report):
-    """Build a corrective-rewrite note from a failing quality gate report.
-
-    Pure function (no I/O) so the regenerate-or-hold loop is unit-testable
-    without a live Bedrock/Lambda call. Mirrors the directness of
-    grounded_generation.correction_prompt.
-    """
-    lines = ["QUALITY GATE FEEDBACK — your previous draft failed review. Fix these specific issues:"]
-    for v in report.get("anti_pattern_violations") or []:
-        phrase = v.get("phrase") if isinstance(v, dict) else v
-        if phrase:
-            lines.append(f'  - Remove/avoid the forbidden phrase: "{phrase}"')
-    for v in report.get("decision_class_violations") or []:
-        if isinstance(v, dict):
-            lines.append(
-                f"  - You exceeded the evidence ceiling (expected max: {v.get('expected_max', 'observational')}); "
-                f"offending text: \"{v.get('excerpt', '')}\""
-            )
-    for flag in report.get("cross_coach_similarity_flags") or []:
-        if isinstance(flag, dict):
-            lines.append(f"  - Too similar to {flag.get('similar_to', 'another coach')}: {flag.get('reason', '')}")
-    for v in report.get("cycle_boundary_violations") or []:  # #1973
-        if isinstance(v, dict):
-            lines.append(
-                f'  - Add explicit prior-cycle framing (e.g. "last cycle", "cycle N") around: '
-                f"\"{v.get('excerpt', '')}\" — {v.get('reason', '')}"
-            )
-    for s in report.get("suggestions") or []:
-        if s:
-            lines.append(f"  - {s}")
-    if len(lines) == 1:
-        lines.append("  - Write a more distinctive, on-voice draft that matches your persona.")
-    lines.append("Rewrite the full response addressing all of the above. Do not mention this feedback in the output.")
-    return "\n".join(lines)
+def _quality_gate_correction_note(report, draft=None):
+    """The corrective note for a failing gate report. #4343: the body lives in
+    `ai/rewrite_note.py` — with the draft it asks for a REVISION of that draft (not a
+    fresh sample), and judge prose never hands the rewrite a banned term the draft lacked."""
+    return _qgn.correction_note(report, draft)
 
 
 # #4185: coach inputs read the served facts (logging record, PT sleep instants), and the gate
@@ -1273,7 +1244,10 @@ def _quality_gate_correction_note(report):
 # the one after it, so the size-ratcheted top-of-module block stays one line per module.
 from coach import coach_input_facts as _ci  # noqa: E402
 
-from ai import regen_deadline as _deadline  # noqa: E402  — #4343: a late coach is held, not regenerated past the budget
+from ai import (  # noqa: E402
+    regen_deadline as _deadline,  # #4343: a late coach is held, not regenerated past the budget
+    rewrite_note as _qgn,  # #4343: the N-06 rewrite revises the draft it judged
+)
 
 # #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
 # helper module beside it", not a baseline raise). Re-exported under its original name so
@@ -1314,7 +1288,7 @@ def _enforce_quality_gate(
     attempts = 0
     while not report.get("passed", True) and attempts < max_regenerations and _deadline.regeneration_allowed(coach_id):
         attempts += 1
-        note = _quality_gate_correction_note(report)
+        note = _quality_gate_correction_note(report, output_text)
         try:
             regenerated = regenerate_fn(note)
         except Exception as e:
@@ -1323,6 +1297,7 @@ def _enforce_quality_gate(
         if not (regenerated or "").strip():
             print(f"[COACH-QUALITY-GATE:{coach_id}] regeneration attempt {attempts} returned empty — keeping prior draft")
             break
+        _qgn.log_revision(coach_id, output_text, regenerated)
         output_text = regenerated
         report = _ci.gated(_invoke_quality_gate_sync, lambda_client, coach_id, output_text, generation_brief)
 

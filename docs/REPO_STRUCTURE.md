@@ -21,6 +21,7 @@ The canonical top-level layout. Read this before adding a new file so things lan
 | `site/` | v4 static site (Cockpit/Story/Evidence), deployed to S3 + CloudFront. |
 | `ci/` | CI support — `lambda_map.json` (source-file → function → stack mapping). |
 | `handovers/` | The live session pointer only — `HANDOVER_LATEST.md` + `README.md`. Prior sessions live on the `session-archive` branch (#1650). |
+| `ledgers/` | Dated, shrink-only residue/exemption ledgers (data, not tests or fixtures) — moved out of `tests/` starting with `conformance_residue.py` (#4270 slice 1; registered in `scripts/obligation_carriers.py::RESIDUE_LEDGERS`). |
 | `remediation/` | Triage agent (`agent.py`, `drift_report.py`, `track_record.py`) — driven by `.github/workflows/remediation-agent.yml`; shadow permanently, the `automerge.py` gate retired 2026-08-30 (#2833). |
 | `assets/` | Repo-level static asset(s) (the platform icon). NB: site/OG images live under the S3 `generated/` prefix, not here. |
 | `ingest/` | Local macOS `launchd` drop-folder watchers for manual data uploads (operational tooling, runs on the operator's machine). |

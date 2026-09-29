@@ -214,6 +214,15 @@ def test_planted_stale_ceiling_in_site_js_flags(facts, tmp_path):
     assert any("$85" in h for h in hits), f"planted stale .js ceiling must flag, got {hits}"
 
 
+def test_planted_ceiling_key_literal_without_a_dollar_sign_flags(facts, tmp_path):
+    """#4135: the source scan's line prefilter keeps the `ceiling` arm — a ceiling-named key
+    assigned a bare int carries no `$`, and must still flag."""
+    src = tmp_path / "planted.py"
+    src.write_text('CONFIG = {"budget_ceiling_usd": 85}\n', encoding="utf-8")
+    hits = facts._source_hits([src])
+    assert any("$85" in h for h in hits), f"planted `ceiling` key literal must flag, got {hits}"
+
+
 def test_planted_stale_ceiling_in_site_html_flags(facts, tmp_path):
     """Same proof for the generated-shell shape: a registry blurb quoting a retired
     ceiling inside a one-line embedded JSON script tag."""
