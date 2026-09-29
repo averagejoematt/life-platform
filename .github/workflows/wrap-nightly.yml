@@ -1,0 +1,108 @@
+# The /wrap-only checks, run nightly (#4262 box 2, epic #4247).
+#
+# Seven checks ran ONLY inside `scripts/wrap_gates.py`, so they ran only on the days a
+# session remembered `/wrap`. This workflow runs the ones that mean something without a
+# session, every night, as ONE matrix job: each leg files (or updates, or on its next green
+# run auto-closes) its OWN `auto-filed` tracker through the #1447 advisory-failure-issue
+# action, keyed by the leg's slug. A red leg therefore names one check, never "wrap nightly".
+#
+# The seven, and where each one went:
+#   backlog-hygiene        leg  — blocking by default; its gh fail-open is a red here (below)
+#   handover-lines         leg  — reads the committed handovers/HANDOVER_LATEST.md
+#   residual-queue         leg  — the same file's residual bullets must each cite an issue
+#   unlinked-closures      leg  — exits 1 only when closure_contract arms `shipped-unlinked`
+#                                 to `block`; armed `warn` today, so it cannot red yet and the
+#                                 leg follows the detector's declared posture, not a new one
+#   merge-text-closures    leg  — advisory by construction (the script always exits 0, posture
+#                                 `validated-merge-text` = warn); the leg is its nightly log
+#   proportionality-ledger NOT a leg — it validates THIS SESSION's diff (the handover vs the
+#                                 commits since the previous `docs(wrap)` commit). With no
+#                                 session there is no diff, and it reds UNANCHORED by
+#                                 construction (measured 2026-09-29 on 481019497: rc=1).
+#                                 It stays a wrap-time gate.
+#   alarm-citations        NOT a leg — it needs CloudWatch read credentials. The only role
+#                                 that holds DescribeAlarms + DescribeAlarmHistory today is
+#                                 github-actions-remediation-role, which also holds Bedrock;
+#                                 widening its callers is an owner ruling (or a narrow new
+#                                 role, which is CDK). Without creds the script prints
+#                                 UNVERIFIED and exits 0, so a creds-less leg would red every
+#                                 night and file a permanent tracker. Parked on #4262.
+#
+# Nothing is removed from wrap_gates.py by this file — that follow-up waits on PR #4390.
+#
+# THE DEGRADE RULE. Two of these checks can decline to look and still exit 0: a script that
+# prints UNVERIFIED, and check_backlog_hygiene.py's gh fail-open ("skipping (advisory)"). At
+# wrap time a human reads that line; at night nobody does, so here it is a RED, never a pass.
+# The output is captured to a file (unpiped — a pipe would hand the step the tail's exit
+# status, the #3103 class) and the check's own rc is kept.
+
+name: Wrap nightly
+
+on:
+  schedule:
+    - cron: '20 13 * * *' # 06:20 PT (PDT) — after the overnight lanes, before the day's first session
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write # the per-leg auto-filed tracker; `gh issue list` reads for three legs
+
+concurrency:
+  group: wrap-nightly
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: ${{ matrix.slug }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slug: wrap-backlog-hygiene
+            cmd: python3 scripts/check_backlog_hygiene.py
+          - slug: wrap-handover-lines
+            cmd: python3 scripts/check_handover_lines.py
+          - slug: wrap-residual-queue
+            cmd: python3 scripts/check_residual_queue.py
+          - slug: wrap-unlinked-closures
+            cmd: python3 scripts/check_unlinked_closures.py
+          - slug: wrap-merge-text-closures
+            cmd: python3 scripts/check_merge_commit_closures.py --days 7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # unlinked-closures reads origin/main history; merge-text reads merge commits
+
+      - uses: ./.github/actions/setup-ci
+
+      - name: Run the wrap-only check (a degrade is a red)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHECK_CMD: ${{ matrix.cmd }}
+        run: |
+          set -u
+          OUT="$(mktemp)"
+          rc=0
+          $CHECK_CMD > "$OUT" 2>&1 || rc=$?
+          cat "$OUT"
+          if grep -Eq 'UNVERIFIED|skipping \(advisory\)' "$OUT"; then
+            echo "::error::the check declined to look (UNVERIFIED / fail-open) — nobody reads that line at night"
+            exit 1
+          fi
+          exit "$rc"
+
+      - name: File or resolve this check's tracker
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: ${{ matrix.slug }}
+          workflow-name: Wrap nightly — ${{ matrix.slug }}
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            A /wrap-only check (#4262) failed on its nightly run, or declined to look
+            (UNVERIFIED / gh fail-open). Re-run the command named in the job log locally
+            for the detail; the owning step in .claude/skills/wrap/SKILL.md documents the
+            remedy.
