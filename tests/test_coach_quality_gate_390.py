@@ -107,6 +107,73 @@ class TestQualityGateCorrectionNote:
         assert "Vary your opening" in note
 
 
+# #4343 (2026-09-28 brief, request 15d734b8): the judge PASSED sleep's draft at 92; it was
+# failed by one deterministic banned word ("gates"). The note carried no draft, so the rewrite
+# was a fresh sample — and the sleep final added `autocorrelation` and `slow-wave`. The judge's
+# similarity reason on that run quoted the other coach's wording verbatim (below).
+SLEEP_0928_DRAFT = (
+    "This isn't a small methodological footnote. It gates everything. On the night of September 26th, the numbers "
+    "are genuinely strong — 89% recovery, HRV of 48.9 ms, resting heart rate of 55 bpm, and a deep sleep percentage "
+    "of 30.1%, which is notable."
+)
+SLEEP_0928_REPORT = {
+    "passed": False,
+    "score": 92,
+    "cross_coach_similarity_flags": [
+        {
+            "similar_to": "physical_coach",
+            "reason": "Both use autocorrelation threshold language ('five consecutive same-direction observations').",
+        }
+    ],
+    "suggestions": ["[banned_term] Replace 'gates' with a plain condition ('once …')."],
+}
+
+
+class TestQualityGateNoteRevisesTheDraft:
+    def test_the_note_quotes_the_draft_and_asks_for_a_revision(self):
+        note = ai_calls._quality_gate_correction_note(SLEEP_0928_REPORT, SLEEP_0928_DRAFT)
+        assert SLEEP_0928_DRAFT in note
+        assert "REVISE" in note and "keep every other sentence" in note
+        assert "Replace 'gates'" in note  # a term the draft used stays named — it is the fix's target
+
+    def test_the_note_hands_the_rewrite_no_banned_term_the_draft_lacked(self):
+        from coach import reader_checks as rc
+
+        note = ai_calls._quality_gate_correction_note(SLEEP_0928_REPORT, SLEEP_0928_DRAFT)
+        instructions = note.replace(SLEEP_0928_DRAFT, "")
+        introduced = {f["claimed"].lower() for f in rc.banned_term(instructions)} - {
+            f["claimed"].lower() for f in rc.banned_term(SLEEP_0928_DRAFT)
+        }
+        assert introduced == set(), introduced
+        assert "(jargon) threshold language" in note
+
+    def test_mutation_control_an_unscrubbed_note_primes_autocorrelation(self, monkeypatch):
+        from ai import quality_gate_note as qgn
+
+        monkeypatch.setattr(qgn, "_banned_patterns", lambda: ())
+        note = ai_calls._quality_gate_correction_note(SLEEP_0928_REPORT, SLEEP_0928_DRAFT)
+        assert "autocorrelation" in note
+
+    def test_without_a_draft_the_note_keeps_its_old_shape(self):
+        note = ai_calls._quality_gate_correction_note(SLEEP_0928_REPORT)
+        assert "YOUR DRAFT" not in note and note.startswith("REVIEW FEEDBACK")
+
+    def test_the_enforcer_passes_the_failing_draft_into_the_note(self):
+        client = _lambda_client_returning(SLEEP_0928_REPORT, {"passed": True, "score": 92})
+        regenerate_fn = MagicMock(return_value=SLEEP_0928_DRAFT.replace("It gates everything.", "Everything waits on it."))
+        output, report = ai_calls._enforce_quality_gate(client, "sleep_coach", SLEEP_0928_DRAFT, {}, regenerate_fn)
+        (note,), _ = regenerate_fn.call_args
+        assert SLEEP_0928_DRAFT in note
+        assert report["passed"] is True
+
+    def test_the_revision_share_is_logged(self, capsys):
+        from ai import quality_gate_note as qgn
+
+        share = qgn.log_revision("sleep_coach", SLEEP_0928_DRAFT, SLEEP_0928_DRAFT.replace("methodological footnote", "footnote"))
+        assert 0.0 < share < 1.0
+        assert "QG_REVISION kept=" in capsys.readouterr().out
+
+
 class TestEnforceQualityGate:
     def test_first_attempt_passes_no_regeneration(self):
         client = _lambda_client_returning({"passed": True, "score": 92})
