@@ -185,7 +185,7 @@ from content import html_builder, output_writers
 from experiment import phase_taxonomy  # ADR-077: the class registry the reads derive from (#2089)
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from ingestion import source_registry  # #2003: the canonical freshness set + thresholds
-from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
+from intelligence import brief_domain_inputs, weight_recency  # #1894/#1924: a weigh-in carries its own date; #4358/#4359 coach blocks
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
@@ -948,6 +948,9 @@ def gather_daily_data(profile, yesterday):
         "dexa": dexa,
         "measurements": measurements,
         "labs": labs_draws,  # #3792: the full draw LIST — see gather_daily_data above
+        # #4358/#4359: the keys the physical (Hevy 14d) and explorer (correlations, experiments)
+        # blocks read — the builders read keys this dict never set, so both blocks were empty.
+        **brief_domain_inputs.gather(table, fetch_range, today, yesterday, USER_PREFIX),
     }
 
 
