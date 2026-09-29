@@ -11,7 +11,6 @@ from mcp.recovery_authoring import (
     LOWER_OF_RULE,
     RPE_BASE_YELLOW,
     RPE_GREEN_BONUS,
-    _consecutive_days,
     assess_authoring_freshness,
     build_top_set_branches,
     derive_training_context,
@@ -73,19 +72,19 @@ def test_e5_lower_of_rule_and_feel_downgrade_only():
 
 # ── E7: each day authored independently of prior-day ACTUALS (pure of them) ──
 def test_e7_days_authored_independently():
-    hist = ["2026-06-18", "2026-06-19", "2026-06-20"]
-    a = derive_training_context(hist, "moderate", "2026-06-21")
-    b = derive_training_context(hist, "moderate", "2026-06-25")
-    # Same history, different target → independent results, no shared/carried state.
-    assert a["consecutive_days"] == 3  # 18,19,20 before the 21st
-    assert b["consecutive_days"] == 0  # nothing on 22,23,24 before the 25th
+    # #4411: the context takes the LOADED-lifting streak (training_streaks, read per target date).
+    a = derive_training_context(3, "moderate", "2026-06-21")
+    b = derive_training_context(0, "moderate", "2026-06-25")
+    # Different streak → independent results, no shared/carried state.
+    assert a["loaded_lifting_streak"] == 3 and a["late_week"] is False
+    assert b["loaded_lifting_streak"] == 0 and b["reasons"] == []
 
 
 # ── E8: late-week streak raises floors / caps GREEN to quality ──
 def test_e8_late_week_caps_green_to_quality():
-    hist = ["2026-06-16", "2026-06-17", "2026-06-18", "2026-06-19", "2026-06-20"]
-    ctx = derive_training_context(hist, "moderate", "2026-06-21")
-    assert ctx["consecutive_days"] == 5
+    ctx = derive_training_context(5, "moderate", "2026-06-21")
+    assert ctx["loaded_lifting_streak"] == 5
+    assert ctx["reasons"][0].startswith("loaded-lifting day 6 in a row")
     assert ctx["late_week"] is True
     assert ctx["green_ceiling_quality"] is True
     b = build_top_set_branches(RPE_BASE_YELLOW, ctx)
@@ -94,14 +93,14 @@ def test_e8_late_week_caps_green_to_quality():
 
 
 def test_deep_deficit_caps_green_to_quality():
-    ctx = derive_training_context([], "deep", "2026-06-21")
+    ctx = derive_training_context(0, "deep", "2026-06-21")
     assert ctx["green_ceiling_quality"] is True
     b = build_top_set_branches(RPE_BASE_YELLOW, ctx)
     assert b["green"]["rpe_cap"] == RPE_BASE_YELLOW
 
 
 def test_early_tissue_ramp_caps_green():
-    ctx = derive_training_context([], "moderate", "2026-06-21", tissue_ramp_sessions=2)
+    ctx = derive_training_context(0, "moderate", "2026-06-21", tissue_ramp_sessions=2)
     assert ctx["green_ceiling_quality"] is True
 
 
@@ -114,17 +113,17 @@ def test_e11_session_block_always_present():
 # ── Subtract-only invariant: green >= yellow >= red, green never exceeds the ceiling ──
 def test_subtract_only_invariant():
     ceiling = RPE_BASE_YELLOW + RPE_GREEN_BONUS
-    for ctx in (None, derive_training_context([], "moderate", "2026-06-21"), derive_training_context([], "deep", "2026-06-21")):
+    for ctx in (None, derive_training_context(0, "moderate", "2026-06-21"), derive_training_context(0, "deep", "2026-06-21")):
         b = build_top_set_branches(RPE_BASE_YELLOW, ctx)
         g, y, r = b["green"]["rpe_cap"], b["yellow"]["rpe_cap"], b["red"]["rpe_cap"]
         assert g >= y >= r, f"subtract-only violated: green={g} yellow={y} red={r}"
         assert g <= ceiling, f"green {g} exceeded authored ceiling {ceiling}"
 
 
-def test_consecutive_days_counts_back_from_target():
-    assert _consecutive_days(["2026-06-19", "2026-06-20"], "2026-06-21") == 2
-    assert _consecutive_days(["2026-06-18", "2026-06-20"], "2026-06-21") == 1  # 19 missing breaks streak
-    assert _consecutive_days([], "2026-06-21") == 0
+def test_an_unread_loaded_streak_is_unknown_never_a_streak_line():
+    """#4411 / ADR-104: None (the streak could not be read) writes no streak reason and caps nothing."""
+    ctx = derive_training_context(None, "moderate", "2026-06-21")
+    assert ctx["loaded_lifting_streak"] is None and ctx["late_week"] is False and ctx["reasons"] == []
 
 
 def test_bands_match_whoop_thresholds():

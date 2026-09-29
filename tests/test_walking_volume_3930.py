@@ -386,7 +386,6 @@ def _joints(draft: dict, block: dict | None, days_since: dict | None = None) -> 
         draft,
         pain_by_idx={},
         days_since_by_idx=days_since or {e["idx"]: 3 for e in draft["exercises"]},
-        active_day_streak=3,
         loaded_lifting_streak=2,
         pain_layer_status="ok",
         recent_aerobic=block,
@@ -515,3 +514,85 @@ def test_draft_custom_names_a_copied_treadmill_the_pick_would_not_draft():
     with patch.object(shared_quantities, "recent_aerobic_layer", side_effect=RuntimeError("boom")):
         (w,) = plan_cardio_pick.draft_cardio_warnings(ir.exercises, "lower", RA_TARGET)
     assert "could not be computed (RuntimeError)" in w
+
+
+# ── #4410: every draft path reads the aerobic minutes; an unread week is unknown, never 0 ────
+# The cron passed `z2_minutes_7d=0.0` and the chat / nightly pre-draft path passed the caller's
+# value or 0, so `full_body_session` wrote "z2 7d=0 < floor 90 … walk more" into the note of a
+# week the recent-aerobic block read at 9+ h. The fixture week (09-21..09-27, the wire above)
+# reads 10.19 h of walking + cycling.
+RA_MINUTES = 611.4  # 10.19 h × 60 — the trailing 7 days through target − 1 of the fixture block
+
+
+def _fixture_read(source: str, start: str, end: str) -> list[dict]:
+    data = {"strava": _ra_rows("strava"), "hevy": _ra_rows("hevy")}
+    return [r for r in data[source] if start <= r["date"] <= end]
+
+
+def _full_body_rationale(monkeypatch, z2: float | None) -> list[str]:
+    """The ideal §3 session for 09-28 (two lifts done → week 1's lower-volume), as the generator
+    builds it — the same stubs as `test_a_full_body_week_generates_through_the_module_grid`."""
+    from training import exercise_history, routine_generator as rg
+
+    monkeypatch.setattr(rg, "CONFIG_DIR", str(Path(__file__).resolve().parents[1] / "config"))
+    monkeypatch.setattr(exercise_history, "load_history_indexes", lambda **kw: ({}, {}))
+    monkeypatch.setattr(exercise_history, "load_bodyweight_index", lambda **kw: {})
+    monkeypatch.setattr(exercise_history, "load_whoop_workout_index", lambda **kw: {})
+    lift = [{"name": "Leg Press", "sets": [{"weight_kg": 90, "reps": 5}]}, {"name": "Bench Press", "sets": [{"weight_kg": 60, "reps": 5}]}]
+    done = [{"date": d, "exercises": lift} for d in ("2026-09-24", "2026-09-26")]
+    inputs = rg.GeneratorInputs(
+        target_date=RA_TARGET, volume_7d={}, recovery_tier="green", acwr_flag="safe", z2_minutes_7d=z2, block_workouts=done
+    )
+    ideal = next(r for r in rg.generate_routines(inputs) if r.variant == "ideal")
+    assert ideal.inputs_snapshot["z2_minutes_7d"] == z2  # the record the live proof reads
+    return ideal.rationale
+
+
+def test_the_draft_path_reads_the_real_aerobic_minutes_and_writes_no_walk_more_note(monkeypatch):
+    """The nightly pre-draft's path (`_action_draft` → `_generator_inputs`) over the fixture partitions.
+    Mutation control: restore `z2_minutes_7d=float(args.get("z2_minutes_7d") or 0)` in
+    `tools_hevy_routine._generator_inputs` — the inputs read 0 and the note says walk more."""
+    from mcp import shared_quantities, tools_hevy_routine as thr
+
+    with patch.object(shared_quantities._core, "query_source_range", side_effect=_fixture_read):
+        inputs = thr._generator_inputs({"target_date": RA_TARGET})
+    assert inputs.z2_minutes_7d == RA_MINUTES
+    assert not any("walk more" in r for r in _full_body_rationale(monkeypatch, inputs.z2_minutes_7d))
+    # the in-test control: the old literal 0 is exactly what wrote the note
+    assert any("walk more" in r for r in _full_body_rationale(monkeypatch, 0.0))
+
+
+def test_the_cron_reads_the_same_quantity_as_the_mcp_path():
+    """Two draft paths, one number. Mutation control: put `z2_minutes_7d=0.0` back in the cron's
+    `_gather_inputs` — this reds."""
+    import importlib
+
+    cron = importlib.import_module("operational.hevy_routine_cron_lambda")
+    assert cron._z2_minutes_7d(RA_TARGET, read=_fixture_read) == RA_MINUTES
+    with patch.object(cron, "_read_partition", side_effect=_fixture_read):
+        assert cron._gather_inputs(RA_TARGET, False).z2_minutes_7d == RA_MINUTES
+
+
+def test_an_unreadable_aerobic_read_is_unknown_and_writes_no_walk_more_note(monkeypatch):
+    """ADR-104: both sources raising → None, and a floor (one source unreadable) → None too — a floor
+    below 90 min cannot say he is below it. None writes the unknown line, never the walk-more note.
+    Mutation control: make `_portfolio_guard` return `(z2_minutes_7d or 0) >= z2_floor` — this reds."""
+    import importlib
+
+    from training import recent_aerobic, routine_generator as rg
+
+    from mcp import shared_quantities, tools_hevy_routine as thr
+
+    with patch.object(shared_quantities._core, "query_source_range", side_effect=RuntimeError("ddb down")):
+        assert thr._generator_inputs({"target_date": RA_TARGET}).z2_minutes_7d is None
+    cron = importlib.import_module("operational.hevy_routine_cron_lambda")
+
+    def strava_down(source: str, start: str, end: str) -> list[dict]:
+        if source == "strava":
+            raise RuntimeError("strava down")
+        return _fixture_read(source, start, end)
+
+    assert cron._z2_minutes_7d(RA_TARGET, read=strava_down) is None
+    assert recent_aerobic.aerobic_minutes_7d(None) is None
+    rationale = _full_body_rationale(monkeypatch, None)
+    assert rg.Z2_UNKNOWN_NOTE in rationale and not any("walk more" in r for r in rationale)

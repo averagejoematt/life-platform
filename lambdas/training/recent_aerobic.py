@@ -290,6 +290,17 @@ def build(
 
 
 # ── what the block says to the drafter and to the critic ──────────────────────────────
+def aerobic_minutes_7d(block: dict[str, Any] | None) -> float | None:
+    """The generator's `z2_minutes_7d` (#4410): the block's trailing-7-day walking + cycling hours, in
+    minutes — the ONE recent-aerobic quantity, never a second count. None = UNKNOWN (ADR-104): an
+    unread block, or totals that are a FLOOR because a source was unreadable (a floor below the
+    portfolio floor cannot say he is below it). Never 0 for an unread week."""
+    if not block or block.get("state") != "read" or block.get("totals_are_floor"):
+        return None
+    hours = ((block.get("totals") or {}).get("trailing_7d") or {}).get("hours")
+    return None if hours is None else round(float(hours) * 60.0, 1)
+
+
 def legs_loaded(block: dict[str, Any] | None) -> tuple[bool | None, str]:
     """(True when the last 48 h carried heavy weight-bearing volume, why). None = unread."""
     if not block or block.get("state") != "read":

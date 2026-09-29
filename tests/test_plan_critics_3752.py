@@ -92,7 +92,6 @@ def _packets(
             d,
             pain_by_idx=pain if pain is not None else {0: {"pain_flag_any": False}, 1: {"pain_flag_any": False}},
             days_since_by_idx=days_since if days_since is not None else {0: 3, 1: 5},
-            active_day_streak=active,
             loaded_lifting_streak=consecutive,
             pain_layer_status=layer,
         ),
