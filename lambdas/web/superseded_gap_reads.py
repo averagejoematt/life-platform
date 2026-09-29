@@ -8,16 +8,18 @@ stored, and `/api/coach/{id}.recent_outputs` still served them: the nutrition co
 and 09-25 reads ("The food log went dark after September 19th", "Nothing was logged since September
 19th", "His food logging went silent after September 19th") and the physical coach's 09-13 read
 ("His food log went silent after September 10th") — while `/api/nutrition_overview` has a row for
-every day after both dates. Regeneration cannot reach a stored past; this is the read-side answer.
+every day after both dates. The nutrition coach's 09-26 and 09-22 reads ("the six-day / a two-day
+logging gap since September 19th") are caught too, since the #4185 follow-up taught the shared matcher
+that phrasing. Regeneration cannot reach a stored past; this is the read-side answer.
 Nothing in DynamoDB is written or deleted.
 
-THE RULE (the narrowest one that catches the four live reads and nothing else)
+THE RULE (the narrowest one that catches the six live reads and nothing else)
 
 A recent_output is SUPERSEDED when all three hold:
   1. it was written before the fix: no `data_through` stamp (the #4227 writer stamps every OUTPUT#
      row) AND `generated_at` earlier than `LOGGING_RECORD_FIX_INSTANT`;
   2. one of its sentences dates a logging stop — "went dark / silent / quiet after <Mon> <d>",
-     "nothing was logged since <Mon> <d>" — read by `coach_input_facts._claimed_last_log`, the SAME
+     "nothing was logged since <Mon> <d>", "the N-day logging gap since <Mon> <d>" — read by `coach_input_facts._claimed_last_log`, the SAME
      matcher the #4227 served-fact gate uses on fresh drafts (one reading of the prose, not two);
   3. the served logging record (`health.nutrition_logging.logging_record`, the computation
      `/api/nutrition_overview` serves, over `coach_input_facts.fetch_macrofactor_window`) has a log

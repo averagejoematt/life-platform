@@ -509,12 +509,26 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 766  # 765 -> 766 (2026-09-29, #4276 box 2 the raw-model-text json.loads guard, on main ea274ed4c): ONE real
-# entrant — `structural::test_bedrock_client.py` (a lambdas/** rglob since the guard joined it), PROVEN (STRUCTURAL_HAND_PROOFS:
-# two real-tree plants each 1 failed / 46 passed, restored 47 passed). MEASURED by id-set diff vs a `git archive origin/main` export
-# at ea274ed4c: main 765 {proven 231, unproven 522, not-applicable 7, attempted-unproven 5} -> this lane 766 {232, 522, 7, 5}.
-# Main's committed 766 was one high (#4463 retired a gate without moving it), so the number is unchanged; the two stale residue
-# lines (sync_doc_metadata, daily_metrics_compute size-guard BASELINE) are deleted in tests/gate_census_unproven_residue.py.
+BASELINE_TOTAL_GATES = 769  # 768 -> 769 (2026-09-29, #4276 box 2 the raw-model-text json.loads guard, merged onto #4470's 768 at
+# c4618d2cb): ONE real entrant — `structural::test_bedrock_client.py` (a lambdas/** rglob since the guard joined it), PROVEN
+# (STRUCTURAL_HAND_PROOFS: two real-tree plants each 1 failed / 46 passed, restored 47 passed). MEASURED by id-set diff vs a
+# `git archive origin/main` export at c4618d2cb: main 768 {proven 234, unproven 522, not-applicable 7, attempted-unproven 5} ->
+# this lane 769 {235, 522, 7, 5}; exactly that id enters, {} leaves.
+# PRIOR: 768  # 766 -> 768 (2026-09-29, #4343 the served-coach-facts probe, merged onto #4459's 766 at a55566bbf):
+# TWO real entrants — `guard::scripts/check_served_coach_facts.py` and `ci::served-coach-facts.yml::probe::3`, both PROVEN
+# (GUARD_PROOFS + CI_PROOFS in scripts/gate_census_proofs.py: three script plants each 1-2 failed, the step's `exit 0` plant
+# 1 failed / 3 passed, restored green). MEASURED by id-set diff on `scripts/gate_census.py --json`, merged tree vs a `git archive
+# origin/main` export at a55566bbf: main 766 {proven 232, unproven 522, not-applicable 7, attempted-unproven 5} -> this lane 768
+# {234, 522, 7, 5}; exactly those two ids enter, {} leaves.
+# PRIOR: 766  # 765 -> 766 (2026-09-29, #4262 box 2 wrap-nightly, merged onto main ea274ed4c after #4460/#4463/#4464/#4454):
+# ONE real entrant — `ci::wrap-nightly.yml::check::2`, the matrix job's run step (five legs, one step, one id), arriving PROVEN
+# (CI_PROOFS in scripts/gate_census_proofs.py: degrade grep deleted -> 1 failed / 2 passed; rc swallowed -> 1 failed / 2 passed;
+# restored 3 passed). MEASURED by id-set diff on `scripts/gate_census.py --json`, merged tree vs a `git archive origin/main` export
+# at ea274ed4c: main 765 {proven 231, unproven 522, not-applicable 7, attempted-unproven 5} -> this lane 766 {232, 522, 7, 5};
+# exactly that id enters, {} leaves. Main's own count was 765 against a committed 766: #4463 (#4271) retired
+# `registry::tests/test_module_size_guard.py::BASELINE::deploy/sync_doc_metadata.py` without moving this constant. Its residue
+# line, and the equally stale `...::BASELINE::lambdas/compute/daily_metrics_compute_lambda.py` line (that entry left the
+# size-guard BASELINE at #4362), are deleted from tests/gate_census_unproven_residue.py in this merge.
 # PRIOR: 766  # 782 -> 766 (2026-09-29, #4252 a push to main re-runs only what no required PR check proved): SIXTEEN gates RETIRE, none enter. ci-test.yml's eleven single-file pytest steps are deleted (each file also ran in the coverage passes; the labels survive as sections printed by scripts/ci_test_sections.py, a fail-open report the census does not count): by label `test / Run unit tests`, `IAM policy linter (test_role_policies.py)`, `CDK handler consistency linter (test_cdk_handler_consistency.py)`, `CDK S3 path linter (test_cdk_s3_paths.py)`, `Safety module wiring linter (test_wiring_coverage.py)`, `DynamoDB pattern linter (test_ddb_patterns.py)`, `MCP registry integrity linter (test_mcp_registry.py)`, `Lambda handler integration linter (test_lambda_handlers.py)`, `IAM/secrets consistency linter (test_iam_secrets_consistency.py)`, `Secret references linter (test_secret_references.py)`, `Upstream-API contract tests (test_upstream_contracts.py)`; and dependabot-validate.yml is deleted (automerge now keys off PR checks): ci::dependabot-validate.yml::validate::2..6 (Install dev toolchain, Format gate, Lint gate, flake8 fail-loud subset, Offline unit suite). Because ci ids are POSITIONAL, the id set reads LEAVE ci::ci-test.yml::test::7..17 + ci::dependabot-validate.yml::validate::2..6 while `Deprecated secrets scan` and `Test coverage gate` slide to test::5/test::6 (same labels, same residue keys). All sixteen were `unproven`, so their 16 lines leave tests/gate_census_unproven_residue.py and UNPROVEN_CEILING_HIGH_WATER moves 540 -> 524 with them; proven does not move (231). ci-lint.yml gains no step (the skip decision is folded into `Install black + ruff`), so its positional ids and their proofs are untouched. MEASURED by id-set diff on `scripts/gate_census.py --json` vs a `git archive origin/main` export at 68fb0ebff: main 782 {proven 231, unproven 539, not-applicable 7, attempted-unproven 5} -> this lane 766 {231, 523, 7, 5}. Exactly {} enters. PRIOR: 781 -> 782 (2026-09-29, #4270 slice 1 re-merged onto #4419's 781): ONE real entrant —
 # `registry::tests/test_root_clutter_guard.py::ALLOWLIST::ledgers`, the D1 root-clutter entry for the new `ledgers/`
 # top-level dir. It arrives PROVEN (REGISTRY_PROOFS record in scripts/gate_census_proofs.py; ARMED 1 failed / 3 passed
