@@ -2292,3 +2292,270 @@ class TestAiOutputOrdering:
         )
         brief.lambda_handler({}, None)
         assert "Quieter journal day" not in (seen.get("journal_coach_text") or ""), "an AI-failure stub was filed as genuine coaching"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 17. #4358 / #4359 — the coach domain blocks, built from the wire
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Both defects were a builder in ai.ai_context reading keys the brief's `data` never set,
+# so the Performance coach (#4358) judged training he could not see and the explorer
+# (#4359) was told "0 correlations, 0 experiments" daily. Every fixture below goes through
+# the REAL gather_daily_data against the FakeTable; the row shapes are trimmed copies of a
+# read-only `aws dynamodb query` taken 2026-09-27 (hevy DATE#…#WORKOUT# rows, strava DAY rows
+# with an `activities` list, weekly_correlations WEEK# rows with a `correlations` MAP keyed by
+# pair label, experiments EXP# rows — including the live tombstoned pilot row that still
+# says status=active).
+
+
+def hevy_row(date_str, wid, title, **fields):
+    base = {
+        "date": date_str,
+        "title": title,
+        "source": "hevy",
+        "phase": "experiment",
+        "start_time": f"{date_str}T18:18:09+00:00",
+        "duration_sec": Decimal("12325"),
+        "exercise_count": Decimal("9"),
+        "set_count": Decimal("25"),
+        "total_volume_kg": Decimal("8400.54"),
+        "exercises": [
+            {"name": "Lat Pulldown (Cable)", "sets": [{"weight_kg": Decimal("63.5"), "reps": Decimal("10"), "rpe": Decimal("7.5")}]}
+        ],
+    }
+    base.update(fields)
+    return {"pk": brief.USER_PREFIX + "hevy", "sk": f"DATE#{date_str}#WORKOUT#{wid}", **base}
+
+
+def strava_day(date_str, activities):
+    return day_row("strava", date_str, activity_count=Decimal(len(activities)), activities=activities)
+
+
+def strava_act(date_str, sport, device, secs, metres=0, hr=None):
+    return {
+        "start_date_local": f"{date_str}T10:59:23Z",
+        "sport_type": sport,
+        "type": sport,
+        "device_name": device,
+        "moving_time_seconds": Decimal(str(secs)),
+        "elapsed_time_seconds": Decimal(str(secs)),
+        "distance_meters": Decimal(str(metres)),
+        "average_heartrate": None if hr is None else Decimal(str(hr)),
+    }
+
+
+def corr_row(week, phase="experiment", **extra):
+    return row(
+        "weekly_correlations",
+        f"WEEK#{week}",
+        week=week,
+        phase=phase,
+        start_date="2026-05-09",
+        end_date=YESTERDAY,
+        n_pairs=Decimal("2"),
+        correlations={
+            "hrv_vs_recovery": {
+                "metric_a": "hrv",
+                "metric_b": "recovery_score",
+                "pearson_r": Decimal("0.9163"),
+                "fdr_significant": True,
+                "n_days": Decimal("89"),
+                "ci95_low": Decimal("0.884"),
+                "ci95_high": Decimal("0.955"),
+                "counterintuitive": False,
+            },
+            "sleep_duration_vs_recovery": {
+                "metric_a": "sleep_duration",
+                "metric_b": "recovery_score",
+                "pearson_r": Decimal("0.1835"),
+                "fdr_significant": False,
+                "n_days": Decimal("89"),
+            },
+        },
+        **extra,
+    )
+
+
+def exp_row(slug, name, status, phase="experiment", **extra):
+    return row("experiments", f"EXP#{slug}", name=name, status=status, phase=phase, **extra)
+
+
+def _seed(table, *rows):
+    for r in rows:
+        table.store[(r["pk"], r["sk"])] = r
+
+
+def _seed_the_wire(table):
+    _seed(
+        table,
+        hevy_row("2026-08-04", "fb535f38", "Foundation - Pull - 4 - 14"),
+        hevy_row(YESTERDAY, "9fe128bd", "Foundation - Engine - 3 - 15", total_volume_kg=Decimal("0"), set_count=Decimal("3")),
+        hevy_row("2026-07-10", "old00000", "Outside the 14-day window"),
+        strava_day(
+            YESTERDAY,
+            [
+                strava_act(YESTERDAY, "WeightTraining", "Hevy", 7808),
+                strava_act(YESTERDAY, "Walk", "Garmin epix (Gen2)", 5400, 8046.7, 104.2),
+            ],
+        ),
+        corr_row("2026-W32"),
+        corr_row("2026-W31", phase="pilot"),
+        exp_row("daily-zone-2-floor-30-min_2026-07-06", "Daily zone-2 floor (>=30 min)", "active", phase="pilot", tombstone=True),
+        exp_row("protein-floor-160", "Protein floor 160 g", "active"),
+        exp_row("no-alcohol-30-days", "No Alcohol for 30 Days", "completed"),
+    )
+
+
+class TestCoachDomainBlocksFromTheWire:
+    def test_the_physical_block_carries_dated_hevy_sessions_and_strava_activities(self, table):
+        from ai import ai_context
+
+        _seed_the_wire(table)
+        built = ai_context._build_physical_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        sessions = built["strength_sessions_14d"]
+        assert [(s["date"], s["title"]) for s in sessions] == [
+            (YESTERDAY, "Foundation - Engine - 3 - 15"),
+            ("2026-08-04", "Foundation - Pull - 4 - 14"),
+        ], "the 14-day Hevy window must reach the Performance coach, newest first, each dated"
+        assert sessions[1]["volume_lb"] == 18520 and sessions[1]["duration_min"] == 205
+        assert built["last_strength_session_date"] == YESTERDAY
+        # the Hevy-mirrored WeightTraining activity is the SAME session — only the walk is cardio
+        assert built["cardio_activities_7d"] == [
+            {"date": YESTERDAY, "type": "Walk", "duration_min": 90.0, "distance_miles": 5.0, "avg_hr": 104.2}
+        ]
+        # the old fields survive beside the new block
+        assert "weight_recency_note" in built and "latest_weight" in built
+
+    def test_a_day_without_a_logged_session_is_stated_as_absence_not_zero(self, table):
+        from ai import ai_context
+
+        _seed(table, hevy_row("2026-08-03", "a1", "Foundation - Upper - 2 - 19"))
+        built = ai_context._build_physical_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        note = built["training_note"]
+        assert f"No strength session logged on {YESTERDAY}" in note and "2026-08-03" in note and "absence" in note
+        assert "No Strava activity" in note and "not zero activity" in note
+
+        table.store.clear()
+        empty = ai_context._build_physical_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        assert empty["last_strength_session_date"] is None and empty["strength_sessions_14d"] == []
+        assert "absence of logs, not proof of rest days" in empty["training_note"]
+
+    def test_the_explorer_block_reads_the_computed_partitions(self, table):
+        from ai import ai_context
+
+        _seed_the_wire(table)
+        built = ai_context._build_explorer_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        assert built["significant_correlations"] == 1 and built["pairs_tested"] == 2
+        assert built["correlation_week"] == "2026-W32", "the pilot-phase W31 row must stay hidden (ADR-058)"
+        assert built["top_pairs"][0]["pair"] == "hrv_vs_recovery" and built["top_pairs"][0]["r"] == 0.92
+        # the tombstoned pilot experiment still says status=active on the live row — it must not count
+        assert built["active_experiments"] == 1 and built["experiment_names"] == ["Protein floor 160 g"]
+
+    def test_an_absent_partition_is_not_computed_never_a_silent_zero(self, table):
+        from ai import ai_context
+        from intelligence import brief_domain_inputs
+
+        # nothing written: correlations are ABSENT (None + status); the experiments partition
+        # WAS read and holds none active, which is the one honest zero.
+        built = ai_context._build_explorer_data(brief.gather_daily_data(PROFILE, YESTERDAY))
+        assert built["significant_correlations"] is None and built["top_pairs"] is None
+        assert "not computed" in built["correlations_status"]
+        assert built["active_experiments"] == 0 and built["experiment_names"] == []
+
+        table.query_error = RuntimeError("throttled")
+        failed = ai_context._build_explorer_data(
+            brief_domain_inputs.gather(table, brief.fetch_range, date(2026, 8, 7), YESTERDAY, brief.USER_PREFIX)
+        )
+        assert failed["active_experiments"] is None and "not computed" in failed["experiments_status"]
+        assert failed["significant_correlations"] is None
+
+
+class _RecordingDict(dict):
+    """A `data` dict that records every key a builder asks it for."""
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.read = set()
+
+    def get(self, key, default=None):
+        self.read.add(key)
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        self.read.add(key)
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        self.read.add(key)
+        return super().__contains__(key)
+
+
+#: Keys a builder reads that the brief deliberately does not set — each a FALLBACK alias
+#: behind a key it does set, or (withings) a named dead read. A key here must say why.
+_OPTIONAL_READS = {
+    "eightsleep": "_build_sleep_data falls back to it behind `sleep`/`whoop` — Eight Sleep is not a brief source",
+    "nutrition": "_build_nutrition_data's alias behind `macrofactor`, which the brief sets",
+    "som": "_build_mind_data's alias behind `state_of_mind`, which lambda_handler sets",
+    "apple_health": "the glucose/training builders' alias behind `apple`, which the brief sets",
+    "withings": (
+        "_build_physical_data's `weight_lbs`/`body_fat_pct` read — DEAD (the brief never set it; "
+        "test_coach_source_facets_3516 names it too). `latest_weight` + `weight_recency` carry the "
+        "same reading WITH its date (#1924), so it is declared here, not fed a second undated weight"
+    ),
+}
+
+
+def _keys_lambda_handler_sets():
+    """`data["X"] = …` assignment targets inside lambda_handler (the post-gather enrichments)."""
+    import ast
+
+    tree = ast.parse(Path(brief.__file__).read_text())
+    handler = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "lambda_handler")
+    keys = set()
+    for node in ast.walk(handler):
+        for tgt in getattr(node, "targets", []):
+            if isinstance(tgt, ast.Subscript) and isinstance(tgt.value, ast.Name) and tgt.value.id == "data":
+                if isinstance(tgt.slice, ast.Constant) and isinstance(tgt.slice.value, str):
+                    keys.add(tgt.slice.value)
+    return keys
+
+
+def _unset_builder_reads(data, set_keys):
+    """{builder: keys it read that the brief never sets and that are not declared optional}."""
+    from ai import ai_context
+
+    builders = sorted(n for n in dir(ai_context) if n.startswith("_build_") and n.endswith("_data"))
+    assert len(builders) >= 8, f"the builder derivation is dark: {builders}"
+    out = {}
+    for name in builders:
+        rec = _RecordingDict(data)
+        getattr(ai_context, name)(rec)
+        missing = rec.read - set_keys - set(_OPTIONAL_READS)
+        if missing:
+            out[name] = sorted(missing)
+    return out
+
+
+class TestEveryBuilderReadIsSetByTheBrief:
+    """#4359's class guard (covering #4358): every key an `ai_context._build_*_data` builder
+    reads must be set by the brief — gather_daily_data's dict (run for real, against the
+    wire) plus lambda_handler's `data[...] =` enrichments — or be declared in _OPTIONAL_READS."""
+
+    def test_no_builder_reads_a_key_the_brief_never_sets(self, table):
+        _seed_the_wire(table)
+        data = brief.gather_daily_data(PROFILE, YESTERDAY)
+        set_keys = set(data) | _keys_lambda_handler_sets()
+        assert {"state_of_mind", "character_sheet"} <= set_keys, "the handler-enrichment derivation is dark"
+        assert _unset_builder_reads(data, set_keys) == {}
+
+    def test_mutation_control_dropping_one_assignment_is_caught(self, table):
+        """Remove what the brief sets for #4358 and for #4359 — the guard must name the builder."""
+        _seed_the_wire(table)
+        data = brief.gather_daily_data(PROFILE, YESTERDAY)
+        set_keys = set(data) | _keys_lambda_handler_sets()
+        for dropped, builder in (("hevy_recent", "_build_physical_data"), ("weekly_correlations", "_build_explorer_data")):
+            found = _unset_builder_reads({k: v for k, v in data.items() if k != dropped}, set_keys - {dropped})
+            assert found.get(builder) == [dropped], f"dropping {dropped} went unseen: {found}"
+        for key, reason in _OPTIONAL_READS.items():
+            assert key not in set_keys, f"{key} is set by the brief now — delete its _OPTIONAL_READS entry"
+            assert len(reason) > 40, f"{key}: an optional read must say why"

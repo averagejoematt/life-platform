@@ -14,6 +14,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DA
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.scoring_engine import habitify_reading  # #4362: rename-aware habit lookup
 from intelligence import (
+    brief_domain_inputs,  # #4358/#4359: the physical training block + the explorer block, one seam with the brief
     labs_facts,  # #3792: the labs window framing has ONE home — see _build_labs_data
     weight_recency,  # #1894/#1924: staleness defined once, used by both coach generators
 )
@@ -1294,6 +1295,9 @@ def _build_physical_data(data):
         # can date the claim instead of implying it is current.
         **recency,
         "weight_recency_note": weight_recency.weight_recency_prompt_block(recency),
+        # #4358: the seat has owned training since the 2026-08-10 merge but read no training
+        # data — the dated Hevy sessions + Strava activities, absence stated as absence.
+        **brief_domain_inputs.training_block(data),
     }
 
 
@@ -1323,14 +1327,13 @@ def _build_labs_data(data):
 
 
 def _build_explorer_data(data):
-    """Extract cross-domain data for the explorer coach."""
-    corr = data.get("weekly_correlations") or {}
-    return {
-        "significant_correlations": corr.get("significant_correlations", 0),
-        "top_pairs": corr.get("top_pairs", [])[:5],
-        "active_experiments": data.get("active_experiments", 0),
-        "experiment_names": data.get("experiment_names", []),
-    }
+    """Extract cross-domain data for the explorer coach.
+
+    #4359: these keys were read here and set nowhere, so the block was a false zero every
+    day. The brief now sets them (`brief_domain_inputs.gather`) and an absent partition
+    renders as "not computed", never 0 / [].
+    """
+    return brief_domain_inputs.explorer_block(data)
 
 
 # ── Grounding receipts (#743) ──────────────────────────────────────────────
