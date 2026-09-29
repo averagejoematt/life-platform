@@ -1022,7 +1022,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 231 -> 232 (2026-09-29, #4262 box 2, merged onto #4383's 231): ONE entrant,
         # `ci::wrap-nightly.yml::check::2`, arrives PROVEN (CI_PROOFS; two workflow-text mutations each 1 failed /
         # 2 passed, restored 3 passed). Id-set diff vs origin/main 68fb0ebff: 782 {231, 539, 7, 5} -> 783 {232, 539, 7, 5}.
-        <= 232
+        # Upper bound 232 -> 234 (2026-09-29, #4343, merged onto #4459's 232): the served-coach-facts script + its nightly
+        # step, both PROVEN (GUARD_PROOFS / CI_PROOFS). Id-set diff vs origin/main a55566bbf: 766 {232, 522, 7, 5} -> 768 {234, 522, 7, 5}.
+        <= 234
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

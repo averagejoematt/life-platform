@@ -509,7 +509,13 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 766  # 765 -> 766 (2026-09-29, #4262 box 2 wrap-nightly, merged onto main ea274ed4c after #4460/#4463/#4464/#4454):
+BASELINE_TOTAL_GATES = 768  # 766 -> 768 (2026-09-29, #4343 the served-coach-facts probe, merged onto #4459's 766 at a55566bbf):
+# TWO real entrants — `guard::scripts/check_served_coach_facts.py` and `ci::served-coach-facts.yml::probe::3`, both PROVEN
+# (GUARD_PROOFS + CI_PROOFS in scripts/gate_census_proofs.py: three script plants each 1-2 failed, the step's `exit 0` plant
+# 1 failed / 3 passed, restored green). MEASURED by id-set diff on `scripts/gate_census.py --json`, merged tree vs a `git archive
+# origin/main` export at a55566bbf: main 766 {proven 232, unproven 522, not-applicable 7, attempted-unproven 5} -> this lane 768
+# {234, 522, 7, 5}; exactly those two ids enter, {} leaves.
+# PRIOR: 766  # 765 -> 766 (2026-09-29, #4262 box 2 wrap-nightly, merged onto main ea274ed4c after #4460/#4463/#4464/#4454):
 # ONE real entrant — `ci::wrap-nightly.yml::check::2`, the matrix job's run step (five legs, one step, one id), arriving PROVEN
 # (CI_PROOFS in scripts/gate_census_proofs.py: degrade grep deleted -> 1 failed / 2 passed; rc swallowed -> 1 failed / 2 passed;
 # restored 3 passed). MEASURED by id-set diff on `scripts/gate_census.py --json`, merged tree vs a `git archive origin/main` export
