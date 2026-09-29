@@ -1019,6 +1019,29 @@ def _off(claim: int, truth: int, tol: float, approx: bool) -> bool:
     return abs(claim - truth) > round(truth * eff)
 
 
+def _fact_spec_hits(rel, lineno: int, line: str, truth: dict) -> list[str]:
+    """FACT_SPECS claims on one doc line that disagree with `truth` (exposed for the test)."""
+    # #4135: every FACT_SPECS claim is a digit run (_to_int drops a bare-comma match),
+    # so a digit-free line cannot yield one — exact, and it skips most prose lines.
+    if not _HAS_DIGIT.search(line) or _is_historical(line):
+        return []
+    hits = []
+    for key, patterns, tol in FACT_SPECS:
+        for pat in patterns:
+            for mo in re.finditer(pat, line):
+                claim = _to_int(mo.group(1))
+                if claim is None:
+                    continue
+                # #3162: approx is per-MATCH, not per-line — see _match_is_approx.
+                if _off(claim, truth[key], tol, _match_is_approx(line, mo)):
+                    hits.append(
+                        f"{rel}:{lineno}: {key} claims {claim}, truth is {truth[key]}"
+                        f"{' (±%d%%)' % round(tol*100) if tol else ''}\n"
+                        f"      | {line.strip()[:120]}"
+                    )
+    return hits
+
+
 def main():
     truth = _ground_truth()
     if "--list" in sys.argv:
@@ -1047,23 +1070,7 @@ def main():
                     f"{rel}:{lineno}: budget ceiling claims ${amt}, allowed is ${sorted(BUDGET_OK)} ({BUDGET_PROVENANCE})\n"
                     f"      | {line.strip()[:120]}"
                 )
-            # #4135: every FACT_SPECS claim is a digit run (_to_int drops a bare-comma match),
-            # so a digit-free line cannot yield one — exact, and it skips most prose lines.
-            if not _HAS_DIGIT.search(line) or _is_historical(line):
-                continue
-            for key, patterns, tol in FACT_SPECS:
-                for pat in patterns:
-                    for mo in re.finditer(pat, line):
-                        claim = _to_int(mo.group(1))
-                        if claim is None:
-                            continue
-                        # #3162: approx is per-MATCH, not per-line — see _match_is_approx.
-                        if _off(claim, truth[key], tol, _match_is_approx(line, mo)):
-                            hits.append(
-                                f"{rel}:{lineno}: {key} claims {claim}, truth is {truth[key]}"
-                                f"{' (±%d%%)' % round(tol*100) if tol else ''}\n"
-                                f"      | {line.strip()[:120]}"
-                            )
+            hits += _fact_spec_hits(rel, lineno, line, truth)
 
     # #1230: same ground truth, now over the SOURCE tree — no hardcoded ceiling in code.
     hits += _source_hits(_scan_source_files())
