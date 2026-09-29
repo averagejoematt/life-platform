@@ -3,7 +3,8 @@
 The fleet-wide derivation-guard primitive named in docs/CHARTER.md: no
 hand-maintained enumeration of registry vocabulary (source ids, persona ids,
 lambda names, alarm names) lands in ``lambdas/ mcp/ cdk/`` without a dated
-exemption in ``tests/conformance_residue.py`` — and that ledger only shrinks.
+exemption in ``ledgers/conformance_residue.py`` — and that ledger only shrinks
+(moved from ``tests/`` 2026-09-27, #4270 slice 1 — a ledger is data, not a test).
 
 Defect class owned (CONVENTIONS §9): the missed-consumer class — a consumer
 hand-types a copy of registry vocabulary, the registry moves, the copy silently
@@ -20,7 +21,9 @@ Run:  python3 -m pytest tests/test_conformance_guard_2844.py -v
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO / "tests"))
+sys.path.insert(0, str(_REPO / "ledgers"))
 
 import conformance_guard_lib as lib  # noqa: E402
 from conformance_residue import CONFORMANCE_RESIDUE  # noqa: E402
