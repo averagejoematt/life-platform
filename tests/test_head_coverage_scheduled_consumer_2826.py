@@ -499,3 +499,98 @@ def test_deadman_is_wired_as_the_last_unskippable_step_of_the_watch():
     assert "if: ${{ !cancelled() }}" in last
     assert "python3 scripts/check_deploy_deadman.py --alert" in last
     assert "continue-on-error" not in last and "|| true" not in last
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# #4472 — plan's diff base is the LAST SUCCESSFUL DEPLOY, not GITHUB_SHA~1.
+# The deploy job's concurrency group cancels an older pending run, so a `~1`
+# base dropped the superseded run's merge forever (#4452's weekly-digest fix,
+# 2026-09-29). Replay: A merges, its run is cancelled; B merges; B's plan must
+# list A's files.
+# ─────────────────────────────────────────────────────────────────────────
+
+import re  # noqa: E402
+import subprocess  # noqa: E402
+
+_CANCELLED = [_j("Plan deployments", "success"), _j("Deploy", "cancelled")]
+_IN_FLIGHT = [_j("Plan deployments", None, None, status="in_progress")]
+
+
+def test_last_deployed_sha_skips_cancelled_failed_and_in_flight_runs():
+    runs = [
+        (_run(4, "d", "2026-09-29T18:00:00Z"), _IN_FLIGHT),  # B — this run, planning now
+        (_run(3, "c", "2026-09-29T17:42:00Z"), _CANCELLED),  # A — superseded
+        (_run(2, "b", "2026-09-29T17:00:00Z"), _REJECTED_LEASE),
+        (_run(1, "a", "2026-09-29T16:00:00Z"), _FLEET_DEPLOYED),
+    ]
+    jobs = {r["id"]: j for r, j in runs}
+    assert dm.last_deployed_sha([r for r, _ in runs], lambda r: jobs[r["id"]], _NOW) == "a" * 5
+    assert dm.last_deployed_sha([r for r, _ in runs[:3]], lambda r: jobs[r["id"]], _NOW) is None, "no deploy in the window → None"
+
+
+def test_deploy_base_mode_prints_only_the_sha_or_exits_indeterminate(monkeypatch, capsys):
+    monkeypatch.setattr(dm, "collect", lambda: ([_run(1, "a", "2026-09-29T16:00:00Z")], lambda r: _FLEET_DEPLOYED))
+    assert dm.main(["--deploy-base"]) == dm.EXIT_OK
+    assert capsys.readouterr().out == "a" * 5 + "\n"
+    monkeypatch.setattr(dm, "collect", lambda: ([_run(1, "a", "2026-09-29T16:00:00Z")], lambda r: _CANCELLED))
+    assert dm.main(["--deploy-base"]) == dm.EXIT_INDETERMINATE
+    assert capsys.readouterr().out == "", "no base → stdout empty, so plan deploys everything"
+
+    def boom():
+        raise RuntimeError("HTTP 502")
+
+    monkeypatch.setattr(dm, "collect", boom)
+    assert dm.main(["--deploy-base"]) == dm.EXIT_INDETERMINATE
+    assert capsys.readouterr().out == ""
+
+
+def _plan_changed_command() -> str:
+    """The `CHANGED=$(git diff … HEAD -- lambdas/ mcp/ mcp_server.py` command in plan's
+    non-deploy_all branch, read from the real ci-cd.yml."""
+    with open(os.path.join(_REPO, ".github", "workflows", "ci-cd.yml")) as f:
+        wf = f.read()
+    step = wf.split("- name: Detect changes and build deploy plan", 1)[1].split("\n      - name:", 1)[0]
+    m = re.search(r"CHANGED=\$\((git diff --name-only \S+ HEAD -- lambdas/ mcp/ mcp_server\.py)", step)
+    assert m, "plan's CHANGED diff command not found"
+    return m.group(1)
+
+
+def test_superseded_run_a_rolls_into_run_b_plan(tmp_path):
+    """A-cancelled → B-deploys: B's plan diff, executed as ci-cd.yml spells it, lists A's
+    file. Mutation control: put the base back to "${GITHUB_SHA}~1" → A's file drops out."""
+    repo = str(tmp_path)
+
+    def git(*a):
+        return subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    shas = {}
+    for name, path in (
+        ("base", "lambdas/emails/daily_brief_lambda.py"),
+        ("A", "lambdas/emails/weekly_digest_lambda.py"),
+        ("B", "mcp/tools_health.py"),
+    ):
+        os.makedirs(os.path.join(repo, os.path.dirname(path)), exist_ok=True)
+        with open(os.path.join(repo, path), "w") as f:
+            f.write(name)
+        git("add", "-A")
+        git("commit", "-qm", name)
+        shas[name] = git("rev-parse", "HEAD")
+
+    runs = [
+        (_run(3, "x", "2026-09-29T18:00:00Z"), _IN_FLIGHT),
+        (_run(2, "y", "2026-09-29T17:42:00Z"), _CANCELLED),
+        (_run(1, "z", "2026-09-29T17:00:00Z"), _FLEET_DEPLOYED),
+    ]
+    runs[0][0]["head_sha"], runs[1][0]["head_sha"], runs[2][0]["head_sha"] = shas["B"], shas["A"], shas["base"]
+    jobs = {r["id"]: j for r, j in runs}
+    base = dm.last_deployed_sha([r for r, _ in runs], lambda r: jobs[r["id"]], _NOW)
+    assert base == shas["base"]
+
+    env = {**os.environ, "DEPLOY_BASE": base, "GITHUB_SHA": shas["B"]}
+    out = subprocess.run(["bash", "-c", _plan_changed_command()], cwd=repo, env=env, check=True, capture_output=True, text=True).stdout
+    changed = set(out.split())
+    assert "lambdas/emails/weekly_digest_lambda.py" in changed, f"superseded run A's merge is missing from B's plan: {changed}"
+    assert "mcp/tools_health.py" in changed

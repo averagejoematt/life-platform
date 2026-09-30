@@ -570,6 +570,11 @@ jobs:
     name: Plan deployments
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # #4472: `actions: read` lets the deploy-base step read this workflow's run/job history.
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
     # #416/ADR-117: gate on the fast deploy-critical lane, NOT the exhaustive
     # `test` suite — an unrelated red unit test must not skip deploy + visual-QA.
     needs: [reconcile, lint, test-critical]   # #1173: reconcile listed to read build_sha
@@ -812,6 +817,8 @@ jobs:
 
       - name: Detect changes and build deploy plan
         id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}   # #4472: the deploy-base read (Actions API, read-only)
         run: |
           set -e
 
@@ -819,13 +826,22 @@ jobs:
             echo "Manual deploy-all triggered — deploying everything"
             CHANGED=$(find lambdas/ mcp/ -name '*.py' -type f)
           else
-            # #1173: diff from the PARENT OF THE PUSHED SHA to HEAD (the reconciled
-            # tree) — with a reconcile commit stacked on top, HEAD~1..HEAD would see
-            # ONLY the reconcile diff and silently drop the merged PR's own changes
-            # from the deploy plan. Without a reconcile commit this is exactly the
-            # old HEAD~1..HEAD.
-            CHANGED=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- lambdas/ mcp/ mcp_server.py 2>/dev/null || \
-                      find lambdas/ mcp/ -name '*.py' -type f)
+            # #4472: diff from the LAST SUCCESSFULLY DEPLOYED sha to HEAD (the reconciled
+            # tree, #1173), not from GITHUB_SHA~1. The deploy job's concurrency group keeps
+            # one pending job and cancels the older one, so a `~1` base dropped a superseded
+            # run's merge forever (#4452's weekly-digest fix, 2026-09-29). This base rolls
+            # every cancelled / failed / skipped run's files into this plan. Unresolvable
+            # (API unreadable, no deploy in the window, base not an ancestor) → deploy all.
+            DEPLOY_BASE=$(python3 scripts/check_deploy_deadman.py --deploy-base || true)
+            if [ -n "$DEPLOY_BASE" ] && git merge-base --is-ancestor "$DEPLOY_BASE" HEAD 2>/dev/null; then
+              echo "Deploy base: $DEPLOY_BASE (last successful Deploy on main; this push is ${GITHUB_SHA})"
+              CHANGED=$(git diff --name-only "$DEPLOY_BASE" HEAD -- lambdas/ mcp/ mcp_server.py 2>/dev/null || \
+                        find lambdas/ mcp/ -name '*.py' -type f)
+            else
+              echo "::warning title=Deploy base unresolved (#4472)::no last-deployed sha that is an ancestor of HEAD ('$DEPLOY_BASE') — deploying everything rather than guessing a base."
+              DEPLOY_BASE=""
+              CHANGED=$(find lambdas/ mcp/ -name '*.py' -type f)
+            fi
           fi
 
           echo "Changed files:"
@@ -853,7 +869,12 @@ jobs:
           # closes the old silent gap where an unmapped helper module deployed
           # to nobody.
           FLEET_CHANGED="false"
-          CONFIG_CHANGED=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- $BUNDLED_CONFIG_PATHS 2>/dev/null || true)  # #1173: same base as CHANGED above
+          # #4472: same base as CHANGED above. No base (deploy_all, or unresolved) → CHANGED
+          # already lists every source, so the fleet redeploys and the config rides with it.
+          CONFIG_CHANGED=""
+          if [ -n "${DEPLOY_BASE:-}" ]; then
+            CONFIG_CHANGED=$(git diff --name-only "$DEPLOY_BASE" HEAD -- $BUNDLED_CONFIG_PATHS 2>/dev/null || true)
+          fi
           if [ -n "$CONFIG_CHANGED" ]; then
             FLEET_CHANGED="true"
             echo "⚡ bundled config changed → fleet deploy:"
@@ -880,7 +901,8 @@ jobs:
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
 
           # ADR-158 (#4256): the one change class that still waits on a human is an IAM
-          # diff this push itself introduced. Same diff base as CHANGED above (#1173). An
+          # diff this push itself introduced. Deliberately NOT the #4472 deploy base: a
+          # carried-over cdk/ diff must not re-offer the click on every later push. An
           # unreadable diff fails TOWARD offering the click, never toward skipping it.
           if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
             CDK_CHANGED="true"

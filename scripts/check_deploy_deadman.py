@@ -46,6 +46,7 @@ Usage:
   python3 scripts/check_deploy_deadman.py              # classify; exit 0/1/2
   python3 scripts/check_deploy_deadman.py --hours 6    # deadline after a green Plan
   python3 scripts/check_deploy_deadman.py --alert      # + tracking issue / dispatch
+  python3 scripts/check_deploy_deadman.py --deploy-base  # #4472: print plan's diff base (exit 0) or nothing (exit 2)
 """
 
 from __future__ import annotations
@@ -171,6 +172,26 @@ def walk(runs: list[dict], jobs_for, now: datetime) -> list[dict]:
     return rows
 
 
+def last_deployed_sha(runs: list[dict], jobs_for, now: datetime) -> str | None:
+    """#4472: the head sha of the newest run on main whose `Deploy` concluded success —
+    the base ci-cd.yml's `plan` diffs from. Pure given `jobs_for`.
+
+    `plan` used to diff `GITHUB_SHA~1` (its own push only). The deploy job's concurrency
+    group keeps ONE pending job and cancels the older one, so a superseded run's merge
+    never reached AWS (#4452's weekly-digest fix, 2026-09-29). Diffing from the last
+    SUCCESSFUL deploy rolls every cancelled, failed or skipped run's files into the next
+    plan. The head sha is an ancestor of the tree that deploy checked out (build_sha may
+    stack a reconcile commit on it), so the diff is a superset — never a gap. None means
+    no deploy in the readable window: the caller deploys everything, never guesses."""
+    ordered = sorted(runs, key=lambda r: str(r.get("created_at") or ""), reverse=True)
+    for reads, run in enumerate(ordered):
+        if reads >= MAX_JOB_READS:
+            break
+        if classify_run(run, jobs_for(run), now)["state"] == DEPLOYED:
+            return run.get("head_sha") or None
+    return None
+
+
 def verdict(rows: list[dict], hours: float = DEADLINE_HOURS) -> dict:
     """The alarm set: undeployed or in-flight rows past the deadline. Pure. An unknown age
     on an owed row alarms — it cannot be ruled out as a stale one (#2791's rule)."""
@@ -272,8 +293,23 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--hours", type=float, default=DEADLINE_HOURS, help="deadline after a green Plan (default %(default)s)")
     ap.add_argument("--alert", action="store_true", help="keep the tracking issue + urgent_alarm dispatch in step")
+    ap.add_argument("--deploy-base", action="store_true", help="#4472: print the last successfully deployed sha (plan's diff base)")
     args = ap.parse_args(argv)
     now = datetime.now(timezone.utc)
+    if args.deploy_base:
+        # stdout carries the sha and nothing else; an unreadable API or no deploy in the
+        # window prints nothing and exits INDETERMINATE — plan then deploys everything.
+        try:
+            runs, jobs_for = collect()
+            sha = last_deployed_sha(runs, jobs_for, now)
+        except Exception as e:  # noqa: BLE001 - unreadable is INDETERMINATE, never a guessed base
+            print(f"deploy-base INDETERMINATE: {e}", file=sys.stderr)
+            return EXIT_INDETERMINATE
+        if not sha:
+            print(f"deploy-base INDETERMINATE: no successful Deploy in the newest {MAX_JOB_READS} runs on {BRANCH}", file=sys.stderr)
+            return EXIT_INDETERMINATE
+        print(sha)
+        return EXIT_OK
     try:
         runs, jobs_for = collect()
         state = verdict(walk(runs, jobs_for, now), args.hours)
