@@ -1104,102 +1104,19 @@ jobs:
           fi
           echo "main moved to $TIP but touched no deployable path — safe to ship $BUILD_SHA."
 
-      - name: Fleet deploy (shared module changed)
-        if: needs.plan.outputs.fleet_changed == 'true'
+      # #4255: THE one Lambda code deploy path. Since #781 every function receives the
+      # identical bundle, so there is nothing a per-function matrix or a hand-inlined MCP
+      # step could ship that deploy_fleet.sh does not — and the inline MCP step skipped
+      # life-platform-mcp-warmer. This job only runs when Plan found code to ship
+      # (has_deploys), so the fleet deploy is unconditional inside it. deploy_fleet.sh
+      # builds ONE bundle (+ the mcp-shaped one), uploads once, updates every mapped
+      # function plus both MCP functions, and seeds each deploys/<fn>/previous.zip for
+      # the rollback job. The step name keeps its `Fleet deploy` prefix: the deploy
+      # dead-man (scripts/check_deploy_deadman.py FLEET_STEP_PREFIX) keys on it.
+      - name: Fleet deploy (the one Lambda deploy path, #781/#4255)
         run: |
-          echo "═══ Shared module changed — deploying the bundle fleet-wide ═══"
-          # #781: one staged bundle (deploy/build_bundle.py), one S3 upload,
-          # N update-function-code calls. Covers MCP (mcp-shaped bundle) too,
-          # so the per-function and MCP steps below are skipped when this runs.
+          echo "═══ Deploying the one bundle fleet-wide (plan: fleet_changed=${{ needs.plan.outputs.fleet_changed }}, mcp_changed=${{ needs.plan.outputs.mcp_changed }}) ═══"
           bash deploy/deploy_fleet.sh
-
-      - name: Deploy MCP server
-        if: needs.plan.outputs.mcp_changed == 'true' && needs.plan.outputs.fleet_changed != 'true'
-        run: |
-          echo "═══ Deploying MCP server (full bundle, #781) ═══"
-
-          WORK_DIR=$(mktemp -d)
-          python3 deploy/build_bundle.py --mcp --out "$WORK_DIR/stage" --zip "$WORK_DIR/deploy.zip"
-
-          # S3 rollback artifact for MCP
-          BUCKET="matthew-life-platform"
-          if aws s3 ls "s3://$BUCKET/deploys/life-platform-mcp/latest.zip" \
-               --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-            aws s3 cp "s3://$BUCKET/deploys/life-platform-mcp/latest.zip" \
-              "s3://$BUCKET/deploys/life-platform-mcp/previous.zip" \
-              --region ${{ env.AWS_REGION }} > /dev/null
-          fi
-          aws s3 cp "$WORK_DIR/deploy.zip" \
-            "s3://$BUCKET/deploys/life-platform-mcp/latest.zip" \
-            --region ${{ env.AWS_REGION }} > /dev/null
-          echo "💾 MCP rollback artifact stored"
-
-          aws lambda update-function-code \
-            --function-name life-platform-mcp \
-            --zip-file "fileb://$WORK_DIR/deploy.zip" \
-            --region ${{ env.AWS_REGION }} > /dev/null
-
-          aws lambda wait function-updated \
-            --function-name life-platform-mcp \
-            --region ${{ env.AWS_REGION }}
-
-          echo "✅ life-platform-mcp deployed"
-          rm -rf "$WORK_DIR"
-
-      - name: Deploy Lambdas
-        if: needs.plan.outputs.fleet_changed != 'true'
-        run: |
-          MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
-          COUNT=$(echo "$MATRIX" | jq 'length')
-
-          if [ "$COUNT" = "0" ]; then
-            echo "No individual Lambdas to deploy"
-            exit 0
-          fi
-
-          echo "═══ Deploying $COUNT Lambda(s) ═══"
-
-          DEPLOYED=0
-          FAILED=0
-
-          for row in $(echo "$MATRIX" | jq -r '.[] | @base64'); do
-            FUNC=$(echo "$row" | base64 -d | jq -r '.function')
-            SRC=$(echo "$row" | base64 -d | jq -r '.source')
-
-            echo ""
-            echo "→ Deploying $FUNC from $SRC..."
-
-            NATIVE=$(jq -r --arg f "$SRC" '.lambdas[$f].native_deps // false' "${{ env.LAMBDA_MAP }}")
-            if [ "$NATIVE" = "true" ]; then
-              echo "  ⚠️ SKIPPED: $FUNC has native deps (deploy manually with correct build env)"
-              continue
-            fi
-
-            SKELETON=$(jq -r --arg f "$SRC" '.lambdas[$f].not_deployed // false' "${{ env.LAMBDA_MAP }}")
-            if [ "$SKELETON" = "true" ]; then
-              echo "  ⚠️ SKIPPED: $FUNC is a skeleton (\'not_deployed\' flag) — activate before deploying via CDK"
-              continue
-            fi
-
-            if bash deploy/deploy_lambda.sh "$FUNC" "$SRC"; then
-              aws lambda wait function-updated \
-                --function-name "$FUNC" \
-                --region ${{ env.AWS_REGION }}
-              echo "  ✅ $FUNC deployed and active"
-              DEPLOYED=$((DEPLOYED + 1))
-            else
-              echo "  ❌ FAILED: $FUNC"
-              FAILED=$((FAILED + 1))
-            fi
-          done
-
-          echo ""
-          echo "═══ Deploy complete: $DEPLOYED succeeded, $FAILED failed ═══"
-
-          if [ "$FAILED" -gt 0 ]; then
-            echo "::error::$FAILED Lambda(s) failed to deploy"
-            exit 1
-          fi
 
       # ── Public site deploy: NOT here anymore (#750) ────────────────────────
       # #393 shipped the site inside this approval-gated job; #750 moved it to
@@ -1559,7 +1476,7 @@ jobs:
     name: Auto-rollback (smoke failure)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [reconcile, plan, deploy, smoke-test]   # #1173: reconcile listed to read build_sha; plan for fleet_changed (#1859)
+    needs: [reconcile, plan, deploy, smoke-test]   # #1173: reconcile listed to read build_sha
     # `always() &&` is REQUIRED: a job whose dependency (smoke-test) failed is
     # skipped by default unless its `if` contains a status-check function — so
     # without always() this rollback never actually fires (#418/ADR-117 fix; the
@@ -1587,33 +1504,17 @@ jobs:
 
       - name: Rollback deployed Lambdas
         run: |
-          MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
-          MCP_CHANGED='${{ needs.plan.outputs.mcp_changed }}'
-          FLEET_CHANGED='${{ needs.plan.outputs.fleet_changed }}'
-
           echo "⚠️  Smoke test failed after successful deploy — initiating auto-rollback"
           echo ""
 
-          # #1859 gap 2: on fleet_changed=true the Deploy job's "Fleet deploy" step
-          # runs deploy/deploy_fleet.sh, which redeploys and re-seeds
-          # deploys/<fn>/previous.zip for EVERY mapped function (+ both MCP
-          # functions, fc18f0c2) — NOT just whatever deploy_matrix happens to hold.
-          # deploy_matrix is built from the file-diff loop keyed on per-function
-          # source paths, so a push that only touches an unmapped shared module
-          # (the fleet trigger) leaves it "[]"; the tally below was silently 0/0/0
-          # (observed twice 2026-07-27, ~01:37Z/~02:27Z) even though the fleet was
-          # actually redeployed. Rebuild the candidate list straight from
-          # ci/lambda_map.json — the same source deploy_fleet.sh iterates — so a
-          # push-triggered fleet deploy's smoke failure produces a REAL rollback
-          # attempt across the functions that were actually touched.
-          FLEET_FALLBACK="false"
-          if [ "$FLEET_CHANGED" = "true" ]; then
-            FLEET_FALLBACK="true"
-            echo "ℹ️  fleet_changed=true — deploy_fleet.sh redeployed the whole map; reverting from ${{ env.LAMBDA_MAP }} rather than trusting deploy_matrix (fleet-push rollback path, #1859)"
-            MATRIX=$(jq -c '[.lambdas | to_entries[] | select((.value.not_deployed // false) | not) | {function: .value.function}]
-                       + [{function:"life-platform-mcp"}, {function:"life-platform-mcp-warmer"}]
-                       | unique_by(.function)' "${{ env.LAMBDA_MAP }}")
-          fi
+          # #4255: every code deploy is a fleet deploy (deploy/deploy_fleet.sh), which
+          # redeploys and re-seeds deploys/<fn>/previous.zip for EVERY mapped function plus
+          # both MCP functions. So the rollback set is always that same list, rebuilt from
+          # ci/lambda_map.json — the source deploy_fleet.sh iterates (#1859 gap 2 was the
+          # per-function deploy_matrix reading "[]" on a fleet push; there is no other path now).
+          MATRIX=$(jq -c '[.lambdas | to_entries[] | select((.value.not_deployed // false) | not) | {function: .value.function}]
+                     + [{function:"life-platform-mcp"}, {function:"life-platform-mcp-warmer"}]
+                     | unique_by(.function)' "${{ env.LAMBDA_MAP }}")
           COUNT=$(echo "$MATRIX" | jq 'length')
           echo "   $COUNT function(s) to roll back"
 
@@ -1636,20 +1537,6 @@ jobs:
                  FAILED=$((FAILED + 1)) ;;
             esac
           done
-
-          # Roll back MCP if it was deployed standalone (the fleet fallback above
-          # already covers both MCP functions — deploy_fleet.sh always updates them).
-          if [ "$MCP_CHANGED" = "true" ] && [ "$FLEET_FALLBACK" = "false" ]; then
-            echo "→ Rolling back life-platform-mcp..."
-            RC=0
-            bash deploy/rollback_lambda.sh "life-platform-mcp" || RC=$?
-            case "$RC" in
-              0) ROLLED_BACK=$((ROLLED_BACK + 1)) ;;
-              2) MISSING=$((MISSING + 1)) ;;
-              *) echo "  ❌ MCP rollback failed — manual intervention required"
-                 FAILED=$((FAILED + 1)) ;;
-            esac
-          fi
 
           echo ""
           echo "═══ Rollback complete: $ROLLED_BACK reverted, $MISSING no-artifact (left on current code), $FAILED failed ═══"
