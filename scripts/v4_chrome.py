@@ -249,7 +249,7 @@ _SOCIAL_FOOT_HTML = "".join(f'<a href="{href}" target="_blank" rel="me noopener"
 # (pixel-identical to /protocols/), /protocols/challenges/, /story/chronicle/ (→ /story/),
 # /story/timeline/, /story/agents/, /method/platform/ and the /method/{ask,cost,pipeline,…}
 # cuts — stay SERVED at their URLs, just unlinked (no URL moves, no 301s, no deletions).
-# `tests/site_vocabulary_residue.py::NAV_REACH_CEILING` (25) is the ratchet that holds it;
+# `ledgers/site_vocabulary_residue.py::NAV_REACH_CEILING` (25) is the ratchet that holds it;
 # `tests/test_wayfinding.py::FOOTER_LINKS_4182` pins the pour.
 #   "How it's built" is the menu home for the platform-itself pages (#1110): the /method/
 # hub, the build log (URL unchanged), the gear, and the score explainer.
