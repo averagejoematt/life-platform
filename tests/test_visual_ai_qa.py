@@ -371,6 +371,19 @@ def test_sweep_tally_never_counts_an_unevaluated_page_as_passed():
     assert passed + failed + unevaluated == len(results)
 
 
+def test_sweep_tally_counts_a_reader_truth_unevaluated_page_as_unevaluated_4474():
+    """Run 36626034291 printed '5 failed, 0 unevaluated' for five pages the
+    reader-truth judge never answered for. They are UNEVALUATED, so the exit
+    term `unevaluated == 0` must see them, not only their FAIL status."""
+    results = [
+        {"page": "a", "path": "/a/", "status": "PASS", "issues": [], "warnings": []},
+        {"page": "b", "path": "/b/", "status": "FAIL", "issues": ["x"], "warnings": [], "truth_unevaluated": "batch [/b/]: UNEVALUATED"},
+        # even if a refactor stopped flipping it to FAIL, it never counts as passed
+        {"page": "c", "path": "/c/", "status": "PASS", "issues": [], "warnings": [], "truth_unevaluated": "batch [/c/]: UNEVALUATED"},
+    ]
+    assert visual_qa.sweep_tally(results) == (1, 0, 2)
+
+
 def test_oversized_capture_is_downscaled_and_actually_evaluated(tmp_path, monkeypatch):
     """The cause fix: a capture over Bedrock's 8000px dimension cap is downscaled
     to a valid payload and the page IS evaluated (Bedrock called, verdict merged) —
