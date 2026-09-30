@@ -110,6 +110,43 @@ The generator (`_enforce_load_floors`, the block's sets + its rationale tag), th
 (`annotate_prescription`, the exposure) and the chat gate (`derive_load_floors`, the drafted sets
 + tag) all build the slot with `slot_of`, so the three still read one number.
 
+#4397 — THE RAMP'S CAP IS REP-AWARE
+
+After #4388 the ramp is a share of band e1RM on every session, and it reaches the redline's 85 % at
+week 6 — but 85 % of e1RM is a ~5-rep load, so an 8–12 volume squat at week 6 would have been
+prescribed ~87.5 kg, his 5-rep weight. The redline (`load_entry.max_pct_of_band_e1rm_until_week_8`)
+carries no rep qualifier, so the cap now takes the lower of the two:
+
+    top_kg <= min(cap_pct x band_e1rm, rep_ceiling_kg(band_e1rm, target_reps, rpe_ceiling))
+    rep_ceiling_pct(reps, rpe) = 100 / (1 + (reps + RIR) / 30),   RIR = 10 - rpe
+
+  * THE TABLE is the inverse of Epley's e1RM (Epley 1985, "Poundage Chart", Boyd Epley Workout,
+    Body Enterprises, Lincoln NE) on (reps + reps in reserve): at RIR 0, 5 reps = 85.7 %, 8 = 78.9 %,
+    10 = 75.0 %, 12 = 71.4 % — within ~3 points of the NSCA %1RM chart (Baechle & Earle, Essentials
+    of Strength Training and Conditioning, 8 = 80 %, 10 = 75 %, 12 = 67 %). POPULATION-DERIVED
+    (ADR-105 rule 4): nothing here is fitted to his own rep–load curve. The RIR reading of RPE is
+    the #4417 hold's (Zourdos et al. 2016; Helms et al. 2016), and the e1RM is the ramp's own
+    `band_e1rm_kg` — the same number the 85 % is a share of.
+  * the slot's TARGET reps (the middle of its range) and its RPE CEILING come from `slot_of` — the
+    same slot the hold reads. Volume 8–12 @ <= 9 -> 10 reps + 1 RIR = 73.2 %; moderate 6–10 @ <= 8
+    -> 75.0 %; accessory 8–15 @ <= 9 -> 71.4 %. So the volume ramp binds from week 4 (75 % > 73.2 %).
+  * THE HEAVY SLOT IS EXEMPT (owner ruling 2026-09-29, option (b)): the 4–6 @ <= 8 top set keeps the
+    ramp's 85 %-of-band-e1RM week-6 redline. The table would read 81.1 % for it (85 % at RPE 8 is
+    nearer a triple); the owner chose the redline. `ramp.rep_cap` still records the row, with
+    `applies: False` and the ruling as its reason (`HEAVY_SLOT_RULING_4397`).
+  * rounded DOWN on the one 5-lb grid (`rep_scheme.load_step_kg`), like the 85 % cap.
+  * ONE helper, `rep_ceiling_kg`: the cap and the hold both call it, so they are the same function
+    of an e1RM. The hold governs when it applies (it runs after the cap and only ever raises): its
+    e1RM is the RPE-adjusted e1RM of a set he moved THIS cycle at THIS band for the slot's rep floor,
+    better evidence than the RIR-0 Epley of the band anchor, and the hold is never above
+    `rep_ceiling_kg` of its own e1RM. A set with no logged RPE is read AT the slot's ceiling (the
+    #4417 docstring's own words) through the same helper. So the final load never exceeds what the
+    one table allows on the best-evidenced e1RM (`ramp.rep_cap.governed_by` names which applied).
+  * a caller that cannot say the slot's RPE ceiling (a hand draft with no rationale tag) caps at the
+    LOWEST ceiling any program exposure carries — the lower number, so it can never refuse a draft
+    the generator wrote with more knowledge (#4149). A slot with no reps at all has no rep ceiling;
+    the row says so (`rep_cap.applies: False`).
+
 Back-offs stay −10 % of the top set (`full_body_session._apply_back_offs`); they are the
 one sanctioned set under the top-set floor, and `back_off_floor_kg` records it so the
 commit gate (`recovery_authoring.audit_prescription`) checks them against their own floor.
@@ -293,6 +330,38 @@ def rpe_adjusted_e1rm_kg(weight_kg: float, reps: int, rpe: float) -> float:
     return float(weight_kg) * (1 + (int(reps) + max(0.0, 10.0 - float(rpe))) / 30.0)
 
 
+REP_TABLE_SOURCE = (
+    "inverse Epley on (reps + RIR), RIR = 10 - RPE — population-derived (ADR-105 rule 4): Epley 1985 'Poundage Chart'; "
+    "RIR reading of RPE per Zourdos et al. 2016 / Helms et al. 2016; agrees with the NSCA %1RM chart within ~3 points to 12 reps (#4397)"
+)
+
+
+def rep_ceiling_pct(target_reps: int, rpe_ceiling: float) -> float:
+    """The most a set of `target_reps` at RPE <= `rpe_ceiling` can carry, as % of e1RM (#4397): the
+    rep -> %1RM table, 100 / (1 + (reps + RIR) / 30). The inverse of `rpe_adjusted_e1rm_kg`."""
+    return 100.0 / (1 + (int(target_reps) + max(0.0, 10.0 - float(rpe_ceiling))) / 30.0)
+
+
+def rep_ceiling_kg(e1rm_kg: float, target_reps: int, rpe_ceiling: float) -> float:
+    """THE rep-aware load ceiling (#4397) — `rep_ceiling_pct` of `e1rm_kg`, rounded DOWN on the one
+    5-lb grid. The ramp's cap and the #4408 hold both call it, so they cannot disagree on the table."""
+    return load_step_kg(float(e1rm_kg) * rep_ceiling_pct(target_reps, rpe_ceiling) / 100.0, down=True)
+
+
+HEAVY_SLOT_RULING_4397 = (
+    "owner ruling 2026-09-29 (b): the heavy slot keeps the ramp's 85% week-6 redline; the rep-aware cap "
+    "applies to the moderate, volume and accessory slots only (#4397)"
+)
+
+
+def lowest_program_rpe_ceiling() -> int:
+    """The lowest RPE ceiling any program exposure carries — the rep cap's read for a slot whose
+    intensity is unknown (#4149: a caller that knows less must land at or under the generator)."""
+    from training import program_structure
+
+    return min(c for c in (slot_rpe_ceiling(i) for i in program_structure.EXPOSURES) if c is not None)
+
+
 def achieved_hold(
     template_id: str | None,
     history_index: dict[str, list],
@@ -329,10 +398,14 @@ def achieved_hold(
                 continue
             rpe = st.get("rpe")
             if rpe is None:
-                e1, held, basis = None, w, "absent"  # no RPE logged: read as at the ceiling, hold the load itself
+                # no RPE logged: read AT the ceiling (#4397 — through the same rep table as the cap). At or
+                # past the target reps that is the load itself; between the rep floor and the target it is
+                # what the table allows for the target, so a 6-rep set never holds an 8-rep slot at its load.
+                e1, basis = None, "absent"
+                held = w if r >= target else min(rep_ceiling_kg(rpe_adjusted_e1rm_kg(w, r, ceiling), target, ceiling), w)
             else:
                 e1 = rpe_adjusted_e1rm_kg(w, r, float(rpe))
-                held = min(load_step_kg(e1 / (1 + (target + (10 - ceiling)) / 30.0), down=True), w)
+                held = min(rep_ceiling_kg(e1, target, ceiling), w)
                 basis = "rpe_adjusted"
             if best is None or (held, d) > (best["held_kg"], best["date"]):
                 best = {
@@ -570,6 +643,7 @@ def v03_floor(
             floor["fallback"] = FALLBACK_NEAREST_BAND
             floor["fallback_detail"] = {**near["fallback"], "current_band_counts": in_band}
     ramped = ramp_floor(floor, week)
+    _apply_rep_cap(ramped, slot)  # #4397: before the hold — the hold only ever raises, on its own e1RM
     _apply_hold(
         ramped,
         template_id,
@@ -586,6 +660,57 @@ def v03_floor(
     ramped["anchor_band"] = (ramped.get("fallback_detail") or {}).get("anchor_band") or (ramped.get("band") if basis else None)
     ramped["anchor_date"] = basis.get("date")
     return ramped
+
+
+def _apply_rep_cap(ramped: dict[str, Any], slot: dict[str, Any] | None) -> None:
+    """#4397, IN PLACE: cap the ramped floor at what the slot's target reps at its RPE ceiling allow
+    of band e1RM (`rep_ceiling_kg`; module docstring). Records `ramp.rep_cap` on every ramped row."""
+    r = ramped.get("ramp")
+    if not r:
+        return
+    if (slot or {}).get("intensity") == "heavy":
+        # Owner ruling 2026-09-29, option (b): the heavy top set (4–6 @ <= 8) keeps the ramp's own
+        # ceiling, the 85 %-of-band-e1RM week-6 redline, and is NOT rep-capped (the table would read
+        # 81.1 %). The rep-aware cap governs the moderate, volume and accessory slots only.
+        r["rep_cap"] = {
+            "applies": False,
+            "binds": False,
+            "slot": slot,
+            "governed_by": "ramp",
+            "reason": HEAVY_SLOT_RULING_4397,
+        }
+        return
+    target = int((slot or {}).get("target_reps") or 0)
+    if target <= 0:
+        r["rep_cap"] = {"applies": False, "binds": False, "slot": slot, "reason": "no slot reps: nothing to read the rep table at"}
+        return
+    ceiling, ceiling_basis = (slot or {}).get("rpe_ceiling"), "slot"
+    if not ceiling:
+        ceiling, ceiling_basis = lowest_program_rpe_ceiling(), "unknown intensity: the lowest program ceiling (#4149)"
+    e1rm = band_e1rm_kg(float(ramped["best_kg"]), (ramped.get("basis") or {}).get("reps"))
+    cap = rep_ceiling_kg(e1rm, target, ceiling)
+    ramp_top = float(ramped.get("floor_kg") or 0)
+    binds = cap < ramp_top - 1e-9
+    r["rep_cap"] = {
+        "applies": True,
+        "binds": binds,
+        "target_reps": target,
+        "rpe_ceiling": int(ceiling),
+        "rir": max(0, 10 - int(ceiling)),
+        "ceiling_basis": ceiling_basis,
+        "pct_of_band_e1rm": round(rep_ceiling_pct(target, ceiling), 1),
+        "cap_kg": cap,
+        "ramp_top_kg": ramp_top,
+        "governed_by": "rep_cap" if binds else "ramp",
+        "table": REP_TABLE_SOURCE,
+        "rule": "the ramp's cap = min(the week's % of band e1RM, the rep table's % for the slot's target reps at its RPE ceiling) (#4397)",
+    }
+    if binds:
+        ramped["floor_kg"] = cap
+        r["top_kg"] = cap
+        r["pct_of_band_e1rm"] = round(100.0 * cap / e1rm, 1)
+        r["pct_of_anchor"] = round(100.0 * cap / float(r["anchor_kg"]), 1)
+        r["pct_of_discounted_base"] = round(100.0 * cap / float(r["discounted_base_kg"]), 1)
 
 
 def _lifting_gap_days(history_index: dict[str, list], as_of: str | None) -> int | None:
@@ -664,6 +789,9 @@ def _apply_hold(
     if applies and hold:
         ramped["floor_kg"] = float(hold["held_kg"])
         r["top_kg"] = ramped["floor_kg"]
+        if (r.get("rep_cap") or {}).get("applies"):
+            # #4397: the hold is the same rep table on a better-evidenced (RPE-adjusted, this-cycle) e1RM
+            r["rep_cap"]["governed_by"] = "hold"
 
 
 def render_ramp_cue(floor: dict[str, Any]) -> str:
@@ -701,6 +829,12 @@ def render_ramp_cue(floor: dict[str, Any]) -> str:
         share = f"{r['ramp_pct']}% of your band e1RM {_fmt_load(float(r['band_e1rm_kg']))}"
     else:
         share = f"{r['ramp_pct']}% of your band anchor"
+    rc = r.get("rep_cap") or {}
+    if rc.get("binds"):
+        share = (
+            f"capped at {rc['pct_of_band_e1rm']:g}% of your band e1RM {_fmt_load(float(r['band_e1rm_kg']))} — the most "
+            f"{rc['target_reps']} reps at RPE <= {rc['rpe_ceiling']} allow (this week's ramp is {r['ramp_pct']}%)"
+        )
     return (
         f"Week {r['week']} load {_fmt_load(float(floor['floor_kg']))} — {share} {discount} "
         f"(anchor {got} on {basis.get('date')} {where}; v0.3 §3). "
