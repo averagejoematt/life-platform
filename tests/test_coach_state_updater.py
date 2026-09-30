@@ -406,6 +406,148 @@ class TestCallHaiku:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# #4276 — the four coach callers send a JSON schema (structured outputs)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _capture_body(monkeypatch, reply="{}"):
+    captured = {}
+
+    def _capture(req):
+        captured["body"] = json.loads(req.data.decode())
+        return {"content": [{"text": reply}], "stop_reason": "end_turn"}
+
+    monkeypatch.setattr(retry_utils, "call_anthropic_raw", _capture)
+    return captured
+
+
+@pytest.mark.parametrize(
+    "module_name", ["coach_state_updater", "coach_narrative_orchestrator", "coach_ensemble_digest", "coach_history_summarizer"]
+)
+def test_each_callers_haiku_sends_the_schema_as_output_config_4276(monkeypatch, module_name):
+    import importlib
+
+    from coach import coach_json_schemas as schemas
+
+    mod = importlib.import_module(module_name)
+    captured = _capture_body(monkeypatch)
+    mod._call_haiku("SYS", "MSG", schema=schemas.STANCE_OUTPUT_SCHEMA)
+    fmt = captured["body"]["output_config"]["format"]
+    assert fmt["type"] == "json_schema" and fmt["schema"] == schemas.STANCE_OUTPUT_SCHEMA
+    captured = _capture_body(monkeypatch)
+    mod._call_haiku("SYS", "MSG")
+    assert "output_config" not in captured["body"], "no schema given -> the request is unchanged"
+
+
+def _schema_objects(schema):
+    """Every object node in a schema (through anyOf and array items)."""
+    if not isinstance(schema, dict):
+        return
+    if schema.get("type") == "object":
+        yield schema
+        for sub in schema["properties"].values():
+            yield from _schema_objects(sub)
+    for sub in schema.get("anyOf", []):
+        yield from _schema_objects(sub)
+    if "items" in schema:
+        yield from _schema_objects(schema["items"])
+
+
+def test_every_schema_object_is_closed_and_fully_required_4276():
+    from coach import coach_json_schemas as schemas
+
+    names = [n for n in dir(schemas) if n.endswith("_OUTPUT_SCHEMA")]
+    assert len(names) == 6
+    for name in names:
+        for obj in _schema_objects(getattr(schemas, name)):
+            assert obj["additionalProperties"] is False, name
+            assert set(obj["required"]) == set(obj["properties"]), name
+
+
+def test_the_extraction_schema_names_every_field_the_prompt_asks_for_4276():
+    """The extraction contract: the builder's closing field list is the schema's key set."""
+    from coach import coach_extraction_prompt, coach_json_schemas as schemas
+
+    msg = coach_extraction_prompt.build_extraction_message("sleep_coach", "text", "daily_brief", {})
+    listed = msg.rsplit("fields:", 1)[1].strip().rstrip(".").split(", ")
+    assert set(listed) == set(schemas.EXTRACTION_OUTPUT_SCHEMA["properties"])
+
+
+def test_the_stance_and_compression_schemas_match_their_prompts_4276():
+    """Every key in the prompt's JSON template is a schema property, save the two the code derives."""
+    import re as _re
+
+    import coach_history_summarizer as chs
+    from coach import coach_json_schemas as schemas
+
+    for prompt, schema, derived in (
+        (chs.STANCE_SYSTEM_PROMPT, schemas.STANCE_OUTPUT_SCHEMA, set()),
+        (chs.COMPRESSION_SYSTEM_PROMPT, schemas.COMPRESSION_OUTPUT_SCHEMA, {"confidence_state", "compressed_at"}),
+    ):
+        top = set(_re.findall(r'^\s{2}"(\w+)":', prompt, _re.M))
+        assert top, "the template's top-level keys were not found"
+        assert top - derived == set(schema["properties"])
+    assert set(schemas.STANCE_OUTPUT_SCHEMA["properties"]) == set(chs._STANCE_FIELDS)
+
+
+def test_the_ensemble_pair_lists_come_back_as_the_dicts_readers_use_4276(monkeypatch):
+    import coach_ensemble_digest as ced
+
+    reply = {
+        "coach_summaries": [],
+        "unanimous_flags": [],
+        "active_disagreements": [
+            {
+                "topic": "t",
+                "coaches": ["a", "b"],
+                "positions": [{"coach_id": "a", "position": "up"}, {"coach_id": "b", "position": "down"}],
+                "status": "unresolved",
+                "data_needed_to_resolve": "x",
+                "resolution_criterion": {
+                    "metric": "hrv",
+                    "condition": "gt",
+                    "threshold": 50,
+                    "resolution_days": 14,
+                    "sides": [{"coach_id": "a", "holds": True}, {"coach_id": "b", "holds": False}],
+                },
+            }
+        ],
+    }
+    _capture_body(monkeypatch, json.dumps(reply))
+    d = ced._call_haiku("SYS", "MSG")["active_disagreements"][0]
+    assert d["positions"] == {"a": "up", "b": "down"}
+    assert d["resolution_criterion"]["sides"] == {"a": True, "b": False}
+    # the schema-less fallback's dict shape passes through untouched
+    reply["active_disagreements"][0]["positions"] = {"a": "up"}
+    _capture_body(monkeypatch, json.dumps(reply))
+    assert ced._call_haiku("SYS", "MSG")["active_disagreements"][0]["positions"] == {"a": "up"}
+
+
+def test_each_call_site_passes_its_own_schema_4276():
+    """Source-level: every `_call_haiku(` in the four modules names a schema (the transport's own def excepted)."""
+    import re as _re
+
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lambdas", "coach")
+    expected = {
+        "coach_state_updater.py": {"EXTRACTION_OUTPUT_SCHEMA"},
+        "coach_narrative_orchestrator.py": {"BRIEF_OUTPUT_SCHEMA"},
+        "coach_ensemble_digest.py": {"ENSEMBLE_OUTPUT_SCHEMA"},
+        "coach_history_summarizer.py": {"COMPRESSION_OUTPUT_SCHEMA", "STANCE_OUTPUT_SCHEMA"},
+    }
+    for fname, schemas_named in expected.items():
+        src = open(os.path.join(root, fname), encoding="utf-8").read()
+        calls = [m.start() for m in _re.finditer(r"(?<!def )_call_haiku\(", src)]
+        assert calls, fname
+        seen = set()
+        for start in calls:
+            window = src[start : start + 400]
+            m = _re.search(r"schema=_schemas\.(\w+)", window[: window.find(")\n") + 1] or window)
+            assert m, f"{fname}: a _call_haiku call without schema= at char {start}"
+            seen.add(m.group(1))
+        assert seen == schemas_named, fname
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CloudWatch emitters — non-fatal by contract
 # ══════════════════════════════════════════════════════════════════════════════
 

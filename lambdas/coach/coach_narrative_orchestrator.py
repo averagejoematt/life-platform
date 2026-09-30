@@ -74,6 +74,7 @@ TARGET_COACH = os.environ.get("TARGET_COACH", "sleep_coach")
 # never re-typed (#2334; this copy had already drifted to a different order than
 # its sibling in coach_history_summarizer). Guard:
 # tests/test_coach_roster_set_guard_2334.py.
+from coach import coach_json_schemas as _schemas  # #4276: structured-output schemas
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 
 ALL_COACH_IDS = list(OPERATIONAL_COACH_IDS)
@@ -244,7 +245,7 @@ def _cycle_boundary_context(today: str):
     return {"day_n": n}
 
 
-def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
+def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3, schema=None):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
@@ -259,28 +260,28 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
     if system:
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
-
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     from common.retry_utils import call_anthropic_raw
 
-    resp = call_anthropic_raw(req)
-    text = resp["content"][0]["text"].strip()
-    # #4276: the fence-tolerant parse is one shared copy now (ai/structured_json.py). This site does
-    # not yet send `output_config.format`: its output needs its own JSON schema first (see #4276).
-    from ai.structured_json import parse_json_text
+    def _send(b):
+        req = urllib.request.Request(
+            ANTHROPIC_API,
+            data=json.dumps(b).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+            },
+            method="POST",
+        )
+        return call_anthropic_raw(req)
 
-    return parse_json_text(text)
+    # #4276: with `schema`, the reply is requested under `output_config.format` (structured
+    # outputs); ai.structured_json.call_json re-sends without it if Bedrock refuses the schema,
+    # and keeps the fence-tolerant parse as the fallback. The schemas: coach/coach_json_schemas.py.
+    from ai.structured_json import call_json
+
+    return call_json(_send, body, schema=schema, label="coach_narrative_orchestrator")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1199,6 +1200,7 @@ def lambda_handler(event, context):
         result = _call_haiku(
             system=SYSTEM_PROMPT,
             user_message=user_message,
+            schema=_schemas.BRIEF_OUTPUT_SCHEMA,
             # 2026-05-28: was 2000 — too small. A full generation brief is
             # ~1800-3000 output tokens, so it truncated mid-JSON (stop_reason
             # max_tokens), failed to parse, and EVERY coach silently fell back

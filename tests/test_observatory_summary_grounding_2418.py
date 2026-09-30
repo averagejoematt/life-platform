@@ -172,7 +172,7 @@ def _no_model(monkeypatch):
 def _model_returns(monkeypatch, payload):
     calls = []
 
-    def _fake(system=None, user_message=None, max_tokens=None, temperature=None):
+    def _fake(system=None, user_message=None, max_tokens=None, temperature=None, schema=None):
         calls.append(user_message)
         return payload
 
