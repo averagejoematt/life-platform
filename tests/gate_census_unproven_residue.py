@@ -160,7 +160,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "guard::deploy/check_hae_webhook_ingress_drift.py": "2026-09-05 seal (#3536)",
     "guard::deploy/check_lambda_config_drift.py": "2026-09-05 seal (#3536)",
     "guard::deploy/config_mirror_audit.py": "2026-09-05 seal (#3536)",
-    "guard::deploy/deploy_and_verify.sh": "2026-09-05 seal (#3536)",
     "guard::deploy/doc_restamp_guard.py": "2026-09-05 seal (#3536)",
     "guard::deploy/lib/smoke_verdict.sh": "2026-09-05 seal (#3536)",
     "guard::deploy/lib/structural_checks.sh": "2026-09-05 seal (#3536)",

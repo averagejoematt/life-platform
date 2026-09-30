@@ -45,9 +45,9 @@ bash deploy/deploy_fleet.sh          # one bundle → S3 → every function
 ### Mode 3: Lambda function (anything else)
 Match the argument against the function-name mapping below using fuzzy matching (e.g., "whoop" matches "whoop-data-ingestion", "site-api" matches "life-platform-site-api"). If ambiguous, list the matches and ask which one. The table is GENERATED from `ci/lambda_map.json` (the same map CI and `deploy_lambda.sh` resolve from) — if a function isn't listed, check the map directly; never hand-edit the block.
 
-**Deploy command:**
+**Deploy command** (#4255 — one bundle, one path; the table names what the fleet covers):
 ```bash
-bash deploy/deploy_and_verify.sh <function-name> <source-path from the table>
+bash deploy/deploy_fleet.sh
 ```
 
 **Special case — `life-platform-mcp`:**
@@ -225,7 +225,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - life-platform-cf-auth → `lambdas/cf-auth/index.mjs` (region: us-east-1)
 
 † `cdk_only` is a historical annotation in the map: since #781 every sanctioned deploy path
-ships the same full-tree bundle, so these deploy fine via `deploy_and_verify.sh` too.
+ships the same full-tree bundle, so these deploy fine via `deploy_fleet.sh` too.
 <!-- END GENERATED: deploy-doc-map -->
 
 ## Doc impact (wiki contract — CONVENTIONS §8)

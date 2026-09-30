@@ -1223,7 +1223,7 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 - [ ] **CDK Stack**: Wire Lambda in `cdk/stacks/ingestion_stack.py` with correct handler, schedule, and IAM
 - [ ] **Secret**: Create `life-platform/<source>` in Secrets Manager (use platform CMK: `alias/life-platform-dynamodb`). Add row to INFRASTRUCTURE.md Secrets table.
 - [ ] **Deploy CDK**: `source cdk/.venv/bin/activate && npx cdk deploy LifePlatformIngestion`
-- [ ] **Deploy Lambda code**: `bash deploy/deploy_and_verify.sh <function-name> lambdas/<source>_lambda.py`
+- [ ] **Deploy Lambda code**: `bash deploy/deploy_fleet.sh` (the one path, #4255 — or merge and let CI run it)
 
 ### Platform Wiring (the steps most often missed)
 - [ ] **SOURCES list**: Add source name to `SOURCES` list in `mcp/config.py`
@@ -1272,7 +1272,7 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 - [ ] **Update R5 range**: If adding tools intentionally, update `EXPECTED_MIN_TOOLS`/`EXPECTED_MAX_TOOLS` in `tests/test_mcp_registry.py`
 
 ### Deploy
-- [ ] `bash deploy/deploy_and_verify.sh life-platform-mcp lambdas/mcp_server.py`
+- [ ] `bash deploy/deploy_fleet.sh` (ships both MCP functions with the fleet, #4255)
 
 ### Documentation
 - [ ] **MCP_TOOL_CATALOG.md**: Add new tool row

@@ -118,7 +118,7 @@ def render_block(lambda_map: dict) -> str:
         lines.append("")
 
     lines.append("† `cdk_only` is a historical annotation in the map: since #781 every sanctioned deploy path")
-    lines.append("ships the same full-tree bundle, so these deploy fine via `deploy_and_verify.sh` too.")
+    lines.append("ships the same full-tree bundle, so these deploy fine via `deploy_fleet.sh` too.")
     lines.append(END_MARKER)
     return "\n".join(lines)
 

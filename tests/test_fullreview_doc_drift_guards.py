@@ -23,7 +23,7 @@ def test_deploy_quickstart_commands_include_source_file():
     txt = _read("CLAUDE.md")
     # the bare one-arg forms (which exit 1) must not appear as documented commands
     assert "deploy/deploy_lambda.sh <function-name>\n" not in txt, "CLAUDE.md deploy_lambda.sh command omits <source-file> (#1258)"
-    assert "deploy/deploy_and_verify.sh <function-name>\n" not in txt, "CLAUDE.md deploy_and_verify.sh command omits <source-file> (#1258)"
+    assert "deploy/deploy_and_verify.sh" not in txt, "CLAUDE.md documents deploy_and_verify.sh, archived by #4255"
     assert "deploy/deploy_lambda.sh <function-name> <source-file>" in txt
 
 

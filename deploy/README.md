@@ -33,9 +33,9 @@ channel stays on the staging module. Full rule: `docs/CONVENTIONS.md` §1.
 
 **"I changed a file. Which script do I run?"** See `docs/QUICKSTART.md` for the full table. Key rules:
 
-1. **Lambda code** → `bash deploy/deploy_and_verify.sh <function-name> <source-file>`
-   (wraps `deploy_lambda.sh` with a post-deploy invoke + CloudWatch log check — preferred),
-   or `bash deploy/deploy_lambda.sh <function-name> <source-file>` for the bare deploy.
+1. **Lambda code** → `bash deploy/deploy_fleet.sh` — the one path CI runs (#4255): every
+   function receives the identical bundle, so the fleet deploy is the deploy. For a
+   one-function hot fix, `bash deploy/deploy_lambda.sh <function-name> <source-file>`.
 2. **MCP Lambda** → `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` —
    the script detects `life-platform-mcp`/`life-platform-mcp-warmer` and builds the
    **mcp-shaped full bundle** automatically (`build_bundle.py --mcp`: whole `lambdas/` tree +
@@ -89,9 +89,8 @@ claim had drifted to a fraction of reality. These are the ones you'll actually r
 |--------|---------|
 | `build_bundle.py` | Stage/zip the ONE full-tree code bundle (#781) — used by every deploy path |
 | `deploy_lambda.sh <fn> <src>` | Deploy one Lambda (full bundle; mcp shape auto-detected) |
-| `deploy_and_verify.sh <fn> <src>` | `deploy_lambda.sh` + post-deploy invoke + log check — preferred |
 | `rollback_lambda.sh <fn>` | Restore the previous zip (S3 rollback artifact) |
-| `deploy_fleet.sh [--dry-run]` | Push the bundle to every function (shared-module change) |
+| `deploy_fleet.sh [--dry-run]` | Push the bundle to every function — THE Lambda code deploy path, CI's too (#4255) |
 | `deploy_site_api.sh [path]` | site-api full bundle + invoke-verify a real route |
 | `sync_site_to_s3.sh` | Attended site sync (content-hashed, self-invalidating) |
 | `smoke_test_site.sh` | HTTP/content smoke of the public site |

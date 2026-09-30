@@ -254,10 +254,6 @@ BUNDLE_STAGING_SITES: dict[str, dict[str, str]] = {
         "status": "sanctioned",
         "notes": "stages via deploy/build_bundle.py (the single hot-deploy path CDK also matches)",
     },
-    "deploy/deploy_mcp_split.sh": {
-        "status": "sanctioned",
-        "notes": "python3 deploy/build_bundle.py --mcp --out ... staged before update-function-code",
-    },
     "deploy/rollback_lambda.sh": {
         "status": "exempt",
         "notes": (

@@ -48,8 +48,8 @@ find lambdas/ mcp/ -name '*.py' -exec python3 -m py_compile {} \;
 # into .claude/skills/deploy/SKILL.md from ci/lambda_map.json)
 bash deploy/deploy_lambda.sh <function-name> <source-file>
 
-# Deploy + run smoke test
-bash deploy/deploy_and_verify.sh <function-name> <source-file>
+# Deploy the whole fleet — the one Lambda code deploy path CI runs (#4255)
+bash deploy/deploy_fleet.sh
 
 # CDK deploy (drift-guarded — runs check_deploy_drift.py first, see docs/CONVENTIONS.md §6)
 bash deploy/cdk_deploy.sh <StackName> [<StackName> ...]

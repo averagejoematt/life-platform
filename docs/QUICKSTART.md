@@ -92,7 +92,7 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 | I edited... | Run this | Why |
 |-------------|----------|-----|
 | A single Lambda file (e.g., `daily_brief_lambda.py`) | `bash deploy/deploy_lambda.sh daily-brief` | Fast (~10s), no CDK synth |
-| A Lambda + want smoke test | `bash deploy/deploy_and_verify.sh daily-brief` | Deploys + invokes + checks for errors |
+| Lambda code, the way CI ships it | `bash deploy/deploy_fleet.sh` | The one deploy path (#4255): one bundle → every function, ancestry-checked |
 | A shared module at the `lambdas/` root (e.g. `ai_calls.py`) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — every function must receive the new copy |
 | Any file in `mcp/` | `bash deploy/deploy_lambda.sh life-platform-mcp` | Since #781 the script stages the mcp-shaped full bundle (tree + `mcp_server.py` + `mcp/`) |
 | CDK stack code (IAM, schedules, new Lambda) | `cd cdk && npx cdk deploy <StackName>` | Infra changes require CloudFormation |
@@ -111,9 +111,9 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 # 1. Edit the Lambda source
 vim lambdas/emails/daily_brief_lambda.py
 
-# 2. Deploy + smoke test
-bash deploy/deploy_and_verify.sh daily-brief
-# → packages → updates function code → invokes → checks CloudWatch for errors
+# 2. Deploy (the one path CI runs, #4255) — or merge and let CI run it
+bash deploy/deploy_fleet.sh
+# → one bundle → S3 → every function → ancestry postflight
 ```
 
 ### MCP Lambda deploy
