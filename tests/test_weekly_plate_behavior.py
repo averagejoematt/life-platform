@@ -335,6 +335,16 @@ class TestLoadPlateHistory:
         table.query_error = RuntimeError("throttled")
         assert wp.load_plate_history(TODAY) == []
 
+    def test_history_skips_a_soft_deleted_edition(self, table):
+        """#4355: delete_platform_memory tombstones (deleted_at) rather than calling
+        dynamodb:DeleteItem (the MCP role has no grant on this partition) — the anti-repeat
+        block must not quote an edition Matthew asked removed."""
+        kept = memory_row("2026-05-29", plate_date="2026-05-29")
+        deleted = memory_row("2026-05-22", plate_date="2026-05-22", deleted_at="2026-05-23T00:00:00+00:00")
+        for row in (kept, deleted):
+            table.items[(row["pk"], row["sk"])] = row
+        assert [h["plate_date"] for h in wp.load_plate_history(TODAY)] == ["2026-05-29"]
+
 
 class TestPlateHistoryContext:
     def test_no_history_produces_no_context_block_at_all(self):

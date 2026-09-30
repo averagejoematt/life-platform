@@ -228,7 +228,6 @@ def _joints(note_dates, dismissals):
         _draft(),
         pain_by_idx={0: {"pain_flag_any": True, "pain_dates": list(note_dates)}},
         days_since_by_idx={0: 9},
-        active_day_streak=1,
         loaded_lifting_streak=1,
         pain_layer_status="ok",
         dismissals=dismissals,
@@ -467,7 +466,6 @@ class TestPerSite4174:
                     0: {"pain_flag_any": True, "pain_dates": [SADDLE_NOTE["date"], TOE_NOTE["date"]], "pain_notes": [SADDLE_NOTE, TOE_NOTE]}
                 },
                 days_since_by_idx={0: 3},
-                active_day_streak=1,
                 loaded_lifting_streak=1,
                 pain_layer_status="ok",
                 dismissals=dismissals,

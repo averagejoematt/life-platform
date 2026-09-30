@@ -107,7 +107,7 @@ DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_
 # ==============================================================================
 
 
-from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.digest_utils import d2f, safe_float, strava_read_seam  # shared bundled helpers (#970); #4419 the strava read seam
 
 
 def _are_consecutive_days(date_strs):
@@ -131,7 +131,7 @@ def _t0_rate(rec):
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": USER_PREFIX + source, "sk": "DATE#" + date_str})
-        return d2f(r.get("Item"))
+        return strava_read_seam(source, d2f(r.get("Item")))
     except Exception as e:
         logger.warning(f"fetch_date({source}, {date_str}): {e}")
         return None
@@ -167,7 +167,7 @@ def fetch_range(source, start, end):
             if "LastEvaluatedKey" not in r:
                 break
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return strava_read_seam(source, records)
     except Exception as e:
         logger.warning(f"fetch_range({source}): {e}")
         return []
@@ -197,7 +197,7 @@ def fetch_memory_records(category, days=30):
                 }
             )
         )
-        return [d2f(i) for i in resp.get("Items", [])]
+        return [d2f(i) for i in resp.get("Items", []) if not i.get("deleted_at")]  # #4355: skip a tombstoned note
     except Exception as e:
         logger.warning(f"fetch_memory({category}): {e}")
         return []
@@ -613,7 +613,7 @@ def _load_intention_history(yesterday_str):
             )
         )
         records = []
-        for item in resp.get("Items", []):
+        for item in (i for i in resp.get("Items", []) if not i.get("deleted_at")):  # #4355: skip a tombstoned note
             rec = d2f(item)
             evals_raw = rec.get("evaluations", "[]")
             if isinstance(evals_raw, str):

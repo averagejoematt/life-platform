@@ -694,32 +694,58 @@ def test_card_has_no_revision_signal_for_ordinary_learnings(monkeypatch):
     assert "revision_signal" not in cobs._render_coach_card("sleep")
 
 
-def test_card_track_record_counts_only_the_last_thirty_days(monkeypatch):
+def _ledger(pid, status, outcome_date, **extra):
+    """A graded PREDICTION# row — the ledger row the record is counted from (#4220)."""
+    return {"pk": SLEEP_PK, "sk": f"PREDICTION#{pid}", "prediction_id": pid, "status": status, "outcome_date": outcome_date, **extra}
+
+
+def _docket_learnings(n, status="confirmed"):
+    """The #4216 shape: one pre-genesis docket re-recorded daily as a blank-prediction_id
+    LEARNING# row, unstamped — exactly what the retired 30-day tally counted."""
+    return [
+        {"pk": SLEEP_PK, "sk": f"LEARNING#2026-08-{d:02d}#docket-x", "status": status, "reason": "dispute docket resolved"}
+        for d in range(1, n + 1)
+    ]
+
+
+def test_card_track_record_is_the_one_record(monkeypatch):
+    """#4220: the card's record is coach_record's — PREDICTION#, this cycle, one resolution
+    per prediction — never a LEARNING# tally. Genesis is pinned to 2026-08-01."""
+    monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
     rows = [
         _output(content="analysis"),
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-09", "status": "confirmed"},
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-05", "status": "confirmed"},
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-01", "status": "confirmed"},
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-07-28", "status": "refuted"},
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-07-20", "status": "inconclusive"},
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-06-01", "status": "refuted"},  # older than the window
+        _ledger("p1", "confirmed", "2026-08-05"),
+        _ledger("p1-2", "confirmed", "2026-08-06", prediction_id="p1"),  # a re-write of p1 — counts once
+        _ledger("p2", "confirmed", "2026-08-07"),
+        _ledger("p3", "refuted", "2026-08-08"),
+        _ledger("p4", "refuted", "2026-07-20"),  # resolved before genesis — not this cycle
+        _ledger("p5", "pending", ""),
+        *_docket_learnings(9),  # nine blank-id learnings the old tally counted as "confirmed"
     ]
     _install(monkeypatch, rows)
     track = cobs._render_coach_card("sleep")["track_record"]
-    assert track["window_days"] == 30
-    assert track["confirmed"] == 3
-    assert track["refuted"] == 1
-    assert track["inconclusive"] == 1
-    assert track["decided_count"] == 4
-    assert track["hit_rate_pct"] == 75
-    assert track["summary"] == "3 of 4 predictions confirmed in last 30 days"
+    assert track["record"] == {"confirmed": 2, "refuted": 1, "n": 3, "through": "2026-08-08"}
+    assert (track["confirmed"], track["refuted"], track["decided_count"]) == (2, 1, 3)
+    assert track["summary"] == "2 of 3 checked calls right through August 8"
+    assert "%" not in track["summary"]  # below n = 10 the record prints counts
+    assert track["scope"] == "this cycle"
 
 
-def test_card_track_record_keeps_conversation_learnings_out_of_the_hit_rate(monkeypatch):
+def test_card_track_record_mutation_control_the_learning_tally_disagrees(monkeypatch):
+    """The retired derivation over the SAME rows says something else — so the test above
+    can tell the two apart (the tally counts the nine docket learnings)."""
+    monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
+    learnings = _docket_learnings(9) + [{"pk": SLEEP_PK, "sk": "LEARNING#2026-08-08#p3", "status": "refuted", "prediction_id": "p3"}]
+    counts, _conv = cobs._tally_learning_statuses(learnings)
+    assert (counts["confirmed"], counts["refuted"]) == (9, 1)  # "9 of 10" — the retired card's answer
+
+
+def test_card_track_record_keeps_conversation_learnings_out_of_the_record(monkeypatch):
+    monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
     rows = [
         _output(content="analysis"),
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-09", "status": "confirmed"},
-        {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-08", "status": "refuted"},
+        _ledger("p1", "confirmed", "2026-08-05"),
+        _ledger("p2", "refuted", "2026-08-06"),
         {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-07", "status": "confirmed", "channel": "conversation"},
     ]
     _install(monkeypatch, rows)
@@ -727,16 +753,27 @@ def test_card_track_record_keeps_conversation_learnings_out_of_the_hit_rate(monk
     assert track["decided_count"] == 2
     assert track["hit_rate_pct"] == 50
     assert track["conversation_learnings"] == 1
-    assert track["summary"] == "1 of 2 predictions confirmed in last 30 days · 1 conversation-sourced learning(s), not in the hit rate"
+    assert track["summary"] == "1 of 2 checked calls right through August 6 · 1 conversation-sourced learning(s), not in the record"
 
 
 def test_card_omits_track_record_when_nothing_has_resolved(monkeypatch):
+    monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
     rows = [
         _output(content="analysis"),
         {"pk": SLEEP_PK, "sk": "LEARNING#2026-08-09", "status": "inconclusive"},
+        _ledger("p5", "pending", ""),
+        *_docket_learnings(3),  # blank-id learnings are not a record
     ]
     _install(monkeypatch, rows)
     assert "track_record" not in cobs._render_coach_card("sleep")
+
+
+def test_card_track_record_failed_ledger_read_is_absence(monkeypatch):
+    monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
+    _install(monkeypatch, [_output(content="analysis")])
+    monkeypatch.setattr(cobs.coach_record, "for_coach", lambda *a, **k: None)
+    track = cobs._render_coach_card("sleep")["track_record"]
+    assert track == {"record": None, "summary": "record unavailable"}
 
 
 def test_card_proactivity_grades_the_nudge_record(monkeypatch):

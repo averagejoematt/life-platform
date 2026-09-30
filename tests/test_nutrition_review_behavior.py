@@ -1177,6 +1177,24 @@ def test_both_panel_prompt_paths_state_which_channel_each_micronutrient_number_c
     assert "Any micro <50% for 3+ days" not in fallback
 
 
+def test_the_served_board_config_prompt_carries_no_food_only_micro_rule(monkeypatch):
+    """#4244 box 2 against the SERVED prompt: the board config the lambda loads (its repo mirror is
+    the wire here) gives Patel "Any micro <50% for 3+ days." — the food-only rule. The render
+    re-scopes it to the food + supplements TOTAL, so the panel is never told both."""
+    mirror = json.loads((Path(__file__).resolve().parent.parent / "config" / "board_of_directors.json").read_text())
+    assert m._FOOD_ONLY_MICRO_RULE.search(json.dumps(mirror)), "fixture no longer carries the stale rule — re-point this test"
+    warned = []
+    monkeypatch.setattr(m.logger, "warning", lambda msg, *a: warned.append(msg % a if a else msg))
+    _with_board(monkeypatch, mirror)
+    prompt = m._build_nutrition_prompt_from_config(1800, 190)
+    assert prompt and m.MICRONUTRIENT_SCOPE_NOTE in prompt
+    assert not m._FOOD_ONLY_MICRO_RULE.search(prompt)
+    assert m.MICRO_GAP_RULE in prompt
+    assert any("food-only micro rule" in w for w in warned), warned
+    # The hardcoded fallback states the same re-scoped rule, word for word.
+    assert m.MICRO_GAP_RULE in m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+
+
 def test_a_supplement_covered_nutrient_is_not_a_gap_in_the_weekly_table():
     """#4244 contract: a day whose supplement record covers vitamin D does not grade it as a
     gap, and the MICRO column header + footnote name both channels and what went uncounted."""
@@ -1197,6 +1215,19 @@ def test_a_supplement_covered_nutrient_is_not_a_gap_in_the_weekly_table():
     assert "food + supplements taken that day" in html
     assert "not counted, no cited conversion: Multivitamin" in html
     assert _day_row(html, "Sat 06/06")[-1] == "100%"
+
+
+def test_a_week_with_no_supplement_record_labels_the_micro_column_food_only():
+    """#4244: the MICRO header is derived from the week's rows. With no supplement record on any
+    day the join counted food alone, so a "food + supps" header would claim a channel nothing was
+    counted from; the column says food only and the footnote names the absent record."""
+    days = m.extract_daily_nutrition({"2026-06-06": _mf_day(cal=1800, fiber=38), "2026-06-07": _mf_day(cal=1800, fiber=19)}, {})
+    assert {d["supplements_state"] for d in days} == {"absent"}
+    html = m.build_summary_table(days, dict(PROFILE))
+    assert "MICRO (food only)" in html
+    assert "food + supps" not in html and "food + supplements" not in html
+    assert "logged food (no supplement record this week)" in html
+    assert "2 days with no supplement record = food only" in html
 
 
 def test_the_hardcoded_fallback_prompt_renders_the_live_targets():
@@ -1720,6 +1751,20 @@ def test_a_dry_run_really_builds_the_review_it_declines_to_send(handler_env):
     assert resp["subject"] == "Nutrition Review - 2026-06-12 - 1800 kcal - 190g protein"
     assert resp["html_bytes"] > 1_000
     assert len(handler_env["calls"]["anthropic"]) == 1  # the panel really ran
+
+
+def test_a_dry_run_reports_the_micro_column_and_the_served_prompts_scope(handler_env):
+    """#4244 live proof from one attended dry run: the MICRO header the email carries and whether
+    the prompt actually served (board config or fallback) is scoped — no S3 config read needed."""
+    resp = m.lambda_handler({"dry_run": True}, None)
+    assert resp["micro_column"] == "MICRO (food only)"  # handler_env serves no supplement rows
+    assert resp["prompt_source"] == "fallback"  # handler_env serves no board config
+    assert resp["prompt_micro_scoped"] is True
+    # The opposite direction: a served prompt that still carries the food-only rule reads False.
+    stale = "BOARD PROMPT. Any micro <50% for 3+ days."
+    handler_env["monkeypatch"].setattr(m, "_build_nutrition_prompt_from_config", lambda cal, pro: stale)
+    resp = m.lambda_handler({"dry_run": True}, None)
+    assert (resp["prompt_source"], resp["prompt_micro_scoped"]) == ("board_config", False)
 
 
 def test_a_dry_run_writes_no_durable_row(handler_env):

@@ -64,6 +64,24 @@ def _get_user_id():
 
 MEMORY_SOURCE = "platform_memory"
 
+# #4355: the MCP role has no dynamodb:DeleteItem for this partition (checked live
+# 2026-09-27T22:59Z — AccessDeniedException) and is deliberately NOT getting one — the
+# scoped grant this role does carry (macrofactor_meals, LeadingKeys) exists for exactly one
+# other tool, and widening it for chat-facing memory would let an LLM-driven call erase a
+# row instead of just marking it gone. So delete is a SOFT delete: an UpdateItem tombstone
+# (`deleted_at` + `deleted_reason`), conditional so a race can neither double-tombstone nor
+# resurrect one, using an action this role already holds unconditionally. Every reader of
+# the partition (`tool_read_platform_memory`, `tool_list_memory_categories`, the coach
+# prompt's `select_conversation_memories`, and the compute readers of computed categories)
+# skips a row once `deleted_at` is set — the row stays in DDB (auditable, and cheaply
+# reversible by a human with console access) but is gone from every surface a coach or a
+# chat tool can see. This is a DIFFERENT flag from the experiment-restart `tombstone=true`
+# (phase_filter.singleton_visible) — reusing that field would make `restart_rollback.py
+# --full-unwind` resurrect a note Matthew explicitly asked to delete.
+_DELETED_AT_FIELD = "deleted_at"
+_DELETED_REASON_FIELD = "deleted_reason"
+_DEFAULT_DELETE_REASON = "mcp_delete"
+
 # #2663: page cap for the category census. The window can no longer be pushed into the
 # key condition (the sk's date is its LAST segment, not its first), so the partition is
 # read whole and filtered after. Bounded so a runaway partition cannot hang the tool —
@@ -349,6 +367,10 @@ def tool_read_platform_memory(args: dict) -> dict:
             **_apply_phase_filter(
                 {
                     "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    # #4355: a soft-deleted note is a tombstone (deleted_at set), never
+                    # `delete_item` — filter it out here rather than at the caller, or
+                    # `read_platform_memory`/stage 1 would keep quoting it.
+                    "FilterExpression": f"attribute_not_exists({_DELETED_AT_FIELD})",
                     "ExpressionAttributeValues": {
                         ":pk": pk,
                         ":s": start_sk,
@@ -377,6 +399,12 @@ def tool_read_platform_memory(args: dict) -> dict:
     # instant each note was stored; the date stays the primary order.
     clean = []
     for r in records:
+        if r.get(_DELETED_AT_FIELD):
+            # #4355: belt-and-suspenders — the query's own FilterExpression already
+            # excludes tombstoned rows against real DynamoDB, but a soft-deleted row
+            # must never surface even if that server-side filter is ever bypassed
+            # (a test double, a future caller that drops _apply_phase_filter, etc).
+            continue
         r.pop("pk", None)
         clean.append(r)
     clean.sort(key=lambda r: (str(r.get("date") or ""), str(r.get("stored_at") or ""), str(r.get("sk") or "")), reverse=True)
@@ -434,7 +462,9 @@ def tool_list_memory_categories(args: dict) -> dict:
                 {
                     "KeyConditionExpression": "pk = :pk AND begins_with(sk, :p)",
                     "ExpressionAttributeValues": {":pk": pk, ":p": "MEMORY#"},
-                    "ProjectionExpression": "sk, category, #d",
+                    # #4355: project deleted_at too (filtered below) — a soft-deleted note
+                    # must not count in the category census either.
+                    "ProjectionExpression": f"sk, category, #d, {_DELETED_AT_FIELD}",
                     "ExpressionAttributeNames": {"#d": "date"},
                 }
             )
@@ -457,6 +487,8 @@ def tool_list_memory_categories(args: dict) -> dict:
         cats = defaultdict(list)
         in_window = 0
         for item in items:
+            if item.get(_DELETED_AT_FIELD):
+                continue  # #4355: a soft-deleted note is not a live record — don't census it
             date = item.get("date") or (_sk_parts(item.get("sk", ""))[1] or "")
             if not date or date < start:
                 continue
@@ -509,8 +541,14 @@ def tool_list_memory_categories(args: dict) -> dict:
 
 def tool_delete_platform_memory(args: dict) -> dict:
     """
-    Delete a specific memory record by category + date (the legacy one-row-per-day key),
-    or by its exact sort key.
+    Soft-delete a specific memory record by category + date (the legacy one-row-per-day
+    key), or by its exact sort key (#4171 per-note row).
+
+    The MCP role carries no dynamodb:DeleteItem for this partition (#4355) — this is a
+    TOMBSTONE, not a DynamoDB delete. The row survives in the table (auditable) but is
+    stamped `deleted_at`/`deleted_reason` and every reader (read_platform_memory,
+    list_memory_categories, the coach prompt's memory block, the compute readers of
+    computed categories) skips it from that instant on.
 
     Args (via args dict):
         category: Memory category.
@@ -518,13 +556,15 @@ def tool_delete_platform_memory(args: dict) -> dict:
               `MEMORY#<category>#<date>` row.
         key: The exact sk (as `read_platform_memory` returns it) — the only way to name a
              #4171 per-note row (`MEMORY#<category>#<date>#<hash>`). Must belong to `category`.
+        reason: Optional short note on why (defaults to "mcp_delete").
 
     Returns:
-        {"status": "deleted", "sk": "..."} or {"status": "not_found"}
+        {"status": "deleted", "sk": "...", "deleted_at": "..."} or {"status": "not_found"}
     """
     category = args.get("category", "")
     date = args.get("date", "")
     key = args.get("key")
+    reason = str(args.get("reason") or "").strip() or _DEFAULT_DELETE_REASON
 
     table = _get_table()
     pk = _memory_pk()
@@ -545,13 +585,29 @@ def tool_delete_platform_memory(args: dict) -> dict:
         sk = _sk(category, date)
 
     try:
-        # Check it exists first
+        # Check it exists (and is not already tombstoned) first, for the honest
+        # "not_found" branch — an UpdateItem on a missing key would otherwise SEED one
+        # (attribute_exists guards that below, but a caller-visible "not_found" is clearer
+        # than a conditional-check error string).
         resp = table.get_item(Key={"pk": pk, "sk": sk})
-        if not resp.get("Item"):
+        item = resp.get("Item")
+        if not item or item.get(_DELETED_AT_FIELD):
             return {"status": "not_found", "sk": sk}
-        table.delete_item(Key={"pk": pk, "sk": sk})
-        return {"status": "deleted", "sk": sk, "category": category, "date": date}
-    except Exception as e:
+        deleted_at = datetime.now(timezone.utc).isoformat()
+        # #4355: UpdateItem, never DeleteItem — the MCP role holds dynamodb:UpdateItem
+        # unconditionally on this table already. Conditional on both attribute_exists(sk)
+        # (never seed a row that isn't there) and attribute_not_exists(deleted_at) (never
+        # re-tombstone — the first deletion's reason/instant wins a race).
+        table.update_item(
+            Key={"pk": pk, "sk": sk},
+            UpdateExpression=f"SET {_DELETED_AT_FIELD} = :da, {_DELETED_REASON_FIELD} = :dr",
+            ConditionExpression=f"attribute_exists(sk) AND attribute_not_exists({_DELETED_AT_FIELD})",
+            ExpressionAttributeValues={":da": deleted_at, ":dr": reason},
+        )
+        return {"status": "deleted", "sk": sk, "category": category, "date": date, "deleted_at": deleted_at}
+    except Exception as e:  # noqa: BLE001 — a lost race (already deleted) reads as not_found
+        if _is_conditional_failure(e):
+            return {"status": "not_found", "sk": sk}
         return {"error": str(e), "sk": sk}
 
 

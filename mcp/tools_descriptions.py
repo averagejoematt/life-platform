@@ -139,7 +139,7 @@ GET_COACH_THREAD_DESCRIPTION = "Read a coach's persistent thread — their runni
 
 GET_PREDICTIONS_DESCRIPTION = "Cross-coach prediction ledger — all predictions from all coaches with statuses. Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. #726: reads the canonical COACH#/PREDICTION# store (evaluator-graded, code-stamped IDs per #725 — the SAME store the public site serves); the legacy SOURCE#coach_thread# embedded predictions were tombstoned. #3712: also folds in the weekly TRAINING PRESCRIPTION's graded forecasts (claimant='prescription', coach_id=null, so a coach filter excludes them and no coach hit-rate can absorb them) — each carries its 80% interval and the n of weeks it was fitted on, status pending/confirmed/refuted/inconclusive, or 'declined' when there was too little history to forecast at all (a result, never a bet). For hit-rate + calibration analysis, use get_coach_track_record; for the prescription's own coverage verdict use get_benchmark(view='forecast')."
 
-GET_COACH_TRACK_RECORD_DESCRIPTION = "Hit-rate track record for a single coach over a configurable window — reads the COACH#{coach_id}/LEARNING# audit trail written daily by the prediction evaluator. Returns by_outcome counts (confirmed/refuted/inconclusive/expired), hit_rate_pct (confirmed / decided), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'."
+GET_COACH_TRACK_RECORD_DESCRIPTION = "Hit-rate track record for a single coach. The headline (record = {confirmed, refuted, n, through}, headline 'K of N checked calls right through <day>', decided_count, hit_rate_pct) is the SAME single producer the public /api/coaches, /api/calibration, /api/predictions and /api/wrong serve (#4220): the PREDICTION# ledger, this cycle, one resolution per prediction — the days window does not narrow it. The breakdowns read the COACH#{coach_id}/LEARNING# audit trail over the days window, one result per prediction, rows with no prediction_id excluded (counted in excluded_learnings): by_outcome counts (confirmed/refuted/inconclusive/expired), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. A subdomain filter scores hit_rate_pct from those breakdowns (hit_rate_source says which). Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'."
 
 AUDIT_COACH_DOSSIER_DESCRIPTION = (
     "#1387: Matthew's PRIVATE audit + correction affordance over a coach's public dossier "
@@ -391,7 +391,8 @@ MANAGE_SICK_DAYS_DESCRIPTION = (
     "Manage sick and rest day flags. Sick day flags suppress streak breaks, habit alerts, and anomaly noise. "
     "'list' (default) = show all logged sick/rest days in a date range. "
     "'log' = flag a date as sick/rest day (requires date=). Accepts dates= list for multiple days. "
-    "'clear' = remove a sick day flag logged in error (requires date=). "
+    "'clear' = remove a sick day flag logged in error (requires date=) — a tombstone (cleared_at), not a delete: "
+    "no reader counts the date as sick from then on, and re-logging the date restores it (#4378). "
     "Use for: 'log a sick day', 'I'm sick today', 'show my sick days', 'remove sick day flag', 'rest day'."
 )
 
@@ -458,9 +459,12 @@ LIST_MEMORY_CATEGORIES_DESCRIPTION = (
 )
 
 DELETE_PLATFORM_MEMORY_DESCRIPTION = (
-    "Delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
+    "SOFT-delete a specific platform_memory record by category + date (the legacy one-row-per-day key) or by "
     "category + key (the exact sk from read_platform_memory — the only handle for a per-note row, #4171). "
-    "Use to correct bad memories or remove stale records."
+    "Use to correct bad memories or remove stale records. #4355: this is a tombstone (deleted_at/deleted_reason), "
+    "not a DynamoDB delete — the MCP role has no dynamodb:DeleteItem on this partition. Every reader "
+    "(read_platform_memory, list_memory_categories, the coach's memory block) skips it from that instant on; "
+    "an optional 'reason' is stored alongside."
 )
 
 LOG_DECISION_DESCRIPTION = (
@@ -478,7 +482,8 @@ MARK_JOURNAL_QUOTE_DESCRIPTION = (
     "names — the ELENA brief's omit list, enforced in code), any paraphrase that isn't verbatim in that "
     "day's entry (ADR-104 grounding), and a third line on a day (cap 0–2). Marked lines surface on the "
     "story hub archive + at most one featured line per week on home, dated, with a receipts link. "
-    "action='unmark' revokes a line (consent is revocable); action='list' shows what's marked. "
+    "action='unmark' revokes a line (consent is revocable) — a tombstone (revoked_at) that also erases the "
+    "stored text; every reader skips it (#4377); action='list' shows what's marked. "
     "The chronicle's never-quote rule is untouched — never quote unmarked journal text anywhere."
 )
 

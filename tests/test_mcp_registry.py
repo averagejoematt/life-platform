@@ -262,6 +262,188 @@ def test_r7_all_tool_modules_parseable():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# R8 — Every tool carries MCP `annotations` (#4286)
+# R9 — mutation control: an AST-provable DynamoDB writer is never readOnlyHint=True
+# ══════════════════════════════════════════════════════════════════════════════
+
+_REQUIRED_ANNOTATION_KEYS = {"readOnlyHint", "destructiveHint", "idempotentHint"}
+
+
+def _live_tools():
+    """Import the real TOOLS dict (post `annotate_tools()`), setting the same
+    env-var defaults every other `from mcp... import` test file sets — importing
+    `mcp.registry` pulls in `mcp.config`, which requires `S3_BUCKET`/`USER_ID`."""
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    os.environ.setdefault("TABLE_NAME", "life-platform")
+    os.environ.setdefault("USER_ID", "matthew")
+    os.environ.setdefault("AWS_REGION", "us-west-2")
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    from mcp.registry import TOOLS
+
+    return TOOLS
+
+
+def test_r8_every_tool_carries_annotations():
+    """R8 (#4286): every tool's schema carries an `annotations` object with the
+    three MCP-spec hint booleans, so a client sees write-vs-read before ever
+    calling `tools/call`. `handle_tools_list` emits `schema` verbatim, so this
+    is also what actually reaches the wire."""
+    tools = _live_tools()
+    missing = [
+        name for name, entry in tools.items() if not (_REQUIRED_ANNOTATION_KEYS <= set(entry.get("schema", {}).get("annotations") or {}))
+    ]
+    assert not missing, f"R8 FAIL: {len(missing)} tool(s) missing one of {_REQUIRED_ANNOTATION_KEYS}: {missing}"
+
+
+def test_r9_ddb_write_tools_are_never_readonly():
+    """R9 (#4286) — mutation control. `tests/mcp_registry_ast.py::ddb_write_tool_names`
+    structurally proves (via AST, following same-module dispatch targets) that a
+    tool's implementing function reaches a DynamoDB put_item/update_item/
+    delete_item/transact_write_items/batch_write_item call. None of those tools
+    may ever advertise `readOnlyHint: true` — a client must never be told a
+    write is safe to auto-approve. This is the guard against a fourth tool
+    landing in the same shape as the three named in mcp/tool_annotations.py
+    (#4401): a read-classified verb with a write hiding behind it."""
+    from mcp_registry_ast import ddb_write_tool_names
+
+    tools = _live_tools()
+    writers = ddb_write_tool_names()
+    assert writers, "R9 FAIL: the AST scan found zero DDB-writing tools — the scan itself is broken"
+    mislabeled = [name for name in writers if (tools.get(name, {}).get("schema", {}).get("annotations") or {}).get("readOnlyHint") is True]
+    assert not mislabeled, f"R9 FAIL: {mislabeled} reach a DynamoDB write (AST) but advertise readOnlyHint=True"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# R10–R12 — `outputSchema` + `structuredContent` for the ten most-called tools (#4286 box 2)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# The schemas live in mcp/tool_output_schemas.py. Whether each one matches what its handler
+# ACTUALLY returns is pinned where the handler's fixtures already live: every behaviour module
+# that drives one of the ten tools wraps it with `check_output_schema` (an autouse fixture), so
+# every result any of those tests produces is validated — 230+ results across all return paths
+# the suite exercises, not one hand-picked call per tool. get_todoist_snapshot had no fixture,
+# so R12 below builds the smallest one for both of its views.
+
+TYPED_TOOLS = (
+    "get_weight_loss_progress",
+    "get_sources",
+    "get_todoist_snapshot",
+    "manage_hevy_routine",
+    "get_workout_detail",
+    "plan_next_session",
+    "get_workouts",
+    "get_freshness_status",
+    "get_date_range",
+    "get_capture_queues",
+)
+
+
+def check_output_schema(monkeypatch, module, tool_name):
+    """Wrap `module.tool_<tool_name>` so every non-error result it returns under this test is
+    validated against the tool's declared outputSchema, through the handler's own JSON
+    normalisation (`handler._json_safe`) — i.e. exactly what becomes `structuredContent`."""
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    os.environ.setdefault("USER_ID", "matthew")
+    from mcp.handler import _json_safe
+    from mcp.tool_output_schemas import conformance_errors, is_error_payload, output_schema_for
+
+    attr = f"tool_{tool_name}"
+    schema = output_schema_for(tool_name)
+    assert schema is not None, f"{tool_name} declares no outputSchema"
+    real = getattr(module, attr)
+
+    def checked(*args, **kwargs):
+        result = real(*args, **kwargs)
+        if not is_error_payload(result):
+            problems = conformance_errors(_json_safe(result), schema)
+            assert not problems, f"{tool_name} returned a result its outputSchema rejects: {problems[:5]}"
+        return result
+
+    checked.__wrapped__ = real  # an identity check (registry fn is the module function) can still see through
+    monkeypatch.setattr(module, attr, checked)
+
+
+def test_r10_exactly_the_ten_typed_tools_carry_an_object_output_schema():
+    """R10: the ten tools (30-day ToolInvocations ranking, mcp/tool_output_schemas.py docstring)
+    carry an `outputSchema` whose root is `type: object` (the MCP spec's requirement); the
+    rest are counted, not silently skipped."""
+    tools = _live_tools()
+    typed = sorted(n for n, e in tools.items() if "outputSchema" in e["schema"])
+    assert typed == sorted(TYPED_TOOLS)
+    for n in typed:
+        assert tools[n]["schema"]["outputSchema"].get("type") == "object", n
+    untyped = len(tools) - len(typed)
+    assert untyped == len(tools) - 10, "the untracked remainder moved without this test knowing"
+
+
+def _call(name, result, monkeypatch):
+    import mcp.handler as h
+
+    monkeypatch.setitem(h.TOOLS[name], "fn", lambda _args: result)
+    monkeypatch.setattr(h, "_emit_tool_metric", lambda *a, **k: None)
+    return h.handle_tools_call({"name": name, "arguments": {}})
+
+
+def test_r11_a_typed_tool_carries_structured_content_and_an_error_is_flagged(monkeypatch):
+    """R11: success -> `structuredContent` (Decimals as numbers); the tool's own error dict ->
+    `isError`, no structured content; a result the schema rejects -> text kept, `isError`,
+    and the OutputSchemaMismatch count; an untyped tool -> unchanged text-only shape."""
+    import json as _json
+    from decimal import Decimal
+
+    import mcp.handler as h
+
+    _live_tools()
+    good = {
+        "count": 1,
+        "total": Decimal("2"),
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-28",
+        "source_filter": None,
+        "workouts": [{}],
+    }
+    out = _call("get_workouts", good, monkeypatch)
+    assert out["structuredContent"]["total"] == 2 and "isError" not in out
+    assert _json.loads(out["content"][0]["text"])["count"] == 1
+
+    err = _call("get_workouts", {"error": "no such window"}, monkeypatch)
+    assert err.get("isError") is True and "structuredContent" not in err
+
+    seen = []
+    monkeypatch.setattr(h, "_emit_output_schema_mismatch", seen.append)
+    bad = _call("get_workouts", {**good, "workouts": "not a list"}, monkeypatch)
+    assert bad.get("isError") is True and "structuredContent" not in bad and seen == ["get_workouts"]
+    assert _json.loads(bad["content"][0]["text"])["workouts"] == "not a list", "the data must still reach the model"
+
+    untyped = next(n for n in h.TOOLS if n not in TYPED_TOOLS)
+    plain = _call(untyped, {"anything": 1}, monkeypatch)
+    assert set(plain) == {"content"}
+
+
+def test_r12_todoist_snapshot_both_views_conform(monkeypatch):
+    """R12: get_todoist_snapshot had no fixture; the smallest one for its two views."""
+    _live_tools()
+    import mcp.tools_todoist as tt
+
+    day = {
+        "date": "2026-09-27",
+        "completed_count": 3,
+        "active_count": 40,
+        "overdue_count": 7,
+        "due_today_count": 2,
+        "priority_breakdown": {"p1_urgent": 1},
+        "completions_by_project": {"Inbox": 3},
+        "completed_tasks": [{"content": "x"}],
+        "tasks_due_today": [],
+    }
+    monkeypatch.setattr(tt, "query_source", lambda *a, **k: [day])
+    check_output_schema(monkeypatch, tt, "get_todoist_snapshot")
+    for view in ("load", "today"):
+        out = tt.tool_get_todoist_snapshot({"view": view, "date": "2026-09-27"})
+        assert "error" not in out, out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 

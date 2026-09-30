@@ -364,6 +364,8 @@ def handle_journal_quotes(event, *, _g):
 
     quotes = []
     for i in items:
+        if jq.is_revoked(i):
+            continue  # #4377: an unmark tombstone — consent withdrawn, never served
         # ADR-104 hardening (2026-07-26 review): only grounding="verified" serves.
         # A mark made before the day's Notion ingestion lands is recorded honestly
         # as pending_ingestion — it is WITHHELD here until the mark_journal_quote

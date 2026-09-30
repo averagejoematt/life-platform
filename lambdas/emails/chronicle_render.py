@@ -511,6 +511,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     .post-header__title {{ font-family:var(--font-serif);font-size:var(--fs-h1);color:var(--ink);line-height:var(--lh-snug);font-weight:var(--weight-reg);font-style:italic;margin-bottom:var(--sp-4); }}
     .post-header__meta {{ display:flex;align-items:center;gap:var(--sp-3);font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-muted); }}
     .post-header__stats {{ font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);letter-spacing:var(--tracking-label);margin-top:var(--sp-2); }}
+    {chronicle_schema.AI_NARRATOR_NOTE_CSS}
     .post-body {{ padding:var(--sp-7) 0 var(--sp-8); }}
     .post-body .prose {{ font-family:var(--font-serif);max-width:none; }}
     .post-body .prose p {{ max-width:none;line-height:var(--lh-relaxed); }}
@@ -568,6 +569,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   <div class="post-header">
     {_art_html}
     <div class="post-header__series">The Measured Life &middot; {cur_label} &middot; By Elena Voss</div>
+    {chronicle_schema.AI_NARRATOR_NOTE_HTML}
     <h1 class="post-header__title">&ldquo;{title}&rdquo;</h1>
     <div class="post-header__meta">
       <span>{date_display}</span>

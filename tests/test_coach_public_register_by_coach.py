@@ -719,7 +719,12 @@ def test_an_owner_directed_read_serves_its_public_twin_or_nothing(monkeypatch):
     s = _WIRE["sleep"]  # no public_summary on the live sleep row → no read at all
     body = _analysis_body(monkeypatch, "sleep", _wire_rows("sleep", s))
     assert "analysis" not in body
-    assert body["key_recommendation"] == s["key_recommendation"], "a reader-safe value passes untouched"
+    # #4384: the captured sleep "one thing" is the theme slug `deep_sleep_variability` —
+    # an identifier, not prose, and never served (this line used to assert it passed).
+    assert "key_recommendation" not in body, "a bare theme slug is not the one thing"
+    n = _WIRE["nutrition"]
+    body = _analysis_body(monkeypatch, "nutrition", _wire_rows("nutrition", n))
+    assert body["key_recommendation"] == n["key_recommendation"], "a reader-safe sentence passes untouched"
 
 
 def test_the_one_thing_prefers_the_public_ask(monkeypatch):
@@ -800,3 +805,241 @@ def test_mutation_control_the_brief_asks_the_glucose_coach_when_the_cgm_is_live(
     out, clients, ai_calls = _brief_run(monkeypatch, cgm_dark=False)
     assert not isinstance(out, ai_calls.CoachHold)
     assert clients, "the pipeline never started for a present coach"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4384 — "the one thing" was a theme SLUG. Live 2026-09-28T02:11Z:
+# /api/coach_analysis?domain=sleep → key_recommendation "deep_sleep_variability",
+# ?domain=labs → "protein_intake"; /coaching/ printed "the one thing deep_sleep_variability".
+# The stored OUTPUT# rows carry key_recommendation NULL, and the serve path fell back to
+# `themes[0]`. The fixtures below are those rows as boto3's Table resource returns them
+# (read-only query 2026-09-28T02:18Z, the prose slots elided — NULL → None, N → Decimal).
+# ══════════════════════════════════════════════════════════════════════════════
+
+from decimal import Decimal  # noqa: E402
+
+_STORED_4384 = {
+    "sleep": {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-09-26#daily_brief_sleep",
+        "created_at": "2026-09-26T17:01:27.315585+00:00",
+        "phase": "experiment",
+        "cycle": Decimal("17"),
+        "key_recommendation": None,
+        "public_summary": None,
+        "themes": [
+            "deep_sleep_variability",
+            "protocol_redesign",
+            "subjective_sleep_quality",
+            "hrv_recovery",
+            "adenosine_hypothesis",
+            "protein_nutrition",
+            "device_signal_validation",
+            "thermal_environment",
+        ],
+    },
+    "labs": {
+        "pk": "COACH#labs_coach",
+        "sk": "OUTPUT#2026-09-26#daily_brief_labs",
+        "created_at": "2026-09-26T17:07:13.254028+00:00",
+        "phase": "experiment",
+        "cycle": Decimal("17"),
+        "key_recommendation": None,
+        "public_summary": None,
+        "themes": [
+            "protein_intake",
+            "kidney_function",
+            "metabolic_panel",
+            "caloric_restriction",
+            "thyroid_axis",
+            "symptom_baseline",
+            "hrv_recovery",
+            "wearable_validation",
+            "biochemical_anchoring",
+        ],
+    },
+}
+_LIVE_SLUGS_4384 = {"sleep": "deep_sleep_variability", "labs": "protein_intake"}
+
+
+def _stored_body_4384(monkeypatch, domain, **over):
+    row = dict(_STORED_4384[domain], **over)
+    return _analysis_body(monkeypatch, domain, [sentinel_item(cgm_dark=False), *fresh_instrument_rows(), row])
+
+
+def _served_strings(body):
+    return [v for v in body.values() if isinstance(v, str)]
+
+
+def test_a_missing_ask_serves_no_one_thing_and_no_theme_slug(monkeypatch):
+    """RED before #4384: both live rows served themes[0] as key_recommendation."""
+    for domain, slug in _LIVE_SLUGS_4384.items():
+        assert _STORED_4384[domain]["themes"][0] == slug, "the fixture is the row the live slug came from"
+        body = _stored_body_4384(monkeypatch, domain)
+        assert "key_recommendation" not in body, f"{domain}: a missing ask must serve null, got {body.get('key_recommendation')!r}"
+        leaked = [t for t in _STORED_4384[domain]["themes"] if t in _served_strings(body)]
+        assert leaked == [], f"{domain}: theme slugs served as prose: {leaked}"
+
+
+def test_the_themes_fallback_is_gone_not_merely_masked_by_the_guard(monkeypatch):
+    """The FIRST defence on its own: with the token refusal neutered, a missing ask is
+    still null — the serve path no longer reaches for `themes[...]` at all."""
+    monkeypatch.setattr(audience_guard, "is_machine_token", lambda text: False)
+    monkeypatch.setattr(audience_guard, "is_bare_token", lambda text: False)
+    for domain in _LIVE_SLUGS_4384:
+        assert "key_recommendation" not in _stored_body_4384(monkeypatch, domain), domain
+
+
+def test_a_slug_stored_as_the_ask_is_refused_on_the_serve_path(monkeypatch):
+    """The second defence: even a producer that WRITES a slug into key_recommendation (or
+    public_ask) does not reach the reader — reader_safe refuses a bare identifier."""
+    for domain, slug in _LIVE_SLUGS_4384.items():
+        assert "key_recommendation" not in _stored_body_4384(monkeypatch, domain, key_recommendation=slug)
+        assert "key_recommendation" not in _stored_body_4384(monkeypatch, domain, public_ask=slug)
+        assert "public_read" not in _stored_body_4384(monkeypatch, domain, public_summary=slug)
+
+
+def test_mutation_control_without_the_token_refusal_the_stored_slug_leaks(monkeypatch):
+    monkeypatch.setattr(audience_guard, "is_machine_token", lambda text: False)
+    monkeypatch.setattr(audience_guard, "is_bare_token", lambda text: False)
+    for domain, slug in _LIVE_SLUGS_4384.items():
+        assert _stored_body_4384(monkeypatch, domain, key_recommendation=slug)["key_recommendation"] == slug
+
+
+def test_a_real_ask_on_the_same_row_is_still_served(monkeypatch):
+    ask = "Before bed one night this week, write down the time he got into bed."
+    assert _stored_body_4384(monkeypatch, "sleep", key_recommendation=ask)["key_recommendation"] == ask
+
+
+def test_the_token_shapes_name_identifiers_and_pass_prose_and_labels():
+    slugs = [t for row in _STORED_4384.values() for t in row["themes"]]
+    for token in [*slugs, "DEEP_SLEEP", "Deep_Sleep"]:  # an identifier: refused in EVERY reader slot
+        assert audience_guard.is_machine_token(token) and audience_guard.is_bare_token(token), token
+        assert audience_guard.reader_safe(token) is None and audience_guard.reader_prose(token) is None, token
+    for token in ["protein-intake", "sleep.deep", "deepSleepVariability", "hydrate", "noticing"]:  # prose slots only
+        assert audience_guard.is_bare_token(token) and not audience_guard.is_machine_token(token), token
+        assert audience_guard.reader_prose(token) is None, token
+    assert audience_guard.reader_safe("noticing") == "noticing", "a one-word LABEL (a stance stage) is still served"
+    prose = [w["key_recommendation"] for w in _WIRE.values() if w.get("key_recommendation") not in _LIVE_SLUGS_4384.values()]
+    assert prose, "the live wire carries real asks to check against"
+    for text in [*prose, "Hydrate.", "Sleep eight hours", "Log protein at lunch.", "Weigh-ins", "", None, 17]:
+        assert not audience_guard.is_bare_token(text), text
+
+
+def _expert_body_4384(monkeypatch, key_recommendation):
+    row = {
+        "pk": "USER#matthew#SOURCE#ai_analysis",
+        "sk": "EXPERT#sleep",
+        "analysis": "Deep sleep swung widely this week.",
+        "key_recommendation": key_recommendation,
+        "generated_at": "2026-09-26T17:00:00+00:00",
+    }
+    monkeypatch.setattr(C, "table", FakeDdbTable(rows=[row]))
+    monkeypatch.setattr(C, "_current_day_n", lambda: 30)
+    resp = C.handle_ai_analysis({"queryStringParameters": {"expert": "sleep"}})
+    assert resp["statusCode"] == 200, resp
+    return json.loads(resp["body"])
+
+
+def test_ai_analysis_never_serves_a_slug_as_its_recommendation(monkeypatch):
+    """#4384 set sweep: /api/ai_analysis's EXPERT# key_recommendation is the same slot."""
+    assert "key_recommendation" not in _expert_body_4384(monkeypatch, "deep_sleep_variability")
+    ask = "Write down the time he got into bed one night this week."
+    assert _expert_body_4384(monkeypatch, ask)["key_recommendation"] == ask
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4392 — the output trail's tag row printed the stored theme SLUGS. Live 2026-09-28
+# 03:06Z: /api/coach/sleep_coach recent_outputs[0].themes == _STORED_4384["sleep"]
+# ["themes"] verbatim; /coaching/ (coaching.js ce-themes) printed up to four of them.
+# The set of public endpoints serving a theme list (grep lambdas/web for "themes"):
+#   /api/coach/<id>          recent_outputs[].themes   (site_api_coach_profile)
+#   /api/journal_analysis    daily_themes[].themes + top_themes[].theme (site_api_mind)
+#   /api/reading_shelf + /api/reading_overview  book.themes (site_api_reading — pinned
+#                            in tests/test_site_api_reading.py)
+# All three go through audience_guard.public_themes.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _coach_themes_4392(monkeypatch):
+    row = dict(_STORED_4384["sleep"], pk=_PK, sk="OUTPUT#2026-09-26#daily_brief_sleep")
+    return _coach_body(monkeypatch, outputs=[row])["recent_outputs"]
+
+
+def test_the_coach_output_trail_serves_reader_labels_not_theme_slugs(monkeypatch):
+    """RED before #4392: recent_outputs[0].themes was the stored slug list verbatim."""
+    outs = _coach_themes_4392(monkeypatch)
+    assert outs, "the stored OUTPUT# row is served in the trail"
+    themes = outs[0]["themes"]
+    assert themes[:4] == ["deep sleep variability", "protocol redesign", "subjective sleep quality", "HRV recovery"], themes
+    assert len(themes) == len(_STORED_4384["sleep"]["themes"]), "humanised, not dropped — the tags carry meaning"
+    assert [t for t in themes if "_" in t or audience_guard.is_machine_token(t)] == [], themes
+
+
+def test_mutation_control_without_public_themes_the_trail_serves_the_slugs(monkeypatch):
+    monkeypatch.setattr(audience_guard, "public_themes", lambda values: values)
+    assert _coach_themes_4392(monkeypatch)[0]["themes"] == _STORED_4384["sleep"]["themes"]
+
+
+def test_reader_theme_humanises_slugs_and_keeps_phrases():
+    assert audience_guard.reader_theme("cgm_data_interpretation") == "CGM data interpretation"
+    assert audience_guard.reader_theme("resting_heart_rate") == "resting heart rate"
+    assert audience_guard.reader_theme("rem_sleep") == "REM sleep"
+    # already-prose themes (the live journal + reading shapes) pass unchanged
+    for phrase in ["cycles of relapse and reset", "work-life balance and pattern recognition", "identity and belonging"]:
+        assert audience_guard.reader_theme(phrase) == phrase
+    for junk in [None, "", "   ", "__", 17, "your_sleep_debt"]:
+        assert audience_guard.reader_theme(junk) is None, junk
+    assert audience_guard.public_themes(["deep_sleep", "deep sleep", "Deep Sleep", None, "hrv"]) == ["deep sleep", "HRV"]
+    assert audience_guard.public_themes("deep_sleep") == [] and audience_guard.public_themes(None) == []
+
+
+def _journal_body_4392(monkeypatch):
+    from web import site_api_mind as M
+
+    rows = [
+        {
+            "pk": "USER#matthew#SOURCE#journal_analysis",
+            "sk": f"DATE#2026-09-2{d}",
+            "date": f"2026-09-2{d}",
+            "themes": themes,
+            "dominant_theme": "health_body",
+            "sentiment_score": Decimal("0.2"),
+            "sentiment_label": "neutral",
+            "word_count": Decimal("120"),
+        }
+        for d, themes in ((5, ["protein_metabolism_cognition_link", "journaling_silence"]), (6, ["journaling silence", "grief"]))
+    ]
+    resp = M.journal_analysis(_g={"table": FakeDdbTable(rows=rows), "_experiment_date": lambda n: "2026-09-06"})
+    return json.loads(resp["body"])
+
+
+def test_journal_analysis_serves_reader_labels_in_both_theme_lists(monkeypatch):
+    body = _journal_body_4392(monkeypatch)
+    daily = [t for d in body["daily_themes"] for t in d["themes"]]
+    top = [t["theme"] for t in body["top_themes"]]
+    assert daily == ["protein metabolism cognition link", "journaling silence", "journaling silence", "grief"], daily
+    assert top[0] == "journaling silence" and body["top_themes"][0]["count"] == 2, "counted by the reader label"
+    assert [t for t in daily + top if "_" in t] == []
+
+
+def test_mutation_control_journal_analysis_without_public_themes_serves_slugs(monkeypatch):
+    monkeypatch.setattr(audience_guard, "public_themes", lambda values: values or [])
+    body = _journal_body_4392(monkeypatch)
+    assert "protein_metabolism_cognition_link" in body["daily_themes"][0]["themes"]
+
+
+def test_coach_analysis_serves_the_output_rows_data_through_beside_generated_at(monkeypatch):
+    """#4185 box 3: /api/coach_analysis serves the OUTPUT# row's `data_through` (stamped by
+    coach_state_updater since #4227) beside `generated_at`; an unstamped row serves no value — this
+    endpoint strips None keys by its own convention, so absent IS its unknown, never a back-fill.
+    Mutation control: drop the `data_through` key from handle_coach_analysis — both asserts red."""
+    domain, wire = next(iter(_WIRE.items()))
+    rows = _wire_rows(domain, wire)
+    out = next(r for r in rows if str(r.get("sk", "")).startswith("OUTPUT#"))
+    out["data_through"] = "2026-09-25"
+    body = _analysis_body(monkeypatch, domain, rows)
+    assert body["generated_at"] and body["data_through"] == "2026-09-25"
+    del out["data_through"]
+    body = _analysis_body(monkeypatch, domain, rows)
+    assert body.get("data_through") is None and body["generated_at"]

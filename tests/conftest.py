@@ -233,6 +233,9 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # ── registries a new module must join (none discoverable from the module) ──
         "test_rate_limit_identity_1221.py",  # #1221: AST sweep — no handler may derive its own client identity
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
+        "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
+        "test_bedrock_client.py",  # #4276: rglob sweep — raw model text is json.loads-ed only in ai/structured_json.py (down-only ledger)
+        "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
@@ -365,6 +368,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # caller must red BEFORE the merge, because after it the dead code is already
         # riding ~104 Lambda zips and reads as API to the next reader.
         "test_no_dead_shared_defs_3538.py",
+        # #4419: os.walk AST sweep of lambdas/ + mcp/ — every DynamoDB reader that can be handed
+        # the strava partition goes through `strava_read_seam`. A new reader that skips it must
+        # red BEFORE the merge; after it, every history read through it counts duplicates twice.
+        "test_shared_modules.py",
         # #2986: the derived-artifact registry. Verdict is pure repo shape — a new
         # generator writing a committed artifact must be classified BEFORE the merge,
         # and a guard placed in the wrong lane must red on the PR that placed it there.

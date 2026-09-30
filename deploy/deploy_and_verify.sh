@@ -6,11 +6,10 @@
 # next scheduled run finds them 11 hours later.
 #
 # USAGE:
-#   bash deploy/deploy_and_verify.sh <function-name> <source-file> [extra args...]
+#   bash deploy/deploy_and_verify.sh <function-name> <source-file>
 #
 # EXAMPLES:
-#   bash deploy/deploy_and_verify.sh daily-brief lambdas/emails/daily_brief_lambda.py \
-#       --extra-files lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py
+#   bash deploy/deploy_and_verify.sh daily-brief lambdas/emails/daily_brief_lambda.py
 #
 # EXIT:
 #   0 = deploy succeeded + Lambda boots clean
@@ -43,7 +42,7 @@ warn() { echo -e "${YELLOW}  ⚠️  $*${RESET}"; }
 
 # ── Args ──────────────────────────────────────────────────────────────────────
 if [ $# -lt 2 ]; then
-    echo "Usage: $0 <function-name> <source-file> [--extra-files ...]"
+    echo "Usage: $0 <function-name> <source-file>"
     exit 1
 fi
 FUNCTION_NAME="$1"

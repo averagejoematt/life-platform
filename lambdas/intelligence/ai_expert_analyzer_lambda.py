@@ -143,7 +143,7 @@ def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
     start_date = _phase_taxonomy.cycle_read_floor(pk, start_date)  # #2113: genesis floor, EXPERIMENT_SCOPED only
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"))
-    return _decimal_to_float(resp.get("Items", []))
+    return strava_read_seam(source, _decimal_to_float(resp.get("Items", [])))
 
 
 def _latest_item(source):
@@ -154,7 +154,7 @@ def _latest_item(source):
         kce = kce & Key("sk").between(f"DATE#{floor}", "DATE#9999-12-31")
     resp = table.query(KeyConditionExpression=kce, ScanIndexForward=False, Limit=1)
     items = _decimal_to_float(resp.get("Items", []))
-    return items[0] if items else None
+    return strava_read_seam(source, items[0] if items else None)
 
 
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
@@ -227,6 +227,7 @@ from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
 from coach import coach_input_facts as _ci  # #4185: the served logging record, PT sleep instants, the served-fact check
 from common.digest_utils import filter_day_rows  # #3442: day rows only — nights_tracked counted #WORKOUT# fragments
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
 
 from intelligence import weight_recency
@@ -332,21 +333,24 @@ def gather_data_for_expert(expert_key):
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
         _f_since, _f_14 = _recency_stats(_item_dates(items), today)
+        # #4185 box 1: ONE logging record. The served derivation (paginated, tombstones dropped) owns
+        # days-logged and last-log; this pack's own unpaginated count survives only when it is unread.
+        _lr = (_ci.served_run_facts({"date": today}, table=table, today=today) or {}).get("nutrition")
         return {
             "expert_key": "nutrition",
             "period": _frame.period,
-            "days_since_last_food_log": _f_since,
+            "days_since_last_food_log": _lr["lag_days"] if _lr else _f_since,
             "food_logs_last_14d": _f_14,
             "avg_calories": avg_cal,
             "avg_protein_g": avg_pro,
             "avg_fiber_g": avg_fiber,
             "protein_target_g": protein_target,
             "protein_adherence_pct": adherence,
-            "days_tracked": len(items),
+            "days_tracked": _lr["days_logged"] if _lr else len(items),
             "zero_calorie_days": zero_cal_days,
             "recency_note": _recency_note,
             # #4185: the SERVED logging record (/api/nutrition_overview's own derivation) — authoritative over the counts above.
-            "logging_record": (_ci.served_run_facts({"date": today}, table=table, today=today) or {}).get("nutrition"),
+            "logging_record": _lr,
         }
 
     elif expert_key == "training":
@@ -1175,6 +1179,7 @@ def generate_and_cache(expert_key, shared_system=None):
         "expert_key": expert_key,
         "analysis": analysis_text,
         "generated_at": now.isoformat(),
+        "data_through": pacific_today(),  # #4185 box 3: the window end (PT) the pack read — same stamp as EXPERT#integrator
         "data_snapshot": json.dumps(data, default=str)[:5000],
         "week_number": _gframe.week_num,
         "days_in_experiment": _gframe.days_in,
@@ -1645,6 +1650,7 @@ def generate_experiment_arc():
             "chapters": parsed.get("chapters", []),
             "week_count": len(weeks),
             "generated_at": now.isoformat(),
+            "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
             "ttl": int((now + timedelta(days=10)).timestamp()),
         }
         table.put_item(Item=item)
@@ -1769,6 +1775,7 @@ def generate_month_rollup():
             "window_label": window_label,
             "days_in_experiment": day_n,
             "generated_at": now.isoformat(),
+            "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
             "ttl": int((now + timedelta(days=10)).timestamp()),
         }
         table.put_item(Item=item)

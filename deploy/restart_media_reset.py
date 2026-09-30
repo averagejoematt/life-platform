@@ -51,6 +51,7 @@ sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
 from restart_chronicle_handler import resolve_calendar  # noqa: E402 — the pre-launch calendar (single source)
 
+from lambdas.common import media_tombstone  # #4365: one tombstone shape, writer + readers
 from lambdas.common.constants import EXPERIMENT_START_DATE
 
 REGION = "us-west-2"
@@ -135,16 +136,9 @@ def s3_exists(s3, key: str) -> bool:
 
 
 def already_tombstoned(s3, key: str) -> bool:
-    """True if the ORIGINAL object is already our tombstone JSON (idempotent re-runs)."""
-    try:
-        head = s3.head_object(Bucket=S3_BUCKET, Key=key)
-        if head.get("ContentLength", 0) > 4096:
-            return False
-        body = s3.get_object(Bucket=S3_BUCKET, Key=key)["Body"].read(4096)
-        doc = json.loads(body)
-        return bool(doc.get("tombstone"))
-    except Exception:
-        return False
+    """True if the ORIGINAL object is already our tombstone JSON (idempotent re-runs).
+    The shape is recognised by the same function the producers' existence checks use (#4365)."""
+    return media_tombstone.media_presence(s3, S3_BUCKET, key)[0] == media_tombstone.TOMBSTONE
 
 
 def archive_and_tombstone(s3, key: str, prefix: str, archive_prefix: str, apply: bool, now_iso: str, manual: list[str]) -> str:
@@ -166,14 +160,7 @@ def archive_and_tombstone(s3, key: str, prefix: str, archive_prefix: str, apply:
         s3.put_object(
             Bucket=S3_BUCKET,
             Key=key,
-            Body=json.dumps(
-                {
-                    "tombstone": True,
-                    "tombstoned_at": now_iso,
-                    "archived_to": dest,
-                    "tombstoned_reason": TOMBSTONE_REASON,
-                }
-            ).encode(),
+            Body=media_tombstone.tombstone_body(now_iso, dest, TOMBSTONE_REASON),
             ContentType="application/json",
         )
         return "archived"

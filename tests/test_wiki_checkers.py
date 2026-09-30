@@ -82,11 +82,14 @@ def test_deploy_docs_scanned_for_tombstones():
     scanned = {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=False)}
     assert "deploy/README.md" in scanned
     assert "deploy/OPERATIONAL_RUNBOOK.md" in scanned
-    # dated/deprecated records stay exempt (history may mention history)…
-    assert "deploy/MANIFEST.md" not in scanned
+    # a dated/deprecated record stays exempt (history may mention history)…
     assert "deploy/V2_ROLLBACK.md" not in scanned
-    # …but are still reachable with --all.
-    assert "deploy/MANIFEST.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
+    # …but is still reachable with --all.
+    assert "deploy/V2_ROLLBACK.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
+    # MANIFEST.md was the same shape but has since moved out of deploy/*.md entirely
+    # (deploy/archive/onetime/MANIFEST.md, #4258) — it no longer appears in either set.
+    assert "deploy/MANIFEST.md" not in scanned
+    assert "deploy/MANIFEST.md" not in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
 
 
 def test_makefile_scanned_for_tombstones():
@@ -330,6 +333,17 @@ def test_doc_facts_gate_is_not_vacuous():
     # a real "N MCP tools" claim IS caught.
     tool_pats = [p for key, pats, _ in facts.FACT_SPECS if key == "tool_count" for p in pats]
     assert any(re.search(p, "the server exposes 143 MCP tools") for p in tool_pats)
+
+
+def test_fact_spec_line_scan_flags_a_planted_stale_count():
+    """#4135: the FACT_SPECS per-line scan (with its digit prefilter) still reds on a planted
+    stale count, passes the true one, and exempts historical framing."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = {"tool_count": 86, "cdk_stacks": 10, "test_count": 3644, "eventbridge_rules": 90, "account_concurrency_limit": 100}
+    assert facts._fact_spec_hits("x.md", 1, "the platform runs 9 CDK stacks today", truth)
+    assert facts._fact_spec_hits("x.md", 1, "the server exposes 143 MCP tools", truth)
+    assert facts._fact_spec_hits("x.md", 1, "the platform runs 10 CDK stacks today", truth) == []
+    assert facts._fact_spec_hits("x.md", 1, "it was 9 CDK stacks before the backup stack", truth) == []
 
 
 def test_experiment_anchor_ground_truth_is_discovered():

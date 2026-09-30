@@ -654,7 +654,8 @@ export function sufficiencyBars(items, { label = "", emberWorst = 2, warnBelow =
       `<span class="suf-track"><span class="suf-fill ${tone}" style="width:${r.pct.toFixed(1)}%"></span></span>` +
       `<span class="suf-v mono">${Math.round(r.pct)}%${amt}</span></div>`;
   };
-  const cap = caveat || "100% = daily target · worst first · intake vs target from logged food, not blood levels.";
+  // #4244: the default names no channel — the caller states what its figures counted.
+  const cap = caveat || "100% = daily target · worst first · intake vs target, not blood levels.";
   // Interactive hover/tap (#582): rows stack vertically, so hit-test by y (axis="y").
   // Dot centres in the focused row; the tooltip carries its exact %/amount.
   const n = rows.length;

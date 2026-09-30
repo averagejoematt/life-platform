@@ -85,14 +85,36 @@ READ_VERBS = frozenset(
         "find",
         "get",
         "list",
-        # #3751: plan_next_session computes the deterministic constraint block and returns
-        # it. It touches no partition — every input is another READ tool, and the commit
-        # path stays where it already is (manage_hevy_routine, a write tool, audited on its
-        # own). Same reasoning as `describe` above. If a future `plan_*` tool ever writes,
-        # it must not rely on this line: name it with a write verb.
+        # #3751: plan_next_session STAGE 1 computes the deterministic constraint block and
+        # touches no partition. STAGE 2 (routine_id supplied, #3752) does write — it persists
+        # the critics' verdicts as a training coach-thread row — so the tool itself is named
+        # in WRITE_TOOLS_BEHIND_READ_VERB below (#4401); this verb line stays READ only
+        # because no other registered `plan_*` tool exists. A new `plan_*` tool that writes
+        # must not rely on this line: name it with a write verb.
         "plan",
         "read",
         "search",
+    }
+)
+
+
+# #4401: registered tools whose NAME verb is a read but whose own body carries a real
+# DynamoDB write (found by #4286's AST reachability check, tests/mcp_registry_ast.py::
+# ddb_write_tool_names). Renaming them would break every connected client's tool list, so
+# the classification follows the CAPABILITY instead of the verb — the same rule the
+# `audit` verb and every `manage_*` fat tool already take: the mutating arm decides the
+# class. Each is therefore audited (#753), residue-guarded (#4190), queueable (#4078) and
+# annotated readOnlyHint=False (#4286) like any other write tool. tests/test_mcp_audit.py
+# holds this set EQUAL to (AST DDB writers) minus (verb-classified writes), both ways.
+WRITE_TOOLS_BEHIND_READ_VERB = frozenset(
+    {
+        # #4036: action=dismiss persists the owner's pain-flag dismissal (_dismiss_pain_flag).
+        "get_exercise_notes",
+        # #915: an empty queue is refilled with generated questions that are PERSISTED so a
+        # re-call returns the same queue (system-generated text, but still a write).
+        "get_coach_checkin_queue",
+        # #3752: stage 2 (routine_id) writes the critics' verdicts as a coach-thread row.
+        "plan_next_session",
     }
 )
 
@@ -107,9 +129,10 @@ def is_write_tool(tool_name: str) -> bool:
 
     Unknown verbs classify as WRITE (fail-safe: an unclassified mutation gets
     audited; an unclassified read costs one harmless extra S3 object). The
-    coverage test keeps unknown verbs out of the registry in practice.
+    coverage test keeps unknown verbs out of the registry in practice. A tool
+    named in WRITE_TOOLS_BEHIND_READ_VERB is a write whatever its verb (#4401).
     """
-    return classify_verb(tool_name) not in READ_VERBS
+    return tool_name in WRITE_TOOLS_BEHIND_READ_VERB or classify_verb(tool_name) not in READ_VERBS
 
 
 def args_hash(arguments: dict | None) -> str:

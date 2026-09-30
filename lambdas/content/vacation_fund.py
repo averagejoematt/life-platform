@@ -38,6 +38,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
 from common.repo_config import config_dir
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 logger = logging.getLogger("vacation_fund")
 
@@ -146,7 +147,7 @@ def _query_range(partition: str, start_date: str, end_date: str) -> list[dict]:
         last_key = resp.get("LastEvaluatedKey")
         if not last_key:
             break
-    return items
+    return strava_read_seam(partition, items)
 
 
 def _strava_miles(start_date: str, end_date: str, included_sport_types):

@@ -188,6 +188,7 @@ SLEEP_DEDUP_FIELDS = {"sleep_efficiency_percentage", "sleep_quality_score"}
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
 TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
@@ -215,7 +216,7 @@ def _check_travel(date_str):
 def fetch_date(source, date_str):
     try:
         r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#{source}", "sk": f"DATE#{date_str}"})
-        return d2f(r.get("Item") or {})
+        return strava_read_seam(source, d2f(r.get("Item") or {}))
     except Exception:
         return {}
 
@@ -251,7 +252,7 @@ def fetch_range(source, start, end):
                 include_pilot=True,  # #2081: cross-phase rolling baseline
             )
         )
-        return [d2f(item) for item in r.get("Items", [])]
+        return strava_read_seam(source, [d2f(item) for item in r.get("Items", [])])
     except Exception:
         return []
 

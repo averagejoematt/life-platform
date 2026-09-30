@@ -26,7 +26,10 @@ from training.rep_scheme import is_below_floor
 
 # `change` grammar — the only fields a critic may move, and the only ones `apply_changes`
 # knows how to move. Anything else is recorded as `unapplied` and never silently dropped.
-CHANGE_FIELD_RE = re.compile(r"^(exercises\[(\d+)\]\.(weight_lbs|set_count|reps|drop)|session\.total_sets)$")
+CHANGE_FIELD_RE = re.compile(r"^(exercises\[(\d+)\]\.(weight_lbs|set_count|reps|drop|movement_key)|session\.total_sets)$")
+# #4387: `movement_key` swaps a timed cardio block's modality (the joints critic's treadmill -> cycling),
+# the sets and their durations untouched. Only these targets, and only on a block that is timed.
+SWAPPABLE_CARDIO = ("cycling",)
 # #4161 RULING (the 2026-09-24 red team, owner-approved: "drop" was its primary recommendation): NO critic adds
 # sets. The rate advocate's "+1 set" is DROPPED, not restricted — in a deficit 20 vs 12 sets/week gave identical
 # lean-mass retention (Roth 2023 SJMSS 33(1):20 doi:10.1111/sms.14237), so an added set buys nothing the evidence
@@ -57,7 +60,7 @@ def apply_changes(ir: Any, verdicts: list[dict[str, Any]], *, set_floors: Callab
     the clash is NAMED on the record (`conflict`): no critic change may produce a draft the
     subtract-only gate refuses. A load change the floor swallows whole is `applied: False`."""
     records: list[dict[str, Any]] = []
-    for v in verdicts:
+    for v in _expanded(verdicts):
         if v.get("verdict") != "change" or not v.get("field"):
             if v.get("verdict") == "change":
                 records.append(
@@ -84,6 +87,17 @@ def apply_changes(ir: Any, verdicts: list[dict[str, Any]], *, set_floors: Callab
             rec["why"] = f"{type(e).__name__}: {e}"
         records.append(rec)
     return records
+
+
+def _expanded(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each verdict, then one pseudo-verdict per `additional_changes` entry (#4387) — same critic, own record."""
+    out: list[dict[str, Any]] = []
+    for v in verdicts:
+        out.append(v)
+        extra = (v.get("additional_changes") or []) if v.get("verdict") == "change" else []
+        for a in extra:
+            out.append({"critic": v["critic"], "verdict": "change", "field": a.get("field"), "to": a.get("to"), "additional": True})
+    return out
 
 
 def _loads(ir: Any) -> list[tuple[int, list]]:
@@ -160,6 +174,15 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
     ex = exercises[idx]
     if attr == "drop":
         exercises.pop(idx)
+        return True, None
+    if attr == "movement_key":
+        if to not in SWAPPABLE_CARDIO or not any(getattr(s, "duration_seconds", None) for s in ex.sets):
+            return False, f"refused: exercises[{idx}] is not a timed cardio block, or {to!r} is not a swap target (#4387)"
+        from training.recent_aerobic import HR_CEILING_BPM
+
+        was = _label(ex)
+        ex.movement_key, ex.rationale_tag = str(to), "custom"
+        ex.notes = f"Cycling (recumbent), same duration, HR < {HR_CEILING_BPM} bpm — swapped from {was} by joints_tendons (#4387)"
         return True, None
     if attr == "weight_lbs":
         kg = float(to) / _LBS_PER_KG

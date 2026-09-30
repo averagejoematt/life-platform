@@ -88,7 +88,6 @@ def _joints_packet(run: dict, draft: dict) -> dict:
         draft,
         pain_by_idx=pain,
         days_since_by_idx=_idx_numbers(n, "days_since_movement"),
-        active_day_streak=n.get("active_day_streak"),
         loaded_lifting_streak=n.get("loaded_lifting_streak"),
         pain_layer_status=n.get("pain_layer_status"),
     )
@@ -187,9 +186,7 @@ def test_a_grounded_escalation_applies_the_flags_number_never_the_models():
 
     d = {"total_sets": 20, "exercises": []}
     fat = cf.assess(readiness_low_streak_days=2, perf_by_idx={}, soreness_by_idx={}, same_region={"state": "clear"})
-    p = c.build_joints_packet(
-        d, pain_by_idx={}, days_since_by_idx={}, active_day_streak=5, loaded_lifting_streak=5, pain_layer_status="ok", fatigue=fat
-    )
+    p = c.build_joints_packet(d, pain_by_idx={}, days_since_by_idx={}, loaded_lifting_streak=5, pain_layer_status="ok", fatigue=fat)
     for asked in (8, 40, 2):
         m = {"verdict": "veto", "metric": "fatigue_trigger", "value": True, "field": "session.total_sets", "to": asked, "sentence": "x"}
         v = c.reconcile(c.deterministic_verdict(p), m, p)
@@ -229,9 +226,7 @@ def test_a_long_loaded_streak_with_no_performance_drop_does_not_trigger():
 
     d = {"total_sets": 20, "exercises": []}
     fat = cf.assess(readiness_low_streak_days=0, perf_by_idx={0: {"state": "clear"}}, soreness_by_idx={}, same_region={"state": "clear"})
-    p = c.build_joints_packet(
-        d, pain_by_idx={}, days_since_by_idx={}, active_day_streak=6, loaded_lifting_streak=6, pain_layer_status="ok", fatigue=fat
-    )
+    p = c.build_joints_packet(d, pain_by_idx={}, days_since_by_idx={}, loaded_lifting_streak=6, pain_layer_status="ok", fatigue=fat)
     assert p["numbers"]["loaded_lifting_streak"] == 6 and p["numbers"]["fatigue_trigger"] is False
     assert c.deterministic_verdict(p)["verdict"] == "approve" and not [f for f in p["flags"] if f["severity"] == "change"]
 
@@ -365,6 +360,9 @@ def test_stage_2_holds_a_critic_cut_at_the_gate_floor_and_the_commit_gate_is_cle
     assert ir.exercises[0].sets[0].weight_kg == pytest.approx(floor["floor_kg"])
     assert g.prescription_gate(ir)["verdict"] == "clean"
     assert "CONFLICT: blueprint_historian vs the subtract-only floor" in out["critics"]["notes_preview"]
+    # #4387: the stored record carries the recent-aerobic rows the joints critic argued from (the live-proof read)
+    assert set(out["critics"]["recent_aerobic"]) == {"window", "rows", "totals", "cardio_pick"}
+    assert "weight_bearing_hr_48h" in out["critics"]["packet_numbers"]["joints_tendons"]
 
 
 # ── 4. the conditional-up detector reads negation ────────────────────────────────────
@@ -446,7 +444,6 @@ def _live_joints_packet(run: dict, draft: dict) -> dict:
         draft,
         pain_by_idx={i: {"pain_flag_any": bool(v), "pain_dates": []} for i, v in _idx_numbers(n, "pain_flag").items()},
         days_since_by_idx=_idx_numbers(n, "days_since_movement"),
-        active_day_streak=n.get("active_day_streak"),
         loaded_lifting_streak=n.get("loaded_lifting_streak"),
         pain_layer_status=n.get("pain_layer_status"),
         stale_by_idx=_stale_by_idx(n),

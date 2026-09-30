@@ -59,11 +59,10 @@ def _sixteen_active_four_loaded():
     return hevy, strava
 
 
-def _joints(active, loaded):
+def _joints(loaded):
+    """#4411: the joints packet takes the LOADED-lifting streak only — the active-day count is no input."""
     draft = {"exercises": [], "total_sets": 0}
-    return c.build_joints_packet(
-        draft, pain_by_idx={}, days_since_by_idx={}, active_day_streak=active, loaded_lifting_streak=loaded, pain_layer_status="ok"
-    )
+    return c.build_joints_packet(draft, pain_by_idx={}, days_since_by_idx={}, loaded_lifting_streak=loaded, pain_layer_status="ok")
 
 
 # ── acceptance: the fixture ────────────────────────────────────────────────────────
@@ -73,8 +72,8 @@ def test_sixteen_active_days_with_a_four_day_lifting_streak_asks_for_no_rest_day
     hevy, strava = _sixteen_active_four_loaded()
     s = ts.streaks(hevy, strava, TARGET)
     assert s["active_day_streak"] == 16 and s["loaded_lifting_streak"] == 4
-    p = _joints(s["active_day_streak"], s["loaded_lifting_streak"])
-    assert p["numbers"]["active_day_streak"] == 16 and p["numbers"]["loaded_lifting_streak"] == 4
+    p = _joints(s["loaded_lifting_streak"])
+    assert "active_day_streak" not in p["numbers"] and p["numbers"]["loaded_lifting_streak"] == 4  # #4411
     assert [f for f in p["flags"] if "streak" in f["metric"]] == []
     (v,) = [
         v
@@ -87,7 +86,7 @@ def test_sixteen_active_days_with_a_four_day_lifting_streak_asks_for_no_rest_day
 def test_a_model_cannot_manufacture_the_ask_from_the_active_streak():
     """The active streak is never flagged, so a model citing it has no handle (#3851).
     Mutation control: add an info flag on `active_day_streak` — the change is then allowed."""
-    p = _joints(16, 4)
+    p = _joints(4)
 
     def invoke(_body):
         reply = {
@@ -126,7 +125,7 @@ def test_no_loaded_streak_length_flags_since_4161():
     control: restore a streak flag in `build_joints_packet` and the 7- and 10-day cases red."""
     assert not hasattr(ts, "loaded_streak_flag") and not hasattr(ts, "REST_ASK_AT_STREAK")
     for loaded in (0, 4, 5, 6, 7, 10):
-        p = _joints(30, loaded)
+        p = _joints(loaded)
         assert p["numbers"]["loaded_lifting_streak"] == loaded
         assert [f for f in p["flags"] if "streak" in f["metric"]] == [], loaded
 
@@ -139,8 +138,8 @@ def test_the_recorded_calibration_is_internally_consistent():
 
 
 def test_unknown_streaks_are_unknown_not_zero():
-    p = _joints(None, None)
-    assert {"active_day_streak", "loaded_lifting_streak"} <= set(p["unknown"])
+    p = _joints(None)
+    assert "loaded_lifting_streak" in p["unknown"] and "active_day_streak" not in p["unknown"]
     assert ts.streaks(None, [], TARGET)["loaded_lifting_streak"] is None
 
 
@@ -181,3 +180,52 @@ def test_the_evidence_gatherer_reads_load_from_the_sanctioned_hevy_path():
         out = tp._training_streaks(TARGET)
     assert out["active_day_streak"] == 16 and out["loaded_lifting_streak"] == 4
     assert "no rest-day ask" in out["loaded_streak_role"]  # #4161: context only
+
+
+# ── #4411: the routine note's streak line is the LOADED-lifting streak ─────────────────────
+def test_fifteen_active_days_with_four_lifting_days_write_no_streak_line_into_the_note():
+    """The owner's v0.5 red-team defect 6: the draft's session block said "day 16 of a streak" off a
+    count of every day with ANY Hevy row. 15 active days (a Hevy row on each — 4 loaded lifts, then
+    Engine days — and a walk on each) carry a loaded streak of 4: no streak line, GREEN uncapped.
+    Mutation control: read `active_day_streak` in `tools_hevy_routine._gather_training_context` — 15 ≥ 5
+    and the note says "day 16"."""
+    from mcp import recovery_authoring as ra, tools_hevy_routine as thr
+
+    hevy = [_lift(_d(n)) for n in range(1, 5)] + [_engine(_d(n)) for n in range(5, 16)]
+    strava = [_walk(_d(n)) for n in range(1, 16)]
+    assert ts.streaks(hevy, strava, TARGET)["active_day_streak"] == 15  # the fixture is the defect's shape
+    raw = [{"sk": f"DATE#{h['date']}#WORKOUT#{i}", **h} for i, h in enumerate(hevy)]
+    with (
+        patch("mcp.tools_strength._read_hevy_all_phases", return_value=(raw, ["experiment"])),
+        patch("mcp.core.query_source_range", return_value=strava),
+        patch("mcp.tools_nutrition.tool_get_deficit_sustainability", return_value={}),
+    ):
+        ctx = thr._gather_training_context(TARGET)
+    assert ctx["loaded_lifting_streak"] == 4 and ctx["late_week"] is False and ctx["green_ceiling_quality"] is False
+    block = ra.render_session_block(ctx)
+    assert "streak" not in block and "in a row" not in block
+    # an unreadable Hevy record is unknown — no streak line either, never a 0-day claim
+    with (
+        patch("mcp.tools_strength._read_hevy_all_phases", side_effect=RuntimeError("ddb down")),
+        patch("mcp.tools_nutrition.tool_get_deficit_sustainability", return_value={}),
+    ):
+        unread = thr._gather_training_context(TARGET)
+    assert unread["loaded_lifting_streak"] is None and unread["reasons"] == []
+
+
+def test_no_critic_packet_and_no_note_carries_the_active_day_streak():
+    """#4411's set: `active_day_streak` is produced by `training_streaks.streaks` and read by (1) the
+    joints packet — removed, (2) plan_draft_evidence's top-level key — removed, (3) the coach session
+    packet's `streaks` record — kept, labelled `active_streak_role` (activity context, never fatigue).
+    Mutation control: pass `active_day_streak` back into `build_joints_packet` — this reds."""
+    import inspect
+
+    assert "active_day_streak" not in inspect.signature(c.build_joints_packet).parameters
+    hevy, strava = _sixteen_active_four_loaded()
+    raw = [{"sk": f"DATE#{h['date']}#WORKOUT#{i}", **h} for i, h in enumerate(hevy)]
+    with (
+        patch("mcp.tools_strength._read_hevy_all_phases", return_value=(raw, ["experiment"])),
+        patch("mcp.core.query_source_range", return_value=strava),
+    ):
+        out = tp._training_streaks(TARGET)
+    assert "NEVER a fatigue or rest signal" in out["active_streak_role"]

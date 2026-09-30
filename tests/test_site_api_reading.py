@@ -81,3 +81,19 @@ def test_overview_profile_exposes_only_wheel():
     body = _body(sar.handle_reading_overview())
     assert body["profile"] == {"wheelDistribution": {"fiction": 2}}
     assert "secret" not in json.dumps(body)
+
+
+def test_book_themes_are_served_through_the_public_theme_seam():
+    """#4392 set member: book.themes rides the same audience_guard.public_themes seam as
+    /api/coach's output trail. The live shelf's themes are already phrases (unchanged);
+    a slug-shaped tag is humanised, never served raw."""
+    bid = rs.add_book(
+        {"title": "T", "author": "A", "themes": ["identity and belonging", "hrv_and_stress"]},
+        initial_status="reading",
+        enricher=lambda m: {},
+    )
+    assert bid
+    item = _body(sar.handle_reading_shelf())["reading"][0]
+    assert item["book"]["themes"] == ["identity and belonging", "HRV and stress"], item["book"]
+    current = _body(sar.handle_reading_overview())["cockpit_line"]["current"]
+    assert current["book"]["themes"] == ["identity and belonging", "HRV and stress"]

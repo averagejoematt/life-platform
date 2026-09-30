@@ -238,7 +238,8 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     # the tripwires the engine cannot compute are named in the block, never silent (ADR-105)
     block = plan_engine.constraint_block(**_FULL)
     assert set(block["unevaluated_tripwires"]) == set(owner_redlines.unevaluated_tripwires())
-    assert any("NOT evaluated by this engine" in line and "walking_collapse" in line for line in block["honesty"])
+    # #4387: walking_collapse is evaluated (report-only) now; rate_overshoot is still named as unevaluated
+    assert any("NOT evaluated by this engine" in line and "rate_overshoot" in line for line in block["honesty"])
     rate = plan_engine.constraint_block(**_FULL)["rate_target"]
     assert rate["low_lb_wk"] == pytest.approx(1.6, abs=0.05)
     assert rate["high_lb_wk"] == pytest.approx(3.2, abs=0.05)
@@ -365,7 +366,6 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
     assert {
         "intake_floor_breached",
         "rate_overshoot",
-        "walking_collapse",
         "logging_dark",
         "volume_ceiling",
         "medical_stop_lines",
@@ -379,6 +379,8 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
         "readiness_floor",
         "pain_flag_named_site",
         "weight_stall_with_adherence",
+        "walking_collapse",  # #4387: report-only, from training.recent_aerobic
+        "walking_overshoot",  # #4387: report-only
         "self_added_volume",
     ]
     for t in owner_redlines.TRIPWIRES:

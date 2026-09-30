@@ -319,10 +319,8 @@ BASELINE = {
     # BELOW its old baseline even after the fixes landed. The pure-subset
     # ratchet allows tightening a shrunk entry.
     "lambdas/ingestion/health_auto_export_lambda.py": 1258,
-    # 2026-09-19 (#3646): 1007 -> 1002. The --check verdict block extracted to
-    # deploy/doc_drift_verdict.py; measured 1001. Net 6 handed back, 1 kept as earned
-    # headroom (N/5, #2610) — never a grant.
-    "deploy/sync_doc_metadata.py": 1002,
+    # deploy/sync_doc_metadata.py LEFT the baseline 2026-09-29 (#4271): deleting the seven CLAUDE.md
+    # sync rules took it to 966 lines, under the 1000 ceiling — the ratchet tightened, entry removed.
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
     # #3728: extracted the inventory WINDOW half (75 lines: the episodic registry,
@@ -387,12 +385,10 @@ BASELINE = {
     # /api/labs labs block (139 lines) to content/labs_scope.py took it 1116 -> 990, under
     # the 1000-line ceiling, so it is governed by the normal rule now and needs no entry.
     # #2816 had previously taken it to 1113 by extracting _dedup_activities.
-    # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
-    # import. That module exists because the compute Lambda and the daily brief had two
-    # different definitions of "last week's weight" and the compute one was wrong (it took
-    # the OLDEST reading in a 14-day window). The single line buys one shared definition —
-    # the ratchet's first real bump, and the shape it is meant to allow.
-    "lambdas/compute/daily_metrics_compute_lambda.py": 1045,
+    # lambdas/compute/daily_metrics_compute_lambda.py LEFT this registry at #4362: its private
+    # pre-#2221 habit-streak scan became a delegate to health.habit_streaks (the one the daily
+    # brief already used), 1045 -> 977, under the ceiling. (#2299 had bumped it 1369 -> 1370
+    # for one shared week-ago-weight import — the same one-definition move.)
     # RETIRED by #3537: banked at 1292 PHYSICAL lines, measures 971 LOGICAL lines —
     # under the 1000-line ceiling, so the entry is stale by the registry's own rule
     # (test_baseline_has_no_stale_entries). The ratchet tightened: this file is now

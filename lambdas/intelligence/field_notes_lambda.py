@@ -58,6 +58,7 @@ def _get_api_key():
 from common import digest_utils  # #3442: the shared day-row predicate (DAY_SK_RE)
 from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def get_iso_week(dt=None):
@@ -98,7 +99,7 @@ def genesis_week_label(iso_week):
 def _query_source(source, start_date, end_date):
     pk = f"{USER_PREFIX}{source}"
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"))
-    return _decimal_to_float(resp.get("Items", []))
+    return strava_read_seam(source, _decimal_to_float(resp.get("Items", [])))
 
 
 # #3442: converged onto the shared predicate — this module's 2026-W26 incident
@@ -123,7 +124,7 @@ def _latest_item(source):
         Limit=1,
     )
     items = _decimal_to_float(resp.get("Items", []))
-    return items[0] if items else None
+    return strava_read_seam(source, items[0] if items else None)
 
 
 def gather_week_data(start_date, end_date):

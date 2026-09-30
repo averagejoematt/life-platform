@@ -258,3 +258,12 @@ def test_every_registered_source_appears_in_the_answer():
     from ingestion.source_registry import mcp_source_ids
 
     assert set(tools_data.SOURCES) == set(mcp_source_ids())
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, tools_data, "get_sources")

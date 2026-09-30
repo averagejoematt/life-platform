@@ -4,9 +4,19 @@
 THE PROBLEM
   /wrap ran ~12 gate scripts sequentially, each a separate round-trip, and its step
   ordering sent the session back to re-edit `handovers/HANDOVER_LATEST.md` ~10 times —
-  once per gate's marker line. The whole battery is ~10s of wall clock (measured
-  2026-08-22); the cost was sequencing and attention, and the measured failure mode was
-  whole-wrap collapse: 20 missing marker lines in a 25-handover window, all in 4 wraps.
+  once per gate's marker line. The cost was sequencing and attention, and the measured
+  failure mode was whole-wrap collapse: 20 missing marker lines in a 25-handover window,
+  all in 4 wraps.
+
+WALL CLOCK (#4262 — replaces the old '~10s', which was a 12-gate battery on 2026-08-22)
+  Measured on a Session BA lane tree, 2026-09-29, n=3 each, network-bound gates live:
+    before #4262 (38 gate runs: doc leg in BOTH phases)  gather 47.3 / 57.0 / 26.6 s   verify 19.1 / 20.2 / 26.1 s
+    after  #4262 (27 gate runs: doc leg in verify only)  gather 40.0 / 44.7 / 50.8 s   verify 21.0 / 19.4 / 25.7 s
+  Both phases together: 53-77 s before, 61-77 s after — under two minutes, and NOT faster:
+  the gather wall is set by the network-bound gates (backlog-hygiene 15-51 s, ci-warnings
+  23-43 s, postflight 22-36 s, closure-dod 3-45 s), which ran in parallel with the doc leg.
+  The dedup saves 11 gate runs of CPU and noise, not wall clock. Each gate now prints its
+  own elapsed seconds and the run ends with a `WRAP-GATES-TIMING` line naming the slowest.
 
 THE SHAPE (gather → write → verify → commit)
   --gather (default)  Run every gate that does NOT read the finished handover, in
@@ -16,8 +26,9 @@ THE SHAPE (gather → write → verify → commit)
                       handover ONCE, pasting and correcting the draft.
   --verify            Run the gates that DO read the finished handover — the #3006 line
                       assertion, the residual-queue gate, the proportionality-ledger
-                      gate, and the beat validators — reporting all failures together.
-                      Must exit 0 before the wrap commit (step (f)).
+                      gate, the beat validators — plus the Docs-CI leg, ONCE, after the
+                      wrap has written the docs it judges (#4262). Must exit 0 before the
+                      wrap commit (step (f)).
 
   Every gate's own semantics are preserved: this runner invokes the same scripts the
   lettered wrap steps document, with the same bare (blocking-default) invocations, and
@@ -37,6 +48,7 @@ import argparse
 import re
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -48,7 +60,7 @@ import check_handover_lines  # noqa: E402  (same directory; the ONE marker deriv
 import check_main_green  # noqa: E402  (same directory; the ONE head-coverage state vocabulary, #3212)
 import restart_verify_gates  # noqa: E402  (deploy/; the ONE docs-ci.yml derivation, #3477/#3531)
 
-TIMEOUT = 300  # seconds per gate; the whole battery is ~10s in practice
+TIMEOUT = 300  # seconds per gate; the measured battery is in the docstring's WALL CLOCK
 
 
 class Gate:
@@ -126,6 +138,25 @@ GATHER = [
     Gate("main-green", "e2", ["python3", "scripts/check_main_green.py"], marker="Main"),
     Gate("stash", "e5", ["git", "stash", "list"], marker="Stash/hooks", ok_when=_stash_ok),
     Gate("hooks", "e5", ["python3", "deploy/session_postflight.py"], marker="Stash/hooks", ok_when=_hooks_ok),
+    # #4259: the lane reaper — the one scheduled caller `scripts/worktree_reaper.py` has. It
+    # removes every lane that is released (or lane-locked and idle 7 d), clean, and merged,
+    # and prints every dirty tree by name without touching it. Every check fails closed and
+    # the budget keeps what it did not reach, so a slow or offline run reaps LESS, never
+    # more. Red only if the reaper itself errors; a dirty tree is a report, not a failure.
+    Gate(
+        "worktree-reap",
+        "e5",
+        [
+            "python3",
+            "scripts/worktree_reaper.py",
+            "--apply",
+            "--quiet",
+            "--release-locks-older-than-days",
+            "7",
+            "--budget-seconds",
+            "240",
+        ],
+    ),
     Gate("backlog-hygiene", "e7", ["python3", "scripts/check_backlog_hygiene.py"]),
     Gate("alarm-citations", "e10", ["python3", "scripts/check_alarm_citations.py"], marker="Alarms"),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),
@@ -134,7 +165,9 @@ GATHER = [
     # is a committed sidecar the standalone sweep writes; this is the consumer that makes a
     # stale entry a wrap-time red rather than a log line nobody reads (#1990's recurrence).
     Gate("a11y-shrink-deadman", "e11", [sys.executable, "-m", "pytest", "tests/test_a11y_shrink_deadman_3546.py", "-q"]),
-    *derived_doc_gates(),  # #3531: every Docs CI python gate, derived from docs-ci.yml
+    # #4262: the derived Docs-CI leg (#3531) is NOT here any more — it runs ONCE, in VERIFY.
+    # A pre-write run judged docs the wrap was about to rewrite (the #3682 defect), so its
+    # verdict was superseded by the verify run every time; the cost was ~11 duplicate gates.
     # #3318: detector A of the closure contract over THIS session's closures (closed since
     # today 00:00 UTC — the same window (e8) lists). In the gather phase every issue closed
     # today still lacks its (e8) verdict, so `no-outcome-verdict` here IS the (e8) to-do list;
@@ -164,8 +197,8 @@ GATHER = [
 
 # ── the verify battery: gates that read the finished handover (run after writing it) ──
 #
-# #3682: Phase 1's derived doc leg (`derived_doc_gates()`, above) runs BEFORE Phase 2
-# writes docs/INCIDENT_LOG.md (e3), docs/alarm_citations.json (e10), docs/PROPORTIONALITY.md
+# #4262: this is now the doc leg's ONLY run. Before that, #3682: Phase 1's derived doc leg
+# (`derived_doc_gates()`, above) ran BEFORE Phase 2 writes docs/INCIDENT_LOG.md (e3), docs/alarm_citations.json (e10), docs/PROPORTIONALITY.md
 # (e12), docs/** pages (e), and CLAUDE.md/handovers/HANDOVER_LATEST.md (a). A wrap that
 # only gathers can therefore pass its own battery over a derived block Phase 2 is about to
 # stale, and the very next push to main pays for it (PR #3680: the Incident-log Patterns
@@ -194,11 +227,15 @@ VERIFY = [
         "c",
         [sys.executable, "-m", "pytest", "tests/test_operating_knowledge_ledger_2848.py", "-q"],
     ),
-    *derived_doc_gates(),  # #3682: the same Phase-1 derivation, re-run AFTER Phase 2 writes
+    *derived_doc_gates(),  # #3531/#3682/#4262: the Docs-CI leg, derived, run ONCE — after Phase 2 writes
 ]
 
 
+_ELAPSED: dict = {}  # gate name -> seconds, for the per-gate timing line (#4262 box 4)
+
+
 def run_gate(gate: Gate):
+    t0 = time.monotonic()
     try:
         p = subprocess.run(gate.cmd, cwd=ROOT, capture_output=True, text=True, timeout=TIMEOUT)
         out = (p.stdout or "") + (p.stderr or "")
@@ -206,6 +243,8 @@ def run_gate(gate: Gate):
         return gate, ok, p.returncode, out
     except (OSError, subprocess.SubprocessError) as e:
         return gate, False, None, f"(runner) could not execute {' '.join(gate.cmd)}: {e}"
+    finally:
+        _ELAPSED[gate.name] = time.monotonic() - t0
 
 
 # #3212: check_main_green.py ends with one machine-readable line naming the state it
@@ -328,13 +367,15 @@ def main(argv=None) -> int:
             print(f"verify  ({g.step})  {g.name}: {' '.join(g.cmd)}")
         return 0
 
+    t0 = time.monotonic()
     with ThreadPoolExecutor(max_workers=len(battery)) as pool:
         results = list(pool.map(run_gate, battery))
+    wall = time.monotonic() - t0
 
     failures = []
     for gate, ok, rc, out in results:
         verdict = "PASS" if ok else "FAIL"
-        print(f"── [{verdict}] {gate.name} (step ({gate.step}), exit {rc}) ──")
+        print(f"── [{verdict}] {gate.name} (step ({gate.step}), exit {rc}, {_ELAPSED.get(gate.name, 0.0):.1f}s) ──")
         body = out.strip()
         if body:
             print(body)
@@ -349,6 +390,8 @@ def main(argv=None) -> int:
             print(line)
         print()
 
+    slowest = max(results, key=lambda r: _ELAPSED.get(r[0].name, 0.0))[0].name if results else "-"
+    print(f"WRAP-GATES-TIMING phase={phase} gates={len(results)} wall={wall:.1f}s slowest={slowest}")
     if failures:
         print(f"{phase.upper()} FAIL — {len(failures)} gate(s) red: " + ", ".join(f"{g.name} (step ({g.step}))" for g in failures))
         print("Each step in .claude/skills/wrap/SKILL.md documents its own remediation; fix and re-run this batch.")

@@ -102,7 +102,6 @@ claim had drifted to a fraction of reality. These are the ones you'll actually r
 | `lib/safe_sync.sh` | S3 sync wrapper that can never `--delete` the bucket root |
 | `maintenance_mode.sh enable\|disable\|status` | Pause non-essential Lambdas |
 | `pitr_restore_drill.sh` | Quarterly DynamoDB PITR restore drill |
-| `archive_onetime_scripts.sh` | Move completed one-time scripts to `archive/` |
 
 CloudWatch alarms and dashboards are **CDK-owned** (`cdk/stacks/monitoring_stack.py` and
 per-stack alarms) — the old `create_*_alarm.sh` / `create_operational_dashboard.sh`
@@ -170,16 +169,19 @@ the `idna` / `urllib3` advisories sitting inside the deployed layer.
 The `archive/` directory holds one-time scripts that have been run and are no longer
 needed. Do not delete them — they serve as a record of what was done and when.
 
-```bash
-bash deploy/archive_onetime_scripts.sh
-```
+There is no fixed-cadence mover. `archive_onetime_scripts.sh` (hardcoded batches,
+last run 2026-03) is itself archived at `deploy/archive/onetime/archive_onetime_scripts.sh`
+— its method missed ~40 one-off scripts that accrued after it stopped running (#4258).
+Sweep for candidates ad hoc with a zero-reference grep per file (basename AND path,
+excluding `archive/` and `docs/reviews/`) before moving anything; see
+`deploy/archive/onetime/README.md` for the dated index this produces.
 
 ---
 
 ## Lambda inventory
 
-`deploy/MANIFEST.md` is **deprecated** (superseded 2026) — do not use it as a source of
-truth. The live inventory is:
+`deploy/archive/onetime/MANIFEST.md` is **deprecated** (superseded 2026, archived #4258)
+— do not use it as a source of truth. The live inventory is:
 
 - `docs/ARCHITECTURE.md` — the system-level Lambda inventory (counts auto-synced by `sync_doc_metadata.py`)
 - `ci/lambda_map.json` — source-file → function mapping (+ per-Lambda region overrides) used by the deploy scripts

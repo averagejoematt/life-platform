@@ -74,7 +74,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any
 
-from training import program_conflicts, program_v03
+from training import in_block_variant, program_conflicts, program_v03
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 
 ACTIVE = True
@@ -722,8 +722,11 @@ def session_prescription_for_role(
     catalog_movements: dict[str, Any] | None = None,
     skill_ceiling: int = 2,
     anchor_exempt: bool = True,
+    in_block: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The session for one v0.4 role, as data: exposures, sets (top / back_off / working), reps.
+
+    `in_block` (#4409): `in_block_variant.performed_in_block` — a slot keeps its in-block variant.
 
     Pure. `catalog_movements` (the movement catalog's `movements` dict) resolves each
     pattern to the first member the generator may prescribe; without it the movements are
@@ -744,6 +747,8 @@ def session_prescription_for_role(
         if intensity == "moderate":
             # #4147: a pattern may name members allowed ONLY at moderate (the RDL as the moderate hinge)
             keys = list(ANCHORS[pattern].get("moderate_catalog_keys") or []) + keys
+        pref = in_block_variant.prefer(in_block, role, pattern, intensity, keys, ANCHORS[pattern].get("moderate_catalog_keys"))
+        keys = pref["keys"] if pref else keys
         key, why = _resolve_movement(
             keys,
             catalog_movements,
@@ -772,6 +777,7 @@ def session_prescription_for_role(
                 "sets": sets,
                 "rest_seconds": spec["rest_seconds"],
                 "cue": spec["cue"],
+                **in_block_variant.exposure_fields(pref, key),
             }
         )
     acc = EXPOSURES["accessory"]
@@ -793,6 +799,7 @@ def session_prescription_for_role(
                 "cue": acc["cue"],
             }
         )
+    in_block_variant.stamp_template_ids(exposures, catalog_movements, in_block)  # #4431: the one slot-template resolver
     deload_info = None
     if deload:
         deload_info = _deload_trim(exposures, int(_deload_cfg()["sets_pct"]))
@@ -837,8 +844,9 @@ def planned_session(
     out: dict[str, Any] = {"date": day, "program_version": PROGRAM_VERSION, **entry}
     role = entry.get("session_role")
     if role in SESSION_TEMPLATES:
+        ib = in_block_variant.performed_in_block(block_workouts, catalog_movements, day)  # #4409
         out["prescription"] = session_prescription_for_role(
-            role, deload=bool(entry.get("deload")), catalog_movements=catalog_movements, skill_ceiling=skill_ceiling
+            role, deload=bool(entry.get("deload")), catalog_movements=catalog_movements, skill_ceiling=skill_ceiling, in_block=ib
         )
     return out
 

@@ -14,11 +14,11 @@ gets a contract test at birth* — and the peer of #2844, which is the fleet-wid
 form of standing rule 1. Same three mechanics, different derivation:
 
     #2844   derivation = AST sweep for hand-typed registry vocabulary
-            ledger     = tests/conformance_residue.py (dated, shrink-only)
+            ledger     = ledgers/conformance_residue.py (dated, shrink-only)
             verdict    = a NEW hand-typed enumeration reds
 
     this    derivation = the #2845 model's edge plane -> must-agree seams
-            ledger     = tests/pair_seam_residue.py (dated, shrink-only)
+            ledger     = ledgers/pair_seam_residue.py (dated, shrink-only)
             verdict    = a NEW must-agree seam with no contract reds
 
 WHY A SEAM AND NOT A PAIR
@@ -39,7 +39,7 @@ enforcement of box 4 rather than a bystander gate.
 
 THE BASELINE IS A PIN, NOT A DEBT CLAIM
 ---------------------------------------
-``tests/pair_seam_residue.py`` grandfathers the seams that existed on 2026-08-25.
+``ledgers/pair_seam_residue.py`` grandfathers the seams that existed on 2026-08-25.
 It is deliberately NOT framed as debt: contracting all 286 of them is neither the
 goal nor proportionate (ADR-103/144). The instrument's whole job is that the 287th
 is a **decision** — enroll it, or write one dated line saying why the two sides

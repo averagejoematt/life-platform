@@ -292,9 +292,11 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     squat = ideal.exercises[0]
     assert squat.movement_key == "squat_barbell"
     top = squat.sets[0].weight_kg
-    # week 1 of the entry ramp (load_ramp, unchanged by #4147) — 60 % of the in-band anchor, no
-    # discount (09-20 is inside the 28 d detraining age)
-    assert top == 54.5  # ceil-to-0.5 kg of 200 lb x 0.60 = 54.43 kg
+    # week 1 of the entry ramp would be 60 % of the band e1RM (#4388): 200 lb x (1 + 8/30) x 0.60 -> 150 lb.
+    # #4408: 200 lb x 8 five days earlier, at this band, this cycle, no layoff, clears the 4–6 top set's rep
+    # floor — nothing to re-enter from, so the achieved load is HELD and the ramp never goes under it
+    assert top == pytest.approx(200 * 0.45359237)
+    assert ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]["ramp"]["hold"]["applies"] is True
     assert [s.weight_kg for s in squat.sets[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     assert "HEAVY: 1 top set of 4–6 @ RPE 7–8" in squat.notes
@@ -425,3 +427,190 @@ def test_plan_next_session_through_the_mcp_handler_serves_lower_heavy_first():
     ]
     assert rx["total_sets"] == 12
     assert out["constraint_block"]["program"]["program_version"] == "0.4"
+
+
+# ── 5. #4409: within a block a slot keeps the variant he performed in it ────────
+# The block-1 Hevy record as it sits in DynamoDB (the raw per-workout rows `load_block_workouts`
+# returns, read-only 2026-09-28): 09-24 lower-heavy (squat, RDL), 09-25 upper-volume (barbell bench,
+# DB row 90 lb x 8, DB shoulder press 52.5 lb x 10, pulldown), 09-26 a Flex complement, 09-28
+# lower-volume (trap bar, squat). The 09-23 row is pre-block. Next in order on 09-29: upper-heavy.
+def _wire_rows() -> list[dict]:
+    from decimal import Decimal
+
+    path = REPO / "tests" / "fixtures" / "training_block1_wire_4408_4409" / "hevy_rows.json"
+    return json.loads(path.read_text(), parse_float=Decimal, parse_int=Decimal)["items"]
+
+
+def _performed(day="2026-09-29"):
+    from training import in_block_variant
+
+    return in_block_variant.performed_in_block(_wire_rows(), CATALOG["movements"], day)
+
+
+def test_4409_the_0929_upper_heavy_keeps_the_in_block_db_row_and_db_press():
+    """The reported swap: the 09-29 pre-draft served `machine_row` (last done May 2025) and
+    `machine_shoulder_press` (2023) although the block's own sessions rowed and pressed the DB
+    versions. The planner's session (the seam the nightly pre-draft and stage 1 read) keeps them."""
+    out = program_structure.planned_session("2026-09-29", block_workouts=_wire_rows(), catalog_movements=CATALOG["movements"])
+    assert out["session_role"] == UH and out["week"] == 1
+    ex = {e["pattern"]: e for e in out["prescription"]["exposures"] if e["kind"] == "anchor"}
+    assert ex["row"]["movement_key"] == "one_arm_db_row"
+    assert ex["overhead_press"]["movement_key"] == "db_shoulder_press"
+    for pattern in ("row", "overhead_press"):
+        ib = ex[pattern]["in_block"]
+        assert ib["kept"] is True and ib["date"] == "2026-09-25" and ib["role"] == UV and ib["basis"] == "same_pattern"
+    # the title-only catalog entry (ADR-069) takes its template id from the performed WIRE record
+    assert ex["overhead_press"]["template_id"] == "878CD1D0" and not CATALOG["movements"]["db_shoulder_press"].get("hevy_template_id_hint")
+    # slots whose in-block variant IS the catalog default are unchanged
+    assert ex["bench"]["movement_key"] == "barbell_bench_press" and ex["vertical_pull"]["movement_key"] == "lat_pulldown"
+
+
+def test_4409_mutation_control_without_the_block_record_the_catalog_default_swaps_them_back():
+    """What the 09-29 draft did: the resolver without the in-block record picks the first listed
+    key — the machines with years-old anchors. So the assertion above reds without the fix."""
+    ex = {e["pattern"]: e["movement_key"] for e in _rx(UH)["exposures"] if e["kind"] == "anchor"}
+    assert ex["row"] == "machine_row" and ex["overhead_press"] == "machine_shoulder_press"
+    assert "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+
+
+def test_4409_the_same_role_slot_wins_over_the_pattern_most_recently_performed():
+    """Rule 1 before rule 2: lower-heavy's moderate hinge stays the RDL it was on 09-24 although
+    the trap bar was pulled more recently (09-28, lower-volume) — and lower-volume keeps the trap
+    bar. A heavy pull never takes the owner's RDL-as-moderate-hinge slot (#4147)."""
+    perf = _performed()
+    lh = {e["pattern"]: e for e in _rx(LH, in_block=perf)["exposures"] if e["kind"] == "anchor"}
+    assert lh["hinge"]["movement_key"] == "romanian_deadlift_barbell" and lh["hinge"]["in_block"]["basis"] == "same_role"
+    lv = {e["pattern"]: e for e in _rx(LV, in_block=perf)["exposures"] if e["kind"] == "anchor"}
+    assert lv["hinge"]["movement_key"] == "deadlift_trap_bar" and lv["hinge"]["in_block"]["role"] == LV
+
+
+def test_4409_a_variant_change_inside_the_block_is_only_the_listed_swap_and_says_so():
+    """Block lock: when the in-block variant is unreachable for THIS session (the Minimum Viable
+    Session's tier-1 ceiling, no anchor exemption) the slot takes the pattern's next LISTED key and
+    the exposure records the change — never a silent swap, never a key outside the pattern."""
+    rx = _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)
+    row = next(e for e in rx["exposures"] if e["pattern"] == "row")
+    assert row["movement_key"] == "machine_row" and row["movement_key"] in program_structure.ANCHORS["row"]["catalog_keys"]
+    assert row["in_block"]["performed"] == "one_arm_db_row" and row["in_block"]["kept"] is False
+    assert "skill_tier 2 > ceiling 1" in row["resolution_note"]
+    # no in-block performance at all -> the catalog order, unchanged
+    assert _rx(UH, in_block=[]) == _rx(UH)
+
+
+def test_4409_the_generator_draft_keeps_the_db_row_and_press_with_a_current_load():
+    """End to end through `generate_routines` on the wire record: the 09-29 upper-heavy draft
+    carries the DB row at 90 lb (the 09-25 load, held by #4408 at the 4–6 top set's rep floor) and
+    the DB press at 52.5 lb (09-25, 10 reps >= the 6–10 floor) — loaded through the performed
+    record's template id, where the catalog entry carries none."""
+    from training import exercise_history
+
+    class _Table:
+        def query(self, **_kw):
+            return {"Items": _wire_rows()}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        history, _cardio = exercise_history.load_history_indexes(lookback_days=30, today=__import__("datetime").date(2026, 9, 28))
+    weights = {"2026-09-23": 315.4, "2026-09-24": 313.7, "2026-09-25": 313.1, "2026-09-28": 313.7}
+    with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
+        ideal = routine_generator.generate_routines(
+            routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=_wire_rows())
+        )[0]
+    assert ideal.title.startswith("UPPER-HEAVY — W1")
+    blocks = {b.movement_key: b for b in ideal.exercises}
+    assert "machine_row" not in blocks and "machine_shoulder_press" not in blocks
+    lb = 0.45359237
+    assert blocks["one_arm_db_row"].sets[0].weight_kg == pytest.approx(90 * lb, abs=0.01)
+    assert blocks["db_shoulder_press"].sets[0].weight_kg == pytest.approx(52.5 * lb, abs=0.01)
+    floors = ideal.inputs_snapshot["load_floors"]["movements"]
+    assert floors["db_shoulder_press"]["template_id"] == "878CD1D0" and floors["db_shoulder_press"]["fallback"] is None
+    # the snapshot's catalog hash is the catalog's own — the wire id is an overlay, not an edit
+    assert ideal.inputs_snapshot["catalog_hash"] == routine_generator._config_hash(CATALOG)
+
+
+# ── 6. #4431: generator, planner and chat gate resolve a slot's template through ONE resolver ──
+# Before #4431 the chat commit gate read the catalog hint only, so `db_shoulder_press` (title-only on
+# purpose, ADR-069) — which the generator floors from its in-block performed record since #4409 —
+# reached the gate as `no_template_id`: no floor, nothing refused, two numbers for one set.
+def _wire_history_4431():
+    import datetime
+
+    from training import exercise_history
+
+    class _Table:
+        def query(self, **_kw):
+            return {"Items": _wire_rows()}
+
+    with patch.object(exercise_history, "_table", return_value=_Table()):
+        history, _cardio = exercise_history.load_history_indexes(lookback_days=30, today=datetime.date(2026, 9, 28))
+    return history, {"2026-09-23": 315.4, "2026-09-24": 313.7, "2026-09-25": 313.1, "2026-09-28": 313.7}
+
+
+def _three_resolutions_4431(day="2026-09-29"):
+    """{role: {movement_key: (generator, planner, gate)}} for every movement of every week-1 session
+    on the wire record — each path read exactly where it loads from."""
+    from training import in_block_variant
+
+    from mcp import hevy_prescription_gate as gate
+
+    movements = CATALOG["movements"]
+    perf = _performed(day)
+    with patch("mcp.plan_hevy_windows._block_workouts", return_value=_wire_rows()):
+        gate_perf, status = gate._in_block_performed(day, movements)
+    assert status["status"] == "read" and gate_perf == perf
+    out: dict[str, dict[str, tuple]] = {}
+    for role in program_structure.SESSION_SEQUENCE["session_roles"]:
+        rx = _rx(role, in_block=perf)
+        load_movements = in_block_variant.with_performed_template_ids(CATALOG, rx, perf)["movements"]  # the generator's floor pass
+        out[role] = {}
+        for e in rx["exposures"]:
+            key = e["movement_key"]
+            if not key:
+                continue
+            generator = (load_movements.get(key) or {}).get("hevy_template_id_hint")
+            planner = (movements.get(key) or {}).get("hevy_template_id_hint") or e.get("template_id")  # annotate_prescription's order
+            out[role][key] = (generator, planner, gate._template_id_for(key, movements, gate_perf)[0])
+    return out
+
+
+def test_4431_generator_planner_and_gate_resolve_every_week1_movement_identically():
+    res = _three_resolutions_4431()
+    disagree = {f"{role}/{k}": v for role, rows in res.items() for k, v in rows.items() if len(set(v)) != 1}
+    assert not disagree, f"the three paths disagree on a slot's template: {disagree}"
+    assert sum(len(r) for r in res.values()) >= 16  # the whole week, not a sample
+    assert res[UH]["db_shoulder_press"] == ("878CD1D0",) * 3
+
+
+def test_4431_db_shoulder_press_generator_floor_equals_gate_floor_and_the_mutation_reds():
+    """The chat gate derives the same floor the generator wrote for the in-block DB press — and the
+    pre-#4431 catalog-only resolver (the mutation) leaves the gate with `no_template_id`."""
+    import types
+
+    from mcp import hevy_prescription_gate as gate
+
+    history, weights = _wire_history_4431()
+    rows = _wire_rows()
+    with patch.object(routine_generator, "_load_note_indexes", return_value=(history, weights, {}, {})):
+        ideal = routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date="2026-09-29", block_workouts=rows))[0]
+    gen = ideal.inputs_snapshot["load_floors"]["movements"]["db_shoulder_press"]
+    assert gen["floor_kg"] and gen["template_id"] == "878CD1D0"
+    custom = types.SimpleNamespace(
+        variant="ideal", target_date="2026-09-29", notes="", inputs_snapshot={"authored": "custom"}, exercises=ideal.exercises
+    )
+
+    def _gate_row():
+        with patch("mcp.plan_hevy_windows._block_workouts", return_value=rows):
+            g = gate.prescription_gate(custom, movements=CATALOG["movements"], history_index=history, weight_index=weights)
+        return g, g["load_floors"]["movements"]["db_shoulder_press"]
+
+    g, row = _gate_row()
+    assert g["verdict"] == "clean", g["audit"]
+    assert row["floor_kg"] == gen["floor_kg"] and row["template_id"] == gen["template_id"]
+    assert row["template_id_source"].startswith("in-block performed record 2026-09-25")
+    # mutation control: the gate's pre-#4431 resolver (catalog hint only) — no template id, no floor
+    catalog_only = lambda key, movements, performed=None: (  # noqa: E731
+        ((movements or {}).get(key) or {}).get("hevy_template_id_hint"),
+        "catalog_hint",
+    )
+    with patch.object(gate, "_template_id_for", side_effect=catalog_only):
+        _g, mutated = _gate_row()
+    assert mutated["status"] == "no_template_id" and not mutated["floor_kg"]

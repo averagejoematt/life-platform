@@ -24,10 +24,11 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import boto3
-from ai import google_tts
+from ai import google_tts, model_defaults  # #4275: model_defaults.NARRATIVE_MODEL is the one Sonnet default
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
+from common import media_tombstone  # #4365: a restart tombstone is not a published episode
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
@@ -160,14 +161,12 @@ def _elena_host_state() -> str:
     writes — her editorial stance (receipts-gated) + a couple of open threads
     she may call back to on-air. Volatile → user turn. Fail-soft ""."""
     try:
-        from boto3.dynamodb.conditions import Key as _Key
-
         bits = []
         st = table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {}
         if st.get("headline_stance") and not st.get("grounding_flag"):
             bits.append(f"Elena's current editorial read (her own, persistent): {str(st['headline_stance'])[:300]}")
         resp = table.query(
-            KeyConditionExpression=_Key("pk").eq("PERSONA#elena") & _Key("sk").begins_with("THREAD#"),
+            KeyConditionExpression=Key("pk").eq("PERSONA#elena") & Key("sk").begins_with("THREAD#"),
             ScanIndexForward=False,
             Limit=20,
         )
@@ -340,18 +339,10 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     return {"url": f"/panelcast/wk{week}.{ext}", "bytes": len(body), "duration_sec": duration}
 
 
-def _episode_exists(week) -> bool:
-    # The weekly publisher writes wk{n}.mp3 (compressed since #1018; .wav before
-    # that, and still the fail-open fallback). Check every extension ever
-    # published so "already published" is never a false negative that
-    # re-synthesizes a week (the .mp3-only check silently missed every .wav episode).
-    for ext in ("mp3", "wav", "m4a"):
-        try:
-            s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}")
-            return True
-        except Exception:
-            continue
-    return False
+# Key of week's real episode audio (every extension ever published), or None. #4365: a restart
+# tombstone on the key is NOT an episode — see common/media_tombstone.py.
+def _episode_exists(week) -> str | None:
+    return media_tombstone.first_published(s3, S3_BUCKET, [f"{PREFIX}/wk{week}.{ext}" for ext in ("mp3", "wav", "m4a")], logger)
 
 
 def _xml(s: str) -> str:
@@ -546,7 +537,7 @@ _INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
 # two speakers to Gemini prebuilt voices; Elena = host (breezy), Eli = guest (informative).
 # Episode 0 is the flagship trailer — use Sonnet (follows the multi-step arc + hard
 # requirements far better than Haiku, which kept dropping Elena's self-intro).
-INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", "claude-sonnet-4-6")
+INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", model_defaults.NARRATIVE_MODEL)
 INTRO_GEMINI_VOICES = {"Elena": "Aoede", "Eli": "Charon"}
 INTRO_STYLE = (
     "Perform this as a real, warm two-person podcast — NOT a formal reading. Two people who like each other, "
@@ -1288,12 +1279,13 @@ HOLD_MAX_RETRIES = int(os.environ.get("PANELCAST_HOLD_MAX_RETRIES", "3"))  # bou
 
 
 def _read_hold(week) -> dict:
-    """The hold record for a week, or {} if none."""
+    """The hold record for a week, or {} if none. #4365: an UNREADABLE hold is logged, not passed off as none."""
     try:
-        raw = s3.get_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json")["Body"].read()
-        d = json.loads(raw)
+        d = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json")["Body"].read())
         return d if isinstance(d, dict) else {}
-    except Exception:
+    except Exception as e:
+        if getattr(e, "response", {}).get("Error", {}).get("Code") not in ("NoSuchKey", "404"):
+            logger.warning("[panel] hold read wk%s FAILED — %s; the sweep cannot see this week's hold", week, e)
         return {}
 
 
@@ -1347,6 +1339,7 @@ def _sweep_held_episodes(dry_run: bool = False) -> dict:
     week = post.get("week")
     hold = _read_hold(week)
     if not hold:
+        logger.info("[panel] hold sweep wk%s: no hold on the current week — nothing to retry", week)
         return {"swept": [], "note": f"no hold for current week {week}"}
 
     hold_class = hold.get("hold_class", "safety")
@@ -1556,7 +1549,11 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     post = _select_week_post()
     week = post["week"]
-    if not force and not dry_run and _episode_exists(week):
+    published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
+    if published_key:
+        logger.info("[panel] wk%s already published — %s matched; skipping (outcome=already-published)", week, published_key)
+        if dry_run:
+            return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
         _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
 

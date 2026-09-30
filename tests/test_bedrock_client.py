@@ -26,6 +26,7 @@ Run:  python3 -m pytest tests/test_bedrock_client.py -v
 import importlib
 import json
 import os
+import re
 import sys
 import types
 from unittest.mock import MagicMock
@@ -501,3 +502,161 @@ def test_invoke_with_retry_does_not_retry_a_non_retryable_code(monkeypatch, _rec
     with pytest.raises(bce.ClientError):
         bc.invoke_with_retry({"messages": []}, model_name="claude-sonnet-4-6")
     assert calls["n"] == 1 and _recorded_sleep == []
+
+
+# ── #4275 box 4: ONE Sonnet default ─────────────────────────────────────────────────────
+_SONNET_LITERAL_RE = re.compile(r"(?:us\.|global\.)?(?:anthropic\.)?claude-sonnet-[\w.:-]+")
+# The resolution map (names → profile ids) is the one place model names MUST be spelled out.
+_SONNET_LITERAL_HOMES = {"lambdas/ai/bedrock_client.py", "lambdas/ai/model_defaults.py"}
+
+
+def _sonnet_literals_outside_the_homes(root):
+    import ast
+    import pathlib
+
+    root = pathlib.Path(root)
+    found = []
+    for p in sorted([*root.glob("lambdas/**/*.py"), *root.glob("mcp/**/*.py")]):
+        rel = p.relative_to(root).as_posix()
+        if rel in _SONNET_LITERAL_HOMES:
+            continue
+        for node in ast.walk(ast.parse(p.read_text())):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and _SONNET_LITERAL_RE.fullmatch(node.value):
+                found.append(f"{rel}:{node.lineno} {node.value}")
+    return found
+
+
+def test_no_module_carries_a_sonnet_default_outside_the_one_constant():
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    assert _sonnet_literals_outside_the_homes(root) == []
+
+
+def test_the_one_constant_is_a_mapped_name_and_its_value_is_unchanged():
+    from ai.model_defaults import NARRATIVE_MODEL
+
+    assert NARRATIVE_MODEL == "claude-sonnet-4-6"  # moving it is #4278 (gate:owner), not #4275
+    assert bc.resolve_model_id(NARRATIVE_MODEL) == "us.anthropic.claude-sonnet-4-6"
+
+
+def test_mutation_control_a_planted_default_literal_is_found(tmp_path):
+    (tmp_path / "lambdas" / "emails").mkdir(parents=True)
+    (tmp_path / "lambdas" / "emails" / "x.py").write_text('import os\nM = os.environ.get("AI_MODEL", "claude-sonnet-4-6")\n')
+    assert _sonnet_literals_outside_the_homes(tmp_path) == ["lambdas/emails/x.py:2 claude-sonnet-4-6"]
+
+
+# ── #4276 box 2: raw model text is parsed in ONE place ─────────────────────────────────
+# `ai/structured_json.py` (schema-constrained, with the fence-tolerant fallback) and
+# `ai/bedrock_client.py` are the only modules that may `json.loads` text taken from a
+# response's `["content"][…]["text"]`. Each hand parse elsewhere is a separate fence-stripper
+# that turns a truncated or malformed reply into a silent `None`/crash instead of a typed error.
+#
+# KNOWN GAP (stated, not hidden): the detector follows the text only WITHIN one function, from
+# the `["content"]…["text"]` subscript through local assignments. Model text that arrives as a
+# helper's RETURN VALUE (ai_calls' IC-3 pass, the enrichment and reading modules,
+# remediation/agent.py) is not seen.
+_JSON_PARSE_HOMES = {"lambdas/ai/structured_json.py", "lambdas/ai/bedrock_client.py"}
+# path::function -> (hand parses in it, why it has not migrated yet). The ledger may only shrink.
+JSON_HAND_PARSE_LEDGER = {
+    "lambdas/compute/daily_insight_compute_lambda.py::_evaluate_intentions_haiku": (
+        1,
+        "2026-09-29 (#4276): fence-strip + json.loads on the intention-evaluation verdict; migrate to structured_json.call_json with a schema",
+    ),
+    "lambdas/compute/hypothesis_engine_lambda.py::generate_hypotheses": (
+        1,
+        "2026-09-29 (#4276): parses after the AI-3 validator; migrate with a hypotheses schema beside the prompt",
+    ),
+    "lambdas/emails/elena_state_updater.py::_call_haiku": (
+        2,
+        "2026-09-29 (#4276): json.loads then a fence-strip retry on the Elena state reply; migrate to structured_json.parse_json_text / call_json",
+    ),
+    "lambdas/intelligence/challenge_generator_lambda.py::generate_challenges": (
+        1,
+        "2026-09-29 (#4276): parses after the AI-3 validator; migrate with a challenges schema",
+    ),
+}
+
+
+def _model_text_json_loads(root):
+    """{path::function: n} for every json.loads whose argument derives from ["content"]…["text"]."""
+    import ast
+    from collections import Counter
+
+    def _is_source(node):
+        for n in ast.walk(node):
+            if isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Constant) and n.slice.value == "text":
+                for m in ast.walk(n.value):
+                    if isinstance(m, ast.Subscript) and isinstance(m.slice, ast.Constant) and m.slice.value == "content":
+                        return True
+        return False
+
+    def _names(node):
+        return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+
+    hits: Counter = Counter()
+    from pathlib import Path as _P
+
+    for path in sorted(str(x) for x in _P(root, "lambdas").rglob("*.py")):
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
+        if rel in _JSON_PARSE_HOMES:
+            continue
+        with open(path, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        for fn in ast.walk(tree):
+            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            tainted: set = set()
+            for _ in range(4):  # a fixed point over the function's own assignments
+                for n in ast.walk(fn):
+                    if isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and n.value is not None:
+                        if _is_source(n.value) or _names(n.value) & tainted:
+                            for t in n.targets if isinstance(n, ast.Assign) else [n.target]:
+                                tainted |= _names(t)
+            for n in ast.walk(fn):
+                if not (isinstance(n, ast.Call) and n.args):
+                    continue
+                f = n.func
+                is_loads = (isinstance(f, ast.Attribute) and f.attr == "loads" and getattr(f.value, "id", "") == "json") or getattr(
+                    f, "id", ""
+                ) == "loads"
+                if is_loads and (_is_source(n.args[0]) or _names(n.args[0]) & tainted):
+                    hits[f"{rel}::{fn.name}"] += 1
+    return dict(hits)
+
+
+def test_no_module_hand_parses_raw_model_text_outside_structured_json():
+    import re as _re
+
+    live = _model_text_json_loads(_REPO_ROOT_4276)
+    grew = sorted(k for k, n in live.items() if n > JSON_HAND_PARSE_LEDGER.get(k, (0, ""))[0])
+    assert not grew, (
+        "json.loads on raw model text outside ai/structured_json.py — route it through structured_json.call_json "
+        "(schema) or parse_json_text (#4276):\n  " + "\n  ".join(f"{k} ({live[k]} site(s))" for k in grew)
+    )
+    stale = sorted(k for k, (n, _why) in JSON_HAND_PARSE_LEDGER.items() if live.get(k, 0) < n)
+    assert not stale, f"these ledger lines count hand parses that are gone — lower or delete them: {stale}"
+    for key, (_n, why) in JSON_HAND_PARSE_LEDGER.items():
+        assert _re.match(r"^\d{4}-\d{2}-\d{2} \(#\d+\): .{20,}$", why), key
+
+
+def test_MUTATION_a_planted_fence_parse_in_a_scratch_module_reds(tmp_path):
+    scratch = tmp_path / "lambdas" / "scratch"
+    scratch.mkdir(parents=True)
+    (scratch / "planted.py").write_text(
+        "import json\n\n\ndef _call(resp):\n"
+        "    raw = resp['content'][0]['text'].strip()\n"
+        "    if raw.startswith('```'):\n        raw = raw.split('\\n', 1)[1]\n"
+        "    return json.loads(raw)\n",
+        encoding="utf-8",
+    )
+    assert _model_text_json_loads(str(tmp_path)) == {"lambdas/scratch/planted.py::_call": 1}
+    # A parse through the one home is not a finding.
+    (scratch / "planted.py").write_text(
+        "from ai import structured_json\n\n\ndef _call(resp):\n    return structured_json.parse_json_text(resp['content'][0]['text'])\n",
+        encoding="utf-8",
+    )
+    assert _model_text_json_loads(str(tmp_path)) == {}
+
+
+_REPO_ROOT_4276 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

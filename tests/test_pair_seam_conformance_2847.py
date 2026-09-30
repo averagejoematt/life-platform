@@ -61,7 +61,7 @@ import sys
 import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (os.path.join(_REPO, "tests"), os.path.join(_REPO, "lambdas")):
+for _p in (os.path.join(_REPO, "tests"), os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "ledgers")):  # ledgers/: #4270 slice 2
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -76,7 +76,7 @@ _BASELINE_CEILING = 286  # the seed census — the frozen baseline may only shri
 _FIX = (
     "Enroll the pair in tests/pair_contract_registry.py (one register(PairContract(...)) call,\n"
     "two-sided mutation proof — see tests/pair_contract.py), or add the seam key to\n"
-    "PAIR_SEAM_DECISIONS in tests/pair_seam_residue.py with the date and the VERIFIED\n"
+    "PAIR_SEAM_DECISIONS in ledgers/pair_seam_residue.py with the date and the VERIFIED\n"
     "reason the two sides cannot disagree about the shape."
 )
 
@@ -114,7 +114,7 @@ def test_ledger_has_no_dead_entries():
     findings = lib.sweep()
     dead = sorted((set(PAIR_SEAM_RESIDUE) | set(PAIR_SEAM_DECISIONS)) - set(findings))
     assert not dead, (
-        "tests/pair_seam_residue.py pins seam(s) the sweep no longer finds — delete them "
+        "ledgers/pair_seam_residue.py pins seam(s) the sweep no longer finds — delete them "
         "(the ratchet counts down; a contracted seam's row comes OUT):\n  " + "\n  ".join(dead)
     )
 
@@ -133,7 +133,7 @@ def test_the_ledger_itself_is_well_formed():
     unreachable assertion asserted inline is a check nobody has seen run.
     """
     defects = lib.ledger_defects(PAIR_SEAM_RESIDUE, PAIR_SEAM_DECISIONS, SEED_DATE, _REASON_FLOOR, _BASELINE_CEILING)
-    assert not defects, "tests/pair_seam_residue.py is malformed:\n  " + "\n  ".join(defects)
+    assert not defects, "ledgers/pair_seam_residue.py is malformed:\n  " + "\n  ".join(defects)
 
 
 def test_enrolling_a_contract_really_does_remove_seam_rows():

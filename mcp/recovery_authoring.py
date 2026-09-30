@@ -27,7 +27,7 @@ Non-negotiables encoded here (brief §2):
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # #3927 — the rule has ONE wording, and it lives on the bundled side because the cron
 # generator must carry it into every Lambda zip. This import keeps the module's purity
@@ -53,7 +53,7 @@ DEFAULT_NOTE = "no band → do YELLOW"
 
 # Deficit states (from get_deficit_sustainability / recent nutrition).
 DEEP_DEFICIT = "deep"
-LATE_WEEK_STREAK = 5  # consecutive training days at/after which GREEN caps to quality
+LATE_WEEK_STREAK = 5  # consecutive LOADED-lifting days (#4411) at/after which GREEN caps to quality
 EARLY_RAMP_SESSIONS = 3  # novel-pattern sessions-into-block below which GREEN tendon-caps
 
 
@@ -108,47 +108,39 @@ def assess_authoring_freshness(volume_completeness, latest_recovery_date, target
 # ──────────────────────────────────────────────────────────────────────────────
 # Week-position / fuel / tissue context (brief §4)
 # ──────────────────────────────────────────────────────────────────────────────
-def _consecutive_days(workout_dates, target_date):
-    """Streak length immediately before target_date (consecutive prior days trained)."""
-    have = {d for d in (workout_dates or []) if d}
-    try:
-        cur = datetime.strptime(target_date, "%Y-%m-%d").date() - timedelta(days=1)
-    except (ValueError, TypeError):
-        return 0
-    streak = 0
-    while cur.isoformat() in have:
-        streak += 1
-        cur -= timedelta(days=1)
-    return streak
-
-
-def derive_training_context(workout_dates, deficit_state, target_date, tissue_ramp_sessions=None):
+def derive_training_context(loaded_lifting_streak, deficit_state, target_date, tissue_ramp_sessions=None):
     """Where is he in the week / fuel / tissue ramp? Drives the GREEN ceiling + floors.
 
     Pure. The GREEN ceiling lowers to "quality, not load" when he's deep in a deficit
-    OR late in a training streak OR early in a novel-pattern ramp (brief §4 / Marcus +
+    OR late in a LOADED-LIFTING streak OR early in a novel-pattern ramp (brief §4 / Marcus +
     Iris). `green_ceiling_quality` True means GREEN must NOT add load/RPE — it collapses
     to the YELLOW baseline (quality maintenance), preserving subtract-only on a
     motivated morning.
+
+    #4411: the streak is `training_streaks.loaded_lifting_streak` — consecutive days before the
+    session carrying a LOADED Hevy session — and nothing else. It used to be every day with ANY
+    Hevy row (walks and Engine days included), which wrote "day 15 of a streak" into the note of
+    a man active on 97 % of his 2024–25 days (TRAINING_CALIBRATION). The active-day streak is
+    never a fatigue signal. None = the streak could not be read: no streak line, never 0.
     """
-    consecutive = _consecutive_days(workout_dates, target_date)
+    streak = None if loaded_lifting_streak is None else int(loaded_lifting_streak)
     deficit = (deficit_state or "moderate").lower()
     early_ramp = tissue_ramp_sessions is not None and tissue_ramp_sessions <= EARLY_RAMP_SESSIONS
 
-    late_week = consecutive >= LATE_WEEK_STREAK
+    late_week = streak is not None and streak >= LATE_WEEK_STREAK
     deep_deficit = deficit == DEEP_DEFICIT
     green_ceiling_quality = late_week or deep_deficit or early_ramp
 
     reasons = []
     if late_week:
-        reasons.append(f"day {consecutive + 1} of a streak — GREEN is quality, bias YELLOW/RED structure")
+        reasons.append(f"loaded-lifting day {streak + 1} in a row — GREEN is quality, bias YELLOW/RED structure")
     if deep_deficit:
         reasons.append("deep deficit — GREEN is quality maintenance, not load")
     if early_ramp:
         reasons.append(f"early tissue ramp ({tissue_ramp_sessions} sessions in) — cap novel-pattern GREEN")
 
     return {
-        "consecutive_days": consecutive,
+        "loaded_lifting_streak": streak,
         "deficit_state": deficit,
         "tissue_ramp_sessions": tissue_ramp_sessions,
         "late_week": late_week,

@@ -25,6 +25,7 @@ v1.2.0 (#2216): the AI-3 validation and IC-15 insight gates no longer key off
 import json
 import logging
 import os
+import re
 
 from common import digest_utils  # shared query_range implementations (#970)
 
@@ -102,6 +103,7 @@ except ImportError:
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 
 def query_range(source, start_date, end_date):
@@ -125,7 +127,7 @@ def query_all(source):
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return [d2f(i) for i in items]
+    return strava_read_seam(source, [d2f(i) for i in items])
 
 
 def fetch_profile():
@@ -511,6 +513,7 @@ def _render_board_prompt(calorie_target, protein_target_g):
         section += f'Principle: "{voice.get("catchphrase", "")}"' if voice.get("catchphrase") else ""
 
         # Render calorie/protein targets into the focus text
+        section = _rescope_micro_rule(section, mid)
         section = section.replace("{calorie_target}", str(calorie_target))
         section = section.replace("{protein_target_g}", str(protein_target_g))
 
@@ -584,6 +587,25 @@ Every `micronutrient_sufficiency` entry in daily_detail is the TOTAL of food (Ma
 - `supplements_unconverted` lists taken doses the platform could not count. They are unknown, not zero: name them as uncounted, never as missing.
 - `supplements_state: "absent"` means no supplement record exists for that day — the number is food only and must be labelled food-only, not read as "took nothing".
 - Omega-3: `species` splits ALA (food) from EPA/DHA (food + supplement). Do not credit plant ALA as EPA/DHA."""
+
+# #4244 box 2, the SERVED prompt: the live S3 board config (and its repo mirror) still gives
+# Patel "Any micro <50% for 3+ days." — the food-only rule, now sitting beside the scope note
+# that contradicts it. The config is S3-owned, so the render re-scopes the sentence and says so
+# in the log; the one re-scoped wording is shared with the hardcoded fallback below.
+MICRO_GAP_RULE = (
+    "Any micro whose food + supplements TOTAL is <50% for 3+ days "
+    "(read from_supplements before calling anything a gap — see MICRONUTRIENT NUMBERS below)."
+)
+_FOOD_ONLY_MICRO_RULE = re.compile(r"Any micro(?:nutrient)?s? *< *50 *% for 3\+ days\.?")
+
+
+def _rescope_micro_rule(text, member_id="fallback"):
+    """Replace the food-only "<50% for 3+ days" rule with MICRO_GAP_RULE, logging when it fired."""
+    rescoped, n = _FOOD_ONLY_MICRO_RULE.subn(MICRO_GAP_RULE, text)
+    if n:
+        logger.warning("[nutrition] board config gives %s the food-only micro rule — re-scoped at render (#4244)", member_id)
+    return rescoped
+
 
 # Fallback prompt (original hardcoded version, used if S3 config unavailable)
 _FALLBACK_SYSTEM_PROMPT = (
@@ -734,6 +756,15 @@ def _unconverted_note(days):
     return f" ({'; '.join(parts)})" if parts else ""
 
 
+def _micro_column_scope(days):
+    """(header scope, footnote basis) for the MICRO column, DERIVED from the week's rows (#4244).
+    The join counts supplements only on days with a supplement record; a week with none is food
+    only, and a header saying "food + supps" over it claims a channel nothing was counted from."""
+    if any(d.get("supplements_state") == "recorded" for d in days):
+        return "food + supps", "food + supplements taken that day"
+    return "food only", "logged food (no supplement record this week)"
+
+
 def build_summary_table(days, profile):
     if not days:
         return ""
@@ -799,6 +830,7 @@ def build_summary_table(days, profile):
         <td style="padding:8px;color:#4cc9f0;font-size:13px;font-weight:700;">AVG</td>{avg_html}
     </tr>"""
 
+    micro_scope, micro_basis = _micro_column_scope(days)
     return f"""<table style="width:100%;border-collapse:collapse;background:#16213e;border-radius:8px;overflow:hidden;margin-bottom:20px;">
         <tr style="background:#0f1127;">
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:left;">DAY</th>
@@ -807,11 +839,11 @@ def build_summary_table(days, profile):
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">CARBS</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">FAT</th>
             <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">FIBER</th>
-            <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">MICRO (food + supps)</th>
+            <th style="padding:8px;color:#9ca3af;font-size:11px;text-align:center;">MICRO ({micro_scope})</th>
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of food + supplements taken that day{_unconverted_note(days)}
+            Targets: {int(cal_target)} kcal | {int(protein_target)}g protein | 38g fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
         </td></tr>
     </table>"""
 
@@ -998,6 +1030,7 @@ def lambda_handler(event, context):
 
     # Try config-driven prompt first, fall back to hardcoded
     system = _build_nutrition_prompt_from_config(cal_target, pro_target)
+    prompt_source = "board_config" if system else "fallback"
     if system:
         logger.info("Using config-driven nutrition panel prompt")
     else:
@@ -1090,6 +1123,10 @@ def lambda_handler(event, context):
             "dry_run": True,
             "subject": subject,
             "html_bytes": len(html),
+            # #4244 live proof without an S3 read: the scoped MICRO header and the SERVED prompt's scope.
+            "micro_column": f"MICRO ({_micro_column_scope(days_this)[0]})",
+            "prompt_source": prompt_source,
+            "prompt_micro_scoped": MICRONUTRIENT_SCOPE_NOTE in system and not _FOOD_ONLY_MICRO_RULE.search(system),
             "body": f"Nutrition review DRY RUN (not sent): {subject}",
         }
 

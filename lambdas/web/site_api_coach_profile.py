@@ -123,20 +123,24 @@ def _reader_reason(raw):
 
 
 def _track_record(coach_id, *, _g):
-    """Confirmed/refuted hit-rate from the COACH#<id>/LEARNING# eval trail (CC-02).
+    """The coach page's report card (CC-02): the record, plus its recent graded calls.
     Honest pre-D-05: empty -> hit_rate None, preliminary True. Always labelled
     self-assessment, never external validation (ER-05).
 
-    #4220: this is the coach page's SELF-ASSESSED report card, not the record. The
-    LEARNING# trail is a second write of each grade (and, per #4216, can carry one
-    docket re-recorded daily), so no headline or scorecard derives from it any more —
-    the record every public surface prints is ``coach.coach_record`` over PREDICTION#.
-    Named, not fixed here: Park's report card read 7 of 16 while the record read 7 of 17
-    on 2026-09-26 (the LEARNING# page cap of 60 and the docket dupes are both in play)."""
+    #4220: the counts are the ONE record — ``coach.coach_record`` over PREDICTION#, this
+    cycle, one resolution per prediction — the same {confirmed, refuted, n, through} that
+    /api/coaches, /api/calibration, /api/predictions and /api/wrong serve, and the same
+    ``headline`` ("K of N checked calls right through <day>"; counts, not a percentage,
+    below ``coach_record.PERCENT_FLOOR``). It used to re-count the LEARNING# trail, which is
+    a second write of each grade and (#4216) carried one pre-genesis docket re-recorded
+    daily; Park's report card read 7 of 16 beside a record of 7 of 17 on 2026-09-26. The
+    LEARNING# trail still supplies ``recent`` (the reason text lives only there) — one
+    result per prediction, and never a row that names no prediction."""
     _reader_reason = _g["_reader_reason"]
     table = _g["table"]
-    confirmed = refuted = 0
+    record = coach_record.for_coach(table, coach_id, genesis=_g["EXPERIMENT_START"])
     recent = []
+    seen = set()
     try:
         resp = table.query(
             **with_phase_filter(
@@ -155,11 +159,11 @@ def _track_record(coach_id, *, _g):
                 # publicly (their status is also outside confirmed/refuted).
                 continue
             st = it.get("status")
-            if st == "confirmed":
-                confirmed += 1
-            elif st == "refuted":
-                refuted += 1
-            if st in ("confirmed", "refuted") and len(recent) < 6:
+            pid = str(it.get("prediction_id") or "").strip()
+            if st not in ("confirmed", "refuted") or not pid or pid in seen:
+                continue  # #4220: a graded call, named, once
+            seen.add(pid)
+            if len(recent) < 6:
                 recent.append(
                     {
                         "date": it.get("date") or it.get("sk", "").replace("LEARNING#", "").split("#")[0],
@@ -170,14 +174,18 @@ def _track_record(coach_id, *, _g):
                 )
     except Exception as _e:
         logger.warning(f"[coaches] track_record {coach_id}: {_e}")
-    decided = confirmed + refuted
+    confirmed = record["confirmed"] if record else None
+    refuted = record["refuted"] if record else None
+    decided = record["n"] if record else None
     return {
         "confirmed": confirmed,
         "refuted": refuted,
         "decided": decided,
         "hit_rate_pct": round(confirmed / decided * 100, 1) if decided else None,
-        "preliminary": decided < 12,
-        "n_note": "preliminary — fewer than 12 decided predictions" if decided < 12 else f"n={decided} decided",
+        "record": record,  # #4220: {confirmed, refuted, n, through} — None when the ledger read failed
+        "headline": coach_record.headline(record),
+        "preliminary": (decided or 0) < 12,
+        "n_note": "preliminary — fewer than 12 decided predictions" if (decided or 0) < 12 else f"n={decided} decided",
         "recent": recent,
         "caveat": "Self-assessment of this coach's own calls — not external validation.",
     }
@@ -391,7 +399,8 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
                     # #4213: the public ask / public read — NEVER served_summary's
                     # key_recommendation→content chain (the imperative owner register).
                     "summary": audience_guard.public_timeline_summary(it),
-                    "themes": it.get("themes", []),
+                    # #4392: the tag row is reader labels, never the stored slugs.
+                    "themes": audience_guard.public_themes(it.get("themes")),
                     # #4185: every coach read carries when it was written AND the last data
                     # day it was written from (null on records that predate the stamp).
                     "generated_at": it.get("created_at"),
@@ -400,7 +409,13 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
             )
     except Exception:
         pass
-    return out
+    # #4185: a stored pre-#4227 read whose dated logging gap the served record contradicts is
+    # served superseded (summary withheld, reason named) — read-side only, nothing is rewritten.
+    from common.pacific_time import pacific_today
+
+    from web import superseded_gap_reads
+
+    return superseded_gap_reads.apply(out, table, pacific_today())
 
 
 def _dossier_block(coach_id, *, _g):

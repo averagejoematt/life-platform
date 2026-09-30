@@ -122,16 +122,11 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "arbitrary From address is on an SES-verified domain — which is the whole check. Deleting "
         "it does not shrink the surface, it moves the flag: with is_verified_sender gone, "
         "sender_domain becomes the unreferenced def (verified by removing it and re-running this "
-        "test). Same shape as structured_output_config below — half of a live contract test, not "
-        "a leftover."
+        "test). Half of a live contract test, not a leftover."
     ),
-    "lambdas/ai/bedrock_client.py:structured_output_config": (
-        "half of a live CONTRACT test, not a leftover. #1385 AC4 "
-        "(tests/test_whole_life_context_1385.py) uses it to build the body it then feeds "
-        "through invoke() to prove the chokepoint FORWARDS `output_config` and STRIPS "
-        "`model`. Delete the builder and the only proof that Bedrock Structured Outputs "
-        "survive the chokepoint goes with it."
-    ),
+    # `structured_output_config` was allowlisted here as half of #1385's contract test. #4276
+    # gave it a production caller (ai/structured_json.py -> the coach quality gate's verdict
+    # schema), so the scan no longer flags it and the entry is deleted.
     # `guarded_send_raw_email` was allowlisted here as an unreferenced member of a SAFETY
     # SET — kept deliberately so the next raw-email sender would find a sanctioned gate
     # waiting rather than reach for boto3. It had no caller from the day it was written.
@@ -302,9 +297,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     "lambdas/health/adherence_calc.py:find_alias_candidates": (
         "#3609 box 2 widen: exercised by tests/test_adherence_calc.py; named only in a COMMENT in deploy/config_ownership_audit.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
-    ),
-    "lambdas/health/sick_day_checker.py:delete_sick_day": (
-        "#3609 box 2 widen: exercised only by tests/test_shared_modules.py (also named in docs/archive/CHANGELOG_v341.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
     "lambdas/health/sick_day_checker.py:write_sick_day": (
         "#3609 box 2 widen: exercised by tests/test_shared_modules.py; named only in a COMMENT in mcp/layer_status.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
