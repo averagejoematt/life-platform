@@ -263,7 +263,7 @@ Working-style corrections the owner has made more than once. They are not author
 waits on the `production` click.** A merged Lambda/MCP change deploys from CI with no gate,
 so for code the question below is settled at merge. What still waits is the `Deploy IAM
 (production gate)` job — the owner's click, which no script and no session takes for him
-(`deploy/watch_deploy_gate.sh` is deleted). Hand deploys from a laptop (`deploy_fleet.sh`,
+(deploy/watch_deploy_gate.sh is deleted — named unquoted, it is no longer a tracked path). Hand deploys from a laptop (`deploy_fleet.sh`,
 `cdk_deploy.sh`) are unchanged: they still need the authority this section describes. The
 lease rules in items 4–5 now apply only to an IAM run parked at the gate.
 
@@ -301,7 +301,7 @@ the repo: a session could find *how* to deploy and not *whether it may* (#3264).
    and `deploy/reject_deployment.sh` are both first-class outcomes, and **rejection is the
    more common correct one** — a superseded lease should be rejected, not approved "to clear
    it". A lease left waiting is not neutral: it queues every later run behind it at zero jobs
-   and reads as a wedge (`scripts/check_deploy_wedge.py`; the auto-approving `deploy/watch_deploy_gate.sh` was retired by ADR-158).
+   and reads as a wedge (`scripts/check_deploy_wedge.py`; the auto-approving deploy/watch_deploy_gate.sh was retired by ADR-158).
 
 6. **Rejecting is not reverting.** A rejected lease ships nothing; it does not undo a deploy
    that already happened. If production is wrong, that is a rollback (`docs/RUNBOOK.md`), a
