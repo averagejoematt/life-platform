@@ -511,7 +511,7 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # (#3315), and the id-set diff is what proves it rather than the intention.
 # 772 -> 774 (2026-09-30, #4472): TWO entrants, both PROVEN (CI_PROOFS) — `ci::ci-cd.yml::plan::7` (plan / Resolve deploy
 # base — check_deploy_deadman.py --deploy-base, a new step ahead of Detect changes) and `ci::config-drift.yml::drift::7` (the
-# nightly live-Lambda staleness advisory). Id-set diff vs a `git archive origin/main` export at ff6f20ceb:
+# nightly live-Lambda staleness advisory). Id-set diff vs a `git archive origin/main` export at 0055fe546 (re-derived at push; ff6f20ceb gave the same):
 # main 772 {239, 521, 7, 5} -> this lane 774 {241, 521, 7, 5}; nothing leaves.
 BASELINE_TOTAL_GATES = 774  # 770 -> 772 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae, owner-approved lane):
 # THREE entrants, all PROVEN — `ci::…/deploy-wedge-watch.yml::watch / Deploy dead-man — main's green runs reached AWS (#4256)`,

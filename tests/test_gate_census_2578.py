@@ -1036,7 +1036,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # entrants (dead-man step + check_deploy_deadman.py + the late-approval guard) on top of main's 236. Id-set diff vs a
         # `git archive origin/main` export at d37bd02ae: main 770 {236, 522, 7, 5} -> this lane 772 {239, 521, 7, 5}.
         # Upper bound 239 -> 241 (2026-09-30, #4472): ci::ci-cd.yml::plan::7 + ci::config-drift.yml::drift::7, PROVEN
-        # (CI_PROOFS). Id-set diff vs origin/main ff6f20ceb: 772 {239, 521, 7, 5} -> 774 {241, 521, 7, 5}.
+        # (CI_PROOFS). Id-set diff vs origin/main 0055fe546: 772 {239, 521, 7, 5} -> 774 {241, 521, 7, 5}.
         <= 241
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
