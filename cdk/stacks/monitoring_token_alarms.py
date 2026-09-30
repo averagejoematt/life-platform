@@ -232,7 +232,7 @@ def add_token_alarms(scope, topic, digest) -> None:
             statistic="Sum",
         ),
         evaluation_periods=1,
-        threshold=6.0,
+        threshold=7.0,
         comparison_operator=GTE,
         treat_missing_data=NB,
     )

@@ -570,6 +570,8 @@ class MonitoringStack(Stack):
         # Lambda timeout is now 900s (was 300s); old 240s threshold fired on
         # every healthy run that included the full 6-coach narrative pass.
         # 720s = 80% of timeout — still catches genuine runaways.
+        # 2026-09-30: tuned 720000 → 750000 ms (720s → 750s) to allow for
+        # normal variance without false-firing (observed p99 near 729s).
         _alarm(
             "DailyBriefDurationHigh",
             "daily-brief-duration-high",
@@ -577,7 +579,7 @@ class MonitoringStack(Stack):
             "Duration",
             86400,
             None,
-            720000,
+            750000,
             GTE,
             {"FunctionName": "daily-brief"},
             ext_stat="p99",
