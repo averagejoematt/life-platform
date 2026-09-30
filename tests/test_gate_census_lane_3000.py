@@ -509,7 +509,12 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 769  # 768 -> 769 (2026-09-29, #4276 box 2 the raw-model-text json.loads guard, merged onto #4470's 768 at
+BASELINE_TOTAL_GATES = 770  # 769 -> 770 (2026-09-29, #4220 the seven-surface coach-record guard, merged onto #4476's 769 at
+# 779957439): ONE real entrant — `structural::test_coaches_api.py` (a lambdas/web/** rglob since the LEARNING#-tally sweep joined
+# it), PROVEN (STRUCTURAL_HAND_PROOFS: one LEARNING# tally re-grown in the report card -> 3 failed / 47 passed, Webb 26 vs 5;
+# restored 50 passed). MEASURED by id-set diff vs a `git archive origin/main` export at 779957439: main 769 {proven 235, unproven
+# 522, not-applicable 7, attempted-unproven 5} -> this lane 770 {236, 522, 7, 5}; exactly that id enters, {} leaves.
+# PRIOR: 769  # 768 -> 769 (2026-09-29, #4276 box 2 the raw-model-text json.loads guard, merged onto #4470's 768 at
 # c4618d2cb): ONE real entrant — `structural::test_bedrock_client.py` (a lambdas/** rglob since the guard joined it), PROVEN
 # (STRUCTURAL_HAND_PROOFS: two real-tree plants each 1 failed / 46 passed, restored 47 passed). MEASURED by id-set diff vs a
 # `git archive origin/main` export at c4618d2cb: main 768 {proven 234, unproven 522, not-applicable 7, attempted-unproven 5} ->

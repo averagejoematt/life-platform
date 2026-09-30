@@ -1206,6 +1206,192 @@ def test_4220_pair10_holds_under_a_frozen_pacific_clock(monkeypatch, pt_clock):
     assert consumed == {"confirmed": 1, "refuted": 1, "n": 2, "through": _day(9)}
 
 
+# ── #4220: SEVEN surfaces, ONE record — every per-coach record reader is record_from_rows ──
+#
+# The four-endpoint guard above covered the public JSON; three more surfaces print a coach's
+# record — the coach page's report card, the owner's MCP reader and the observatory card —
+# and each one was, until #4445/#4438/#4454, a separate LEARNING# tally. This asserts all
+# seven against the producer computed DIRECTLY from the wire's PREDICTION# rows, over a wire
+# that carries every row shape that ever inflated one: twenty blank-prediction_id docket
+# LEARNING# rows per side, suffixed PREDICTION# re-writes, and (added here) one visible
+# pre-genesis resolution per side with its LEARNING# twin.
+
+
+def _add_pre_genesis_resolution(table):
+    """One call per side, graded BEFORE genesis and NOT phase-stamped — the record must not
+    count it (it resolved in an earlier cycle); a LEARNING# re-count would."""
+    from coach import coach_prediction_evaluator as ev
+
+    for coach_id, status in (("nutrition_coach", "confirmed"), ("explorer_coach", "refuted")):
+        row = _graded(
+            _emitted(coach_id, _day(-12), "A call made and settled before Day 1.", metric="hrv_7day_avg", condition="up", threshold=1),
+            status,
+            _day(-2),
+            0.01,
+        )
+        table.put_item(Item=row)
+        ev._write_learning_record(
+            coach_id,
+            _day(-2),
+            {"prediction_id": row["prediction_id"], "status": status, "metric": "hrv_7day_avg", "condition": "up", "actual_value": 0.01},
+        )
+
+
+def _add_observatory_outputs(table, coach_ids):
+    """The observatory card renders only when a coach has an OUTPUT# row."""
+    for cid in coach_ids:
+        sk = f"OUTPUT#{_day(20)}#daily"
+        table.store[(f"COACH#{cid}", sk)] = {"pk": f"COACH#{cid}", "sk": sk, "date": _day(20), "analysis": "A read of the week."}
+
+
+def _seven_surfaces(monkeypatch, table, short_id, served):
+    """{surface: record-or-None} for one coach, each read through its real handler."""
+    import coach_observatory_renderer as cobs
+
+    coaches, calibration, predictions, wrong = served
+    routed = _route_table(table)
+    persona = f"{short_id}_coach"
+    wrong_by = {r["coach"]: r for r in wrong["predictions"]["by_coach"]}
+    card = _body(api.handle_coach({"rawPath": f"/api/coach/{persona}"}))
+    monkeypatch.setattr(cobs, "table", routed)
+    domain = {v: k for k, v in cobs.DOMAIN_COACH_MAP.items() if k not in ("training",)}.get(persona)
+    obs = cobs._render_coach_card(domain) if domain else {}
+    obs_record = (obs.get("track_record") or {}).get("record")
+    return (
+        {
+            "/api/coaches .record": {c["persona_id"]: c for c in coaches["coaches"]}[persona]["record"],
+            "/api/calibration .record": {c["coach_id"]: c for c in calibration["coaches"]}[short_id]["record"],
+            "/api/predictions .by_coach.record": predictions["by_coach"][short_id]["record"],
+            "/api/wrong .by_coach": {k: v for k, v in wrong_by[short_id].items() if k != "coach"} if short_id in wrong_by else None,
+            "/api/coach/{id} .report_card.track_record.record": card["report_card"]["track_record"]["record"],
+            "MCP get_coach_track_record .record": _mcp_track_record(monkeypatch, table, short_id)["record"],
+            "observatory card .track_record.record": obs_record,
+        },
+        card,
+        obs,
+    )
+
+
+def test_every_per_coach_record_surface_is_record_from_rows(monkeypatch):
+    from coach import coach_record
+
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    _add_pre_genesis_resolution(table)
+    operational = list(api.persona_registry.OPERATIONAL_COACH_IDS)
+    _add_observatory_outputs(table, operational)
+    served = _served_four(monkeypatch, table)
+
+    checked = 0
+    for persona in operational:
+        short_id = persona.replace("_coach", "")
+        prediction_rows = [dict(r) for (pk, sk), r in table.store.items() if pk == f"COACH#{persona}" and str(sk).startswith("PREDICTION#")]
+        truth = coach_record.record_from_rows(prediction_rows, genesis=EXPERIMENT_START)
+        surfaces, card, obs = _seven_surfaces(monkeypatch, table, short_id, served)
+        for name, got in surfaces.items():
+            if got is None and truth["n"] == 0 and name in ("/api/wrong .by_coach", "observatory card .track_record.record"):
+                continue  # both surfaces omit a coach with nothing decided — absence, not a second number
+            assert got == truth, f"{persona}: {name} serves {got}, record_from_rows says {truth}"
+        headline = coach_record.headline(truth)
+        assert {c["persona_id"]: c for c in served[0]["coaches"]}[persona]["headline_stat"] == headline, persona
+        assert card["report_card"]["track_record"]["headline"] == headline, persona
+        assert _mcp_track_record(monkeypatch, table, short_id)["headline"] == headline, persona
+        if truth["n"]:
+            assert obs["track_record"]["summary"].startswith(headline), persona
+        checked += 1
+    assert checked == len(operational) >= 2
+    # The wire's point: the pre-genesis call and the docket trail are on it, and none counts.
+    webb_rows = [r for (pk, sk), r in table.store.items() if pk == "COACH#nutrition_coach" and str(sk).startswith("PREDICTION#")]
+    assert coach_record.record_from_rows(webb_rows, genesis=EXPERIMENT_START)["n"] == 5
+    assert coach_record.record_from_rows(webb_rows, genesis=None)["n"] == 6  # the pre-genesis call, seen without the cycle cut
+
+
+# The companion SET guard: no reader in these files may re-derive a record from LEARNING#.
+_RECORD_SWEEP_FILES = ("lambdas/coach/coach_observatory_renderer.py", "mcp/tools_coach_intelligence.py")  # + lambdas/web/** (rglob)
+_LEARNING_TALLY_READER_REASONS = {
+    # path::function -> why it may read LEARNING# AND name confirmed/refuted without being a record
+    "lambdas/coach/coach_observatory_renderer.py::_tally_learning_statuses": "conversation-provenance (#1481, ADR-141): only "
+    "conversation_count is read; the card's record is coach_record.for_coach",
+    "mcp/tools_coach_intelligence.py::tool_get_coach_track_record": "conversation-provenance split + by_subdomain/by_metric "
+    "breakdowns over one result per prediction; its unfiltered record is coach_record (surface 6 above)",
+}
+
+
+def _learning_tally_readers(root):
+    """path::function for every function that reads LEARNING# and tallies confirmed/refuted —
+    directly, or by calling a same-module function that does."""
+    import ast
+
+    def _strs(node):
+        out = set()
+        for n in ast.walk(node):
+            if isinstance(n, ast.Constant) and isinstance(n.value, str):
+                out.add(n.value)
+        return out
+
+    def _tallies(fn):
+        """A numeric count keyed on a graded status: an `x += <int>` / `sum(...)` / `Counter(...)` in the
+        same function as a "confirmed"/"refuted" literal used as a comparand or a zero-initialised counter key."""
+        counters = {
+            n.target.value.id
+            for n in ast.walk(fn)
+            if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Subscript) and isinstance(n.target.value, ast.Name)
+        }
+        status_keyed = False
+        for n in ast.walk(fn):
+            if isinstance(n, ast.Compare):
+                status_keyed |= bool(_strs(n) & {"confirmed", "refuted"})
+            elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "get":
+                # counts.get("confirmed", 0) where `counts[...] += 1` elsewhere in the function
+                owner = getattr(n.func.value, "id", None)
+                if owner in counters and _strs(n) & {"confirmed", "refuted"}:
+                    status_keyed = True
+            elif isinstance(n, ast.Dict):  # a counter initialised per status: {"confirmed": 0, ...}
+                status_keyed |= any(
+                    isinstance(k, ast.Constant) and k.value in ("confirmed", "refuted") and isinstance(v, ast.Constant) and v.value == 0
+                    for k, v in zip(n.keys, n.values)
+                )
+        if not status_keyed:
+            return False
+        for n in ast.walk(fn):
+            if isinstance(n, ast.AugAssign) and isinstance(n.value, ast.Constant) and isinstance(n.value.value, int):
+                return True
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("sum", "Counter"):
+                return True
+        return False
+
+    from pathlib import Path as _P
+
+    hits = set()
+    paths = sorted(str(x) for x in _P(root, "lambdas", "web").rglob("*.py"))
+    paths += [os.path.join(root, f) for f in _RECORD_SWEEP_FILES if os.path.exists(os.path.join(root, f))]
+    for path in paths:
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
+        with open(path, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        fns = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        talliers = {name for name, fn in fns.items() if _tallies(fn)}
+        for name, fn in fns.items():
+            reads_learning = any(s.startswith("LEARNING#") for s in _strs(fn))
+            calls = {getattr(c.func, "id", None) for c in ast.walk(fn) if isinstance(c, ast.Call)}
+            if name in talliers and reads_learning:
+                hits.add(f"{rel}::{name}")
+            elif reads_learning:
+                # A reader that hands its LEARNING# rows to a same-module tallier: the tallier is the finding.
+                hits.update(f"{rel}::{t}" for t in calls & talliers)
+    return hits
+
+
+def test_no_record_surface_tallies_learning_rows():
+    hits = _learning_tally_readers(_REPO)
+    unexempt = sorted(hits - set(_LEARNING_TALLY_READER_REASONS))
+    assert not unexempt, (
+        "these functions read COACH#…/LEARNING# and tally confirmed/refuted — a second producer of a coach's record "
+        "(#4220: Webb read 20 of 25 there beside the record's 0 of 5). Read coach.coach_record instead:\n  " + "\n  ".join(unexempt)
+    )
+    stale = sorted(set(_LEARNING_TALLY_READER_REASONS) - hits)
+    assert not stale, f"exemptions whose function no longer tallies LEARNING# — delete them: {stale}"
+
+
 # ── #4185: a stored pre-fix read whose dated logging gap the served record contradicts ──
 # The live wire (public /api/coach/{nutrition,physical}_coach recent_outputs + /api/nutrition_overview,
 # read 2026-09-29): the nutrition coach's 09-23/24/25 reads say logging stopped after September 19th
