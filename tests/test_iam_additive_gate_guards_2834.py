@@ -457,7 +457,7 @@ def test_the_2834_steps_run_before_any_code_deploy(wf):
     assert iam.index("name: Configure AWS credentials (OIDC)") < iam.index("Additive IAM deploy — evaluated == deployed (#2834)")
     i_deadman = deploy.index("IAM gate verdict present (dead-man, #2834)")
     i_creds = deploy.index("name: Configure AWS credentials (OIDC)")
-    for code_step in ("Fleet deploy (shared module changed)", "Deploy MCP server", "Deploy Lambdas"):
+    for code_step in ("Fleet deploy (the one Lambda deploy path, #781/#4255)",):
         assert i_creds < i_deadman < deploy.index(code_step), f"the #2834 dead-man must precede {code_step!r}"
 
 

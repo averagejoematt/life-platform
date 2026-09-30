@@ -44,7 +44,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     # from job `deploy` into its own `deploy-iam` job — the one job still behind the
     # production click. The seal date is the step's own; the residue's size is unchanged.
     "ci::.github/workflows/ci-cd.yml::deploy-iam / Additive IAM deploy — evaluated == deployed (#2834)": "2026-09-05 seal (#3536)",
-    "ci::.github/workflows/ci-cd.yml::deploy / Deploy Lambdas": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::deploy / IAM gate verdict present (dead-man,": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::plan / Assert stateful resources exist": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::plan / CDK diff — detect IAM/infra drift": "2026-09-05 seal (#3536)",

@@ -19,7 +19,8 @@
      auto-rollback job tallied 0/0/0 twice on 2026-07-27 (~01:37Z, ~02:27Z).
      Fix: when fleet_changed=true, the rollback job rebuilds its candidate
      list from ci/lambda_map.json (the same source deploy_fleet.sh iterates)
-     instead of trusting deploy_matrix.
+     instead of trusting deploy_matrix. Since #4255 every code deploy is a fleet
+     deploy, so the rebuild is unconditional.
 
 Both fixes must NOT regress the three-way tally semantics from #1848/5d36b4a9
 (reverted / no-artifact / failed) — see test_lambda_map_regions.py for the
@@ -150,15 +151,18 @@ def _rollback_job_body():
     return text[start:end]
 
 
-def test_rollback_job_depends_on_plan():
-    """Needed so the job can read needs.plan.outputs.fleet_changed."""
+def test_rollback_job_runs_after_the_deploy_and_the_smoke_test():
     body = _rollback_job_body()
     assert "needs: [reconcile, plan, deploy, smoke-test]" in body
 
 
-def test_rollback_step_reads_fleet_changed_output():
+def test_rollback_set_never_branches_on_the_plan_diff():
+    """#4255: every code deploy is a fleet deploy, so the rollback set is always the
+    whole map — a plan output (deploy_matrix / fleet_changed / mcp_changed) choosing a
+    subset is the #1859 gap-2 shape (an empty matrix on a real fleet deploy)."""
     body = _rollback_job_body()
-    assert "needs.plan.outputs.fleet_changed" in body
+    for output in ("needs.plan.outputs.deploy_matrix", "needs.plan.outputs.fleet_changed", "needs.plan.outputs.mcp_changed"):
+        assert output not in body, f"the rollback set branches on {output} again"
 
 
 def test_rollback_step_rebuilds_matrix_from_lambda_map_on_fleet_push():
@@ -169,15 +173,13 @@ def test_rollback_step_rebuilds_matrix_from_lambda_map_on_fleet_push():
     assert ".lambdas | to_entries[]" in body
     assert "not_deployed" in body
     assert "life-platform-mcp-warmer" in body
-    assert 'FLEET_CHANGED = "true"' in body or 'if [ "$FLEET_CHANGED" = "true" ]' in body
 
 
-def test_standalone_mcp_rollback_skipped_when_fleet_fallback_used():
-    """Avoid a redundant double-rollback attempt on life-platform-mcp: the
-    standalone-MCP branch must be gated on the fleet fallback NOT having run
-    (deploy_fleet.sh — and therefore the fallback list — always covers MCP)."""
+def test_no_standalone_mcp_rollback_branch():
+    """#4255: the standalone MCP deploy step is gone, so its standalone rollback went
+    with it — the map list already carries both MCP functions (no double revert)."""
     body = _rollback_job_body()
-    assert 'if [ "$MCP_CHANGED" = "true" ] && [ "$FLEET_FALLBACK" = "false" ]' in body
+    assert "MCP_CHANGED" not in body and "FLEET_FALLBACK" not in body
 
 
 def test_fleet_fallback_jq_query_produces_a_real_full_fleet_list():
