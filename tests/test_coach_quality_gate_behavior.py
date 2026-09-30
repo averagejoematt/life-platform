@@ -788,6 +788,13 @@ LEAD_0929 = (
     "score this morning is 54, his heart-rate variability is 40 milliseconds, his resting heart rate is 58 beats per "
     "minute, and he slept 8.7 hours last night."
 )
+# The 2026-09-30 read (score 15, RUBRIC_SCOPED "unchanged"), verbatim from EVALRET#coach_brief.
+LEAD_0930 = (
+    "Matthew has lost 15.0 pounds since Sunday, September 6, settling into a steady weekly loss rate of 3.8 pounds per "
+    "week, likely between 2.2 and 4.1. His most recent weigh-in on Tuesday, September 29 showed 312.3 pounds. This "
+    "morning his recovery score was 59, with heart-rate variability of 41 milliseconds, resting heart rate of 57 beats "
+    "per minute, and 8.2 hours of sleep last night."
+)
 _NARRATING = "Narrating the dashboard (listing metrics without interpreting them)"
 
 
@@ -837,6 +844,20 @@ class TestLeadReadRubricScope:
         monkeypatch.setattr(gate, "_fetch_other_coaches_recent_outputs", lambda *a, **k: pytest.fail("peers fetched"))
         haiku.result = {"passed": True, "score": 90}
         gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0928, "generation_brief": _LEAD_BRIEF}, None)
+
+    def test_the_judges_own_grounding_entry_does_not_hold_a_clean_lead_read(self, wired, haiku):
+        # 2026-09-30 17:08Z (request 3958f82a): RUBRIC_SCOPED verdict "unchanged", score 15, violations=0,
+        # number_grounding=clean — the only in-scope arm left was the judge's own
+        # `number_grounding_violations` entry (a required key in the output schema). The judge's
+        # JSON is not logged, so the entry's wording below is an inferred shape; its presence is
+        # what the log proves by elimination.
+        rep = _judge_0928()
+        rep["score"] = 15
+        rep["number_grounding_violations"] = [{"detail": "Verdict CLEAN: no ungrounded numbers."}]
+        haiku.result = rep
+        r = gate.lambda_handler({"coach_id": "eli_marsh", "output_text": LEAD_0930, "generation_brief": _LEAD_BRIEF}, None)
+        assert r["passed"] is True and r["rubric_scope"]["verdict"] == "restored"
+        assert r["number_grounding_violations"] == []
 
     def test_mutation_control_without_the_scope_the_lead_read_is_held(self, wired, haiku, monkeypatch):
         from coach import rubric_scope

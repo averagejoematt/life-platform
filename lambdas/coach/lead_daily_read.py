@@ -368,7 +368,10 @@ def run(
 
         def _regen(note: str) -> str:
             t = _draft(note)
-            return t if not check(t, cited, data_through, today) else ""
+            refused = check(t, cited, data_through, today)
+            if refused:  # #4343: the gate logs this "" as "returned empty" — name the real reason here
+                logger.warning("[lead_daily] gate regeneration refused by the cited-number check: %s", refused)
+            return "" if refused else t
 
         if enforce_gate is None:
             from ai import ai_calls
