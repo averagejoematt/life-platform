@@ -300,6 +300,8 @@ def test_apply_sends_the_exact_ruleset_payload_when_secret_is_present(monkeypatc
     assert sent["conditions"] == {"ref_name": {"include": ["refs/heads/main"], "exclude": []}}
     assert {c["context"] for c in sent["rules"][0]["parameters"]["required_status_checks"]} == {
         "Collect + deploy-critical + format",
+        # #4251, owner ruling 2026-09-29 option (a): the full suite is required.
+        "Full unit suite (pre-merge, issue 3025)",
         "gitleaks (PR commit range only, not full history)",
     }
     assert sent["rules"][0]["parameters"]["strict_required_status_checks_policy"] is False

@@ -66,6 +66,10 @@ WRITER = os.path.join(REPO_ROOT, "deploy", "write_lane_posture.py")
 LAST_MEASURED_SECONDS_2026_09_21 = {
     "Collect + deploy-critical + format": 1286,
     "gitleaks (PR commit range only, not full history)": 12,
+    # #4251 (owner ruling 2026-09-29, option (a)): the full suite joined the required
+    # set. Frozen at its first write_lane_posture.py --measure reading: p95 1149s over
+    # n=29 genuine completions, measured 2026-09-29.
+    "Full unit suite (pre-merge, issue 3025)": 1149,
 }
 
 _PROVENANCE_KEYS = ("typical_measured_on", "typical_measured_by", "typical_statistic", "typical_n")

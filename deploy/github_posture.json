@@ -69,6 +69,17 @@
         "typical_n": 22
       },
       {
+        "context": "Full unit suite (pre-merge, issue 3025)",
+        "workflow": "pr-checks.yml",
+        "job": "full-suite",
+        "typical_seconds": 1149,
+        "why": "OWNER RULING 2026-09-29 on #4251 / PR #4441, option (a): required. #4251 cut the fast lane to `deploy_critical`, so the behaviour suite and the structural gates (the `premerge` selection) run pre-merge ONLY here — the whole tests/ tree in two passes (xdist `-m \"not serial\"`, then `-m serial`). Without this context required, GitHub auto-merge could land a PR whose behaviour tests are red. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class. The job `name:` carries no `#` on purpose (#3117: an unquoted ` #` truncated the wire name). `typical_seconds` is WRITTEN by deploy/write_lane_posture.py --measure, never typed.",
+        "typical_measured_on": "2026-09-29",
+        "typical_measured_by": "scripts/check_job_timeout_headroom.py sampler (trailing window, genuine completions)",
+        "typical_statistic": "p95",
+        "typical_n": 29
+      },
+      {
         "context": "gitleaks (PR commit range only, not full history)",
         "workflow": "secret-scan.yml",
         "job": "gitleaks",

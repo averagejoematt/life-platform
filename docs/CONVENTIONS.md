@@ -289,14 +289,26 @@ holds this paragraph and the workflow to the same literal, so editing one alone 
 
 ### 4a0. What gates the MERGE (#1662, ADR-148)
 
-Distinct from §4a (which gates the *deploy*, on push to `main`). Two check-runs are
+Distinct from §4a (which gates the *deploy*, on push to `main`). Three check-runs are
 **required** on every PR to `main` by the `main-required-fast-lane` ruleset:
-`Collect + deploy-critical + format` (`pr-checks.yml`) and
-`gitleaks (PR commit range only, not full history)` (`secret-scan.yml`) — the only two
-PR gates with no `paths:` filter and no job-level `if:`, so they report on every PR
-class including docs-only. Everything else (full `Unit Tests`, `Lint + Syntax Check`,
-CodeQL, visual QA, and the path-filtered gates) stays **advisory / post-merge**.
-Auto-merge is on: arm the PR once, GitHub lands it when those two go green.
+`Collect + deploy-critical + format` and `Full unit suite (pre-merge, issue 3025)`
+(both `pr-checks.yml`), and `gitleaks (PR commit range only, not full history)`
+(`secret-scan.yml`). These are PR gates with no `paths:` filter and no job-level `if:`,
+so they report on every PR class including docs-only. Everything else (post-merge
+`Unit Tests`, `Lint + Syntax Check`, CodeQL, visual QA, the API-before-frontend check
+and the path-filtered gates) stays **advisory / post-merge**. Auto-merge is on: arm the
+PR once, GitHub lands it when those three go green.
+
+**What the required fast lane runs (#4251):** collection + `deploy_critical` under xdist
++ mypy/black/ruff + bundle-boot. The wider `premerge` selection (behaviour suite +
+structural gates) runs on the same PR in `Full unit suite (pre-merge, issue 3025)`.
+**Owner ruling 2026-09-29 (#4251, PR #4441, option (a)): that context is REQUIRED.**
+Without it, auto-merge could land a PR whose behaviour tests are red once the fast
+lane stopped carrying them. The cost is the required wall-clock: the full suite's p95
+is ~19 min (`typical_seconds` in `deploy/github_posture.json`, written by
+`deploy/write_lane_posture.py --measure`), against the fast lane's ~7.5 min. The two
+jobs run in parallel, so a PR waits for the slower one. The ruleset change is applied
+by `python3 scripts/apply_branch_protection.py --apply` after this lands (driver-run).
 
 The trap to know: a required check matches by check-run *name*, and "never reported"
 is not distinguishable from "failed". Adding a `paths:` filter to either workflow,
@@ -380,8 +392,9 @@ required PR check already proved. The decisions:
   `PR checks` run. It merges only when that run concluded `success`, which needs every
   pr-checks job including the full suite. It also checks that the PR head is still the
   sha that went green and that the required contexts plus `Full unit suite (pre-merge,
-  issue 3025)` are `success` on it. The full suite is not a required context, so a
-  merge path that waited only on the ruleset would miss a red behaviour suite.
+  issue 3025)` are `success` on it. The full suite is now a required context too
+  (§4a0, #4251); the explicit check is kept because automerge must never outrun a
+  ruleset apply that has not happened yet.
 
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
@@ -427,22 +440,22 @@ after any change: `python3 -m pytest tests/ -m "deploy_critical and not integrat
 python3 -m pytest tests/ -m "premerge and not integration" -q
 ```
 
-That is the *same selection* `pr-checks.yml` runs as `Collect + deploy-critical + format` —
-the required merge gate from §4a0. One marker, named by both, so a local green here and
-the PR check cannot drift apart by construction (#2258). Membership is **derived**, not
-listed: `tests/conftest.py` applies `premerge` to every `tests/*_behavior.py` file, to
-everything `deploy_critical`, and to the structural gates in `_PREMERGE_EXTRA_FILES`.
-**8,813 tests in 155s** (measured locally 2026-08-21) against the job's 10-minute timeout.
+That is the *merge-relevant* selection: since #4251 it is split across `pr-checks.yml`'s
+two jobs. The **required** `Collect + deploy-critical + format` runs only its
+`deploy_critical` part (`-m "deploy_critical and not integration and not serial" -n auto
+--dist loadfile`, then the `serial` complement in one process — empty today, so that pass
+exits 5 and the step forgives exactly that code). The rest of `premerge` runs in the same
+PR's `Full unit suite` job, which runs the whole tree and is **not** required (§4a0).
+Before #4251 the fast lane ran all ~12.5k premerge tests and the full-suite job ran them
+again; the fast lane took 12–13 min for it (`gh run view <id> --json jobs`).
+`tests/test_premerge_lane.py` holds both halves: the fast lane's partition over
+`serial`, and the full-suite passes selecting every premerge test.
 
-**On the runner it is two passes over that one selection (#4251)** — the full-suite job's
-idiom: `-m "premerge and not integration and not serial" -n auto --dist loadfile`, then
-`-m "premerge and not integration and serial"` in one process for the in-tree writers.
-The expressions are exact complements, so no test runs twice inside the lane
-(`tests/test_premerge_lane.py` holds the partition). Run serially, it had grown to ~21 min
-on the runner — slower than the 30k-test parallel full suite on the same PR. Locally the
-one-pass command above is still the same selection; add `-n auto --dist loadfile -m
-"premerge and not integration and not serial"` for the lane's speed (12,258 tests in
-406s on 12 cores, 2026-09-27, plus 46 serial in 94s).
+Membership is **derived**, not listed: `tests/conftest.py` applies `premerge` to every
+`tests/*_behavior.py` file, to everything `deploy_critical`, and to the structural gates
+in `_PREMERGE_EXTRA_FILES`. The marker stays: `deploy/merge_train.sh`, the reset
+pipeline and `docs-ci.yml` still name it. To reproduce only the required check locally:
+`python3 -m pytest tests/ -m "deploy_critical and not integration" -n auto --dist loadfile -q`.
 
 **What it does NOT do: predict main.** It covers the *merge* gate. The lane that reds
 `main` is the full `Unit Tests` job — ~1,320s (#2692) — and no cheap local subset honestly
