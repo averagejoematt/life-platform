@@ -131,8 +131,9 @@ concurrency:
   #     code `deploy` job no longer waits at the production gate, so a gate park can no
   #     longer hold this slot — the #2467 holder class is gone by construction.)
   #
-  # If a phantom EVER appears again after this, it can only be in the deploy group —
-  # and that is a much narrower thing to reason about than "no CI at all".
+  # If a phantom EVER appears again after this, it can only be in the deploy group (or,
+  # since #4252 box 5, the `test` job's unit-test group) — and that is a much narrower
+  # thing to reason about than "no CI at all".
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
@@ -558,6 +559,18 @@ jobs:
     # non-zero; if its runner dies, this job is skipped and the run is red on
     # test-owner's failure (visible, not silent).
     needs: [reconcile, lint, test-owner]   # #1173: reconcile listed to read build_sha
+    # #4252 box 5: a burst of pushes runs ONE in-flight full suite, not one per push. A run
+    # that will actually test (a push with no owner, above) joins the shared group and
+    # CANCELS the older in-flight suite: the newer run tests a tree that contains the older
+    # one, and check_main_green reads the evicted rollup as superseded (#3530 — a cancelled
+    # job with no failure). A run that skips, or a dispatch, gets a run-unique group, so it
+    # can never evict a run that is really testing. Deploy is untouched: `test` gates
+    # nothing but notify-failure (ADR-117), and the `deploy` group keeps cancel-in-progress
+    # false. If this group ever wedges (the phantom-queue class, see the workflow-level
+    # comment), salt its name; the blast radius is this one job.
+    concurrency:
+      group: ${{ (github.event_name == 'push' && needs.test-owner.outputs.owner_run == '') && format('ci-cd-unit-tests-{0}', github.ref) || format('ci-cd-unit-tests-{0}-{1}', github.ref, github.run_id) }}
+      cancel-in-progress: true
     uses: ./.github/workflows/ci-test.yml
     with:
       build_sha: ${{ needs.reconcile.outputs.build_sha }}
