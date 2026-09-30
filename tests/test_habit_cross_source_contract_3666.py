@@ -208,3 +208,156 @@ def test_the_check_is_wired_into_the_nightly_sweep():
     src = open(os.path.join(ROOT, "lambdas", "operational", "qa_smoke_lambda.py"), encoding="utf-8").read()
     assert "habit_cross_source_qa" in src
     assert '"habit_cross_source"' in src
+
+
+# ══ #4245 box 5 — the dead-man on the supplement join going dark ════════════════════
+# The same cross-source shape: a Habitify tick is a claim the supplements partition must
+# carry, and a content-bearing row is a claim nutrient_intake must count. Rows below are
+# the live 2026-09-29 records (read-only get-item 2026-09-30), trimmed to four supplements
+# and the fields the join reads; values verbatim.
+from operational.supplement_join_qa import (  # noqa: E402
+    check_supplement_join_liveness,
+    join_violations,
+    ticked_supplements,
+)
+
+SUPP_DAY = "2026-09-29"
+_STAMP = "2026-09-30T02:33:45.296Z"
+HABITIFY_0929 = {
+    "habit_statuses": {
+        name: {
+            "status": "completed",
+            "completed_at": _STAMP,
+            "current_value": Decimal("1"),
+            "target_value": Decimal("1"),
+            "periodicity": "daily",
+            "scheduled_today": True,
+            "group": "Optimize",
+        }
+        for name in ("Vitamin D", "Omega 3", "L-Threonate", "Multivitamin")
+    }
+    | {"Weigh In": {"status": "completed", "group": "Core", "completed_at": "2026-09-29T22:50:23.969Z"}},
+}
+
+
+def _bridged(name, dose, unit, category, timing="with_meal"):
+    return {
+        "name": name,
+        "dose": Decimal(dose),
+        "unit": unit,
+        "category": category,
+        "timing": timing,
+        "source": "habitify_bridge",
+        "logged_at": "2026-09-30T17:06:02.083597+00:00",
+    }
+
+
+SUPPLEMENTS_0929 = {
+    "date": SUPP_DAY,
+    "source": "supplements",
+    "schema_version": Decimal("1"),
+    "bridge_source": "habitify",
+    "supplements": [
+        _bridged("Vitamin D", "5000", "IU", "vitamin"),
+        _bridged("Omega 3", "2000", "mg", "supplement"),
+        _bridged("L-Threonate", "2000", "mg", "supplement", "before_bed"),
+        _bridged("Multivitamin", "1", "capsule", "vitamin"),
+    ],
+}
+
+
+def _supp_pt_now():
+    return datetime.fromisoformat("2026-09-30T09:00:00")
+
+
+def _supp_table(days):
+    items = {}
+    for day, (habit, supp) in days.items():
+        if habit is not None:
+            items[("USER#matthew#SOURCE#habitify", "DATE#" + day)] = habit
+        if supp is not None:
+            items[("USER#matthew#SOURCE#supplements", "DATE#" + day)] = supp
+    return _FakeTable(items)
+
+
+_WINDOW = ("2026-09-29", "2026-09-28", "2026-09-27")
+
+
+def test_the_live_0929_rows_are_joined():
+    assert ticked_supplements(HABITIFY_0929) == ["L-Threonate", "Multivitamin", "Omega 3", "Vitamin D"]
+    assert join_violations(SUPP_DAY, HABITIFY_0929, SUPPLEMENTS_0929) == []
+
+
+def test_a_ticked_supplement_with_no_bridge_row_is_the_bridge_going_dark():
+    """The 2026-09-06 shape (#3666): ticks landed, the bridge wrote nothing."""
+    (v,) = join_violations(SUPP_DAY, HABITIFY_0929, None)
+    assert "bridge dark" in v and "Vitamin D" in v
+    manual_only = {"supplements": [{"name": "Vitamin D", "dose": Decimal("5000"), "unit": "IU", "source": "manual"}]}
+    (v,) = join_violations(SUPP_DAY, HABITIFY_0929, manual_only)
+    assert "bridge dark" in v, "a manual MCP entry is not the bridge"
+
+
+def test_a_row_the_read_seam_cannot_count_is_the_join_going_dark(monkeypatch):
+    """The row reached the partition and fell out at nutrient_intake (a renamed bridge habit,
+    an emptied registry row, a lost conversion): counted is empty beside content-bearing doses."""
+    import operational.supplement_join_qa as sjq
+
+    monkeypatch.setattr(sjq, "nutrient_intake", lambda food, supp, habit: {"counted": []})
+    (v,) = join_violations(SUPP_DAY, HABITIFY_0929, SUPPLEMENTS_0929)
+    assert "join dark" in v and "Vitamin D" in v
+
+
+def test_what_is_not_a_violation():
+    # manual entries with no tick (MCP log_supplement) — the reverse direction is legitimate
+    assert join_violations(SUPP_DAY, {"habit_statuses": {}}, SUPPLEMENTS_0929) == []
+    # a day of failed/skipped/pending supplement habits and no row — a scheduled miss, not a dark bridge
+    missed = {"habit_statuses": {"Vitamin D": {"status": "failed", "miss_source": "vendor"}, "Omega 3": {"status": "pending"}}}
+    assert join_violations(SUPP_DAY, missed, None) == []
+    # unknown-content doses only (Multivitamin) — the join has nothing it could count
+    unknown_only = {"supplements": [_bridged("Multivitamin", "1", "capsule", "vitamin")]}
+    assert join_violations(SUPP_DAY, {"habit_statuses": {"Multivitamin": {"status": "completed"}}}, unknown_only) == []
+    # a non-supplement habit never counts as a tick
+    assert ticked_supplements({"habit_statuses": {"Weigh In": {"status": "completed"}}}) == []
+
+
+def test_the_nightly_leg_greens_on_three_joined_days_and_reds_naming_the_dark_one():
+    live = {d: (HABITIFY_0929, SUPPLEMENTS_0929) for d in _WINDOW}
+    (check,) = check_supplement_join_liveness(_supp_table(live), "USER#matthew#SOURCE#", _Check, "content_truth", _supp_pt_now)
+    assert check.passed is True and "3/3" in check.message
+    dark = dict(live) | {"2026-09-28": (HABITIFY_0929, None)}
+    (check,) = check_supplement_join_liveness(_supp_table(dark), "USER#matthew#SOURCE#", _Check, "content_truth", _supp_pt_now)
+    assert check.passed is False and "2026-09-28: bridge dark" in check.message
+
+
+def test_the_nightly_leg_warns_by_name_when_it_cannot_look():
+    """Absence louder than failure: no habit record, or no tick anywhere, is never a green."""
+    (check,) = check_supplement_join_liveness(_supp_table({}), "USER#matthew#SOURCE#", _Check, "content_truth", _supp_pt_now)
+    assert check.passed is None and "not evaluable" in check.message
+    no_ticks = {d: ({"habit_statuses": {"Weigh In": {"status": "completed"}}}, None) for d in _WINDOW}
+    (check,) = check_supplement_join_liveness(_supp_table(no_ticks), "USER#matthew#SOURCE#", _Check, "content_truth", _supp_pt_now)
+    assert check.passed is None and "no supplement habit completed" in check.message
+
+
+def test_the_nightly_leg_reads_only_the_closed_window_and_reds_on_a_ddb_error():
+    seen = []
+
+    class _Spy(_FakeTable):
+        def get_item(self, Key):  # noqa: N803
+            seen.append(Key["sk"])
+            return super().get_item(Key)
+
+    check_supplement_join_liveness(_Spy({}), "USER#matthew#SOURCE#", _Check, "content_truth", _supp_pt_now)
+    assert set(seen) == {"DATE#" + d for d in _WINDOW}
+
+    class _Broken:
+        def get_item(self, Key):  # noqa: N803
+            raise RuntimeError("throughput exceeded")
+
+    (check,) = check_supplement_join_liveness(_Broken(), "USER#matthew#SOURCE#", _Check, "content_truth", _supp_pt_now)
+    assert check.passed is False and "DDB error" in check.message
+
+
+def test_the_supplement_join_check_is_wired_into_the_nightly_sweep():
+    src = open(os.path.join(ROOT, "lambdas", "operational", "qa_smoke_lambda.py"), encoding="utf-8").read()
+    assert "supplement_join_qa.check_supplement_join_liveness" in src
+    assert '"supplement_join_liveness"' in src
