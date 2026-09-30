@@ -155,6 +155,7 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "guard::deploy/archive/20260310/verify_iam_migration.sh": "2026-09-05 seal (#3536)",
     "guard::deploy/archive/20260314/check_eb_scheduler_orphans.sh": "2026-09-05 seal (#3536)",
     "guard::deploy/archive/20260314/r8_p0_verify.sh": "2026-09-05 seal (#3536)",
+    "guard::deploy/archive/onetime/deploy_and_verify.sh": "2026-09-30 re-keyed (#4255 archived deploy/deploy_and_verify.sh; was the 2026-09-05 seal (#3536) line)",
     "guard::deploy/archive/20260314/verify_dlq_alarm_periods.sh": "2026-09-05 seal (#3536)",
     "guard::deploy/archive/20260718/setup_pipeline_health_check.sh": "2026-09-05 seal (#3536)",
     "guard::deploy/check_hae_webhook_ingress_drift.py": "2026-09-05 seal (#3536)",

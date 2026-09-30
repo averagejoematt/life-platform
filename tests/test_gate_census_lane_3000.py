@@ -509,7 +509,13 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 772  # 770 -> 772 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae, owner-approved lane):
+BASELINE_TOTAL_GATES = 771  # 772 -> 771 (2026-09-30, #4255 one Lambda deploy path): ONE leaves, one RELOCATES. Leaves:
+# `ci::ci-cd.yml::deploy::6` (`deploy / Deploy Lambdas`, the per-function matrix loop — deleted; unproven, its residue line
+# goes). Relocates, verdict unchanged (unproven): `guard::deploy/deploy_and_verify.sh` -> `guard::deploy/archive/onetime/
+# deploy_and_verify.sh` (archived; its residue line re-keyed, not absorbed). The inline `Deploy MCP server` step was never a
+# census gate; the fleet step keeps position deploy::4. MEASURED by id-set diff on `scripts/gate_census.py --json`, this tree
+# vs a `git archive origin/main` export at ff6f20ceb: 772 -> 771.
+# PRIOR: 772  # 770 -> 772 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae, owner-approved lane):
 # THREE entrants, all PROVEN — `ci::…/deploy-wedge-watch.yml::watch / Deploy dead-man — main's green runs reached AWS (#4256)`,
 # `guard::scripts/check_deploy_deadman.py` and `ci::…/ci-cd.yml::deploy / Late-approval guard — never ship an older tree over
 # newer code (#4256)` (the proofs recorded in this PR's own lines below). ONE retires: `registry::tests/test_deploy_wedge_2052.py::
