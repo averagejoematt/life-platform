@@ -8,7 +8,11 @@
 #   2b. Unit Tests — the exhaustive suite; runs in parallel, still reds main, but no
 #       longer skips deploy + the reader-facing visual-QA gate on an unrelated red test.
 #   3. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
-#   4. Deploy — requires manual approval (GitHub Environment: production)
+#   4. Deploy — code ships on green, NO manual approval (ADR-158, #4256). Only the
+#      additive-IAM CDK deploy (`deploy-iam`, "Deploy IAM (production gate)") waits on
+#      the GitHub Environment `production` click, and only when THIS push changed cdk/
+#      or infra/. Whether main actually reached AWS is the scheduled dead-man's
+#      question (scripts/check_deploy_deadman.py, run by deploy-wedge-watch.yml).
 #   5. Smoke test — invokes qa-smoke + canary, checks structured output
 #   6. Auto-rollback — Lambda/MCP (smoke failure, TB7-25) reverts each function to
 #      its prior S3 code artifact; there is no shared layer to roll back — it was
@@ -123,8 +127,9 @@ concurrency:
   #   * The invariant that DID matter — never two concurrent deploys of the same ref —
   #     moves to a job-level concurrency block on `deploy` (below), where it belongs.
   #     Blast radius if a phantom ever forms there is one job on one ref, visible as a
-  #     stuck Deploy rather than an entire pipeline that never starts, and the
-  #     production approval gate already serialises it in practice.
+  #     stuck Deploy rather than an entire pipeline that never starts. (Since ADR-158 the
+  #     code `deploy` job no longer waits at the production gate, so a gate park can no
+  #     longer hold this slot — the #2467 holder class is gone by construction.)
   #
   # If a phantom EVER appears again after this, it can only be in the deploy group —
   # and that is a much narrower thing to reason about than "no CI at all".
@@ -578,6 +583,10 @@ jobs:
       # runs `cdk deploy` ONLY for iam_additive_stacks, after re-evaluating at apply time.
       iam_gate_verdict: ${{ steps.cdk_diff.outputs.iam_gate_verdict }}
       iam_additive_stacks: ${{ steps.cdk_diff.outputs.iam_additive_stacks }}
+      # ADR-158 (#4256): did THIS push change cdk/ or infra/? The production click is offered
+      # only then — an additive-IAM diff carried over from an earlier merge does not re-park
+      # every later code deploy behind the owner.
+      cdk_changed: ${{ steps.plan.outputs.cdk_changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -870,6 +879,21 @@ jobs:
           fi
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
 
+          # ADR-158 (#4256): the one change class that still waits on a human is an IAM
+          # diff this push itself introduced. Same diff base as CHANGED above (#1173). An
+          # unreadable diff fails TOWARD offering the click, never toward skipping it.
+          if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
+            CDK_CHANGED="true"
+          elif CDK_FILES=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- cdk/ infra/ 2>/dev/null); then
+            if [ -n "$CDK_FILES" ]; then CDK_CHANGED="true"; else CDK_CHANGED="false"; fi
+          else
+            CDK_CHANGED="true"
+          fi
+          echo "cdk_changed=$CDK_CHANGED" >> "$GITHUB_OUTPUT"
+          if [ "$CDK_CHANGED" = "false" ] && [ -n "${{ steps.cdk_diff.outputs.iam_additive_stacks }}" ]; then
+            echo "::warning title=Additive IAM diff not offered (ADR-158)::${{ steps.cdk_diff.outputs.iam_additive_stacks }} carries an ALLOW-ADDITIVE IAM diff this push did not introduce (carried over, or reached through a non-cdk/ input). The production click is only offered on the push that changes cdk/ or infra/ — ship it with 'bash deploy/cdk_deploy.sh <Stack>' from main, or dispatch ci-cd.yml with deploy_all=true."
+          fi
+
           # Public-site deploys moved OUT of this pipeline (#750): a push touching
           # site/ triggers .github/workflows/site-deploy.yml, which deploys the merged
           # main tree WITHOUT the production approval gate (that gate was the
@@ -910,28 +934,30 @@ jobs:
           echo "matrix=$(echo "$DEPLOYS" | jq -c '.')" >> "$GITHUB_OUTPUT"
 
   # ════════════════════════════════════════════════════════════════
-  # Job 4: Deploy (manual approval gate)
+  # Job 4a: Deploy IAM — the ONLY manual approval gate (ADR-158, #4256)
   # ════════════════════════════════════════════════════════════════
-  deploy:
-    name: Deploy
+  # Owner ruling 2026-09-27: only IAM/CDK needs the `production` click; code ships on
+  # green like the site does (#750). This job is the whole of what still waits on a
+  # human: the #2834 additive-IAM `cdk deploy`, offered only when THIS push changed cdk/
+  # or infra/ (plan's cdk_changed) — a carried-over diff does not re-park every later merge.
+  #
+  # NO `concurrency:` HERE, DELIBERATELY. A job parked at an environment gate OCCUPIES its
+  # concurrency slot (#2467 — the 2026-08-09 all-day wedge was two 8-day-old gate parks
+  # holding the deploy group), and every wedge / janitor / lease-steward mechanism this
+  # repo grew exists because the gate and the group were the same job. CloudFormation
+  # already refuses a concurrent update to one stack, and the step below re-evaluates the
+  # live template at apply time, so two approved IAM runs cannot both apply a stale diff.
+  deploy-iam:
+    name: Deploy IAM (production gate)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [reconcile, plan]   # #1173: reconcile listed to read build_sha
-    # #2834: an IAM-only merge changes cdk/ alone (has_deploys=false) and must still reach
-    # the additive-IAM step below — the code-deploy steps handle an empty matrix already.
-    if: needs.plan.outputs.has_deploys == 'true' || needs.plan.outputs.iam_additive_stacks != ''
-    environment: production   # ← Manual approval gate
-    # The real invariant, moved here from the workflow level (2026-08-02, 4th
-    # phantom-queue wedge): never two concurrent deploys of the same ref. A
-    # mid-flight deploy still completes (cancel-in-progress: false) — it is only
-    # the *validation* jobs that no longer queue behind anything.
-    concurrency:
-      group: ci-cd-deploy-${{ github.ref }}
-      cancel-in-progress: false
+    if: needs.plan.outputs.iam_additive_stacks != '' && needs.plan.outputs.cdk_changed == 'true'
+    environment: production   # ← the ONE manual approval gate (ADR-158)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: deploy the reconciled tree (e.g. the synced site_api_common literals)
+          ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
 
       - name: Configure AWS credentials (OIDC)
         uses: ./.github/actions/setup-ci
@@ -943,24 +969,12 @@ jobs:
       # ── #2834: the additive-IAM deploy (ADR-065 amendment 2026-08-30) ──────────
       # Owner decision on #2834, option (b): CI may apply an IAM change ONLY when the
       # synthesized template diff is additive-only (deploy/iam_additive_gate.py decides).
-      # Two steps, deliberately: a dead-man that reds if the Plan verdict is ABSENT
-      # (absence must be louder than failure), then the deploy itself, which re-evaluates
-      # at apply time and deploys the exact cloud assembly it evaluated.
-      # ORDER (CISO review N2, 2026-08-30): both steps run BEFORE the fleet/MCP/per-function
-      # code deploys below. A grant that lands after its code would leave the code live and
-      # unable to do its job for as long as the apply-time evaluation takes to fail; the
-      # 2026-08-14 P1 was exactly a deployed function missing one s3:GetObject.
-      - name: IAM gate verdict present (dead-man, #2834)
-        run: |
-          VERDICT='${{ needs.plan.outputs.iam_gate_verdict }}'
-          if [ -z "$VERDICT" ]; then
-            echo "::error::Plan produced NO iam_gate_verdict output — deploy/iam_additive_gate.py did not run (step removed, output renamed, or it crashed before writing). Absence is a failure, not a pass (#2834 dead-man)."
-            exit 1
-          fi
-          echo "iam_gate_verdict=$VERDICT  iam_additive_stacks='${{ needs.plan.outputs.iam_additive_stacks }}'"
-
+      # It re-evaluates at apply time and deploys the exact cloud assembly it evaluated.
+      # ORDER (CISO review N2, 2026-08-30): this job runs BEFORE the code deploys — the
+      # `deploy` job below `needs:` it. A grant that lands after its code would leave the
+      # code live and unable to do its job; the 2026-08-14 P1 was exactly a deployed
+      # function missing one s3:GetObject.
       - name: Additive IAM deploy — evaluated == deployed (#2834)
-        if: needs.plan.outputs.iam_additive_stacks != ''
         run: |
           set -euo pipefail
           PLAN_STACKS="${{ needs.plan.outputs.iam_additive_stacks }}"
@@ -1015,6 +1029,80 @@ jobs:
             --message "CI applied additive-only IAM (#2834). Stacks: $DEPLOY_STACKS. Run: ${GITHUB_RUN_ID} sha ${GITHUB_SHA:0:12}. Admitted: ${ADMITTED}. Ledger: s3://matthew-life-platform/${AUDIT_BASE}-*.json" \
             --region ${{ env.AWS_REGION }} >/dev/null
           echo "✅ additive IAM deployed: $DEPLOY_STACKS · ledger s3://matthew-life-platform/${AUDIT_BASE}-*.json · notified life-platform-alerts"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 4b: Deploy — code ships on green (ADR-158, #4256; no approval gate)
+  # ════════════════════════════════════════════════════════════════
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # #1173: reconcile listed to read build_sha. deploy-iam listed for ORDER only (CISO N2):
+    # when this push carries an additive-IAM grant, the code that needs it waits for it.
+    needs: [reconcile, plan, deploy-iam]
+    # ADR-158: runs when Plan is green and there is code to ship, whether deploy-iam ran
+    # (success) or was not needed (skipped). A failed or REJECTED IAM gate skips the code
+    # deploy that was waiting on it — the dead-man (scripts/check_deploy_deadman.py) names
+    # that run until a deploy_all supersedes it. `!cancelled()` rather than `always()`: a
+    # cancelled run must not deploy.
+    if: >-
+      !cancelled()
+      && needs.plan.result == 'success'
+      && needs.plan.outputs.has_deploys == 'true'
+      && (needs.deploy-iam.result == 'success' || needs.deploy-iam.result == 'skipped')
+    # The real invariant, moved here from the workflow level (2026-08-02, 4th
+    # phantom-queue wedge): never two concurrent deploys of the same ref. A
+    # mid-flight deploy still completes (cancel-in-progress: false) — it is only
+    # the *validation* jobs that no longer queue behind anything. Since ADR-158 nothing
+    # in this job waits on a human, so the slot is held for minutes, never for days.
+    concurrency:
+      group: ci-cd-deploy-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: deploy the reconciled tree (e.g. the synced site_api_common literals)
+
+      - name: Configure AWS credentials (OIDC)
+        uses: ./.github/actions/setup-ci
+        with:
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      # #2834's dead-man, unchanged in meaning: a Plan that produced NO IAM verdict means
+      # deploy/iam_additive_gate.py did not run, and nothing ships on an unevaluated diff.
+      - name: IAM gate verdict present (dead-man, #2834)
+        run: |
+          VERDICT='${{ needs.plan.outputs.iam_gate_verdict }}'
+          if [ -z "$VERDICT" ]; then
+            echo "::error::Plan produced NO iam_gate_verdict output — deploy/iam_additive_gate.py did not run (step removed, output renamed, or it crashed before writing). Absence is a failure, not a pass (#2834 dead-man)."
+            exit 1
+          fi
+          echo "iam_gate_verdict=$VERDICT  iam_additive_stacks='${{ needs.plan.outputs.iam_additive_stacks }}'"
+
+      # ADR-158: the one way this job can run late is behind an IAM click. If the owner
+      # approved hours after the merge and main has since moved code that this run would
+      # overwrite with an older tree, refuse — the run's own diff is then shipped by the
+      # recovery below, never by regressing a newer deploy.
+      - name: Late-approval guard — never ship an older tree over newer code (#4256)
+        if: needs.deploy-iam.result == 'success'
+        run: |
+          set -euo pipefail
+          BUILD_SHA="${{ needs.reconcile.outputs.build_sha }}"
+          git fetch --no-tags --depth=1 origin main
+          TIP=$(git rev-parse FETCH_HEAD)
+          if [ "$TIP" = "$BUILD_SHA" ]; then
+            echo "main is still at $BUILD_SHA — nothing newer to overwrite."
+            exit 0
+          fi
+          NEWER=$(git diff --name-only "$BUILD_SHA" "$TIP" -- lambdas/ mcp/ mcp_server.py $(python3 deploy/build_bundle.py --print-bundled-config-paths))
+          if [ -n "$NEWER" ]; then
+            echo "::error title=Late IAM approval (ADR-158)::main moved past $BUILD_SHA and changed deployable code since; this run would overwrite it with an older tree. The IAM grant landed; ship the code with: gh workflow run ci-cd.yml --ref main -f deploy_all=true"
+            echo "$NEWER" | head -40
+            exit 1
+          fi
+          echo "main moved to $TIP but touched no deployable path — safe to ship $BUILD_SHA."
 
       - name: Fleet deploy (shared module changed)
         if: needs.plan.outputs.fleet_changed == 'true'
@@ -1615,7 +1703,7 @@ jobs:
     # #416: include test-critical so a deploy-gating failure also notifies.
     # #1173: include reconcile so a failed reconcile (non-whitelisted dirt,
     # rejected push) also lands in the digest.
-    needs: [reconcile, lint, test-critical, test, plan, deploy, smoke-test]
+    needs: [reconcile, lint, test-critical, test, plan, deploy-iam, deploy, smoke-test]
     if: failure()
     steps:
       - name: Configure AWS credentials (OIDC)

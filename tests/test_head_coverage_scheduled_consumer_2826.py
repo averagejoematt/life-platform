@@ -336,3 +336,166 @@ def test_omitting_committer_preserves_the_original_behaviour():
     ci = _ci_paths()
     assert cmg.classify_zero_run_head([], ["lambdas/web/foo.py"], ci)["state"] == cmg.ZR_SWALLOWED
     assert cmg.classify_zero_run_head([{"name": "Docs CI"}], ["CLAUDE.md"], ci)["state"] == cmg.ZR_PATH_FILTER_SKIP
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# #4256 / ADR-158 — the deploy dead-man, the second scheduled consumer in
+# deploy-wedge-watch.yml. Code ships on green with no approval gate, so the
+# one question left is whether main's green runs reached AWS. The three run
+# shapes marked REAL are the job lists of live CI/CD runs on main (read-only
+# `gh api …/actions/runs/<id>/jobs`, 2026-09-28), trimmed to the fields read;
+# the IAM-gate shapes are SYNTHETIC because the `Deploy IAM (production gate)`
+# job only exists once this ADR merges.
+# ─────────────────────────────────────────────────────────────────────────
+
+_dm_spec = importlib.util.spec_from_file_location("deadman_4256", os.path.join(_REPO, "scripts", "check_deploy_deadman.py"))
+dm = importlib.util.module_from_spec(_dm_spec)
+_dm_spec.loader.exec_module(dm)
+
+from datetime import datetime, timezone  # noqa: E402
+
+_NOW = datetime(2026, 9, 28, 8, 0, 0, tzinfo=timezone.utc)
+
+
+def _j(name, conclusion, completed_at="2026-09-28T01:50:00Z", status="completed", steps=None):
+    return {"name": name, "status": status, "conclusion": conclusion, "completed_at": completed_at, "steps": steps or []}
+
+
+# REAL — run 36366557551 (b2f3fbb1b): Plan green 01:50:00Z, Deploy success via the fleet step.
+_FLEET_DEPLOYED = [
+    _j("Plan deployments", "success", "2026-09-28T01:50:00Z"),
+    _j(
+        "Deploy",
+        "success",
+        "2026-09-28T02:02:35Z",
+        steps=[
+            {"name": "IAM gate verdict present (dead-man,", "conclusion": "success"},
+            {"name": "Fleet deploy (shared module changed)", "conclusion": "success"},
+            {"name": "Deploy Lambdas", "conclusion": "skipped"},
+        ],
+    ),
+]
+# REAL — run 36367108059 (536d8716e, a dependabot CDK-CLI bump): Plan green, Deploy skipped.
+_NOTHING_OWED = [_j("Plan deployments", "success", "2026-09-28T01:58:25Z"), _j("Deploy", "skipped", "2026-09-28T01:58:26Z")]
+# REAL — run 36357312147 (6e2584ff0): Plan green 23:14:30Z, Deploy `failure` — its approval
+# record reads `rejected … session AP` (a superseded lease rejected under the OLD routing).
+_REJECTED_LEASE = [_j("Plan deployments", "success", "2026-09-27T23:14:30Z"), _j("Deploy", "failure", "2026-09-27T23:15:27Z")]
+
+
+def _run(rid, sha, created, event="push"):
+    return {"id": rid, "head_sha": sha * 5, "created_at": created, "event": event}
+
+
+def test_deadman_job_names_are_the_ones_ci_cd_yml_declares():
+    """A rename in ci-cd.yml that is not mirrored here would make every run read as
+    `in-flight` (no Plan job found) — pinned against the real file."""
+    with open(os.path.join(_REPO, ".github", "workflows", "ci-cd.yml")) as f:
+        wf = f.read()
+    for name in (dm.PLAN_JOB, dm.DEPLOY_JOB, dm.DEPLOY_IAM_JOB):
+        assert f"    name: {name}\n" in wf, name
+    assert f"- name: {dm.FLEET_STEP_PREFIX} (shared module changed)" in wf
+
+
+def test_deadman_classifies_the_real_run_shapes():
+    cases = {
+        "fleet-deployed": (_FLEET_DEPLOYED, dm.DEPLOYED),
+        "nothing-owed": (_NOTHING_OWED, dm.NOTHING),
+        "rejected-lease": (_REJECTED_LEASE, dm.UNDEPLOYED),
+    }
+    wrong = {k: dm.classify_run(_run(1, "a", "2026-09-28T01:00:00Z"), jobs, _NOW)["state"] for k, (jobs, _) in cases.items()}
+    assert wrong == {k: want for k, (_, want) in cases.items()}
+
+
+def test_deadman_iam_gate_shapes():
+    plan = _j("Plan deployments", "success", "2026-09-28T01:00:00Z")
+    parked = dm.classify_run(
+        _run(1, "a", "x"),
+        [plan, _j("Deploy IAM (production gate)", None, None, status="waiting"), _j("Deploy", None, None, status="pending")],
+        _NOW,
+    )
+    assert parked["state"] == dm.IN_FLIGHT and "production gate" in parked["reason"] and parked["age_hours"] == 7.0
+    rejected = dm.classify_run(_run(2, "b", "x"), [plan, _j("Deploy IAM (production gate)", "failure"), _j("Deploy", "skipped")], _NOW)
+    assert rejected["state"] == dm.UNDEPLOYED and "IAM gate" in rejected["reason"]
+    iam_only = dm.classify_run(_run(3, "c", "x"), [plan, _j("Deploy IAM (production gate)", "success"), _j("Deploy", "skipped")], _NOW)
+    assert iam_only["state"] == dm.NOTHING
+    red = dm.classify_run(_run(4, "d", "x"), [_j("Plan deployments", "failure"), _j("Deploy", "skipped")], _NOW)
+    assert red["state"] == dm.NOT_GREEN
+
+
+def _walk(runs_and_jobs, hours=dm.DEADLINE_HOURS):
+    jobs = {r["id"]: j for r, j in runs_and_jobs}
+    return dm.verdict(dm.walk([r for r, _ in runs_and_jobs], lambda r: jobs[r["id"]], _NOW), hours)
+
+
+def test_deadman_alarms_on_an_undeployed_green_run_newer_than_the_last_fleet_deploy():
+    state = _walk(
+        [
+            (_run(3, "c", "2026-09-28T02:00:00Z"), _NOTHING_OWED),
+            (_run(2, "b", "2026-09-27T23:00:00Z"), _REJECTED_LEASE),
+            (_run(1, "a", "2026-09-27T20:00:00Z"), _FLEET_DEPLOYED),
+        ]
+    )
+    assert [a["run_id"] for a in state["alarms"]] == [2]
+    code, text = dm.render(state)
+    assert code == dm.EXIT_ALARM and dm.RECOVERY in text
+
+
+def test_deadman_a_newer_fleet_deploy_supersedes_an_older_failure():
+    state = _walk([(_run(2, "b", "2026-09-28T02:00:00Z"), _FLEET_DEPLOYED), (_run(1, "a", "2026-09-27T23:00:00Z"), _REJECTED_LEASE)])
+    assert state["alarms"] == [] and [r["run_id"] for r in state["rows"]] == [2], "the walk stops at the fleet deploy"
+    assert dm.render(state)[0] == dm.EXIT_OK
+
+
+def test_deadman_another_run_at_the_same_sha_settles_it():
+    per_function = [_j("Plan deployments", "success"), _j("Deploy", "success", steps=[{"name": "Deploy Lambdas", "conclusion": "success"}])]
+    state = _walk(
+        [(_run(2, "a", "2026-09-28T03:00:00Z", "workflow_dispatch"), per_function), (_run(1, "a", "2026-09-28T01:00:00Z"), _REJECTED_LEASE)]
+    )
+    assert state["alarms"] == []
+
+
+def test_deadman_waits_out_the_deadline_and_never_reads_unknown_age_as_fresh():
+    young = [_j("Plan deployments", "success", "2026-09-28T07:00:00Z"), _j("Deploy", "failure")]
+    assert _walk([(_run(1, "a", "2026-09-28T06:00:00Z"), young)])["alarms"] == []
+    unknown = [_j("Plan deployments", "success", None), _j("Deploy", "failure")]
+    assert [a["run_id"] for a in _walk([(_run(1, "a", "2026-09-28T06:00:00Z"), unknown)])["alarms"]] == [1]
+
+
+def test_deadman_main_exit_codes_are_the_three_way_contract(monkeypatch, capsys):
+    def boom():
+        raise RuntimeError("HTTP 502")
+
+    monkeypatch.setattr(dm, "collect", boom)
+    assert dm.main([]) == dm.EXIT_INDETERMINATE
+    assert "✅" not in capsys.readouterr().out, "an unreadable API must never print the OK glyph"
+    runs = [_run(1, "a", "2026-09-27T23:00:00Z")]
+    monkeypatch.setattr(dm, "collect", lambda: (runs, lambda r: _REJECTED_LEASE))
+    assert dm.main(["--hours", "0.5"]) == dm.EXIT_ALARM
+    monkeypatch.setattr(dm, "collect", lambda: (runs, lambda r: _FLEET_DEPLOYED))
+    assert dm.main([]) == dm.EXIT_OK
+    assert len({dm.EXIT_OK, dm.EXIT_ALARM, dm.EXIT_INDETERMINATE}) == 3
+
+
+def test_deadman_alert_throttles_one_dispatch_per_episode(monkeypatch):
+    calls = []
+    state = {"alarms": [{"run_id": 7}], "rows": [], "hours": 4.0}
+    marker = f"{dm.ALERT_MARKER_PREFIX}{dm.episode_key(state)}{dm.ALERT_MARKER_SUFFIX}"
+    monkeypatch.setattr(dm, "_gh_api", lambda path: [{"number": 9, "body": f"x {marker}"}])
+    monkeypatch.setattr(dm, "_gh", lambda args, stdin=None: calls.append(args) or "")
+    assert dm.maybe_alert(state, "🛑 head", _NOW).startswith("alert-throttled")
+    assert calls == []
+    monkeypatch.setattr(dm, "_gh_api", lambda path: [])
+    assert dm.maybe_alert(state, "🛑 head", _NOW).startswith("alert-fired")
+    assert any(f"labels[]={dm.ALERT_LABEL}" in a for c in calls for a in c), "the tracking issue carries its one label"
+    assert any(f"repos/{dm.REPO}/dispatches" in c for c in calls)
+
+
+def test_deadman_is_wired_as_the_last_unskippable_step_of_the_watch():
+    with open(os.path.join(_REPO, ".github", "workflows", "deploy-wedge-watch.yml")) as f:
+        wf = f.read()
+    steps = wf.split("\n      - ")
+    last = steps[-1]
+    assert last.startswith("name: Deploy dead-man"), "the dead-man must be the final step"
+    assert "if: ${{ !cancelled() }}" in last
+    assert "python3 scripts/check_deploy_deadman.py --alert" in last
+    assert "continue-on-error" not in last and "|| true" not in last

@@ -984,6 +984,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # this lane -> 776 {proven 225, unproven 540, not-applicable 6, attempted-unproven 5}; a `git archive
         # origin/main` export at 3c43af4ce -> 775 {224, 540, 6, 5}. Exactly that one id enters, {} leaves — unproven
         # does NOT move.
+        # Upper bound 227 -> 230 (2026-09-28, #4256 ADR-158, code ships on green): THREE proofs, each with a real run —
+        # `ci::deploy-wedge-watch.yml::watch::9` + `guard::scripts/check_deploy_deadman.py` (verdict() neutered to
+        # `alarms = []` in the real file: 3 failed / 7 passed, restored 10 passed; plus a live read-only run with the
+        # fleet supersession removed, exit 1 vs 0) and `ci::ci-cd.yml::deploy::3`, the late-approval guard (its run:
+        # body in a depth-30 clone of main: BUILD_SHA=main~3 exit 1, tip exit 0). Id-set diff vs the untouched tree at
+        # origin/main 5672de8c4: main 778 {227, 540, 6, 5} -> this lane 780 {230, 539, 6, 5}.
         # Upper bound 230 -> 231 (2026-09-29, #4270 slice 1 re-merged onto #4419's 230): ONE entrant,
         # `registry::tests/test_root_clutter_guard.py::ALLOWLIST::ledgers` (the new `ledgers/` top-level dir, the first
         # residue ledger moved out of tests/), arriving PROVEN via a REGISTRY_PROOFS record in scripts/gate_census_proofs.py
@@ -1026,7 +1032,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # step, both PROVEN (GUARD_PROOFS / CI_PROOFS). Id-set diff vs origin/main a55566bbf: 766 {232, 522, 7, 5} -> 768 {234, 522, 7, 5}.
         # Upper bound 234 -> 235 (2026-09-29, #4276): structural::test_bedrock_client.py, PROVEN (STRUCTURAL_HAND_PROOFS).
         # Upper bound 235 -> 236 (2026-09-29, #4220): structural::test_coaches_api.py, PROVEN (STRUCTURAL_HAND_PROOFS).
-        <= 236
+        # Upper bound 236 -> 239 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae): the lane's THREE proven
+        # entrants (dead-man step + check_deploy_deadman.py + the late-approval guard) on top of main's 236. Id-set diff vs a
+        # `git archive origin/main` export at d37bd02ae: main 770 {236, 522, 7, 5} -> this lane 772 {239, 521, 7, 5}.
+        <= 239
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

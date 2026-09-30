@@ -525,11 +525,12 @@ def is_plan_red_deploy_skipped(jobs: list[dict]) -> bool:
 
 
 def _deploy_is_sole_failure(jobs: list[dict]) -> bool:
-    """True iff `Deploy` failed and no other job did (skips are not failures)."""
+    """True iff `Deploy` failed and no other job did (skips are not failures). Since ADR-158
+    the rejectable job is `Deploy IAM (production gate)` — both names are the deploy leg."""
     deploy_failed = other_failed = False
     for j in jobs:
         concl = j.get("conclusion")
-        if j.get("name") == "Deploy":
+        if j.get("name") in ("Deploy", "Deploy IAM (production gate)"):
             deploy_failed = deploy_failed or concl == "failure"
         elif concl == "failure":
             other_failed = True

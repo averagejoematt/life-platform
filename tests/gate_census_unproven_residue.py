@@ -40,7 +40,10 @@ visible — it is a `# gate-entrypoint:`-grade decision, never a lane's convenie
 """
 
 UNPROVEN_RESIDUE: dict[str, str] = {
-    "ci::.github/workflows/ci-cd.yml::deploy / Additive IAM deploy — evaluated == deployed (#2834)": "2026-09-05 seal (#3536)",
+    # RELOCATED, not added (#4256, ADR-158): the same #2834 step, byte-identical body, moved
+    # from job `deploy` into its own `deploy-iam` job — the one job still behind the
+    # production click. The seal date is the step's own; the residue's size is unchanged.
+    "ci::.github/workflows/ci-cd.yml::deploy-iam / Additive IAM deploy — evaluated == deployed (#2834)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::deploy / Deploy Lambdas": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::deploy / IAM gate verdict present (dead-man,": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::plan / Assert stateful resources exist": "2026-09-05 seal (#3536)",
@@ -359,7 +362,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_cast_roster_consistency.py::PROMPT_LITERAL_ALLOWLIST::lambdas/emails/monthly_digest_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_cast_roster_consistency.py::PROMPT_LITERAL_ALLOWLIST::lambdas/emails/partner_email_lambda.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_cast_roster_consistency.py::PROMPT_LITERAL_ALLOWLIST::lambdas/emails/weekly_digest_lambda.py": "2026-09-05 seal (#3536)",
-    "registry::tests/test_deploy_wedge_2052.py::_GATE_WATCH": "2026-09-05 seal (#3536)",
     "registry::tests/test_docs_ci_owns_doc_gates.py::_DOC_GATES::deploy/sync_doc_metadata.py --check": "2026-09-05 seal (#3536)",
     "registry::tests/test_docs_ci_owns_doc_gates.py::_DOC_GATES::scripts/check_doc_facts.py": "2026-09-05 seal (#3536)",
     "registry::tests/test_docs_ci_owns_doc_gates.py::_DOC_GATES::scripts/check_doc_index.py --strict": "2026-09-05 seal (#3536)",

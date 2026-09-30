@@ -111,6 +111,17 @@ def test_rejected_deployment_with_deploy_sole_red_is_a_rejection():
     assert g.is_deploy_rejection(REJECTED_JOBS, REJECTED_APPROVALS) is True
 
 
+def test_a_rejected_iam_gate_under_adr_158_is_a_rejection():
+    """ADR-158 (#4256): the one job left behind the click is `Deploy IAM (production gate)`.
+    Rejecting it fails that job and SKIPS the code `Deploy` that needed it — still the
+    rejected shape, never a red main. SYNTHETIC (the job exists only once ADR-158 lands)."""
+    g = _gate()
+    jobs = [dict(j) for j in REJECTED_JOBS if j["name"] != "Deploy"]
+    jobs += [{"name": "Deploy IAM (production gate)", "conclusion": "failure"}, {"name": "Deploy", "conclusion": "skipped"}]
+    assert g.is_deploy_rejection(jobs, REJECTED_APPROVALS) is True
+    assert g.is_deploy_rejection(jobs, APPROVED_APPROVALS) is False
+
+
 def test_approved_deployment_with_the_same_job_shape_is_NOT_a_rejection():
     """LOAD-BEARING: a genuinely broken Deploy job is byte-identical in shape.
 

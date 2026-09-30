@@ -379,10 +379,23 @@ def test_plan_job_runs_the_gate_and_exports_its_verdict(wf):
     assert step.index("resource DESTRUCTIONS") < step.index("iam_additive_gate.py")
 
 
-def test_deploy_job_runs_for_an_iam_only_merge(wf):
+def test_the_production_gate_holds_only_the_iam_deploy(wf):
+    """ADR-158 (#4256): the additive-IAM deploy is its own job and the ONLY one behind the
+    `production` click; code ships on green. The IAM job carries no concurrency group — a
+    gate park that holds a group slot is the #2467 wedge class."""
+    iam = _job(wf, "deploy-iam")
+    assert "environment: production" in iam
+    assert "if: needs.plan.outputs.iam_additive_stacks != '' && needs.plan.outputs.cdk_changed == 'true'" in iam
+    assert "concurrency:" not in iam
     deploy = _job(wf, "deploy")
-    assert "if: needs.plan.outputs.has_deploys == 'true' || needs.plan.outputs.iam_additive_stacks != ''" in deploy
-    assert "environment: production" in deploy  # the additive deploy sits behind the same click
+    assert not re.search(r"^    environment:", deploy, re.M), "code deploys must not wait on the production click (ADR-158)"
+    assert "needs: [reconcile, plan, deploy-iam]" in deploy
+    assert "needs.plan.outputs.has_deploys == 'true'" in deploy
+    assert "(needs.deploy-iam.result == 'success' || needs.deploy-iam.result == 'skipped')" in deploy
+    cond = deploy.split("if: >-", 1)[1].split("\n    concurrency:", 1)[0]
+    assert "!cancelled()" in cond and "always()" not in cond, "a cancelled run must never deploy"
+    # the set, not the instance: no other ci-cd job may sit behind the environment either
+    assert len(re.findall(r"^    environment: production", wf, re.M)) == 1
 
 
 def test_deploy_job_dead_man_asserts_the_verdict_exists(wf):
@@ -395,9 +408,10 @@ def test_deploy_job_dead_man_asserts_the_verdict_exists(wf):
 
 
 def test_additive_deploy_step_evaluates_then_deploys_the_evaluated_assembly(wf):
-    deploy = _job(wf, "deploy")
+    deploy = _job(wf, "deploy-iam")
     step = _step(deploy, "Additive IAM deploy — evaluated == deployed (#2834)")
-    assert "if: needs.plan.outputs.iam_additive_stacks != ''" in step
+    # ADR-158: the admission condition moved from the step to the deploy-iam job itself
+    assert "if: needs.plan.outputs.iam_additive_stacks != ''" in deploy.split("steps:", 1)[0]
     assert "continue-on-error" not in step
     assert "set -euo pipefail" in step
     body = step.split("run:", 1)[1]
@@ -421,7 +435,7 @@ def test_additive_deploy_publishes_one_line_to_the_alert_topic(wf):
     failed ledger write. The grant it uses is one the deploy role already held (asserted
     from the committed policy document in the test below).
     """
-    step = _step(_job(wf, "deploy"), "Additive IAM deploy — evaluated == deployed (#2834)")
+    step = _step(_job(wf, "deploy-iam"), "Additive IAM deploy — evaluated == deployed (#2834)")
     body = step.split("run:", 1)[1]
     assert "aws sns publish" in body
     assert "life-platform-alerts" in body
@@ -435,13 +449,16 @@ def test_the_2834_steps_run_before_any_code_deploy(wf):
     """N2 (CISO review): a grant that lands AFTER its code leaves the code live and unable to
     do its job for as long as the apply-time evaluation takes to fail — which is the
     2026-08-14 P1 shape exactly (a deployed function missing one s3:GetObject)."""
+    # ADR-158: the order is now carried by `needs:` — the code job cannot start until the
+    # IAM job has finished (or was skipped), and a failed/rejected IAM job skips it.
+    iam = _job(wf, "deploy-iam")
     deploy = _job(wf, "deploy")
+    assert "deploy-iam" in deploy.split("steps:", 1)[0].split("needs:", 1)[1].split("\n", 1)[0]
+    assert iam.index("name: Configure AWS credentials (OIDC)") < iam.index("Additive IAM deploy — evaluated == deployed (#2834)")
     i_deadman = deploy.index("IAM gate verdict present (dead-man, #2834)")
-    i_additive = deploy.index("Additive IAM deploy — evaluated == deployed (#2834)")
     i_creds = deploy.index("name: Configure AWS credentials (OIDC)")
     for code_step in ("Fleet deploy (shared module changed)", "Deploy MCP server", "Deploy Lambdas"):
-        assert i_additive < deploy.index(code_step), f"the #2834 steps must precede {code_step!r}"
-    assert i_creds < i_deadman < i_additive, "…and must still sit after the OIDC credentials step"
+        assert i_creds < i_deadman < deploy.index(code_step), f"the #2834 dead-man must precede {code_step!r}"
 
 
 def test_deploy_role_needs_no_new_grant_for_the_additive_deploy():
