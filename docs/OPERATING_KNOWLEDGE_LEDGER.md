@@ -602,7 +602,7 @@ user_who_is_matthew.md
 | `feedback_ideation_include_offsite_channels.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §3a.6 | homed-here |
 | `feedback_instagram_story_post_rulings_2026_09_27.md` | feedback | — narrative: dated owner rulings on one post series, recorded where the posts are built | narrative |
 | `feedback_never_ask_inline_overnight.md` | feedback | — off-repo: the unattended-driver brief that carries this rule lives in `~/.claude/plans/`, outside this tree | off-repo |
-| `feedback_no_cycle_count_on_the_site_2026_09_26.md` | feedback | `docs/SITE_TRANSFORMATION_V7.md` §0/§14 and ADR-157 (the cycle count is internal; the public frame is the experiment and the day); the mechanism is the vocabulary ledger's `cycle` row in `tests/site_vocabulary_residue.py` (shrink-only, 2 unlisted pages) | homed-here |
+| `feedback_no_cycle_count_on_the_site_2026_09_26.md` | feedback | `docs/SITE_TRANSFORMATION_V7.md` §0/§14 and ADR-157 (the cycle count is internal; the public frame is the experiment and the day); the mechanism is the vocabulary ledger's `cycle` row in `ledgers/site_vocabulary_residue.py` (shrink-only, 2 unlisted pages) | homed-here |
 | `feedback_partial_acceptance_is_not_a_close.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §2.1 + `.claude/skills/land/SKILL.md` §5 | already-homed |
 | `feedback_prod_deploy_authorization.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §5 (placed by #3264) | already-homed |
 | `feedback_rest_and_params_multifactor.md` | feedback | `docs/DECISIONS.md` (ADR-066/068: rest is a multi-factor coach judgment, never auto-set) | already-homed |

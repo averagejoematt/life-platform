@@ -3,7 +3,7 @@
 The registry is site/data/glossary.json (charter primitive 1). This is its derivation guard
 and ratchet (primitives 2 + 3): every registered term is counted across reader pages' STATIC
 main content (tests/site_text.py), and the count may only move down against the dated ledger
-in tests/site_vocabulary_residue.py. A keep-with-gloss term counts only on pages that do not wrap
+in ledgers/site_vocabulary_residue.py. A keep-with-gloss term counts only on pages that do not wrap
 THAT term in a <dfn>/<abbr> (per-term since #4182's build-time gloss pass), so glossing it is how
 its count falls.
 
@@ -20,8 +20,8 @@ import re
 
 import pytest
 
+from ledgers.site_vocabulary_residue import BASELINE
 from tests import site_text
-from tests.site_vocabulary_residue import BASELINE
 
 REGISTRY = os.path.join(site_text.REPO, "site", "data", "glossary.json")
 RULINGS = {"rename", "cut", "keep-with-gloss"}

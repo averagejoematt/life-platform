@@ -22,7 +22,7 @@ whole of it:
     standing rule 3  every new "must agree" pair gets a contract test AT BIRTH
                      -> THIS     tests/test_pair_seam_conformance_2847.py
 
-#2846 already set that precedent (``tests/lambda_enrollment_ledger.py``: same three
+#2846 already set that precedent (``ledgers/lambda_enrollment_ledger.py``: same three
 mechanics, own derivation, own file, peer of #2844 rather than a row inside it).
 So box 4 is routable — as a peer in the guard family, on a derivation the #2845
 model can actually ground. The mechanics are identical and deliberately so: a

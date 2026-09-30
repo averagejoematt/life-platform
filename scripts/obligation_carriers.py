@@ -410,7 +410,7 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_obligation_carriers_3597.py",
     },
-    "tests/gate_census_unproven_residue.py::UNPROVEN_RESIDUE": {
+    "ledgers/gate_census_unproven_residue.py::UNPROVEN_RESIDUE": {
         "carrier": "#3610",
         "condition": "a gate leaves when it is proven able to fail or adjudicated unprovable (#3000/#3610)",
         "declared": _SEEDED,
