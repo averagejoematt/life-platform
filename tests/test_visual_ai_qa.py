@@ -649,8 +649,10 @@ def test_pillow_is_wired_into_every_ai_qa_lane():
         assert any(line.split("==")[0].strip() == "pillow" for line in f if "==" in line), "pillow not pinned in requirements-dev.txt"
     ai_qa_workflows = [".github/workflows/visual-qa.yml", ".github/workflows/ci-cd.yml", ".github/workflows/site-deploy.yml"]
     for wf in ai_qa_workflows:
+        from tests.playwright_browser_calls import expanded  # #4254: the install is the composite
+
         with open(os.path.join(repo, wf)) as f:
-            text = f.read()
+            text = expanded(f.read())
         assert "--ai-qa" in text, f"{wf} no longer runs --ai-qa — update this test's lane list"
         install_lines = [ln for ln in text.splitlines() if "ci_pins.py" in ln and "playwright" in ln]
         assert install_lines and all(
