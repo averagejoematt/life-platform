@@ -50,6 +50,7 @@ from mcp.core import (
     session_token_valid,
 )
 from mcp.registry import TOOLS
+from mcp.resources import RESOURCE_NOT_FOUND_CODE, ResourceNotFound, handle_resources_list, handle_resources_read  # #4286 box 3
 from mcp.tool_output_schemas import conformance_errors, is_error_payload, output_schema_for  # #4286 box 2
 from mcp.utils import mcp_error, validate_date_range, validate_single_date
 from mcp.warmer import nightly_cache_warmer
@@ -74,7 +75,8 @@ def handle_initialize(params):
 
     return {
         "protocolVersion": server_version,
-        "capabilities": {"tools": {}},
+        # #4286 box 3: `resources` advertises the surface index (mcp/resources.py).
+        "capabilities": {"tools": {}, "resources": {}},
         "serverInfo": {"name": "life-platform", "version": __version__},
     }
 
@@ -541,6 +543,8 @@ METHOD_HANDLERS = {
     "initialize": handle_initialize,
     "tools/list": handle_tools_list,
     "tools/call": handle_tools_call,
+    "resources/list": handle_resources_list,
+    "resources/read": handle_resources_read,
     "notifications/initialized": lambda _: None,
     "ping": lambda _: {},
 }
@@ -562,6 +566,8 @@ def _process_jsonrpc(body: dict) -> dict | None:
         if result is None:
             return None  # notification — no response
         return {"jsonrpc": "2.0", "id": rpc_id, "result": result}
+    except ResourceNotFound as e:
+        return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": RESOURCE_NOT_FOUND_CODE, "message": str(e)}}
     except ValueError as e:
         return {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32602, "message": str(e)}}
     except Exception as e:
