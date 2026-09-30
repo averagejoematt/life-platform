@@ -35,7 +35,7 @@ ships is byte-identical by construction.
   bundle → S3 → every mapped function + both MCP functions, each
   `deploys/<fn>/previous.zip` re-seeded for `rollback_lambda.sh`. CI's deploy job
   runs it for EVERY code change — the per-function matrix and the inline MCP step
-  are gone, and `deploy_and_verify.sh` / `deploy_mcp_split.sh` are archived under
+  are gone, and the retired `deploy_and_verify.sh` / `deploy_mcp_split.sh` sit under
   `deploy/archive/onetime/`. `deploy_lambda.sh` stays only as the laptop hot-fix
   path; `deploy/bundle_and_mirror_registry.py` names every `update-function-code`
   site and `tests/test_bundle_and_mirror_registry_3608.py` reds on a new one.
