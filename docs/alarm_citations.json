@@ -87,9 +87,9 @@
   },
   "qa-smoke-warnings": {
     "added": "2026-09-21",
-    "cause_observed": "2026-09-29",
-    "cause": "data:orphan_routine_drafts,reader_truth:confirm,reader_truth:verdict",
-    "citation": "#4183 + #4220 — RE-CITED 2026-09-29 (Session AZ): three live causes. `data:orphan_routine_drafts` = draft 78dd2da5… (created 2026-09-21) aged past 7 days on 09-28 — owner act: archive or commit it (#4183, comment 2026-09-29). `reader_truth:confirm` + `reader_truth:verdict` = one finding e8f2c1 on /api/coaches: the judge reads Dr. Lisa Park's headline_stat '8 of 19 checked calls right (42%) through September 27' as a temporal contradiction at Day 23/24 (confirm-pass demoted it high→WARN, the issue-2741 flake class; the ruling ledger also adjudicates the same finding ADVISORY in a sibling leg). Owned by the coach-record single-producer surface, #4220. `score:hydration` no longer fires."
+    "cause_observed": "2026-09-30",
+    "cause": "data:orphan_routine_drafts",
+    "citation": "#4183 — RE-CITED 2026-09-30 (Session BA): one live cause, `data:orphan_routine_drafts` = draft 78dd2da5… (created 2026-09-21) aged past 7 days; owner act pending — archive or commit it (#4183). The reader_truth finding on /api/coaches' headline_stat cleared once issue 4220's record wording landed (issue closed 2026-09-29 on live proof)."
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -127,7 +127,7 @@
   },
   "daily-brief-duration-high": {
     "added": "2026-09-29",
-    "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the #4345 budget box) was not exercised.",
+    "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the remaining-time-floor budget box) was not exercised. RE-CITED 2026-09-30 (Session BA): the 2026-09-29 17:00Z brief ran 733 s with 5 quality holds (same class); PR 4443 (rewrite revises the draft) and PR 4466 (lead read's own rubric) deployed after it — proof due at the 2026-09-30 17:00Z brief under #4343.",
     "note": "Session AZ wrap citation for a fired-and-cleared episode (#2912)."
   }
 }

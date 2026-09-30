@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-29 (Session AZ: +1 project, the session record; snapshot and counters updated in the same edit as the row). Prior: 2026-09-28 (Session AY: +3 feedback +2 reference +4 project — seven inherited from Session AX / the Sonnet burn-down whose wraps had not landed rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-27 (Session AW: +3 feedback +3 reference +4 project, all narrative). Prior: 2026-09-25 (Session AT: +4 reference +3 project +1 index — four of them inherited from Sessions AR/AS, whose wraps never landed the rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-22 (Session AQ: +2 reference +1 project this session — the second, the TTL-0 cache-policy constraint, from the attended afternoon; snapshot and counters updated from the rows in the same edit). Prior: 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 515** — feedback 34 · reference 291 · security 1 · project 185 · user 1 · index 3
+**Files in the memory index snapshot: 517** — feedback 34 · reference 292 · security 1 · project 186 · user 1 · index 3
 
-**Rule-class files (feedback + reference + security): 326** — homed-here 84 · already-homed 194 · superseded 7 · narrative 31 · off-repo 10
+**Rule-class files (feedback + reference + security): 327** — homed-here 84 · already-homed 194 · superseded 7 · narrative 32 · off-repo 10
 
-**Program/session files (project): 185** — already-homed 15 · superseded 1 · narrative 166 · off-repo 2 · index 1
+**Program/session files (project): 186** — already-homed 15 · superseded 1 · narrative 167 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 3**
 <!-- LEDGER-COVERAGE:END -->
@@ -244,6 +244,7 @@ project_session_aw_overnight_plan_2026_09_27.md
 project_session_ax_2026_09_27.md
 project_session_ay_2026_09_28.md
 project_session_az_2026_09_29.md
+project_session_ba_2026_09_29.md
 project_session_b_2026_08_25.md
 project_session_c_2026_08_26.md
 project_session_d_2026_08_26.md
@@ -320,6 +321,7 @@ reference_a_new_config_file_needs_an_ownership_ruling_before_merge.md
 reference_a_page_level_overflow_measure_is_blind.md
 reference_a_page_of_logs_is_not_the_latest.md
 reference_a_pair_contract_pins_a_writer_another_lane_retires.md
+reference_a_superseded_ci_run_never_deploys.md
 reference_a_parent_turn_can_stall_while_its_children_finish.md
 reference_a_pct_suffix_is_not_one_semantic.md
 reference_a_piped_exit_code_is_not_a_test_result.md
@@ -986,6 +988,7 @@ carries an operating rule.
 | `project_session_ax_2026_09_27.md` | project | — narrative: a session record | narrative |
 | `project_session_ay_2026_09_28.md` | project | — narrative: a session record | narrative |
 | `project_session_az_2026_09_29.md` | project | — narrative: a session record | narrative |
+| `project_session_ba_2026_09_29.md` | project | — narrative: a session record | narrative |
 | `project_session_b_2026_08_25.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_c_2026_08_26.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_d_2026_08_26.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
@@ -1123,4 +1126,5 @@ checked against the tree by `tests/test_operating_knowledge_ledger_2848.py`)
 | `project_session_aw_overnight_plan_2026_09_27.md` | project | — narrative: a session record | narrative |
 | `reference_a_metric_named_for_a_total_that_reads_one_channel.md` | reference | — narrative: the #4244 finding; the rule now lives in `lambdas/health/nutrient_intake.py`'s header once PR #4333 lands | narrative |
 | `reference_a_pair_contract_pins_a_writer_another_lane_retires.md` | reference | — narrative: the 2026-09-27 row in `docs/INCIDENT_LOG.md` carries the event; the merge-order reflex is session practice | narrative |
+| `reference_a_superseded_ci_run_never_deploys.md` | reference | — narrative: the 2026-09-29 row in `docs/INCIDENT_LOG.md` carries the event; the structural fix is issue 4472 | narrative |
 | `reference_an_unread_non_2xx_fetch_body_blocks_networkidle.md` | reference | — narrative: the reflex lives in each v7 page's `getJSON` (PRs #4300 #4301 #4302 #4303) and in `tests/js/v7_*.test.mjs` | narrative |
