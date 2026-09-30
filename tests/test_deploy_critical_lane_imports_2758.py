@@ -23,6 +23,8 @@ skip first — the #2699/#2732 fix shape).
 """
 
 import ast
+import collections
+import functools
 import re
 import sys
 from pathlib import Path
@@ -107,12 +109,17 @@ def _importorskip_names(tree):
 _FIRST_PARTY_ROOTS = ("lambdas", "mcp", "scripts", "deploy", "cdk", "remediation", "")
 
 
+@functools.lru_cache(maxsize=None)
 def _resolve_first_party(dotted):
     """The file a dotted first-party module name resolves to, or None.
 
     `lambdas/` is packaged by domain and staged at the ZIP ROOT, so runtime imports
     read `from web import card_engine` while the file lives at lambdas/web/card_engine.py.
     Both spellings are tried.
+
+    #4480: memoized. The sweep asks this ~200k times for a few thousand distinct names,
+    and each miss costs up to 14 stat calls — 2.2M stats were a third of the test's
+    wall time. The tree does not change during a test run, so the answer cannot either.
     """
     parts = dotted.split(".")
     for root in _FIRST_PARTY_ROOTS:
@@ -124,31 +131,59 @@ def _resolve_first_party(dotted):
     return None
 
 
-def _transitive_third_party(dotted, allowed, _seen=None, _depth=0):
+@functools.lru_cache(maxsize=None)
+def _module_edges(dotted):
+    """((top, target), …) for one first-party module's module-scope imports, or None.
+
+    #4480: parsed ONCE per module per process. The closure used to re-`ast.parse` every
+    first-party module once per test FILE that reached it — 18,035 parses for ~1,400
+    test files, over half the runtime. Parsing is a pure function of the file, so
+    caching it changes nothing the guard proves.
+    """
+    path = _resolve_first_party(dotted)
+    if path is None:
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except SyntaxError:
+        return ()
+    return tuple((top, target or top) for _lineno, top, target in _module_scope_imports(tree, with_targets=True))
+
+
+def _transitive_third_party(dotted, allowed):
     """Third-party top-level names reachable from a first-party module at module scope.
 
     Returns [(name, chain)] so a finding can name the PATH, not just the leaf — the
     thing a reader needs in order to fix it.
+
+    #4480: a breadth-first walk over the memoized edge table (`_module_edges`) with a
+    visited set — cycle-safe by construction and with no depth cap, so it reaches every
+    module the old depth-12 DFS reached (and any a longer chain would have hidden). Each
+    reported chain is a SHORTEST path to the leaf, which is the most useful one to fix.
     """
-    if _seen is None:
-        _seen = set()
-    if dotted in _seen or _depth > 12:  # 12 is a cycle/pathology stop, not a policy depth
-        return []
-    _seen.add(dotted)
-    path = _resolve_first_party(dotted)
-    if path is None:
-        return []
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    except SyntaxError:
-        return []
+    parent = {dotted: None}
+    queue = collections.deque([dotted])
     found = []
-    for _lineno, top, target in _module_scope_imports(tree, with_targets=True):
-        if _resolve_first_party(target or top) is not None:
-            for name, chain in _transitive_third_party(target or top, allowed, _seen, _depth + 1):
-                found.append((name, [dotted] + chain))
-        elif top not in allowed:
-            found.append((top, [dotted, top]))
+
+    def _chain(mod):
+        out = []
+        while mod is not None:
+            out.append(mod)
+            mod = parent[mod]
+        return out[::-1]
+
+    while queue:
+        mod = queue.popleft()
+        edges = _module_edges(mod)
+        if edges is None:
+            continue
+        for top, target in edges:
+            if _resolve_first_party(target) is not None:
+                if target not in parent:
+                    parent[target] = mod
+                    queue.append(target)
+            elif top not in allowed:
+                found.append((top, _chain(mod) + [top]))
     return found
 
 
