@@ -208,4 +208,19 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-29 (Opus 5.5, **Session AZ — the overnight burn-down, and the owner's v0.5 training red team**; 2026-09-28 19:13 PT → 09-29 ~07:30 PT). **15 PRs merged**, CI-deployed: #4399 #4415 #4400 #4406 #4407 #4414 #4426 #4421 #4422 #4420 #4417 #4413 #4432 #4418 #4428. **7 closed on live proof** (#4253 #4184 #4186 #4217 #4370 #4416 #4419); open 88 → 94 (13 filed; the ≤ 55 target was not honest tonight — most fixes prove on the 17:00Z/19:30Z/02:00Z runs, lines in the handover). **v0.5 red team** (owner brief 19:28 PT): private deliverables in `~/Desktop/training_v05/` (never the repo, #3052); engine fixes #4417 (RPE-adjusted hold, in-block variant), #4418 (real aerobic minutes, lifting streak), #4432, #4420; epics #4423 #4424 #4425, story #4427. **F1:** the 2024–25 blueprint counted every walk twice (WHOOP + Garmin) — true 8.5–9.8 h/wk at 270–299 lb — confirmed live by #4419's read seam (#4428: 15 → 8 walks for 2024-10-01..07). **Gotchas:** a closing keyword in prose closes even negated ("does not close #N"); an engine-doc `Verified:` stamp with the Pacific date reds Docs CI (incident row); three PRs claiming one census slot → merge one, re-derive the next. **Owner acts left:** merge #4395 + #4390 · rule on #4430 (heavy-day cap 81.1 %) and v0.5 OD1–OD8 · run the #4363 chronicle repair script · the #4401/#4377/#4378/#4219 attended proofs.
+**Verified:** 2026-09-30 (Opus 5.5, **Session BA — the all-day paydown, with the owner on hand**; 2026-09-29 09:17 PT → ~21:00 PT). **38 PRs merged** (list in the handover). **17 closed on live proof** (#4219 #4065 #3712 #4373 #4359 #4220 #4244 #4404 #4135 #4275 #4378 #4355 #4362 #4408 #4410 #4388), open 94 → 83. The < 50 target was not met: most fixes prove on later runs, and each has a proof-due line. **Headline:** #4220 is closed. One coach record now reads the same everywhere (Webb 0 of 9, Brandt 3 of 7 on four APIs, the MCP tool, the scorecard and /method/). **Owner rulings executed:**
+- #4395 merged (ADR-158: code ships on green; the gate watcher is retired, so the additive-IAM deploy needs the human click).
+- The full suite is now a REQUIRED check (#4441, `apply_branch_protection.py --apply`).
+- CDK Mcp + Email deployed by the driver (#4451/#4457; simulate returns `allowed`).
+- #4430 option (b).
+- #4465 (names public, EPA+DHA 0.5 g).
+- The 182 g few-shot fixed in S3 + repo (#4479).
+- The habit_registry re-key and the 09-26 recap card regenerated.
+- `deploy_all` dispatched 03:25Z 09-30.
+
+**Gotchas:**
+- A superseded CI/CD run never deploys (#4472): #4452 sat undeployed, and its dry-run proof leaked an insight row (incident row; deleted). Prove a fix on the DEPLOYED zip.
+- `pgrep -f "train2.sh N"` matches its own waiter.
+- `gh pr update-branch` on owner-held PRs is classifier-denied.
+
+**Owner items left:** v0.5 OD1–OD8 · the #4363/#4183/#4170/#4189/#3761 acts · the 09-29 brief email header check (#4360/#4361) · the 10-issue triage list.

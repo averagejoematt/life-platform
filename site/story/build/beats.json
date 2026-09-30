@@ -3734,6 +3734,45 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4228"
         }
       ]
+    },
+    {
+      "id": "2026-09-29-one-record-everywhere",
+      "date": "2026-09-29",
+      "title": "One record, everywhere",
+      "shipped": "Every place a coach's track record is shown now reads the same ledger. The nutrition coach reads 0 of 9 checked calls right and the explorer 3 of 7, on the coaches page, the calibration page, the wrong-calls page, the scorecard, the method ledger, each coach's own page and the owner's chat tool. Below ten decided calls the record prints counts, not a percentage. Graded calls now say in plain words what happened ('went up, as called'; 'not gradable yet — not enough average blood glucose data'), where the scorecard used to print the grader's raw notes. The same day, a sick day logged in error can finally be cleared from chat, a memory can be deleted, a habit renamed in its tracking app no longer reads as missed on the daily card, and 26 stale 'wrong call' pages now forward to the live ledger.",
+      "why_it_mattered": "The owner's chat tool said the nutrition coach was right 74% of the time (20 of 27) while the public scorecard said 0 of 7. Both could not be true: twenty rows from a pre-experiment docket were being counted as calls, once per side. A coach's record is the one number a reader uses to decide whether to trust the coaching at all, so three answers to it was worse than none.",
+      "gotcha": "A fix can merge green and never ship. When a newer merge queues behind an older one's deploy, the older run is cancelled and the newer one deploys only its own change, so one fix sat undeployed for hours and its dry-run proof ran the old code. Reading the deployed code, not the merge, is what caught it.",
+      "honest_miss": "The coaches' daily reads were still held five times out of six on the morning brief, and the fix for that proves only on tomorrow's run. The day's target was under 50 open issues; it ended in the eighties, because a real proof often lands after the day ends.",
+      "prs": [
+        {
+          "label": "PR #4438",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4438"
+        },
+        {
+          "label": "PR #4445",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4445"
+        },
+        {
+          "label": "PR #4454",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4454"
+        },
+        {
+          "label": "PR #4458",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4458"
+        },
+        {
+          "label": "PR #4413",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4413"
+        },
+        {
+          "label": "PR #4399",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4399"
+        },
+        {
+          "label": "PR #4421",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4421"
+        }
+      ]
     }
   ]
 }
