@@ -1,9 +1,9 @@
 # Deploy dead-man + head coverage — main's deploy path watched from OUTSIDE ci-cd.yml.
 #
 # #4256 box 3 (ADR-158): this file was the #2052 phantom-wedge watch. ADR-158 moved the
-# production gate off the code `deploy` job, so the wedge classifier
-# (scripts/check_deploy_wedge.py, with its opt-in `--recover` and its #2149 alert) and the
-# lease janitor (deploy-gate-janitor.yml) were retired into ONE deploy dead-man — the last
+# production gate off the code `deploy` job, so the wedge classifier and the lease janitor
+# were retired (scripts/check_deploy_wedge.py retired with its `--recover` and #2149 alert;
+# deploy-gate-janitor.yml retired) into ONE deploy dead-man — the last
 # step below, which alarms on ANY green run on main that has not deployed within its
 # deadline. A wedged Deploy is such a run, so the wedge class is still caught, at the
 # dead-man's deadline instead of a 10-minute threshold. The filename is kept: the

@@ -509,7 +509,15 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 772  # 770 -> 772 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae, owner-approved lane):
+BASELINE_TOTAL_GATES = 767  # 772 -> 767 (2026-09-30, #4256 box 3 — the lease janitor and the wedge classifier retired into the
+# one deploy dead-man): FIVE leave, NONE enter. Leave: `ci::deploy-gate-janitor.yml::janitor::3` and `::4` (the workflow is
+# deleted), `guard::scripts/check_deploy_wedge.py` (deleted), and — by POSITION — `ci::deploy-wedge-watch.yml::watch::7` and `::8`:
+# the classify / recover / fail-on-wedge steps (watch::3-5) are deleted, so the three head-coverage steps and the dead-man shift
+# from watch::6-9 to watch::3-6 and the two highest positional ids vanish. The dead-man's CI_PROOFS record is re-keyed
+# watch::9 -> watch::6 after its mutation was re-run against the current gate (3 failed / 7 passed, restored 10 passed); the six
+# residue lines of the retired gates are deleted. MEASURED by id-set diff on `scripts/gate_census.py --json`, this tree vs a
+# `git archive origin/main` export at ff6f20ceb: 772 -> 767.
+# PRIOR: 772  # 770 -> 772 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae, owner-approved lane):
 # THREE entrants, all PROVEN — `ci::…/deploy-wedge-watch.yml::watch / Deploy dead-man — main's green runs reached AWS (#4256)`,
 # `guard::scripts/check_deploy_deadman.py` and `ci::…/ci-cd.yml::deploy / Late-approval guard — never ship an older tree over
 # newer code (#4256)` (the proofs recorded in this PR's own lines below). ONE retires: `registry::tests/test_deploy_wedge_2052.py::
