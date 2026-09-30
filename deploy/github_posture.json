@@ -69,6 +69,17 @@
         "typical_n": 22
       },
       {
+        "context": "Full unit suite (pre-merge, issue 3025)",
+        "workflow": "pr-checks.yml",
+        "job": "full-suite",
+        "typical_seconds": 1149,
+        "why": "OWNER RULING 2026-09-29 on #4251 / PR #4441, option (a): required. #4251 cut the fast lane to `deploy_critical`, so the behaviour suite and the structural gates (the `premerge` selection) run pre-merge ONLY here — the whole tests/ tree in two passes (xdist `-m \"not serial\"`, then `-m serial`). Without this context required, GitHub auto-merge could land a PR whose behaviour tests are red. `on: pull_request: branches: [main]` with NO path filter and no job-level `if:` — it reports on every PR class. The job `name:` carries no `#` on purpose (#3117: an unquoted ` #` truncated the wire name). `typical_seconds` is WRITTEN by deploy/write_lane_posture.py --measure, never typed.",
+        "typical_measured_on": "2026-09-29",
+        "typical_measured_by": "scripts/check_job_timeout_headroom.py sampler (trailing window, genuine completions)",
+        "typical_statistic": "p95",
+        "typical_n": 29
+      },
+      {
         "context": "gitleaks (PR commit range only, not full history)",
         "workflow": "secret-scan.yml",
         "job": "gitleaks",
@@ -82,7 +93,7 @@
     ],
     "advisory_not_required": [
       "CodeQL analysis (python) / (javascript-typescript) — codeql.yml is unfiltered on PRs but its `analyze` step never exits non-zero on a finding, so requiring it buys latency and no verdict (ADR-148).",
-      "Dependabot Validate / validate — job-level `if:` restricts it to dependabot[bot] dev-tooling branches, so it reports `skipped` on every human PR; a skipped required check never satisfies the rule.",
+      "Dependabot Auto-merge / automerge — a workflow_run job `if:`-gated to dependabot[bot] dev-tooling branches, so it reports `skipped` on every human PR; a skipped required check never satisfies the rule. (Dependabot Validate was deleted by #4252: pr-checks.yml validates every PR.)",
       "Wiki drift gates (docs-ci.yml), Surface-drift gate (surface-drift.yml), Migration coverage + HTML well-formedness / Render + accuracy gate (v4-gate.yml) — all PATH-FILTERED, so they simply do not report on PRs outside their globs and would block those PRs forever.",
       "Unit Tests / Lint + Syntax Check (ci-cd.yml) and Visual + AI-vision QA — post-merge (push/scheduled) only; they emit no PR check-run to require."
     ],

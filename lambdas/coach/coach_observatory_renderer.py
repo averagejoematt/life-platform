@@ -80,6 +80,7 @@ DOMAIN_COACH_MAP = {
 # `title`), so this surface now derives entirely rather than keeping its own copy.
 # `include=("operational", "retired")` keeps the retired training_coach entry
 # resolvable, for cross-coach references inside historical OUTPUT#/ENSEMBLE# records.
+from coach import coach_record  # #4220: the ONE per-coach record producer
 from coach.persona_registry import (
     OPERATIONAL_SHORT_IDS,  # #3172: the ai_analysis EXPERT# keyspace
     display_map as _registry_display_map,
@@ -486,12 +487,19 @@ def _render_coach_card(domain, include_threads=True):
                 revision_signal = "Recently revised position"
             break
 
-    # ── 6b. Prediction track record (v7.18.0) ────────────────────────────────
-    # Aggregate LEARNING# verdicts over a 30-day window so the card can show
-    # "N of M predictions confirmed in last 30 days". Distinct from section 6's
-    # revision_signal query (which is limited to 3 records and matches only
-    # type=position_revision). This query uses an SK-between bound on date.
+    # ── 6b. Prediction track record (v7.18.0; #4220) ─────────────────────────
+    # The record is the ONE producer every public surface prints — coach.coach_record over
+    # the PREDICTION# ledger, this cycle, one resolution per prediction ("K of N checked
+    # calls right through <day>"; counts, not a percentage, below n = 10). It used to be a
+    # 30-day LEARNING# tally, the seventh derivation of one coach's record: that trail is a
+    # second write of each grade and carried one pre-genesis docket re-recorded daily
+    # (#4216), so on 2026-09-26 it could say Webb 20 of 25 beside a scorecard's 0 of 5.
+    # LEARNING# is still read here, but only for what it alone holds: the count of
+    # conversation-sourced self-calibration learnings (#1481, ADR-141), shown NEXT TO the
+    # record, never inside it.
     track_record = None
+    record = coach_record.for_coach(table, coach_id, genesis=EXPERIMENT_START)
+    conversation_count = 0
     try:
         cutoff = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")  # #2414: PT — sk days are Pacific
         tr_resp = table.query(
@@ -503,29 +511,30 @@ def _render_coach_card(domain, include_threads=True):
                 }
             )
         )
-        counts, conversation_count = _tally_learning_statuses(tr_resp.get("Items", []))
-        decided = counts["confirmed"] + counts["refuted"]
-        # Only surface the panel when something useful resolved. Daily-brief
-        # consumers can render absence as "no track record yet."
-        if decided > 0:
-            hit_rate = round(100 * counts["confirmed"] / decided, 0)
-            summary = f"{counts['confirmed']} of {decided} predictions confirmed in last 30 days"
-            if conversation_count:
-                # #1481 (ADR-141): provenance made visible — conversation-sourced
-                # self-calibration sits NEXT TO the data-derived hit rate, never inside it.
-                summary += f" · {conversation_count} conversation-sourced learning(s), not in the hit rate"
-            track_record = {
-                "window_days": 30,
-                "confirmed": counts["confirmed"],
-                "refuted": counts["refuted"],
-                "inconclusive": counts["inconclusive"],
-                "decided_count": decided,
-                "hit_rate_pct": hit_rate,
-                "conversation_learnings": conversation_count,
-                "summary": summary,
-            }
+        _counts, conversation_count = _tally_learning_statuses(tr_resp.get("Items", []))
     except Exception as e:
-        logger.warning("track_record query failed for %s: %s", coach_id, e)
+        logger.warning("conversation-learning count failed for %s: %s", coach_id, e)
+    if record is None:
+        # ADR-104: a failed ledger read is absence, said as absence — never a zero record.
+        track_record = {"record": None, "summary": coach_record.headline(None)}
+    elif record["n"] > 0:
+        # Only surface the panel when something resolved; consumers render the absence as
+        # "no track record yet".
+        summary = coach_record.headline(record)
+        if conversation_count:
+            # #1481 (ADR-141): provenance made visible — conversation-sourced
+            # self-calibration sits NEXT TO the data-derived record, never inside it.
+            summary += f" · {conversation_count} conversation-sourced learning(s), not in the record"
+        track_record = {
+            "scope": "this cycle",
+            "record": record,  # {confirmed, refuted, n, through} — the same dict /api/coaches serves
+            "confirmed": record["confirmed"],
+            "refuted": record["refuted"],
+            "decided_count": record["n"],
+            "hit_rate_pct": round(100 * record["confirmed"] / record["n"], 0),
+            "conversation_learnings": conversation_count,
+            "summary": summary,
+        }
 
     # ── 6c. Proactivity track record (#1382) ─────────────────────────────────
     # The coach-who-texts-first record: every proactive NUDGE# this coach sent

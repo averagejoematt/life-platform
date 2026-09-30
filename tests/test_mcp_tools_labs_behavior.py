@@ -1506,3 +1506,12 @@ def test_the_allergen_surface_is_unreachable_from_the_registry():
 
     callers = [name for name, spec in TOOLS.items() if "_ige_class" in inspect.getsource(spec["fn"])]
     assert callers == []
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, tl, "get_freshness_status")

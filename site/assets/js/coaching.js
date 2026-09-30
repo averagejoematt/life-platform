@@ -41,6 +41,7 @@ import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — rea
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { daysOverdue, lateWords } from "/assets/js/entry_age.js"; // #4219 — an overdue ask says it is late
 import { rosterEntries, scorecardSeats, retiredSeatNote, rateText, rateWord } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping; #4215 retired seats apart
+import { callReasonText } from "/assets/js/scorecard_reason.js"; // #4220 — a graded call's reason in reader words
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 import { instantDayInWords } from "/assets/js/entry_age.js"; // #4182 sweep fix 2 — the lab-note card's date in words
 import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
@@ -1632,7 +1633,7 @@ function _scCallHTML(p, shareUrl) {
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
     `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}${dueBit}</div>` +
     `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>` +
-    `${p.outcome_notes ? `<p class="sc-call-why label">${esc(p.outcome_notes)}</p>` : ""}` +
+    `${callReasonText(st, p.outcome_notes) ? `<p class="sc-call-why label">${esc(callReasonText(st, p.outcome_notes))}</p>` : ""}` + // #4220: reader words, never the raw dict
     `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
 }
 // #404: a graded call's permalink, from the moments index (built by the daily

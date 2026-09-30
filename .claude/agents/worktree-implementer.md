@@ -34,7 +34,9 @@ write surface is your own worktree and your own branch.
    `scripts/worktree_reaper.py` deleting your working directory mid-task — it listed three
    *running* lanes as reapable on its first real use, because a lane is clean between
    checkout and its first edit (#3289). Do not hand-roll `git worktree add`; do not
-   `git worktree unlock` your own lane (the driver releases it after the merge).
+   `git worktree unlock` your own lane — the DRIVER releases it, after it has verified your
+   merge, with `python3 scripts/lane_worktree.py release <issue-N>` (`/land` §5), and the
+   `worktree-reap` wrap gate then removes it once clean and merged (#4259).
    Pass the BARE issue number (`3315`, not `issue-3315`) — the leaf is built from it and
    a prefixed argument yields an `issue-issue-3315` lane.
    The script also enforces the two placement rules: **OUTSIDE the repo, and inside the

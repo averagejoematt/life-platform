@@ -25,11 +25,13 @@ WHY THIS EXISTS (#3289)
 
 USAGE
     python3 scripts/lane_worktree.py new 3289 reaper-liveness      # create + lock
-    python3 scripts/lane_worktree.py release <path>                # unlock when the lane is done
+    python3 scripts/lane_worktree.py release <path|issue-number>   # unlock when the lane is done
 
   Release is the deliberate act that says "this lane is finished" — until it happens the
   reaper keeps the worktree, by design. The reaper prints the exact release command on every
-  kept-because-locked row.
+  kept-because-locked row. WHO runs it (#4259): the driver, in `/land`, after a verified
+  merge; the `worktree-reap` wrap gate then removes the released lane, and also releases a
+  lane lock left idle 7 days (the forgotten-release backstop) if the lane is clean + merged.
 """
 
 from __future__ import annotations
@@ -109,6 +111,31 @@ def new_lane(issue: int | str, slug: str, repo: Path = ROOT, base: str = "origin
     return path
 
 
+def resolve_lane(target: str, repo: Path = ROOT) -> Path:
+    """A release target: a worktree path, or a BARE issue number (#4259).
+
+    The merging driver knows the issue number, not the lane's slug, so `release 4259`
+    finds the one worktree whose branch is `issue-4259-<slug>`. Zero or several matches is
+    an error naming them — never a guess, because the next step makes the lane reapable.
+    """
+    if not target.isdigit():
+        return Path(target)
+    code, out = _git(["worktree", "list", "--porcelain"], cwd=_true_case(repo))
+    if code != 0:
+        raise SystemExit(f"git worktree list failed: {out}")
+    prefix = f"refs/heads/issue-{target}-"
+    hits, cur = [], None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            cur = line[len("worktree ") :]
+        elif line.startswith("branch ") and cur and line[len("branch ") :].startswith(prefix):
+            hits.append(Path(cur))
+    if len(hits) != 1:
+        found = ", ".join(str(h) for h in hits) or "none"
+        raise SystemExit(f"issue {target}: expected exactly one lane on a `issue-{target}-*` branch, found {len(hits)} ({found})")
+    return hits[0]
+
+
 def release_lane(path: Path, repo: Path = ROOT) -> None:
     """Unlock a lane — the deliberate 'this is finished' act that makes it reapable."""
     code, out = _git(["worktree", "unlock", str(path)], cwd=_true_case(repo))
@@ -130,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("slug", help="short kebab slug, e.g. reaper-liveness")
     n.add_argument("--base", default="origin/main")
     rel = sub.add_parser("release", help="unlock a finished lane so the reaper may retire it")
-    rel.add_argument("path")
+    rel.add_argument("path", help="the lane's worktree path, or its bare issue number (e.g. 4259)")
     args = ap.parse_args(argv)
 
     if args.mode == "new":
@@ -141,8 +168,9 @@ def main(argv: list[str] | None = None) -> int:
         for line in PROHIBITION_BANNER:
             print(line)
         return 0
-    release_lane(Path(args.path))
-    print(f"released {args.path} — the reaper may now retire it once it is clean, merged and idle")
+    path = resolve_lane(args.path)
+    release_lane(path)
+    print(f"released {path} — the reaper may now retire it once it is clean, merged and idle")
     return 0
 
 

@@ -276,9 +276,14 @@ _WEIGHT_FORECAST_SENTENCE = re.compile(
 _WEIGHT_NOT_NOW_AFTER = re.compile(r"^[\s-]*(?:goal|target|mark|milestone)\b", re.IGNORECASE)
 
 _MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
-# "went dark after September 19th", "no logs since Sep 19", "nothing logged since the 19th of September"
+# "went dark after September 19th", "no logs since Sep 19", "nothing logged since the 19th of September",
+# and (#4185 follow-up) "the six-day logging gap since September 19th" / "a two-day food-log gap since
+# Sep 19" — the served 09-26 and 09-22 nutrition reads. Only the DATE is read from that phrasing (the
+# last log it implies); its day count is not a `log_gap_days` claim, so a correct read whose N is off by
+# the upload lag is never held on the count.
 _GAP_SINCE_DATE = re.compile(
-    r"\b(?:went\s+(?:dark|quiet|silent)|stopped|no\s+(?:food\s+)?logs?|nothing\s+(?:was\s+)?logged|hasn't\s+logged|haven't\s+logged)"
+    r"\b(?:went\s+(?:dark|quiet|silent)|stopped|no\s+(?:food\s+)?logs?|nothing\s+(?:was\s+)?logged|hasn't\s+logged|haven't\s+logged"
+    r"|(?:food[-\s]?)?log(?:ging)?\s+gap)"
     r"\s+(?:after|since)\s+(?:the\s+)?([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b",
     re.IGNORECASE,
 )

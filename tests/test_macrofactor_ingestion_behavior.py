@@ -1632,7 +1632,40 @@ def test_the_nutrient_registry_covers_every_supplement_the_bridge_can_write():
         for n in ast.walk(tree)
         if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "SUPPLEMENT_MAP" for t in n.targets)
     )
-    assert set(smap) == set(ni.SUPPLEMENT_NUTRIENT_CONTENT)
+    unmapped = sorted(set(smap) - set(ni.SUPPLEMENT_NUTRIENT_CONTENT))
+    assert not unmapped, (
+        f"habitify_lambda.SUPPLEMENT_MAP can write {unmapped} but health.nutrient_intake.SUPPLEMENT_NUTRIENT_CONTENT has "
+        "no disposition for them — give each a content list, [] (no tracked nutrient) or None with a reason (#4245)"
+    )
+    orphaned = sorted(set(ni.SUPPLEMENT_NUTRIENT_CONTENT) - set(smap))
+    assert not orphaned, f"registry rows for supplements the bridge can no longer write — delete them: {orphaned}"
     for name, spec in ni.SUPPLEMENT_NUTRIENT_CONTENT.items():
+        assert "content" in spec, f"{name}: no explicit disposition (content list, [], or None with a reason)"
         for c in spec.get("content") or []:
             assert c["unit"] == smap[name]["unit"], name
+
+
+# #4245 box 5, the ratchet: a supplement whose nutrient content is UNKNOWN (content None) is a
+# dose the sufficiency figures cannot see. The set may only shrink, and each member carries the
+# date it was recorded unknown and what would retire the line (a label read, a product change).
+UNKNOWN_CONTENT_LEDGER = {
+    "Multivitamin": "2026-09-27 (#4245): retire when the label's per-nutrient amounts are recorded as content",
+    "Basic B Complex": "2026-09-27 (#4245): retire when the label's per-nutrient amounts are recorded as content",
+    "Electrolytes": "2026-09-27 (#4245): retire when the packet's potassium/magnesium amounts are recorded as content",
+    "Probiotics": "2026-09-27 (#4245): no tracked nutrient on any record — retire if it becomes content []",
+}
+
+
+def test_unknown_supplement_content_only_shrinks_and_each_line_is_dated():
+    import re
+
+    unknown = {name for name, spec in ni.SUPPLEMENT_NUTRIENT_CONTENT.items() if spec.get("content") is None}
+    grew = sorted(unknown - set(UNKNOWN_CONTENT_LEDGER))
+    assert not grew, (
+        f"new supplement(s) with UNKNOWN nutrient content {grew} — record the content, or add a dated ledger line "
+        "(the count may only fall; a new unknown is a deliberate, dated decision)"
+    )
+    stale = sorted(set(UNKNOWN_CONTENT_LEDGER) - unknown)
+    assert not stale, f"these supplements' content is now known — delete their ledger lines: {stale}"
+    for name, line in UNKNOWN_CONTENT_LEDGER.items():
+        assert re.match(r"^\d{4}-\d{2}-\d{2} \(#\d+\): .{20,}$", line), f"{name}: expected 'YYYY-MM-DD (#issue): what retires it'"

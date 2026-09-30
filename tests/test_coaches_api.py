@@ -929,6 +929,133 @@ def test_4220_mcp_track_record_a_repeated_result_counts_once_and_a_failed_ledger
     assert down["headline"] == "record unavailable"
 
 
+# ── #4220: a graded call's reason is served in reader words ──────────────────
+# Wire strings: `outcome_notes` exactly as /api/predictions served them 2026-09-29 16:24Z
+# (build_outcome_notes' JSON blob), beside the evaluation spec the same rows carry.
+
+
+def _pred_row(status, ev, **notes):
+    return {"status": status, "evaluation": ev, "outcome_notes": json.dumps({"algo_version": "1.0", "beats_null": False, **notes})}
+
+
+_DIR_UP = {"type": "directional", "metric": "hrv_7day_avg", "condition": "up", "threshold": None}
+_DIR_DOWN = {"type": "directional", "metric": "recovery_score", "condition": "down", "threshold": None}
+_POINT = {"type": "point", "metric": "sleep_duration_hours", "condition": "within", "threshold": 7.1}
+
+
+@pytest.mark.parametrize(
+    "row,expected",
+    [
+        (
+            _pred_row("confirmed", _DIR_UP, actual_value=0.2341, reason="hrv_7day_avg trend=up (slope=0.2341), predicted=up"),
+            ("Heart-rate variability (7-day average) went up, as called", True),
+        ),
+        (
+            _pred_row("refuted", _DIR_DOWN, actual_value=0.1439, reason="recovery_score trend=up (slope=0.1439), predicted=down"),
+            ("Morning recovery score went up — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _DIR_DOWN,
+                actual_value=-0.0037,
+                reason="predicted down, metric flat (slope=-0.0037, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+            ),
+            ("Morning recovery score held flat — the call was for it to go down", True),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                _POINT,
+                actual_value=4.7,
+                reason="sleep_duration_hours=4.70 on 2026-09-11 vs predicted 7.1 ±1.1708; |Δ|=2.40 → outside tolerance",
+            ),
+            ("Sleep time came in at 4.7 hours against a call of 7.1 hours — outside its usual day-to-day range", True),
+        ),
+        (
+            _pred_row(
+                "inconclusive",
+                {"type": "directional", "metric": "blood_glucose_avg", "condition": "down"},
+                actual_value=None,
+                reason="Insufficient data to determine trend for 'blood_glucose_avg'",
+                grading_open=True,
+            ),
+            ("not gradable yet — not enough average blood glucose data to read it", False),
+        ),
+        (
+            _pred_row(
+                "refuted",
+                {"type": "machine", "metric": "total_calories_kcal", "condition": "gt", "threshold": None},
+                actual_value=-0.0346,
+                reason="[null-threshold machine spec re-routed to directional] total_calories_kcal trend=down (slope=-0.0346), predicted=up",
+            ),
+            ("Calories eaten went down — the call was for it to go up", True),
+        ),
+        (
+            _pred_row(
+                "expired",
+                {"type": "qualitative"},
+                actual_value=None,
+                reason="Retired unevaluated at window end (14d): eval_type=qualitative has no deterministic grading path",
+            ),
+            ("retired ungraded — a call like this has no measurable test", False),
+        ),
+        # A metric with no reader words: the grader's own sentence, unwrapped — never a guess.
+        (
+            _pred_row(
+                "refuted", {"type": "directional", "metric": "strain", "condition": "up"}, actual_value=-0.5, reason="strain trend=down"
+            ),
+            ("strain trend=down", True),
+        ),
+        # No reason written -> none served (ADR-104); nothing came back yet -> the flag is None.
+        (_pred_row("inconclusive", _DIR_UP, actual_value=None, reason=None), (None, False)),
+        ({"status": "pending", "evaluation": _DIR_UP, "outcome_notes": ""}, (None, None)),
+        ({"status": "confirmed", "evaluation": _DIR_UP, "outcome_notes": "plain grader note"}, ("plain grader note", True)),
+    ],
+)
+def test_4220_prediction_reason_in_reader_words(row, expected):
+    from web import prediction_reason
+
+    assert prediction_reason.reason_words(row) == expected
+
+
+def test_4220_every_measurable_metric_has_reader_words():
+    from experiment.measurable_metrics import METRIC_SOURCES, base_metric
+    from web import prediction_reason
+
+    assert {base_metric(k) for k in METRIC_SOURCES} == set(prediction_reason.METRIC_WORDS)
+
+
+def test_4220_predictions_serve_reason_and_graded_on_data_beside_the_raw_notes(monkeypatch):
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    _coaches, _cal, predictions, _wrong = _served_four(monkeypatch, table)
+    from web import prediction_reason
+
+    served = predictions["predictions"]
+    webb = [p for p in served if p["coach_id"] == "nutrition" and p["status"] == "refuted"]
+    assert len(webb) == 5, "the wire serves Webb's five refuted calls"
+    for p in webb:
+        assert p["outcome_notes"].startswith("{"), "outcome_notes stays the grader's blob (compatibility)"
+        assert p["graded_on_data"] is True
+        # The wire's grader wrote reason "r" on a machine spec with no reader-word shape:
+        # the grader's own text is served, unwrapped — never the blob, never a guess.
+        assert p["reason"] == "r", p["reason"]
+    # Every served row's reason is the one function's answer over its stored row.
+    stored = {
+        (row.get("claim_natural"), row.get("created_date")): row
+        for (_pk, sk), row in table.store.items()
+        if str(sk).startswith("PREDICTION#") and not str(sk).startswith("PREDICTION#docket-")
+    }
+    checked = 0
+    for p in served:
+        row = stored.get((p["text"], p["date"]))
+        if row is None:
+            continue
+        assert (p["reason"], p["graded_on_data"]) == prediction_reason.reason_words({**row, "status": p["status"]}), p
+        checked += 1
+    assert checked >= 9
+
+
 _LIVE_WRONG_4220 = os.path.join(_REPO, "tests", "fixtures", "wrong_obituaries_4220", "live_2026-09-27.json")
 
 
@@ -1077,3 +1204,272 @@ def test_4220_pair10_holds_under_a_frozen_pacific_clock(monkeypatch, pt_clock):
     docket_row = produced["rows"][1]
     assert str(docket_row["resolved_at"]).startswith(frozen_utc.isoformat()[:16]), "the frozen clock did not reach the writer"
     assert consumed == {"confirmed": 1, "refuted": 1, "n": 2, "through": _day(9)}
+
+
+# ── #4220: SEVEN surfaces, ONE record — every per-coach record reader is record_from_rows ──
+#
+# The four-endpoint guard above covered the public JSON; three more surfaces print a coach's
+# record — the coach page's report card, the owner's MCP reader and the observatory card —
+# and each one was, until #4445/#4438/#4454, a separate LEARNING# tally. This asserts all
+# seven against the producer computed DIRECTLY from the wire's PREDICTION# rows, over a wire
+# that carries every row shape that ever inflated one: twenty blank-prediction_id docket
+# LEARNING# rows per side, suffixed PREDICTION# re-writes, and (added here) one visible
+# pre-genesis resolution per side with its LEARNING# twin.
+
+
+def _add_pre_genesis_resolution(table):
+    """One call per side, graded BEFORE genesis and NOT phase-stamped — the record must not
+    count it (it resolved in an earlier cycle); a LEARNING# re-count would."""
+    from coach import coach_prediction_evaluator as ev
+
+    for coach_id, status in (("nutrition_coach", "confirmed"), ("explorer_coach", "refuted")):
+        row = _graded(
+            _emitted(coach_id, _day(-12), "A call made and settled before Day 1.", metric="hrv_7day_avg", condition="up", threshold=1),
+            status,
+            _day(-2),
+            0.01,
+        )
+        table.put_item(Item=row)
+        ev._write_learning_record(
+            coach_id,
+            _day(-2),
+            {"prediction_id": row["prediction_id"], "status": status, "metric": "hrv_7day_avg", "condition": "up", "actual_value": 0.01},
+        )
+
+
+def _add_observatory_outputs(table, coach_ids):
+    """The observatory card renders only when a coach has an OUTPUT# row."""
+    for cid in coach_ids:
+        sk = f"OUTPUT#{_day(20)}#daily"
+        table.store[(f"COACH#{cid}", sk)] = {"pk": f"COACH#{cid}", "sk": sk, "date": _day(20), "analysis": "A read of the week."}
+
+
+def _seven_surfaces(monkeypatch, table, short_id, served):
+    """{surface: record-or-None} for one coach, each read through its real handler."""
+    import coach_observatory_renderer as cobs
+
+    coaches, calibration, predictions, wrong = served
+    routed = _route_table(table)
+    persona = f"{short_id}_coach"
+    wrong_by = {r["coach"]: r for r in wrong["predictions"]["by_coach"]}
+    card = _body(api.handle_coach({"rawPath": f"/api/coach/{persona}"}))
+    monkeypatch.setattr(cobs, "table", routed)
+    domain = {v: k for k, v in cobs.DOMAIN_COACH_MAP.items() if k not in ("training",)}.get(persona)
+    obs = cobs._render_coach_card(domain) if domain else {}
+    obs_record = (obs.get("track_record") or {}).get("record")
+    return (
+        {
+            "/api/coaches .record": {c["persona_id"]: c for c in coaches["coaches"]}[persona]["record"],
+            "/api/calibration .record": {c["coach_id"]: c for c in calibration["coaches"]}[short_id]["record"],
+            "/api/predictions .by_coach.record": predictions["by_coach"][short_id]["record"],
+            "/api/wrong .by_coach": {k: v for k, v in wrong_by[short_id].items() if k != "coach"} if short_id in wrong_by else None,
+            "/api/coach/{id} .report_card.track_record.record": card["report_card"]["track_record"]["record"],
+            "MCP get_coach_track_record .record": _mcp_track_record(monkeypatch, table, short_id)["record"],
+            "observatory card .track_record.record": obs_record,
+        },
+        card,
+        obs,
+    )
+
+
+def test_every_per_coach_record_surface_is_record_from_rows(monkeypatch):
+    from coach import coach_record
+
+    table, _rows = _write_live_0926_wire(monkeypatch)
+    _add_pre_genesis_resolution(table)
+    operational = list(api.persona_registry.OPERATIONAL_COACH_IDS)
+    _add_observatory_outputs(table, operational)
+    served = _served_four(monkeypatch, table)
+
+    checked = 0
+    for persona in operational:
+        short_id = persona.replace("_coach", "")
+        prediction_rows = [dict(r) for (pk, sk), r in table.store.items() if pk == f"COACH#{persona}" and str(sk).startswith("PREDICTION#")]
+        truth = coach_record.record_from_rows(prediction_rows, genesis=EXPERIMENT_START)
+        surfaces, card, obs = _seven_surfaces(monkeypatch, table, short_id, served)
+        for name, got in surfaces.items():
+            if got is None and truth["n"] == 0 and name in ("/api/wrong .by_coach", "observatory card .track_record.record"):
+                continue  # both surfaces omit a coach with nothing decided — absence, not a second number
+            assert got == truth, f"{persona}: {name} serves {got}, record_from_rows says {truth}"
+        headline = coach_record.headline(truth)
+        assert {c["persona_id"]: c for c in served[0]["coaches"]}[persona]["headline_stat"] == headline, persona
+        assert card["report_card"]["track_record"]["headline"] == headline, persona
+        assert _mcp_track_record(monkeypatch, table, short_id)["headline"] == headline, persona
+        if truth["n"]:
+            assert obs["track_record"]["summary"].startswith(headline), persona
+        checked += 1
+    assert checked == len(operational) >= 2
+    # The wire's point: the pre-genesis call and the docket trail are on it, and none counts.
+    webb_rows = [r for (pk, sk), r in table.store.items() if pk == "COACH#nutrition_coach" and str(sk).startswith("PREDICTION#")]
+    assert coach_record.record_from_rows(webb_rows, genesis=EXPERIMENT_START)["n"] == 5
+    assert coach_record.record_from_rows(webb_rows, genesis=None)["n"] == 6  # the pre-genesis call, seen without the cycle cut
+
+
+# The companion SET guard: no reader in these files may re-derive a record from LEARNING#.
+_RECORD_SWEEP_FILES = ("lambdas/coach/coach_observatory_renderer.py", "mcp/tools_coach_intelligence.py")  # + lambdas/web/** (rglob)
+_LEARNING_TALLY_READER_REASONS = {
+    # path::function -> why it may read LEARNING# AND name confirmed/refuted without being a record
+    "lambdas/coach/coach_observatory_renderer.py::_tally_learning_statuses": "conversation-provenance (#1481, ADR-141): only "
+    "conversation_count is read; the card's record is coach_record.for_coach",
+    "mcp/tools_coach_intelligence.py::tool_get_coach_track_record": "conversation-provenance split + by_subdomain/by_metric "
+    "breakdowns over one result per prediction; its unfiltered record is coach_record (surface 6 above)",
+}
+
+
+def _learning_tally_readers(root):
+    """path::function for every function that reads LEARNING# and tallies confirmed/refuted —
+    directly, or by calling a same-module function that does."""
+    import ast
+
+    def _strs(node):
+        out = set()
+        for n in ast.walk(node):
+            if isinstance(n, ast.Constant) and isinstance(n.value, str):
+                out.add(n.value)
+        return out
+
+    def _tallies(fn):
+        """A numeric count keyed on a graded status: an `x += <int>` / `sum(...)` / `Counter(...)` in the
+        same function as a "confirmed"/"refuted" literal used as a comparand or a zero-initialised counter key."""
+        counters = {
+            n.target.value.id
+            for n in ast.walk(fn)
+            if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Subscript) and isinstance(n.target.value, ast.Name)
+        }
+        status_keyed = False
+        for n in ast.walk(fn):
+            if isinstance(n, ast.Compare):
+                status_keyed |= bool(_strs(n) & {"confirmed", "refuted"})
+            elif isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "get":
+                # counts.get("confirmed", 0) where `counts[...] += 1` elsewhere in the function
+                owner = getattr(n.func.value, "id", None)
+                if owner in counters and _strs(n) & {"confirmed", "refuted"}:
+                    status_keyed = True
+            elif isinstance(n, ast.Dict):  # a counter initialised per status: {"confirmed": 0, ...}
+                status_keyed |= any(
+                    isinstance(k, ast.Constant) and k.value in ("confirmed", "refuted") and isinstance(v, ast.Constant) and v.value == 0
+                    for k, v in zip(n.keys, n.values)
+                )
+        if not status_keyed:
+            return False
+        for n in ast.walk(fn):
+            if isinstance(n, ast.AugAssign) and isinstance(n.value, ast.Constant) and isinstance(n.value.value, int):
+                return True
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("sum", "Counter"):
+                return True
+        return False
+
+    from pathlib import Path as _P
+
+    hits = set()
+    paths = sorted(str(x) for x in _P(root, "lambdas", "web").rglob("*.py"))
+    paths += [os.path.join(root, f) for f in _RECORD_SWEEP_FILES if os.path.exists(os.path.join(root, f))]
+    for path in paths:
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
+        with open(path, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        fns = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        talliers = {name for name, fn in fns.items() if _tallies(fn)}
+        for name, fn in fns.items():
+            reads_learning = any(s.startswith("LEARNING#") for s in _strs(fn))
+            calls = {getattr(c.func, "id", None) for c in ast.walk(fn) if isinstance(c, ast.Call)}
+            if name in talliers and reads_learning:
+                hits.add(f"{rel}::{name}")
+            elif reads_learning:
+                # A reader that hands its LEARNING# rows to a same-module tallier: the tallier is the finding.
+                hits.update(f"{rel}::{t}" for t in calls & talliers)
+    return hits
+
+
+def test_no_record_surface_tallies_learning_rows():
+    hits = _learning_tally_readers(_REPO)
+    unexempt = sorted(hits - set(_LEARNING_TALLY_READER_REASONS))
+    assert not unexempt, (
+        "these functions read COACH#…/LEARNING# and tally confirmed/refuted — a second producer of a coach's record "
+        "(#4220: Webb read 20 of 25 there beside the record's 0 of 5). Read coach.coach_record instead:\n  " + "\n  ".join(unexempt)
+    )
+    stale = sorted(set(_LEARNING_TALLY_READER_REASONS) - hits)
+    assert not stale, f"exemptions whose function no longer tallies LEARNING# — delete them: {stale}"
+
+
+# ── #4185: a stored pre-fix read whose dated logging gap the served record contradicts ──
+# The live wire (public /api/coach/{nutrition,physical}_coach recent_outputs + /api/nutrition_overview,
+# read 2026-09-29): the nutrition coach's 09-23/24/25 reads say logging stopped after September 19th
+# and the physical coach's 09-13 read says after September 10th — the served record has a log on every
+# day through 09-26. Rebuilt into the stored OUTPUT# shape and served through the REAL _recent_outputs.
+_GAP_FX = json.load(open(os.path.join(os.path.dirname(__file__), "fixtures", "coach_superseded_gap_4185", "live_wire_2026-09-29.json")))
+
+
+def _gap_rows(coach_id):
+    rows = []
+    for o in _GAP_FX["coaches"][coach_id]:
+        row = {"pk": f"COACH#{coach_id}", "sk": f"OUTPUT#{o['date']}#daily_brief", "created_at": o["generated_at"]}
+        if o.get("summary"):
+            row["public_summary"] = o["summary"]
+        if o.get("data_through"):
+            row["data_through"] = o["data_through"]
+        rows.append(row)
+    return rows
+
+
+def _served_recent(monkeypatch, coach_id, *, macrofactor=True):
+    mf = [{"pk": "USER#matthew#SOURCE#macrofactor", "sk": f"DATE#{d}", "date": d} for d in _GAP_FX["nutrition_overview"]["trend_dates"]]
+    routes = {f"COACH#{coach_id}": _gap_rows(coach_id), "USER#matthew#SOURCE#macrofactor": mf if macrofactor else []}
+    monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=lambda _t, **kw: _fake_query_by_pk(routes)(**kw)))
+    return api._recent_outputs(coach_id)
+
+
+def test_the_six_pre_fix_gap_reads_are_served_superseded_and_nothing_else(monkeypatch):
+    """Exactly the six live reads — nutrition 09-22/23/24/25/26, physical 09-13 — lose their false summary and
+    carry `superseded`; every other read (including the post-fix 09-28/29 reads that mention September 19th)
+    is served byte-for-byte. Mutation controls: drop the `served_last_log > d` comparison or the pre-fix
+    condition — more reads supersede and the set assertion reds; remove the `apply` call — none do."""
+    assert _GAP_FX["nutrition_overview"]["nutrition"]["latest_date"] == "2026-09-26"
+    hit = {}
+    for cid in ("nutrition_coach", "physical_coach"):
+        served = _served_recent(monkeypatch, cid)
+        wire = _GAP_FX["coaches"][cid]
+        assert [o["date"] for o in served] == [o["date"] for o in wire]
+        for o, w in zip(served, wire):
+            if o.get("superseded"):
+                hit[(cid, o["date"])] = o["superseded"]["claimed_logging_stopped_after"]
+                assert o["summary"] is None and o["superseded"]["served_last_log"] == "2026-09-26"
+                assert o["superseded"]["note"] == "superseded — generated before the logging-record fix"
+            else:
+                assert o["summary"] == (w["summary"] or ""), (cid, o["date"])
+    # 09-26 and 09-22 say "N-day logging gap since September 19th" — read since the #4185 follow-up widened
+    # `coach_input_facts._GAP_SINCE_DATE`; the other four use "went dark / silent / nothing logged".
+    assert hit == {
+        ("nutrition_coach", "2026-09-26"): "2026-09-19",
+        ("nutrition_coach", "2026-09-22"): "2026-09-19",
+        ("nutrition_coach", "2026-09-25"): "2026-09-19",
+        ("nutrition_coach", "2026-09-24"): "2026-09-19",
+        ("nutrition_coach", "2026-09-23"): "2026-09-19",
+        ("physical_coach", "2026-09-13"): "2026-09-10",
+    }
+
+
+def test_an_unread_or_uncontradicting_record_supersedes_nothing(monkeypatch):
+    """ADR-104: no macrofactor rows (an unread/empty record) contradicts no claim — every read passes
+    through; and a claimed stop the record agrees with (last log ON the claimed date) is not superseded."""
+    served = _served_recent(monkeypatch, "nutrition_coach", macrofactor=False)
+    assert not any(o.get("superseded") for o in served)
+    from web import superseded_gap_reads as g
+
+    wire = _GAP_FX["coaches"]["nutrition_coach"]
+    assert not any(o.get("superseded") for o in g.mark(wire, "2026-09-19"))
+    assert sum(1 for o in g.mark(wire, "2026-09-20") if o.get("superseded")) == 5
+
+
+def test_only_a_pre_fix_read_is_superseded_a_post_fix_one_is_left_to_the_gate():
+    """The same 09-25 sentence written AFTER #4227 (stamped `data_through`, or generated after the fix
+    instant) is not superseded here: a post-fix read was produced against the served record and judged by
+    the #4227 served-fact gate — this filter only repairs the stored past. Mutation control: make
+    `_before_fix` return True — both reds."""
+    from web import superseded_gap_reads as g
+
+    (dark,) = [o for o in _GAP_FX["coaches"]["nutrition_coach"] if o["date"] == "2026-09-25"]
+    assert g.mark([dark], "2026-09-26")[0].get("superseded")
+    stamped = {**dark, "data_through": "2026-09-24"}
+    later = {**dark, "generated_at": "2026-09-28T17:03:12.000000+00:00"}
+    assert [o.get("superseded") for o in g.mark([stamped, later], "2026-09-26")] == [None, None]

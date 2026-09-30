@@ -415,3 +415,13 @@ def test_dead_code_census_resolved_orphan_helper_and_phantom_tool_are_gone():
     assert not hasattr(th, "_latest_per_workout_record"), "orphan helper is back — give it a caller or delete it again"
     assert not hasattr(th, "tool_get_workout_source_status"), "third tool now exists — update this census and the docstring"
     assert "get_workout_source_status" not in (th.__doc__ or ""), "docstring re-advertises a tool that does not exist"
+
+
+@pytest.fixture(autouse=True)
+def _output_schema_conformance_4286(monkeypatch):
+    """#4286 box 2: every result this module's fixtures produce is validated against the
+    tool's declared MCP outputSchema (tests/test_mcp_registry.py::check_output_schema)."""
+    from test_mcp_registry import check_output_schema
+
+    check_output_schema(monkeypatch, th, "get_workouts")
+    check_output_schema(monkeypatch, th, "get_workout_detail")

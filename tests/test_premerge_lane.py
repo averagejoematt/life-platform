@@ -17,6 +17,7 @@ Deliberately stdlib-only (string asserts, no yaml dep) — the guard for the
 collection-error killer must never itself be a collection error.
 """
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,10 +38,9 @@ def test_premerge_lane_exists_and_triggers_on_pull_request():
 def test_premerge_lane_carries_the_three_checks():
     text = _text()
     assert "--collect-only" in text, "ADR-139: the collection gate (the #1297 class) is gone"
-    # #2258 widened this: the lane now selects the `premerge` marker, which
-    # tests/conftest.py auto-applies to everything `deploy_critical` PLUS the whole
-    # behaviour suite. ADR-117's subset is still covered — it is a superset, not a swap.
-    assert "premerge and not integration" in text, "ADR-139/#2258: the pre-merge test lane is gone"
+    # #4251: the required lane selects ADR-117's `deploy_critical` subset; the wider
+    # `premerge` selection runs in the same workflow's `full-suite` job (asserted below).
+    assert "deploy_critical and not integration" in text, "ADR-139/#4251: the pre-merge test lane is gone"
     assert "black --check" in text, "ADR-139: the format gate is gone"
 
 
@@ -73,7 +73,11 @@ def test_the_premerge_marker_is_registered_and_auto_applied():
     assert "_behavior.py" in conftest, "#2258: the hook no longer keys on the behaviour-suite filename"
 
 
-_SELECTION = f"{_MARKER} and not integration"
+# #4251: the REQUIRED lane's selection. `premerge` (above) is still the marker the
+# full-suite job, merge_train.sh and the reset pipeline name; the fast lane runs the
+# deploy-gating subset of it.
+_FAST_MARKER = "deploy_critical"
+_SELECTION = f"{_FAST_MARKER} and not integration"
 
 
 def _fast_lane_pytest_selections():
@@ -92,16 +96,50 @@ def _fast_lane_pytest_selections():
 
 
 def test_the_premerge_lane_runs_the_marker_not_a_hand_listed_subset():
-    """#2258's property, rewritten for #4251's two-pass lane: every pass selects on the
-    ONE marker expression (plus only the `serial` split), never a hand-listed subset."""
+    """#2258's property, rewritten for #4251: every fast-lane pass selects on ONE
+    registered marker expression (plus only the `serial` split), never a hand-listed
+    subset of files. The marker is now `deploy_critical`; the `premerge` selection moved
+    to the full-suite job (test_every_premerge_test_still_runs_on_the_pr below)."""
     sels = _fast_lane_pytest_selections()
     assert sels, "#2258: pr-checks.yml's fast lane no longer runs a marker-selected pytest"
+    assert f"{_FAST_MARKER}:" in PYTEST_INI.read_text(encoding="utf-8"), "#4251: `deploy_critical` is no longer registered in pytest.ini"
     for expr, cmd in sels:
-        assert expr.startswith(_SELECTION), (
-            "#2258: pr-checks.yml no longer selects the `premerge` marker. The pre-merge "
-            "lane must not go back to being a strict subset of the post-merge one — that "
-            f"gap red-mained main three times in 24h on 2026-08-08. Got: {cmd}"
-        )
+        assert expr.startswith(_SELECTION), f"#4251: the fast lane must select `{_SELECTION}` (the one marker), got: {cmd}"
+
+
+def _full_suite_pytest_commands():
+    import re
+
+    text = _text()
+    block = text[text.index("  full-suite:") :]
+    nxt = re.search(r"\n  [a-z][a-z0-9-]*:\n", block[len("  full-suite:") :])
+    if nxt:
+        block = block[: len("  full-suite:") + nxt.start()]
+    return re.findall(r"(python3 -m pytest tests/[^\n]*)", block)
+
+
+def test_every_premerge_test_still_runs_on_the_pr():
+    """#2258 + #4251: the behaviour suite and the structural gates left the REQUIRED lane,
+    so they must still run on the PR. The full-suite job's passes select the whole tree
+    split only over `serial` — no `-m` term that could drop a `premerge` test. If a pass
+    ever gains another marker filter (or the job disappears), the 2026-08-08 red-main
+    class is post-merge-only again and this reds."""
+    import re
+
+    cmds = _full_suite_pytest_commands()
+    assert len(cmds) == 2, f"expected the full-suite job's parallel + serial passes, found {cmds}"
+    exprs = []
+    for c in cmds:
+        m = re.search(r' -m (?:"([^"]+)"|(\S+))', c.replace("python3 -m pytest", "", 1))
+        assert m, f"a full-suite pass carries no -m split — expected the `serial` complement pair: {c}"
+        exprs.append(m.group(1) or m.group(2))
+    exprs.sort()
+    assert exprs == ["not serial", "serial"], (
+        f"the full-suite job's passes must be exact complements over `serial` and nothing else, got {exprs} — "
+        "any other marker term can deselect premerge tests that no longer run in the fast lane (#4251)"
+    )
+    for c in cmds:
+        assert " --deselect" not in c and " -k " not in c, f"the full-suite job narrowed its selection: {c}"
 
 
 def test_the_fast_lane_partitions_its_selection_into_a_parallel_and_a_serial_pass():
@@ -126,7 +164,12 @@ def test_the_fast_lane_partitions_its_selection_into_a_parallel_and_a_serial_pas
     # Both passes land in the capture the deselection report reads, and a red first pass
     # must not skip the second (#749) nor be swallowed (#2746).
     assert "| tee /tmp/premerge_lane_output.txt || status=$?" in par
-    assert "| tee -a /tmp/premerge_lane_output.txt || status=$?" in ser
+    assert "| tee -a /tmp/premerge_lane_output.txt || serial_rc=$?" in ser
+    # No deploy_critical test is serial today, so the serial pass collects nothing and
+    # pytest exits 5. Exactly that code is forgiven, for the serial pass only.
+    assert (
+        '[ "$serial_rc" -ne 0 ] && [ "$serial_rc" -ne 5 ]; then status=$serial_rc' in block
+    ), "the serial pass's exit handling changed: it must forgive ONLY exit 5 (no tests collected) and propagate every other code"
     assert "exit $status" in block, "the two-pass step no longer exits with its passes' status"
 
 
@@ -261,10 +304,10 @@ def test_the_structural_gates_run_pre_merge():
         f"_PREMERGE_EXTRA_FILES dropped {dropped} while the file still exists. That gate is "
         "post-merge-only again — which is how main went red four times on 2026-08-08."
     )
-    # The lane must still select them via the ONE marker, not a second hand-list in YAML.
-    assert (
-        'pytest tests/ -m "premerge' in _text()
-    ), "the lane no longer selects the whole tests/ tree by marker — the extra files would not be picked up"
+    # #4251: they run pre-merge in the full-suite job, which selects the whole tests/
+    # tree (test_every_premerge_test_still_runs_on_the_pr holds that), not in the
+    # required fast lane. Never a second hand-list in YAML.
+    assert all("python3 -m pytest tests/" in c for c in _full_suite_pytest_commands())
 
 
 def test_the_mypy_gate_runs_pre_merge_with_the_same_command():
@@ -326,3 +369,58 @@ def test_the_coverage_gate_can_actually_fail_the_build():
         "its exit code is tail's (always 0). --cov-fail-under=74 and any test failure "
         "are silently swallowed and the step reports success unconditionally."
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4252 — a push to main re-runs black/ruff/mypy only when no required PR check did
+# ══════════════════════════════════════════════════════════════════════════════
+DEPENDABOT_AUTOMERGE = ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
+
+
+def _ci_lint_step(name_prefix):
+    text = CI_LINT.read_text(encoding="utf-8")
+    start = text.index(f"      - name: {name_prefix}")
+    nxt = text.find("\n      - ", start + 10)
+    return text[start : nxt if nxt != -1 else len(text)]
+
+
+def test_ci_lint_skips_the_pr_proven_gates_only_on_a_single_squash_merge():
+    """The three gates pr-checks.yml's required lane already ran carry the skip condition;
+    the decision lives in the install step (no new step: the census ids are positional)
+    and requires every clause of the squash-merge shape. A clause dropped from the
+    decision would let a reconcile / reset / multi-commit push skip them."""
+    decide = _ci_lint_step("Install black + ruff")
+    assert "id: proven" in decide
+    for clause in (
+        '"$EVENT_NAME" = "push"',
+        '"$BUILD_SHA" != "$PUSHED_SHA"',
+        '"$PARENTS" != "2"',
+        '"$PARENT" != "$BEFORE_SHA"',
+        '"$COMMITTER" != "noreply@github.com"',
+        '[[ "$SUBJECT" =~ \\(#[0-9]+\\)$ ]]',
+        'echo "pr_proven=$PROVEN" >> "$GITHUB_OUTPUT"',
+    ):
+        assert clause in decide, f"#4252: the PR-proven decision lost a clause: {clause}"
+    assert decide.index("PROVEN=false") < decide.index("PROVEN=true"), "the decision must default to running the gates"
+    for gate in ("Format gate (black", "Lint gate (ruff", "Mypy gate (ENFORCED"):
+        assert "if: always() && steps.proven.outputs.pr_proven != 'true'" in _ci_lint_step(gate), gate
+    # gitleaks is the one scan of a direct push (secret-scan.yml is pull_request-only).
+    assert "steps.proven" not in _ci_lint_step("Secret scan (gitleaks")
+
+
+def test_dependabot_automerge_keys_off_pr_checks_and_requires_the_full_suite():
+    """#4252 box 3: dependabot-validate.yml is deleted; automerge fires on the PR checks
+    workflow and must see the full suite green. The full suite is NOT a ruleset-required
+    context, so an automerge that waited only on the required ones could land a bump
+    whose behaviour tests are red."""
+    assert not (ROOT / ".github" / "workflows" / "dependabot-validate.yml").exists()
+    text = DEPENDABOT_AUTOMERGE.read_text(encoding="utf-8")
+    assert 'workflows: ["PR checks"]' in text and "name: PR checks" in _text()
+    assert "github.event.workflow_run.conclusion == 'success'" in text
+    required = text[text.index("REQUIRED_GREEN: |") : text.index("run: |")]
+    for ctx in ("Collect + deploy-critical + format", "gitleaks (PR commit range only, not full history)"):
+        assert ctx in required, ctx
+    full = re.search(r"^\s+name: (Full unit suite[^\n]*)$", _text(), re.M).group(1).strip()
+    assert full in required, f"automerge does not require the full-suite check by its exact name ({full})"
+    assert '"$HEAD" != "$GREEN_SHA"' in text, "a newer, unvalidated head could be merged"
+    assert "--match-head-commit" in text

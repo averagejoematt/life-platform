@@ -289,14 +289,26 @@ holds this paragraph and the workflow to the same literal, so editing one alone 
 
 ### 4a0. What gates the MERGE (#1662, ADR-148)
 
-Distinct from §4a (which gates the *deploy*, on push to `main`). Two check-runs are
+Distinct from §4a (which gates the *deploy*, on push to `main`). Three check-runs are
 **required** on every PR to `main` by the `main-required-fast-lane` ruleset:
-`Collect + deploy-critical + format` (`pr-checks.yml`) and
-`gitleaks (PR commit range only, not full history)` (`secret-scan.yml`) — the only two
-PR gates with no `paths:` filter and no job-level `if:`, so they report on every PR
-class including docs-only. Everything else (full `Unit Tests`, `Lint + Syntax Check`,
-CodeQL, visual QA, and the path-filtered gates) stays **advisory / post-merge**.
-Auto-merge is on: arm the PR once, GitHub lands it when those two go green.
+`Collect + deploy-critical + format` and `Full unit suite (pre-merge, issue 3025)`
+(both `pr-checks.yml`), and `gitleaks (PR commit range only, not full history)`
+(`secret-scan.yml`). These are PR gates with no `paths:` filter and no job-level `if:`,
+so they report on every PR class including docs-only. Everything else (post-merge
+`Unit Tests`, `Lint + Syntax Check`, CodeQL, visual QA, the API-before-frontend check
+and the path-filtered gates) stays **advisory / post-merge**. Auto-merge is on: arm the
+PR once, GitHub lands it when those three go green.
+
+**What the required fast lane runs (#4251):** collection + `deploy_critical` under xdist
++ mypy/black/ruff + bundle-boot. The wider `premerge` selection (behaviour suite +
+structural gates) runs on the same PR in `Full unit suite (pre-merge, issue 3025)`.
+**Owner ruling 2026-09-29 (#4251, PR #4441, option (a)): that context is REQUIRED.**
+Without it, auto-merge could land a PR whose behaviour tests are red once the fast
+lane stopped carrying them. The cost is the required wall-clock: the full suite's p95
+is ~19 min (`typical_seconds` in `deploy/github_posture.json`, written by
+`deploy/write_lane_posture.py --measure`), against the fast lane's ~7.5 min. The two
+jobs run in parallel, so a PR waits for the slower one. The ruleset change is applied
+by `python3 scripts/apply_branch_protection.py --apply` after this lands (driver-run).
 
 The trap to know: a required check matches by check-run *name*, and "never reported"
 is not distinguishable from "failed". Adding a `paths:` filter to either workflow,
@@ -355,6 +367,35 @@ The honest bounds: this is client-side — a bare `git push origin main` is not 
 and the docs stand-in is a superset of Docs CI, not of CI/CD's Unit Tests, which also run on a
 docs push.
 
+**What a push to `main` does NOT re-run (#4252).** A push to main re-proves only what no
+required PR check already proved. The decisions:
+
+- **black / ruff / mypy in `ci-lint.yml` are CONDITIONAL, not removed.** They are skipped
+  only when the push is exactly one GitHub squash merge of a PR: a push event, the pushed
+  sha is the tree under test (no reconcile commit on top), one commit with one parent
+  whose parent is `github.event.before`, committed by `noreply@github.com`, and a subject
+  ending `(#N)`. The `Install black + ruff` step decides and prints its reason; a step
+  that cannot decide leaves the gates on. Every other push runs them: the reconcile
+  bot, the reset pipeline, a direct docs push, a dispatch. Residue, stated: the
+  ruleset's owner bypass can merge past a red required check, and a mypy break that
+  exists only in the union of two PRs (strict status checks are off) is not re-checked
+  on main. It reds the next PR's fast lane, which type-checks the merged tree.
+  The decision is folded into an existing step on purpose: a new step would slide every
+  positional `ci::ci-lint.yml::lint::N` census id after it.
+- **gitleaks in `ci-lint.yml` stays unconditional.** `secret-scan.yml` is
+  `pull_request`-only, so this is the one scan of a direct push, and it costs about 3s.
+- **`ci-test.yml`'s eleven single-file pytest steps are gone.** Every one of those files
+  also ran in the coverage passes. The labels survive as named sections that
+  `scripts/ci_test_sections.py` prints from the passes' JUnit XML, with a failure
+  annotated by its old step name.
+- **`dependabot-validate.yml` is gone.** `dependabot-automerge.yml` fires on a completed
+  `PR checks` run. It merges only when that run concluded `success`, which needs every
+  pr-checks job including the full suite. It also checks that the PR head is still the
+  sha that went green and that the required contexts plus `Full unit suite (pre-merge,
+  issue 3025)` are `success` on it. The full suite is now a required context too
+  (§4a0, #4251); the explicit check is kept because automerge must never outrun a
+  ruleset apply that has not happened yet.
+
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
 Since ADR-117, `plan` (and therefore `deploy` + the reader-facing visual-QA gate)
@@ -399,22 +440,22 @@ after any change: `python3 -m pytest tests/ -m "deploy_critical and not integrat
 python3 -m pytest tests/ -m "premerge and not integration" -q
 ```
 
-That is the *same selection* `pr-checks.yml` runs as `Collect + deploy-critical + format` —
-the required merge gate from §4a0. One marker, named by both, so a local green here and
-the PR check cannot drift apart by construction (#2258). Membership is **derived**, not
-listed: `tests/conftest.py` applies `premerge` to every `tests/*_behavior.py` file, to
-everything `deploy_critical`, and to the structural gates in `_PREMERGE_EXTRA_FILES`.
-**8,813 tests in 155s** (measured locally 2026-08-21) against the job's 10-minute timeout.
+That is the *merge-relevant* selection: since #4251 it is split across `pr-checks.yml`'s
+two jobs. The **required** `Collect + deploy-critical + format` runs only its
+`deploy_critical` part (`-m "deploy_critical and not integration and not serial" -n auto
+--dist loadfile`, then the `serial` complement in one process — empty today, so that pass
+exits 5 and the step forgives exactly that code). The rest of `premerge` runs in the same
+PR's `Full unit suite` job, which runs the whole tree and is **not** required (§4a0).
+Before #4251 the fast lane ran all ~12.5k premerge tests and the full-suite job ran them
+again; the fast lane took 12–13 min for it (`gh run view <id> --json jobs`).
+`tests/test_premerge_lane.py` holds both halves: the fast lane's partition over
+`serial`, and the full-suite passes selecting every premerge test.
 
-**On the runner it is two passes over that one selection (#4251)** — the full-suite job's
-idiom: `-m "premerge and not integration and not serial" -n auto --dist loadfile`, then
-`-m "premerge and not integration and serial"` in one process for the in-tree writers.
-The expressions are exact complements, so no test runs twice inside the lane
-(`tests/test_premerge_lane.py` holds the partition). Run serially, it had grown to ~21 min
-on the runner — slower than the 30k-test parallel full suite on the same PR. Locally the
-one-pass command above is still the same selection; add `-n auto --dist loadfile -m
-"premerge and not integration and not serial"` for the lane's speed (12,258 tests in
-406s on 12 cores, 2026-09-27, plus 46 serial in 94s).
+Membership is **derived**, not listed: `tests/conftest.py` applies `premerge` to every
+`tests/*_behavior.py` file, to everything `deploy_critical`, and to the structural gates
+in `_PREMERGE_EXTRA_FILES`. The marker stays: `deploy/merge_train.sh`, the reset
+pipeline and `docs-ci.yml` still name it. To reproduce only the required check locally:
+`python3 -m pytest tests/ -m "deploy_critical and not integration" -n auto --dist loadfile -q`.
 
 **What it does NOT do: predict main.** It covers the *merge* gate. The lane that reds
 `main` is the full `Unit Tests` job — ~1,320s (#2692) — and no cheap local subset honestly
@@ -1457,7 +1498,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | A consumer hand-types a copy of registry vocabulary (source ids, persona ids, lambda names, alarm names) — the missed-consumer class (#2842 WS-A) | Kernel conformance guard (#2844): AST sweep + shrink-only dated exemption ledger; editing an exempted list re-reds it by content-keying | `tests/test_conformance_guard_2844.py`; ledger `ledgers/conformance_residue.py`; charter standing rule 1 |
 | The system model or its rendering goes stale or gets hand-edited — the dependency picture lies again (#2839's false-edges class) | System-model drift gate (#2845): CI regenerates `model/platform_model.json` + `docs/DEPENDENCY_GRAPH.md` from source and diffs byte-for-byte; known-true-edge pins catch extractor regressions | `tests/test_platform_model_drift.py`; generator `scripts/generate_platform_model.py`; queries `scripts/blast_radius.py` |
 | A producer and a consumer each pass their OWN tests against their OWN idea of a shape while the WIRE disagrees — the fixture-not-the-wire class (§9a). Measured instances: `site_stats_refresh_lambda` reads `tier0_streak` off `habit_scores` (which writes `t0_perfect_streak`); `coach_observatory_renderer` reads `journaling_prompt` off `OUTPUT#` rows (which no writer emits) — both green in every existing test | Producer/consumer contract sweep (#2847, charter primitive 4 generalised from #2813): the REAL producer's output round-trips through the REAL consumer, then a disagreement is injected into BOTH sides — PRODUCER SIDE reds when the mutated path is absent from what the producer emits, CONSUMER SIDE reds when the consumer's answer does not move. Coverage is a floor + ratchet (named pairs · enrolled count · pinned writer set per contracted partition); the candidate universe is derived live from the #2845 model's edge plane | `tests/test_pair_contract_sweep_2847.py`; registry `tests/pair_contract_registry.py`; model plane `contracts` |
-| A change makes a module a NEW participant in a shape another module already depends on, and nobody decides whether the two must agree — the pair is born untested (#2847 box 4; charter standing rule 3, "a contract test AT BIRTH"). This is the birth event behind both measured §9a instances: #2804's dead-zone read and #2214's dual writer each began as a second party joining a live shape | Must-agree seam guard (#2847 box 4): derives the seam census `(partition, module, direction)` from the #2845 model's edge plane, **built live from source** (the committed model regenerates in batches, so a committed-file read would be dark on exactly the PR that adds the seam), subtracts the seams covered by an enrolled `PairContract`, and reds on anything not in the dated shrink-only ledger. Enrolling a contract takes its rows OUT — the ratchet's downward gear. Baseline frozen at its seed date so it cannot be grown as an escape hatch; new seams need a 40-char argued exemption. Peer of #2844 (rule 1) and #2846, **not** a row inside #2844's vocabulary sweep — "these two must agree about a shape" has no token to match (the category mismatch PR #3169 named, resolved by siting rather than by distorting that guard). Blind spot pinned: the model resolves 72% of edge sites; a seam behind a dynamic helper read is invisible and a resolution drop reds | `tests/test_pair_seam_conformance_2847.py`; `tests/pair_seam_guard_lib.py`; `tests/pair_seam_residue.py` |
+| A change makes a module a NEW participant in a shape another module already depends on, and nobody decides whether the two must agree — the pair is born untested (#2847 box 4; charter standing rule 3, "a contract test AT BIRTH"). This is the birth event behind both measured §9a instances: #2804's dead-zone read and #2214's dual writer each began as a second party joining a live shape | Must-agree seam guard (#2847 box 4): derives the seam census `(partition, module, direction)` from the #2845 model's edge plane, **built live from source** (the committed model regenerates in batches, so a committed-file read would be dark on exactly the PR that adds the seam), subtracts the seams covered by an enrolled `PairContract`, and reds on anything not in the dated shrink-only ledger. Enrolling a contract takes its rows OUT — the ratchet's downward gear. Baseline frozen at its seed date so it cannot be grown as an escape hatch; new seams need a 40-char argued exemption. Peer of #2844 (rule 1) and #2846, **not** a row inside #2844's vocabulary sweep — "these two must agree about a shape" has no token to match (the category mismatch PR #3169 named, resolved by siting rather than by distorting that guard). Blind spot pinned: the model resolves 72% of edge sites; a seam behind a dynamic helper read is invisible and a resolution drop reds | `tests/test_pair_seam_conformance_2847.py`; `tests/pair_seam_guard_lib.py`; `ledgers/pair_seam_residue.py` |
 | A judgment ritual (review cadence) silently stops running — the filing rate drops to zero for that lens while every deterministic gate stays green (#2832's measured state: 4 of 5 review families dark) | Operating-calendar dead-man (#2832): daily scheduled sweep of artifact-dated probes; OVERDUE reds the run → remediation triage. The registry/doc-drift half (`--check`) gates in docs-ci; the SET guard + mutation proofs live in the pre-merge lane | `scripts/operating_calendar.py --due`; workflow + tests in `docs/OPERATING_CALENDAR.md`'s header |
 | A skill or subagent prompt carries a dead reference, a stale conditional pointer, or no frontmatter at all — silent, because a wrong instruction misleads the next session instead of raising | Skill-corpus contract (`skill_lint`): frontmatter well-formedness, `allowed-tools`/`tools` presence, every backticked repo path resolves (including `path:LINE` citations and `::symbol` anchors), conditional pointers at CLOSED issues, and a dated down-only ratchet for skills with no contract test. Runs offline with no third-party import, so no missing package can make it dark (#3234). Mutation proof is its own CI step | `scripts/skill_lint.py` (`--offline`, proof `--self-test`); `tests/test_skill_contract.py` |
 | A scheduled workflow silently STOPS FIRING — the advisory auto-filer (#1447) is armed on a run's *result* and its close policy is "auto-closes on the next green run", so a cron that never fires never files, never re-comments, and the surface is unwatched while its tracker issue reads healthy (#3213's measured case: `Visual QA (standalone)` had no run at all on 2026-08-26, ~1.5h past due, and nothing anywhere said so). Distinct from "fired and failed", which #1447 already owns — the classifier here is not passed a `conclusion` and structurally cannot express an opinion about one | Scheduled-workflow cadence watch (#3213, epic #2799): every `cron:` in `.github/workflows/` carries a watched/unwatched ruling; cadence is DERIVED from the workflow's own cron (worst legitimate gap, so Mon/Wed/Fri is 72h not 48h), grace is declared with a measured basis. Reports `stale` vs `never-fired` vs `unverified`, and exits **2** when it could verify nothing — "I could not look" is never a pass. Runs on `push: main` + `workflow_dispatch`, **never on `schedule`**: GitHub silences cron as a class (dropped under load; auto-disabled after 60 days of repo inactivity), so a watcher on that trigger cannot detect its own absence | `scripts/check_cron_freshness.py`; registry `scripts/scheduled_workflow_registry.py` |

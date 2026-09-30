@@ -100,7 +100,24 @@ unreachable, and 15 documented fields sat dark for six days behind a green fixtu
 bash deploy/verify_deployed_symbol.sh <function-name> <symbol>
 ```
 
-## 5. Close the loop honestly
+## 5. Release the lane — after the merge is verified, never before
+
+A lane worktree is locked from creation (`lane_worktree.py new`) so the reaper cannot eat a
+running agent. Nothing else ever unlocks it: on 2026-09-27 that was 348 worktrees, 97 still
+locked, ~37 GB (#4259). So once §1 asserted the checks and the squash landed on `main`, the
+**driver** (the session that ran the merge — never the lane itself) releases it:
+
+```bash
+python3 scripts/lane_worktree.py release <worktree-path | issue-number>
+```
+
+A bare issue number resolves the one `issue-<N>-*` lane (zero or several matches is an
+error, never a guess). Releasing does not delete anything: the `worktree-reap` wrap gate
+removes the released lane at the next `/wrap` if it is clean, idle and merged, and reports it
+by name if it is dirty. A PR that is open, red or unmerged is still live work — do not
+release it.
+
+## 6. Close the loop honestly
 
 Per ADR-099, the session that merges owns the closing comment:
 

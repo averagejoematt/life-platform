@@ -218,17 +218,39 @@ class Enrolment:
     policy_fn: str
 
 
-def _kw_str(keywords: dict, name: str):
+def _kw_str(keywords: dict, name: str, consts: dict | None = None):
+    """A keyword's string value — a literal, or (#4439) a module-level `NAME = "..."` constant."""
     node = keywords.get(name)
+    if isinstance(node, ast.Name) and consts:
+        return consts.get(node.id)
     return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
 
 
-def derive_role_family(stack_glob: str | None = None) -> list:
-    """Every `create_platform_lambda(...)` in the CDK stacks, as (function, module, policy)."""
+def _module_str_consts(tree) -> dict:
+    """{NAME: value} for every top-level `NAME = "literal"` in a stack module."""
+    out = {}
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            for target in stmt.targets:
+                if isinstance(target, ast.Name):
+                    out[target.id] = stmt.value.value
+    return out
+
+
+def derive_role_family(stack_glob: str | None = None, dropped: list | None = None) -> list:
+    """Every `create_platform_lambda(...)` in the CDK stacks, as (function, module, policy).
+
+    #4439: a site passing `custom_policies=` that cannot be resolved to all three fields is
+    appended to `dropped` (stack:line) instead of vanishing. Before, `function_name=
+    MCP_FUNCTION_NAME` (a module constant, not a literal) silently took both MCP Lambdas out
+    of every guard built on this family — including #3563's invoke-implies-record parity,
+    which is how the MCP role billed Bedrock with no cloudwatch:PutMetricData for weeks.
+    """
     rows: list = []
     for path in sorted(glob.glob(stack_glob or os.path.join(CDK_STACKS, "*_stack.py"))):
         with open(path, encoding="utf-8") as fh:
             tree = ast.parse(fh.read(), filename=path)
+        consts = _module_str_consts(tree)
         for node in ast.walk(tree):
             if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda"):
                 continue
@@ -238,13 +260,16 @@ def derive_role_family(stack_glob: str | None = None) -> list:
             if isinstance(policy, ast.Call):
                 f = policy.func
                 policy_fn = f.attr if isinstance(f, ast.Attribute) else (f.id if isinstance(f, ast.Name) else None)
-            fn, src = _kw_str(kw, "function_name"), _kw_str(kw, "source_file")
+            fn, src = _kw_str(kw, "function_name", consts), _kw_str(kw, "source_file", consts)
             if fn and src and policy_fn:
                 rows.append(Enrolment(os.path.basename(path), fn, src, policy_fn))
+            elif policy is not None and dropped is not None:
+                dropped.append(f"{os.path.basename(path)}:{node.lineno}")
     return rows
 
 
-ROLE_FAMILY = derive_role_family()
+UNRESOLVED_SITES: list = []
+ROLE_FAMILY = derive_role_family(dropped=UNRESOLVED_SITES)
 ENROLLED_MODULES = {e.source_file for e in ROLE_FAMILY}
 
 
@@ -419,6 +444,30 @@ def test_the_role_family_is_derived_and_substantial():
         assert policy_is_defined(
             e.policy_fn
         ), f"{e.stack} wires {e.function_name} to {e.policy_fn}(), which no role_policies* member defines"
+
+
+def test_no_custom_policies_site_is_silently_dropped():
+    """#4439: every `create_platform_lambda(..., custom_policies=...)` enrols, or reds by site.
+
+    A site the extractor cannot resolve used to vanish from the family, and with it from every
+    guard derived from the family — the two MCP Lambdas did, for want of a literal name."""
+    assert not UNRESOLVED_SITES, (
+        "these create_platform_lambda sites pass custom_policies but did not resolve to a "
+        "(function_name, source_file, policy fn) enrolment — extend _kw_str:\n  " + "\n  ".join(UNRESOLVED_SITES)
+    )
+    assert {"life-platform-mcp", "life-platform-mcp-warmer"} <= {e.function_name for e in ROLE_FAMILY}
+
+
+def test_MUTATION_an_unresolvable_site_is_reported_not_dropped(tmp_path):
+    """Positive control: a site whose name is not statically resolvable lands in `dropped`."""
+    stack = tmp_path / "probe_stack.py"
+    stack.write_text("create_platform_lambda(self, 'X', function_name=make_name(), source_file='a.py', custom_policies=rp.p())\n")
+    dropped: list = []
+    assert derive_role_family(str(tmp_path / "*_stack.py"), dropped=dropped) == []
+    assert dropped == ["probe_stack.py:1"], dropped
+    const = tmp_path / "const_stack.py"
+    const.write_text("NAME = 'fn-x'\ncreate_platform_lambda(self, 'X', function_name=NAME, source_file='a.py', custom_policies=rp.p())\n")
+    assert [e.function_name for e in derive_role_family(str(const))] == ["fn-x"]
 
 
 def test_the_write_extractor_reads_the_two_incident_modules():
@@ -850,3 +899,48 @@ def test_live_role_policies_match_the_checked_in_documents():
     assert not stale, "these KNOWN_LIVE_DRIFT lines no longer describe live drift — the deploy landed; delete them:\n" + "\n".join(
         f"  {k}" for k in stale
     )
+
+
+# ── #4449: the podcast's panelcast-holds/ verbs, derived from the code, granted by the role ──
+# The DDB legs above cannot see S3. The SS-02 hold sweep put_object'd holds under a PutObject-only
+# grant and then get_object'd them back: every read AccessDenied inside a fail-soft `except`, so a
+# quality hold read as "no hold" and was never retried (live 2026-09-28, wk3). One prefix, derived
+# both ways: the S3 verbs the module calls with a HOLD_PREFIX key, and the role that must grant them.
+_S3_METHOD_ACTION = {
+    "get_object": "s3:GetObject",
+    "head_object": "s3:GetObject",
+    "put_object": "s3:PutObject",
+    "delete_object": "s3:DeleteObject",
+}
+
+
+def _hold_prefix_s3_actions(source: str) -> set:
+    actions = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _S3_METHOD_ACTION:
+            key = next((k.value for k in node.keywords if k.arg == "Key"), None)
+            if key is not None and "HOLD_PREFIX" in ast.unparse(key):
+                actions.add(_S3_METHOD_ACTION[node.func.attr])
+    return actions
+
+
+def _granted_on(statements, resource_suffix: str) -> set:
+    return {a for s in statements for a in s.actions if any(r.endswith(resource_suffix) for r in s.resources)}
+
+
+def test_the_podcast_role_grants_every_verb_its_hold_sweep_calls_on_panelcast_holds():
+    with open(os.path.join(ROOT, "lambdas", "emails", "coach_panel_podcast_lambda.py"), encoding="utf-8") as fh:
+        called = _hold_prefix_s3_actions(fh.read())
+    assert called == {"s3:GetObject", "s3:PutObject", "s3:DeleteObject"}, called  # the extractor sees all three
+    granted = _granted_on(policy_statements("email_coach_panel_podcast"), "/panelcast-holds/*")
+    assert called <= granted, f"coach-panel-podcast calls {sorted(called - granted)} on panelcast-holds/* with no grant"
+
+
+def test_MUTATION_a_put_only_grant_reds_on_the_hold_read():
+    """The pre-#4449 role: S3Write PutObject on panelcast-holds/* and nothing else."""
+    put_only = [types.SimpleNamespace(actions=["s3:PutObject"], resources=["arn:aws:s3:::b/panelcast-holds/*"])]
+    called = {"s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
+    assert called - _granted_on(put_only, "/panelcast-holds/*") == {"s3:GetObject", "s3:DeleteObject"}
+    assert _hold_prefix_s3_actions('s3.get_object(Bucket=B, Key=f"{HOLD_PREFIX}/wk1.json")\ns3.get_object(Key="other/x")') == {
+        "s3:GetObject"
+    }

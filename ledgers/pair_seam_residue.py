@@ -1,4 +1,4 @@
-"""tests/pair_seam_residue.py — the #2847 must-agree-seam ledger (box 4, epic #2842).
+"""ledgers/pair_seam_residue.py — the #2847 must-agree-seam ledger (box 4, epic #2842).
 
 The dated, shrink-only companion to ``tests/pair_seam_guard_lib.py``, in the shape
 ``ledgers/conformance_residue.py`` (#2844) and ``tests/lambda_enrollment_ledger.py``
@@ -572,6 +572,33 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "`measured` as a FLOOR with `sources.hevy.status = read_failed` BY NAME, and with Strava also unreadable the "
         "field is `read_failed` naming both errors — never `absent`, never an empty day. Pinned by "
         "tests/test_coach_session_packet_4082.py::test_today_is_read_failed_when_neither_source_reads_and_a_floor_when_one_does.",
+    ),
+    # #4412 (2026-09-29): the hourly rejoin re-reads the last two days' Hevy workout rows.
+    "hevy::lambdas/training/cardio_hr_store.py::read": (
+        "2026-09-29",
+        "#4412: `rejoin_recent` queries the Hevy partition (a literal pk, never a caller-chosen source) and hands each "
+        "`#WORKOUT#` row to the pure join `training.cardio_hr`, which reads only the fields `hevy_common.normalize_workout` "
+        "writes and the shared cardio readers already depend on: `start_time`/`end_time` (the same instants "
+        "`walking_volume.hevy_cardio_intervals` reads), `exercises[].name` through `walking_volume._modality_for_hevy` "
+        "(the one counted-name rule), and `sets[].duration_sec|duration_seconds/reps/weight_kg`. VERIFIED, not assumed: "
+        "a drift cannot fabricate a heart rate — an unmatched name means no cardio block and `derive` returns None (no "
+        "write); an unmatched set shape means no placeable window and the block is `state: unknown` with every HR field "
+        "None. Pinned by tests/test_walking_volume_3930.py::test_the_hourly_rejoin_heals_an_unknown_block_once_the_"
+        "wearable_lands_and_then_writes_nothing and ::test_the_0925_treadmill_replays_joined_on_the_live_fixture.",
+    ),
+    # #4412 (2026-09-29): the cardio-HR join reads the Strava day item's `activities[]`.
+    "strava::lambdas/training/cardio_hr_store.py::read": (
+        "2026-09-29",
+        "#4412: the store hands the Strava day item's `activities` list, unparsed, to the pure join "
+        "`training.cardio_hr`, which reads the HR-covered minutes ONLY through `common.activity_overlap.hr_intervals` "
+        "(`start_date`, `elapsed_time_seconds`, `average_heartrate`, the `is_hevy_echo` filter) — the SAME reader the "
+        "Hevy-vs-Strava load and calorie de-dup already depend on (#4075/#4158), so there is no second parse of the "
+        "time shape to drift. Its own keys are `average_heartrate`/`max_heartrate`/`zone{n}_seconds`/`device_name`, "
+        "exactly the names `strava_lambda._normalize` + `_fetch_activity_zones` write. VERIFIED, not assumed: a drift "
+        "cannot fabricate a number — an unmatched field makes the activity non-HR-bearing, coverage 0.0 and the block "
+        "`state: unknown` with avg/max None (never 0), a visible flip on the stored `cardio_hr` record. Pinned by "
+        "tests/test_walking_volume_3930.py::test_no_overlap_or_thin_coverage_is_unknown_never_zero and "
+        "::test_the_0925_treadmill_replays_joined_on_the_live_fixture (the live-row fixture).",
     ),
 }
 
