@@ -594,3 +594,48 @@ def test_superseded_run_a_rolls_into_run_b_plan(tmp_path):
     changed = set(out.split())
     assert "lambdas/emails/weekly_digest_lambda.py" in changed, f"superseded run A's merge is missing from B's plan: {changed}"
     assert "mcp/tools_health.py" in changed
+
+
+# #4472 box 2 — live Lambda older than its source on main (the nightly advisory).
+_T = lambda s: datetime.fromisoformat(s).replace(tzinfo=timezone.utc)  # noqa: E731
+
+
+def test_aws_last_modified_parses_to_an_aware_instant():
+    assert dm._parse_aws_ts("2026-09-29T18:00:59.000+0000") == _T("2026-09-29T18:00:59")
+    assert dm._parse_aws_ts(None) is None and dm._parse_aws_ts("garbage") is None
+
+
+def test_stale_functions_replays_the_weekly_digest_incident():
+    """#4452 merged 17:42Z; the live weekly-digest zip was 18:00:59Z from an older run's
+    tree — here modelled as a zip older than the merge. Fresh, in-grace and absent shapes."""
+    now = _T("2026-09-30T08:00:00")
+    owed = {
+        "weekly-digest": (_T("2026-09-29T17:42:00"), "lambdas/emails/weekly_digest_lambda.py changed"),
+        "daily-brief": (_T("2026-09-29T17:42:00"), "a shared module / bundled config changed"),
+        "coach-nudge": (_T("2026-09-30T07:30:00"), "lambdas/coach/coach_nudge.py changed"),  # inside the grace window
+        "gone": (_T("2026-09-29T10:00:00"), "lambdas/x.py changed"),
+    }
+    live = {"weekly-digest": _T("2026-09-29T16:59:00"), "daily-brief": _T("2026-09-29T18:10:00"), "coach-nudge": _T("2026-09-29T01:00:00")}
+    rows = dm.stale_functions(live, owed, now)
+    assert [r["function"] for r in rows] == ["gone", "weekly-digest"]
+    assert "not listed by AWS" in rows[0]["why"], "a mapped function AWS does not list is never read as fresh"
+    code, text = dm.render_stale(rows)
+    assert code == dm.EXIT_ALARM and dm.RECOVERY in text and "weekly-digest" in text
+    assert dm.render_stale([])[0] == dm.EXIT_OK
+
+
+def test_stale_lambdas_mode_is_indeterminate_when_aws_is_unreadable(monkeypatch, capsys):
+    def boom():
+        raise RuntimeError("ExpiredToken")
+
+    monkeypatch.setattr(dm, "collect_last_modified", boom)
+    assert dm.main(["--stale-lambdas"]) == dm.EXIT_INDETERMINATE
+    assert "✅" not in capsys.readouterr().out
+
+
+def test_stale_lambdas_is_wired_as_an_advisory_step_of_the_nightly_drift_workflow():
+    with open(os.path.join(_REPO, ".github", "workflows", "config-drift.yml")) as f:
+        wf = f.read()
+    step = [s for s in wf.split("\n      - ") if "check_deploy_deadman.py --stale-lambdas" in s]
+    assert len(step) == 1, "the stale-Lambda check must be one step of config-drift.yml"
+    assert "if: always()" in step[0] and "continue-on-error: true" in step[0]

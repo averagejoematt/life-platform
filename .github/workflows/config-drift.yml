@@ -248,3 +248,18 @@ jobs:
           sys.exit(1 if failed else 0)
           PYEOF
           exit $rc
+
+      # #4472 box 2 — the fourth "merged but not serving" question, for CODE rather than
+      # config: is any live Lambda older than the newest main commit that should have
+      # redeployed it (its handler, a shared module, a bundled config path)? The deploy
+      # dead-man (deploy-wedge-watch.yml) reads GitHub's side; this reads AWS's. ADVISORY
+      # (continue-on-error): a stale function prints the deploy_all recovery and marks the
+      # step, but does not red the nightly — an out-of-band laptop deploy before a merge is
+      # a legitimate stale-looking shape. Read-only: lambda:ListFunctions, already granted
+      # to this role (ci-cd.yml's plan uses it).
+      - name: Live Lambda older than its source on main (#4472, read-only, advisory)
+        if: always()
+        continue-on-error: true
+        run: |
+          git fetch --quiet --unshallow origin main || git fetch --quiet origin main
+          python3 scripts/check_deploy_deadman.py --stale-lambdas

@@ -815,10 +815,24 @@ jobs:
           fi
           echo "✅ All Lambda source files define lambda_handler"
 
+      # #4472: the diff base is the LAST SUCCESSFULLY DEPLOYED sha, not GITHUB_SHA~1. The deploy
+      # job's concurrency group keeps one pending job and cancels the older one, so a `~1` base
+      # dropped a superseded run's merge forever (#4452's weekly-digest fix, 2026-09-29).
+      # Read-only (Actions API). Empty output = unresolved → the next step deploys everything.
+      - name: Resolve deploy base — the last successful Deploy on main (#4472)
+        id: base
+        if: github.event.inputs.deploy_all != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(python3 scripts/check_deploy_deadman.py --deploy-base || true)
+          echo "deploy base: '${SHA}'"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Detect changes and build deploy plan
         id: plan
         env:
-          GH_TOKEN: ${{ github.token }}   # #4472: the deploy-base read (Actions API, read-only)
+          RESOLVED_DEPLOY_BASE: ${{ steps.base.outputs.sha }}
         run: |
           set -e
 
@@ -826,13 +840,11 @@ jobs:
             echo "Manual deploy-all triggered — deploying everything"
             CHANGED=$(find lambdas/ mcp/ -name '*.py' -type f)
           else
-            # #4472: diff from the LAST SUCCESSFULLY DEPLOYED sha to HEAD (the reconciled
-            # tree, #1173), not from GITHUB_SHA~1. The deploy job's concurrency group keeps
-            # one pending job and cancels the older one, so a `~1` base dropped a superseded
-            # run's merge forever (#4452's weekly-digest fix, 2026-09-29). This base rolls
-            # every cancelled / failed / skipped run's files into this plan. Unresolvable
-            # (API unreadable, no deploy in the window, base not an ancestor) → deploy all.
-            DEPLOY_BASE=$(python3 scripts/check_deploy_deadman.py --deploy-base || true)
+            # #4472: diff from the LAST SUCCESSFULLY DEPLOYED sha (step `base`) to HEAD (the
+            # reconciled tree, #1173), not from GITHUB_SHA~1 — every cancelled / failed /
+            # skipped run's files roll into this plan. Unresolvable (API unreadable, no deploy
+            # in the window, base not an ancestor of HEAD) → deploy all, never a guessed base.
+            DEPLOY_BASE="${RESOLVED_DEPLOY_BASE:-}"
             if [ -n "$DEPLOY_BASE" ] && git merge-base --is-ancestor "$DEPLOY_BASE" HEAD 2>/dev/null; then
               echo "Deploy base: $DEPLOY_BASE (last successful Deploy on main; this push is ${GITHUB_SHA})"
               CHANGED=$(git diff --name-only "$DEPLOY_BASE" HEAD -- lambdas/ mcp/ mcp_server.py 2>/dev/null || \
