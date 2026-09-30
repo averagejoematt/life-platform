@@ -1442,6 +1442,29 @@ def test_parse_verdict_none_is_unevaluated():
     assert rtq.parse_verdict(None)[rtq.UNEVALUATED_FIELD] == rtq.KIND_NO_VERDICT
 
 
+# #4474: a WHOLE verdict followed by prose that carries a brace. The greedy span
+# runs to the last "}", so json.loads rejected it and the batch was UNEVALUATED
+# although the judge had answered in full.
+_VERDICT_THEN_BRACE_PROSE = (
+    '{"findings": [{"page": "/", "category": "other", "severity": "low", "note": "n"}], "severity": "low"}\n\n'
+    "Note: the {placeholder} token on the page is intentional."
+)
+
+
+def test_parse_verdict_reads_a_whole_verdict_before_trailing_brace_prose_4474():
+    v = rtq.parse_verdict(_VERDICT_THEN_BRACE_PROSE)
+    assert rtq.UNEVALUATED_FIELD not in v
+    assert [f["note"] for f in v["findings"]] == ["n"]
+
+
+def test_parse_verdict_unparseable_names_the_decoder_position_4474():
+    v = rtq.parse_verdict(_MALFORMED_VERDICT)
+    assert v[rtq.UNEVALUATED_FIELD] == rtq.KIND_UNPARSEABLE
+    assert v["detail"].startswith("Expecting property name enclosed in double quotes at char ")
+    _findings, errors = rtq.assess_prose(_PAGES, _raw_invoke(_MALFORMED_VERDICT), today_iso=_DAY_2)
+    assert "UNEVALUATED (unparseable) [Expecting property name" in str(errors[0])
+
+
 @pytest.mark.parametrize("text,kind", _UNREADABLE)
 def test_assess_prose_unreadable_batch_lands_in_errors_as_unevaluated(text, kind):
     findings, errors = rtq.assess_prose(_PAGES, _raw_invoke(text), today_iso=_DAY_2)

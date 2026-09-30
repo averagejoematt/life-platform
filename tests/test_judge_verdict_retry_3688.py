@@ -310,9 +310,9 @@ def test_the_batch_judges_budget_is_a_named_constant_the_control_can_force():
     reproduction ("lower the budget below p50") had no knob and the positive
     control could only be faked. Same rule the sibling gate already enforces for
     `visual_ai_qa._VERDICT_MAX_TOKENS` (#3652): every budget is a NAMED constant.
-    The value is unchanged — #3688 is the retry, not another raise."""
+    #3688 kept the value; #4474 raised it 1500 -> 3000 on 14 runs of measurement."""
     src = _read("lambdas/operational/reader_truth_qa.py")
-    assert rtq.BATCH_VERDICT_MAX_TOKENS == 1500
+    assert rtq.BATCH_VERDICT_MAX_TOKENS == 3000
     body = src.split("def assess_prose")[1]
     assert '"max_tokens": BATCH_VERDICT_MAX_TOKENS' in body
     assert not re.search(r'"max_tokens":\s*\d+', body), "assess_prose hardcodes a max_tokens literal again"
