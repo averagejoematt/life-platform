@@ -53,8 +53,11 @@ def _markers():
     return chl.derive_markers(WRAP.read_text(encoding="utf-8"))
 
 
+RESIDUAL = "\n## Residual / next picks\n- #4262 something parked\n"
+
+
 def _full_handover() -> str:
-    return "# Handover\n" + "\n".join(f"**{name}:** something on record" for name in EXPECTED)
+    return "# Handover\n" + "\n".join(f"**{name}:** something on record" for name in EXPECTED) + RESIDUAL
 
 
 # ── the derivation reads wrap.md, and finds the whole set ───────────────────────
@@ -104,25 +107,44 @@ def test_current_repo_handover_passes():
     assert ok, f"the checked-in handover regressed a marker line: {messages}"
 
 
-def test_each_missing_line_is_red_and_named():
+def test_each_missing_marker_is_a_named_prompt_not_a_red():
+    """#4262: marker lines passed on the presence of a sentence, so they are prompts now —
+    a dropped one is NAMED (so the session sees it) but never fails the wrap."""
     markers = _markers()
     for dropped in EXPECTED:
-        text = "# Handover\n" + "\n".join(f"**{n}:** something" for n in EXPECTED if n != dropped)
+        text = "# Handover\n" + "\n".join(f"**{n}:** something" for n in EXPECTED if n != dropped) + RESIDUAL
         ok, messages = chl.evaluate(text, markers)
         joined = "\n".join(messages)
-        assert not ok, f"dropping **{dropped}:** must fail"
-        assert f"`**{dropped}:**`" in joined and "MISSING" in joined, f"the missing line must be NAMED, got: {joined}"
-        # exactly the dropped one, not a shotgun
-        assert joined.count("MISSING") == 1, f"only **{dropped}:** was removed but got: {joined}"
+        assert ok, f"#4262: dropping the optional **{dropped}:** line must NOT fail, got: {joined}"
+        assert f"PROMPT — `**{dropped}:**`" in joined, f"the absent line must still be NAMED as a prompt, got: {joined}"
+        assert "MISSING" not in joined, f"only an optional line was removed but got: {joined}"
+
+
+def test_missing_residual_section_is_the_one_red():
+    """#4262 mutation: every marker present, the residual section absent -> exit-1 shape.
+    check_residual_queue passes vacuously without the section, so this is its one guard."""
+    text = "# Handover\n" + "\n".join(f"**{n}:** something" for n in EXPECTED)
+    ok, messages = chl.evaluate(text, _markers())
+    joined = "\n".join(messages)
+    assert not ok, "#4262: a handover with no residual / next-picks section must fail"
+    assert "residual / next-picks section" in joined and "MISSING" in joined
+    ok, _ = chl.evaluate("# Handover\n" + RESIDUAL, _markers())
+    assert ok, "#4262: the residual section alone, with no marker line, must pass"
+
+
+def test_proportionality_ledger_is_advisory_in_the_wrap_battery():
+    """#4262: the (e12) gate passes on a `**Ledger:**` sentence — a marker-line gate — so its
+    verdict prints but never fails the wrap; it stays in VERIFY so the prompt is seen."""
+    (e12,) = [g for g in wg.VERIFY if "check_proportionality_ledger.py" in " ".join(g.cmd)]
+    assert e12.ok_when is not None and e12.ok_when(1, "FAIL") is True
 
 
 def test_marker_matching_tolerates_the_house_variants():
-    markers = {"Ledger": "e12"}
     for line in ("**Ledger:** none — x", "Ledger: none — x", "- **Ledger:** none — x", "  **ledger:** none — x"):
-        ok, _ = chl.evaluate(f"# H\n{line}\n", markers)
-        assert ok, f"house-variant line {line!r} must count"
-    ok, _ = chl.evaluate("# H\nthe session ledger; was updated\n", markers)
-    assert not ok, "a prose mention without the colon marker must NOT count"
+        assert chl.marker_present(f"# H\n{line}\n", "Ledger"), f"house-variant line {line!r} must count"
+    assert not chl.marker_present(
+        "# H\nthe session ledger; was updated\n", "Ledger"
+    ), "a prose mention without the colon marker must NOT count"
 
 
 # ── the batched runner (#3007): battery composition, not behaviour re-tests ─────

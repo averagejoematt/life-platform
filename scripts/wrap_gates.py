@@ -25,8 +25,9 @@ THE SHAPE (gather → write → verify → commit)
                       each script-determined outcome pre-filled. The session writes the
                       handover ONCE, pasting and correcting the draft.
   --verify            Run the gates that DO read the finished handover — the #3006 line
-                      assertion, the residual-queue gate, the proportionality-ledger
-                      gate, the beat validators — plus the Docs-CI leg, ONCE, after the
+                      assertion (residual section only since #4262; markers are
+                      prompts), the residual-queue gate, the proportionality-ledger
+                      gate (advisory since #4262), the beat validators — plus the Docs-CI leg, ONCE, after the
                       wrap has written the docs it judges (#4262). Must exit 0 before the
                       wrap commit (step (f)).
 
@@ -213,7 +214,10 @@ GATHER = [
 VERIFY = [
     Gate("handover-lines", "f", ["python3", "scripts/check_handover_lines.py"]),
     Gate("residual-queue", "e4", ["python3", "scripts/check_residual_queue.py"]),
-    Gate("proportionality-ledger", "e12", ["python3", "scripts/check_proportionality_ledger.py"]),
+    # #4262: a marker-line gate — it passes on a `**Ledger:**` sentence — so it is a PROMPT:
+    # its verdict prints in full, it never fails the wrap. check_handover_lines likewise
+    # blocks only on the residual section; every other marker line is a printed prompt.
+    Gate("proportionality-ledger", "e12", ["python3", "scripts/check_proportionality_ledger.py"], ok_when=lambda rc, out: True),
     Gate("content-policy", "d", ["python3", "scripts/content_policy_scan.py"]),
     Gate("beats-schema", "d", ["python3", "scripts/validate_beats.py"]),
     # #2848/#3682's sixth Set member: step (c) regenerates docs/OPERATING_KNOWLEDGE_LEDGER.md's
