@@ -861,6 +861,14 @@ jobs:
           fi
           for file in $CHANGED; do
             case "$file" in
+              # #4250 box 3: the reconcile bot's counter file is never a fleet trigger.
+              # It ships in every bundle, so the next real fleet deploy carries it;
+              # a count bump alone must not park a `production` lease for ~106 functions.
+              # This also covers a reconcile-only push: the reconcile whitelist's only
+              # lambdas/ path is this file, and it names no BUNDLED_CONFIG_PATHS entry.
+              lambdas/web/platform_counts.py)
+                echo "ℹ️ $file is a reconcile counter file — rides the next fleet deploy, never triggers one (#4250)"
+                ;;
               lambdas/*)
                 MAPPED=$(jq -r --arg f "$file" '.lambdas[$f].function // empty' "$LAMBDA_MAP_FILE")
                 if [ -z "$MAPPED" ]; then
