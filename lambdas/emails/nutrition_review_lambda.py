@@ -187,6 +187,9 @@ def gather_nutrition_data():
     # #4244: BOTH weeks, so the prior week's micronutrient figures are joined on the same
     # basis as this week's (extract_daily_nutrition joins per day through health.nutrient_intake).
     supplements = query_range("supplements", w2_start, w1_end)
+    # #4245 box 4: Habitify's statuses tell a SCHEDULED supplement miss (a zero) from no record
+    # (absent); nutrient_intake reads only the registry supplement habits from each day's row.
+    habitify = query_range("habitify", w2_start, w1_end)
 
     # Previous week's nutrition review (for trending)
     prev_review = None
@@ -219,6 +222,7 @@ def gather_nutrition_data():
         "latest_lab": latest_lab,
         "latest_dexa": latest_dexa,
         "supplements": supplements,
+        "habitify": habitify,
         "prev_review": prev_review,
         "profile": profile,
         "dates": {"this_start": w1_start, "this_end": w1_end, "prior_start": w2_start, "prior_end": w2_end},
@@ -230,7 +234,7 @@ def gather_nutrition_data():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def extract_daily_nutrition(mf_data, supplements=None):
+def extract_daily_nutrition(mf_data, supplements=None, habitify=None):
     """One day row per MacroFactor day. `supplements` is the {date: row} map from the
     supplements partition (#4244): the micronutrient figures below are the food +
     supplements JOIN (health.nutrient_intake), not the stored food-only number — the
@@ -238,9 +242,10 @@ def extract_daily_nutrition(mf_data, supplements=None):
     5,000 IU of vitamin D the same prompt listed under `supplements`."""
     days = []
     supplements = supplements or {}
+    habitify = habitify or {}
     for date_str in sorted(mf_data.keys()):
         rec = mf_data[date_str]
-        intake = nutrient_intake.nutrient_intake(rec, supplements.get(date_str))
+        intake = nutrient_intake.nutrient_intake(rec, supplements.get(date_str), habitify.get(date_str))
         food_log = rec.get("food_log", [])
         foods = []
         for item in food_log:
@@ -306,6 +311,7 @@ def extract_daily_nutrition(mf_data, supplements=None):
             "micronutrient_avg_pct_basis": intake["avg_pct_basis"],
             "micronutrient_food_only_avg_pct": intake["food_only_avg_pct"],
             "supplements_state": intake["supplements_state"],
+            "supplements_not_taken": intake["not_taken"],
             "supplements_counted": intake["counted"],
             "supplements_unconverted": intake["unconverted"],
             "foods": foods,
@@ -586,7 +592,8 @@ Every `micronutrient_sufficiency` entry in daily_detail is the TOTAL of food (Ma
 - `uncounted_supplements` on an entry names a taken dose whose content is unknown (multivitamin, electrolytes) — the total for that nutrient is a FLOOR; say "at least".
 - `supplements_unconverted` lists taken doses the platform could not count. They are unknown, not zero: name them as uncounted, never as missing.
 - `supplements_state: "absent"` means no supplement record exists for that day — the number is food only and must be labelled food-only, not read as "took nothing".
-- Omega-3: `species` splits ALA (food) from EPA/DHA (food + supplement). Do not credit plant ALA as EPA/DHA."""
+- `supplements_state: "scheduled_miss"` (and `missed_supplements` on an entry) means the supplement WAS scheduled and not taken that day — that zero is real; `supplements_not_taken` names each missed dose.
+- Omega-3 is TWO targets: `omega3_epa_dha_g` (EPA+DHA, food + the fish-oil dose) and `omega3_ala_g` (plant ALA, food only). Never credit plant ALA as EPA/DHA, and never report one combined omega-3 figure."""
 
 # #4244 box 2, the SERVED prompt: the live S3 board config (and its repo mirror) still gives
 # Patel "Any micro <50% for 3+ days." — the food-only rule, now sitting beside the scope note
@@ -671,8 +678,8 @@ Write clean HTML with inline styles. Design:
 
 
 def build_user_message(data):
-    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"))
-    days_prior = extract_daily_nutrition(data["macrofactor_prior"], data.get("supplements"))
+    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"), data.get("habitify"))
+    days_prior = extract_daily_nutrition(data["macrofactor_prior"], data.get("supplements"), data.get("habitify"))
     summary_this = compute_weekly_summary(days_this)
     summary_prior = compute_weekly_summary(days_prior)
 
@@ -760,7 +767,7 @@ def _micro_column_scope(days):
     """(header scope, footnote basis) for the MICRO column, DERIVED from the week's rows (#4244).
     The join counts supplements only on days with a supplement record; a week with none is food
     only, and a header saying "food + supps" over it claims a channel nothing was counted from."""
-    if any(d.get("supplements_state") == "recorded" for d in days):
+    if any(d.get("supplements_state") in ("recorded", "scheduled_miss") for d in days):
         return "food + supps", "food + supplements taken that day"
     return "food only", "logged food (no supplement record this week)"
 
@@ -1005,7 +1012,7 @@ def lambda_handler(event, context):
     dates = data["dates"]
     profile = data["profile"]
 
-    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"))
+    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"), data.get("habitify"))
     if not days_this:
         logger.error("No MacroFactor data this week")
         return {"statusCode": 500, "body": "No nutrition data"}

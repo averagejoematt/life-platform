@@ -1230,6 +1230,30 @@ def test_a_week_with_no_supplement_record_labels_the_micro_column_food_only():
     assert "2 days with no supplement record = food only" in html
 
 
+def test_a_scheduled_supplement_miss_reaches_the_weekly_rows_as_a_zero_not_an_absence():
+    """#4245 box 4 in the weekly review: the day's Habitify record resolved vitamin D `failed` and
+    the bridge wrote no supplement row. The row says scheduled-and-missed (a real zero), and the
+    footnote does not call it a day with no supplement record."""
+    habitify = {"2026-06-06": {"habit_statuses": {"Vitamin D": {"status": "failed", "miss_source": "vendor"}}}}
+    days = m.extract_daily_nutrition({"2026-06-06": _mf_day(cal=1800, fiber=38, total_vitamin_d_mcg=5)}, {}, habitify)
+    assert days[0]["supplements_state"] == "scheduled_miss"
+    assert days[0]["supplements_not_taken"] == [{"name": "Vitamin D", "status": "failed", "miss_source": "vendor"}]
+    vd = days[0]["micronutrient_sufficiency"]["vitamin_d_mcg"]
+    assert (vd["from_supplements"], vd["missed_supplements"]) == (0.0, ["Vitamin D"])
+    html = m.build_summary_table(days, dict(PROFILE))
+    assert "MICRO (food + supps)" in html and "no supplement record" not in html
+    # The same week with no Habitify row stays absent — food only, named as such.
+    days = m.extract_daily_nutrition({"2026-06-06": _mf_day(cal=1800, fiber=38, total_vitamin_d_mcg=5)}, {}, {})
+    assert days[0]["supplements_state"] == "absent" and days[0]["supplements_not_taken"] == []
+
+
+def test_the_panel_is_told_omega3_is_two_targets_and_what_a_scheduled_miss_means():
+    fallback = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1800, protein_target_g=190)
+    for needle in ("omega3_epa_dha_g", "omega3_ala_g", "scheduled_miss", "supplements_not_taken"):
+        assert needle in m.MICRONUTRIENT_SCOPE_NOTE and needle in fallback, needle
+    assert "`species`" not in m.MICRONUTRIENT_SCOPE_NOTE  # the retired field is not described to the panel
+
+
 def test_the_hardcoded_fallback_prompt_renders_the_live_targets():
     rendered = m._FALLBACK_SYSTEM_PROMPT.format(calorie_target=1650, protein_target_g=205)
     assert "1650 kcal" in rendered

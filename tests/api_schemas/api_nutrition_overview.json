@@ -135,6 +135,11 @@
             "length_sample": 2,
             "type": "array"
           },
+          "not_taken": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
           "protein_distribution_score": {
             "type": "null"
           },

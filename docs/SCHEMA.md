@@ -680,7 +680,7 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `meals_above_30g_protein` | number | Count of meals meeting ≥30g protein target |
 | `total_meals` | number | Distinct meals detected (eating occasions ≥400 kcal) |
 | `total_snacks` | number | Eating occasions excluded as snacks (<400 kcal) |
-| `micronutrient_sufficiency` | object | Per-nutrient map: {nutrient_key: {actual, target, pct}} — 5 nutrients tracked. **FOOD-ONLY at rest** (#4244): the stored figure counts MacroFactor alone; every published surface serves the food + supplements join from `health.nutrient_intake.nutrient_intake` (adds `from_food`, `from_supplements`, `channels_counted`) |
+| `micronutrient_sufficiency` | object | Per-nutrient map: {nutrient_key: {actual, target, pct}} — 6 nutrients tracked; omega-3 is two targets, `omega3_epa_dha_g` (EPA+DHA, summed from `total_omega3_epa_g` + `total_omega3_dha_g`) and `omega3_ala_g`, since #4245 (rows before it carry the retired single `omega3_total_g`). **FOOD-ONLY at rest** (#4244): the stored figure counts MacroFactor alone; every published surface serves the food + supplements join from `health.nutrient_intake.nutrient_intake` (adds `total` (= `actual`), `label`, `from_food`, `from_supplements`, `channels_counted`, and `missed_supplements` when a scheduled dose was not taken per the day's Habitify statuses) |
 | `micronutrient_avg_pct` | number | Average food-only sufficiency across tracked nutrients (each capped at 100%) — served as `food_only_avg_pct` beside the joined `avg_pct` |
 | `micronutrient_intake_channels` | list | `["food"]` — what the stored figure counted (#4244); the label travels with the number |
 

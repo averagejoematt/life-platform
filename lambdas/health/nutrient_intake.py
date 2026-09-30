@@ -40,7 +40,28 @@ MICRONUTRIENT_TARGETS: dict[str, dict[str, Any]] = {
     "potassium_mg": {"target": 3400, "label": "Potassium"},
     "magnesium_mg": {"target": 420, "label": "Magnesium"},
     "vitamin_d_mcg": {"target": 100, "label": "Vitamin D"},  # 4000 IU
-    "omega3_total_g": {"target": 3, "label": "Omega-3"},
+    # #4245 box 3: omega-3 is TWO targets, never one summed total. The retired single
+    # `omega3_total_g` target (3 g) was filled almost entirely by plant ALA on the food side
+    # (2026-09-24: ALA 3.7 g, EPA 0, DHA 0) while the supplement dose is EPA/DHA, so summing
+    # them published "Omega-3 80%" for a day with no marine omega-3 in the food at all. 3 g is
+    # also the wrong KIND of number for EPA+DHA: FDA 21 CFR 184.1472 treats up to 3 g/day of
+    # EPA+DHA as the safe ceiling, not an intake goal.
+    "omega3_epa_dha_g": {
+        "target": 0.5,
+        "label": "Omega-3 EPA+DHA",
+        "food_fields": ("omega3_epa_g", "omega3_dha_g"),
+        "decimals": 2,
+        "source": "ISSFAL 2004 policy statement: >=500 mg/day EPA+DHA for cardiovascular health in adults; EFSA 2012 "
+        "(EFSA Journal 10(7):2815) sets 250 mg/day EPA+DHA as the adult Adequate Intake floor. No US DRI exists for "
+        "EPA/DHA (NIH ODS Omega-3 fact sheet).",
+    },
+    "omega3_ala_g": {
+        "target": 1.6,
+        "label": "Omega-3 ALA",
+        "decimals": 2,
+        "source": "IOM/Food and Nutrition Board DRI 2005, as tabled in the NIH ODS Omega-3 fact sheet: ALA Adequate "
+        "Intake for men 19+ = 1.6 g/day. ALA is the only omega-3 with a US DRI.",
+    },
 }
 
 # The channels this derivation joins. Published verbatim beside every number it produces.
@@ -57,7 +78,7 @@ UNIT_CONVERSIONS: dict[tuple[str, str], dict[str, Any]] = {
         "source": "FDA 21 CFR 101.9(c)(8)(iv) (2016 Nutrition/Supplement Facts rule): vitamin D is declared in mcg, "
         "1 mcg = 40 IU; NIH ODS Vitamin D fact sheet states the same equivalence.",
     },
-    ("mg", "omega3_total_g"): {
+    ("mg", "omega3_epa_dha_g"): {
         "factor": 0.001,
         "source": "SI: 1 g = 1,000 mg.",
     },
@@ -129,15 +150,14 @@ SUPPLEMENT_NUTRIENT_CONTENT: dict[str, Optional[dict[str, Any]]] = {
     "Omega 3": {
         "content": [
             {
-                "nutrient": "omega3_total_g",
+                "nutrient": "omega3_epa_dha_g",
                 "unit": "mg",
                 "fraction": 1.0,
-                "species": "epa_dha",
                 "basis": "STACK-DECLARED, not label-verified: config/supplement_registry.json omega3 ('Omega-3 "
                 "(EPA/DHA)', dose '2-4g combined') declares the dose as EPA+DHA COMBINED, so the 2,000 mg habit dose "
                 "is read as 2.0 g EPA+DHA — the lower bound of the declared range, not fish-oil capsule mass. If the "
-                "habit were logging capsule mass instead, this would overstate; the species split below keeps the "
-                "EPA/DHA (supplement) vs ALA (food) distinction visible rather than summing it away (#4245).",
+                "habit were logging capsule mass instead, this would overstate. It feeds the EPA+DHA target only, "
+                "never the food side's plant ALA (#4245).",
             }
         ],
     },
@@ -193,6 +213,17 @@ def _num(value: Any) -> Optional[float]:
     return f
 
 
+def _food_value(row: Mapping[str, Any], key: str) -> Optional[float]:
+    """A target's food amount from `total_*` fields. A composite target (`food_fields`, e.g.
+    EPA+DHA) sums the fields that were logged, and is absent only when none of them was."""
+    fields = MICRONUTRIENT_TARGETS[key].get("food_fields")
+    direct = _num(row.get(f"total_{key}"))
+    if direct is not None or not fields:
+        return direct
+    parts = [v for v in (_num(row.get(f"total_{f}")) for f in fields) if v is not None]
+    return sum(parts) if parts else None
+
+
 def food_sufficiency(totals_prefixed: Mapping[str, Any]) -> tuple[Optional[dict[str, dict[str, Any]]], Optional[float]]:
     """The FOOD-ONLY scorer — what ingest stores (moved intact from macrofactor_lambda).
 
@@ -203,12 +234,12 @@ def food_sufficiency(totals_prefixed: Mapping[str, Any]) -> tuple[Optional[dict[
     sufficiency: dict[str, dict[str, Any]] = {}
     pcts: list[float] = []
     for nutrient_key, config in MICRONUTRIENT_TARGETS.items():
-        actual = _num(totals_prefixed.get(f"total_{nutrient_key}"))
+        actual = _food_value(totals_prefixed, nutrient_key)
         if actual is None:
             continue
         target = config["target"]
         pct = min(round(actual / target * 100, 1), 100.0)
-        sufficiency[nutrient_key] = {"actual": round(actual, 1), "target": target, "pct": pct}
+        sufficiency[nutrient_key] = {"actual": round(actual, config.get("decimals", 1)), "target": target, "pct": pct}
         pcts.append(pct)
     if not pcts:
         return None, None
@@ -216,13 +247,13 @@ def food_sufficiency(totals_prefixed: Mapping[str, Any]) -> tuple[Optional[dict[
 
 
 def _food_amounts(food_row: Optional[Mapping[str, Any]]) -> dict[str, float]:
-    """Per-target food amounts: the `total_<key>` field, else the stored food-only `actual`."""
+    """Per-target food amounts: the `total_*` field(s), else the stored food-only `actual`."""
     if not food_row:
         return {}
     stored = food_row.get("micronutrient_sufficiency") or {}
     out: dict[str, float] = {}
     for key in MICRONUTRIENT_TARGETS:
-        v = _num(food_row.get(f"total_{key}"))
+        v = _food_value(food_row, key)
         if v is None and isinstance(stored, Mapping):
             entry = stored.get(key)
             v = _num(entry.get("actual")) if isinstance(entry, Mapping) else None
@@ -231,13 +262,16 @@ def _food_amounts(food_row: Optional[Mapping[str, Any]]) -> dict[str, float]:
     return out
 
 
+def _empty_contrib(state: str) -> dict[str, Any]:
+    return {"state": state, "amounts": {}, "counted": [], "unconverted": [], "may_contain": {}}
+
+
 def _supplement_contributions(supplement_row: Optional[Mapping[str, Any]]) -> dict[str, Any]:
     """Walk the day's TAKEN doses; convert what has a cited path, name what does not."""
     entries = (supplement_row or {}).get("supplements") if supplement_row else None
     if not supplement_row or not isinstance(entries, list):
-        return {"state": "absent", "amounts": {}, "species": {}, "counted": [], "unconverted": [], "may_contain": {}}
+        return _empty_contrib("absent")
     amounts: dict[str, float] = {}
-    species: dict[str, float] = {}
     counted: list[dict[str, Any]] = []
     unconverted: list[dict[str, Any]] = []
     may_contain: dict[str, list[str]] = {}
@@ -267,8 +301,6 @@ def _supplement_contributions(supplement_row: Optional[Mapping[str, Any]]) -> di
                 continue
             amount = dose * float(c["fraction"]) * float(conv["factor"])
             amounts[c["nutrient"]] = amounts.get(c["nutrient"], 0.0) + amount
-            if c.get("species"):
-                species[c["species"]] = species.get(c["species"], 0.0) + amount
             counted.append(
                 {
                     "name": name,
@@ -280,62 +312,98 @@ def _supplement_contributions(supplement_row: Optional[Mapping[str, Any]]) -> di
                     "conversion": conv["source"],
                 }
             )
-    return {
-        "state": "recorded",
-        "amounts": amounts,
-        "species": species,
-        "counted": counted,
-        "unconverted": unconverted,
-        "may_contain": may_contain,
-    }
+    return {"state": "recorded", "amounts": amounts, "counted": counted, "unconverted": unconverted, "may_contain": may_contain}
 
 
-def _omega3_species(food_row: Optional[Mapping[str, Any]], contrib: Mapping[str, Any]) -> dict[str, Any]:
-    """EPA/DHA vs ALA, per channel — the distinction a single omega-3 total hides (#4245)."""
-    fr = food_row or {}
-    ala = _num(fr.get("total_omega3_ala_g"))
-    epa = _num(fr.get("total_omega3_epa_g"))
-    dha = _num(fr.get("total_omega3_dha_g"))
-    food_epa_dha = None if epa is None and dha is None else (epa or 0.0) + (dha or 0.0)
-    supp = contrib["species"].get("epa_dha") if contrib["state"] == "recorded" else None
-    return {
-        "ala_g": {"food": round(ala, 2) if ala is not None else None},
-        "epa_dha_g": {
-            "food": round(food_epa_dha, 2) if food_epa_dha is not None else None,
-            "supplements": round(supp, 2) if supp is not None else (0.0 if contrib["state"] == "recorded" else None),
-        },
-    }
+# ── #4245 box 4: a SCHEDULED MISS is a zero; no record is absent ────────────────────────
+# The supplements partition lists TAKEN doses only, and the bridge writes no row on a day with
+# no tick — so "no row" cannot tell "not recorded" from "scheduled and not taken". The Habitify
+# day record can: every scheduled habit carries a resolved status (#3666). A supplement habit
+# resolved `failed` (the vendor's miss, or the platform's at Pacific day close — `miss_source`
+# says which) or `skipped` (an owner decision) was scheduled and not taken: its nutrients are a
+# recorded ZERO. `pending` (the day is still open) and a missing Habitify row stay ABSENT. Only
+# names in SUPPLEMENT_NUTRIENT_CONTENT are ever read, so no non-supplement habit name leaves here.
+NOT_TAKEN_STATUSES: tuple[str, ...] = ("failed", "skipped")
 
 
-def nutrient_intake(food_row: Optional[Mapping[str, Any]], supplement_row: Optional[Mapping[str, Any]]) -> dict[str, Any]:
+def _supplement_habit_statuses(habit_row: Optional[Mapping[str, Any]]) -> dict[str, list[Any]]:
+    statuses = (habit_row or {}).get("habit_statuses") if habit_row else None
+    out: dict[str, list[Any]] = {"not_taken": [], "pending": [], "completed": []}
+    if not isinstance(statuses, Mapping):
+        return out
+    for name, hs in statuses.items():
+        if str(name).strip().lower() not in _REGISTRY_BY_NORM or not isinstance(hs, Mapping):
+            continue
+        status = hs.get("status")
+        if status in NOT_TAKEN_STATUSES:
+            out["not_taken"].append({"name": str(name), "status": status, "miss_source": hs.get("miss_source")})
+        elif status in ("pending", "completed"):
+            out[status].append(str(name))
+    return out
+
+
+def _fed_by(names: list[str]) -> dict[str, list[str]]:
+    """Tracked nutrient -> the named supplements whose registry row feeds (or may feed) it."""
+    fed: dict[str, list[str]] = {}
+    for name in names:
+        spec = _REGISTRY_BY_NORM.get(name.strip().lower()) or {}
+        keys = [c["nutrient"] for c in spec.get("content") or []] + list(spec.get("may_contain") or [])
+        for key in keys:
+            if key in MICRONUTRIENT_TARGETS and name not in fed.get(key, []):
+                fed.setdefault(key, []).append(name)
+    return fed
+
+
+def nutrient_intake(
+    food_row: Optional[Mapping[str, Any]],
+    supplement_row: Optional[Mapping[str, Any]],
+    habit_row: Optional[Mapping[str, Any]] = None,
+) -> dict[str, Any]:
     """ONE day's micronutrient intake across every channel the platform can convert.
 
-    Per target nutrient: `actual` (the total of the channels counted), `from_food`,
-    `from_supplements`, `channels_counted`, `pct` (of target, capped 100) — and, where an
-    unconverted dose MAY carry the nutrient, `uncounted_supplements` naming it, so the total
-    is read as a floor. Absence rules (ADR-104):
-      * no supplement row for the day  → `supplements_state: "absent"`, `from_supplements`
-        None everywhere, totals are food-only and `channels_counted` says so;
+    Per target nutrient: `total` (the sum of the channels counted; `actual` is the same number
+    under its original served name — both are kept, #4245 box 2), `from_food`,
+    `from_supplements`, `channels_counted`, `pct` (of target, capped 100), `label` — and, where
+    an unconverted or still-pending dose MAY carry the nutrient, `uncounted_supplements` naming
+    it, so the total is read as a floor. `habit_row` is the day's Habitify record (optional).
+    Absence rules (ADR-104):
+      * no supplement row and no Habitify evidence → `supplements_state: "absent"`,
+        `from_supplements` None everywhere, totals are food-only and `channels_counted` says so;
+      * no supplement row, and Habitify resolved the scheduled supplement habits `failed` or
+        `skipped` with none ticked → `supplements_state: "scheduled_miss"`: the supplement channel
+        is a recorded ZERO, each nutrient a missed dose would have fed names it in
+        `missed_supplements`, and `not_taken[]` carries each habit's status + `miss_source`;
       * a supplement row that carries no dose feeding a nutrient → `from_supplements` 0.0
         (the record was consulted and holds none — the row lists TAKEN doses only) — but only
-        beside a food figure: with no food value either, the nutrient is absent, never 0%;
+        beside a food figure or a named missed dose: otherwise the nutrient is absent, never 0%;
       * a nutrient only an unconverted dose might feed → `from_supplements` None, the
         dose named — never a 0 that reads as "took none".
     """
     food = _food_amounts(food_row)
     contrib = _supplement_contributions(supplement_row)
-    recorded = contrib["state"] == "recorded"
+    habits = _supplement_habit_statuses(habit_row)
+    not_taken = habits["not_taken"]
+    if contrib["state"] == "absent" and not_taken and not habits["completed"]:
+        # A ticked supplement habit with no supplement row is a bridge gap, not a miss — that
+        # day stays absent. Still-pending habits leave their nutrients uncounted (a floor).
+        contrib = _empty_contrib("scheduled_miss")
+        for key, names in _fed_by(habits["pending"]).items():
+            contrib["may_contain"].setdefault(key, []).extend(names)
+    consulted = contrib["state"] in ("recorded", "scheduled_miss")
+    missed_by_key = _fed_by([m["name"] for m in not_taken]) if consulted else {}
     sufficiency: dict[str, dict[str, Any]] = {}
     pcts: list[float] = []
     for key, cfg in MICRONUTRIENT_TARGETS.items():
         f = food.get(key)
         s: Optional[float] = contrib["amounts"].get(key)
         uncounted = contrib["may_contain"].get(key, [])
-        if recorded and s is None and not uncounted:
+        missed = missed_by_key.get(key, []) if not s else []
+        if consulted and s is None and not uncounted:
             s = 0.0
         # Absent, not 0%: with no food figure, a supplement record that fed nothing into this
-        # nutrient says nothing about the day's intake of it.
-        if f is None and not s:
+        # nutrient says nothing about the day's intake of it — unless a dose of it was SCHEDULED
+        # and not taken, which is the zero #4245 box 4 asks for.
+        if f is None and not s and not missed:
             continue
         channels: list[str] = []
         total = 0.0
@@ -347,18 +415,21 @@ def nutrient_intake(food_row: Optional[Mapping[str, Any]], supplement_row: Optio
             channels.append("supplements")
         target = cfg["target"]
         pct = min(round(total / target * 100, 1), 100.0)
+        dp = cfg.get("decimals", 1)
         entry: dict[str, Any] = {
-            "actual": round(total, 1),
+            "label": cfg["label"],
+            "total": round(total, dp),
+            "actual": round(total, dp),
             "target": target,
             "pct": pct,
-            "from_food": round(f, 1) if f is not None else None,
-            "from_supplements": round(s, 1) if s is not None else None,
+            "from_food": round(f, dp) if f is not None else None,
+            "from_supplements": round(s, dp) if s is not None else None,
             "channels_counted": channels,
         }
         if uncounted:
             entry["uncounted_supplements"] = list(uncounted)
-        if key == "omega3_total_g":
-            entry["species"] = _omega3_species(food_row, contrib)
+        if missed:
+            entry["missed_supplements"] = list(missed)
         sufficiency[key] = entry
         pcts.append(pct)
     food_only_map, food_only_avg = food_sufficiency({f"total_{k}": v for k, v in food.items()})
@@ -370,5 +441,6 @@ def nutrient_intake(food_row: Optional[Mapping[str, Any]], supplement_row: Optio
         "supplements_state": contrib["state"],
         "counted": contrib["counted"],
         "unconverted": contrib["unconverted"],
+        "not_taken": not_taken if consulted else [],
         "food_only_avg_pct": food_only_avg,
     }
