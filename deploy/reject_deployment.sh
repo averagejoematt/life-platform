@@ -7,11 +7,11 @@
 # wedge was two 8-day-old zombies doing exactly that. Rejecting is the safe exit: the
 # run dies, nothing stale deploys, the slot frees. Approving instead would deploy the
 # old sha the run was minted from, and "GitHub expires them at 30d" was measured false
-# at day 8. Fresh runs (see STALE_GATE_REJECT_HOURS in scripts/check_deploy_wedge.py)
+# at day 8. Fresh runs (the retired check_deploy_wedge.py's STALE_GATE_REJECT_HOURS was 24)
 # still get actioned on Matthew's say-so via deploy/approve_deployment.sh.
 #
 # Usage: bash deploy/reject_deployment.sh <run_id> [comment]
-#   <run_id>  the waiting CI/CD run's databaseId (from `gh run list` or check_deploy_wedge)
+#   <run_id>  the waiting CI/CD run's databaseId (from `gh run list`)
 #   [comment] optional rejection comment
 set -euo pipefail
 RUN_ID="${1:?usage: reject_deployment.sh <run_id> [comment]}"
