@@ -1,0 +1,40 @@
+name: 'Playwright browser for the visual-QA harness'
+description: >-
+  The ONE install step list for tests/visual_qa.py (#4254). It replaces the copied
+  "Install Playwright + <browser>" block in the four visual-QA jobs: ci-cd.yml visual-qa,
+  site-deploy.yml visual-qa, visual-qa.yml (standalone) and webkit-mobile-qa.yml. Before
+  this, a change to the pins or the engine install had to land four times, and the callers
+  carried a "keep the step lists in sync" comment in place of a mechanism.
+
+  Scope is deliberately just the install. Each caller keeps its own step ORDER and step
+  count: checkout, then setup-ci (python), then this step at the SAME index the inline
+  block had, so every `ci::<workflow>::<job>::<idx>` census id downstream of it is
+  unchanged. The sweep flags, the dial, the rollback verdict and the artifact name stay
+  caller-owned because they really differ per caller. Checkout and setup-python must run
+  before this step, because a local composite resolves only after checkout.
+
+inputs:
+  browser:
+    description: "Playwright engine to install with --with-deps: 'chromium' (the three Chromium callers) or 'webkit' (the weekly iOS-Safari sweep)."
+    required: true
+  pins:
+    description: >-
+      Distributions resolved through scripts/ci_pins.py from requirements-dev.txt (CQ-01, #2609),
+      never a literal version. The default is the AI-vision lane's set. boto3/botocore are
+      LOAD-BEARING (#2938): visual_ai_qa imports lambdas/ai/bedrock_client, and without boto3 both
+      --ai-qa and --reader-truth printed "unavailable" while the job reported success. pillow
+      (#2973) downscales full-page captures over Bedrock's 8000px image limit, and (#3353) stitches
+      the WebKit tiled-screenshot fallback.
+    required: false
+    default: 'playwright boto3 botocore pillow'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install pinned Playwright + ${{ inputs.browser }}
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        PINS=$(python3 scripts/ci_pins.py ${{ inputs.pins }})
+        python -m pip install $PINS
+        python -m playwright install --with-deps ${{ inputs.browser }}

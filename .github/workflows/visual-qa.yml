@@ -109,18 +109,11 @@ jobs:
           python-cache: 'pip'
 
       - name: Install Playwright + Chromium
-        run: |
-          python -m pip install --upgrade pip
-          # #2938: boto3 is LOAD-BEARING here, not incidental. visual_ai_qa imports
-          # lambdas/ai/bedrock_client, which needs it — without it BOTH --ai-qa and
-          # --reader-truth printed "⚠ unavailable" and the job still reported success,
-          # so the gates CLAUDE.md/ADR-076 call gating were structurally dark. Pinned
-          # via ci_pins.py from requirements-dev.txt (CQ-01, #2609), never a literal.
-          # pillow (#2973): visual_ai_qa downscales full-page captures over Bedrock's
-          # 8000px image limit — without it those pages FAIL loudly instead of evaluating.
-          PINS=$(python3 scripts/ci_pins.py playwright boto3 botocore pillow)
-          python -m pip install $PINS
-          python -m playwright install --with-deps chromium
+        # The one install step list for every visual-QA job (#4254): pinned playwright +
+        # boto3/botocore (#2938, load-bearing for the AI gates) + pillow (#2973).
+        uses: ./.github/actions/playwright-browser
+        with:
+          browser: chromium
 
       # configure-aws-credentials (OIDC; one pinned SHA, in the composite) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)

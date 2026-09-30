@@ -80,7 +80,7 @@ def test_site_deploy_wires_rollback_and_gates():
 
 #: Local composites whose contents pin a TOOLCHAIN, and therefore must be referenced in
 #: lockstep across workflows. Everything else local is version-free by construction.
-_TOOLCHAIN_LOCAL_ACTIONS = {"./.github/actions/setup-ci"}
+_TOOLCHAIN_LOCAL_ACTIONS = {"./.github/actions/setup-ci", "./.github/actions/playwright-browser"}  # #4254: the visual-QA install
 
 
 def test_site_deploy_uses_same_pinned_actions_as_ci_cd():
@@ -116,8 +116,10 @@ def test_site_deploy_playwright_pin_matches_ci_cd():
     which is strictly stronger than the old set-subset comparison.
     """
 
+    from tests.playwright_browser_calls import expanded  # #4254: the install is the composite
+
     def resolves_playwright(path):
-        return [args for args in re.findall(r"ci_pins\.py([^)\n]*)", _read(path)) if "playwright" in args.split()]
+        return [args for args in re.findall(r"ci_pins\.py([^)\n]*)", expanded(_read(path))) if "playwright" in args.split()]
 
     def literals(path):
         return sorted(set(re.findall(r"playwright==([0-9][0-9A-Za-z.\-]*)", _read(path))))
@@ -128,6 +130,39 @@ def test_site_deploy_playwright_pin_matches_ci_cd():
         assert not literals(
             path
         ), f"{name} hardcodes a playwright version again ({literals(path)}) — resolve it instead, or the copies can drift (#2609)"
+
+
+def test_the_install_composite_runs_what_the_guards_expand_it_to():
+    """#4254: the copied install block is ONE composite now, and the pin guards above
+    (#2609/#2938/#2973/#1434) read a workflow through tests/playwright_browser_calls.py's
+    expanded(). That expansion is only honest while the composite's run block executes
+    exactly the two lines it synthesizes. Pin that shape, and pin that no visual-QA
+    workflow re-grows an inline copy (the drift the composite exists to end)."""
+    from tests.playwright_browser_calls import ACTION_REF, action_text, calls
+
+    run = action_text()
+    assert "PINS=$(python3 scripts/ci_pins.py ${{ inputs.pins }})" in run, "the composite no longer resolves its pins input"
+    assert "python -m pip install $PINS" in run, "the composite resolves pins but never installs them"
+    assert "python -m playwright install --with-deps ${{ inputs.browser }}" in run, "the composite no longer installs its browser input"
+    wf_dir = os.path.join(_REPO, ".github", "workflows")
+    callers = {}
+    for name in sorted(os.listdir(wf_dir)):
+        text = _read(os.path.join(wf_dir, name))
+        executable = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+        # The set is DERIVED: every workflow that runs the visual-QA harness. Other
+        # Playwright users (fresh-eyes, v4-gate) run different tools and are out of scope.
+        if "python3 tests/visual_qa.py" in executable:
+            assert (
+                "playwright install" not in executable
+            ), f"{name} runs visual_qa.py but installs Playwright inline again; use {ACTION_REF} (#4254)"
+        if ACTION_REF in executable:
+            callers[name] = [c.get("browser") for c in calls(text)]
+    assert callers == {
+        "ci-cd.yml": ["chromium"],
+        "site-deploy.yml": ["chromium"],
+        "visual-qa.yml": ["chromium"],
+        "webkit-mobile-qa.yml": ["webkit"],
+    }, f"the four visual-QA jobs must each install through {ACTION_REF} exactly once: {callers}"
 
 
 def test_ci_cd_no_longer_owns_the_site_deploy():
