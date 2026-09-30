@@ -176,6 +176,7 @@ def test_the_janitor_and_the_wedge_classifier_stay_retired():
     assert not Path(_REPO, "scripts", "check_deploy_wedge.py").exists()
     assert Path(_REPO, "scripts", "check_deploy_deadman.py").exists()
     for wf in sorted(Path(_REPO, ".github", "workflows").glob("*.yml")):
-        text = wf.read_text()
+        # Comments may name the retirement; only a live line may not run it.
+        text = "\n".join(ln for ln in wf.read_text().splitlines() if not ln.lstrip().startswith("#"))
         assert "check_deploy_wedge.py" not in text, f"{wf.name} still runs the retired wedge classifier"
         assert "DEPLOY_GATE_JANITOR_TOKEN" not in text, f"{wf.name} still reads the retired janitor's token"
