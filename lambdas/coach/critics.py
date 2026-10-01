@@ -304,7 +304,17 @@ def build_joints_packet(
                 # site, so a dismissal covers the site it names and a note naming no dismissed
                 # site stays open; the veto stands until every site on the lift is dismissed.
                 instances = training_context_registry.expand_instances(
-                    [{"movement": ex["label"], "note_dates": dates, "notes": pain.get("pain_notes") or []}], dismissals
+                    [
+                        {
+                            "movement": ex["label"],
+                            # #4519: the exercise the flag was derived from — the label is a slot tag on a drafted row
+                            "exercise": pain.get("exercise"),
+                            "movement_key": pain.get("movement_key") or ex.get("movement_key"),
+                            "note_dates": dates,
+                            "notes": pain.get("pain_notes") or [],
+                        }
+                    ],
+                    dismissals,
                 )
                 rows = training_context_registry.resolve_flags(instances, dismissals)
                 held = {(str(r["movement"]), r.get("instance_site")) for r in rows if r.get("dismissed")}

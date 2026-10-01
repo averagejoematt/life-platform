@@ -374,6 +374,7 @@ class TestTheReadBack:
                 "site": "right_lower_back",
                 "note_dates": [FLAG_NOTE_DATE],
                 "notes": [{"date": FLAG_NOTE_DATE, "text": _RDL_PAIN_NOTE["note_raw"]}],
+                "exercise": RDL,  # #4519: the exercise the flag was derived from rides on the instance
             }
         ]
 
@@ -716,9 +717,10 @@ class TestPerSite4174:
         by_site = {(r["movement"], r["site"]): r for r in row["by_site"]}
         assert by_site[(CYCLING, "saddle_sore")]["state"] == "dismissed_by_owner"
         assert by_site[(CYCLING, "saddle_sore")]["dismissal"] == "DISMISSAL#saddle_sore#2026-09-25"
-        assert by_site[(CYCLING, None)] == {
+        assert by_site[(CYCLING, "unknown")] == {
             "movement": CYCLING,
-            "site": None,
+            "exercise": CYCLING,  # #4519: the exercise the flag was derived from
+            "site": "unknown",  # #4519: explicit, never a bare null
             "state": "tripped",
             "note_dates": ["2026-09-18"],
             "dismissal": None,

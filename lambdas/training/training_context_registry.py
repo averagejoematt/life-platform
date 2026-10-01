@@ -315,10 +315,41 @@ def _site_key_of(dismissal: dict[str, Any]) -> str:
     return str(dismissal.get("site_key") or normalize_dismissal_key(dismissal.get("site", "")))
 
 
-def _names_movement(dismissal: dict[str, Any], movement: str | None) -> bool:
+def _equipment_stripped(name: Any) -> str:
+    """'Romanian Deadlift (Barbell)' -> 'Romanian Deadlift' — a Hevy exercise name with its
+    trailing equipment parenthetical dropped. The owner names a lift the way he says it
+    ("romanian deadlift"), and the 2026-10-01 hinge dismissal is keyed exactly that way (#4519)."""
+    s = str(name or "").strip()
+    return s[: s.rindex("(")].strip() if s.endswith(")") and "(" in s else ""
+
+
+def identity_keys(movement: Any, exercise: Any = None, movement_key: Any = None) -> set[str]:
+    """Every match key a flag instance answers to (#4519).
+
+    A flag is DERIVED from one exercise, but the label it travels under is whatever the caller
+    keyed the row by — on a drafted session that is the program's slot tag
+    (`anchor:hinge:moderate`), which no dismissal can ever name. So an instance carries the
+    exercise it came from (`exercise`, the Hevy name; `movement_key`, the catalog key) beside
+    its label, and a dismissal naming ANY of them — or the Hevy name without its equipment
+    suffix — names this instance. The site and note-date legs are unchanged: this widens WHICH
+    exercise a dismissal can name, never which notes or which site it covers.
+    """
+    keys: set[str] = set()
+    for name in (movement, exercise, movement_key):
+        for variant in (name, _equipment_stripped(name)):
+            k = normalize_dismissal_key(variant)
+            if k:
+                keys.add(k)
+    return keys
+
+
+def _names_movement(dismissal: dict[str, Any], movement: str | None, keys: set[str] | None = None) -> bool:
     """A dismissal with no movement leg cannot exist (`build_dismissal_record` refuses it), so
-    an instance WITH a movement is covered only by a dismissal that names it."""
-    return not movement or normalize_dismissal_key(movement) in _movement_keys(dismissal)
+    an instance WITH a movement is covered only by a dismissal that names it — by its label or,
+    since #4519, by the exercise the flag was derived from (`identity_keys`)."""
+    if not movement and not keys:
+        return True
+    return bool((keys or identity_keys(movement)) & _movement_keys(dismissal))
 
 
 def _note_names_site(text: Any, site_key: str) -> bool:
@@ -332,7 +363,11 @@ def _note_names_site(text: Any, site_key: str) -> bool:
 
 
 def site_instances(
-    movement: str | None, notes: list[dict[str, Any]] | None, dismissals: list[dict[str, Any]] | None
+    movement: str | None,
+    notes: list[dict[str, Any]] | None,
+    dismissals: list[dict[str, Any]] | None,
+    *,
+    keys: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Split ONE movement's pain notes into per-site flag instances (#4174).
 
@@ -348,7 +383,7 @@ def site_instances(
     A note none of those reach is `site: None`: OPEN, and no dismissal can cover it — the
     2026-09-18 Cycling big-toe note under the saddle-sore dismissal alone.
     """
-    covering = [d for d in (dismissals or []) if isinstance(d, dict) and _names_movement(d, movement)]
+    covering = [d for d in (dismissals or []) if isinstance(d, dict) and _names_movement(d, movement, keys)]
     by_site: dict[str, list[dict[str, Any]]] = {}
     for d in covering:
         by_site.setdefault(_site_key_of(d), []).append(d)
@@ -390,12 +425,24 @@ def expand_instances(instances: list[dict[str, Any]] | None, dismissals: list[di
             out.append(dict(inst))
             continue
         notes = inst.get("notes") or [{"date": d} for d in (inst.get("note_dates") or [])]
-        split = site_instances(inst.get("movement"), notes, dismissals)
-        out.extend(split or [{"movement": inst.get("movement"), "site": None, "note_dates": [], "notes": []}])
+        # #4519: the exercise the flag was derived from rides on every split row, so a slot-tag
+        # label never strands a flag outside every dismissal's reach.
+        link = {k: inst[k] for k in _IDENTITY_FIELDS if inst.get(k)}
+        split = site_instances(inst.get("movement"), notes, dismissals, keys=_instance_keys(inst))
+        out.extend({**row, **link} for row in (split or [{"movement": inst.get("movement"), "site": None, "note_dates": [], "notes": []}]))
     return out
 
 
-def _dismissal_matches(dismissal: dict[str, Any], *, movement: str | None, site: str | None, note_dates: list[str] | None) -> bool:
+_IDENTITY_FIELDS = ("exercise", "movement_key")  # #4519 — the exercise a flag instance was derived from
+
+
+def _instance_keys(inst: dict[str, Any]) -> set[str]:
+    return identity_keys(inst.get("movement"), inst.get("exercise"), inst.get("movement_key"))
+
+
+def _dismissal_matches(
+    dismissal: dict[str, Any], *, movement: str | None, site: str | None, note_dates: list[str] | None, keys: set[str] | None = None
+) -> bool:
     """Does this dismissal cover this instance? Per SITE, never per movement (#4174).
 
     With a site: the dismissal names that site AND this movement. Without one: the dismissal
@@ -404,7 +451,7 @@ def _dismissal_matches(dismissal: dict[str, Any], *, movement: str | None, site:
     with no note dates at all matches on the movement alone, only so `resolve_flag` can
     report `undated_flag` (never `dismissed`) instead of dropping the flag.
     """
-    if not _names_movement(dismissal, movement):
+    if not _names_movement(dismissal, movement, keys):
         return False
     if site:
         return normalize_dismissal_key(site) == _site_key_of(dismissal)
@@ -420,6 +467,8 @@ def resolve_flag(
     note_dates: list[str] | None,
     dismissals: list[dict[str, Any]] | None,
     site: str | None = None,
+    exercise: str | None = None,
+    movement_key: str | None = None,
 ) -> dict[str, Any] | None:
     """The ONE date comparison. Returns None when no dismissal covers this flag, else a row.
 
@@ -431,7 +480,8 @@ def resolve_flag(
       * latest note  > the dismissal date  -> `re_armed`, and the dismissal is `superseded`
       * no readable note date              -> `undated_flag`: NOT dismissed (see DISMISSAL_RULE)
     """
-    covering = [d for d in (dismissals or []) if _dismissal_matches(d, movement=movement, site=site, note_dates=note_dates)]
+    keys = identity_keys(movement, exercise, movement_key)
+    covering = [d for d in (dismissals or []) if _dismissal_matches(d, movement=movement, site=site, note_dates=note_dates, keys=keys)]
     if not covering:
         return None
     latest = max(covering, key=lambda d: str(d.get("dismissed_on") or ""))
@@ -444,6 +494,7 @@ def resolve_flag(
         # #4174 — the (movement, site) INSTANCE this row resolves; consumers key on it, so a
         # matcher that covered an instance it should not would show up as exactly that.
         "instance_site": site,
+        "exercise": exercise,  # #4519 — the exercise the flag was derived from, when the caller linked it
         "note_dates": dates,
         "dismissed_on": dismissed_on,
         "words": latest.get("words"),
@@ -485,6 +536,8 @@ def resolve_flags(instances: list[dict[str, Any]] | None, dismissals: list[dict[
             movement=(inst or {}).get("movement"),
             note_dates=(inst or {}).get("note_dates"),
             site=(inst or {}).get("site"),
+            exercise=(inst or {}).get("exercise"),
+            movement_key=(inst or {}).get("movement_key"),
             dismissals=dismissals,
         )
         if res is not None:

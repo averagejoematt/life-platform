@@ -283,11 +283,11 @@ def _performed_movements(target_date: str) -> tuple[list[dict[str, Any]], list[s
             if not tid or not name:
                 orphan_blocks += 1
                 continue
-            row = by_tid.setdefault(tid, {"label": name, "template_id": tid, "last_performed": day, "sessions": 0})
+            row = by_tid.setdefault(tid, {"label": name, "exercise": name, "template_id": tid, "last_performed": day, "sessions": 0})
             row["sessions"] += 1
             if day >= row["last_performed"]:
                 row["last_performed"] = day
-                row["label"] = name
+                row["label"] = row["exercise"] = name  # #4519: `exercise` survives a draft row's slot-tag label in the union
     rows = sorted(by_tid.values(), key=lambda r: (r["last_performed"], r["label"]), reverse=True)
     for r in rows:
         r["days_since"] = _days_between(r["last_performed"], target_date)
@@ -699,8 +699,17 @@ def tool_plan_next_session(args):
         # is a DATE comparison — a flag with no readable date can never read as dismissed.
         # #4174: and the notes' own words, because a dismissal covers a SITE — the engine splits
         # a movement's notes per site and a note naming no dismissed site stays open.
+        # #4519: and the EXERCISE the flag was derived from — a drafted row's label is its slot tag
+        # (`anchor:hinge:moderate`), which no dismissal can name.
         pain_flag_instances=[
-            {"movement": r["label"], "note_dates": r.get("pain_dates") or [], "notes": r.get("pain_notes") or []} for r in flagged
+            {
+                "movement": r["label"],
+                "exercise": r.get("exercise"),
+                "movement_key": r.get("movement_key"),
+                "note_dates": r.get("pain_dates") or [],
+                "notes": r.get("pain_notes") or [],
+            }
+            for r in flagged
         ],
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.

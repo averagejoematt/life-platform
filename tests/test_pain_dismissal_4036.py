@@ -403,7 +403,7 @@ def _cycling_tripwires(dismissals):
     )
 
 
-def _movement_only_rule(dismissal, *, movement, site, note_dates=None):
+def _movement_only_rule(dismissal, *, movement, site, note_dates=None, keys=None):
     """The pre-#4174 matcher, verbatim in effect: any dismissal naming the movement covers it."""
     return bool(movement) and tcr.normalize_dismissal_key(movement) in tcr._movement_keys(dismissal)
 
@@ -437,7 +437,7 @@ class TestPerSite4174:
         assert row["state"] == "tripped", row
         assert row["by_movement"] == {CYCLING: "tripped"}
         states = {(r["site"], r["state"], r["dismissal_state"]) for r in row["by_site"]}
-        assert states == {("saddle_sore", "dismissed_by_owner", "dismissed_by_owner"), (None, "tripped", "none")}
+        assert states == {("saddle_sore", "dismissed_by_owner", "dismissed_by_owner"), ("unknown", "tripped", "none")}  # #4519: explicit
         assert [d["sk"] for d in row["dismissals"]] == ["DISMISSAL#saddle_sore#2026-09-25"]
         assert row["dismissals"][0]["latest_note_date"] == "2026-09-09", "the saddle row must not carry the toe note's date"
         assert "2026-09-18" in row["detail"] and "name no dismissed site" in row["detail"]
@@ -490,3 +490,223 @@ class TestPerSite4174:
         broken = _pain_row(_cycling_tripwires([SADDLE_SORE]))
         assert broken["state"] == "dismissed_by_owner", "the movement-only rule no longer hides the toe note — the control is dead"
         assert all(r["state"] == "dismissed_by_owner" for r in broken["by_site"]), broken["by_site"]
+
+
+# ── 6. #4519 — a flag keyed to a SLOT TAG reaches the dismissal of the exercise it came from ──
+#
+# THE WIRE (read-only, 2026-10-01): stage 2 on routine 6dfc9176 keyed the 09-13 RDL flag to the
+# drafted row's label — the slot tag `anchor:hinge:moderate` — so `by_site` read
+# `{"movement": "anchor:hinge:moderate", "site": null, "dismissal": null}` and the joints critic
+# vetoed, while BOTH owner records naming that exercise sat in DynamoDB: 09-21 (`right lower back`,
+# movement_keys `romanian_deadlift_barbell`) and 10-01 (`hinge`, `romanian_deadlift`). The records
+# below are the live 10-01 items verbatim (minus pk); the note is the live 2026-09-13 note_raw.
+SLOT = "anchor:hinge:moderate"
+RDL_KEY = "romanian_deadlift_barbell"
+NOTE_0913 = {
+    "date": "2026-09-13",
+    "text": "This felt fine. But i could feel my right side of my lower back more consciously.  And so i decided to not add "
+    "weight this workout to risk anything.  So more safe - it wasnt pain or ache - i just could tell during the pull movement "
+    "i could feel it in my lower right back more than i could my lower left.",
+}
+HINGE_1001 = {
+    "sk": "DISMISSAL#hinge#2026-10-01",
+    "site": "hinge",
+    "site_key": "hinge",
+    "dismissed_on": "2026-10-01",
+    "words": "yes hinge pain gone",
+    "movements": ["romanian deadlift"],
+    "movement_keys": ["romanian_deadlift"],
+    "flag_note_date": "2026-09-13",
+    "recorded_at": "2026-10-01T18:15:44Z",
+    "recorded_via": "get_exercise_notes/dismiss",
+    "issue": "#4036",
+}
+WALKING_0922 = {
+    "sk": "DISMISSAL#lower_back#2026-09-22",
+    "site": "lower back",
+    "site_key": "lower_back",
+    "dismissed_on": "2026-09-22",
+    "words": "walking ache is gone",
+    "movements": ["Walking"],
+    "movement_keys": ["walking"],
+    "flag_note_date": "2026-09-08",
+}
+
+
+def _slot_instance(*, linked=True):
+    inst = {"movement": SLOT, "note_dates": ["2026-09-13"], "notes": [dict(NOTE_0913)]}
+    if linked:
+        inst.update({"exercise": RDL, "movement_key": RDL_KEY})
+    return inst
+
+
+def _slot_row(dismissals, *, linked=True):
+    return _pain_row(
+        plan_engine._tripwire_states(
+            protein_days_missed_7d=0,
+            readiness_low_streak_days=0,
+            anchor_lift_drop_pct=0.0,
+            anchor_lift_drop_sessions=0,
+            pain_flag_sites=[SLOT],
+            pain_flag_instances=[_slot_instance(linked=linked)],
+            pain_dismissals=dismissals,
+            pain_layer_status="degraded",
+            weight_stall_days=0,
+            adherence_on_plan=True,
+        )
+    )
+
+
+def _slot_joints(dismissals, *, linked=True):
+    ir = RoutineSpec(
+        routine_id="r-4519",
+        target_date="2026-10-01",
+        archetype="lower",
+        exercises=[ExerciseBlock(movement_key=RDL_KEY, rationale_tag=SLOT, sets=[Set(weight_kg=95 * KG, reps=8) for _ in range(3)])],
+    )
+    pain = {"pain_flag_any": True, "pain_dates": ["2026-09-13"], "pain_notes": [dict(NOTE_0913)]}
+    if linked:
+        pain["exercise"] = RDL
+    return c.build_joints_packet(
+        c.draft_summary(ir),
+        pain_by_idx={0: pain},
+        days_since_by_idx={0: 9},
+        loaded_lifting_streak=1,
+        pain_layer_status="ok",
+        dismissals=dismissals,
+    )
+
+
+class TestSlotTaggedFlag4519:
+    def test_identity_keys_name_the_label_the_exercise_its_bare_name_and_the_catalog_key(self):
+        assert tcr.identity_keys(SLOT, RDL, RDL_KEY) == {"anchor_hinge_moderate", "romanian_deadlift_barbell", "romanian_deadlift"}
+
+    def test_the_10_01_hinge_dismissal_reads_dismissed_by_owner_on_the_slot_tagged_flag(self):
+        row = _slot_row([HINGE_1001, WALKING_0922])
+        assert row["state"] == "dismissed_by_owner", row
+        assert row["by_site"] == [
+            {
+                "movement": SLOT,
+                "exercise": RDL,
+                "site": "hinge",
+                "state": "dismissed_by_owner",
+                "note_dates": ["2026-09-13"],
+                "dismissal": "DISMISSAL#hinge#2026-10-01",
+                "dismissal_state": "dismissed_by_owner",
+            }
+        ]
+        assert [d["sk"] for d in row["dismissals"]] == ["DISMISSAL#hinge#2026-10-01"], "the Walking lower-back record covers no RDL note"
+
+    def test_the_09_21_record_keyed_to_the_hevy_name_also_reaches_it(self):
+        row = _slot_row([_dismissal(), HINGE_1001])
+        assert row["state"] == "dismissed_by_owner", row
+        assert {(r["site"], r["state"]) for r in row["by_site"]} == {
+            ("hinge", "dismissed_by_owner"),
+            ("right_lower_back", "dismissed_by_owner"),
+        }
+
+    def test_the_joints_critic_does_not_veto_the_dismissed_slot_tagged_rdl(self):
+        p = _slot_joints([HINGE_1001])
+        assert p["violations"] == [], p["violations"]
+        assert p["numbers"]["pain_dismissed[0]"] is True
+        assert [d["sk"] for d in p["owner_dismissals"]] == ["DISMISSAL#hinge#2026-10-01"]
+
+    def test_mutation_control_drop_the_exercise_link_and_the_veto_returns(self):
+        """Acceptance box 2's control: the SAME inputs with the exercise link removed reproduce
+        the live defect — slot-tag label, `site: unknown`, no dismissal, joints veto."""
+        row = _slot_row([HINGE_1001], linked=False)
+        assert row["state"] == "tripped"
+        assert [(r["movement"], r["site"], r["dismissal"]) for r in row["by_site"]] == [(SLOT, "unknown", None)]
+        p = _slot_joints([HINGE_1001], linked=False)
+        assert [v["redline"] for v in p["violations"]] == ["pain_flag_loaded"], "without the Hevy name, 'romanian deadlift' names nothing"
+        assert "2026-09-13" in p["violations"][0]["reason"]
+
+    def test_mutation_control_a_label_only_identity_restores_the_live_veto(self, monkeypatch):
+        """THE control: put the pre-#4519 label-only identity back and the joints critic vetoes
+        the dismissed RDL again — so the green above is bought by the exercise link."""
+        assert _slot_joints([HINGE_1001])["violations"] == []
+        monkeypatch.setattr(
+            tcr, "identity_keys", lambda movement, exercise=None, movement_key=None: {tcr.normalize_dismissal_key(movement)}
+        )
+        broken = _slot_joints([HINGE_1001])
+        assert [v["redline"] for v in broken["violations"]] == [
+            "pain_flag_loaded"
+        ], "label-only identity no longer vetoes — the control is dead"
+        assert _slot_row([HINGE_1001])["state"] == "tripped"
+
+
+def _ttn():
+    import os
+
+    os.environ.setdefault("TABLE_NAME", "life-platform")
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    os.environ.setdefault("USER_ID", "matthew")
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    sys.path.insert(0, str(REPO))
+    from mcp import tools_training_notes as ttn
+
+    return ttn
+
+
+class _RecordingTable:
+    def __init__(self):
+        self.puts = []
+
+    def put_item(self, Item):  # noqa: N803 — the boto3 keyword
+        self.puts.append(Item)
+
+
+def _notes_read(pain_dates, notes):
+    return {
+        "exercise": RDL,
+        "template_id": "2B4B7310",
+        "pain_flag_any": bool(pain_dates),
+        "pain_dates": list(pain_dates),
+        "layer_status": "ok",
+        "timeline": [{"date": n["date"], "note_raw": n["text"], "pain_flag": True} for n in notes],
+    }
+
+
+class TestTheDismissalRefusesByName4519:
+    def test_a_slot_tag_is_refused_by_name_and_nothing_is_written(self, monkeypatch):
+        ttn = _ttn()
+        tbl = _RecordingTable()
+        monkeypatch.setattr(ttn, "table", tbl)
+        out = ttn.tool_get_exercise_notes(
+            {"action": "dismiss", "site": "hinge", "words": "yes hinge pain gone", "movement": SLOT, "flag_note_date": "2026-09-13"}
+        )
+        assert out["wrote"] is False and "is a program slot tag, not an exercise" in out["error"], out
+        assert tbl.puts == []
+
+    def test_a_dismissal_that_would_resolve_no_tripped_flag_is_refused_by_name(self, monkeypatch):
+        """Backdated to 09-14 while a 09-20 flagged note already exists: the record would read
+        `re_armed` the moment it landed. Refused, naming the site and the movement; nothing written."""
+        ttn = _ttn()
+        tbl = _RecordingTable()
+        monkeypatch.setattr(ttn, "table", tbl)
+        later = {"date": "2026-09-20", "text": "hinge felt tight again"}
+        monkeypatch.setattr(ttn, "tool_get_exercise_notes", lambda a: _notes_read(["2026-09-13", "2026-09-20"], [NOTE_0913, later]))
+        out = ttn._dismiss_pain_flag(
+            {"site": "hinge", "words": "hinge fine", "movement": RDL, "flag_note_date": "2026-09-13", "dismissed_on": "2026-09-14"}
+        )
+        assert out["wrote"] is False, out
+        assert out["error"].startswith("refused: no tripped flag matches site 'hinge' / movement 'Romanian Deadlift (Barbell)'"), out
+        assert "re_armed" in out["error"]
+        assert tbl.puts == []
+
+    def test_a_matching_dismissal_is_written_and_previews_dismissed_by_owner(self, monkeypatch):
+        ttn = _ttn()
+        tbl = _RecordingTable()
+        monkeypatch.setattr(ttn, "table", tbl)
+        monkeypatch.setattr(ttn, "tool_get_exercise_notes", lambda a: _notes_read(["2026-09-13"], [NOTE_0913]))
+        out = ttn._dismiss_pain_flag(
+            {
+                "site": "hinge",
+                "words": "yes hinge pain gone",
+                "movement": "romanian deadlift",
+                "flag_note_date": "2026-09-13",
+                "dismissed_on": "2026-10-01",
+            }
+        )
+        assert out["wrote"] is True and out["reads_as"]["state"] == "dismissed_by_owner", out
+        assert [p["sk"] for p in tbl.puts] == ["DISMISSAL#hinge#2026-10-01"]
