@@ -2984,3 +2984,55 @@ STRUCTURAL_HAND_PROOFS["structural::test_coaches_api.py"] = {
     ),
     "proved_on": "2026-09-29",
 }
+
+# #4472: plan's change detector now reads the last-deployed sha through check_deploy_deadman.py --deploy-base,
+# which makes the census see the step as a gate. What it can fail at is DROPPING a superseded run's merge.
+CI_PROOFS["ci::ci-cd.yml::plan::7"] = {
+    "gate_name": "plan / Resolve deploy base — the last successful Deploy on main (#4472)",
+    "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -q -p no:cacheprovider   # baseline 44 passed",
+    "mutation": (
+        "M1: in the real tracked scripts/check_deploy_deadman.py, last_deployed_sha()'s "
+        '`if classify_run(...)["state"] == DEPLOYED:` replaced by `if True:` (the base becomes the newest run, i.e. '
+        "this push — the pre-#4472 behaviour). M2: in the real ci-cd.yml, the Detect step's diff base "
+        '`"$DEPLOY_BASE"` put back to `"${GITHUB_SHA}~1"`. test_superseded_run_a_rolls_into_run_b_plan executes the '
+        "workflow's own `CHANGED=$(git diff …)` command in a throwaway repo (base → A touches weekly_digest_lambda.py → B "
+        "touches mcp/tools_health.py) with the base last_deployed_sha() resolves over A-cancelled / B-in-flight runs. "
+        "Each restored by copying the file back (script md5 e9403d99… before and after)."
+    ),
+    "observed": (
+        "2026-09-30. M1: 3 failed, 41 passed — test_last_deployed_sha_skips_cancelled_failed_and_in_flight_runs, "
+        "test_deploy_base_mode_prints_only_the_sha_or_exits_indeterminate, test_superseded_run_a_rolls_into_run_b_plan. "
+        "M2: 1 failed, 43 passed — superseded run A's merge is missing from B's plan: {'mcp/tools_health.py'}. "
+        "RESTORED: 44 passed. LIVE read-only: --deploy-base printed ff6f20ceb… (exit 0)."
+    ),
+    "scope": (
+        "The step's `|| true` is deliberate: an unresolved base is an empty output, and the Detect step then deploys "
+        "everything under a ::warning — it never fails the plan on an API read. A deploy made outside CI "
+        "(deploy_fleet.sh from a laptop) is not a recorded Deploy; the next plan re-ships those files, which is harmless."
+    ),
+    "proved_on": "2026-09-30",
+}
+# #4472 box 2: the nightly live-Lambda staleness advisory (config-drift.yml). The step is a bare
+# `python3 scripts/check_deploy_deadman.py --stale-lambdas`, so its exit code IS main()'s return.
+CI_PROOFS["ci::config-drift.yml::drift::7"] = {
+    "gate_name": "drift / Live Lambda older than its source on main (#4472, read-only, advisory)",
+    "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -q -p no:cacheprovider   # baseline 44 passed",
+    "mutation": (
+        "M1 (test): stale_functions()'s `elif live < owed_at:` replaced by `elif False:` in the real tracked "
+        "scripts/check_deploy_deadman.py (md5 e9403d99… before and after, restored by copying the file back). "
+        "M2 (LIVE, read-only): main(['--stale-lambdas']) against the real AWS list-functions read and this repo's git "
+        "history, with collect_last_modified() wrapped to backdate weekly-digest's LastModified by two days."
+    ),
+    "observed": (
+        "2026-09-30. M1: 1 failed, 43 passed — test_stale_functions_replays_the_weekly_digest_incident: "
+        "assert ['gone'] == ['gone', 'weekly-digest']. RESTORED: 44 passed. M2: exit 1 — '1 live Lambda(s) older than "
+        "their source on main', naming weekly-digest (live 2026-09-28T16:59Z, owes 2026-09-30T03:51Z). UNMUTATED live: "
+        "exit 0 — 'none older than its source on main' (after the region-aware read found the two us-east-1 functions)."
+    ),
+    "scope": (
+        "ADVISORY (continue-on-error): an exit 1 marks the step, not the nightly. Compares commit time to LastModified, so a "
+        "laptop deploy made BEFORE its merge reads stale, and a merge inside the 2 h grace is not judged. life-platform-mcp "
+        "(the `mcp` map) is not covered; lambdas/web/platform_counts.py is not counted as shared (#4250)."
+    ),
+    "proved_on": "2026-09-30",
+}
