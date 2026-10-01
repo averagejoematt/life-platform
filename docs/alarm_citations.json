@@ -87,9 +87,9 @@
   },
   "qa-smoke-warnings": {
     "added": "2026-09-21",
-    "cause_observed": "2026-09-30",
-    "cause": "data:orphan_routine_drafts",
-    "citation": "#4183 — RE-CITED 2026-09-30 (Session BA): one live cause, `data:orphan_routine_drafts` = draft 78dd2da5… (created 2026-09-21) aged past 7 days; owner act pending — archive or commit it (#4183). The reader_truth finding on /api/coaches' headline_stat cleared once issue 4220's record wording landed (issue closed 2026-09-29 on live proof)."
+    "cause_observed": "2026-10-01",
+    "cause": "hooks:liveness_matrix,reader_truth:confirm,reader_truth:verdict,weeks:absence_agreement,weeks:fact_agreement,weeks:rate_disclosure",
+    "citation": "#4183 — RE-CITED 2026-10-01 (Session BC): the orphan-drafts cause CLEARED (10 never-pushed drafts archived on the owner's 2026-10-01 ruling; the 03:00:30Z qa-smoke run shows no orphan leg). The alarm stays lit on six other legs, four of them 'NOT OBSERVED (census read budget of 60s spent)'; #4183 carries them until the alarm reaches OK."
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -129,5 +129,17 @@
     "added": "2026-09-29",
     "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the remaining-time-floor budget box) was not exercised. RE-CITED 2026-09-30 (Session BA): the 2026-09-29 17:00Z brief ran 733 s with 5 quality holds (same class); PR 4443 (rewrite revises the draft) and PR 4466 (lead read's own rubric) deployed after it — proof due at the 2026-09-30 17:00Z brief under #4343.",
     "note": "Session AZ wrap citation for a fired-and-cleared episode (#2912)."
+  },
+  "ai-daily-spend-high-urgent": {
+    "added": "2026-10-01",
+    "cause_observed": "2026-10-01",
+    "cause": "rolling-24h threshold at the measured baseline",
+    "citation": "#4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision visual QA + attended dry runs) cross it. Incident row 2026-09-30 (Session BB)."
+  },
+  "ai-tokens-platform-daily-total-urgent": {
+    "added": "2026-10-01",
+    "cause_observed": "2026-10-01",
+    "cause": "rolling-24h threshold at the measured baseline",
+    "citation": "#4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision visual QA + attended dry runs) cross it. Incident row 2026-09-30 (Session BB)."
   }
 }
