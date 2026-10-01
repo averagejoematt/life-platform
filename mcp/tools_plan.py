@@ -385,6 +385,30 @@ def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -
         w["honesty"] = list(layer["honesty"])
 
 
+def _attach_collapse_actuator(block: dict[str, Any], status_reader=None) -> None:
+    """#4503 OD7: fill the walking_collapse actuator MARK's `designation` — ONLY on a tripped row, so an
+    ordinary night never touches the private config. Reads whether a named human is designated, never
+    who (`coach.named_human_contact.designation_status`), and sends NOTHING. A read that raises leaves
+    `designation: unreadable` — never a silent `not_read`."""
+    from training import recent_aerobic
+
+    row = next((t for t in block.get("tripwires") or [] if t.get("id") == "walking_collapse"), None)
+    if row is None or row.get("state") != "tripped":
+        return
+    try:
+        if status_reader is None:
+            from coach import named_human_contact
+
+            from mcp.config import S3_BUCKET, s3_client
+
+            designation = named_human_contact.designation_status(s3_client, S3_BUCKET)
+        else:
+            designation = status_reader()
+    except Exception:  # noqa: BLE001 — the mark degrades to unreadable; the plan never fails on it
+        designation = {"designation": "unreadable", "armed": None}
+    row["actuator"] = recent_aerobic.collapse_actuator(row["state"], designation)
+
+
 BODYSCAN_LOOKBACK_DAYS = 180
 
 
@@ -716,6 +740,7 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     _attach_session_loads(block, target_date, catalog_movements)
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.

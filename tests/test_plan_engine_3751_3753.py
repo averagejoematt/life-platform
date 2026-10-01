@@ -309,18 +309,34 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
     assert R["protein_floor_g"]["g_per_kg_dxa_lean"]["floor"] == 2.3
     assert R["fat_floor_g"]["value"] == 65 and R["carb_floor_g"]["value"] == 120
     w = R["walking_floor_hr_wk"]
-    assert (w["value"], w["target_hr_wk"], w["target_by_week"], w["front_load_permitted_hr_wk"], w["maintenance_floor_hr_wk"]) == (
+    # #4503 OD2 (owner 2026-09-30): 11–12 h by block-2 week 6 (was 13), 16 h retired, HR avg <= 120 with 105 the target
+    assert (w["value"], w["target_hr_wk"], w["target_range_hr_wk"], w["target_by_week"], w["maintenance_floor_hr_wk"]) == (
         8.5,
-        13,
+        12,
+        [11, 12],
         6,
-        16,
         10,
     )
-    assert w["front_load_weeks"] == [3, 12] and w["hr_ceiling_bpm"] == 105 and w["permanent"] is True
+    assert "front_load_permitted_hr_wk" not in w and w["retired"]["front_load_permitted_hr_wk"] == 16
+    assert (w["hr_ceiling_bpm"], w["hr_target_bpm"], w["talk_test"], w["long_walk_slots_per_wk"]) == (120, 105, True, 1)
+    assert (
+        w["standalone_walks"] == {"min_per_wk": 3, "min_minutes": 20, "outside": w["standalone_walks"]["outside"]}
+        and w["permanent"] is True
+    )
     lift = R["lifting_sessions_per_wk"]
     # #4147 v0.4 (owner 2026-09-23): ~10 hard sets/muscle/wk -> [8, 12]; everything else in the block is unchanged
     assert (lift["low"], lift["high"], lift["sets_per_muscle_wk"], lift["session_minutes"]) == (3, 4, [8, 12], [55, 70])
-    assert R["run_gate_lb"]["value"] == 240 and "12 h walking" in R["run_gate_lb"]["gate"]
+    # #4503 OD3: the tissue clause is 4 wk weight-bearing >= 8.5 h pain-free AND Stage 4; no running or impact intervals at any weight
+    rg = R["run_gate_lb"]
+    assert (
+        rg["value"] == 240
+        and "12 h walking" not in rg["gate"]
+        and "≥ 8.5 h weight-bearing" in rg["gate"]
+        and "Stage 4 completed" in rg["gate"]
+    )
+    assert "No running or impact intervals at any weight" in rg["gate"] and "12-lead ECG + BP" in rg["gate"]
+    assert rg["tissue_clause"] == {"weeks": 4, "weight_bearing_hr_wk": 8.5, "pain_free": True, "stage_completed": 4}
+    assert rg["non_impact_intensity"]["max_per_wk_above_275_lb"] == 1 and rg["non_impact_intensity"]["max_per_wk_at_or_below_275_lb"] == 2
     m = R["medical_cover"]
     assert m["dxa_every_weeks"] == 8 and m["baseline_within_weeks"] == 2 and m["ursodiol"]["trend_threshold_lb_wk"] == 3.0
     assert (

@@ -37,7 +37,7 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
     if pick["movement_key"] == "treadmill":
         return []
     return [
-        f"cardio: {b.movement_key} drafted, but the pick from the last 3 days is {pick['modality']} (HR < {pick['hr_ceiling_bpm']} bpm) — "
+        f"cardio: {b.movement_key} drafted, but the pick from the last 3 days is {pick['modality']} (HR avg ≤ {pick['hr_ceiling_bpm']} bpm, target {pick['hr_target_bpm']}) — "
         f"{pick['reason']}. Stage 2's joints_tendons critic swaps it when the legs are loaded (#4387)."
         for b in timed_wb
     ]

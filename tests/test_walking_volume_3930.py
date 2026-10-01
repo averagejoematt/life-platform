@@ -394,8 +394,8 @@ def _joints(draft: dict, block: dict | None, days_since: dict | None = None) -> 
 
 def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_treadmill_to_cycling():
     """The incident, replayed on the wire rows: the plan for 09-28 sees Saturday's and Sunday's walks,
-    both over 75 min and over the 105-bpm ceiling, and the joints critic CHANGEs the lower draft's
-    treadmill to cycling — same 60 min, HR < 105. Mutation controls: drop `aerobic_flags` from
+    both over 75 min — and, since OD2 (#4503, cap 120 avg, 105 the target), UNDER the HR cap at ~116 bpm —
+    and the joints critic CHANGEs the lower draft's treadmill to cycling — same 60 min, HR avg ≤ 120. Mutation controls: drop `aerobic_flags` from
     `build_joints_packet`, or make `recent_aerobic.window` end at target − 2 — this reds."""
     block = _ra_block()
     walks = [r for r in block["rows"] if r["modality"] == "walk"]
@@ -403,7 +403,7 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
         ("2026-09-26", 101.8, "Garmin epix (Gen2)"),
         ("2026-09-27", 164.8, "Garmin epix (Gen2)"),
     ]
-    assert all(r["flags"] == {"over_75_min": True, "avg_hr_over_ceiling": True} for r in walks)
+    assert all(r["flags"] == {"over_75_min": True, "avg_hr_over_ceiling": False} for r in walks)
     assert [(r["avg_hr"], r["max_hr"]) for r in walks] == [(116.8, 171.0), (116.1, 176.0)]
     # the Hevy treadmill Strava cannot see is a row; the WHOOP walk over its minutes is not a second one (#4068)
     (tread,) = [r for r in block["rows"] if r["modality"] == "treadmill"]
@@ -416,11 +416,11 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
     draft = critics.draft_summary(ir)
     verdict = critics.deterministic_verdict(_joints(draft, block))
     assert verdict["verdict"] == "change" and verdict["field"] == "exercises[5].movement_key" and verdict["to"] == "cycling"
-    assert "POPULATION-DERIVED" in verdict["reason"] and "HR < 105" in verdict["reason"]
+    assert "POPULATION-DERIVED" in verdict["reason"] and "HR avg ≤ 120 bpm (target 105)" in verdict["reason"]
     (rec,) = critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
     assert rec["applied"] is True
     assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
-    assert "HR < 105" in ir.exercises[5].notes
+    assert "HR avg ≤ 120 bpm (target 105)" in ir.exercises[5].notes
     # re-evaluated, the revised draft carries nothing left to swap
     assert critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))["verdict"] == "approve"
 
@@ -491,12 +491,108 @@ def test_walking_collapse_and_overshoot_are_report_only_rows_on_the_block():
     cb = plan_engine.constraint_block(date=RA_TARGET, recent_aerobic=big)
     rows = {t["id"]: t for t in cb["tripwires"]}
     assert rows["walking_overshoot"]["state"] == "tripped" and rows["walking_overshoot"]["report_only"] is True
-    assert "above the 13 h target" in rows["walking_overshoot"]["detail"]
-    assert rows["walking_collapse"]["state"] == "clear" and rows["walking_collapse"]["report_only"] is True
+    assert "above the 12 h target" in rows["walking_overshoot"]["detail"]  # #4503 OD2: 13 -> 12
+    # #4503 OD7: the hours half is clear (-0.4 %), but the live week holds only 2 standalone walks (the
+    # 09-26 and 09-27 Garmin walks) — every WHOOP walk sits inside a Hevy session — so the walks half trips it
+    wc = rows["walking_collapse"]
+    assert wc["state"] == "tripped" and wc["report_only"] is True and wc["observed"] == -0.4
+    assert "2 standalone walk(s) ≥ 20 min outside a gym window" in wc["detail"] and "report under 3" in wc["detail"]
+    assert wc["actuator"]["designation"] == "not_read" and wc["actuator"]["sends"] is False  # the engine never reads the config
     assert cb["recent_aerobic"]["rows"] == big["rows"] and cb["recent_aerobic"]["cardio_pick"]["movement_key"] in ("cycling", "treadmill")
     none = plan_engine.constraint_block(date=RA_TARGET)
     assert {t["id"]: t["state"] for t in none["tripwires"]}["walking_overshoot"] == "unknown"
     assert none["recent_aerobic"]["cardio_pick"]["movement_key"] == "cycling"
+
+
+def test_standalone_walks_count_only_the_minutes_outside_every_gym_window():
+    """#4503 OD7 on the live wire rows: 09-21..27 holds seven Strava walks, and five are WHOOP walks recorded
+    INSIDE a Hevy session (the treadmill block seen by the wrist, or a walk inside a lifting session) — the
+    vital sign counts 2. Mutation controls: pass no gym windows to `dedup_strava` — the in-session walks
+    count and this reds; drop the min_minutes filter — the 09-16 14.5-min walk counts and the prior week
+    reads 2. (Every live session here carries a cardio block, so cardio-only intervals are caught by the
+    synthetic test below, not this one.)"""
+    sw = _ra_block()["totals"]["standalone_walks"]
+    t, p = sw["trailing_7d"], sw["prior_7d"]
+    assert (sw["min_per_wk"], sw["min_minutes"]) == (3, 20)
+    assert (t["start"], t["end"], t["count"], t["untimed"]) == ("2026-09-21", "2026-09-27", 2, 0)
+    assert [(w["date"], w["minutes_outside_gym"]) for w in t["walks"]] == [("2026-09-26", 101.8), ("2026-09-27", 164.8)]
+    assert (p["count"], [w["date"] for w in p["walks"]]) == (1, ["2026-09-14"])
+
+
+def test_standalone_walk_rule_on_synthetic_sessions():
+    """A walk straddling a session counts only its minutes outside it; an untimed walk is never standalone
+    and makes a short count UNKNOWN, not tripped; three timed walks clear the half. The session carries NO
+    cardio block: mutation control — use `walking_volume.hevy_cardio_intervals` (cardio sessions only) as
+    the gym window — the in-session walks count and this reds."""
+    from training import recent_aerobic
+
+    def walk(day, hhmm, minutes, start=True):
+        a = {"type": "Walk", "moving_time_seconds": minutes * 60, "elapsed_time_seconds": minutes * 60, "device_name": "Garmin"}
+        if start:
+            a["start_date"] = f"{day}T{hhmm}:00Z"
+        return {"date": day, "activities": [a]}
+
+    gym = [{"date": "2026-09-21", "start_time": "2026-09-21T10:00:00Z", "end_time": "2026-09-21T11:00:00Z", "exercises": []}]
+
+    def count(item):
+        return recent_aerobic.standalone_walks(recent_aerobic._strava_rows([item]), gym, "2026-09-21", "2026-09-27")["count"]
+
+    assert count(walk("2026-09-21", "09:30", 40)) == 1  # 30 of its 40 min fall before the 10:00 session
+    assert count(walk("2026-09-21", "09:50", 25)) == 0  # only 10 min outside it
+    assert count(walk("2026-09-21", "10:10", 30)) == 0  # wholly inside the session
+
+    def block(items):
+        return recent_aerobic.build(target_date="2026-09-28", today="2026-09-28", strava_items=items, hevy_workouts=gym)
+
+    two_and_untimed = block(
+        [walk("2026-09-22", "15:00", 30), walk("2026-09-23", "15:00", 30), walk("2026-09-24", "15:00", 30, start=False)]
+    )
+    state, _, detail = recent_aerobic.weekly_reports(two_and_untimed, 30.0)["walking_collapse"]
+    assert state == "unknown" and "1 untimed walk(s)" in detail
+    three = block([walk(d, "15:00", 30) for d in ("2026-09-22", "2026-09-23", "2026-09-24")])
+    assert three["totals"]["standalone_walks"]["trailing_7d"]["count"] == 3
+    assert "3 standalone walk(s)" in recent_aerobic.weekly_reports(three, 30.0)["walking_collapse"][2]
+
+
+def test_the_collapse_actuator_is_a_mark_read_only_on_a_tripped_row():
+    """#4503 OD7: the named human is the actuator — a MARK that sends nothing. Stage 1 reads the private
+    config's designation ONLY on a tripped row, and never carries the identity. Mutation controls: drop
+    the `state != "tripped"` early return in `_attach_collapse_actuator` — the clear block reads the
+    config and this reds; make `would_actuate` ignore the designation — the not-designated case reds."""
+    from training import recent_aerobic
+
+    calls = []
+
+    def reader(answer):
+        def _r():
+            calls.append(answer)
+            return answer
+
+        return _r
+
+    cb = plan_engine.constraint_block(date=RA_TARGET, recent_aerobic=_ra_block())
+    tp._attach_collapse_actuator(cb, status_reader=reader({"designation": "designated", "armed": False}))
+    act = {t["id"]: t for t in cb["tripwires"]}["walking_collapse"]["actuator"]
+    assert act["designation"] == "designated" and act["would_actuate"] is True and act["sends"] is False
+    assert (act["role"], act["config_key"], act["when"]) == ("named_human", "config/coaching/named_human.json", "same day")
+    assert len(calls) == 1
+
+    clear = json.loads(json.dumps(cb))
+    row = {t["id"]: t for t in clear["tripwires"]}["walking_collapse"]
+    row.update(state="clear", actuator=recent_aerobic.collapse_actuator("clear", None))
+    tp._attach_collapse_actuator(clear, status_reader=reader({"designation": "designated", "armed": True}))
+    assert len(calls) == 1 and row["actuator"]["designation"] == "not_read" and row["actuator"]["would_actuate"] is False
+
+    assert (
+        recent_aerobic.collapse_actuator("tripped", {"designation": "not_designated_or_invalid", "armed": None})["would_actuate"] is False
+    )
+
+    def boom():
+        raise RuntimeError("AccessDenied")
+
+    tp._attach_collapse_actuator(cb, status_reader=boom)
+    act = {t["id"]: t for t in cb["tripwires"]}["walking_collapse"]["actuator"]
+    assert act["designation"] == "unreadable" and act["would_actuate"] is False
 
 
 def test_draft_custom_names_a_copied_treadmill_the_pick_would_not_draft():
@@ -705,10 +801,10 @@ def test_the_0925_treadmill_replays_joined_on_the_live_fixture():
         "avg_hr": 116.9,
         "max_hr": 150.0,
         "hr_coverage": 0.858,
-        "over_ceiling": True,
+        "over_ceiling": False,  # #4503 OD2: 116.9 is under the 120 avg cap (105 is the target, not the cap)
     }
     packet = _joints(critics.draft_summary(_lower_volume_draft()), block)
-    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and packet["numbers"]["last_cardio_block_over_hr_ceiling"] is True
+    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and packet["numbers"]["last_cardio_block_over_hr_ceiling"] is False
     verdict = critics.deterministic_verdict(packet)
     assert "116.9 bpm avg" in verdict["reason"] and "coverage 0.858" in verdict["reason"]
 

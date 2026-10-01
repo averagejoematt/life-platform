@@ -273,9 +273,9 @@ ROTATION_RULE: dict[str, Any] = {
 # ── the day shape ────────────────────────────────────────────────────────────
 DAY_SHAPE: dict[str, Any] = {
     "am": "lift the next session in ORDER (upper-heavy, lower-heavy, upper-volume, lower-volume) on a lifting day — the hard, loaded work; ~55–70 min",
-    "pm": "easy walking EVERY day (Zone 2, ≤ 105 bpm; 2–3 walks, none over 75 min; conversational, never intervals)",
+    "pm": "easy walking EVERY day (HR avg ≤ 120 with the talk test, 105 the target; 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals)",
     "order": "the sessions are a SEQUENCE, not weekdays (#4110): a walk or rest day postpones the next session, never skips it (v0.4, #4147)",
-    "cardio_placement": "no walking in the 2 h before lifting; the lightest walking day follows the heavy session; cycling ≤ 2 h/wk as the knee-sparing substitute",
+    "cardio_placement": "no walking in the 2 h before lifting; the lightest walking day follows the heavy session; cycling is the knee-sparing substitute (OD2 deleted the ≤ 2 h cap)",
     "provenance": "owner-history",
     "stated": "2026-06-19",
     "note": (

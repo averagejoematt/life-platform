@@ -6,7 +6,7 @@ On 2026-09-27 the coach planned Mon 09-28: trap-bar + squat, then 60 min of incl
 Its only aerobic input was `constraint_block.walking` — a 7-day TOTAL in hours, over a window
 that ended at target − 2. It never saw Sunday, and it had no per-walk duration and no heart rate.
 Strava held 4.4 h / 13.4 mi of outdoor walking on 09-26..27 — walks of 102 and 165 min at
-~116 bpm average, both over the walking redlines (≤ 75 min per walk, ≤ 105 bpm). No critic saw
+~116 bpm average, both over the then walking redlines (≤ 75 min per walk, ≤ 105 bpm). No critic saw
 them; the red team approved the treadmill (`CORRECTION#2026-09-27#5a60fd05`).
 
 A total cannot say "yesterday was 2¾ hours on foot". This block can:
@@ -20,7 +20,15 @@ A total cannot say "yesterday was 2¾ hours on foot". This block can:
     WHOOP/Garmin walk recorded over a Hevy cardio session's minutes counted once. The primitives
     are `training.walking_volume`'s — this module adds per-row detail, never a second rule;
   * weight-bearing hours in the last 48 h and 72 h, and week-to-date hours against the ramp
-    (`ramp_hr_per_wk_max`) and the target (`target_hr_wk`).
+    (`ramp_hr_per_wk_max`) and the target (`target_hr_wk`);
+  * #4503 OD7 — the STANDALONE walks of the trailing 7 days (and the 7 before): Strava walks whose
+    minutes outside every Hevy session (the gym window — lifting sessions too, not only cardio
+    ones) reach `standalone_walks.min_minutes`, de-duplicated across devices by the same
+    `walking_volume.dedup_strava` rule. A walk with no timestamp cannot be placed against a gym
+    window; it is counted in `untimed`, never as standalone, and makes a short count UNKNOWN.
+
+The OD2 heart-rate line (owner 2026-09-30): `hr_ceiling_bpm` is the cap on a walk's AVERAGE (120,
+with the talk test) and `hr_target_bpm` the aim (105) — `avg_hr_over_ceiling` flags the cap only.
 
 It is PURE: the partitions are read by `mcp.shared_quantities.recent_aerobic_layer`, the one
 module that owns the walking definition, and handed in. `None` for a source means it could not
@@ -46,6 +54,8 @@ _WALKING = owner_redlines.REDLINES["walking_floor_hr_wk"]
 # number equal to the phrase in the redline, so the two cannot drift apart.
 WALK_MAX_MIN = 75
 HR_CEILING_BPM = int(_WALKING["hr_ceiling_bpm"])
+HR_TARGET_BPM = int(_WALKING["hr_target_bpm"])  # #4503 OD2: the aim under the 120 cap
+_STANDALONE = _WALKING["standalone_walks"]  # #4503 OD7: >= 3 walks/wk of >= 20 min outside a gym window
 _M_PER_MI = 1609.344
 
 # The joints_tendons trigger (#4387). POPULATION-DERIVED, not his variance (ADR-105): the value is
@@ -178,6 +188,46 @@ def _hevy_rows(workouts: list[dict[str, Any]], strava_items: list[dict[str, Any]
     return rows
 
 
+def gym_windows(workouts: list[dict[str, Any]] | None) -> list[tuple[Any, Any]]:
+    """[start_time, end_time] of EVERY timed Hevy session — the gym window a standalone walk sits outside (#4503 OD7).
+
+    Wider than `walking_volume.hevy_cardio_intervals` (cardio-carrying sessions only): a walk recorded
+    over a lifting session is the walk to the rack, not a standalone walk."""
+    out = []
+    for w in workouts or []:
+        start, end = walking_volume._parse_utc(w.get("start_time")), walking_volume._parse_utc(w.get("end_time"))
+        if start is not None and end is not None and end > start:
+            out.append((start, end))
+    return out
+
+
+def standalone_walks(strava_raw: list[dict[str, Any]], workouts: list[dict[str, Any]] | None, start: str, end: str) -> dict[str, Any]:
+    """The OD7 walk count over [start, end]: Strava walks whose de-duplicated minutes OUTSIDE every gym
+    window reach the redline's `min_minutes`. Pure. The time rule is `walking_volume.dedup_strava`'s,
+    with every Hevy session claiming its interval first — so a WHOOP + Garmin pair of one walk counts
+    once, and a walk inside a session counts only its minutes outside it."""
+    walks = [r for r in strava_raw if r["modality"] == "walk" and start <= r["date"] <= end]
+    kept, _ = walking_volume.dedup_strava(walks, gym_windows(workouts))
+    min_s = float(_STANDALONE["min_minutes"]) * 60.0
+    timed = [r for r in kept if r.get("start") is not None and r.get("end") is not None]
+    counted = sorted((r for r in timed if r["seconds"] >= min_s), key=lambda r: r["start"])
+    return {
+        "start": start,
+        "end": end,
+        "count": len(counted),
+        "untimed": len(kept) - len(timed),
+        "walks": [
+            {
+                "date": r["date"],
+                "start_utc": r["start"].isoformat(),
+                "minutes_outside_gym": round(r["seconds"] / 60.0, 1),
+                "device": r.get("device"),
+            }
+            for r in counted
+        ],
+    }
+
+
 def _public_row(r: dict[str, Any]) -> dict[str, Any]:
     wb = r["modality"] in WEIGHT_BEARING
     minutes = round(r["seconds"] / 60.0, 1)
@@ -284,12 +334,20 @@ def build(
             },
             "trailing_7d": {"start": shift_day_key(end, -6), "end": end, "hours": trailing},
             "prior_7d": {"start": shift_day_key(end, -13), "end": shift_day_key(end, -7), "hours": prior7},
+            "standalone_walks": {
+                "min_per_wk": int(_STANDALONE["min_per_wk"]),
+                "min_minutes": int(_STANDALONE["min_minutes"]),
+                "rule": "a Strava walk whose de-duplicated minutes outside every Hevy session (the gym window) reach min_minutes",
+                "trailing_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -6), end),
+                "prior_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -13), shift_day_key(end, -7)),
+            },
         },
         "totals_are_floor": bool(unreadable),
         "unreadable_sources": unreadable,
         "redlines": {
             "walk_max_min": WALK_MAX_MIN,
             "hr_ceiling_bpm": HR_CEILING_BPM,
+            "hr_target_bpm": HR_TARGET_BPM,
             "provenance": _WALKING["provenance"],
             "source": "owner_redlines.walking_floor_hr_wk",
         },
@@ -365,13 +423,50 @@ def cardio_pick(block: dict[str, Any] | None, archetype: Any) -> dict[str, Any]:
         "movement_key": modality,
         "modality": "cycling (recumbent)" if modality == "cycling" else "treadmill",
         "hr_ceiling_bpm": HR_CEILING_BPM,
+        "hr_target_bpm": HR_TARGET_BPM,
         "reason": reason,
         "rule": "lower session or loaded legs -> cycling; treadmill only when the legs are fresh (#4387)",
     }
 
 
+def _standalone_half(block: dict[str, Any]) -> tuple[str, str]:
+    """(state, detail) for the OD7 walk-count half of walking_collapse (#4503)."""
+    sw = (block.get("totals") or {}).get("standalone_walks")
+    if not sw:
+        return "unknown", "standalone walks were not counted on this block"
+    if "strava" in (block.get("unreadable_sources") or []):
+        return "unknown", "standalone walks: Strava could not be read"
+    t, need = sw["trailing_7d"], int(sw["min_per_wk"])
+    what = f"{t['count']} standalone walk(s) ≥ {sw['min_minutes']} min outside a gym window {t['start']}..{t['end']} (report under {need})"
+    if t["count"] >= need:
+        return "clear", what
+    if t["count"] + int(t["untimed"]) >= need:
+        return "unknown", what + f"; {t['untimed']} untimed walk(s) could not be placed against a gym window"
+    return "tripped", what
+
+
+def collapse_actuator(state: str, designation: dict[str, Any] | None) -> dict[str, Any]:
+    """The OD7 actuator MARK on the walking_collapse row (#4503). It SENDS NOTHING: it states that the
+    designated human would be the same-day actuator, and whether the private config designates one.
+    `designation` is `coach.named_human_contact.designation_status`'s identity-free answer, or None when
+    it was not read (the config is read only on a tripped row, so an ordinary night never touches it)."""
+    spec = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "walking_collapse")["actuator"]
+    d = designation or {"designation": "not_read", "armed": None}
+    return {
+        **spec,
+        "designation": d["designation"],
+        "armed": d.get("armed"),
+        "would_actuate": state == "tripped" and d["designation"] == "designated",
+        "note": "a mark only — no message is sent from this row; the contact path is coach.named_human_contact's (disengagement only, #4063 A)",
+    }
+
+
 def weekly_reports(block: dict[str, Any] | None, collapse_pct: float) -> dict[str, tuple[str, Any, str]]:
-    """(state, observed, detail) for the two REPORT-ONLY walking tripwires — never a veto (#4387)."""
+    """(state, observed, detail) for the two REPORT-ONLY walking tripwires — never a veto (#4387).
+
+    walking_collapse has two halves since #4503 OD7: the hours week-over-week, and the standalone walk
+    count. Either tripped trips it; otherwise either unknown leaves it unknown; `observed` stays the
+    hours ratio (None when it has no ratio)."""
     if not block or block.get("state") != "read":
         why = "the recent-aerobic read failed or was not supplied"
         return {"walking_collapse": ("unknown", None, why), "walking_overshoot": ("unknown", None, why)}
@@ -380,10 +475,18 @@ def weekly_reports(block: dict[str, Any] | None, collapse_pct: float) -> dict[st
     floor = " (a FLOOR — a source was unreadable)" if block.get("totals_are_floor") else ""
     if last > 0:
         wow = round((this - last) / last * 100.0, 1)
-        state = "tripped" if wow < -collapse_pct else "clear"
-        collapse = (state, wow, f"walking+cycling {this} h vs {last} h the 7 days before ({wow:+}%, report at -{collapse_pct:g}%){floor}")
+        hours_state = "tripped" if wow < -collapse_pct else "clear"
+        hours = (
+            hours_state,
+            wow,
+            f"walking+cycling {this} h vs {last} h the 7 days before ({wow:+}%, report at -{collapse_pct:g}%){floor}",
+        )
     else:
-        collapse = ("unknown", None, f"the prior 7 days read 0 h — no week-over-week ratio; trailing 7 d {this} h{floor}")
+        hours = ("unknown", None, f"the prior 7 days read 0 h — no week-over-week ratio; trailing 7 d {this} h{floor}")
+    walks_state, walks_detail = _standalone_half(block)
+    states = (hours[0], walks_state)
+    state = "tripped" if "tripped" in states else ("unknown" if "unknown" in states else "clear")
+    collapse = (state, hours[1], f"{hours[2]}; {walks_detail}")
     wk = t["week_to_date"]
     over = [f"above the {wk['target_hr_wk']:g} h target" if wk["over_target"] else None]
     over.append(f"above last week + the {wk['ramp_hr_per_wk_max']:g} h ramp ({wk['ramp_ceiling_hr']} h)" if wk["over_ramp"] else None)
