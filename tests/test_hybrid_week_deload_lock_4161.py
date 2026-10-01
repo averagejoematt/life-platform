@@ -474,17 +474,21 @@ def test_mutation_control_a_moved_tier_edge_reds_4166(edge_index, ffm, moved_to)
         assert _served([_scan("2026-11-01", ffm - 8.0)])["protein_gate"]["tier"] == moved_to
 
 
+WEEK16 = "2026-12-27"  # #4503 OD6: the override first evaluates at the week-16 DXA
+
+
 def test_the_dxa_override_enforces_at_any_body_fat_4166():
-    """Pre-registered: dFFM/dW > 0.25 over a losing DXA pair -> the full gate even at >= 40 % body fat."""
+    """Pre-registered: dFFM/dW > 0.25 over a losing DXA pair -> the full gate even at >= 40 % body fat. #4503 OD6: the
+    override first evaluates at the week-16 scan; the same pair ending at week 8 is a baseline, not yet evaluated."""
     week0 = DXA_WIRE[-1]  # the live 2026-03-30 scan: 311.7 lb, FFM 178.6
-    bad = _scan("2026-11-01", 170.6 - 5.2, total=291.7)  # dW 20.0, dFFM 5.2 -> 0.26
+    bad = _scan(WEEK16, 170.6 - 5.2, total=291.7)  # dW 20.0, dFFM 5.2 -> 0.26
     rt = _served([*DXA_WIRE, bad], weight=292.0)
     gate = rt["protein_gate"]
-    assert gate["dxa_override"]["pair"] == [week0["scan_date"], "2026-11-01"]
+    assert gate["dxa_override"]["pair"] == [week0["scan_date"], WEEK16]
     assert (gate["dxa_override"]["state"], gate["dxa_override"]["ffm_share_of_loss"]) == ("triggered", 0.26)
     assert gate["mode"] == "enforce" and "DXA override" in gate["mode_reason"] and rt["target_lb_wk"] == gate["gated_target_lb_wk"]
     # 0.25 exactly is NOT worse than the diet-alone average: the tier decides (report-only above 40 %)
-    ok = _served([*DXA_WIRE, _scan("2026-11-01", 170.6 - 5.0, total=291.7)], weight=320.0)["protein_gate"]
+    ok = _served([*DXA_WIRE, _scan(WEEK16, 170.6 - 5.0, total=291.7)], weight=320.0)["protein_gate"]
     assert (ok["dxa_override"]["state"], ok["mode"]) == ("clear", "report_only")
     # mutation control: an override that is ignored serves the report-only step at 45 % body fat
     with patch("training.redline_rate.dxa_override", return_value={"triggered": False, "state": "clear"}):
@@ -492,6 +496,16 @@ def test_the_dxa_override_enforces_at_any_body_fat_4166():
     # mutation control: a higher threshold stops the same pair triggering
     with patch.dict(owner_redlines.REDLINES["rate_protein_gate"]["body_fat_tiers"]["dxa_override"], {"ffm_share_of_loss_above": 0.3}):
         assert _served([*DXA_WIRE, bad], weight=330.0)["protein_gate"]["dxa_override"]["triggered"] is False
+
+
+def test_4503_od6_the_week_8_scan_does_not_evaluate_the_override():
+    bad8 = _scan("2026-11-01", 170.6 - 5.2, total=291.7)  # the same 0.26 pair, ending at week 8
+    gate = _served([*DXA_WIRE, bad8], weight=292.0)["protein_gate"]
+    assert gate["dxa_override"]["state"] == "not_yet_evaluated" and gate["dxa_override"]["triggered"] is False
+    assert "DXA override" not in gate["mode_reason"]
+    # mutation control: without the OD6 date the week-8 pair triggers, as it did before the ruling
+    with patch.dict(owner_redlines.REDLINES["rate_protein_gate"]["body_fat_tiers"]["dxa_override"], {"first_evaluation_on_or_after": None}):
+        assert _served([*DXA_WIRE, bad8], weight=292.0)["protein_gate"]["dxa_override"]["state"] == "triggered"
 
 
 @pytest.mark.parametrize(
@@ -652,3 +666,65 @@ def test_the_plan_gate_and_the_deficit_advocate_read_one_window(target_offset):
     if target_offset == 1:  # mutation control: the pre-review window [target-6, target] sees 2 misses — a different state
         old = [g for d, g in grams.items() if shift_day_key(target, -6) <= d <= target]
         assert owner_redlines.protein_gate(*owner_redlines.protein_days_missed(old))["state"] == "clear"
+
+
+# ── #4503 OD6 (owner, amended 2026-09-30): Body Scan 2 between DXA scans — bioimpedance-labelled, own-variance band ──
+# Synthetic rows (the live values are owner health data and stay out of a public fixture). Segments in the stored
+# field names; torso carries the dominant share; the five fat-free segments sum to the scalar, as on the wire (#2994).
+def _bs2(day: str, torso: float, leg: float = 15.5, arm: float = 6.2) -> dict:
+    row: dict = {"date": day, "sk": f"DATE#{day}"}
+    for kind, scale in (("fat_free_mass", 1.0), ("muscle_mass", 0.95), ("fat_mass", 0.5)):
+        for seg, v in (("torso", torso), ("left_leg", leg), ("right_leg", leg), ("left_arm", arm), ("right_arm", arm)):
+            row[f"{kind}_{seg}_kg"] = round(v * scale, 2)
+    row["fat_free_mass_kg"] = round(torso + 2 * leg + 2 * arm, 2)
+    return row
+
+
+BS2_ROWS = [
+    _bs2("2026-09-18", 49.0),
+    _bs2("2026-09-19", 49.2),
+    _bs2("2026-09-20", 48.9),
+    _bs2("2026-09-21", 49.1),
+    _bs2("2026-09-22", 48.8),
+    _bs2("2026-09-29", 47.5),
+]
+
+
+def test_4503_od6_the_between_dxa_read_is_labelled_bioimpedance_with_his_own_noise_band():
+    from training import bodyscan_lean
+
+    r = bodyscan_lean.between_dxa_read(BS2_ROWS, [{"scan_date": "2026-03-30"}], "2026-09-30")
+    assert r["state"] == "measured" and "bioimpedance" in r["label"] and "never a substitute for the DXA anchor" in r["label"]
+    assert r["dxa_anchor"] == "2026-03-30" and r["baseline"]["date"] == "2026-09-18" and r["latest"] == "2026-09-29"
+    torso = r["deltas"]["fat_free_mass:torso"]
+    # repeat pairs <= 2 d apart: +0.2, -0.3, +0.2, -0.3 -> SD 0.2887 -> band 1.96 x SD = 0.57; n = 4 (the 7-day gap is not a repeat)
+    assert torso["noise"]["n"] == 4 and torso["noise"]["band_kg"] == pytest.approx(0.57, abs=0.01)
+    assert torso["delta_kg"] == pytest.approx(-1.5) and torso["beyond_noise"] is True
+    legs = r["deltas"]["fat_free_mass:legs"]
+    assert legs["delta_kg"] == 0 and legs["noise"]["band_kg"] == 0 and legs["beyond_noise"] is False
+    assert set(r["deltas"]) >= {"total_ffm_kg", "fat_free_mass:arms", "muscle_mass:torso"}
+
+
+def test_4503_od6_a_thin_record_reports_no_band_and_a_partial_scan_is_not_a_full_scan():
+    from training import bodyscan_lean
+
+    thin = bodyscan_lean.between_dxa_read(BS2_ROWS[-2:], [], "2026-09-30")
+    assert thin["baseline"]["rule"].endswith("no DXA on record")
+    assert thin["deltas"]["total_ffm_kg"]["noise"]["band_kg"] is None and thin["deltas"]["total_ffm_kg"]["beyond_noise"] is None
+    partial = dict(BS2_ROWS[0])
+    del partial["muscle_mass_left_arm_kg"]
+    assert bodyscan_lean.full_scans([partial]) == []
+    assert bodyscan_lean.between_dxa_read(None, [], "2026-09-30")["state"] == "read_failed"
+    # mutation control: with no repeat-scan window the band cannot be computed — the 1.5 kg torso drop is no longer judged
+    with patch.object(bodyscan_lean, "REPEAT_MAX_GAP_DAYS", 0):
+        r = bodyscan_lean.between_dxa_read(BS2_ROWS, [], "2026-09-30")
+    assert r["deltas"]["fat_free_mass:torso"]["beyond_noise"] is None
+
+
+def test_4503_od6_plan_next_session_serves_the_read():
+    from mcp import tools_plan
+
+    with patch("mcp.core.query_source", return_value=BS2_ROWS):
+        out = tools_plan._between_dxa_lean("2026-09-30", [{"scan_date": "2026-03-30"}], "measured")
+    assert out["state"] == "measured" and out["input_status"]["state"] == "measured" and out["dxa_read"] == "measured"
+    assert 'out["between_dxa_lean"]' in (pathlib.Path(tools_plan.__file__)).read_text()
