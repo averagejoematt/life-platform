@@ -708,7 +708,7 @@ change to a value that, under #3984, a branch never carries:
 - the MCP module count in `docs/ARCHITECTURE.md`/`RUNBOOK.md`;
 - the ADR count.
 
-None of them was a no-op, and none touched `test_count`. Each change is occasional (about 1 merge in 6), which
+None of them was a no-op. None bumped `test_count`; `78a1c9c2f` deleted the leftover literal, once. Each change is occasional (about 1 merge in 6), which
 is the bot's intended job. The commit body names the sha it reconciled and the paths it moved, so
 the share by cause can be re-measured from `git log --grep='chore(reconcile)'`.
 
