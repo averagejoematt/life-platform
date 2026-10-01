@@ -39,6 +39,7 @@ caller's own `call_model` so this module never picks a transport.
 
 from common.text_utils import truncate_at_word
 
+from coach.coach_json_schemas import RECONDENSE_OUTPUT_SCHEMA  # #4276
 from coach.reading_date_fidelity import SUMMARY_DAY_CORRESPONDENCE_RULE
 
 # The set, named once. Order is the WRITE order (how the extraction prompt lists them),
@@ -169,6 +170,7 @@ def recondense(coach_id, source_text, extraction, correction, call_model) -> dic
         user_message=recondense_message(coach_id, source_text, extraction, correction),
         max_tokens=1500,
         temperature=0.1,
+        schema=RECONDENSE_OUTPUT_SCHEMA,  # #4276: structured outputs (coach_json_schemas.py)
     )
     if not isinstance(reply, dict):
         return dict(extraction or {})
