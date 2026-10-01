@@ -3800,6 +3800,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4494"
         }
       ]
+    },
+    {
+      "id": "2026-10-01-the-held-coach-says-why",
+      "date": "2026-10-01",
+      "title": "A held coach now says why",
+      "shipped": "When the morning brief holds back a coach's read, the log now names the rule that held it and quotes the sentence that broke it. That covers a figure with no time window, a banned phrase, or the judge itself failing it. The step that revises a held draft now edits only the sentences that need it, so it keeps between 55 and 79 percent of the draft instead of almost none. Overnight, the bike sessions logged in the gym app finally got heart rate attached from the watch: 109 bpm average on a 40-minute ride, where they used to show nothing. The training plan began following the version the owner approved the day before. A load lifted in the last four weeks is now held rather than re-ramped, sessions are capped at 20 sets, and a between-scan lean-mass read from the bathroom scale arrives with its own noise band.",
+      "why_it_mattered": "For three days the brief held back four of seven coaches every morning, and the log said only 'score 87'. That is a passing score. A synthetic run showed the judge had passed them all, and a second, silent check was overriding it. You cannot fix a rule you cannot see.",
+      "gotcha": "Some proofs the platform will not let an agent fake. Marking a journal line publishes it, and dismissing a pain flag records the owner's own words and lifts a real safety veto, so both stay the owner's to do. Even a commit designed to be refused was blocked before it ran.",
+      "honest_miss": "The coaches are still held: four at this morning's 10:00 brief, each for a real named rule. That is better than an invisible one, but still not a published read. The session also sat idle for eleven hours overnight before its next step fired, and lost the night's best working window.",
+      "prs": [
+        {
+          "label": "PR #4512",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4512"
+        },
+        {
+          "label": "PR #4490",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4490"
+        },
+        {
+          "label": "PR #4508",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4508"
+        },
+        {
+          "label": "PR #4509",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4509"
+        },
+        {
+          "label": "PR #4510",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4510"
+        },
+        {
+          "label": "PR #4511",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4511"
+        }
+      ]
     }
   ]
 }
