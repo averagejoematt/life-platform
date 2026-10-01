@@ -154,7 +154,10 @@ class _Gates:
 
     def __init__(self, n: int, dossier: Dict[str, Any], budget: Dict[str, Any], prev_ledger: Dict[str, Any]):
         self.n, self.dossier = n, dossier
-        self.allowed = story_checks.allowed_numbers(dossier, {"week": n})
+        # the series' own record is grounding too: a bet's threshold, last week's scored result
+        self.allowed = story_checks.allowed_numbers(
+            dossier, {"week": n}, budget.get("bet"), budget.get("bet_scored"), prev_ledger.get("bets")
+        )
         self.nye = ["macrofactor"] if (dossier.get("nutrition") or {}).get("not_yet_exported_dates") else []
         w = dossier.get("weight") or {}
         self.weights = [x["lbs"] for x in w.get("weigh_ins_in_window", [])] + [
