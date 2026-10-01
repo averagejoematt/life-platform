@@ -334,10 +334,20 @@ jobs:
 
             git config user.name  "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            # #4250: the body names the commit it reconciled and the paths it moved. The old body
+            # blamed "a concurrently-merged PR" every time; of the 19 bot commits after #4364
+            # (2026-09-27 -> 10-01) every one carried the merged PR's OWN delta to a value a
+            # branch never carries (#3984): the system model, the gate census, the MCP module
+            # count, the ADR count. A commit that names its cause can be re-measured from git log.
+            MERGED_SHA=$(git rev-parse HEAD)
+            MOVED=$(printf '%s\n' "$DIRTY" | cut -c4- | paste -sd ' ' -)
             git add -A
             git commit \
               -m "chore(reconcile): regenerate derived artifacts after merge [skip-reconcile]" \
-              -m "Auto-reconcile (#1173): a concurrently-merged PR moved config/doc-sync truth past this push's committed derived artifacts. The enumerated generators were rerun on the merged main tree; only whitelisted generator outputs are committed. Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              -m "Auto-reconcile (#1173): the generators' output on the merged tree differs from the committed derived artifacts. Usual cause since #3984: the merged commit moved a value a branch never carries (the system model, a bot-owned doc literal). Otherwise a concurrently merged PR carried a stale one. The enumerated generators were rerun on the merged main tree; only whitelisted generator outputs are committed." \
+              -m "Reconciled: ${MERGED_SHA}" \
+              -m "Moved: ${MOVED}" \
+              -m "Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
             if git push origin main; then
               BUILD_SHA=$(git rev-parse HEAD)
