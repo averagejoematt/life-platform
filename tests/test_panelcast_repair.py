@@ -550,3 +550,80 @@ def test_weekly_passing_attempt_inside_budget_publishes_normally(monkeypatch):
     body = json.loads(out["body"])
     assert body["would"] == "PUBLISH" and body["clean_turns"] == 8 and body["week"] == 3
     assert emails == []  # no escalation on a pass
+
+
+# ── #4501: the editor pass under a JSON schema; an unparseable reply is UNEVALUATED ────────
+from emails import panelcast_editor as editor  # noqa: E402
+
+# The editor's 2026-09-30 18:02:14Z reply on /aws/lambda/coach-panel-podcast (RequestId 29a0b762-…),
+# exactly as the old `%.120s` warning kept it: the model was cut at max_tokens=600 inside the
+# `issues` list, so the fence and the JSON never close. It is 120 characters by construction.
+TRUNCATED_0930 = (
+    '```json\n{\n  "verdict": "hold",\n  "issues": [\n' "    \"CAUSAL CLAIM: 'The nervous system has caught up to the heart' and 'The"
+)
+# Mutation control on the FIXTURE: the same reply, closed. It parses, so the only thing
+# separating the two outcomes below is the truncation.
+CLOSED_0930 = TRUNCATED_0930 + ' ...\' imply cause."\n  ],\n  "pull_quote": ""\n}\n```'
+
+
+def _editor_invoke(text, seen=None):
+    def _invoke(body, model_name=None):
+        if seen is not None:
+            seen.append(body)
+        return {"content": [{"type": "text", "text": text}], "stop_reason": "max_tokens"}
+
+    return _invoke
+
+
+def test_4501_fixture_is_the_logged_120_chars():
+    assert len(TRUNCATED_0930) == 120
+
+
+def test_4501_editor_sends_the_schema_and_a_budget_above_the_measured_cut():
+    seen = []
+    out = editor.review(
+        [{"speaker": "elena", "line": "hi"}],
+        {},
+        _editor_invoke(json.dumps({"verdict": "pass", "issues": [], "pull_quote": "q"}), seen),
+        "m",
+        _LOG,
+    )
+    assert out == {"verdict": "pass", "issues": [], "pull_quote": "q"}
+    body = seen[0]
+    assert body["output_config"]["format"]["schema"] == editor.EDITOR_OUTPUT_SCHEMA
+    assert body["max_tokens"] > 600  # every measured editor reply was cut at 600
+    assert f"at most {editor.EDITOR_MAX_ISSUES} issues" in body["system"]
+
+
+def test_4501_truncated_reply_is_unevaluated_with_decoder_position_never_a_hold(caplog):
+    caplog.set_level(logging.INFO)
+    seen = []
+    out = editor.review([{"speaker": "elena", "line": "hi"}], {}, _editor_invoke(TRUNCATED_0930, seen), "m", _LOG)
+    assert len(seen) == 2  # both attempts spent, as on 09-30
+    assert out == {"verdict": editor.UNEVALUATED, "issues": [], "pull_quote": ""}
+    assert out["verdict"] != "hold"  # the half-written "hold" is not read as a verdict
+    lines = [r.getMessage() for r in caplog.records if "editor UNEVALUATED (attempt" in r.getMessage()]
+    assert len(lines) == 2 and all("JSONDecodeError: Unterminated string" in ln and "(char " in ln for ln in lines), lines
+
+
+def test_4501_mutation_control_the_closed_reply_parses_to_its_stated_hold():
+    out = editor.review([{"speaker": "elena", "line": "hi"}], {}, _editor_invoke(CLOSED_0930), "m", _LOG)
+    assert out["verdict"] == "hold" and out["issues"][0].startswith("CAUSAL CLAIM")
+
+
+def test_4501_weekly_loop_treats_unevaluated_as_no_editor_verdict(monkeypatch):
+    """The weekly loop holds only on a PARSED editor hold: an UNEVALUATED verdict goes on to the
+    gates (here the judge passes, so it reaches publish) and puts no 'editor:' reason in the ledger."""
+    _weekly_harness(monkeypatch, judge=lambda turns, rubric, gt="": (True, []))
+    monkeypatch.setattr(panel, "_editor_review", lambda turns, bible: {"verdict": editor.UNEVALUATED, "issues": [], "pull_quote": ""})
+    out = panel._run_weekly(force=False, dry_run=True)
+    body = json.loads(out["body"])
+    assert body["would"] == "PUBLISH", body
+
+
+def test_4501_decode_error_names_the_position():
+    from ai.structured_json import decode_error
+
+    msg = decode_error(TRUNCATED_0930)
+    assert msg == "JSONDecodeError: Unterminated string starting at line 5 col 5 (char 42 of 113)", msg
+    assert decode_error({"verdict": "pass"}) == "parsed a JSON object"

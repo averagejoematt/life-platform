@@ -690,6 +690,13 @@ except ImportError:  # bundle stages lambdas/ at the zip root
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
         import panelcast_repair as _repair
 
+# #4501: the editor pass (schema-constrained; an unparseable reply is UNEVALUATED, not a hold).
+try:
+    from emails import panelcast_editor as _editor
+except ImportError:  # bundle stages lambdas/ at the zip root
+    if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+        import panelcast_editor as _editor
+
 # #1178: free RSS zeitgeist — optional topical color, fetched ONCE per run; the
 # same list feeds the judge's ground truth (details in panelcast_zeitgeist.py).
 try:
@@ -1159,33 +1166,12 @@ def _write_show_memory(week, title, pull_quote, guest_id, guest_name, open_bet) 
 
 
 def _editor_review(turns: list, bible: dict) -> dict:
-    """Haiku judge — semantic quality + safety floor the lexical gate can't see."""
+    """Haiku judge — semantic quality + safety floor the lexical gate can't see. #4501: under a
+    JSON schema; an unparseable reply is verdict UNEVALUATED (logged with its decoder position),
+    which the weekly loop treats as no editor verdict — never as a hold."""
     from ai import bedrock_client
 
-    script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
-    system = (
-        "You are the EDITOR of a narrative podcast. Judge the script against this rubric and return ONLY JSON "
-        '{"verdict":"pass"|"revise"|"hold","issues":[...],"pull_quote":"..."}. '
-        f"RUBRIC:\n{json.dumps(bible.get('editor_rubric', {}))}\n"
-        "Use 'hold' (route to a human, do NOT publish) if you detect any: causal claim, a bogus finding on a tiny sample, "
-        "a report-card/judgmental tone, a hard week handled without compassion, or a reference to grief/family/a named person. "
-        "Use 'revise' for fixable quality issues; 'pass' only if it clears the must-pass bar and the quality floor."
-    )
-    body = {"model": JUDGE_MODEL, "max_tokens": 600, "system": system, "messages": [{"role": "user", "content": script}]}
-    for attempt in (1, 2):
-        try:
-            resp = bedrock_client.invoke(body, model_name=JUDGE_MODEL)
-            text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-            parsed = _extract_json(text)
-            if isinstance(parsed, dict) and parsed.get("verdict"):
-                return parsed
-            logger.warning("[panel] editor unparseable (attempt %d): %.120s", attempt, text)
-        except Exception as e:
-            logger.warning("[panel] editor review error (attempt %d) — %s", attempt, e)
-    # A persistent infra/format failure is NOT a content verdict — fail OPEN and defer to the
-    # deterministic safety gate + the weekly read-aloud QA gate (the real floor). A flaky JSON
-    # reply from the judge must never hard-HOLD every episode.
-    return {"verdict": "pass", "issues": ["editor unparseable — deferred to safety + weekly QA gates"], "pull_quote": ""}
+    return _editor.review(turns, bible, bedrock_client.invoke, JUDGE_MODEL, logger)
 
 
 def _weekly_gate(turns: list, allowed_numbers, guest_id: str):

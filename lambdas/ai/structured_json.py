@@ -54,6 +54,29 @@ def parse_json_text(text: Any) -> Any:
     return text
 
 
+def decode_error(value: Any) -> str:
+    """Why `value` (call_json's return) is not a JSON object: the decoder's message and position.
+
+    A fence-wrapped reply cut at `max_tokens` has no closing fence, so the fence is stripped
+    from the front only and the rest handed to the decoder; its position is into that remainder.
+    """
+    if isinstance(value, dict):
+        return "parsed a JSON object"
+    if not isinstance(value, str):
+        return f"parsed a JSON {type(value).__name__}, not an object"
+    text = value.strip()
+    for opener in ("```json", "```"):
+        if text.startswith(opener):
+            text = text[len(opener) :]
+            break
+    text = text.rstrip().removesuffix("```")
+    try:
+        json.loads(text)
+    except json.JSONDecodeError as e:
+        return f"JSONDecodeError: {e.msg} line {e.lineno} col {e.colno} (char {e.pos} of {len(text)})"
+    return "parsed JSON that is not an object"
+
+
 def with_schema(body: dict, schema: dict) -> dict:
     """A copy of `body` whose `output_config` carries the JSON-schema format (other keys kept)."""
     from ai.bedrock_client import structured_output_config
