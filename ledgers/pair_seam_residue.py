@@ -586,12 +586,25 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "None. Pinned by tests/test_walking_volume_3930.py::test_the_hourly_rejoin_heals_an_unknown_block_once_the_"
         "wearable_lands_and_then_writes_nothing and ::test_the_0925_treadmill_replays_joined_on_the_live_fixture.",
     ),
+    # #4412 (2026-10-01): the cardio-HR join also reads the WHOOP workout rows (WHOOP pushes only some to Strava).
+    "whoop::lambdas/training/cardio_hr_store.py::read": (
+        "2026-10-01",
+        "#4412: `_whoop_workouts` queries the WHOOP partition (a literal pk) for `DATE#{day}#WORKOUT#` rows and hands "
+        "them, unparsed, to the pure `training.cardio_hr.whoop_activity`, which reads exactly the keys "
+        "`whoop_lambda._extract_workout` writes — `start_time`/`end_time` (the API's `start`/`end`, parsed by "
+        "`parse_iso_utc`), `average_heart_rate`, `max_heart_rate`, `sport_name`, `workout_id`. VERIFIED, not assumed: "
+        "a drift cannot fabricate a heart rate — an unparseable time drops the row (None), and a missing "
+        "`average_heart_rate` makes it non-HR-bearing, so the block stays `state: unknown` with avg/max None. The "
+        "`zone_{n}_minutes` keys are deliberately NOT read (they read 0 on 135 bpm sessions). Pinned by "
+        "tests/test_walking_volume_3930.py::test_the_live_rides_join_through_the_store_and_the_0928_ride_needs_the_"
+        "whoop_partition (the live rows).",
+    ),
     # #4412 (2026-09-29): the cardio-HR join reads the Strava day item's `activities[]`.
     "strava::lambdas/training/cardio_hr_store.py::read": (
         "2026-09-29",
         "#4412: the store hands the Strava day item's `activities` list, unparsed, to the pure join "
         "`training.cardio_hr`, which reads the HR-covered minutes ONLY through `common.activity_overlap.hr_intervals` "
-        "(`start_date`, `elapsed_time_seconds`, `average_heartrate`, the `is_hevy_echo` filter) — the SAME reader the "
+        "(`start_date`, `elapsed_time_seconds`, `average_heartrate`; since 1.1.0 with `lift_is_echo=False`, only the Hevy device is an echo) — the SAME reader the "
         "Hevy-vs-Strava load and calorie de-dup already depend on (#4075/#4158), so there is no second parse of the "
         "time shape to drift. Its own keys are `average_heartrate`/`max_heartrate`/`zone{n}_seconds`/`device_name`, "
         "exactly the names `strava_lambda._normalize` + `_fetch_activity_zones` write. VERIFIED, not assumed: a drift "

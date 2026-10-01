@@ -11,8 +11,13 @@ the hourly `hevy-backfill` poller (the Hevy ingest path):
     `rejoin_recent(table, today)` re-derives the last `REJOIN_DAYS` days' workouts every run and
     UpdateItems `cardio_hr` ONLY when the derivation changed (no churn on an unchanged record).
 
-Every read failure degrades to `unknown` (the Strava partition could not be read) — never a
-failed ingest, never 0 bpm.
+  * ONE WORKOUT — `rejoin_one(table, user, day, workout_id)` re-derives a single named workout
+    outside the two-day window (the hevy-backfill `{"rejoin_workout": id, "date": day}` event),
+    with the same write-only-on-change rule. It writes nothing but the `cardio_hr` attribute.
+
+The join reads BOTH the Strava day items and the WHOOP workout rows (#4412: WHOOP pushes only
+some workouts to Strava). A read failure on one degrades to the other; on both, `unknown` —
+never a failed ingest, never 0 bpm.
 """
 
 from __future__ import annotations
@@ -31,6 +36,7 @@ logger = logging.getLogger("hevy-backfill")
 
 REJOIN_DAYS = 2  # today + yesterday (Pacific): long enough for the WHOOP → Strava lag, short enough to stay cheap
 _STRAVA_PK = "USER#{user}#SOURCE#strava"
+_WHOOP_PK = "USER#{user}#SOURCE#whoop"
 _HEVY_PK = "USER#{user}#SOURCE#hevy"  # the rejoin reads ONLY Hevy workouts — never a caller-chosen partition
 
 
@@ -48,12 +54,32 @@ def _strava_activities(table: Any, user: str, day: str) -> Optional[list[dict[st
     return acts
 
 
+def _whoop_workouts(table: Any, user: str, day: str) -> Optional[list[dict[str, Any]]]:
+    """WHOOP `#WORKOUT#` rows on the WHOOP partitions of `day` and `day + 1`; None when a read failed."""
+    from boto3.dynamodb.conditions import Key
+
+    rows: list[dict[str, Any]] = []
+    try:
+        for d in (day, shift_day_key(day, 1)):
+            rows.extend(
+                table.query(
+                    KeyConditionExpression=Key("pk").eq(_WHOOP_PK.format(user=user)) & Key("sk").begins_with(f"DATE#{d}#WORKOUT#"),
+                ).get("Items", [])
+            )
+    except Exception as e:  # noqa: BLE001 — a failed read is `unknown`, never a failed ingest
+        logger.warning("cardio-hr whoop read failed for %s: %s: %s", day, type(e).__name__, e)
+        return None
+    return rows
+
+
 def derive(table: Any, user: str, rec: dict[str, Any]) -> Optional[dict[str, Any]]:
     """The `cardio_hr` value for one normalized Hevy record, or None when it has no cardio block."""
     if not any(cardio_hr.cardio_modality(ex) for ex in rec.get("exercises") or []):
         return None
     day = str(rec.get("date") or "")[:10]
-    return cardio_hr.join_workout(rec, _strava_activities(table, user, day) if parse_day_key(day) else None)
+    if not parse_day_key(day):
+        return cardio_hr.join_workout(rec, None, None)
+    return cardio_hr.join_workout(rec, _strava_activities(table, user, day), _whoop_workouts(table, user, day))
 
 
 def attach(table: Any, user: str, rec: dict[str, Any]) -> None:
@@ -89,7 +115,6 @@ def _same(a: Any, b: Any) -> bool:
 def rejoin_recent(table: Any, user: str, today: str) -> dict[str, int]:
     """Re-derive `cardio_hr` for the last REJOIN_DAYS Pacific days; write only what changed."""
     from boto3.dynamodb.conditions import Key
-    from common.numeric import floats_to_decimal
 
     start = shift_day_key(today, -(REJOIN_DAYS - 1))
     out = {"considered": 0, "updated": 0, "joined": 0, "errors": 0}
@@ -105,21 +130,49 @@ def rejoin_recent(table: Any, user: str, today: str) -> dict[str, int]:
         if "#WORKOUT#" not in str(item.get("sk")):
             continue
         try:
-            joined = derive(table, user, item)
-            if joined is None:
-                continue
-            out["considered"] += 1
-            out["joined"] += sum(1 for b in joined["blocks"] if b.get("state") == "joined")
-            if _same(joined, item.get("cardio_hr")):
-                continue
-            table.update_item(
-                Key={"pk": item["pk"], "sk": item["sk"]},
-                UpdateExpression="SET cardio_hr = :c",
-                ConditionExpression="attribute_exists(sk)",  # never resurrect a workout deleted mid-run
-                ExpressionAttributeValues={":c": floats_to_decimal(joined)},
-            )
-            out["updated"] += 1
+            _rejoin_item(table, user, item, out)
         except Exception as e:  # noqa: BLE001
             out["errors"] += 1
             logger.warning("cardio-hr rejoin failed for %s: %s: %s", item.get("sk"), type(e).__name__, e)
+    return out
+
+
+def _rejoin_item(table: Any, user: str, item: dict[str, Any], out: dict[str, int]) -> Optional[dict[str, Any]]:
+    """Re-derive one stored Hevy row and SET only `cardio_hr`, only when it changed. Returns the derivation."""
+    from common.numeric import floats_to_decimal
+
+    joined = derive(table, user, item)
+    if joined is None:
+        return None
+    out["considered"] += 1
+    out["joined"] += sum(1 for b in joined["blocks"] if b.get("state") == "joined")
+    if _same(joined, item.get("cardio_hr")):
+        return joined
+    table.update_item(
+        Key={"pk": item["pk"], "sk": item["sk"]},
+        UpdateExpression="SET cardio_hr = :c",
+        ConditionExpression="attribute_exists(sk)",  # never resurrect a workout deleted mid-run
+        ExpressionAttributeValues={":c": floats_to_decimal(joined)},
+    )
+    out["updated"] += 1
+    return joined
+
+
+def rejoin_one(table: Any, user: str, day: str, workout_id: str) -> dict[str, Any]:
+    """Re-derive `cardio_hr` for ONE named Hevy workout (`DATE#{day}#WORKOUT#{workout_id}`). Idempotent."""
+    out: dict[str, Any] = {"considered": 0, "updated": 0, "joined": 0, "errors": 0, "found": False}
+    if not parse_day_key(day) or not workout_id or "#" in workout_id:
+        out.update(errors=1, reason="date must be YYYY-MM-DD and workout id a bare Hevy id")
+        return out
+    key = {"pk": _HEVY_PK.format(user=user), "sk": f"DATE#{day}#WORKOUT#{workout_id}"}
+    item = table.get_item(Key=key).get("Item")
+    if not item:
+        out["reason"] = f"no Hevy workout at {key['sk']}"
+        return out
+    out["found"] = True
+    joined = _rejoin_item(table, user, item, out)
+    out["blocks"] = [
+        {k: b.get(k) for k in ("exercise_index", "name", "state", "hr_coverage", "avg_hr", "max_hr", "hr_source", "reason")}
+        for b in (joined or {}).get("blocks", [])
+    ]
     return out
