@@ -3852,6 +3852,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/cardio_hr_store.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/training/exercise_history.py",
@@ -7495,7 +7509,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 727,
+      "edges": 729,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7510,8 +7524,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 359,
-        "sites_resolved": 898,
-        "sites_total": 1257
+        "sites_resolved": 900,
+        "sites_total": 1259
       },
       "schedule_resolution": {
         "dynamic": 0,

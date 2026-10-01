@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-727 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+729 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -232,7 +232,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `weekly_correlations` | weekly_correlation_compute_lambda.py | ai_expert_analyzer_lambda.py, daily_insight_compute_lambda.py, site_api_ai_context.py, site_api_discovery.py, site_api_journey.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
-| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_lambda.py |
+| `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_lambda.py |
 | `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
@@ -507,7 +507,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1257 total · 898 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1259 total · 900 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
