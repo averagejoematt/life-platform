@@ -1201,6 +1201,7 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
         if not isinstance(payload, dict):
             raise ValueError(f"non-dict quality gate payload: {type(payload)}")
         payload.setdefault("passed", True)
+        payload["judge_passed"] = payload["passed"]  # #4343: the judge's own verdict, before the client checks merge
         # #1973: the deterministic day<=3 cycle-boundary rule, merged into the
         # SAME report/regenerate-or-hold path the LLM-scored findings above
         # use — no parallel enforcement mechanism (ADR-108). Runs regardless
@@ -1305,7 +1306,7 @@ def _enforce_quality_gate(
     if not report.get("passed", True):
         print(
             f"[COACH-QUALITY-GATE:{coach_id}] HELD after {attempts} regeneration attempt(s) — "
-            f"score={report.get('score')}, not publishing this cycle (N-06)"
+            f"{_qgn.hold_reason(report)} — not publishing this cycle (N-06)"
         )
         try:
             _cw.put_metric_data(

@@ -483,3 +483,70 @@ class TestRetainCoachBriefFlag:
         monkeypatch.setattr(eval_retention, "retain", _boom)
         # Must not raise — retention is never load-bearing for the coach pipeline.
         ai_calls._retain_coach_brief_flag("sleep_coach", "flagged_dropped", "d", "f", {"score": 62})
+
+
+# #4343, the 2026-10-01 03:08Z daily-brief dry run (RequestId 55ed5e10): the coach-quality-gate
+# Lambda logged `passed=True, score=87, violations=0, voice_score=82, similarity_flags=1` for
+# sleep_coach on both passes, and the brief still logged `HELD after 1 regeneration attempt(s) —
+# score=87`. The hold was the client-side reader check (`coach.reader_checks.merge_into_report`)
+# on this sentence of the real draft (retained EVALRET#coach_brief record, 03:10:24Z); the
+# revision kept 16 of 20 sentences and this one verbatim, because the note never quoted it.
+SLEEP_1001_WINDOWLESS = (
+    "I'm not ready to call this a confirmed signal; the running average for deep sleep is 19.4% with a flat "
+    "trajectory and only three of the five consecutive same-direction observations I'd need before making any "
+    "directional claim."
+)
+SLEEP_1001_DRAFT = (
+    "On the night of September 28th, Whoop recorded a sleep score of 88, 8.71 hours of sleep, 23.3% deep sleep, "
+    "and 21.9% REM. I don't know what you were carrying into those nights. " + SLEEP_1001_WINDOWLESS
+)
+SLEEP_1001_JUDGE = {"statusCode": 200, "passed": True, "score": 87, "violations": 0, "voice_score": 82}
+# labs_coach, same run: the judge passed at 87; banned_term 'gate' held it. The revision fixed one
+# of the draft's `gate` sentences and kept the rest (retained final, 03:15:27Z).
+LABS_1001_DRAFT = (
+    "Now the gate breach, plainly: protein has been escalating — 153.5 g average over the last 21 logged days, "
+    "with the running average trending upward — despite the kidney function gate I set on September 16. "
+    "The gate was explicit: hold protein escalation at its current level until creatinine, BUN, and eGFR return "
+    "from a new panel. That gate has not been cleared. Book the draw."
+)
+
+
+class TestHeldOnAJudgePass4343:
+    def _enforce(self, draft, reply, coach_id="sleep_coach"):
+        client = _lambda_client_returning(SLEEP_1001_JUDGE, SLEEP_1001_JUDGE)
+        regenerate_fn = MagicMock(return_value=reply)
+        out, rep = ai_calls._enforce_quality_gate(client, coach_id, draft, {}, regenerate_fn, revise=True)
+        return out, rep, regenerate_fn
+
+    def test_a_judge_pass_is_held_by_the_client_rule_and_the_line_says_so(self, capsys):
+        keep_it = json.dumps(
+            {"edits": [{"find": "I don't know what you were carrying into those nights.", "replace": "I can't see the why."}]}
+        )
+        out, rep, _fn = self._enforce(SLEEP_1001_DRAFT, keep_it)
+        assert out is None and rep["judge_passed"] is True and rep["passed"] is False
+        line = [ln for ln in capsys.readouterr().out.splitlines() if "HELD after" in ln][0]
+        assert "judge passed=True score=87; client rule(s): unlabeled_window_figure \"I'm not ready to call this" in line
+
+    def test_mutation_control_the_window_named_publishes(self):
+        named = SLEEP_1001_DRAFT.replace(
+            "the running average for deep sleep is", "over the last 20 nights the running average for deep sleep is"
+        )
+        client = _lambda_client_returning(SLEEP_1001_JUDGE)
+        out, rep = ai_calls._enforce_quality_gate(client, "sleep_coach", named, {}, MagicMock(side_effect=AssertionError), revise=True)
+        assert out == named and rep["passed"] is True and rep["judge_passed"] is True
+
+    def test_the_note_quotes_the_windowless_sentence(self):
+        _out, _rep, fn = self._enforce(SLEEP_1001_DRAFT, "")
+        (note,), _ = fn.call_args
+        assert f'[unlabeled_window_figure] the sentence to edit: "{SLEEP_1001_WINDOWLESS}"' in note
+
+    def test_the_note_names_every_sentence_carrying_a_banned_term(self):
+        _out, _rep, fn = self._enforce(LABS_1001_DRAFT, "", coach_id="labs_coach")
+        (note,), _ = fn.call_args
+        quoted = [ln for ln in note.splitlines() if ln.startswith("  - [banned_term] the sentence to edit:")]
+        assert len(quoted) == 3 and not any("Book the draw" in ln for ln in quoted)
+
+    def test_a_judge_hold_reads_as_the_judge(self):
+        from ai import rewrite_note as qgn
+
+        assert qgn.hold_reason({"passed": False, "judge_passed": False, "score": 28}) == "judge passed=False score=28; client rule(s): none"
