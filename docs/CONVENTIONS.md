@@ -697,6 +697,21 @@ served number is therefore exactly as fresh as the last deploy of the bundle —
 what `/api/platform_stats` describes. The rule for the next such counter: if a generator's
 output would move on most merges, stamp it where the artifact is built, never commit it.
 
+**What still produces a reconcile commit, and what does not (measured 2026-10-01, #4250 box 2).**
+A merge whose derived artifacts already match the generators produces no commit: the job prints
+`nothing to reconcile` and passes the merge sha through as `build_sha`. #4512 (`a02956e71`) added
+tests, and the next commit on main was the next PR, with one `ci-cd.yml` run on that sha.
+There were 19 bot commits from #4364 to 2026-10-01. Each one carried the merged commit's own
+change to a value that, under #3984, a branch never carries:
+- the system model, `model/platform_model.json` + `docs/DEPENDENCY_GRAPH.md` (a new DynamoDB read or write site);
+- the gate census count in `docs/PROPORTIONALITY.md` (a gate added or removed);
+- the MCP module count in `docs/ARCHITECTURE.md`/`RUNBOOK.md`;
+- the ADR count.
+
+None of them was a no-op. None bumped `test_count`; `78a1c9c2f` deleted the leftover literal, once. Each change is occasional (about 1 merge in 6), which
+is the bot's intended job. The commit body names the sha it reconciled and the paths it moved, so
+the share by cause can be re-measured from `git log --grep='chore(reconcile)'`.
+
 **When the reconcile job itself reds, check in this order:**
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
    Do NOT widen the whitelist reflexively; inspect the generator diff, fix main
