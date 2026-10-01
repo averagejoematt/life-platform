@@ -192,6 +192,80 @@ def test_charter_points_the_boot_at_the_model():
     assert "platform_model.json" in charter
 
 
+# ── the CLAUDE.md shrink-only ratchet (#4271 box 4) ──────────────────────────
+# CLAUDE.md is the boot input every session pays for. Measured as bytes // 4 (the
+# issue's `wc -c`/4 — bytes, not characters, and no tokenizer, so CI stays offline and
+# deterministic). The ceiling only moves DOWN: test 1 stops growth, test 2 forces every
+# shrink to be banked in the same diff (the UNPROVEN_CEILING_HIGH_WATER shape). Stack
+# concurrent edits like BASELINE_TOTAL_GATES and re-measure at merge, never by arithmetic.
+# Demote when: CLAUDE.md sits at or below the 3,500-token target for 30 days — the
+# ratchet becomes a flat cap and test 2 is deleted.
+CLAUDE_MD_TOKEN_CEILING = 7081  # 7081 (2026-10-01, fd20ad99f, 28,326 B). Target 3500 (#4271). Down-only.
+CLAUDE_MD_TOKEN_SLACK = 100  # ~400 B a PR may shrink by before it must lower the ceiling
+# Box 3 (the one-line status pointer) has not landed. Until it does, the status block
+# (`## Session status` to EOF) may not grow past its byte count at the BB wrap.
+STATUS_BLOCK_BYTE_CEILING = 2029  # 2029 (2026-10-01, fd20ad99f). Retired by box 3's one-line shape.
+_STATUS_HEADING = "## Session status"
+_STATUS_POINTER = re.compile(r"^\*\*Status:\*\* see handovers/HANDOVER_LATEST\.md \(Verified \d{4}-\d{2}-\d{2}\)$")
+
+
+def _claude_md_bytes() -> bytes:
+    return (ROOT / "CLAUDE.md").read_bytes()
+
+
+def _largest_sections(raw: bytes, n: int = 3) -> list[tuple[str, int]]:
+    sections: dict[str, int] = {}
+    current = "(preamble)"
+    for line in raw.decode("utf-8").splitlines(keepends=True):
+        if line.startswith("## "):
+            current = line.strip()
+        sections[current] = sections.get(current, 0) + len(line.encode("utf-8"))
+    return sorted(sections.items(), key=lambda kv: -kv[1])[:n]
+
+
+def _status_block(raw: bytes) -> str:
+    text = raw.decode("utf-8")
+    at = text.find("\n" + _STATUS_HEADING)
+    assert at >= 0, f"CLAUDE.md has no `{_STATUS_HEADING}` heading — the wrap convention's block is gone"
+    return text[at + 1 :]
+
+
+def test_claude_md_does_not_grow_past_its_token_ceiling():
+    raw = _claude_md_bytes()
+    tokens = len(raw) // 4
+    over = len(raw) - CLAUDE_MD_TOKEN_CEILING * 4
+    assert tokens <= CLAUDE_MD_TOKEN_CEILING, (
+        f"CLAUDE.md is {tokens} tokens ({len(raw)} B), {over} B over the down-only ceiling "
+        f"{CLAUDE_MD_TOKEN_CEILING} (#4271). Largest sections: {_largest_sections(raw)} — "
+        "move history into its ADR or a pointer; never raise the ceiling."
+    )
+
+
+def test_claude_md_token_ceiling_is_banked_after_a_shrink():
+    tokens = len(_claude_md_bytes()) // 4
+    assert CLAUDE_MD_TOKEN_CEILING - tokens <= CLAUDE_MD_TOKEN_SLACK, (
+        f"CLAUDE.md shrank to {tokens} tokens but CLAUDE_MD_TOKEN_CEILING is still "
+        f"{CLAUDE_MD_TOKEN_CEILING} — lower it to {tokens} in this diff so the shrink is banked (#4271)."
+    )
+
+
+def test_claude_md_status_block_holds_its_shape():
+    block = _status_block(_claude_md_bytes())
+    pointers = [ln for ln in block.splitlines() if ln.startswith("**Status:**")]
+    if pointers:
+        # Box 3 landed: the convention paragraph plus exactly one pointer line, nothing after.
+        last = block.rstrip("\n").splitlines()[-1]
+        assert len(pointers) == 1 and _STATUS_POINTER.match(
+            last
+        ), f"the status block must end in exactly one line matching {_STATUS_POINTER.pattern}; found {pointers!r}"
+        return
+    size = len(block.encode("utf-8"))
+    assert size <= STATUS_BLOCK_BYTE_CEILING, (
+        f"the CLAUDE.md status block is {size} B, over its {STATUS_BLOCK_BYTE_CEILING} B ceiling — "
+        "the wrap replaces it with a SHORTER paragraph (or box 3's one-line pointer), never a longer one (#4271)."
+    )
+
+
 # ── the #3314 facets on the model itself ─────────────────────────────────────
 
 
