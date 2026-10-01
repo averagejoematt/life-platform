@@ -339,13 +339,13 @@ WEEK_GRID_PROVENANCE: dict[str, dict[str, Any]] = {
         ),
     },
     "session_set_ceiling": {
-        "changed_from": 25,
-        "value": 18,
-        "provenance": "population-derived",
-        "stated": "2026-09-22",
+        "changed_from": 18,
+        "value": 20,
+        "provenance": "owner",
+        "stated": "2026-09-30",
         "note": (
-            "v0.3 §3: 12–18 hard sets per session, unchanged in v0.4 (its four sessions run 12–17). The muscle-budget path trims "
-            "budgets proportionally to this ceiling and records the trim in the rationale — the ceiling is enforced, not assumed."
+            "v0.5 OD4 (#4503): 20 base / 24 with 🟢 (`green_block`); was 18 (v0.3 §3). The locked v0.4 sessions run 12–17 and carry no 🟢 "
+            "tail (OD8a), so no locked session gains a set. The muscle-budget path trims budgets to this ceiling and records the trim."
         ),
     },
     "session_minutes_ceiling": {
@@ -409,7 +409,7 @@ def week_grid() -> dict[str, Any]:
         "_version": 3,
         "schedule": {k: dict(v) for k, v in _SCHEDULE.items()},
         "archetype_targets": {k: list(v) for k, v in _ARCHETYPE_TARGETS.items()},
-        "session_set_ceiling": 18,
+        "session_set_ceiling": 20,
         "session_minutes_ceiling": 70,  # drift-ok: MINUTES per lifting session, not the ADR-133 AI budget ceiling in dollars
         "weekly_volume_cap_per_muscle": 22,
         "skill_ceiling": 2,
@@ -425,10 +425,10 @@ def week_grid() -> dict[str, Any]:
         "exercise_notes_lookback_days": 3650,
         "_notes": [
             f"v{PROGRAM_VERSION}: split={SPLIT} (owner, 2026-09-23, {DECISION_SK}; supersedes v0.3 full body — program_v03); six anchor patterns 2x/wk (population-derived, not his variance).",
-            "Loads HOLD: start 60–65 % of band-anchored e1RM after the detraining discount, ramp ~5 %/wk to week 6, ≤ 85 % until week 8, then hold; gains taken only when offered. One home: owner_redlines.REDLINES['lifting_sessions_per_wk'].",
+            "Loads HOLD: start 60–65 % of band-anchored e1RM after the detraining discount, ramp ~5 %/wk to week 6, ≤ 85 % until week 8, then hold; gains rep-triggered (double progression, v0.5 OD5). One home: owner_redlines.REDLINES['lifting_sessions_per_wk'].",
             "The PM walking is NOT in this grid — `schedule` holds one archetype per day; walking days are `aerobic`. Read program_structure.DAY_SHAPE.",
             "The weekday placement is NOMINAL: the sessions are served in ORDER (upper-heavy, lower-heavy, upper-volume, lower-volume) — the next one after the last PERFORMED lift, whatever the date (#4110). This grid answers only when the Hevy record cannot be read.",
-            "session_set_ceiling 25 -> 18 and session_minutes_ceiling 75 -> 70 are §3 (12–18 sets, 55–70 min), unchanged in v0.4; the weekly cap of 22 is the unchanged fail-safe and never binds here.",
+            "session_set_ceiling 18 -> 20 base / 24 with 🟢 is v0.5 OD4 (#4503, training.green_block); session_minutes_ceiling 75 -> 70 is §3 (55–70 min); the weekly cap of 22 is the unchanged fail-safe and never binds here.",
             "The generator selects by muscle, not by pattern: a `back` budget reaches row OR vertical pull. See program_structure.anchor_reachability() for what the grid can and cannot guarantee.",
             "RESOLVED against redlines v3 (approved 2026-09-21): 3–4 lifting days sits inside owner_redlines.REDLINES['lifting_sessions_per_wk'] (3–4); `program_conflicts.conflicts()` computes it rather than asserting it.",
         ],

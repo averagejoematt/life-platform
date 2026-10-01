@@ -146,8 +146,12 @@ def test_sessions_fit_the_ceiling_and_the_week_total_sits_in_the_redline_band():
     totals = {r: _rx(r)["total_sets"] for r in program_structure.SESSION_TEMPLATES}
     assert totals == {UH: 15, LH: 12, UV: 17, LV: 12}
     assert all(t <= ceiling for t in totals.values()), totals
-    lo, hi = owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"]
+    # #4503 OD4: the locked v0.4 block (56/wk) sits in v0.4's 50–65; v0.5's base 60–75 governs the next block, and the
+    # locked templates take NO 🟢 tail to reach it (OD8a) — so the locked week sits UNDER the v0.5 band, by ruling.
+    lo, hi = owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk_v0_4"]
     assert lo <= sum(totals.values()) <= hi
+    v05_lo, _ = owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"]
+    assert sum(totals.values()) == 56 < v05_lo == 60
     for role, tmpl in program_structure.SESSION_TEMPLATES.items():
         assert 2 <= len(tmpl["accessories"]) <= 3, role
         assert set(tmpl["accessories"]) <= set(program_structure.ACCESSORY_POOL[tmpl["archetype"]]), role
@@ -614,3 +618,58 @@ def test_4431_db_shoulder_press_generator_floor_equals_gate_floor_and_the_mutati
     with patch.object(gate, "_template_id_for", side_effect=catalog_only):
         _g, mutated = _gate_row()
     assert mutated["status"] == "no_template_id" and not mutated["floor_kg"]
+
+
+# ── #4503 OD4 + OD5 + OD8a (owner rulings 2026-09-30): the 20/24 ceiling, the `bonus` role, the gain rule ──
+def _blocks(base: int, bonus: int = 0) -> list:
+    from training.routine_ir import ExerciseBlock, Set
+
+    out = [ExerciseBlock(movement_key=f"m{i}", sets=[Set()] * 2, rationale_tag="anchor:row:heavy") for i in range(base // 2)]
+    return out + [ExerciseBlock(movement_key=f"b{i}", sets=[Set()], rationale_tag="bonus:fly:accessory") for i in range(bonus)]
+
+
+def test_4503_od4_the_ceiling_is_20_base_24_with_green_and_the_bonus_role_is_graded_apart():
+    from training import green_block
+
+    assert program_structure.week_grid()["session_set_ceiling"] == green_block.BASE_SESSION_SET_CEILING == 20
+    assert green_block.GREEN_SESSION_SET_CEILING == 24 and green_block.GREEN_BONUS_SETS_PER_SESSION == {"upper": 4, "lower": 3}
+    assert green_block.GREEN_BONUS_SETS_PER_WEEK == 12
+    assert owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"] == [60, 75]
+    assert green_block.session_set_check(_blocks(20), "upper") == []
+    assert green_block.session_set_check(_blocks(20, 4), "upper") == []  # 24 with 🟢
+    assert green_block.session_set_check(_blocks(20, 4), "lower") == ["🟢 sets 4 exceed the lower session's +3 (OD4)"]
+    assert green_block.session_set_check(_blocks(22), "upper")[0].startswith("base sets 22 exceed the session ceiling 20")
+    over = green_block.session_set_check(_blocks(18, 7), "upper")
+    assert any("total sets 25 exceed the 🟢 session ceiling 24" in w for w in over)
+
+
+def test_4503_od4_mutation_control_without_the_bonus_role_a_green_session_reads_over_the_base_ceiling():
+    from training import green_block
+
+    with patch.object(green_block, "BONUS_KIND", "not-bonus"):
+        assert green_block.session_set_check(_blocks(20, 4), "upper")[0].startswith("base sets 24 exceed")
+
+
+def test_4503_od8a_no_green_tail_on_the_locked_templates_so_the_ceiling_adds_no_set():
+    """The ceiling is a bound, not a target: every locked v0.4 session keeps its v0.4 total and carries no `bonus` exposure."""
+    from training import green_block
+
+    assert green_block.GREEN_TAIL_ON_LOCKED_TEMPLATES is False
+    assert program_structure.BLOCK_LOCK["locked_until"] == "2026-11-04"
+    for role in program_structure.SESSION_TEMPLATES:
+        rx = _rx(role)
+        assert not [e for e in rx["exposures"] if e["kind"] == green_block.BONUS_KIND], role
+    assert {r: _rx(r)["total_sets"] for r in program_structure.SESSION_TEMPLATES} == {UH: 15, LH: 12, UV: 17, LV: 12}
+
+
+def test_4503_od5_gains_are_rep_triggered_with_no_nutrition_clause_and_protein_gates_only_green():
+    lift = owner_redlines.REDLINES["lifting_sessions_per_wk"]
+    g = lift["gain_rule"]
+    assert g["kind"] == "double_progression" and g["consecutive_same_type_exposures"] == 2 and g["nutrition_clause"] is None
+    assert "veto only" in g["rpe_role"] and "offered_when" not in g
+    assert not any("kcal" in c or "intake" in c for c in g["refused_when"])
+    from training import green_block
+
+    prot = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "protein_floor_missed")
+    assert green_block.GREEN_BLOCKED_BY == (prot["id"],)
+    assert "🟢 block is withheld" in prot["action"] and "NOT blocked" in prot["action"] and "does not grow" not in prot["action"]

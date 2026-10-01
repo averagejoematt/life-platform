@@ -739,12 +739,15 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         from training.routine_generator import _load_json
 
         resolved_week = resolve_week_grid(_load_json)
-        ceiling = (resolved_week.week or {}).get("session_set_ceiling")
-        if ceiling and total_sets > int(ceiling):
-            warnings.append(
-                f"total_sets {total_sets} exceeds session_set_ceiling {ceiling} "
-                f"(week grid source={resolved_week.source}); allowed for a custom session, just flagging."
-            )
+        from training import green_block
+
+        ceiling = int((resolved_week.week or {}).get("session_set_ceiling") or 0)
+        # #4503 OD4: on the program's grid, base sets grade against 20 and `bonus:` (🟢) sets on their own caps, to 24
+        if ceiling == green_block.BASE_SESSION_SET_CEILING:
+            found = green_block.session_set_check(blocks, archetype)
+        else:
+            found = [f"total_sets {total_sets} exceeds session_set_ceiling {ceiling}"] if ceiling and total_sets > ceiling else []
+        warnings += [f"{w} (week grid source={resolved_week.source}); allowed for a custom session, just flagging." for w in found]
     except Exception:
         pass
 

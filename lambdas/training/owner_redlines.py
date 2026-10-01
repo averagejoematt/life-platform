@@ -347,10 +347,13 @@ REDLINES: dict[str, dict[str, Any]] = {
         "sets_per_muscle_wk": [8, 12],
         "sets_per_muscle_wk_provenance": "owner 2026-09-23 (#4147, v0.4): ~10 hard sets/muscle/wk; was [6, 10] under v0.3 (red team 2026-09-22)",
         "sets_per_muscle_wk_small": [4, 6],
-        "total_hard_sets_wk": [50, 65],
+        # #4503 OD4 (A, owner 2026-09-30): base 60–75, was v0.4's 50–65. The locked v0.4 block (56/wk, no 🟢 tail — OD8a) runs
+        # under it until `program_structure.BLOCK_LOCK['locked_until']`; the band governs the next block's templates.
+        "total_hard_sets_wk": [60, 75],
+        "total_hard_sets_wk_v0_4": [50, 65],
         "session_minutes": [55, 70],
         "anchors_per_week": 2,
-        "load_rule": "hold — gains taken only when offered",
+        "load_rule": "hold — gains are rep-triggered (double progression, #4503 OD5)",
         "load_entry": {
             "start_pct_of_band_e1rm": [60, 65],
             "after_detraining_discount": True,
@@ -359,20 +362,26 @@ REDLINES: dict[str, dict[str, Any]] = {
             "max_pct_of_band_e1rm_until_week_8": 85,
             "then": "hold",
         },
+        # #4503 OD5 (A, owner 2026-09-30): rep-triggered double progression; RPE is a veto only; NO nutrition clause (v0.4's
+        # "prior-day intake logged >= 1,800 kcal" is retired); `protein_floor_missed` gates the 🟢 block only (training.green_block).
         "gain_rule": {
-            "size": "+2.5 % or +1 rep, one anchor at a time, no more than every 14 days",
-            "offered_when": [
-                "two consecutive prescribed top sets at ≤ RPE 7 with back-offs complete",
-                "no pain flag in 14 days",
-                "prior-day intake logged ≥ 1,800 kcal",
-            ],
+            "kind": "double_progression",
+            "trigger": "the top of the slot's rep range on 2 consecutive same-type exposures (heavy -> heavy, volume -> volume)",
+            "consecutive_same_type_exposures": 2,
+            "size": "one 5-lb step (~+2.5 %), reps back to the bottom of the range",
+            "rpe_role": "veto only — a top-of-range set logged above the slot's RPE ceiling does not count toward the trigger",
+            "nutrition_clause": None,
             "refused_when": [
                 "recovery < 50",
                 "sleep < 6.5 h",
                 "the week after a rate-over-cap flag",
                 "the first three exposures of a novel-again pattern",
             ],
+            "provenance": "owner",
+            "stated": "2026-09-30",
+            "v0_4": "+2.5 % or +1 rep, one anchor at a time, <= every 14 d; offered after two top sets <= RPE 7, no pain flag 14 d, prior-day intake >= 1,800 kcal",
         },
+        "cal_rep_out": "CAL rep-out 2/wk on machine accessories (the existing pushdown / leg curl) until n >= 6, then 1/wk (OD5, OD8c)",
         "rep_scheme": "heavy exposure 4–6: one top set at RPE 7–8 plus two back-offs at −10 %; moderate 6–10; volume 8–12; accessories 8–15 at RIR 1–2",
         "accessory_rule": "2–3 per session, 2 sets, machines/cables, fixed for the block — none added after week 1; first thing dropped on a bad day",
         # v3.3 (#4161, the 2026-09-24 red team, owner-approved): was {"every_nth_week": 6, "sets_pct": -30} — every 6th
@@ -630,8 +639,8 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 3,
         "provenance": "owner",
         "action": (
-            "the next 7 days are a kitchen intervention (pre-portioned protein); training does not grow that week and "
-            "the rate is not 'earned' — the consequence lands in the kitchen, not only on the gym"
+            "the next 7 days are a kitchen intervention (pre-portioned protein) and the 🟢 block is withheld that week — base sets "
+            "and rep-triggered gains are NOT blocked (#4503 OD5, owner 2026-09-30); the consequence lands in the kitchen"
         ),
         "note": (
             "His own stated #1 preservation lever. Missing it is the mechanism by which an aggressive rate costs muscle "

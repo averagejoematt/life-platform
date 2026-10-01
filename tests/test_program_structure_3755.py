@@ -166,7 +166,7 @@ def test_week_grid_is_an_upper_lower_week_the_generator_can_read():
         assert day["archetype"] in grid["archetype_targets"], day
     assert set(grid["archetype_targets"]["upper"]) == {"chest", "back", "shoulders", "biceps", "triceps"}
     assert set(grid["archetype_targets"]["lower"]) == {"quadriceps", "hamstrings", "glutes", "calves"}
-    assert grid["session_set_ceiling"] == 18, "§3: 12–18 hard sets per session (unchanged in v0.4)"
+    assert grid["session_set_ceiling"] == 20, "v0.5 OD4 (#4503): 20 base / 24 with 🟢 (training.green_block)"
     assert grid["session_minutes_ceiling"] == 70, "§3: 55–70 min"
     assert grid["weekly_volume_cap_per_muscle"] == 22, "the fail-safe cap does not move; the 8–12 target lives in owner_redlines"
     assert grid["exercise_notes_mode"] == "one_best_line" and grid["exercise_notes_lookback_days"] == 3650
