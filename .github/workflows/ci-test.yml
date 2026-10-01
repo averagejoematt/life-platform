@@ -162,7 +162,7 @@ jobs:
         run: |
           # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
           # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`
-          # exited with tail's status (always 0). Both `--cov-fail-under=80` AND every
+          # exited with tail's status (always 0). Both `--cov-fail-under=82` AND every
           # test failure in this step were therefore silently discarded — this gate has
           # never once failed a build. Proven locally:
           #   bash -e -c 'python3 -c "import sys; sys.exit(1)" | tail -100'; echo $?  → 0
@@ -211,7 +211,7 @@ jobs:
               --cov=lambdas --cov=mcp --cov-append \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=80 \
+              --cov-fail-under=82 \
               --durations=25 \
               -m serial \
               --junitxml=/tmp/junit_serial.xml \
@@ -317,9 +317,9 @@ jobs:
           # #4252: the former single-file steps' labels, as sections (report only, exit 0).
           python3 scripts/ci_test_sections.py /tmp/junit_parallel.xml /tmp/junit_serial.xml || true
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 80 --gap-threshold 10 \
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 82 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \
-              --high-water 83.20 --fail-on-regression
+              --high-water 86.30 --fail-on-regression
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
