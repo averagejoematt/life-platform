@@ -622,7 +622,13 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     nutrition = _nutrition(table, wk, plan)
     dossier = {
         "week": wk["week"],
-        "window": {"start": wk["start"], "end": wk["end"], "experiment_days": f"Day {wk['day_first']} to Day {wk['day_last']}"},
+        "window": {
+            "start": wk["start"],
+            "end": wk["end"],
+            "experiment_days": f"Day {wk['day_first']} to Day {wk['day_last']}",
+            # weekday names are facts too — a writer guessing them put "Sunday" on a Tuesday
+            "calendar": {d: f"{_d(d).strftime('%A')}, Day {(_d(d) - _d(GENESIS)).days + 1}" for d in _dates(wk["start"], wk["end"])},
+        },
         "plan": plan,
         "roster": team,
         "weight": _weight(table, wk, plan),
@@ -648,6 +654,6 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     dossier["data_caveats"] = [
         *(["nutrition for " + ", ".join(nutrition["not_yet_exported_dates"]) + " is not yet exported"] if nye else []),
         "steps undercount (phone only)",
-        "journal ingestion has been degraded since mid-September; a missing entry may be unlanded, so treat journal presence as weak evidence",
+        "journal ingestion has been degraded since mid-September: an absent entry may simply be unlanded. Journal presence is NOT a story this experiment — at most one passing line in a season, never a lead or a coach's theme",
     ]
     return dossier, nye

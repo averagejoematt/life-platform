@@ -152,7 +152,14 @@ MAX_REWRITES = 2
 class _Gates:
     """Everything one week's installments are held to, built once per week."""
 
-    def __init__(self, n: int, dossier: Dict[str, Any], budget: Dict[str, Any], prev_ledger: Dict[str, Any]):
+    def __init__(
+        self,
+        n: int,
+        dossier: Dict[str, Any],
+        budget: Dict[str, Any],
+        prev_ledger: Dict[str, Any],
+        prev_dossier: Optional[Dict[str, Any]] = None,
+    ):
         self.n, self.dossier = n, dossier
         # the series' own record is grounding too: a bet's threshold, last week's scored result
         self.allowed = story_checks.allowed_numbers(
@@ -272,7 +279,7 @@ def repair_week(out: str, n: int, notes: Optional[List[str]] = None, episode_not
     report = _load(out, f"wk{n}_report.json")
     prev_post = _load(out, f"wk{n - 1}_chronicle.md") if n > 0 else None
     prev_ep = _load(out, f"wk{n - 1}_episode.txt") if n > 0 else None
-    g = _Gates(n, dossier, budget, prev_ledger)
+    g = _Gates(n, dossier, budget, prev_ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None)
 
     md = _load(out, f"wk{n}_chronicle.md")
     pf = [f"editor's note: {x}" for x in (notes or [])] + g.post(md, "end_turn")
