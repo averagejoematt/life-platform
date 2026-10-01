@@ -97,11 +97,10 @@ now, `achieved_hold`:
   * a set with NO logged RPE is read as at the ceiling: its hold is the achieved load, and the row
     says so (`hold.rpe_basis: "absent"`). `hold.rpe_basis` / `hold.e1rm_rpe_adjusted` record the
     basis on every row.
-  * no hold under a layoff — a gap of at least `DETRAINING_ANCHOR_AGE_DAYS`, the SAME line the #4107
-    detraining discount starts at (driver review #2: #4408's rule is "a detraining discount > 0 (a
-    layoff) or a novel-again pattern"; a 7-day line would re-prescribe the 60 % ramp after one missed
-    week), read from the caller's days OR the record (`_lifting_gap_days`: the cron hands the
-    generator a constant 2) — on a nearest-band
+  * #4503 OD1 (owner ruling 2026-09-30, `layoff_tiers`): the tier is the larger of the caller's days,
+    the record's gap (`_lifting_gap_days`: the cron hands the generator a constant 2) and THIS
+    movement's gap at this band — <= 28 d held (qualifying sets from the last 28 days), 29–90 d at
+    85–90 % of the same slot-aware hold over 90 days, > 90 d the ramp — on a nearest-band
     fallback anchor (nothing at this band), or when the caller cannot say the slot (`slot` None or
     no RPE ceiling — the ramp alone, the lower number, so a caller that knows less can never refuse
     a draft that knows more: #4149).
@@ -372,9 +371,11 @@ def achieved_hold(
     as_of: str | None = None,
     tolerance_days: int | None = None,
     p: dict[str, Any] | None = None,
+    since: str | None = None,
 ) -> dict[str, Any] | None:
     """The best RPE-adjusted hold over the sets moved for >= the slot's rep floor at the current band
-    this cycle, before `as_of` — or None (#4408; module docstring for the arithmetic)."""
+    this cycle, before `as_of` — or None (#4408; module docstring for the arithmetic). `since` (#4503
+    OD1) reads "this cycle" as on/after that date instead of the block-1 line."""
     from training.band_reference import band_key
     from training.exercise_history import BODYWEIGHT_TOLERANCE_DAYS, nearest_bodyweight
 
@@ -387,7 +388,7 @@ def achieved_hold(
     best: dict[str, Any] | None = None
     for s in (history_index or {}).get(template_id) or []:
         d = str(s.get("date") or "")
-        if (as_of and d >= as_of) or anchor_discount(d, p)[1]["applies"]:
+        if (as_of and d >= as_of) or (d < since if since else anchor_discount(d, p)[1]["applies"]):
             continue
         lbs = nearest_bodyweight(d, weight_index, tol)
         if lbs is None or band_key(lbs) != band:
@@ -751,19 +752,44 @@ def _apply_hold(
             "reason": "nearest-band anchor: nothing lifted at this band",
         }
         return
-    # driver review #2: a "layoff" here IS the detraining discount's own line (#4107), not the 7-day
-    # re-entry routine's threshold — one missed week is not something to re-enter from. `layoff_days`
-    # (the generator's re-entry threshold) is accepted and deliberately NOT used for the hold.
-    threshold = DETRAINING_ANCHOR_AGE_DAYS
+    # #4503 OD1 (owner, 2026-09-30): the tier is read off the larger of the caller's days, the record's
+    # gap and THIS movement's gap at this band — <= 28 held, 29–90 at 85–90 % of band best, > 90 the ramp
+    # (`layoff_tiers`). `layoff_days` (the generator's 7-day re-entry threshold) is deliberately NOT used.
+    from common.pacific_time import shift_day_key
+
+    from training import layoff_tiers as lt
+
     gap = _lifting_gap_days(history_index, as_of)
-    layoff = any(d is not None and int(d) >= threshold for d in (days_since_last_workout, gap))
-    hold = (
-        None
-        if layoff
-        else achieved_hold(
-            template_id, history_index, weight_index, current_weight_lb, slot=slot, as_of=as_of, tolerance_days=tolerance_days
-        )
-    )
+    move_gap = lt.movement_band_gap_days(template_id, history_index, weight_index, current_weight_lb, as_of, tolerance_days)
+    tier_gap = max((int(d) for d in (days_since_last_workout, gap, move_gap) if d is not None), default=None)
+    tier = lt.od1_tier(tier_gap)
+    layoff = tier != lt.TIER_HOLD
+    hold = None
+    if tier != lt.TIER_RAMP:
+        # the 28-day hold, and 85–90 % of the 90-day band best — whichever is higher (a set aged out of
+        # the hold window still re-enters at 85–90 %, never at the ramp)
+        def _best(window: int) -> dict[str, Any] | None:
+            since = shift_day_key(as_of, -window) if as_of else None
+            return achieved_hold(
+                template_id,
+                history_index,
+                weight_index,
+                current_weight_lb,
+                slot=slot,
+                as_of=as_of,
+                tolerance_days=tolerance_days,
+                since=since,
+            )
+
+        held = _best(lt.HOLD_MAX_GAP_DAYS) if tier == lt.TIER_HOLD else None
+        best = _best(lt.REENTRY_MAX_GAP_DAYS) if as_of else None
+        if best is not None:
+            kg, pct = lt.reentry_load_kg(float(best["held_kg"]))
+            best = {**best, "band_best_kg": best["held_kg"], "held_kg": kg, "pct_of_band_best": pct}
+        hold = max((h for h in (held, best) if h is not None), key=lambda h: float(h["held_kg"]), default=None)
+    caps = lt.exposure_caps(template_id, history_index, as_of)
+    if caps:
+        r["exposure_caps"] = caps
     applies = hold is not None and float(hold["held_kg"]) > float(ramped.get("floor_kg") or 0) + 1e-9
     r["hold"] = {
         "applies": applies,
@@ -773,11 +799,15 @@ def _apply_hold(
         "rpe_basis": hold["rpe_basis"] if hold else None,
         "e1rm_rpe_adjusted": hold["e1rm_rpe_adjusted"] if hold else None,
         "layoff": layoff,
+        "tier": tier,
         "layoff_evidence": {
             "caller_days_since_last_workout": days_since_last_workout,
             "record_gap_days": gap,
-            "threshold_days": threshold,
-            "threshold_source": "load_ramp.DETRAINING_ANCHOR_AGE_DAYS — the #4107 detraining-discount line",
+            "movement_band_gap_days": move_gap,
+            "tier_gap_days": tier_gap,
+            "threshold_days": lt.HOLD_MAX_GAP_DAYS,
+            "reentry_max_days": lt.REENTRY_MAX_GAP_DAYS,
+            "threshold_source": lt.OD1_RULING,
         },
         "ramp_top_kg": ramped.get("floor_kg"),
         "rule": (
@@ -801,6 +831,12 @@ def render_ramp_cue(floor: dict[str, Any]) -> str:
     r = (floor or {}).get("ramp") or {}
     if not r or not floor.get("floor_kg"):
         return ""
+    caps = r.get("exposure_caps")
+    capped = (
+        f"Exposure {caps['exposure']} of 3 after a {caps['gap_days']}-day gap: RPE <= {caps['rpe_max']}, reps <= {caps['reps_max']} (OD1). "
+        if caps
+        else ""
+    )
     hold = r.get("hold") or {}
     if hold.get("applies"):
         a = hold["achieved"]
@@ -811,8 +847,14 @@ def render_ramp_cue(floor: dict[str, Any]) -> str:
             why = f"what that allows for {a['target_reps']} reps at RPE <= {a['rpe_ceiling']} (RPE-adjusted e1RM {_fmt_load(float(a['e1rm_rpe_adjusted']))})"
         return (
             f"Week {r['week']} load {_fmt_load(float(floor['floor_kg']))} — held from what you already moved: {moved} on {a['date']} "
-            f"at {a['bodyweight_lb']} lb, this band, no layoff; {why}. The entry ramp "
-            f"({r['ramp_pct']}% = {_fmt_load(float(hold['ramp_top_kg']))}) is for re-entry and never goes under an achieved load. "
+            f"at {a['bodyweight_lb']} lb, this band, "
+            + (
+                f"a {hold['layoff_evidence']['tier_gap_days']}-day gap, so {a['pct_of_band_best']:g}% of it (OD1)"
+                if a.get("pct_of_band_best")
+                else "no layoff"
+            )
+            + f"; {why}. The entry ramp "
+            f"({r['ramp_pct']}% = {_fmt_load(float(hold['ramp_top_kg']))}) is for re-entry and never goes under an achieved load. {capped}"
             "Down on the day if you must, never up."
         )
     basis = floor.get("basis") or {}
@@ -837,7 +879,7 @@ def render_ramp_cue(floor: dict[str, Any]) -> str:
         )
     return (
         f"Week {r['week']} load {_fmt_load(float(floor['floor_kg']))} — {share} {discount} "
-        f"(anchor {got} on {basis.get('date')} {where}; v0.3 §3). "
+        f"(anchor {got} on {basis.get('date')} {where}; v0.3 §3). {capped}"
         "Down on the day if you must, never up."
     )
 
