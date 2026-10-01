@@ -1763,6 +1763,19 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
             print(f"[COACH-V2:{coach_id}] semantic recall wiring failed (non-blocking): {_sr_e}")
             _recall_block, _recall_precedents = "", []
 
+        # #4343: the banned-term + window rules and the FORBIDDEN lists render from the code that
+        # holds the draft (reader_checks) and the list the judge reads (judge_blacklists), never a copy.
+        from coach import reader_checks as _rc
+
+        _reader_rules = _rc.prompt_reader_rules()
+        _forbidden = (anti_patterns.get("phrase_blacklist", []), anti_patterns.get("structural_blacklist", []))
+        try:
+            from coach.coach_quality_gate import judge_blacklists
+
+            _forbidden = judge_blacklists(voice_spec)
+        except Exception as _bl_e:  # noqa: BLE001 — the coach's own lists stand in, as before
+            print(f"[COACH-V2:{coach_id}] judge blacklists unavailable (non-blocking): {_bl_e}")
+
         system_prompt = f"""You are {voice_spec['display_name']}, {voice_spec.get('domain', '')} specialist.
 
 VOICE RULES:
@@ -1778,8 +1791,8 @@ DECISION STYLE:
 - Bold claims: {decision_style.get('comfort_with_bold_claims', 'low')}
 - Revision style: {decision_style.get('revision_style', 'transparent')}
 
-FORBIDDEN PHRASES: {json.dumps(anti_patterns.get('phrase_blacklist', []))}
-FORBIDDEN STRUCTURES: {json.dumps(anti_patterns.get('structural_blacklist', []))}
+FORBIDDEN PHRASES: {json.dumps(_forbidden[0])}
+FORBIDDEN STRUCTURES: {json.dumps(_forbidden[1])}
 
 OPENING GUIDANCE: {voice_guidance.get('suggested_opening', 'vary your opening')}
 AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
@@ -1818,7 +1831,7 @@ DATA INTERPRETATION RULES:
 - NEVER tell Matthew to "obtain" or "get" a scan/test if the data already exists in the payload below
 - Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin is available.
 READER RULES (a friend of Matthew's with no health background reads a condensed version):
-- Plain words. Never: EWMA, autocorrelation, etiology, mechanistic(ally), gate/ungate, load-bearing, contingent, interoception, gluconeogenesis, counter-regulatory, slow-wave, standard deviation, n=, slope, Zone 2 hold, catabolic, liquidation, subtherapeutic, BMR/Mifflin. Say: "running average", "the reason", "one good night tends to follow another", "easy cardio", "21 days of data".
+{_reader_rules}
 - Every figure carries its day or window IN THE SAME SENTENCE, in words, Pacific time: "182 g on Friday, September 25", "153 g a day over the last 20 logged days", "99 % on the night of Thursday, September 24". A figure with no day is dropped. No ISO dates.
 - Only figures given in the DATA below. Never subtract, divide, average, count days or convert a time — if the difference is not given, say "short of the 170 g floor" with no number.
 - Days logged / last log / silence: state only the given `days_logged`, `last_food_log_date`, `gap_days`, `journal_gap_days`. If none is given he is present — narrate no gap.

@@ -45,6 +45,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
+from coach.reader_checks import READER_BANNED_TERMS
+
 logger = logging.getLogger(__name__)
 
 LEAD_ID = "eli_marsh"  # persona_registry.LEAD_PERSONA_ID — pinned equal in the tests
@@ -69,6 +71,8 @@ LEAD_PROMPT = (
     '- Write dates in words exactly as the facts give them (for example "Friday, September 25"), never as digits like 2026-09-25.\n'
     "- Plain words, no jargon or abbreviations: say heart-rate variability and resting heart rate, never HRV, RHR, TDEE, "
     "EWMA or CI.\n"
+    # #4343: the reader checks' own banned list, rendered from the tuple that holds the text
+    + "- Never these words: " + ", ".join(word for _p, word, _plain in READER_BANNED_TERMS) + ".\n"
     "- A rate marked provisional is an early estimate; say so if you use it.\n"
     "- Correlative only: never claim one thing caused another.\n"
     "- No medical advice, no diagnosis, no supplement or drug suggestions.\n"

@@ -708,6 +708,17 @@ def _shared_blacklists():
         return [], []
 
 
+def judge_blacklists(voice_spec):
+    """(phrases, structures) the judge checks a coach against: the coach's own anti-pattern
+    lists plus the shared standard's. #4343: the daily-brief generation prompt renders its
+    FORBIDDEN lines from THIS call, so the model is told the list it is judged on — the prompt
+    used to carry the coach's own list only, never the shared one."""
+    anti_patterns = (voice_spec or {}).get("anti_pattern_detection", {})
+    shared_phrases, shared_structural = _shared_blacklists()
+    own_p, own_s = list(anti_patterns.get("phrase_blacklist", [])), list(anti_patterns.get("structural_blacklist", []))
+    return own_p + [p for p in shared_phrases if p not in own_p], own_s + [x for x in shared_structural if x not in own_s]
+
+
 def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_brief, other_outputs=None, grounding=None):
     """Build the user message for the quality gate LLM call."""
     parts = [
@@ -729,14 +740,7 @@ def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_br
     # Voice spec anti-patterns + the MOS shared avoid-list (every coach inherits
     # the substrate's banned clichés on top of their own list — the shared
     # standard's "communication avoid" made concrete and enforceable).
-    anti_patterns = voice_spec.get("anti_pattern_detection", {})
-    shared_phrases, shared_structural = _shared_blacklists()
-    phrase_bl = list(anti_patterns.get("phrase_blacklist", [])) + [
-        p for p in shared_phrases if p not in anti_patterns.get("phrase_blacklist", [])
-    ]
-    structural_bl = list(anti_patterns.get("structural_blacklist", [])) + [
-        s for s in shared_structural if s not in anti_patterns.get("structural_blacklist", [])
-    ]
+    phrase_bl, structural_bl = judge_blacklists(voice_spec)
     if phrase_bl or structural_bl:
         parts.append("## Anti-Pattern Checklist")
         if phrase_bl:

@@ -16,7 +16,8 @@ The eight classes, and where each applies:
                              that is not on the generation's own allow-list — a unit voids
                              the benign-small-count exemption (grounded_generation)
     unlabeled_window_figure  an average / running average / EWMA / trend figure whose
-                             sentence names no window ("over N days", "since", "through")
+                             sentence names no window ("over N days", "since", "through",
+                             a date range, "based on N logged days" — ruling 8, #4343)
     raw_instant              a raw machine instant or ISO date in reader text, or a clock
                              time that is a served UTC instant read as local time
     banned_term              the READER RULES jargon list (§2.1A + §2.1F), in code
@@ -218,14 +219,41 @@ def unit_number_not_served(text: str, allowed: Optional[set] = None, **_: Any) -
 # ── check 4: unlabeled_window_figure ────────────────────────────────────────
 _AVERAGE_RE = re.compile(r"\b(?:running\s+average|average[sd]?|averaging|ewma|trend(?:ing|s)?|mean)\b", re.IGNORECASE)
 _FIGURE_RE = re.compile(r"\d")
+_N = r"(?:\d+|" + "|".join(_NUMBER_WORDS) + r"|twenty\S*)"
+_SPAN_UNIT = r"(?:days?|nights?|weeks?|sessions?|weigh-ins?|walks?|workouts?|runs?|rides?|readings?|scans?|logs?)"
+# A day as a coach writes one: "September 24th", "Thursday, September 24", or a bare weekday.
+_DAY = (
+    r"(?:(?:" + "|".join(_WEEKDAYS) + r"),?\s+)?(?:" + "|".join(_MONTHS) + r")\s+\d{1,2}(?:st|nd|rd|th)?|(?:" + "|".join(_WEEKDAYS) + r")"
+)
 _WINDOW_RE = re.compile(
-    r"\b(?:over|across)\s+(?:the\s+)?(?:last\s+|past\s+|those\s+|these\s+)?(?:\d+|" + "|".join(_NUMBER_WORDS) + r"|twenty\S*)\s+(?:\w+\s+)?"
-    r"(?:days?|nights?|weeks?|sessions?|weigh-ins?)\b"
+    r"\b(?:over|across)\s+(?:the\s+)?(?:last\s+|past\s+|those\s+|these\s+)?" + _N + r"\s+(?:\w+\s+)?" + _SPAN_UNIT + r"\b"
     r"|\bsince\s+\w+|\bthrough\s+\w+"
     r"|\b(?:\d+|" + "|".join(_NUMBER_WORDS) + r")[- ](?:day|night|week)\b"
-    r"|\b(?:this|last|past)\s+(?:week|month)\b",
+    r"|\b(?:this|last|past)\s+(?:week|month)\b"
+    # Ruling 8 (owner, 2026-10-01, #4343): a stated date range and a "based on N logged
+    # days" count ARE labelled windows. The 10-01 brief held physical on "across those five
+    # walks, each logged between September 24th and …" and labs on "a pattern with 26 nights".
+    r"|\b(?:between|from)\s+(?:" + _DAY + r")\s+(?:and|to|until|through)\s+(?:" + _DAY + r"|\d{1,2}(?:st|nd|rd|th)?)\b"
+    r"|\b(?:" + "|".join(_MONTHS) + r")\s+\d{1,2}(?:st|nd|rd|th)?\s*[–-]\s*(?:(?:" + "|".join(_MONTHS) + r")\s+)?\d{1,2}\b"
+    r"|\b(?:based\s+on|from|of|in|with)\s+(?:the\s+)?(?:last\s+|past\s+|his\s+)?" + _N + r"\s+(?:\w+\s+)?" + _SPAN_UNIT + r"\b",
     re.IGNORECASE,
 )
+
+
+def prompt_reader_rules() -> str:
+    """The two READER RULES lines a coach generation prompt carries, DERIVED from the rules that
+    hold it (#4343): the ``banned_term`` list (``READER_BANNED_TERMS``) and the window forms
+    ``unlabeled_window_figure`` accepts (``_WINDOW_RE``). The 10-01 brief held four coaches the
+    judge passed, every one on one of these two rules; telling the model up front is cheaper than
+    a revision round, and rendering from the tuple means the prompt cannot lag the check."""
+    words = ", ".join(word for _p, word, _plain in READER_BANNED_TERMS)
+    return (
+        f'- Plain words. Never: {words}. Say: "running average", "the reason", "one good night tends to follow another", '
+        '"easy cardio", "21 days of data", "deep sleep", "rising/falling".\n'
+        "- Any average, running average, mean or trend figure names its window IN THE SAME SENTENCE, in one of these forms: "
+        '"over the last 20 logged days", "across 21 logged days", "based on 21 logged days", "since Sunday, September 6", '
+        '"through Friday, September 25", "between September 24 and September 30", "this week". A date alone is not a window.'
+    )
 
 
 # "a favorable data point, not a trend" DENIES a trend — it is not an average figure.
@@ -247,7 +275,8 @@ def _average_figure_clause(sentence: str) -> bool:
 def unlabeled_window_figure(text: str, **_: Any) -> list:
     """An average/trend figure whose sentence names no window (the #1968 shape, generalised).
 
-    A window is "over/across N days", "since …", "through …", "N-day", "this/last week".
+    A window is "over/across N days", "since …", "through …", "N-day", "this/last week",
+    and (ruling 8, #4343) a stated date range or "based on N logged days".
     A date alone is NOT a window: "1,596 kcal EWMA … on the night of 2026-09-24" still
     leaves the average's span unnamed. The average word and the figure must share a
     clause (#4343); the window may sit anywhere in the sentence.
@@ -342,36 +371,41 @@ def raw_instant(text: str, facts: Optional[dict] = None, **_: Any) -> list:
 
 # ── check 6: banned_term ────────────────────────────────────────────────────
 # §2.1A READER RULES ban list + §2.1F per-coach additions, moved out of the Haiku judge
-# into code. Each entry: (pattern, the plain replacement the correction offers).
+# into code. Each entry: (pattern, the word as the generation prompt names it, the plain
+# replacement the correction offers). #4343: the coach prompts render their "Never:" list
+# from THIS tuple (``prompt_reader_rules``), so the list the model is told and the list
+# that holds it cannot drift — the prompt used to carry a hand-copied 19-term literal that
+# lacked "went dark" and "protein-primacy", the two terms that held sleep and explorer on
+# the 2026-10-01 brief.
 READER_BANNED_TERMS = (
-    (r"\bEWMAs?\b", "running average"),
-    (r"\bautocorrelat\w*", "one good night tends to follow another"),
-    (r"\betiolog\w*", "the reason"),
-    (r"\bmechanistic(?:ally)?\b", "plain cause-and-effect words"),
-    (r"\b(?:un)?gat(?:e|es|ed|ing)\b", "a plain condition ('once …')"),
-    (r"\bload-bearing\b", "plain words"),
-    (r"\bcontingent\b", "plain words"),
-    (r"\binteroception\w*", "noticing how he feels"),
-    (r"\bgluconeogenesis\b", "plain words"),
-    (r"\bcounter-regulatory\b", "plain words"),
-    (r"\bslow-wave\b", "deep sleep"),
-    (r"\bstandard deviations?\b", "plain words ('well above his usual')"),
-    (r"\bn\s*=\s*\d+", "'21 days of data'"),
-    (r"\bslopes?\b", "rising/falling"),
-    (r"\bZone 2 hold\b", "easy cardio"),
-    (r"\bcatabolic\b", "plain words"),
-    (r"\bliquidation\b", "plain words"),
-    (r"\bsubtherapeutic\b", "plain words"),
-    (r"\bBMR\b", "plain words (the engine serves TDEE)"),
-    (r"\bMifflin\b", "plain words (the engine serves TDEE)"),
-    (r"\blogging gap\b", "the served days_logged"),
-    (r"\bwent dark\b", "the served days_logged"),
-    (r"\bopposing vectors\b", "plain words"),
-    (r"\bemotional texture\b", "plain words"),
-    (r"\bcontingent predictions\b", "plain words"),
-    (r"\bprotein-primacy\b", "plain words"),
+    (r"\bEWMAs?\b", "EWMA", "running average"),
+    (r"\bautocorrelat\w*", "autocorrelation", "one good night tends to follow another"),
+    (r"\betiolog\w*", "etiology", "the reason"),
+    (r"\bmechanistic(?:ally)?\b", "mechanistic", "plain cause-and-effect words"),
+    (r"\b(?:un)?gat(?:e|es|ed|ing)\b", "gate/gated/ungate", "a plain condition ('once …')"),
+    (r"\bload-bearing\b", "load-bearing", "plain words"),
+    (r"\bcontingent\b", "contingent", "plain words"),
+    (r"\binteroception\w*", "interoception", "noticing how he feels"),
+    (r"\bgluconeogenesis\b", "gluconeogenesis", "plain words"),
+    (r"\bcounter-regulatory\b", "counter-regulatory", "plain words"),
+    (r"\bslow-wave\b", "slow-wave", "deep sleep"),
+    (r"\bstandard deviations?\b", "standard deviation", "plain words ('well above his usual')"),
+    (r"\bn\s*=\s*\d+", "n=", "'21 days of data'"),
+    (r"\bslopes?\b", "slope", "rising/falling"),
+    (r"\bZone 2 hold\b", "Zone 2 hold", "easy cardio"),
+    (r"\bcatabolic\b", "catabolic", "plain words"),
+    (r"\bliquidation\b", "liquidation", "plain words"),
+    (r"\bsubtherapeutic\b", "subtherapeutic", "plain words"),
+    (r"\bBMR\b", "BMR", "plain words (the engine serves TDEE)"),
+    (r"\bMifflin\b", "Mifflin", "plain words (the engine serves TDEE)"),
+    (r"\blogging gap\b", "logging gap", "the served days_logged"),
+    (r"\bwent dark\b", "went dark", "the served days_logged"),
+    (r"\bopposing vectors\b", "opposing vectors", "plain words"),
+    (r"\bemotional texture\b", "emotional texture", "plain words"),
+    (r"\bcontingent predictions\b", "contingent predictions", "plain words"),
+    (r"\bprotein-primacy\b", "protein-primacy", "plain words"),
 )
-_BANNED_RES = tuple((re.compile(p, re.IGNORECASE), plain) for p, plain in READER_BANNED_TERMS)
+_BANNED_RES = tuple((re.compile(p, re.IGNORECASE), plain) for p, _word, plain in READER_BANNED_TERMS)
 
 
 def banned_term(text: str, **_: Any) -> list:

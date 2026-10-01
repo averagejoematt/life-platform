@@ -550,3 +550,62 @@ class TestHeldOnAJudgePass4343:
         from ai import rewrite_note as qgn
 
         assert qgn.hold_reason({"passed": False, "judge_passed": False, "score": 28}) == "judge passed=False score=28; client rule(s): none"
+
+
+# Ruling 9 (owner, 2026-10-01, #4343): an edit whose replacement introduces a banned term is
+# DROPPED and the original sentence kept. The 10-01 17:00Z explorer revision swapped its
+# `mechanistic` sentence for one carrying `protein-primacy` and was held on the new term.
+EXPLORER_1001_DRAFT = (
+    "The wearables kept running through the quiet stretch. The mechanistic story is that protein carries recovery. "
+    "One thing I'd like him to try this week is a steady breakfast."
+)
+
+
+class TestRuling9DropAnEditThatIntroducesABannedTerm:
+    def test_the_edit_is_dropped_and_the_original_sentence_kept(self, capsys):
+        from ai import rewrite_note as qgn
+
+        reply = json.dumps(
+            {
+                "edits": [
+                    {"find": "The mechanistic story is that protein carries recovery.", "replace": "The protein-primacy story holds."},
+                    {"find": "The wearables kept running through the quiet stretch.", "replace": "The wearables kept recording."},
+                ]
+            }
+        )
+        out = qgn.apply_edits(EXPLORER_1001_DRAFT, reply)
+        assert "The mechanistic story is that protein carries recovery." in out and "protein-primacy" not in out
+        assert out.startswith("The wearables kept recording.")
+        assert "edit dropped — the replacement introduces banned term 'protein-primacy'" in capsys.readouterr().out
+
+    def test_an_edit_list_whose_every_edit_is_dropped_keeps_the_prior_draft(self):
+        from ai import rewrite_note as qgn
+
+        reply = json.dumps({"edits": [{"find": "The mechanistic story is that protein carries recovery.", "replace": "It went dark."}]})
+        assert qgn.apply_edits(EXPLORER_1001_DRAFT, reply) == ""
+
+    def test_a_term_the_find_already_carried_is_not_introduced(self):
+        from ai import rewrite_note as qgn
+
+        assert qgn.introduced_banned_term("The slope is up.", "The slope is up, a little.") is None
+        assert qgn.introduced_banned_term("Deep sleep is up.", "The slow-wave share is up.") == "slow-wave"
+
+    def test_mutation_control_without_the_ruling_the_banned_edit_lands(self, monkeypatch):
+        from ai import rewrite_note as qgn
+
+        monkeypatch.setattr(qgn, "introduced_banned_term", lambda *_a, **_k: None)
+        reply = json.dumps(
+            {"edits": [{"find": "The mechanistic story is that protein carries recovery.", "replace": "The protein-primacy story."}]}
+        )
+        assert "protein-primacy" in qgn.apply_edits(EXPLORER_1001_DRAFT, reply)
+
+
+def test_the_note_quotes_a_served_fact_sentence():
+    """#4343: the 10-01 physical revision kept 'roughly 4 lbs per week' (served 3.68, CI 2.29-3.91)
+    because the served-fact finding quoted no sentence for the edit list to aim at."""
+    from ai import rewrite_note as qgn
+
+    sent = "At roughly 4 lbs per week of loss, the arithmetic becomes unfavorable."
+    draft = "He walked five times. " + sent
+    report = {"passed": False, "served_fact_violations": [{"type": "contradiction", "detail": "cites 4 lb/week", "excerpt": sent}]}
+    assert f'[served_fact] the sentence to edit: "{sent}"' in qgn.correction_note(report, draft, edits=True)
