@@ -176,6 +176,8 @@ class _Gates:
             "this_weeks_bet_scoring": budget.get("bet_scored"),
             "this_weeks_new_bet": budget.get("bet"),
             "previous_titles": prev_ledger.get("titles", []),
+            # last week's facts: an installment may recall them, so the fact read must be able to check them
+            "previous_week_dossier": prev_dossier or {},
         }
 
     def post(self, md: str, stop: Optional[str]) -> List[str]:

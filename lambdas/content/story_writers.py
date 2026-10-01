@@ -327,7 +327,7 @@ def fact_check(
     body = {
         "system": FACT_RUBRIC,
         "messages": [{"role": "user", "content": f"DOSSIER:\n{json.dumps(dossier, indent=1, default=str)}\n\n{ctx}INSTALLMENT:\n{text}"}],
-        "max_tokens": 4000,
+        "max_tokens": 8000,
         "temperature": 0,
         "output_config": {"format": {"type": "json_schema", "schema": FACT_SCHEMA}},
     }
