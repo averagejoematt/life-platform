@@ -249,11 +249,11 @@ def test_weekly_hard_sets_per_muscle_sit_inside_the_redline_ranges():
         lo, hi = row["range"]
         assert lo <= row["sets"] <= hi, (group, row)
     assert week["back"]["sets"] == 10 and week["delts"]["sets"] == 6
-    # the summed total still sits in §3's 50–65
+    # the summed total still sits in §3's 50–65 — the locked v0.4 block's band (#4503 OD4: v0.5's 60–75 governs the next block)
     total = sum(
         program_structure.session_prescription_for_role(r)["total_sets"] for r in program_structure.SESSION_SEQUENCE["session_roles"]
     )
-    lo, hi = lift["total_hard_sets_wk"]
+    lo, hi = lift["total_hard_sets_wk_v0_4"]
     assert lo <= total <= hi, total
 
 
