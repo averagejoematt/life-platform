@@ -31,10 +31,14 @@ Every deploy path uses it — CDK (`lambda_helpers.staged_tree_asset()`),
 `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh` — so what any path
 ships is byte-identical by construction.
 
-- **A shared-module change reaches the fleet** via `bash deploy/deploy_fleet.sh`
-  (one bundle → S3 → every function) or `cd cdk && npx cdk deploy --all`. CI does
-  this automatically: any changed `lambdas/` file that is not a mapped
-  per-function source triggers the fleet-deploy step.
+- **THE Lambda code deploy path is `bash deploy/deploy_fleet.sh`** (#4255): one
+  bundle → S3 → every mapped function + both MCP functions, each
+  `deploys/<fn>/previous.zip` re-seeded for `rollback_lambda.sh`. CI's deploy job
+  runs it for EVERY code change — the per-function matrix and the inline MCP step
+  are gone, and the retired `deploy_and_verify.sh` / `deploy_mcp_split.sh` sit under
+  `deploy/archive/onetime/`. `deploy_lambda.sh` stays only as the laptop hot-fix
+  path; `deploy/bundle_and_mirror_registry.py` names every `update-function-code`
+  site and `tests/test_bundle_and_mirror_registry_3608.py` reds on a new one.
 - **The invariant** (enforced by CI's plan job + `test_i2_shared_layer_retired` +
   `session_postflight`): **zero** functions reference `life-platform-shared-utils`.
   A function referencing it predates the collapse (redeploy its stack) or a

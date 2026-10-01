@@ -193,7 +193,7 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 | Change | Command | Notes |
 |--------|---------|-------|
 | Single Lambda code | `bash deploy/deploy_lambda.sh <name>` | Auto-reads handler config from AWS |
-| Single Lambda code + smoke | `bash deploy/deploy_and_verify.sh <name>` | Preferred for non-trivial changes |
+| Lambda code (the one path, #4255) | `bash deploy/deploy_fleet.sh` | What CI runs; every function gets the identical bundle |
 | MCP server | `bash deploy/deploy_lambda.sh life-platform-mcp` | Stages the mcp-shaped full bundle since #781; never hand-roll a partial zip |
 | Website | `bash deploy/sync_site_to_s3.sh` | Uses `safe_sync.sh` wrapper; targets `s3://matthew-life-platform/site/` |
 | Shared module (`lambdas/` root) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — no layer step |

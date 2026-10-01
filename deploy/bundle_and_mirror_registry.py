@@ -254,10 +254,6 @@ BUNDLE_STAGING_SITES: dict[str, dict[str, str]] = {
         "status": "sanctioned",
         "notes": "stages via deploy/build_bundle.py (the single hot-deploy path CDK also matches)",
     },
-    "deploy/deploy_mcp_split.sh": {
-        "status": "sanctioned",
-        "notes": "python3 deploy/build_bundle.py --mcp --out ... staged before update-function-code",
-    },
     "deploy/rollback_lambda.sh": {
         "status": "exempt",
         "notes": (
@@ -274,14 +270,8 @@ BUNDLE_STAGING_SITES: dict[str, dict[str, str]] = {
             "call inside its documented rollback() example never runs on its own"
         ),
     },
-    ".github/workflows/ci-cd.yml": {
-        "status": "sanctioned",
-        "notes": (
-            "two real call sites: the 'Fleet deploy' step (bash deploy/deploy_fleet.sh — sanctioned via that "
-            "script) and the 'Deploy MCP server' step, which runs `python3 deploy/build_bundle.py --mcp --out ...` "
-            "immediately before its own update-function-code call"
-        ),
-    },
+    # .github/workflows/ci-cd.yml left this registry with #4255: its deploy job runs
+    # `bash deploy/deploy_fleet.sh` and calls update-function-code nowhere itself.
     # ── CDK code-asset construction sites (discover_cdk_code_asset_sites) ──
     "cdk/stacks/lambda_helpers.py": {
         "status": "sanctioned",

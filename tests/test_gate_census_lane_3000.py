@@ -509,7 +509,13 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 768  # 774 -> 768 (2026-10-01, #4256 box 3 — the lease janitor and the wedge classifier retired into the
+BASELINE_TOTAL_GATES = 767  # 768 -> 767 (2026-10-01, #4255 one Lambda deploy path, re-synced onto #4497's 768): ONE leaves,
+# one RELOCATES, nothing enters as new. Leaves: `ci::ci-cd.yml::deploy::6` (`deploy / Deploy Lambdas`, the per-function matrix
+# loop — deleted; unproven, its residue line goes). Relocates, verdict unchanged (unproven): `guard::deploy/deploy_and_verify.sh`
+# -> `guard::deploy/archive/onetime/deploy_and_verify.sh` (archived; residue line re-keyed, not absorbed). MEASURED by id-set
+# diff on `scripts/gate_census.py --json`, this tree vs a `git archive origin/main` export at a73d85a10 (git-init'd, fully
+# added): main 768 {proven 241, unproven 515, not-applicable 7, attempted-unproven 5} -> this lane 767 {241, 514, 7, 5}.
+# PRIOR: 768  # 774 -> 768 (2026-10-01, #4256 box 3 — the lease janitor and the wedge classifier retired into the
 # one deploy dead-man, merged onto #4496's 774): SIX ids leave, NONE enter. Leave: `ci::deploy-gate-janitor.yml::janitor::3` and
 # `::4` (the workflow is deleted), `guard::scripts/check_deploy_wedge.py` (deleted), and — by POSITION — `ci::deploy-wedge-watch.yml::
 # watch::7`, `::8` and `::9`: the classify / recover / fail-on-wedge steps (watch::3-5) are deleted, so the three head-coverage
@@ -522,6 +528,12 @@ BASELINE_TOTAL_GATES = 768  # 774 -> 768 (2026-10-01, #4256 box 3 — the lease 
 # base — check_deploy_deadman.py --deploy-base, a new step ahead of Detect changes) and `ci::config-drift.yml::drift::7` (the
 # nightly live-Lambda staleness advisory). Id-set diff vs a `git archive origin/main` export at 0055fe546 (re-derived at push; ff6f20ceb gave the same):
 # main 772 {239, 521, 7, 5} -> this lane 774 {241, 521, 7, 5}; nothing leaves.
+# PRIOR (lane, first measured): 771  # 772 -> 771 (2026-09-30, #4255 one Lambda deploy path): ONE leaves, one RELOCATES. Leaves:
+# `ci::ci-cd.yml::deploy::6` (`deploy / Deploy Lambdas`, the per-function matrix loop — deleted; unproven, its residue line
+# goes). Relocates, verdict unchanged (unproven): `guard::deploy/deploy_and_verify.sh` -> `guard::deploy/archive/onetime/
+# deploy_and_verify.sh` (archived; its residue line re-keyed, not absorbed). The inline `Deploy MCP server` step was never a
+# census gate; the fleet step keeps position deploy::4. MEASURED by id-set diff on `scripts/gate_census.py --json`, this tree
+# vs a `git archive origin/main` export at ff6f20ceb: 772 -> 771.
 # PRIOR: 772  # 770 -> 772 (2026-09-29, #4395 / #4256 ADR-158 re-merged onto main d37bd02ae, owner-approved lane):
 # THREE entrants, all PROVEN — `ci::…/deploy-wedge-watch.yml::watch / Deploy dead-man — main's green runs reached AWS (#4256)`,
 # `guard::scripts/check_deploy_deadman.py` and `ci::…/ci-cd.yml::deploy / Late-approval guard — never ship an older tree over

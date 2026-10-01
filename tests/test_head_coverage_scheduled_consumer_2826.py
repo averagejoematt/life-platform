@@ -393,7 +393,7 @@ def test_deadman_job_names_are_the_ones_ci_cd_yml_declares():
         wf = f.read()
     for name in (dm.PLAN_JOB, dm.DEPLOY_JOB, dm.DEPLOY_IAM_JOB):
         assert f"    name: {name}\n" in wf, name
-    assert f"- name: {dm.FLEET_STEP_PREFIX} (shared module changed)" in wf
+    assert f"- name: {dm.FLEET_STEP_PREFIX} (" in wf  # #4255: the one deploy path keeps the prefix
 
 
 def test_deadman_classifies_the_real_run_shapes():

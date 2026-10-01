@@ -213,8 +213,7 @@ python3 deploy/restart_verify_rendered.py                    # rendered public p
 - **`deploy_lambda.sh`** — Single-Lambda surgical redeploy. Source-of-truth for hot fixes.
 - **`rollback_lambda.sh`** — Inverse of above.
 - **`build_bundle.py`** — Stages/zips the ONE full-tree code bundle (#781); used by every deploy path.
-- **`deploy_fleet.sh`** — Pushes the bundle to every function (shared-module changes).
-- **`deploy_and_verify.sh`** — `deploy_lambda.sh` + smoke test combo.
+- **`deploy_fleet.sh`** — Pushes the bundle to every function: THE Lambda code deploy path, CI's too (#4255).
 - **`safe_sync.sh`** — S3 sync wrapper that's guaranteed not to `--delete` bucket root (ADR-032/033).
 - **`sync_doc_metadata.py`** — Updates PLATFORM_FACTS dict in docs from CDK source-of-truth.
 - **`archive/`** — One-off scripts older than 30 days.

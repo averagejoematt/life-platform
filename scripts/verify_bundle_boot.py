@@ -21,8 +21,8 @@ this docstring):
      staged. That is the strongest placement available: the artifact actually
      exists at that moment, so the gate reads the real thing instead of a
      reconstruction, and it fires BEFORE the first AWS mutation in every caller
-     (deploy_lambda.sh, deploy_fleet.sh, deploy_site_api.sh, deploy_mcp_split.sh
-     — all `set -e`). Wiring it in `main()` rather than in each shell script is
+     (deploy_lambda.sh, deploy_fleet.sh, deploy_site_api.sh — all `set -e`;
+     deploy_mcp_split.sh was archived by #4255). Wiring it in `main()` rather than in each shell script is
      deliberate: a future deploy script inherits the gate instead of forgetting
      it. `stage_tree()`/`stage_mcp()` are NOT gated — CDK imports those directly
      at synth time and must stay fast.

@@ -1,5 +1,11 @@
 #!/bin/bash
-# deploy_lambda.sh — Universal Lambda deploy helper (#781: full-bundle, always)
+# deploy_lambda.sh — EMERGENCY single-function deploy (#781: full-bundle, always)
+#
+# EMERGENCY-ONLY, NOT THE ROUTINE PATH (owner ruling 2026-10-01, #4255). The routine
+# Lambda code deploy is `bash deploy/deploy_fleet.sh` — what CI runs on every code
+# merge. Use this only to hot-fix ONE function when a fleet deploy is not an option,
+# and follow it with a fleet deploy (or a `deploy_all` CI dispatch) so the fleet is
+# back on one bundle.
 #
 # Ships the SAME staged full-tree bundle CDK deploys (deploy/build_bundle.py):
 # the whole lambdas/ tree + food_vocabulary.json, so a hot deploy can never
