@@ -2462,7 +2462,7 @@ REGISTRY_PROOFS.update(
 )
 
 
-# ── #4182 — the reader-facing vocabulary ledger (tests/site_vocabulary_residue.py::BASELINE) ──
+# ── #4182 — the reader-facing vocabulary ledger (ledgers/site_vocabulary_residue.py::BASELINE) ──
 # One registry gate per ruled term. Proved 2026-09-26 by lowering each term's ledger value to
 # (live count − 1) in-process and calling the parametrized ratchet test for that term; every
 # one failed with the pages named, and the reverted ledger passed (20 passed). The live counts
@@ -2486,7 +2486,7 @@ _VOCAB_LEDGER_LIVE = {
 }
 REGISTRY_PROOFS.update(
     {
-        f"registry::tests/site_vocabulary_residue.py::BASELINE::{term}": {
+        f"registry::ledgers/site_vocabulary_residue.py::BASELINE::{term}": {
             "gate_name": f"BASELINE[{term}]",
             "command": f"python3 -m pytest tests/test_site_vocabulary_registry.py -q -p no:cacheprovider -k 'ratchets_down and {term.split()[0]}'",
             "mutation": f"BASELINE[{term!r}] lowered to {max(n - 1, 0)} (live count {n} − 1) in-process, the same test function called for that term.",
@@ -2507,7 +2507,7 @@ REGISTRY_PROOFS.update(
 
 # #4182 A-grade sweep: "Hevy" (keep-with-gloss) lands at ledger 0, so the lower-by-one mutation
 # above cannot apply — the mutation is the gloss instead: strip gear's one <dfn> around it.
-REGISTRY_PROOFS["registry::tests/site_vocabulary_residue.py::BASELINE::Hevy"] = {
+REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::Hevy"] = {
     "gate_name": "BASELINE[Hevy]",
     "command": "python3 -m pytest tests/test_site_vocabulary_registry.py -q -p no:cacheprovider -k 'ratchets_down and Hevy'",
     "mutation": 'site/gear/index.html\'s <dfn class="gloss" … data-gloss="a workout-logging app">Hevy</dfn> stripped to plain text.',

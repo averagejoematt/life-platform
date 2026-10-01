@@ -32,8 +32,9 @@ could only judge docs Phase 2 was about to rewrite.
 
 ## Phase 2 — Write everything once (steps (a)–(e))
 
-Write the handover ONCE in step (a), with ALL marker lines (the corrected draft plus the
-judgment lines from (d), (e), (e3), (e8), (e9), (e12)); Phase 3 asserts each (#3006).
+Write the handover ONCE in step (a), with the corrected draft plus the judgment lines from
+(d), (e), (e3), (e8), (e9), (e12). **Marker lines are prompts (#4262)**: Phase 3 blocks only
+on the (e4) residual section; the scripts behind the lines still block on their artifacts.
 
 ### (a) Archive the outgoing handover, write the new one
 
@@ -47,7 +48,7 @@ judgment lines from (d), (e), (e3), (e8), (e9), (e12)); Phase 3 asserts each (#3
    fails, re-run `git push origin session-archive` before (f).
 3. **Overwrite** `handovers/HANDOVER_LATEST.md` in place, in the archived files' shape:
    driving instruction, what shipped (PRs, merged/deployed), what was verified, gotchas, the
-   residual/next-picks queue — and every marker line (`scripts/check_handover_lines.py`).
+   residual/next-picks queue (required — `scripts/check_handover_lines.py`) and the marker lines.
 
 ### (b) Replace — never stack — the CLAUDE.md session-status block
 
@@ -89,7 +90,7 @@ Memory is outside git (never in the (f) commit). Durable lessons → a topic fil
 Follow `docs/content/BUILD_DISPATCH_CHECKLIST.md`. **Eligible** only if this session's work
 is merged to `main` AND deployed — an open PR, a staged deploy or a plan is not.
 
-- Not eligible: the new `handovers/HANDOVER_LATEST.md` from step (a) must carry one line —
+- Not eligible: the new `handovers/HANDOVER_LATEST.md` from step (a) carries one line (optional, #4262) —
   `**Build beat:** none — <one-clause reason>`. An empty week is honest; do not force a beat.
 - Eligible: append ONE object to `beats` in `site/story/build/beats.json` (schema in the
   checklist; `prs` entries are `{"label", "url"}` objects, never strings; numbers measured,
@@ -109,7 +110,7 @@ a retired load-bearing path gets a `docs/_lint/tombstones.txt` rule in the same 
   `docs_ci_gate_commands()`; its one declared omission is `MUTATING_GATES`
   (`skill_lint.py --self-test`, reason at `derived_doc_gates()`), and
   `tests/test_restart_verify_gates_3477.py` reds on any other.
-- The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
+- The new `handovers/HANDOVER_LATEST.md` carries one line either way (optional, #4262):
   `**Docs:** <pages updated>` or `**Docs:** none needed — <one-clause reason>`.
 - **Decisions gate (#1343)** — a governance-consequential decision not already in
   `docs/DECISIONS.md` gets its ADR in the same commit (then `generate_adr_index.py --apply`).
@@ -139,7 +140,7 @@ the handover says none. Silent omission is not an outcome.
   `python3 scripts/incident_log_patterns.py --apply` — Phase 3 re-runs its `--check` (#3682).
 - **Stage it**: `docs/INCIDENT_LOG.md` is named in Phase 4's `git add` (#3682 — a row left
   dirty in a shared checkout once shipped inside an unrelated PR).
-- The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
+- The new `handovers/HANDOVER_LATEST.md` carries one line either way:
   `**Incidents:** <N row(s) added — one-clause list>` or `**Incidents:** none`.
 
 ### (e4) Residual-queue gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3) (#1340)
@@ -246,7 +247,7 @@ The handover carries one line either way: `**CI warnings:** none`, `**CI warning
 
 ### (e12) Proportionality-ledger gate — a wrap gate, same shape as (d)/(e)/(e2)–(e11) (#2380, enforced by #2761)
 
-`python3 scripts/check_proportionality_ledger.py` (Phase 3) passes only on a
+`python3 scripts/check_proportionality_ledger.py` (Phase 3, advisory since #4262) passes only on a
 `docs/PROPORTIONALITY.md` diff this session OR an explicit `**Ledger:**` line. A NEW standing
 subsystem (CI gate, scheduled writer, watcher, alarm, workflow) gets its row (posture + rent +
 demote trigger, ADR-103/144) in the wrap commit; a line claiming a row the ledger never saw
@@ -259,8 +260,8 @@ fails. The handover carries one line either way: `**Ledger:** <subsystem> row ad
 python3 scripts/wrap_gates.py --verify
 ```
 
-Runs `scripts/check_handover_lines.py` (#3006 — every marker line, derived from THIS file's
-"carries one line" contracts), (e4), (e12), the (d) validators,
+Runs `scripts/check_handover_lines.py` (#4262 — blocks only on the (e4) residual section;
+an absent "carries one line" marker prints `PROMPT`), (e4), (e12) (advisory), the (d) validators,
 `tests/test_operating_knowledge_ledger_2848.py`, and **the Docs-CI leg** (`docs_ci_gate_commands()`
 minus `MUTATING_GATES`) AFTER Phase 2 wrote `docs/INCIDENT_LOG.md`, `docs/alarm_citations.json`,
 `docs/PROPORTIONALITY.md`, `docs/**` and `CLAUDE.md` (#3682). **It must exit 0 before (f).**
@@ -278,21 +279,21 @@ git commit -m "docs(wrap): <short session theme> (<n items/PRs shipped>)"
 
 ## Guardrails (do not relax these)
 
-| Gate (the rule) | Step | Script / assertion | Handover line |
+| Gate (the rule) | Step | Script / assertion | Handover line (a prompt since #4262; residual required) |
 |---|---|---|---|
 | Beat or explicit skip (#736); merged-and-live work only | (d) | `validate_beats.py` + `content_policy_scan.py` | `**Build beat:**` |
 | Docs or explicit skip (wiki contract) | (e) | derived Docs-CI leg (Phase 3) | `**Docs:**` |
 | Decisions or explicit skip (#1343) | (e) | `check_handover_lines.py` | `**Decisions:**` |
 | Main declared from a read badge (#1327; stranded #1901/#2052) | (e2) | `scripts/check_main_green.py` | `**Main:**` |
 | Incident rows or explicit skip (#1332), Patterns regenerated and staged (#3682) | (e3) | `incident_log_patterns.py --check` | `**Incidents:**` |
-| Residual bullets cite `#N` or `not-work — <reason>` (#1340) | (e4) | `scripts/check_residual_queue.py` | per-bullet |
+| Residual bullets cite `#N` or `not-work — <reason>` (#1340) | (e4) | `scripts/check_residual_queue.py` + `check_handover_lines.py` | the section (required) |
 | Stash empty + hook fresh, or explained (#1326) | (e5) | `git stash list` + `session_postflight.py` | `**Stash/hooks:**` |
 | Filing-contract violators fixed, not deferred (#1870, blocking since #1872) | (e7) | `scripts/check_backlog_hygiene.py` bare | fail-open noted |
 | An outcome verdict — the ADR-099 closure comment — on every closure (#1870); an instrument closes on live proof (#3595) | (e8) | `closure_sweep.py --session` | `**Closures:**` |
 | `Now` refilled by stored rank; every stale `Later` issue gets a promote-or-close call (#1870) | (e9) | `backlog_next.py --refill-now --lane <model>` | `**Backlog:**` |
 | A red alarm >72h, or a flap, is cited or named (#1959/#2912) | (e10) | `scripts/check_alarm_citations.py` | `**Alarms:**` |
 | A `::warning::` on green main is triaged (#1966) | (e11) | `scripts/check_ci_warnings.py` | `**CI warnings:**` |
-| Standing machinery gets a PROPORTIONALITY row, or says why not (#2380, #2761) | (e12) | `scripts/check_proportionality_ledger.py` | `**Ledger:**` |
+| Standing machinery gets a PROPORTIONALITY row, or says why not (#2380, #2761) | (e12) | `scripts/check_proportionality_ledger.py` (advisory) | `**Ledger:**` |
 
 Also binding: **replace, don't stack** (one status paragraph); **one live handover** on `main`
 (#1650); **body follows index**, never an index-only patch (#1342).

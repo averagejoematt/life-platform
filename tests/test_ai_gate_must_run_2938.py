@@ -105,8 +105,11 @@ def test_only_the_failing_gate_is_named():
 
 
 def _workflow(name):
+    # #4254: the install lives in ONE composite; expanded() appends what each call runs.
+    from tests.playwright_browser_calls import expanded
+
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return open(os.path.join(root, ".github", "workflows", name)).read()
+    return expanded(open(os.path.join(root, ".github", "workflows", name)).read())
 
 
 def test_every_visual_qa_copy_installs_boto3():

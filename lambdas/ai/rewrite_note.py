@@ -23,6 +23,21 @@ Two rules here:
      the draft is replaced with "(jargon)" before the line is written. A term the draft
      DID use stays quoted: that is the deterministic `banned_term` fix naming its target.
 
+**Rule 1 needed a shape, not a sentence (the 2026-09-30 brief, request `3958f82a`).** With
+the draft quoted and "keep every other sentence as written" in the note, the rewrite still
+came back as a paraphrase of the whole section: `QG_REVISION kept=0.03 of 30` (physical),
+`0.00 of 27` (labs), `0.00 of 26` (explorer). The callers' `regenerate_fn` re-runs the ORIGINAL
+generation prompt with the note appended, and a model re-reading its whole brief writes the
+section again; the retained finals kept the draft's paragraph plan and changed every
+sentence, adding faults the drafts did not have (labs' final introduced "48 hours", a
+fabricated number; physical's introduced "around 1,600" calories and "exceptional"). So a
+caller that opts in (`ai_calls._enforce_quality_gate(..., revise=True)`) now asks for EDITS:
+a JSON list of `{"find": <a sentence copied from the draft>, "replace": <its fix>}`, and
+`apply_edits` applies them to the draft in code. A sentence no edit names is kept verbatim by
+construction, not by request. A reply that is not an edit list is taken as a full rewrite (the
+old behaviour); an edit list none of whose `find`s is in the draft changes nothing, so it is
+returned empty and the caller keeps the prior draft.
+
 The header says "REVIEW FEEDBACK", not "QUALITY GATE FEEDBACK": `gate` is itself a READER
 RULES term, and the old header put it into every rewrite prompt (physical's 09-28 final
 carried `gate`).
@@ -47,6 +62,17 @@ _HEADER_REVISE = (
 )
 _TAIL = "Rewrite the full response addressing all of the above. Do not mention this feedback in the output."
 _TAIL_REVISE = "Return the full revised section, and nothing else. Do not mention this feedback in the output."
+_HEADER_EDITS = (
+    "REVIEW FEEDBACK — your draft (quoted below) failed review. Do NOT rewrite it. Fix only what each line below "
+    "names, as sentence edits. Every sentence you do not name is kept exactly as written. A replacement adds no new "
+    "material, terms or figures; to fix a figure, remove it or use one already in your data."
+)
+_TAIL_EDITS = (
+    'Return ONLY a JSON object: {"edits": [{"find": "<one sentence copied exactly from YOUR DRAFT>", '
+    '"replace": "<the corrected sentence, or an empty string to delete it>"}]}. One edit per sentence you change. '
+    "No other text."
+)
+_JSON_RE = re.compile(r"\{.*\}", re.S)
 
 
 def _banned_patterns() -> tuple:
@@ -69,8 +95,9 @@ def scrub(line: str, draft: Optional[str], patterns: Optional[tuple] = None) -> 
     return out
 
 
-def correction_note(report: Any, draft: Optional[str] = None) -> str:
-    """Build the corrective note from a failing gate report (and, when known, its draft)."""
+def correction_note(report: Any, draft: Optional[str] = None, edits: bool = False) -> str:
+    """Build the corrective note from a failing gate report (and, when known, its draft).
+    `edits=True` asks for a JSON edit list (see `apply_edits`) instead of the whole section."""
     report = report if isinstance(report, dict) else {}
     pats = _banned_patterns()
 
@@ -106,7 +133,45 @@ def correction_note(report: Any, draft: Optional[str] = None) -> str:
     text = (draft or "").strip()
     if not text:
         return "\n".join([_HEADER, *body, _TAIL])
+    if edits:
+        return "\n".join([_HEADER_EDITS, *body, "", "YOUR DRAFT:", "<<<", text, ">>>", _TAIL_EDITS])
     return "\n".join([_HEADER_REVISE, *body, "", "YOUR DRAFT:", "<<<", text, ">>>", _TAIL_REVISE])
+
+
+def parse_edits(response: Any) -> Optional[list]:
+    """The `{"edits": [...]}` list in a reply, or None when the reply is not an edit list."""
+    import json
+
+    m = _JSON_RE.search(str(response or ""))
+    if not m:
+        return None
+    try:
+        obj = json.loads(m.group(0))
+    except (ValueError, TypeError):
+        return None
+    raw = obj.get("edits") if isinstance(obj, dict) else None
+    if not isinstance(raw, list):
+        return None
+    return [e for e in raw if isinstance(e, dict) and isinstance(e.get("find"), str) and isinstance(e.get("replace", ""), str)]
+
+
+def apply_edits(draft: str, response: Any) -> str:
+    """Apply a reply's sentence edits to `draft`. A reply that is not an edit list is returned
+    as-is (a full rewrite); an edit list that changes nothing returns "" (keep the prior draft)."""
+    found = parse_edits(response)
+    if found is None:
+        return str(response or "")
+    out, applied = draft or "", 0
+    for e in found:
+        find, repl = e["find"].strip(), str(e.get("replace") or "").strip()
+        if len(find) < 8 or find not in out:
+            continue
+        out, applied = out.replace(find, repl, 1), applied + 1
+    if not applied:
+        return ""
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r" +([.,;:!?])", r"\1", out)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(line.strip() for line in out.split("\n"))).strip()
 
 
 def log_revision(coach_id: str, draft: str, revised: str) -> float:

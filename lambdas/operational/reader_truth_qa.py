@@ -148,10 +148,18 @@ MAX_PROSE_CHARS = 6000
 # for the same reason `visual_ai_qa._VERDICT_MAX_TOKENS` is — "every budget must be
 # a named, derived constant" (test_visual_ai_qa_max_tokens_3652) — and because the
 # #3688 positive control has to be able to force it below p50 to reproduce a real
-# truncation. The VALUE is unchanged from the inline literal it replaces; #3688
-# deliberately does not raise it again (#3652/#3656 already tried the raise, and
-# the raise is what did not hold — run 34907061838 truncated at 1500).
-BATCH_VERDICT_MAX_TOKENS = 1500
+# truncation. #3688 kept it at 1500 and added the retry instead.
+#
+# #4474 raised it 1500 -> 3000, on measurement. Over the 14 standalone runs
+# 2026-09-16..09-29, 10 truncated at least one batch at 1500 (12 truncations in
+# all). Every truncated first attempt was billed in full and thrown away, and the
+# retry at 3000 never truncated (0 of 12; a retry that failed did so because its
+# reply did not parse, not because it was cut). A batch verdict that needs more
+# than 1500 tokens is the normal case for the prose-heavy /story/ and /data/
+# batches, not an outlier, so 1500 was below the working set. Output tokens bill
+# only when produced, so the raise costs nothing on a verdict that fits, and the
+# retry now doubles to 6000 for the rare batch that still does not.
+BATCH_VERDICT_MAX_TOKENS = 3000
 
 
 # ── phase ground truth ─────────────────────────────────────────────────────────
@@ -742,14 +750,25 @@ def parse_verdict(text):
         }
     try:
         v = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return {
-            "findings": [],
-            "severity": "unknown",
-            "summary": "(unparseable verdict)",
-            UNEVALUATED_FIELD: KIND_UNPARSEABLE,
-            "raw": (text or "")[:200],
-        }
+    except json.JSONDecodeError as greedy_err:
+        # #4474: the greedy span runs from the FIRST "{" to the LAST "}". A complete
+        # verdict followed by prose that itself contains a brace (or by a second
+        # object) spans both and fails to parse, although the verdict is whole.
+        # raw_decode reads exactly one object from the first "{" and ignores what
+        # follows. A reply whose first object is itself broken still fails, and the
+        # decoder's own message is kept, so the next unparseable batch names the
+        # position and reason instead of only "unparseable".
+        try:
+            v, _end = json.JSONDecoder().raw_decode(m.group(0))
+        except json.JSONDecodeError:
+            return {
+                "findings": [],
+                "severity": "unknown",
+                "summary": "(unparseable verdict)",
+                UNEVALUATED_FIELD: KIND_UNPARSEABLE,
+                "raw": (text or "")[:200],
+                "detail": f"{greedy_err.msg} at char {greedy_err.pos} of {len(m.group(0))}",
+            }
     # No isinstance(v, dict) guard here on purpose: the regex above only ever
     # yields a span that starts "{" and ends "}", so json.loads returns a dict or
     # raises — a third case does not exist, and a guard that cannot fire is the
@@ -780,7 +799,7 @@ def _normalize_finding(f, batch_paths):
     # of every finding's evidence, and triage necessarily worked from a partial
     # sentence (the [never diagnose from a truncated log line] trap built into the
     # instrument's own record). The note is already bounded by the model's own
-    # max_tokens (1500/batch); truncation belongs at PRINT time only.
+    # max_tokens (BATCH_VERDICT_MAX_TOKENS/batch); truncation belongs at PRINT time only.
     out = {"page": page, "category": cat, "severity": sev, "note": str(f.get("note") or "")}
     # #3337: the judge's own structured basis, kept ONLY when it is one of the three
     # enum values. Absent or unrecognized → the field is omitted and every ruling
@@ -839,6 +858,7 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                 label="reader-truth batch [" + ", ".join(str(p.get("path")) for p in batch) + "]",
             )
             verdict = parse_verdict(response_text(resp))
+            detail = f" [{verdict['detail']}]" if verdict.get("detail") else ""
             # #3540: the batch's own coverage verdict, decided BEFORE its findings
             # are read — `unread` above is that decision, now taken on the LAST
             # attempt rather than the first. The batch is reported unevaluated and
@@ -847,7 +867,7 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
             if unread:
                 errors.append(
                     BatchOutcome(
-                        f"batch [{', '.join(str(p.get('path')) for p in batch)}]: UNEVALUATED ({unread}) — "
+                        f"batch [{', '.join(str(p.get('path')) for p in batch)}]: UNEVALUATED ({unread}){detail} — "
                         f"the judge returned no readable verdict, so these surfaces were NOT judged (#3540)",
                         kind=unread,
                         paths=tuple(str(p.get("path")) for p in batch),

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """scripts/ci_dark_flag_sweep.py — the dark-flag sweep (#3315, #2938's unclaimed box).
 
-THE CLASS: a CI step invokes a script or tool flag whose dependency the job never
-installs. `setup-ci` installs NO packages (the #3234 lesson), so every job's installed
-set is exactly what its own `pip install` lines declare — and when a script reaches a
-third-party import the job did not install, one of three things happens:
+THE CLASS: a CI step invokes a script or tool flag whose dependency the job never installs. `setup-ci` installs NO
+packages (the #3234 lesson), so every job's installed set is exactly what its own `pip install` lines declare — and
+when a script reaches a third-party import the job did not install, one of three things happens:
 
   * a module-scope import dies loudly at start (the "dies on import, not on drift" shape
     config-drift.yml documents) — visible, but the step can never do its job;
@@ -15,8 +14,8 @@ third-party import the job did not install, one of three things happens:
     deploy-wedge-watch's `--head-coverage-check` + PyYAML, found here).
 
 This module pins the class, not the instances. For every job in every workflow it
-derives the installed set step by step (ci_pins.py arguments, `pip install -r`, literal
-`pip install`, `playwright install <browser>`), follows every python invocation — in
+derives the installed set step by step (ci_pins.py args, `pip install -r`, literal `pip install`, `playwright install <browser>`,
+a local composite's run: blocks via ci_local_composite, #4254), follows every python invocation — in
 the step's own `run:` block, inside the `bash deploy/*.sh` scripts those steps call, in
 `python3 - <<'PY'` heredocs and `python3 -c` one-liners — computes each entry script's
 transitive repo-local import closure, and reports every third-party distribution that
@@ -53,6 +52,8 @@ import re
 import shlex
 import sys
 from dataclasses import dataclass, field
+
+from ci_local_composite import local_composite_run  # #4254: sees through ./.github/actions/*
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -805,6 +806,7 @@ def evaluate_job(workflow: str, job_id: str, job: dict, repo: str, allowed=ALLOW
         if uses:
             if "setup-python" in uses or ("setup-ci" in uses and str(with_.get("python", "true")).lower() != "false"):
                 runtime = "setup"
+            apply_installs(local_composite_run(uses, with_, repo), installed, repo)  # #4254: a local composite's run: blocks
             results.append(StepResult(workflow, job_id, i, name, "action", "n/a", tuple(sorted(installed)), detail=uses))
             continue
         apply_installs(run, installed, repo)

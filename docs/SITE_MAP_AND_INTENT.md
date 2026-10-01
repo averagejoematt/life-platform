@@ -28,7 +28,7 @@ topic pages (physical, sleep, training, nutrition, labs) · by-coach, scorecard,
 experiments · journal, panel, about, attempts · /method/ + /method/character/ · /story/build/ ·
 /gear/ · /subscribe/ · /privacy/. Everything else stays SERVED at its URL but unlinked (registry
 `"unlisted"` flag or dropped footer link) — no URL moves, no 301s, no deletions.
-`tests/site_vocabulary_residue.py::NAV_REACH_CEILING` holds it.
+`ledgers/site_vocabulary_residue.py::NAV_REACH_CEILING` holds it.
 
 **Wayfinding (#1475):** every chrome-bearing page's footer opens with the `.wayfinder` —
 this registry's five stations in loop order, with the page's own station marked, the next

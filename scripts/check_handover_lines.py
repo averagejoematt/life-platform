@@ -23,11 +23,23 @@ THE FIX
   than MIN_EXPECTED_MARKERS markers is itself an error (exit 2), so a wrap.md rewording
   cannot silently reduce this gate to a no-op (#1189 "no vacuous scans").
 
+#4262 — ONE BLOCKING LINE, THE REST ARE PROMPTS
+  The eleven marker lines passed on the presence of a sentence (`**Ledger:** none — …`,
+  `**Build beat:** none — …`), so a blocking check on them measured typing, not truth; the
+  scripts behind them (main-green, the closure sweep, validate_beats, the doc leg) already
+  block on the artifact. The markers are still DERIVED (the Phase 1 draft block templates
+  them) and a missing one is printed as a `PROMPT`, but only ONE line blocks: the
+  residual / next-picks section. It is the one hand-off a later session reads to find the
+  parked work, and `check_residual_queue.py` passes VACUOUSLY when the section is absent
+  ("nothing to gate", exit 0) — so its presence is asserted here, with the header regex
+  imported from that script (the ONE definition), never restated.
+
 USAGE
   python3 scripts/check_handover_lines.py [HANDOVER_PATH] [--wrap WRAP_PATH]
     HANDOVER_PATH defaults to handovers/HANDOVER_LATEST.md;
     WRAP_PATH defaults to .claude/skills/wrap/SKILL.md (test hook).
-  Exit 0: every derived marker line present. Exit 1: one or more missing (each named).
+  Exit 0: the residual / next-picks section is present (missing marker lines print as
+  PROMPT and do not fail). Exit 1: the residual section is missing.
   Exit 2: the derivation itself regressed (wrap.md unreadable or too few markers found).
 """
 
@@ -69,6 +81,12 @@ _WINDOW = 250
 
 _STEP_HEADING = re.compile(r"^### \(([a-z0-9]+)\)", re.M)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_residual_queue  # noqa: E402  (same directory; the ONE residual-section header, #1340)
+
+# The one BLOCKING line (#4262): the (e4) residual / next-picks section.
+RESIDUAL_STEP = "e4"
+
 
 def step_sections(wrap_text: str):
     """Yield (step_id, body) for each `### (x)` step in wrap.md."""
@@ -103,23 +121,37 @@ def marker_present(handover_text: str, name: str) -> bool:
     return bool(pat.search(handover_text))
 
 
+def residual_present(handover_text: str) -> bool:
+    """True if the handover carries the (e4) residual / next-picks section header."""
+    return any(check_residual_queue.SECTION_HEADER.match(line) for line in handover_text.splitlines())
+
+
 def evaluate(handover_text: str, markers: dict) -> tuple:
-    """(ok, messages) — pure, so the mutation tests drive it directly."""
+    """(ok, messages) — pure, so the mutation tests drive it directly.
+
+    #4262: `ok` turns ONLY on the residual section; a missing marker line is a PROMPT."""
     messages = []
-    missing = []
+    prompts = []
     for name in sorted(markers, key=lambda n: markers[n]):
         if marker_present(handover_text, name):
             messages.append(f"OK — `**{name}:**` present (step ({markers[name]}))")
         else:
-            missing.append(name)
+            prompts.append(name)
             messages.append(
-                f"MISSING — `**{name}:**` (wrap step ({markers[name]})) has no line in the handover.\n"
-                f"  Write the gate's outcome either way — silent omission is not an outcome (#3006)."
+                f"PROMPT — `**{name}:**` (wrap step ({markers[name]})) has no line in the handover; "
+                "optional since #4262, worth one line if the step had an outcome."
             )
-    if missing:
-        messages.append(f"FAIL — {len(missing)} of {len(markers)} gate lines missing: " + ", ".join(missing))
+    if prompts:
+        messages.append(f"PROMPT — {len(prompts)} of {len(markers)} optional marker lines absent: " + ", ".join(prompts))
+    if not residual_present(handover_text):
+        messages.append(
+            f"MISSING — the residual / next-picks section (wrap step ({RESIDUAL_STEP})) is absent.\n"
+            "  It is the one blocking line (#4262): add a `## Residual / next picks` heading whose bullets\n"
+            "  each cite `#N` or `not-work — <reason>` (check_residual_queue.py passes vacuously without it)."
+        )
+        messages.append("FAIL — the residual / next-picks section is missing.")
         return False, messages
-    messages.append(f"OK — all {len(markers)} gate marker lines present.")
+    messages.append(f"OK — residual / next-picks section present; {len(markers) - len(prompts)} of {len(markers)} marker lines written.")
     return True, messages
 
 

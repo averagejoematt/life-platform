@@ -63,7 +63,7 @@ the YAML walk and the grep agree on the same 11.
 
 **Why two keys below look truncated.** `- name: Generate SBOM (syft — …, #1661)` is an
 unquoted YAML scalar, so ` #1661)` is a **comment**: every YAML parser — this guard's and
-GitHub's — drops it, and the step's real name ends at the comma. `tests/gate_census_unproven_residue.py`
+GitHub's — drops it, and the step's real name ends at the comma. `ledgers/gate_census_unproven_residue.py`
 independently records the same truncated names, which is how that was confirmed rather than
 assumed. The keys match what GitHub actually calls the steps; the names were deliberately not
 re-quoted, because doing so would change the census keys in that file.

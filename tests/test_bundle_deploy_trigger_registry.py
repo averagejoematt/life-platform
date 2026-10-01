@@ -205,3 +205,39 @@ def test_bundled_extra_paths_cli_flag_matches_python_api():
     assert proc.returncode == 0, proc.stderr
     cli_paths = sorted(line for line in proc.stdout.splitlines() if line.strip())
     assert cli_paths == build_bundle.bundled_extra_paths()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 4. #4250 box 3 — the reconcile counter file is never a fleet trigger.
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def _plan_fleet_loop() -> str:
+    """The `for file in $CHANGED; do case … done` shared-module loop in plan's Detect step,
+    read from the real ci-cd.yml."""
+    import re
+
+    workflow = _read(".github", "workflows", "ci-cd.yml")
+    step = workflow.split("- name: Detect changes and build deploy plan", 1)[1]
+    m = re.search(r'\n( *for file in \$CHANGED; do\n *case "\$file" in\n.*?\n *esac\n *done)\n', step, re.S)
+    assert m, "plan's shared-module fleet loop not found in ci-cd.yml"
+    return m.group(1)
+
+
+def _fleet_for(changed: str) -> str:
+    import subprocess
+
+    script = 'FLEET_CHANGED="false"\n' + _plan_fleet_loop() + '\necho "FLEET=$FLEET_CHANGED"\n'
+    env = {**os.environ, "CHANGED": changed, "LAMBDA_MAP_FILE": os.path.join(REPO_ROOT, "ci", "lambda_map.json")}
+    out = subprocess.run(["bash", "-c", 'CHANGED="$CHANGED"\n' + script], env=env, capture_output=True, text=True, check=True).stdout
+    return out.strip().splitlines()[-1]
+
+
+@pytest.mark.skipif(__import__("shutil").which("jq") is None, reason="the plan loop shells out to jq")
+def test_reconcile_counter_file_alone_never_triggers_a_fleet_deploy():
+    """A reconcile-only push changes lambdas/web/platform_counts.py (plus docs). The plan
+    loop, executed as ci-cd.yml spells it, must not set FLEET_CHANGED for it — and must
+    still set it for a genuine unmapped shared module (the control)."""
+    assert _fleet_for("lambdas/web/platform_counts.py") == "FLEET=false"
+    assert _fleet_for("lambdas/web/platform_counts.py lambdas/common/constants.py") == "FLEET=true"
+    assert _fleet_for("lambdas/emails/weekly_digest_lambda.py") == "FLEET=false", "a mapped handler is a per-function deploy"
