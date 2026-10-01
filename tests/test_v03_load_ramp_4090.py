@@ -555,35 +555,103 @@ def test_4408_a_missed_week_is_not_a_layoff_the_load_is_still_held():
 
 
 def test_4408_mutation_control_a_7_day_layoff_line_re_prescribes_the_ramp_after_one_missed_week():
-    with patch.object(load_ramp, "DETRAINING_ANCHOR_AGE_DAYS", 7):
+    """#4503 OD1: the line lives in `layoff_tiers.HOLD_MAX_GAP_DAYS` now. Put it back at 7 and the 10-day
+    gap is no longer held — it drops to the re-entry tier (180 lb, 90 % rounded down), not 205."""
+    from training import layoff_tiers
+
+    with patch.object(layoff_tiers, "HOLD_MAX_GAP_DAYS", 7):
         history, _ = _wire_history()
         row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of="2026-10-08", week=1, slot=HEAVY_SLOT)
-    assert row["ramp"]["hold"]["layoff"] is True and row["floor_kg"] == pytest.approx(145 * LB)
+    assert row["ramp"]["hold"]["layoff"] is True and row["floor_kg"] == pytest.approx(180 * LB)
+
+
+# ── #4503 OD1 (owner ruling 2026-09-30): <= 28 d held · 29–90 d at 85–90 % of band best · > 90 d the ramp ──
+def _bench_gap(days, **kw):
+    """`days` after the bench's last session at this band (09-25 — the movement's own gap, which OD1 reads)."""
+    from common.pacific_time import shift_day_key
+
+    history, _ = _wire_history()
+    kw.setdefault("slot", HEAVY_SLOT)
+    return load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=shift_day_key("2026-09-25", days), week=1, **kw)
+
+
+def test_4503_od1_a_14_day_gap_holds_the_load_instead_of_ramping():
+    row = _bench_gap(14)
+    h = row["ramp"]["hold"]
+    assert h["tier"] == "hold" and h["layoff"] is False and h["layoff_evidence"]["tier_gap_days"] >= 14
+    assert h["layoff_evidence"]["threshold_days"] == 28 and row["floor_kg"] == pytest.approx(205 * LB)
+
+
+def test_4503_od1_mutation_control_a_14_day_gap_under_the_old_7_day_line_does_not_hold():
+    from training import layoff_tiers
+
+    with patch.object(layoff_tiers, "HOLD_MAX_GAP_DAYS", 7):
+        row = _bench_gap(14)
+    assert row["ramp"]["hold"]["tier"] == "reentry" and row["floor_kg"] < 205 * LB - 1e-6
+
+
+def test_4503_od1_the_28_day_boundary_is_inclusive_29_is_reentry():
+    at28, at29 = _bench_gap(28), _bench_gap(29)
+    assert at28["ramp"]["hold"]["tier"] == "hold" and at28["ramp"]["hold"]["layoff"] is False
+    assert at29["ramp"]["hold"]["tier"] == "reentry" and at29["ramp"]["hold"]["layoff"] is True
+
+
+def test_4503_od1_a_40_day_gap_gets_85_to_90_percent_of_band_best():
+    """205 x 5 @ RPE 8 is the band best for the 4–6 top set; 40 days on, 90 % rounded DOWN on the 5-lb grid = 180 lb (87.8 %)."""
+    row = _bench_gap(40)
+    h = row["ramp"]["hold"]
+    assert h["tier"] == "reentry" and h["applies"] is True
+    a = h["achieved"]
+    assert a["band_best_kg"] == pytest.approx(205 * LB, abs=0.01) and 85.0 <= a["pct_of_band_best"] <= 90.0
+    assert row["floor_kg"] == pytest.approx(180 * LB)
+    assert "a 40-day gap, so 87.8% of it (OD1)" in load_ramp.render_ramp_cue(row)
+
+
+def test_4503_od1_mutation_control_without_the_reentry_tier_a_40_day_gap_ramps_to_145():
+    from training import layoff_tiers
+
+    with patch.object(layoff_tiers, "REENTRY_MAX_GAP_DAYS", 28):
+        row = _bench_gap(40)
+    assert row["ramp"]["hold"]["tier"] == "ramp" and row["floor_kg"] == pytest.approx(145 * LB)
 
 
 def test_4408_the_ramp_still_fires_after_a_layoff():
-    """Past the detraining line — the record's gap, whatever the caller passes (the cron hands the
-    generator a constant 2) — there IS something to re-enter from, and the ramp stands."""
-    history, _ = _wire_history()
-    gap_day = __import__("common.pacific_time", fromlist=["shift_day_key"]).shift_day_key(
-        "2026-09-28", load_ramp.DETRAINING_ANCHOR_AGE_DAYS
-    )
-    row = load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=gap_day, week=1, slot=HEAVY_SLOT, days_since_last_workout=2)
-    assert row["ramp"]["hold"]["layoff"] is True
-    assert row["ramp"]["hold"]["layoff_evidence"]["record_gap_days"] == load_ramp.DETRAINING_ANCHOR_AGE_DAYS
+    """Past 90 days — the record's gap, whatever the caller passes (the cron hands the generator a
+    constant 2) — there IS something to re-enter from, and the ramp stands (#4503 OD1)."""
+    row = _bench_gap(91, days_since_last_workout=2)
+    assert row["ramp"]["hold"]["layoff"] is True and row["ramp"]["hold"]["tier"] == "ramp"
+    assert row["ramp"]["hold"]["layoff_evidence"]["tier_gap_days"] == 91
     assert row["floor_kg"] == pytest.approx(145 * LB) and row["ramp"]["hold"]["applies"] is False
 
 
+def test_4503_od1_exposures_1_to_3_after_a_90_day_gap_carry_the_rpe_7_reps_8_caps():
+    tid = BENCH_TID
+    hist = {tid: [{"date": "2026-03-02", "top_weight_kg": 90.0, "sets": [{"weight_kg": 90.0, "reps": 5}]}]}
+    weights = {"2026-03-02": 314.0, "2026-09-28": 313.7}
+    row = load_ramp.v03_floor(tid, hist, weights, 313.7, as_of="2026-09-29", week=1, slot=HEAVY_SLOT)
+    caps = row["ramp"]["exposure_caps"]
+    assert (caps["exposure"], caps["rpe_max"], caps["reps_max"]) == (1, 7, 8) and row["ramp"]["hold"]["tier"] == "ramp"
+    assert "Exposure 1 of 3" in load_ramp.render_ramp_cue(row) and "RPE <= 7, reps <= 8" in load_ramp.render_ramp_cue(row)
+    later = {tid: hist[tid] + [{"date": d, "sets": [{"weight_kg": 60.0, "reps": 8}]} for d in ("2026-09-29", "2026-10-01", "2026-10-03")]}
+    assert (
+        load_ramp.v03_floor(tid, later, weights, 313.7, as_of="2026-10-02", week=1, slot=HEAVY_SLOT)["ramp"]["exposure_caps"]["exposure"]
+        == 3
+    )
+    assert "exposure_caps" not in load_ramp.v03_floor(tid, later, weights, 313.7, as_of="2026-10-05", week=1, slot=HEAVY_SLOT)["ramp"]
+
+
 def test_4408_the_ramp_still_fires_on_a_novel_again_anchor():
-    """An anchor the detraining discount applies to (>= 28 d before block 1) is exactly what the ramp
-    re-enters from — in band or not, it holds nothing up. The 09-28 trap bar stays at 120 lb."""
+    """An anchor the detraining discount applies to (>= 28 d before block 1) keeps its anchor-set base,
+    and past 90 days at this band it holds nothing up. The 09-28 trap bar stays at 120 lb. #4503 OD1: a
+    59-day-old in-band set is no longer novel-again for the hold — it is the 85–90 % re-entry tier."""
     row = load_ramp.v03_floor(TRAP_TID, HISTORY_0928, WEIGHTS_0928, 313.7, as_of="2026-09-28", week=1, slot=HEAVY_SLOT)
     assert row["floor_kg"] == pytest.approx(120 * LB) and row["ramp"]["hold"]["applies"] is False
-    in_band_old = {BENCH_TID: [{"date": "2026-08-01", "top_weight_kg": 100.0, "sets": [{"weight_kg": 100.0, "reps": 5}]}]}
-    old = load_ramp.v03_floor(
-        BENCH_TID, in_band_old, {"2026-08-01": 314.0, "2026-09-28": 313.7}, 313.7, as_of="2026-09-29", week=1, slot=HEAVY_SLOT
-    )
-    assert old["ramp"]["discount_pct"] == 10 and old["ramp"]["hold"]["achieved"] is None and old["floor_kg"] < 100.0
+    weights = {"2026-08-01": 314.0, "2026-06-01": 314.0, "2026-09-28": 313.7}
+    for day, tier in (("2026-06-01", "ramp"), ("2026-08-01", "reentry")):
+        in_band_old = {BENCH_TID: [{"date": day, "top_weight_kg": 100.0, "sets": [{"weight_kg": 100.0, "reps": 5}]}]}
+        old = load_ramp.v03_floor(BENCH_TID, in_band_old, weights, 313.7, as_of="2026-09-29", week=1, slot=HEAVY_SLOT)
+        assert old["ramp"]["discount_pct"] == 10 and old["ramp"]["hold"]["tier"] == tier and old["floor_kg"] < 100.0
+    assert old["floor_kg"] == pytest.approx(195 * LB)  # 90 % of 220.5 lb, rounded down
 
 
 def test_4408_generator_planner_and_chat_gate_read_one_held_number():
@@ -663,7 +731,7 @@ def _bench_after_layoff(week, slot):
     from common.pacific_time import shift_day_key
 
     history, _ = _wire_history()
-    after = shift_day_key("2026-09-28", load_ramp.DETRAINING_ANCHOR_AGE_DAYS)
+    after = shift_day_key("2026-09-28", 91)  # #4503 OD1: past 90 days, the ramp re-enters
     return load_ramp.v03_floor(BENCH_TID, history, WIRE_WEIGHTS, 313.7, as_of=after, week=week, slot=slot)
 
 
