@@ -177,6 +177,56 @@ def test_a_spent_budget_defers_rather_than_pretending():
     assert result.deferred and not result.ok and "budget" in result.error
 
 
+def test_the_census_budget_times_census_reads_not_the_sweep_before_them(monkeypatch):
+    """#4183: the budget's clock starts at construction, and the handler used to construct it
+    at invocation start — so the ~40 checks ahead of the census legs (52-62s live) spent its
+    60s and the legs went NOT OBSERVED on any run longer than the budget (6 alarmed warns on
+    the 2026-10-01T03:00Z invoke). Driven through the REAL handler and the REAL step order:
+    every non-census step advances a fake clock 5s, far past the budget, and the census legs
+    must still receive an UNSPENT budget — one budget shared by both, fresh per invocation."""
+    from types import SimpleNamespace
+
+    from operational import census_probe, qa_smoke_lambda as qa
+
+    clock = {"t": 0.0}
+    monkeypatch.setattr(census_probe, "time", SimpleNamespace(monotonic=lambda: clock["t"]))
+    census_labels = ("hook_liveness_matrix", "week_narration_agreement")
+    labels = [label for label, _fn in qa.check_steps()]
+    assert set(census_labels) <= set(labels)
+    seen: dict = {}
+
+    def steps():
+        out = []
+        for label in labels:
+            if label in census_labels:
+
+                def census(_lab=label):
+                    budget = qa.census_budget()
+                    seen.setdefault(_lab, []).append((budget, budget.exhausted))
+                    return [Check(f"stub:{_lab}", "Stub", CONTENT_TRUTH).ok("stub")]
+
+                out.append((label, census))
+            else:
+
+                def slow(_lab=label):
+                    clock["t"] += 5.0
+                    return [Check(f"stub:{_lab}", "Stub", CONTENT_TRUTH).ok("stub")]
+
+                out.append((label, slow))
+        return out
+
+    monkeypatch.setattr(qa, "check_steps", steps)
+    for _ in range(2):
+        assert qa.lambda_handler({"dry_run": True}, None)["statusCode"] == 200
+    ahead = labels.index(census_labels[0])
+    assert ahead * 5.0 > census_probe.DEFAULT_BUDGET_SECONDS, "the control must actually outrun the budget before the census"
+    for lab in census_labels:
+        assert [spent for _b, spent in seen[lab]] == [False, False], f"{lab} got a budget the earlier checks had already spent"
+    first, second = (seen[census_labels[0]][i][0] for i in (0, 1))
+    assert seen[census_labels[1]][0][0] is first, "the two census legs must share ONE budget (each url read once)"
+    assert second is not first, "each invocation must get a fresh budget"
+
+
 # ── the leg ──────────────────────────────────────────────────────────────────
 class _FakeTable:
     def __init__(self, items=None, query_items=None):
