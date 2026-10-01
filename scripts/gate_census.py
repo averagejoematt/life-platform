@@ -564,7 +564,7 @@ ATTEMPTED_UNPROVEN: dict[str, str] = {
         "which is exactly what makes it fail CLOSED); reproducing either locally means "
         "planting a leak on prod or faking an AWS outage the CI runner does not actually "
         "have, so a local exit code would be a verdict on a different gate (#3620's own "
-        "bucket-policy-drift entry in tests/gate_census_unproven_residue.py records the "
+        "bucket-policy-drift entry in ledgers/gate_census_unproven_residue.py records the "
         "identical reasoning for the live-AWS half of that check). What IS mutation-proven, "
         "at the unit level, is the function this step wires: "
         "tests/test_public_surface_pii_guard.py::test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass "
@@ -898,7 +898,9 @@ _REGISTRY_NAME = re.compile(
     r"^_?(GATE_CLASSES|.*_CHECKS|.*_RULES|.*ALLOWLIST|.*DENYLIST|.*_EXEMPT.*|"
     r"BASELINE|.*_BASELINE|CHOKEPOINTS|.*_GATES|.*_GUARDS|GATE_.*|.*_CLASSES)$"
 )
-_REGISTRY_ROOTS = ("lambdas", "tests", "scripts", "deploy", "mcp")
+# "ledgers" added #4270 slice 3: the shrink-only ledgers moved out of tests/ keep their
+# registry entries in the census (site_vocabulary_residue.py::BASELINE is 16 proven gates).
+_REGISTRY_ROOTS = ("lambdas", "tests", "scripts", "deploy", "mcp", "ledgers")
 
 
 def _literal_entries(value: ast.expr | None) -> list[str] | None:

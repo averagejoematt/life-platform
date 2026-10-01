@@ -25,7 +25,12 @@ import boto3
 from common.pacific_time import pacific_today  # #2815: the OUTPUT# frame's no-generation_date fallback
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
-from coach import audience_guard, coach_derived_prose, published_vitals  # #2972 public frame; #2418 derived-prose SET; #2575 vitals stamp
+from coach import (  # #2972 public frame; #2418 derived-prose SET; #2575 vitals stamp
+    audience_guard,
+    coach_derived_prose,
+    coach_json_schemas as _schemas,  # #4276: structured-output schemas
+    published_vitals,
+)
 from coach.reading_date_fidelity import guard_derived_summary  # #2343
 from coach.relationship_engine import compute_relationship_update  # #536
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
@@ -297,7 +302,7 @@ def _emit_prediction_gradability(gradable: int, qualitative: int) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
+def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1, schema=None):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
@@ -319,28 +324,28 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
         # if the prompt ever grows on its merits). See ai.prompt_cache.CACHING_DECISIONS.
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
-
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     from common.retry_utils import call_anthropic_raw
 
-    resp = call_anthropic_raw(req)
-    text = resp["content"][0]["text"].strip()
-    # #4276: the fence-tolerant parse is one shared copy now (ai/structured_json.py). This site does
-    # not yet send `output_config.format`: its output needs its own JSON schema first (see #4276).
-    from ai.structured_json import parse_json_text
+    def _send(b):
+        req = urllib.request.Request(
+            ANTHROPIC_API,
+            data=json.dumps(b).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+            },
+            method="POST",
+        )
+        return call_anthropic_raw(req)
 
-    return parse_json_text(text)
+    # #4276: with `schema`, the reply is requested under `output_config.format` (structured
+    # outputs); ai.structured_json.call_json re-sends without it if Bedrock refuses the schema,
+    # and keeps the fence-tolerant parse as the fallback. The schemas: coach/coach_json_schemas.py.
+    from ai.structured_json import call_json
+
+    return call_json(_send, body, schema=schema, label="coach_state_updater")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1122,6 +1127,7 @@ def lambda_handler(event, context):
             system=EXTRACTION_SYSTEM_PROMPT,
             user_message=user_message,
             temperature=0.1,
+            schema=_schemas.EXTRACTION_OUTPUT_SCHEMA,
         )
 
         # Validate we got a dict

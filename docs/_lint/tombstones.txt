@@ -69,3 +69,5 @@ off\s*\|\s*shadow\s*\|\s*auto	`auto` is a retired remediation-mode value (#2833,
 scripts/deploy\.command	retired 2026-09-19 by #3608 — it hand-zipped mcp_server.py alone outside the one-bundle rule (#781); use `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py`
 deploy_and_verify\.sh	archived by #4255 — the one Lambda code deploy path is deploy/deploy_fleet.sh (CI runs it too)
 deploy_mcp_split\.sh	archived by #4255 — deploy/deploy_fleet.sh ships both MCP functions
+check_deploy_wedge\.py	retired by #4256 box 3 — the deploy dead-man scripts/check_deploy_deadman.py replaced it (ADR-158)
+deploy-gate-janitor\.yml	retired by #4256 box 3 — ADR-158 left no code-deploy lease to reject

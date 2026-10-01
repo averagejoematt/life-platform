@@ -92,7 +92,6 @@ DEMOTE_FIELD_RESIDUE: dict[str, str] = {
     "docs/PROPORTIONALITY.md::c407e86338cb": "2026-09-23",  # Per-feature AI budget ledger (#3374 R3: `scripts/ai_budget_ledger.py` + `tests/test_ai_bud
     "docs/PROPORTIONALITY.md::ac86519cb3e5": "2026-09-23",  # MoM close delta clause (#3374 R2: `doc_facts_ops.monthly_close_driver_hits`, wired into `s
     "docs/PROPORTIONALITY.md::265c47b722ad": "2026-09-23",  # Per-door audience instrumentation (#3376: the bounded `Door` dimension on `LifePlatform/Tr
-    "docs/PROPORTIONALITY.md::1e9cfc4a1c46": "2026-09-23",  # Reject-only production-gate lease steward (#3422, carried by the #3021 janitor: `scripts/c
     "docs/PROPORTIONALITY.md::d5c3a89291ff": "2026-09-23",  # Compute-pipeline liveness heartbeat (#3473: `compute-pipeline-stale-heartbeat` in the extr
     "docs/PROPORTIONALITY.md::284dd0a21eeb": "2026-09-23",  # Reset doc-gate sweep (#3477: `deploy/restart_verify_gates.py`, the final sub-script of `re
     "docs/PROPORTIONALITY.md::755b88a6b720": "2026-09-23",  # Co-owned computed_metrics write contract + ACWR dead-man (#3443: `compute/computed_metrics

@@ -1,4 +1,4 @@
-"""tests/site_vocabulary_residue.py — the dated, shrink-only ledger behind the vocabulary guard (#4182).
+"""ledgers/site_vocabulary_residue.py — the dated, shrink-only ledger behind the vocabulary guard (#4182).
 
 Per registered term in site/data/glossary.json: the number of reader pages whose STATIC
 main content still carried it when the guard landed. Measured 2026-09-26 at main 44c77f11c

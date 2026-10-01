@@ -23,36 +23,23 @@ straight past:
     from main. This is not an ordinary red — every subsequent merge's deploy
     strands too, invisibly, until the CDK deploy clears it.
 
-#2052 adds the THIRD stranded state, which the two above cannot express:
-
-  * **Phantom deploy wedge** — the run's `Deploy` job is blocked in the
-    `ci-cd-deploy-<ref>` concurrency group by an entry that corresponds to no
-    real run. Since the #2009 redesign this no longer presents as `0 jobs`:
-    the run shows FIVE GREEN JOBS and sits `pending`, which reads as "waiting
-    for approval" — but `pending_deployments` is empty and will stay empty,
-    because GitHub evaluates concurrency BEFORE the environment rule, so the
-    gate never opens and there is nothing to approve. Every tell documented
-    for the older phantom class keys on "0 jobs" and is therefore now blind.
-    Detection lives in `scripts/check_deploy_wedge.py` (it needs per-run JOB
-    state, which `gh run list` does not carry); this gate consumes its verdict.
-    Distinguishing it from the stranded-approval class above is NOT possible
-    from a single run — the two are byte-identical — it turns entirely on
-    whether any other in-flight run actually holds the deploy group.
+#2052's THIRD stranded state — the phantom deploy wedge (Deploy blocked in its
+concurrency group by an entry no real run holds) — was detected here from
+`scripts/check_deploy_wedge.py`'s verdict until #4256 box 3 retired that classifier:
+ADR-158 took the production gate off the code `deploy` job, and the deploy dead-man
+(`scripts/check_deploy_deadman.py`, scheduled in deploy-wedge-watch.yml) alarms on any
+green run on main that has not deployed within its deadline — a wedge included.
 
 Verdicts:
   * green                → exit 0
   * green + a YOUNG waiting run (< ~2h at the approval gate) → exit 0 with a
     notice (a manual production approval pending is the pipeline's normal
     post-merge state, not an incident — until it ages past the threshold)
-  * stranded-approval / stranded-plan / stranded-deploy-wedge / red /
+  * stranded-approval / stranded-plan / red /
     no-verdict → print the decode contract and exit 1. The wrap may proceed
     ONLY by writing the one-line decode into the handover (e.g. `**Main:**
     stranded — run 303… waiting at the production gate since 03:06Z, #1901
     class`) and re-running with --decoded to acknowledge.
-
-A phantom deploy wedge outranks every other verdict INCLUDING green: while it
-holds, no deploy can start, so the last completed run's success is a stale
-fact about a pipeline that is no longer able to ship.
 
 #2590 adds the FOURTH non-verdict state — the one created by obeying #2467:
 
@@ -249,7 +236,6 @@ GREEN = "green"
 RED = "red"
 STRANDED_APPROVAL = "stranded-approval"
 STRANDED_PLAN = "stranded-plan"
-STRANDED_DEPLOY_WEDGE = "stranded-deploy-wedge"
 NO_VERDICT = "no-verdict"
 MISSING_JOB = "missing-job"  # #3608 box 2: an EXPECTED job never attached to the run.
 
@@ -376,8 +362,7 @@ def head_coverage(runs: list[dict], head_sha: str | None) -> dict:
 # docs-only or handover-only commit, e.g.), and that is indistinguishable from
 # a genuine swallow using ci-cd.yml's run list alone. The discriminator below
 # is fleet-level (queries runs of ALL workflows at head_sha, not just ci-cd.yml)
-# — same shape as check_deploy_wedge.holders() needing a fleet view to tell a
-# real holder from a phantom.
+# — a fleet view, because one workflow's run list cannot tell the two apart.
 
 CI_CD_WORKFLOW_FILE = "ci-cd.yml"
 
@@ -612,7 +597,6 @@ def classify_pipeline(
     runs: list[dict],
     latest_failure_jobs: list[dict] | None = None,
     now: datetime | None = None,
-    deploy_wedge: dict | None = None,
     rejected: list[dict] | None = None,
     cancelled_verdicts: dict | None = None,
     cancelled_notes: list[dict] | None = None,
@@ -623,15 +607,9 @@ def classify_pipeline(
     """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
     Returns {"kind", "sha", "run", "waiting", "overdue_waiting"} where kind is one of
-    GREEN / RED / STRANDED_APPROVAL / STRANDED_PLAN / STRANDED_DEPLOY_WEDGE / NO_VERDICT.
+    GREEN / RED / STRANDED_APPROVAL / STRANDED_PLAN / NO_VERDICT / MISSING_JOB.
 
-    `deploy_wedge` is the verdict dict from `check_deploy_wedge.classify_fleet` (the
-    caller supplies it — this gate reads `gh run list`, which carries no per-run job
-    state, so it cannot detect the wedge itself).
-
-    Precedence: a phantom deploy wedge outranks everything — while it holds, NO deploy
-    can start and no approval is even possible, so a green completed run is a stale
-    fact. Then an OVERDUE waiting run (it blocks every later run regardless of the last
+    Precedence: an OVERDUE waiting run (it blocks every later run regardless of the last
     completed verdict). A young waiting run does not change the verdict — it is
     reported alongside it.
     """
@@ -643,17 +621,13 @@ def classify_pipeline(
     if latest_failure_jobs:
         plan_failed, deploy_skipped, other_failed = _job_shape(latest_failure_jobs)
 
-    wedged = [v for v in (deploy_wedge or {}).get("verdicts", []) if v.get("kind") == "phantom-wedge"]
-
     rejected = rejected or []
     completed = latest_completed_run(
         runs,
         rejected_ids={(e.get("run") or {}).get("databaseId") for e in rejected},
         cancelled_verdicts=cancelled_verdicts,
     )
-    if wedged:
-        kind = STRANDED_DEPLOY_WEDGE
-    elif overdue:
+    if overdue:
         kind = STRANDED_APPROVAL
     elif completed is None:
         kind = NO_VERDICT
@@ -681,7 +655,6 @@ def classify_pipeline(
         "run": completed,
         "waiting": waiting,
         "overdue_waiting": overdue,
-        "wedged": wedged,
         "rejected": rejected,
         # #3530: every cancelled run the walk saw, and what its OWN jobs said.
         "cancelled_notes": cancelled_notes or [],
@@ -731,26 +704,6 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
     sha8 = (state.get("sha") or "")[:8]
     lines: list[str] = []
     notices = _rejection_notices(state) + _cancelled_notices(state)
-
-    if kind == STRANDED_DEPLOY_WEDGE:
-        lines.append("🛑 PHANTOM DEPLOY WEDGE (#2052 class) — main's deploy path is dead; a green completed run is a stale fact:")
-        for v in state.get("wedged", []):
-            lines.append(
-                f"   run {v.get('run_id')} sha {v.get('sha')} — Deploy blocked {v.get('blocked_minutes')}m with NOTHING holding the deploy group."
-            )
-        lines.append(
-            "   This is NOT the #1901 stranded-approval class even though it looks identical:\n"
-            "   `pending_deployments` is EMPTY and stays empty — GitHub evaluates the job's\n"
-            "   `concurrency` BEFORE the `production` environment rule, so the gate never opens\n"
-            "   and there is nothing to approve. Waiting for it is waiting forever. Since #2009\n"
-            "   moved the group onto the `deploy` job, the run shows five GREEN jobs, so every\n"
-            "   documented '0 jobs' tell for this class is blind.\n"
-            "   Recovery: `python3 scripts/check_deploy_wedge.py --recover` (cancels the wedged\n"
-            "   run, re-dispatches ci-cd.yml with deploy_all=true — a dispatch carries no push\n"
-            "   diff, so change detection would otherwise deploy nothing). Do NOT salt the\n"
-            "   concurrency group: three salts failed across recurrences 1-3 (CONVENTIONS §4d)."
-        )
-        return 1, "\n".join(lines + notices)
 
     if kind == MISSING_JOB:
         lines.append(
@@ -1008,20 +961,6 @@ def main() -> int:
 
     rejected, jobs = scan_rejections(runs, _probe, cancelled_verdicts=cancelled_verdicts)
 
-    # #2052: the phantom deploy wedge needs per-run JOB state, which `gh run list`
-    # does not carry. Best-effort — a detector failure must never turn a readable
-    # green/red verdict into a hard error, so it degrades to "wedge unknown".
-    wedge = None
-    try:
-        import check_deploy_wedge  # noqa: PLC0415 - optional, same directory
-
-        in_flight, jobs_by_run, pending_by_run = check_deploy_wedge.collect()
-        wedge = check_deploy_wedge.classify_fleet(in_flight, jobs_by_run, pending_by_run)
-    except Exception as e:  # noqa: BLE001
-        print(
-            f"⚠️  check_main_green: deploy-wedge detection unavailable ({e}) — run scripts/check_deploy_wedge.py by hand if a deploy looks stuck."
-        )
-
     # #3608 box 2: the winning run's OWN job list, so an EXPECTED job that never
     # attached cannot hide behind a `success` rollup. Probed only for the run the
     # walk selected (one extra `gh run view`), and only consulted when that run
@@ -1041,7 +980,6 @@ def main() -> int:
     state = classify_pipeline(
         runs,
         latest_failure_jobs=jobs,
-        deploy_wedge=wedge,
         rejected=rejected,
         cancelled_verdicts=cancelled_verdicts,
         cancelled_notes=cancelled_notes,

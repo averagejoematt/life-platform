@@ -134,22 +134,10 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "(2026-08-26, median ~47 min) and 4.3h since the newest at 2026-08-27T04:12Z. "
         "GitHub throttles high-frequency crons hard, so grace is set from the observed "
         "tail, not the declared period: 8h is ~2.3x the worst observed gap.",
-        "reason": "The fifth-recurrence escape hatch for a wedged ci-cd run (#2052) — it exists "
-        "to observe the pipeline from OUTSIDE. If it stops, a stranded deploy sits "
-        "invisible for exactly as long as nobody looks, which is the incident it was "
-        "built after.",
-    },
-    "deploy-gate-janitor.yml": {
-        "watched": True,
-        "grace_hours": 8.0,
-        "basis": "declared */15, the SAME cron deploy-wedge-watch.yml carries (it was a step of that "
-        "workflow until #3422 split it out on 2026-09-04); MEASURED on that workflow's 60 newest "
-        "scheduled runs 2026-08-26 -> 2026-09-04: gap median 211 min, p90 417, max 729 (12.2h). "
-        "8h matches its sibling's grace; the max is why this workflow also fires on "
-        "`deployment_status` (the event hook is the fast path, the cron is only the dead-man).",
-        "reason": "The #3021/#3422 superseded-lease janitor. If its cron stops, a superseded "
-        "production-gate lease that the event hook missed holds the deploy-group slot until a "
-        "human notices (#2467) — the manual toil the janitor exists to retire.",
+        "reason": "Hosts THE deploy dead-man (ADR-158, #4256 — it absorbed the #2052 wedge watch and "
+        "the #3021 lease janitor) and the #2826 head-coverage check; it observes the pipeline "
+        "from OUTSIDE. If it stops, a green merge that never deployed sits invisible for "
+        "exactly as long as nobody looks.",
     },
     "config-drift.yml": {
         "watched": True,

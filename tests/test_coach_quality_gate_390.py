@@ -174,6 +174,84 @@ class TestQualityGateNoteRevisesTheDraft:
         assert "QG_REVISION kept=" in capsys.readouterr().out
 
 
+# #4343 (2026-09-30 brief, request 3958f82a): the note quoted the draft and asked to keep every
+# other sentence, and the rewrites still came back as paraphrases — `QG_REVISION kept=0.03 of 30`
+# (physical), `0.00 of 27` (labs). Physical's draft paragraph, verbatim from EVALRET#coach_brief:
+PHYSICAL_0930_DRAFT = (
+    "Protein is the one place I can point to genuine forward movement. Over your 21 logged food days, you're "
+    "averaging 153.5 g a day. That's real progress from where the running average sat at the start of this cycle. "
+    "It's still short of the 170 g floor, let alone the 190 g target, and dinner remains the structural load-bearing "
+    "meal — one disrupted evening collapses the daily number."
+)
+# ...and the same paragraph in its final: every sentence paraphrased, one figure added ("around 1,600").
+PHYSICAL_0930_FINAL = (
+    "Protein is moving in the right direction, and I want to name that plainly. Over 21 logged food days, you're "
+    "averaging 153.5 g a day — real progress from where that running average sat at the start of this cycle. At a "
+    "weight loss rate of 3.8 lbs per week with calories averaging around 1,600 across those 21 logged days, your body "
+    "is shedding tissue faster than I'd want to see."
+)
+PHYSICAL_0930_REPORT = {
+    "passed": False,
+    "score": 28,
+    "suggestions": ["[unlabeled_window_figure] an average/trend figure is stated with no window in its sentence"],
+}
+_FIXED = "That's real progress from the 7-day running average at the start of this cycle."
+PHYSICAL_0930_EDITS = json.dumps(
+    {"edits": [{"find": "That's real progress from where the running average sat at the start of this cycle.", "replace": _FIXED}]}
+)
+
+
+class TestQualityGateRevisionIsAnEditList:
+    def _enforce(self, reply, *reports):
+        client = _lambda_client_returning(PHYSICAL_0930_REPORT, *(reports or ({"passed": True, "score": 90},)))
+        regenerate_fn = MagicMock(return_value=reply)
+        out, rep = ai_calls._enforce_quality_gate(client, "physical_coach", PHYSICAL_0930_DRAFT, {}, regenerate_fn, revise=True)
+        judged = [json.loads(c.kwargs["Payload"])["output_text"] for c in client.invoke.call_args_list]
+        return out, rep, regenerate_fn, judged
+
+    def test_the_note_asks_for_edits_not_a_section(self):
+        _out, _rep, fn, _judged = self._enforce(PHYSICAL_0930_EDITS)
+        (note,), _ = fn.call_args
+        assert PHYSICAL_0930_DRAFT in note and '"edits"' in note and "Do NOT rewrite it" in note
+
+    def test_the_edits_change_only_the_named_sentence(self, capsys):
+        from ai import rewrite_note as qgn
+
+        _out, _rep, _fn, judged = self._enforce(PHYSICAL_0930_EDITS)
+        revised = judged[1]  # the text the gate judged on the second pass
+        assert _FIXED in revised
+        kept = [s for s in qgn._SENTENCE_RE.split(PHYSICAL_0930_DRAFT) if "real progress from where" not in s]
+        assert all(s in revised for s in kept)
+        assert "QG_REVISION kept=0.75 of 4" in capsys.readouterr().out
+
+    def test_mutation_control_the_live_paraphrase_keeps_nothing(self):
+        from ai import rewrite_note as qgn
+
+        assert qgn.log_revision("physical_coach", PHYSICAL_0930_DRAFT, PHYSICAL_0930_FINAL) == 0.0
+        assert qgn.log_revision("physical_coach", PHYSICAL_0930_DRAFT, qgn.apply_edits(PHYSICAL_0930_DRAFT, PHYSICAL_0930_EDITS)) == 0.75
+
+    def test_a_fenced_edit_list_and_a_deletion_apply(self):
+        from ai import rewrite_note as qgn
+
+        reply = '```json\n{"edits": [{"find": "Protein is the one place I can point to genuine forward movement.", "replace": ""}]}\n```'
+        out = qgn.apply_edits(PHYSICAL_0930_DRAFT, reply)
+        assert out.startswith("Over your 21 logged food days") and "  " not in out
+
+    def test_an_edit_list_that_matches_nothing_keeps_the_prior_draft(self):
+        reply = json.dumps({"edits": [{"find": "a sentence the draft never had", "replace": "x"}]})
+        out, rep, _fn, judged = self._enforce(reply, {"passed": True, "score": 90})
+        assert out is None and len(judged) == 1  # nothing applied -> "" -> no second judge call, held on the draft's report
+
+    def test_a_prose_reply_is_taken_as_a_full_rewrite(self):
+        _out, _rep, _fn, judged = self._enforce(PHYSICAL_0930_FINAL)
+        assert judged[1] == PHYSICAL_0930_FINAL
+
+    def test_the_coach_v2_call_site_opts_in(self):
+        import inspect
+
+        assert "regenerate_fn=_regen_fn, revise=True" in inspect.getsource(ai_calls)
+
+
 class TestEnforceQualityGate:
     def test_first_attempt_passes_no_regeneration(self):
         client = _lambda_client_returning({"passed": True, "score": 92})

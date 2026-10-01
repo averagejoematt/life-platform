@@ -83,7 +83,7 @@ than a session.
 | Recurring intervention | Rate (2026-08 corpus) | The act | Tool / rule |
 |---|---|---|---|
 | **Deploy-lease disposal** — a gated `production` run parked at the gate holds the deploy slot | every merge session; 6 leases disposed on 2026-08-31 alone | approve the main-tip run, REJECT every ancestor run; never leave one waiting | `deploy/approve_deployment.sh` · `deploy/reject_deployment.sh` · `docs/OPERATING_DISCIPLINE.md` §5 |
-| **Deploy-plane wedge / strand / race** | 26 rows | read `check_deploy_wedge`, dispose the zombie lease, re-run the tip | `scripts/check_deploy_wedge.py` · `docs/CONVENTIONS.md` §4d |
+| **Deploy-plane wedge / strand / race** | 26 rows | read the deploy dead-man, dispose the zombie lease, re-run the tip | `scripts/check_deploy_deadman.py` · `docs/CONVENTIONS.md` §4d |
 | **Swallowed push / zero-run mint** | recurring since #3219 (three rungs in one night, 2026-08-30) | wait 10–15 min (delay ≠ swallow), then close/reopen → re-mint push → supersede-PR → integration train | `scripts/check_main_green.py --classify-sha` · `/land` §2 |
 | **QA-oracle false positive — deploy race** (#2978) | 36 rows; 1 per 1.5 days in Aug | ground-truth the artifact (`report.json`), never the truncated log line; re-land the wanted build if the rollback ate it | `gh run download <run> -n visual-qa-standalone-screenshots` · `deploy/rollback_site.sh` is a FULL rerun, never `--failed` |
 | **Rollback adjudication** — the site auto-rollback fired | subset of the row above | decide whether the trigger was reachable by `site/**` at all (`/api/*`-served defects are not) | #3268 / #3252 verdicts · `docs/INCIDENT_LOG.md` |

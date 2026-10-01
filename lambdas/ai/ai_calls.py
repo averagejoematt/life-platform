@@ -1257,7 +1257,7 @@ from ai.coach_brief_retention import retain_coach_brief_flag as _retain_coach_br
 
 
 def _enforce_quality_gate(
-    lambda_client, coach_id, output_text, generation_brief, regenerate_fn, max_regenerations=_QUALITY_GATE_MAX_REGENERATIONS
+    lambda_client, coach_id, output_text, generation_brief, regenerate_fn, max_regenerations=_QUALITY_GATE_MAX_REGENERATIONS, revise=False
 ):
     """N-06 (#390): the coach quality gate, promoted from advisory to blocking.
 
@@ -1288,9 +1288,10 @@ def _enforce_quality_gate(
     attempts = 0
     while not report.get("passed", True) and attempts < max_regenerations and _deadline.regeneration_allowed(coach_id):
         attempts += 1
-        note = _quality_gate_correction_note(report, output_text)
+        # #4343: revise=True asks for sentence edits and applies them in code (ai/rewrite_note.py).
+        note = _qgn.correction_note(report, output_text, edits=True) if revise else _quality_gate_correction_note(report, output_text)
         try:
-            regenerated = regenerate_fn(note)
+            regenerated = _qgn.apply_edits(output_text, regenerate_fn(note)) if revise else regenerate_fn(note)
         except Exception as e:
             print(f"[COACH-QUALITY-GATE:{coach_id}] regeneration attempt {attempts} failed: {e}")
             break
@@ -1965,9 +1966,8 @@ Write your {domain_label} coaching section now."""
         # Runs BEFORE the state updater so a regenerated draft (not a discarded
         # one) is what gets recorded and published.
         # `brief_with_grounding` (#2573) supplies the deterministic grounding context.
-        output, _quality_report = _enforce_quality_gate(
-            lambda_client, coach_id, output, brief_with_grounding(generation_brief, _canon_facts, _allowed), regenerate_fn=_regen_fn
-        )
+        _gated_brief = brief_with_grounding(generation_brief, _canon_facts, _allowed)
+        output, _quality_report = _enforce_quality_gate(lambda_client, coach_id, output, _gated_brief, regenerate_fn=_regen_fn, revise=True)
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
             # #966: a deliberate hold is terminal — signal it distinctly from an

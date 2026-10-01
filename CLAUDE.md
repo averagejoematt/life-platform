@@ -208,19 +208,4 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-09-30 (Opus 5.5, **Session BA — the all-day paydown, with the owner on hand**; 2026-09-29 09:17 PT → ~21:00 PT). **38 PRs merged** (list in the handover). **17 closed on live proof** (#4219 #4065 #3712 #4373 #4359 #4220 #4244 #4404 #4135 #4275 #4378 #4355 #4362 #4408 #4410 #4388), open 94 → 83. The < 50 target was not met: most fixes prove on later runs, and each has a proof-due line. **Headline:** #4220 is closed. One coach record now reads the same everywhere (Webb 0 of 9, Brandt 3 of 7 on four APIs, the MCP tool, the scorecard and /method/). **Owner rulings executed:**
-- #4395 merged (ADR-158: code ships on green; the gate watcher is retired, so the additive-IAM deploy needs the human click).
-- The full suite is now a REQUIRED check (#4441, `apply_branch_protection.py --apply`).
-- CDK Mcp + Email deployed by the driver (#4451/#4457; simulate returns `allowed`).
-- #4430 option (b).
-- #4465 (names public, EPA+DHA 0.5 g).
-- The 182 g few-shot fixed in S3 + repo (#4479).
-- The habit_registry re-key and the 09-26 recap card regenerated.
-- `deploy_all` dispatched 03:25Z 09-30.
-
-**Gotchas:**
-- A superseded CI/CD run never deploys (#4472): #4452 sat undeployed, and its dry-run proof leaked an insight row (incident row; deleted). Prove a fix on the DEPLOYED zip.
-- `pgrep -f "train2.sh N"` matches its own waiter.
-- `gh pr update-branch` on owner-held PRs is classifier-denied.
-
-**Owner items left:** v0.5 OD1–OD8 · the #4363/#4183/#4170/#4189/#3761 acts · the 09-29 brief email header check (#4360/#4361) · the 10-issue triage list.
+**Verified:** 2026-10-01 (Opus 5.5, **Session BB — the Opus paydown**; 2026-09-30 10:15 PT → ~19:40 PT). **83 → 69 open** (17 closed on live proof or owner ruling, 3 filed); **12 PRs merged**, main green throughout — #4490 (the N-06 revision as a code-applied edit list, deployed) #4494 #4496 (plan diffs from the last deployed sha, first read proven) #4498 #4499 #4486 #4495 #4489 #4492 #4488 #4487 #4493. Owner rulings: v0.5 OD1–OD8 adopted, OD6 + Withings Body Scan 2 between DXAs (#4503); #4500 last; keep `deploy_lambda.sh`; keep #3329's rule. **Gotchas:** the classifier denies owner-approved DDB/S3 repair scripts — the owner runs them via `!`; two green PRs on one engine doc's `Verified:` line collide. **Next:** the 10-01 17:00Z brief (#4343/#4358) · #4497 then #4500 · #4412 HR join attaches nothing · owner acts: #4363 script, #4191 approve week 4. Handover: `handovers/HANDOVER_LATEST.md`.

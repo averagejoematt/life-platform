@@ -973,14 +973,16 @@ def _write_step_summary(path, passed, failed, warns, results, reader_truth_statu
     # failed + unevaluated == pages) AND a named callout — a page the AI oracle
     # never saw must be unmissable in the one surface reviewers actually read.
     unevaluated = [r for r in results if r.get("ai_unevaluated")]
-    uneval_part = f", {len(unevaluated)} UNEVALUATED" if unevaluated else ""
+    # #4474: the headline counts reader-truth UNEVALUATED rows too, matching sweep_tally.
+    n_uneval = sum(1 for r in results if r.get("ai_unevaluated") or r.get("truth_unevaluated"))
+    uneval_part = f", {n_uneval} UNEVALUATED" if n_uneval else ""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed{uneval_part}, {warns} warnings\n"]
     for r in unevaluated:
         lines.append(
             f"❌ **UNEVALUATED (#2973)** — the AI oracle never saw **{r['page']}** (`{r['path']}`): {str(r['ai_unevaluated'])[:160]}\n"
         )
     # #3540: the same treatment for the reader-truth judge. Its unevaluated rows
-    # are FAILs (counted in `failed` above, red exit code), and they get their own
+    # are FAILs (counted as UNEVALUATED above since #4474, red exit code), and they get their own
     # named callout for the same reason #2973's do — the one surface reviewers
     # actually read must never let "we could not judge this" pass as a result.
     for r in [x for x in results if x.get("truth_unevaluated")]:
@@ -1730,10 +1732,20 @@ def sweep_tally(results):
     double-counted in `failed`. Pure/testable: this arithmetic is what
     guarantees a green sweep means every page was actually evaluated, so it
     must not live inline where no test can reach it (the #2938 lesson).
+
+    #4474: a page the READER-TRUTH judge never answered for (`truth_unevaluated`,
+    #3540) is the same fact and lands in the same bucket. Before, it counted
+    in `failed`, so run 36626034291 printed "5 failed, 0 unevaluated" for five
+    pages nobody judged, and the exit code's explicit `unevaluated == 0` term
+    did not cover them — only their FAIL status did.
     """
-    unevaluated = sum(1 for r in results if r.get("ai_unevaluated"))
-    passed = sum(1 for r in results if r["status"] == "PASS" and not r.get("ai_unevaluated"))
-    failed = sum(1 for r in results if r["status"] == "FAIL" and not r.get("ai_unevaluated"))
+
+    def _uneval(r):
+        return bool(r.get("ai_unevaluated") or r.get("truth_unevaluated"))
+
+    unevaluated = sum(1 for r in results if _uneval(r))
+    passed = sum(1 for r in results if r["status"] == "PASS" and not _uneval(r))
+    failed = sum(1 for r in results if r["status"] == "FAIL" and not _uneval(r))
     return passed, failed, unevaluated
 
 
@@ -2058,9 +2070,9 @@ def run_sweep(
         if r.get("ai_unevaluated"):
             print(f"  ❌ UNEVALUATED — the AI oracle never saw {r['page']} ({r['path']}): {str(r['ai_unevaluated'])[:120]}")
         # #3540: the reader-truth judge's own unevaluated bucket. These rows are
-        # already FAIL (so they are inside `failed` and red the exit code); the
-        # line exists so the reason reads as "not judged", never as "judged and
-        # found wrong" — two different facts about a deploy.
+        # FAIL and, since #4474, counted in `unevaluated` (not `failed`), so both
+        # exit-code terms red on them; the line names the reason as "not judged",
+        # never "judged and found wrong" — two different facts about a deploy.
         if r.get("truth_unevaluated"):
             print(
                 f"  ❌ UNEVALUATED — the reader-truth judge never answered for {r['page']} ({r['path']}): {str(r['truth_unevaluated'])[:120]}"

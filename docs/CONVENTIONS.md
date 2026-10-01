@@ -821,8 +821,8 @@ where an operator will be standing when they hit them.
    distinguishing tell: phantom = 0 jobs AND no other run in the group; stranded
    gate = 0-job runs queued BEHIND an older run in `waiting`.** Check
    `gh run list --branch main` for a `waiting` run FIRST. Recovery splits on the
-   holder's AGE (#2467): a **fresh** run (younger than ~24h,
-   `STALE_GATE_REJECT_HOURS` in `check_deploy_wedge.py`) — action the gate,
+   holder's AGE (#2467): a **fresh** run (younger than ~24h — the retired wedge
+   classifier's `STALE_GATE_REJECT_HOURS`) — action the gate,
    `bash deploy/approve_deployment.sh` (approve or reject, on Matthew's say-so). A
    **stale** one — **REJECT it immediately**: `bash deploy/reject_deployment.sh
    <run_id>` (`POST …/actions/runs/<id>/pending_deployments` with
@@ -893,16 +893,16 @@ where an operator will be standing when they hit them.
    `in_progress` or `waiting` — a job parked at the gate still occupies the slot). No
    holder + blocked past the threshold = phantom.
 
-   Do not diagnose this by eye. Run **`python3 scripts/check_deploy_wedge.py`**, which
-   fetches the per-run job state `gh run list` does not carry — and, since #2467,
-   enumerates ALL non-completed runs on the workflow (each in-flight status queried
-   explicitly, paginated, **no recency bound**), so a gate-parked `waiting` run of ANY
-   age is named as the holder with its age before "phantom" can be concluded. Recovery:
-   `--recover` (cancel the wedged run, re-dispatch `ci-cd.yml` with `deploy_all=true` —
-   a dispatch has no push diff, so change detection would otherwise deploy nothing).
+   **Since #4256 box 3 the retired classifier (`check_deploy_wedge.py`) no longer
+   answers this** — it went with the lease janitor: ADR-158 took the gate off the code `deploy` job, and
+   the deploy dead-man (`scripts/check_deploy_deadman.py`, the last step of
+   `deploy-wedge-watch.yml`) alarms on any green run on main that has not deployed within
+   its deadline — a wedged Deploy included. Recovery is the one command its alarm prints:
+   cancel the stuck run, then `gh workflow run ci-cd.yml --ref main -f deploy_all=true`
+   (a dispatch has no push diff, so change detection would otherwise deploy nothing).
    **Do NOT salt the concurrency group** — see the ledger below.
 
-   **Last-mile alerting (#2149).** #2052 proved detection but a red scheduled workflow
+   **Last-mile alerting (#2149; history — the dead-man's `--alert` carries it since #4256).** #2052 proved detection but a red scheduled workflow
    is a passive channel — the 2026-08-05 stranded-approval recurrence (#5 in the
    session-status block, distinct from this ledger's #5) went red 6× over ~9h with no
    human paged until a manual run. `deploy-wedge-watch.yml`'s classify step now runs
@@ -913,7 +913,7 @@ where an operator will be standing when they hit them.
    episode via a GitHub issue marker (label `deploy-wedge-alert`), not an AWS-written
    marker — this workflow holds no AWS credentials and gains none for this. Throttle/
    payload logic: `alert_candidate`/`should_fire_alert`/`build_dispatch_payload`/
-   `maybe_alert` in `check_deploy_wedge.py`, tested in `tests/test_deploy_wedge_alert_2149.py`.
+   `maybe_alert` in the retired `check_deploy_wedge.py`, tested in `tests/test_deploy_wedge_alert_2149.py`.
 
 4. **Rejected-and-superseded — the #2590 shape (NOT a state to fix; a state to read
    correctly).** Rejecting a gated run is the *prescribed* action of state 1, and it
@@ -956,7 +956,7 @@ where an operator will be standing when they hit them.
    `deploy/approve_deployment.sh` and `deploy/reject_deployment.sh` now call
    `surface_gate_lease_holder` (`deploy/lib/deploy_gate_lease.sh`) on that branch: it
    enumerates every `waiting` run with no recency bound and names the holder, or says
-   plainly that nothing holds the lease and points at `check_deploy_wedge.py`.
+   plainly that nothing holds the lease and points at the deploy dead-man.
 
 **A dark-flag waiver's reason rots when the reach GROWS (#3315/#3361, 2026-08-31).** A lane that makes a new import reachable from a CI-invoked script must grep `scripts/ci_dark_flag_sweep.py`'s `ALLOWED_ABSENT` entries for that dist and delete or re-scope the waiver in the same PR — the liveness test proves waivers dead (reach gone or dist installed), never reasons true, so a stale reason ships a fallback that prints 'unavailable' on the wire while every run stays green. The sweep's `N stale waiver(s)` line is a finding, not noise.
 
@@ -973,7 +973,7 @@ fix before #2052 was shipped **blind**: nothing measured the wedge while it was 
 | 2 | 2026-07-27 | same, after 2 supersede-cancellations | salt `-v3` | recurred in 6 days |
 | 3 | 2026-08-02 | same, group otherwise EMPTY | salt `-v4` | recurred same day |
 | 4 | 2026-08-02 | same, sole member of its group | **#2009 redesign** — workflow group per-`run_id`; the real invariant moved to a job-level group on `deploy` | moved the wedge, did not remove it |
-| 5 | 2026-08-02 | **5 green jobs**, `Deploy` blocked, gate never opens | **#2052** — detection + escape hatch (`check_deploy_wedge.py`, `deploy-wedge-watch.yml`) | measured for the first time |
+| 5 | 2026-08-02 | **5 green jobs**, `Deploy` blocked, gate never opens | **#2052** — detection + escape hatch (`check_deploy_wedge.py`, retired by #4256; `deploy-wedge-watch.yml`) | measured for the first time |
 | 6 | 2026-08-09 | all-day wedge; THREE `deploy_all` dispatches blocked in sequence; `--recover` looped | **root cause finally measured (#2467): not phantom** — two 8-day-old gated runs (08-01/02) sat `waiting` with Deploy parked at the gate, silently holding the job-level slot; the script's recent-run window couldn't see them, so it read "no holder = phantom". Cure: **REJECT the zombies' pending_deployments** (state=rejected — run dies, nothing stale ships, slot frees). The "pin-exclude and leave waiting" zombie posture is retired — leave-waiting = hold-the-fleet-hostage; and "GitHub expires them at 30d" was false at day 8. **Fix shipped (#2467): the holder scan enumerates ALL non-completed runs (paginated, no recency bound); stale gate holders get reject guidance (`deploy/reject_deployment.sh`), and `watch_deploy_gate.sh` auto-rejects them** | the sixth entry closes the ledger's question: entries 1–5's "phantom" may have been unseen gate-parked holders all along |
 
 Two things the ledger settles. **Salting never worked** — three attempts, three
@@ -1466,7 +1466,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | A shipped change invalidated a wiki page and nobody updated it | Doc-impact sweep, step (e) | `.claude/skills/wrap/SKILL.md` step (e); mechanics in §8 above |
 | A governance-consequential decision landed with no ADR | Decisions gate (#1343), step (e) | `.claude/skills/wrap/SKILL.md` step (e) |
 | A status block claims "main GREEN" without reading the badge | Green-main gate (#1327), step (e2) | `scripts/check_main_green.py` |
-| A deploy parks forever behind a phantom concurrency entry while its run reads "waiting for approval" | Deploy-wedge detector (#2052), folded into step (e2) | `scripts/check_deploy_wedge.py`; §4d above |
+| A deploy parks forever behind a phantom concurrency entry while its run reads "waiting for approval" | Deploy dead-man (#4256, ADR-158 — it absorbed the #2052 wedge detector) | `scripts/check_deploy_deadman.py`; §4d above |
 | An incident-class event (rollback, main red >1h, data gap, budget-tier event) went unlogged | Incident gate (#1332), step (e3) | `docs/INCIDENT_LOG.md` + `.claude/skills/wrap/SKILL.md` step (e3) |
 | A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
@@ -1493,7 +1493,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | Defect class | Owning gate | Where |
 |---|---|---|
 | Unformatted/unsorted Python, a stale-typed module, a syntax error | Lint job (`black`/`ruff`/`mypy`/`py_compile`) | §4 above |
-| A reader page's static main content gains a builder term the vocabulary registry ruled cut/renamed, or an unglossed keep-with-gloss term (#4182 ruling vii) | Vocabulary registry guard + shrink-only ledger | `site/data/glossary.json` (registry) · `tests/test_site_vocabulary_registry.py` · `tests/site_vocabulary_residue.py` |
+| A reader page's static main content gains a builder term the vocabulary registry ruled cut/renamed, or an unglossed keep-with-gloss term (#4182 ruling vii) | Vocabulary registry guard + shrink-only ledger | `site/data/glossary.json` (registry) · `tests/test_site_vocabulary_registry.py` · `ledgers/site_vocabulary_residue.py` |
 | A new page joins the nav-reachable set from `/` without the reach ceiling being lowered first (#4182 ruling vi — 39 at landing, the owner's cap set by lowering the number) | Static-reach ratchet | `tests/test_site_nav_reach_ratchet.py` · `tests/site_text.py` (the census) |
 | A `deploy/**`-only push (e.g. `smoke_test_site.sh`, the script that can auto-rollback the public site) reaches main with ZERO CI runs — a legitimate `paths:` skip indistinguishable from a swallowed push (#2881, DEVOPS-01 class) | `deploy/**` added to `ci-cd.yml`'s push `paths:`; a new `bash -n` syntax-check step in `ci-lint.yml` closes the gap black/ruff/py_compile never covered (shell scripts) | `ci-lint.yml` step "Shell syntax check (bash -n)" (#2881); the `paths:` half is history — see §4a0 (#3378) |
 | A Lambda/CDK deploy artifact or its wiring is broken (IAM, handler names, DDB patterns, MCP registry) | `test-critical` deploy-critical lane (ADR-117) | §4a above |
