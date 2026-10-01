@@ -61,3 +61,49 @@ def test_the_average_and_the_figure_must_share_a_clause():
 def test_mutation_control_a_sentence_wide_pairing_fires_on_the_two_clause_sentence(monkeypatch):
     monkeypatch.setattr(reader_checks, "_CLAUSE_JOIN_RE", re.compile(r"(?!x)x"))
     assert len(reader_checks.unlabeled_window_figure(GLUCOSE_0927_TWO_CLAUSES)) == 1
+
+
+# Ruling 8 (owner, 2026-10-01, #4343): a stated date range, or "based on N logged days",
+# COUNTS as a labelled window. The first two are verbatim from the held 2026-10-01 17:00Z
+# finals (EVALRET#coach_brief physical_coach 17:05:23Z, labs_coach 17:06:29Z).
+PHYSICAL_1001_RANGE = (
+    "Average heart rate across those five walks, each logged between September 24th and September 30th, held right "
+    "around 116 bpm — exactly where I want it for easy aerobic base work."
+)
+LABS_1001_COUNT = (
+    "In practical terms, I cannot tell you whether the wearable rebound after the September 10th trough represents real "
+    "physiological adaptation or is simply the number bouncing back toward its own average — a pattern with 26 nights "
+    "behind it but no lab to anchor it."
+)
+RULING_8 = (
+    PHYSICAL_1001_RANGE,
+    LABS_1001_COUNT,
+    "The running average for deep sleep is 19.4%, based on 21 logged days.",
+    "His average was 150 g from September 24 to 30.",
+    "Protein averaged 150 g, September 24–30.",
+    "Recovery averaged 74% between Monday and Friday.",
+)
+
+
+def test_ruling_8_a_date_range_or_a_day_count_is_a_window():
+    for text in RULING_8:
+        assert reader_checks.unlabeled_window_figure(text) == [], text
+    # still held: a date alone, and no window at all
+    assert len(reader_checks.unlabeled_window_figure("Average 2,000 kcal on Friday, September 25.")) == 1
+    assert len(reader_checks.unlabeled_window_figure("The running average for deep sleep is 19.4%.")) == 1
+
+
+def test_mutation_control_the_pre_ruling_window_forms_hold_the_live_finals(monkeypatch):
+    # origin/main's window regex before ruling 8, verbatim
+    n = "|".join(reader_checks._NUMBER_WORDS)
+    pre = re.compile(
+        r"\b(?:over|across)\s+(?:the\s+)?(?:last\s+|past\s+|those\s+|these\s+)?(?:\d+|" + n + r"|twenty\S*)\s+(?:\w+\s+)?"
+        r"(?:days?|nights?|weeks?|sessions?|weigh-ins?)\b"
+        r"|\bsince\s+\w+|\bthrough\s+\w+"
+        r"|\b(?:\d+|" + n + r")[- ](?:day|night|week)\b"
+        r"|\b(?:this|last|past)\s+(?:week|month)\b",
+        re.IGNORECASE,
+    )
+    monkeypatch.setattr(reader_checks, "_WINDOW_RE", pre)
+    for text in (PHYSICAL_1001_RANGE, LABS_1001_COUNT, RULING_8[2]):
+        assert len(reader_checks.unlabeled_window_figure(text)) == 1, text

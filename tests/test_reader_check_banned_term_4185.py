@@ -30,4 +30,39 @@ def test_plain_words_pass():
 
 
 def test_every_listed_term_carries_a_plain_replacement():
-    assert all(plain for _, plain in reader_checks.READER_BANNED_TERMS)
+    assert all(plain for _p, _word, plain in reader_checks.READER_BANNED_TERMS)
+
+
+# #4343 (the 2026-10-01 brief): sleep was held on "went dark" and explorer on
+# "protein-primacy" — neither was in the prompt's hand-copied 19-term "Never:" list. The
+# prompts now render the list from READER_BANNED_TERMS itself.
+def test_every_prompt_word_is_caught_by_its_own_pattern():
+    for pat, word, _plain in reader_checks.READER_BANNED_TERMS:
+        for part in word.split("/"):
+            probe = part + "21" if part.endswith("=") else part
+            assert reader_checks.banned_term(f"He wrote {probe} today."), (pat, part)
+
+
+def test_the_coach_prompts_name_every_banned_word():
+    from coach import lead_daily_read
+
+    rules = reader_checks.prompt_reader_rules()
+    for _p, word, _plain in reader_checks.READER_BANNED_TERMS:
+        assert word in rules and word in lead_daily_read.LEAD_PROMPT, word
+    assert "went dark" in rules and "protein-primacy" in rules
+
+
+def test_the_coach_v2_prompt_renders_the_rules_not_a_copy():
+    import inspect
+
+    from ai import ai_calls
+
+    src = inspect.getsource(ai_calls._run_coach_v2_pipeline)
+    assert "{_reader_rules}" in src and "_rc.prompt_reader_rules()" in src
+    assert "Never: EWMA" not in src  # the retired hand-copied literal
+    assert "judge_blacklists(voice_spec)" in src and "{json.dumps(_forbidden[0])}" in src
+
+
+def test_mutation_control_a_term_added_to_the_tuple_reaches_the_prompt(monkeypatch):
+    monkeypatch.setattr(reader_checks, "READER_BANNED_TERMS", reader_checks.READER_BANNED_TERMS + ((r"\bzzqx\b", "zzqx", "plain"),))
+    assert "zzqx" in reader_checks.prompt_reader_rules()

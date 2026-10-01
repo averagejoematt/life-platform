@@ -317,6 +317,16 @@ class TestQualityGateMessage:
         msg = gate._build_quality_gate_message("sleep_coach", "draft", {}, None)
         assert "Anti-Pattern Checklist" not in msg
 
+    def test_judge_blacklists_is_the_list_the_message_and_the_generation_prompt_share(self, monkeypatch):
+        """#4343: the daily-brief generation prompt renders FORBIDDEN PHRASES from this call,
+        so the model is told the shared list it is judged on, not only its own."""
+        monkeypatch.setattr(gate, "_shared_blacklists", lambda: (["keep up the good work", "circle back"], ["shared shape"]))
+        spec = {"anti_pattern_detection": {"phrase_blacklist": ["circle back"], "structural_blacklist": ["three bullets"]}}
+        phrases, shapes = gate.judge_blacklists(spec)
+        assert phrases == ["circle back", "keep up the good work"] and shapes == ["three bullets", "shared shape"]
+        msg = gate._build_quality_gate_message("sleep_coach", "draft", spec, None)
+        assert all(p in msg for p in phrases + shapes)
+
     def test_the_decision_class_ceiling_reaches_the_model(self):
         """Check 2 is 'does the output exceed the evidence ceiling' — the
         ceiling has to be in the prompt for that check to be real."""

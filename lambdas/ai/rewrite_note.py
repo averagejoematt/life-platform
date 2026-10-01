@@ -157,9 +157,12 @@ def correction_note(report: Any, draft: Optional[str] = None, edits: bool = Fals
     for s in report.get("suggestions") or []:
         if s:
             body.append(f"  - {_s(s)}")
-    for f in report.get("reader_check_findings") or []:
+    # #4343: a served-fact finding quotes its sentence too — the 10-01 physical revision left
+    # "roughly 4 lbs per week" (served 3.68, CI 2.29-3.91) untouched because no line named it.
+    flagged = list(report.get("reader_check_findings") or []) + list(report.get("served_fact_violations") or [])
+    for f in flagged:
         for sent in flagged_sentences(f, draft):
-            body.append(f'  - [{f.get("check")}] the sentence to edit: "{sent}"')
+            body.append(f'  - [{f.get("check") or "served_fact"}] the sentence to edit: "{sent}"')
     if not body:
         body.append("  - Write a more distinctive, on-voice draft that matches your persona.")
 
@@ -188,16 +191,36 @@ def parse_edits(response: Any) -> Optional[list]:
     return [e for e in raw if isinstance(e, dict) and isinstance(e.get("find"), str) and isinstance(e.get("replace", ""), str)]
 
 
+def introduced_banned_term(find: str, replace: str, patterns: Optional[tuple] = None) -> Optional[str]:
+    """The first READER RULES term `replace` carries that `find` did not, or None (#4343). The
+    10-01 brief's explorer revision swapped a `mechanistic` sentence for one with
+    `protein-primacy` and was held on the new term — an edit that adds a banned word trades one
+    hold for another."""
+    for rx in _banned_patterns() if patterns is None else patterns:
+        m = rx.search(replace or "")
+        if m and not rx.search(find or ""):
+            return m.group(0)
+    return None
+
+
 def apply_edits(draft: str, response: Any) -> str:
     """Apply a reply's sentence edits to `draft`. A reply that is not an edit list is returned
-    as-is (a full rewrite); an edit list that changes nothing returns "" (keep the prior draft)."""
+    as-is (a full rewrite); an edit list that changes nothing returns "" (keep the prior draft).
+    Ruling 9 (owner, 2026-10-01, #4343): an edit whose replacement introduces a banned term is
+    DROPPED and its original sentence kept — so an edit list whose every edit is dropped changes
+    nothing and returns "" like any other no-op list."""
     found = parse_edits(response)
     if found is None:
         return str(response or "")
     out, applied = draft or "", 0
+    pats = _banned_patterns()
     for e in found:
         find, repl = e["find"].strip(), str(e.get("replace") or "").strip()
         if len(find) < 8 or find not in out:
+            continue
+        introduced = introduced_banned_term(find, repl, pats)
+        if introduced:  # ruling 9 (owner, 2026-10-01): drop the edit, keep the original sentence
+            print(f"[COACH-QUALITY-GATE] {REVISION_LOG_TAG} edit dropped — the replacement introduces banned term {introduced!r}")
             continue
         out, applied = out.replace(find, repl, 1), applied + 1
     if not applied:
