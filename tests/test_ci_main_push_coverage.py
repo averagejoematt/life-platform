@@ -205,3 +205,53 @@ def test_unit_tests_job_is_skipped_only_by_an_owner():
     for gated in ("test-critical", "plan", "deploy"):
         needs = jobs[gated].get("needs") or []
         assert "test-owner" not in (needs if isinstance(needs, list) else [needs]), f"{gated} must not wait on test-owner"
+
+
+# ── #4252 box 5 — push concurrency on the full suite ──────────────────────────────
+# A burst of pushes must not run one full suite per push, and the only runs allowed to
+# evict one are runs that will really test. The group expression is EVALUATED below (a
+# minimal translation of the GitHub expression to Python), not just string-matched.
+
+
+def _eval_gh_expr(expr: str, ctx: dict) -> str:
+    import re
+
+    body = expr.strip()
+    assert body.startswith("${{") and body.endswith("}}"), expr
+    body = body[3:-2].strip()
+    for name, value in ctx.items():
+        body = body.replace(name, repr(value))
+    body = body.replace("&&", " and ").replace("||", " or ")
+    body = re.sub(r"\bformat\(", "_fmt(", body)
+    return eval(body, {"_fmt": lambda f, *a: f.format(*a)})  # noqa: S307 - a test-only, repo-controlled string
+
+
+def _test_group(event: str, owner_run: str, run_id: str) -> str:
+    conc = _load(CI_CD)["jobs"]["test"]["concurrency"]
+    ctx = {
+        "github.event_name": event,
+        "needs.test-owner.outputs.owner_run": owner_run,
+        "github.run_id": run_id,
+        "github.ref": "refs/heads/main",
+    }
+    return _eval_gh_expr(conc["group"], ctx)
+
+
+def test_only_a_testing_push_run_joins_the_shared_unit_test_group():
+    conc = _load(CI_CD)["jobs"]["test"]["concurrency"]
+    assert conc["cancel-in-progress"] is True
+    shared = _test_group("push", "", "101")
+    assert shared == _test_group("push", "", "202"), "two testing push runs must share one group (the newer evicts the older)"
+    assert "101" not in shared
+    skipping = _test_group("push", "99", "101")
+    assert skipping != shared and "101" in skipping, "a run that SKIPS (owner elsewhere) must never evict a run that is testing"
+    dispatch = _test_group("workflow_dispatch", "", "101")
+    assert dispatch != shared and "101" in dispatch, "a dispatch tests on its own and evicts nothing"
+
+
+def test_push_concurrency_never_reaches_the_deploy_chain():
+    jobs = _load(CI_CD)["jobs"]
+    assert jobs["deploy"]["concurrency"]["cancel-in-progress"] is False, "a mid-flight deploy must complete"
+    for job in ("reconcile", "lint", "test-critical", "test-owner", "plan", "deploy-iam"):
+        assert "concurrency" not in jobs[job], f"{job} must not queue behind or be evicted by another run"
+    assert "github.run_id" in _load(CI_CD)["concurrency"]["group"], "the workflow-level group stays run-unique"

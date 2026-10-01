@@ -46,12 +46,15 @@ Usage:
   python3 scripts/check_deploy_deadman.py              # classify; exit 0/1/2
   python3 scripts/check_deploy_deadman.py --hours 6    # deadline after a green Plan
   python3 scripts/check_deploy_deadman.py --alert      # + tracking issue / dispatch
+  python3 scripts/check_deploy_deadman.py --deploy-base  # #4472: print plan's diff base (exit 0) or nothing (exit 2)
+  python3 scripts/check_deploy_deadman.py --stale-lambdas  # #4472: live Lambdas older than their source (AWS read)
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -171,6 +174,26 @@ def walk(runs: list[dict], jobs_for, now: datetime) -> list[dict]:
     return rows
 
 
+def last_deployed_sha(runs: list[dict], jobs_for, now: datetime) -> str | None:
+    """#4472: the head sha of the newest run on main whose `Deploy` concluded success —
+    the base ci-cd.yml's `plan` diffs from. Pure given `jobs_for`.
+
+    `plan` used to diff `GITHUB_SHA~1` (its own push only). The deploy job's concurrency
+    group keeps ONE pending job and cancels the older one, so a superseded run's merge
+    never reached AWS (#4452's weekly-digest fix, 2026-09-29). Diffing from the last
+    SUCCESSFUL deploy rolls every cancelled, failed or skipped run's files into the next
+    plan. The head sha is an ancestor of the tree that deploy checked out (build_sha may
+    stack a reconcile commit on it), so the diff is a superset — never a gap. None means
+    no deploy in the readable window: the caller deploys everything, never guesses."""
+    ordered = sorted(runs, key=lambda r: str(r.get("created_at") or ""), reverse=True)
+    for reads, run in enumerate(ordered):
+        if reads >= MAX_JOB_READS:
+            break
+        if classify_run(run, jobs_for(run), now)["state"] == DEPLOYED:
+            return run.get("head_sha") or None
+    return None
+
+
 def verdict(rows: list[dict], hours: float = DEADLINE_HOURS) -> dict:
     """The alarm set: undeployed or in-flight rows past the deadline. Pure. An unknown age
     on an owed row alarms — it cannot be ruled out as a stale one (#2791's rule)."""
@@ -192,6 +215,116 @@ def render(state: dict) -> tuple[int, str]:
         "   A row parked at the production gate is an IAM diff waiting on the owner: approve or reject it in Actions."
     )
     return EXIT_ALARM, head + "\n" + "\n".join(lines)
+
+
+# ── #4472 box 2: which LIVE Lambda is older than its source on main (read-only) ─────────
+#
+# The run walk above reads GitHub's side only. This reads AWS's: each mapped function's
+# `LastModified` against the newest main commit that should have redeployed it — its own
+# handler, any shared module (an unmapped lambdas/ file ships in every bundle), or a
+# bundled config path. It is the direct check of the weekly-digest incident: the live zip
+# predated #4452's merge while every run on main read green or cancelled.
+
+# The reconcile bot's counter file is unmapped but never triggers a fleet deploy (#4250);
+# counting it as shared would read the whole fleet stale after every count bump.
+STALE_SHARED_EXCLUDE = ("lambdas/web/platform_counts.py",)
+# A merge this recent may still be deploying; the nightly run never alarms on it.
+STALE_GRACE_HOURS = 2.0
+
+
+def _parse_aws_ts(ts: str | None) -> datetime | None:
+    """`2026-09-29T18:00:59.000+0000` (Lambda's LastModified) → aware datetime."""
+    if not ts:
+        return None
+    t = str(ts)
+    if len(t) > 5 and t[-5] in "+-" and t[-4:].isdigit():
+        t = t[:-2] + ":" + t[-2:]
+    return _parse_iso(t)
+
+
+def stale_functions(last_modified: dict, owed: dict, now: datetime, grace_hours: float = STALE_GRACE_HOURS) -> list[dict]:
+    """Pure. `last_modified`: function -> live LastModified (datetime or None).
+    `owed`: function -> (datetime of the newest main commit that should have redeployed
+    it, what that commit touched). A function is stale when it is live-older than what it
+    owes and the owed commit is past the grace window. A function main maps but AWS does
+    not list is reported too — absence is never read as fresh."""
+    rows = []
+    for fn, (owed_at, why) in sorted(owed.items()):
+        if owed_at is None or (now - owed_at).total_seconds() / 3600.0 < grace_hours:
+            continue
+        live = last_modified.get(fn)
+        if live is None:
+            rows.append({"function": fn, "live": None, "owed": owed_at, "why": why + " (function not listed by AWS)"})
+        elif live < owed_at:
+            rows.append({"function": fn, "live": live, "owed": owed_at, "why": why})
+    return rows
+
+
+def _git_ts(paths: list[str], excludes: tuple[str, ...] = ()) -> datetime | None:
+    args = ["git", "log", "-1", "--format=%ct", "HEAD", "--", *paths, *(f":(exclude){e}" for e in excludes)]
+    out = subprocess.run(args, capture_output=True, text=True, timeout=120, check=True).stdout.strip()
+    return datetime.fromtimestamp(int(out), tz=timezone.utc) if out else None
+
+
+def collect_owed(lambda_map_path: str = "ci/lambda_map.json") -> dict:
+    """function -> (owed datetime, reason), from git history of the checked-out main."""
+    with open(lambda_map_path) as f:
+        mapped = {src: row for src, row in json.load(f)["lambdas"].items()}
+    live_map = {src: row["function"] for src, row in mapped.items() if not row.get("native_deps") and not row.get("not_deployed")}
+    bundled = subprocess.run(
+        [sys.executable, "deploy/build_bundle.py", "--print-bundled-config-paths"], capture_output=True, text=True, timeout=120, check=True
+    ).stdout.split()
+    shared_at = _git_ts(["lambdas/", *bundled], excludes=(*mapped.keys(), *STALE_SHARED_EXCLUDE))
+    owed = {}
+    for src, fn in live_map.items():
+        own_at = _git_ts([src])
+        if shared_at is not None and (own_at is None or shared_at > own_at):
+            owed[fn] = (shared_at, "a shared module / bundled config changed")
+        else:
+            owed[fn] = (own_at, f"{src} changed")
+    return owed
+
+
+def collect_last_modified(lambda_map_path: str = "ci/lambda_map.json") -> dict:
+    """function -> live LastModified, across every region the map names (a `region` key,
+    else the pipeline's own region — two web functions live in us-east-1)."""
+    with open(lambda_map_path) as f:
+        default = os.environ.get("AWS_REGION") or "us-west-2"
+        regions = {row.get("region") or default for row in json.load(f)["lambdas"].values()}
+    live: dict = {}
+    for region in sorted(regions):
+        out = subprocess.run(
+            [
+                "aws",
+                "lambda",
+                "list-functions",
+                "--region",
+                region,
+                "--query",
+                "Functions[].[FunctionName,LastModified]",
+                "--output",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=True,
+        ).stdout
+        live.update({name: _parse_aws_ts(ts) for name, ts in json.loads(out)})
+    return live
+
+
+def render_stale(rows: list[dict]) -> tuple[int, str]:
+    if not rows:
+        return EXIT_OK, "✅ live Lambdas: none older than its source on main."
+    lines = [
+        f"🛑 {len(rows)} live Lambda(s) older than their source on main (#4472) — main is ahead of AWS.",
+        f"   Recovery: {RECOVERY}",
+    ]
+    for r in rows:
+        live = r["live"].strftime("%Y-%m-%dT%H:%MZ") if r["live"] else "absent"
+        lines.append(f"  {r['function']:<40} live {live}  owes {r['owed'].strftime('%Y-%m-%dT%H:%MZ')}  {r['why']}")
+    return EXIT_ALARM, "\n".join(lines)
 
 
 # ── alerting (thin `gh` I/O; every failure is swallowed into the returned status) ─────
@@ -272,8 +405,33 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--hours", type=float, default=DEADLINE_HOURS, help="deadline after a green Plan (default %(default)s)")
     ap.add_argument("--alert", action="store_true", help="keep the tracking issue + urgent_alarm dispatch in step")
+    ap.add_argument("--stale-lambdas", action="store_true", help="#4472: live Lambdas older than their source on main (AWS read)")
+    ap.add_argument("--deploy-base", action="store_true", help="#4472: print the last successfully deployed sha (plan's diff base)")
     args = ap.parse_args(argv)
     now = datetime.now(timezone.utc)
+    if args.stale_lambdas:
+        try:
+            rows = stale_functions(collect_last_modified(), collect_owed(), now)
+        except Exception as e:  # noqa: BLE001 - an unreadable AWS/git read is INDETERMINATE, never OK
+            print(f"⚠️  stale-Lambda check INDETERMINATE: {e}")
+            return EXIT_INDETERMINATE
+        code, report = render_stale(rows)
+        print(report)
+        return code
+    if args.deploy_base:
+        # stdout carries the sha and nothing else; an unreadable API or no deploy in the
+        # window prints nothing and exits INDETERMINATE — plan then deploys everything.
+        try:
+            runs, jobs_for = collect()
+            sha = last_deployed_sha(runs, jobs_for, now)
+        except Exception as e:  # noqa: BLE001 - unreadable is INDETERMINATE, never a guessed base
+            print(f"deploy-base INDETERMINATE: {e}", file=sys.stderr)
+            return EXIT_INDETERMINATE
+        if not sha:
+            print(f"deploy-base INDETERMINATE: no successful Deploy in the newest {MAX_JOB_READS} runs on {BRANCH}", file=sys.stderr)
+            return EXIT_INDETERMINATE
+        print(sha)
+        return EXIT_OK
     try:
         runs, jobs_for = collect()
         state = verdict(walk(runs, jobs_for, now), args.hours)

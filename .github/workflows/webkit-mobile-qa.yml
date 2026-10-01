@@ -115,18 +115,14 @@ jobs:
 
       - name: Install Playwright + WebKit (the iOS Safari engine)
         if: steps.dial.outputs.level == 'standard' || steps.dial.outputs.level == 'full'
-        run: |
-          python -m pip install --upgrade pip
-          # Same pinned Playwright as the enforced ci-cd.yml gate (CQ-01 class:
-          # a different version here would make a red mean "engine version",
-          # not "iOS Safari breakage"). Both read the ONE pin in requirements-dev.txt
-          # (#2609) — test_webkit_weekly_qa.py enforces that they share the source.
-          # pillow (#3353): the WebKit tiled-screenshot fallback stitches viewport tiles with Pillow;
-          # the first dispatched run after PR #3356 printed "Tiled screenshot fallback unavailable —
-          # Pillow import failed" on /protocols/challenges/ because this job never installed it.
-          PINS=$(python3 scripts/ci_pins.py playwright pillow)
-          python -m pip install $PINS
-          python -m playwright install --with-deps webkit
+        # The one install step list for every visual-QA job (#4254). Same pinned Playwright as
+        # the gating Chromium copies (CQ-01: a different version would make a red mean "engine
+        # version", not "iOS Safari breakage"); pillow (#3353) stitches the tiled-screenshot
+        # fallback. No boto3: this sweep runs no AI layer.
+        uses: ./.github/actions/playwright-browser
+        with:
+          browser: webkit
+          pins: playwright pillow
 
       - name: Run WebKit mobile sweep (deterministic only — no AI, $0)
         id: sweep

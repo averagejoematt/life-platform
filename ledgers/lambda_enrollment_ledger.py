@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tests/lambda_enrollment_ledger.py — the dated, shrink-only enrollment debt (#2846).
+ledgers/lambda_enrollment_ledger.py — the dated, shrink-only enrollment debt (#2846).
 
 Three ledgers, one rule each, all with the same mechanics (the #1964 / #2844
 precedent): **an entry may only ever come OUT.** A new violation is a red, never a

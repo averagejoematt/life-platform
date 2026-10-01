@@ -917,6 +917,13 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
             logger=logger,
         )
 
+        # #4343: `number_grounding_violations` is the DETERMINISTIC verdict's key — the judge only
+        # restates it. On 2026-09-30 the lead read (grounding CLEAN) came back with the judge's own
+        # entry there (the output schema makes the key required), which `rubric_scope` read as an
+        # in-scope honesty finding: verdict "unchanged", score 15, held. The judge's copy is
+        # discarded; `_apply_number_grounding_verdict` writes the key from the grounder alone.
+        result["number_grounding_violations"] = []
+
         # #2573: the deterministic verdict is applied to the report structurally,
         # BEFORE the score threshold — a fabricated number blocks whatever the model
         # scored (measured: 92/92/82 with passed=true on the three canaries).

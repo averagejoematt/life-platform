@@ -131,8 +131,9 @@ concurrency:
   #     code `deploy` job no longer waits at the production gate, so a gate park can no
   #     longer hold this slot — the #2467 holder class is gone by construction.)
   #
-  # If a phantom EVER appears again after this, it can only be in the deploy group —
-  # and that is a much narrower thing to reason about than "no CI at all".
+  # If a phantom EVER appears again after this, it can only be in the deploy group (or,
+  # since #4252 box 5, the `test` job's unit-test group) — and that is a much narrower
+  # thing to reason about than "no CI at all".
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
@@ -558,6 +559,18 @@ jobs:
     # non-zero; if its runner dies, this job is skipped and the run is red on
     # test-owner's failure (visible, not silent).
     needs: [reconcile, lint, test-owner]   # #1173: reconcile listed to read build_sha
+    # #4252 box 5: a burst of pushes runs ONE in-flight full suite, not one per push. A run
+    # that will actually test (a push with no owner, above) joins the shared group and
+    # CANCELS the older in-flight suite: the newer run tests a tree that contains the older
+    # one, and check_main_green reads the evicted rollup as superseded (#3530 — a cancelled
+    # job with no failure). A run that skips, or a dispatch, gets a run-unique group, so it
+    # can never evict a run that is really testing. Deploy is untouched: `test` gates
+    # nothing but notify-failure (ADR-117), and the `deploy` group keeps cancel-in-progress
+    # false. If this group ever wedges (the phantom-queue class, see the workflow-level
+    # comment), salt its name; the blast radius is this one job.
+    concurrency:
+      group: ${{ (github.event_name == 'push' && needs.test-owner.outputs.owner_run == '') && format('ci-cd-unit-tests-{0}', github.ref) || format('ci-cd-unit-tests-{0}-{1}', github.ref, github.run_id) }}
+      cancel-in-progress: true
     uses: ./.github/workflows/ci-test.yml
     with:
       build_sha: ${{ needs.reconcile.outputs.build_sha }}
@@ -570,6 +583,11 @@ jobs:
     name: Plan deployments
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # #4472: `actions: read` lets the deploy-base step read this workflow's run/job history.
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
     # #416/ADR-117: gate on the fast deploy-critical lane, NOT the exhaustive
     # `test` suite — an unrelated red unit test must not skip deploy + visual-QA.
     needs: [reconcile, lint, test-critical]   # #1173: reconcile listed to read build_sha
@@ -810,8 +828,24 @@ jobs:
           fi
           echo "✅ All Lambda source files define lambda_handler"
 
+      # #4472: the diff base is the LAST SUCCESSFULLY DEPLOYED sha, not GITHUB_SHA~1. The deploy
+      # job's concurrency group keeps one pending job and cancels the older one, so a `~1` base
+      # dropped a superseded run's merge forever (#4452's weekly-digest fix, 2026-09-29).
+      # Read-only (Actions API). Empty output = unresolved → the next step deploys everything.
+      - name: Resolve deploy base — the last successful Deploy on main (#4472)
+        id: base
+        if: github.event.inputs.deploy_all != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(python3 scripts/check_deploy_deadman.py --deploy-base || true)
+          echo "deploy base: '${SHA}'"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
       - name: Detect changes and build deploy plan
         id: plan
+        env:
+          RESOLVED_DEPLOY_BASE: ${{ steps.base.outputs.sha }}
         run: |
           set -e
 
@@ -819,13 +853,20 @@ jobs:
             echo "Manual deploy-all triggered — deploying everything"
             CHANGED=$(find lambdas/ mcp/ -name '*.py' -type f)
           else
-            # #1173: diff from the PARENT OF THE PUSHED SHA to HEAD (the reconciled
-            # tree) — with a reconcile commit stacked on top, HEAD~1..HEAD would see
-            # ONLY the reconcile diff and silently drop the merged PR's own changes
-            # from the deploy plan. Without a reconcile commit this is exactly the
-            # old HEAD~1..HEAD.
-            CHANGED=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- lambdas/ mcp/ mcp_server.py 2>/dev/null || \
-                      find lambdas/ mcp/ -name '*.py' -type f)
+            # #4472: diff from the LAST SUCCESSFULLY DEPLOYED sha (step `base`) to HEAD (the
+            # reconciled tree, #1173), not from GITHUB_SHA~1 — every cancelled / failed /
+            # skipped run's files roll into this plan. Unresolvable (API unreadable, no deploy
+            # in the window, base not an ancestor of HEAD) → deploy all, never a guessed base.
+            DEPLOY_BASE="${RESOLVED_DEPLOY_BASE:-}"
+            if [ -n "$DEPLOY_BASE" ] && git merge-base --is-ancestor "$DEPLOY_BASE" HEAD 2>/dev/null; then
+              echo "Deploy base: $DEPLOY_BASE (last successful Deploy on main; this push is ${GITHUB_SHA})"
+              CHANGED=$(git diff --name-only "$DEPLOY_BASE" HEAD -- lambdas/ mcp/ mcp_server.py 2>/dev/null || \
+                        find lambdas/ mcp/ -name '*.py' -type f)
+            else
+              echo "::warning title=Deploy base unresolved (#4472)::no last-deployed sha that is an ancestor of HEAD ('$DEPLOY_BASE') — deploying everything rather than guessing a base."
+              DEPLOY_BASE=""
+              CHANGED=$(find lambdas/ mcp/ -name '*.py' -type f)
+            fi
           fi
 
           echo "Changed files:"
@@ -853,7 +894,12 @@ jobs:
           # closes the old silent gap where an unmapped helper module deployed
           # to nobody.
           FLEET_CHANGED="false"
-          CONFIG_CHANGED=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- $BUNDLED_CONFIG_PATHS 2>/dev/null || true)  # #1173: same base as CHANGED above
+          # #4472: same base as CHANGED above. No base (deploy_all, or unresolved) → CHANGED
+          # already lists every source, so the fleet redeploys and the config rides with it.
+          CONFIG_CHANGED=""
+          if [ -n "${DEPLOY_BASE:-}" ]; then
+            CONFIG_CHANGED=$(git diff --name-only "$DEPLOY_BASE" HEAD -- $BUNDLED_CONFIG_PATHS 2>/dev/null || true)
+          fi
           if [ -n "$CONFIG_CHANGED" ]; then
             FLEET_CHANGED="true"
             echo "⚡ bundled config changed → fleet deploy:"
@@ -861,6 +907,14 @@ jobs:
           fi
           for file in $CHANGED; do
             case "$file" in
+              # #4250 box 3: the reconcile bot's counter file is never a fleet trigger.
+              # It ships in every bundle, so the next real fleet deploy carries it;
+              # a count bump alone must not park a `production` lease for ~106 functions.
+              # This also covers a reconcile-only push: the reconcile whitelist's only
+              # lambdas/ path is this file, and it names no BUNDLED_CONFIG_PATHS entry.
+              lambdas/web/platform_counts.py)
+                echo "ℹ️ $file is a reconcile counter file — rides the next fleet deploy, never triggers one (#4250)"
+                ;;
               lambdas/*)
                 MAPPED=$(jq -r --arg f "$file" '.lambdas[$f].function // empty' "$LAMBDA_MAP_FILE")
                 if [ -z "$MAPPED" ]; then
@@ -880,7 +934,8 @@ jobs:
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
 
           # ADR-158 (#4256): the one change class that still waits on a human is an IAM
-          # diff this push itself introduced. Same diff base as CHANGED above (#1173). An
+          # diff this push itself introduced. Deliberately NOT the #4472 deploy base: a
+          # carried-over cdk/ diff must not re-offer the click on every later push. An
           # unreadable diff fails TOWARD offering the click, never toward skipping it.
           if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
             CDK_CHANGED="true"
@@ -1348,8 +1403,8 @@ jobs:
   # #749: the SAME sweep is also runnable standalone — .github/workflows/
   # visual-qa.yml (workflow_dispatch + full AI-vision on the weekly Sunday
   # run) — so the reader-facing net fires even when this pipeline copy is
-  # skipped (red upstream job, or a push with nothing to deploy). Keep the
-  # step lists in sync across ci-cd.yml / site-deploy.yml / visual-qa.yml.
+  # skipped (red upstream job, or a push with nothing to deploy). The pinned
+  # install is one composite, .github/actions/playwright-browser (#4254).
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA
@@ -1366,18 +1421,11 @@ jobs:
           python-cache: 'pip'
 
       - name: Install Playwright + Chromium
-        run: |
-          python -m pip install --upgrade pip
-          # #2938: boto3 is LOAD-BEARING here, not incidental. visual_ai_qa imports
-          # lambdas/ai/bedrock_client, which needs it — without it BOTH --ai-qa and
-          # --reader-truth printed "⚠ unavailable" and the job still reported success,
-          # so the gates CLAUDE.md/ADR-076 call gating were structurally dark. Pinned
-          # via ci_pins.py from requirements-dev.txt (CQ-01, #2609), never a literal.
-          # pillow (#2973): visual_ai_qa downscales full-page captures over Bedrock's
-          # 8000px image limit — without it those pages FAIL loudly instead of evaluating.
-          PINS=$(python3 scripts/ci_pins.py playwright boto3 botocore pillow)
-          python -m pip install $PINS
-          python -m playwright install --with-deps chromium
+        # The one install step list for every visual-QA job (#4254): pinned playwright +
+        # boto3/botocore (#2938, load-bearing for the AI gates) + pillow (#2973).
+        uses: ./.github/actions/playwright-browser
+        with:
+          browser: chromium
 
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
         uses: ./.github/actions/setup-ci

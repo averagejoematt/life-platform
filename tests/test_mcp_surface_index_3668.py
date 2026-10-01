@@ -433,3 +433,42 @@ def test_the_endpoint_registry_is_staged_into_the_mcp_bundle():
     src = open(os.path.join(_REPO, "deploy", "build_bundle.py"), encoding="utf-8").read()
     stage_mcp = src.split("def stage_mcp(")[1].split("\ndef ")[0]
     assert "endpoint_registry.py" in stage_mcp
+
+
+# ── #4286 box 3: the index as an MCP resource ─────────────────────────────────────────────
+
+
+def _rpc(method, params=None):
+    from mcp import handler
+
+    return handler._process_jsonrpc({"jsonrpc": "2.0", "id": 7, "method": method, "params": params or {}})
+
+
+def test_initialize_advertises_resources_4286():
+    assert "resources" in _rpc("initialize", {"protocolVersion": "2025-06-18"})["result"]["capabilities"]
+
+
+def test_resources_list_names_the_surface_index_4286():
+    from mcp import resources
+
+    listed = _rpc("resources/list")["result"]["resources"]
+    assert [r["uri"] for r in listed] == [resources.SURFACE_INDEX_URI]
+    assert listed[0]["mimeType"] == "application/json" and listed[0]["name"]
+
+
+def test_resources_read_is_the_same_index_the_tool_returns_4286(monkeypatch):
+    """One builder: the resource body IS describe_platform_surfaces({}), so the two cannot drift."""
+    import json as _json
+
+    from mcp import resources
+
+    sentinel = {"surfaces": [{"name": "planted_4286"}], "counts": {"reachable": 1}}
+    monkeypatch.setattr(TS, "tool_describe_platform_surfaces", lambda args=None: sentinel)
+    contents = _rpc("resources/read", {"uri": resources.SURFACE_INDEX_URI})["result"]["contents"]
+    assert len(contents) == 1 and contents[0]["uri"] == resources.SURFACE_INDEX_URI
+    assert _json.loads(contents[0]["text"]) == sentinel
+
+
+def test_resources_read_of_an_unknown_uri_is_the_spec_not_found_error_4286():
+    err = _rpc("resources/read", {"uri": "life-platform://nope"})["error"]
+    assert err["code"] == -32002 and "life-platform://nope" in err["message"]

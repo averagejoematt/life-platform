@@ -50,6 +50,9 @@ LAMBDA_MAP = os.path.join(ROOT, "ci", "lambda_map.json")
 # imports nothing but the stdlib, so this works with no CDK installed.
 if os.path.join(ROOT, "cdk") not in sys.path:
     sys.path.insert(0, os.path.join(ROOT, "cdk"))
+# ledgers/ holds the shrink-only enrollment ledger since #4270 slice 3 (moved out of tests/).
+if os.path.join(ROOT, "ledgers") not in sys.path:
+    sys.path.insert(0, os.path.join(ROOT, "ledgers"))
 
 from common.pacific_time import pacific_today  # noqa: E402  (tests/conftest.py puts lambdas/ on sys.path)
 from lambda_enrollment_ledger import (  # noqa: E402

@@ -106,7 +106,9 @@ def test_workflow_is_weekly_scheduled_and_dispatchable():
 
 
 def test_workflow_installs_webkit_and_drives_the_mobile_tier2_sweep():
-    text = _workflow_text()
+    from tests.playwright_browser_calls import expanded  # #4254: the install is the composite
+
+    text = expanded(_workflow_text())
     assert re.search(r"playwright install --with-deps webkit", text), "webkit engine not installed"
     run = re.search(r"python3 tests/visual_qa\.py([^\n]*)", text)
     assert run, "workflow never invokes python3 tests/visual_qa.py"
@@ -177,9 +179,11 @@ def test_workflow_playwright_pin_matches_ci_gate():
     absence of a second copy.
     """
 
+    from tests.playwright_browser_calls import expanded  # #4254: the install is the composite
+
     def resolves_playwright(path):
         with open(path, encoding="utf-8") as f:
-            return [args for args in re.findall(r"ci_pins\.py([^)\n]*)", f.read()) if "playwright" in args.split()]
+            return [args for args in re.findall(r"ci_pins\.py([^)\n]*)", expanded(f.read())) if "playwright" in args.split()]
 
     def literals(path):
         with open(path, encoding="utf-8") as f:

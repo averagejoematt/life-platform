@@ -70,6 +70,7 @@ from operational import (
     qa_check_oauth_door,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
+    supplement_join_qa,  # noqa: E402  (#4245 dead-man: the supplement join going dark)
     week_agreement_qa,  # noqa: E402  (#3615 boxes 2+3: same-week fact + absence agreement)
     weight_truth_qa,  # noqa: E402
 )
@@ -1159,6 +1160,11 @@ def check_steps():
         (
             "habit_cross_source",
             lambda: habit_cross_source_qa.check_habit_cross_source(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now),
+        ),
+        # #4245 dead-man: a ticked supplement must reach the supplements row, and a content-bearing row must be counted
+        (
+            "supplement_join_liveness",
+            lambda: supplement_join_qa.check_supplement_join_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now),
         ),
         ("hae_liveness_truth", check_hae_liveness_truth),  # #2001: dark HAE datatypes carry a numeric days_dark when findable
         ("s3_freshness", check_s3_freshness),

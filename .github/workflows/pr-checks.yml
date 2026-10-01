@@ -170,7 +170,7 @@ jobs:
       # tests/test_premerge_lane.py asserts the partition and the exit-5 carve-out.
       #
       # The step LABEL still reads "premerge marker — behaviour + ..." ON PURPOSE: a CI
-      # step's census key is `<job> / <label>` (tests/gate_census_unproven_residue.py), so
+      # step's census key is `<job> / <label>` (ledgers/gate_census_unproven_residue.py), so
       # relabelling it is a census entrant, and census changes land in their own PR.
       # The selection is `deploy_critical`; the label is stale until that PR relabels it.
       - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)

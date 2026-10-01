@@ -1,4 +1,4 @@
-"""tests/gate_census_unproven_residue.py — the #3536 per-entrant proof ledger.
+"""ledgers/gate_census_unproven_residue.py — the #3536 per-entrant proof ledger.
 
 THE dated, shrink-only record of every census gate that carried the `unproven`
 verdict when the per-entrant rule landed (charter primitive 3, docs/CHARTER.md:
