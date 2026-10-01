@@ -1153,7 +1153,7 @@ def _build_weekly_script_v2(beats: dict, bible: dict) -> dict:
     try:
         return _psv2.build_weekly_script_v2(beats, bible, _psv2_deps())
     except Exception as e:  # any v2 failure → v1 keeps the show alive
-        logger.warning("[panel] v2 script engine failed (%s) — falling back to v1", e)
+        logger.warning("[panel] v2 script engine failed (%s) — falling back to v1 (v2_fallback=engine_error)", e)
         return {}
 
 
