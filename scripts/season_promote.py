@@ -154,8 +154,13 @@ def plan(staging: str, weeks: List[int]) -> Dict[str, Any]:
     for wk in weeks:
         st = _staged(staging, wk)
         rep = st["report"]
-        if rep.get("post_findings") or rep.get("episode_findings"):
-            out["staging_findings"].append({"week": wk, "post": rep.get("post_findings"), "episode": rep.get("episode_findings")})
+        allf = (rep.get("post_findings") or []) + (rep.get("episode_findings") or [])
+        blocking = [f for f in allf if not f.startswith("fact:")]
+        review = [f for f in allf if f.startswith("fact:")]
+        if blocking:
+            out["staging_findings"].append({"week": wk, "blocking": blocking})
+        if review:
+            out.setdefault("fact_findings_for_review", []).append({"week": wk, "review": review})
         existing = table.get_item(Key={"pk": CHRONICLE_PK, "sk": ROWS[wk]}).get("Item") or {}
         upd = _row_update(wk, st, existing)
         out["chronicle"].append(
@@ -410,6 +415,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--apply", action="store_true", help="OWNER ACT: perform the publish")
     ap.add_argument("--only", default=",".join(STEPS), help=f"comma list of steps from {STEPS}")
     ap.add_argument("--backup-dir", default=None)
+    ap.add_argument("--accept-reviewed", action="store_true", help="the remaining fact-read findings were adjudicated by a person")
     args = ap.parse_args(argv)
     os.environ.setdefault("AWS_MAX_ATTEMPTS", "1")
     a, _, b = args.weeks.partition("-")
@@ -421,8 +427,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = plan(args.staging, weeks)
     print(json.dumps(p, indent=1, default=str))
     if p["staging_findings"]:
-        print("\nREFUSING: the staging bundle carries unresolved gate findings (above). Fix or re-stage those weeks first.")
+        print("\nREFUSING: the staging bundle carries unresolved deterministic gate findings (above). Fix or re-stage those weeks first.")
         return 3
+    if p.get("fact_findings_for_review") and not args.accept_reviewed:
+        print(
+            "\nREFUSING: the fact read left findings (above) that a person has not adjudicated. The fact read is a model and can be"
+            " wrong; once each is resolved or overruled on the record, re-run with --accept-reviewed."
+        )
+        return 4
     if not args.apply:
         print("\nDRY RUN — nothing written. Re-run with --apply (owner act).")
         return 0

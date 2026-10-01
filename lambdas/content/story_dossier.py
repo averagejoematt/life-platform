@@ -451,6 +451,8 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         "pre_registered": prereg,
         # counts are facts, not something a model should count from a list (a fact read miscounted 16 as 15)
         "pre_registered_count": len(prereg),
+        "pre_registered_filer_names": sorted({p["filed_by"] for p in prereg}),
+        "pre_registered_filer_count": len({p["filed_by"] for p in prereg}),
         "pre_registered_status_counts": {
             k: sum(1 for p in prereg if p["status_at_week_end"] == k) for k in sorted({p["status_at_week_end"] for p in prereg})
         },
@@ -636,11 +638,13 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "steps": _steps(table, wk),
     }
     nye = ["macrofactor"] if nutrition["not_yet_exported_dates"] else []
-    dossier["roster_note"] = (
-        "The sealed pre-registration filed opening calls from eight specialists. Two names there are not on the weekly desk: "
-        "the training calls were filed by Dr. Sarah Chen, who does not sit on the operational team, and the physical coach's calls "
-        "were filed under the name Dr. Victor Reyes — the physical coach on the weekly desk is Dr. Max Reyes."
-    )
+    dossier["roster_note"] = {
+        "weekly_team": [c["name"] for c in team],
+        "weekly_team_count": len(team),
+        "pre_registration_filers": "sixteen calls under eight names; six of those names sit on the weekly team",
+        "not_on_the_weekly_team": "Dr. Sarah Chen (the two training calls)",
+        "same_seat_two_names": "the physical seat's two calls were filed as 'Dr. Victor Reyes'; that seat is Dr. Max Reyes on the weekly team",
+    }
     dossier["data_caveats"] = [
         *(["nutrition for " + ", ".join(nutrition["not_yet_exported_dates"]) + " is not yet exported"] if nye else []),
         "steps undercount (phone only)",
