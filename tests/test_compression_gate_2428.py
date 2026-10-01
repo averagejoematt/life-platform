@@ -81,7 +81,7 @@ CLEAN = {
 def _wire_haiku(monkeypatch, payload):
     calls = []
 
-    def fake_haiku(system, user_message, max_tokens=1500, temperature=0.2):
+    def fake_haiku(system, user_message, max_tokens=1500, temperature=0.2, schema=None):
         calls.append(user_message)
         return dict(payload)
 

@@ -73,6 +73,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 # own copy.
 from coach import (
     audience_guard,  # #4213: the stance read is a public-audience slot
+    coach_json_schemas as _schemas,  # #4276: structured-output schemas
     coach_presence_gate,  # #4217: the absent-coach gate's shared glue
 )
 from coach.persona_registry import OPERATIONAL_COACH_IDS
@@ -275,7 +276,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
+def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2, schema=None):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
@@ -290,28 +291,28 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
     if system:
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
-
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
     from common.retry_utils import call_anthropic_raw
 
-    resp = call_anthropic_raw(req)
-    text = resp["content"][0]["text"].strip()
-    # #4276: the fence-tolerant parse is one shared copy now (ai/structured_json.py). This site does
-    # not yet send `output_config.format`: its output needs its own JSON schema first (see #4276).
-    from ai.structured_json import parse_json_text
+    def _send(b):
+        req = urllib.request.Request(
+            ANTHROPIC_API,
+            data=json.dumps(b).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+            },
+            method="POST",
+        )
+        return call_anthropic_raw(req)
 
-    return parse_json_text(text)
+    # #4276: with `schema`, the reply is requested under `output_config.format` (structured
+    # outputs); ai.structured_json.call_json re-sends without it if Bedrock refuses the schema,
+    # and keeps the fence-tolerant parse as the fallback. The schemas: coach/coach_json_schemas.py.
+    from ai.structured_json import call_json
+
+    return call_json(_send, body, schema=schema, label="coach_history_summarizer")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -999,6 +1000,7 @@ def _apply_compression_gate(coach_id, meta, state, user_message, result, presenc
     def _regen_fn(correction):
         retry = _call_haiku(
             system=COMPRESSION_SYSTEM_PROMPT,
+            schema=_schemas.COMPRESSION_OUTPUT_SCHEMA,
             user_message=user_message + "\n\n" + correction,
             max_tokens=4000,
             temperature=0.2,
@@ -1036,6 +1038,7 @@ def _compress_coach(coach_id, state, presence_signal=None):
     try:
         result = _call_haiku(
             system=COMPRESSION_SYSTEM_PROMPT,
+            schema=_schemas.COMPRESSION_OUTPUT_SCHEMA,
             user_message=user_message,
             # 2026-06-29: was 1500 — too small once threads/predictions accrued.
             # A rich coach (50+ threads, 40+ predictions) produces a compressed
@@ -1328,7 +1331,9 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
 
     def _regen_fn(correction):
         strict_message = user_message + "\n\n" + correction
-        retry = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=strict_message, max_tokens=1400, temperature=0.2)
+        retry = _call_haiku(
+            system=STANCE_SYSTEM_PROMPT, user_message=strict_message, max_tokens=1400, temperature=0.2, schema=_schemas.STANCE_OUTPUT_SCHEMA
+        )
         if not isinstance(retry, dict):
             return ""
         for field, default in _STANCE_FIELDS.items():
@@ -1378,7 +1383,9 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
             "Only reflect this in 'how_my_read_changed' if it genuinely shifts your read; "
             "otherwise proceed with your normal analysis."
         )
-    result = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=user_message, max_tokens=1400, temperature=0.3)
+    result = _call_haiku(
+        system=STANCE_SYSTEM_PROMPT, user_message=user_message, max_tokens=1400, temperature=0.3, schema=_schemas.STANCE_OUTPUT_SCHEMA
+    )
     if not isinstance(result, dict):
         logger.warning("[stance] LLM returned non-dict for %s — skipping stance this run", coach_id)
         return None
@@ -1389,7 +1396,9 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
             "\n\nSTRICT CORRECTION: your previous attempt cited raw numeric values (HRV/RHR/"
             "weights/percentages). Rewrite with ZERO numbers — describe patterns and positions only."
         )
-        retry = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=strict, max_tokens=1400, temperature=0.2)
+        retry = _call_haiku(
+            system=STANCE_SYSTEM_PROMPT, user_message=strict, max_tokens=1400, temperature=0.2, schema=_schemas.STANCE_OUTPUT_SCHEMA
+        )
         if isinstance(retry, dict) and _vital_hits(retry) < _vital_hits(result):
             result = retry
 

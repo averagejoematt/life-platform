@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
+from coach import coach_json_schemas as _schemas  # #4276: structured-output schemas
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 
 # Structured logger
@@ -147,7 +148,7 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
+def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2, schema=None):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
@@ -162,41 +163,35 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.2):
     if system:
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
-    payload = json.dumps(body).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
-
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw, now
     # backed by Bedrock (was urllib → api.anthropic.com). Handles backoff +
     # token metrics + failure metric. `req` is still built above; the body is
     # extracted and forwarded to bedrock_client.invoke().
     from common.retry_utils import call_anthropic_raw
 
-    resp = call_anthropic_raw(req)
-    # An empty `content` list is what a max_tokens stop with no emitted text
-    # looks like. Indexing [0] raised IndexError, which the handler's blanket
-    # except swallowed into a fallback digest — the failure was real but
-    # unnamed. Treat "no completion" as its own explicit outcome (ADR-104: a
-    # failed model call must be distinguishable, never silently filed).
-    content = (resp or {}).get("content") or []
-    first = content[0] if content else None
-    text = (first.get("text") or "").strip() if isinstance(first, dict) else ""
-    if not text:
-        logger.warning("ensemble model returned an empty completion — treating as no response")
-        return ""
-    # #4276: the fence-tolerant parse is one shared copy now (ai/structured_json.py). This site does
-    # not yet send `output_config.format`: its output needs its own JSON schema first (see #4276).
-    from ai.structured_json import parse_json_text
+    def _send(b):
+        req = urllib.request.Request(
+            ANTHROPIC_API,
+            data=json.dumps(b).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+            },
+            method="POST",
+        )
+        return call_anthropic_raw(req)
 
-    return parse_json_text(text)
+    # #4276: the digest is requested under ENSEMBLE_OUTPUT_SCHEMA when `schema` is given (see
+    # coach/coach_json_schemas.py); call_json keeps the fence-tolerant parse as the fallback. An
+    # empty completion (a max_tokens stop with no text) still comes back as "" and is named here,
+    # never filed silently (ADR-104).
+    from ai.structured_json import call_json
+
+    parsed = call_json(_send, body, schema=schema, label="coach_ensemble_digest")
+    if parsed == "":
+        logger.warning("ensemble model returned an empty completion — treating as no response")
+    return _schemas.ensemble_to_dicts(parsed)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -633,6 +628,7 @@ def _apply_grounding_gate(digest, user_message, remaining_seconds=None):
         strict_message = user_message + "\n\n" + correction
         retry = _call_haiku(
             system=_ensemble_system_prompt(),
+            schema=_schemas.ENSEMBLE_OUTPUT_SCHEMA,
             user_message=strict_message,
             max_tokens=6000,
             temperature=0.2,
@@ -1153,6 +1149,7 @@ def lambda_handler(event, context):
             raise RuntimeError("ensemble digest AI paused by budget tier — using fallback")
         result = _call_haiku(
             system=_ensemble_system_prompt(),
+            schema=_schemas.ENSEMBLE_OUTPUT_SCHEMA,
             user_message=user_message,
             # 2026-05-28: was 2000 — occasionally truncated the digest JSON
             # (7 parse-fails/48h) → fell back. Same bug class as the orchestrator.
