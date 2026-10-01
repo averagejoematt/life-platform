@@ -142,3 +142,79 @@ class TestV2Fallback:
 
         monkeypatch.setattr(pod._psv2, "build_weekly_script_v2", lambda *a: (_ for _ in ()).throw(RuntimeError("boom")))
         assert pod._build_weekly_script_v2({}, {}) == {}
+
+
+class _RecLog:
+    def __init__(self):
+        self.lines = []
+
+    def warning(self, msg, *a):
+        self.lines.append(msg % a if a else msg)
+
+    info = warning
+
+
+# #4514: the 10-01 15:33Z dry run — pass-1 cut at max_tokens mid-turn (shape of the real reply).
+_TRUNCATED_PASS1 = (
+    '{"elena_turns":[{"line":"Week three, and the bet from last week is still open.","wants_from_guest":"score the bet"},'
+    '{"line":"Sleep held at seven hours on four of six nights","wants_from_guest":"is that'
+)
+
+
+class TestPassBudgetAndFallbackKey4514:
+    def _beats(self):
+        return TestV2Fallback()._beats()
+
+    def test_truncated_pass1_is_unevaluated_and_the_fallback_is_counted_by_name(self, monkeypatch):
+        log = _RecLog()
+        deps = _deps(
+            lambda body, model_name=None: {
+                "content": [{"type": "text", "text": _TRUNCATED_PASS1}],
+                "stop_reason": "max_tokens",
+            }
+        )
+        deps["logger"] = log
+        assert psv2.build_weekly_script_v2(self._beats(), {}, deps) == {}
+        fb = [ln for ln in log.lines if "falling back to v1" in ln]
+        assert len(fb) == 1, log.lines
+        assert "pass-1 (Elena) UNEVALUATED" in fb[0]
+        assert "stop_reason=max_tokens" in fb[0]
+        assert "v2_fallback=pass-1" in fb[0]
+        assert "JSONDecodeError" in fb[0]  # the decoder's message and position, not a bare "failed"
+
+    def test_truncated_pass2_names_its_stage(self, monkeypatch):
+        log = _RecLog()
+        calls = []
+
+        def _invoke(body, model_name=None):
+            calls.append(body)
+            if len(calls) == 1:
+                turns = [{"line": f"E{i}", "wants_from_guest": "q"} for i in range(6)]
+                return {"content": [{"type": "text", "text": json.dumps({"elena_turns": turns})}], "stop_reason": "end_turn"}
+            return {"content": [{"type": "text", "text": '{"replies":["C1","C2'}], "stop_reason": "max_tokens"}
+
+        deps = _deps(_invoke)
+        deps["logger"] = log
+        monkeypatch.setattr(psv2, "guest_voice_spec", lambda s3, b, gid: ("", ""))
+        assert psv2.build_weekly_script_v2(self._beats(), {}, deps) == {}
+        assert any("v2_fallback=pass-2" in ln and "stop_reason=max_tokens" in ln for ln in log.lines), log.lines
+
+    def test_both_passes_carry_the_measured_budget_and_a_schema(self, monkeypatch):
+        calls = []
+
+        def _invoke(body, model_name=None):
+            calls.append(body)
+            if len(calls) == 1:
+                turns = [{"line": f"E{i}", "wants_from_guest": "q"} for i in range(6)]
+                return {"content": [{"type": "text", "text": json.dumps({"elena_turns": turns})}], "stop_reason": "end_turn"}
+            return {"content": [{"type": "text", "text": '{"replies":["C1","C2","C3","C4","C5"]}'}], "stop_reason": "end_turn"}
+
+        deps = _deps(_invoke)
+        monkeypatch.setattr(psv2, "guest_voice_spec", lambda s3, b, gid: ("", ""))
+        out = psv2.build_weekly_script_v2(self._beats(), {}, deps)
+        assert out["script_engine"] == "two-pass-v2"
+        # The largest measured writer reply was 2,246 tokens (09-17..10-01); the budget sits above it.
+        assert psv2.PASS_MAX_TOKENS > 2246
+        assert [c["max_tokens"] for c in calls] == [psv2.PASS_MAX_TOKENS, psv2.PASS_MAX_TOKENS]
+        fmts = [c["output_config"]["format"]["schema"] for c in calls]
+        assert fmts == [psv2.ELENA_OUTPUT_SCHEMA, psv2.GUEST_OUTPUT_SCHEMA]
