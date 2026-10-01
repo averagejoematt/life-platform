@@ -556,8 +556,12 @@ def test_today_flags_the_garmin_walk_over_the_hr_ceiling_read_from_the_redline(s
     ceiling = owner_redlines.REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
     value, _ = _today("2026-09-27")
     assert value["walking_floor_hr_wk"]["hr_ceiling_bpm"] == ceiling
+    # #4503 OD2: the cap is 120 avg, so the 116.8-bpm walk is compliant now; at the retired 105 cap it is the one flag
+    assert ceiling == 120 and value["hr_ceiling_flags"] == []
+    monkeypatch.setitem(owner_redlines.REDLINES["walking_floor_hr_wk"], "hr_ceiling_bpm", 105)
+    value, _ = _today("2026-09-27")
     assert [(f["id"], f["avg_hr"], f["hr_ceiling_bpm"], f["over_by_bpm"], f["deduplicated"]) for f in value["hr_ceiling_flags"]] == [
-        ("strava:20343117320", 116.8, ceiling, round(116.8 - ceiling, 1), False)
+        ("strava:20343117320", 116.8, 105, 11.8, False)
     ]
     src = (ROOT / "mcp" / "coach_packet_today.py").read_text()
     assert not any(isinstance(n, ast.Constant) and n.value == ceiling for n in ast.walk(ast.parse(src))), "the ceiling is a literal"

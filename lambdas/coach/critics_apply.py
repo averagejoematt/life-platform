@@ -178,11 +178,11 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
     if attr == "movement_key":
         if to not in SWAPPABLE_CARDIO or not any(getattr(s, "duration_seconds", None) for s in ex.sets):
             return False, f"refused: exercises[{idx}] is not a timed cardio block, or {to!r} is not a swap target (#4387)"
-        from training.recent_aerobic import HR_CEILING_BPM
+        from training.recent_aerobic import HR_CEILING_BPM, HR_TARGET_BPM
 
         was = _label(ex)
         ex.movement_key, ex.rationale_tag = str(to), "custom"
-        ex.notes = f"Cycling (recumbent), same duration, HR < {HR_CEILING_BPM} bpm — swapped from {was} by joints_tendons (#4387)"
+        ex.notes = f"Cycling (recumbent), same duration, HR avg ≤ {HR_CEILING_BPM} bpm (target {HR_TARGET_BPM}) — swapped from {was} by joints_tendons (#4387)"
         return True, None
     if attr == "weight_lbs":
         kg = float(to) / _LBS_PER_KG

@@ -483,6 +483,22 @@ def test_no_mood_signal_is_read():
         assert partition not in code
 
 
+def test_designation_status_is_identity_free_and_fails_closed():
+    """#4503 OD7: the walking_collapse actuator MARK asks only WHETHER a human is designated. Mutation
+    control: return the parsed config (or its contact) from `designation_status` — the identity leaks
+    into the plan block and this reds."""
+    for payload, want in (
+        (ARMED_CONFIG, {"designation": "designated", "armed": True}),
+        (FAKE_CONFIG, {"designation": "designated", "armed": False}),
+        ({**FAKE_CONFIG, "status": "PENDING"}, {"designation": "not_designated_or_invalid", "armed": None}),
+    ):
+        got = nhc.designation_status(FakeS3(payload), "bucket")
+        assert got == want
+        blob = json.dumps(got)
+        assert FAKE_NAME not in blob and "@" not in blob and "contact" not in blob
+    assert nhc.designation_status(FakeS3(fail=True), "bucket") == {"designation": "unreadable", "armed": None}
+
+
 def test_read_failure_fails_closed_before_the_config():
     t = FakeTable(QUIET_LATEST, fail=True)
     out, ses, logs, s3 = _leg(t, armed=True)

@@ -562,6 +562,18 @@ def load_config(s3_client: Any, bucket: str) -> tuple[Optional[dict[str, Any]], 
     return (cfg, "") if cfg is not None else (None, CONFIG_INVALID)
 
 
+def designation_status(s3_client: Any, bucket: str) -> dict[str, Any]:
+    """Identity-free: does the private config designate a named human? (#4503 OD7, the walking_collapse
+    actuator MARK.) Returns only {"designation", "armed"} — never the name, the address or the raw body,
+    and it sends nothing. `designation` is "designated", "not_designated_or_invalid" (no DESIGNATED
+    status, or a malformed contact/threshold — the same fail-closed parse the contact leg uses) or
+    "unreadable" (the object could not be read)."""
+    cfg, reason = load_config(s3_client, bucket)
+    if cfg is not None:
+        return {"designation": "designated", "armed": bool(cfg["armed"])}
+    return {"designation": "unreadable" if reason == CONFIG_UNAVAILABLE else "not_designated_or_invalid", "armed": None}
+
+
 def newest_row_day(table: Any, user_id: str) -> Optional[str]:
     """The newest DATE# day on ANY channel partition, with no floor and no predicate.
 

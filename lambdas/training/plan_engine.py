@@ -85,7 +85,8 @@ from health import deficit_disclosures
 
 from training import owner_redlines, program_structure, recent_aerobic, self_added_volume, training_context_registry
 
-ENGINE_VERSION = "plan-engine@1.9.0"  # #4387: recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
+ENGINE_VERSION = "plan-engine@1.10.0"  # #4503 OD7: walking_collapse counts standalone walks + carries the named-human actuator mark
+# plan-engine@1.9.0 (#4387): recent_aerobic per activity; walking_collapse + walking_overshoot evaluated, report-only
 # plan-engine@1.8.0 (#4161): hybrid weeks, the lock-anchored −40 % deload, the protein-gated rate target
 # plan-engine@1.7.0 (#4110/#4147): the session and the program week follow the completed-session SEQUENCE (v0.4 upper/lower)
 # plan-engine@1.6.0 (#4081): self_added_volume evaluated from adherence's set counts; 1.5.0 #4098: `not_before_week` enforced + rolling e1RM anchor drop
@@ -608,6 +609,11 @@ def _tripwire_states(
         state, observed, detail = reports[tid]
         row = _missing(tid, detail) if recent_aerobic_block is None else _row(tid, state, observed, detail)
         row["report_only"] = True
+        if tid == "walking_collapse":
+            # #4503 OD7: the walk-count half's evidence, and the actuator MARK (sends nothing; the caller
+            # fills `designation` from the private config only when the row is tripped)
+            row["standalone_walks"] = ((recent_aerobic_block or {}).get("totals") or {}).get("standalone_walks")
+            row["actuator"] = recent_aerobic.collapse_actuator(row["state"], None)
         out.append(row)
     # #4098: the week gate, applied to EVERY row whose tripwire declares `not_before_week` —
     # never per-tripwire, so a new declaration is read the day it is written.
