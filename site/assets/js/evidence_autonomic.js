@@ -12,6 +12,7 @@
 */
 import { targetSpine, barChart, sparkline } from "/assets/js/charts.js";
 import { esc, fmt, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { GENESIS_ISO } from "/assets/js/coach_popover.js"; // the one genesis source of truth (P0.1)
 
 // ── Autonomic balance (RQA-06) ────────────────────────────────────────────────
 
@@ -91,18 +92,34 @@ const _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", 
 // parsed as UTC midnight, and rendering that through a Pacific locale prints the PREVIOUS
 // day. That is the same "a date pushed through a clock that isn't its own" defect this
 // panel is being fixed for — it would be absurd to reintroduce it in the label.
+function _part(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "").slice(0, 10));
+  if (!m) return null;
+  return { mon: _MONTHS[Number(m[2]) - 1] || m[2], day: String(Number(m[3])) };
+}
+
+// "Sep 6" from a YYYY-MM-DD, by the same string-parts rule as weekRange.
+export function monthDay(iso) {
+  const p = _part(iso);
+  return p ? `${p.mon} ${p.day}` : String(iso || "—");
+}
+
 export function weekRange(w) {
   const start = w && w.week_start ? String(w.week_start).slice(0, 10) : "";
   const end = w && w.week_end ? String(w.week_end).slice(0, 10) : "";
-  const part = (iso) => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-    if (!m) return null;
-    return { mon: _MONTHS[Number(m[2]) - 1] || m[2], day: String(Number(m[3])) };
-  };
-  const a = part(start), b = part(end);
+  const a = _part(start), b = _part(end);
   if (!a) return start || "—";
   if (!b) return `${a.mon} ${a.day}`;
   return a.mon === b.mon ? `${a.mon} ${a.day}–${b.day}` : `${a.mon} ${a.day} – ${b.mon} ${b.day}`;
+}
+
+// #4474: the distribution's window, dated, and flagged when it starts before the experiment.
+function _periodNote(p) {
+  const a = p && p.start_date ? String(p.start_date).slice(0, 10) : "";
+  const b = p && p.end_date ? String(p.end_date).slice(0, 10) : "";
+  if (!a || !b) return "";
+  const pre = a < GENESIS_ISO ? `, which starts before the experiment began on ${monthDay(GENESIS_ISO)}` : "";
+  return ` (${esc(monthDay(a))} – ${esc(monthDay(b))}${esc(pre)})`;
 }
 
 export function renderZone2(d) {
@@ -144,14 +161,38 @@ export function renderZone2(d) {
   }
 
   // Altitude 2 — weekly Zone-2 minutes (barChart reuse).
+  //
+  // #4474 — the chart is the API's trailing ~90-day window, which reaches back before the
+  // experiment began. It was titled only "Zone-2 minutes by week" with undated "of 14 weeks"
+  // stats, so a reader on Day 26 read late-June bars as this experiment's history (the
+  // reader-truth judge's temporal_contradiction, run 36893507101). The window now wears its
+  // dates, the weeks before the start are counted and named, and the since-start tally is
+  // stated separately from the whole-window one.
   if (weeks.length) {
     const items = weeks.map((w) => ({ label: String(w.week_start).slice(5), value: w.zone_2_minutes }));
-    parts.push(sec("Zone-2 minutes by week",
-      barChart(items, { valueKey: "value", labelKey: "label", label: "Zone-2 min / week" }) +
+    const first = String(weeks[0].week_start || "").slice(0, 10);
+    const lastEnd = String(weeks[weeks.length - 1].week_end || weeks[weeks.length - 1].week_start || "").slice(0, 10);
+    const win = `${monthDay(first)} – ${monthDay(lastEnd)}`;
+    const before = weeks.filter((w) => String(w.week_end || w.week_start || "").slice(0, 10) < GENESIS_ISO);
+    const since = weeks.filter((w) => !(String(w.week_end || w.week_start || "").slice(0, 10) < GENESIS_ISO));
+    const sinceMet = since.filter((w) => Number(w.zone_2_minutes) >= target).length;
+    const start = monthDay(GENESIS_ISO);
+    const per = d.period || {};
+    const perA = per.start_date ? String(per.start_date).slice(0, 10) : "";
+    const perB = per.end_date ? String(per.end_date).slice(0, 10) : "";
+    // The bars are whole calendar weeks, so the first and last can run past the data window.
+    const partial = perA && perB && (perA !== first || perB !== lastEnd)
+      ? ` The bars are whole calendar weeks around the data window, ${esc(monthDay(perA))} – ${esc(monthDay(perB))}, so the first and last are partial.`
+      : "";
+    const frame = before.length
+      ? `This window reaches back before the experiment: ${before.length} of these ${weeks.length} weeks ended before it began on <strong>${esc(start)}</strong>; the other ${since.length} include that day or come after it. From the week of ${esc(start)} on, ${sinceMet} of ${since.length} week${since.length === 1 ? "" : "s"} hit the 150-min mark. `
+      : "";
+    parts.push(sec(`Zone-2 minutes by week, ${win}`,
+      barChart(items, { valueKey: "value", labelKey: "label", label: `Zone-2 min / week, ${win}` }) +
       // #3286: `weeks` holds only the weeks that HAD qualifying activity — a blank week is
       // absent from this chart, not a zero bar. Said out loud so the last bar is never read
       // as "the current week" the way `current_week` used to be.
-      `<p class="rd-meta label">Weeks with at least one qualifying session (a blank week is absent, not a zero bar). ${s.weeks_meeting_target || 0} of ${s.weeks_analyzed || weeks.length} weeks hit the 150-min mark (${fmt(s.target_hit_rate_pct, 0)}%); the window averages ${fmt(s.avg_weekly_zone_2_min, 0)} min/week.${d.trend ? ` Direction is <strong>${esc(d.trend.direction)}</strong> (${fmt(d.trend.first_half_avg_min, 0)} → ${fmt(d.trend.second_half_avg_min, 0)} min).` : ""}</p>`));
+      `<p class="rd-meta label">${frame}Weeks with at least one qualifying session (a blank week is absent, not a zero bar). Across the whole window (${esc(win)}), ${s.weeks_meeting_target || 0} of ${s.weeks_analyzed || weeks.length} weeks hit the 150-min mark (${fmt(s.target_hit_rate_pct, 0)}%) and it averages ${fmt(s.avg_weekly_zone_2_min, 0)} min/week.${d.trend ? ` Direction is <strong>${esc(d.trend.direction)}</strong> (${fmt(d.trend.first_half_avg_min, 0)} → ${fmt(d.trend.second_half_avg_min, 0)} min).` : ""}${partial}</p>`));
   }
 
   // Altitude 3 — the full 5-zone distribution + Zone-2 sport mix, as honest tables.
@@ -162,7 +203,7 @@ export function renderZone2(d) {
       `<span class="zdist-v mono">${fmt(z.total_minutes, 0)} min · ${fmt(z.pct_of_training, 0)}%</span></div>`).join("");
     parts.push(sec("Full zone distribution",
       `<div class="zdist">${rows}</div>` +
-      `<p class="rd-meta label">Where the cardio time actually landed across all five HR zones over the window — total ${fmt(s.total_zone_2_min, 0)} min in Zone 2 across ${s.total_activities || 0} sessions. Most people undertrain Zone 2 relative to the higher zones.</p>`));
+      `<p class="rd-meta label">Where the cardio time actually landed across all five HR zones over the data window${_periodNote(d.period)} — total ${fmt(s.total_zone_2_min, 0)} min in Zone 2 across ${s.total_activities || 0} sessions. Most people undertrain Zone 2 relative to the higher zones.</p>`));
   }
   if (sports.length) {
     const rows = sports.map((sp) =>
