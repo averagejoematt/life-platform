@@ -50,16 +50,22 @@ def is_hevy_echo(act: Mapping[str, Any]) -> bool:
     return str(act.get("device_name") or "").strip().lower() == HEVY_DEVICE
 
 
-def hr_intervals(activities: Optional[Iterable[Mapping[str, Any]]]) -> List[Tuple[datetime, datetime]]:
+def hr_intervals(activities: Optional[Iterable[Mapping[str, Any]]], *, lift_is_echo: bool = True) -> List[Tuple[datetime, datetime]]:
     """Merged UTC [start, end] intervals covered by HR-bearing, non-echo Strava activities.
 
     These are the minutes an HR record already scored. A Hevy-logged cardio block
     overlapping them must not be charged again — on the TSB-load side
     (`training_load.hevy_session_load`) or the calorie side (`health.tdee.worked_set_seconds`).
+
+    `lift_is_echo=False` (#4412, the cardio-HR join) drops ONLY Hevy's own push (device
+    `Hevy`). The de-dup treats every lift-labelled activity as an echo, but WHOOP reaches
+    Strava as `WeightTraining` for a whole gym session (its Cross Training / Activity
+    sport), and that record DID measure the heart rate over the bike minutes at its tail.
     """
     spans = []
     for act in activities or []:
-        if not (_num(act.get("average_heartrate")) or 0) > 0 or is_hevy_echo(act):
+        echo = is_hevy_echo(act) if lift_is_echo else str(act.get("device_name") or "").strip().lower() == HEVY_DEVICE
+        if not (_num(act.get("average_heartrate")) or 0) > 0 or echo:
             continue
         start = parse_iso_utc(act.get("start_date"))
         secs = _num(act.get("elapsed_time_seconds")) or _num(act.get("moving_time_seconds")) or 0

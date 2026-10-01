@@ -308,6 +308,14 @@ def lambda_handler(event: dict, context: Any) -> dict:
     if event and event.get("reextract_days"):
         return reextract_training_notes(int(event["reextract_days"]))
 
+    # #4412: re-derive the cardio-HR join for ONE named workout (outside the hourly two-day
+    # window) — `{"rejoin_workout": "<hevy id>", "date": "YYYY-MM-DD"}`. Writes only `cardio_hr`,
+    # only when the derivation changed; a second invoke writes nothing.
+    if event and event.get("rejoin_workout"):
+        res = cardio_hr_store.rejoin_one(_table, USER_ID, str(event.get("date") or ""), str(event["rejoin_workout"]))
+        logger.info("cardio-hr rejoin_workout: %s", json.dumps(res, default=str))
+        return {"statusCode": 200, "body": json.dumps(res, default=str)}
+
     poll_started_at = datetime.now(timezone.utc).isoformat()
     since = load_since()
     is_initial = since == INITIAL_SINCE

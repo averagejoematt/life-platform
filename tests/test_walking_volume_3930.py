@@ -713,19 +713,35 @@ def test_the_0925_treadmill_replays_joined_on_the_live_fixture():
     assert "116.9 bpm avg" in verdict["reason"] and "coverage 0.858" in verdict["reason"]
 
 
-class _FakeTable:
-    """The two DDB calls the store makes, over dicts — the wire shapes, no boto3."""
+def _key_values(cond) -> list:
+    """The literal values inside a boto3 key condition (pk value, sk bound/prefix)."""
+    out = []
+    for v in cond.get_expression()["values"]:
+        out.extend(_key_values(v) if hasattr(v, "get_expression") else [] if hasattr(v, "name") else [v])
+    return out
 
-    def __init__(self, workouts: list[dict], strava: dict[str, dict]):
-        self.workouts, self.strava, self.updates = workouts, strava, []
+
+class _FakeTable:
+    """The DDB calls the store makes, over dicts — the wire shapes, no boto3 I/O. Queries route by pk:
+    the Hevy partition returns `workouts`, the WHOOP partition the `whoop` rows whose sk starts with
+    the queried prefix."""
+
+    def __init__(self, workouts: list[dict], strava: dict[str, dict], whoop: list[dict] | None = None):
+        self.workouts, self.strava, self.whoop, self.updates = workouts, strava, whoop or [], []
 
     def get_item(self, Key):
+        if "#SOURCE#hevy" in Key["pk"]:
+            return next(({"Item": w} for w in self.workouts if w["sk"] == Key["sk"]), {})
         return {"Item": self.strava[Key["sk"]]} if Key["sk"] in self.strava else {}
 
-    def query(self, **_kw):
+    def query(self, **kw):
+        pk, *rest = _key_values(kw["KeyConditionExpression"])
+        if "#SOURCE#whoop" in pk:
+            return {"Items": [r for r in self.whoop if r["sk"].startswith(rest[0])]}
         return {"Items": self.workouts}
 
     def update_item(self, Key, UpdateExpression, ConditionExpression, ExpressionAttributeValues):
+        assert UpdateExpression == "SET cardio_hr = :c" and set(ExpressionAttributeValues) == {":c"}  # ONLY cardio_hr
         self.updates.append((Key["sk"], ExpressionAttributeValues[":c"]))
         for w in self.workouts:
             if w["sk"] == Key["sk"]:
@@ -749,3 +765,96 @@ def test_the_hourly_rejoin_heals_an_unknown_block_once_the_wearable_lands_and_th
     assert rec["cardio_hr"]["blocks"][0]["state"] == "joined"
     second = store.rejoin_recent(t, "matthew", "2026-09-29")
     assert second["updated"] == 0 and len(t.updates) == 1
+
+
+# ── #4412 proof read (2026-10-01): the join ran and attached NOTHING on the two live rides ─────────
+# The REAL rows, read read-only from DDB and stored as the wire shape (tests/fixtures/walking_volume_3930/
+# cardio_hr_4412_live.json — location/polyline/notes keys redacted, named in its `_source`). Two causes:
+#   (1) the 09-29 WHOOP gym session (Cross Training, 23:03 → 00:28:59Z, avg 109) reaches Strava as
+#       `WeightTraining`, and 1.0.0 reused the de-dup's filter, which treats every lift-labelled
+#       activity as a Hevy echo — so the one record that measured the bike minutes was dropped;
+#   (2) the 09-28 WHOOP 'Activity' (23:53 → 00:33:59Z, avg 135) never reached Strava at all, and
+#       1.0.0 read only Strava.
+_LIVE_4412 = json.loads((FIXTURES / "cardio_hr_4412_live.json").read_text())
+
+
+def _live_4412_table() -> "_FakeTable":
+    hevy = [dict(w) for w in _LIVE_4412["hevy"]]
+    return _FakeTable(hevy, _LIVE_4412["strava"], _LIVE_4412["whoop"])
+
+
+def _live_hevy(day: str) -> dict:
+    (w,) = [w for w in _LIVE_4412["hevy"] if w["date"] == day]
+    return dict(w)
+
+
+def test_the_live_0929_ride_joins_the_whoop_gym_session_its_strava_copy_calls_weighttraining():
+    """Strava ONLY (cause 1 in isolation): the block's inferred minutes 00:06:57 → 00:46:57Z sit
+    1322 s inside WHOOP's `WeightTraining` row → coverage 0.551 ≥ 0.5, joined at the row's 111.8.
+    The Hevy echo (device Hevy, average_heartrate a flattened NULL) still lends nothing.
+    Mutation control: `lift_is_echo=True` in `cardio_hr._hr_activities`/`join_block` (1.0.0's
+    filter) — the block reads `unknown`, coverage 0.0, and this reds (run: red, then green)."""
+    from training import cardio_hr
+
+    w = _live_hevy("2026-09-29")
+    acts = [a for sk in ("DATE#2026-09-29", "DATE#2026-09-30") for a in _LIVE_4412["strava"][sk]["activities"]]
+    (b,) = cardio_hr.join_workout(w, acts)["blocks"]
+    assert b["window"] == {"start_utc": "2026-09-30T00:06:57+00:00", "end_utc": "2026-09-30T00:46:57+00:00", "timing": "inferred_tail"}
+    assert (b["state"], b["hr_coverage"], b["avg_hr"], b["hr_source"]) == ("joined", 0.551, 111.8, "WHOOP")
+    assert [a["device"] for a in b["hr_activities"]] == ["WHOOP"]  # never the Hevy echo
+
+
+def test_the_live_rides_join_through_the_store_and_the_0928_ride_needs_the_whoop_partition():
+    """The full store path on the real rows (Strava day items + WHOOP workout rows, day and day+1):
+      09-29 → joined from the direct WHOOP row (Cross Training, avg 109, max 139), coverage 0.551 —
+              its Strava twin (same start) is dropped, and the row in BOTH the 09-29 and 09-30
+              partitions is counted once;
+      09-28 → joined from WHOOP 'Activity' (avg 135, max 153), coverage 0.985 — a record Strava
+              never had.
+    Mutation control: make `_whoop_workouts` return [] (1.0.0's Strava-only read) — 09-28 reads
+    `unknown` with coverage 0.0 and this reds (run: red, then green)."""
+    from training import cardio_hr_store as store
+
+    t = _live_4412_table()
+    j29 = store.derive(t, "matthew", _live_hevy("2026-09-29"))
+    (b29,) = j29["blocks"]
+    assert j29["version"] == "cardio-hr@1.1.0"
+    assert (b29["state"], b29["hr_coverage"], b29["avg_hr"], b29["max_hr"], b29["hr_source"]) == ("joined", 0.551, 109.0, 139, "WHOOP")
+    assert [a["whoop_workout_id"] for a in b29["hr_activities"]] == ["d49d8bac-e0f4-4d80-9828-29840bc361cf"]
+    assert b29["zone_seconds"] is None  # WHOOP's zone minutes read 0 at avg 109 — not used, never prorated
+    (b28,) = store.derive(t, "matthew", _live_hevy("2026-09-28"))["blocks"]
+    assert (b28["state"], b28["hr_coverage"], b28["avg_hr"], b28["max_hr"]) == ("joined", 0.985, 135.0, 153)
+    assert [a["whoop_workout_id"] for a in b28["hr_activities"]] == ["60f4ac11-c50b-41ee-b071-8631c802d571"]
+
+
+def test_rejoin_one_rewrites_only_cardio_hr_once_and_then_nothing():
+    """The re-derive path the driver runs after the deploy (hevy-backfill
+    `{"rejoin_workout": "<id>", "date": "YYYY-MM-DD"}`): the stored 1.0.0 `unknown` record becomes
+    `joined` in ONE UpdateItem that SETs only `cardio_hr` (the fake asserts the expression); the
+    second invoke writes nothing. A missing workout or a malformed id writes nothing.
+    Mutation control: drop the `_same` short-circuit in `_rejoin_item` — the second invoke writes
+    again and `len(t.updates) == 1` reds."""
+    from training import cardio_hr_store as store
+
+    t = _live_4412_table()
+    wid = "ef89d610-dc29-469e-b08e-2e4263264a58"
+    assert t.workouts[1]["cardio_hr"]["blocks"][0]["state"] == "unknown"  # the stored 1.0.0 verdict
+    first = store.rejoin_one(t, "matthew", "2026-09-29", wid)
+    assert (first["found"], first["updated"], first["joined"]) == (True, 1, 1)
+    assert first["blocks"][0]["state"] == "joined" and first["blocks"][0]["avg_hr"] == 109.0
+    second = store.rejoin_one(t, "matthew", "2026-09-29", wid)
+    assert second["updated"] == 0 and len(t.updates) == 1
+    assert store.rejoin_one(t, "matthew", "2026-09-29", "nope")["found"] is False
+    assert store.rejoin_one(t, "matthew", "2026-09-29", "x#WORKOUT#y")["errors"] == 1 and len(t.updates) == 1
+
+
+def test_the_hevy_backfill_routes_the_rejoin_workout_event_and_polls_nothing(monkeypatch):
+    """`{"rejoin_workout", "date"}` calls `rejoin_one` with exactly those values and returns before
+    the events poll (no cursor read)."""
+    from ingestion import hevy_backfill_lambda as hbl
+
+    seen = []
+    monkeypatch.setattr(hbl.cardio_hr_store, "rejoin_one", lambda _t, u, d, w: seen.append((u, d, w)) or {"updated": 1})
+    monkeypatch.setattr(hbl, "load_since", lambda: (_ for _ in ()).throw(AssertionError("polled")))
+    out = hbl.lambda_handler({"rejoin_workout": "abc", "date": "2026-09-29"}, None)
+    assert seen == [(hbl.USER_ID, "2026-09-29", "abc")] and json.loads(out["body"]) == {"updated": 1}

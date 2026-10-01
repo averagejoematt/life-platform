@@ -1,0 +1,1447 @@
+{
+ "_source": "read-only DDB get_item/query on life-platform, 2026-10-01 ~03:00Z (issue 4412). Redacted keys: hevy ['description', 'raw_ref'] + exercises[].notes; strava activities ['end_latlng', 'gear_id', 'location_city', 'location_country', 'location_state', 'start_latlng', 'strava_id', 'summary_polyline'].",
+ "hevy": [
+  {
+   "adherence": {
+    "as_prescribed": {
+     "reasons": [
+      "sets: 83.3% of programmed sets completed",
+      "intensity: 1 set(s) above the prescribed RPE ceiling (deadlift_trap_bar)"
+     ],
+     "verdict": "no"
+    },
+    "computed_at": "2026-09-29T02:00:06.219736+00:00",
+    "extra": [
+     "75A4F6C4",
+     "527DA061"
+    ],
+    "intensity_adherence": {
+     "max_overage": 0.5,
+     "movements_with_ceiling": 5,
+     "over_ceiling_movements": [
+      "deadlift_trap_bar"
+     ],
+     "pct": 93.3,
+     "sets_graded": 15,
+     "sets_over_ceiling": 1,
+     "sets_rpe_absent": 0,
+     "status": "graded"
+    },
+    "match_method": "hevy_routine_id",
+    "matched_routine_id": "f905fdc257cb45c03a1c3f98f050d095",
+    "missing": [
+     "machine_crunch"
+    ],
+    "movements": [
+     {
+      "intensity": {
+       "basis": "exercise_notes:rpe",
+       "ceiling_rpe": 7,
+       "max_overage": 0.5,
+       "max_rpe": 7.5,
+       "pct_within_ceiling": 80,
+       "sets_graded": 5,
+       "sets_over_ceiling": 1,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 5
+      },
+      "movement_key": "deadlift_trap_bar",
+      "pct": 100,
+      "performed_sets": 5,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": "program_default:anchor:squat",
+       "ceiling_rpe": 8,
+       "max_overage": 0,
+       "max_rpe": 7.5,
+       "pct_within_ceiling": 100,
+       "sets_graded": 4,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 4
+      },
+      "movement_key": "squat_barbell",
+      "pct": 100,
+      "performed_sets": 4,
+      "programmed_sets": 3
+     },
+     {
+      "intensity": {
+       "basis": "program_default:accessory",
+       "ceiling_rpe": 9,
+       "max_overage": 0,
+       "max_rpe": 8,
+       "pct_within_ceiling": 100,
+       "sets_graded": 3,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 3
+      },
+      "movement_key": "leg_curl",
+      "pct": 100,
+      "performed_sets": 3,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": "program_default:accessory",
+       "ceiling_rpe": 9,
+       "max_overage": 0,
+       "max_rpe": 7,
+       "pct_within_ceiling": 100,
+       "sets_graded": 3,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 3
+      },
+      "movement_key": "calf_raise_machine",
+      "pct": 100,
+      "performed_sets": 3,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": "program_default:accessory",
+       "ceiling_rpe": 9,
+       "max_overage": null,
+       "max_rpe": null,
+       "pct_within_ceiling": null,
+       "sets_graded": 0,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 0,
+       "status": "unreadable",
+       "working_sets": 0
+      },
+      "movement_key": "machine_crunch",
+      "pct": 0,
+      "performed_sets": 0,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": null,
+       "ceiling_rpe": null,
+       "max_overage": null,
+       "max_rpe": null,
+       "pct_within_ceiling": null,
+       "sets_graded": 0,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 1,
+       "status": "unprescribed",
+       "working_sets": 1
+      },
+      "movement_key": "cycling",
+      "pct": 100,
+      "performed_sets": 1,
+      "programmed_sets": 1
+     }
+    ],
+    "overall_pct": 83.3,
+    "overall_pct_dimension": "sets_only",
+    "per_muscle": {
+     "abs": 0,
+     "calves": 100,
+     "cardio": 100,
+     "glutes": 100,
+     "hamstrings": 100,
+     "quadriceps": 100
+    },
+    "routine_target_date": "2026-09-28",
+    "sets_adherence": {
+     "pct": 83.3,
+     "performed_sets": 10,
+     "programmed_sets": 12
+    },
+    "status": "matched",
+    "workout_pacific_date": "2026-09-28"
+   },
+   "cardio_hr": {
+    "blocks": [
+     {
+      "avg_hr": null,
+      "coverage_min": 0.5,
+      "drift_recovery_reason": "no per-second HR series on the wire \u2014 the activity summary's hr_recovery describes the activity's end, not the block's",
+      "duration_s": 2400,
+      "exercise_index": 5,
+      "hr_coverage": 0,
+      "hr_drift": null,
+      "hr_recovery_60s": null,
+      "hr_source": null,
+      "max_hr": null,
+      "modality": "cycling",
+      "name": "Cycling",
+      "reason": "no HR-bearing wearable activity overlaps the block",
+      "state": "unknown",
+      "template_id": "D8F7F851",
+      "window": {
+       "end_utc": "2026-09-29T00:34:36+00:00",
+       "start_utc": "2026-09-28T23:54:36+00:00",
+       "timing": "inferred_tail"
+      },
+      "zone_seconds": null
+     }
+    ],
+    "threshold": {
+     "derived_by": "#4068's same-minutes rule (at least half overlaps); NOT his variance, NOT a population norm (ADR-105) \u2014 re-derive from the measured drift between the inferred tail window and the wearable interval",
+     "hr_coverage_min": 0.5,
+     "provenance": "convention"
+    },
+    "version": "cardio-hr@1.0.0"
+   },
+   "date": "2026-09-28",
+   "duration_sec": 6962,
+   "end_time": "2026-09-29T00:49:36+00:00",
+   "exercise_count": 7,
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 20.41168092460379
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7,
+       "set_index": 3,
+       "type": "normal",
+       "weight_kg": 79.37875915123695
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 4,
+       "type": "normal",
+       "weight_kg": 88.45061733994974
+      }
+     ],
+     "template_id": "B923B230"
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 3,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Leg Extension (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 31.75150366049478
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 31.75150366049478
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 7.5,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 31.75150366049478
+      }
+     ],
+     "template_id": "75A4F6C4"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "rpe": 7,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 145.14973101940473
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "rpe": 7,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 145.14973101940473
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "rpe": 7,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 145.14973101940473
+      }
+     ],
+     "template_id": "91237BDD"
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "rpe": 8,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "rpe": 8,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 8,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      }
+     ],
+     "template_id": "11A123F3"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 15450,
+       "duration_sec": 2400,
+       "reps": null,
+       "rpe": null,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 900,
+       "reps": null,
+       "rpe": null,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "hevy_routine_id": "9347cff2-0fca-4cab-a1fc-b89898851a1b",
+   "ingested_at": "2026-09-29T02:00:06.020731+00:00",
+   "original_unit": "kg",
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#hevy",
+   "schema_version": 2,
+   "set_count": 20,
+   "sk": "DATE#2026-09-28#WORKOUT#e7eb6103-c566-4973-9b31-7e7c43baaf49",
+   "source": "hevy",
+   "source_workout_id": "e7eb6103-c566-4973-9b31-7e7c43baaf49",
+   "start_time": "2026-09-28T22:53:34+00:00",
+   "title": "Foundation - Lower - 2 - 22",
+   "total_volume_kg": 14519.51,
+   "workout_uid": "hevy:e7eb6103-c566-4973-9b31-7e7c43baaf49"
+  },
+  {
+   "adherence": {
+    "as_prescribed": {
+     "reasons": [
+      "intensity: 9 set(s) above the prescribed RPE ceiling (barbell_bench_press, db_shoulder_press, lat_pulldown, one_arm_db_row)"
+     ],
+     "verdict": "no"
+    },
+    "computed_at": "2026-09-30T02:00:06.322844+00:00",
+    "extra": [
+     "527DA061"
+    ],
+    "intensity_adherence": {
+     "max_overage": 1.5,
+     "movements_with_ceiling": 6,
+     "over_ceiling_movements": [
+      "barbell_bench_press",
+      "db_shoulder_press",
+      "lat_pulldown",
+      "one_arm_db_row"
+     ],
+     "pct": 57.1,
+     "sets_graded": 21,
+     "sets_over_ceiling": 9,
+     "sets_rpe_absent": 1,
+     "status": "graded"
+    },
+    "match_method": "hevy_routine_id",
+    "matched_routine_id": "f46423781a6ab1e82bad7d46192720b4",
+    "missing": [],
+    "movements": [
+     {
+      "intensity": {
+       "basis": "exercise_notes:rpe",
+       "ceiling_rpe": 8,
+       "max_overage": 1,
+       "max_rpe": 9,
+       "pct_within_ceiling": 33.3,
+       "sets_graded": 6,
+       "sets_over_ceiling": 4,
+       "sets_rpe_absent": 1,
+       "status": "graded",
+       "working_sets": 7
+      },
+      "movement_key": "barbell_bench_press",
+      "pct": 100,
+      "performed_sets": 7,
+      "programmed_sets": 3
+     },
+     {
+      "intensity": {
+       "basis": "exercise_notes:rpe",
+       "ceiling_rpe": 8,
+       "max_overage": 1.5,
+       "max_rpe": 9.5,
+       "pct_within_ceiling": 50,
+       "sets_graded": 4,
+       "sets_over_ceiling": 2,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 4
+      },
+      "movement_key": "one_arm_db_row",
+      "pct": 100,
+      "performed_sets": 4,
+      "programmed_sets": 3
+     },
+     {
+      "intensity": {
+       "basis": "program_default:anchor:overhead_press",
+       "ceiling_rpe": 8,
+       "max_overage": 0.5,
+       "max_rpe": 8.5,
+       "pct_within_ceiling": 66.7,
+       "sets_graded": 3,
+       "sets_over_ceiling": 1,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 3
+      },
+      "movement_key": "db_shoulder_press",
+      "pct": 100,
+      "performed_sets": 3,
+      "programmed_sets": 3
+     },
+     {
+      "intensity": {
+       "basis": "program_default:anchor:vertical_pull",
+       "ceiling_rpe": 8,
+       "max_overage": 0.5,
+       "max_rpe": 8.5,
+       "pct_within_ceiling": 0,
+       "sets_graded": 2,
+       "sets_over_ceiling": 2,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 2
+      },
+      "movement_key": "lat_pulldown",
+      "pct": 100,
+      "performed_sets": 2,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": "program_default:accessory",
+       "ceiling_rpe": 9,
+       "max_overage": 0,
+       "max_rpe": 8.5,
+       "pct_within_ceiling": 100,
+       "sets_graded": 3,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 3
+      },
+      "movement_key": "cable_tricep_pushdown",
+      "pct": 100,
+      "performed_sets": 3,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": "program_default:accessory",
+       "ceiling_rpe": 9,
+       "max_overage": 0,
+       "max_rpe": 8,
+       "pct_within_ceiling": 100,
+       "sets_graded": 3,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 0,
+       "status": "graded",
+       "working_sets": 3
+      },
+      "movement_key": "db_curl",
+      "pct": 100,
+      "performed_sets": 3,
+      "programmed_sets": 2
+     },
+     {
+      "intensity": {
+       "basis": null,
+       "ceiling_rpe": null,
+       "max_overage": null,
+       "max_rpe": null,
+       "pct_within_ceiling": null,
+       "sets_graded": 0,
+       "sets_over_ceiling": 0,
+       "sets_rpe_absent": 1,
+       "status": "unprescribed",
+       "working_sets": 1
+      },
+      "movement_key": "cycling",
+      "pct": 100,
+      "performed_sets": 1,
+      "programmed_sets": 1
+     }
+    ],
+    "overall_pct": 100,
+    "overall_pct_dimension": "sets_only",
+    "per_muscle": {
+     "back": 100,
+     "biceps": 100,
+     "cardio": 100,
+     "chest": 100,
+     "shoulders": 100,
+     "triceps": 100
+    },
+    "routine_target_date": "2026-09-29",
+    "sets_adherence": {
+     "pct": 100,
+     "performed_sets": 16,
+     "programmed_sets": 16
+    },
+    "status": "matched",
+    "workout_pacific_date": "2026-09-29"
+   },
+   "cardio_hr": {
+    "blocks": [
+     {
+      "avg_hr": null,
+      "coverage_min": 0.5,
+      "drift_recovery_reason": "no per-second HR series on the wire \u2014 the activity summary's hr_recovery describes the activity's end, not the block's",
+      "duration_s": 2400,
+      "exercise_index": 6,
+      "hr_coverage": 0,
+      "hr_drift": null,
+      "hr_recovery_60s": null,
+      "hr_source": null,
+      "max_hr": null,
+      "modality": "cycling",
+      "name": "Cycling",
+      "reason": "no HR-bearing wearable activity overlaps the block",
+      "state": "unknown",
+      "template_id": "D8F7F851",
+      "window": {
+       "end_utc": "2026-09-30T00:46:57+00:00",
+       "start_utc": "2026-09-30T00:06:57+00:00",
+       "timing": "inferred_tail"
+      },
+      "zone_seconds": null
+     }
+    ],
+    "threshold": {
+     "derived_by": "#4068's same-minutes rule (at least half overlaps); NOT his variance, NOT a population norm (ADR-105) \u2014 re-derive from the measured drift between the inferred tail window and the wearable interval",
+     "hr_coverage_min": 0.5,
+     "provenance": "convention"
+    },
+    "version": "cardio-hr@1.0.0"
+   },
+   "date": "2026-09-29",
+   "duration_sec": 8236,
+   "end_time": "2026-09-30T01:01:57+00:00",
+   "exercise_count": 8,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": null,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 20.41168092460379
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 6,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 7,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 8.5,
+       "set_index": 3,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 9,
+       "set_index": 4,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 8.5,
+       "set_index": 5,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 7,
+       "rpe": 9,
+       "set_index": 6,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      }
+     ],
+     "template_id": "79D0BB3A"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 7.5,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 8,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 9,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "rpe": 9.5,
+       "set_index": 3,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 8,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 24.947610018960187
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 8,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 24.947610018960187
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 8.5,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 24.947610018960187
+      }
+     ],
+     "template_id": "878CD1D0"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "rpe": 8.5,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 63.50300732098956
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "rpe": 8.5,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 63.50300732098956
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "rpe": 8,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "rpe": 8,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "rpe": 8.5,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 39.689379575618474
+      }
+     ],
+     "template_id": "93A552C6"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "rpe": 8,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "rpe": 8,
+       "set_index": 1,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "rpe": 8,
+       "set_index": 2,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      }
+     ],
+     "template_id": "37FCC2BB"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 14565,
+       "duration_sec": 2400,
+       "reps": null,
+       "rpe": null,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 900,
+       "reps": null,
+       "rpe": null,
+       "set_index": 0,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "hevy_routine_id": "5a00e2dd-49ed-485c-b712-7e10e2871655",
+   "ingested_at": "2026-09-30T02:00:06.061407+00:00",
+   "original_unit": "kg",
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#hevy",
+   "schema_version": 2,
+   "set_count": 24,
+   "sk": "DATE#2026-09-29#WORKOUT#ef89d610-dc29-469e-b08e-2e4263264a58",
+   "source": "hevy",
+   "source_workout_id": "ef89d610-dc29-469e-b08e-2e4263264a58",
+   "start_time": "2026-09-29T22:44:41+00:00",
+   "title": "Foundation - Upper - 4 - 23",
+   "total_volume_kg": 7632.83,
+   "workout_uid": "hevy:ef89d610-dc29-469e-b08e-2e4263264a58"
+  }
+ ],
+ "strava": {
+  "DATE#2026-09-28": {
+   "activities": [
+    {
+     "achievement_count": 0,
+     "average_cadence": null,
+     "average_heartrate": null,
+     "average_speed_ms": 0,
+     "average_watts": null,
+     "commute": false,
+     "device_name": "Hevy",
+     "device_watts": false,
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 6962,
+     "elev_high_meters": null,
+     "elev_low_meters": null,
+     "enriched_at": "2026-09-29T15:30:29.614000+00:00",
+     "enriched_name": "Foundation - Lower - 2 - 22 \u00b7 \ud83d\udfe1",
+     "has_heartrate": false,
+     "kilojoules": null,
+     "kudos_count": 0,
+     "manual": false,
+     "max_heartrate": null,
+     "max_speed_ms": 0,
+     "max_watts": null,
+     "moving_time_seconds": 6962,
+     "name": "Foundation - Lower - 2 - 22",
+     "pr_count": 0,
+     "private": true,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-09-28T22:53:34Z",
+     "start_date_local": "2026-09-28T15:53:34Z",
+     "timezone": "(GMT-08:00) America/Los_Angeles",
+     "total_elevation_gain_feet": null,
+     "total_elevation_gain_meters": 0,
+     "trainer": true,
+     "type": "WeightTraining",
+     "weighted_average_watts": null
+    },
+    {
+     "achievement_count": 0,
+     "average_cadence": null,
+     "average_heartrate": 125.7,
+     "average_speed_ms": 0,
+     "average_watts": null,
+     "commute": false,
+     "device_name": "WHOOP",
+     "device_watts": false,
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 2099,
+     "elev_high_meters": null,
+     "elev_low_meters": null,
+     "enriched_at": "2026-09-29T15:30:29.614173+00:00",
+     "enriched_name": "Afternoon Weight Training \u00b7 125bpm avg \u00b7 \ud83d\udfe1",
+     "has_heartrate": true,
+     "hr_recovery": {
+      "hr_30s_recovery": 17,
+      "hr_60s_recovery": 33,
+      "hr_peak": 165
+     },
+     "kilojoules": null,
+     "kudos_count": 0,
+     "manual": false,
+     "max_heartrate": 165,
+     "max_speed_ms": 0,
+     "max_watts": null,
+     "moving_time_seconds": 2099,
+     "name": "Afternoon Weight Training",
+     "pr_count": 0,
+     "private": true,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-09-28T22:58:00Z",
+     "start_date_local": "2026-09-28T15:58:00Z",
+     "timezone": "(GMT-08:00) America/Los_Angeles",
+     "total_elevation_gain_feet": null,
+     "total_elevation_gain_meters": 0,
+     "trainer": true,
+     "type": "WeightTraining",
+     "weighted_average_watts": null,
+     "zone1_seconds": 1084,
+     "zone2_seconds": 986,
+     "zone3_seconds": 29,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "activity_count": 2,
+   "date": "2026-09-28",
+   "enriched_at": "2026-09-29T15:30:29.614230+00:00",
+   "ingested_at": "2026-10-01T02:10:14.438216+00:00",
+   "kilojoules_moving_time_seconds": 0,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#strava",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-28",
+   "source": "strava",
+   "sport_types": [
+    "WeightTraining"
+   ],
+   "total_distance_miles": 0,
+   "total_elevation_gain_feet": 0,
+   "total_kilojoules": 0,
+   "total_moving_time_seconds": 9061,
+   "total_zone2_seconds": 986
+  },
+  "DATE#2026-09-29": {
+   "activities": [
+    {
+     "achievement_count": 0,
+     "average_cadence": null,
+     "average_heartrate": null,
+     "average_speed_ms": 0,
+     "average_watts": null,
+     "commute": false,
+     "device_name": "Hevy",
+     "device_watts": false,
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 8236,
+     "elev_high_meters": null,
+     "elev_low_meters": null,
+     "enriched_at": "2026-09-30T15:30:29.427267+00:00",
+     "enriched_name": "Foundation - Upper - 4 - 23 \u00b7 \ud83d\udfe1",
+     "has_heartrate": false,
+     "kilojoules": null,
+     "kudos_count": 0,
+     "manual": false,
+     "max_heartrate": null,
+     "max_speed_ms": 0,
+     "max_watts": null,
+     "moving_time_seconds": 8236,
+     "name": "Foundation - Upper - 4 - 23",
+     "pr_count": 0,
+     "private": true,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-09-29T22:44:41Z",
+     "start_date_local": "2026-09-29T15:44:41Z",
+     "timezone": "(GMT-08:00) America/Los_Angeles",
+     "total_elevation_gain_feet": null,
+     "total_elevation_gain_meters": 0,
+     "trainer": true,
+     "type": "WeightTraining",
+     "weighted_average_watts": null
+    },
+    {
+     "achievement_count": 0,
+     "average_cadence": null,
+     "average_heartrate": 111.8,
+     "average_speed_ms": 0,
+     "average_watts": null,
+     "commute": false,
+     "device_name": "WHOOP",
+     "device_watts": false,
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 5159,
+     "elev_high_meters": null,
+     "elev_low_meters": null,
+     "enriched_at": "2026-09-30T15:30:29.427460+00:00",
+     "enriched_name": "Afternoon Weight Training \u00b7 111bpm avg \u00b7 \ud83d\udfe1",
+     "has_heartrate": true,
+     "hr_recovery": {
+      "hr_30s_recovery": 25,
+      "hr_60s_recovery": 27,
+      "hr_peak": 137
+     },
+     "kilojoules": null,
+     "kudos_count": 0,
+     "manual": false,
+     "max_heartrate": 137,
+     "max_speed_ms": 0,
+     "max_watts": null,
+     "moving_time_seconds": 5159,
+     "name": "Afternoon Weight Training",
+     "pr_count": 0,
+     "private": true,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-09-29T23:03:00Z",
+     "start_date_local": "2026-09-29T16:03:00Z",
+     "timezone": "(GMT-08:00) America/Los_Angeles",
+     "total_elevation_gain_feet": null,
+     "total_elevation_gain_meters": 0,
+     "trainer": true,
+     "type": "WeightTraining",
+     "weighted_average_watts": null,
+     "zone1_seconds": 4548,
+     "zone2_seconds": 611,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "activity_count": 2,
+   "date": "2026-09-29",
+   "enriched_at": "2026-09-30T15:30:29.427521+00:00",
+   "ingested_at": "2026-10-01T02:10:16.089815+00:00",
+   "kilojoules_moving_time_seconds": 0,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#strava",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-29",
+   "source": "strava",
+   "sport_types": [
+    "WeightTraining"
+   ],
+   "total_distance_miles": 0,
+   "total_elevation_gain_feet": 0,
+   "total_kilojoules": 0,
+   "total_moving_time_seconds": 13395,
+   "total_zone2_seconds": 611
+  },
+  "DATE#2026-09-30": {
+   "activities": [
+    {
+     "achievement_count": 0,
+     "average_cadence": 53,
+     "average_heartrate": 116.4,
+     "average_speed_ms": 1.318,
+     "average_watts": null,
+     "commute": false,
+     "device_name": "Garmin epix (Gen2)",
+     "device_watts": false,
+     "distance_meters": 8647.3,
+     "distance_miles": 5.37,
+     "elapsed_time_seconds": 6655,
+     "elev_high_meters": 99.6,
+     "elev_low_meters": 47.6,
+     "has_heartrate": true,
+     "hr_recovery": {
+      "hr_30s_recovery": 20,
+      "hr_60s_recovery": 53,
+      "hr_peak": 171
+     },
+     "kilojoules": null,
+     "kudos_count": 0,
+     "manual": false,
+     "max_heartrate": 171,
+     "max_speed_ms": 1.74,
+     "max_watts": null,
+     "moving_time_seconds": 6563,
+     "name": "Afternoon Walk",
+     "pr_count": 0,
+     "private": true,
+     "sport_type": "Walk",
+     "start_date": "2026-09-30T23:10:11Z",
+     "start_date_local": "2026-09-30T16:10:11Z",
+     "timezone": "(GMT-08:00) America/Los_Angeles",
+     "total_elevation_gain_feet": 334.6,
+     "total_elevation_gain_meters": 102,
+     "trainer": false,
+     "type": "Walk",
+     "weighted_average_watts": null,
+     "zone1_seconds": 5511,
+     "zone2_seconds": 865,
+     "zone3_seconds": 187,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "achievement_count": 0,
+     "average_cadence": null,
+     "average_heartrate": 118,
+     "average_speed_ms": 0,
+     "average_watts": null,
+     "commute": false,
+     "device_name": "WHOOP",
+     "device_watts": false,
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 6539,
+     "elev_high_meters": null,
+     "elev_low_meters": null,
+     "has_heartrate": true,
+     "hr_recovery": {
+      "hr_30s_recovery": 3,
+      "hr_60s_recovery": 8,
+      "hr_peak": 171
+     },
+     "kilojoules": null,
+     "kudos_count": 0,
+     "manual": false,
+     "max_heartrate": 171,
+     "max_speed_ms": 0,
+     "max_watts": null,
+     "moving_time_seconds": 6539,
+     "name": "Afternoon Walk",
+     "pr_count": 0,
+     "private": true,
+     "sport_type": "Walk",
+     "start_date": "2026-09-30T23:14:00Z",
+     "start_date_local": "2026-09-30T16:14:00Z",
+     "timezone": "(GMT-08:00) America/Los_Angeles",
+     "total_elevation_gain_feet": null,
+     "total_elevation_gain_meters": 0,
+     "trainer": true,
+     "type": "Walk",
+     "weighted_average_watts": null,
+     "zone1_seconds": 5617,
+     "zone2_seconds": 724,
+     "zone3_seconds": 198,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "activity_count": 2,
+   "date": "2026-09-30",
+   "ingested_at": "2026-10-01T02:10:18.020041+00:00",
+   "kilojoules_moving_time_seconds": 0,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#strava",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-30",
+   "source": "strava",
+   "sport_types": [
+    "Walk"
+   ],
+   "total_distance_miles": 5.37,
+   "total_elevation_gain_feet": 334.6,
+   "total_kilojoules": 0,
+   "total_moving_time_seconds": 13102,
+   "total_zone2_seconds": 1589
+  }
+ },
+ "whoop": [
+  {
+   "average_heart_rate": 121,
+   "date": "2026-09-28",
+   "end_time": "2026-09-28T23:32:59.250Z",
+   "ingested_at": "2026-10-01T00:00:34.973006+00:00",
+   "kilojoule": 1135.78,
+   "max_heart_rate": 166,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-28#WORKOUT#462944ab-b31f-4cef-a931-8207ab23d9bb",
+   "source": "whoop",
+   "sport_id": 45,
+   "sport_name": "Cross Training",
+   "start_time": "2026-09-28T22:58:00.250Z",
+   "strain": 10.46,
+   "workout_id": "462944ab-b31f-4cef-a931-8207ab23d9bb",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "average_heart_rate": 135,
+   "date": "2026-09-28",
+   "end_time": "2026-09-29T00:33:59.230Z",
+   "ingested_at": "2026-10-01T00:00:34.954064+00:00",
+   "kilojoule": 1882.57,
+   "max_heart_rate": 153,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-28#WORKOUT#60f4ac11-c50b-41ee-b071-8631c802d571",
+   "source": "whoop",
+   "sport_id": -1,
+   "sport_name": "Activity",
+   "start_time": "2026-09-28T23:53:00.240Z",
+   "strain": 9.25,
+   "workout_id": "60f4ac11-c50b-41ee-b071-8631c802d571",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "date": "2026-09-29",
+   "end_time": "2026-09-29T01:04:12.980Z",
+   "ingested_at": "2026-10-01T00:00:36.527252+00:00",
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-29#WORKOUT#4c59b95f-ea41-4853-b464-33f6f7c6add5",
+   "source": "whoop",
+   "sport_id": 128,
+   "sport_name": "Sport_128",
+   "start_time": "2026-09-29T00:46:34.034Z",
+   "workout_id": "4c59b95f-ea41-4853-b464-33f6f7c6add5",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "average_heart_rate": 135,
+   "date": "2026-09-29",
+   "end_time": "2026-09-29T00:33:59.230Z",
+   "ingested_at": "2026-10-01T00:00:36.547029+00:00",
+   "kilojoule": 1882.57,
+   "max_heart_rate": 153,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-29#WORKOUT#60f4ac11-c50b-41ee-b071-8631c802d571",
+   "source": "whoop",
+   "sport_id": -1,
+   "sport_name": "Activity",
+   "start_time": "2026-09-28T23:53:00.240Z",
+   "strain": 9.25,
+   "workout_id": "60f4ac11-c50b-41ee-b071-8631c802d571",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "average_heart_rate": 109,
+   "date": "2026-09-29",
+   "end_time": "2026-09-30T00:28:59.690Z",
+   "ingested_at": "2026-10-01T00:00:36.507284+00:00",
+   "kilojoule": 1838.14,
+   "max_heart_rate": 139,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-29#WORKOUT#d49d8bac-e0f4-4d80-9828-29840bc361cf",
+   "source": "whoop",
+   "sport_id": 45,
+   "sport_name": "Cross Training",
+   "start_time": "2026-09-29T23:03:00.710Z",
+   "strain": 12.83,
+   "workout_id": "d49d8bac-e0f4-4d80-9828-29840bc361cf",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "date": "2026-09-30",
+   "end_time": "2026-09-30T00:59:47.824Z",
+   "ingested_at": "2026-10-01T03:00:26.948710+00:00",
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-30#WORKOUT#5a8145d0-3a23-430c-be69-394357a5f948",
+   "source": "whoop",
+   "sport_id": 128,
+   "sport_name": "Sport_128",
+   "start_time": "2026-09-30T00:40:34.561Z",
+   "workout_id": "5a8145d0-3a23-430c-be69-394357a5f948",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "average_heart_rate": 116,
+   "date": "2026-09-30",
+   "end_time": "2026-10-01T01:02:59.990Z",
+   "ingested_at": "2026-10-01T03:00:26.936882+00:00",
+   "kilojoule": 3027.57,
+   "max_heart_rate": 171,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-30#WORKOUT#bc816278-106b-42f4-a2c3-6d108ba3183e",
+   "source": "whoop",
+   "sport_id": 63,
+   "sport_name": "Hiking",
+   "start_time": "2026-09-30T23:14:00.000Z",
+   "strain": 10.73,
+   "workout_id": "bc816278-106b-42f4-a2c3-6d108ba3183e",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  },
+  {
+   "average_heart_rate": 109,
+   "date": "2026-09-30",
+   "end_time": "2026-09-30T00:28:59.690Z",
+   "ingested_at": "2026-10-01T03:00:26.968740+00:00",
+   "kilojoule": 1838.14,
+   "max_heart_rate": 139,
+   "phase": "experiment",
+   "pk": "USER#matthew#SOURCE#whoop",
+   "schema_version": 1,
+   "sk": "DATE#2026-09-30#WORKOUT#d49d8bac-e0f4-4d80-9828-29840bc361cf",
+   "source": "whoop",
+   "sport_id": 45,
+   "sport_name": "Cross Training",
+   "start_time": "2026-09-29T23:03:00.710Z",
+   "strain": 12.83,
+   "workout_id": "d49d8bac-e0f4-4d80-9828-29840bc361cf",
+   "zone_0_minutes": 0,
+   "zone_1_minutes": 0,
+   "zone_2_minutes": 0,
+   "zone_3_minutes": 0,
+   "zone_4_minutes": 0,
+   "zone_5_minutes": 0
+  }
+ ]
+}
