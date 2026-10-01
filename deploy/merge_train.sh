@@ -73,6 +73,11 @@
 #            merge failure ABORTS the whole train; every PR after it is reported
 #            NOT-ATTEMPTED, never quietly skipped.
 #
+#            After each confirmed merge the PR's lane worktree is RELEASED
+#            (`lane_worktree.py release <head branch>`, #4259) so the wrap
+#            reaper can retire it — a train that merges and never releases is
+#            how merged lanes pile up locked.
+#
 #   Phase 5  REPORT. One table: per-PR disposition (merged sha / dropped + why /
 #            not-attempted + why).
 #
@@ -116,8 +121,8 @@
 #   2  bad arguments / unusable environment.
 #
 # SOURCEABLE for tests: `source deploy/merge_train.sh --source-only` exposes
-# `classify_conflicts`, `reconcile_branch_onto`, `push_reconciled` and `merge_pr`
-# without running main — see tests/test_merge_train_3104.py, which drives them
+# `classify_conflicts`, `reconcile_branch_onto`, `push_reconciled`, `merge_pr` and
+# `release_merged_lane` without running main — see tests/test_merge_train_3104.py, which drives them
 # against synthetic `git init` repos with no network and no `gh`.
 #
 # KNOWN REPO GOTCHA: `.claude/skills/reconcile-branch/SKILL.md` §4 documents a
@@ -137,6 +142,8 @@ SKIP_GATE="${MERGE_TRAIN_SKIP_GATE:-0}"
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WAIT_PR_GREEN="${MERGE_TRAIN_WAIT_SCRIPT:-${_SCRIPT_DIR}/wait_pr_green.sh}"
+# #4259: the one script that unlocks a lane worktree. Injectable only for the offline tests.
+LANE_SCRIPT="${MERGE_TRAIN_LANE_SCRIPT:-${_SCRIPT_DIR}/../scripts/lane_worktree.py}"
 
 # The regenerator is injectable ONLY so the offline tests can drive the conflict
 # machinery in a synthetic repo that has no deploy/ tree. In every real run this
@@ -352,6 +359,31 @@ merge_pr() {
     return 0
   fi
   gh pr merge "${pr}" --repo "${REPO}" --squash --delete-branch
+}
+
+# release_merged_lane <head_ref> <repo_root>
+#   #4259: a lane worktree is LOCKED from creation (`lane_worktree.py new`) so the reaper
+#   cannot eat a running agent, and only an explicit release unlocks it. `/land` releases
+#   the lane it merged; this train merged N PRs and released none, so a train-merged lane
+#   stayed locked until someone unlocked it by hand (93 of 117 worktrees were locked at
+#   Session BD's boot, 2026-10-01, 88 of them on already-merged PRs). Called
+#   ONLY after a PR is confirmed MERGED. Releases by the PR's head branch — exact, unlike an
+#   issue number two lanes can share — and `--missing-ok` because a merged PR need not have
+#   a lane here (another machine, a dependabot branch). Never fatal: the merge already
+#   landed, so a failed release is reported by name and the 7-day wrap backstop
+#   (`worktree_reaper.py --release-locks-older-than-days 7`) still catches it.
+release_merged_lane() {
+  local ref="$1" repo_root="$2" out
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    echo "DRY-RUN would release the lane worktree on ${ref}"
+    return 0
+  fi
+  if out="$(python3 "${LANE_SCRIPT}" release --missing-ok --repo "${repo_root}" "${ref}" 2>&1)"; then
+    echo "    ${out}"
+    return 0
+  fi
+  echo "    WARNING: lane release failed for ${ref} (merge stands; release it by hand): ${out}"
+  return 1
 }
 
 # _watch_pr_green <pr>
@@ -752,7 +784,16 @@ main() {
     fi
 
     echo "  #${pr}: squash-merging"
-    if ! merge_pr "${pr}"; then
+    local merge_rc=0 pr_state=""
+    merge_pr "${pr}" || merge_rc=$?
+    if [[ "${merge_rc}" -ne 0 ]]; then
+      # A non-zero exit is not proof the merge failed: `--delete-branch` exits non-zero when
+      # the local branch sits in a LOCKED lane worktree (gh tries the worktree removal and
+      # git refuses the lock — inference from the driver's merge log, 2026-09-27), after
+      # the squash already landed. GitHub's own state decides.
+      pr_state="$(gh pr view "${pr}" --repo "${REPO}" --json state --jq .state 2>/dev/null)"
+    fi
+    if [[ "${merge_rc}" -ne 0 && "${pr_state}" != "MERGED" ]]; then
       dispo[$i]="FAILED"
       detail[$i]="gh pr merge failed — TRAIN ABORTED here"
       aborted=1
@@ -764,6 +805,7 @@ main() {
     dispo[$i]="MERGED"
     detail[$i]="squash sha ${merged_sha:-unknown}"
     echo "  #${pr}: MERGED ${merged_sha:0:12}"
+    release_merged_lane "${head_ref[$i]}" "${root}" || detail[$i]="${detail[$i]}; lane NOT released"
   done
 
   cd "${saved_pwd}" || true
