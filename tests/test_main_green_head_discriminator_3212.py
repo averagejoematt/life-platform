@@ -39,9 +39,6 @@ pure function nobody could reach from the command a human runs.
 import importlib.util
 import os
 import sys
-import types
-
-import pytest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("cmg_3212", os.path.join(_REPO, "scripts", "check_main_green.py"))
@@ -99,16 +96,6 @@ class _FakeGh:
                     raise value
                 return value
         raise AssertionError(f"unstubbed gh call in test: {args}")
-
-
-@pytest.fixture(autouse=True)
-def _offline_wedge_detector(monkeypatch):
-    """`main()` imports check_deploy_wedge and calls collect(), which hits the
-    network. Stub it to the "no wedge" answer so these tests are hermetic."""
-    fake = types.ModuleType("check_deploy_wedge")
-    fake.collect = lambda: ([], {}, {})
-    fake.classify_fleet = lambda *_a, **_k: {"verdicts": []}
-    monkeypatch.setitem(sys.modules, "check_deploy_wedge", fake)
 
 
 def _gh_for(all_runs, files, committer="averagejoematt"):

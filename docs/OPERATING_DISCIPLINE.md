@@ -301,7 +301,7 @@ the repo: a session could find *how* to deploy and not *whether it may* (#3264).
    and `deploy/reject_deployment.sh` are both first-class outcomes, and **rejection is the
    more common correct one** — a superseded lease should be rejected, not approved "to clear
    it". A lease left waiting is not neutral: it queues every later run behind it at zero jobs
-   and reads as a wedge (`scripts/check_deploy_wedge.py`; the auto-approving deploy/watch_deploy_gate.sh was retired by ADR-158).
+   and reads as a wedge (the deploy dead-man `scripts/check_deploy_deadman.py` names it past its deadline; the wedge classifier and the auto-approving watcher were retired by #4256/ADR-158).
 
 6. **Rejecting is not reverting.** A rejected lease ships nothing; it does not undo a deploy
    that already happened. If production is wrong, that is a rollback (`docs/RUNBOOK.md`), a

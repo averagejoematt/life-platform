@@ -42,7 +42,8 @@ surface_gate_lease_holder() {
   else
     echo "  (a) — no run is in \`waiting\`, so nothing holds the lease."
     echo "  If this run's Deploy is stuck \`pending\` with every other job GREEN, that is the"
-    echo "  #2052 phantom deploy wedge, not an approval you are waiting for:"
-    echo "    python3 scripts/check_deploy_wedge.py"
+    echo "  #2052 phantom deploy wedge, not an approval you are waiting for (the dead-man"
+    echo "  names it past its deadline; #4256 retired the wedge classifier):"
+    echo "    python3 scripts/check_deploy_deadman.py"
   fi
 }

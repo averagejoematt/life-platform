@@ -1,39 +1,27 @@
-# Deploy-wedge watch (#2052) — the fifth-recurrence escape hatch.
+# Deploy dead-man + head coverage — main's deploy path watched from OUTSIDE ci-cd.yml.
 #
-# WHY THIS IS A SEPARATE WORKFLOW, NOT A JOB IN ci-cd.yml:
-# it has to observe ci-cd.yml from OUTSIDE. The wedged run is one whose own jobs can
-# never start — a job inside it could not report on it, and a job in a later ci-cd run
-# would queue behind the very same group. This workflow shares nothing with ci-cd.yml:
-# no concurrency group of its own (see below), no environment, no AWS.
+# #4256 box 3 (ADR-158): this file was the #2052 phantom-wedge watch. ADR-158 moved the
+# production gate off the code `deploy` job, so the wedge classifier and the lease janitor
+# were retired (scripts/check_deploy_wedge.py retired with its `--recover` and #2149 alert;
+# deploy-gate-janitor.yml retired) into ONE deploy dead-man — the last
+# step below, which alarms on ANY green run on main that has not deployed within its
+# deadline. A wedged Deploy is such a run, so the wedge class is still caught, at the
+# dead-man's deadline instead of a 10-minute threshold. The filename is kept: the
+# cron-freshness registry, the dark-flag sweep and the gate census key on it.
 #
-# NO `concurrency:` BLOCK HERE, DELIBERATELY. A watchdog for a stuck concurrency queue
-# must not own a concurrency queue. Overlapping runs of this workflow are harmless —
-# it is read-only unless explicitly asked to recover.
-#
-# LOUDNESS: on a phantom wedge the job FAILS. A red scheduled workflow is the repo's
-# existing "email the owner" channel, and the failure body carries the full decode plus
-# the exact recovery command — the operator should never have to re-derive it at 2am.
-#
-# It does NOT deploy. The recovery path re-dispatches ci-cd.yml, which still stops at
-# the production approval gate like any other run.
-#
-# LAST-MILE ALERTING (#2149): a red scheduled run turned out to be a passive channel —
-# the 2026-08-05 wedge went red 6x over ~9h with no email/page. `--alert` (below) fires
-# on a CONFIRMED wedge only, via `repository_dispatch` `urgent_alarm` — the SAME event
-# `remediation-agent.yml` already listens for on urgent CloudWatch alarms, so it reuses
-# that curated-email path rather than adding one. Throttled to one alert per episode via
-# a GitHub issue marker (scripts/check_deploy_wedge.py's alert_candidate/should_fire_
-# alert/maybe_alert — offline-tested in tests/test_deploy_wedge_alert_2149.py); it holds
-# no AWS credentials for this and gains none — `contents: write` (dispatch the event) and
-# `issues: write` (the throttle marker) below are the only permission additions.
+# WHY THIS IS A SEPARATE WORKFLOW, NOT A JOB IN ci-cd.yml: it has to observe ci-cd.yml
+# from OUTSIDE — a job in a later ci-cd run would queue behind the very deploy group it
+# is watching. NO `concurrency:` BLOCK HERE, DELIBERATELY: a watchdog for a stuck queue
+# must not own a queue (tests/test_deploy_wedge_2052.py). It holds no AWS credentials
+# and never deploys; a red scheduled run is the repo's "email the owner" channel.
 #
 # SCHEDULED HEAD-COVERAGE CHECK (#2826): `scripts/check_main_green.py::head_coverage()`
 # (#2762) detects the swallowed-push shape — a push to main that mints ZERO CI/CD runs —
 # but until this step it only ever ran inside a session's `/wrap` gate, so an unattended
 # merge (dependabot-automerge, remediation automerge) whose push was swallowed had no
 # detector until a human happened to run it. This cron is the natural scheduled home:
-# read-only, no AWS, same "red scheduled run pages the owner" channel as the wedge check
-# above. `--head-coverage-check` was built to tell a GENUINE swallow apart from an
+# read-only, no AWS, same "red scheduled run pages the owner" channel as the dead-man
+# below. `--head-coverage-check` was built to tell a GENUINE swallow apart from an
 # ORDINARY path-filter skip (ci-cd.yml's `paths:` filter declining a docs-only or
 # handover-only push — e.g. HEAD 8cbf075f read `uncovered` while `Docs CI` ran at it).
 # Since #3378 (2026-09-01) ci-cd.yml has NO `paths:` filter — every push to main mints a
@@ -46,7 +34,7 @@
 # operator glancing at the run instantly knows "swallowed push, page" from "the check
 # broke, decode manually" rather than reading one red run as the other.
 
-name: Deploy wedge watch
+name: Deploy dead-man
 
 on:
   schedule:
@@ -64,26 +52,14 @@ on:
     # the declared `*/15`.
     - cron: '*/15 * * * *'
   workflow_dispatch:
-    inputs:
-      recover:
-        description: 'Run the documented recovery if a phantom wedge is CONFIRMED (cancel + re-dispatch ci-cd.yml with deploy_all=true)'
-        required: false
-        type: boolean
-        default: false
-      threshold:
-        description: 'Minutes a Deploy may sit blocked with nothing holding the group before alarming'
-        required: false
-        type: string
-        default: '10'
 
 permissions:
-  contents: write  # read run/job state; #2149: also required to POST repos/.../dispatches (repo scope equivalent)
-  actions: write   # `recover` cancels the wedged run + re-dispatches
-  issues: write    # #2149: create/comment/close the deploy-wedge-alert throttle marker
+  contents: write  # read run/job state; also required to POST repos/.../dispatches (the dead-man's urgent_alarm)
+  issues: write    # the dead-man's one `deploy-deadman` tracking issue
 
 jobs:
   watch:
-    name: Detect a wedged deploy
+    name: Deploy dead-man + head coverage
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -104,52 +80,6 @@ jobs:
         run: |
           PINS=$(python3 scripts/ci_pins.py pyyaml)   # version from requirements-dev.txt (CQ-01)
           pip install --quiet $PINS
-
-      - name: Classify the in-flight deploy state
-        id: classify
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -o pipefail
-          python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" --alert | tee verdict.txt
-        continue-on-error: true
-
-      - name: Recover a confirmed phantom wedge
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.recover == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # --recover refuses to act on any verdict other than a confirmed phantom wedge.
-          python3 scripts/check_deploy_wedge.py --threshold "${{ github.event.inputs.threshold || '10' }}" --recover
-
-      # #3021's superseded-lease janitor ran here as a step from 2026-08-30 to 2026-09-04.
-      # It now lives in its own workflow, deploy-gate-janitor.yml (#3422): it needs a
-      # `concurrency:` group so an event-triggered sweep and a cron sweep cannot dispose the
-      # same lease at once, and THIS workflow must never own one (see the header + the
-      # #2052 test). The two stay disjoint by predicate: the janitor requires a non-empty
-      # pending_deployments; the phantom-wedge class has it empty by definition.
-
-      - name: Fail loudly on a wedge
-        if: steps.classify.outcome == 'failure'
-        run: |
-          echo "::error title=Deploy wedge or stranded gate::CI/CD's deploy path is not progressing — see the decode below."
-          {
-            echo "## 🛑 CI/CD deploy path is not progressing"
-            echo
-            echo '```'
-            cat verdict.txt
-            echo '```'
-            echo
-            echo "(the last line of the block above is the #2149 alert-throttle outcome — "
-            echo "\`alert-fired\` means the curated remediation-agent email is on its way; "
-            echo "\`alert-throttled\` means this episode already paged once.)"
-            echo
-            echo "Escape hatch: re-run this workflow via **Run workflow** with \`recover: true\`,"
-            echo "or locally: \`python3 scripts/check_deploy_wedge.py --recover\`."
-            echo
-            echo "Background: \`docs/CONVENTIONS.md\` §4d (five recurrences and what was tried each time)."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
 
       - name: Check main's HEAD has CI/CD coverage (#2826)
         id: head_coverage
@@ -214,7 +144,7 @@ jobs:
       # rejected IAM gate, or is still parked/running past the deadline, and not superseded
       # by a later fleet deploy. Exit 1 = alarm, 2 = the API was unreadable (never OK);
       # --alert keeps one `deploy-deadman` issue in step and fires `urgent_alarm` once per
-      # episode. LAST step + `!cancelled()`: a red wedge/head-coverage step above must not
+      # episode. LAST step + `!cancelled()`: a red head-coverage step above must not
       # skip it, and it must not skip them.
       - name: Deploy dead-man — main's green runs reached AWS (#4256)
         if: ${{ !cancelled() }}

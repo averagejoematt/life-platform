@@ -952,7 +952,7 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         "scope": (
             "Job/step conclusions on GitHub only — a deploy made outside CI is invisible to it; the "
             "`--alert` issue/dispatch half is best-effort and monkeypatch-tested only. The CI step that "
-            "runs it is its own record, ci::deploy-wedge-watch.yml::watch::9."
+            "runs it is its own record, ci::deploy-wedge-watch.yml::watch::6 (step 9 until #4256 box 3 removed the three wedge steps above it)."
         ),
         "proved_on": "2026-09-28",
     },
@@ -2585,7 +2585,7 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-28",
     },
-    "ci::deploy-wedge-watch.yml::watch::9": {
+    "ci::deploy-wedge-watch.yml::watch::6": {
         "gate_name": "watch / Deploy dead-man — main's green runs reached AWS (#4256)",
         "command": "python3 -m pytest tests/test_head_coverage_scheduled_consumer_2826.py -k deadman -q",
         "mutation": (
@@ -2610,7 +2610,10 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
             "(`deploy_fleet.sh` from a laptop) is invisible to it, so after one the operator runs the "
             "deploy_all dispatch the alarm prints. Detection latency is --hours (4) plus the watch "
             "workflow's real scheduler gap. The --alert issue/dispatch half is best-effort and "
-            "offline-tested only (monkeypatched gh)."
+            "offline-tested only (monkeypatched gh). RE-KEYED watch::9 -> watch::6 on 2026-09-30 (#4256 box 3 "
+            "removed the classify/recover/fail-on-wedge steps above it); the mutation was re-run against the "
+            "current gate that day: BASELINE 10 passed, MUTATED (alarms = []) 3 failed / 7 passed (the same "
+            "three tests), RESTORED 10 passed."
         ),
         "proved_on": "2026-09-28",
     },
