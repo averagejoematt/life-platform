@@ -342,7 +342,10 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # lead-in + prereg chapter) must not collide on the same week-NN page key.
     _all_keys = sorted((x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if x.get("date", ""))
     _all_dates = [k[0] for k in _all_keys]
-    _pre_keys = [k for k in _all_keys if k[0] < _genesis]
+    # #4537: an unlisted installment keeps its URL slot (seq is over ALL keys) but leaves the
+    # manifest and the Prologue part numbering. Parity with deploy/restart_leadin_pages.run.
+    _unlisted = {(x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if x.get("unlisted")}
+    _pre_keys = [k for k in _all_keys if k[0] < _genesis and k not in _unlisted]
 
     def _series_label(d, k=""):
         if not d:
@@ -647,7 +650,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # "label" carries the genesis-anchored truth (Prologue vs Week N).
     posts_manifest = []
     for inst in sorted(
-        all_installments,
+        [x for x in all_installments if not x.get("unlisted")],
         key=lambda x: (x.get("date", ""), _seq_for(x.get("date", ""), x.get("sk", ""))),
         reverse=True,
     ):
