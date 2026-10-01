@@ -42,7 +42,9 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
         key = getattr(ex, "movement_key", "") or ""
         label = (getattr(ex, "rationale_tag", "") or "") if (getattr(ex, "rationale_tag", "") or "") != "custom" else key
         tid = _safe(resolver, key) if resolver else None
-        row: dict[str, Any] = {"idx": idx, "label": label or key, "template_id": tid}
+        # #4519: the label is the program's slot tag (`anchor:hinge:moderate`); `movement_key` and
+        # `exercise` (the Hevy name, below) are the exercise a pain flag on this row was derived from.
+        row: dict[str, Any] = {"idx": idx, "label": label or key, "template_id": tid, "movement_key": key or None}
         hist = (
             _safe(
                 tool_get_exercise_history,
@@ -52,6 +54,8 @@ def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict
             else None
         )
         everything = (hist or {}).get("sessions") or []
+        if everything and everything[-1].get("exercise_name"):
+            row["exercise"] = everything[-1]["exercise_name"]
         trend_start = _minus_days(target_date, ANCHOR_HISTORY_LOOKBACK_DAYS)
         sessions = [s for s in everything if str(s.get("date") or "")[:10] >= trend_start]
         # #4069: the trend is computed over ONE template identity (see `_anchor_trend`), and the

@@ -340,6 +340,12 @@ def _list_dismissals():
     }
 
 
+def _is_slot_tag(name: str) -> bool:
+    """`anchor:hinge:moderate`, `accessory:leg_curl:accessory` — the routine generator's
+    rationale tags, which a drafted row carries as its label (#4519). No exercise name has a colon."""
+    return ":" in str(name or "")
+
+
 def _dismiss_pain_flag(args):
     """action='dismiss' — the owner overrides one flag instance, in his own words."""
     from datetime import datetime, timezone
@@ -357,6 +363,17 @@ def _dismiss_pain_flag(args):
         )
     except ValueError as e:
         return {"error": f"refused: {e}", "rule": tcr.DISMISSAL_RULE}
+
+    # #4519: a program SLOT TAG ('anchor:hinge:moderate') is not an exercise. A flag is derived
+    # from an exercise's notes, so the dismissal names that exercise — refused by name here
+    # rather than by the note reader's opaque "no exercise matching".
+    if _is_slot_tag(record["movements"][0]):
+        return {
+            "error": f"refused: {record['movements'][0]!r} is a program slot tag, not an exercise — a pain flag is derived "
+            "from one exercise's notes; dismiss it by that exercise's name (plan_next_session's by_site row names it as "
+            "`exercise`, e.g. 'Romanian Deadlift (Barbell)')",
+            "wrote": False,
+        }
 
     # The dismissal must point at a flag that EXISTS. An override of nothing is not an
     # override — the same ADR-104 grounding rule manage_diary_claims applies to a claim
@@ -379,6 +396,33 @@ def _dismiss_pain_flag(args):
             "wrote": False,
         }
 
+    # #4174: the preview resolves per SITE. This record covers the note it pinned (and any
+    # note whose words name the site) — every other flagged note on the movement stays open
+    # and is named here, so the chat asks about it instead of assuming it was covered.
+    # #4519: resolved BEFORE the write — a record that would dismiss no tripped instance is
+    # refused by name, never stored as an override the engines then silently ignore.
+    instances = tcr.expand_instances(
+        [
+            {
+                "movement": record["movements"][0],
+                "exercise": notes.get("exercise"),
+                "note_dates": pain_dates,
+                "notes": _pain_notes(notes.get("timeline") or []),
+            }
+        ],
+        [record],
+    )
+    resolution = next((r for r in tcr.resolve_flags(instances, [record]) if r.get("site_key") == record["site_key"]), None)
+    if not (resolution or {}).get("dismissed"):
+        return {
+            "error": f"refused: no tripped flag matches site {record['site']!r} / movement {record['movements'][0]!r} "
+            f"(flag note {record['flag_note_date']})"
+            + (f" — it would read {resolution['state']}: {resolution['detail']}" if resolution else ""),
+            "why": "a dismissal is stored only when it dismisses a tripped flag instance the engines will resolve (#4519)",
+            "wrote": False,
+        }
+    still_open = [i for i in instances if i.get("site") != record["site_key"] and i.get("note_dates")]
+
     table.put_item(
         Item={
             # literal (orphan-gate greppable); == training_context_registry.DISMISSAL_PK
@@ -386,14 +430,6 @@ def _dismiss_pain_flag(args):
             **record,
         }
     )
-    # #4174: the preview resolves per SITE. This record covers the note it pinned (and any
-    # note whose words name the site) — every other flagged note on the movement stays open
-    # and is named here, so the chat asks about it instead of assuming it was covered.
-    instances = tcr.expand_instances(
-        [{"movement": record["movements"][0], "note_dates": pain_dates, "notes": _pain_notes(notes.get("timeline") or [])}], [record]
-    )
-    resolution = next((r for r in tcr.resolve_flags(instances, [record]) if r.get("site_key") == record["site_key"]), None)
-    still_open = [i for i in instances if i.get("site") != record["site_key"] and i.get("note_dates")]
     return {
         "status": "dismissed",
         "wrote": True,

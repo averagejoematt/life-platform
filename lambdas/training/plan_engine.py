@@ -494,10 +494,13 @@ def _tripwire_states(
         # reader sees "Cycling / saddle_sore dismissed 09-25" AND "Cycling / big_toe open"
         # instead of one movement-level word that hides the second note.
         res_by_key = {(str(r["movement"]), r.get("instance_site")): r for r in resolutions}
+        # #4519: each row names the EXERCISE it was derived from (a drafted row's label is the slot
+        # tag), and a note no dismissal attributes reads `site: "unknown"` — never a bare null.
         row["by_site"] = [
             {
                 "movement": str(i.get("movement")),
-                "site": i.get("site"),
+                "exercise": i.get("exercise") or i.get("movement_key"),
+                "site": i.get("site") or "unknown",
                 "state": "dismissed_by_owner" if (str(i.get("movement")), i.get("site")) in dismissed else "tripped",
                 "note_dates": list(i.get("note_dates") or []),
                 "dismissal": (res_by_key.get((str(i.get("movement")), i.get("site"))) or {}).get("sk"),
