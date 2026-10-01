@@ -595,3 +595,35 @@ def test_3982_the_watcher_checkout_step_has_full_history():
     steps = doc["jobs"]["cadence"]["steps"]
     checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
     assert checkout.get("with", {}).get("fetch-depth") == 0
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# #4520 — the runs endpoint's first element is not reliably the newest: a per_page=1
+# read returned a ~640h-old run for a 15-min workflow (false STALE, auto-filed). The
+# lookup now reads a page and takes the max.
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def test_4520_newest_of_takes_the_max_not_the_first():
+    page = ["2026-09-04T10:00:00Z", "2026-10-01T18:33:10Z", "2026-10-01T18:09:30Z"]
+    assert watch.newest_of(page) == "2026-10-01T18:33:10Z"
+    assert watch.newest_of([]) is None
+    assert watch.newest_of(["", None]) is None
+
+
+def test_4520_lookup_reads_a_page_and_returns_its_max(monkeypatch):
+    import subprocess as sp
+
+    seen = {}
+
+    def _fake_run(cmd, **_kw):
+        seen["cmd"] = cmd
+        return sp.CompletedProcess(cmd, 0, stdout='["2026-09-04T10:00:00Z","2026-10-01T18:33:10Z"]', stderr="")
+
+    monkeypatch.setattr(watch.subprocess, "run", _fake_run)
+    assert watch.newest_scheduled_run("deploy-wedge-watch.yml") == "2026-10-01T18:33:10Z"
+    assert "per_page=1&" not in seen["cmd"][2] and not seen["cmd"][2].endswith("per_page=1")
+    monkeypatch.setattr(watch.subprocess, "run", lambda cmd, **_kw: sp.CompletedProcess(cmd, 0, stdout="[]", stderr=""))
+    assert watch.newest_scheduled_run("x.yml") is None
+    monkeypatch.setattr(watch.subprocess, "run", lambda cmd, **_kw: sp.CompletedProcess(cmd, 0, stdout="not json", stderr=""))
+    assert watch.newest_scheduled_run("x.yml") is False
