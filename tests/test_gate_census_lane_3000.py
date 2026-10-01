@@ -509,14 +509,15 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 769  # 774 -> 769 (2026-09-30, #4256 box 3 — the lease janitor and the wedge classifier retired into the
-# one deploy dead-man): FIVE leave, NONE enter. Leave: `ci::deploy-gate-janitor.yml::janitor::3` and `::4` (the workflow is
-# deleted), `guard::scripts/check_deploy_wedge.py` (deleted), and — by POSITION — `ci::deploy-wedge-watch.yml::watch::7` and `::8`:
-# the classify / recover / fail-on-wedge steps (watch::3-5) are deleted, so the three head-coverage steps and the dead-man shift
-# from watch::6-9 to watch::3-6 and the two highest positional ids vanish. The dead-man's CI_PROOFS record is re-keyed
+BASELINE_TOTAL_GATES = 768  # 774 -> 768 (2026-10-01, #4256 box 3 — the lease janitor and the wedge classifier retired into the
+# one deploy dead-man, merged onto #4496's 774): SIX ids leave, NONE enter. Leave: `ci::deploy-gate-janitor.yml::janitor::3` and
+# `::4` (the workflow is deleted), `guard::scripts/check_deploy_wedge.py` (deleted), and — by POSITION — `ci::deploy-wedge-watch.yml::
+# watch::7`, `::8` and `::9`: the classify / recover / fail-on-wedge steps (watch::3-5) are deleted, so the three head-coverage
+# steps and the dead-man shift from watch::6-9 to watch::3-6 (four ids CHANGE name, same verdicts) and the three highest vanish. The dead-man's CI_PROOFS record is re-keyed
 # watch::9 -> watch::6 after its mutation was re-run against the current gate (3 failed / 7 passed, restored 10 passed); the six
 # residue lines of the retired gates are deleted. MEASURED by id-set diff on `scripts/gate_census.py --json`, this tree vs a
-# `git archive origin/main` export at ff6f20ceb: 772 -> 767.
+# `git archive origin/main` export at 4b540e8a0 (git-init'd, fully added): main 774 {proven 241, unproven 521, not-applicable 7,
+# attempted-unproven 5} -> this lane 768 {241, 515, 7, 5} (first measured 772 -> 767 at ff6f20ceb before #4496 merged).
 # PRIOR: 774 # 772 -> 774 (2026-09-30, #4472): TWO entrants, both PROVEN (CI_PROOFS) — `ci::ci-cd.yml::plan::7` (plan / Resolve deploy
 # base — check_deploy_deadman.py --deploy-base, a new step ahead of Detect changes) and `ci::config-drift.yml::drift::7` (the
 # nightly live-Lambda staleness advisory). Id-set diff vs a `git archive origin/main` export at 0055fe546 (re-derived at push; ff6f20ceb gave the same):
