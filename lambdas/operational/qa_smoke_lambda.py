@@ -144,13 +144,25 @@ def yesterday_str():
 # costs one read per night and the two legs cannot collectively overrun the sweep's
 # 240s Lambda ceiling — see census_probe.py for why a spent budget reports `deferred`
 # (a warn) rather than passing.
+#
+# #4183: the budget's wall clock starts when it is CONSTRUCTED, so it is constructed by the
+# first census leg that asks for it — never at handler start. Built at handler start, it
+# spent its 60s on the ~40 checks that run BEFORE the census legs (the whole sweep takes
+# 52-62s), so the legs reported NOT OBSERVED on any run longer than the budget: 6 alarmed
+# warns on the 2026-10-01T03:00Z invoke (61.1s), none on the 52-60s runs either side of it,
+# and qa-smoke-warnings could never settle OK.
 _CENSUS_BUDGET: dict = {"budget": None}
 
 
 def census_budget(reset: bool = False):
+    """The invocation's shared census budget. `reset=True` DISARMS it (returns None): the next
+    plain call — the first census leg — builds a fresh one, so its clock times census reads only."""
     from operational.census_probe import ProbeBudget
 
-    if reset or _CENSUS_BUDGET["budget"] is None:
+    if reset:
+        _CENSUS_BUDGET["budget"] = None
+        return None
+    if _CENSUS_BUDGET["budget"] is None:
         _CENSUS_BUDGET["budget"] = ProbeBudget()
     return _CENSUS_BUDGET["budget"]
 
@@ -1250,7 +1262,7 @@ def lambda_handler(event, context):
         run_time = pt_now()
         run_time_str = run_time.strftime("%A, %b %-d at %-I:%M %p PT")
         print(f"[QA] Smoke test starting — {run_time_str}")
-        census_budget(reset=True)  # #3615: a fresh read budget per invocation, shared by both census legs
+        census_budget(reset=True)  # #3615/#4183: disarm; the first census leg builds this invocation's budget
 
         # #2307: fault-isolated accumulation. A raise inside any one step is
         # reported as a red `sweep:<label>` check; it can no longer cancel the
