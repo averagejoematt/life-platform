@@ -95,6 +95,36 @@ def scrub(line: str, draft: Optional[str], patterns: Optional[tuple] = None) -> 
     return out
 
 
+def flagged_sentences(finding: Any, draft: Optional[str]) -> list:
+    """The draft sentence(s) a deterministic reader-check finding names (#4343, the 2026-10-01
+    dry run). The finding's `fix` line ("Name the window in the same sentence", "Replace 'gate'
+    with plain words") quotes no sentence, so an edit-list revision could not aim at it: sleep's
+    revision kept 16 of 20 sentences and left the one unlabeled average untouched; labs' fixed
+    one of its four `gate` sentences. A banned term names EVERY sentence that uses it."""
+    if not isinstance(finding, dict) or not draft:
+        return []
+    sents = [s.strip() for s in _SENTENCE_RE.split(draft) if s.strip()]
+    term = finding.get("claimed") if finding.get("check") == "banned_term" else None
+    if term:
+        rx = re.compile(r"(?<![\w-])" + re.escape(str(term)) + r"(?![\w-])", re.IGNORECASE)
+        return [s for s in sents if rx.search(s)]
+    ex = str(finding.get("excerpt") or "").strip()
+    return [s for s in sents if ex and ex in s]
+
+
+def hold_reason(report: Any) -> str:
+    """Which criterion held a coach, for the N-06 HELD log line (#4343). The judge's own
+    verdict (`judge_passed`, stamped by `ai_calls._invoke_quality_gate_sync` before the
+    deterministic checks merge) beside every client rule that flipped `passed`. On the
+    2026-10-01 dry run the line read only `score=87` for four coaches the judge PASSED;
+    the hold was a client rule (a window-less average, a banned term) the log never named."""
+    r = report if isinstance(report, dict) else {}
+    rules = [f"{f.get('check')} {str(f.get('excerpt') or '')[:80]!r}" for f in r.get("reader_check_findings") or [] if isinstance(f, dict)]
+    rules += [f"served_fact {str(f.get('detail') or '')[:80]!r}" for f in r.get("served_fact_violations") or [] if isinstance(f, dict)]
+    rules += ["cycle_boundary"] * bool(r.get("cycle_boundary_violations")) + ["judge_unavailable"] * bool(r.get("_fallback"))
+    return f"judge passed={r.get('judge_passed', 'n/a')} score={r.get('score')}; client rule(s): {'; '.join(rules) or 'none'}"
+
+
 def correction_note(report: Any, draft: Optional[str] = None, edits: bool = False) -> str:
     """Build the corrective note from a failing gate report (and, when known, its draft).
     `edits=True` asks for a JSON edit list (see `apply_edits`) instead of the whole section."""
@@ -127,6 +157,9 @@ def correction_note(report: Any, draft: Optional[str] = None, edits: bool = Fals
     for s in report.get("suggestions") or []:
         if s:
             body.append(f"  - {_s(s)}")
+    for f in report.get("reader_check_findings") or []:
+        for sent in flagged_sentences(f, draft):
+            body.append(f'  - [{f.get("check")}] the sentence to edit: "{sent}"')
     if not body:
         body.append("  - Write a more distinctive, on-voice draft that matches your persona.")
 
