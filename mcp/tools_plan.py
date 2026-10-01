@@ -385,6 +385,20 @@ def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -
         w["honesty"] = list(layer["honesty"])
 
 
+BODYSCAN_LOOKBACK_DAYS = 180
+
+
+def _between_dxa_lean(target_date: str, dxa: list[dict[str, Any]] | None, dxa_state: str | None) -> dict[str, Any]:
+    """#4503 OD6: the Body Scan 2 between-DXA lean/regional read (`training.bodyscan_lean`) — bioimpedance-labelled,
+    with his own repeat-scan noise band. Owner-only (MCP)."""
+    from training.bodyscan_lean import between_dxa_read
+
+    from mcp.core import query_source
+
+    rows, status = _read("withings_full_scans", query_source, "withings", _minus_days(target_date, BODYSCAN_LOOKBACK_DAYS), target_date)
+    return {**between_dxa_read(rows, dxa, target_date), "input_status": status, "dxa_read": dxa_state}
+
+
 def _protein_days_7d(end_date: str) -> tuple[int | None, int | None]:
     """(days below the owner's protein floor, days measured) over THE protein-gate window for a plan on
     `end_date` (#4161: `owner_redlines.protein_window` — the 7 COMPLETED days ending the day before the
@@ -731,6 +745,8 @@ def tool_plan_next_session(args):
     # the same resolver, so the two surfaces cannot disagree. Owner-only (MCP), never a site
     # or email surface.
     out["nutrition_critics"] = _safe(_nutrition_critics_block) or {"error": "nutrition critics could not be built", "verdicts": []}
+    # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
+    out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1
 

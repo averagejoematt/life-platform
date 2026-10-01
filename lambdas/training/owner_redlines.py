@@ -140,7 +140,7 @@ REDLINES: dict[str, dict[str, Any]] = {
                 "target": 3.0,
                 "cap": 3.5,
                 "pct_bw_wk": "1.09–1.15",
-                "dxa_gate": "3.5 permitted ONLY if the week-8 DXA lean share of the loss is ≤ 12 % and the anchors are flat",
+                "dxa_gate": "3.5 permitted ONLY if the week-16 DXA lean share of the loss is ≤ 12 % and the anchors are flat (OD6, #4503: week 8 is a baseline)",
                 "note": "his measured 1.99 at 260s — walking had fallen to 7 h. The energy floor binds here on any base under 13 h",
             },
             {
@@ -271,7 +271,11 @@ REDLINES: dict[str, dict[str, Any]] = {
             # pre-registered 2026-09-25: a DXA pair (the latest two, weight FELL between them; FFM = lean + BMC) overrules the
             # tier with the full gate at any body fat when dFFM / dW is worse than the diet-alone average for obese men
             # (Heymsfield 2014: 2.9 of 10 kg on diet alone)
-            "dxa_override": {"ffm_share_of_loss_above": 0.25, "first_evaluation": "the week-8 DXA (~2026-11-01)"},
+            "dxa_override": {
+                "ffm_share_of_loss_above": 0.25,
+                "first_evaluation": "the week-16 DXA (~2026-12-27) — OD6 (#4503, owner 2026-09-30): week 8 is a baseline + gross-failure + regional checks",
+                "first_evaluation_on_or_after": "2026-12-27",
+            },
             "provenance": "owner",
             "stated": "2026-09-25",
         },
@@ -831,7 +835,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "derived_by": "obesity-medicine physician (red team 2026-09-22)",
         "action": "slow one band; > 25 % of the loss, or appendicular lean −5 % from week 0 → maintenance until the next scan",
         "evaluated_by_engine": False,
-        "note": "The instrument that answers his actual question (did I keep the muscle) and the one that earns the DXA-gated 3.5 / 3.0 steps. Week 0 = the 2026-03-30 scan by owner ruling 2026-09-22 (medical_cover.week0_reference); it earns nothing until the week-8 scan.",
+        "note": "The instrument that answers his actual question (did I keep the muscle) and the one that earns the DXA-gated 3.5 / 3.0 steps. Week 0 = the 2026-03-30 scan by owner ruling 2026-09-22 (medical_cover.week0_reference); it earns nothing until the week-16 scan (OD6, #4503, owner 2026-09-30: the week-8 scan is a baseline plus the gross-failure and regional checks; between scans Body Scan 2 is the bioimpedance trend — training.bodyscan_lean).",
     },
     {
         "id": "sleep",

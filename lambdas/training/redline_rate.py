@@ -88,6 +88,13 @@ def dxa_override(points: list[dict[str, Any]]) -> dict[str, Any]:
         return {**out, "state": "no_pair", "reason": f"{len(points)} readable DXA scan(s) — a pair is needed"}
     prev, last = points[-2], points[-1]
     out["pair"] = [prev["scan_date"], last["scan_date"]]
+    first = o.get("first_evaluation_on_or_after")
+    if first and last["scan_date"] < first:  # #4503 OD6: the override first evaluates at week 16
+        return {
+            **out,
+            "state": "not_yet_evaluated",
+            "reason": f"OD6: the override first evaluates on a scan on/after {first}; the pair ends {last['scan_date']}",
+        }
     if prev["scan_weight_lb"] is None or last["scan_weight_lb"] is None:
         return {**out, "state": "unreadable", "reason": "a scan in the pair carries no total_mass_lb"}
     d_w, d_ffm = round(prev["scan_weight_lb"] - last["scan_weight_lb"], 1), round(prev["ffm_lb"] - last["ffm_lb"], 1)
