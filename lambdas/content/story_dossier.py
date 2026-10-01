@@ -449,6 +449,11 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         "made_this_week_by_coach": {roster.get(k, k): v for k, v in made.items()},
         "record_to_date_by_coach": {roster.get(k, k): v for k, v in record.items()},
         "pre_registered": prereg,
+        # counts are facts, not something a model should count from a list (a fact read miscounted 16 as 15)
+        "pre_registered_count": len(prereg),
+        "pre_registered_status_counts": {
+            k: sum(1 for p in prereg if p["status_at_week_end"] == k) for k in sorted({p["status_at_week_end"] for p in prereg})
+        },
         "grading_caveat": "the evaluator grades directional calls by trend slope; a count claim ('5 of 7 nights') graded by slope is not a count (#4541)",
     }
 
