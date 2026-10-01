@@ -25,12 +25,12 @@ WHY THIS EXISTS (#3289)
 
 USAGE
     python3 scripts/lane_worktree.py new 3289 reaper-liveness      # create + lock
-    python3 scripts/lane_worktree.py release <path|issue-number>   # unlock when the lane is done
+    python3 scripts/lane_worktree.py release <path|issue-number|branch>   # unlock when the lane is done
 
   Release is the deliberate act that says "this lane is finished" — until it happens the
   reaper keeps the worktree, by design. The reaper prints the exact release command on every
   kept-because-locked row. WHO runs it (#4259): the driver, in `/land`, after a verified
-  merge; the `worktree-reap` wrap gate then removes the released lane, and also releases a
+  merge, and `deploy/merge_train.sh` after each PR it merges (by the PR's head branch); the `worktree-reap` wrap gate then removes the released lane, and also releases a
   lane lock left idle 7 days (the forgotten-release backstop) if the lane is clean + merged.
 """
 
@@ -111,34 +111,60 @@ def new_lane(issue: int | str, slug: str, repo: Path = ROOT, base: str = "origin
     return path
 
 
+class NoLane(SystemExit):
+    """`resolve_lane` found zero (missing=True) or several lanes. A SystemExit, so a bare
+    caller still exits naming the matches; `release --missing-ok` catches ONLY the zero case
+    (a merged PR that never had a lane worktree — a dependabot or owner branch)."""
+
+    def __init__(self, message: str, missing: bool) -> None:
+        super().__init__(message)
+        self.missing = missing
+
+
 def resolve_lane(target: str, repo: Path = ROOT) -> Path:
-    """A release target: a worktree path, or a BARE issue number (#4259).
+    """A release target: a worktree path, a BARE issue number, or a lane BRANCH name (#4259).
 
     The merging driver knows the issue number, not the lane's slug, so `release 4259`
-    finds the one worktree whose branch is `issue-4259-<slug>`. Zero or several matches is
-    an error naming them — never a guess, because the next step makes the lane reapable.
+    finds the one worktree whose branch is `issue-4259-<slug>`. A merge script knows the
+    PR's head branch exactly (`deploy/merge_train.sh` reads `headRefName`), so `release
+    issue-4259-merge-train-release` finds the one worktree with that branch checked out —
+    the precise form, which stays unambiguous when two lanes share an issue number. Zero or
+    several matches is an error naming them — never a guess, because the next step makes
+    the lane reapable.
     """
-    if not target.isdigit():
+    # A path is absolute or exists; a slash alone is not one (`dependabot/pip/x` is a branch).
+    if Path(target).is_absolute() or (os.sep in target and Path(target).exists()):
         return Path(target)
     code, out = _git(["worktree", "list", "--porcelain"], cwd=_true_case(repo))
     if code != 0:
         raise SystemExit(f"git worktree list failed: {out}")
-    prefix = f"refs/heads/issue-{target}-"
+    if target.isdigit():
+        prefix, exact, what = (
+            f"refs/heads/issue-{target}-",
+            None,
+            f"issue {target}: expected exactly one lane on a `issue-{target}-*` branch",
+        )
+    else:
+        prefix, exact, what = None, f"refs/heads/{target}", f"branch {target}: expected exactly one worktree with it checked out"
     hits, cur = [], None
     for line in out.splitlines():
         if line.startswith("worktree "):
             cur = line[len("worktree ") :]
-        elif line.startswith("branch ") and cur and line[len("branch ") :].startswith(prefix):
-            hits.append(Path(cur))
+        elif line.startswith("branch ") and cur:
+            ref = line[len("branch ") :]
+            if (prefix and ref.startswith(prefix)) or (exact and ref == exact):
+                hits.append(Path(cur))
     if len(hits) != 1:
         found = ", ".join(str(h) for h in hits) or "none"
-        raise SystemExit(f"issue {target}: expected exactly one lane on a `issue-{target}-*` branch, found {len(hits)} ({found})")
+        raise NoLane(f"{what}, found {len(hits)} ({found})", missing=not hits)
     return hits[0]
 
 
 def release_lane(path: Path, repo: Path = ROOT) -> None:
     """Unlock a lane — the deliberate 'this is finished' act that makes it reapable."""
     code, out = _git(["worktree", "unlock", str(path)], cwd=_true_case(repo))
+    if code != 0 and "is not locked" in out:
+        return  # already released — a second release (the driver after the train) is a no-op
     if code != 0:
         raise SystemExit(f"git worktree unlock failed: {out}")
 
@@ -157,7 +183,13 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("slug", help="short kebab slug, e.g. reaper-liveness")
     n.add_argument("--base", default="origin/main")
     rel = sub.add_parser("release", help="unlock a finished lane so the reaper may retire it")
-    rel.add_argument("path", help="the lane's worktree path, or its bare issue number (e.g. 4259)")
+    rel.add_argument("path", help="the lane's worktree path, its bare issue number (e.g. 4259), or its branch name")
+    rel.add_argument("--repo", default=str(ROOT), help="the checkout whose worktrees to search (default: this script's repo)")
+    rel.add_argument(
+        "--missing-ok",
+        action="store_true",
+        help="no lane worktree for the target is not an error (a merge script releasing whatever lane a merged PR had)",
+    )
     args = ap.parse_args(argv)
 
     if args.mode == "new":
@@ -168,8 +200,15 @@ def main(argv: list[str] | None = None) -> int:
         for line in PROHIBITION_BANNER:
             print(line)
         return 0
-    path = resolve_lane(args.path)
-    release_lane(path)
+    repo = Path(args.repo)
+    try:
+        path = resolve_lane(args.path, repo=repo)
+    except NoLane as e:
+        if args.missing_ok and e.missing:
+            print(f"no lane worktree for {args.path} — nothing to release")
+            return 0
+        raise
+    release_lane(path, repo=repo)
     print(f"released {path} — the reaper may now retire it once it is clean, merged and idle")
     return 0
 
