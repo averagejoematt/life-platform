@@ -591,3 +591,48 @@ def test_an_unreadable_hold_is_logged_not_passed_off_as_none(monkeypatch):
     monkeypatch.setattr(panel, "s3", _DeniedS3("NoSuchKey"))
     assert panel._read_hold(3) == {}
     assert log.lines == []  # a genuinely absent hold is quiet
+
+
+# ── #4514: the two LLM judges run under a schema with a measured budget ──────
+# The 10-01 dry run held wk3 on `qa-judge-error (fail-closed): Unterminated string … (char 1889)`:
+# the QA judge's reply was cut at max_tokens=500. A truncation is a judge failure, not a verdict.
+
+
+def _judge_resp(text, stop="end_turn"):
+    return {"content": [{"type": "text", "text": text}], "stop_reason": stop}
+
+
+def test_4514_both_judges_send_the_budget_and_a_schema(monkeypatch):
+    from ai import bedrock_client
+    from emails import panelcast_qa as qa
+
+    sent = []
+
+    def _fake(body, model_name=None):
+        sent.append(body)
+        return _judge_resp('{"pass": true, "fails": [], "cited_beats": ["a", "b"]}')
+
+    monkeypatch.setattr(bedrock_client, "invoke", _fake)
+    turns = [{"speaker": "elena_voss", "line": "hi"}]
+    assert qa._qa_review(turns, "1. anything") == (True, [])
+    assert qa._craft_judge(turns, "1. anything")[0] is True
+    assert len(sent) == 2
+    for body in sent:
+        assert body["max_tokens"] == qa.QA_JUDGE_MAX_TOKENS >= 1500
+        assert "output_config" in body
+    assert qa.QA_VERDICT_SCHEMA["required"] == ["pass", "fails"]
+    assert "cited_beats" in qa.CRAFT_VERDICT_SCHEMA["required"]
+
+
+def test_4514_a_truncated_judge_reply_holds_and_names_the_stop_reason(monkeypatch):
+    from ai import bedrock_client
+    from emails import panelcast_qa as qa
+
+    cut = '{"pass": false, "fails": ["READ-ALOUD TURING TEST: \'not just X'
+    monkeypatch.setattr(bedrock_client, "invoke", lambda body, model_name=None: _judge_resp(cut, stop="max_tokens"))
+    ok, fails = qa._qa_review([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
+    assert ok is False
+    assert "fail-closed" in fails[0] and "stop_reason=max_tokens" in fails[0]
+    ok, fails, cited = qa._craft_judge([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
+    assert ok is False and cited == []
+    assert "fail-closed" in fails[0] and "stop_reason=max_tokens" in fails[0]

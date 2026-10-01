@@ -5,7 +5,6 @@ Extracted from coach_panel_podcast_lambda.py at the 2000-line god-module gate
 deterministic checks first (ADR-105), Haiku judge fail-closed (ADR-087/108).
 """
 
-import json
 import logging
 import os
 import re
@@ -131,6 +130,30 @@ def _craft_check(turns: list, max_consecutive: int = _QA_MAX_CONSECUTIVE) -> lis
     return fails
 
 
+# #4514 (10-01 dry run): the QA judge's reply was CUT at the old 500 — `qa-judge-error (fail-closed):
+# Unterminated string … (char 1889)` — and fail-closed turned a judge truncation into a HOLD. A
+# verdict with six reasons runs past 500; 1,500 is 3x, and output bills only when produced.
+# The craft judge (700, plus verbatim cited beats) is the same class and shares the budget.
+QA_JUDGE_MAX_TOKENS = 1500
+# The shape the judge returns, constrained at the model (ai.structured_json.call_json, #4276).
+QA_VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {"pass": {"type": "boolean"}, "fails": {"type": "array", "items": {"type": "string"}}},
+    "required": ["pass", "fails"],
+    "additionalProperties": False,
+}
+CRAFT_VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pass": {"type": "boolean"},
+        "fails": {"type": "array", "items": {"type": "string"}},
+        "cited_beats": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["pass", "fails", "cited_beats"],
+    "additionalProperties": False,
+}
+
+
 def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
     """LLM craft+accuracy judge (Haiku, cheap). Returns (ok, [reasons]). FAIL-CLOSED
     (#1122, ADR-087/108 posture): a judge/infra error returns a failure reason so the
@@ -143,15 +166,24 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
     system = (
         "You are a ruthless podcast script editor doing QA on a draft. Judge ONLY the rubric below. "
         'Reply with STRICT JSON: {"pass": true|false, "fails": ["short reason", ...]}. No prose, no fences. '
+        "At most 6 fails, each one sentence of 25 words or fewer. "
         "Be strict but fair — flag a rubric item only on a clear miss.\n\nRUBRIC:\n" + rubric
     )
     user = (f"GROUND TRUTH (the only facts allowed about the subject):\n{ground_truth}\n\n" if ground_truth else "") + f"SCRIPT:\n{script}"
     try:
-        body = {"model": MODEL, "max_tokens": 500, "system": system, "messages": [{"role": "user", "content": user}]}
-        resp = bedrock_client.invoke(body, model_name=MODEL)
-        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-        verdict = json.loads(text)
+        from ai.structured_json import call_json, decode_error
+
+        body = {"model": MODEL, "max_tokens": QA_JUDGE_MAX_TOKENS, "system": system, "messages": [{"role": "user", "content": user}]}
+        seen: dict = {}
+
+        def _call(b: dict) -> dict:
+            seen["resp"] = bedrock_client.invoke(b, model_name=MODEL) or {}
+            return seen["resp"]
+
+        verdict = call_json(_call, body, schema=QA_VERDICT_SCHEMA, label="panelcast_qa_judge")
+        if not isinstance(verdict, dict):
+            stop = (seen.get("resp") or {}).get("stop_reason")
+            raise ValueError(f"judge reply unparseable (stop_reason={stop}): {decode_error(verdict)}")
         if verdict.get("pass"):
             return True, []
         return False, [str(r) for r in (verdict.get("fails") or ["failed QA rubric"])][:6]
@@ -276,14 +308,28 @@ def _craft_judge(turns: list, rubric: str, model: str = None) -> tuple:
         '"cited_beats": ["<verbatim line from the script>", "..."]}. No prose, no fences. '
         "You MUST quote, verbatim, the two funniest or most human lines you credit; each cited beat must be an exact "
         "substring of a line in the script. If you cannot find two lines that would make a stranger smile or feel "
-        "something, FAIL the humour item and say so in fails.\n\nRUBRIC:\n" + rubric
+        "something, FAIL the humour item and say so in fails. At most 6 fails, each one sentence of 25 words or fewer."
+        "\n\nRUBRIC:\n" + rubric
     )
     try:
-        body = {"model": m, "max_tokens": 700, "system": system, "messages": [{"role": "user", "content": f"SCRIPT:\n{script}"}]}
-        resp = bedrock_client.invoke(body, model_name=m)
-        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-        verdict = json.loads(text)
+        from ai.structured_json import call_json, decode_error
+
+        body = {
+            "model": m,
+            "max_tokens": QA_JUDGE_MAX_TOKENS,
+            "system": system,
+            "messages": [{"role": "user", "content": f"SCRIPT:\n{script}"}],
+        }
+        seen: dict = {}
+
+        def _call(b: dict) -> dict:
+            seen["resp"] = bedrock_client.invoke(b, model_name=m) or {}
+            return seen["resp"]
+
+        verdict = call_json(_call, body, schema=CRAFT_VERDICT_SCHEMA, label="panelcast_craft_judge")
+        if not isinstance(verdict, dict):
+            stop = (seen.get("resp") or {}).get("stop_reason")
+            raise ValueError(f"judge reply unparseable (stop_reason={stop}): {decode_error(verdict)}")
         cited = [str(c) for c in (verdict.get("cited_beats") or [])][:4]
         if verdict.get("pass"):
             return True, [], cited
