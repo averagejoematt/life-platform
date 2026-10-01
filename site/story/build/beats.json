@@ -3773,6 +3773,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4421"
         }
       ]
+    },
+    {
+      "id": "2026-09-30-deploy-from-what-shipped",
+      "date": "2026-09-30",
+      "title": "Deploy from what actually shipped",
+      "shipped": "The deploy pipeline now works out what to ship by comparing against the last commit that actually reached AWS, not against the commit just before it. On its first run after merging it named the right base: the most recent change whose deploy had succeeded. The same day, the coach-review step that rewrites a held draft was changed to edit only the sentences that need it, keeping the rest word for word. Before, it had kept as little as 0% of the draft and then scored lower. A slow import check went from about two minutes to eleven seconds, and the training reference was rebuilt to count each 2024–25 walk once: 214 sessions, where the double-counted table had 399 records.",
+      "why_it_mattered": "The day before, a fix merged green and never ran in production. A newer merge had cancelled its deploy, and the next run shipped only its own change. Nothing reported the gap until a proof check ran the old code. A pipeline that silently skips changes undermines every later claim that something is live.",
+      "gotcha": "Two pull requests that each pass alone can still collide. Both today's coach fixes edited the same 'last verified' line of one engine document, so the second had to be rebased onto the first before it could merge, and the brief fix went first because tomorrow morning's run is its proof.",
+      "honest_miss": "The morning brief still held three of its coaches against a bar of two, and the rewrite fix proves only on tomorrow's run. A new heart-rate join for bike sessions ran but attached nothing, even though a watch workout covered more than half the ride. That is filed, not fixed.",
+      "prs": [
+        {
+          "label": "PR #4496",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4496"
+        },
+        {
+          "label": "PR #4490",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4490"
+        },
+        {
+          "label": "PR #4486",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4486"
+        },
+        {
+          "label": "PR #4494",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4494"
+        }
+      ]
     }
   ]
 }
