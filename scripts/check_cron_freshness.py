@@ -445,26 +445,41 @@ def render(
 # ── IO (thin, everything above is pure) ──────────────────────────────────────
 
 
+NEWEST_SAMPLE = 10
+
+
+def newest_of(created_ats: list[str]) -> str | None:
+    """The max of a page of `created_at` stamps — never trust the page's own order (#4520)."""
+    stamps = [s for s in created_ats if s]
+    return max(stamps) if stamps else None
+
+
 def newest_scheduled_run(workflow_file: str) -> Any:
     """Newest `event: schedule` run's `created_at`, None if the API says there are none,
-    or the sentinel False if the lookup itself failed."""
+    or the sentinel False if the lookup itself failed.
+
+    #4520: `per_page=1` + `workflow_runs[0]` intermittently returned a run ~640h old for a
+    workflow scheduled every 15 min (deploy-wedge-watch 2026-10-01 17:01Z/18:26Z, config-drift
+    17:27Z) while an identical query seconds later returned the 18:33Z run — the endpoint's
+    first element is not reliably the newest. Read a page and take the max instead."""
     try:
         out = subprocess.run(
             [
                 "gh",
                 "api",
-                f"repos/{{owner}}/{{repo}}/actions/workflows/{workflow_file}/runs?event=schedule&per_page=1",
+                f"repos/{{owner}}/{{repo}}/actions/workflows/{workflow_file}/runs?event=schedule&per_page={NEWEST_SAMPLE}",
                 "--jq",
-                '(.workflow_runs[0].created_at) // ""',
+                "[.workflow_runs[].created_at]",
             ],
             capture_output=True,
             text=True,
             timeout=60,
             check=True,
         ).stdout.strip()
-    except (subprocess.SubprocessError, OSError):
+        stamps = json.loads(out or "[]")
+    except (subprocess.SubprocessError, OSError, ValueError):
         return False
-    return out or None
+    return newest_of(stamps)
 
 
 def scheduled_run_history(workflow_file: str, per_page: int = GRACE_HISTORY_SAMPLE) -> Any:
