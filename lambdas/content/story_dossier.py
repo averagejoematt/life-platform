@@ -29,7 +29,8 @@ import re
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
-GENESIS = "2026-09-06"
+from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
+
 USER = "matthew"
 
 
@@ -621,24 +622,22 @@ def _owner_voice(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _body_composition(table, wk: Dict[str, Any]) -> Dict[str, Any]:
+    """Fat-free mass only: it is owner-published (field_tiers TIER_OWNER_PUBLISHED). Fat mass is Tier-2 owner-only
+    and never enters the dossier (#4531 privacy fix — tests/test_privacy_tier_wiring_2803.py)."""
     days = _days(table, "withings", GENESIS, wk["end"])
-    scans = [
-        (d, _f(r.get("fat_mass_lbs")), _f(r.get("fat_free_mass_lbs")))
-        for d, r in sorted(days.items())
-        if _f(r.get("fat_mass_lbs")) is not None
-    ]
+    scans = [(d, _f(r.get("fat_free_mass_lbs"))) for d, r in sorted(days.items()) if _f(r.get("fat_free_mass_lbs")) is not None]
     if len(scans) < 2:
         return {"available": False}
-    (d0, f0, ff0), (d1, f1, ff1) = scans[0], scans[-1]
+    (d0, ff0), (d1, ff1) = scans[0], scans[-1]
     return {
         "available": True,
-        "first_scan": {"date": d0, "fat_mass_lbs": _r(f0), "fat_free_mass_lbs": _r(ff0)},
-        "latest_scan": {"date": d1, "fat_mass_lbs": _r(f1), "fat_free_mass_lbs": _r(ff1)},
-        "fat_mass_change_lbs": _r(f1 - f0),
+        "first_scan": {"date": d0, "fat_free_mass_lbs": _r(ff0)},
+        "latest_scan": {"date": d1, "fat_free_mass_lbs": _r(ff1)},
         "fat_free_mass_change_lbs": _r(ff1 - ff0),
         "scans": len(scans),
         "caveat": "scale bio-impedance on full-scan days only — noisy and not a DEXA; fat-free mass includes water. The platform's "
-        "lean-mass flag is a RATE heuristic (lb/week), not a composition measurement — never call it a measured lean-mass loss",
+        "lean-mass flag is a RATE heuristic (lb/week), not a composition measurement — never call it a measured lean-mass loss. "
+        "Fat mass is private: never state it or derive it.",
     }
 
 

@@ -102,6 +102,18 @@ def _ex(destination, reason, gated_by=None):
 # ("it's internal") is not a reason; each says WHERE the text lands and WHY that
 # destination does not need a registered grounding surface.
 EXEMPTIONS: dict[str, dict[str, str]] = {
+    # — the Story Desk (#4531) —
+    "lambdas/content/story_questions.py": _ex(
+        OWNER_EMAIL,
+        "the reply desk's Monday questions — SES to EMAIL_RECIPIENT only (wednesday-chronicle {story_questions}); the "
+        "send marker row stores the question list for the parser, and no /api/ route serves it.",
+    ),
+    "lambdas/content/story_desk.py": _ex(
+        INTERNAL_INPUT,
+        "the desk's structured story budget is consumed by content.story_writers (the gated writers) and never served "
+        "itself; its one reader-visible field, the dek's top line, is gated by content.story_pipeline._Gates.dek "
+        "(dossier number grounding, story door, banned tics, fact read) before it is rendered.",
+    ),
     # — owner-email: one recipient, and it is Matthew —
     "lambdas/emails/monthly_digest_lambda.py": _ex(
         OWNER_EMAIL,
@@ -262,6 +274,12 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
 # exemptions: each says what a reader sees and where the fix is tracked. An entry
 # leaves this table by landing a SURFACES registration, never by being re-described.
 UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
+    "lambdas/content/story_writers.py": {
+        "issue": 4535,
+        "note": "the Story Desk's chronicle post and Panel script are reader prose held by the desk's OWN gates "
+        "(content.story_checks + story_craft + a structured fact read + the story-auditor publish gate, #4549) — real gates, "
+        "but not yet the registered grounding chokepoint; registering them as SURFACES is tracked on #4535.",
+    },
     # coach_state_updater.py left this table 2026-08-10 the designed way (#2418): its
     # DERIVED READER PROSE — observatory_summary AND the key_recommendation that
     # outranks it on three of the six serving paths, AND elena_quote — now crosses one
@@ -469,7 +487,13 @@ class TestDerivationIsReal:
     def test_all_three_seams_are_bound(self):
         """A two-seam census misses the chronicle. Prove the third one resolves."""
         seen = set().union(*SITES.values()) if SITES else set()
-        assert seen == {"invoke", "call_anthropic_raw", "call_anthropic_api"}, f"seams actually resolved: {sorted(seen)}"
+        # invoke_with_retry joined 2026-10-02 (#4531): the Story Desk is its first direct caller (UNIQUE_SEAMS lists it).
+        assert seen == {
+            "invoke",
+            "call_anthropic_raw",
+            "call_anthropic_api",
+            "invoke_with_retry",
+        }, f"seams actually resolved: {sorted(seen)}"
         api_callers = {m for m, s in SITES.items() if "call_anthropic_api" in s}
         assert "lambdas/emails/chronicle_prompt.py" in api_callers, (
             "the chronicle reaches Bedrock via chronicle_prompt.call_anthropic → call_anthropic_api → invoke. "

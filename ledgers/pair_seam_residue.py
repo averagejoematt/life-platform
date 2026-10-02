@@ -363,6 +363,12 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "chronicle::lambdas/emails/panelcast_desk.py::read": (
+        "2026-10-02",
+        "#4536: the Panel's desk path (split out of coach_panel_podcast_lambda for #1665) reads desk_episode_json off "
+        "DATE#<week end>, which wednesday_chronicle_lambda._attach_desk_artifacts writes; the pair is proven two-sided "
+        "on the real row shape with mutation controls in tests/test_story_desk_wiring.py.",
+    ),
     "chronicle::lambdas/emails/wednesday_chronicle_lambda.py::read": (
         "2026-10-02",
         "#4546: the only new direct read is the STORYQ#W<n> send-once marker (get_item by exact key, no attribute read beyond "
