@@ -435,7 +435,7 @@ def stale_by_build_sha(
                 "function": fn,
                 "live": last_modified.get(fn),
                 "owed": at,
-                "why": f"{why} — live build {live_sha[:8]} does not contain {sha[:8]} ({verdict_.replace('_', '-')})",
+                "why": f"{why} — live build {live_sha[:8]} does not contain {sha[:8]} ({'behind' if verdict_ == bundle_ancestry.FAST_FORWARD else verdict_})",
             }
         )
     rows += stale_functions(last_modified, fallback, now, grace_hours=0.0)

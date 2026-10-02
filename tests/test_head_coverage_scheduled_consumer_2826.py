@@ -782,7 +782,7 @@ def test_stale_by_build_sha_replays_a_superseded_runs_undeployed_merge(tmp_path)
     rows = dm.stale_by_build_sha(deployed, last_modified, owed, now, oracle)
     got = {r["function"]: r["why"] for r in rows}
     assert sorted(got) == ["laptop-lane", "unfetched", "weekly-digest"], got
-    assert f"live build {s['base'][:8]} does not contain {s['A'][:8]}" in got["weekly-digest"]
+    assert f"live build {s['base'][:8]} does not contain {s['A'][:8]} (behind)" in got["weekly-digest"]
     assert "(diverged)" in got["laptop-lane"]
     assert "LastModified basis: live build ffffffff not resolvable here" in got["unfetched"]
     lm_only = [r["function"] for r in dm.stale_functions(last_modified, {k: v[1:] for k, v in owed.items()}, now)]
