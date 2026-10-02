@@ -250,13 +250,16 @@ jobs:
           exit $rc
 
       # #4472 box 2 — the fourth "merged but not serving" question, for CODE rather than
-      # config: is any live Lambda older than the newest main commit that should have
-      # redeployed it (its handler, a shared module, a bundled config path)? The deploy
-      # dead-man (deploy-wedge-watch.yml) reads GitHub's side; this reads AWS's. ADVISORY
+      # config: does any live Lambda's bundle predate the newest main commit that should have
+      # redeployed it (its handler, a shared module, a bundled config path)? The verdict is
+      # ANCESTRY: the live bundle's build_info.json git_sha (#2377) must contain that commit
+      # (deploy/bundle_ancestry.classify); a bundle with no fingerprint falls back to
+      # LastModified, and the log prints which basis judged how many. The deploy dead-man
+      # (deploy-wedge-watch.yml) reads GitHub's side; this reads AWS's. ADVISORY
       # (continue-on-error): a stale function prints the deploy_all recovery and marks the
-      # step, but does not red the nightly — an out-of-band laptop deploy before a merge is
-      # a legitimate stale-looking shape. Read-only: lambda:ListFunctions, already granted
-      # to this role (ci-cd.yml's plan uses it).
+      # step, but does not red the nightly. Read-only: lambda:ListFunctions + GetFunction and
+      # a ranged GET of the presigned code URL (~260 KB per function, not the whole zip);
+      # both actions already granted to this role (iam simulate-principal-policy, 2026-10-02).
       - name: Live Lambda older than its source on main (#4472, read-only, advisory)
         if: always()
         continue-on-error: true

@@ -47,16 +47,20 @@ Usage:
   python3 scripts/check_deploy_deadman.py --hours 6    # deadline after a green Plan
   python3 scripts/check_deploy_deadman.py --alert      # + tracking issue / dispatch
   python3 scripts/check_deploy_deadman.py --deploy-base  # #4472: print plan's diff base (exit 0) or nothing (exit 2)
-  python3 scripts/check_deploy_deadman.py --stale-lambdas  # #4472: live Lambdas older than their source (AWS read)
+  python3 scripts/check_deploy_deadman.py --stale-lambdas  # #4472: live Lambdas whose build_info.git_sha lacks their source (AWS read)
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import subprocess
 import sys
+import urllib.request
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 REPO = "averagejoematt/life-platform"
@@ -260,29 +264,38 @@ def stale_functions(last_modified: dict, owed: dict, now: datetime, grace_hours:
     return rows
 
 
-def _git_ts(paths: list[str], excludes: tuple[str, ...] = ()) -> datetime | None:
-    args = ["git", "log", "-1", "--format=%ct", "HEAD", "--", *paths, *(f":(exclude){e}" for e in excludes)]
-    out = subprocess.run(args, capture_output=True, text=True, timeout=120, check=True).stdout.strip()
-    return datetime.fromtimestamp(int(out), tz=timezone.utc) if out else None
+def _git_last(paths: list[str], excludes: tuple[str, ...] = ()) -> tuple[str | None, datetime | None]:
+    """(sha, commit time) of the newest HEAD commit touching `paths`, or (None, None)."""
+    args = ["git", "log", "-1", "--format=%H %ct", "HEAD", "--", *paths, *(f":(exclude){e}" for e in excludes)]
+    out = subprocess.run(args, capture_output=True, text=True, timeout=120, check=True).stdout.split()
+    return (out[0], datetime.fromtimestamp(int(out[1]), tz=timezone.utc)) if len(out) == 2 else (None, None)
 
 
-def collect_owed(lambda_map_path: str = "ci/lambda_map.json") -> dict:
-    """function -> (owed datetime, reason), from git history of the checked-out main."""
+def collect_owed_commits(lambda_map_path: str = "ci/lambda_map.json") -> dict:
+    """function -> (owed sha, owed datetime, reason), from git history of the checked-out main.
+    The owed commit is the newest one that should have redeployed the function: its own
+    handler, or any shared module / bundled config path (an unmapped lambdas/ file ships in
+    every bundle), whichever is newer."""
     with open(lambda_map_path) as f:
         mapped = {src: row for src, row in json.load(f)["lambdas"].items()}
     live_map = {src: row["function"] for src, row in mapped.items() if not row.get("native_deps") and not row.get("not_deployed")}
     bundled = subprocess.run(
         [sys.executable, "deploy/build_bundle.py", "--print-bundled-config-paths"], capture_output=True, text=True, timeout=120, check=True
     ).stdout.split()
-    shared_at = _git_ts(["lambdas/", *bundled], excludes=(*mapped.keys(), *STALE_SHARED_EXCLUDE))
+    shared_sha, shared_at = _git_last(["lambdas/", *bundled], excludes=(*mapped.keys(), *STALE_SHARED_EXCLUDE))
     owed = {}
     for src, fn in live_map.items():
-        own_at = _git_ts([src])
+        own_sha, own_at = _git_last([src])
         if shared_at is not None and (own_at is None or shared_at > own_at):
-            owed[fn] = (shared_at, "a shared module / bundled config changed")
+            owed[fn] = (shared_sha, shared_at, "a shared module / bundled config changed")
         else:
-            owed[fn] = (own_at, f"{src} changed")
+            owed[fn] = (own_sha, own_at, f"{src} changed")
     return owed
+
+
+def collect_owed(lambda_map_path: str = "ci/lambda_map.json") -> dict:
+    """function -> (owed datetime, reason) — the LastModified view of collect_owed_commits."""
+    return {fn: (at, why) for fn, (_sha, at, why) in collect_owed_commits(lambda_map_path).items()}
 
 
 def collect_last_modified(lambda_map_path: str = "ci/lambda_map.json") -> dict:
@@ -312,6 +325,166 @@ def collect_last_modified(lambda_map_path: str = "ci/lambda_map.json") -> dict:
         ).stdout
         live.update({name: _parse_aws_ts(ts) for name, ts in json.loads(out)})
     return live
+
+
+# ── the build_info.git_sha verdict (#4472 box 2, #2377's fingerprint) ─────────────────
+#
+# LastModified answers "was the function touched after the commit"; it cannot tell WHICH
+# tree was shipped — a stale run deploying after a newer merge stamps a fresh LastModified
+# over old code (the 2026-08-08 race, #2377), and a laptop deploy made before its merge
+# reads stale. Every bundle carries build_info.json {git_sha, …} (deploy/build_bundle.py),
+# so the stronger question is ancestry: does the LIVE bundle's commit contain the commit
+# the function owes? Decided by deploy/bundle_ancestry.classify (one implementation of the
+# deploy-time preflight and this nightly read). A bundle with no fingerprint, or a sha this
+# checkout cannot resolve, falls back to the LastModified verdict — never to "fresh".
+
+BUILD_INFO_NAME = "build_info.json"
+# The tail read: end-of-central-directory + the central directory of a ~1,000-member
+# bundle fit in one request; build_info.json's own bytes are one more small range read.
+ZIP_TAIL_BYTES = 256 * 1024
+
+
+class _HttpRangeFile(io.RawIOBase):
+    """A read-only, seekable view of a remote zip over HTTP Range requests, so zipfile can
+    pull one member out of a 2-5 MB bundle without downloading it (the presigned
+    `Code.Location` URL Lambda's GetFunction returns honours Range). `opener` is
+    urllib.request.urlopen in production and an in-memory server in tests."""
+
+    def __init__(self, url: str, opener=None, tail: int = ZIP_TAIL_BYTES):
+        self._url, self._open, self._pos = url, opener or urllib.request.urlopen, 0
+        data, total = self._get(f"bytes=-{tail}")
+        self._size = total
+        self._tail_at, self._tail = total - len(data), data
+
+    def _get(self, rng: str) -> tuple[bytes, int]:
+        req = urllib.request.Request(self._url, headers={"Range": rng})
+        with self._open(req, timeout=60) as resp:
+            body = resp.read()
+            cr = resp.headers.get("Content-Range") or ""
+        total = int(cr.rsplit("/", 1)[1]) if "/" in cr else len(body)  # no Range support → the whole body
+        return body, total
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self._pos
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        base = {0: 0, 1: self._pos, 2: self._size}[whence]
+        self._pos = max(0, base + offset)
+        return self._pos
+
+    def read(self, n: int = -1) -> bytes:
+        end = self._size if n is None or n < 0 else min(self._size, self._pos + n)
+        if end <= self._pos:
+            return b""
+        if self._pos >= self._tail_at:
+            out = self._tail[self._pos - self._tail_at : end - self._tail_at]
+        else:
+            out, _ = self._get(f"bytes={self._pos}-{end - 1}")
+        self._pos += len(out)
+        return out
+
+
+def read_build_sha(url: str, opener=None) -> str | None:
+    """The git_sha in a deployed bundle's build_info.json, or None (no fingerprint)."""
+    _ensure_deploy_path()
+    import bundle_ancestry
+
+    with zipfile.ZipFile(_HttpRangeFile(url, opener)) as zf:
+        if BUILD_INFO_NAME not in zf.namelist():
+            return None
+        return bundle_ancestry.parse_build_info(zf.read(BUILD_INFO_NAME).decode("utf-8", "replace"))
+
+
+def _ensure_deploy_path() -> None:
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy")
+    if here not in sys.path:
+        sys.path.insert(0, here)
+
+
+def stale_by_build_sha(
+    deployed: dict, last_modified: dict, owed: dict, now: datetime, is_ancestor, grace_hours: float = STALE_GRACE_HOURS
+) -> list[dict]:
+    """Pure given `is_ancestor`. `deployed`: function -> live build_info git_sha (None = no
+    fingerprint). `owed`: function -> (owed sha, owed datetime, reason). A function is
+    stale when its live bundle's commit does NOT contain the owed commit (the deployed sha
+    is an ancestor of it, or the two diverged). Unfingerprinted / unresolvable functions
+    take the LastModified verdict instead, labelled as such."""
+    _ensure_deploy_path()
+    import bundle_ancestry
+
+    rows, fallback = [], {}
+    for fn, (sha, at, why) in sorted(owed.items()):
+        if at is None or (now - at).total_seconds() / 3600.0 < grace_hours:
+            continue
+        live_sha = deployed.get(fn)
+        verdict_ = bundle_ancestry.classify(live_sha, sha, is_ancestor=is_ancestor) if live_sha and sha else bundle_ancestry.UNKNOWN
+        if verdict_ in (bundle_ancestry.SAME, bundle_ancestry.STALE):  # STALE here = the owed commit is an ancestor of live
+            continue
+        if verdict_ == bundle_ancestry.UNKNOWN:
+            note = "no build_info.json" if not live_sha else f"live build {live_sha[:8]} not resolvable here"
+            fallback[fn] = (at, f"{why} [LastModified basis: {note}]")
+            continue
+        rows.append(
+            {
+                "function": fn,
+                "live": last_modified.get(fn),
+                "owed": at,
+                "why": f"{why} — live build {live_sha[:8]} does not contain {sha[:8]} ({verdict_.replace('_', '-')})",
+            }
+        )
+    rows += stale_functions(last_modified, fallback, now, grace_hours=0.0)
+    return sorted(rows, key=lambda r: r["function"])
+
+
+def collect_deployed_shas(functions: dict, workers: int = 8) -> dict:
+    """function -> live build_info git_sha (None when the bundle carries none), for every
+    function in `functions` (name -> region). Read-only: lambda:GetFunction + a ranged GET
+    of the presigned code URL. A function whose read fails maps to None (LastModified
+    fallback) and is counted in the caller's UNVERIFIED line, never read as fresh."""
+    _ensure_deploy_path()
+
+    def one(item):
+        fn, region = item
+        try:
+            url = subprocess.run(
+                [
+                    "aws",
+                    "lambda",
+                    "get-function",
+                    "--function-name",
+                    fn,
+                    "--region",
+                    region,
+                    "--query",
+                    "Code.Location",
+                    "--output",
+                    "text",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            ).stdout.strip()
+            return fn, (read_build_sha(url) if url and url != "None" else None)
+        except Exception:  # noqa: BLE001 - one unreadable bundle degrades to the LastModified basis
+            return fn, None
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return dict(pool.map(one, sorted(functions.items())))
+
+
+def mapped_regions(lambda_map_path: str = "ci/lambda_map.json") -> dict:
+    """function -> region for every deployable mapped function (same filter as the owed set)."""
+    default = os.environ.get("AWS_REGION") or "us-west-2"
+    with open(lambda_map_path) as f:
+        rows = json.load(f)["lambdas"].values()
+    return {r["function"]: r.get("region") or default for r in rows if not r.get("native_deps") and not r.get("not_deployed")}
 
 
 def render_stale(rows: list[dict]) -> tuple[int, str]:
@@ -411,12 +584,26 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(timezone.utc)
     if args.stale_lambdas:
         try:
-            rows = stale_functions(collect_last_modified(), collect_owed(), now)
+            _ensure_deploy_path()
+            import bundle_ancestry
+
+            last_modified, owed = collect_last_modified(), collect_owed_commits()
+            deployed = collect_deployed_shas({fn: r for fn, r in mapped_regions().items() if fn in last_modified})
+            rows = stale_by_build_sha(deployed, last_modified, owed, now, bundle_ancestry.git_is_ancestor)
         except Exception as e:  # noqa: BLE001 - an unreadable AWS/git read is INDETERMINATE, never OK
             print(f"⚠️  stale-Lambda check INDETERMINATE: {e}")
             return EXIT_INDETERMINATE
         code, report = render_stale(rows)
         print(report)
+        verified = sum(1 for fn in owed if deployed.get(fn))
+        rest = sorted(fn for fn in owed if not deployed.get(fn))
+        print(
+            f"   basis: build_info.git_sha for {verified} of {len(owed)} mapped functions; LastModified for {len(rest)}: {', '.join(rest) or 'none'}"
+        )
+        # A pass is only as wide as what was judged: a fresh shared-module merge puts the whole
+        # fleet inside the grace window, and "none stale" then means "none looked at".
+        waived = sum(1 for _s, at, _w in owed.values() if at is None or (now - at).total_seconds() / 3600.0 < STALE_GRACE_HOURS)
+        print(f"   judged: {len(owed) - waived} of {len(owed)}; {waived} owe a commit inside the {STALE_GRACE_HOURS:g} h grace window")
         return code
     if args.deploy_base:
         # stdout carries the sha and nothing else; an unreadable API or no deploy in the
