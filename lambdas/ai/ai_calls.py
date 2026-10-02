@@ -179,7 +179,7 @@ Output this exact JSON structure:
         # ceiling, not the next round number: 1500 tok ≈ 6000 chars ≈ 2.6× it.
         # #4276: constrained to _IC3_SCHEMA at the model and parsed in the one door; a
         # non-object reply (a max_tokens cut) raises here, into the #2668 ERROR + metric.
-        body = {"model": AI_MODEL_HAIKU, "max_tokens": 1500, "messages": [{"role": "user", "content": prompt}]}
+        body = _structured_json.user_turn_body(prompt, model=AI_MODEL_HAIKU, max_tokens=1500)
         parsed = _structured_json.call_json(_ic3_send, body, schema=_IC3_SCHEMA, label="ic3_analysis")
         if not isinstance(parsed, dict):
             raise ValueError(_structured_json.decode_error(parsed))

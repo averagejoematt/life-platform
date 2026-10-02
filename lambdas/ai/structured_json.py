@@ -145,6 +145,12 @@ def decode_error(value: Any) -> str:
     return "parsed JSON that is not an object"
 
 
+def user_turn_body(prompt: str, model: str, max_tokens: int) -> dict:
+    """A one-user-turn Messages body (no system block), for `call_json` callers that held only
+    a prompt string — e.g. ai_calls' IC-3 pass, which used the text transport before #4276."""
+    return {"model": model, "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]}
+
+
 def with_schema(body: dict, schema: dict) -> dict:
     """A copy of `body` whose `output_config` carries the JSON-schema format (other keys kept)."""
     from ai.bedrock_client import structured_output_config
