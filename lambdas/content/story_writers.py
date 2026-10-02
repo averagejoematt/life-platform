@@ -350,6 +350,8 @@ def fact_check(
         found = json.loads(_text(resp)).get("findings", [])
     except ValueError:
         return ["fact-read: unparseable — the installment is unverified"]
-    _noop = re.compile(r"(?i)\bno (?:change|error|issue)s? (?:needed|found|here)\b|\bskipping\b")
+    _noop = re.compile(
+        r"(?i)\bno (?:change|error|issue|correction)s? (?:is )?(?:needed|found|here|required|necessary)\b|\bskipping\b|\bthis is accurate\b"
+    )
     real = [f for f in found if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}")]
     return [f"fact: {f['claim']!r} — {f['problem']} → {f['fix']}" for f in real]

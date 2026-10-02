@@ -26,7 +26,7 @@ from ai.model_defaults import NARRATIVE_MODEL as DESK_MODEL  # noqa: E402 — th
 
 from content import story_ledger
 
-DESK_MAX_TOKENS = 6000
+DESK_MAX_TOKENS = 12000  # the craft-standard schema measured past 6000 on wk2 (2026-10-01)
 
 _STR = {"type": "string"}
 
