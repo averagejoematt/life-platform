@@ -89,7 +89,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | constant |
 | `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | constant |
 | `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | constant |
-| `wednesday-chronicle` | email_stack | `cron(0 15 ? * WED *)` | constant |
+| `wednesday-chronicle` | email_stack | `cron(0 15 ? * WED *)` + `cron(0 16 * * MON *)` | constant, constructed |
 | `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | constant |
 | `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | constant |
 | `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | constant |
@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-729 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+735 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -140,7 +140,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `challenges` | challenge_generator_lambda.py, character_sheet_lambda.py, site_api_social_challenges.py | challenge_generator_lambda.py, site_api_social_challenges.py |
 | `character_receipt` | — | qa_smoke_lambda.py, site_api_character.py |
 | `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_discovery.py, site_api_fulfillment.py, site_api_habits.py, site_api_journey.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
-| `chronicle` | chronicle_approve_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py | ask_retrieval.py, chronicle_approve_lambda.py, chronicle_data.py, chronicle_email_sender_lambda.py, chronicle_podcast_lambda.py, chronicle_store.py, coach_panel_podcast_lambda.py, site_api_coach_narrative.py, site_writer.py |
+| `chronicle` | chronicle_approve_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, wednesday_chronicle_lambda.py | ask_retrieval.py, chronicle_approve_lambda.py, chronicle_data.py, chronicle_email_sender_lambda.py, chronicle_podcast_lambda.py, chronicle_store.py, coach_panel_podcast_lambda.py, panelcast_desk.py, site_api_coach_narrative.py, site_writer.py, wednesday_chronicle_lambda.py |
 | `circadian` | circadian_compliance_lambda.py | — |
 | `coach_actions` | intelligence_common.py | intelligence_common.py |
 | `coach_corrections` | coach_corrections.py | coach_corrections.py |
@@ -198,7 +198,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, site_api_physical.py |
 | `milestones` | — | — |
 | `morning_note` | site_api_social_note.py | morning_note.py |
-| `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_fulfillment.py, site_api_mind.py, site_api_pulse.py, tools_journal.py, tools_social_connection.py |
+| `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_fulfillment.py, site_api_mind.py, site_api_pulse.py, story_dossier.py, tools_journal.py, tools_social_connection.py |
 | `nutrition_review` | nutrition_review_lambda.py | nutrition_review_lambda.py |
 | `panelcast` | coach_panel_podcast_lambda.py, podcast_script_v2.py | coach_panel_podcast_lambda.py, podcast_script_v2.py, site_api_coach_ledger.py |
 | `pending_writes` | — | — |
@@ -507,11 +507,11 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1259 total · 900 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1270 total · 911 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 90 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
+- Schedules: 91 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -528,7 +528,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | ai_features | 20 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 133 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 32 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 90 | this model's schedules plane (CDK AST) |
+| schedules | 91 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.
