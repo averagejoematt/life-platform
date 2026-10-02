@@ -155,8 +155,9 @@ def plan(staging: str, weeks: List[int]) -> Dict[str, Any]:
         st = _staged(staging, wk)
         rep = st["report"]
         allf = (rep.get("post_findings") or []) + (rep.get("episode_findings") or [])
-        blocking = [f for f in allf if not f.startswith("fact:")]
-        review = [f for f in allf if f.startswith("fact:")]
+        review_classes = ("fact:", "craft:")  # judgement calls a person adjudicates; everything else blocks
+        blocking = [f for f in allf if not f.startswith(review_classes)]
+        review = [f for f in allf if f.startswith(review_classes)]
         if blocking:
             out["staging_findings"].append({"week": wk, "blocking": blocking})
         if review:

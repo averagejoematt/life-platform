@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ai.model_defaults import NARRATIVE_MODEL as WRITER_MODEL  # noqa: E402 — the one narrative default (#4275)
 
-from content import story_ledger
+from content import story_craft, story_ledger
 
 CHRONICLE_MAX_TOKENS = 7000  # ~1,100-1,500 words lands near 2,500 tokens; the ceiling is headroom, never the target
 EPISODE_MAX_TOKENS = 8000
@@ -85,7 +85,7 @@ week as the chronicle. ELENA VOSS (an AI journalist, the host) talks with ONE co
 desk chose — about what the week's data showed. Two people with all the numbers in front of them, talking like
 colleagues: warm, specific, sometimes disagreeing, never a lecture.
 
-SHOW SHAPE (about 1,000-1,300 spoken words, 6-9 minutes):
+SHOW SHAPE (1,250-1,450 spoken words, about 9 minutes):
 1. Cold open — Elena, one vivid real moment from the week, two or three sentences.
 2. Welcome — Elena names the show, the day number of the experiment, and the guest (name and what they cover).
    One or two sentences of "previously" for a cold listener.
@@ -159,7 +159,7 @@ def write_chronicle(
     footer = "*Prologue — The Measured Life*" if week == 0 else f"*Week {week} of The Measured Life*"
     fmt = (
         "FORMAT: line 1 is the title in double quotes (your editorial choice). Line 2 blank. Then the body, "
-        f"about 1,100-1,500 words of clean prose. Then a line with --- and finally the line {footer}"
+        f"900-1,200 words of clean prose. Then a line with --- and finally the line {footer}"
     )
     messages = [{"role": "user", "content": _context(dossier, budget, ledger, week, previous) + "\n\n" + fmt}]
     if fix and prior_draft:
@@ -172,7 +172,12 @@ def write_chronicle(
             },
         ]
     resp = _invoke(
-        {"system": ELENA_VOICE + "\n\n" + SEASON_RULES, "messages": messages, "max_tokens": CHRONICLE_MAX_TOKENS, "temperature": 0.7},
+        {
+            "system": ELENA_VOICE + "\n\n" + SEASON_RULES + "\n\n" + story_craft.CHRONICLE_RULES + "\n\n" + story_craft.owner_voice_rules(),
+            "messages": messages,
+            "max_tokens": CHRONICLE_MAX_TOKENS,
+            "temperature": 0.7,
+        },
         invoke,
     )
     return _text(resp), resp.get("stop_reason")
@@ -212,7 +217,7 @@ def write_episode(
             {"role": "user", "content": "The checks found these problems. Return the whole corrected script:\n- " + "\n- ".join(fix)},
         ]
     body: Dict[str, Any] = {
-        "system": EPISODE_VOICE + "\n\n" + SEASON_RULES,
+        "system": EPISODE_VOICE + "\n\n" + SEASON_RULES + "\n\n" + story_craft.EPISODE_RULES + "\n\n" + story_craft.owner_voice_rules(),
         "messages": messages,
         "max_tokens": EPISODE_MAX_TOKENS,
         "temperature": 0.7,
@@ -221,7 +226,9 @@ def write_episode(
     resp = _invoke(body, invoke)
     text = _text(resp)
     try:
-        return json.loads(text), resp.get("stop_reason")
+        ep = json.loads(text)
+        ep["turns"] = story_craft.clean_turns(ep.get("turns", []))
+        return ep, resp.get("stop_reason")
     except ValueError:
         return {"title": "", "excerpt": "", "turns": []}, resp.get("stop_reason") or "unparseable"
 

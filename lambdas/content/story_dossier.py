@@ -268,7 +268,7 @@ def _recovery(table, wk: Dict[str, Any]) -> Dict[str, Any]:
         return {"date": p["date"], "value": p[key]}
 
     return {
-        "note": "a morning's recovery, HRV and resting HR describe the NIGHT BEFORE; sleep_h is that night's sleep",
+        "note": "each row is a MORNING: its recovery, HRV, resting HR and sleep_h all describe the night in sleep_night_of — pair them exactly as given",
         "per_day": per,
         "recovery_mean": _mean([p["recovery"] for p in per]),
         "hrv_mean_ms": _mean([p["hrv_ms"] for p in per]),
@@ -448,6 +448,7 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         "graded_this_week_count": len(graded),
         "made_this_week_by_coach": {roster.get(k, k): v for k, v in made.items()},
         "record_to_date_by_coach": {roster.get(k, k): v for k, v in record.items()},
+        "records_through": wk["end"],
         "pre_registered": prereg,
         # counts are facts, not something a model should count from a list (a fact read miscounted 16 as 15)
         "pre_registered_count": len(prereg),
@@ -456,7 +457,8 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         "pre_registered_status_counts": {
             k: sum(1 for p in prereg if p["status_at_week_end"] == k) for k in sorted({p["status_at_week_end"] for p in prereg})
         },
-        "grading_caveat": "the evaluator grades directional calls by trend slope; a count claim ('5 of 7 nights') graded by slope is not a count (#4541)",
+        "grading_caveat": "the evaluator grades directional calls by trend slope; a count claim ('5 of 7 nights') graded by slope is not a count (#4541); "
+        "steps-based calls are graded on phone-only step counts that undercount, so a steps miss may be the instrument; state a record as 'through <records_through>'",
     }
 
 
@@ -521,9 +523,9 @@ def _coaches(table, wk: Dict[str, Any], roster: Dict[str, str]) -> List[Dict[str
                 "name": roster.get(cid, cid),
                 "outputs_this_week": len(items),
                 "latest_date": latest["sk"].split("#")[1],
-                "latest_public_summary": str(latest.get("public_summary") or "")[:500],
+                "latest_public_summary": str(latest.get("public_summary") or "")[:1400],
                 "summary_caveat": "a coach summary may cite the profile's stale 190 g / 1,800 kcal targets (#4540); the plan's targets are in nutrition.targets_from_plan — never quote a target figure from a summary",
-                "latest_key_recommendation": str(latest.get("key_recommendation") or "")[:300],
+                "latest_key_recommendation": str(latest.get("key_recommendation") or "")[:400],
                 "themes": [str(t) for t in (latest.get("themes") or [])][:5],
             }
         )
@@ -567,6 +569,65 @@ def _steps(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "per_day": [{"date": d, "steps": _f(r.get("steps"))} for d, r in sorted(days.items())],
         "caveat": "steps come from the phone only this experiment (the watch feed is paused), so they undercount — gym treadmill walks and walks without the phone are invisible; do not build a story on step counts",
+    }
+
+
+def _season_to_date(table, wk: Dict[str, Any]) -> Dict[str, Any]:
+    """Experiment-to-date extremes and firsts, computed over every day since genesis — the ONLY source a writer may
+    use for "first / lowest / highest / only / never / since the start" (the red team found six false superlatives
+    derived from a single week's window)."""
+    days = _days(table, "whoop", GENESIS, wk["end"])
+
+    def ext(field: str, fn) -> Optional[Dict[str, Any]]:
+        vals = [(d, _f(r.get(field))) for d, r in days.items() if _f(r.get(field)) is not None]
+        if not vals:
+            return None
+        d, v = fn(vals, key=lambda x: x[1])
+        return {"morning": d, "value": _r(v, 1)}
+
+    sessions = sorted(_rows(table, "hevy", GENESIS, wk["end"]), key=lambda r: str(r.get("start_time") or r.get("sk") or ""))
+    incomplete = []
+    for r in sessions:
+        ad = r.get("adherence") or {}
+        pct = _f(ad.get("overall_pct"))
+        if r.get("hevy_routine_id") and pct is not None and pct < 100:
+            incomplete.append({"date": r.get("date") or r["sk"][5:15], "title": r.get("title"), "sets_pct": _r(pct, 0)})
+    trained = sorted({(r.get("date") or r["sk"][5:15]) for r in sessions})
+    return {
+        "through": wk["end"],
+        "recovery_low": ext("recovery_score", min),
+        "recovery_high": ext("recovery_score", max),
+        "hrv_low_ms": ext("hrv", min),
+        "hrv_high_ms": ext("hrv", max),
+        "rhr_low": ext("resting_heart_rate", min),
+        "sleep_shortest_h": ext("sleep_duration_hours", min),
+        "sleep_longest_h": ext("sleep_duration_hours", max),
+        "programmed_sessions_below_100pct_sets": incomplete,
+        "first_training_day": trained[0] if trained else None,
+        "days_without_a_session_since_genesis": [d for d in _dates(GENESIS, wk["end"]) if d not in set(trained)],
+        "rule": "a superlative or a 'first' must come from this block; this week's window alone cannot support one",
+    }
+
+
+def _body_composition(table, wk: Dict[str, Any]) -> Dict[str, Any]:
+    days = _days(table, "withings", GENESIS, wk["end"])
+    scans = [
+        (d, _f(r.get("fat_mass_lbs")), _f(r.get("fat_free_mass_lbs")))
+        for d, r in sorted(days.items())
+        if _f(r.get("fat_mass_lbs")) is not None
+    ]
+    if len(scans) < 2:
+        return {"available": False}
+    (d0, f0, ff0), (d1, f1, ff1) = scans[0], scans[-1]
+    return {
+        "available": True,
+        "first_scan": {"date": d0, "fat_mass_lbs": _r(f0), "fat_free_mass_lbs": _r(ff0)},
+        "latest_scan": {"date": d1, "fat_mass_lbs": _r(f1), "fat_free_mass_lbs": _r(ff1)},
+        "fat_mass_change_lbs": _r(f1 - f0),
+        "fat_free_mass_change_lbs": _r(ff1 - ff0),
+        "scans": len(scans),
+        "caveat": "scale bio-impedance on full-scan days only — noisy and not a DEXA; fat-free mass includes water. The platform's "
+        "lean-mass flag is a RATE heuristic (lb/week), not a composition measurement — never call it a measured lean-mass loss",
     }
 
 
@@ -642,6 +703,8 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "character_sheet": _character(table, wk),
         "day_grades": _grades(table, wk),
         "steps": _steps(table, wk),
+        "season_to_date": _season_to_date(table, wk),
+        "body_composition": _body_composition(table, wk),
     }
     nye = ["macrofactor"] if nutrition["not_yet_exported_dates"] else []
     dossier["roster_note"] = {

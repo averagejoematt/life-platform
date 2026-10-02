@@ -34,7 +34,19 @@ LEDGER_PREFIX = "LEDGER#"
 
 
 def empty_ledger() -> Dict[str, Any]:
-    return {"week": None, "date": None, "threads": [], "bets": [], "featured": [], "leads": [], "beats": [], "arcs": {}, "titles": []}
+    return {
+        "week": None,
+        "date": None,
+        "threads": [],
+        "bets": [],
+        "featured": [],
+        "leads": [],
+        "beats": [],
+        "arcs": {},
+        "titles": [],
+        "asks": [],
+        "spine": {},
+    }
 
 
 def open_threads(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -133,6 +145,23 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
         if upd.get("who"):
             led.setdefault("arcs", {})[upd["who"]] = upd.get("line", "")
     led.setdefault("titles", []).append({"week": week, "date": date, "title": title})
+    if not led.get("spine"):
+        from content.story_craft import season_spine
+
+        led["spine"] = season_spine()
+    for fu in budget.get("asks_followed_up", []):
+        for a in led.setdefault("asks", []):
+            if (
+                a.get("status") in (None, "", "open")
+                and (fu.get("ask") or "")[:40]
+                and a.get("ask", "")[:40] in (fu.get("ask") or "") + a.get("ask", "")[:0]
+            ):
+                a["status"], a["outcome"], a["followed_week"] = "followed_up", fu.get("outcome"), week
+    for ask in budget.get("coach_asks", []):
+        if ask.get("ask"):
+            led.setdefault("asks", []).append({**ask, "week": week, "status": "open"})
+    if budget.get("throughline_advanced"):
+        led.setdefault("throughline_log", []).append({"week": week, "id": budget["throughline_advanced"]})
     return led
 
 
@@ -153,6 +182,9 @@ def ledger_for_prompt(ledger: Dict[str, Any], week: int) -> Dict[str, Any]:
         "beats_already_used": [b["beat"] for b in ledger.get("beats", [])][-14:],
         "recently_featured_coaches": recently_featured(ledger, 3),
         "character_arcs": ledger.get("arcs", {}),
+        "season_spine": ledger.get("spine") or {},
+        "open_coach_asks": [a for a in ledger.get("asks", []) if a.get("status") in (None, "", "open")],
+        "throughline_log": ledger.get("throughline_log", [])[-4:],
     }
 
 

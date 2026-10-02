@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from content import story_checks, story_desk, story_dossier, story_ledger, story_writers  # noqa: E402
+from content import story_checks, story_craft, story_desk, story_dossier, story_ledger, story_writers  # noqa: E402
 
 CHRONICLE_PK = "USER#matthew#SOURCE#chronicle"
 PLAN_PROLOGUE_SK = "DATE#2026-09-05"
@@ -159,11 +159,14 @@ class _Gates:
         budget: Dict[str, Any],
         prev_ledger: Dict[str, Any],
         prev_dossier: Optional[Dict[str, Any]] = None,
+        previous: Optional[Dict[int, str]] = None,
     ):
         self.n, self.dossier = n, dossier
+        self.previous = previous or {}  # week -> that installment's post + episode text (callback checks)
+        self.corpus = story_craft.quote_corpus(dossier)
         # the series' own record is grounding too: a bet's threshold, last week's scored result
         self.allowed = story_checks.allowed_numbers(
-            dossier, {"week": n}, budget.get("bet"), budget.get("bet_scored"), prev_ledger.get("bets")
+            dossier, {"week": n}, budget.get("bet"), budget.get("bet_scored"), prev_ledger.get("bets"), prev_dossier or {}
         )
         self.nye = ["macrofactor"] if (dossier.get("nutrition") or {}).get("not_yet_exported_dates") else []
         w = dossier.get("weight") or {}
@@ -181,9 +184,16 @@ class _Gates:
         }
 
     def post(self, md: str, stop: Optional[str]) -> List[str]:
-        return story_checks.all_findings(
-            md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
-        ) + story_writers.fact_check(md, self.dossier, context=self.context)
+        _title, body = story_writers.split_title(md)
+        return (
+            story_checks.all_findings(
+                md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
+            )
+            + story_craft.chronicle_findings(body, week=self.n)
+            + story_craft.callback_findings(body, self.previous)
+            + story_craft.quote_findings(body, self.corpus)
+            + story_writers.fact_check(md, self.dossier, context=self.context)
+        )
 
     def episode(self, ep: Dict[str, Any], stop: Optional[str]) -> List[str]:
         txt = story_writers.episode_text(ep)
@@ -192,8 +202,31 @@ class _Gates:
             + story_checks.story_door(txt, not_yet_exported=self.nye)
             + story_checks.ungrounded_numbers(txt, self.allowed)
             + story_writers.spoken_word_findings(ep.get("turns", []), body_weights=self.weights)
+            + story_craft.episode_findings(ep.get("turns", []))
+            + story_craft.callback_findings(txt, self.previous)
             + story_writers.fact_check(txt, self.dossier, context=self.context)
         )
+
+
+def with_dek(md: str, dossier: Dict[str, Any], ledger: Dict[str, Any], budget: Dict[str, Any], n: int) -> str:
+    """The two italic lines a stranger reads first, rendered by code after the gates ran: the desk's plain top line
+    and the scoreboard (never the model's numbers)."""
+    title, body = story_writers.split_title(md)
+    if n == 0:
+        return md
+    top = (budget.get("top_line") or "").strip()
+    sb = story_craft.scoreboard_line(story_craft.scoreboard(dossier, ledger))
+    dek = "\n\n".join(f"*{x}*" for x in (top, sb) if x)
+    return f'"{title}"\n\n{dek}\n\n{body}'
+
+
+def _previous_texts(out: str, n: int) -> Dict[int, str]:
+    texts: Dict[int, str] = {}
+    for k in range(0, n):
+        md, ep = _load(out, f"wk{k}_chronicle.md"), _load(out, f"wk{k}_episode.txt")
+        if md or ep:
+            texts[k] = (md or "") + "\n" + (ep or "")
+    return texts
 
 
 def _write_post(g: _Gates, dossier, budget, ledger, n, previous, md=None, findings=None):
@@ -236,12 +269,17 @@ def run_week(
         dossier, _nye = prologue_dossier(table), []
     else:
         dossier, _nye = story_dossier.week_dossier(table, wk)
+    # his own words, when he answered the week's questions (reply desk #4546; staged file for the rebuild)
+    ov = _load(out, f"wk{n}_owner_voice.json")
+    if ov:
+        dossier["owner_voice"] = ov
     _save(out, f"wk{n}_dossier.json", dossier)
     budget = story_desk.run_desk(dossier, ledger, week=n)
     _save(out, f"wk{n}_budget.json", budget)
-    g = _Gates(n, dossier, budget, ledger)
+    g = _Gates(n, dossier, budget, ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
 
     md, findings = _write_post(g, dossier, budget, ledger, n, previous_post)
+    md = with_dek(md, dossier, ledger, budget, n)
     _save(out, f"wk{n}_chronicle.md", md)
     title, body = story_writers.split_title(md)
 
@@ -281,7 +319,7 @@ def repair_week(out: str, n: int, notes: Optional[List[str]] = None, episode_not
     report = _load(out, f"wk{n}_report.json")
     prev_post = _load(out, f"wk{n - 1}_chronicle.md") if n > 0 else None
     prev_ep = _load(out, f"wk{n - 1}_episode.txt") if n > 0 else None
-    g = _Gates(n, dossier, budget, prev_ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None)
+    g = _Gates(n, dossier, budget, prev_ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
 
     md = _load(out, f"wk{n}_chronicle.md")
     pf = [f"editor's note: {x}" for x in (notes or [])] + g.post(md, "end_turn")
