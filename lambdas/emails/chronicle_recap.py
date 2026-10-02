@@ -60,7 +60,8 @@ def _published_installments(data):
     A draft that hasn't cleared the approve gate is NOT yet part of the public story."""
     out = []
     for inst in data.get("prev_installments", []) or []:
-        if (inst.get("status") or "published") == "published":
+        # #4537: an unlisted installment (a superseded earlier-launch lead-in) is off the reading list and off the recap
+        if (inst.get("status") or "published") == "published" and not inst.get("unlisted"):
             out.append(inst)
     out.sort(key=lambda i: i.get("date", ""), reverse=True)
     return out

@@ -267,11 +267,26 @@ class EmailStack(Stack):
             # completed. 300s = the measured pipeline + the persist/render tail
             # with real headroom; the generation cache (chronicle_store, #2669)
             # is the other half — a timeout retry reuses the text it already paid for.
-            timeout_seconds=300,
+            # #4535: 300 → 900. The Story Desk writes the post AND the episode in one run (desk budget, two writers, a
+            # fact read per piece, at most one corrective rewrite each live) — measured 5-12 min per week on the cycle-17
+            # rebuild. 900s is the Lambda ceiling; the generation cache keeps a timeout retry free of re-generation.
+            timeout_seconds=900,
             memory_mb=256,
-            environment=_email_env,
+            environment={**_email_env, "STORY_DESK": "on", "STORY_DESK_MAX_REWRITES": "1"},
             custom_policies=rp.email_wednesday_chronicle(),
             **shared,
+        )
+
+        # #4546 the reply desk: Monday 16:00 UTC (09:00 PT), the week's 3-5 gap questions go to Matthew with Reply-To the
+        # SES inbound address; his reply lands as owner voice for Wednesday's chronicle and episode. Never blocks a week.
+        story_questions_rule = events.Rule(
+            self,
+            "StoryQuestionsMonday",
+            schedule=events.Schedule.cron(minute="0", hour="16", week_day="MON"),
+            description="#4546: the Story Desk's weekly reply-by-email questions (optional; no reply is a normal week)",
+        )
+        story_questions_rule.add_target(
+            targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"story_questions": True}))
         )
 
         create_platform_lambda(

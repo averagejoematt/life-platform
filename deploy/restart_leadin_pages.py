@@ -70,10 +70,13 @@ _ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VII
 
 
 def fetch_visible_installments(table):
-    """All non-tombstoned phase-experiment DATE# chronicle records, oldest-first by date."""
+    """All non-tombstoned DATE# chronicle records of the current phase, oldest-first by date. A record with NO phase
+    attribute is current-phase — the same rule as experiment.phase_filter.with_phase_filter, which the Wednesday
+    publisher reads through (#4537: the strict "#phase = :phase" form dropped weeks 1-4, which the live writer stores
+    without a phase, and a re-render published a two-post reading list)."""
     resp = table.query(
         KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-        FilterExpression="#phase = :phase AND attribute_not_exists(tombstone)",
+        FilterExpression="(#phase = :phase OR attribute_not_exists(#phase)) AND attribute_not_exists(tombstone)",
         ExpressionAttributeNames={"#phase": "phase"},
         ExpressionAttributeValues={
             ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
@@ -85,7 +88,7 @@ def fetch_visible_installments(table):
     while "LastEvaluatedKey" in resp:
         resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            FilterExpression="#phase = :phase AND attribute_not_exists(tombstone)",
+            FilterExpression="(#phase = :phase OR attribute_not_exists(#phase)) AND attribute_not_exists(tombstone)",
             ExpressionAttributeNames={"#phase": "phase"},
             ExpressionAttributeValues={
                 ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
@@ -470,6 +473,12 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
 
     all_dates = sorted(x.get("date", "") for x in installments if x.get("date", ""))
     all_keys = installment_keys(installments)
+    # #4537: an UNLISTED installment keeps its page and its URL (the week-NN sequence is over
+    # ALL visible records, so links never move) but leaves the manifest and the Prologue part
+    # numbering — the listed season reads Part I, Part II with no gap. Parity with
+    # chronicle_render.publish_to_journal (pinned in tests/test_story_desk_unlisted.py).
+    listed = [x for x in installments if not x.get("unlisted")]
+    listed_keys = installment_keys(listed)
     genesis = EXPERIMENT_START_DATE
     print(f"Genesis: {genesis} · visible installments: {len(installments)}")
 
@@ -481,7 +490,11 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
         week_num = int(item.get("week_number", 0) or 0)
         title = item.get("title", "Untitled")
         stats_line = display_stats_line(item.get("stats_line", ""), date_str)  # #949 — prologue-framed dek pre-genesis
-        label = series_label(date_str, all_dates, week_num, sk=item.get("sk", ""), all_keys=all_keys)
+        label = (
+            "From the archive"
+            if item.get("unlisted")
+            else series_label(date_str, all_dates, week_num, sk=item.get("sk", ""), all_keys=listed_keys)
+        )
         seq = seq_for(date_str, all_dates, week_num, sk=item.get("sk", ""), all_keys=all_keys)
         body_html = body_html_from_record(item)
         page = render_post_html(title, stats_line, body_html, label, date_str, seq)
@@ -494,7 +507,7 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     # SEQUENCE via manifest_sort_key, never by insertion order — schema + tie-break
     # identical to publish_to_journal(). See manifest_sort_key's docstring for #1988.
     posts_manifest = []
-    for item in sorted(installments, key=lambda x: manifest_sort_key(x, all_dates, all_keys), reverse=True):
+    for item in sorted(listed, key=lambda x: manifest_sort_key(x, all_dates, all_keys), reverse=True):
         date_str = item.get("date", "")
         seq = seq_for(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys)
         posts_manifest.append(
@@ -502,7 +515,9 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
                 # #1988 AC2 — a Prologue-dated record's week is always 0, never the raw
                 # (and, live, inconsistent) DDB week_number attribute.
                 "week": 0 if date_str < genesis else int(item.get("week_number", 0) or 0),
-                "label": series_label(date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=all_keys),
+                "label": series_label(
+                    date_str, all_dates, int(item.get("week_number", 0) or 0), sk=item.get("sk", ""), all_keys=listed_keys
+                ),
                 # #1988 AC1 — explicit sequence field, parity with publish_to_journal()'s manifest.
                 "sequence": seq,
                 "title": item.get("title", ""),

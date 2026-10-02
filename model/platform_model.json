@@ -977,7 +977,7 @@
     "ai_features": 20,
     "alarms": 133,
     "emf_namespaces": 32,
-    "schedules": 90,
+    "schedules": 91,
     "secrets": 30
   },
   "edges": [
@@ -2032,6 +2032,27 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/story_dossier.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/story_dossier.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/story_pipeline.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/content/theme_river.py",
@@ -2747,6 +2768,13 @@
     },
     {
       "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/panelcast_desk.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
       "lambda": "partner-weekly-email",
       "module": "lambdas/emails/partner_email_lambda.py",
       "partition": "email_log",
@@ -2781,7 +2809,21 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "wednesday-chronicle",
+      "module": "lambdas/emails/wednesday_chronicle_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
+      "lambda": "wednesday-chronicle",
+      "module": "lambdas/emails/wednesday_chronicle_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
       "lambda": "wednesday-chronicle",
       "module": "lambdas/emails/wednesday_chronicle_lambda.py",
       "partition": "chronicle",
@@ -7371,10 +7413,14 @@
         {
           "expr": "cron(0 15 ? * WED *)",
           "resolution": "constant"
+        },
+        {
+          "expr": "cron(0 16 * * MON *)",
+          "resolution": "constructed"
         }
       ],
       "stack": "email_stack",
-      "timeout_seconds": 300
+      "timeout_seconds": 900
     },
     "weekly-correlation-compute": {
       "declared_alarm": null,
@@ -7509,7 +7555,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 729,
+      "edges": 735,
       "lambdas": 106,
       "mcp_tool_modules": 34,
       "mcp_tools": 86,
@@ -7519,13 +7565,13 @@
       "privacy_sources_owner_only": 17,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 82,
-      "schedules": 90
+      "schedules": 91
     },
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 359,
-        "sites_resolved": 900,
-        "sites_total": 1259
+        "sites_resolved": 911,
+        "sites_total": 1270
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8516,6 +8562,13 @@
       "lambda": "telegram-coach-worker",
       "resolution": "constant",
       "stack": "serve_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 * * MON *)",
+      "lambda": "wednesday-chronicle",
+      "resolution": "constructed",
+      "stack": "email_stack",
       "utc": "16:00"
     },
     {

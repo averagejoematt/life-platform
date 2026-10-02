@@ -1517,6 +1517,23 @@ def _select_week_post() -> dict:
     return {"week": wk, "date": pacific_now().date().isoformat(), "title": f"Week {wk}"}
 
 
+def _desk_episode(post: dict) -> dict | None:
+    return _panel_desk().desk_episode(post, _g=globals())
+
+
+def _publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False) -> dict:
+    return _panel_desk().publish_desk_episode(week, post, ep, dry_run, _g=globals())
+
+
+def _panel_desk():
+    try:
+        from emails import panelcast_desk
+    except ImportError:
+        if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+            import panelcast_desk
+    return panelcast_desk
+
+
 def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD.
 
@@ -1534,6 +1551,13 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
         _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
+
+    # #4536: when the week's chronicle was written by the Story Desk, the episode script was written WITH it — from the
+    # same story budget, dossier and season ledger, through the same gates — and rides on the chronicle row. The Panel
+    # renders that script (after its own per-line safety gate) instead of writing a second, unrelated one.
+    desk_ep = _desk_episode(post)
+    if desk_ep:
+        return _publish_desk_episode(week, post, desk_ep, dry_run=dry_run)
 
     bible = _load_bible()
     state = _state_read()

@@ -243,6 +243,25 @@ def _mark_published(date_str: str) -> None:
         logger.error("DDB update failed: %s", exc)
 
 
+def _commit_ledger(item: dict) -> None:
+    """#4533: when a Story Desk week publishes, its season ledger (threads, bets, asks, arcs) becomes LEDGER#{date} —
+    the memory the next week's desk reads. Written on publish only, never on draft. Fail-soft."""
+    raw = item.get("desk_ledger_json")
+    if not raw:
+        return
+    try:
+        from content import story_ledger
+        from experiment.phase_taxonomy import experiment_stamp_for
+
+        led = json.loads(raw)
+        row = story_ledger.ledger_row(CHRONICLE_PK, led, cycle=str(item.get("cycle") or "17"))
+        row.update(experiment_stamp_for(row["pk"], row["sk"]))  # #3599: the class-gated write-time stamp
+        table.put_item(Item=row)
+        logger.info("[#4533] season ledger committed for %s", led.get("date"))
+    except Exception as exc:  # noqa: BLE001 — never blocks publishing the installment
+        logger.warning("[#4533] ledger commit failed for %s: %s", item.get("date"), exc)
+
+
 def _commit_recap(item: dict) -> None:
     """Phase 3: commit the week's pre-built 'previously on' recap to RECAP#latest +
     RECAP#{date} when the week is actually published. The recap is grounded in
@@ -431,6 +450,7 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
             paths = _publish_to_s3(item)
             _invalidate_cloudfront(paths)
             _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
+            _commit_ledger(item)  # #4533: the season ledger the next week picks the story up from
             _mark_published(date_str)
             _index_for_recall(date_str)  # #1384: published → it can be cited as a precedent
             _invoke_elena_state_updater(date_str)  # #537: published → update her memory
@@ -546,6 +566,7 @@ def _handle(event: dict) -> dict:
         invalidation_paths = _publish_to_s3(item)
         _invalidate_cloudfront(invalidation_paths)
         _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
+        _commit_ledger(item)  # #4533: the season ledger the next week picks the story up from
         _mark_published(date_str)
         _index_for_recall(date_str)  # #1384: published → it can be cited as a precedent
         _invoke_email_sender()

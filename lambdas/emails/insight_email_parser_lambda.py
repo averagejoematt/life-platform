@@ -57,6 +57,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run
+from content import story_questions  # #4546: the Story Desk's reply route
 from experiment.phase_taxonomy import experiment_stamp_for  # #3513: class-gated, date-derived write-time stamp
 
 # #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
@@ -552,6 +553,26 @@ def lambda_handler(event, context):
             except Exception as e:
                 print(f"[ERROR] Failed to parse email: {e}")
                 _persist_failure_envelope(key, "parse_exception", {"bucket": bucket, "key": key, "error": str(e), "raw_email": raw_email})
+                continue
+
+            # #4546: a reply to the Story Desk's weekly questions ("[SQ-W<n>]" in the subject) carries answers typed
+            # INLINE under quoted questions — parsed from the full body (extract_reply_text stops at the first quoted
+            # line and would drop them) and stored as that week's owner voice. Never generates a confirmation mail.
+            sq_week = story_questions.week_from_subject(subject)
+            if sq_week is not None:
+                sq_answers = story_questions.parse_reply(body_text)
+                print(f"[INFO] story-questions reply for week {sq_week}: {len(sq_answers)} answer(s)")
+                if sq_answers and not dry_run:
+                    sq_row = story_questions.qa_row(
+                        f"USER#{USER_ID}#SOURCE#insights",
+                        sq_week,
+                        sq_answers,
+                        received_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        source_key=key,
+                    )
+                    sq_row.update(experiment_stamp_for(sq_row["pk"], sq_row["sk"]))  # #3599
+                    table.put_item(Item=sq_row)
+                    send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
                 continue
 
             # #1690 (epic #1687): a reply to the weekly AI review-pack email carrying

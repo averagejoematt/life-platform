@@ -735,6 +735,7 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
     in monitoring_stack.py, and the self-heal lives in recall_freshness_qa.
     """
     return [
+        _experiment_cycle_read(),  # #4531: _commit_ledger stamps the LEDGER# row via experiment_stamp_for
         iam.PolicyStatement(
             sid="DynamoDB",
             # Query added for the SS-01 daily sweep (find stale drafts to auto-publish).
