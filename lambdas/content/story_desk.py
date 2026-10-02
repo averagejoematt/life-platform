@@ -116,7 +116,8 @@ with the numbers in the note); "none" when there was no open bet.
 
 THE SEASON SPINE: the ledger carries the season question and its throughlines. Name the throughline this week's
 lead advances ("throughline_advanced" = its id). Write "top_line": two plain sentences a stranger understands in five
-seconds — the day, the scale's direction, the one thing at stake — no jargon, no device names. Write "cliffhanger":
+seconds — the day, the scale's direction, the one thing at stake — no jargon, no device names, and no stronger a verb than
+the instrument earns (a scale's body-composition reading "suggests", it does not "confirm"). Write "cliffhanger":
 one concrete unknown that will be true or false by a NAMED day in the coming week.
 
 HIS VOICE: if the dossier has "owner_voice" answers, the week should turn on them — pick at most two lines to quote

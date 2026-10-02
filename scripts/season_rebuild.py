@@ -184,6 +184,17 @@ class _Gates:
             "previous_week_dossier": prev_dossier or {},
         }
 
+    def dek(self, top_line: str) -> List[str]:
+        """The desk's top line sits above the piece and is added after the writer's gates — so it gets its own."""
+        if not top_line:
+            return []
+        return [
+            f"dek: {f}"
+            for f in story_checks.ungrounded_numbers(top_line, self.allowed)
+            + story_checks.story_door(top_line)
+            + story_craft.banned(top_line)
+        ] + [f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)]
+
     def post(self, md: str, stop: Optional[str]) -> List[str]:
         _title, body = story_writers.split_title(md)
         return (
@@ -224,7 +235,7 @@ def with_dek(md: str, dossier: Dict[str, Any], ledger: Dict[str, Any], budget: D
     title, body = story_writers.split_title(md)
     if n == 0:
         return md
-    top = (budget.get("top_line") or "").strip()
+    top = story_craft.tts_clean(budget.get("top_line") or "")  # the dek is prose a reader sees first: same cleanup
     sb = story_craft.scoreboard_line(story_craft.scoreboard(dossier, ledger))
     dek = "\n\n".join(f"*{x}*" for x in (top, sb) if x)
     return f'"{title}"\n\n{dek}\n\n{body}'
@@ -289,6 +300,7 @@ def run_week(
     g = _Gates(n, dossier, budget, ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
 
     md, findings = _write_post(g, dossier, budget, ledger, n, previous_post)
+    findings += g.dek(budget.get("top_line") or "")
     title, body = story_writers.split_title(md)
 
     guest = _guest(dossier, budget) if n else next(c for c in dossier["roster"] if c.get("coach_id") == "head_coach")
