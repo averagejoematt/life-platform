@@ -189,6 +189,8 @@ def test_judge_calls_bedrock_invoke_with_a_valid_body_dict(monkeypatch):
     assert isinstance(body["messages"][0]["content"], str) and body["messages"][0]["content"]
     assert body.get("max_tokens") == 400
     assert isinstance(body.get("system"), str) and body["system"]
+    # #4276: the judge is asked under its schema (structured outputs), through ai.structured_json
+    assert body["output_config"]["format"]["schema"] == canary._JUDGE_SCHEMA
 
 
 def test_judge_failure_is_observable_via_metric(monkeypatch):

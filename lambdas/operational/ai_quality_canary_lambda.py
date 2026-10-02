@@ -483,6 +483,14 @@ def _emit_judge_failure() -> None:
         logger.warning("canary: judge-failure metric emit failed: %s", e)
 
 
+_JUDGE_SCHEMA = {  # #4276: the advisory judge's reply shape, closed and all-required
+    "type": "object",
+    "properties": {"coherent": {"type": "boolean"}, "notes": {"type": "array", "items": {"type": "string"}}},
+    "required": ["coherent", "notes"],
+    "additionalProperties": False,
+}
+
+
 def _judge(transcript, persona_names=None):
     """Budget-gated Haiku read: is each answer on-character and grounded? ADVISORY
     only — kept in the record/digest for a human, never tied to the metric gauge
@@ -523,10 +531,12 @@ def _judge(transcript, persona_names=None):
             "system": "Terse QA judge. JSON only.",
             "messages": [{"role": "user", "content": prompt}],
         }
-        out = bedrock_client.invoke(body)
-        text = "".join(b.get("text", "") for b in out.get("content", [])) if isinstance(out, dict) else str(out)
-        m = re.search(r"\{.*\}", text, re.S)
-        return json.loads(m.group(0)) if m else None
+        # #4276: constrained to _JUDGE_SCHEMA and parsed in the one door; a schema-less fallback
+        # reply with prose around its JSON still gets the old {...} span salvage.
+        from ai.structured_json import call_json, parse_json_span
+
+        parsed = call_json(lambda b: bedrock_client.invoke(b), body, schema=_JUDGE_SCHEMA, label="ai_quality_canary_judge")
+        return parse_json_span(parsed, "{") if isinstance(parsed, str) else parsed
     except Exception as e:  # noqa: BLE001
         logger.warning("canary: advisory judge failed (non-fatal): %s", e)
         _emit_judge_failure()

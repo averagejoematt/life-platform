@@ -43,7 +43,6 @@ import hashlib
 import json
 import logging
 import os
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -363,17 +362,31 @@ def build_generation_prompt(coach_id, coach_name, coach_bio, snapshot, n) -> dic
     }
 
 
-def parse_questions(text: str, max_n: int = MAX_OPEN_QUESTIONS) -> list:
-    """[{question, tags}] from the model's JSON (fenced or bare); [] if unparseable."""
-    if not text:
-        return []
-    cleaned = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", text.strip())
-    try:
-        parsed = json.loads(cleaned)
-    except (ValueError, TypeError):
+# The generation prompt's shape, constrained at the model (#4276) via ai.structured_json.call_json.
+QUESTIONS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"question": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}},
+                "required": ["question", "tags"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["questions"],
+    "additionalProperties": False,
+}
+
+
+def shape_questions(parsed, max_n: int = MAX_OPEN_QUESTIONS) -> list:
+    """[{question, tags}] from a parsed reply; [] for anything that is not a JSON object."""
+    if not isinstance(parsed, dict):
         return []
     out = []
-    for q in (parsed or {}).get("questions") or []:
+    for q in parsed.get("questions") or []:
         if not isinstance(q, dict):
             continue
         question = str(q.get("question") or "").strip()[:MAX_QUESTION_CHARS]
@@ -386,6 +399,12 @@ def parse_questions(text: str, max_n: int = MAX_OPEN_QUESTIONS) -> list:
     return out
 
 
+def _bedrock_send(body: dict) -> dict:
+    from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+
+    return call_anthropic_raw(body, timeout=30)
+
+
 def generate_questions(coach_id, coach_name, coach_bio, snapshot, n, caller=None) -> list:
     """Generate n questions via the Bedrock chokepoint. Fail-soft: [] on any
     error (budget tier 3, throttle, malformed JSON) — the caller degrades to
@@ -393,14 +412,10 @@ def generate_questions(coach_id, coach_name, coach_bio, snapshot, n, caller=None
     n = max(1, min(int(n), MAX_OPEN_QUESTIONS))
     body = build_generation_prompt(coach_id, coach_name, coach_bio, snapshot, n)
     try:
-        if caller is None:
-            from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+        from ai.structured_json import call_json  # #4276: the one door for JSON-shaped model calls
 
-            result = call_anthropic_raw(body, timeout=30)
-        else:
-            result = caller(body)
-        text = "".join(b.get("text", "") for b in (result or {}).get("content", []) if b.get("type") == "text")
-        return parse_questions(text, max_n=n)
+        parsed = call_json(caller or _bedrock_send, body, schema=QUESTIONS_SCHEMA, label="coach_checkin")
+        return shape_questions(parsed, max_n=n)
     except Exception as e:  # noqa: BLE001 — fail-soft is the contract
         logger.warning("[coach_checkin] question generation failed (%s) — falling back", type(e).__name__)
         return []

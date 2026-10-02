@@ -44,7 +44,6 @@ due-callback promises (from the PERSONA#elena CALLBACK# ledger, #537).
 v1.0.0 — 2026-07-05 (#548, epic #527)
 """
 
-import json
 import logging
 import re
 
@@ -207,31 +206,16 @@ def build_critique_user_message(installment_text, week_number, due_callbacks, no
 
 
 def _extract_json(text):
-    """Robust JSON parse: raw, or fenced ```json blocks. None on failure."""
-    text = (text or "").strip()
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    if "```json" in text:
-        start = text.find("```json") + 7
-        end = text.find("```", start)
-        if end > start:
-            try:
-                return json.loads(text[start:end].strip())
-            except json.JSONDecodeError:
-                return None
-    elif "```" in text:
-        start = text.find("```") + 3
-        end = text.find("```", start)
-        if end > start:
-            try:
-                return json.loads(text[start:end].strip())
-            except json.JSONDecodeError:
-                return None
-    return None
+    """The critique reply parsed in the one door (#4276): a dict, else None.
+
+    Schema-less on purpose: `critique_fn` is a text seam (`_margaret_haiku_call` →
+    `retry_utils.call_anthropic_api`), shared with Elena's PROSE revision call, so it
+    carries no `output_config`. The fence-tolerant parse is `structured_json.parse_json_text`.
+    """
+    from ai.structured_json import parse_json_text
+
+    parsed = parse_json_text(text)
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _sanitize_critique(data):

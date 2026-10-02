@@ -44,8 +44,6 @@ import logging
 import math
 import os
 import statistics
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -71,7 +69,6 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PROFILE_PK = f"USER#{USER_ID}"
 
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 _api_key_cache = None
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
@@ -561,33 +558,23 @@ Rules:
 - If a log looks incomplete (nutrition_note present), treat food-logging as false.
 - Be conservative -- if evidence is unclear, lean toward executed=false with confidence=low.
 
-Return ONLY a JSON array, no preamble:
-[{{"type": "sleep_timing", "text": "get to bed by 10", "executed": false, "evidence": "sleep start 23:30 -- 90 min late", "confidence": "high"}}]"""
+Return ONLY a JSON object, no preamble:
+{{"evaluations": [{{"type": "sleep_timing", "text": "get to bed by 10", "executed": false, "evidence": "sleep start 23:30 -- 90 min late", "confidence": "high"}}]}}"""
 
-    payload = json.dumps(
-        {
-            "model": AI_MODEL_HAIKU,
-            "max_tokens": 600,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    ).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-        method="POST",
-    )
+    body = {"model": AI_MODEL_HAIKU, "max_tokens": 600, "messages": [{"role": "user", "content": prompt}]}
     try:
         # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
+        # #4276: constrained to _INTENTION_EVAL_SCHEMA at the model and parsed in the one door. The
+        # array is wrapped in an object (a schema's root is an object); a bare array from the
+        # schema-less fallback is still accepted.
+        from ai.structured_json import call_json
         from common.retry_utils import call_anthropic_raw
 
-        resp = call_anthropic_raw(req, timeout=25)
-        raw = resp["content"][0]["text"].strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        return json.loads(raw.strip())
+        from compute.compute_json_schemas import INTENTION_EVAL_SCHEMA
+
+        parsed = call_json(lambda b: call_anthropic_raw(b, timeout=25), body, schema=INTENTION_EVAL_SCHEMA, label="intention_eval")
+        evals = parsed.get("evaluations") if isinstance(parsed, dict) else parsed
+        return evals if isinstance(evals, list) else []
     except Exception as e:
         logger.warning(f"IC-8 Haiku evaluation failed: {e}")
         return []

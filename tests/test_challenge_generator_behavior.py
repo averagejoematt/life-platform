@@ -93,13 +93,14 @@ def frozen_clock(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
-    """ADR-062: this module builds a legacy urllib Request but the transport is
-    Bedrock. Any real urlopen from this suite is a bug in the test or the code."""
+    """ADR-062: the transport is Bedrock (and since #4276 the module builds no urllib
+    Request at all). Any real urlopen from this suite is a bug in the test or the code."""
+    import urllib.request
 
     def _boom(*a, **kw):  # pragma: no cover - only runs if something regresses
         raise AssertionError("the challenge generator must never open a socket")
 
-    monkeypatch.setattr(chg.urllib.request, "urlopen", _boom)
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -703,6 +704,12 @@ class TestAiDegradation:
     def test_a_clean_json_response_is_parsed(self, monkeypatch):
         stub_model(monkeypatch, payload={"challenges": [candidate()], "reasoning": "because"})
         assert chg.generate_challenges({})["reasoning"] == "because"
+
+    def test_the_request_carries_the_challenges_schema(self, monkeypatch):
+        """#4276: the generation call is constrained to CHALLENGES_SCHEMA (structured outputs)."""
+        calls = stub_model(monkeypatch, payload={"challenges": [], "reasoning": "quiet"})
+        chg.generate_challenges({})
+        assert calls[0]["output_config"]["format"]["schema"] == chg.CHALLENGES_SCHEMA
 
     def test_a_fenced_response_is_unwrapped(self, monkeypatch):
         stub_model(monkeypatch, text='```json\n{"challenges": [], "reasoning": "quiet"}\n```')

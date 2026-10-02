@@ -2199,31 +2199,31 @@ class TestExtractThreadFromNarrative:
         result = self._extract(monkeypatch, payload)
         assert "sleep coach" not in result["position_summary"].lower()
 
-    def test_the_request_bypasses_the_bedrock_chokepoint(self, monkeypatch):
-        """PIN (P2): ADR-062 routes ALL Claude inference through
-        `bedrock_client.invoke()` so the ADR-063 budget guard can gate it. This
-        function still builds a raw api.anthropic.com request with an x-api-key
-        header, so it is neither budget-tiered nor IAM-authed. Pinned rather
-        than fixed — a migration is its own change."""
+    def test_the_request_is_a_plain_messages_body_under_the_thread_schema(self, monkeypatch):
+        """#4276 retired the old P2 pin: the call no longer builds an api.anthropic.com
+        Request with an x-api-key header (call_anthropic_raw always routed it to Bedrock and
+        ignored both). It sends a plain Messages body carrying THREAD_SCHEMA as
+        output_config.format, through ai.structured_json.call_json."""
         captured = {}
 
         def fake_call(req, timeout=30):
-            captured["url"] = req.full_url
-            captured["headers"] = {k.lower(): v for k, v in req.headers.items()}
+            captured["req"] = req
             return {"content": [{"type": "text", "text": "{}"}]}
 
         monkeypatch.setattr("common.retry_utils.call_anthropic_raw", fake_call)
         monkeypatch.setattr(ic, "read_coach_thread", lambda coach_id, limit=10: [])
         ic.extract_thread_from_narrative("sleep", "narrative", "fake-key")
-        assert captured["url"] == "https://api.anthropic.com/v1/messages"
-        assert captured["headers"]["x-api-key"] == "fake-key"
+        assert isinstance(captured["req"], dict) and "fake-key" not in json.dumps(captured["req"])
+        from intelligence.intelligence_json_schemas import THREAD_SCHEMA
+
+        assert captured["req"]["output_config"]["format"]["schema"] == THREAD_SCHEMA
 
     def test_the_narrative_sent_for_extraction_is_bounded(self, monkeypatch):
         """A 2,000-character cap keeps the parse call cheap and predictable."""
         captured = {}
 
         def fake_call(req, timeout=30):
-            captured["body"] = req.data.decode()
+            captured["body"] = req["messages"][0]["content"]
             return {"content": [{"type": "text", "text": "{}"}]}
 
         monkeypatch.setattr("common.retry_utils.call_anthropic_raw", fake_call)

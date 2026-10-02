@@ -204,6 +204,8 @@ class TestRunPanel:
         calls = []
 
         class _BR:
+            structured_output_config = staticmethod(lambda schema: {"format": {"type": "json_schema", "schema": schema}})
+
             @staticmethod
             def invoke(body, model_name=None):
                 calls.append(body)
@@ -215,11 +217,15 @@ class TestRunPanel:
         assert len(votes) == 3
         # panel temperature diversity — not 3 copies of one call
         assert len({c["temperature"] for c in calls}) == 3
+        # #4276: each panelist is asked under a schema whose guess enum IS the roster
+        assert calls[0]["output_config"]["format"]["schema"]["properties"]["guess"]["enum"] == ["sleep_coach", "training_coach"]
 
     def test_one_panelist_failure_shrinks_panel_not_crashes(self, monkeypatch):
         state = {"n": 0}
 
         class _BR:
+            structured_output_config = staticmethod(lambda schema: {"format": {"type": "json_schema", "schema": schema}})
+
             @staticmethod
             def invoke(body, model_name=None):
                 state["n"] += 1
@@ -233,6 +239,8 @@ class TestRunPanel:
 
     def test_all_malformed_returns_no_votes(self, monkeypatch):
         class _BR:
+            structured_output_config = staticmethod(lambda schema: {"format": {"type": "json_schema", "schema": schema}})
+
             @staticmethod
             def invoke(body, model_name=None):
                 return {"content": [{"type": "text", "text": "garbage"}]}

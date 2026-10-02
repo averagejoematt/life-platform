@@ -59,8 +59,20 @@ def captured(monkeypatch):
 
 
 def _run(monkeypatch, response: str):
-    monkeypatch.setattr(ai_calls, "call_anthropic", lambda *a, **k: response)
+    # #4276: the pass sends a raw Messages body through structured_json.call_json; the
+    # seam is the sender, and the reply is the wire shape Bedrock returns.
+    stop = "max_tokens" if response is TRUNCATED else "end_turn"
+    monkeypatch.setattr(ai_calls, "_ic3_send", lambda body: {"content": [{"type": "text", "text": response}], "stop_reason": stop})
     return ai_calls._run_analysis_pass({"sleep": 60}, "", "", "FAKE-KEY")
+
+
+def test_the_pass_requests_the_ic3_schema(monkeypatch, captured):
+    """#4276: the request carries output_config.format with the IC-3 schema."""
+    sent = []
+    monkeypatch.setattr(ai_calls, "_ic3_send", lambda body: sent.append(body) or {"content": [{"type": "text", "text": WELL_FORMED}]})
+    ai_calls._run_analysis_pass({"sleep": 60}, "", "", "FAKE-KEY")
+    assert sent[0]["output_config"]["format"]["schema"] == ai_calls._IC3_SCHEMA
+    assert sent[0]["max_tokens"] == 1500
 
 
 def test_a_truncated_response_returns_none_not_a_partial_dict(monkeypatch, captured):
@@ -113,7 +125,7 @@ def test_the_token_cap_clears_the_measured_truncation_ceiling():
     src = inspect.getsource(ai_calls._run_analysis_pass)
     import re
 
-    m = re.search(r"max_tokens=(\d+)", src)
+    m = re.search(r"max_tokens[\"']?\s*[=:]\s*(\d+)", src)
     assert m, "max_tokens literal not found in _run_analysis_pass"
     cap = int(m.group(1))
     assert cap * 4 > 2277 * 2, f"max_tokens={cap} leaves under 2x the longest measured truncation (2277 chars)"

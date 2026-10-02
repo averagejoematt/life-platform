@@ -209,11 +209,9 @@ def _build_script(week, title, chronicle_text, coach_id, coach_out, coach_name) 
     body = {"model": MODEL, "max_tokens": 1600, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=MODEL)
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-    try:
-        turns = json.loads(text)
-    except Exception as e:
-        logger.warning("wk%s: script JSON parse failed — %s", week, e)
+    turns = _extract_json(text)  # #4276: parsed in the one door (ai.structured_json)
+    if turns is None:
+        logger.warning("wk%s: script JSON parse failed", week)
         return []
     return turns if isinstance(turns, list) else []
 
@@ -1026,20 +1024,14 @@ def _today() -> str:
 
 
 def _extract_json(text: str):
-    """Tolerant parse: strip fences, then grab the first balanced JSON object/array
-    (LLMs sometimes append prose after the JSON). Returns None on failure."""
-    t = re.sub(r"^```(?:json)?|```$", "", (text or "").strip(), flags=re.M).strip()
-    try:
-        return json.loads(t)
-    except Exception:
-        pass
-    m = re.search(r"[\{\[].*[\}\]]", t, re.S)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except Exception:
-            return None
-    return None
+    """Tolerant parse in the one door (#4276): fences first (`parse_json_text`), then the first
+    JSON object/array span (`parse_json_span` — LLMs sometimes append prose after the JSON).
+    Returns None on failure. Schema-less on purpose: it is the `extract_json` dep every
+    panelcast text seam (repair, craft, the script builders) parses through."""
+    from ai.structured_json import parse_json_span, parse_json_text
+
+    parsed = parse_json_text(text)
+    return parse_json_span(parsed) if isinstance(parsed, str) else parsed
 
 
 def _gather_week(post: dict, state: dict) -> dict:

@@ -1229,6 +1229,13 @@ class TestGeneration:
         result = eng.generate_hypotheses([{"date": DAY}], [])
         assert result["hypotheses"][0]["hypothesis_id"] == "a"
 
+    def test_the_request_carries_the_hypotheses_schema(self, monkeypatch):
+        """#4276: the generation call is constrained to HYPOTHESES_SCHEMA (structured outputs)."""
+        fake = _anthropic('{"hypotheses": []}')
+        monkeypatch.setattr(retry_utils, "call_anthropic_raw", fake)
+        eng.generate_hypotheses([{"date": DAY}], [])
+        assert fake.calls[0]["output_config"]["format"]["schema"] == eng.HYPOTHESES_SCHEMA
+
     def test_unparseable_output_yields_nothing_rather_than_a_fabricated_hypothesis(self, monkeypatch):
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", _anthropic("I could not find any patterns."))
         assert eng.generate_hypotheses([{"date": DAY}], []) is None

@@ -53,7 +53,6 @@ without credentials.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import re
@@ -407,6 +406,34 @@ Extract as JSON:
   "causal_hints": [<cause->effect links the author EXPLICITLY asserts, each {{"cause": "...", "effect": "...", "quote": "<verbatim sentence from the answer>"}}. Max 3. Empty list if none — most answers have none>]
 }}"""
 
+# USER_PROMPT_TEMPLATE's shape, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. Every key required; a score that may be unclear is anyOf [number, null].
+_C_STRS = {"type": "array", "items": {"type": "string"}}
+_C_NUM = {"anyOf": [{"type": "number"}, {"type": "null"}]}
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "mood_score": _C_NUM,
+        "energy_score": _C_NUM,
+        "stress_score": _C_NUM,
+        "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative", "mixed"]},
+        "emotions": _C_STRS,
+        "themes": _C_STRS,
+        "avoidance_flags": _C_STRS,
+        "causal_hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"cause": {"type": "string"}, "effect": {"type": "string"}, "quote": {"type": "string"}},
+                "required": ["cause", "effect", "quote"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["mood_score", "energy_score", "stress_score", "sentiment", "emotions", "themes", "avoidance_flags", "causal_hints"],
+    "additionalProperties": False,
+}
+
 
 def build_prompt(text, channel, date, context):
     """The Anthropic Messages body (Haiku — structured task, ADR-049)."""
@@ -420,18 +447,16 @@ def build_prompt(text, channel, date, context):
     }
 
 
-def parse_extraction(result):
-    """Model response → dict (fence-tolerant), or None on unparseable output."""
-    text = "".join(b.get("text", "") for b in (result or {}).get("content", []) if b.get("type") == "text").strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    try:
-        return json.loads(text.strip())
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.error("[#1577] failed to parse extraction: %s — raw: %.300s", e, text)
-        return None
+def extract(call, body):
+    """One extraction through the one door (#4276): `call(body)` under EXTRACTION_SCHEMA,
+    parsed by ai.structured_json.call_json. A dict, or None on an unparseable reply."""
+    from ai.structured_json import call_json
+
+    parsed = call_json(call, body, schema=EXTRACTION_SCHEMA, label="conversation_enrichment")
+    if isinstance(parsed, dict):
+        return parsed
+    logger.error("[#1577] failed to parse extraction as a JSON object — raw: %.300s", parsed)
+    return None
 
 
 def _ground_causal_hints(hints, text):
@@ -658,7 +683,7 @@ def run(table=None, start_date=None, end_date=None, force=False, caller=None, co
         seen_hashes.add(h)
 
         try:
-            extraction = parse_extraction(call(build_prompt(text, channel, cand["date"], cand["context"])))
+            extraction = extract(call, build_prompt(text, channel, cand["date"], cand["context"]))
             if not extraction:
                 errors += 1
                 continue

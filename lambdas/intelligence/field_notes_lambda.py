@@ -17,8 +17,6 @@ v1.0.0 — 2026-03-31
 import json
 import logging
 import os
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -316,35 +314,38 @@ Requirements:
 - Tone should match the data: don't be affirming when the data is concerning"""
 
 
+_FN_NULLABLE = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+# #4276: build_prompt's JSON shape, constrained at the model — closed, all-required; the two
+# "optional — omit" sections are anyOf [string, null] (the writer below skips a falsy one).
+NOTES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ai_present": {"type": "string"},
+        "ai_cautionary": _FN_NULLABLE,
+        "ai_affirming": _FN_NULLABLE,
+        "ai_tone": {"type": "string", "enum": ["affirming", "cautionary", "urgent", "mixed"]},
+    },
+    "required": ["ai_present", "ai_cautionary", "ai_affirming", "ai_tone"],
+    "additionalProperties": False,
+}
+
+
 def _call_notes_model(prompt, api_key):
-    """One model call → parsed field-notes JSON (shared by first pass + regen)."""
-    req_body = json.dumps(
-        {
-            "model": AI_MODEL,
-            "max_tokens": 2000,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    )
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=req_body.encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-    )
+    """One model call → parsed field-notes JSON (shared by first pass + regen).
+
+    #4276: constrained to NOTES_SCHEMA and parsed in the one door (ai.structured_json);
+    a reply that is not a JSON object raises, as json.loads did. `api_key` is unused
+    (Bedrock is IAM-authed, ADR-062) and kept for the callers' signature."""
+    from ai.structured_json import call_json, decode_error
+
     # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
     from common.retry_utils import call_anthropic_raw
 
-    result = call_anthropic_raw(req, timeout=60)
-    text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text").strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-    return json.loads(text)
+    body = {"model": AI_MODEL, "max_tokens": 2000, "messages": [{"role": "user", "content": prompt}]}
+    parsed = call_json(lambda b: call_anthropic_raw(b, timeout=60), body, schema=NOTES_SCHEMA, label="field_notes")
+    if not isinstance(parsed, dict):
+        raise ValueError(decode_error(parsed))
+    return parsed
 
 
 _NOTE_FIELDS = ("ai_present", "ai_cautionary", "ai_affirming")
