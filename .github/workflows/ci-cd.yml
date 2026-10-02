@@ -460,11 +460,21 @@ jobs:
   # ("Deploy-critical test lane") and are enforced by the `deploy_critical`
   # pytest marker (pytest.ini). `not integration` keeps the one live-AWS
   # test in a marked file (test_lv6) out of this creds-free lane.
+  #
+  # #4252: runs BESIDE lint, not after it. `plan` needs BOTH lint and this job, so a red
+  # lint still blocks plan → deploy exactly as before; the chain just stops paying lint's
+  # ~2.5 min and this job's ~3.5 min back to back (plan used to start at ~+7 min).
+  # NOT skipped on a PR squash merge, deliberately (unlike black/ruff/mypy in ci-lint.yml):
+  # the required fast lane ran this selection on the PR's merge ref, but that ref equals
+  # the pushed tree only when the PR head already contained main. Measured over the 20
+  # squash merges ad9d77fff..3772618e8: 5 of 20 landed a tree equal to the PR head's. In the
+  # other 15 the base had moved, and the moved-base union is the one case this deploy
+  # gate exists to catch (#4304 + #4317). Same rejection as find_test_verdict_owner.py's.
   test-critical:
     name: Deploy-critical tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [reconcile, lint]   # #1173: reconcile listed to read build_sha
+    needs: [reconcile]   # #1173: reconcile listed to read build_sha. #4252: not lint (see above)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -568,7 +578,11 @@ jobs:
     # `test / Unit Tests = skipped` — present, never absent. test-owner never exits
     # non-zero; if its runner dies, this job is skipped and the run is red on
     # test-owner's failure (visible, not silent).
-    needs: [reconcile, lint, test-owner]   # #1173: reconcile listed to read build_sha
+    # #4252: no longer `needs: lint`. This job gates nothing but notify-failure (ADR-117),
+    # so waiting on lint bought only one thing — not spending runner time when lint is red
+    # — and cost every push lint's ~2.5 min at the head of the 20-min long pole. A red lint
+    # still reds the run and still blocks plan → deploy through `plan`'s own needs.
+    needs: [reconcile, test-owner]   # #1173: reconcile listed to read build_sha
     # #4252 box 5: a burst of pushes runs ONE in-flight full suite, not one per push. A run
     # that will actually test (a push with no owner, above) joins the shared group and
     # CANCELS the older in-flight suite: the newer run tests a tree that contains the older
