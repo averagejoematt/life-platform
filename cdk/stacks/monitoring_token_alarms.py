@@ -37,6 +37,62 @@ from aws_cdk import (
 GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 NB = cloudwatch.TreatMissingData.NOT_BREACHING
 
+# ── #4517: the two daily-Sum thresholds, DERIVED from his own variance (ADR-105 rule 4) ──
+#
+# What the alarm evaluates. A Sum over an 86400 s period is a ROLLING 24 h window, re-read
+# every minute, not a calendar day. A calendar-day sum understates it, so the sample below is the
+# statistic the alarm actually sees: each UTC day's MAXIMUM of the rolling-24 h Sum, computed from
+# 5-minute LifePlatform/AI datapoints (read-only get-metric-statistics, 2026-10-01). There is one
+# value per day, which keeps 288 overlapping windows a day from counting as independent samples.
+#
+# Why log-normal. Spend and tokens are positive and right-skewed. On this sample the skew is
+# +1.37 (dollars) and +0.98 (tokens) raw, and +0.17 and -0.06 after a log. A normal mean + 3 SD
+# on the raw days puts the bar BELOW the old one ($5.60 vs $6, 240,911 vs 250,000) and would
+# page more, not less. So the bar is mean + 3 SD in log space, which is the fitted 99.87th
+# percentile: an expected ~0.04 pages per 30 days on this distribution.
+#
+# Backtest (the #4517 PR body, 5-minute rolling replay). Replaying the old $6 / 250,000 against
+# this window reproduced both live 09-30 episodes to within 5 minutes (describe-alarm-history). At
+# the derived bars there are 0 crossings from 09-01 to 10-01 18:30Z.
+# tests/test_token_alarm_composite_2116.py pins each threshold to this derivation and keeps it above
+# the sample's own maximum, which is what "0 crossings over the window" means for this statistic.
+#
+# THE BASELINE IS MOVING. The last week (09-26..09-30) holds the five highest dollar days, and a bar
+# derived on 09-01..09-20 alone ($5.95) would still have paged on 09-30. Re-derive from a fresh
+# trailing 30 days when the week-over-week geometric mean moves more than 25 %, and on 2026-11-01
+# regardless (the docs/PROPORTIONALITY.md budget-governor row carries the trigger).
+AI_ALARM_DERIVATION_WINDOW = ("2026-09-01", "2026-09-30")
+AI_ALARM_DERIVATION_K_SD = 3
+AI_SPEND_DAILY_MAX_ROLLING_24H_USD = (
+    ("09-01", 3.37), ("09-02", 3.528), ("09-03", 3.247), ("09-04", 2.384), ("09-05", 2.297),
+    ("09-06", 2.561), ("09-07", 2.561), ("09-08", 2.052), ("09-09", 1.592), ("09-10", 1.385),
+    ("09-11", 1.369), ("09-12", 1.345), ("09-13", 2.501), ("09-14", 2.559), ("09-15", 2.163),
+    ("09-16", 3.013), ("09-17", 3.02), ("09-18", 2.143), ("09-19", 3.19), ("09-20", 3.113),
+    ("09-21", 2.9), ("09-22", 1.912), ("09-23", 2.88), ("09-24", 2.927), ("09-25", 2.609),
+    ("09-26", 3.554), ("09-27", 4.7), ("09-28", 5.272), ("09-29", 5.061), ("09-30", 6.862),
+)  # fmt: skip
+AI_TOKENS_DAILY_MAX_ROLLING_24H = (
+    ("09-01", 149182), ("09-02", 172360), ("09-03", 167518), ("09-04", 138153), ("09-05", 129008),
+    ("09-06", 119692), ("09-07", 119700), ("09-08", 102622), ("09-09", 87389), ("09-10", 77980),
+    ("09-11", 78507), ("09-12", 77670), ("09-13", 143801), ("09-14", 156481), ("09-15", 115674),
+    ("09-16", 132606), ("09-17", 128863), ("09-18", 117771), ("09-19", 157363), ("09-20", 180626),
+    ("09-21", 170365), ("09-22", 117125), ("09-23", 139005), ("09-24", 138587), ("09-25", 132660),
+    ("09-26", 150642), ("09-27", 195597), ("09-28", 212378), ("09-29", 200604), ("09-30", 282563),
+)  # fmt: skip
+
+
+def lognormal_upper_bound(sample, k_sd=AI_ALARM_DERIVATION_K_SD) -> float:
+    """exp(mean(ln x) + k·SD(ln x)) over the (label, value) pairs: the personal-variance bar."""
+    import math
+    import statistics
+
+    logs = [math.log(v) for _, v in sample]
+    return math.exp(statistics.mean(logs) + k_sd * statistics.stdev(logs))
+
+
+AI_DAILY_SPEND_THRESHOLD_USD = round(lognormal_upper_bound(AI_SPEND_DAILY_MAX_ROLLING_24H_USD), 2)  # 8.72 (n=30)
+AI_TOKENS_PLATFORM_DAILY_THRESHOLD = int(round(lognormal_upper_bound(AI_TOKENS_DAILY_MAX_ROLLING_24H), -3))  # 337,000 (n=30)
+
 
 def add_token_alarms(scope, topic, digest) -> None:
     """Declare the AI token/spend alarms on `scope`.
@@ -115,7 +171,10 @@ def add_token_alarms(scope, topic, digest) -> None:
         to_digest=True,
     )
 
-    # Platform-level total (no dims). 2026-09-04 (#3474): 150000 → 250000, re-derived (ADR-105). Set in 2026-06
+    # Platform-level total (no dims). 2026-10-01 (#4517): 250000 → AI_TOKENS_PLATFORM_DAILY_THRESHOLD
+    # (337,000), derived at the top of this module on the ROLLING-24h statistic. It fired twice on
+    # 09-30, and the calendar-day estimators below never saw the rolling peak.
+    # 2026-09-04 (#3474): 150000 → 250000, re-derived (ADR-105). Set in 2026-06
     # against a ~59k/day baseline peaking ~121k, 150000 had become the platform's
     # 75th PERCENTILE and fired on the ordinary working day. n=31 daily Sums to
     # 2026-09-02: median 87,046 · Q3 145,161 · max 492,314, every breach on a
@@ -152,7 +211,7 @@ def add_token_alarms(scope, topic, digest) -> None:
         alarm_name="ai-tokens-platform-daily-total",
         metric=ai_tokens_platform_metric,
         evaluation_periods=1,
-        threshold=250000,
+        threshold=AI_TOKENS_PLATFORM_DAILY_THRESHOLD,
         comparison_operator=GTE,
         treat_missing_data=NB,
     )
@@ -208,6 +267,9 @@ def add_token_alarms(scope, topic, digest) -> None:
     # (not digest): a cost runaway should page promptly, not batch overnight.
     # Future: swap to a CloudWatch anomaly-detection band once this metric
     # has ~2 weeks of history to train on.
+    # 2026-10-01 (#4517): $6.0 → AI_DAILY_SPEND_THRESHOLD_USD ($8.72), derived at the top of this
+    # module. The "~$1.3/day normal" above is history. The measured 09-01..09-30 rolling-24h daily
+    # max has a geometric mean of $2.73, and $6 paged twice on the ordinary 09-30 (brief + AI-vision QA + dry runs).
     #
     # #3505: a daily SUM, so a reset day's regen burst adds to it exactly like a
     # runaway would — and unlike the token alarms this one is routed URGENT, to a
@@ -232,7 +294,7 @@ def add_token_alarms(scope, topic, digest) -> None:
             statistic="Sum",
         ),
         evaluation_periods=1,
-        threshold=6.0,
+        threshold=AI_DAILY_SPEND_THRESHOLD_USD,
         comparison_operator=GTE,
         treat_missing_data=NB,
     )
