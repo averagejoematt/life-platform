@@ -20,9 +20,9 @@
 # scheduled READ of the LIVE surface, not a per-push check of the repo). Mirrors
 # config-drift.yml / hae-webhook-ingress-drift.yml: scheduled, blocking, narrow,
 # read-only against AWS (one S3 GetObject for the content-filter vocabulary
-# fallback — already granted to github-actions-deploy-role, see
-# infra/iam/github-actions-deploy-role.permissions.json's S3DeployArtifacts
-# statement) plus GET-only HTTP against the public site. No new IAM grant.
+# fallback — granted to github-actions-readonly-role by
+# infra/iam/github-actions-readonly-role.permissions.json's S3ConfigRead
+# statement, #4257) plus GET-only HTTP against the public site.
 #
 # Fail-closed by construction: `scan_endpoints()` resolves the blocked-vice
 # vocabulary with `require=True` (lambdas/privacy/content_filter_channel.py),
@@ -75,12 +75,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # setup-python + configure-aws-credentials via the shared composite (#1655).
-      # deploy-role, not remediation-role: this reads config/content_filter.json
-      # from S3 (S3DeployArtifacts already grants s3:GetObject on the whole
-      # bucket) — no new IAM grant.
+      # readonly-role (#4257; the deploy role until then): this only reads
+      # config/content_filter.json from S3 (S3ConfigRead, config/* objects).
       - uses: ./.github/actions/setup-ci
         with:
-          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       # setup-ci installs no packages. pii_surface_guard.py's --endpoints arm pulls

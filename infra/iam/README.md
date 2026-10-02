@@ -13,7 +13,9 @@ hand-managed AWS identities that gate all automated access to the cloud:
 
 | Identity | What it gates | Assumed by |
 | --- | --- | --- |
-| `github-actions-deploy-role` | ALL CI/CD deploys (lambda, layer, CDK, site, smoke, visual-QA, rollback, notify) | every job in `.github/workflows/ci-cd.yml` |
+| `github-actions-deploy-role` | every CI/CD WRITE: Lambda code, the additive-IAM CDK deploy, the site sync, both rollbacks | only jobs bound to a GitHub environment (#4257): `ci-cd.yml` `deploy-iam` (`production`, the one human click), `deploy` + `rollback-on-smoke-failure` and `site-deploy.yml` `deploy-site` + `rollback-site-on-failure` (`ungated-deploy`, no reviewers, main-only branch policy) |
+| `github-actions-readonly-role` | the observe-only CI jobs: describe/list/get reads, `config/` object reads, the two smoke invokes, the digest publish, the CDK **lookup** role (#4257) | `ci-cd.yml` `plan`, `smoke-test`, `post-deploy-checks`, `notify-failure`; `site-deploy.yml` `notify-deploy-failure`; `config-drift.yml`; `pii-endpoint-sweep.yml` |
+| `github-actions-diagnosis-role` | Bedrock vision-QA + the qa_archive writes (#687) | the visual-QA steps of `ci-cd.yml`, `site-deploy.yml`, `visual-qa.yml`, `webkit-mobile-qa.yml` |
 | `github-actions-remediation-role` | the self-healing agent's read-only diagnosis + Bedrock + scoped audit-log writes | `.github/workflows/remediation-agent.yml` |
 | `github-actions-golden-eval-role` | the eval harness's advisory Haiku judge + `LifePlatform/GoldenBrief` metric emit + read-only `EVALRET#*` harvest reads (#812) | `.github/workflows/golden-brief-eval.yml`, `.github/workflows/eval-harvest.yml` |
 | `token.actions.githubusercontent.com` OIDC provider | the GitHub → AWS identity federation the roles trust | AWS STS `AssumeRoleWithWebIdentity` |
@@ -30,6 +32,8 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 - `github-oidc-provider.json` — the OIDC provider (URL, client-id list, thumbprints)
 - `github-actions-deploy-role.trust.json` — deploy role assume-role (trust) policy
 - `github-actions-deploy-role.permissions.json` — deploy role inline policy `life-platform-cicd-permissions`
+- `github-actions-readonly-role.trust.json` / `.permissions.json` — the read-only role (#4257), inline
+  policy `readonly-permissions` — **staged, not yet live**: see the #4257 PENDING APPLY section below
 - `github-actions-remediation-role.trust.json` — remediation role assume-role (trust) policy
 - `github-actions-remediation-role.permissions.json` — remediation role inline policy `remediation-permissions`
 
@@ -39,6 +43,87 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 > hand-maintained twin, and running the remediation one put a stale document (15 of 17 statements,
 > any-ref trust) live for ≈6 minutes — `docs/INCIDENT_LOG.md`. `tests/test_iam_twin_free_3336.py`
 > fails the suite if an inline policy document for any role listed here reappears under `deploy/`.
+
+### PENDING APPLY — the deploy role trusts only its environments; a read-only role for everything else (#4257, 2026-10-01)
+
+**Why.** Until #4257 the deploy role trusted `ref:refs/heads/main` as well as
+`environment:production`, so EVERY main-branch job held its 15 statements / 48 actions —
+the nightly `config-drift` and `pii-endpoint-sweep` crons, `plan`, `smoke-test`,
+`post-deploy-checks` and both failure notices included. `plan` was worse than it looked:
+its change-set `cdk diff` assumed the CDK bootstrap **deploy** and **file-publishing**
+roles (CloudTrail 2026-09-30→10-01: 96 + 384 assumes, 48 of the lookup role), i.e. a
+"plan" that could have executed a change set. CloudTrail over 2026-09-24→10-01 shows the
+deploy role assumed 650× through the bare main subject and 59× through `production`.
+
+**What changes.**
+
+| | before | after |
+|---|---|---|
+| `github-actions-deploy-role` trust | `ref:refs/heads/main` + `environment:production` | `environment:production` + `environment:ungated-deploy` — nothing else (`verify_oidc_iam.py` names any other subject as `TRUST-SHAPE`) |
+| who holds it | every main-branch job that asked | the five jobs that write (table above), each bound to an environment |
+| `github-actions-readonly-role` | — | new; main-only trust; 17 statements, every one a read except two scoped invokes (`life-platform-qa-smoke`, `life-platform-canary`) and `sns:Publish` on the digest topic; `sts:AssumeRole` on the CDK **lookup** role only |
+| `plan`'s diff | change set (deploy + file-publishing roles) | `cdk diff --method=template` (lookup role, else the role's own CloudFormation reads) |
+
+What the readonly role can NOT do, checked with `aws iam simulate-custom-policy` (read-only)
+on 2026-10-01: update or publish a Lambda, invoke any other function, put any S3 object, read
+`raw/` (objects are `config/*` only), read a secret's value, decrypt with the table CMK,
+`Query` the table, invalidate CloudFront, publish to the immediate alerts topic, or assume
+the CDK deploy / file-publishing / cfn-exec roles — 17 negative controls, all `implicitDeny`;
+59 required (action, resource) pairs across the seven jobs, all `allowed`. It also GAINS
+`s3:GetBucketPolicy`, which the deploy role never held: `config-drift`'s bucket-policy leg
+read AccessDenied on every nightly run until now.
+
+**Apply — the OWNER, in this order.** Steps 1–3 go BEFORE the merge: the merged workflows
+assume the readonly role and present `environment:ungated-deploy`, so both must be live
+first. Step 3 is a TRANSITIONAL trust (the final file + the old main subject) so a run
+still on pre-merge workflow files keeps deploying; step 5 removes it.
+
+```bash
+# 1. the environment — no reviewers, deployable from main ONLY. This branch policy IS the
+#    boundary now: an environment created implicitly by a workflow reference has none.
+gh api -X PUT repos/averagejoematt/life-platform/environments/ungated-deploy \
+  --input - <<<'{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
+gh api -X POST repos/averagejoematt/life-platform/environments/ungated-deploy/deployment-branch-policies \
+  -f name=main -f type=branch
+gh api repos/averagejoematt/life-platform/environments/ungated-deploy/deployment-branch-policies \
+  --jq '[.branch_policies[].name]'                              # expect ["main"]
+
+# 2. the readonly role, from the checked-in documents verbatim
+aws iam create-role --role-name github-actions-readonly-role \
+  --assume-role-policy-document file://infra/iam/github-actions-readonly-role.trust.json \
+  --description "GitHub Actions OIDC read-only role for observe-only CI jobs (#4257)" \
+  --max-session-duration 3600
+aws iam put-role-policy --role-name github-actions-readonly-role --policy-name readonly-permissions \
+  --policy-document file://infra/iam/github-actions-readonly-role.permissions.json
+
+# 3. transitional deploy-role trust (snapshot first — it is the rollback)
+aws iam get-role --role-name github-actions-deploy-role \
+  --query Role.AssumeRolePolicyDocument > /tmp/deploy-trust.rollback-4257.json
+jq '.Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] += ["repo:averagejoematt/life-platform:ref:refs/heads/main"]' \
+  infra/iam/github-actions-deploy-role.trust.json > /tmp/deploy-trust.transition-4257.json
+aws iam update-assume-role-policy --role-name github-actions-deploy-role \
+  --policy-document file:///tmp/deploy-trust.transition-4257.json
+
+# 4. merge; watch the merge sha's CI/CD run go green (plan/smoke/post-deploy on the
+#    readonly role, deploy bound to ungated-deploy), and no run left in flight on an
+#    older sha.
+
+# 5. the final narrowing — applies the checked-in trust + permissions verbatim and ends
+#    with verify_oidc_iam.py --strict (expect CLEAN, readonly role included)
+bash deploy/setup_github_oidc.sh
+```
+
+**Rollback.** `aws iam update-assume-role-policy --role-name github-actions-deploy-role
+--policy-document file:///tmp/deploy-trust.rollback-4257.json`, then `git revert` the PR.
+The readonly role can stay (nothing assumes it after the revert) or be deleted.
+
+**Live proof.** (a) `aws iam get-role --role-name github-actions-deploy-role --query
+Role.AssumeRolePolicyDocument` lists exactly the two `environment:` subjects;
+(b) `python3 deploy/verify_oidc_iam.py --strict` → CLEAN; (c) the next CI/CD run, the next
+`site-deploy` run, and the next `config-drift` and `pii-endpoint-sweep` runs all succeed —
+`config-drift` for the first time since its bucket-policy leg was added;
+(d) CloudTrail `AssumeRoleWithWebIdentity` for `github-actions-deploy-role` shows only
+`environment:` subjects after step 5.
 
 ### PENDING APPLY — the remediation role's narrowed grants (#3562, 2026-09-05)
 
