@@ -1071,7 +1071,9 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     """
     return _operational_base(
         ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
-        needs_s3_read=["inbound-email/*", "generated/qa_archive/text/*"],
+        # #4546: the SES receipt rule (insight-capture) writes raw/inbound_email/ — the old "inbound-email/*" grant matched
+        # nothing, so every reply since 2026-02-27 died on GetObject. Both kept until the old prefix is proven empty.
+        needs_s3_read=["raw/inbound_email/*", "inbound-email/*", "generated/qa_archive/text/*"],
         needs_s3_write=["dead-letter-archive/insight-email-parser/*"],
         needs_dlq=True,
         extra_statements=[

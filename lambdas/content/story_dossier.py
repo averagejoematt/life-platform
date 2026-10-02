@@ -609,6 +609,12 @@ def _season_to_date(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _owner_voice(table, wk: Dict[str, Any]) -> Dict[str, Any]:
+    from content import story_questions
+
+    return story_questions.owner_voice(table, f"USER#{USER}#SOURCE#insights", int(wk["week"]))
+
+
 def _body_composition(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     days = _days(table, "withings", GENESIS, wk["end"])
     scans = [
@@ -704,6 +710,8 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "day_grades": _grades(table, wk),
         "steps": _steps(table, wk),
         "season_to_date": _season_to_date(table, wk),
+        # his own words, when he answered the week's questions by email (#4546); empty is a normal week
+        "owner_voice": _owner_voice(table, wk),
         "body_composition": _body_composition(table, wk),
     }
     nye = ["macrofactor"] if nutrition["not_yet_exported_dates"] else []
