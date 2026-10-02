@@ -3039,3 +3039,24 @@ CI_PROOFS["ci::config-drift.yml::drift::7"] = {
     ),
     "proved_on": "2026-09-30",
 }
+# #4472 box 2, the sha basis (2026-10-02): the same step now judges each live bundle's build_info.git_sha by
+# ancestry (deploy/bundle_ancestry.classify) and keeps LastModified only as the labelled fallback. Re-proved.
+CI_PROOFS["ci::config-drift.yml::drift::7"]["mutation"] += (
+    " SHA BASIS (2026-10-02): M3 (test) stale_by_build_sha()'s fresh set widened to include FAST_FORWARD (a live build "
+    "behind the owed commit read as fresh); M4 (test) the ranged reader's tail request replaced by `bytes=0-`; M5 (test) "
+    "the `judged:` coverage line renamed; each in the real tracked file (md5 f035b74c… before and after). M6 (LIVE, "
+    "read-only): main(['--stale-lambdas']) with collect_deployed_shas() wrapped to replace weekly-digest's live sha by "
+    "its owed commit's parent."
+)
+CI_PROOFS["ci::config-drift.yml::drift::7"]["observed"] += (
+    " 2026-10-02, baseline 47 passed. M3: 2 failed (test_stale_by_build_sha_replays_a_superseded_runs_undeployed_merge, "
+    "test_stale_lambdas_mode_reads_the_sha_basis_and_prints_its_coverage). M4: 1 failed "
+    "(test_build_sha_is_read_from_the_live_bundle_over_ranged_gets). M5: 1 failed. RESTORED: 47 passed. M6 04:20Z: exit 1 "
+    "naming weekly-digest — live 02:39Z, owes 02:19Z (LastModified alone reads it fresh), 'live build 8891569e does not "
+    "contain 612fe47d (behind)'. UNMUTATED live 04:20Z: exit 0, git_sha basis for 104 of 104, judged 104 of 104."
+)
+CI_PROOFS["ci::config-drift.yml::drift::7"]["scope"] += (
+    " Since 2026-10-02 the verdict is commit ancestry, not time: a late deploy of an older tree is caught, and a laptop "
+    "deploy from a lane branch main has not absorbed reads stale (diverged); a bundle whose sha this checkout cannot "
+    "resolve takes the LastModified basis, named in the log."
+)

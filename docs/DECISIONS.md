@@ -1269,6 +1269,10 @@ Today nothing clears all four. The condition that would most plausibly change th
 
 ---
 
+**CLAUDE.md digest, moved here (2026-10-01, #4271 boxes 1–3).** CLAUDE.md's prompt-caching paragraph, before it shrank to the rule + a pointer at `lambdas/ai/prompt_cache.py`. Verbatim:
+
+> **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). **A `cache_control` block is NOT evidence of caching**: below the model's minimum cacheable prefix the marker is silently ignored — no error, `cache_read_input_tokens` just stays 0 (Haiku 4.5's floor is 4,096 tok, 4x Sonnet's). Read the floor + the per-caller engaged/declined record from `lambdas/ai/prompt_cache.py`, and the live proof from the `PromptCacheNoOp` metric — never from the presence of the wrapper. Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049 (+ its 2026-08-27 #3085 amendment).
+
 ### ADR-050 — TD-19: UTC as the platform-wide DDB partition convention
 
 **Status:** Active (Phase 2 fix-forward shipped 2026-05-03 v6.8.9; Phase 3 historical migration deferred)
@@ -1616,6 +1620,7 @@ Other blast-radius facts the original estimate didn't itemize:
   `raw/{source}/...` with **no user segment at all**, and hevy is flat UUID-keyed.
   Multi-tenancy needs every source's `raw_layout` facet re-derived, not one path-prefix change.
   *(2026-09-29, #4271 — the fuller layout history, moved from CLAUDE.md; "three-generation" above is an under-count, per #3570's live drift check. Verbatim:)* 2. **Store**: Raw JSON in S3 — the raw/ zone is fractured well past "three-generation" (X-9/#498, under-counted until #3570's live drift check): most sources write `raw/matthew/{source}/{YYYY}/{MM}/{filename}`, a WIDER no-user-segment legacy family than "todoist/weather" alone writes `raw/{source}/…` (todoist/weather's CURRENT-and-only layout, plus a live-confirmed bulk-import predecessor generation on cgm_readings/eightsleep/garmin/macrofactor/state_of_mind/strava/whoop/withings/workouts, every object dated 2026-02-21..03-08), hevy is flat UUID-keyed (`raw/hevy/{workout_id}.json`), apple_health's full-history gz export exists in two real generations (`raw/apple_health/`, `raw/matthew/apple_health/`) PLUS an accidental recursive re-copy of the whole `raw/matthew/` tree under `raw/matthew/matthew/**` (9,634 objects, all 2026-03-08 — an accident, not a fifth generation), and `raw/{,matthew/}inbound_email/` carries no SOURCE_REGISTRY entry (deliberately — RETIRED with a dated reason in `RETIRED_SOURCES`, #3669; `raw/matthew/labs/` DID carry none until #3669 gave labs a registry entry that owns the prefix, and the asymmetry that hid it is worth keeping in mind: **a `raw_layout` facet is not a registry entry**, so a source can satisfy the raw-zone drift check and still be invisible to every freshness and staleness check).
+  *(2026-10-01, #4271 boxes 1–3 — the 2026-09-30 Store paragraph, moved from CLAUDE.md before it shrank to the rule. Verbatim:)* 2. **Store**: Raw JSON in S3 — the raw/ zone is fractured (X-9/#498; the generation-by-generation history moved to the raw-layout note under `docs/DECISIONS.md`'s multi-tenancy blast-radius list, #4271). **A `raw_layout` facet is not a registry entry**, so a source can satisfy the raw-zone drift check and still be invisible to every freshness and staleness check (`raw/{,matthew/}inbound_email/` is RETIRED in `RETIRED_SOURCES`, #3669). **The leaf filename ALSO varies (#1256): framework/API sources write `YYYY-MM-DD.json` (the SIMP-2 migration flipped the old `DD.json` form to the full date mid-2026 — pre-2026 objects on the flipped sources todoist/garmin are still `DD.json`), while the HAE-webhook sources (cgm/blood_pressure/state_of_mind) write `DD.json`. Each source's actual layout — prefix, scheme, AND filename — is the `raw_layout` facet in `lambdas/ingestion/source_registry.py`; read it, don't construct keys (no mass-move — raw/* is delete-protected). `scripts/check_raw_zone_drift.py` (read-only, run quarterly) asserts every live top-level prefix under `raw/` and `raw/matthew/` is named by a facet — it is the number, this line is a pointer.** Normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 - **The public product is single-persona by construction** — the site, chronicle, and
   coaching narratives are written for "Matthew," not a generic user record; there is no
   tenant-scoping layer at the product surface, only (partially) at the data layer.
@@ -1808,6 +1813,10 @@ Hevy is a workout-logging app Matthew uses alongside MacroFactor. Previously wor
 - The MacroFactor unofficial-API client (WS-2) is **NOT included** in this ADR — see ADR-061.
 
 ---
+
+**CLAUDE.md digest, moved here (2026-10-01, #4271 boxes 1–3).** CLAUDE.md's Ingest paragraph carried this removal note; the boot file now names only the rule. Verbatim:
+
+> The standing `hevy-webhook` FunctionURL (parked since Hevy doesn't publish webhooks) was removed 2026-07-06 (#756, R21 kill list #8) — its handler source stays in git history for revival if Hevy ever ships webhooks.
 
 ## ADR-061: MacroFactor Unofficial-API Puller as Tier 1 Food-Level Nutrition Path
 
@@ -2760,6 +2769,10 @@ Live; the 2026-06-02 QA sweep verified all 36 routes render with 0 HTTP/JS/CSP e
 
 ---
 
+**CLAUDE.md digest, moved here (2026-10-01, #4271 boxes 1–3).** CLAUDE.md's Public Website paragraph, before it shrank to the rules (the door list is `docs/SITE_MAP_AND_INTENT.md`). Verbatim:
+
+> `averagejoematt.com` is a static site (S3 + CloudFront `E3S424OXQZ8NBE`) over the unchanged engine — **Home + 5 doors** (v5 IA): **the cockpit** (`/cockpit/`, live data) · **the data** (`/data/`, the evidence archive — old `/evidence/*` slugs 301) · **the coaching** · **the protocols** · **the story** (`/story/`, the writing hub). Home (`/`) is a cinematic landing. The old site is preserved verbatim at `/legacy` (private rollback, no UI links); old URLs 301 via the CloudFront `v4-redirects` function (regenerated from `redirects.map` by `scripts/v4_migration_inventory.py`). No framework/deps: `tokens.css` design system + vanilla-JS ES modules, self-hosted fonts, inline-SVG charts. Build helpers: `scripts/v4_build_{evidence,dispatches,rss}.py`. Deploy: **automatic on merge** — a push to `main` touching `site/**` runs `.github/workflows/site-deploy.yml` (#750: canonical sync + fonts sync + smoke/visual-QA gates + `rollback_site.sh` auto-rollback; no approval gate). Attended path: `bash deploy/sync_site_to_s3.sh` (content-hashed, self-invalidates; also regenerates `rss.xml`) + explicit `aws s3 sync site/assets/fonts/`. **Never link `/legacy` from the UI; engine/`/api/*` contracts are read-only from the front-end.**
+
 ## ADR-072: Experiment restart zeroes the accountability ledger
 
 **Date:** 2026-06-02
@@ -2871,6 +2884,10 @@ The two layers are complementary and earned their keep immediately — the inter
 **Verified:** 2026-06-05 (ADR-076 — visual + AI-vision test harness; advisory in CI)
 
 ---
+
+**CLAUDE.md digest, moved here (2026-10-01, #4271 boxes 1–3).** CLAUDE.md's Site QA paragraph; the gate and rollback rules are maintained in `docs/CONVENTIONS.md` §4b. Verbatim:
+
+> **Site QA (3 complementary layers, ADR-076):** (1) `deploy/smoke_test_site.sh` — HTTP/content smoke (v4 pages 200, legacy URLs 301, API freshness); (2) `lambdas/operational/qa_smoke_lambda.py` — data/output health (DDB freshness, score sanity), nightly; (3) **`tests/visual_qa.py`** — Playwright browser sweep (inline-SVG renders, the cockpit pillar interaction, responsive overflow) **+ `tests/visual_ai_qa.py`** — Claude/Bedrock semantic vision QA of each screenshot (`--ai-qa`; Haiku, robust to daily data changes where pixel-diff false-positives). The harness runs post-deploy as the `visual-qa` CI job (**gating** since 2026-06-05 — a deterministic FAIL or AI "high" verdict blocks the pipeline; site-deploy's `rollback-site-on-failure` **needs** it and fires on its failure, and since #3352/#3395/#3652 the rollback first asks `tests/visual_qa_verdict.py` whether the failing surface is `site/**`-reachable — an `api`, `deploy-script` or `ai-unevaluated` verdict DECLINES the revert by name). Run locally: `python3 tests/visual_qa.py --screenshot --ai-qa` (needs `playwright install chromium`). The `/qa` skill wraps these.
 
 ## ADR-077: Phase taxonomy — one classification for experiment-restart semantics
 
@@ -4315,6 +4332,18 @@ cross-referenced against `s3://matthew-life-platform/remediation-log/automerge/`
 - The schedule: the cron was moved from `45 14` by #3499 so the sweep runs AFTER the 16:20Z AI canary it reads, not 95 min before it (#3499).
 - **Rent (measured, ADR-105):** `LifePlatform/AI::EstimatedCostUSD{LambdaFunction=remediation-agent}` summed **$1.60 over 2026-08-24→30 (n=9 emitting runs of 11; 3 scheduled)** ≈ $0.18/run — see the row in `docs/PROPORTIONALITY.md`.
 
+**CLAUDE.md digest, moved here (2026-10-01, #4271 boxes 1–3).** CLAUDE.md's remediation section as it stood on 2026-09-30, before it shrank to one rules paragraph. Verbatim:
+
+> Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~10:35 PT Mon/Wed/Fri — cron `35 17 * * 1,3,5` — after the 16:20Z AI canary it reads (#3499); urgent alarms still trigger it on-demand via `repository_dispatch`) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — opens PRs for what it can fix, reports needs-human items in one curated email. **It merges nothing, in any mode.**
+>
+> **Auth:** AWS OIDC → `github-actions-remediation-role` (Bedrock + read-only diagnosis + scoped audit-log writes, NO deploy/IAM mutate). Model: Haiku-primary on Bedrock (Sonnet for escalation) — no Anthropic key.
+>
+> **Kill-switch:** SSM `/life-platform/remediation-mode` = `off | shadow`. Tier-3 budget also no-ops the run. **`auto` is a retired value** (owner decision on #2833, 2026-08-29; ADR-129 amendment 2026-08-30); the why and what retired with it is that amendment (#4271). A stale `auto` in SSM is coerced to `shadow` by `agent.py::gate()` and surfaced as a needs-human line — it is never honoured. There is no re-promotion path; reopening one is a new ADR, not an SSM flip.
+>
+> **What the agent still does:** classifies each signal per `docs/REMEDIATION_TAXONOMY.md` (A = safe-class template, B = fix-via-PR, C = needs-human, D = stale). Buckets A and B both land as PRs a human merges — the `auto-fix-safe` label is a triage class, not a grant; IAM (`cdk/stacks/role_policies*`) stays Bucket B (#2611). `gh pr merge` is in the agent's `disallowed_tools` and the workflow has no merge step (`tests/test_remediation_agent.py` + the public-claims registry hold that shape). **CI's production approval gate is untouched** — a merged PR is never a deployed one.
+>
+> **Rent:** the remediation row in `docs/PROPORTIONALITY.md` (the measured history is in ADR-129, #4271). **Audit log:** every run → `s3://matthew-life-platform/remediation-log/YYYY/MM/DD/HHMMSS.json`; the `automerge/` sub-prefix is history (it holds zero objects).
+
 ## ADR-130: GitHub Pages disabled — a second, unmanaged public surface redundant with the canonical CloudFront site (E8/#752)
 
 **Date:** 2026-07-06 · **Status:** Accepted · **Story:** #752 (R21 definitive review, kill list / perimeter close-out)
@@ -4476,6 +4505,18 @@ worked: u=905  T=1355 engaged_at_bar=1355 -> surge OFF ceiling $215
 > **$215/month hard ceiling** (ADR-063; base $75→$85 2026-07-08, →$150 2026-08-18 #2836, →$215 by the ADR-133 amendment 2026-08-28 #2801 — the permanent September base, derived from measured steady state $5.74/day n=25 ≈ $172/mo, NOT from a projection, and chosen as the lowest base that never reaches tier 2 across three modelled September burn rates; **floats to $252 in reader-traffic surge mode** — ≥900 trailing-7d uniques, ADR-133). **August 2026 ONLY, a dated window set the base to $200 / surge $235** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16 #2734, `_TEMP_CEILING_WINDOW`) — it **auto-reverts 2026-09-01 with no deploy or manual step**, and because the new base is higher, that revert is now a RAISE rather than the cliff it used to be; the AWS Budgets backstop moves WITH the permanent base (#2801 — it was pinned low only while the raises were temporary; a permanent base above the backstop would page every month by construction).
 
 <!-- drift-ok: the $200/$235 pair in this quoted digest is the August-2026 window's own value, now history; the CURRENT base is $215/$252 -->
+
+**CLAUDE.md digest, moved here (2026-10-01, #4271 boxes 1–3).** CLAUDE.md's budget block as it stood on 2026-09-30, before it shrank to the ceiling + the tier rules. Verbatim:
+
+> **Single chokepoint:** all Claude calls route through `lambdas/bedrock_client.invoke()` (ADR-062). Auth is IAM (`bedrock:InvokeModel` + `InvokeModelWithResponseStream`), no API key. Cross-region inference profiles required: `us.anthropic.claude-sonnet-4-6` (narrative) and `us.anthropic.claude-haiku-4-5-20251001-v1:0` (structured). Prompt caching uses `cache_control` blocks on the system message (~2048+ tokens to engage).
+>
+> **$215/month hard ceiling** (ADR-063/ADR-133 — how the base got here is ADR-133's amendment trail, #4271); **floats to $252 in reader-traffic surge mode** — ≥900 trailing-7d uniques, ADR-133; the AWS Budgets backstop moves WITH the permanent base (#2801). **The backstop amount is resolved at CDK synth time by parsing the governor source, so `cdk deploy LifePlatformCore` is required even when no CDK file changed**: one AWS budget covers ALL spend (`life-platform-monthly-75` — name is historical, deliberately not renamed). `cost_governor_lambda` (every 8h) projects month-end spend (non-AI from Cost Explorer + Bedrock token usage × current price) and writes a tier 0–3 to SSM `/life-platform/budget-tier`; tier bands are fixed fractions (≈73%/87%/97%) of the effective ceiling. `lambdas/ai/budget_guard.py` (bundled module) gates AI features by tier (audience-ordered per ADR-125):
+> - **0** (<73% of ceiling): all AI runs normally.
+> - **1** (73–87%): internal/dev AI paused (ensemble, chronicle editor, coherence-semantic).
+> - **2** (87–97%): + reader narratives paused (coach commentary, State of Matthew, chronicle).
+> - **3** (≥97%): hard cutoff — website AI returns "paused", daily brief skips AI, and the two AI **CI gates** (`reader_truth_qa`, `visual_ai_qa`) pause here and ONLY here (ADR-125 amendment 2026-08-03, #1927 — they were in band 1 and consequently dark 26 of 30 days while still reporting green); `bedrock_client.invoke()` raises `BudgetExceeded`.
+>
+> Daily brief is "protect longest" by design. Manual reset for testing: `aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`.
 
 ## ADR-134: Character math v2 — XP zero-point at "a decent day", dark stretches hit the headline, uninstrumented pillars neither earn nor drag (epic #956)
 
