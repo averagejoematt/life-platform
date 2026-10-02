@@ -20,7 +20,7 @@
     "added": "2026-10-02",
     "cause": "rolling-24h output-token Sum above the 250,000 threshold on a heavy attended day",
     "cause_observed": "2026-10-02",
-    "citation": "#4517 — the episode beginning 2026-10-01T20:00:34Z (13:00 PT) is the same class #4517 re-derives: 250,000 sits inside the measured daily distribution. The 10-01 attended day ran the 17:00Z brief, two dry-run briefs and podcasts, and AI-vision visual QA, all with the budget tier at 0. PR #4528 re-derives the threshold to 337,000 (log-normal mean+3 SD of the daily max of the rolling 24h Sum, n=30; 30-day backtest: 0 episodes). It is held for the owner's `cdk_deploy.sh LifePlatformMonitoring`. The 09-04 entry (the September flap, pruned here) predates this episode."
+    "citation": "#4517 — the episode beginning 2026-10-01T20:00:34Z (13:00 PT) is the class #4517 re-derives: 250,000 sat inside the measured daily distribution. The re-derived bar (337,000; log-normal mean+3 SD, n=30, 30-day backtest 0 episodes) was merged and deployed to LifePlatformMonitoring at 2026-10-02T14:13Z; the lit state is the OLD bar's transition (255,273 >= 250,000) awaiting re-evaluation under the new one. #4517 stays open for its 7-day no-flap proof (due on/after 2026-10-09)."
   },
   "ai-tokens-platform-daily-total-genesis-window": {
     "added": "2026-09-05",
