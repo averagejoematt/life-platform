@@ -243,7 +243,9 @@ def test_wrap_nightly_step_reds_a_check_that_declined_to_look(tmp_path):
 
 
 def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
-    """Each leg is a real wrap_gates.py gate command, and the two left out are named in the file."""
+    """The legs ARE wrap_gates.NIGHTLY, in both directions (#4262 follow-up): a check that left
+    the interactive wrap has a nightly home, and a leg runs a real wrap gate command. The two
+    left out are named in the file, with their reasons."""
     import re
 
     import yaml
@@ -253,9 +255,16 @@ def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
     legs = yaml.safe_load(text)["jobs"]["check"]["strategy"]["matrix"]["include"]
     import wrap_gates
 
-    gate_cmds = {" ".join(g.cmd) for g in wrap_gates.GATHER + wrap_gates.VERIFY}
+    nightly = {" ".join(g.cmd) for g in wrap_gates.NIGHTLY}
     assert len({leg["slug"] for leg in legs}) == len(legs) == 5
     for leg in legs:
-        assert leg["cmd"] in gate_cmds, f"{leg['slug']} runs {leg['cmd']!r}, which is not a wrap_gates.py gate"
+        assert leg["cmd"] in nightly, f"{leg['slug']} runs {leg['cmd']!r}, which is not a wrap_gates.NIGHTLY gate"
+    missing = nightly - {leg["cmd"] for leg in legs}
+    assert not missing, f"#4262: wrap_gates.NIGHTLY names {sorted(missing)} but no wrap-nightly.yml leg runs it — it would run nowhere"
+    # a check that moved OUT of the wrap must not still run in it; the two shared with VERIFY
+    # (handover-lines, residual-queue) are the declared exceptions — they judge the new handover.
+    interactive = {" ".join(g.cmd) for g in wrap_gates.GATHER + wrap_gates.VERIFY}
+    moved = {" ".join(g.cmd) for g in wrap_gates.NIGHTLY if g.name not in ("handover-lines", "residual-queue")}
+    assert moved and not (moved & interactive), f"#4262: moved to nightly but still in the wrap battery: {sorted(moved & interactive)}"
     for left_out in ("proportionality-ledger", "alarm-citations"):
         assert re.search(rf"{left_out}\s+NOT a leg", text), f"{left_out} must be named, with its reason, as deliberately left out"
