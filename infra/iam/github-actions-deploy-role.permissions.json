@@ -42,7 +42,8 @@
         "s3:HeadObject",
         "s3:HeadBucket",
         "s3:ListBucket",
-        "s3:GetBucketLocation"
+        "s3:GetBucketLocation",
+        "s3:GetBucketPolicy"
       ],
       "Resource": [
         "arn:aws:s3:::matthew-life-platform",
