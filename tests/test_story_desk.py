@@ -261,3 +261,16 @@ def test_the_desk_prefers_an_unmet_coach_with_a_graded_call():
     led = story_ledger.apply_budget(led, _budget(featured=("nutrition_coach",)), week=3, date="d", title="t")
     assert any("never been featured" in x for x in story_desk.validate(_budget(featured=("physical_coach",)), dossier, led, week=4))
     assert not [x for x in story_desk.validate(_budget(featured=("sleep_coach",)), dossier, led, week=4) if "never been featured" in x]
+
+
+def test_a_carried_bet_must_be_scored_once_its_window_closes():
+    led = story_ledger.apply_budget(
+        story_ledger.empty_ledger(), _budget(bet_claim="weight on Day 7 below 326.2"), week=0, date="d0", title="t"
+    )
+    led = story_ledger.apply_budget(led, _budget(scored="not_gradable", bet_claim="recovery Day 7 >= 70"), week=1, date="d1", title="t")
+    b = _budget(scored="right")
+    assert any("Week 0 bet" in x for x in story_ledger.continuity_findings(led, b, 2))
+    b["bets_scored"] = [{"bet_week": 0, "result": "right", "winner": "Elena", "note": "319.7 on Day 7"}]
+    assert not [x for x in story_ledger.continuity_findings(led, b, 2) if "Week 0 bet" in x]
+    led = story_ledger.apply_budget(led, b, week=2, date="d2", title="t")
+    assert led["bets"][0]["result"] == "right" and led["bets"][0]["winner"] == "Elena"

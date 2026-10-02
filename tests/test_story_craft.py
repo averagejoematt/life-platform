@@ -69,7 +69,7 @@ def test_the_quote_gate_holds_quotes_to_the_stored_words():
 
 
 def test_tts_clean_removes_the_script_artifacts():
-    assert c.tts_clean("September 15th, 2026 \\\n Day 10\t— of the experiment") == "September 15th, 2026 Day 10 — of the experiment"
+    assert c.tts_clean("September 15th, 2026 \\\n Day 10\t— of the experiment") == "September 15th, 2026 — Day 10 — of the experiment"
 
 
 def test_the_scoreboard_is_code_rendered():
@@ -84,3 +84,13 @@ def test_the_scoreboard_is_code_rendered():
     ledger = {"bets": [{"result": "wrong"}, {"result": "right"}]}
     line = c.scoreboard_line(c.scoreboard(dossier, ledger))
     assert "Day 24" in line and "327.3 → 312.3 lb" in line and "23 straight training days" in line and "on-air bets 1–1" in line
+
+
+def test_a_mangled_dash_is_restored_not_dropped():
+    assert c.tts_clean("Before we get into it \\ the open bet") == "Before we get into it — the open bet"
+
+
+def test_lines_already_heard_are_findings():
+    prev = {3: "MAX: One good scan is one good scan, and fast is fine if the protein holds."}
+    assert c.repeat_findings("MARCUS: Look, one good scan is one good scan, and fast is fine if it holds.", prev)
+    assert c.repeat_findings("MARCUS: A single scan tells us little on its own.", prev) == []

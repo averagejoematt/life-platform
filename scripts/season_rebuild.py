@@ -165,6 +165,7 @@ class _Gates:
         self.n, self.dossier = n, dossier
         self.previous = previous or {}  # week -> that installment's post + episode text (callback checks)
         self.corpus = story_craft.quote_corpus(dossier)
+        self.owner_lines = [a.get("quotable") or a.get("answer") or "" for a in (dossier.get("owner_voice") or {}).get("answers", [])]
         # the series' own record is grounding too: a bet's threshold, last week's scored result
         self.allowed = story_checks.allowed_numbers(
             dossier, {"week": n}, budget.get("bet"), budget.get("bet_scored"), prev_ledger.get("bets"), prev_dossier or {}
@@ -204,6 +205,7 @@ class _Gates:
             + story_craft.chronicle_findings(body, week=self.n)
             + story_craft.callback_findings(body, self.previous)
             + story_craft.quote_findings(body, self.corpus)
+            + story_craft.repeat_findings(body, self.previous, self.owner_lines)
             + story_writers.fact_check(md, self.dossier, context=self.context)
         )
 
@@ -216,6 +218,7 @@ class _Gates:
             + story_writers.spoken_word_findings(ep.get("turns", []), body_weights=self.weights)
             + story_craft.episode_findings(ep.get("turns", []))
             + story_craft.callback_findings(txt, self.previous)
+            + story_craft.repeat_findings(txt, self.previous, self.owner_lines)
             + story_writers.fact_check(txt, self.dossier, context=self.context)
         )
 

@@ -57,6 +57,17 @@ BUDGET_SCHEMA: Dict[str, Any] = _obj(
             ),
         },
         "bet_scored": _obj({"result": {"type": "string", "enum": ["none", "right", "wrong", "not_gradable"]}, "note": _STR}),
+        "bets_scored": {
+            "type": "array",
+            "items": _obj(
+                {
+                    "bet_week": {"type": "integer"},
+                    "result": {"type": "string", "enum": ["right", "wrong", "not_gradable"]},
+                    "winner": _STR,
+                    "note": _STR,
+                }
+            ),
+        },
         "bet": _obj({"claim": _STR, "metric": _STR, "rule": _STR, "window_days": {"type": "integer"}}),
         "beats_used": {"type": "array", "items": _STR},
         "arc_updates": {"type": "array", "items": _obj({"who": _STR, "line": _STR})},
@@ -112,7 +123,8 @@ THE BET: the podcast closes on one bet about the coming week that code can grade
 dossier, a threshold or direction, and a window that CLOSES ON OR BEFORE the last day of next week's window (the
 next episode scores it with data in hand). No bets on absences, on journaling, or on anything the
 dossier does not measure. Score last week's open bet against this week's dossier (right / wrong / not_gradable,
-with the numbers in the note); "none" when there was no open bet.
+with the numbers in the note); "none" when there was no open bet. ALSO list EVERY open bet in the ledger whose window
+has closed in "bets_scored" — carried ones included — each with who won (Elena or the guest who took the side).
 
 THE SEASON SPINE: the ledger carries the season question and its throughlines. Name the throughline this week's
 lead advances ("throughline_advanced" = its id). Write "top_line": two plain sentences a stranger understands in five

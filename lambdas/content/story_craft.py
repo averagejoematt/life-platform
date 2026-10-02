@@ -243,7 +243,8 @@ def scoreboard_line(sb: Dict[str, Any]) -> str:
 def tts_clean(line: str) -> str:
     """Normalise a script line for the voice engine: no stray backslashes, tabs or mid-sentence line breaks
     (four of five first-season scripts carried them), spaced em-dashes, one space between words."""
-    s = (line or "").replace("\\", " ").replace("\t", " ")
+    # a lone backslash is the model's mangled em-dash (" \\ " where " — " was meant) — restore the dash, never drop it
+    s = re.sub(r"\s+\\\s+", " — ", line or "").replace("\\", " ").replace("\t", " ")
     s = re.sub(r"\s*\n\s*", " ", s)
     s = re.sub(r"\s*—\s*", " — ", s)
     s = re.sub(r"\s{2,}", " ", s)
@@ -338,4 +339,28 @@ def quote_findings(body: str, corpus: str) -> List[str]:
                 continue
             if any(f not in corpus for f in frags):
                 out.append(f"quote: not exact words the platform holds — paraphrase it without quotation marks: {sent[:110]!r}")
+    return out
+
+
+def repeat_findings(text: str, previous: Dict[int, str], owner_lines: Iterable[str] = (), n: int = 7) -> List[str]:
+    """Lines a returning reader or listener has already heard (the producer's re-score: two coaches sharing whole sentences
+    across episodes; the same owner quote in two weeks). Any n-word run from an earlier installment, and any of his quoted
+    lines already used in one, is a finding."""
+    out: List[str] = []
+    if not previous:
+        return out
+
+    def grams(s: str) -> set:
+        w = re.findall(r"[a-z0-9']+", (s or "").lower())
+        return {" ".join(w[i : i + n]) for i in range(len(w) - n + 1)}
+
+    mine = grams(text)
+    for wk, prev in sorted(previous.items()):
+        shared = sorted(mine & grams(prev))
+        if shared:
+            out.append(f"repeat: {len(shared)} {n}-word run(s) already used in Week {wk}, e.g. {shared[0]!r} — say it new or cut it")
+    for line in owner_lines:
+        frag = " ".join(re.findall(r"[a-z0-9']+", (line or "").lower())[:8])
+        if frag and frag in _norm(text) and any(frag in _norm(p) for p in previous.values()):
+            out.append(f"repeat: his line {frag!r}… was already quoted in an earlier installment — use a different line or paraphrase")
     return out

@@ -96,6 +96,17 @@ def continuity_findings(prev: Dict[str, Any], budget: Dict[str, Any], week: int)
         )
     if last_open_bet(prev) and (budget.get("bet_scored") or {}).get("result", "none") == "none":
         findings.append("last week's bet is open and the budget does not score it")
+    scored_weeks = {s.get("bet_week") for s in budget.get("bets_scored") or []}
+    for b in prev.get("bets", []):
+        if (
+            b.get("result") in (None, "", "open")
+            and b.get("week") is not None
+            and week - int(b["week"]) >= 2
+            and b["week"] not in scored_weeks
+        ):
+            findings.append(
+                f"the Week {b['week']} bet ({str(b.get('claim'))[:60]}…) is still open after its window — score it in bets_scored"
+            )
     return findings
 
 
@@ -134,6 +145,10 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
                     break
                 b["result"], b["scored_week"], b["verdict_note"] = scored.get("result"), week, scored.get("note")
                 break
+    for sc in budget.get("bets_scored") or []:  # every open bet whose window closed, carried ones included
+        for b in led.get("bets", []):
+            if b.get("week") == sc.get("bet_week") and b.get("result") in (None, "", "open") and sc.get("result") != "not_gradable":
+                b["result"], b["scored_week"], b["verdict_note"], b["winner"] = sc["result"], week, sc.get("note"), sc.get("winner")
     if (budget.get("bet") or {}).get("claim"):
         led.setdefault("bets", []).append({**budget["bet"], "week": week, "result": "open"})
     lead = budget.get("lead") or {}
