@@ -224,7 +224,10 @@ def scoreboard_line(sb: Dict[str, Any]) -> str:
     if sb.get("day"):
         parts.append(sb["day"])
     if sb.get("weight_from") and sb.get("weight_now"):
-        parts.append(f"{sb['weight_from']:g} → {sb['weight_now']:g} lb")
+        if sb["weight_from"] == sb["weight_now"]:
+            parts.append(f"{sb['weight_now']:g} lb at the first weigh-in")
+        else:
+            parts.append(f"{sb['weight_from']:g} → {sb['weight_now']:g} lb")
     if sb.get("training_streak_days"):
         parts.append(f"{sb['training_streak_days']} straight training days")
     if sb.get("bets_right") or sb.get("bets_wrong"):
@@ -254,8 +257,8 @@ def clean_turns(turns: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def owner_voice_rules() -> str:
     return (
         "OWNER VOICE: answers he sent by replying to the week's questions. Quote at most two short lines exactly; never "
-        "alter, extend or paraphrase them into quotes; never quote anything he marked off the record; never infer feelings "
-        "he did not state."
+        "alter, extend or paraphrase them into quotes; quote the 'quotable' form when present (spelling fixed, words his); "
+        "never comment on how he typed; never quote anything he marked off the record; never infer feelings he did not state."
     )
 
 
@@ -304,7 +307,7 @@ def quote_corpus(dossier: Dict[str, Any]) -> str:
         parts += [str(c.get("latest_public_summary") or ""), str(c.get("latest_key_recommendation") or "")]
     for a in (dossier.get("owner_voice") or {}).get("answers", []) or []:
         if not a.get("off_record"):
-            parts.append(str(a.get("answer") or ""))
+            parts += [str(a.get("answer") or ""), str(a.get("quotable") or "")]
     preds = dossier.get("predictions") or {}
     for p in preds.get("pre_registered", []) or []:
         parts.append(str(p.get("claim") or ""))

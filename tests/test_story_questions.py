@@ -98,3 +98,29 @@ def test_the_parser_writes_what_the_dossier_reads():
     ov = q.owner_voice(_T(), pk, 5)
     assert [a["q"] for a in ov["answers"]] == [1, 2] and ov["answers"][1]["off_record"] is True
     assert q.owner_voice(_T(), pk, 6) == {}
+
+
+def test_copyedit_fixes_spelling_but_cannot_rewrite_him():
+    raw = "i think im probably tougher on myself this time because of how disappointed i am having conqured it so recently"
+
+    def tidy(body, model):
+        return {
+            "stop_reason": "end_turn",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "I think I'm probably tougher on myself this time because of how disappointed I am having conquered it so recently.",
+                }
+            ],
+        }
+
+    def rewrite(body, model):
+        return {
+            "stop_reason": "end_turn",
+            "content": [
+                {"type": "text", "text": "This time the stakes feel higher, and I am harder on myself after such a recent victory."}
+            ],
+        }
+
+    assert q.copyedit(raw, invoke=tidy).startswith("I think I'm probably tougher")
+    assert q.copyedit(raw, invoke=rewrite) == raw  # mutation control: a rewrite is rejected, the raw answer stands

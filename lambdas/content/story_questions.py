@@ -210,3 +210,43 @@ def send(ses: Any, *, week: int, questions: List[str], to: str, sender: str) -> 
         ReplyToAddresses=[REPLY_TO],
         Content={"Simple": {"Subject": {"Data": e["subject"]}, "Body": {"Text": {"Data": e["body"]}}}},
     )
+
+
+# ── the quotable form of an answer ───────────────────────────────────────────
+#
+# He answers fast, on a phone, in lowercase. A newsroom quotes a written answer with its spelling and capitalization
+# fixed and every word kept — never a [sic] parade, never commentary on how he typed. The copyedit is a model pass held
+# to that brief by code: a result that changes more than COPYEDIT_MAX_CHANGE of the words is rejected and the raw
+# answer is used instead (quoted exactly, or paraphrased).
+
+COPYEDIT_MAX_CHANGE = 0.15
+_COPYEDIT = (
+    "Copyedit this reply for publication as a quote. Fix ONLY spelling, capitalization and punctuation. Do not add, remove, "
+    "reorder or replace words (contractions may gain their apostrophe). Return only the corrected text."
+)
+
+
+def copyedit(answer: str, *, invoke: Optional[Callable[..., Dict[str, Any]]] = None) -> str:
+    import difflib
+
+    body = {"system": _COPYEDIT, "messages": [{"role": "user", "content": answer}], "max_tokens": 1500, "temperature": 0}
+    try:
+        if invoke is None:
+            from ai import bedrock_client
+            from ai.model_defaults import NARRATIVE_MODEL
+
+            resp = bedrock_client.invoke_with_retry(body, NARRATIVE_MODEL)
+        else:
+            resp = invoke(body, "test")
+        if resp.get("stop_reason") != "end_turn":
+            return answer
+        fixed = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text").strip()
+    except Exception:  # noqa: BLE001 — the raw answer is always a valid fallback
+        return answer
+
+    def words(s: str) -> List[str]:
+        return re.findall(r"[a-z0-9]+", s.lower().replace("'", ""))
+
+    a, b = words(answer), words(fixed)
+    changed = 1 - difflib.SequenceMatcher(a=a, b=b).ratio()
+    return fixed if fixed and changed <= COPYEDIT_MAX_CHANGE else answer

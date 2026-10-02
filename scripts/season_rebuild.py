@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional
 
@@ -208,6 +209,15 @@ class _Gates:
         )
 
 
+def strip_dek(md: str) -> str:
+    """The model never writes the dek; drop any italic dek lines right under the title before a rewrite."""
+    title, body = story_writers.split_title(md)
+    paras = body.split("\n\n")
+    while paras and re.fullmatch(r"\*[^*].*[^*]\*", paras[0].strip()) and not paras[0].strip().startswith("*Week"):
+        paras.pop(0)
+    return f'"{title}"\n\n' + "\n\n".join(paras)
+
+
 def with_dek(md: str, dossier: Dict[str, Any], ledger: Dict[str, Any], budget: Dict[str, Any], n: int) -> str:
     """The two italic lines a stranger reads first, rendered by code after the gates ran: the desk's plain top line
     and the scoreboard (never the model's numbers)."""
@@ -279,8 +289,6 @@ def run_week(
     g = _Gates(n, dossier, budget, ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
 
     md, findings = _write_post(g, dossier, budget, ledger, n, previous_post)
-    md = with_dek(md, dossier, ledger, budget, n)
-    _save(out, f"wk{n}_chronicle.md", md)
     title, body = story_writers.split_title(md)
 
     guest = _guest(dossier, budget) if n else next(c for c in dossier["roster"] if c.get("coach_id") == "head_coach")
@@ -290,6 +298,8 @@ def run_week(
     _save(out, f"wk{n}_episode.txt", story_writers.episode_text(ep))
 
     new_ledger = story_ledger.apply_budget(ledger, budget, week=n, date=wk.get("date") or "2026-09-05", title=title)
+    md = with_dek(md, dossier, new_ledger, budget, n)  # the scoreboard counts this week's scored bet
+    _save(out, f"wk{n}_chronicle.md", md)
     _save(out, f"wk{n}_ledger.json", new_ledger)
     report = {
         "week": n,
@@ -321,9 +331,10 @@ def repair_week(out: str, n: int, notes: Optional[List[str]] = None, episode_not
     prev_ep = _load(out, f"wk{n - 1}_episode.txt") if n > 0 else None
     g = _Gates(n, dossier, budget, prev_ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
 
-    md = _load(out, f"wk{n}_chronicle.md")
+    md = strip_dek(_load(out, f"wk{n}_chronicle.md"))
     pf = [f"editor's note: {x}" for x in (notes or [])] + g.post(md, "end_turn")
     md, pf = _write_post(g, dossier, budget, prev_ledger, n, prev_post, md=md, findings=pf)
+    md = with_dek(md, dossier, ledger, budget, n)
     _save(out, f"wk{n}_chronicle.md", md)
     title, body = story_writers.split_title(md)
 
