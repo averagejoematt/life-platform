@@ -53,9 +53,11 @@ on the (e4) residual section; the scripts behind the lines still block on their 
 ### (b) Replace — never stack — the CLAUDE.md session-status block
 
 Under `## Session status (the ONE live block — replace, don't stack)`, leave the convention
-paragraph and **overwrite the one `**Verified:** ...` paragraph in place** — no addendum or
-trailer. Same shape as the one you replace (date, instruction, PRs, verification, gotchas,
-next picks); anything durable goes to memory (c) or `docs/CONVENTIONS.md`.
+paragraph and **rewrite the one pointer line in place, changing only its date** — the block
+ends in exactly `**Status:** see handovers/HANDOVER_LATEST.md (Verified YYYY-MM-DD)` (#4271;
+`tests/test_boot_contract_3314.py` pins the shape and the file's token ceiling). The session
+narrative goes in `HANDOVER_LATEST.md` (a), never back into CLAUDE.md; anything durable goes
+to memory (c) or `docs/CONVENTIONS.md`.
 
 ### (c) Update the persistent memory system
 
