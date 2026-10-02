@@ -26,7 +26,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 # ── the rules, as the writers are told them ──────────────────────────────────
 
-CHRONICLE_RULES = """THE CRAFT STANDARD (what makes strangers read the next one):
+CHRONICLE_BRIEF = """THE CRAFT STANDARD (what makes strangers read the next one):
 - TOP LINE FIRST. The first paragraph tells a stranger, in plain words, how he is and what is at stake this week — the
   day number and the scale's direction in the first two sentences. Never open on a date or a wearable reading; open on
   something he did, chose, said, or a moment with stakes.
@@ -49,7 +49,7 @@ CHRONICLE_RULES = """THE CRAFT STANDARD (what makes strangers read the next one)
   aphorism closers, more than ONE "not X — it's Y" construction, "genuinely", "the gap between X and Y" as a closer,
   "architecture" for anything but software, the words "ledger", "desk", "dossier", "budget"."""
 
-EPISODE_RULES = """THE CRAFT STANDARD FOR THE EAR (what keeps a commuter past minute one):
+EPISODE_BRIEF = """THE CRAFT STANDARD FOR THE EAR (what keeps a commuter past minute one):
 - COLD OPEN: one moment and one contrast, under 60 words, no thresholds explained. Then a welcome under 50 words.
 - THE GUEST IS ON THE HOT SEAT. Read their graded record aloud in a sentence; they answer for it. The coach whose
   record or ask is the week's story is the guest.
@@ -273,11 +273,6 @@ def season_spine() -> Dict[str, Any]:
             {"id": "the_machines_scoreboard", "question": "Whose model of him is right — and which coach changes their mind?"},
         ],
     }
-
-
-def stale_coach_asks(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Asks a coach made on the record that have not yet been followed up."""
-    return [a for a in ledger.get("asks", []) if a.get("status") in (None, "", "open")]
 
 
 def first_sentence(text: str) -> Optional[str]:

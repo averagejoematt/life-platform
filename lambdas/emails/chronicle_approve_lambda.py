@@ -251,9 +251,12 @@ def _commit_ledger(item: dict) -> None:
         return
     try:
         from content import story_ledger
+        from experiment.phase_taxonomy import experiment_stamp_for
 
         led = json.loads(raw)
-        table.put_item(Item=story_ledger.ledger_row(CHRONICLE_PK, led, cycle=str(item.get("cycle") or "17")))
+        row = story_ledger.ledger_row(CHRONICLE_PK, led, cycle=str(item.get("cycle") or "17"))
+        row.update(experiment_stamp_for(row["pk"], row["sk"]))  # #3599: the class-gated write-time stamp
+        table.put_item(Item=row)
         logger.info("[#4533] season ledger committed for %s", led.get("date"))
     except Exception as exc:  # noqa: BLE001 — never blocks publishing the installment
         logger.warning("[#4533] ledger commit failed for %s: %s", item.get("date"), exc)

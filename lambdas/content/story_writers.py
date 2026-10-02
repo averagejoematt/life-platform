@@ -25,7 +25,7 @@ EPISODE_MAX_TOKENS = 8000
 
 CHRONICLE_FOOTER = r"\*Week \d+ of The Measured Life\*|\*Prologue — The Measured Life\*"
 
-SEASON_RULES = """THE SEASON. This is one installment of a continuous series that follows a year-long experiment week by week.
+SEASON_BRIEF = """THE SEASON. This is one installment of a continuous series that follows a year-long experiment week by week.
 A reader may arrive at any installment cold, or may have read every one. Serve both:
 - Orient the cold reader in a sentence or two, early and naturally — who he is, where the experiment stands
   (the day number, the direction of travel) — without re-telling the whole story.
@@ -173,7 +173,7 @@ def write_chronicle(
         ]
     resp = _invoke(
         {
-            "system": ELENA_VOICE + "\n\n" + SEASON_RULES + "\n\n" + story_craft.CHRONICLE_RULES + "\n\n" + story_craft.owner_voice_rules(),
+            "system": ELENA_VOICE + "\n\n" + SEASON_BRIEF + "\n\n" + story_craft.CHRONICLE_BRIEF + "\n\n" + story_craft.owner_voice_rules(),
             "messages": messages,
             "max_tokens": CHRONICLE_MAX_TOKENS,
             "temperature": 0.7,
@@ -217,7 +217,7 @@ def write_episode(
             {"role": "user", "content": "The checks found these problems. Return the whole corrected script:\n- " + "\n- ".join(fix)},
         ]
     body: Dict[str, Any] = {
-        "system": EPISODE_VOICE + "\n\n" + SEASON_RULES + "\n\n" + story_craft.EPISODE_RULES + "\n\n" + story_craft.owner_voice_rules(),
+        "system": EPISODE_VOICE + "\n\n" + SEASON_BRIEF + "\n\n" + story_craft.EPISODE_BRIEF + "\n\n" + story_craft.owner_voice_rules(),
         "messages": messages,
         "max_tokens": EPISODE_MAX_TOKENS,
         "temperature": 0.7,

@@ -195,6 +195,9 @@ def owner_voice(table: Any, pk: str, week: int) -> Dict[str, Any]:
         answers: List[Dict[str, Any]] = []
         for it in resp.get("Items", []):
             answers += json.loads(it.get("answers_json") or "[]")
+        for a in answers:  # the quotable form: spelling/capitalization fixed, every word his (code-guarded)
+            if not a.get("off_record") and not a.get("quotable"):
+                a["quotable"] = copyedit(a.get("answer") or "")
         return {"answers": answers, "rules": "quote at most two short lines exactly; never an off_record answer"} if answers else {}
     except Exception:  # noqa: BLE001 — absence of his voice is a normal week
         return {}

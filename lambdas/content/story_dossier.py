@@ -47,7 +47,7 @@ RATE_FLAG_LB_WK = 2.5  # the platform's own "losing too fast" flag (get_weight_l
 
 
 def _d(s: str) -> _dt.date:
-    return _dt.date.fromisoformat(s)
+    return _dt.datetime.strptime(s[:10], "%Y-%m-%d").date()
 
 
 def season_weeks(genesis: str = GENESIS, through: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -191,9 +191,10 @@ def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
         seen.add(wid)
         mins = None
         try:
-            a = _dt.datetime.fromisoformat(str(w["start_time"]).replace("Z", "+00:00"))
-            b = _dt.datetime.fromisoformat(str(w["end_time"]).replace("Z", "+00:00"))
-            mins = round((b - a).total_seconds() / 60)
+            from common.pacific_time import parse_iso_utc
+
+            a, b = parse_iso_utc(w["start_time"]), parse_iso_utc(w["end_time"])
+            mins = round((b - a).total_seconds() / 60) if a and b else None
         except (KeyError, ValueError):
             pass
         sport = str(w.get("sport_name") or "")

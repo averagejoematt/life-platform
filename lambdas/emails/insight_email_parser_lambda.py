@@ -563,15 +563,15 @@ def lambda_handler(event, context):
                 sq_answers = story_questions.parse_reply(body_text)
                 print(f"[INFO] story-questions reply for week {sq_week}: {len(sq_answers)} answer(s)")
                 if sq_answers and not dry_run:
-                    table.put_item(
-                        Item=story_questions.qa_row(
-                            f"USER#{USER_ID}#SOURCE#insights",
-                            sq_week,
-                            sq_answers,
-                            received_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                            source_key=key,
-                        )
+                    sq_row = story_questions.qa_row(
+                        f"USER#{USER_ID}#SOURCE#insights",
+                        sq_week,
+                        sq_answers,
+                        received_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        source_key=key,
                     )
+                    sq_row.update(experiment_stamp_for(sq_row["pk"], sq_row["sk"]))  # #3599
+                    table.put_item(Item=sq_row)
                     send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
                 continue
 

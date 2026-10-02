@@ -173,7 +173,7 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
     ledger = story_ledger.latest_visible(table, chronicle_pk, date_str)
     # the last two published installments: the writer's continuity and the callback/repeat gates' memory
     resp = table.query(
-        KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").between("DATE#", f"DATE#{date_str}"), ScanIndexForward=False
+        KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").between("DATE#", f"DATE#{date_str}~"), ScanIndexForward=False
     )
     prior = [
         it

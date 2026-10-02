@@ -1227,7 +1227,7 @@ def _send_story_questions(event):
     from common.pacific_time import pacific_today
     from content import story_dossier, story_ledger, story_questions
 
-    today = _dtm.date.fromisoformat(pacific_today())  # pacific_today() is a YYYY-MM-DD string
+    today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()  # pacific_today() is a YYYY-MM-DD string
     upcoming = next(
         (
             w
@@ -1249,13 +1249,15 @@ def _send_story_questions(event):
     if event.get("dry_run"):
         return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "questions": questions})}
     resp = story_questions.send(ses, week=n, questions=questions, to=RECIPIENT, sender=SENDER)
+    from experiment.phase_taxonomy import experiment_stamp_for
+
     table.put_item(
         Item={
             **marker,
             "questions_json": json.dumps(questions),
             "sent_at": datetime.now(timezone.utc).isoformat(),
-            "phase": "experiment",
             "message_id": resp.get("MessageId", ""),
+            **experiment_stamp_for(marker["pk"], marker["sk"]),  # #3599: the class-gated write-time stamp
         }
     )
     return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": len(questions)})}

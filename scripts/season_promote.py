@@ -285,7 +285,11 @@ def apply_ledger(staging: str, weeks: List[int]) -> None:
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
     for wk in weeks:
         led = _staged(staging, wk)["ledger"]
-        table.put_item(Item=story_ledger.ledger_row(CHRONICLE_PK, led, cycle="17"))
+        from experiment.phase_taxonomy import experiment_stamp_for
+
+        row = story_ledger.ledger_row(CHRONICLE_PK, led, cycle="17")
+        row.update(experiment_stamp_for(row["pk"], row["sk"]))  # #3599
+        table.put_item(Item=row)
         print(f"LEDGER LEDGER#{led['date']} ({len(led.get('threads', []))} threads)")
 
 
@@ -379,14 +383,15 @@ def apply_panel(staging: str, weeks: List[int]) -> None:
             print(f"PANEL hold {k} not cleared: {exc}")
     episodes.sort(key=lambda e: e["week"], reverse=True)
     panel._write_indexes(episodes)
+    from experiment.phase_taxonomy import experiment_stamp_for
+
     open_bet = next((b["bet"] for b in reversed(bet_ledger) if b["outcome"] == "open"), None)
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
     table.put_item(
         Item={
             "pk": PANEL_PK,
             "sk": "STATE#current",
-            "phase": "experiment",
-            "cycle": "17",
+            **experiment_stamp_for(PANEL_PK, "STATE#current"),  # #3599
             "updated": _now()[:10],
             "state_json": json.dumps(
                 {
@@ -404,8 +409,7 @@ def apply_panel(staging: str, weeks: List[int]) -> None:
             "pk": PANEL_PK,
             "sk": "SHOW#memory",
             "record_type": "show_memory",
-            "phase": "experiment",
-            "cycle": "17",
+            **experiment_stamp_for(PANEL_PK, "SHOW#memory"),  # #3599
             "callbacks": [
                 {"week": e["week"], "title": e["title"], "pull_quote": e["excerpt"], "open_bet": ""}
                 for e in sorted(episodes, key=lambda x: x["week"])
