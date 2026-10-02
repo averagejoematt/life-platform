@@ -235,7 +235,13 @@ _WINDOW_RE = re.compile(
     # walks, each logged between September 24th and …" and labs on "a pattern with 26 nights".
     r"|\b(?:between|from)\s+(?:" + _DAY + r")\s+(?:and|to|until|through)\s+(?:" + _DAY + r"|\d{1,2}(?:st|nd|rd|th)?)\b"
     r"|\b(?:" + "|".join(_MONTHS) + r")\s+\d{1,2}(?:st|nd|rd|th)?\s*[–-]\s*(?:(?:" + "|".join(_MONTHS) + r")\s+)?\d{1,2}\b"
-    r"|\b(?:based\s+on|from|of|in|with)\s+(?:the\s+)?(?:last\s+|past\s+|his\s+)?" + _N + r"\s+(?:\w+\s+)?" + _SPAN_UNIT + r"\b",
+    r"|\b(?:based\s+on|from|of|in|with)\s+(?:the\s+)?(?:last\s+|past\s+|his\s+)?" + _N + r"\s+(?:\w+\s+)?" + _SPAN_UNIT + r"\b"
+    # Ruling 8 extension (owner, 2026-10-02, answer (a)): ONE session's own average stated with
+    # that session's date is labelled — "116.4 bpm average on September 30" is the walk on the
+    # 30th. The 10-01 dry run held physical on exactly that sentence (judge 87). A RUNNING
+    # average on a date still hides its span, so the lookbehind keeps that one held.
+    r"|(?<!running\s)\baverage\s+(?:on|for)\s+(?:the\s+)?(?:" + _DAY + r")"
+    r"|\baveraged\s+[\d.,]+\s*(?:[a-z%/]+\s+)?on\s+(?:" + _DAY + r")",
     re.IGNORECASE,
 )
 
@@ -252,7 +258,8 @@ def prompt_reader_rules() -> str:
         '"easy cardio", "21 days of data", "deep sleep", "rising/falling".\n'
         "- Any average, running average, mean or trend figure names its window IN THE SAME SENTENCE, in one of these forms: "
         '"over the last 20 logged days", "across 21 logged days", "based on 21 logged days", "since Sunday, September 6", '
-        '"through Friday, September 25", "between September 24 and September 30", "this week". A date alone is not a window.'
+        '"through Friday, September 25", "between September 24 and September 30", "this week", or ONE session\'s own average '
+        'with its date ("116 bpm average on September 30"). A date alone is not a window for a running average or trend.'
     )
 
 
@@ -276,7 +283,8 @@ def unlabeled_window_figure(text: str, **_: Any) -> list:
     """An average/trend figure whose sentence names no window (the #1968 shape, generalised).
 
     A window is "over/across N days", "since …", "through …", "N-day", "this/last week",
-    and (ruling 8, #4343) a stated date range or "based on N logged days".
+    and (ruling 8, #4343) a stated date range or "based on N logged days", and (its 10-02
+    extension) one session's own average with that session's date.
     A date alone is NOT a window: "1,596 kcal EWMA … on the night of 2026-09-24" still
     leaves the average's span unnamed. The average word and the figure must share a
     clause (#4343); the window may sit anywhere in the sentence.
