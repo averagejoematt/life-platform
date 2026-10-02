@@ -23,12 +23,14 @@ history lives in its issue and its script's docstring; this file is contract + r
 python3 scripts/wrap_gates.py            # --list prints the battery, DERIVED — read it there, not here
 ```
 
-It runs, in parallel, every gate that does NOT read the finished handover ((e2), (e5), (e7),
-(e8), (e10), (e11)), reports **all failures together** with each script's own exit code and
+It runs, in parallel, every gate that does NOT read the finished handover ((e2), (e5), (e8),
+(e10), (e11)), reports **all failures together** with each script's own exit code and
 `UNVERIFIED` degrade verbatim, and prints a **draft marker-line block**. Fix reds with the
 owning step's remedy and re-run; correct every `<placeholder>` in Phase 2 — the draft is a
 start, never a record. **The Docs-CI leg runs ONCE, in Phase 3** (#4262): a Phase 1 run
-could only judge docs Phase 2 was about to rewrite.
+could only judge docs Phase 2 was about to rewrite. **(e7) and closure detectors C/D run
+nightly instead** (`.github/workflows/wrap-nightly.yml`, #4262 — `--list` prints them as
+`nightly`): each failing check files or comments on ONE `auto-filed` tracker; read any open one in (e9).
 
 ## Phase 2 — Write everything once (steps (a)–(e))
 
@@ -138,10 +140,8 @@ the handover says none. Silent omission is not an outcome.
 
 - **Write the row through the `incident` skill** (`.claude/skills/incident/SKILL.md`) — it
   owns the row shape, the class-level tracker and the procedure edit; this step does not.
-- **Regenerate the derived Patterns block in the SAME edit** —
-  `python3 scripts/incident_log_patterns.py --apply` — Phase 3 re-runs its `--check` (#3682).
-- **Stage it**: `docs/INCIDENT_LOG.md` is named in Phase 4's `git add` (#3682 — a row left
-  dirty in a shared checkout once shipped inside an unrelated PR).
+- In the SAME edit run `python3 scripts/incident_log_patterns.py --apply` (Phase 3 re-runs its
+  `--check`), and keep `docs/INCIDENT_LOG.md` in Phase 4's `git add` (#3682).
 - The new `handovers/HANDOVER_LATEST.md` carries one line either way:
   `**Incidents:** <N row(s) added — one-clause list>` or `**Incidents:** none`.
 
@@ -155,9 +155,7 @@ Every residual/next-picks bullet cites an issue `#N` (file it, ADR-099 shape) or
 
 - Run `git stash list` (the Phase 1 batch runs it). It **must print nothing**, or every entry must be
   explained (inspected via `git stash show -p stash@{N}` and either dropped or
-  intentionally kept with a one-line reason). Memory rule: stash is BANNED in
-  concurrent sessions — if you didn't put it there this session, inspect and
-  drop it, don't leave it for the next session to trip over.
+  intentionally kept with a one-line reason). Stash is BANNED in concurrent sessions (#3804).
 - Run `python3 deploy/session_postflight.py` (also in the Phase 1 batch) and confirm the `hook freshness`
   line is 🟢. If 🔴 (stale or not installed), run `bash scripts/install_hooks.sh`
   and re-check before closing the wrap.
@@ -168,19 +166,19 @@ Every residual/next-picks bullet cites an issue `#N` (file it, ADR-099 shape) or
   It removes every lane that `/land` released (or whose lane lock has sat idle 7 days) once it
   is clean and merged, and lists every **dirty** worktree by name without touching it. Its
   last line is `REAPER-SUMMARY …`; a dirty lane it names is yours to commit, park as a patch,
-  or explain — the reaper never decides that for you. It was 348 worktrees / 97 locked on
-  2026-09-27 because nothing released a lane; this gate is the one scheduled caller.
+  or explain — the reaper never decides that for you.
 
 ### (e7) Backlog-hygiene gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5) (#1870, blocking since #1872)
 
-The Phase 1 batch runs exactly this bare, blocking invocation:
+Not in the wrap battery since #4262 — the `wrap-backlog-hygiene` leg of `wrap-nightly.yml`
+runs exactly this bare, blocking invocation every night (a red files or comments on its tracker):
 ```bash
 python3 scripts/check_backlog_hygiene.py
 ```
 It lints the open corpus against the ADR-099 amendment (#1865). **Blocking by default since #1872**
 (which absorbed and deleted the old label-only script): a printed violator on an issue this
-session filed, touched or closed may not be left unfixed. `--advisory` is the explicit
-opt-out for reports. A `gh` fetch failure fails open (exit 0) — say so in the handover.
+session filed, touched or closed may not be left unfixed — so a session that filed issues
+runs it once itself. `--advisory` is the opt-out for reports; a `gh` failure fails open (exit 0).
 `now_liveness` / `now_lane_coverage` / `later_staleness` are (e9)'s input, not defects; the
 bare run is lane-blind on purpose — (e9) re-runs it with `--lane <model>` (#3254).
 
@@ -290,7 +288,7 @@ git commit -m "docs(wrap): <short session theme> (<n items/PRs shipped>)"
 | Incident rows or explicit skip (#1332), Patterns regenerated and staged (#3682) | (e3) | `incident_log_patterns.py --check` | `**Incidents:**` |
 | Residual bullets cite `#N` or `not-work — <reason>` (#1340) | (e4) | `scripts/check_residual_queue.py` + `check_handover_lines.py` | the section (required) |
 | Stash empty + hook fresh, or explained (#1326) | (e5) | `git stash list` + `session_postflight.py` | `**Stash/hooks:**` |
-| Filing-contract violators fixed, not deferred (#1870, blocking since #1872) | (e7) | `scripts/check_backlog_hygiene.py` bare | fail-open noted |
+| Filing-contract violators fixed, not deferred (#1870, blocking since #1872) | (e7) | `scripts/check_backlog_hygiene.py` bare, nightly (`wrap-nightly.yml`) | its auto-filed tracker |
 | An outcome verdict — the ADR-099 closure comment — on every closure (#1870); an instrument closes on live proof (#3595) | (e8) | `closure_sweep.py --session` | `**Closures:**` |
 | `Now` refilled by stored rank; every stale `Later` issue gets a promote-or-close call (#1870) | (e9) | `backlog_next.py --refill-now --lane <model>` | `**Backlog:**` |
 | A red alarm >72h, or a flap, is cited or named (#1959/#2912) | (e10) | `scripts/check_alarm_citations.py` | `**Alarms:**` |
