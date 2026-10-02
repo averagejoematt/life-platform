@@ -278,9 +278,14 @@ def test_generate_questions_fail_soft_on_error_and_garbage():
     assert cc.generate_questions("mind", "N", "", {}, 3, caller=garbage) == []
 
 
-def test_parse_questions_strips_markdown_fences():
+def test_generate_questions_strips_markdown_fences_and_sends_the_schema():
+    # #4276: the reply is parsed in ai.structured_json (fence-tolerant fallback) and the
+    # request carries QUESTIONS_SCHEMA as output_config.format.
+    sent = []
     text = '```json\n{"questions": [{"question": "Q?", "tags": ["x"]}]}\n```'
-    assert cc.parse_questions(text) == [{"question": "Q?", "tags": ["x"]}]
+    fenced = lambda body: sent.append(body) or {"content": [{"type": "text", "text": text}]}  # noqa: E731
+    assert cc.generate_questions("mind", "N", "", {}, 3, caller=fenced) == [{"question": "Q?", "tags": ["x"]}]
+    assert sent[0]["output_config"]["format"]["schema"] == cc.QUESTIONS_SCHEMA
 
 
 # ── log tool ─────────────────────────────────────────────────────────────────

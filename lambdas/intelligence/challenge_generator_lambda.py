@@ -32,8 +32,6 @@ import logging
 import os
 import re
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -446,51 +444,90 @@ Generate 1-5 challenge candidates based on the strongest signals in this data.
 If no clear signal exists, return 0 challenges. Quality over quantity."""
 
 
+_C_S = {"type": "string"}
+# #4276: SYSTEM_PROMPT's JSON shape, constrained at the model — every object closed, every key
+# required, the closed vocabularies as enums (store_challenge's own lists). `metric_targets` is
+# left out: the prompt shows it only as an empty free map, which a closed schema cannot express,
+# and store_challenge already defaults it to {}.
+CHALLENGES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "challenges": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": _C_S,
+                    "description": _C_S,
+                    "source": {"type": "string", "enum": ["journal_mining", "data_signal", "hypothesis_graduate", "science_scan"]},
+                    "source_detail": _C_S,
+                    "domain": {
+                        "type": "string",
+                        "enum": ["sleep", "movement", "nutrition", "supplements", "mental", "social", "discipline", "metabolic", "general"],
+                    },
+                    "difficulty": {"type": "string", "enum": ["easy", "moderate", "hard"]},
+                    "duration_days": {"type": "integer"},
+                    "protocol": _C_S,
+                    "success_criteria": _C_S,
+                    "hoped_outcome": _C_S,
+                    "tags": {"type": "array", "items": _C_S},
+                    "verification_method": {"type": "string", "enum": ["self_report", "metric_auto", "hybrid"]},
+                },
+                "required": [
+                    "name",
+                    "description",
+                    "source",
+                    "source_detail",
+                    "domain",
+                    "difficulty",
+                    "duration_days",
+                    "protocol",
+                    "success_criteria",
+                    "hoped_outcome",
+                    "tags",
+                    "verification_method",
+                ],
+                "additionalProperties": False,
+            },
+        },
+        "reasoning": _C_S,
+    },
+    "required": ["challenges", "reasoning"],
+    "additionalProperties": False,
+}
+
+
 def generate_challenges(context):
     """Call Claude Sonnet to generate challenge candidates."""
     # COST-OPT-2: the daily-changing phase block rides the USER message — the
     # cache_control-wrapped SYSTEM_PROMPT must stay byte-stable.
     user_message = build_generation_prompt(context)
 
-    payload = json.dumps(
-        {
-            "model": AI_MODEL,
-            "max_tokens": 2000,
-            "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            "messages": [{"role": "user", "content": user_message}],
-        }
-    ).encode()
-
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
+    body = {
+        "model": AI_MODEL,
+        "max_tokens": 2000,
+        "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        "messages": [{"role": "user", "content": user_message}],
+    }
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
+    # #4276: constrained to CHALLENGES_SCHEMA at the model and parsed in the one door.
     try:
+        from ai.structured_json import call_json, decode_error
         from common.retry_utils import call_anthropic_raw
 
-        resp = call_anthropic_raw(req)
-        raw = resp["content"][0]["text"].strip()
-        # Strip markdown fences
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
+        parsed = call_json(call_anthropic_raw, body, schema=CHALLENGES_SCHEMA, label="challenge_generator")
+        if not isinstance(parsed, dict):
+            logger.error(f"Challenge parse error: {decode_error(parsed)}")
+            return None
         # AI-3 validation
         if _HAS_AI_VALIDATOR:
-            val_result = validate_ai_output(raw, AIOutputType.GENERIC)
+            val_result = validate_ai_output(json.dumps(parsed, ensure_ascii=False), AIOutputType.GENERIC)
             if val_result.blocked:
                 logger.error("[AI-3] challenge generation blocked: %s", val_result.block_reason)
                 return None
-        return json.loads(raw.strip())
-    except (json.JSONDecodeError, KeyError) as e:
+        return parsed
+    except KeyError as e:
         logger.error(f"Challenge parse error: {e}")
         return None
 

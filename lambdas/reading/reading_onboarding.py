@@ -14,14 +14,11 @@ any failure returns a minimal, honest hypothesis rather than blocking onboarding
 
 from __future__ import annotations
 
-import json
 import logging
-import urllib.request
 
 logger = logging.getLogger()
 
 MODEL = "claude-haiku-4-5-20251001"
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 
 # The question bank (calibration §8). Cora picks ~6-8 conversationally and follows
 # threads — this is the pool, not a script. Exclusions are signal too.
@@ -58,6 +55,24 @@ _USER_TEMPLATE = """From these interview answers, infer a starting taste hypothe
 
 Answers:
 {answers}"""
+
+# The shape above, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. Domains stay free strings here — `_VALID_DOMAINS` (below)
+# is wider than the prompt's list, and the filter after the call is the authority.
+_STRS = {"type": "array", "items": {"type": "string"}}
+_TASTE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "affinities": _STRS,
+        "aversions": _STRS,
+        "starting_domains": _STRS,
+        "on_ramp_note": {"type": "string"},
+        "confidence": {"type": "string", "enum": ["low"]},
+        "rationale": {"type": "string"},
+    },
+    "required": ["affinities", "aversions", "starting_domains", "on_ramp_note", "confidence", "rationale"],
+    "additionalProperties": False,
+}
 
 _VALID_DOMAINS = {
     "fiction",
@@ -106,17 +121,10 @@ def _format_answers(answers) -> str:
     return "\n\n".join(lines)
 
 
-def _parse(text: str) -> dict | None:
-    text = (text or "").strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    try:
-        return json.loads(text.strip())
-    except json.JSONDecodeError as e:
-        logger.warning("[reading_onboarding] JSON parse failed: %s", e)
-        return None
+def _bedrock_send(body: dict, timeout: int) -> dict:
+    from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+
+    return call_anthropic_raw(body, timeout=timeout)
 
 
 def synthesize_taste(answers, *, caller=None) -> dict:
@@ -132,20 +140,9 @@ def synthesize_taste(answers, *, caller=None) -> dict:
         "messages": [{"role": "user", "content": _USER_TEMPLATE.format(answers=formatted)}],
     }
     try:
-        if caller is None:
-            from common.retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
+        from ai.structured_json import call_json  # #4276: the one door for JSON-shaped model calls
 
-            req = urllib.request.Request(
-                ANTHROPIC_API,
-                data=json.dumps(body).encode("utf-8"),
-                method="POST",
-                headers={"content-type": "application/json", "anthropic-version": "2023-06-01"},
-            )
-            result = call_anthropic_raw(req, timeout=40)
-        else:
-            result = caller(body)
-        text = "".join(b.get("text", "") for b in (result or {}).get("content", []) if b.get("type") == "text")
-        parsed = _parse(text)
+        parsed = call_json(caller or (lambda b: _bedrock_send(b, 40)), body, schema=_TASTE_SCHEMA, label="reading_onboarding")
         if not isinstance(parsed, dict):
             return _empty("unparseable")
     except Exception as e:  # noqa: BLE001 — fail-soft is the contract

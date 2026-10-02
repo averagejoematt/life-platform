@@ -119,6 +119,31 @@ Extract as JSON:
   "causal_hints": [<cause->effect links the author EXPLICITLY asserts, each {{"cause": "...", "effect": "...", "quote": "<verbatim sentence from the post>"}}. Max 4. Empty list if none — most posts have none>]
 }}"""
 
+# USER_PROMPT_TEMPLATE's shape, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. Every key required; exercise_context is anyOf [string, null].
+_S_STRS = {"type": "array", "items": {"type": "string"}}
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "themes": _S_STRS,
+        "behaviors": _S_STRS,
+        "entities": _S_STRS,
+        "exercise_context": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative", "mixed"]},
+        "causal_hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"cause": {"type": "string"}, "effect": {"type": "string"}, "quote": {"type": "string"}},
+                "required": ["cause", "effect", "quote"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["themes", "behaviors", "entities", "exercise_context", "sentiment", "causal_hints"],
+    "additionalProperties": False,
+}
+
 
 def _ground_causal_hints(hints, post_text):
     """Reuse the journal enricher's ADR-104 grounding gate verbatim — a causal hint
@@ -162,25 +187,15 @@ def call_haiku(text, channel, date):
         "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_content}],
     }
+    # #4276: the reply is constrained to EXTRACTION_SCHEMA at the model and parsed in the one door.
+    from ai.structured_json import call_json
     from common.retry_utils import call_anthropic_raw
 
-    result = call_anthropic_raw(body, timeout=30)
-
-    text_out = ""
-    for block in result.get("content", []):
-        if block.get("type") == "text":
-            text_out += block["text"]
-    text_out = text_out.strip()
-    if text_out.startswith("```"):
-        text_out = text_out.split("\n", 1)[1] if "\n" in text_out else text_out[3:]
-    if text_out.endswith("```"):
-        text_out = text_out[:-3]
-    text_out = text_out.strip()
-    try:
-        return json.loads(text_out)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse Haiku response: {e}\nRaw: {text_out[:500]}")
+    parsed = call_json(lambda b: call_anthropic_raw(b, timeout=30), body, schema=EXTRACTION_SCHEMA, label="social_enrichment")
+    if not isinstance(parsed, dict):
+        logger.error(f"Failed to parse Haiku response as a JSON object: {str(parsed)[:500]}")
         return None
+    return parsed
 
 
 FIELD_MAPPING = {

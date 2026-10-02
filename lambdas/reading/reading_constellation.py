@@ -17,15 +17,12 @@ the loop is proven; below the node threshold the surface stays honestly empty.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import re
-import urllib.request
 
 logger = logging.getLogger()
 
 MODEL = "claude-haiku-4-5-20251001"
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 MIN_NODES = 4  # the Constellation refuses to render below this (brief §2)
 
 # The ADR-104 grounded-generation harness (#2425). The prompt's grounding
@@ -47,6 +44,24 @@ _EXTRACT_SYSTEM = (
     "max; fewer is better than vague. For each, a short lowercase label (2-5 words) and a one-line gist. "
     'Respond with ONLY JSON: {"ideas": [{"label": "...", "gist": "..."}]}.'
 )
+# The shape above, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. Every object closed, every key required (Bedrock's rules).
+_IDEAS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ideas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"label": {"type": "string"}, "gist": {"type": "string"}},
+                "required": ["label", "gist"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["ideas"],
+    "additionalProperties": False,
+}
 
 
 def idea_id(label: str) -> str:
@@ -55,16 +70,10 @@ def idea_id(label: str) -> str:
     return "idea-" + hashlib.sha1(norm.encode("utf-8")).hexdigest()[:12]  # noqa: S324 — id, not security
 
 
-def _parse(text: str) -> dict | None:
-    text = (text or "").strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    try:
-        return json.loads(text.strip())
-    except json.JSONDecodeError:
-        return None
+def _bedrock_send(body: dict, timeout: int) -> dict:
+    from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+
+    return call_anthropic_raw(body, timeout=timeout)
 
 
 def _idea_grounding_findings(candidate: str, allowed: set, allowed_dates: set) -> list:
@@ -98,20 +107,9 @@ def extract_ideas(book_title: str, source_text: str, *, caller=None) -> list:
         "messages": [{"role": "user", "content": f"Book: {book_title}\n\nHis takeaway + notes:\n{source_text}"}],
     }
     try:
-        if caller is None:
-            from common.retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
+        from ai.structured_json import call_json  # #4276: the one door for JSON-shaped model calls
 
-            req = urllib.request.Request(
-                ANTHROPIC_API,
-                data=json.dumps(body).encode("utf-8"),
-                method="POST",
-                headers={"content-type": "application/json", "anthropic-version": "2023-06-01"},
-            )
-            result = call_anthropic_raw(req, timeout=30)
-        else:
-            result = caller(body)
-        text = "".join(b.get("text", "") for b in (result or {}).get("content", []) if b.get("type") == "text")
-        parsed = _parse(text)
+        parsed = call_json(caller or (lambda b: _bedrock_send(b, 30)), body, schema=_IDEAS_SCHEMA, label="reading_constellation")
         if not isinstance(parsed, dict):
             return []
     except Exception as e:  # noqa: BLE001 — fail-soft, never invent

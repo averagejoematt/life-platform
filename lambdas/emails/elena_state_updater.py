@@ -35,8 +35,6 @@ import json
 import logging
 import os
 import re
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 
 import boto3
@@ -55,7 +53,6 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 
 PERSONA_PK = "PERSONA#elena"
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
@@ -179,6 +176,38 @@ EXTRACTION_SYSTEM_PROMPT = (
 )
 
 
+_E_S = {"type": "string"}
+
+
+def _e_obj(props):
+    return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
+
+
+def _e_list(props):
+    return {"type": "array", "items": _e_obj(props)}
+
+
+# EXTRACTION_SYSTEM_PROMPT's OUTPUT shape, constrained at the model (#4276) — closed, all-required.
+EXTRACTION_SCHEMA = _e_obj(
+    {
+        "threads_opened": _e_list({"slug": _E_S, "summary": _E_S, "type": {"type": "string", "enum": ["pattern", "question", "conflict"]}}),
+        "threads_advanced": {"type": "array", "items": _E_S},
+        "threads_resolved": _e_list({"slug": _E_S, "resolution": _E_S}),
+        "callbacks_made": _e_list({"slug": _E_S, "promise": _E_S, "due_in_weeks": {"type": "integer"}}),
+        "callbacks_paid": _e_list({"slug": _E_S, "payoff_note": _E_S}),
+        "motifs": {"type": "array", "items": _E_S},
+        "stance": _e_obj(
+            {
+                "headline_stance": _E_S,
+                "positions": {"type": "array", "items": _E_S},
+                "how_my_stance_changed": _E_S,
+                "receipts": {"type": "array", "items": _E_S},
+            }
+        ),
+    }
+)
+
+
 def _call_haiku(system, user_message, max_tokens=2500, temperature=0.2):
     """Haiku via the shared Bedrock retry path. Returns dict or raw text."""
     body = {
@@ -189,31 +218,11 @@ def _call_haiku(system, user_message, max_tokens=2500, temperature=0.2):
     }
     if system:
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=json.dumps(body).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-        },
-        method="POST",
-    )
+    # #4276: constrained to EXTRACTION_SCHEMA at the model and parsed in the one door.
+    from ai.structured_json import call_json
     from common.retry_utils import call_anthropic_raw
 
-    resp = call_anthropic_raw(req)
-    text = resp["content"][0]["text"].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        if "```json" in text:
-            start = text.find("```json") + 7
-            end = text.find("```", start)
-            if end > start:
-                try:
-                    return json.loads(text[start:end].strip())
-                except json.JSONDecodeError:
-                    pass
-        return text
+    return call_json(call_anthropic_raw, body, schema=EXTRACTION_SCHEMA, label="elena_state_updater")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

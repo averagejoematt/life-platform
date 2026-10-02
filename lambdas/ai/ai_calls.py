@@ -35,6 +35,8 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DA
 from common.pacific_time import pacific_today
 from health.scoring_engine import habitify_reading  # #4362
 
+from ai import structured_json as _structured_json  # #4276: the one door for model JSON
+
 # God-module split slices 2+3: pure context/scoring + domain-data builders moved
 # to ai_context.py. Re-exported so callers + the coach functions keep working.
 from ai.ai_context import (  # noqa: F401
@@ -128,6 +130,28 @@ def init(s3_client: Any, bucket: str, has_board_loader: bool, board_loader_modul
 # ==============================================================================
 
 
+_S = {"type": "string"}
+# The IC-3 shape below, constrained at the model (#4276) — every object closed, every key required.
+_IC3_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "key_patterns": {"type": "array", "items": _S},
+        "likely_connection": _S,
+        "challenge": _S,
+        "priority": _S,
+        "tone": {"type": "string", "enum": ["celebrate", "challenge", "support"]},
+    },
+    "required": ["key_patterns", "likely_connection", "challenge", "priority", "tone"],
+    "additionalProperties": False,
+}
+
+
+def _ic3_send(body):
+    from common.retry_utils import call_anthropic_raw  # the one retry policy (#4279)
+
+    return call_anthropic_raw(body)
+
+
 def _run_analysis_pass(component_scores, habit_miss_context, insights_ctx, api_key):
     """IC-3 Pass 1: Identify patterns and causal chains BEFORE writing coaching.
 
@@ -153,13 +177,13 @@ Output this exact JSON structure:
         # "Unterminated string", cut between chars 1754 and 2277 (the measurements
         # are in tests/test_ic3_truncation_2668.py). Sized against that observed
         # ceiling, not the next round number: 1500 tok ≈ 6000 chars ≈ 2.6× it.
-        raw = call_anthropic(prompt, api_key, max_tokens=1500, model=AI_MODEL_HAIKU)
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        print("[INFO] IC-3 analysis parsed clean (%d keys)" % len(parsed := json.loads(raw.strip())))  # #2668: positive evidence
+        # #4276: constrained to _IC3_SCHEMA at the model and parsed in the one door; a
+        # non-object reply (a max_tokens cut) raises here, into the #2668 ERROR + metric.
+        body = _structured_json.user_turn_body(prompt, model=AI_MODEL_HAIKU, max_tokens=1500)
+        parsed = _structured_json.call_json(_ic3_send, body, schema=_IC3_SCHEMA, label="ic3_analysis")
+        if not isinstance(parsed, dict):
+            raise ValueError(_structured_json.decode_error(parsed))
+        print("[INFO] IC-3 analysis parsed clean (%d keys)" % len(parsed))  # #2668: positive evidence
         return parsed
     except Exception as e:
         # #2668: ERROR + a keyable metric. This ran dead 10 of 12 days with Errors
@@ -168,6 +192,17 @@ Output this exact JSON structure:
         print("[ERROR] IC-3 analysis pass failed: " + str(e))
         _emit_failure_metric("IC3AnalysisFailure")
         return None
+
+
+def _grounded_json(raw):
+    """#4276: parse a GROUNDED reply in the one door. These two callers stay schema-less
+    on purpose: `_ground_legacy_output` gates and re-asks on the raw text through
+    `call_anthropic` (text in, text out), which carries no `output_config`. Raises on a
+    non-object so the caller's existing `{}` degrade runs, exactly as json.loads did."""
+    parsed = _structured_json.parse_json_text(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError(_structured_json.decode_error(parsed))
+    return parsed
 
 
 # ==============================================================================
@@ -434,13 +469,7 @@ Respond in EXACTLY this JSON format, no other text:
             # #2056: the #1699 behavioral class, armed on the same render coach-v2 uses.
             available_logs=_available_logs_for_today(data, None, None),
         )
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        return json.loads(cleaned)
+        return _grounded_json(raw)
     except Exception as e:
         print("[WARN] Training/nutrition coach failed: " + str(e))
         return {}
@@ -1091,13 +1120,7 @@ Respond in EXACTLY this JSON format, no other text:
             # "could ONLY apply to TODAY", which is the same-day framing the gate reads.
             available_logs=_available_logs_for_today(data, None, None),
         )
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        return json.loads(cleaned)
+        return _grounded_json(raw)
     except Exception as e:
         print("[WARN] TL;DR+Guidance failed: " + str(e))
         return {}

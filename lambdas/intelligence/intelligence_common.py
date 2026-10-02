@@ -1601,8 +1601,6 @@ def extract_thread_from_narrative(coach_id: str, narrative: str, api_key: str) -
     emotional_investment_level, open_questions. Prediction identity + target dates
     are stamped in code (ADR-106) — see stamp_thread_predictions.
     """
-    import urllib.request
-
     prompt = f"""Extract structured thread data from this coach narrative. Return ONLY valid JSON.
 
 NARRATIVE:
@@ -1627,41 +1625,18 @@ Rules:
 
     try:
         model = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-        os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
-
-        # Use provided API key
-        req_body = json.dumps(
-            {
-                "model": model,
-                "max_tokens": 500,
-                "messages": [{"role": "user", "content": prompt}],
-            }
-        )
-
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=req_body.encode(),
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-            },
-        )
+        body = {"model": model, "max_tokens": 500, "messages": [{"role": "user", "content": prompt}]}
 
         # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
+        # #4276: constrained to THREAD_SCHEMA at the model and parsed in the one door.
+        from ai.structured_json import call_json, decode_error
         from common.retry_utils import call_anthropic_raw
 
-        result = call_anthropic_raw(req, timeout=30)
+        from intelligence.intelligence_json_schemas import THREAD_SCHEMA
 
-        text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-
-        # Parse JSON
-        cleaned = text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        parsed = json.loads(cleaned.strip())
+        parsed = call_json(lambda b: call_anthropic_raw(b, timeout=30), body, schema=THREAD_SCHEMA, label="coach_thread_extract")
+        if not isinstance(parsed, dict):
+            raise ValueError(decode_error(parsed))
         # ADR-106: code owns prediction identity + target dates, never the model.
         parsed["predictions"] = stamp_thread_predictions(coach_id, parsed.get("predictions", []))
         # #1987: deterministic voice-register check (zero AI cost), sibling to the
