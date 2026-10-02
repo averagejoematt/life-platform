@@ -238,7 +238,11 @@ def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
         "minutes_total": sum(s["minutes"] for s in sessions),
         "longest_session_min": max((s["minutes"] for s in sessions), default=None),
         "new_programme_blocks_this_week": new_blocks,
-        "who_writes_the_sessions": "each programmed session is authored by the coaching team as that day's routine and matched on completion",
+        "who_writes_the_sessions": (
+            "each programmed session is a routine the coaching workflow writes for that day and matches on completion; the volume is "
+            "the programme as executed — whether he pushed past what was recommended is HIS call to report (owner_voice), and the "
+            "over-ceiling sets in off_prescription_reasons are the data's evidence. Never attribute motive without his words."
+        ),
         "cardio_and_walks_whoop": cardio,
         "strava_walks": walks,
     }
