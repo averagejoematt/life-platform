@@ -25,7 +25,7 @@ import json
 import logging
 import os
 import secrets as _secrets
-from datetime import datetime, timezone  # noqa: F401 — timezone is resolved via the _g seam (chronicle_personas:204)
+from datetime import datetime, timedelta, timezone  # noqa: F401 — timezone is resolved via the _g seam (chronicle_personas:204)
 
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
@@ -690,6 +690,24 @@ def _handler_core(event: dict, context) -> dict:
     if _cached is not None:  # the explicit narrow — mypy can't see through the bool
         raw_installment = _cached
 
+    # #4535: the Story Desk writes the week (dossier → desk budget → post + episode → gates → dek). Its own gates
+    # replace the legacy passes below — including the #914 presence gate, which forced a logging stall into the story
+    # and so narrated MacroFactor export lag as silence. STORY_DESK=off restores the legacy writer.
+    _desk = None
+    if _cached is None and os.environ.get("STORY_DESK", "on").lower() != "off" and _target_date:
+        try:
+            from content import story_pipeline
+
+            _desk = story_pipeline.live_week(table, _target_date, log=logger.info)
+        except Exception as _desk_e:  # noqa: BLE001 — the legacy writer is the fallback, never a dark week
+            logger.error(f"[#4535] story desk failed — falling back to the legacy writer: {_desk_e}")
+            _desk = None
+        if _desk:
+            raw_installment = _desk["raw_installment"]
+            _skip_model_passes = True
+            week_num = _desk["week"]
+            logger.info(f"[#4535] story desk wrote week {week_num}: {_desk['title']!r} · findings {_desk['findings']}")
+
     # Call Sonnet
     try:
         if not _skip_model_passes:
@@ -1053,6 +1071,9 @@ def _handler_core(event: dict, context) -> dict:
             allow_overwrite=bool(event.get("force")),
         )
 
+        if _stored and _desk:
+            _attach_desk_artifacts(date_str, _desk)
+
         # #2254: the conditional put refused (a protected row raced in between the
         # idempotency read and this write). The approval_token was never persisted, so
         # mailing its approve link would hand Matthew a button that 403s — and the
@@ -1179,6 +1200,67 @@ def _handler_core(event: dict, context) -> dict:
     }
 
 
+def _attach_desk_artifacts(date_str, desk):
+    """#4535/#4536: the desk's budget, episode script and the ledger this week leaves ride on the chronicle row — the
+    Panel renders the episode from it, and the approve path commits the ledger on publish."""
+    try:
+        table.update_item(
+            Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"},
+            UpdateExpression="SET desk_budget_json = :b, desk_episode_json = :e, desk_ledger_json = :l, desk_findings_json = :f, #p = if_not_exists(#p, :ph)",
+            ExpressionAttributeNames={"#p": "phase"},
+            ExpressionAttributeValues={
+                ":b": json.dumps(desk["budget"], default=str),
+                ":e": json.dumps(desk["episode"], default=str),
+                ":l": json.dumps(desk["ledger"], default=str),
+                ":f": json.dumps(desk["findings"], default=str),
+                ":ph": "experiment",
+            },
+        )
+    except Exception as e:  # noqa: BLE001 — the post still publishes; the Panel falls back to its own writer
+        logger.error(f"[#4535] could not attach desk artifacts to {date_str}: {e}")
+
+
+def _send_story_questions(event):
+    """#4546: Monday — the week's gap questions by email, Reply-To the SES inbound address. Never blocks anything."""
+    import datetime as _dtm
+
+    from common.pacific_time import pacific_today
+    from content import story_dossier, story_ledger, story_questions
+
+    today = _dtm.date.fromisoformat(pacific_today())  # pacific_today() is a YYYY-MM-DD string
+    upcoming = next(
+        (
+            w
+            for w in story_dossier.season_weeks(through=(today + timedelta(days=7)).isoformat())
+            if w["start"] <= today.isoformat() <= w["end"]
+        ),
+        None,
+    )
+    if upcoming is None:
+        return {"statusCode": 200, "body": json.dumps({"status": "no_week"})}
+    n = upcoming["week"]
+    marker = {"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"STORYQ#W{n:03d}"}
+    if not event.get("force") and table.get_item(Key=marker).get("Item"):
+        return {"statusCode": 200, "body": json.dumps({"status": "already_sent", "week": n})}
+    so_far = {**upcoming, "end": min(upcoming["end"], (today - timedelta(days=1)).isoformat())}
+    dossier, _ = story_dossier.week_dossier(table, so_far)
+    ledger = story_ledger.latest_visible(table, f"USER#{USER_ID}#SOURCE#chronicle", upcoming["end"])
+    questions = story_questions.generate(dossier, story_ledger.ledger_for_prompt(ledger, n))
+    if event.get("dry_run"):
+        return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "questions": questions})}
+    resp = story_questions.send(ses, week=n, questions=questions, to=RECIPIENT, sender=SENDER)
+    table.put_item(
+        Item={
+            **marker,
+            "questions_json": json.dumps(questions),
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "phase": "experiment",
+            "message_id": resp.get("MessageId", ""),
+        }
+    )
+    return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": len(questions)})}
+
+
 def lambda_handler(event: dict, context) -> dict:
     """#2669: timeout-watchdog wrapper (common.timeout_watchdog) — _handler_core is the real flow."""
     from common.timeout_watchdog import arm, disarm
@@ -1189,6 +1271,8 @@ def lambda_handler(event: dict, context) -> dict:
         detail="the run dies mid-tail; if a '[#2669] generation cached' line appears above, the retry is free",
     )
     try:
+        if isinstance(event, dict) and event.get("story_questions"):
+            return _send_story_questions(event)  # #4546: Monday's optional questions — never touches the week's chronicle
         return _handler_core(event, context)
     finally:
         disarm(timer)

@@ -27,7 +27,7 @@ paragraph itself used to name two of them. A sample rather than an inventory:
 `python3 scripts/skill_registry.py` lists the live set; nothing here is hand-maintained.
 
 **3b. Subagent library — [`.claude/agents/`](agents/)**
-**4 subagent definitions** for the standing multi-agent fan-out pattern, each declaring its own least-privilege `tools:` list:
+**5 subagent definitions** for the standing multi-agent fan-out pattern, each declaring its own least-privilege `tools:` list:
 [`worktree-implementer`](agents/worktree-implementer.md) (one issue → one worktree → one
 open PR, with the worktree-discipline incident classes baked in),
 [`finding-verifier`](agents/finding-verifier.md) (adversarial second pass on review

@@ -25,6 +25,7 @@ counts), journal entries are counted, never read, and nothing here is a cycle co
 from __future__ import annotations
 
 import datetime as _dt
+import re
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -440,7 +441,7 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         for p in block.get("predictions", []):
             prereg.append(
                 {
-                    "filed_by": block.get("coach_name"),
+                    "filed_by": display_name(block.get("coach_name")),
                     "coach_id": cid,
                     "claim": str(p.get("claim_natural"))[:240],
                     "window_days": p.get("window_days"),
@@ -644,15 +645,31 @@ def _body_composition(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 # ── the dossier ──────────────────────────────────────────────────────────────
 
 
-def load_plan() -> Dict[str, Any]:
+def _goals() -> Dict[str, Any]:
+    """The plan root: the repo file when present (scripts, tests), else S3 config/ (the Lambda runtime — config/ is
+    not bundled), the same order experiment.plan_facts.load_plan_facts uses."""
     import json
+    import os
 
-    from common.repo_config import config_path
+    try:
+        from common.repo_config import config_path
+
+        with open(config_path("user_goals.json"), encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:  # noqa: BLE001 — fall through to S3
+        import boto3
+
+        s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+        return json.loads(
+            s3.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="config/user_goals.json")["Body"].read()
+        )
+
+
+def load_plan() -> Dict[str, Any]:
     from experiment.plan_facts import load_plan_facts
 
     facts = load_plan_facts() or {}
-    with open(config_path("user_goals.json"), encoding="utf-8") as fh:
-        goals = json.load(fh)
+    goals = _goals()
     t = goals.get("targets") or {}
     return {
         **facts,
@@ -665,17 +682,31 @@ def load_plan() -> Dict[str, Any]:
     }
 
 
+def display_name(name: Optional[str]) -> str:
+    """Reader-facing coach name: the AI personas carry no honorific (owner ruling 2026-10-02)."""
+    return re.sub(r"^Dr\.\s+", "", name or "")
+
+
 def roster() -> List[Dict[str, Any]]:
     from coach import persona_registry
 
     out = []
-    for pid, p in persona_registry.operational_personas().items():
+    import os
+
+    s3 = None
+    if not os.path.exists(
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "personas.json")
+    ):
+        import boto3
+
+        s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))  # Lambda: config/ lives in S3
+    for pid, p in persona_registry.operational_personas(s3, os.environ.get("S3_BUCKET", "matthew-life-platform") if s3 else None).items():
         cid = p.get("engine_id") or p.get("coach_config_key")
         out.append(
             {
                 "coach_id": cid,
                 "persona_id": pid,
-                "name": p.get("name"),
+                "name": display_name(p.get("name")),
                 "title": p.get("title"),
                 "lens": p.get("lens"),
                 "bio": p.get("short_bio"),

@@ -1517,6 +1517,80 @@ def _select_week_post() -> dict:
     return {"week": wk, "date": pacific_now().date().isoformat(), "title": f"Week {wk}"}
 
 
+def _desk_episode(post: dict) -> dict | None:
+    """The Story Desk's episode for this week's chronicle, or None (legacy path)."""
+    try:
+        it = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{post.get('date')}"}).get("Item") or {}
+        raw = it.get("desk_episode_json")
+        ep = json.loads(raw) if raw else None
+        return ep if ep and ep.get("turns") else None
+    except Exception as e:  # noqa: BLE001 — the legacy writer is the fallback, never a crash
+        logger.warning("[panel] desk episode read failed — %s; using the legacy writer", e)
+        return None
+
+
+def _publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False) -> dict:
+    """Render + publish a Story Desk episode (#4536): the same safety gate, voices, audio publisher, feed and series
+    memory as the legacy path; the script itself was written and gated upstream with the chronicle."""
+    from ai import gemini_tts
+
+    guest = ep.get("guest") or {}
+    guest_id = guest.get("persona_id") or guest.get("coach_id") or persona_registry.OPERATIONAL_COACH_IDS[0]
+    guest_name = guest.get("name") or "Coach"
+    turns = [{"speaker": ELENA if t.get("speaker") == "elena" else guest_id, "line": str(t.get("line") or "").strip()} for t in ep["turns"]]
+    turns = [t for t in turns if t["line"]]
+    unsafe = [r for t in turns for r in _safety_gate(t["line"])]
+    if unsafe:
+        if dry_run:
+            return _dry(week, "HOLD", stage="desk-safety", reasons=sorted(set(unsafe)))
+        return _hold_and_alert(week, sorted(set(unsafe)), {"turns": turns, "source": "story_desk"}, hold_class="safety")
+    if dry_run:
+        return _dry(week, "PUBLISH", stage="desk", guest=guest_name, clean_turns=len(turns), date=post.get("date"))
+    label_of = {ELENA: "Elena", guest_id: guest_name}
+    voices = {"Elena": _gemini_voice(ELENA), guest_name: _gemini_voice(guest_id)}
+    label_turns = [{"speaker": label_of[t["speaker"]], "line": t["line"]} for t in turns]
+    audio = gemini_tts.synthesize_dialogue(label_turns, voices, WEEKLY_STYLE)
+    published = _publish_episode_audio(week, audio)
+    transcript = "\n\n".join(f"{t['speaker']}: {t['line']}" for t in label_turns)
+    s3.put_object(
+        Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.transcript.txt", Body=transcript.encode("utf-8"), ContentType="text/plain; charset=utf-8"
+    )
+    try:
+        existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
+    except Exception:
+        existing = []
+    rec = {
+        "week": week,
+        "title": f"EP{week} · {ep.get('title') or post.get('title')}",
+        "date": post.get("date"),
+        **published,
+        "byline": f"Elena + {guest_name}",
+        "guest_id": guest_id,
+        "guest_name": guest_name,
+        "excerpt": (ep.get("excerpt") or "")[:240],
+        "image_url": "",
+        "image_credit": "",
+    }
+    existing = sorted([e for e in existing if e.get("week") != week] + [rec], key=lambda e: e.get("week", 0), reverse=True)
+    state = _state_read()
+    _state_write(
+        {
+            "episode_count": len(existing),
+            "last_episode": rec,
+            "open_bet": (ep.get("bet") or {}).get("claim") or state.get("open_bet"),
+            "recent_topics": [e["title"] for e in existing[:5]],
+            "bet_ledger": state.get("bet_ledger", [])[-20:],
+        }
+    )
+    _write_indexes(existing)
+    _write_show_memory(week, rec["title"], rec["excerpt"], guest_id, guest_name, (ep.get("bet") or {}).get("claim"))
+    _emit_published_metric()
+    _emit_outcome("published")
+    _notify_new_episode(rec)
+    logger.info("[panel] wk%s PUBLISHED (story desk) — %d turns, guest %s", week, len(turns), guest_id)
+    return {"statusCode": 200, "body": json.dumps({"week": week, "published": True, "source": "story_desk"})}
+
+
 def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD.
 
@@ -1534,6 +1608,13 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
         _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
+
+    # #4536: when the week's chronicle was written by the Story Desk, the episode script was written WITH it — from the
+    # same story budget, dossier and season ledger, through the same gates — and rides on the chronicle row. The Panel
+    # renders that script (after its own per-line safety gate) instead of writing a second, unrelated one.
+    desk_ep = _desk_episode(post)
+    if desk_ep:
+        return _publish_desk_episode(week, post, desk_ep, dry_run=dry_run)
 
     bible = _load_bible()
     state = _state_read()

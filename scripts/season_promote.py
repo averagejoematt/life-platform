@@ -97,7 +97,10 @@ def _stats_line(week: int, dossier: Dict[str, Any]) -> str:
     days = (dossier.get("window") or {}).get("experiment_days", "")
     parts = [days]
     if w.get("available"):
-        parts.append(f"{w['week_end']['lbs']} lbs ({w['week_change_lbs']:+} this week)")
+        if w.get("week_change_lbs"):
+            parts.append(f"{w['week_end']['lbs']} lbs ({w['week_change_lbs']:+} this week)")
+        else:
+            parts.append(f"{w['week_end']['lbs']} lbs at the first weigh-in")
     parts.append(f"{t.get('session_count', 0)} training sessions")
     return " · ".join(p for p in parts if p)
 
@@ -122,6 +125,7 @@ def _row_update(week: int, st: Dict[str, Any], existing: Dict[str, Any]) -> Dict
         "word_count": len(body_md.split()),
         "has_board_interview": "\n> " in ("\n" + body),
         "status": "published",
+        "phase": existing.get("phase") or "experiment",  # every renderer filters on phase; never leave it unset (#4537)
         "rebuilt_at": _now(),
         "rebuilt_by": "story-desk season rebuild (#4537)",
         "previous_title": existing.get("title"),
@@ -308,8 +312,24 @@ def apply_panel(staging: str, weeks: List[int]) -> None:
         label_of = {"elena": "Elena", "coach": guest.get("name") or "Coach"}
         voices = {"Elena": panel._gemini_voice(panel.ELENA), label_of["coach"]: panel._gemini_voice(gid)}
         label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in ep["turns"]]
-        audio = gemini_tts.synthesize_dialogue(label_turns, voices, panel.WEEKLY_STYLE)
-        published = panel._publish_episode_audio(wk, audio)
+        done_path = os.path.join(staging, "panel_published.json")
+        done = json.load(open(done_path)) if os.path.exists(done_path) else {}
+        if str(wk) in done:  # resumable: an episode already published in this promote is reused, not re-synthesized
+            published = done[str(wk)]
+        else:
+            audio = None
+            for attempt in range(3):  # the TTS vendor read can time out on a long episode
+                try:
+                    audio = gemini_tts.synthesize_dialogue(label_turns, voices, panel.WEEKLY_STYLE)
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    print(f"PANEL wk{wk}: synthesis attempt {attempt + 1} failed: {exc}")
+            if audio is None:
+                raise SystemExit(f"PANEL wk{wk}: synthesis failed 3 times — re-run to resume; published weeks are kept")
+            published = panel._publish_episode_audio(wk, audio)
+            done[str(wk)] = published
+            with open(done_path, "w", encoding="utf-8") as fh:
+                json.dump(done, fh, indent=1)
         transcript = "\n\n".join(f"{t['speaker']}: {t['line']}" for t in label_turns)
         s3.put_object(
             Bucket=BUCKET, Key=f"{PANEL_PREFIX}/wk{wk}.transcript.txt", Body=transcript.encode(), ContentType="text/plain; charset=utf-8"
@@ -349,10 +369,14 @@ def apply_panel(staging: str, weeks: List[int]) -> None:
         print(
             f"PANEL wk{wk}: {title!r} with {label_of['coach']} → {published['url']} ({published['bytes']} bytes, {published['duration_sec']}s)"
         )
-    for k in PLACEHOLDER_STUBS + SUPERSEDED_AUDIO:
-        s3.delete_object(Bucket=BUCKET, Key=f"{PANEL_PREFIX}/{k}")
+    # generated/* is delete-protected by the bucket policy (ADR-032/033/046) — never delete there. The placeholder stubs
+    # are restart tombstones that media_tombstone already reads as "not an episode" (#4396), and each published week's
+    # audio and transcript overwrite their keys. Only the private holds are cleared.
     for k in STALE_HOLDS:
-        s3.delete_object(Bucket=BUCKET, Key=f"{HOLD_PREFIX}/{k}")
+        try:
+            s3.delete_object(Bucket=BUCKET, Key=f"{HOLD_PREFIX}/{k}")
+        except Exception as exc:  # noqa: BLE001 — a hold that cannot be cleared is reported, never fatal to the publish
+            print(f"PANEL hold {k} not cleared: {exc}")
     episodes.sort(key=lambda e: e["week"], reverse=True)
     panel._write_indexes(episodes)
     open_bet = next((b["bet"] for b in reversed(bet_ledger) if b["outcome"] == "open"), None)

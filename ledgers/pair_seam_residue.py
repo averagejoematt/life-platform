@@ -363,6 +363,17 @@ _WHOOP_HISTORY_READ_REASON = (
 
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "chronicle::lambdas/emails/wednesday_chronicle_lambda.py::read": (
+        "2026-10-02",
+        "#4546: the only new direct read is the STORYQ#W<n> send-once marker (get_item by exact key, no attribute read beyond "
+        "existence); the week's installment reads still go through chronicle_store. Covered by tests/test_story_desk_wiring.py.",
+    ),
+    "chronicle::lambdas/emails/wednesday_chronicle_lambda.py::write": (
+        "2026-10-02",
+        "#4535/#4536/#4533: the desk attaches desk_episode_json / desk_ledger_json (+ budget, findings, phase) to DATE#<week end>; "
+        "the readers are coach_panel_podcast_lambda._desk_episode and chronicle_approve_lambda._commit_ledger. The pair is "
+        "proven two-sided on the real row shape with mutation controls in tests/test_story_desk_wiring.py.",
+    ),
     "notion::lambdas/content/story_dossier.py::read": (
         "2026-10-01",
         "#4532: the story dossier COUNTS journal rows by key only (ProjectionExpression='sk', begins_with "

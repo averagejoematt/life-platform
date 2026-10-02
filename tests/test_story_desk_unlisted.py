@@ -124,3 +124,11 @@ def test_mutation_control_listed_again_reappears(monkeypatch):
         assert "The Night Before Everything" in [p["title"] for p in _leadin_manifest(monkeypatch)]
     finally:
         OLD["unlisted"] = True
+
+
+def test_a_row_without_a_phase_is_rendered_like_the_wednesday_publisher_reads_it():
+    """#4537 incident: weeks 1-4 carry no `phase`; the strict filter dropped them and published a 2-post list."""
+    import inspect
+
+    src = inspect.getsource(rlp.fetch_visible_installments)
+    assert "attribute_not_exists(#phase)" in src

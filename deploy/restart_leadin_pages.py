@@ -70,10 +70,13 @@ _ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VII
 
 
 def fetch_visible_installments(table):
-    """All non-tombstoned phase-experiment DATE# chronicle records, oldest-first by date."""
+    """All non-tombstoned DATE# chronicle records of the current phase, oldest-first by date. A record with NO phase
+    attribute is current-phase — the same rule as experiment.phase_filter.with_phase_filter, which the Wednesday
+    publisher reads through (#4537: the strict "#phase = :phase" form dropped weeks 1-4, which the live writer stores
+    without a phase, and a re-render published a two-post reading list)."""
     resp = table.query(
         KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-        FilterExpression="#phase = :phase AND attribute_not_exists(tombstone)",
+        FilterExpression="(#phase = :phase OR attribute_not_exists(#phase)) AND attribute_not_exists(tombstone)",
         ExpressionAttributeNames={"#phase": "phase"},
         ExpressionAttributeValues={
             ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
@@ -85,7 +88,7 @@ def fetch_visible_installments(table):
     while "LastEvaluatedKey" in resp:
         resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
-            FilterExpression="#phase = :phase AND attribute_not_exists(tombstone)",
+            FilterExpression="(#phase = :phase OR attribute_not_exists(#phase)) AND attribute_not_exists(tombstone)",
             ExpressionAttributeNames={"#phase": "phase"},
             ExpressionAttributeValues={
                 ":pk": f"USER#{USER_ID}#SOURCE#chronicle",
