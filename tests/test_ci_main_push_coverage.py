@@ -255,3 +255,25 @@ def test_push_concurrency_never_reaches_the_deploy_chain():
     for job in ("reconcile", "lint", "test-critical", "test-owner", "plan", "deploy-iam"):
         assert "concurrency" not in jobs[job], f"{job} must not queue behind or be evicted by another run"
     assert "github.run_id" in _load(CI_CD)["concurrency"]["group"], "the workflow-level group stays run-unique"
+
+
+# ── #4252 — the two test jobs start beside lint; lint still holds the deploy chain ──────
+
+
+def _needs(job: dict) -> list:
+    needs = job.get("needs") or []
+    return needs if isinstance(needs, list) else [needs]
+
+
+def test_test_jobs_run_beside_lint_and_lint_still_gates_plan():
+    """Neither test job waits on lint (that wait put lint's ~2.5 min at the head of the
+    20-min Unit Tests long pole on every push). The safety half is the load-bearing one:
+    `plan` must still need BOTH lint and test-critical, and `deploy` must still need
+    `plan`, so a red lint or a red deploy-critical lane still blocks every deploy."""
+    jobs = _load(CI_CD)["jobs"]
+    for job in ("test", "test-critical"):
+        assert "lint" not in _needs(jobs[job]), f"{job} waits on lint again — #4252 runs it beside lint"
+        assert "reconcile" in _needs(jobs[job]), f"{job} must still read build_sha from reconcile (#1173)"
+    assert {"lint", "test-critical"} <= set(_needs(jobs["plan"])), "plan must still need lint AND test-critical"
+    assert "plan" in _needs(jobs["deploy"]), "deploy must still need plan"
+    assert {"lint", "test-critical", "test"} <= set(_needs(jobs["notify-failure"])), "notify-failure must see every gate"

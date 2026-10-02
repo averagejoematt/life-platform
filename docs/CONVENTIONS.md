@@ -177,10 +177,12 @@ content-policy` — but since #749 every gate after flake8 carries
 push surfaces ALL violations at once. (Before #749 the steps were strictly sequential —
 the first red stopped the job and MASKED every later gate, so debt surfaced in layers,
 one push per layer. That masked-gate class bit twice on 2026-07-08 alone.) Gating is
-unchanged: any red gate still fails the Lint job, and `test-critical` (→ `plan` →
-`deploy`) `needs` Lint, so a **red Lint still blocks the deploy chain** — it just no
+unchanged: any red gate still fails the Lint job, and `plan` (→ `deploy`) `needs` Lint
+as well as `test-critical`, so a **red Lint still blocks the deploy chain** — it just no
 longer hides the other gates' findings. NB: `always()` steps also run after a
-cancellation.
+cancellation. Since #4252, Lint, `test-critical` and `test` all start once `reconcile`
+is done and run side by side. Nothing waits on Lint except `plan` and `notify-failure`.
+A red Lint therefore no longer skips the two test jobs, but it still holds `plan`.
 
 **A `cancelled` CI/CD rollup is NOT a superseded push — read the JOBS (#3530).** This
 paragraph used to say a cancel "only happens on a manual cancel" under
@@ -388,6 +390,13 @@ required PR check already proved. The decisions:
   positional `ci::ci-lint.yml::lint::N` census id after it.
 - **gitleaks in `ci-lint.yml` stays unconditional.** `secret-scan.yml` is
   `pull_request`-only, so this is the one scan of a direct push, and it costs about 3s.
+- **The deploy-critical lane (`test-critical`) stays unconditional.** The required fast lane
+  ran the same `deploy_critical` selection on the PR, but on the PR's merge ref. That ref is
+  the pushed tree only when the PR head already contained main. In the 20 squash merges
+  `ad9d77fff..3772618e8`, 5 landed a tree equal to their PR head's. The other 15 landed on a
+  moved base, and a moved-base union is what this deploy gate exists to catch (#4304 +
+  #4317). What changed instead is the ordering: `test-critical` and `test` no longer
+  `needs` Lint. They run beside it, and `plan` still needs both Lint and `test-critical` (above).
 - **`ci-test.yml`'s eleven single-file pytest steps are gone.** Every one of those files
   also ran in the coverage passes. The labels survive as named sections that
   `scripts/ci_test_sections.py` prints from the passes' JUnit XML, with a failure
