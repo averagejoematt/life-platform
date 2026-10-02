@@ -409,6 +409,26 @@ for _k, _v in {"TABLE_NAME": TABLE, "S3_BUCKET": BUCKET, "USER_ID": "matthew", "
     os.environ.setdefault(_k, _v)
 
 
+def audit_gate(staging: str, weeks: List[int]) -> List[str]:
+    """#4549: an adversarial raw-data audit (the story-auditor agent) must have read THIS staging — newer than every
+    staged installment file — and left zero blocking items. Returns the reasons it refuses (empty = pass)."""
+    path = os.path.join(staging, "audit.json")
+    if not os.path.exists(path):
+        return ["no audit.json — run the story-auditor agent on this staging folder first"]
+    try:
+        with open(path, encoding="utf-8") as fh:
+            audit = json.load(fh)
+    except ValueError:
+        return ["audit.json is unreadable"]
+    reasons = []
+    newest = max(os.path.getmtime(os.path.join(staging, f"wk{w}_{k}")) for w in weeks for k in ("chronicle.md", "episode.json"))
+    if os.path.getmtime(path) < newest:
+        reasons.append("audit.json is older than a staged installment — the audit did not read what would publish; re-audit")
+    if audit.get("blocking"):
+        reasons.append(f"audit.json lists {len(audit['blocking'])} blocking item(s)")
+    return reasons
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--staging", required=True)
@@ -436,9 +456,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             " wrong; once each is resolved or overruled on the record, re-run with --accept-reviewed."
         )
         return 4
+    refusals = audit_gate(args.staging, weeks)
+    for r in refusals:
+        print(f"AUDIT GATE: {r}")
     if not args.apply:
         print("\nDRY RUN — nothing written. Re-run with --apply (owner act).")
         return 0
+    if refusals:
+        print("\nREFUSING: the audit gate is not satisfied (#4549).")
+        return 5
     if "backup" in steps:
         backup(args.backup_dir or os.path.join(args.staging, "backup"))
     if "chronicle" in steps:
