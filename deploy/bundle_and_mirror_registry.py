@@ -431,6 +431,12 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
         "claim": ".github/workflows/docs-ci.yml",
         "notes": "the wrap gate set stands in for docs-ci.yml's gate list",
     },
+    "scripts/wrap_gates.py": {
+        "clause": "C",
+        "claim": ".github/workflows/wrap-nightly.yml",
+        "notes": "NIGHTLY names the wrap checks that run only as wrap-nightly.yml matrix legs (#4262); "
+        "tests/test_advisory_failure_issue.py holds the list and the matrix equal in both directions",
+    },
     "deploy/README.md": {
         "clause": "C",
         "claim": ".github/workflows/site-deploy.yml",
@@ -581,7 +587,11 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
 # deploy/write_lane_posture.py (box 4) names pr-checks.yml by path, and the
 # equality assertion redded by name until it was registered. That is the
 # derivation guard working on its author, one commit after it landed.
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 25}
+#
+# C 25 -> 26 (2026-10-02, #4262): scripts/wrap_gates.py's NIGHTLY list stands in for
+# wrap-nightly.yml's matrix (held equal by tests/test_advisory_failure_issue.py) and names
+# the workflow by path — a real clause-C mirror, registered rather than reworded.
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 26}
 
 
 def main() -> None:

@@ -40,6 +40,83 @@ MAX_CALLBACKS = 10
 MAX_GUEST_HISTORY = 12
 TURN_CAP = 22
 
+# #4514: each pass's output budget, sized from what the passes actually write. The
+# coach-panel-podcast Sonnet writer calls (AnthropicOutputTokens, 1-min Maximum, 2026-09-17..10-01,
+# n=10 calls) ran 1,678-2,246 tokens; two of them were CUT at the old 2,200 (09-25 pass-2,
+# 10-01 pass-1), so 2,200 sat inside the distribution, not above it. 4,096 is ~1.8x the largest
+# measured reply. Output bills only when produced, so a reply that fits costs the same.
+PASS_MAX_TOKENS = 4096
+
+# #4514: both passes run under a JSON schema (#4276's one door, ai.structured_json.call_json),
+# so Bedrock constrains the shape. A schema refusal degrades to the old schema-less request.
+ELENA_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "elena_turns": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"line": {"type": "string"}, "wants_from_guest": {"type": "string"}},
+                "required": ["line", "wants_from_guest"],
+                "additionalProperties": False,
+            },
+        },
+        "open_bet": {"type": "string"},
+        "last_bet_result": {
+            "type": "object",
+            "properties": {"outcome": {"type": "string", "enum": ["won", "lost", "open", "none"]}},
+            "required": ["outcome"],
+            "additionalProperties": False,
+        },
+        "pull_quote": {"type": "string"},
+        "episode_title": {"type": "string"},
+    },
+    "required": ["elena_turns", "open_bet", "last_bet_result", "pull_quote", "episode_title"],
+    "additionalProperties": False,
+}
+GUEST_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {"replies": {"type": "array", "items": {"type": "string"}}},
+    "required": ["replies"],
+    "additionalProperties": False,
+}
+
+
+def _run_pass(deps: dict, body: dict, schema: dict, label: str) -> tuple:
+    """One schema-constrained pass. Returns (parsed, stop_reason, detail). `parsed` is the
+    schema path's dict, else the caller's tolerant extract_json of the raw text; `detail` is the
+    decoder's message and position when neither yields an object."""
+    from ai.structured_json import call_json, decode_error
+
+    seen: dict = {}
+
+    def _call(b: dict) -> dict:
+        resp = deps["invoke"](b, model_name=b.get("model"))
+        seen["resp"] = resp or {}
+        return seen["resp"]
+
+    parsed = call_json(_call, body, schema=schema, label=label)
+    resp = seen.get("resp") or {}
+    if not isinstance(parsed, dict):
+        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
+        tolerant = deps["extract_json"](text)
+        parsed = tolerant if isinstance(tolerant, dict) else parsed
+    detail = "" if isinstance(parsed, dict) else decode_error(parsed)
+    return parsed, resp.get("stop_reason"), detail
+
+
+def _fallback(logger, stage: str, stop_reason, detail: str) -> dict:
+    """A pass that did not yield a usable object is UNEVALUATED, and the v1 fallback is counted
+    by one greppable key (`v2_fallback=<stage>`) carrying the stop reason — never silent (#4514)."""
+    logger.warning(
+        "[panel] v2 %s UNEVALUATED stop_reason=%s detail=%s — falling back to v1 (v2_fallback=%s)",
+        stage,
+        stop_reason,
+        detail or "parsed an object without the required fields",
+        stage.split(" ")[0],
+    )
+    return {}
+
 
 def load_show_memory(table, user_id, logger) -> dict:
     """The episode-memory ledger — callbacks + guest history. Absence = empty
@@ -218,15 +295,14 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
         + "Write the JSON now."
     )
     model = deps["writer_model"]
-    resp = deps["invoke"](
-        {"model": model, "max_tokens": 2200, "system": elena_system, "messages": [{"role": "user", "content": elena_user}]},
-        model_name=model,
+    elena, stop1, detail1 = _run_pass(
+        deps,
+        {"model": model, "max_tokens": PASS_MAX_TOKENS, "system": elena_system, "messages": [{"role": "user", "content": elena_user}]},
+        ELENA_OUTPUT_SCHEMA,
+        "panelcast_v2_pass1",
     )
-    text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-    elena = deps["extract_json"](text)
     if not isinstance(elena, dict) or not isinstance(elena.get("elena_turns"), list) or len(elena["elena_turns"]) < 4:
-        logger.warning("[panel] v2 pass-1 (Elena) failed — falling back to v1")
-        return {}
+        return _fallback(logger, "pass-1 (Elena)", stop1, detail1)
 
     # Pass 2 — the guest answers Elena's ACTUAL lines, in their own voice spec.
     v_rules, v_example = guest_voice_spec(deps["s3"], deps["bucket"], guest_id)
@@ -256,20 +332,18 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
         )
         + f"ELENA'S LINES:\n{numbered}\n\nWrite the JSON now."
     )
-    resp2 = deps["invoke"](
-        {"model": model, "max_tokens": 2200, "system": coach_system, "messages": [{"role": "user", "content": coach_user}]},
-        model_name=model,
+    coach, stop2, detail2 = _run_pass(
+        deps,
+        {"model": model, "max_tokens": PASS_MAX_TOKENS, "system": coach_system, "messages": [{"role": "user", "content": coach_user}]},
+        GUEST_OUTPUT_SCHEMA,
+        "panelcast_v2_pass2",
     )
-    text2 = "".join(p.get("text", "") for p in (resp2.get("content") or []) if isinstance(p, dict)).strip()
-    coach = deps["extract_json"](text2)
     if not isinstance(coach, dict) or not isinstance(coach.get("replies"), list) or len(coach["replies"]) < 3:
-        logger.warning("[panel] v2 pass-2 (guest) failed — falling back to v1")
-        return {}
+        return _fallback(logger, "pass-2 (guest)", stop2, detail2)
 
     turns = interleave_turns(elena["elena_turns"], coach["replies"])
     if len(turns) < 8:
-        logger.warning("[panel] v2 interleave too short (%d) — falling back to v1", len(turns))
-        return {}
+        return _fallback(logger, "interleave", None, f"only {len(turns)} turns after interleaving")
     return {
         "turns": turns,
         "open_bet": elena.get("open_bet"),

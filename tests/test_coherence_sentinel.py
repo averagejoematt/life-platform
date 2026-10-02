@@ -422,3 +422,20 @@ def test_quiet_source_staleness_counts_pacific_days(monkeypatch):
     out = sentinel._quiet_behavioral_sources([key])
     assert out and out[0]["last_date"] == "2026-06-01"
     assert out[0]["days"] == 76, f"staleness counted in the wrong frame: {out[0]['days']}"
+
+
+def test_semantic_pass_is_asked_under_its_schema_and_salvages_a_prose_wrapped_reply(monkeypatch):
+    """#4276: the semantic pass sends _SEMANTIC_SCHEMA as output_config.format through
+    ai.structured_json.call_json; a schema-less fallback reply with prose around its JSON
+    still parses through the door's span salvage."""
+    from ai import bedrock_client, budget_guard
+
+    monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+    sent = []
+    reply = 'Here is my read: {"coherent": false, "issues": ["HRV in bpm"]} — done.'
+    monkeypatch.setattr(
+        bedrock_client, "invoke", lambda body, model_name=None: sent.append(body) or {"content": [{"type": "text", "text": reply}]}
+    )
+    out = sentinel._semantic_pass({"hrv_ms": 25.2}, ["HRV sat at 25 bpm."])
+    assert out == {"coherent": False, "issues": ["HRV in bpm"]}
+    assert sent[0]["output_config"]["format"]["schema"] == sentinel._SEMANTIC_SCHEMA

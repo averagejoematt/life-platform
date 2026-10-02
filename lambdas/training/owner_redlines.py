@@ -314,28 +314,41 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "walking_floor_hr_wk": {
         "value": 8.5,
-        "target_hr_wk": 13,
+        # #4503 OD2 (A, owner 2026-09-30): 11–12 h by block-2 week 6 (was 13 h by week 6); v0.3's 16 h front-load is retired
+        "target_hr_wk": 12,
+        "target_range_hr_wk": [11, 12],
         "target_by_week": 6,
+        "target_by": "block-2 week 6",
         "ramp_hr_per_wk_max": 1.0,
-        "front_load_permitted_hr_wk": 16,
-        "front_load_weeks": [3, 12],
+        "retired": {"front_load_permitted_hr_wk": 16, "front_load_weeks": [3, 12], "target_hr_wk": 13, "hr_ceiling_bpm": 105},
         "ceiling_hr_wk_outside_front_load": 15,
         "maintenance_floor_hr_wk": 10,
-        "hr_ceiling_bpm": 105,  # drift-ok: a heart-rate ceiling in bpm, not a budget ceiling (ADR-133 scanner false-positive)
-        "walks": "2–3 per day, none over 75 min; no walking in the 2 h before lifting; the lightest walking day follows the heavy session",
+        # OD2: the average walking HR is capped at 120 with the talk test; 105 is the TARGET, no longer the cap
+        "hr_ceiling_bpm": 120,  # drift-ok: a heart-rate ceiling in bpm, not a budget ceiling (ADR-133 scanner false-positive)
+        "hr_target_bpm": 105,
+        "talk_test": True,
+        "long_walk_slots_per_wk": 1,
+        # OD7 (A): the vital sign is hours AND >= 3 standalone walks a week of >= 20 min outside a gym window (`training.recent_aerobic`)
+        "standalone_walks": {"min_per_wk": 3, "min_minutes": 20, "outside": "every Hevy session's start..end (a gym window)"},
+        "walks": (
+            "2–3 per day; on a weekday none over 75 min as a default, plus one long-walk slot a week; no walking in the 2 h before "
+            "lifting; the lightest walking day follows the heavy session"
+        ),
         "permanent": True,
-        "provenance": "owner-history",
-        "stated": "2026-06-19",
+        "provenance": "owner",
+        "stated": "2026-09-30",
+        # derived from owner-history (2026-06-19, the by-band table) + the v0.5 red team; OD2/OD7 ruled by the owner 2026-09-30 (#4503)
         "note": (
             "PROVEN_BLUEPRINT's by-band table: at 300-309 lb during the campaign that worked he was walking ~10x/wk, "
             "~8.5 hrs/wk, from day one. v3 (historian, 2026-09-22): the 2024–25 rate was BOUGHT with walking — 15 walks, 16–19 h/wk "
             "at 83–104 bpm for the first nine weeks — and halved to 2.0 at ~269 lb when walking fell from 18 to 7 h while lifting "
-            "volume rose. Today: 8.4 h. Rebuild to 13 h by week 6; 16 h is permitted in weeks 3–12 and is what the historical rate "
-            "actually requires at 2,000–2,200 kcal — the plan assumes he will not hold it longer and does not depend on it. The floor "
-            "is PERMANENT and is a vital sign, not a schedule: a week under 8.5 h (10 h in maintenance) fires the relapse-prodrome "
-            "tripwire in every phase (11.4 → 4.4 walks/wk inside 8 weeks of the 2025 trough preceded the regain). Owner correction "
-            "2026-09-19: treadmill and cycling blocks logged inside Hevy count; Apple Health steps are NOT a walking proxy. "
-            "The walking-hours choice for weeks 3–12 (13 or 16) is the owner's open item — it decides 38 vs 34 vs ~31 weeks."
+            "volume rose. v0.5 (OD2, owner 2026-09-30): 11–12 h total by block-2 week 6 with weight-bearing ≥ 8.5 h; 16 h is retired "
+            "and so is 'cycling ≤ 2 h'; HR average ≤ 120 with the talk test, 105 the target; one long-walk slot a week, weekday walks "
+            "≤ 75 min as a default. The floor is PERMANENT and is a vital sign, not a schedule: a week under 8.5 h (10 h in "
+            "maintenance) fires the relapse-prodrome tripwire in every phase (11.4 → 4.4 walks/wk inside 8 weeks of the 2025 trough "
+            "preceded the regain) — and since OD7 the vital sign also counts walks: ≥ 3 standalone walks a week of ≥ 20 min outside "
+            "a gym window. Owner correction 2026-09-19: treadmill and cycling blocks logged inside Hevy count toward hours; Apple "
+            "Health steps are NOT a walking proxy."
         ),
     },
     "lifting_sessions_per_wk": {
@@ -439,10 +452,17 @@ REDLINES: dict[str, dict[str, Any]] = {
     },
     "run_gate_lb": {
         "value": 240,
+        # #4503 OD3 (wording C + clause B, owner 2026-09-30): the tissue clause is 4 wk weight-bearing >= 8.5 h pain-free AND
+        # Stage 4 completed (v0.4: "four consecutive weeks >= 12 h walking without a pain flag AND a run/walk on-ramp; no intervals at
+        # any weight"); no running or impact intervals at any weight.
         "gate": (
-            "≤ 240 lb AND four consecutive weeks ≥ 12 h walking without a pain flag AND a run/walk on-ramp; max 2 runs/wk, none within "
-            "24 h of a heavy lower session; no intervals at any weight"
+            "≤ 240 lb AND four consecutive weeks ≥ 8.5 h weight-bearing walking without a pain flag AND Stage 4 completed AND a run/walk "
+            "on-ramp; max 2 runs/wk, none within 24 h of a heavy lower session. No running or impact intervals at any weight; non-impact "
+            "intensity is governed by the stage gates — ≤ 1 session/wk above 275 lb, ≤ 2 below, never within 24 h before a heavy lower "
+            "session; Stage 3 needs one 12-lead ECG + BP on record"
         ),
+        "tissue_clause": {"weeks": 4, "weight_bearing_hr_wk": 8.5, "pain_free": True, "stage_completed": 4},
+        "non_impact_intensity": {"max_per_wk_above_275_lb": 1, "max_per_wk_at_or_below_275_lb": 2, "not_within_h_before_heavy_lower": 24},
         "provenance": "owner-history",
         "stated": "2026-06-19",
         "note": (
@@ -855,21 +875,28 @@ TRIPWIRES: list[dict[str, Any]] = [
         "derived_by": "transformation coach (red team 2026-09-22)",
         "action": "the Minimum Viable Week",
         "evaluated_by_engine": False,
-        "note": "Sleep is his one degraded channel now (7.25 h vs 8.4 in the 290s of 2024) and is why the walking ceiling is 15 h outside the front-loaded window.",
+        "note": "Sleep is his one degraded channel now (7.25 h vs 8.4 in the 290s of 2024) and is why the walking ceiling is 15 h (the front-load window is retired, OD2).",
     },
     {
         "id": "walking_collapse",
-        "signal": "walking+cycling hours down >30% week-over-week, or two skipped evening walks in one week",
+        "signal": (
+            "walking+cycling hours down >30% week-over-week, or fewer than `walking_floor_hr_wk.standalone_walks` (3 walks ≥ 20 min "
+            "outside a gym window) in the trailing 7 days"
+        ),
         "threshold_pct": 30,
         "provenance": "owner-history",
         "tripwire_class": "report_only",
         "action": "mandatory human contact the same day and a mode review — this is the relapse prodrome, not a rest day",
+        # #4503 OD7 (A): the named human is the actuator. A MARK ONLY: the engine reads whether `config/coaching/named_human.json`
+        # designates one (never the identity) and sends NOTHING — the contact path stays `coach.named_human_contact`'s.
+        "actuator": {"role": "named_human", "config_key": "config/coaching/named_human.json", "when": "same day", "sends": False},
         "evaluated_by_engine": True,
         "note": (
             "11.4 → 4.4 walks/wk inside 8 weeks of the 2025 trough preceded the regain, and the 2024–25 rate halved at ~269 lb the week "
-            "walking fell from 18 to 7 h. #4387: plan_engine evaluates the hours half (trailing 7 days vs the 7 before, from "
-            "`training.recent_aerobic`) and REPORTS it the way self_added_volume is reported — a row and a report, never a veto; "
-            "the skipped-evening-walks half is not computed."
+            "walking fell from 18 to 7 h. plan_engine evaluates both halves from `training.recent_aerobic` (#4387 hours: trailing 7 days "
+            "vs the 7 before; #4503 OD7 walks: Strava walks whose de-duplicated minutes outside every Hevy session reach 20) and REPORTS "
+            "them the way self_added_volume is reported — a row and a report, never a veto. v0.4's 'two skipped evening walks' is "
+            "replaced by the standalone-walk count."
         ),
     },
     {
@@ -881,7 +908,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "evaluated_by_engine": True,
         "note": (
             "#4387 (owner incident 2026-09-27): a 4.4 h walking weekend went unseen by every critic. The ramp (1.0 h/wk) and the "
-            "target (13 h by week 6) are his own redline values (`walking_floor_hr_wk`); crossing them is reported, never blocked — "
+            "target (12 h by block-2 week 6, OD2) are his own redline values (`walking_floor_hr_wk`); crossing them is reported, never blocked — "
             "walking is the lever that made the 2024–25 rate."
         ),
     },

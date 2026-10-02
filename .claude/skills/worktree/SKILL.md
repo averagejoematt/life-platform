@@ -85,11 +85,15 @@ deleted). It enforces rules 1–3 below rather than asking you to recall them.
 
 **Release when the lane is done** (after the PR merges — not when the PR opens; a pushed
 branch awaiting merge is still live work). The driver does this in `/land` §5, after a
-verified merge:
+verified merge, and `deploy/merge_train.sh` does it for every PR it merges (by the PR's head
+branch, #4259):
 
 ```bash
-python3 scripts/lane_worktree.py release <path|issue-N>    # == git worktree unlock <path>
+python3 scripts/lane_worktree.py release <path|issue-N|branch>    # == git worktree unlock <path>
 ```
+
+A driver that merges with a script of its own must release the same way: a merge that does
+not release leaves the lane locked, and the reaper honours the lock.
 
 Until it is released the reaper keeps the worktree, by design, and prints this command on
 the kept row. The `worktree-reap` wrap gate (#4259) removes released lanes at every `/wrap`,

@@ -501,3 +501,54 @@ def test_phase1_and_phase4_share_the_one_watch_call_site():
     # this isn't a wrapper added alongside the old duplication.
     code = "".join(_executable_lines())
     assert code.count('bash "${WAIT_PR_GREEN}"') == 1, "expected _watch_pr_green to be the ONE call site"
+
+
+# ── 6. #4259: a merged PR's lane worktree is RELEASED, never left locked ─────
+#
+# The train merged N PRs and unlocked none, so each train-merged lane stayed locked and
+# the reaper (which honours a lock) kept it forever. The wire here is real git: a real
+# `worktree add` + `worktree lock` in a synthetic repo, the shipped `lane_worktree.py`,
+# and `git worktree list --porcelain` read back afterwards.
+
+
+def _locked_lane(tmp_path, branch):
+    repo = _init_repo(tmp_path / "repo")
+    _write(repo, "a.txt", "a\n")
+    _commit(repo, "init")
+    lane = tmp_path / branch
+    _git(repo, "worktree", "add", "-q", "-b", branch, str(lane))
+    _git(repo, "worktree", "lock", str(lane), "--reason", f"lane in use: {branch}")
+    return repo, lane
+
+
+def _is_locked(repo, lane):
+    blocks = _git(repo, "worktree", "list", "--porcelain").split("\n\n")
+    (block,) = [b for b in blocks if os.path.realpath(str(lane)) in b or str(lane) in b]
+    return "\nlocked" in "\n" + block
+
+
+def test_a_merged_pr_releases_its_lane_and_a_dry_run_releases_nothing(tmp_path):
+    repo, lane = _locked_lane(tmp_path, "issue-4259-train-lane")
+    assert _is_locked(repo, lane)
+
+    p = _sourced(f"release_merged_lane issue-4259-train-lane '{repo}'", env={"MERGE_TRAIN_DRY_RUN": "1"})
+    assert p.returncode == 0 and "DRY-RUN would release" in p.stdout, p.stdout + p.stderr
+    assert _is_locked(repo, lane), "--dry-run must not unlock anything"
+
+    p = _sourced(f"release_merged_lane issue-4259-train-lane '{repo}'", env={"MERGE_TRAIN_DRY_RUN": "0"})
+    assert p.returncode == 0 and "released" in p.stdout, p.stdout + p.stderr
+    assert not _is_locked(repo, lane), "the merged PR's lane is still locked — the reaper will keep it forever"
+
+    # A merged PR with no lane here (another machine, a dependabot branch) is not an error,
+    # and a second release of the same lane (the driver after the train) is a no-op.
+    for ref in ("dependabot/pip/boto3-1.2.3", "issue-4259-train-lane"):
+        p = _sourced(f"release_merged_lane '{ref}' '{repo}'", env={"MERGE_TRAIN_DRY_RUN": "0"})
+        assert p.returncode == 0, f"{ref}: {p.stdout}{p.stderr}"
+
+
+def test_phase4_releases_only_after_the_merge_is_confirmed():
+    code = "".join(_executable_lines())
+    merged = code.index('dispo[$i]="MERGED"')
+    release = code.index('release_merged_lane "${head_ref[$i]}"')
+    failed = code.index('detail[$i]="gh pr merge failed')
+    assert failed < merged < release, "the lane is released only on the MERGED branch of phase 4, after the merge"

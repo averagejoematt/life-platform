@@ -540,6 +540,14 @@ def _gather_experiment_continuity():
 
 
 # ── Semantic pass (budget-gated Claude) ──────────────────────────────────────
+_SEMANTIC_SCHEMA = {  # #4276: the semantic pass's reply shape, closed and all-required
+    "type": "object",
+    "properties": {"coherent": {"type": "boolean"}, "issues": {"type": "array", "items": {"type": "string"}}},
+    "required": ["coherent", "issues"],
+    "additionalProperties": False,
+}
+
+
 def _semantic_pass(facts, narratives):
     """A Haiku read on whether the served narratives cohere with the facts —
     the content analogue of the visual AI-QA. Budget-gated; fail-soft."""
@@ -575,11 +583,13 @@ def _semantic_pass(facts, narratives):
             "max_tokens": 400,
             "messages": [{"role": "user", "content": prompt}],
         }
-        resp = bedrock_client.invoke(body)
-        text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
-        s = text.strip()
-        a, b = s.find("{"), s.rfind("}")
-        parsed = json.loads(s[a : b + 1]) if a != -1 and b > a else {}  # noqa: E203
+        # #4276: constrained to _SEMANTIC_SCHEMA and parsed in the one door; a schema-less
+        # fallback reply with prose around its JSON still gets the old {...} span salvage.
+        from ai.structured_json import call_json, parse_json_span
+
+        parsed = call_json(lambda b: bedrock_client.invoke(b), body, schema=_SEMANTIC_SCHEMA, label="coherence_semantic")
+        if isinstance(parsed, str):
+            parsed = parse_json_span(parsed, "{")
         return parsed or None
     except Exception as e:  # noqa: BLE001
         logger.warning("coherence: semantic pass failed: %s", e)

@@ -2,7 +2,7 @@
 
 On 2026-09-27 the red team approved 60 min of incline treadmill after a trap-bar + squat lower
 session, the morning after a 4.4 h walking weekend (walks of 102 and 165 min at ~116 bpm, both
-over the owner's ≤ 75 min / ≤ 105 bpm walking redlines). No critic held the walks: the joints
+over the owner's then ≤ 75 min / ≤ 105 bpm walking redlines). No critic held the walks: the joints
 packet carried pain flags, novelty and the fatigue trigger, and nothing about weight-bearing load.
 
 THE RULE (computed here, never by the model — the #4149 determinism ruling)
@@ -11,8 +11,9 @@ THE RULE (computed here, never by the model — the #4149 determinism ruling)
             (#4412: the numbers also carry the last Hevy cardio block's own joined HR,
             `last_cardio_block_avg_hr` — None/unknown when no wearable covered its minutes);
   AND       the draft is a LOWER session carrying a weight-bearing cardio block (treadmill/walk);
-  THEN      `change`: that block becomes cycling (recumbent), the same duration, HR < 105 bpm.
-  The 75-min and 105-bpm lines are OWNER-HISTORY (`owner_redlines.walking_floor_hr_wk`). The
+  THEN      `change`: that block becomes cycling (recumbent), the same duration, HR average under the
+            redline cap (120 since OD2, #4503) with its 105 target named.
+  The 75-min line and the HR cap/target are the owner's (`owner_redlines.walking_floor_hr_wk`). The
   3.0 h trigger is POPULATION-DERIVED and the flag says so at the point of use (ADR-105).
 
 The flag is `governed` (the model cannot re-escalate it into a different change) and
@@ -77,8 +78,8 @@ def aerobic_flags(
             "change",
             (
                 f"{ex['label']} {minutes} min on a lower session after {why} — swap to cycling (recumbent), same {minutes} min, "
-                f"HR < {recent_aerobic.HR_CEILING_BPM} bpm. The {recent_aerobic.WALK_MAX_MIN}-min / {recent_aerobic.HR_CEILING_BPM}-bpm "
-                f"walking lines are owner-history; the {recent_aerobic.WEIGHT_BEARING_48H_TRIGGER_HR} h / 48 h trigger is "
+                f"HR avg ≤ {recent_aerobic.HR_CEILING_BPM} bpm (target {recent_aerobic.HR_TARGET_BPM}). The {recent_aerobic.WALK_MAX_MIN}-min / "
+                f"{recent_aerobic.HR_CEILING_BPM}-bpm walking lines are the owner's; the {recent_aerobic.WEIGHT_BEARING_48H_TRIGGER_HR} h / 48 h trigger is "
                 "POPULATION-DERIVED, not his variance (ADR-105, #4387)" + hr_note
             ),
             provenance="owner-history",

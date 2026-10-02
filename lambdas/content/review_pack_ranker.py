@@ -33,7 +33,6 @@ v1.0.0 — 2026-07-22 (#1688)
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Callable, Optional
@@ -398,12 +397,10 @@ def _parse_critic(resp: dict) -> dict:
     """Parse the critic's JSON array → {n: wrongness float in 0..1}. Defensive: tolerate
     fences/prose, drop malformed rows. Returns {} on any parse failure."""
     text = "".join(p.get("text", "") for p in (resp or {}).get("content", []) if p.get("type") == "text").strip()
-    start, end = text.find("["), text.rfind("]")
-    if start == -1 or end == -1 or end < start:
-        return {}
-    try:
-        arr = json.loads(text[start : end + 1])  # noqa: E203
-    except (ValueError, TypeError):
+    from ai.structured_json import parse_json_span  # #4276: the span salvage lives in the one door
+
+    arr = parse_json_span(text, "[")
+    if arr is None:
         return {}
     out = {}
     for row in arr if isinstance(arr, list) else []:

@@ -719,6 +719,14 @@ class TestEvaluateIntentionsHaiku:
         out = di._evaluate_intentions_haiku({"today": "run today"}, {}, "k")
         assert out == [{"type": "exercise", "executed": True}]
 
+    def test_the_schema_object_is_unwrapped_and_the_schema_is_sent(self, monkeypatch):
+        """#4276: the request carries the evaluation schema; its {"evaluations": [...]} root is unwrapped."""
+        calls = self._patch_transport(monkeypatch, '{"evaluations": [{"type": "walk", "executed": true}]}')
+        assert di._evaluate_intentions_haiku({"today": "walk today"}, {}, "k") == [{"type": "walk", "executed": True}]
+        from compute.compute_json_schemas import INTENTION_EVAL_SCHEMA
+
+        assert calls[0]["output_config"]["format"]["schema"] == INTENTION_EVAL_SCHEMA
+
     def test_a_fenced_json_array_is_unwrapped(self, monkeypatch):
         self._patch_transport(monkeypatch, '```json\n[{"type": "walk"}]\n```')
         assert di._evaluate_intentions_haiku({"today": "walk today"}, {}, "k") == [{"type": "walk"}]
@@ -735,7 +743,7 @@ class TestEvaluateIntentionsHaiku:
     def test_both_intention_sources_reach_the_prompt(self, monkeypatch):
         calls = self._patch_transport(monkeypatch, "[]")
         di._evaluate_intentions_haiku({"today": "log all meals", "tomorrow": "bed by ten"}, {"calories_logged": 1200}, "k")
-        body = json.loads(calls[0].data.decode())["messages"][0]["content"]
+        body = calls[0]["messages"][0]["content"]
         assert "[Morning intention] log all meals" in body and "[Previous-evening plan] bed by ten" in body
         assert "calories_logged" in body
 

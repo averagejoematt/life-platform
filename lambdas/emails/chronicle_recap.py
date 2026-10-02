@@ -2,7 +2,6 @@
 grounded only in published installments + the narrative arc, split out of
 wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 
-import json
 from datetime import datetime, timezone
 
 from common.constants import EXPERIMENT_START_DATE
@@ -199,25 +198,19 @@ def _as_int(v):
 
 
 def _parse_recap_json(raw):
-    """Parse the recap LLM output: bare JSON, or fenced ```json … ```."""
+    """Parse the recap LLM output in the one door (#4276): a dict, else None.
+
+    Schema-less on purpose: `call_anthropic` here is the chronicle's text seam (prompt in,
+    text out), which carries no `output_config`; the fence-tolerant parse is
+    `ai.structured_json.parse_json_text`."""
     if isinstance(raw, dict):
         return raw
     if not isinstance(raw, str):
         return None
-    txt = raw.strip()
-    try:
-        return json.loads(txt)
-    except json.JSONDecodeError:
-        pass
-    if "```json" in txt:
-        start = txt.find("```json") + 7
-        end = txt.find("```", start)
-        if end > start:
-            try:
-                return json.loads(txt[start:end].strip())
-            except json.JSONDecodeError:
-                return None
-    return None
+    from ai.structured_json import parse_json_text
+
+    parsed = parse_json_text(raw)
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _write_recap(recap, date_str, *, _g):

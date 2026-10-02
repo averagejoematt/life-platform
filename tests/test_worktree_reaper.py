@@ -588,3 +588,25 @@ def test_the_wrap_battery_runs_the_reaper_and_the_release_step_is_named():
     for rel in (".claude/skills/land/SKILL.md", ".claude/agents/worktree-implementer.md"):
         body = Path(REPO, rel).read_text(encoding="utf-8")
         assert "lane_worktree.py release" in body, f"{rel} must name the release step"
+
+
+def test_release_by_branch_name_is_exact_idempotent_and_missing_ok(sandbox):
+    """#4259: `deploy/merge_train.sh` releases by the PR's head branch — exact where an issue
+    number is ambiguous — and must not fail on a merged PR that never had a lane here."""
+    first = lane.new_lane("4259", "by-branch", repo=sandbox)
+    lane.new_lane("4259", "sibling", repo=sandbox)  # same issue: the number is ambiguous, the branch is not
+    assert os.path.realpath(lane.resolve_lane("issue-4259-by-branch", repo=sandbox)) == os.path.realpath(first)
+
+    def locked(p):
+        porcelain = _run(["git", "worktree", "list", "--porcelain"], sandbox)
+        (block,) = [b for b in porcelain.split("\n\n") if os.path.realpath(p) in b or str(p) in b]
+        return "\nlocked" in "\n" + block
+
+    assert lane.main(["release", "--repo", str(sandbox), "issue-4259-by-branch"]) == 0
+    assert not locked(first)
+    assert lane.main(["release", "--repo", str(sandbox), "issue-4259-by-branch"]) == 0, "a second release is a no-op"
+    assert lane.main(["release", "--missing-ok", "--repo", str(sandbox), "dependabot/pip/x-1.0"]) == 0
+    with pytest.raises(SystemExit):
+        lane.main(["release", "--repo", str(sandbox), "no-such-branch"])  # without --missing-ok: an error
+    with pytest.raises(SystemExit):
+        lane.main(["release", "--missing-ok", "--repo", str(sandbox), "4259"])  # ambiguous is never 'missing'

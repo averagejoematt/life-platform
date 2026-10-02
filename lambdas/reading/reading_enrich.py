@@ -33,14 +33,11 @@ instruction is not a gate. The gate here is chosen per-field for what is honest:
 
 from __future__ import annotations
 
-import json
 import logging
-import urllib.request
 
 logger = logging.getLogger()
 
 MODEL = "claude-haiku-4-5-20251001"
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"  # routed to Bedrock by retry_utils (ADR-062)
 
 # ── Closed vocabularies — the deterministic half of the #2425 gate ────────────
 # The prompt below is generated from these same constants, so prompt and
@@ -100,6 +97,27 @@ Title: {title}
 Author: {author}
 Page count: {pages}
 Format: {fmt}""".replace("%TAGS%", ", ".join(sorted(DOMAIN_TAG_VOCAB)))
+
+# The shape above, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. The closed vocabularies are enums, so an out-of-vocabulary
+# tag cannot be emitted; the #2425 validator below still filters (it is the fallback's guard).
+_SUBSCORE = {"type": "integer", "enum": [1, 2, 3, 4, 5]}
+_ENRICH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "domainTags": {"type": "array", "items": {"type": "string", "enum": sorted(DOMAIN_TAG_VOCAB)}},
+        "themes": {"type": "array", "items": {"type": "string"}},
+        "era": {"anyOf": [{"type": "string", "enum": sorted(ERA_VOCAB)}, {"type": "null"}]},
+        "difficulty": {
+            "type": "object",
+            "properties": {"density": _SUBSCORE, "prose": _SUBSCORE, "structure": _SUBSCORE},
+            "required": ["density", "prose", "structure"],
+            "additionalProperties": False,
+        },
+    },
+    "required": ["domainTags", "themes", "era", "difficulty"],
+    "additionalProperties": False,
+}
 
 
 def _grounded_themes(themes: list, prompt_text: str) -> list:
@@ -173,17 +191,10 @@ def _coerce_difficulty(raw: dict, pages) -> dict:
     return out
 
 
-def _parse(text: str) -> dict | None:
-    text = (text or "").strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    try:
-        return json.loads(text.strip())
-    except json.JSONDecodeError as e:
-        logger.warning("[reading_enrich] JSON parse failed: %s | raw=%s", e, text[:300])
-        return None
+def _bedrock_send(body: dict, timeout: int) -> dict:
+    from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+
+    return call_anthropic_raw(body, timeout=timeout)
 
 
 def enrich_book(meta: dict, *, caller=None) -> dict:
@@ -208,20 +219,9 @@ def enrich_book(meta: dict, *, caller=None) -> dict:
         "messages": [{"role": "user", "content": user}],
     }
     try:
-        if caller is None:
-            from common.retry_utils import call_anthropic_raw  # lazy — layer module, only at runtime
+        from ai.structured_json import call_json  # #4276: the one door for JSON-shaped model calls
 
-            req = urllib.request.Request(
-                ANTHROPIC_API,
-                data=json.dumps(body).encode("utf-8"),
-                method="POST",
-                headers={"content-type": "application/json", "anthropic-version": "2023-06-01"},
-            )
-            result = call_anthropic_raw(req, timeout=30)
-        else:
-            result = caller(body)
-        text = "".join(b.get("text", "") for b in (result or {}).get("content", []) if b.get("type") == "text")
-        parsed = _parse(text)
+        parsed = call_json(caller or (lambda b: _bedrock_send(b, 30)), body, schema=_ENRICH_SCHEMA, label="reading_enrich")
         if not isinstance(parsed, dict):
             return _empty("unparseable")
     except Exception as e:  # noqa: BLE001 — fail-soft is the contract

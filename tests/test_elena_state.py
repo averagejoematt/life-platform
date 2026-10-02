@@ -268,3 +268,18 @@ def test_updater_writes_only_the_persona_partition():
 
     for m in re.finditer(r'\.(?:put_item|update_item)\(\s*(?:Item=\{|Key=\{)\s*"pk": ([^,]+),', UPDATER_SRC):
         assert m.group(1).strip() == "PERSONA_PK", f"write outside PERSONA_PK: {m.group(0)}"
+
+
+def test_the_extraction_is_asked_under_its_schema_and_parsed_in_the_one_door(monkeypatch):
+    """#4276: `_call_haiku` sends EXTRACTION_SCHEMA as output_config.format through
+    ai.structured_json.call_json; a fenced reply still parses (the door's fallback)."""
+    import common.retry_utils as retry_utils
+
+    esu = _updater()
+    sent = []
+    reply = '```json\n{"motifs": ["the long walk"]}\n```'
+    monkeypatch.setattr(
+        retry_utils, "call_anthropic_raw", lambda body, **k: sent.append(body) or {"content": [{"type": "text", "text": reply}]}
+    )
+    assert esu._call_haiku("sys", "user") == {"motifs": ["the long walk"]}
+    assert sent[0]["output_config"]["format"]["schema"] == esu.EXTRACTION_SCHEMA

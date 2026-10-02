@@ -2940,26 +2940,34 @@ CI_PROOFS["ci::wrap-nightly.yml::check::2"] = {
 }
 
 # #4276 box 2: test_bedrock_client.py became a tree sweep (lambdas/**/*.py rglob) when the raw-model-text
-# json.loads guard joined it. Two REAL-tree plants, each restored by copying the pre-mutation file back.
+# json.loads guard joined it. Re-proved 2026-10-02 when the detector grew rules (b)-(d) — model text returned
+# by a text transport, a fence-handling helper, a {...}/[...] span grab — closing the gap the 09-29 record
+# stated. Three REAL-tree plants, each restored by copying the pre-mutation file back.
 STRUCTURAL_HAND_PROOFS["structural::test_bedrock_client.py"] = {
     "gate_name": "test_bedrock_client.py",
-    "command": "python3 -m pytest tests/test_bedrock_client.py -q -p no:cacheprovider   # 47 tests; baseline 47 passed",
+    "command": "python3 -m pytest tests/test_bedrock_client.py -q -p no:cacheprovider   # 49 tests; baseline 49 passed",
     "mutation": (
-        "M1: a `_planted_fence_parse(resp)` appended to lambdas/coach/coach_quality_gate.py — `resp['content'][0]['text']`, a "
-        "fence strip, `json.loads` (md5 9a229858… -> 41c688b1…). M2: one of the two ledgered `json.loads(text)` in "
-        "lambdas/emails/elena_state_updater.py::_call_haiku replaced (md5 8cbe495e… -> 2eab8510…) — the ledger now over-counts."
+        "M1: a `_planted_parse(text)` appended to lambdas/reading/reading_recall.py — a fence strip on a PARAMETER, then "
+        "`json.loads` (rule c; md5 ca4560ba… -> 3c6bb2b1…). M2: a `_planted_ic3(prompt)` appended to lambdas/ai/ai_calls.py — "
+        "`json.loads` of `call_anthropic(...)`'s return (rule b; md5 ac3136b0… -> 367f7925…). M1+M2 planted together. "
+        "M3: lenient_json's key-regex unescape `json.loads` removed from lambdas/intelligence/lenient_json.py "
+        "(md5 7ec41f36… -> 1c8e439e…) — the ledger now over-counts."
     ),
     "observed": (
-        "2026-09-29. M1: 1 failed, 46 passed — test_no_module_hand_parses_raw_model_text_outside_structured_json names "
-        "`lambdas/coach/coach_quality_gate.py::_planted_fence_parse (1 site(s))`. M2: 1 failed, 46 passed — the same test's "
-        "stale-ledger leg names `lambdas/emails/elena_state_updater.py::_call_haiku`. RESTORED (md5s back): 47 passed."
+        "2026-10-02. M1+M2: 1 failed, 48 passed — test_no_module_hand_parses_raw_model_text_outside_structured_json names "
+        "`lambdas/ai/ai_calls.py::_planted_ic3 (1 site(s))` and `lambdas/reading/reading_recall.py::_planted_parse (1 site(s))`. "
+        "M3: 1 failed, 48 passed — the stale-ledger leg names `lambdas/intelligence/lenient_json.py::lenient_json`. "
+        "RESTORED (md5s back): 49 passed. Control: origin/main's detector, run over the M1-planted tree, does NOT find "
+        "_planted_parse (the stated gap this re-proof closes)."
     ),
     "scope": (
-        "Proves the guard reds on a new hand parse of raw model text and on a ledger that out-counts the tree. The taint is "
-        "followed within ONE function from the `['content']…['text']` subscript through local assignments; model text "
-        "returned by a helper (ai_calls' IC-3 pass, enrichment, reading, remediation/agent.py) is a known, stated gap."
+        "Proves the guard reds on a new hand parse of model text in each helper shape and on a ledger that out-counts the "
+        "tree; scratch-module plants for all four rules (a)-(d) plus non-model controls (S3 body, Lambda payload, a plain "
+        "slice, a docstring fence) are standing tests in the same file. Stated gap: a bare `json.loads(param)` with no "
+        "fence and no span handling is indistinguishable from parsing a non-model body and is not counted; "
+        "remediation/agent.py is outside lambdas/."
     ),
-    "proved_on": "2026-09-29",
+    "proved_on": "2026-10-02",
 }
 
 # #4220: test_coaches_api.py became a tree sweep (lambdas/web/** rglob) when the seven-surface record guard and its
@@ -3039,3 +3047,24 @@ CI_PROOFS["ci::config-drift.yml::drift::7"] = {
     ),
     "proved_on": "2026-09-30",
 }
+# #4472 box 2, the sha basis (2026-10-02): the same step now judges each live bundle's build_info.git_sha by
+# ancestry (deploy/bundle_ancestry.classify) and keeps LastModified only as the labelled fallback. Re-proved.
+CI_PROOFS["ci::config-drift.yml::drift::7"]["mutation"] += (
+    " SHA BASIS (2026-10-02): M3 (test) stale_by_build_sha()'s fresh set widened to include FAST_FORWARD (a live build "
+    "behind the owed commit read as fresh); M4 (test) the ranged reader's tail request replaced by `bytes=0-`; M5 (test) "
+    "the `judged:` coverage line renamed; each in the real tracked file (md5 f035b74c… before and after). M6 (LIVE, "
+    "read-only): main(['--stale-lambdas']) with collect_deployed_shas() wrapped to replace weekly-digest's live sha by "
+    "its owed commit's parent."
+)
+CI_PROOFS["ci::config-drift.yml::drift::7"]["observed"] += (
+    " 2026-10-02, baseline 47 passed. M3: 2 failed (test_stale_by_build_sha_replays_a_superseded_runs_undeployed_merge, "
+    "test_stale_lambdas_mode_reads_the_sha_basis_and_prints_its_coverage). M4: 1 failed "
+    "(test_build_sha_is_read_from_the_live_bundle_over_ranged_gets). M5: 1 failed. RESTORED: 47 passed. M6 04:20Z: exit 1 "
+    "naming weekly-digest — live 02:39Z, owes 02:19Z (LastModified alone reads it fresh), 'live build 8891569e does not "
+    "contain 612fe47d (behind)'. UNMUTATED live 04:20Z: exit 0, git_sha basis for 104 of 104, judged 104 of 104."
+)
+CI_PROOFS["ci::config-drift.yml::drift::7"]["scope"] += (
+    " Since 2026-10-02 the verdict is commit ancestry, not time: a late deploy of an older tree is caught, and a laptop "
+    "deploy from a lane branch main has not absorbed reads stale (diverged); a bundle whose sha this checkout cannot "
+    "resolve takes the LastModified basis, named in the log."
+)

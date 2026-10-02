@@ -13,9 +13,7 @@ Pure logic + a fail-soft LLM gist scorer. The EventBridge sweep
 
 from __future__ import annotations
 
-import json
 import logging
-import urllib.request
 from datetime import date, timedelta
 
 from common.pacific_time import pacific_now, pacific_today  # #2798: THE Pacific frame — nextDue/askedAt name Pacific days
@@ -28,7 +26,6 @@ INTERVALS = [3, 7, 16, 35, 90, 180]
 RETENTION_N_GATE = 3  # no retentionScore until this many scored probes exist (§7)
 
 MODEL = "claude-haiku-4-5-20251001"
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 
 _GIST_SYSTEM = (
     "You score spaced-retrieval recall for a reader. You receive the prompt asked weeks after a book "
@@ -38,6 +35,15 @@ _GIST_SYSTEM = (
     "not the detail' is partial credit, not zero. Respond with ONLY JSON: "
     '{"gist": <0.0-1.0>, "note": "<one short phrase>"}.'
 )
+# The shape above, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. The 0-1 range is clamped in code (numeric bounds are not
+# a structured-output keyword this door relies on).
+_GIST_SCHEMA = {
+    "type": "object",
+    "properties": {"gist": {"type": "number"}, "note": {"type": "string"}},
+    "required": ["gist", "note"],
+    "additionalProperties": False,
+}
 
 
 def _today() -> str:
@@ -73,16 +79,10 @@ def retention_score(performance_history: list, *, n_gate: int = RETENTION_N_GATE
     return round(sum(s * w for s, w in zip(scored, weights)) / sum(weights), 3)
 
 
-def _parse(text: str) -> dict | None:
-    text = (text or "").strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    try:
-        return json.loads(text.strip())
-    except json.JSONDecodeError:
-        return None
+def _bedrock_send(body: dict, timeout: int) -> dict:
+    from common.retry_utils import call_anthropic_raw  # lazy — bundled module, runtime only
+
+    return call_anthropic_raw(body, timeout=timeout)
 
 
 def score_gist(prompt: str, answer: str, *, caller=None) -> dict:
@@ -97,20 +97,9 @@ def score_gist(prompt: str, answer: str, *, caller=None) -> dict:
         "messages": [{"role": "user", "content": f"Prompt (asked weeks later):\n{prompt}\n\nReader's answer:\n{answer}"}],
     }
     try:
-        if caller is None:
-            from common.retry_utils import call_anthropic_raw  # lazy — layer module, runtime only
+        from ai.structured_json import call_json  # #4276: the one door for JSON-shaped model calls
 
-            req = urllib.request.Request(
-                ANTHROPIC_API,
-                data=json.dumps(body).encode("utf-8"),
-                method="POST",
-                headers={"content-type": "application/json", "anthropic-version": "2023-06-01"},
-            )
-            result = call_anthropic_raw(req, timeout=30)
-        else:
-            result = caller(body)
-        text = "".join(b.get("text", "") for b in (result or {}).get("content", []) if b.get("type") == "text")
-        parsed = _parse(text)
+        parsed = call_json(caller or (lambda b: _bedrock_send(b, 30)), body, schema=_GIST_SCHEMA, label="reading_recall")
         if not isinstance(parsed, dict) or not isinstance(parsed.get("gist"), (int, float)):
             return {"gist": None, "note": "unscored", "scored": False}
         gist = max(0.0, min(1.0, float(parsed["gist"])))

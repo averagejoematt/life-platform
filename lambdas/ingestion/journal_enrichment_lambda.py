@@ -51,6 +51,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -136,6 +137,51 @@ Extract as JSON:
   "causal_hints": [<cause→effect links the author EXPLICITLY asserts, each as {{"cause": "...", "effect": "...", "quote": "<the verbatim sentence from the entry that asserts the link>"}}. Max 4. Empty list if none — most entries have none>]
 }}"""
 
+# USER_PROMPT_TEMPLATE's shape, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. Every key required; "null if …" fields are anyOf [T, null].
+_J_STRS = {"type": "array", "items": {"type": "string"}}
+_J_NUM = {"anyOf": [{"type": "number"}, {"type": "null"}]}
+_J_STR = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+EXTRACTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "mood_score": _J_NUM,
+        "energy_score": _J_NUM,
+        "stress_score": _J_NUM,
+        "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative", "mixed"]},
+        "emotions": _J_STRS,
+        "themes": _J_STRS,
+        "cognitive_patterns": _J_STRS,
+        "growth_signals": _J_STRS,
+        "avoidance_flags": _J_STRS,
+        "ownership_score": _J_NUM,
+        "social_quality": {"anyOf": [{"type": "string", "enum": ["alone", "surface", "meaningful", "deep"]}, {"type": "null"}]},
+        "flow_indicators": {"type": "boolean"},
+        "values_lived": _J_STRS,
+        "gratitude_items": _J_STRS,
+        "alcohol_mention": {"type": "boolean"},
+        "sleep_disruption_context": _J_STR,
+        "pain_mentions": _J_STRS,
+        "exercise_context": _J_STR,
+        "notable_quote": _J_STR,
+        "defense_patterns": _J_STRS,
+        "primary_defense": _J_STR,
+        "entities": _J_STRS,
+        "behaviors": _J_STRS,
+        "causal_hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"cause": {"type": "string"}, "effect": {"type": "string"}, "quote": {"type": "string"}},
+                "required": ["cause", "effect", "quote"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "additionalProperties": False,
+}
+EXTRACTION_SCHEMA["required"] = list(EXTRACTION_SCHEMA["properties"])
+
 
 def _ground_causal_hints(hints, raw_text):
     """#505: deterministic grounding — a causal hint survives only if its quote is
@@ -200,29 +246,15 @@ def call_haiku(raw_text, date, template, structured_scores):
     }
 
     # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
+    # #4276: the reply is constrained to EXTRACTION_SCHEMA at the model and parsed in the one door.
+    from ai.structured_json import call_json
     from common.retry_utils import call_anthropic_raw
 
-    result = call_anthropic_raw(body, timeout=30)
-
-    # Extract text content
-    text = ""
-    for block in result.get("content", []):
-        if block.get("type") == "text":
-            text += block["text"]
-
-    # Clean and parse JSON
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse Haiku response: {e}\nRaw: {text[:500]}")
+    parsed = call_json(lambda b: call_anthropic_raw(b, timeout=30), body, schema=EXTRACTION_SCHEMA, label="journal_enrichment")
+    if not isinstance(parsed, dict):
+        logger.error(f"Failed to parse Haiku response as a JSON object: {str(parsed)[:500]}")
         return None
+    return parsed
 
 
 FIELD_MAPPING = {

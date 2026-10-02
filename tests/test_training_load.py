@@ -221,15 +221,18 @@ def test_z1_ceiling_is_derived_from_the_platforms_one_zone_table():
     assert tl.Z1_CEILING_HR == round(tl.MAX_HR * tl.Z1_CEILING_FRACTION_OF_MAX, 1) == 109.8
 
 
-def test_a_redline_compliant_walk_scores_exactly_zero():
-    """The programme's walking cap (owner_redlines, 105 bpm) sits under the Z1 ceiling,
-    so every walk the plan prescribes contributes nothing to ATL/CTL."""
+def test_a_walk_on_the_redline_target_scores_exactly_zero():
+    """The programme's walking HR TARGET (owner_redlines, 105 bpm) sits under the Z1 ceiling, so a walk
+    on target contributes nothing to ATL/CTL. Since OD2 (#4503) the CAP is 120 avg — above Z1 — so a
+    compliant walk near the cap scores a little, and that is stated rather than hidden."""
     from training.owner_redlines import REDLINES
 
-    cap = REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
-    assert cap <= tl.Z1_CEILING_HR
-    pts, basis = tl.activity_load(_hr_walk(75, cap))
+    target = REDLINES["walking_floor_hr_wk"]["hr_target_bpm"]
+    assert target <= tl.Z1_CEILING_HR
+    pts, basis = tl.activity_load(_hr_walk(75, target))
     assert pts == 0.0 and basis == "hr"
+    cap = REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
+    assert cap > tl.Z1_CEILING_HR and tl.activity_load(_hr_walk(75, cap))[0] > 0.0
 
 
 def test_z1_walk_with_hr_is_near_zero_while_the_same_walk_without_hr_is_proxied():

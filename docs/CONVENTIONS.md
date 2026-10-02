@@ -177,10 +177,12 @@ content-policy` — but since #749 every gate after flake8 carries
 push surfaces ALL violations at once. (Before #749 the steps were strictly sequential —
 the first red stopped the job and MASKED every later gate, so debt surfaced in layers,
 one push per layer. That masked-gate class bit twice on 2026-07-08 alone.) Gating is
-unchanged: any red gate still fails the Lint job, and `test-critical` (→ `plan` →
-`deploy`) `needs` Lint, so a **red Lint still blocks the deploy chain** — it just no
+unchanged: any red gate still fails the Lint job, and `plan` (→ `deploy`) `needs` Lint
+as well as `test-critical`, so a **red Lint still blocks the deploy chain** — it just no
 longer hides the other gates' findings. NB: `always()` steps also run after a
-cancellation.
+cancellation. Since #4252, Lint, `test-critical` and `test` all start once `reconcile`
+is done and run side by side. Nothing waits on Lint except `plan` and `notify-failure`.
+A red Lint therefore no longer skips the two test jobs, but it still holds `plan`.
 
 **A `cancelled` CI/CD rollup is NOT a superseded push — read the JOBS (#3530).** This
 paragraph used to say a cancel "only happens on a manual cancel" under
@@ -388,6 +390,13 @@ required PR check already proved. The decisions:
   positional `ci::ci-lint.yml::lint::N` census id after it.
 - **gitleaks in `ci-lint.yml` stays unconditional.** `secret-scan.yml` is
   `pull_request`-only, so this is the one scan of a direct push, and it costs about 3s.
+- **The deploy-critical lane (`test-critical`) stays unconditional.** The required fast lane
+  ran the same `deploy_critical` selection on the PR, but on the PR's merge ref. That ref is
+  the pushed tree only when the PR head already contained main. In the 20 squash merges
+  `ad9d77fff..3772618e8`, 5 landed a tree equal to their PR head's. The other 15 landed on a
+  moved base, and a moved-base union is what this deploy gate exists to catch (#4304 +
+  #4317). What changed instead is the ordering: `test-critical` and `test` no longer
+  `needs` Lint. They run beside it, and `plan` still needs both Lint and `test-critical` (above).
 - **`ci-test.yml`'s eleven single-file pytest steps are gone.** Every one of those files
   also ran in the coverage passes. The labels survive as named sections that
   `scripts/ci_test_sections.py` prints from the passes' JUnit XML, with a failure
@@ -696,6 +705,21 @@ read by `lambdas/web/bundle_counts.py`); in a checkout the reader counts `tests/
 served number is therefore exactly as fresh as the last deploy of the bundle — which is
 what `/api/platform_stats` describes. The rule for the next such counter: if a generator's
 output would move on most merges, stamp it where the artifact is built, never commit it.
+
+**What still produces a reconcile commit, and what does not (measured 2026-10-01, #4250 box 2).**
+A merge whose derived artifacts already match the generators produces no commit: the job prints
+`nothing to reconcile` and passes the merge sha through as `build_sha`. #4512 (`a02956e71`) added
+tests, and the next commit on main was the next PR, with one `ci-cd.yml` run on that sha.
+There were 19 bot commits from #4364 to 2026-10-01. Each one carried the merged commit's own
+change to a value that, under #3984, a branch never carries:
+- the system model, `model/platform_model.json` + `docs/DEPENDENCY_GRAPH.md` (a new DynamoDB read or write site);
+- the gate census count in `docs/PROPORTIONALITY.md` (a gate added or removed);
+- the MCP module count in `docs/ARCHITECTURE.md`/`RUNBOOK.md`;
+- the ADR count.
+
+None of them was a no-op. None bumped `test_count`; `78a1c9c2f` deleted the leftover literal, once. Each change is occasional (about 1 merge in 6), which
+is the bot's intended job. The commit body names the sha it reconciled and the paths it moved, so
+the share by cause can be re-measured from `git log --grep='chore(reconcile)'`.
 
 **When the reconcile job itself reds, check in this order:**
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
@@ -1470,7 +1494,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | An incident-class event (rollback, main red >1h, data gap, budget-tier event) went unlogged | Incident gate (#1332), step (e3) | `docs/INCIDENT_LOG.md` + `.claude/skills/wrap/SKILL.md` step (e3) |
 | A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
-| A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes, epic link, or a `model:*`/`type:*`/`area:*`/`prio:*` label) | Filing-contract linter (#1867/#1870), step (e7) — blocking by default since #1872, which absorbed and deleted the older #1349 `model:*`-only gate | `scripts/check_backlog_hygiene.py` |
+| A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes, epic link, or a `model:*`/`type:*`/`area:*`/`prio:*` label) | Filing-contract linter (#1867/#1870), step (e7) — blocking by default since #1872, which absorbed and deleted the older #1349 `model:*`-only gate; runs nightly in `wrap-nightly.yml` (one auto-filed tracker), not in the wrap battery, since #4262 | `scripts/check_backlog_hygiene.py` |
 | An issue closed this session leaves no outcome verdict (53 of the last 60 closures had zero comments) | Closure-comment gate (#1870), step (e8) | `.claude/skills/wrap/SKILL.md` step (e8); contract in ADR-099's amendment ¶3 |
 | A close that the (e8) comment cannot vouch for: the issue kept being worked AFTER `closedAt` (a comment past the grace window — #2848's "stays OPEN" at +15m, #2670's scope assertion at +2.5h), the closing comment named a residual and disposed it nowhere (#2938/#2921/#3208 — the #2845 shape), or an epic closed over an open child | Closure-DoD sweep (#3318), folded into step (e8) — ADVISORY until the registry's flip bar is met, EXCEPT `no-live-proof` (#3595), armed block from day one: an instrument (`closure:live-proof`) closed with no `**Live proof:** <instant> — <where>` comment exits 1 whatever the posture — and `unhomed-residual` (#3597, armed 2026-09-23): a closing comment naming a residual or an obligation (`revisit`, `fast-follow`, `owner decides`) with no `#N` / `not-work —` home exits 1 too; the structural leg is a timestamp comparison, the residual leg is the (e4) `not-work — <home>` rule applied to the close | `scripts/closure_sweep.py --session`; registry `scripts/closure_contract.py`; §4a2 above |
 | A waiver, citation, exemption, deferral or residue ledger outlives its condition — an ADR's "revisit when …", a PROPORTIONALITY demote trigger that fired unnoticed for a month, a `*_RESIDUE` ledger with no expiry, a closing comment's bare "fast-follow" (the forensic RCA's class 7) | Carrier-expiry rule (#3597): an obligation on a governed surface needs a `#N`, a `not-work —` tag or a calendar-probed date (≤90d); every residue ledger is registered with carrier + condition + expiry + shrink consumer, discovered structurally so a new one cannot hide; every Load-bearing row carries `demote_by:` / `demote_when:`; the daily calendar exits 5 on a lapse. Pre-existing debt is pinned shrink-only (drain: #4122) | `scripts/obligation_carriers.py`; `tests/test_obligation_carriers_3597.py`; `scripts/operating_calendar.py --due` |

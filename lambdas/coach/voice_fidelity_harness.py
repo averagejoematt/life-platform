@@ -183,22 +183,29 @@ def _build_user_message(candidates, passage):
     return f"## Roster\n{roster}\n\n## Blinded passage\n---\n{passage}\n---\n\nWho wrote it?"
 
 
-def _parse_vote(text, valid_ids):
-    """Best-effort JSON extraction (mirrors the platform's ```json-fence tolerance
-    used elsewhere, e.g. coach_quality_gate._call_haiku). Returns {} on anything
-    that doesn't parse to a valid-roster guess — a malformed panelist response
-    must never crash the run or count as a phantom vote."""
-    raw = (text or "").strip()
-    if "```" in raw:
-        fence = "```json" if "```json" in raw else "```"
-        start = raw.find(fence) + len(fence)
-        end = raw.find("```", start)
-        if end > start:
-            raw = raw[start:end].strip()
-    try:
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return {}
+def _vote_schema(valid_ids):
+    """The judge's reply shape (#4276): the guess is an enum of THIS roster, so a phantom id
+    cannot be emitted under the schema. Every object closed, every key required."""
+    return {
+        "type": "object",
+        "properties": {
+            "guess": {"type": "string", "enum": sorted(valid_ids)},
+            "confidence": {"type": "number"},
+            "reasoning": {"type": "string"},
+        },
+        "required": ["guess", "confidence", "reasoning"],
+        "additionalProperties": False,
+    }
+
+
+def _parse_vote(parsed, valid_ids):
+    """A vote from the judge's parsed reply (or its raw text, parsed in the one door,
+    ai.structured_json — #4276). Returns {} on anything that isn't a valid-roster guess —
+    a malformed panelist response must never crash the run or count as a phantom vote."""
+    if isinstance(parsed, str):
+        from ai.structured_json import parse_json_text
+
+        parsed = parse_json_text(parsed)
     if not isinstance(parsed, dict):
         return {}
     guess = parsed.get("guess")
@@ -222,9 +229,12 @@ def _classify_once(candidates, passage, temperature):
         "system": _JUDGE_SYSTEM,
         "messages": [{"role": "user", "content": _build_user_message(candidates, passage)}],
     }
-    resp = bedrock_client.invoke(body, model_name=MODEL)
-    text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict))
-    return _parse_vote(text, valid_ids)
+    from ai.structured_json import call_json  # #4276: the one door for JSON-shaped model calls
+
+    parsed = call_json(
+        lambda b: bedrock_client.invoke(b, model_name=MODEL), body, schema=_vote_schema(valid_ids), label="voice_fidelity_judge"
+    )
+    return _parse_vote(parsed, valid_ids)
 
 
 def _run_panel(candidates, passage):

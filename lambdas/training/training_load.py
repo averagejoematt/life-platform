@@ -109,8 +109,9 @@ MAX_HR = 183.0
 # `tests/test_training_load.py` asserts the three agree, so this cannot drift silently.
 Z1_CEILING_FRACTION_OF_MAX = 0.60
 # 0.60 × 183 = 109.8 bpm. At or below this average HR an activity contributes 0.
-# The programme's own walking cap (`owner_redlines.REDLINES["walking_floor_hr_wk"]
-# ["hr_ceiling_bpm"]` = 105) sits under it, so a redline-compliant walk scores exactly 0.
+# The programme's walking HR TARGET (`owner_redlines.REDLINES["walking_floor_hr_wk"]
+# ["hr_target_bpm"]` = 105) sits under it, so a walk on target scores exactly 0. Since OD2
+# (#4503) the CAP is 120 avg — a walk between 110 and 120 is compliant and scores a little.
 Z1_CEILING_HR = round(MAX_HR * Z1_CEILING_FRACTION_OF_MAX, 1)
 # Banister's TRIMP weighting (Banister 1991, "Modeling elite athletic performance",
 # in MacDougall, Wenger & Green (eds.), Physiological Testing of the High-Performance

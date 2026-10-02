@@ -9,10 +9,11 @@ name: Dependabot Auto-merge
 # (the lanes resolve their pins from requirements-dev.txt), so the validate job was a third copy
 # and is deleted. This workflow now fires on a completed "PR checks" run.
 #
-# FULL-SUITE GREEN IS REQUIRED HERE, not only the required fast lane. The ruleset
-# requires just `Collect + deploy-critical + format` + gitleaks; `Full unit suite
-# (pre-merge, issue 3025)` is advisory. A merge that waited only on the required
-# contexts could land a bump whose behaviour tests are red. Two checks hold it:
+# FULL-SUITE GREEN IS REQUIRED HERE, not only the required fast lane. When this was
+# written the ruleset required just `Collect + deploy-critical + format` + gitleaks, and
+# `Full unit suite (pre-merge, issue 3025)` was advisory. It is required now (#4251, read
+# 2026-10-02 from `gh api repos/<repo>/rules/branches/main`). The explicit check stays
+# so this merge can never outrun a ruleset that loses it again. Two checks hold it:
 #   1. the workflow_run conclusion is `success`, which pr-checks.yml reports only
 #      when EVERY job in it succeeded (fast lane + full suite + the sequencing check);
 #   2. the merge step re-reads the check-runs on the PR's CURRENT head sha and requires

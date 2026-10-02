@@ -283,11 +283,11 @@ def _performed_movements(target_date: str) -> tuple[list[dict[str, Any]], list[s
             if not tid or not name:
                 orphan_blocks += 1
                 continue
-            row = by_tid.setdefault(tid, {"label": name, "template_id": tid, "last_performed": day, "sessions": 0})
+            row = by_tid.setdefault(tid, {"label": name, "exercise": name, "template_id": tid, "last_performed": day, "sessions": 0})
             row["sessions"] += 1
             if day >= row["last_performed"]:
                 row["last_performed"] = day
-                row["label"] = name
+                row["label"] = row["exercise"] = name  # #4519: `exercise` survives a draft row's slot-tag label in the union
     rows = sorted(by_tid.values(), key=lambda r: (r["last_performed"], r["label"]), reverse=True)
     for r in rows:
         r["days_since"] = _days_between(r["last_performed"], target_date)
@@ -383,6 +383,30 @@ def _merge_walking_volume(block: dict[str, Any], layer: dict[str, Any] | None) -
     w["total_is_floor"] = layer["total_is_floor"]
     if layer["honesty"]:
         w["honesty"] = list(layer["honesty"])
+
+
+def _attach_collapse_actuator(block: dict[str, Any], status_reader=None) -> None:
+    """#4503 OD7: fill the walking_collapse actuator MARK's `designation` — ONLY on a tripped row, so an
+    ordinary night never touches the private config. Reads whether a named human is designated, never
+    who (`coach.named_human_contact.designation_status`), and sends NOTHING. A read that raises leaves
+    `designation: unreadable` — never a silent `not_read`."""
+    from training import recent_aerobic
+
+    row = next((t for t in block.get("tripwires") or [] if t.get("id") == "walking_collapse"), None)
+    if row is None or row.get("state") != "tripped":
+        return
+    try:
+        if status_reader is None:
+            from coach import named_human_contact
+
+            from mcp.config import S3_BUCKET, s3_client
+
+            designation = named_human_contact.designation_status(s3_client, S3_BUCKET)
+        else:
+            designation = status_reader()
+    except Exception:  # noqa: BLE001 — the mark degrades to unreadable; the plan never fails on it
+        designation = {"designation": "unreadable", "armed": None}
+    row["actuator"] = recent_aerobic.collapse_actuator(row["state"], designation)
 
 
 BODYSCAN_LOOKBACK_DAYS = 180
@@ -699,8 +723,17 @@ def tool_plan_next_session(args):
         # is a DATE comparison — a flag with no readable date can never read as dismissed.
         # #4174: and the notes' own words, because a dismissal covers a SITE — the engine splits
         # a movement's notes per site and a note naming no dismissed site stays open.
+        # #4519: and the EXERCISE the flag was derived from — a drafted row's label is its slot tag
+        # (`anchor:hinge:moderate`), which no dismissal can name.
         pain_flag_instances=[
-            {"movement": r["label"], "note_dates": r.get("pain_dates") or [], "notes": r.get("pain_notes") or []} for r in flagged
+            {
+                "movement": r["label"],
+                "exercise": r.get("exercise"),
+                "movement_key": r.get("movement_key"),
+                "note_dates": r.get("pain_dates") or [],
+                "notes": r.get("pain_notes") or [],
+            }
+            for r in flagged
         ],
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
@@ -716,6 +749,7 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     _attach_session_loads(block, target_date, catalog_movements)
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
