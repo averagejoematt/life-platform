@@ -1,85 +1,49 @@
-# Handover — Session BC: the overnight paydown toward 30 (2026-10-01 03:00Z → ~18:00Z, Opus only, owner asleep)
+# Handover — Session BD: autonomous paydown on the owner's 10-01 rulings (2026-10-01 18:33Z → 2026-10-02 ~03:15Z, Opus 5.5, owner on hand)
 
-**Driver plan:** `~/.claude/plans/zazzy-foraging-treasure.md`, owner-approved ~03:00Z. The owner had rejected a first plan that landed at ~60 open: "i want the plan to get us closer to 30 open issues, we can synthetic tests to prove things." The plan used three levers:
-- synthetic proofs (dry runs, re-verdicts, future-date drafts, dispatches);
-- section-A owner-ruling closes;
-- folding the four child epics into #4287.
+**Driver plan:** `~/.claude/plans/zazzy-foraging-treasure.md`, written after the owner's unblock round (rulings 8–17). Five Opus lanes (A–E) plus a late F, two-PR trains via `~/.claude/plans/session-ax-harness/train2.sh`, and synthetic proofs (`AWS_MAX_ATTEMPTS=1`, deployed zip grepped before each). The owner was present: he answered four asks mid-session and started a **separate editorial session** for the chronicle/Panel story arc. That session filed the Story Desk epic **#4531** (+ #4532–#4541, #4545, #4546, #4549); don't touch its lane.
 
-**Result: 68 → 48 open (REST, 2026-10-01 ~17:55Z).** 22 closed (20 by the driver, 2 auto-closed trackers) and 2 filed (#4514, #4517). **The ~30 target was not met.** Three reasons:
-- Four planned synthetic proofs were refused, correctly, by the tools' consent contracts or by the classifier (see Gotchas).
-- The brief's coach holds turned out to be real rule violations (a reader check overriding the judge), not a pure bug.
-- The driver sat idle ~11 h (04:12Z → 15:33Z) before its next step fired.
+## Shipped: 14 PRs merged, all deployed
+- **#4521** cron-freshness: a page of 10 runs, `max(created_at)` (GitHub's `per_page=1` first element was intermittently weeks old). The auto-filed #4520 auto-closed.
+- **#4524** (Lane B) coach prompts carry the banned list + window rule from the checks; rulings 8 + 9. **#4547** the ruling-8 extension (owner "a", 10-02): one session's average with its date is a labelled window.
+- **#4525** (Lane A) a slot-tagged pain flag carries its exercise; a non-matching dismissal is refused by name.
+- **#4527** (Lane C) OD2/OD3/OD7: walking 11–12 h, HR avg ≤ 120 (target 105), the run-gate tissue clause, `walking_collapse` standalone walks + the named-human actuator mark (sends nothing).
+- **#4522** (Lane D) podcast v2 passes under schema, 4096 budget. **#4543** (driver, found by #4522's proof) the QA and craft judges under schema, 1500 budget; the QA judge had been cut at 500 and fail-closed into a HOLD.
+- **#4529** (Lane D) /data/zone2/ dates its window. **#4526** (Lane E) the census read budget starts at the first census read. **#4523** (Lane E) `merge_train.sh` releases each merged lane. **#4530** (Lane E) the reconcile bot commit names what it reconciled.
+- **#4548** project allow-list 121 → 81 (#4261, owner "apply").
+- #4500 (from BC) deployed through `deploy_fleet.sh`: 107 updated / 0 failed.
 
-## Shipped — 12 PRs merged, main green after every merge (now 6a474f62d)
-- **Brief / coach:** #4512 (a held coach names its client rule and the judge verdict; the revision note quotes the sentence to edit). The 17:00Z brief ran on it.
-- **Training (v0.5 rulings, #4503):** #4509 (OD1 re-entry tiers, 28 d held), #4510 (OD4/OD5: ceiling 20/24, bonus role, rep-triggered gains), #4511 (OD6: Body Scan 2 between-DXA read with own-variance noise).
-- **Training (HR):** #4508 (the cardio-HR join reads WHOOP workout rows; WHOOP's gym session is no longer dropped as a Hevy echo; a `rejoin_workout` path).
-- **Podcast:** #4506 (the editor under a JSON schema).
-- **CI/harness:**
-  - #4497: janitor and wedge classifier retired into the one dead-man.
-  - #4505: coverage high-water 83.20 → 86.30, floor 80 → 82.
-  - #4507: CLAUDE.md token and status-block ratchet.
-- **Session BB's wrap:** #4504.
-
-## Verified live (the driver read each)
-**Closed with `**Live proof:**` (real or labelled synthetic):**
-- #4245: `/api/nutrition_overview` serves supplements; the deployed dead-man check returns `ok 3/3`.
-- #4111: the deployed weekly-digest render has 'Added Beyond Plan: 21 set(s) added (+21 net)'.
-- #4387: a `plan_next_session` re-verdict of `4300a686…` reads 4.44 h weight-bearing in 48 h and picks cycling.
-- #4185: dry-run nutrition 'went quiet on September 26'; the probe found 0 protein findings.
-- #4360 / #4361: the deployed header and inventory renders.
-- #4256: the janitor is deleted on main; the dead-man was proven by #4484.
-- #4164: 15 consecutive green PII sweeps (5 scheduled + 10 dispatched).
-- #4480: 0 duration warnings on 3 main runs.
-- #4501: podcast dry run `[STRUCTURED_OUTPUT] label=panelcast_editor … parsed=dict`, `editor verdict=pass`.
-- #4412: the 09-28 and 09-29 rejoins joined (coverage 0.985 and 0.551, WHOOP), and the planner's `recent_aerobic` reads 109/139.
-
-**Ruling closes (section A of the approved plan):** #4267 #4266 #4254 #4263 #4277 #4278.
-**Epics folded into #4287:** #4246 #4247 #4248 #4249.
-**Auto-closed trackers:** #4485 (wrap-nightly green), #4491 (the served-coach-facts probe green at 17:48Z).
-
-**Partial, with the proof due named on each issue:**
-- #4343 / #4358: the 17:00Z brief (54651dc7-…) has 4 holds, each a named real rule (unlabeled window ×2, banned term ×2, one judge fail). Two owner rulings are parked on #4512.
-- #4503: boxes 1–3 live (synthetic 10-02 draft: `caps.total_sets` 20, `tier hold` / `threshold_days 28`; `between_dxa_lean` measured). Box 4 is blocked: the docs live in private S3 `config/`.
-- #4472: deploy-base proven; box 3 (a burst) not run, deliberately.
-- #4286: the server advertises resources, but this client's capabilities predate the deploy.
-- #4474: its truncation cause is fixed (0 TRUNCATED, 0 unevaluated); a new red on `/data/zone2/`.
-- #4183: the orphan leg is clear; the alarm is lit by six other legs.
-- #4252: 18.2 / 24.2 / 19.3 min (not three in a row).
-- #4262: one measured wrap (BB) plus this one.
+## Verified: 9 closed on live proof, plus #4520 auto
+#4286 (fresh bridge lists and reads `life-platform://surfaces/index`) · #4255 (owner-run rollback rehearsal on `milestone-digest`; the fleet path restored it 26 s later; the `deploy_lambda.sh` ancestry guard refused a stale tree) · #4343 #4358 (dry-run brief: 2 HELD, both named) · #4519 (stage 2 `dismissed_by_owner`, no veto) · #4474 (visual QA green) · #4514 (podcast dry run: every pass and judge `parsed=dict`, 0 truncations) · #4409 (02:00Z upper pre-draft keeps the DB row/press in-block) · #4183 (`qa-smoke-warnings` ALARM→OK 03:01Z, first OK since 09-20).
+**Partial, recorded on the issue:** #4503 box 4 (live stage-1 read), box 5 except the 24-set 🟢 ceiling · #4250 box 2 (10 merges, 0 reconcile commits, 1 CI/CD run each) · #4261 (applied; overnight_allow + a fewer-prompts scan left) · #3761 (Day-1 front/side/back stored, GPS EXIF stripped; the extra side and flex shots stay in `uploads/`).
+**Owner acts done this session:** the rollback rehearsal, apply 4261, ruling (a), copy photos, CodeQL 183/184 dismissed.
 
 ## Gotchas
-- **Tools refused synthetic proofs by design, and that's correct:**
-  - `mark_journal_quote` publishes a line and needs the owner's per-line yes (#4377);
-  - `get_exercise_notes dismiss` records his verbatim words and lifts a pain veto (#4401);
-  - a Telegram turn needs the bot secret (#4170);
-  - the classifier denied even a commit built to be refused (#4172, 'Unrequested Commit in a Connected App').
-
-  Plan synthetic proofs around consent contracts, not just side effects.
-- **The `aws lambda invoke` CLI auto-retries a long synchronous call.** The retry then hits the first run's own in-flight lock ('already in flight — skipped'). Use `AWS_MAX_ATTEMPTS=1` and read the logs.
-- **A chained train read its predecessor as STOPPED although that log said DONE**, so trains 11 and 12 never ran. Separately, `merge_pr.sh` reported a merge as done over a GitHub GraphQL error. Chain fewer trains (one `train2.sh` with several PRs), and confirm `gh pr view --json state` after each merge.
-- **The driver idled ~11 h** between a background notification (04:12Z) and its handling (15:33Z). Overnight, prefer one long-lived waiter over many short chained ones, and check the clock at every wake.
+- **`/clear` does not restart MCP servers.** This session's bridge dated from 09-27, so "a fresh session" still lacked `resources`. Prove a capability with a freshly spawned `mcp_bridge.py` instead.
+- **The auto-mode classifier denies `rollback_lambda.sh`** even with an owner grant; the owner ran it via `!`. A fleet deploy on the next merge restores every function, so time a rehearsal between merges.
+- **A proof can find the next defect.** #4522's proof run exposed the QA judge's 500-token cut (#4543). Read the whole run, not just the issue's own lines.
+- **iPhone uploads carry GPS EXIF.** Strip it before anything lands in `raw/`.
+- `gh run list --branch main --workflow CI/CD` once returned foreign shas as failures. Use `--json headBranch,event` before calling main red.
 
 ## Residual / next picks
-- #4500: re-synced (`bf65591e3`), green, held for the owner (one deploy path; the rollback dry run is in its body).
-- #4343: rule on #4512's two parked questions (does a stated date range count as a window? drop an edit that introduces a banned term?), then put the banned list and the window rule into the coach prompts.
-- #4503: box 4, the OD2/OD3/OD7 doc redlines in S3 `config/coaching/` (the drafted text is in Lane C's scratchpad), plus OD7's named human.
-- #4517: re-derive or retire the urgent AI-spend thresholds.
-- #4514: the podcast's Elena pass-1 truncation.
-- #4474: the `/data/zone2/` temporal-contradiction finding.
-- #4286: the first fresh client's resources/list.
-- Owner acts: #4377 #4401 #4170 #4172 #4191 #4189 #4261 #3761 #4076 #4259.
-- #4329 / #4330: Fable-only.
-- not-work — the owner's lower-heavy pre-draft carries a joints VETO on the RDL (09-13 hinge pain flag); his `get_exercise_notes dismiss` would both clear it and prove #4401.
+- **#4544** OIDC narrowing (Lane F, held): the owner runs pre-merge steps 1–3 from the PR body (the GitHub env `ungated-deploy`, the readonly role, the transitional trust), then merge, then `bash deploy/setup_github_oidc.sh`. Merging first breaks CI.
+- **#4517** via PR #4528 (held, CDK): the owner says go → merge → `bash deploy/cdk_deploy.sh LifePlatformMonitoring`. `ai-tokens-platform-daily-total` is in ALARM now on exactly this.
+- **#4358** publication proof: the next 17:00Z brief should publish the Performance read now that #4547 is live.
+- **#4503** box 5's 24-set 🟢 ceiling: the first draft that carries a 🟢 block.
+- **#4411**: a pre-draft whose loaded-lifting streak reaches the note threshold (10-02 read 1).
+- **#4365**: Friday's wk4 Panel run is the stub-file proof; wk3 stays HOLD on real script findings (the Story Desk #4531 lane owns the content).
+- **#4191**: the owner approves week 4, or it auto-publishes Fri ~18:00Z.
+- **#4259**: the worktree count at the next boot (35 at this wrap, 6 dirty and named by the reaper).
+- **#4250** boxes 1/3 need an owner design ruling (the counters' home, ADR-160); box 5 is the 30-day re-measure.
+- not-work — GitHub secret `DEPLOY_GATE_JANITOR_TOKEN` is unused (the owner deletes it); `GH_POSTURE_TOKEN` was never set.
 
-**Build beat:** 2026-10-01-the-held-coach-says-why
-**Docs:** `docs/alarm_citations.json` (two urgent AI composites cited to #4517; qa-smoke-warnings re-cited to its live cause); engine docs updated inside their PRs (COACH_STANCE.md by #4512, CI registry by #4496/#4497, PROPORTIONALITY by #4497)
-**Decisions:** none needed — the v0.5 rulings are recorded on #4503 and in memory; the section-A rulings are recorded in each closing comment
-**Main:** green (6a474f62)
-**Incidents:** none — the second urgent AI-spend flap (09-30 20:17Z) is the same class as Session BB's row and is now tracked as #4517
+**Build beat:** none — a debt-and-proof session; the one reader-visible change (zone2 dating) is a correction, not a beat.
+**Docs:** docs/alarm_citations.json (the platform-tokens entry rewritten to its live cause), docs/INCIDENT_LOG.md (one row + Patterns); the lanes' own docs (READINESS, CONVENTIONS §4c, AWS_ACCESS/SECURITY on #4544's branch) rode their PRs.
+**Decisions:** none needed — rulings 8–17 and the 10-02 answers are owner rulings recorded on their issues and in memory; no new governance.
+**Main:** green (ef4ef6e2)
+**Incidents:** 1 row added — the cron-freshness false STALE (#4520 → #4521)
 **Stash/hooks:** clean
-**Closures:** #4267, #4266, #4254, #4263, #4277, #4278, #4246, #4247, #4248, #4249, #4245, #4111, #4387, #4185, #4360, #4361, #4256, #4164, #4480, #4501, #4412 commented (#4485, #4491 auto-closed) · DoD: scanned 26, hits 0
-**Backlog:** Now live at 5 opus-startable stories (floor 3, 0 short); 0 hygiene violations; #4514 and #4517 added to their epics' Stories
-**Alarms:** 0 uncited — 2 flaps (`ai-daily-spend-high-urgent`, `ai-tokens-platform-daily-total-urgent`) cited to #4517; `qa-smoke-warnings` re-cited to its live cause on #4183
-**CI warnings:** 5 — playwright SKIPPED in CI (#3640): known, by design; the coverage high-water warning is resolved by #4505
-**Ledger:** none — no new standing subsystem; #4497 retired machinery and updated its PROPORTIONALITY row inside the PR
+**Closures:** #4286, #4255, #4343, #4358, #4519, #4474, #4514, #4409, #4183 commented (Shipped / Live proof / Outcome) · DoD: scanned 42, hits 2 — both `post-close-comment` notices (#4172's proof re-stated parseably from the MCP log at 18:18:39Z; #4343's residual homed to #4547), blocking=none
+**Backlog:** Now live at 14 (opus 14, sonnet 2, fable 2); no stale Later issues · #3754/#3759 score lines → Roadmap
+**Alarms:** 1 lit and cited — `ai-tokens-platform-daily-total` re-cited to #4517 (citation re-derived for the 10-01 episode)
+**CI warnings:** 5 — all `SKIPPED in CI — no playwright/chromium` (#3640's deliberate skip notice; no action)
+**Ledger:** none — no standing machinery shipped (#4544's readonly role is unmerged)
