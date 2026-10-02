@@ -239,3 +239,25 @@ def test_the_season_calendar_matches_the_published_week_keys():
         (4, "2026-09-23", "2026-09-29"),
     ]
     assert weeks[3]["day_first"] == 18 and weeks[3]["day_last"] == 24
+
+
+def test_an_ungradable_bet_whose_window_is_open_is_carried_not_dropped():
+    led = story_ledger.apply_budget(
+        story_ledger.empty_ledger(), _budget(bet_claim="weight on Day 7 below 326.2"), week=0, date="d0", title="t"
+    )
+    led = story_ledger.apply_budget(led, _budget(scored="not_gradable"), week=1, date="d1", title="t")
+    assert story_ledger.last_open_bet(led)["claim"] == "weight on Day 7 below 326.2"  # still open, carried
+    led = story_ledger.apply_budget(led, _budget(scored="right"), week=2, date="d2", title="t")
+    assert led["bets"][0]["result"] == "right"
+
+
+def test_the_desk_prefers_an_unmet_coach_with_a_graded_call():
+    dossier = {
+        "roster": [{"coach_id": c} for c in ("sleep_coach", "nutrition_coach", "mind_coach", "physical_coach")],
+        "predictions": {"graded_this_week": [{"coach_id": "sleep_coach"}]},
+    }
+    led = story_ledger.apply_budget(story_ledger.empty_ledger(), _budget(featured=("physical_coach",)), week=1, date="d", title="t")
+    led = story_ledger.apply_budget(led, _budget(featured=("mind_coach",)), week=2, date="d", title="t")
+    led = story_ledger.apply_budget(led, _budget(featured=("nutrition_coach",)), week=3, date="d", title="t")
+    assert any("never been featured" in x for x in story_desk.validate(_budget(featured=("physical_coach",)), dossier, led, week=4))
+    assert not [x for x in story_desk.validate(_budget(featured=("sleep_coach",)), dossier, led, week=4) if "never been featured" in x]

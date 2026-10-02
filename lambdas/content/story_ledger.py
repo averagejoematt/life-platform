@@ -28,6 +28,7 @@ THREAD_STATUSES = ("open", "advanced", "resolved", "retired")
 # running, and the promise (score the predictions at two weeks) that silently never comes back.
 STALE_AFTER = 3
 MAX_CONSECUTIVE_LEAD = 2
+BET_CARRY_WEEKS = 2
 
 LEDGER_PREFIX = "LEDGER#"
 
@@ -113,6 +114,12 @@ def apply_budget(prev: Dict[str, Any], budget: Dict[str, Any], *, week: int, dat
     if scored.get("result", "none") != "none":
         for b in reversed(led.get("bets", [])):
             if b.get("result") in (None, "", "open"):
+                # A bet whose window has not closed yet is CARRIED, not dropped (#4533: Ep0's Day-7 weight bet fell
+                # into Ep1's 3-day window, was marked not_gradable and vanished — it had won). It expires only
+                # after BET_CARRY_WEEKS installments.
+                if scored.get("result") == "not_gradable" and week - int(b.get("week") or week) < BET_CARRY_WEEKS:
+                    b["carried_note"] = scored.get("note")
+                    break
                 b["result"], b["scored_week"], b["verdict_note"] = scored.get("result"), week, scored.get("note")
                 break
     if (budget.get("bet") or {}).get("claim"):

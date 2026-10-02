@@ -98,10 +98,12 @@ The lead may not run on the same thread three weeks in a row. Do not reuse a bea
 
 FEATURED COACH: pick one (two at most) whose week has the most at stake — a call graded, a disagreement, their
 domain leading the news. Do not feature a coach featured in either of the last two installments unless no one
-else has a stake. coach ids come from the roster in the dossier.
+else has a stake. Prefer a coach who has NOT yet been featured this season when they have a graded call this week —
+the audience should meet the whole team. coach ids come from the roster in the dossier.
 
 THE BET: the podcast closes on one bet about the coming week that code can grade: a metric that is in the
-dossier, a threshold or direction, and a window (7 days). No bets on absences, on journaling, or on anything the
+dossier, a threshold or direction, and a window that CLOSES ON OR BEFORE the last day of next week's window (the
+next episode scores it with data in hand). No bets on absences, on journaling, or on anything the
 dossier does not measure. Score last week's open bet against this week's dossier (right / wrong / not_gradable,
 with the numbers in the note); "none" when there was no open bet.
 
@@ -130,6 +132,15 @@ def validate(budget: Dict[str, Any], dossier: Dict[str, Any], ledger: Dict[str, 
     for c in budget.get("featured_coaches", []):
         if roster and c not in roster:
             findings.append(f"featured coach {c!r} is not on the roster {sorted(roster)}")
+    ever = {f.get("coach_id") for f in ledger.get("featured", [])}
+    graded_this_week = {g.get("coach_id") for g in (dossier.get("predictions") or {}).get("graded_this_week", [])}
+    unmet_with_stake = (graded_this_week - ever) & roster
+    lead_coach = (budget.get("featured_coaches") or [None])[0]
+    if week > 1 and lead_coach in ever and len(unmet_with_stake) >= 1:
+        findings.append(
+            f"featured coach {lead_coach!r} has guested before while {sorted(unmet_with_stake)} had a graded call this week and has "
+            "never been featured — introduce the rest of the team"
+        )
     if not budget.get("featured_coaches"):
         findings.append("no featured coach")
     recent = set(story_ledger.recently_featured(ledger, 2))
