@@ -130,6 +130,12 @@ def hard_canonical_contradictions(text, facts):
     inventing across a re-run (RHR 53/56-57 vs 64; recovery 73 vs 30; HRV 50 vs 25.2).
     Tolerances are per-metric — RHR/recovery are stable (tight), HRV swings
     day-to-day (loose 40%, only catches a ~2x error).
+
+    CRITICAL ENFORCEMENT (2026-10-02 coherence finding): HRV MUST be cited in
+    milliseconds (ms), never bpm. The canonical facts carry hrv_ms. If a narrative
+    cites HRV in bpm by mistake, this detector will flag it as a hard contradiction
+    (claimed ~50 bpm vs canonical ~25 ms, triggering a >40% absolute miss → ALARM).
+    All coaches and narrative generators MUST enforce: "HRV is always in ms, never bpm."
     """
     low = _spelled_to_digits((text or "").lower())
 
