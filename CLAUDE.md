@@ -138,4 +138,4 @@ channel are functional and stay. Why earlier history was left intact: ADR-159.
 
 The live session state is `handovers/HANDOVER_LATEST.md`, the only handover on `main` (#1650; prior ones are on the `session-archive` branch, `handovers/README.md`). `/wrap` (`.claude/skills/wrap/SKILL.md`) archives it, overwrites it, and replaces the ONE pointer line below — never a paragraph, never stacked.
 
-**Status:** see handovers/HANDOVER_LATEST.md (Verified 2026-10-02)
+**Status:** see handovers/HANDOVER_LATEST.md (Verified 2026-10-03)

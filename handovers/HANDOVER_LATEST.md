@@ -1,59 +1,48 @@
-# Handover — Session BE: overnight paydown (2026-10-02 04:07Z → ~17:10Z, Opus 5.5, owner asleep → waking)
+# Handover — Story Desk: the season rebuilt and the desk live (2026-10-01 → 10-03 ~05:30Z, Opus 5.5, owner on hand)
 
-**Driver plan:** `~/.claude/plans/giggly-shimmying-willow.md`. Five Opus lanes (A–E) were briefed with `~/.claude/plans/session-ax-harness/lane_rules_full.txt`. Merges went through `train2.sh`. The owner authorized #4528 (merge + CDK) and #4544 (steps 1–3, then merge) "if the classifier allows." The Story Desk (#4531–#4549, PR #4542) was left to the editorial session and is untouched.
+**Driving instruction:** the owner asked for an editorial continuity review of the chronicle and The Panel. That became: correct all of it, then build it so it stays correct (epic #4531). He then asked for a red team for compelling, fact-true and in the spirit of the experiment, and for a reply-by-email question loop. On 10-02 he approved: publish the season; mirror/2-10 material public; keep the prologue; drop "Dr."; wire the desk into the live lambdas; deploy; move `ELENA_PREQUEL_BRIEF.md` off-repo. Either `ALLOWED_SENDERS` address is fine for replies.
 
-**The night's defect:** the five lanes had all opened PRs by ~05:00Z. The driver then froze **~10 h** (04:21Z → 14:11Z) on a permission prompt for a backgrounded `aws lambda invoke` (the #4358 dry run). `run_in_background` does not avoid the prompt. Every merge happened after 14:11Z. The memory `reference_unattended_lambda_invoke_stall.md` is updated: treat invoke as always-prompting overnight.
+## Shipped: 4 PRs merged, all deployed (main green at 9f4b6947; 3efc4b8f is docs-only)
+- **#4542** — the Story Desk (`lambdas/content/story_{dossier,ledger,desk,writers,checks,craft,questions,pipeline}.py`): dossier → season ledger → desk budget → writers → gates → code-rendered dek/scoreboard.
+  - Wired into wednesday-chronicle (`STORY_DESK=on`, 900 s, `MAX_REWRITES=1`) and coach-panel-podcast (`emails/panelcast_desk.py`); chronicle-approve commits `LEDGER#`.
+  - Reply desk: Monday 16:00Z `StoryQuestionsMonday` → SES Reply-To `insight@aws.mattsusername.com` → `insight-email-parser` → `STORYQA#W` rows → `owner_voice`.
+  - Publishing requires a fresh audit (`.claude/agents/story-auditor.md`, `scripts/season_promote.py`). CDK `LifePlatformEmail` deployed by hand ✅.
+- **#4565** — a question with a false premise never reaches the owner: absolute claims and ungrounded figures are dropped in code. The desk logs when it declines a date, and a rehearsal can name its week (`{"dry_run": true, "desk_week_end": "YYYY-MM-DD"}`).
+- **#4566** — Bedrock refused `BUDGET_SCHEMA` ("compiled grammar is too large"). The desk now re-sends schema-less and checks the shape in code (`structured_json.schema_findings`). The attribution rubric follows his own account of the training volume.
+- **#4567** — `docs/content/ELENA_PREQUEL_BRIEF.md` is now a pointer stub. The full brief is at `~/Documents/Claude/private/` (sha-verified copy). The old text is still in git history; that is the repo-privacy plan's scope.
+- **Season published (owner act, 10-01/02):** prologue + weeks 1–4 rewritten with correction notes. The July "Night Before Everything" is unlisted. 5 Panel episodes are MP3 and in the feed. Panel `STATE#current`/`SHOW#memory` were reseeded for cycle 17. The recap was corrected.
+- **CDK `LifePlatformOperational` (10-03):** the parser's `raw/inbound_email/*` read grant. SES `insight-capture` writes there, so without it every reply would have AccessDenied.
 
-## Shipped: 7 PRs merged, all deployed (main green at 01750f8e9)
-- **#4528** → #4517: urgent AI daily-Sum bars at 8.72 USD / 337000 tokens. `cdk_deploy.sh LifePlatformMonitoring` ✅ 14:13:13Z; `describe-alarms` confirms both thresholds.
-- **#4551** → #4252 (Lane C): the two test jobs start beside lint; plan still needs lint plus deploy-critical.
-- **#4554** → #4472 (Lane A): the nightly stale-Lambda advisory judges `build_info.git_sha` by ancestry, through ranged zip reads.
-- **#4553** → #4271 (Lane E): CLAUDE.md 28,116 → 13,990 B; the status block is one pointer line; ratchet 7081 → 3497 tokens.
-- **#4555** → #4276 (Lane B): 19 more sites on `ai.structured_json.call_json` with schemas; text seams use `parse_json_span`; the guard sees helper-shaped parses.
-- **#4552** → #4262 (Lane D): backlog-hygiene and closure detectors C/D run only nightly; 29 → 25 gate runs per wrap. It needed a CI-mirror registry entry (`wrap_gates.py`) and one re-sync after #4553.
-- Fleet: CI deployed 87515ad5b, then 01750f8e9. All 104 live bundles report `git_sha` 01750f8e9.
-
-## Verified
-- **Closed on live proof:**
-  - **#4365**: the deployed `media_tombstone.first_published` read wk1/2/4 from live S3 as tombstones, not episodes. A weekly dry run at 15:07Z reached the writer for wk3 and HELD at `safety-gate` (`causal-claim`).
-  - **#4472**: after two quick merges, the first run concluded cancelled (superseded) and its Deploy still ran. The second queued and deployed; 104/104 bundles contain #4555, and the zips carry `parse_json_span`.
-- **#4358** (already closed): the post-#4547 dry run at 14:11Z published the Performance (`physical_coach`) read with no HELD line. Recorded on the issue.
-- **Partials, each recorded on its issue:**
-  - **#4517**: the 7-day no-flap window runs from 14:13Z. Both alarms still show the OLD bar's 10-01 ALARM state, awaiting re-evaluation.
-  - **#4252**: box 4 is unmet. Runs took 22.5 and 21.4 min; Unit Tests itself is now the long pole.
-  - **#4262**: `wrap-nightly.yml` dispatch 37029660567 ran 4 legs green. The hygiene leg went red and auto-filed **#4558**, as designed; it is red on Story Desk bodies only.
-  - **#4276**: box 2 is partial (5 span parsers still ledgered). Box 4's before-value is 164 truncations / $1.69 per 7 d; the after-value is due ~10-09. The post-deploy dry run (16:45Z) is in progress at writing. Read its `[STRUCTURED_OUTPUT] label=ic3_analysis` line from `/aws/lambda/daily-brief` (16:45Z+) and post it on #4276.
-  - **#4259**: the reaper removed 4 lanes at boot and 5 at wrap. 31–34 remain (6 dirty, 7 detached, 10 closed-PR or no-verdict). Getting below 20 needs an owner archive ruling, which is parked on the issue.
-- **Owner-held:** **#4544 → #4257**.
-  - Step 1 RAN: GitHub env `ungated-deploy`, branch policy `["main"]`.
-  - Step 2 was **DENIED by the classifier**, verbatim: "Permission for this action was denied by the Claude Code auto mode classifier. Reason: [CI Bypass]". It was denied at the first command, which extracts the readonly-role JSON from the PR branch.
-  - Nothing was created in IAM, the deploy trust is unchanged, and #4544 is not merged.
+## Verified live
+- Lambda dry run of the desk path, week 4: log `[#4535] story desk wrote week 4: 'The Instruments Push Back'`, then `Week 4 built (1108 words) — nothing stored`. The grammar fallback fired in-Lambda.
+- Monday questions dry run: Week 5, 5 questions. One false premise was found ("never missed a protein day"; raw: 7/26 days ≥170 g, mean 147 g) → #4565 drops it (replayed on the live dossier).
+- Deployed bundle sha 9f4b6947 (`build_info.json`) carries both fixes. wednesday-chronicle: 900 s, desk on; the Monday rule is ENABLED.
 
 ## Gotchas
-- **`run_in_background` doesn't dodge a permission prompt.** The invoke waited about 10 h overnight, and ~50 min again with the owner awake. Put proofs that need `aws lambda invoke` after every merge and deploy, or get them pre-approved.
-- **A tracker can be red on another lane's issues.** #4558 fails only on Story Desk bodies: the "A cold reader" audience, 2-box acceptance, and the epic's `## Stories` list. The editorial session or the owner fixes those.
-- **The ALARM state survives a threshold change** until the next evaluation. Read `StateReason`'s threshold before calling it a live breach.
-- An alarm citation that *mentions* a merged PR number (#4528) trips the closed-owner gate (#2996). Cite the open issue only.
+- **A strict JSON schema can be too big for Bedrock**, and the refusal message does not mention `output_config`. `structured_json._schema_rejected` therefore misses it for the 19 #4555 sites. Recorded on #4276.
+- **Off-Wednesday the desk declines** (the legacy window ends "yesterday", not a week end). Prove it with `desk_week_end`.
+- **A Monday-rule `Lambda::Permission` makes Email OWNER-REQUIRED at CI's IAM gate.** Use `bash deploy/cdk_deploy.sh <Stack> -- --require-approval never` from main. Without that flag, a non-TTY run stops at the security confirmation.
+- **Local direct-zip uploads to us-east-1 (email-subscriber, progress-viewer) drop every time from this network** (3/3). CI's deploy updates them fine; they are current.
+- **`season_promote` writes chronicle rows directly**, bypassing approve's recall indexer. The nightly self-healed it (qa-smoke-warnings `recall:corpus_freshness`).
 
 ## Residual / next picks
-- **#4257** (owner): run #4544's steps 2–3 via `!` (step 1 is done), then merge #4544, wait for green, then `bash deploy/setup_github_oidc.sh`.
-- **#4276**: post the 16:45Z dry run's IC-3 `schema=yes` line. The 7-day `_note_truncation` after-value is due ~10-09. The 5 ledgered span parsers need a follow-up.
-- **#4517**: confirm both alarms return to OK on the new bars, then the 7-day no-flap proof on/after 2026-10-09T14:13Z.
-- **#4558**: Story Desk issue bodies need conforming. This is the editorial session's lane, or the owner rules "A cold reader" ≡ Reddit newcomers.
-- **#4560**: the 182 s board-ask test in CI, first seen after #4555.
-- **#4252**: box 4 needs the Unit Tests job itself under ~17 min.
-- **#4262**: box 4, wrap wall-clock over 3 sessions. This wrap's gather took 16.5 s.
-- **#4259**: owner ruling to archive the detached and closed-PR worktrees.
-- not-work — #4250 boxes 1/3 (ADR-160 home), #4261 overnight_allow, #4191, #4076, #4431: owner acts or rulings, unchanged from BD.
+- The week-4 on-air bet (recovery ≤60% by the morning of Oct 6) must be scored by name in week 5 — #4535 (the desk carries open bets; verify the 10-07 draft does).
+- Wednesday 2026-10-07: the first live desk week. Read the draft's `desk_findings_json` before approving — #4535.
+- `structured_json._schema_rejected` should also absorb the grammar refusal — #4276.
+- "Dr." removal site-wide — #4564.
+- Story Desk dead-men (incl. a missed Monday send) — #4539.
+- Profile targets 1800/190 vs the plan's 1500/170 — #4540.
+- Nightly pre-draft failed 10-03 ("not readable back") — #4568.
+- Nutrition coach cites 166 g vs engine 146.5 g — #4569.
 
-**Build beat:** none — CI, tooling and alarm hygiene; nothing reader-visible shipped.
-**Docs:** docs/alarm_citations.json (the platform-tokens entry re-pointed at #4517 with the deploy instant). The lanes' doc edits (CONVENTIONS §4/§9, PROPORTIONALITY, DECISIONS notes, CI_CONTINUE_ON_ERROR_REGISTRY) rode their PRs.
-**Decisions:** none needed — #4553's ADR text moves are narrative relocations, not new governance.
-**Main:** green (01750f8e)
-**Incidents:** none — the ~10 h stall is a driver-permission event, recorded in memory, not a platform incident.
+**Build beat:** 2026-10-02-the-story-gets-a-copy-desk
+**Docs:** docs/content/STORY_DESK.md, docs/CONVENTIONS.md §9, docs/PROPORTIONALITY.md, docs/ARCHITECTURE.md (shipped in #4542); docs/content/ELENA_PREQUEL_BRIEF.md → stub (#4567); docs/alarm_citations.json (this wrap)
+**Decisions:** none needed — the desk's rules live in docs/content/STORY_DESK.md and the PROPORTIONALITY row; no governance change
+**Main:** green (9f4b6947)
+**Incidents:** none — the grammar refusal and the false-premise question were caught in rehearsal, before any reader saw them
 **Stash/hooks:** clean
-**Closures:** #4365, #4472 commented (Shipped / Live proof / Outcome) · DoD: scanned 8, hits 0, blocking=none
-**Backlog:** Now live at 14 (opus 14); no refill needed · filed #4560 (Next)
-**Alarms:** 2 lit (`ai-daily-spend-high`, `ai-tokens-platform-daily-total`), both on the pre-deploy bar, cited to #4517
-**CI warnings:** 6. One is the 182 s duration on `test_a_panel_costs_one_token_per_persona`, filed as #4560. Five are `SKIPPED in CI — no playwright/chromium`, #3640's deliberate skip notice; no action.
-**Ledger:** none — no new standing machinery. The lanes extended the existing wrap-nightly and config-drift rows in their PRs.
+**Closures:** none — no issues closed this session (every PR used Refs) · DoD: scanned=0 hits=0
+**Backlog:** Now live at 14 (opus 14 startable); Later sweep — unverified, GitHub connection reset during the run
+**Alarms:** 3 lit, all re-cited to their live causes — nightly-predraft-missing → #4568, qa-smoke-failures → #4569, qa-smoke-warnings → dated self-clearing (recall re-indexed after the season promote)
+**CI warnings:** 6 — 1 Operational additive IAM diff (this session's parser grant; deployed by `cdk_deploy.sh LifePlatformOperational` this wrap); 5 playwright-skip notices (standing, owned by #3640, no action)
+**Ledger:** Story Desk row added (in #4542)

@@ -3835,6 +3835,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4511"
         }
       ]
+    },
+    {
+      "id": "2026-10-02-the-story-gets-a-copy-desk",
+      "date": "2026-10-02",
+      "title": "The weekly story gets a copy desk",
+      "shipped": "The weekly chronicle and the podcast now come out of one newsroom pipeline instead of two separate writers. Code first builds the week's facts: weight, training, sleep, food and the coaches' calls. A desk step picks the story and remembers last week's threads and open bets. The post and the episode are written from that one plan, and code checks every number and every quote before anything is published. The first five weeks were rewritten through it and republished, each with a correction note. On Mondays the owner now gets a few questions by email and can answer by hitting reply. If he doesn't answer, nothing waits.",
+      "why_it_mattered": "The published weeks had been wrong in ways a reader would believe. They used the wrong calorie and protein targets. Food logs that had not been exported yet were told as him going silent. One title carried a count it should never have shown. A story about one person's data is only worth reading if the data is right.",
+      "gotcha": "Passing every in-loop check was not enough. A separate audit against the raw database still found 20, then 26, then 5, then 3 blocking errors before it reached zero: sleep paired with the wrong morning, the wrong weekdays, a bet that contradicted its own rule. That audit is now required before anything publishes.",
+      "honest_miss": "The first live rehearsal inside AWS crashed: the model service refused the desk's structured plan as too complex, and the run quietly fell back to the old writer, which titled the week 'The Silence Between the Numbers'. It was caught and fixed before Wednesday. A test of the Monday questions also asked whether he had 'never missed a protein day'. The truth was 7 of 26. That kind of question is now dropped in code.",
+      "prs": [
+        {
+          "label": "PR #4542",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4542"
+        },
+        {
+          "label": "PR #4565",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4565"
+        },
+        {
+          "label": "PR #4566",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4566"
+        },
+        {
+          "label": "PR #4567",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4567"
+        }
+      ]
     }
   ]
 }
