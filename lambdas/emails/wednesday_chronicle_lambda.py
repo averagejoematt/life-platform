@@ -698,7 +698,11 @@ def _handler_core(event: dict, context) -> dict:
         try:
             from content import story_pipeline
 
-            _desk = story_pipeline.live_week(table, _target_date, log=logger.info)
+            # a rehearsal may name the week (#4535 proof): {"dry_run": true, "desk_week_end": "YYYY-MM-DD"}
+            _desk_end = (event.get("desk_week_end") if _dry else None) or _target_date
+            _desk = story_pipeline.live_week(table, _desk_end, log=logger.info)
+            if _desk is None:
+                logger.info(f"[#4535] story desk declined {_desk_end}: not a season week end — legacy writer")
         except Exception as _desk_e:  # noqa: BLE001 — the legacy writer is the fallback, never a dark week
             logger.error(f"[#4535] story desk failed — falling back to the legacy writer: {_desk_e}")
             _desk = None
