@@ -69,7 +69,9 @@ def test_forbidden_topics_never_reach_him():
             "content": [{"type": "text", "text": '{"questions": ["How was work?", "Did you journal?", "What did the walk feel like?"]}'}],
         }
 
-    assert q.generate({}, {}, invoke=fake) == q.FALLBACK[:4]  # 1 survivor < 3 → the fallback set
+    qs = q.generate({}, {}, invoke=fake)
+    assert "How was work?" not in qs and "Did you journal?" not in qs
+    assert qs == ["What did the walk feel like?", *q.FALLBACK[:2]]  # the survivor kept, topped up to MIN_QUESTIONS
 
 
 def test_a_failed_generation_never_blocks():
@@ -124,3 +126,22 @@ def test_copyedit_fixes_spelling_but_cannot_rewrite_him():
 
     assert q.copyedit(raw, invoke=tidy).startswith("I think I'm probably tougher")
     assert q.copyedit(raw, invoke=rewrite) == raw  # mutation control: a rewrite is rejected, the raw answer stands
+
+
+def test_a_false_premise_question_is_dropped_and_the_set_is_topped_up():
+    """The 2026-10-02 live dry run: 'never missed a protein target day' when 7 of 26 days hit the floor."""
+    import json
+
+    from content import story_questions as sq
+
+    dossier = {"nutrition": {"days_protein_at_or_over_floor": 2, "protein_mean_g": 135.1}, "window": {"day_last": 24}}
+    bad = "You're 31 days in and have never missed a protein target day. What would you tell someone on Day 1?"
+    ok1 = "Protein averaged 135.1 g this week. What got in the way on the low days?"
+    ok2 = "You hit the floor on 2 days. What was different about those days?"
+    reply = {"stop_reason": "end_turn", "content": [{"type": "text", "text": json.dumps({"questions": [ok1, bad, ok2]})}]}
+    qs = sq.generate(dossier, {}, invoke=lambda body, model: reply)
+    assert bad not in qs and ok1 in qs and ok2 in qs
+    assert len(qs) >= sq.MIN_QUESTIONS  # topped up from FALLBACK, not discarded wholesale
+    assert sq.ungrounded(bad, dossier) and not sq.ungrounded(ok1, dossier)
+    # mutation control: an ungrounded figure alone is also caught
+    assert sq.ungrounded("You walked 99,999 steps on Tuesday — how did that feel?", dossier)

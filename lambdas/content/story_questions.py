@@ -45,7 +45,9 @@ Ask about what the data CANNOT say: a decision he made, a moment that stood out,
 from the inside, whether he did what a coach asked, what he would tell someone starting this. Anchor each question
 in a specific thing from this week's dossier (a day, a session, a number) so it is concrete. 3 to 5 questions.
 At most ONE about feelings. Never ask about vices or substances, family, partner, his job, his journal, or his
-weight goal as a feeling. Never lead the witness. Plain, friendly, short (under 25 words each)."""
+weight goal as a feeling. Never lead the witness. Plain, friendly, short (under 25 words each).
+Every fact a question states must be in the dossier as written: never claim a streak, a "never", an "always", an
+"every day" or a record the dossier does not state, and never extrapolate one week's figure to the whole season."""
 
 _SCHEMA = {
     "type": "object",
@@ -81,12 +83,31 @@ def generate(dossier: Dict[str, Any], ledger_view: Dict[str, Any], *, invoke: Op
             raise ValueError(f"stop_reason={resp.get('stop_reason')}")
         text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
         qs = [q.strip() for q in json.loads(text).get("questions", []) if q and q.strip()]
-        qs = [q for q in qs if not _forbidden(q)][:MAX_QUESTIONS]
-        if len(qs) >= MIN_QUESTIONS:
+        qs = [q for q in qs if not _forbidden(q) and not ungrounded(q, dossier)][:MAX_QUESTIONS]
+        if qs:  # top up from the fixed set rather than discard the grounded ones
+            qs += [f for f in FALLBACK if f not in qs][: max(0, MIN_QUESTIONS - len(qs))]
             return qs
     except Exception:  # noqa: BLE001 — the questions are optional; never the reason a week does not ship
         pass
     return FALLBACK[:4]
+
+
+# A question with a false premise invites a false answer that then gets quoted. Measured 2026-10-02: the first live
+# dry run asked "You're 31 days in and have never missed a protein target day" — the season was 7 of 26 days at or
+# over the floor. The prompt rule is not the gate; this is.
+_ABSOLUTE = re.compile(
+    r"\b(?:never|always|not once|every (?:single )?(?:day|time|session|week)|each and every|without (?:a )?(?:miss|fail))\b",
+    re.IGNORECASE,
+)
+
+
+def ungrounded(q: str, dossier: Dict[str, Any]) -> List[str]:
+    """Why a generated question cannot be sent: an absolute claim (the model's favourite fabrication), or a figure no
+    dossier value renders to (content.story_checks — the same number gate the writers face)."""
+    from content import story_checks
+
+    out = [f"absolute claim: {m.group(0)!r}" for m in _ABSOLUTE.finditer(q)]
+    return out + story_checks.ungrounded_numbers(q, story_checks.allowed_numbers(dossier))
 
 
 _FORBIDDEN = re.compile(
