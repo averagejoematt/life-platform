@@ -274,3 +274,52 @@ def test_a_carried_bet_must_be_scored_once_its_window_closes():
     assert not [x for x in story_ledger.continuity_findings(led, b, 2) if "Week 0 bet" in x]
     led = story_ledger.apply_budget(led, b, week=2, date="d2", title="t")
     assert led["bets"][0]["result"] == "right" and led["bets"][0]["winner"] == "Elena"
+
+
+def _minimal_budget(schema=None):
+    """A schema-conformant instance derived FROM BUDGET_SCHEMA (so the fixture cannot drift from the schema)."""
+    from content import story_desk as d
+
+    sc = d.BUDGET_SCHEMA if schema is None else schema
+    if "enum" in sc:
+        return sc["enum"][0]
+    t = sc.get("type")
+    if t == "object":
+        return {k: _minimal_budget(v) for k, v in (sc.get("properties") or {}).items()}
+    return {"array": [], "string": "", "integer": 0, "number": 0, "boolean": False}[t]
+
+
+def test_a_grammar_refusal_falls_back_schema_less_and_the_shape_is_still_checked():
+    """2026-10-02: Bedrock refused BUDGET_SCHEMA ('The compiled grammar is too large'), the desk raised, and the live
+    chronicle fell back to the legacy writer. The desk now re-sends schema-less and checks the shape in code."""
+    import json as _json
+
+    from ai import structured_json
+    from content import story_desk as d
+
+    calls = []
+    good = _json.loads(_json.dumps(_minimal_budget()))
+
+    def invoke(body, model):
+        calls.append(body)
+        if "output_config" in body:
+            raise RuntimeError(
+                "An error occurred (ValidationException) when calling the InvokeModel operation: The compiled grammar is too large"
+            )
+        if len(calls) == 2:  # first schema-less reply: wrong shape → the corrective retry must name it
+            return {"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"lead": "a string"}'}]}
+        return {"stop_reason": "end_turn", "content": [{"type": "text", "text": _json.dumps(good)}]}
+
+    try:
+        d.run_desk({"roster": []}, story_ledger.empty_ledger(), week=0, invoke=invoke, log=lambda m: None)
+    except RuntimeError:
+        pass  # the editorial checks may still reject a minimal budget; the seam is what is under test
+    assert "output_config" in calls[0] and "output_config" not in calls[1]  # strict first, then schema-less
+    assert "JSON Schema" in calls[1]["system"]
+    retry_text = calls[2]["messages"][-1]["content"]
+    assert "missing required" in retry_text  # the shape error reached the corrective retry, by name
+
+    shape_errors = structured_json.schema_findings({"lead": "a string"}, d.BUDGET_SCHEMA)
+    assert any("missing required" in f for f in shape_errors) and any("expected object" in f for f in shape_errors)
+    assert not structured_json.schema_findings(good, d.BUDGET_SCHEMA)
+    assert "output_config" not in d._schema_less({"system": "s", "output_config": {}})
