@@ -22,6 +22,7 @@ import json
 import re
 from typing import Any, Callable, Dict, List, Optional
 
+from ai import structured_json  # the shared JSON seam (#4276)
 from ai.model_defaults import NARRATIVE_MODEL as DESK_MODEL  # noqa: E402 — the one narrative default (#4275/#4278)
 
 from content import story_ledger
@@ -105,9 +106,9 @@ this week, or (b) the data shows a consequence of it. Otherwise give it at most 
 say why in "omitted". Never lead two weeks running on an absence. A source whose window has not fully EXPORTED
 yet is a data caveat ("not yet exported"), never a behaviour.
 
-ATTRIBUTION: the training sessions are PROGRAMMED by the coaching team and matched to the day's prescription —
-when the volume is high, that is the team's programme being executed, and the story (if there is one) is about
-the programme and how the body is absorbing it, not about the subject's impatience.
+ATTRIBUTION: the training sessions are PROGRAMMED by the coaching team, and he has said he often goes past the
+prescription and skips rest days by his own choice. Never assign motive for the volume (impatience, the coaches'
+push, anything) except in his own words from owner_voice; otherwise report what was programmed and what was done.
 
 CONTINUITY: the season ledger lists open threads. Every open thread must be accounted for (advance, resolve,
 retire, or hold with a reason in the note). A thread flagged stale MUST be resolved or retired by name. Open new
@@ -157,6 +158,16 @@ def desk_messages(dossier: Dict[str, Any], ledger: Dict[str, Any], *, week: int)
         "Return this week's story budget."
     )
     return {"system": RUBRIC, "messages": [{"role": "user", "content": user}], "max_tokens": DESK_MAX_TOKENS, "temperature": 0.4}
+
+
+def _schema_less(body: Dict[str, Any]) -> Dict[str, Any]:
+    """The request without ``output_config``: the schema rides in the system prompt instead (#4535)."""
+    out = {k: v for k, v in body.items() if k != "output_config"}
+    out["system"] = (
+        f"{body.get('system', '')}\n\nReturn ONLY one JSON object (no prose, no code fence) matching this JSON Schema "
+        f"exactly — every required key, no others:\n{json.dumps(BUDGET_SCHEMA)}"
+    )
+    return out
 
 
 def validate(budget: Dict[str, Any], dossier: Dict[str, Any], ledger: Dict[str, Any], *, week: int) -> List[str]:
@@ -228,12 +239,21 @@ def run_desk(
                     "content": "The desk's checks rejected this budget:\n- " + "\n- ".join(findings) + "\nReturn a corrected budget.",
                 },
             ]
-        resp = invoke(body, DESK_MODEL)
+        try:
+            resp = invoke(body, DESK_MODEL)
+        except Exception as e:  # noqa: BLE001 — only a schema/grammar refusal is absorbed; all else re-raises
+            if "output_config" not in body or not structured_json.grammar_rejected(e):
+                raise
+            log(f"desk: strict schema refused ({str(e)[:120]}) — schema-less, shape checked in code")
+            body = _schema_less(body)
+            resp = invoke(body, DESK_MODEL)
         if resp.get("stop_reason") != "end_turn":
             raise RuntimeError(f"desk: budget call stopped with {resp.get('stop_reason')!r} — not a complete budget")
         text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
-        budget = json.loads(text)
-        findings = validate(budget, dossier, ledger, week=week)
+        parsed = structured_json.parse_json_span(text.strip())
+        budget = parsed if isinstance(parsed, dict) else {}
+        findings = structured_json.schema_findings(budget, BUDGET_SCHEMA) if budget else ["the reply was not a JSON object"]
+        findings = findings or validate(budget, dossier, ledger, week=week)
         if not findings:
             return budget
         log(f"desk: week {week} attempt {attempt} rejected: {findings}")

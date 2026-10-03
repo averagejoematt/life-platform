@@ -72,7 +72,7 @@ from __future__ import annotations
 
 import copy
 import json
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional
 
 LOG_TAG = "STRUCTURED_OUTPUT"
 
@@ -160,6 +160,40 @@ def with_schema(body: dict, schema: dict) -> dict:
     oc.update(structured_output_config(schema))
     out["output_config"] = oc
     return out
+
+
+_JSON_TYPES = {"object": dict, "array": list, "string": str, "integer": int, "number": (int, float), "boolean": bool}
+
+
+def schema_findings(value: Any, schema: dict, path: str = "$") -> List[str]:
+    """The shape check a schema-less reply still owes its schema (#4535): type, required keys, enum, and no keys the
+    schema does not name. A subset of JSON Schema — exactly the keywords the strict output path honours."""
+    t = schema.get("type")
+    py = _JSON_TYPES.get(t) if isinstance(t, str) else None
+    if py is not None and (not isinstance(value, py) or (t in ("integer", "number") and isinstance(value, bool))):
+        return [f"{path}: expected {t}, got {type(value).__name__}"]
+    out: List[str] = []
+    if "enum" in schema and value not in schema["enum"]:
+        out.append(f"{path}: {value!r} is not one of {schema['enum']}")
+    if t == "object" and isinstance(value, dict):
+        props = schema.get("properties") or {}
+        out += [f"{path}: missing required {k!r}" for k in schema.get("required", []) if k not in value]
+        if schema.get("additionalProperties") is False:
+            out += [f"{path}: unexpected key {k!r}" for k in value if k not in props]
+        for k, sub in props.items():
+            if k in value:
+                out += schema_findings(value[k], sub, f"{path}.{k}")
+    if t == "array" and isinstance(value, list) and isinstance(schema.get("items"), dict):
+        for i, item in enumerate(value):
+            out += schema_findings(item, schema["items"], f"{path}[{i}]")
+    return out
+
+
+def grammar_rejected(exc: Exception) -> bool:
+    """Bedrock refuses a strict schema whose compiled grammar is too large (measured 2026-10-02 on the Story Desk's
+    budget: 'The compiled grammar is too large… Simplify your tool schemas'). Same remedy as a refusal: go schema-less."""
+    msg = str(exc)
+    return "ValidationException" in msg and ("grammar" in msg.lower() or "output_config" in msg)
 
 
 def _schema_rejected(exc: Exception) -> bool:
