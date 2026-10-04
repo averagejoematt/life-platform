@@ -100,6 +100,13 @@ DECISIONS = {
     "lambdas/emails/coach_panel_podcast_lambda.py": DERIVED,
     # #4188: the lead read's day number and genesis come from build_experiment_phase_context.
     "lambdas/coach/lead_daily_read.py": DERIVED,
+    "lambdas/coach/coach_moves.py": (
+        "SETTING, not a phase claim (#4583). The matching prose is 'a public health-experiment site' in the cast and line "
+        "prompts; it states no day number, start date or cycle. The only phase facts the model sees are the fact sheet's "
+        "'day of the experiment' and 'experiment start date' rows, copied from the lead read's cited block, which "
+        "coach.lead_daily_read builds from ai_context.build_experiment_phase_context. coach_moves_sheet.check_line holds "
+        "every line to them with the freshness class (stale Day N, experiment span) and the exact figure rule."
+    ),
     "lambdas/content/review_pack_ranker.py": (
         "NOT A PROMPT. The matching string is a FINDING detail — genesis_mismatch's "
         '"generated {gen_date}, BEFORE the current genesis {start_date_iso}" — emitted by the '

@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
@@ -268,7 +268,11 @@ def run(
             return {"status": "already_written", "date": today}
         if inputs is None:
             inputs = sheet_mod.read_inputs(table, today, coach_ids, names)
-            inputs["yesterday"] = (_row(table, (date.fromisoformat(today) - timedelta(days=1)).isoformat()) or {}).get("lines") or []
+            from common.pacific_time import parse_day_key  # #3609: the one calendar-day parser
+
+            day = parse_day_key(today)
+            prev = (day - timedelta(days=1)).isoformat() if day else ""
+            inputs["yesterday"] = ((_row(table, prev) if prev else None) or {}).get("lines") or []
         sheet = sheet_mod.build_sheet(inputs, today)
         absent_ids = {a["coach_id"] for a in sheet["absent"]}
         eligible = [c for c in coach_ids if c not in absent_ids]

@@ -851,6 +851,14 @@ SURFACE_FACETS = {
         "the write — nothing is stored, and the door falls back to its existing chain. A quality-gate regeneration must "
         "re-pass the same check or it is discarded.",
     ),
+    "lambdas/coach/coach_moves_sheet.py::check_line": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "lambdas/coach/coach_moves.py::run@reasons",
+        "The board's daily moves are served as /api/coaching-dashboard.moves and the edition's coach lines. Fail-closed: "
+        "`coach_moves.run` regenerates a refused line once with the reasons named and, if any survive, records the coach in "
+        "`held` and stores no line for it — that coach is silent today. Nothing refused is written to the served `lines`.",
+    ),
     "lambdas/compute/coach_memoir_lambda.py::gate_check": _facet(
         PUBLIC,
         FAIL_CLOSED,

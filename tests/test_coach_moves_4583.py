@@ -552,3 +552,9 @@ def test_graded_claims_are_context_and_their_figures_never_join_the_allow_list()
     assert [g["prediction_id"] for g in sh["graded"]] == ["p2", "pred_sleep_0930"], "newest first"
     allowed, _dates = S.allowed_for(sh)
     assert 190.0 not in allowed
+
+
+def test_a_calendar_day_is_a_date_not_a_figure_and_a_bare_small_count_is_not_a_figure(sheet):
+    assert S.figures_in("I expect 309 by Saturday, October 10.") == [309.0]
+    assert S.off_sheet_figures("I think two of us agree, and 7 lb is not on the sheet.", S.allowed_for(sheet)[0]) == [7.0]
+    assert S.off_sheet_figures("I expect the loss of 3.6 lb a week to hold.", S.allowed_for(sheet)[0]) == []

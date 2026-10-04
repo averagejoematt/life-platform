@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -154,10 +154,10 @@ def _fact(out: list, key: str, label: str, value: Any, as_of: Optional[str], sou
 
 
 def _days_between(a: Optional[str], b: Optional[str]) -> Optional[int]:
-    try:
-        return (date.fromisoformat(str(b)[:10]) - date.fromisoformat(str(a)[:10])).days
-    except (TypeError, ValueError):
-        return None
+    from common.pacific_time import parse_day_key  # #3609: the one calendar-day parser
+
+    da, db = parse_day_key(str(a or "")[:10]), parse_day_key(str(b or "")[:10])
+    return (db - da).days if da and db else None
 
 
 def mask_figures(text: Any) -> str:
@@ -374,10 +374,22 @@ def _word_figures(text: str) -> list:
     return out
 
 
+# A calendar day ("October 10", "September 9th") is a date, policed by the date class —
+# not a figure, and not one of the two a move may lean on.
+_MONTH_DAY_RE = re.compile(
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?\b",
+    re.IGNORECASE,
+)
+
+
+def _without_dates(text: str) -> str:
+    return _MONTH_DAY_RE.sub("<date>", text or "")
+
+
 def figures_in(text: str) -> list:
-    """Every figure in a line: digit tokens (years excluded) plus spelled-out counts with a unit."""
+    """Every figure in a line: digit tokens (years and calendar days excluded) plus spelled-out counts with a unit."""
     digits = []
-    for m in _DIGIT_FIGURE_RE.finditer(text or ""):
+    for m in _DIGIT_FIGURE_RE.finditer(_without_dates(text)):
         try:
             v = float(m.group(0).replace(",", ""))
         except ValueError:
@@ -385,6 +397,23 @@ def figures_in(text: str) -> list:
         if not (2020 <= v <= 2035 and "." not in m.group(0)):
             digits.append(v)
     return digits + _word_figures(text or "")
+
+
+def off_sheet_figures(text: str, allowed: set) -> list:
+    """The EXACT number rule (the lead read's `uncited_numbers` discipline): every figure must be
+    a sheet value or a rounding of one. A unitless count up to twelve ("two coaches") is not a
+    figure; a count WITH a unit ("eleven days", "4 lb") always is."""
+    from ai.grounded_generation import _is_restatement, unit_bearing_numbers
+
+    clean = _without_dates(text)
+    with_unit = unit_bearing_numbers(clean) | set(_word_figures(clean))
+    out = []
+    for v in sorted(set(figures_in(text))):
+        if v.is_integer() and 0 <= v <= 12 and v not in with_unit:
+            continue
+        if not any(_is_restatement(v, a) for a in allowed):
+            out.append(v)
+    return out
 
 
 def allowed_for(sheet: dict, extra: str = "") -> tuple:
@@ -510,7 +539,7 @@ def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, targe
     from ai import grounded_generation as gg
     from common.constants import EXPERIMENT_START_DATE
 
-    reasons += [f"not_on_sheet:{v:g}" for v in sorted(set(_word_figures(t))) if not any(gg._is_restatement(v, a) for a in allowed)]
+    reasons += [f"not_on_sheet:{v:g}" for v in off_sheet_figures(t, allowed)]
     reasons += [
         f"grounding:{f.get('type')}:{f.get('claimed', '')}"
         for f in gg.grounding_findings(
@@ -519,9 +548,7 @@ def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, targe
             allowed_dates=allowed_dates,
             generation_date_iso=today,
             start_date_iso=EXPERIMENT_START_DATE,
-            number_tolerance=gg.NUMBER_TOLERANCE_EXACT,
-            unit_voids_benign=True,
-        )
+        )  # the default window: the exact rule is `off_sheet_figures` above (#2290 keeps EXACT to /api/explain)
     ]
     try:
         from coach import coach_input_facts, reader_checks
@@ -553,9 +580,13 @@ def cross_line_findings(text: str, accepted: list, sheet: dict) -> list:
 
 def _graded(table: Any, coach_ids: list, today: str) -> list:
     from boto3.dynamodb.conditions import Key
+    from common.pacific_time import parse_day_key  # #3609: the one calendar-day parser
     from experiment.phase_filter import with_phase_filter
 
-    since = (date.fromisoformat(today) - timedelta(days=GRADED_LOOKBACK_DAYS)).isoformat()
+    day = parse_day_key(today)
+    if day is None:
+        return []
+    since = (day - timedelta(days=GRADED_LOOKBACK_DAYS)).isoformat()
     out = []
     for cid in coach_ids:
         try:
