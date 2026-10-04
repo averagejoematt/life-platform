@@ -147,6 +147,12 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-chart__line { fill: none; stroke: var(--ck-accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .ck-chart__now { fill: var(--ck-accent); }
 
+/* The daily mark: one column a day, the green is what is gone and the grey what is left
+   (a proposal — not yet approved by the owner). */
+.ck-mark { width: 100%; height: auto; display: block; }
+.ck-mark__gone { fill: var(--ck-accent); }
+.ck-mark__left { fill: var(--ck-line); }
+
 /* 11. Follow box */
 .ck-follow { background: var(--ck-panel); border-radius: 20px; padding: 32px 24px; align-items: flex-start; }
 

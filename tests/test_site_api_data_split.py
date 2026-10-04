@@ -66,6 +66,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/coach_docket": "handle_coach_docket",  # #1386 — the Dispute Docket (open positions + resolved history)
     "/api/coach_team": "handle_coach_team",
     "/api/coach_timeline": "handle_coach_timeline",
+    "/api/calls": "handle_calls",  # #4586 — a page per settled coach call (inline in _dispatch_route)
     "/api/coaches": "handle_coaches",
     "/api/constellation": "handle_constellation",
     "/api/content_cadence": "handle_content_cadence",  # #1972 — chronicle/podcast next-installment line

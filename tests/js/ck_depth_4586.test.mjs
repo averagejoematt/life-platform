@@ -157,13 +157,10 @@ test("a measure name from the address bar finds only real measures", () => {
   assert.equal(D.isMeasure("steps"), true);
 });
 
-test("the index lists every measure once, in four areas, and each lift done at least twice", () => {
-  const html = D.trendIndexHTML(BASE, SRC.workouts.workouts);
-  for (const area of ["Body", "Food", "Training", "Sleep", "Each lift"]) assert.match(html, new RegExp(`<p class="ck-label">${area}</p>`));
+test("the index lists every measure once, in four areas, and no list of lifts", () => {
+  const html = D.trendIndexHTML(BASE);
+  for (const area of ["Body", "Food", "Training", "Sleep"]) assert.match(html, new RegExp(`<p class="ck-label">${area}</p>`));
   const listed = D.TREND_AREAS.flatMap((a) => a.measures);
   assert.deepEqual([...listed].sort(), Object.keys(D.MEASURES).sort(), "every measure is in exactly one area");
-  assert.match(html, /trend\/\?m=lift&amp;x=Bench%20Press%20\(Barbell\)">Bench Press \(Barbell\) /);
-  const names = D.liftNames(SRC.workouts.workouts);
-  assert.ok(names.includes("Bench Press (Barbell)") && !names.includes("Stretching") && !names.includes("Cycling"));
-  assert.doesNotMatch(D.trendIndexHTML(BASE, []), /Each lift/);
+  assert.doesNotMatch(html, /Each lift|m=lift/, "a lift's trend is reached from the lift on a day page, never from a menu");
 });

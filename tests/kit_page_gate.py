@@ -61,10 +61,12 @@ KIT_PAGES = {
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
-    # One page per AI coach, one template: seven short sections (watching, next, the longer
-    # view, the record, disagreements, the character, the terms) — six screens, as the front page.
+    "/next/v8/sheet/": 4,  # the character sheet, plainly: one level, seven areas, the earned badges
+    "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
+    # One page per AI coach, one template: the record first, then what settles next, the
+    # bets, the watch list, the longer view, the character and the terms — six screens at most.
     "/next/v8/coach/?c=sleep_coach": 6,  # a watch list the coach wrote, three open bets
-    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the longer view is served
+    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the coach has a longer view
     "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
     "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
     "/next/v8/coach/": 4,  # no coach named: one sentence and the way back
@@ -72,9 +74,13 @@ KIT_PAGES = {
     # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
     # room for a few more rows, so a list that doubles still fails here.
     "/next/v8/appendix/": 11,
+    "/next/v8/call/": 4,  # the newest settled call above the list of all of them
+    "/next/v8/call/?id=sleep-20260907-8436f03290": 4,  # one number call
+    "/next/v8/call/?id=bet-20260930-994b3d89f6": 4,  # a bet: both sides' words, the longest a call page gets
+    "/next/v8/call/?id=sleep-20260907-0000000000": 4,  # an address that names no call: one sentence and the list
 }
 
-#: route glob -> fixture file. Every route ck_pages.js, ck_depth.js and ck_coach.js read.
+#: route glob -> fixture file. Every route the kit pages' modules read.
 ROUTES = {
     "**/api/edition": "edition.json",
     "**/journal/posts.json": "posts.json",
@@ -94,6 +100,14 @@ ROUTES = {
     "**/api/training_overview": "training_overview.json",
     "**/api/nutrition_overview": "nutrition_overview.json",
     "**/api/frequent_meals": "frequent_meals.json",
+    "**/api/weekly_priority": "weekly_priority.json",
+    "**/api/character": "character.json",
+    "**/api/achievements": "achievements.json",
+    "**/panelcast/wk4.transcript.json": "transcript_wk4.json",
+    "**/api/platform_stats": "platform_stats.json",
+    "**/api/receipts": "receipts.json",
+    "**/api/predictions": "predictions.json",
+    "**/api/calls": "calls.json",  # ck_call.js — this route's own output for tests/fixtures/calls_wire_4586/
 }
 
 _FORBIDDEN = (

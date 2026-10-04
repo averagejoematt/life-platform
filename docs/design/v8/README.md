@@ -65,6 +65,15 @@ keyboard focus ring. Section labels use the soft text colour.
 
 Nothing else was changed. The class names gained the `ck-` prefix.
 
+## A proposal the owner has not approved yet: the daily mark
+
+`ck-mark` (#4586) is one column a day for the last four weeks, drawn the same way every
+day in a frame whose height is the whole distance from the start weight to the goal:
+`ck-mark__gone` (accent) is what is gone as of that day, `ck-mark__left` is what is left,
+and a day with no weigh-in leaves a gap. It is
+the only addition to the sheet since the kit was approved, it is on the preview path only,
+and it comes out if he says no.
+
 ## The sources
 
 `prototype/` holds the three approved sources exactly as the owner saw them:

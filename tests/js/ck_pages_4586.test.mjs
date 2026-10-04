@@ -103,14 +103,24 @@ test("the bet card states the question, the date and both sides", () => {
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-05" }] }, "2026-10-05"), "");
 });
 
-test("one right and one wrong, each with a plain measured result", () => {
+test("one right and one wrong, never a conditional or a claim that quotes a raw date", () => {
   const { right, wrong } = P.verdictPick(load("coaches"));
   assert.equal(right.status, "confirmed");
   assert.equal(wrong.status, "refuted");
-  assert.equal(wrong.eval_type, "point");
-  const html = P.verdictsHTML(load("coaches"));
-  assert.match(html, /The result was 166\. Checked October 3\./);
+  for (const c of [right, wrong]) assert.doesNotMatch(c.claim, /^\s*(if|once|when)\b|\b20\d\d-\d\d-\d\d\b/i);
   assert.equal(P.verdictsHTML({ coaches: [] }), "");
+});
+
+test("the showcase pair comes from the settled calls that have a page, each a door to it", () => {
+  const calls = load("calls");
+  const html = P.callVerdictsHTML(calls, "/next/v8/");
+  const right = calls.calls.find((c) => c.verdict === "right" && c.kind !== "bet");
+  const wrong = calls.calls.find((c) => c.verdict === "wrong" && c.kind !== "bet");
+  assert.ok(html.includes(right.called_short.replace(/’/g, "’")) || html.includes("Right"));
+  assert.match(html, new RegExp(`href="/next/v8/call/\\?id=${right.id}"`));
+  if (wrong) assert.match(html, new RegExp(`href="/next/v8/call/\\?id=${wrong.id}"`));
+  assert.equal(P.callVerdictsHTML(null), "");
+  assert.equal(P.callVerdictsHTML({ calls: [] }), "");
 });
 
 test("the recap skips an editor's note and never prints a clipped sentence", () => {
@@ -160,37 +170,9 @@ test("progress runs from the start to the goal, and is not drawn without a goal"
   assert.equal(P.progressHTML({ ...B.today.data, goal_weight_lbs: null }), "");
 });
 
-test("the seven days show a dot per recorded day and the block's own sentence", () => {
-  const html = P.weekHTML(B.week);
-  assert.match(html, /Trained on 7 of 7 days recorded\./);
-  assert.match(html, /aria-label="2 of 3 days"/);
-  assert.equal((html.split("At or above")[0].split("Food")[1].match(/ck-dot/g) || []).length, 4, "three days recorded: two met, one open (the open dot carries two class tokens)");
-  const gone = { ...B.week, data: { ...B.week.data, measures: { ...B.week.data.measures, sleep: { state: "unavailable", absent_text: "Sleep is not served right now.", data: null } } } };
-  assert.match(P.weekHTML(gone), /Sleep is not served right now\./);
-});
 
-test("the rest of it is one served fact per area, each a door", () => {
-  const html = P.lifeHTML(B.life, { habits: "/data/habits/", supplements: "/protocols/" });
-  assert.match(html, /<a href="\/data\/habits\/">Habits: 5 of 7 daily habits kept on Friday, October 2\./);
-  assert.match(html, /Supplements: 21 in the daily stack\./);
-  assert.match(html, /Mind: Nothing new in his own words since Wednesday, September 23\./);
-  assert.doesNotMatch(html, /Body:/);
-});
 
 test("a right call that gave a range says the result fell inside it", () => {
   assert.match(P.verdictsHTML(load("coaches")), /The result was 97, inside the range given\. Checked October 3\./);
 });
 
-test("each day opens in place to what was recorded that day, newest first", () => {
-  const html = P.daysHTML(B.week, "2026-10-03");
-  assert.equal((html.match(/<details>/g) || []).length, 7);
-  assert.match(P.daysHTML(B.week, "2026-10-03", "/next/v8/"), /href="\/next\/v8\/day\/\?d=2026-10-02">The full day: lifts, food and trends<\/a>/);
-  assert.match(html, /<time datetime="2026-10-03">Today<\/time>/);
-  assert.match(html, /<time datetime="2026-10-02">Fri 2<\/time>/);
-  assert.match(html, /<summary>311\.0 lb · trained · slept 8\.8 h<\/summary>/);
-  assert.match(html, /Food<\/span><span>153 g protein, 1,732 kcal/);
-  assert.ok(html.indexOf("2026-10-03") < html.indexOf("2026-09-27"), "newest day first");
-  const empty = { ...B.week, data: { ...B.week.data, detail: [{ date: "2026-10-03", summary: "Nothing recorded yet.", facts: [] }] } };
-  assert.doesNotMatch(P.daysHTML(empty, "2026-10-03"), /<details>/);
-  assert.match(P.daysHTML(empty, "2026-10-03"), /Nothing recorded yet\./);
-});

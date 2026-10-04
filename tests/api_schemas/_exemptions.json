@@ -23,6 +23,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 #1394 one-tap weekly cohort single-number submission (write)"
   },
+  "/api/calls": {
+    "category": "capture-failed",
+    "reason": "#4586 (epic #4580) \u2014 new GET route, NOT deployed yet at PR time, so there is no live shape to snapshot (the #1373 /api/character_receipt precedent). Post-deploy the driver runs `deploy/capture_api_schemas.py --only /api/calls`, commits tests/api_schemas/api_calls.json, and drops this entry."
+  },
   "/api/edition": {
     "category": "capture-failed",
     "reason": "#4582 (epic #4580) \u2014 new GET route, NOT deployed yet at PR time, so there is no live shape to snapshot (the #1373 /api/character_receipt precedent). Post-deploy the driver runs `deploy/capture_api_schemas.py --only /api/edition`, commits tests/api_schemas/api_edition.json, adds /api/edition to public_archive_registry.ARCHIVE_ROUTES if it should be archived, and drops this entry."
