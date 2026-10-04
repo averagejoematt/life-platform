@@ -75,31 +75,60 @@ export function timeInWords(iso) {
   return `${day}, at ${mins}, Pacific time`;
 }
 
-// The engine's metric names in the reader's words. Unknown → the name with its underscores
-// opened, never hidden.
-const METRIC_WORDS = {
-  recovery_score: "the night’s recovery",
-  recovery_score_7day_avg: "the seven-night average recovery",
-  sleep_duration_hours: "the night’s sleep, in hours",
-  sleep_hours: "the night’s sleep, in hours",
-  total_sleep_hours: "the night’s sleep, in hours",
-  hrv: "heart-rate variability",
-  hrv_ms: "heart-rate variability",
-  rhr: "resting heart rate",
-  resting_heart_rate: "resting heart rate",
-  weight_lbs: "his weight",
-  weight: "his weight",
-  total_calories_kcal_7day_avg: "the seven-day average calories",
-  total_calories_kcal: "the day’s calories",
-  total_protein_g: "the day’s protein, in grams",
-  protein_g: "the day’s protein, in grams",
-  steps: "the day’s steps",
-  deep_pct: "the share of deep sleep",
-  rem_pct: "the share of dreaming sleep",
+// The engine’s metric names in the reader’s words. Unknown → the name with its underscores
+// opened, never hidden. Each BASE metric carries its words and what one reading spans (a
+// night or a day); a windowed form — `<base>_7day_avg`, `_14day_avg`, … — is DERIVED from its
+// base by rule ("the night’s recovery" → "the seven-night average recovery"), never typed as
+// another row (R7 fix 2: `total_protein_g_7day_avg` and `deep_pct_7day_avg` printed raw
+// because only two of the windowed forms had a row). tests/js/v7_coaches.test.mjs holds
+// every metric of a served docket to words.
+const METRIC_BASE = {
+  recovery_score: ["the night’s recovery", "night"],
+  sleep_duration_hours: ["the night’s sleep, in hours", "night"],
+  sleep_hours: ["the night’s sleep, in hours", "night"],
+  total_sleep_hours: ["the night’s sleep, in hours", "night"],
+  sleep_score: ["the night’s sleep score", "night"],
+  hrv: ["heart-rate variability", "night"],
+  hrv_ms: ["heart-rate variability", "night"],
+  rhr: ["resting heart rate", "night"],
+  resting_heart_rate: ["resting heart rate", "night"],
+  weight_lbs: ["his weight", "day"],
+  weight: ["his weight", "day"],
+  total_calories_kcal: ["the day’s calories", "day"],
+  calories: ["the day’s calories", "day"],
+  total_protein_g: ["the day’s protein, in grams", "day"],
+  protein_g: ["the day’s protein, in grams", "day"],
+  steps: ["the day’s steps", "day"],
+  deep_pct: ["the share of deep sleep", "night"],
+  rem_pct: ["the share of dreaming sleep", "night"],
 };
+const RE_WINDOWED = /^(.+)_(\d+)day_avg$/;
+// "" when the metric has no words (neither a base row nor a windowed form of one).
+function resolveMetric(metric) {
+  const m = String(metric || "");
+  if (METRIC_BASE[m]) return METRIC_BASE[m][0];
+  const w = RE_WINDOWED.exec(m);
+  const base = w && METRIC_BASE[w[1]];
+  const n = w ? Number(w[2]) : 0;
+  if (!base || !(n > 1)) return "";
+  const span = `${numberWords(n)}-${base[1]} average`;
+  const words = base[0];
+  if (words.startsWith("his ")) return `his ${span} ${words.slice(4)}`;
+  return `the ${span} ${words.replace(/^the (night|day)’s /, "").replace(/^the /, "")}`;
+}
+/** True when the metric resolves to reader words — false is a field name about to print. */
+export function metricKnown(metric) {
+  return Boolean(resolveMetric(metric));
+}
 export function metricWords(metric) {
   const m = String(metric || "");
-  return METRIC_WORDS[m] || m.replace(/_/g, " ");
+  return resolveMetric(m) || m.replace(/_/g, " ");
+}
+/** The words split from their unit: "the day’s protein, in grams" → { what: "the day’s protein",
+ *  unit: "grams" } — so a sentence can put the unit after the number ("190 grams or better"). */
+export function metricParts(metric) {
+  const m = /^(.*), in ([a-z]+)$/.exec(metricWords(metric));
+  return m ? { what: m[1], unit: m[2] } : { what: metricWords(metric), unit: "" };
 }
 const COND_WORDS = { lt: "under", lte: "at most", le: "at most", gt: "over", gte: "at or above", ge: "at or above", eq: "at", up: "up", down: "down" };
 export function conditionWords(cond) {
@@ -140,9 +169,9 @@ const Q_COND = { gte: "or better", ge: "or better", gt: "or more", lte: "or lowe
 export function docketQuestion(criterion, resolutionDate) {
   const c = criterion || {};
   if (!c.metric || c.threshold == null) return "";
-  const what = metricWords(c.metric);
+  const { what, unit } = metricParts(c.metric);
   const cond = String(c.condition || "").toLowerCase();
-  const thr = fmtNum(c.threshold);
+  const thr = `${fmtNum(c.threshold)}${unit ? ` ${unit}` : ""}`;
   const when = dayInWords(resolutionDate);
   const on = when ? ` on ${when}` : "";
   if (cond === "lt" || cond === "gt") return `Will ${what} be ${cond === "lt" ? "under" : "over"} ${thr}${on}?`;

@@ -98,7 +98,7 @@ test("the standing-rules line states an empty record as empty and an unserved on
   assert.equal(T.rulesLine({ protocols: [], count: 0 }), "No standing rule is on the record beyond the stack.");
   assert.equal(T.rulesLine({ protocols: [{ name: "x" }], count: 1 }), "One standing rule is on the record.");
   assert.equal(T.rulesLine({ protocols: [{}, {}], count: 2 }), "Two standing rules are on the record.");
-  assert.equal(T.rulesLine(null), "Standing rules: not loaded.");
+  assert.equal(T.rulesLine(null), "The standing rules are not served right now.");
 });
 
 test("running first, then ready to start, then the honest count waiting", () => {
@@ -142,9 +142,15 @@ test("his calls: only published notes, residue dropped whole, the channel never 
   assert.equal(T.hisCalls(null).length, 0);
 });
 
-test("the day under a note is the decision's date in words, else the note's own write day", () => {
+test("R7 fix 7: the day under a note is the Pacific day he WROTE it (note_at), as Home dates it; the decision's date only without an instant", () => {
   const calls = T.hisCalls(DEC);
-  assert.equal(T.callDay(calls[0]), "Wednesday, September 23");
+  // the live record: filed under 2026-09-08, written 2026-09-07T04:02Z — Sunday evening, September 6, Pacific
+  const live = T.hisCalls({ decisions: [{ date: "2026-09-08", note: "I am 320+lb and have not worked out consistently for a long time.", note_at: "2026-09-07T04:02:58.868Z" }, { date: "2026-09-08", note: "no instant on this one" }] });
+  assert.equal(T.callDay(live[0]), "Sunday, September 6");
+  assert.equal(T.callIso(live[0]), "2026-09-06");
+  assert.equal(T.callDay(live[1]), "Tuesday, September 8");
+  assert.equal(T.callIso(live[1]), "2026-09-08");
+  assert.equal(T.callDay(calls[0]), "Wednesday, September 23"); // 03:10Z on the 24th is the evening of the 23rd in Pacific
   assert.equal(T.callDay(calls[2]), "Sunday, September 6"); // 04:02Z on the 7th is the evening of the 6th in Pacific
   assert.equal(T.followedWords(calls[0]), "He went the other way.");
   assert.equal(T.followedWords(calls[1]), "He went with it.");

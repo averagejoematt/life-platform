@@ -57,7 +57,12 @@ test("weightGoalSentence — the rate with its interval and n, provisional, and 
   assert.match(s, /About <span data-src="api_journey.journey.weekly_rate_lbs">4\.4<\/span> lb a week down so far over <span[^>]*>13<\/span> weigh-ins, provisional; the likely range is <span[^>]*>2\.8<\/span> to <span[^>]*>4\.7<\/span>\./);
   assert.match(s, /No date to goal\.$/);
   assert.doesNotMatch(visible(s), /cycle|reset|attempt|as of/i);
-  assert.match(M.weightGoalSentence({ ...JOURNEY, projected_goal_date: "2027-04-20" }), /The engine dates the goal Tuesday, April 20\./);
+  // R7 fix 5: a month, a year and the engine's range — "Tuesday, April 20" with no year read as a day already past
+  assert.match(visible(M.weightGoalSentence({ ...JOURNEY, projected_goal_date: "2027-04-20" })), /At this rate the goal lands around April 2027\.$/);
+  const ranged = visible(M.weightGoalSentence({ ...JOURNEY, projected_goal_date: "2027-06-09", projected_goal_date_earliest: "2027-05-22", projected_goal_date_latest: "2027-09-22" }));
+  assert.match(ranged, /At this rate the goal lands around June 2027 — between May and September 2027\.$/);
+  assert.doesNotMatch(ranged, /Wednesday, June 9|engine dates/);
+  assert.match(visible(M.weightGoalSentence({ ...JOURNEY, projected_goal_date: "2027-12-20", projected_goal_date_earliest: "2027-11-02", projected_goal_date_latest: "2028-02-11" })), /around December 2027 — between November 2027 and February 2028\.$/);
   assert.equal(M.weightGoalSentence(null), "");
 });
 
@@ -138,10 +143,16 @@ test("absenceRows — the five, in order, each an absence with its served count;
 });
 
 test("absenceRows — a missing breakdown says so; a recorded stream says so; the age floor reads as 'more than'", () => {
+  // R7 fix 9: a feed that did not answer is "not served right now"; a served feed with no row is
+  // "nothing on record" — and neither names "the payload" (a builder word)
   const none = M.absenceRows({ freshness: { sources: [] }, pulse: null });
-  assert.equal(none[0].text, "not in today’s payload");
-  assert.equal(none[1].text, "not in today’s payload");
-  assert.equal(none[4].text, "not in today’s payload");
+  assert.equal(none[0].text, "not served right now");
+  assert.equal(none[1].text, "nothing on record");
+  assert.equal(none[4].text, "nothing on record");
+  const down = M.absenceRows({ freshness: null, pulse: null });
+  assert.deepEqual(down.map((r) => r.text), Array(5).fill("not served right now"));
+  assert.equal(M.absenceRows({ freshness: { sources: [] }, pulse: { pulse: { glyphs: {} } } })[0].text, "nothing on record");
+  for (const r of [...none, ...down]) assert.doesNotMatch(r.text, /payload/);
   const fr = { sources: [{ id: "apple_health", datatypes: [{ key: "cgm", dark: false, last_seen: "2026-09-25" }, { key: "blood_pressure", dark: true, age_days: null, age_floor_days: 400 }] }] };
   const rows = M.absenceRows({ freshness: fr, pulse: { pulse: { glyphs: { journal: { written_today: true } } } } });
   assert.equal(rows[0].text, "an entry today");
@@ -163,4 +174,24 @@ test("engineKey — the plain key names the day, the k of n areas, the level; ar
   ]);
   assert.doesNotMatch(visible(k.key), /pillar|character level|cycle/i);
   assert.equal(M.engineKey(null), null);
+});
+
+// ── R7 (#4329) ──────────────────────────────────────────────────────────────────
+test("R7 fix 6: ONE day count — the training rows start at the served start day, and the weight sentence counts the experiment's days", () => {
+  // the live shape: the feed's trailing window opens the day BEFORE the start
+  const daily = [{ date: "2026-09-05", total_min: 0 }, { date: "2026-09-06", total_min: 65 }, { date: "2026-09-07", total_min: 30 }];
+  assert.deepEqual(M.trainingSeries(daily, "2026-09-06").map((r) => r.date), ["2026-09-06", "2026-09-07"]);
+  assert.equal(M.trainingSeries(daily).length, 3, "no served start → the rows as served");
+  assert.match(M.trainingSentence({ daily_modality_minutes_30d: daily }, "2026-09-06"), /^Trained on <span[^>]*>2<\/span> of <span[^>]*>2<\/span> days since September 6\./);
+  const j = { current_weight_lbs: 311.0, lost_lbs: 16.3, start_weight_lbs: 327.3, started_date: "2026-09-06", last_weighin_date: "2026-10-03", weighin_count: 20, weighin_span_days: 27, day_n: 28 };
+  assert.match(M.weightLine(j, "2026-10-03"), /, 20 weigh-ins in 28 days\.$/);
+  assert.match(M.weightLine({ ...j, day_n: null }, "2026-10-03"), /, 20 weigh-ins in 27 days\.$/, "no served day count → the shared line stands");
+});
+
+test("R7 fix 10: the page ends on the dated things to come back for — the next write-up and the next weigh-in", () => {
+  const n = M.nextEntry({ cad: { chronicle: { paused: false, next_date: "2026-10-07" } }, pending: null, journey: { journey: { last_weighin_date: "2026-10-03" } }, clock: "2026-10-03" });
+  assert.equal(visible(n.html), "The next write-up is drafted Wednesday, October 7 and publishes once Matthew has read it.The next weigh-in is due Sunday, October 4.");
+  assert.equal(n.day, "2026-10-07");
+  assert.match(n.html, /<time datetime="2026-10-04" data-src="api_journey.journey.last_weighin_date">/);
+  assert.equal(M.nextEntry({ cad: null, pending: null, journey: null, clock: "" }).html, "");
 });

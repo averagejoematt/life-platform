@@ -346,9 +346,24 @@ function renderWeek(journey, served) {
   if (journey) setMargin(sec, journey.last_weighin_date, "api_snapshot.journey.last_weighin_date");
 }
 
-function renderNight(vitals, served) {
+/** The night by BOTH instruments (R7 fix 10): the shared line above prints the wrist strap's hours
+ *  alone while Home and His numbers print the bed sensor's — one night, two figures across pages.
+ *  This is the sentence Home prints, from /api/sleep_detail, and only when it is the SAME night the
+ *  line above describes. "" when either figure is unserved or the nights differ. */
+export function bothSensorsLine(vitals, sleep) {
+  const sd = (sleep && sleep.sleep_detail) || {};
+  const bed = num(sd.total_sleep_hours);
+  const strap = num(sd.whoop_hours);
+  if (bed == null || strap == null) return "";
+  if (vitals && vitals.night_of && sd.night_of && iso(vitals.night_of) !== iso(sd.night_of)) return "";
+  return `That night the bed sensor read <span data-src="api_sleep_detail.sleep_detail.total_sleep_hours">${esc(bed.toFixed(1))}</span> hours of sleep and the wrist strap <span data-src="api_sleep_detail.sleep_detail.whoop_hours">${esc(strap.toFixed(1))}</span>.`;
+}
+
+function renderNight(vitals, served, sleep) {
   const sec = document.getElementById("td-night");
-  fill(sec, stateHTML({ served, line: readerWords(nightLine(vitals)), what: "Last night", fact: "No sleep reading is on the record for last night.", src: SRC.night }));
+  const line = readerWords(nightLine(vitals));
+  const both = line ? bothSensorsLine(vitals, sleep) : "";
+  fill(sec, stateHTML({ served, line, what: "Last night", fact: "No sleep reading is on the record for last night.", src: SRC.night }) + (both ? `<p class="td-small">${both}</p>` : ""));
   if (vitals) setMargin(sec, vitals.night_of || vitals.as_of_date, vitals.night_of ? "api_snapshot.vitals.night_of" : "api_snapshot.vitals.as_of_date");
 }
 
@@ -425,13 +440,14 @@ export async function getJSON(p, fetchImpl = fetch) {
 }
 
 async function main() {
-  const [snap, rt, nut, dash, fresh, session] = await Promise.all([
+  const [snap, rt, nut, dash, fresh, session, sleep] = await Promise.all([
     getJSON("/api/snapshot"),
     getJSON("/api/routine"),
     getJSON("/api/nutrition_overview"),
     getJSON("/api/coaching-dashboard"),
     getJSON("/api/source_freshness"),
     getJSON("/api/session"), // plan E3 (#4318) — a non-2xx is drained above and prints as not served
+    getJSON("/api/sleep_detail"), // R7 fix 10 — the bed sensor's figure beside the strap's
   ]);
   const journey = snap ? unwrap(snap.journey, "journey") : null;
   const vitals = snap ? unwrap(snap.vitals, "vitals") : null;
@@ -442,7 +458,7 @@ async function main() {
   if (thr) thr.textContent = dataThrough(through);
   const now = new Date();
   renderWeek(journey, !!snap);
-  renderNight(vitals, !!snap);
+  renderNight(vitals, !!snap, sleep);
   renderToday({ rt, nut, session });
   renderAsk(dash, now);
   renderSkips({ pillars, freshness: fresh, since: journey && journey.started_date, snapServed: !!snap, freshServed: !!fresh });

@@ -138,6 +138,9 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
     parts = [
         "    <h1>Under the hood</h1>\n",
         '    <p class="v7-job">How a number is made, and the corrections column.</p>\n',
+        # R7 fix 10: the ONE "Data through" line sits in the fold, above the device count — the
+        # fold was an undated paragraph and the first date a screen down.
+        '    <p class="hd-note hd-through" id="hd-through" data-src="api_vitals.vitals.as_of_date"></p>\n',
         '    <noscript><p class="hd-note">Every number on this page is drawn from the site’s served data when scripts run. With scripts off the entries below name what each one holds, not the numbers.</p></noscript>\n',
         _entry("hd-how", "How a number is made", f'<div id="hd-how-body">{_PENDING}</div>\n        {CHARACTER_FOLD}', "§"),
         _entry("hd-corrections", "The corrections column", f'<div id="hd-corrections-body">{_PENDING}</div>'),
@@ -146,7 +149,7 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         _entry(
             "hd-return",
             "Next",
-            f'<div id="hd-return-body">{_PENDING}</div>\n        <p class="hd-note hd-through" id="hd-through" data-src="api_vitals.vitals.as_of_date"></p>',
+            f'<div id="hd-return-body">{_PENDING}</div>',
             "→",
         ),
     ]

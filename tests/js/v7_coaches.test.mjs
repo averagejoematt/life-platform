@@ -424,3 +424,48 @@ test("getJSON drains a non-2xx body before returning null — an unread body kee
     globalThis.fetch = realFetch;
   }
 });
+
+// ── R7 fix 2 (#4329): the windowed-metric wording is a RULE, and the SET is guarded ──────────
+// The four criteria /api/coach_docket served on 2026-10-03 (captured from the live body). Two of
+// them — total_protein_g_7day_avg and deep_pct_7day_avg — printed as "total protein g 7day avg"
+// because the words were rows and only two windowed forms had one.
+const SERVED_DOCKET = {
+  open: [
+    { coach_a: "physical_coach", coach_b: "sleep_coach", sides: { physical_coach: false, sleep_coach: true }, resolution_date: "2026-10-05", criterion: { threshold: 81.6, condition: "gte", metric: "recovery_score_7day_avg", description: "recovery_score_7day_avg >= 81.6 on 2026-10-05" } },
+    { coach_a: "mind_coach", coach_b: "sleep_coach", sides: { mind_coach: false, sleep_coach: true }, resolution_date: "2026-10-07", criterion: { threshold: 80.0, condition: "gte", metric: "recovery_score_7day_avg", description: "recovery_score_7day_avg >= 80 on 2026-10-07" } },
+    { coach_a: "mind_coach", coach_b: "nutrition_coach", sides: { nutrition_coach: true, mind_coach: false }, resolution_date: "2026-10-12", criterion: { threshold: 190.0, condition: "gte", metric: "total_protein_g_7day_avg", description: "total_protein_g_7day_avg >= 190 on 2026-10-12" } },
+    { coach_a: "sleep_coach", coach_b: "physical_coach", sides: { sleep_coach: false, physical_coach: true }, resolution_date: "2026-10-16", criterion: { threshold: 26.0, condition: "gte", metric: "deep_pct_7day_avg", description: "deep_pct_7day_avg >= 26 on 2026-10-16" } },
+  ],
+};
+
+test("R7 fix 2: every metric in a served docket resolves to words — none prints as a field name with its underscores opened", () => {
+  const offenders = [];
+  for (const row of SERVED_DOCKET.open) {
+    const metric = row.criterion.metric;
+    const opened = metric.replace(/_/g, " ");
+    const q = V.docketQuestion(row.criterion, row.resolution_date);
+    const r = V.docketRow(row, {}, new Set(), null, {});
+    if (!V.metricKnown(metric)) offenders.push(`${metric}: no words`);
+    for (const shown of [V.metricWords(metric), q, r.question, r.settled]) {
+      if (shown.includes(opened) || /\d+day|\bavg\b|_/.test(shown)) offenders.push(`${metric}: prints "${shown}"`);
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test("R7 fix 2: a windowed form is derived from its base — the reading's own span, the unit after the number", () => {
+  assert.equal(V.metricWords("recovery_score_7day_avg"), "the seven-night average recovery");
+  assert.equal(V.metricWords("total_calories_kcal_7day_avg"), "the seven-day average calories");
+  assert.equal(V.metricWords("total_protein_g_7day_avg"), "the seven-day average protein, in grams");
+  assert.equal(V.metricWords("deep_pct_7day_avg"), "the seven-night average share of deep sleep");
+  assert.equal(V.metricWords("hrv_14day_avg"), "the fourteen-night average heart-rate variability");
+  assert.equal(V.metricWords("weight_lbs_7day_avg"), "his seven-day average weight");
+  assert.deepEqual(V.metricParts("total_protein_g_7day_avg"), { what: "the seven-day average protein", unit: "grams" });
+  assert.equal(V.docketQuestion({ metric: "total_protein_g_7day_avg", condition: "gte", threshold: 190 }, "2026-10-12"), "Will the seven-day average protein be 190 grams or better on Monday, October 12?");
+  assert.equal(V.docketQuestion({ metric: "deep_pct_7day_avg", condition: "gte", threshold: 26 }, "2026-10-16"), "Will the seven-night average share of deep sleep be 26 or better on Friday, October 16?");
+  // a base with no words has none in any window — known is false, and the caller decides
+  assert.equal(V.metricKnown("some_new_engine_field_7day_avg"), false);
+  assert.equal(V.metricKnown("some_new_engine_field"), false);
+  assert.equal(V.metricKnown("recovery_score_1day_avg"), false);
+  assert.equal(V.metricKnown("deep_pct_7day_avg"), true);
+});

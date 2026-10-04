@@ -10,7 +10,9 @@ export const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").repl
 // skeleton forever — no timeout meant non-resolution slid past tryJSON's catch,
 // and ~15 renderers await this chokepoint. A 10s abort converts a hang into a
 // rejection so each renderer's existing honest-error branch fires instead.
-export async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10000) }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
+// A non-2xx body is DRAINED before the throw: an unread body stays "in flight" to Chromium, so
+// `networkidle` never arrives and the visual-QA gate that waits on it rolls the deploy back.
+export async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10000) }); if (!r.ok) { await r.text().catch(() => ""); throw new Error(p + " " + r.status); } return r.json(); }
 
 export async function tryJSON(p) { try { return await getJSON(p); } catch (e) { return null; } }
 
