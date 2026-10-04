@@ -411,6 +411,12 @@ def discover_ci_mirror_sites(repo_root: str = REPO_ROOT) -> set[str]:
 
 
 CI_MIRROR_SITES: dict[str, dict[str, str]] = {
+    "scripts/reader_surface.py": {
+        "clause": "C",
+        "claim": ".github/workflows/ci-cd.yml",
+        "notes": "#4589: the reader-surface gate names the two workflows whose AI-judge steps it decides (ci-cd.yml visual-qa, "
+        "visual-qa.yml cadence) as part of the surface itself — a wiring edit must exercise the judge. It mirrors no check set",
+    },
     "scripts/verify_citations.py": {
         "clause": "C",
         "claim": ".github/workflows/citation-network-check.yml",
@@ -591,7 +597,10 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
 # C 25 -> 26 (2026-10-02, #4262): scripts/wrap_gates.py's NIGHTLY list stands in for
 # wrap-nightly.yml's matrix (held equal by tests/test_advisory_failure_issue.py) and names
 # the workflow by path — a real clause-C mirror, registered rather than reworded.
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 26}
+# C 26 -> 27 (2026-10-04, #4589): scripts/reader_surface.py names ci-cd.yml / visual-qa.yml by
+# path because their AI-judge wiring is part of the reader surface it derives — registered,
+# not reworded around the regex.
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 27}
 
 
 def main() -> None:

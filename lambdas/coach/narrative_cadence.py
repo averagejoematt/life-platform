@@ -46,6 +46,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Iterable, Optional
 
+from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741/#3609)
+
 # date.weekday(): Monday == 0 ... Sunday == 6.
 NARRATIVE_WEEKDAYS = (0, 3)  # Monday, Thursday
 _WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
@@ -55,7 +57,12 @@ OFF_CADENCE_REASON = "off_cadence"
 
 
 def _as_date(day) -> date:
-    return day if isinstance(day, date) else date.fromisoformat(str(day)[:10])
+    if isinstance(day, date):
+        return day
+    parsed = parse_day_key(str(day)[:10])
+    if parsed is None:
+        raise ValueError(f"not a YYYY-MM-DD day: {day!r}")
+    return parsed
 
 
 def is_narrative_day(day) -> bool:
@@ -90,18 +97,6 @@ def max_gap_days() -> int:
         raise ValueError("NARRATIVE_WEEKDAYS is empty")
     gaps = [(days[(i + 1) % len(days)] - days[i]) % 7 or 7 for i in range(len(days))]
     return max(gaps)
-
-
-def narrative_days_between(first, last) -> list:
-    """Narrative days in [first, last], newest first — what a dead-man should expect."""
-    a, b = _as_date(first), _as_date(last)
-    out = []
-    d = b
-    while d >= a:
-        if d.weekday() in NARRATIVE_WEEKDAYS:
-            out.append(d)
-        d -= timedelta(days=1)
-    return out
 
 
 def describe() -> str:
