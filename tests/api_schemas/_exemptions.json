@@ -43,10 +43,6 @@
     "category": "capture-failed",
     "reason": "#4189 (2026-09-27) \u2014 route not deployed yet, no live GET shape to snapshot (the #1373 /api/character_receipt disposition); post-deploy the driver runs deploy/capture_api_schemas.py --only /api/morning_note, commits api_morning_note.json and drops this entry"
   },
-  "/api/owner_words": {
-    "category": "capture-failed",
-    "reason": "#4584 (2026-10-04) \u2014 route not deployed yet, no live GET shape to snapshot (the #1373 /api/character_receipt disposition); post-deploy the driver runs deploy/capture_api_schemas.py --only /api/owner_words, commits api_owner_words.json and drops this entry"
-  },
   "/api/nudge": {
     "category": "write-path",
     "reason": "POST-only \u2014 evening nudge action (write)"
