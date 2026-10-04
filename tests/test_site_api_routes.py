@@ -435,3 +435,45 @@ def test_a_measure_with_no_reading_this_week_is_absent_not_a_row_of_zeroes():
     wire["training"] = {"daily_modality_minutes_30d": [{"date": "2026-09-01", "total_min": 60}]}
     part = _edition(wire)["blocks"]["week"]["data"]["measures"]["training"]
     assert part["state"] == "absent" and part["data"] is None and part["absent_text"] == "Training has no reading in these seven days."
+
+
+def test_each_of_the_seven_days_opens_to_what_was_recorded_that_day():
+    """#4586 (tap a day): newest first; a measure with no reading that day is left out."""
+    detail = _edition(_wire())["blocks"]["week"]["data"]["detail"]
+    assert [d["date"] for d in detail][:2] == ["2026-10-03", "2026-10-02"] and len(detail) == 7
+    newest = detail[0]
+    assert newest["summary"] == "311.0 lb · trained · slept 8.8 h"
+    assert newest["facts"] == [
+        {"label": "Weight", "text": "311.0 lb"},
+        {"label": "Training", "text": "241 minutes of walking"},
+        {"label": "Sleep", "text": "8.8 hours; recovery 98 out of 100"},
+        {"label": "Food", "text": "153 g protein, 1,732 kcal"},
+        {"label": "Steps", "text": "9,913"},
+    ]
+    oldest = detail[-1]
+    assert "Food" not in [f["label"] for f in oldest["facts"]], "no food row was served for that day: the day must not invent one"
+
+
+def test_a_day_with_no_rows_at_all_says_nothing_was_recorded():
+    wire = _wire()
+    wire["pulse"] = {"pulse_history": []}
+    wire["training"] = {"daily_modality_minutes_30d": []}
+    wire["nutrition"] = dict(wire["nutrition"], nutrition_trend=[])
+    assert all(d["summary"] == "Nothing recorded yet." and d["facts"] == [] for d in _edition(wire)["blocks"]["week"]["data"]["detail"])
+
+
+def test_todays_zero_training_minutes_is_not_a_day_without_training():
+    """Live 2026-10-04 08:14 PT: 'Trained on 6 of 7 days' — the seventh was today, not over.
+    Control: the same zero on a past day IS a recorded day without training."""
+    wire = _wire()
+    rows = [dict(r) for r in wire["training"]["daily_modality_minutes_30d"]]
+    rows[-1] = {"date": _CAPTURE_DAY, "total_min": 0}
+    wire["training"] = {"daily_modality_minutes_30d": rows}
+    week = _edition(wire)["blocks"]["week"]["data"]
+    assert week["measures"]["training"]["data"]["values"][-1] is None
+    assert week["measures"]["training"]["data"]["text"] == "Trained on 6 of 6 days recorded."
+    assert "Training" not in [f["label"] for f in week["detail"][0]["facts"]]
+    rows[-2] = {"date": rows[-2]["date"], "total_min": 0}
+    past = _edition(wire)["blocks"]["week"]["data"]
+    assert past["measures"]["training"]["data"]["text"] == "Trained on 5 of 6 days recorded."
+    assert {"label": "Training", "text": "No training recorded."} in past["detail"][1]["facts"]

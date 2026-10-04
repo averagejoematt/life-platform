@@ -180,3 +180,16 @@ test("the rest of it is one served fact per area, each a door", () => {
 test("a right call that gave a range says the result fell inside it", () => {
   assert.match(P.verdictsHTML(load("coaches")), /The result was 97, inside the range given\. Checked October 3\./);
 });
+
+test("each day opens in place to what was recorded that day, newest first", () => {
+  const html = P.daysHTML(B.week, "2026-10-03");
+  assert.equal((html.match(/<details>/g) || []).length, 7);
+  assert.match(html, /<time datetime="2026-10-03">Today<\/time>/);
+  assert.match(html, /<time datetime="2026-10-02">Fri 2<\/time>/);
+  assert.match(html, /<summary>311\.0 lb · trained · slept 8\.8 h<\/summary>/);
+  assert.match(html, /Food<\/span><span>153 g protein, 1,732 kcal/);
+  assert.ok(html.indexOf("2026-10-03") < html.indexOf("2026-09-27"), "newest day first");
+  const empty = { ...B.week, data: { ...B.week.data, detail: [{ date: "2026-10-03", summary: "Nothing recorded yet.", facts: [] }] } };
+  assert.doesNotMatch(P.daysHTML(empty, "2026-10-03"), /<details>/);
+  assert.match(P.daysHTML(empty, "2026-10-03"), /Nothing recorded yet\./);
+});

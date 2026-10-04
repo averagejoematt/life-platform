@@ -397,6 +397,15 @@ def _by_date(rows: Any, field: str) -> dict:
     return {str(r.get("date")): _num(r.get(field)) for r in rows or [] if isinstance(r, dict) and r.get("date")}
 
 
+def _training_minutes(rows: Any, today: str) -> dict:
+    """Training minutes by day. Today's zero is NOT a reading: the day is not over, so a
+    session not yet logged must not count as a day without training."""
+    minutes = _by_date(rows, "total_min")
+    if not minutes.get(today):
+        minutes.pop(today, None)
+    return minutes
+
+
 def _measure(
     src: Any, what: str, body: dict | None, days: list, values: dict | None, sentence: Callable[[list], str | None], bar=None
 ) -> dict:
@@ -410,6 +419,57 @@ def _measure(
     if bar is not None:
         data["met"] = [None if v is None else bool(bar(v)) for v in series]
     return _block("ok", seen[-1], src, f"{what} has no reading in these seven days.", data)
+
+
+_MODALITY_WORDS = (
+    ("strength_min", "strength"),
+    ("walking_min", "walking"),
+    ("cycling_min", "cycling"),
+    ("hiking_min", "hiking"),
+    ("soccer_min", "soccer"),
+    ("stretching_min", "stretching"),
+    ("breathwork_min", "breathwork"),
+    ("other_min", "other training"),
+)
+
+
+def _rows_by_date(rows: Any) -> dict:
+    return {str(r.get("date")): r for r in rows or [] if isinstance(r, dict) and r.get("date")}
+
+
+def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, food_row: dict | None, is_today: bool = False) -> dict:
+    """One day, opened: every fact a route served for that day, in plain words. A measure
+    with no reading that day is left out — the day says what was recorded, nothing else."""
+    facts, summary = [], []
+    p, t, f = pulse_row or {}, training_row or {}, food_row or {}
+    weight, hours, recovery, steps = (
+        _num(p.get("weight_lbs")),
+        _num(p.get("sleep_hours")),
+        _num(p.get("recovery_pct")),
+        _num(p.get("steps")),
+    )
+    if weight is not None:
+        facts.append({"label": "Weight", "text": f"{weight:.1f} lb"})
+        summary.append(f"{weight:.1f} lb")
+    total = _num(t.get("total_min"))
+    if total:
+        kinds = [f"{_fmt_num(t[k])} minutes of {word}" for k, word in _MODALITY_WORDS if _num(t.get(k))]
+        facts.append({"label": "Training", "text": "; ".join(kinds) or f"{_fmt_num(total)} minutes"})
+        summary.append("trained")
+    elif training_row is not None and not is_today:
+        facts.append({"label": "Training", "text": "No training recorded."})
+        summary.append("no training recorded")
+    if hours is not None:
+        rec = f"; recovery {_fmt_num(recovery)} out of 100" if recovery is not None else ""
+        facts.append({"label": "Sleep", "text": f"{_fmt_num(hours)} hours{rec}"})
+        summary.append(f"slept {_fmt_num(hours)} h")
+    protein, calories = _num(f.get("protein_g")), _num(f.get("calories"))
+    if protein is not None:
+        kcal = f", {int(calories):,} kcal" if calories is not None else ""
+        facts.append({"label": "Food", "text": f"{_fmt_num(protein)} g protein{kcal}"})
+    if steps is not None:
+        facts.append({"label": "Steps", "text": f"{int(steps):,}"})
+    return {"date": day, "summary": " · ".join(summary) or "Nothing recorded yet.", "facts": facts}
 
 
 def _week(b: dict, today: str) -> dict:
@@ -450,7 +510,7 @@ def _week(b: dict, today: str) -> dict:
             "Training",
             training,
             days,
-            _by_date((training or {}).get("daily_modality_minutes_30d"), "total_min"),
+            _training_minutes((training or {}).get("daily_modality_minutes_30d"), today),
             count_text("Trained", trained),
             trained,
         ),
@@ -481,13 +541,12 @@ def _week(b: dict, today: str) -> dict:
         for r in history or []
         if isinstance(r, dict) and r.get("date") and _num(r.get("weight_lbs")) is not None and str(r["date"]) <= today
     ]
-    return _block(
-        "ok",
-        today,
-        src,
-        "Nothing is recorded in these seven days.",
-        {"days": days, "order": list(parts), "measures": parts, "weight_series": series},
-    )
+    by_pulse, by_training = _rows_by_date(history), _rows_by_date((training or {}).get("daily_modality_minutes_30d"))
+    by_food = _rows_by_date((nutrition or {}).get("nutrition_trend"))
+    # Newest first: the day a returning reader came for is the first one they can open.
+    detail = [_day_detail(d, by_pulse.get(d), by_training.get(d), by_food.get(d), d == today) for d in reversed(days)]
+    data = {"days": days, "order": list(parts), "measures": parts, "detail": detail, "weight_series": series}
+    return _block("ok", today, src, "Nothing is recorded in these seven days.", data)
 
 
 # ── the whole-life rows (#4586) ─────────────────────────────────────────────────

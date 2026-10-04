@@ -240,6 +240,174 @@
       }
      }
     },
+    "detail": [
+     {
+      "date": "2026-10-03",
+      "summary": "311.0 lb · trained · slept 8.8 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "311.0 lb"
+       },
+       {
+        "label": "Training",
+        "text": "241 minutes of walking"
+       },
+       {
+        "label": "Sleep",
+        "text": "8.8 hours; recovery 98 out of 100"
+       },
+       {
+        "label": "Food",
+        "text": "153 g protein, 1,732 kcal"
+       },
+       {
+        "label": "Steps",
+        "text": "9,913"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-02",
+      "summary": "311.0 lb · trained · slept 8.4 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "311.0 lb"
+       },
+       {
+        "label": "Training",
+        "text": "155 minutes of strength"
+       },
+       {
+        "label": "Sleep",
+        "text": "8.4 hours; recovery 98 out of 100"
+       },
+       {
+        "label": "Food",
+        "text": "172 g protein, 1,568 kcal"
+       },
+       {
+        "label": "Steps",
+        "text": "1,113"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-01",
+      "summary": "311.7 lb · trained · slept 9.1 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "311.7 lb"
+       },
+       {
+        "label": "Training",
+        "text": "137 minutes of strength"
+       },
+       {
+        "label": "Sleep",
+        "text": "9.1 hours; recovery 62 out of 100"
+       },
+       {
+        "label": "Food",
+        "text": "186 g protein, 1,690 kcal"
+       },
+       {
+        "label": "Steps",
+        "text": "6,382"
+       }
+      ]
+     },
+     {
+      "date": "2026-09-30",
+      "summary": "311.4 lb · trained · slept 8.2 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "311.4 lb"
+       },
+       {
+        "label": "Training",
+        "text": "109 minutes of walking"
+       },
+       {
+        "label": "Sleep",
+        "text": "8.2 hours; recovery 59 out of 100"
+       },
+       {
+        "label": "Steps",
+        "text": "4,833"
+       }
+      ]
+     },
+     {
+      "date": "2026-09-29",
+      "summary": "312.3 lb · trained · slept 8.7 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "312.3 lb"
+       },
+       {
+        "label": "Training",
+        "text": "137 minutes of strength"
+       },
+       {
+        "label": "Sleep",
+        "text": "8.7 hours; recovery 54 out of 100"
+       },
+       {
+        "label": "Steps",
+        "text": "1,561"
+       }
+      ]
+     },
+     {
+      "date": "2026-09-28",
+      "summary": "313.2 lb · trained · slept 7.8 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "313.2 lb"
+       },
+       {
+        "label": "Training",
+        "text": "116 minutes of strength"
+       },
+       {
+        "label": "Sleep",
+        "text": "7.8 hours; recovery 64 out of 100"
+       },
+       {
+        "label": "Steps",
+        "text": "1,134"
+       }
+      ]
+     },
+     {
+      "date": "2026-09-27",
+      "summary": "314.5 lb · trained · slept 7.5 h",
+      "facts": [
+       {
+        "label": "Weight",
+        "text": "314.5 lb"
+       },
+       {
+        "label": "Training",
+        "text": "28 minutes of strength; 165 minutes of walking"
+       },
+       {
+        "label": "Sleep",
+        "text": "7.5 hours; recovery 89 out of 100"
+       },
+       {
+        "label": "Steps",
+        "text": "18,419"
+       }
+      ]
+     }
+    ],
     "weight_series": [
      {
       "date": "2026-09-06",
