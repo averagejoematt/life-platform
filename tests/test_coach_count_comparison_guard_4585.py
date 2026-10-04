@@ -46,7 +46,7 @@ COUNT_MARKERS = re.compile(
 )
 COMPARISON_RE = re.compile(r"\b(?:coachComparison|comparisonText)\(")
 STATIC_COUNT_RE = re.compile(r"\b\d+ of (?:\d+|[a-z-]+) checked calls?\b")
-INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc=)(?![^>]*application/(?:ld\+)?json)[^>]*>(.*?)</script\s*>", re.S | re.I)
+INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc=)(?![^>]*application/(?:ld\+)?json)[^>]*>(.*?)</script\b[^>]*>", re.S | re.I)
 IMPORT_RE = re.compile(r"import\s*\{([^}]*)\}\s*from\s*[\"']/assets/js/([\w.-]+\.js)[\"']")
 
 #: module -> (its exports that carry a coach count, why the module itself renders none).
