@@ -8,9 +8,15 @@ shipping it. Pure functions: no boto3, no model calls.
   * ``completeness``   — the text ends where the writer ended it (#4535: two installments
                          shipped cut off because nothing read ``stop_reason`` or looked at
                          the last sentence and the footer).
-  * ``story_door``     — no cycle / reset / attempt counts on a reader surface (owner
-                         ruling 2026-09-26; ADR-157 point 5 extended from recap cards to the
-                         story door, #4538), and none of the absence phrasings that read an
+  * ``reader_surface`` — THE shared reader-surface check (#4538): no cycle / reset / attempt
+                         counts (owner ruling 2026-09-26; ADR-157 point 5 extended from recap
+                         cards to the story door) and no off-record specifics (a family member
+                         or partner, his employer or colleagues). Every publishing path calls
+                         this one function at its own chokepoint — the chronicle handler, the
+                         "previously on" recap and the Panel (desk and legacy writers) — so a
+                         writer that bypasses the desk cannot bypass the door.
+  * ``story_door``     — ``reader_surface`` plus the desk writers' own findings: the
+                         machinery's vocabulary, and the absence phrasings that read an
                          export lag as a behaviour.
   * ``ungrounded_numbers`` — every figure in the text exists in the week's dossier
                          (ADR-104: claims ⊆ what the writer was given).
@@ -60,12 +66,15 @@ _CARDINALS = (
 )
 _COUNT_NOUNS = r"resets?|restarts?|attempts?|starts?|tries|try|cycles?|launch(?:es)?|false starts?|do-overs?"
 
+# A numbered label is not a tally: "Day 3 starts", "week two tries his patience", "set 4 starts".
+_LABELLED = "".join(rf"(?<!\b{w}\s)" for w in ("day", "week", "month", "session", "episode", "set", "phase", "round", "at"))
+
 # "the fifteenth reset", "16th start", "fifteen resets", "15 attempts", "cycle 17", "reset number 15",
 # "for the fifteenth time". A bare "reset" (a recovery reset, a reset week) is fine — only a COUNT is not.
 _COUNT_PATTERNS = [
     re.compile(rf"\b(?:{_ORDINALS})\s+(?:(?:real|actual|official|failed|new|fresh)\s+)?(?:{_COUNT_NOUNS})\b", re.IGNORECASE),
     re.compile(
-        rf"\b(?:{_CARDINALS})(?:,\s*maybe\s+(?:{_CARDINALS}))?\s+(?:(?:prior|previous|earlier|failed|false)\s+)?(?:{_COUNT_NOUNS})\b",
+        rf"{_LABELLED}\b(?:{_CARDINALS})(?:,\s*maybe\s+(?:{_CARDINALS}))?\s+(?:(?:prior|previous|earlier|failed|false)\s+)?(?:{_COUNT_NOUNS})\b",
         re.IGNORECASE,
     ),
     re.compile(r"\bcycle\s*(?:#\s*)?\d+\b", re.IGNORECASE),
@@ -75,6 +84,32 @@ _COUNT_PATTERNS = [
 # Words that legitimately follow a small cardinal and would otherwise trip the 'starts' noun —
 # "three starts to the week" is rare; "two tries" at a lift is fine only with a lift named. Kept narrow:
 # the gate errs toward a regenerate, which costs one call, never toward a published count.
+
+# Off the record (#4538). The journal is deep background: its weather may inform a writer, its specifics may not
+# reach a reader — and the specifics that identify are the people around him and his working life. One label,
+# stated once, rides on every journal-derived input a writer is shown (``emails/chronicle_data`` is the one live
+# reader of journal text; the desk's dossier counts entries and never reads them).
+OFF_RECORD_JOURNAL_HEADER = (
+    "=== JOURNAL (OFF THE RECORD — never quote directly; no third party named or described, "
+    "no employer, colleague or career specifics) ==="
+)
+_HIS = r"(?:his|matt(?:hew)?['’]s)"
+_OFF_RECORD = [
+    (
+        "a third party",
+        re.compile(
+            rf"\b{_HIS}\s+(?:wife|husband|girlfriend|boyfriend|fianc[eé]e?|partner|ex-wife|ex-girlfriend|mother|father|mom|mum|dad|"
+            r"brother|sister|son|daughter|kids?|children|parents?|family|roommate|in-laws?)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "his working life",
+        re.compile(rf"\b{_HIS}\s+(?:employer|boss|manager|co-?workers?|colleagues?|clients?|day job|workplace|career)\b", re.IGNORECASE),
+    ),
+    # a named employer: "his job at Initech", "a role at Globex" — the capital is the tell, so this one is case-sensitive
+    ("his working life", re.compile(r"\b(?:[Jj]ob|[Rr]ole|[Pp]osition|[Ee]mployed|[Cc]areer)\s+(?:at|with)\s+[A-Z][\w&.-]+")),
+]
 
 # The machinery's own vocabulary is not reader copy: no reader knows the desk, the dossier or the ledger.
 _BACKSTAGE = re.compile(r"\b(?:the desk|desk (?:flagged|noted|says)|dossier|story budget|season ledger|the ledger)\b", re.IGNORECASE)
@@ -88,16 +123,27 @@ _ABSENCE_AS_BEHAVIOUR = [
 ]
 
 
-def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
-    """Reader-surface findings: a cycle/reset/attempt count, or an export lag told as silence.
-
-    ``not_yet_exported`` is the dossier's list of sources whose window is not fully landed; the
-    absence phrasings are only findings when such a source exists (a real, landed gap may be
-    reported — as a fact with its dates, never as a motive)."""
+def reader_surface(text: str) -> List[str]:
+    """THE shared reader-surface check (#4538): findings for a cycle/reset/attempt count (ordinal or cardinal,
+    title or body) and for off-record specifics. Pure and deterministic, so every publishing path can afford
+    it at its own chokepoint: the chronicle handler, the recap, the Panel's per-line gate and its titles."""
     findings: List[str] = []
     for pat in _COUNT_PATTERNS:
         for m in pat.finditer(text or ""):
             findings.append(f"story-door: a cycle/attempt count is not reader copy (owner ruling 2026-09-26): {m.group(0)!r}")
+    for what, pat in _OFF_RECORD:
+        for m in pat.finditer(text or ""):
+            findings.append(f"off-record: {what} stays out of reader copy: {m.group(0)!r}")
+    return findings
+
+
+def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
+    """``reader_surface`` plus the desk writers' own findings: backstage words, or an export lag told as silence.
+
+    ``not_yet_exported`` is the dossier's list of sources whose window is not fully landed; the
+    absence phrasings are only findings when such a source exists (a real, landed gap may be
+    reported — as a fact with its dates, never as a motive)."""
+    findings = reader_surface(text)
     for m in _BACKSTAGE.finditer(text or ""):
         findings.append(f"backstage: {m.group(0)!r} is the machinery's word, not the reader's — say what the data shows")
     if list(not_yet_exported):
