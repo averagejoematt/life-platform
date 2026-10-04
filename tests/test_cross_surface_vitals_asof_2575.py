@@ -78,7 +78,7 @@ _PUBLISHED_08_11 = {
 }
 
 
-def _coach(prose=_MIND_PROSE, stamp=_PUBLISHED_08_11, name="Dr. Nathan Reeves"):
+def _coach(prose=_MIND_PROSE, stamp=_PUBLISHED_08_11, name="Nathan Reeves"):
     c = {"name": name, "position_summary": prose}
     if stamp is not None:
         c["published_vitals"] = stamp

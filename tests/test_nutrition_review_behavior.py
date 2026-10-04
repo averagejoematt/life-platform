@@ -965,7 +965,7 @@ def test_no_weigh_ins_means_no_weight_line_rather_than_a_zero():
 
 
 def test_the_panel_commentary_is_delivered_verbatim():
-    ai = '<div style="border-left:3px solid #10b981;">Dr. Webb: protein held at 190g.</div>'
+    ai = '<div style="border-left:3px solid #10b981;">Webb: protein held at 190g.</div>'
     html = m.build_email_html("", ai, dict(DATES), None)
     assert ai in html
 
@@ -1067,23 +1067,23 @@ def test_no_previous_review_means_no_trend_block_is_invented():
 BOARD = {
     "members": {
         "webb": {
-            "name": "Dr. Marcus Webb",
+            "name": "Marcus Webb",
             "active": True,
             "color": "#10b981",
             "voice": {"tone": "Direct, evidence-based", "catchphrase": "Build from what's working."},
             "features": {
                 "nutrition_review": {
-                    "section_header": "### Dr. Marcus Webb - Macros",
+                    "section_header": "### Marcus Webb - Macros",
                     "prompt_focus": "Weekly calorie avg vs target ({calorie_target} kcal) and protein vs {protein_target_g}g.",
                 }
             },
         },
         "patel": {
-            "name": "Dr. Amara Patel",
+            "name": "Amara Patel",
             "active": True,
             "color": "#8b5cf6",
             "voice": {"tone": "Scientific but accessible"},
-            "features": {"nutrition_review": {"section_header": "### Dr. Amara Patel - Micros", "prompt_focus": "Micronutrients."}},
+            "features": {"nutrition_review": {"section_header": "### Amara Patel - Micros", "prompt_focus": "Micronutrients."}},
         },
     }
 }
@@ -1098,8 +1098,8 @@ def _with_board(monkeypatch, config):
 def test_the_panel_prompt_names_every_configured_expert(monkeypatch):
     _with_board(monkeypatch, BOARD)
     prompt = m._build_nutrition_prompt_from_config(1800, 190)
-    assert "Dr. Marcus Webb" in prompt
-    assert "Dr. Amara Patel" in prompt
+    assert "Marcus Webb" in prompt
+    assert "Amara Patel" in prompt
 
 
 def test_the_panel_prompt_renders_the_targets_into_the_expert_briefs(monkeypatch):
@@ -1135,8 +1135,8 @@ def test_an_inactive_board_member_is_left_off_the_panel(monkeypatch):
     config["members"]["patel"]["active"] = False
     _with_board(monkeypatch, config)
     prompt = m._build_nutrition_prompt_from_config(1800, 190)
-    assert "Dr. Marcus Webb" in prompt
-    assert "Dr. Amara Patel" not in prompt
+    assert "Marcus Webb" in prompt
+    assert "Amara Patel" not in prompt
 
 
 def test_an_unavailable_board_config_falls_back_rather_than_guessing(monkeypatch):
@@ -1147,7 +1147,7 @@ def test_an_unavailable_board_config_falls_back_rather_than_guessing(monkeypatch
 
 
 def test_a_board_with_nobody_assigned_to_this_email_falls_back(monkeypatch):
-    config = {"members": {"webb": {"name": "Dr. Marcus Webb", "active": True, "features": {"weekly_digest": {}}}}}
+    config = {"members": {"webb": {"name": "Marcus Webb", "active": True, "features": {"weekly_digest": {}}}}}
     _with_board(monkeypatch, config)
     assert m._build_nutrition_prompt_from_config(1800, 190) is None
 
@@ -1689,7 +1689,7 @@ def test_real_panel_html_output_is_still_safety_validated(handler_env):
         "validate_ai_output",
         lambda text, *a, **k: seen.append(text) or aiv.AIValidationResult(original_text=text, output_type=aiv.AIOutputType.NUTRITION_COACH),
     )
-    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;padding:12px;">Dr. Webb: eat 600 calories.</div>'
+    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;padding:12px;">Webb: eat 600 calories.</div>'
     m.lambda_handler({}, None)
     assert len(seen) == 1
 
@@ -1718,10 +1718,10 @@ def test_a_full_length_compliant_edition_reaches_the_reader_unchanged(handler_en
     misread ("1,700 kcal" as a 700 kcal prescription)."""
     edition = (
         '<div style="border-left:3px solid #10b981;padding:12px;margin-bottom:16px;">'
-        "<div>Dr. Webb: you averaged 1,700 kcal per day against the 1,800 target, and protein held at 186 g. "
+        "<div>Webb: you averaged 1,700 kcal per day against the 1,800 target, and protein held at 186 g. "
         "Thursday's 1,450 kcal was the only outlier.</div></div>"
         '<div style="border-left:3px solid #8b5cf6;padding:12px;margin-bottom:16px;">'
-        "<div>Dr. Patel: choline landed near 380 mg; two eggs at breakfast closes most of that gap.</div></div>"
+        "<div>Patel: choline landed near 380 mg; two eggs at breakfast closes most of that gap.</div></div>"
         '<div style="border-left:3px solid #f59e0b;padding:12px;">'
         "<div>Meal idea: Smoky Turkey Kofte Bowls — 520 cal per serving, 42P / 30C / 18F.</div></div>"
     )
@@ -1739,7 +1739,7 @@ def test_genuinely_dangerous_calorie_advice_in_a_real_edition_is_still_blocked(h
     """The permissive direction above is only safe while this one still fires."""
     handler_env["state"]["ai"] = (
         '<div style="border-left:3px solid #10b981;padding:12px;">'
-        "<div>Dr. Webb: eat only 600 calories per day this week and the scale will move fast.</div></div>"
+        "<div>Webb: eat only 600 calories per day this week and the scale will move fast.</div></div>"
     )
     m.lambda_handler({}, None)
     html = _sent_html(handler_env)
@@ -1748,7 +1748,7 @@ def test_genuinely_dangerous_calorie_advice_in_a_real_edition_is_still_blocked(h
 
 
 def test_a_delivered_panel_review_is_recorded_in_the_insight_ledger(handler_env):
-    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;">Dr. Webb: protein held.</div>'
+    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;">Webb: protein held.</div>'
     m.lambda_handler({}, None)
     assert len(handler_env["writer"].written) == 1
 
@@ -1756,7 +1756,7 @@ def test_a_delivered_panel_review_is_recorded_in_the_insight_ledger(handler_env)
 def test_blocked_panel_output_is_not_recorded_in_the_insight_ledger(handler_env):
     """A validator fallback is not an insight — IC-16 would feed it back into next
     week's prompt as 'previous nutrition insights'."""
-    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;">Dr. Webb: eat only 500 calories per day until Saturday.</div>'
+    handler_env["state"]["ai"] = '<div style="border-left:3px solid #10b981;">Webb: eat only 500 calories per day until Saturday.</div>'
     m.lambda_handler({}, None)
     assert handler_env["writer"].written == []
 

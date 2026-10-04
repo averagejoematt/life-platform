@@ -504,7 +504,7 @@ He is also proud of showing up anyway.
 **🧠 WHAT'S HAPPENING UNDERNEATH — DR. CONTI
 He is measuring instead of feeling.
 
-🤝 HOW TO SHOW UP FOR HIM — DR. MURTHY
+🤝 HOW TO SHOW UP FOR HIM — MURTHY
 Sit with him without a plan.
 
 💪 HIS BODY THIS WEEK — THE CHAIR

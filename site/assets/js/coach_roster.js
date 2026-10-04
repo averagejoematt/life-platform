@@ -48,7 +48,7 @@ export function rosterEntries(coaches, opts) {
   (#1378) and hiding them would break ADR-104, so the scorecard keeps them — labelled,
   in their own group, never interleaved with the live cast. Before this, both
   scorecard lists in coaching.js built every by_coach key into one list and a stranger
-  met "Dr. Sarah Chen" as a ninth current coach.
+  met "Sarah Chen" as a ninth current coach.
 
   The page never decides who is retired: the flag is the persona registry's, served on
   each /api/predictions row (and on by_coach once the server carries it, #4215's server

@@ -157,7 +157,7 @@ def test_coach_checkin_surfaces_persisted_open_questions(monkeypatch):
     item = {
         "sk": "CHECKIN#2026-07-17#aaaa1111",
         "coach_id": "mind",
-        "coach_name": "Dr. Nathan Reeves",
+        "coach_name": "Nathan Reeves",
         "question": "What's been taking up mental space?",
         "tags": ["mood"],
         "asked_at": "2026-07-17T18:00:00Z",

@@ -637,10 +637,10 @@ _BOARD_CONFIG = {
             "title": "Behavioral Scientist",
             "domains": ["habits", "willpower", "design", "extra"],
         },
-        "park": {"name": "Dr. Park", "title": "Sleep", "domains": ["sleep"], "voice": {"catchphrase": "Protect the window."}},
+        "park": {"name": "Park", "title": "Sleep", "domains": ["sleep"], "voice": {"catchphrase": "Protect the window."}},
         "chen": {"name": "Coach Chen", "title": "Training", "domains": ["training"]},
         "the_chair": {"name": "The Chair", "title": "Platform Intelligence", "domains": ["leverage"]},
-        "webb": {"name": "Dr. Webb", "title": "Nutrition", "domains": ["food"], "active": False},
+        "webb": {"name": "Webb", "title": "Nutrition", "domains": ["food"], "active": False},
     }
 }
 
@@ -658,7 +658,7 @@ class TestBoardContext:
         out = mc._build_board_context_for_compass({"weakest_pillar": "sleep", "recovery": 70}, {"total_overdue": 3})
 
         assert "Dr. Elena Rodriguez" in out
-        assert "Dr. Park" in out
+        assert "Park" in out
         assert 'Principle: "Protect the window."' in out
         # domains are truncated to three
         assert "habits, willpower, design" in out and "extra" not in out
@@ -668,12 +668,12 @@ class TestBoardContext:
         _install_board(monkeypatch)
         out = mc._build_board_context_for_compass({"weakest_pillar": "movement", "recovery": 42}, {"total_overdue": 0})
         assert "Coach Chen" in out  # movement specialist
-        assert "Dr. Park" in out  # added because recovery < 50
+        assert "Park" in out  # added because recovery < 50
 
     def test_low_recovery_when_sleep_is_already_weakest_adds_training(self, monkeypatch):
         _install_board(monkeypatch)
         out = mc._build_board_context_for_compass({"weakest_pillar": "sleep", "recovery": 20}, {"total_overdue": 0})
-        assert "Dr. Park" in out and "Coach Chen" in out
+        assert "Park" in out and "Coach Chen" in out
 
     def test_big_backlog_with_healthy_recovery_adds_the_chair(self, monkeypatch):
         _install_board(monkeypatch)
@@ -683,9 +683,9 @@ class TestBoardContext:
     def test_inactive_members_are_skipped_and_empty_selection_falls_back(self, monkeypatch):
         _install_board(monkeypatch, {"members": {"webb": _BOARD_CONFIG["members"]["webb"]}})
         out = mc._build_board_context_for_compass({"weakest_pillar": "nutrition", "recovery": 70}, {"total_overdue": 0})
-        assert "Dr. Webb" not in out
+        assert "Webb" not in out
         # #2384: the fallback names the LIVE mind coach, not the phantom "Dr. Elena Rodriguez"
-        assert "Dr. Nathan Reeves (Mind & Behaviour Coach)" in out  # the fallback text
+        assert "Nathan Reeves (Mind & Behaviour Coach)" in out  # the fallback text
 
     def test_missing_board_config_uses_fallback(self, monkeypatch):
         _install_board(monkeypatch, None)
@@ -695,7 +695,7 @@ class TestBoardContext:
 
     def test_loader_absent_uses_fallback(self, monkeypatch):
         monkeypatch.setattr(mc, "_HAS_BOARD_LOADER", False)
-        assert "Dr. Nathan Reeves" in mc._build_board_context_for_compass({"weakest_pillar": "sleep"}, {})
+        assert "Nathan Reeves" in mc._build_board_context_for_compass({"weakest_pillar": "sleep"}, {})
 
 
 # ═══════════════════════════════════════════════════════════════════════════

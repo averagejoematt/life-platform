@@ -30,7 +30,7 @@ def markdown_to_html(md_text):
 
         # Blockquotes (Board interviews). #2221: the marker is ">" — the space after
         # it is OPTIONAL in markdown. Requiring "> " rendered an interview written as
-        # ">Dr. Park said..." as ordinary prose with a stray ">" in front of it.
+        # ">Park said..." as ordinary prose with a stray ">" in front of it.
         if stripped.startswith(">"):
             if not in_blockquote:
                 in_blockquote = True

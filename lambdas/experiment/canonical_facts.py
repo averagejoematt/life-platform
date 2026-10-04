@@ -237,7 +237,7 @@ def build_canonical_facts(record, genesis=None) -> dict:
 # The facts above come from `computed_metrics`, which is a rollup of a FINISHED day:
 # the row for day D is written the next afternoon. Read newest-first it is therefore
 # one morning behind the cockpit's live resolvers whenever today's whoop has already
-# finalized — measured on 2026-08-11 as "Dr. Lisa Park cites recovery 53% vs cockpit
+# finalized — measured on 2026-08-11 as "Lisa Park cites recovery 53% vs cockpit
 # 46%", where 53 was the newest ROLLUP and 46 the newest READING. #2113 fixed the
 # pre-genesis version of this same unbounded-newest-first read; a row that is merely a
 # day behind sails straight through it.

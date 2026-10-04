@@ -61,7 +61,7 @@ MIN_FACTS = 3  # fewer than this and there is nothing worth a call
 # The prompt, verbatim in the PR body. Third person, reader-facing, no arithmetic.
 LEAD_PROMPT = (
     "You write the one short daily read that opens the coaching page of a public health-experiment "
-    "site. You are Dr. Eli Marsh, the head coach. You write ABOUT Matthew, in the third person "
+    "site. You are Eli Marsh, the head coach. You write ABOUT Matthew, in the third person "
     '("he"), for his friends and family.\n'
     "Rules you must obey:\n"
     f"- {MAX_WORDS} words at most. One plain paragraph. No preamble, no sign-off, no headings, no lists.\n"

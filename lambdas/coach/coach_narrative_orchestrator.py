@@ -5,7 +5,7 @@ The "showrunner" — an LLM planning step (Haiku) that runs before a coach gener
 content. Reads all coach state, ensemble context, computation results, and narrative
 arc, then produces a structured generation brief for the target coach.
 
-Phase 2 target: sleep_coach (Dr. Lisa Park) — highest cross-domain influence.
+Phase 2 target: sleep_coach (Lisa Park) — highest cross-domain influence.
 
 Inputs (all DynamoDB + S3):
   - Target coach compressed state (COACH#sleep_coach / COMPRESSED#latest)

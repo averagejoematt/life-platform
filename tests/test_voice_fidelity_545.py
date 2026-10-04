@@ -188,16 +188,16 @@ class TestParseVote:
 
 class TestBuildUserMessage:
     def test_roster_and_passage_present(self):
-        candidates = [{"coach_id": "sleep_coach", "name": "Dr. Lisa Park", "domain": "sleep_science"}]
+        candidates = [{"coach_id": "sleep_coach", "name": "Lisa Park", "domain": "sleep_science"}]
         msg = vfh._build_user_message(candidates, "some passage text")
-        assert "sleep_coach" in msg and "Dr. Lisa Park" in msg and "sleep_science" in msg
+        assert "sleep_coach" in msg and "Lisa Park" in msg and "sleep_science" in msg
         assert "some passage text" in msg
 
 
 class TestRunPanel:
     CANDIDATES = [
-        {"coach_id": "sleep_coach", "name": "Dr. Lisa Park", "domain": "sleep_science"},
-        {"coach_id": "training_coach", "name": "Dr. Sarah Chen", "domain": "exercise_physiology"},
+        {"coach_id": "sleep_coach", "name": "Lisa Park", "domain": "sleep_science"},
+        {"coach_id": "training_coach", "name": "Sarah Chen", "domain": "exercise_physiology"},
     ]
 
     def test_three_calls_collected(self, monkeypatch):
@@ -313,8 +313,8 @@ class TestLambdaHandler:
         monkeypatch.setattr(vfh.table, "get_item", lambda **kw: {"Item": None})
 
         candidates = [
-            {"coach_id": "sleep_coach", "name": "Dr. Lisa Park", "domain": "sleep_science"},
-            {"coach_id": "training_coach", "name": "Dr. Sarah Chen", "domain": "exercise_physiology"},
+            {"coach_id": "sleep_coach", "name": "Lisa Park", "domain": "sleep_science"},
+            {"coach_id": "training_coach", "name": "Sarah Chen", "domain": "exercise_physiology"},
         ]
         monkeypatch.setattr(vfh, "_load_candidates", lambda: candidates)
 

@@ -324,7 +324,7 @@ def test_revise_weekly_passes_judge_feedback_verbatim():
     out = repair.revise_weekly(
         [{"speaker": "elena_voss", "line": "hi"}],
         ["JUDGE-ITEM-GAMMA: no humour beat"],
-        "Dr. Sarah Chen",
+        "Sarah Chen",
         "The Measured Life",
         _invoke_capturing(payload, calls),
         "test-model",
@@ -333,7 +333,7 @@ def test_revise_weekly_passes_judge_feedback_verbatim():
     )
     assert out == payload
     assert "JUDGE-ITEM-GAMMA: no humour beat" in calls[0]["messages"][0]["content"]
-    assert "Dr. Sarah Chen" in calls[0]["system"]
+    assert "Sarah Chen" in calls[0]["system"]
 
 
 def test_revise_intro_fails_soft_to_empty_on_error():
@@ -472,8 +472,8 @@ def _weekly_harness(monkeypatch, judge):
         "date": "2026-08-01",
         "title": "Week 3",
         "chronicle": "A solid, ordinary training week with good sleep.",
-        "coach_reads": [{"id": "sleep_coach", "name": "Dr. Sarah Chen", "summary": "Sleep held steady all week.", "themes": []}],
-        "guest": {"id": "sleep_coach", "name": "Dr. Sarah Chen", "summary": "Sleep held steady all week.", "themes": []},
+        "coach_reads": [{"id": "sleep_coach", "name": "Sarah Chen", "summary": "Sleep held steady all week.", "themes": []}],
+        "guest": {"id": "sleep_coach", "name": "Sarah Chen", "summary": "Sleep held steady all week.", "themes": []},
         "presence_note": "",
         "phase_block": "",
         "last_open_bet": None,

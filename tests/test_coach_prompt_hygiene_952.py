@@ -109,7 +109,7 @@ class TestAllowlistExcludesFewShot:
 # ── 2. the [AI_UNAVAILABLE] sentinel is held, never published/cached (ai-content-6) ──
 
 VOICE_SPEC = {
-    "display_name": "Dr. Sarah Chen",
+    "display_name": "Sarah Chen",
     "domain": "sleep",
     "few_shot_examples": ["Your deep sleep hit 18.2% last night — efficiency dipped from 89% to 86%."],
     "structural_voice_rules": {},
@@ -238,7 +238,7 @@ class TestBodIntroFromProfile:
         loader = MagicMock()
         loader.load_board.return_value = {"members": {}}
         loader.get_feature_members.return_value = [
-            ("sarah_chen", {"name": "Dr. Sarah Chen", "title": "Sports Scientist"}, {"role": "unified_panel", "contribution": "training"})
+            ("sarah_chen", {"name": "Sarah Chen", "title": "Sports Scientist"}, {"role": "unified_panel", "contribution": "training"})
         ]
         monkeypatch.setattr(ai_calls, "_HAS_BOARD_LOADER", True)
         monkeypatch.setattr(ai_calls, "_board_loader", loader)

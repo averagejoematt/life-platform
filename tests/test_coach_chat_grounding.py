@@ -196,7 +196,7 @@ def test_the_grounder_is_reusable_across_turns_without_rebuilding():
 from coach import coach_team_texture as ctt  # noqa: E402
 
 _ON_RECORD = ctt.team_room_section(
-    ['Sunday 2026-08-09 — you and Dr. Nathan Reeves went back and forth about the deficit. You said: "Under-fed." He said: "No."']
+    ['Sunday 2026-08-09 — you and Nathan Reeves went back and forth about the deficit. You said: "Under-fed." He said: "No."']
 )
 _NOTHING_ON_RECORD = ctt.team_room_section([])
 _INVENTED = "We talked about you on Tuesday and Nathan agreed with me."

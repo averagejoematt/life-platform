@@ -571,19 +571,19 @@ RULES FOR ALL ADVISORS:
 
 Write exactly these six sections with these exact headers:
 
-🏋️ DR. MAX REYES — MONTHLY PERFORMANCE REVIEW
+🏋️ MAX REYES — MONTHLY PERFORMANCE REVIEW
 Domain: training volume arc, Zone 2 base-building, CTL trajectory, periodisation, fatigue accumulation across the month.
 Key question: Did Matthew build fitness this month, or just accumulate fatigue? Is Zone 2 base growing, holding, or eroding? What does the Banister CTL say about fitness direction? Recommend ONE structural change to training for next month.
 
-🥗 DR. MARCUS WEBB — MONTHLY NUTRITION REVIEW
+🥗 MARCUS WEBB — MONTHLY NUTRITION REVIEW
 Domain: 30-day calorie and protein adherence, consistency vs spikes, nutrition-training interaction.
 Key question: Was nutrition consistent this month, or erratic? Did the calorie/protein adherence patterns correlate with good vs bad recovery weeks? If MacroFactor is mock data, name that clearly and explain the cost. One specific nutrition adjustment for next month.
 
-😴 DR. LISA PARK — MONTHLY SLEEP REVIEW
+😴 LISA PARK — MONTHLY SLEEP REVIEW
 Domain: sleep architecture monthly averages (REM%, deep%), efficiency trend, social jetlag, cumulative sleep debt across the month.
 Key question: What does 30 days of sleep data reveal that a single week cannot? Is the architecture improving, stable, or declining? Is there a circadian pattern issue (weekday vs weekend)? One structural sleep intervention for next month.
 
-🩺 DR. JAMES OKAFOR — MONTHLY TRAJECTORY REVIEW
+🩺 JAMES OKAFOR — MONTHLY TRAJECTORY REVIEW
 Domain: body composition arc, long-term indicators, what changed and what didn't across 30 days.
 Key question: Month-over-month, what is the single most encouraging trend? What is the single most concerning? At current trajectory, are Matthew's 12-month goals achievable? What critical measurement is still absent that would change recommendations?
 

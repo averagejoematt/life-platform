@@ -110,9 +110,9 @@ KIND_PRE_EVENT = "pre_event"
 # The ping comes from the DOMAIN-OWNING coach (the #2490 acceptance bullet), and
 # the persona ids below are registry ids — tests/test_coach_outbound_behavior.py
 # asserts every one of them is a persona that can actually text.
-LIFT_OWNER = "physical_coach"  # Dr. Max Reyes — the merged Performance seat
-RECOVERY_OWNER = "sleep_coach"  # Dr. Lisa Park — sleep/recovery
-NUTRITION_OWNER = "nutrition_coach"  # Dr. Marcus Webb — weight + composition
+LIFT_OWNER = "physical_coach"  # Max Reyes — the merged Performance seat
+RECOVERY_OWNER = "sleep_coach"  # Lisa Park — sleep/recovery
+NUTRITION_OWNER = "nutrition_coach"  # Marcus Webb — weight + composition
 LEAD_OWNER = "eli_marsh"  # the Principal Investigator: whole-program facts, and the
 # honest default — an unmapped ladder belongs to the person who owns the whole thing,
 # never to whichever specialist happens to be first in a dict.

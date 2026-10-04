@@ -76,7 +76,7 @@ const OBS_DOMAINS = new Set(["sleep", "training", "nutrition", "mind", "physical
 // API from config/personas.json's single `lead: true` persona; this constant is only
 // the render-time fallback for a payload that predates the byline field, and
 // tests/test_board_lead_single_character.py pins it equal to the registry's lead.
-const LEAD_BYLINE_FALLBACK = "Dr. Eli Marsh";
+const LEAD_BYLINE_FALLBACK = "Eli Marsh";
 const READ_SCOPES = [
   { id: "today", title: "Today", date: "every coach's latest read" },
   { id: "week", title: "This week", date: "the week in each domain" },
@@ -1217,16 +1217,16 @@ function groundingFooterHTML(grounding) {
 // sigils and names on the convene cards match the roster (the phantom second
 // cast answered ungrounded and is retired; the API maps old cached ids).
 // Coaching-team v2 (2026-08-10): the training seat retired — the merged Performance
-// seat (Dr. Max Reyes) carries training. Keep this map equal to /api/coaches'
+// seat (Max Reyes) carries training. Keep this map equal to /api/coaches'
 // operational roster (tests/test_board_ask_roster.py + cast-consistency guard).
 const BOARD_PERSONAS = {
-  nutrition_coach: { name: "Dr. Marcus Webb", title: "Evidence-Based Nutrition" },
-  sleep_coach: { name: "Dr. Lisa Park", title: "Sleep & Recovery" },
-  physical_coach: { name: "Dr. Max Reyes", title: "Performance & Training" },
-  glucose_coach: { name: "Dr. Amara Patel", title: "Glucose & Metabolic Response" },
-  mind_coach: { name: "Dr. Nathan Reeves", title: "Mind & Behaviour" },
-  labs_coach: { name: "Dr. James Okafor", title: "Labs & Biomarkers" },
-  explorer_coach: { name: "Dr. Henning Brandt", title: "Cross-Domain Patterns" },
+  nutrition_coach: { name: "Marcus Webb", title: "Evidence-Based Nutrition" },
+  sleep_coach: { name: "Lisa Park", title: "Sleep & Recovery" },
+  physical_coach: { name: "Max Reyes", title: "Performance & Training" },
+  glucose_coach: { name: "Amara Patel", title: "Glucose & Metabolic Response" },
+  mind_coach: { name: "Nathan Reeves", title: "Mind & Behaviour" },
+  labs_coach: { name: "James Okafor", title: "Labs & Biomarkers" },
+  explorer_coach: { name: "Henning Brandt", title: "Cross-Domain Patterns" },
 };
 const BOARD_TRIO = ["physical_coach", "nutrition_coach", "sleep_coach"];
 
@@ -1241,7 +1241,7 @@ function attachFollowup(card, pid, sessionToken, getLeft, setLeft) {
   wrap.className = "cv-followup";
   wrap.setAttribute("novalidate", "");
   wrap.innerHTML =
-    `<input class="cv-fu-in" name="fq" maxlength="500" placeholder="Ask ${esc(BOARD_PERSONAS[pid].name.replace(/^Dr\.\s*/, "Dr. "))} a follow-up…" aria-label="Follow-up question for ${esc(BOARD_PERSONAS[pid].name)}">` +
+    `<input class="cv-fu-in" name="fq" maxlength="500" placeholder="Ask ${esc(BOARD_PERSONAS[pid].name)} a follow-up…" aria-label="Follow-up question for ${esc(BOARD_PERSONAS[pid].name)}">` +
     `<button class="cv-fu-btn" type="submit">Ask</button>` +
     `<span class="cv-fu-note label" role="status" aria-live="polite">${getLeft()} follow-up${getLeft() === 1 ? "" : "s"} left</span>`;
   card.appendChild(wrap);

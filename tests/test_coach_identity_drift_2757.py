@@ -175,7 +175,7 @@ _cd_observatory_link = {
     "sleep": "/sleep/",
     "nutrition": "/nutrition/",
 }
-_cd_names = {"sleep_coach": {"name": "Dr. Lisa Park", "initials": "LP"}}
+_cd_names = {"sleep_coach": {"name": "Lisa Park", "initials": "LP"}}
 """
     tree = ast.parse(fine_src)
     offenders = []

@@ -13,6 +13,7 @@ Consistency between this file, the JSON, and every coach id-space is enforced by
 
 import json
 import logging
+import re
 import time
 
 from common.repo_config import config_path
@@ -35,7 +36,7 @@ OPERATIONAL_COACH_IDS = [
 OPERATIONAL_SHORT_IDS = [c.replace("_coach", "") for c in OPERATIONAL_COACH_IDS]
 
 # Coaching-team v2 (2026-08-10): the roster grew TIERS. training_coach retired at
-# the cycle-13 genesis (Dr. Sarah Chen — the Performance seat absorbs training);
+# the cycle-13 genesis (Sarah Chen — the Performance seat absorbs training);
 # chat-tier coaches carry a voice spec + a Telegram bot but no daily engine
 # outputs; consulting specialists keep pipelines + site but no bots. MUST stay
 # equal to the corresponding flags in config/personas.json
@@ -59,8 +60,29 @@ LEAD_PERSONA_ID = "eli_marsh"
 # #1986: the board-lead byline is the one field a reader uses to decide who runs
 # the board, so the fallback is pinned to the lead persona and asserted equal to
 # config/personas.json by tests/test_board_lead_single_character.py.
-LEAD_FALLBACK_NAME = "Dr. Eli Marsh"
+LEAD_FALLBACK_NAME = "Eli Marsh"
 LEAD_FALLBACK_TITLE = "Principal Investigator — Program Lead"
+
+# Owner ruling 2026-10-02 (#4564): the AI personas carry NO honorific on any reader
+# surface — they are AI coaches with domains and track records, not credentialed
+# doctors. ``plain_name`` is the ONE spelling of that rule; the registry applies it at
+# load, so a stale S3 twin (or any legacy record that still says "Dr. X") cannot put
+# the honorific back on a surface that derives its names from here.
+_HONORIFIC_RE = re.compile(r"^\s*Dr\.?\s+", re.IGNORECASE)
+
+
+def plain_name(name) -> str:
+    """A persona's reader-facing name: the stored name minus a leading 'Dr.'."""
+    return _HONORIFIC_RE.sub("", str(name or "")).strip()
+
+
+def _plain_registry(data):
+    """The registry with every persona ``name`` passed through ``plain_name``."""
+    for p in (data.get("personas") or {}).values():
+        if isinstance(p, dict) and isinstance(p.get("name"), str):
+            p["name"] = plain_name(p["name"])
+    return data
+
 
 _S3_KEY = "config/personas.json"
 _cache = {"data": None, "ts": 0}
@@ -105,6 +127,7 @@ def load_registry(s3_client=None, bucket=None, force_refresh=False):
                 return _cache["data"]
             return {"version": "0", "personas": {}}
 
+    data = _plain_registry(data)
     _cache["data"] = data
     _cache["ts"] = now
     return data
@@ -134,7 +157,7 @@ def lead_persona(s3_client=None, bucket=None):
     """The single ``lead: true`` persona — the head coach who runs the board.
 
     #1986: two characters used to occupy this role (the integrator byline said
-    Dr. Kai Nakamura, the roster said Dr. Eli Marsh). There is now ONE, and it is
+    Kai Nakamura, the roster said Eli Marsh). There is now ONE, and it is
     resolved here — every byline, prompt and noscript derives from this function
     rather than restating a name, so the cast can never fork again.
     """
@@ -185,7 +208,7 @@ def display_name(persona_id, s3_client=None, bucket=None):
 
 
 def _initials(name: str) -> str:
-    parts = [w for w in str(name or "").replace("Dr.", "").split() if w and w[0].isalpha()]
+    parts = [w for w in plain_name(name).split() if w and w[0].isalpha()]
     return "".join(w[0].upper() for w in parts[:2])
 
 

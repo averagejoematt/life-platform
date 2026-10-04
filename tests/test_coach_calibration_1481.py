@@ -57,7 +57,7 @@ def _answered_item(coach_id="sleep", date="2026-07-20", uid="abcd1234", **over):
         "sk": f"CHECKIN#{date}#{uid}",
         "record_type": "coach_checkin",
         "coach_id": coach_id,
-        "coach_name": "Dr. Lisa Park",
+        "coach_name": "Lisa Park",
         "question": "How have the evenings before bed actually been feeling lately?",
         "status": cc.STATUS_ANSWERED,
         "answer": ANSWER,

@@ -73,7 +73,7 @@ def prologue_dossier(table) -> Dict[str, Any]:
     with open(config_path("user_goals.json"), encoding="utf-8") as fh:
         goals = _json.load(fh)
     prof = goals.get("athlete_profile") or {}
-    eli = next((v for v in persona_registry.personas().values() if v.get("name") == "Dr. Eli Marsh"), {})
+    eli = next((v for v in persona_registry.personas().values() if v.get("name") == "Eli Marsh"), {})
     team = story_dossier.roster()
     return {
         "week": 0,
@@ -117,9 +117,9 @@ def prologue_dossier(table) -> Dict[str, Any]:
         "head_coach_filed_predictions": False,
         "roster_note": (
             "The sealed pre-registration carries opening calls from eight specialists. Say it once, cleanly, if at all: the training "
-            "calls came from Dr. Sarah Chen, a specialist consulted for the pre-registration who does not sit on the weekly team, and the "
-            "physical coach's calls appear under the name Dr. Victor Reyes — the same seat Dr. Max Reyes holds on the weekly team. The "
-            "weekly team is the seven coaches in the roster plus the head coach, Dr. Eli Marsh."
+            "calls came from Sarah Chen, a specialist consulted for the pre-registration who does not sit on the weekly team, and the "
+            "physical coach's calls appear under the name Victor Reyes — the same seat Max Reyes holds on the weekly team. The "
+            "weekly team is the seven coaches in the roster plus the head coach, Eli Marsh."
         ),
         "sealed_plan_prologue_is_separate": "'The Plan, On the Record' (published the day before Day 1) carries every target and prediction; this prologue introduces the person, the system and the narrator, and points to it",
     }

@@ -174,7 +174,7 @@ def revise_intro(turns, fails, invoke, model, extract_json, logger):
     script_text = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
     system = (
         'You are the head writer revising a draft of "The Measured Life" Episode 0 — host ELENA VOSS (embedded '
-        "journalist), guest DR. ELI MARSH (the Principal Investigator); MATT is the third-person subject and never "
+        "journalist), guest ELI MARSH (the Principal Investigator); MATT is the third-person subject and never "
         "speaks. Fix EVERY issue listed below and keep everything that already works. Invent nothing about Matt (no "
         "events, losses, dates, numbers, or any weight); turns STRICTLY ALTERNATE — never two consecutive turns from "
         "the same speaker; every question or challenge is answered substantively by the OTHER speaker in the very "

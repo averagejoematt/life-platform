@@ -5,7 +5,7 @@ The second instance of the #2738 class, and the sole driver of the 2026-09-14
 `qa-smoke-failures` in ALARM all day:
 
     "On September 12th, his Whoop recorded 73% recovery, 36.4 ms HRV, and 60 bpm
-     resting heart rate — solid single-night readings…"        (Dr. Max Reyes)
+     resting heart rate — solid single-night readings…"        (Max Reyes)
 
 Three surfaces, all correct, one red gate:
 
@@ -44,7 +44,7 @@ _STAMP = {"recovery_pct": 63.0, "hrv_ms": 35.07, "rhr_bpm": 59.0, "sleep_hours":
 def test_the_live_2026_09_14_payload_no_longer_fires():
     """The regression proper — all three metrics in one sentence, one prose date."""
     ok, msg = wq.assess_cross_surface_vitals(
-        _COCKPIT, [{"name": "Dr. Max Reyes", "position_summary": _REYES_PROSE, "published_vitals": _STAMP}]
+        _COCKPIT, [{"name": "Max Reyes", "position_summary": _REYES_PROSE, "published_vitals": _STAMP}]
     )
     assert ok, msg
 
@@ -89,7 +89,7 @@ def test_a_bare_month_is_still_not_a_date():
 
 def test_an_undated_stale_claim_still_fails():
     """The half that must not regress — the whole point of the check."""
-    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Dr. Max Reyes", "position_summary": "Recovery is 73% right now."}])
+    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Max Reyes", "position_summary": "Recovery is 73% right now."}])
     assert not ok and "recovery 73" in msg
 
 
