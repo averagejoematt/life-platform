@@ -540,6 +540,15 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    # #4586 — the kit pages' pre-merge gate (height budget, overflow, axe).
+    "guard::tests/kit_page_gate.py": {
+        "gate_name": "tests/kit_page_gate.py",
+        "command": "python3 tests/kit_page_gate.py",
+        "mutation": "The front page's budget in KIT_PAGES lowered from 6 to 3 in tests/kit_page_gate.py — the same page against a budget it exceeds; one line, reverted by the inverse edit.",
+        "observed": "2026-10-04. BASELINE `python3 tests/kit_page_gate.py` exit 0 (control line printed, four pages ok: 3.92 of 6, 3.62 of 4, 2.84 of 4, 3.96 of 4 screens, axe 0 serious/critical in light and dark). MUTATED exit 1: `FAIL /next/v8/  3.92 of 3 screens — 3.92 phone screens tall — the budget is 3 (3305px > 2532px)`. REVERTED exit 0. The in-run control is a second, standing proof: every run first renders a front page whose catch-up list is inflated to 60 chapters (8.28 screens) and exits 2 (`BLIND`) if the height check passes it.",
+        "scope": "Height, sideways overflow, JS errors, the ready mark, axe serious/critical and three forbidden strings, for the pages listed in KIT_PAGES only, at 390x844, against the committed fixtures in tests/fixtures/kit_pages_4586/. NOT SEEN: a page that loads clean.css but is missing from KIT_PAGES; a height that only live data produces (a longer chapter title, a ninth coach) — by design, the fixtures pin the data and this never runs as a deploy rollback; desktop widths.",
+        "proved_on": "2026-10-04",
+    },
     "guard::deploy/config_ownership_audit.py": {
         "gate_name": "deploy/config_ownership_audit.py",
         "command": (
@@ -2526,6 +2535,15 @@ REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::Hevy"] 
 # itself states at its own family-2 import (19 lines of headroom at the time this
 # was written) — `gate_census.py` still `.update()`s it into the SAME dict.
 CI_PROOFS: dict[str, dict[str, Any]] = {
+    # #4586 — the same gate as its CI step (the PR render job).
+    "ci::v4-gate.yml::render-accuracy-gate::4": {
+        "gate_name": "render-accuracy-gate / Kit page gate (height budget, overflow, axe)",
+        "command": "python3 tests/kit_page_gate.py --out qa-render-gate/kit",
+        "mutation": "The front page's budget in KIT_PAGES lowered from 6 to 3 in tests/kit_page_gate.py — the same page against a budget it exceeds; one line, reverted by the inverse edit.",
+        "observed": "2026-10-04. BASELINE `python3 tests/kit_page_gate.py` exit 0 (control line printed, four pages ok: 3.92 of 6, 3.62 of 4, 2.84 of 4, 3.96 of 4 screens, axe 0 serious/critical in light and dark). MUTATED exit 1: `FAIL /next/v8/  3.92 of 3 screens — 3.92 phone screens tall — the budget is 3 (3305px > 2532px)`. REVERTED exit 0. The in-run control is a second, standing proof: every run first renders a front page whose catch-up list is inflated to 60 chapters (8.28 screens) and exits 2 (`BLIND`) if the height check passes it.",
+        "scope": "Height, sideways overflow, JS errors, the ready mark, axe serious/critical and three forbidden strings, for the pages listed in KIT_PAGES only, at 390x844, against the committed fixtures in tests/fixtures/kit_pages_4586/. NOT SEEN: a page that loads clean.css but is missing from KIT_PAGES; a height that only live data produces (a longer chapter title, a ninth coach) — by design, the fixtures pin the data and this never runs as a deploy rollback; desktop widths.",
+        "proved_on": "2026-10-04",
+    },
     "ci::visual-qa.yml::visual-qa::10": {
         "gate_name": "visual-qa / Comprehension judge — six doors, blind reader + grader (#4182 M4, advisory)",
         "command": "python3 -m pytest tests/test_comprehension_qa.py -k main_returns -v",

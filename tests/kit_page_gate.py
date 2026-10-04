@@ -30,20 +30,25 @@ Usage:
 
 import argparse
 import copy
+import functools
 import json
 import os
 import re
 import sys
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-sys.path.insert(0, HERE)
-
-import a11y_audit  # noqa: E402
-import pr_render_gate  # noqa: E402
-
 FIXTURES_DIR = os.path.join(HERE, "fixtures", "kit_pages_4586")
 VIEWPORT = {"width": 390, "height": 844}
+AXE_JS_PATH = os.path.join(HERE, "vendor", "axe.min.js")  # the bundle tests/a11y_audit.py vendors
+AXE_GATING_IMPACTS = ("critical", "serious")
+_RUN_AXE_JS = """async () => {
+    const r = await axe.run(document, {resultTypes: ['violations']});
+    return r.violations.map(v => ({id: v.id, impact: v.impact, nodes: v.nodes.length,
+        targets: v.nodes.slice(0, 2).map(n => (n.target || []).join(' '))}));
+}"""
 
 #: path -> phone-screen budget. Adding a kit page means adding it here.
 KIT_PAGES = {
@@ -80,6 +85,32 @@ def _over_long(fixtures):
     items = mutated["**/api/edition"]["blocks"]["catch_up"]["data"]["items"]
     mutated["**/api/edition"]["blocks"]["catch_up"]["data"]["items"] = [dict(items[i % len(items)]) for i in range(60)]
     return mutated
+
+
+class _QuietHandler(SimpleHTTPRequestHandler):
+    def log_message(self, *_a):
+        pass
+
+
+def _serve(directory):
+    """A static server for `directory` on a free port -> (base_url, shutdown). Local to this
+    file on purpose: importing the render gate's copy would pull its whole import graph
+    (boto3, pillow) into a CI job that installs only playwright."""
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_QuietHandler, directory=directory))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{httpd.socket.getsockname()[1]}", httpd.shutdown
+
+
+def run_axe(page):
+    """axe's violations on `page`. The bundle goes in by page.evaluate, never a script tag
+    (the site CSP blocks inline script). Stdlib-only on purpose: tests/a11y_audit.py's
+    import graph reaches boto3, which this CI job does not install. Raises if axe did not
+    load — a pass that did not run is not a pass."""
+    with open(AXE_JS_PATH, encoding="utf-8") as fh:
+        page.evaluate(fh.read())
+    if not page.evaluate("() => typeof window.axe !== 'undefined'"):
+        raise RuntimeError("axe bundle evaluated but window.axe is undefined — the audit did not run")
+    return page.evaluate(_RUN_AXE_JS)
 
 
 def _serve_json(payload):
@@ -127,8 +158,8 @@ def measure(browser, base_url, fixtures, pages, out_dir=None, axe=True):
                     os.makedirs(out_dir, exist_ok=True)
                     page.screenshot(path=os.path.join(out_dir, (path.strip("/").replace("/", "_") or "root") + ".png"), full_page=True)
             if axe:
-                for v in a11y_audit.run_axe(page):
-                    if v["impact"] in a11y_audit.GATING_IMPACTS:
+                for v in run_axe(page):
+                    if v["impact"] in AXE_GATING_IMPACTS:
                         res["findings"].append(f"[{theme}] axe {v['impact']}: {v['id']} ({v['nodes']} node(s)) {v['targets'][:2]}")
             page.close()
         context.close()
@@ -143,7 +174,7 @@ def main():
 
     from playwright.sync_api import sync_playwright
 
-    base_url, shutdown = pr_render_gate._serve(args.site)
+    base_url, shutdown = _serve(args.site)
     fixtures = _fixtures()
     try:
         with sync_playwright() as pw:
