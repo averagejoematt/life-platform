@@ -658,7 +658,7 @@ jobs:
         uses: ./.github/actions/setup-ci
         with:
           python: 'false'
-          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK diff — detect IAM/infra drift
@@ -691,7 +691,16 @@ jobs:
           pip install -r requirements.txt --quiet
 
           set +e
-          npx cdk diff --all 2>&1 | tee /tmp/cdk_diff.txt
+          # #4257: --method=template. The default change-set diff assumes the CDK bootstrap
+          # DEPLOY and file-publishing roles (CloudTrail 2026-09-30→10-01: 96 + 384 assumes from
+          # this job), i.e. a "plan" that could execute a change set. This job now runs as
+          # github-actions-readonly-role, which may assume only the CDK lookup role; a template
+          # diff needs nothing more (GetTemplate through the lookup role, falling back to the
+          # role's own CloudFormation reads), and runs in seconds rather than ~4 min. What a
+          # template diff gives up is the change set's replacement PRECISION; the destruction
+          # grep below keys on `[-] AWS::` resource lines, which the template diff prints the
+          # same way, and the #2834 IAM gate reads the synthesized templates, not this text.
+          npx cdk diff --all --method=template 2>&1 | tee /tmp/cdk_diff.txt
           CDK_EXIT=$?
           set -e
 
@@ -1134,6 +1143,10 @@ jobs:
     # mid-flight deploy still completes (cancel-in-progress: false) — it is only
     # the *validation* jobs that no longer queue behind anything. Since ADR-158 nothing
     # in this job waits on a human, so the slot is held for minutes, never for days.
+    # #4257: the deploy role trusts only `environment:` subjects, never a bare main ref. This
+    # environment has NO reviewers (ADR-158: code ships on green) and a main-only branch
+    # policy — it is the job's identity, not a gate. The one human click stays `production`.
+    environment: ungated-deploy
     concurrency:
       group: ci-cd-deploy-${{ github.ref }}
       cancel-in-progress: false
@@ -1225,7 +1238,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run QA smoke test
@@ -1410,11 +1423,9 @@ jobs:
   # I2: shared layer is retired — zero shared-utils references fleet-wide
   # I5: required secrets exist (needs secretsmanager:DescribeSecret on OIDC role)
   #
-  # ⚠️  I5 requires the github-actions-deploy-role to have:
-  #     secretsmanager:DescribeSecret on life-platform/* secrets.
-  #     If the role lacks this, I5 will be skipped (continue-on-error: true).
-  #     To enable: add secretsmanager:DescribeSecret to role_policies for the
-  #     github-actions-deploy-role CDK construct.
+  # I5 needs secretsmanager:DescribeSecret on life-platform/* — granted to
+  # github-actions-readonly-role (SecretsDescribe, #4257), which this job assumes.
+  # Describe only: no job on the readonly role can read a secret's value.
   # ════════════════════════════════════════════════════════════════
   post-deploy-checks:
     name: Post-deploy integration checks (I1/I2/I5)
@@ -1448,7 +1459,7 @@ jobs:
         uses: ./.github/actions/setup-ci
         with:
           python: 'false'
-          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: I1 — Lambda handler names match expected module names
@@ -1562,6 +1573,10 @@ jobs:
     # findings warn, alarm and email instead. Neither can be fixed by reverting
     # code, and each has reverted a healthy fleet at least once.
     if: always() && needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
+    # #4257: the deploy role trusts only `environment:` subjects, never a bare main ref. This
+    # environment has NO reviewers (ADR-158: code ships on green) and a main-only branch
+    # policy — it is the job's identity, not a gate. The one human click stays `production`.
+    environment: ungated-deploy
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1668,7 +1683,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Post failure to SNS

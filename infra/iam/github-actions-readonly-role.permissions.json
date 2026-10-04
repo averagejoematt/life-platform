@@ -1,0 +1,141 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaRead",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:lambda:us-west-2:205930651321:function:*",
+        "arn:aws:lambda:us-east-1:205930651321:function:*"
+      ]
+    },
+    {
+      "Sid": "LambdaListAccountLevel",
+      "Effect": "Allow",
+      "Action": "lambda:ListFunctions",
+      "Resource": "*"
+    },
+    {
+      "Sid": "SmokeAndCanaryInvoke",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": [
+        "arn:aws:lambda:us-west-2:205930651321:function:life-platform-qa-smoke",
+        "arn:aws:lambda:us-west-2:205930651321:function:life-platform-canary"
+      ]
+    },
+    {
+      "Sid": "S3BucketRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetBucketPolicy"
+      ],
+      "Resource": "arn:aws:s3:::matthew-life-platform"
+    },
+    {
+      "Sid": "S3ConfigRead",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::matthew-life-platform/config/*"
+    },
+    {
+      "Sid": "DynamoDBDescribe",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeContinuousBackups"
+      ],
+      "Resource": "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform"
+    },
+    {
+      "Sid": "KMSDescribe",
+      "Effect": "Allow",
+      "Action": "kms:DescribeKey",
+      "Resource": "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"
+    },
+    {
+      "Sid": "SNSRead",
+      "Effect": "Allow",
+      "Action": "sns:GetTopicAttributes",
+      "Resource": [
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts",
+        "arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest"
+      ]
+    },
+    {
+      "Sid": "FailureNotifyDigest",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest"
+    },
+    {
+      "Sid": "SQSRead",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl"
+      ],
+      "Resource": "arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq"
+    },
+    {
+      "Sid": "EventBridgeRuleRead",
+      "Effect": "Allow",
+      "Action": [
+        "events:DescribeRule",
+        "events:ListTargetsByRule"
+      ],
+      "Resource": "arn:aws:events:us-west-2:205930651321:rule/*"
+    },
+    {
+      "Sid": "EventBridgeList",
+      "Effect": "Allow",
+      "Action": "events:ListRules",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchAlarmRead",
+      "Effect": "Allow",
+      "Action": "cloudwatch:DescribeAlarms",
+      "Resource": "*"
+    },
+    {
+      "Sid": "SecretsDescribe",
+      "Effect": "Allow",
+      "Action": "secretsmanager:DescribeSecret",
+      "Resource": "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/*"
+    },
+    {
+      "Sid": "CloudFormationStackRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackResource",
+        "cloudformation:GetTemplate",
+        "cloudformation:ListStackResources",
+        "cloudformation:DescribeStackEvents"
+      ],
+      "Resource": [
+        "arn:aws:cloudformation:*:205930651321:stack/LifePlatform*/*",
+        "arn:aws:cloudformation:*:205930651321:stack/CDKToolkit/*"
+      ]
+    },
+    {
+      "Sid": "CloudFormationList",
+      "Effect": "Allow",
+      "Action": "cloudformation:ListStacks",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CDKLookupRoleAssume",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::205930651321:role/cdk-hnb659fds-lookup-role-205930651321-*"
+    }
+  ]
+}

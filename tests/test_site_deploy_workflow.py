@@ -42,9 +42,13 @@ def test_site_deploy_workflow_exists_and_triggers_on_site_pushes():
 
 def test_site_deploy_has_no_manual_approval_gate():
     # The whole point of #750: a site merge deploys WITHOUT waiting on the
-    # `environment: production` approval used by ci-cd.yml's deploy job.
+    # `environment: production` approval used by ci-cd.yml's IAM job.
+    # #4257: the deploy jobs bind `ungated-deploy` — no reviewers, main-only branch policy —
+    # because the deploy role now trusts only environment subjects. Any OTHER environment
+    # (production above all) would reintroduce the approval wait (the drift class).
     code = _strip_comments(_read(_SITE_DEPLOY))
-    assert "environment:" not in code, "site-deploy.yml must not reintroduce an approval environment (the drift class)"
+    envs = set(re.findall(r"^\s*environment:\s*(\S+)", code, re.M))
+    assert envs <= {"ungated-deploy"}, f"site-deploy.yml must not bind an approval environment (the drift class): {sorted(envs)}"
 
 
 def test_site_deploy_uses_canonical_path_not_reimplemented_sync():

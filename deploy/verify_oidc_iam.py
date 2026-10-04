@@ -78,10 +78,19 @@ OIDC_PROVIDER_ARN = "arn:aws:iam::205930651321:oidc-provider/token.actions.githu
 # The identities this script owns. Each role maps to its checked-in trust policy and
 # inline permissions policy (the live PolicyName that carries them).
 ROLES = {
+    # #4257: the deploy role is assumable ONLY from a job bound to one of these two GitHub
+    # environments — never from a bare `ref:refs/heads/main` subject, which any main-branch
+    # job (a read-only cron included) could present. `production` is the ADR-158 IAM click;
+    # `ungated-deploy` has no reviewers and a main-only branch policy (code + site ship on
+    # green). The shape is asserted below on the checked-in file AND the live document.
     "github-actions-deploy-role": {
         "trust_file": "github-actions-deploy-role.trust.json",
         "permissions_file": "github-actions-deploy-role.permissions.json",
         "inline_policy_name": "life-platform-cicd-permissions",
+        "trusted_subjects": (
+            "repo:averagejoematt/life-platform:environment:production",
+            "repo:averagejoematt/life-platform:environment:ungated-deploy",
+        ),
     },
     "github-actions-remediation-role": {
         "trust_file": "github-actions-remediation-role.trust.json",
@@ -104,7 +113,19 @@ ROLES = {
         "permissions_file": "github-actions-diagnosis-role.permissions.json",
         "inline_policy_name": "diagnosis-permissions",
     },
+    # #4257: the observe-only CI jobs (ci-cd plan/smoke/post-deploy/notify-failure,
+    # site-deploy's failure notice, config-drift, pii-endpoint-sweep) split off the deploy
+    # role. Reads, two smoke invokes and a digest publish; no Lambda update, no S3 write,
+    # no secret value, and only the CDK LOOKUP role may be assumed (never the CDK deploy role).
+    "github-actions-readonly-role": {
+        "trust_file": "github-actions-readonly-role.trust.json",
+        "permissions_file": "github-actions-readonly-role.permissions.json",
+        "inline_policy_name": "readonly-permissions",
+    },
 }
+
+#: The subject every role trusts unless its ROLES entry names `trusted_subjects` (#4257).
+MAIN_REF_SUBJECT = "repo:averagejoematt/life-platform:ref:refs/heads/main"
 
 PROVIDER_FILE = "github-oidc-provider.json"
 
@@ -244,6 +265,43 @@ def _diff(label, checked_in, live, findings):
     return False
 
 
+def trust_subjects(doc) -> list[str]:
+    """Every `token.actions.githubusercontent.com:sub` value in a trust document."""
+    subs: list[str] = []
+    for st in doc.get("Statement", []):
+        for op in ("StringLike", "StringEquals"):
+            v = (st.get("Condition") or {}).get(op, {}).get("token.actions.githubusercontent.com:sub")
+            if isinstance(v, str):
+                subs.append(v)
+            elif isinstance(v, list):
+                subs.extend(v)
+    return subs
+
+
+def trust_shape_findings(role_name: str, doc, where: str) -> list[dict]:
+    """#4257: the role trusts EXACTLY its declared subjects — no more, no fewer.
+
+    Pure (no AWS), so the same rule runs on the checked-in file in the test suite and on
+    the live document here. For the deploy role the declared set is two `environment:`
+    subjects, so the pre-#4257 bare `ref:refs/heads/main` subject is a finding by name,
+    not merely a byte difference from the file: a revert of the JSON alone would make the
+    file and live agree again, and the plain drift diff would then report CLEAN."""
+    want = sorted(ROLES[role_name].get("trusted_subjects", (MAIN_REF_SUBJECT,)))
+    got = sorted(trust_subjects(doc))
+    if got == want:
+        return []
+    extra = sorted(set(got) - set(want))
+    missing = sorted(set(want) - set(got))
+    return [
+        {
+            "target": f"{role_name}:trust-shape ({where})",
+            "status": "TRUST-SHAPE",
+            "checked_in": {"declared_subjects": want},
+            "live": {"subjects": got, "unexpected": extra, "missing": missing},
+        }
+    ]
+
+
 def verify(iam):
     findings: list[dict] = []
     checks = 0
@@ -286,6 +344,8 @@ def verify(iam):
         checks += 1
         trust_ci = _load_json(os.path.join(_IAM_DIR, spec["trust_file"]))
         _diff(f"{role_name}:trust-policy", trust_ci, role["AssumeRolePolicyDocument"], findings)
+        findings.extend(trust_shape_findings(role_name, trust_ci, "checked-in"))
+        findings.extend(trust_shape_findings(role_name, role["AssumeRolePolicyDocument"], "live"))
 
         checks += 1
         perms_ci = _load_json(os.path.join(_IAM_DIR, spec["permissions_file"]))
