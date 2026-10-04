@@ -49,6 +49,17 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 from operational import ensemble_digest_qa as edq  # noqa: E402
 from operational.qa_check import CONTENT_TRUTH, Check  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _every_day_is_a_narrative_day(monkeypatch):
+    """#4589: the long per-coach narratives run on Monday/Thursday only (coach/narrative_cadence.py).
+    These tests pin the daily-cadence incident replays (#3829), not the cadence, so they run on a narrative day whatever the wall
+    clock says. The cadence itself is pinned in tests/test_narrative_cadence_4589.py."""
+    from coach import narrative_cadence
+
+    monkeypatch.setattr(narrative_cadence, "NARRATIVE_WEEKDAYS", tuple(range(7)))
+
+
 # The live partition, 2026-09-18T03:01Z. 09-13 and 09-15 are the incident's own holes.
 LIVE_CYCLES = ["2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-17"]
 

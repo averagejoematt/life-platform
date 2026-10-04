@@ -1029,11 +1029,15 @@ def _dispatch_route(event, path, method):
             _cd_lead_daily = _cd_lead_mod.latest_served(table)
             if _cd_lead_daily:
                 _cd_lead_daily.update(coach_name=_cd_lead_name, coach_title=_cd_lead_title)
+            # #4583: the board's daily moves (coach.coach_moves, COACH#eli_marsh / MOVES#) — at
+            # most three move-tagged lines + the absent coaches' reasons; None until a row lands.
+            from coach import coach_moves as _cd_moves_mod
 
             return _ok(
                 {
                     "weekly_priority": _cd_priority,
                     "lead_daily": _cd_lead_daily,
+                    "moves": _cd_moves_mod.latest_served(table),
                     "open_actions": _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,

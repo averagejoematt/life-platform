@@ -2521,7 +2521,7 @@ REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::Hevy"] 
 
 # ── #4182 M4 — the comprehension judge's own CI step ─────────────────────────
 # CI-step proofs live directly in `gate_census.PROVEN_CAN_FAIL` for every other
-# family-1 record (see e.g. "ci::ci-cd.yml::visual-qa::4" there); this one is
+# family-1 record (see e.g. "ci::ci-cd.yml::visual-qa::5" there); this one is
 # recorded here instead purely for the #1665 line-ceiling reason gate_census.py
 # itself states at its own family-2 import (19 lines of headroom at the time this
 # was written) — `gate_census.py` still `.update()`s it into the SAME dict.

@@ -576,7 +576,10 @@ async function renderToday(mount) {
     const clipped = /…$|\.\.\.$/.test(text.trim());
     h += `<section class="ct-read" aria-labelledby="ct-read-h" style="--coach:${esc(chosen.color || "")}">`;
     if (banner) h += `<p class="ct-banner">${esc(banner)}</p>`;
-    h += `<h2 class="ct-kicker label" id="ct-read-h">today's read</h2>` +
+    // #4589: the long coach reads are written twice a week (Mon/Thu), so a 3-4 day old read is the
+    // normal state; past the 48 h banner it is "the latest read", never "today's".
+    const kicker = readTier === "stale" ? "the latest read" : "today's read";
+    h += `<h2 class="ct-kicker label" id="ct-read-h">${kicker}</h2>` +
       `<p class="ct-who"><span class="ct-name">${esc(chosen.name || "")}</span>${_roleOf(chosen) ? ` <span class="ct-role label">· ${esc(_roleOf(chosen))}</span>` : ""}</p>` +
       `<p class="provenance"><span class="pv-src${readTier === "stale" ? " pv-stale" : ""}">${esc(writtenStamp(chosen.analysis_generated_at, now))}</span>` +
       `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
