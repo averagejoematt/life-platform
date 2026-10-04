@@ -60,7 +60,8 @@ KIT_PAGES = {
     "/next/v8/day/?d=2026-10-02": 4,  # a lifting day: the longest a day page gets
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
-    "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
+    "/next/v8/trend/?m=protein": 4,
+    "/next/v8/sheet/": 4,  # the character sheet, plainly: one level, seven areas, the earned badges  # a food trend carries the frequent-meals list too
 }
 
 #: route glob -> fixture file. Every route ck_pages.js reads.
@@ -77,6 +78,8 @@ ROUTES = {
     "**/api/nutrition_overview": "nutrition_overview.json",
     "**/api/frequent_meals": "frequent_meals.json",
     "**/api/weekly_priority": "weekly_priority.json",
+    "**/api/character": "character.json",
+    "**/api/achievements": "achievements.json",
     "**/panelcast/wk4.transcript.json": "transcript_wk4.json",
 }
 

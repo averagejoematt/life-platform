@@ -1,0 +1,414 @@
+{
+ "achievements": [
+  {
+   "id": "week_warrior",
+   "label": "Week Warrior",
+   "category": "streak",
+   "description": "7-day Tier 0 habit streak",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "7 days to unlock"
+  },
+  {
+   "id": "fortnight",
+   "label": "Fortnight",
+   "category": "streak",
+   "description": "14-day Tier 0 habit streak",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "14 days to unlock"
+  },
+  {
+   "id": "monthly_grind",
+   "label": "Monthly Grind",
+   "category": "streak",
+   "description": "30-day Tier 0 habit streak",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "30 days to unlock"
+  },
+  {
+   "id": "quarterly",
+   "label": "Quarterly",
+   "category": "streak",
+   "description": "90-day Tier 0 habit streak",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "90 days to unlock"
+  },
+  {
+   "id": "half_year_hold",
+   "label": "Half-Year Hold",
+   "category": "streak",
+   "description": "180-day Tier 0 habit streak",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "180 days to unlock"
+  },
+  {
+   "id": "first_level_up",
+   "label": "First Level Up",
+   "category": "level",
+   "description": "Reached Character Level 2",
+   "earned": true,
+   "earned_date": "2026-09-12",
+   "icon": null,
+   "unlock_hint": null
+  },
+  {
+   "id": "apprentice",
+   "label": "Apprentice",
+   "category": "level",
+   "description": "Reached Character Level 5",
+   "earned": true,
+   "earned_date": "2026-09-20",
+   "icon": null,
+   "unlock_hint": null
+  },
+  {
+   "id": "journeyman",
+   "label": "Journeyman",
+   "category": "level",
+   "description": "Reached Character Level 10",
+   "earned": true,
+   "earned_date": "2026-10-03",
+   "icon": null,
+   "unlock_hint": null
+  },
+  {
+   "id": "adept",
+   "label": "Adept",
+   "category": "level",
+   "description": "Reached Character Level 20",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "Level 10 → Level 20 needed"
+  },
+  {
+   "id": "master_of_the_craft",
+   "label": "Master of the Craft",
+   "category": "level",
+   "description": "Reached Character Level 40",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "Level 10 → Level 40 needed"
+  },
+  {
+   "id": "lost_5",
+   "label": "First Five",
+   "category": "milestone",
+   "description": "Lost 5 lbs from starting weight",
+   "earned": true,
+   "earned_date": "2026-09-12",
+   "icon": null,
+   "unlock_hint": null
+  },
+  {
+   "id": "lost_10",
+   "label": "Lost 10 lbs",
+   "category": "milestone",
+   "description": "Lost 10 lbs from starting weight",
+   "earned": true,
+   "earned_date": "2026-09-17",
+   "icon": "⚖️",
+   "unlock_hint": null
+  },
+  {
+   "id": "lost_20",
+   "label": "Lost 20 lbs",
+   "category": "milestone",
+   "description": "Lost 20 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "5 lbs to go"
+  },
+  {
+   "id": "lost_30",
+   "label": "Lost 30 lbs",
+   "category": "milestone",
+   "description": "Lost 30 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "15 lbs to go"
+  },
+  {
+   "id": "lost_40",
+   "label": "Lost 40 lbs",
+   "category": "milestone",
+   "description": "Lost 40 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "25 lbs to go"
+  },
+  {
+   "id": "lost_50",
+   "label": "Lost 50 lbs",
+   "category": "milestone",
+   "description": "Lost 50 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "35 lbs to go"
+  },
+  {
+   "id": "lost_60",
+   "label": "Lost 60 lbs",
+   "category": "milestone",
+   "description": "Lost 60 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "45 lbs to go"
+  },
+  {
+   "id": "lost_70",
+   "label": "Lost 70 lbs",
+   "category": "milestone",
+   "description": "Lost 70 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "55 lbs to go"
+  },
+  {
+   "id": "lost_80",
+   "label": "Lost 80 lbs",
+   "category": "milestone",
+   "description": "Lost 80 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "65 lbs to go"
+  },
+  {
+   "id": "lost_90",
+   "label": "Lost 90 lbs",
+   "category": "milestone",
+   "description": "Lost 90 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "75 lbs to go"
+  },
+  {
+   "id": "lost_100",
+   "label": "Lost 100 lbs",
+   "category": "milestone",
+   "description": "Lost 100 lbs from starting weight",
+   "earned": false,
+   "earned_date": null,
+   "icon": "⚖️",
+   "unlock_hint": "85 lbs to go"
+  },
+  {
+   "id": "sub_280",
+   "label": "Sub-280",
+   "category": "milestone",
+   "description": "Weight under 280 lbs",
+   "earned": false,
+   "earned_date": null,
+   "icon": "🎯",
+   "unlock_hint": "32 lbs to go"
+  },
+  {
+   "id": "sub_250",
+   "label": "Sub-250",
+   "category": "milestone",
+   "description": "Weight under 250 lbs",
+   "earned": false,
+   "earned_date": null,
+   "icon": "🎯",
+   "unlock_hint": "62 lbs to go"
+  },
+  {
+   "id": "sub_220",
+   "label": "Sub-220",
+   "category": "milestone",
+   "description": "Weight under 220 lbs",
+   "earned": false,
+   "earned_date": null,
+   "icon": "🎯",
+   "unlock_hint": "92 lbs to go"
+  },
+  {
+   "id": "sub_200",
+   "label": "Sub-200",
+   "category": "milestone",
+   "description": "Weight under 200 lbs",
+   "earned": false,
+   "earned_date": null,
+   "icon": "🎯",
+   "unlock_hint": "112 lbs to go"
+  },
+  {
+   "id": "30_days",
+   "label": "Month of Data",
+   "category": "data",
+   "description": "30+ days of habit logging",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "2 days to unlock"
+  },
+  {
+   "id": "100_days",
+   "label": "100 Days Tracked",
+   "category": "data",
+   "description": "100+ days of habit logging",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "72 days to unlock"
+  },
+  {
+   "id": "365_days",
+   "label": "Year of Data",
+   "category": "data",
+   "description": "365 days of habit logging",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "337 days to unlock"
+  },
+  {
+   "id": "first_experiment",
+   "label": "First Experiment",
+   "category": "science",
+   "description": "Completed first N=1 experiment",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": null
+  },
+  {
+   "id": "hypothesis_confirmed",
+   "label": "Hypothesis Confirmed",
+   "category": "science",
+   "description": "N=1 result statistically validated",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "Complete a tracked experiment to unlock"
+  },
+  {
+   "id": "exp_3_completed",
+   "label": "Lab Rat",
+   "category": "science",
+   "description": "Completed 3 experiments",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "3 experiments to unlock"
+  },
+  {
+   "id": "exp_5_completed",
+   "label": "Research Fellow",
+   "category": "science",
+   "description": "Completed 5 experiments",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "5 experiments to unlock"
+  },
+  {
+   "id": "exp_10_completed",
+   "label": "Principal Investigator",
+   "category": "science",
+   "description": "Completed 10 experiments",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "10 experiments to unlock"
+  },
+  {
+   "id": "exp_streak_3",
+   "label": "Hot Streak",
+   "category": "science",
+   "description": "3 consecutive completed experiments (no fails)",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "Complete 3 experiments in a row without abandoning"
+  },
+  {
+   "id": "exp_all_pillars",
+   "label": "Renaissance Man",
+   "category": "science",
+   "description": "Completed experiment in every pillar",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "Complete at least one experiment in each of the 7 pillars"
+  },
+  {
+   "id": "first_challenge",
+   "label": "First Challenge",
+   "category": "challenge",
+   "description": "Completed first challenge",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": null
+  },
+  {
+   "id": "five_challenges",
+   "label": "Challenge Regular",
+   "category": "challenge",
+   "description": "Completed 5 challenges",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "5 challenges to unlock"
+  },
+  {
+   "id": "ten_challenges",
+   "label": "Challenge Veteran",
+   "category": "challenge",
+   "description": "Completed 10 challenges",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "10 challenges to unlock"
+  },
+  {
+   "id": "twenty_five_challenges",
+   "label": "Challenge Legend",
+   "category": "challenge",
+   "description": "Completed 25 challenges",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "25 challenges to unlock"
+  },
+  {
+   "id": "perfect_challenge",
+   "label": "Flawless",
+   "category": "challenge",
+   "description": "Completed a challenge with 100% success rate (7+ days)",
+   "earned": false,
+   "earned_date": null,
+   "icon": null,
+   "unlock_hint": "Complete a 7+ day challenge without missing a single day"
+  }
+ ],
+ "summary": {
+  "earned": 5,
+  "total": 40,
+  "current_streak": 0,
+  "days_tracked": 28,
+  "current_level": 10,
+  "current_weight": 312,
+  "completed_challenges": 0,
+  "perfect_challenges": 0
+ }
+}

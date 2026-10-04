@@ -223,7 +223,8 @@ export function leadReadHTML(body, base = "/") {
   const lead = firstSentences(text);
   const day = dayInWords(body && body.data_through);
   if (!lead || !day || !body.coach_name) return soft("The lead coach’s read of the week is not served right now.");
-  const more = `<p><a class="ck-link" href="${esc(base)}coaches/">The team, and how often they’re right</a></p>`;
+  const first = String(body.coach_name).split(" ")[0];
+  const more = body.coach_id || /^Eli Marsh$/.test(body.coach_name) ? `<p><a class="ck-link" href="${esc(base)}coach/?c=${esc(body.coach_id || "eli_marsh")}">${esc(`${first}’s page`)}</a></p>` : "";
   return `<p class="ck-small">${esc(`${body.coach_name}, the AI lead coach, on ${day}`)}</p><p>“${esc(lead)}”</p>${more}`;
 }
 // One line from the podcast: the guest's first turn in the published transcript, verbatim.

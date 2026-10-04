@@ -1,0 +1,378 @@
+{
+ "character": {
+  "level": 10.0,
+  "tier": "Foundation",
+  "tier_emoji": "🔨",
+  "xp_total": 54.6429,
+  "xp_debt": 123.5,
+  "character_mood": "steady",
+  "character_mood_inputs": {
+   "gap_days": 1.0,
+   "composite_raw": 44.2,
+   "trend_7d": 1.5,
+   "presence_class": "present"
+  },
+  "as_of_date": "2026-10-03",
+  "composite_score": 43.2,
+  "composite_delta_1d": 2.2,
+  "composite_pillar_count": 6,
+  "composite_pillar_total": 7,
+  "composite_note": "composite_score is the mean of 6 of 7 pillars — 1 not yet instrumented pillar(s) are excluded, not averaged in at a neutral score.",
+  "time_travel": false,
+  "active_effects": []
+ },
+ "pillars": [
+  {
+   "name": "sleep",
+   "emoji": "😴",
+   "level": 16.0,
+   "raw_score": 84.1,
+   "tier": "Foundation",
+   "xp_delta": 2.0,
+   "xp_earned": 3.0,
+   "score_delta": -0.6,
+   "data_coverage": 1.0,
+   "coverage_hold": false,
+   "not_instrumented": false,
+   "not_instrumented_note": null,
+   "absent_behaviors": [],
+   "xp_debt": 0.0,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [
+     "duration_vs_target",
+     "deep_sleep_pct"
+    ],
+    "dragging": [],
+    "absent": [],
+    "no_data": []
+   }
+  },
+  {
+   "name": "movement",
+   "emoji": "🏋️",
+   "level": 22.0,
+   "raw_score": 65.6,
+   "tier": "Momentum",
+   "xp_delta": 1.0,
+   "xp_earned": 2.0,
+   "score_delta": 10.9,
+   "data_coverage": 0.75,
+   "coverage_hold": false,
+   "not_instrumented": false,
+   "not_instrumented_note": null,
+   "absent_behaviors": [],
+   "xp_debt": 0.0,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [
+     "strength_sessions",
+     "training_frequency"
+    ],
+    "dragging": [
+     "zone2_adequacy"
+    ],
+    "absent": [],
+    "no_data": [
+     "training_load_balance",
+     "progressive_overload"
+    ]
+   },
+   "absence": {
+    "state": "logged",
+    "sources": [
+     "hevy",
+     "strava"
+    ],
+    "dark_sources": [],
+    "last_log_date": "2026-10-03",
+    "days_dark": null,
+    "stale_hours": null,
+    "transition": "paused",
+    "days_since_last_log": 1,
+    "absent_behaviors": []
+   }
+  },
+  {
+   "name": "nutrition",
+   "emoji": "🥗",
+   "level": 2.0,
+   "raw_score": 1.8,
+   "tier": "Foundation",
+   "xp_delta": -2.0,
+   "xp_earned": -1.0,
+   "score_delta": 0.0,
+   "data_coverage": 1.0,
+   "coverage_hold": false,
+   "not_instrumented": false,
+   "not_instrumented_note": null,
+   "absent_behaviors": [
+    "calorie_adherence",
+    "protein_total",
+    "protein_distribution",
+    "consistency"
+   ],
+   "xp_debt": 49.5,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [],
+    "dragging": [
+     "body_composition_progress"
+    ],
+    "absent": [
+     "calorie_adherence",
+     "protein_total",
+     "protein_distribution",
+     "consistency"
+    ],
+    "no_data": []
+   },
+   "absence": {
+    "state": "logged",
+    "sources": [
+     "macrofactor"
+    ],
+    "dark_sources": [],
+    "last_log_date": "2026-10-03",
+    "days_dark": null,
+    "stale_hours": null,
+    "transition": "paused",
+    "days_since_last_log": 1,
+    "absent_behaviors": [
+     "calorie_adherence",
+     "protein_total",
+     "protein_distribution",
+     "consistency"
+    ]
+   }
+  },
+  {
+   "name": "metabolic",
+   "emoji": "📊",
+   "level": 1.0,
+   "raw_score": 59.4,
+   "tier": "Foundation",
+   "xp_delta": 0.0,
+   "xp_earned": 0.0,
+   "score_delta": 0.0,
+   "data_coverage": 0.15,
+   "coverage_hold": true,
+   "not_instrumented": false,
+   "not_instrumented_note": null,
+   "absent_behaviors": [],
+   "xp_debt": 0.0,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [
+     "resting_heart_rate"
+    ],
+    "dragging": [],
+    "absent": [],
+    "no_data": [
+     "cgm_glucose_control",
+     "lab_biomarkers",
+     "blood_pressure"
+    ]
+   }
+  },
+  {
+   "name": "mind",
+   "emoji": "🧠",
+   "level": 3.0,
+   "raw_score": 18.5,
+   "tier": "Foundation",
+   "xp_delta": -2.0,
+   "xp_earned": -1.0,
+   "score_delta": 0.0,
+   "data_coverage": 0.7,
+   "coverage_hold": false,
+   "not_instrumented": false,
+   "not_instrumented_note": null,
+   "absent_behaviors": [
+    "t0_habit_compliance",
+    "t1_habit_compliance"
+   ],
+   "xp_debt": 47.5,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [
+     "stress_management"
+    ],
+    "dragging": [
+     "journal_consistency",
+     "reading_practice"
+    ],
+    "absent": [
+     "t0_habit_compliance",
+     "t1_habit_compliance"
+    ],
+    "no_data": [
+     "state_of_mind_valence",
+     "vice_control",
+     "values_alignment"
+    ]
+   },
+   "absence": {
+    "state": "dark",
+    "sources": [
+     "notion"
+    ],
+    "dark_sources": [
+     "notion"
+    ],
+    "last_log_date": "2026-09-09",
+    "days_dark": 25,
+    "stale_hours": 336,
+    "transition": "paused",
+    "days_since_last_log": 25,
+    "absent_behaviors": [
+     "t0_habit_compliance",
+     "t1_habit_compliance"
+    ]
+   }
+  },
+  {
+   "name": "relationships",
+   "emoji": "💬",
+   "level": 1.0,
+   "raw_score": 50.0,
+   "tier": "Foundation",
+   "xp_delta": 0.0,
+   "xp_earned": 0.0,
+   "score_delta": 0.0,
+   "data_coverage": 0.0,
+   "coverage_hold": true,
+   "not_instrumented": true,
+   "not_instrumented_note": "No relationship data source feeds this pillar yet — tracked as future work (#747).",
+   "absent_behaviors": [],
+   "xp_debt": 0.0,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [],
+    "dragging": [],
+    "absent": [],
+    "no_data": [
+     "social_interaction_frequency",
+     "interaction_quality",
+     "social_mood_correlation"
+    ]
+   }
+  },
+  {
+   "name": "consistency",
+   "emoji": "🎯",
+   "level": 13.0,
+   "raw_score": 29.7,
+   "tier": "Foundation",
+   "xp_delta": -1.0,
+   "xp_earned": 0.0,
+   "score_delta": 3.1,
+   "data_coverage": 1.0,
+   "coverage_hold": false,
+   "not_instrumented": false,
+   "not_instrumented_note": null,
+   "absent_behaviors": [],
+   "xp_debt": 26.5,
+   "neglect_decay": null,
+   "drivers": {
+    "top": [
+     "data_completeness",
+     "weekend_weekday_stability"
+    ],
+    "dragging": [
+     "cross_pillar_variance",
+     "streak_maintenance"
+    ],
+    "absent": [],
+    "no_data": []
+   },
+   "absence": {
+    "state": "logged",
+    "sources": [
+     "todoist",
+     "habitify"
+    ],
+    "dark_sources": [],
+    "last_log_date": "2026-10-04",
+    "days_dark": null,
+    "stale_hours": null,
+    "transition": null,
+    "days_since_last_log": null,
+    "absent_behaviors": []
+   }
+  }
+ ],
+ "input_manifest": {
+  "status": "partial",
+  "complete": false,
+  "as_of_day": "2026-10-04",
+  "degraded": [
+   "food_delivery",
+   "notion"
+  ],
+  "unobserved": [],
+  "note": "Computed on partial input — food_delivery, notion was stale or missing when this ran, so today's numbers are qualified, not complete.",
+  "sources": {
+   "whoop": {
+    "status": "fresh",
+    "latest_day": "2026-10-04",
+    "age_hours": 9.51,
+    "stale_after_hours": 48.0
+   },
+   "apple_health": {
+    "status": "fresh",
+    "latest_day": "2026-10-04",
+    "age_hours": 9.51,
+    "stale_after_hours": 48.0
+   },
+   "habitify": {
+    "status": "fresh",
+    "latest_day": "2026-10-04",
+    "age_hours": 9.51,
+    "stale_after_hours": 48.0
+   },
+   "food_delivery": {
+    "status": "stale",
+    "latest_day": "2026-03-28",
+    "age_hours": 4569.51,
+    "stale_after_hours": 336.0
+   },
+   "macrofactor": {
+    "status": "fresh",
+    "latest_day": "2026-10-03",
+    "age_hours": 33.51,
+    "stale_after_hours": 96.0
+   },
+   "notion": {
+    "status": "stale",
+    "latest_day": "2026-09-09",
+    "age_hours": 609.51,
+    "stale_after_hours": 336.0
+   },
+   "strava": {
+    "status": "fresh",
+    "latest_day": "2026-10-03",
+    "age_hours": 33.51,
+    "stale_after_hours": 48.0
+   },
+   "todoist": {
+    "status": "fresh",
+    "latest_day": "2026-10-03",
+    "age_hours": 33.51,
+    "stale_after_hours": 72.0
+   },
+   "withings": {
+    "status": "fresh",
+    "latest_day": "2026-10-03",
+    "age_hours": 33.51,
+    "stale_after_hours": 168.0
+   },
+   "hevy": {
+    "status": "fresh",
+    "latest_day": "2026-10-02",
+    "age_hours": 57.51,
+    "stale_after_hours": 168.0
+   }
+  }
+ }
+}

@@ -18,6 +18,7 @@ import { tryJSON, esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import * as F from "/assets/js/ck_front.js";
+import { sheetLine } from "/assets/js/ck_sheet.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -356,8 +357,10 @@ async function mountFront(edition, b) {
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
   fill("ck-quotes", F.quotesHTML(b.chapter, null, base));
-  const [read, transcript] = await Promise.all([tryJSON("/api/weekly_priority"), transcriptUrl ? tryJSON(transcriptUrl) : null]);
+  const [read, transcript, character] = await Promise.all([tryJSON("/api/weekly_priority"), transcriptUrl ? tryJSON(transcriptUrl) : null, tryJSON("/api/character")]);
   fill("ck-lead-read", F.leadReadHTML(read, base));
+  const sheet = sheetLine(character);
+  if (sheet) fill("ck-sheet-line", `<a class="ck-link" href="${esc(base)}sheet/">${esc(`The whole of it: ${sheet.charAt(0).toLowerCase()}${sheet.slice(1)}`)}</a>`);
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
 }
 
