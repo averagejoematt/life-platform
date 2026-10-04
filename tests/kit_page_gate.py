@@ -56,6 +56,11 @@ KIT_PAGES = {
     "/next/v8/start/": 4,
     "/next/v8/story/": 4,
     "/next/v8/coaches/": 4,
+    "/next/v8/day/": 4,
+    "/next/v8/day/?d=2026-10-02": 4,  # a lifting day: the longest a day page gets
+    "/next/v8/trend/": 4,  # the index of every trend
+    "/next/v8/trend/?m=weight": 4,
+    "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
 }
 
 #: route glob -> fixture file. Every route ck_pages.js reads.
@@ -66,6 +71,11 @@ ROUTES = {
     "**/api/coaches": "coaches.json",
     "**/api/coach_docket": "coach_docket.json",
     "**/api/timeline": "timeline.json",
+    "**/api/pulse_history": "pulse_history.json",
+    "**/api/workouts": "workouts.json",
+    "**/api/training_overview": "training_overview.json",
+    "**/api/nutrition_overview": "nutrition_overview.json",
+    "**/api/frequent_meals": "frequent_meals.json",
 }
 
 _FORBIDDEN = (
@@ -156,7 +166,9 @@ def measure(browser, base_url, fixtures, pages, out_dir=None, axe=True):
                         res["findings"].append(f"renders {what}: {text[max(0, hit.start() - 30):hit.end() + 30]!r}")
                 if out_dir:
                     os.makedirs(out_dir, exist_ok=True)
-                    page.screenshot(path=os.path.join(out_dir, (path.strip("/").replace("/", "_") or "root") + ".png"), full_page=True)
+                    page.screenshot(
+                        path=os.path.join(out_dir, (re.sub(r"[^A-Za-z0-9._-]+", "_", path).strip("_") or "root") + ".png"), full_page=True
+                    )
             if axe:
                 for v in run_axe(page):
                     if v["impact"] in AXE_GATING_IMPACTS:

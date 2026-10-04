@@ -1,67 +1,70 @@
-# Handover — Session BG: the living front page's engine landed and four candidate pages are on preview (2026-10-04 04:37Z → ~10:00Z, Fable 5.1, overnight, owner asleep)
+# Handover — Session BH: the first candidate pages graded C to D, two research rounds, and the redesign's direction reset (2026-10-04 13:40Z → ~19:30Z, Fable 5.1, owner on hand)
 
-**Driving instruction:** the owner's overnight prompt for epic #4580: wait for Session BF's wrap; confirm #4578 and #4592 landed (finish them if not); run #4583, #4584, #4585 and #4589 as background lanes; build all four pages on the preview path from the kit and `/api/edition` as candidates (no cut-over, the live front page untouched); file the scorecard story; leave a morning note and wrap. Merges and deploys for these stories were approved; other AWS writes were to be listed, not made.
+**Driving instruction:** the owner read the overnight candidate pages and said they looked "so bare bones … only podcast+chronicle", asked whether expert red teams and research on comparable sites had been done (they had not), and then steered the session: grade it honestly, research what makes such a site break out, keep the character sheet and badges, lose no good content, serve a daily reader and a weekly one, and make open design calls without asking ("you just fill in the blanks or recommend"). He will supply his own words by email or through his Claude chat.
 
-## Shipped: 5 PRs merged, all deployed (main green at 11f525bd)
-- **#4592** → #4582: `GET /api/edition`, the front page's one composed document (one Pacific `as_of`, one `day_n`, ten blocks, each with state / as_of / source / an absence sentence / data). Finished at the merge checklist: registered in the week-agreement registry as a compared surface; the test's capture pins named for what they are; names through `persona_registry.plain_name`.
-- **#4597** → #4583: the daily coach line is a move. `coach-daily-reflection` builds one fact sheet, one call casts at most three speakers, one short call per speaker, and code refuses a numbers-only line or a value not on the sheet; two opposed lines open a docket bet. Stored at `COACH#eli_marsh / MOVES#{date}`, served as `/api/coaching-dashboard` `moves`. Added cost about 0.75 USD a month typical, 1.40 worst case.
-- **#4598** → #4589: long coach narratives go to Monday and Thursday (`lambdas/coach/narrative_cadence.py`); the two AI judges in CI run only on reader-surface diffs (`scripts/reader_surface.py`); a workstation's Bedrock calls are labelled `dev-session`. The October 1–2 jump is attributed on the issue.
-- **#4599** → #4585: the coaches' record never appears alone. A "nothing changes" rule is scored at grading time; `/api/predictions`, `/api/calibration`, `/api/coaches`, the coach report card and `/api/wrong` serve a `comparison` block; a set guard holds every site module that prints a coach count.
-- **#4600** → #4586: four candidate pages at `/next/v8/` (front page), `/next/v8/start/`, `/next/v8/story/`, `/next/v8/coaches/`, built from `clean.css` and one script (`site/assets/js/ck_pages.js`); the edition's `coach_lines` serves the day's moves when a current day exists; `tests/kit_page_gate.py` holds the phone-height budget on the PR.
-- **CDK `LifePlatformCompute`** deployed from main at 08:17Z for #4597: the reflection job's timeout 180 → 300 s and one read-only `ssm:GetParameter` grant on `/life-platform/experiment-cycle`.
-- **#4595 filed** (Next): the whole-life scorecard by written rule, the second-release story for the block `/api/edition` serves as not built.
+## Shipped: 4 PRs merged (main at 01994e30); the first three are live on the preview, the fourth was deploying at wrap
+- **#4602** → #4586: the preview front page shows progress to goal, the last seven days as rows of dots, the coaches with the open bet, a labelled one-sentence chapter with Read and Listen, and "the rest of it" as doors. `/api/edition` gained a `week` block and a `life` block; eight routes joined its `SOURCES`.
+- **#4603** → #4586: each of the last seven days opens in place to what was recorded that day; today's unlogged training is no reading, never a day without training.
+- **#4605** → #4586 (merged 19:15Z; `/next/v8/day/` and `/next/v8/trend/` returned 200 at 19:30Z): a page per day (`/next/v8/day/?d=`) and a page per trend (`/next/v8/trend/?m=`, and `?m=lift&x=`), plus one index of trends. A lift's trend is its best set by estimated one-rep max; daily counts are bars from zero with a target line and a seven-day average; each lift shows the best set last time. Steps left the front page's day.
+- **#4606** → #4583 (merged 19:29Z; its deploy was still running at wrap, so the function is unverified live): the coach-moves cast recognises a coach referred to by name.
+- **Filed:** #4604 (five served, sitemap-listed pages still show the count of earlier starts), #4607 (`/api/edition` takes about five seconds uncached).
+- **Research, private and off-repo:** two reports under `~/.claude/plans/averagejoematt-platform-plan/reports/` ("Journey site design research", "Journey site breakout and virality") with their notes. A content map of all 95 live pages was published privately to the owner.
 
 ## Verified live
-- `/api/coaches` carries no "Dr." (05:56Z) — #4578.
-- `/api/edition` (07:55Z, then again through the pages at 09:46Z): `as_of` 2026-10-04, day 29; 311.0 lb, −16.3 since September 6; "41 of 96 checked calls right. So far they do not beat a simple guess."; scorecard absent; his words stale since September 23.
-- `/api/coaching-dashboard` serves `moves` (null: the job's first scheduled run is 19:00 UTC on 10-04).
-- `/api/predictions` serves `comparison` with `scored_complete: false`; each coach on `/api/coaches` carries its own block (09:04Z).
-- `coach-daily-reflection` timeout reads 300 live; fleet code updated 08:52–08:57Z by CI run 37189661306.
-- The four preview pages return 200 and render with live data at 390×844: 3.95, 3.62, 2.84 and 3.96 phone screens, no sideways overflow, no JS error. Screenshots: `~/Desktop/v8-preview-2026-10-04/`.
-- The 95-of-96 count on #4585 reproduces from the back-fill's read-only dry run; the #4589 attribution matches `LifePlatform/AI::EstimatedCostUSD` for `CallerClass=dev-session` (13.52 / 15.66 / 1.50 USD on Oct 1 / 2 / 3).
+- `/api/edition` serves `week` (measures, per-day `detail`, `weight_series`) and `life` (eight rows) — read by content at 17:14Z and again after #4603's deploy ("Trained on 6 of 6 days recorded").
+- The preview front page renders with the day's weigh-in at 390×844 with no JS error and no sideways overflow; the day rows open.
+- `coach-daily-reflection` ran its moves stage for the first time at 19:00Z and wrote `MOVES#2026-10-04` with **zero lines**: the cast chose three speakers by name and `admit_cast` dropped all three as off the roster (read from the stored row's `dropped`). #4606 fixes it; the lines' quality is still unproven.
+- `GET /api/edition` uncached: 5.35 s, 4.58 s, 4.56 s (three timed requests), against 0.10 s for `/api/journey`.
 
-## Held for the owner
-- **PR #4596** (#4584, the Tuesday question) is open, reconciled with main and complete, and NOT merged. It adds one EventBridge rule, which epic #4580's rule 5 forbids in this release, and `LifePlatformServe` needs an owner-required deploy (a `Lambda::Permission` and one `PutItem` grant). Merging first would park main's deploy at the IAM gate. To ship before Tuesday 2026-10-06 19:00 PDT: merge, then `bash deploy/cdk_deploy.sh LifePlatformServe -- --require-approval never` from main.
-- **The #4585 back-fill** (a DynamoDB write): `python3 scripts/backfill_coach_baseline_4585.py`, then `--apply`.
-- **Memory backup to S3** was not run this wrap (an AWS write outside the stories).
+## Grades the work received (hard-marked reviewers, unfiltered)
+- First candidate front page: called "a chapter landing page"; a design director refused to present it.
+- Revised front page: design C+, storytelling C, returnability C to C+, platform as a whole C−, depth D+.
+- Four readers on the current preview — would they come back: cold Reddit newcomer D+, non-technical friend D+, quantified-self skeptic C, hiring leader C+ on taking a meeting.
+- Day page C+, trend page D+ before fixes; not re-graded after.
+- What every reader agreed: the owner is missing from his own page; the one new idea (coaches publicly graded against a simple guess, with bets) is buried three and a half screens down; "Open a day" and "The rest of it" pushed the story down, and "The rest of it" is the old topic menu returning.
+
+## Decisions the owner made
+- Keep the character sheet and badges as a feature. Pages marked to retire stay reachable from an appendix at the foot of the site; only exact duplicates redirect.
+- Renamed topic sections (Today / Team / Record / Method / Story) are the first version's mistake; he wants a new approach to the design itself.
+- He will supply his own words, by email or his Claude chat; design may assume it. The Telegram Tuesday question (PR #4596) is the wrong channel.
+- Two rhythms: he returns daily and wants specifics on the last 24 hours; a casual reader returns weekly and wants what is trending up and down, the overall read, and quotes that invite a tap. Coaches likewise speak at three distances.
+- Open design calls are the driver's to make. Before he is shown work it is red-teamed with honest grades and grounded in research.
 
 ## Gotchas
-- **An additive IAM grant that rides with a non-IAM change is OWNER-REQUIRED at CI's gate.** #4597's one read-only grant shared its stack with a timeout change; three deploy runs on main failed at Plan (08:01–08:12Z) and nothing deployed until `cdk_deploy.sh LifePlatformCompute` ran from main. The next merge's run then deployed the union.
-- **A sibling lane's guard can catch a file it never saw.** #4599's coach-count guard failed `ck_pages.js` only after both were on one tree, and its statistics helper staled `docs/engines/HYPOTHESIS.md`'s verified stamp, which reddened Docs CI on main until #4600 carried the re-verify (about 40 minutes).
-- **A new CI step that imports a test helper inherits the helper's whole import graph.** `kit_page_gate.py` first imported `pr_render_gate` and `a11y_audit`; the dark-flag sweep traced both to `boto3`, which the render job does not install. The gate now carries its own static server and axe runner.
-- **The served comparison sentence becomes twenty lines on a phone once the back-fill runs** (four records, each with its own clause). The Coaches preview page keeps the edition's one sentence and leaves the record-by-record text on the scorecard; the edition's `record` block needs a short post-back-fill sentence (#4585).
-- **The manifest's chapter excerpts are cut mid-sentence after the editor's note**, so Start here shows the code-rendered stats line for weeks 1–3 instead of a sentence.
-- **The front page's coach lines are still the older restated text** until the moves job first runs; on 10-04 the page shows three October 3 lines under "today", one of them the eleven-day journal claim #4583 exists to stop.
-- **`deploy_site_api.sh` at 06:01Z returned at about 07:55Z.** The bundle built in seconds; the cause of the gap was not established (the suspects are the script's own verify invoke and a permission prompt). CI had already deployed the same sha, so the run was redundant.
+- **A composed route's cost is the sum of its upstreams.** Eight sources added to `/api/edition` in one morning took it to about five seconds uncached and flapped `site-api-p95-latency-high` twice on cold preview loads. Measure the route after adding a source (#4607).
+- **A fixture is not the wire.** The coach-moves cast passed 33 tests and produced nothing live, because the tests cast by id and the model answered with names.
+- **The research cuts against two ideas the driver proposed the same day:** opening content in place is the last resort for depth, not the first (days, coaches and chapters should be real pages); and the scoreboard is proof and a source of shareable misses, not the hook — framing the man as a contestant invites wagering on his body.
+- **Nothing shows a game layer interests onlookers**, and badges have documented backfire; the character sheet stays by the owner's ruling and should be presented plainly.
+- **Step counts are unreliable** (1,113 on a day with 155 minutes of training). They are off the front page's day and carry a caveat on their trend page; the cause is not established.
+- **A lift's estimated one-rep max overstates high-rep sets**, so a "peak" from a set of 12 is partly a formula artefact. The page says it is an estimate; it does not yet say this.
+- **`gh pr merge --squash` with a custom subject/body is seen by no guard**; use the bare form. An artifact upload rejects a filename containing a question mark.
 
 ## Residual / next picks
-- **#4586**: the owner reviews the four candidate pages one screen at a time, top of the front page first; each screen needs his recorded yes. Named gaps are on PR #4600: the kit has no player component, the scorecard section is left out, static first-person copy is draft wording, Coaches sits at 3.96 of 4 screens.
-- **#4584**: PR #4596 held on two owner calls (a schedule the epic forbids; an owner-required Serve deploy). Live proof needs a real reply after Tuesday's send.
-- **#4583**: live proof — read `MOVES#2026-10-04` after 19:00 UTC, then 14 consecutive days with no unresolved same-day contradiction. Owner calls on the PR: keep or retire the older per-coach reflections; show silent coaches or not.
-- **#4585**: the back-fill is the owner's write; the owner rules which reading the rule starts from; then the edition's `record` block gets a short per-record sentence.
-- **#4589**: live proofs due — the Tuesday 2026-10-06 off-day brief, the first judge skip on a producer-only deploy, the 14-day projection. Owner calls on the PR: confirm Monday and Thursday; the `qa-level=lean` dial.
-- **#4582**: the page-side contract test and a schema baseline capture for `/api/edition` (the dated `_exemptions.json` entry).
-- **#4595**: the scorecard by written rule (Next); four owner rulings listed in the issue.
-- **#4581**: the kit chart's two SVG labels render at about 7 px on a phone; the preview pages put the end labels under the chart instead.
-- **#4587** five real readers and **#4590** the interview — owner-gated, unchanged.
-- **#4588**: the cut-over, only after every screen has his yes.
-- **#4540**: still the carrier for the protein floor ruling (170 g or 180 g).
-- **#4546**: `ALLOWED_SENDERS` does not include the address the Monday questions email is sent to.
-- **#4593**: the missed week-4 email and the share kit.
-- **#4531**: the first live desk week is Wednesday 2026-10-07 — read `desk_findings_json` before approving.
-- not-work — the memory backup to S3 (`aws s3 sync … claude-memory-backup/`): an AWS write outside the stories; run it at the next attended wrap.
-- not-work — whether a doctor reviews the plan: only the owner knows; Start here says nothing about it until he does.
-- not-work — the S3 delete for the old day-1 photo: an owner AWS write, commands given in Session BF.
-- not-work — #4257 (the refill plan's one promotion) is owner-held; it was not promoted.
+- **#4607** first: `/api/edition` takes about five seconds uncached; it gates the cut-over and flaps the latency alarm on every cold preview load.
+- **#4586**: the agreed build order — the owner's words at the top; a page for each settled prediction and the latest on the front page; the front page reshaped into a fixed top line, his dated note, the last settled call and the next, a Today band and a This week band; coaches at three distances; one signature daily mark proposed on a real screen; the character sheet presented plainly; the appendix. Take "The rest of it" off the front page, make the seven-day list one link, and drop the list of individual lifts from the trend index.
+- **#4583**: confirm #4606 deployed (`coach-daily-reflection` updated after 19:29Z on 10-04); read `MOVES#<date>` after the next 19:00 UTC run and judge the lines; the 14-day box has not started.
+- **#4584**: a lane is building the owner's-words channel (an MCP tool for his Claude chat, and his email replies to the Monday questions) with one store, one filter and one route; find its PR, review, land and prove it with one real note. PR #4596 is superseded; close it with a note once the replacement merges.
+- **#4585**: the back-fill is still the owner's write; the Coaches page's examples must be checkable calls (threshold, result, what the simple guess said), not a conditional.
+- **#4604**: five served, sitemap-listed pages still show the count of earlier starts; the owner rules per page.
+- **#4595**: the scorecard by written rule; consider whether the character sheet's seven areas are that view.
+- **#4588**: the cut-over, only after every screen has his yes, five real readers, and #4607.
+- **#4587** five real readers and **#4590** the interview — owner-gated; the research found no substitute for either.
+- **#4589**: live proofs still due (Tuesday 2026-10-06 off-day brief; the first judge skip; the 14-day projection).
+- **#4582**: the page-side contract test and a schema baseline for `/api/edition`.
+- **#4540**, **#4546**, **#4593**, **#4531**: unchanged from Session BG.
+- not-work — the memory backup to S3: an AWS write outside the stories; run it at the next attended wrap.
+- not-work — whether readers may make their own predictions about his outcomes, and whether each day's meals are public: owner rulings; neither is built.
+- not-work — why 185 and why in public, in his own words: only he can say; the top of the site and Start here wait on it.
+- not-work — the first-person copy on the preview is draft wording; each page says so.
 
-**Build beat:** none — the front page these pieces serve is still a preview, and the one reader-visible change (the comparison beside each coach count) reads its full form only after the owner's back-fill
-**Docs:** docs/PROPORTIONALITY.md (the kit page gate row, this wrap); docs/engines/HYPOTHESIS.md re-verified in #4600; docs/SCHEMA.md, docs/CONVENTIONS.md §9, docs/PROPORTIONALITY.md and docs/qa/SURFACE_DRIFT_EXEMPTIONS.md rode the lane PRs
-**Decisions:** none needed — the cadence and gating changes are the owner's stated cuts and carry PROPORTIONALITY rows; no governance rule moved
-**Main:** green (11f525bd)
-**Incidents:** none — three Plan-red deploy runs (08:01–08:12Z) were the IAM gate working as designed and cleared in 51 minutes; Docs CI was red on main for about 40 minutes
+**Build beat:** none — everything this session shipped is on the unlisted preview path, and the reviewers graded it C to D
+**Docs:** docs/alarm_citations.json and docs/OPERATING_KNOWLEDGE_LEDGER.md (this wrap); the kit page gate's PROPORTIONALITY row landed in the previous wrap
+**Decisions:** none needed — the owner's rulings are design direction recorded in memory and on the issues; no governance rule moved
+**Main:** green (9e03b929)
+**Incidents:** none — `site-api-p95-latency-high` flapped twice for five minutes on cold preview loads (cited to #4607); no reader surface was affected
 **Stash/hooks:** clean
 **Closures:** none — no issues closed this session (every PR used Refs) · DoD: scanned 2, hits 1 (#4330 post-close comment from Session BF, advisory), blocking=none
-**Backlog:** Now live (opus 19 startable, sonnet 3, fable 2); #4595 filed to Next; no promotion made — the refill plan's pick, #4257, is owner-held
-**Alarms:** all cited — the battery found no uncited alarm red over 72 h and no uncited flap
+**Backlog:** Now live; #4604 and #4607 filed to Now, #4595 in Next; no promotion made
+**Alarms:** 1 flap cited — `site-api-p95-latency-high` → #4607; no uncited alarm red over 72 h
 **CI warnings:** 5 — all `SKIPPED in CI — no playwright/chromium`, #3640's deliberate skip notice; no action
-**Ledger:** Kit page gate row added (this wrap); the reader-surface gate row rode #4598
+**Ledger:** none — no standing machinery shipped this session beyond the kit page gate, whose row landed in the previous wrap

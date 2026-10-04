@@ -184,6 +184,7 @@ test("a right call that gave a range says the result fell inside it", () => {
 test("each day opens in place to what was recorded that day, newest first", () => {
   const html = P.daysHTML(B.week, "2026-10-03");
   assert.equal((html.match(/<details>/g) || []).length, 7);
+  assert.match(P.daysHTML(B.week, "2026-10-03", "/next/v8/"), /href="\/next\/v8\/day\/\?d=2026-10-02">The full day: lifts, food and trends<\/a>/);
   assert.match(html, /<time datetime="2026-10-03">Today<\/time>/);
   assert.match(html, /<time datetime="2026-10-02">Fri 2<\/time>/);
   assert.match(html, /<summary>311\.0 lb · trained · slept 8\.8 h<\/summary>/);
