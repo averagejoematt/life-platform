@@ -17,6 +17,7 @@
 import { tryJSON, esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
+import * as F from "/assets/js/ck_front.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -77,7 +78,7 @@ export function hisWordsFresh(block) {
 export function hisWordsHTML(block) {
   if (hisWordsFresh(block)) {
     const d = block.data;
-    const asked = d.question ? small(`Asked: ${d.question}`) : "";
+    const asked = d.prompt || d.question ? small(`Asked: ${d.prompt || d.question}`) : "";
     return `${label(`In my words · ${shortDay(d.date) || d.date_text || ""}`)}<p class="ck-quote">“${esc(d.text)}”</p>${asked}`;
   }
   return `${label("In my words")}${absent(block, "Nothing in his own words is served right now.")}`;
@@ -140,69 +141,6 @@ export function progressHTML(t) {
   if (start === null || goal === null || now === null || start <= goal) return "";
   const pct = Math.max(0, Math.min(100, Math.round((100 * (start - now)) / (start - goal))));
   return `<div class="ck-track" role="img" aria-label="${fmt1(start - now)} of ${fmt1(start - goal)} pounds lost"><i style="width:${pct}%"></i></div><div class="ck-ends"><span>${esc(`${trim1(start)} at the start`)}</span><span>${esc(`${trim1(Math.max(0, now - goal))} to go to ${trim1(goal)}`)}</span></div>`;
-}
-
-// ── the last seven days ────────────────────────────────────────────────────────
-// One row per measure: seven dots where the measure has a daily bar (filled = met, open =
-// not met, nothing = no reading that day), then the block's own sentence.
-const WEEK_LABELS = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
-export function weekHTML(block) {
-  if (!usable(block)) return absent(block, "The last seven days are not served right now.");
-  const measures = block.data.measures || {};
-  const rows = (block.data.order || Object.keys(measures))
-    .map((key) => {
-      const m = measures[key];
-      const label = WEEK_LABELS[key] || key;
-      if (!usable(m)) return `<li><span class="ck-rows__key">${esc(label)}</span><span class="ck-soft">${esc((m && m.absent_text) || "Not served right now.")}</span></li>`;
-      const met = m.data.met || [];
-      const done = met.filter((x) => x === true).length;
-      const seen = met.filter((x) => x !== null && x !== undefined).length;
-      const dots = met.length
-        ? `<span role="img" aria-label="${done} of ${seen} days">${met.map((x) => (x === true ? '<i class="ck-dot" aria-hidden="true"></i>' : x === false ? '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>' : "")).join("")}</span><br>`
-        : "";
-      return `<li><span class="ck-rows__key">${esc(label)}</span><span>${dots}${esc(m.data.text || "")}</span></li>`;
-    })
-    .join("");
-  return `<ul class="ck-rows">${rows}</ul>`;
-}
-
-// Each of the seven days, newest first, opens in place to what was recorded that day. The
-// disclosure is the browser's own <details>: no script, and it works with scripts off
-// once the rows are in the page.
-export function daysHTML(block, todayIso = "", base = "") {
-  const detail = usable(block) ? block.data.detail || [] : [];
-  if (!detail.length) return "";
-  const rows = detail
-    .map((d) => {
-      const words = dayInWords(d.date);
-      const [weekday, monthDay] = [words.split(",")[0], (words.split(", ")[1] || "").replace(/^[A-Za-z]+ /, "")];
-      const key = d.date === todayIso ? "Today" : `${weekday.slice(0, 3)} ${monthDay}`;
-      const facts = (d.facts || []).map((f) => `<li><span class="ck-rows__key">${esc(f.label)}</span><span>${esc(f.text)}</span></li>`).join("");
-      const full = base ? `<p><a class="ck-link" href="${esc(base)}day/?d=${esc(d.date)}">The full day: lifts, food and trends</a></p>` : "";
-      const body = facts ? `<details><summary>${esc(d.summary)}</summary><ul class="ck-rows">${facts}</ul>${full}</details>` : `<span class="ck-soft">${esc(d.summary)}</span>`;
-      return `<li><span class="ck-rows__key"><time datetime="${esc(d.date)}">${esc(key)}</time></span>${body}</li>`;
-    })
-    .join("");
-  return `<ul class="ck-rows">${rows}</ul>`;
-}
-
-// ── the whole thing: one fact per area, each a door ────────────────────────────
-// Body, sleep and food are already on the page in the seven-day rows, so the doors here
-// are the areas the page has not shown. `hrefs` maps an area to the page that holds it.
-const LIFE_LABELS = { training: "Training", habits: "Habits", supplements: "Supplements", experiments: "Experiments", mind: "Mind", body: "Body", sleep: "Sleep", food: "Food" };
-export function lifeHTML(block, hrefs = {}, keys = ["training", "habits", "supplements", "experiments", "mind"]) {
-  if (!usable(block)) return absent(block, "How the whole thing is going is not served right now.");
-  const rows = block.data.rows || {};
-  const items = keys
-    .filter((k) => rows[k])
-    .map((k) => {
-      const r = rows[k];
-      const text = usable(r) && r.data.text ? (r.state === "stale" ? `${r.data.text} ${r.absent_text}` : r.data.text) : r.absent_text || "Not served right now.";
-      const line = `${LIFE_LABELS[k] || k}: ${text}`;
-      return hrefs[k] ? `<li><a href="${esc(hrefs[k])}">${esc(line)} <span aria-hidden="true">→</span></a></li>` : `<li><a>${esc(line)}</a></li>`;
-    })
-    .join("");
-  return items ? `<ul class="ck-rows ck-rows--more">${items}</ul>` : absent(block, "Nothing is recorded yet.");
 }
 
 // ── today: what the coaches said ───────────────────────────────────────────────
@@ -397,29 +335,30 @@ const fill = (id, html) => {
   return el;
 };
 
-const DOORS = { training: "/cockpit/", habits: "/data/habits/", supplements: "/protocols/", experiments: "/protocols/experiments/", mind: "/data/mind/" };
-
 async function mountFront(edition, b) {
-  // The person leads: fresh words sit above everything else. Silence is not a section —
-  // the Mind row lower down carries it as one plain line.
-  if (hisWordsFresh(b.his_words)) {
-    const words = document.createElement("section");
-    words.className = "ck-section";
-    words.innerHTML = hisWordsHTML(b.his_words);
-    const anchor = document.getElementById("today");
-    if (anchor) anchor.before(words);
-  }
   const base = document.body.dataset.ckBase || "/";
-  fill("ck-today-label", esc(`Today · ${dayInWords(edition.as_of)}`));
-  fill("ck-today", todayHTML(b.today, edition));
-  fill("ck-chart", chartHTML(usable(b.week) ? b.week.data.weight_series : null, { sentence: false }));
-  fill("ck-week", weekHTML(b.week));
-  fill("ck-days", daysHTML(b.week, edition.as_of, base));
-  fill("ck-chapter", `${chapterHTML(b.chapter, b.next, { heading: "h2", player: false, listenHref: `${base}story/` })}<p><a class="ck-link" href="${esc(base)}story/">Every chapter and episode</a></p>`);
-  fill("ck-coach-lines", coachLinesHTML(b.coach_lines));
+  // The fixed top: his own dated note (or the plain sentence that there is none), the
+  // record beside the premise, the daily mark, and the next call with its date.
+  fill("ck-words", hisWordsHTML(b.his_words));
   fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
+  fill("ck-mark", F.markHTML(usable(b.week) ? b.week.data.weight_series : null, edition.as_of));
+  fill("ck-mark-caption", F.markCaption(b.today, edition) || esc((b.today && b.today.absent_text) || ""));
   fill("ck-bet", betHTML(b.next));
-  fill("ck-life", lifeHTML(b.life, DOORS));
+  // Today: the last 24 hours.
+  fill("ck-today-label", esc(`Today · ${dayInWords(edition.as_of)}`));
+  fill("ck-today", F.todayBandHTML(edition, b, base));
+  fill("ck-coach-lines", F.coachTodayHTML(b.coach_lines));
+  // This week: what is going well and not, the lead's read, the chapter and the podcast.
+  const span = F.weekSpan(b.week);
+  fill("ck-week-label", esc(span ? `This week · ${span}` : "This week"));
+  fill("ck-week", F.weekSortHTML(b.week, base));
+  fill("ck-follow-line", esc(F.followLine(b.next)));
+  const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
+  const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
+  fill("ck-quotes", F.quotesHTML(b.chapter, null, base));
+  const [read, transcript] = await Promise.all([tryJSON("/api/weekly_priority"), transcriptUrl ? tryJSON(transcriptUrl) : null]);
+  fill("ck-lead-read", F.leadReadHTML(read, base));
+  if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
 }
 
 async function mountStart(edition, b) {

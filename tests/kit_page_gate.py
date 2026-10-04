@@ -76,6 +76,8 @@ ROUTES = {
     "**/api/training_overview": "training_overview.json",
     "**/api/nutrition_overview": "nutrition_overview.json",
     "**/api/frequent_meals": "frequent_meals.json",
+    "**/api/weekly_priority": "weekly_priority.json",
+    "**/panelcast/wk4.transcript.json": "transcript_wk4.json",
 }
 
 _FORBIDDEN = (

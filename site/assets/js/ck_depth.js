@@ -315,22 +315,11 @@ export const TREND_AREAS = [
   { name: "Training", measures: ["training", "steps"] },
   { name: "Sleep", measures: ["sleep", "recovery"] },
 ];
-// The lifts done in at least two sessions, most frequent first.
-export function liftNames(workouts, min = 2) {
-  const count = new Map();
-  for (const w of workouts || []) {
-    for (const e of w.exercises || []) {
-      if (e && e.name && (e.sets || []).some(isWork)) count.set(e.name, (count.get(e.name) || 0) + 1);
-    }
-  }
-  return [...count].filter(([, n]) => n >= min).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
-}
-export function trendIndexHTML(base, workouts) {
+// A lift's trend is reached from the lift itself on a day page, so the index lists the
+// nine measures only: a list of every exercise is a menu, and nothing links to a menu.
+export function trendIndexHTML(base) {
   const link = (href, text) => `<li><a href="${esc(href)}">${esc(text)} <span aria-hidden="true">→</span></a></li>`;
-  const areas = TREND_AREAS.map((a) => `<p class="ck-label">${esc(a.name)}</p><ul class="ck-rows ck-rows--more">${a.measures.map((m) => link(trendHref(base, m), MEASURES[m].name)).join("")}</ul>`);
-  const lifts = liftNames(workouts);
-  if (lifts.length) areas.push(`<p class="ck-label">Each lift</p><ul class="ck-rows ck-rows--more">${lifts.map((n) => link(trendHref(base, "lift", n), n)).join("")}</ul>`);
-  return areas.join("");
+  return TREND_AREAS.map((a) => `<p class="ck-label">${esc(a.name)}</p><ul class="ck-rows ck-rows--more">${a.measures.map((m) => link(trendHref(base, m), MEASURES[m].name)).join("")}</ul>`).join("");
 }
 
 // ── mount ──────────────────────────────────────────────────────────────────────
@@ -377,7 +366,7 @@ async function mountTrend(base) {
     fill("ck-title", "Every trend");
     document.title = "Every trend — Average Joe Matt";
     fill("ck-about", soft("Each one is a single measure over the whole experiment. Every reading links back to its day."));
-    fill("ck-chart", trendIndexHTML(base, src.workouts && src.workouts.workouts));
+    fill("ck-chart", trendIndexHTML(base));
     for (const id of ["ck-recent-section", "ck-extra-section", "ck-related-section"]) document.getElementById(id)?.remove();
     return;
   }
