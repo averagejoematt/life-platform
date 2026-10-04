@@ -1,0 +1,173 @@
+<title>The AI Coaches</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm column, one idea per section, generous space between sections.
+   One typeface, three sizes that matter, one accent used only for progress. */
+:root {
+  --bg: #FFFFFF;
+  --fg: #0E1113;
+  --soft: #5B646B;
+  --faint: #8A9399;
+  --line: #E6E9EB;
+  --panel: #F5F7F8;
+  --accent: #0A7A5A;
+  --accent-wash: #E7F3EF;
+  --sans: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0D0F10; --fg: #F2F4F5; --soft: #A3ACB2; --faint: #7A848A; --line: #23282B; --panel: #15191B; --accent: #3FC59B; --accent-wash: #11261F; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0D0F10; --fg: #F2F4F5; --soft: #A3ACB2; --faint: #7A848A; --line: #23282B; --panel: #15191B; --accent: #3FC59B; --accent-wash: #11261F; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.page { max-width: 680px; margin: 0 auto; padding-inline: 24px; padding-block: 0 96px; display: flex; flex-direction: column; gap: 88px; }
+a { color: inherit; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, p, ul { margin: 0; }
+h1 { font-size: clamp(2rem, 7.4vw, 3rem); line-height: 1.1; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+h2 { font-size: clamp(1.45rem, 5vw, 1.9rem); line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; text-wrap: balance; }
+.soft { color: var(--soft); }
+.small { font-size: 0.88rem; color: var(--faint); }
+.num { font-variant-numeric: tabular-nums; }
+
+.bar { display: flex; justify-content: space-between; align-items: center; padding-block: 20px; font-size: 0.95rem; }
+.bar .brand { font-weight: 600; letter-spacing: -0.01em; }
+.bar .day { color: var(--soft); }
+
+section { display: flex; flex-direction: column; gap: 20px; }
+.kicker { font-size: 0.88rem; color: var(--accent); font-weight: 500; }
+
+/* 1 — who, and where he is today */
+.hero { gap: 32px; }
+.who { display: flex; align-items: center; gap: 14px; }
+.who img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: block; }
+.who div { display: flex; flex-direction: column; line-height: 1.3; }
+.who b { font-weight: 600; }
+.today { display: flex; flex-direction: column; gap: 14px; padding-top: 28px; border-top: 1px solid var(--line); }
+.today .big { font-size: clamp(3.6rem, 17vw, 5.5rem); line-height: 1; letter-spacing: -0.045em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.today .big span { font-size: 0.26em; letter-spacing: 0; font-weight: 500; color: var(--soft); margin-left: 6px; }
+.track { height: 6px; border-radius: 3px; background: var(--line); position: relative; }
+.track i { position: absolute; inset: 0 auto 0 0; width: 11.5%; border-radius: 3px; background: var(--accent); }
+.ends { display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+.btn { background: var(--fg); color: var(--bg); text-decoration: none; font-weight: 500; padding: 13px 22px; border-radius: 999px; }
+.link { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+
+/* 2 — the story so far */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--sans); font-size: 13px; fill: var(--faint); }
+.weeks { list-style: none; padding: 0; display: flex; flex-direction: column; }
+.weeks li { display: grid; grid-template-columns: 4.6rem 1fr auto; gap: 12px; align-items: baseline; padding-block: 15px; border-top: 1px solid var(--line); }
+.weeks li:last-child { border-bottom: 1px solid var(--line); }
+.weeks .w { color: var(--faint); font-size: 0.88rem; }
+.weeks a { text-decoration: none; font-weight: 500; min-width: 0; }
+.weeks .lb { color: var(--soft); font-variant-numeric: tabular-nums; font-size: 0.95rem; white-space: nowrap; }
+.weeks li.now a { color: var(--accent); }
+
+/* 3 — the AI */
+.stat { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.stat b { font-size: clamp(2.6rem, 11vw, 3.6rem); line-height: 1; letter-spacing: -0.04em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.next { background: var(--panel); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 8px; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.three div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.three b { font-size: 1.5rem; letter-spacing: -0.02em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.three span { font-size: 0.88rem; color: var(--soft); }
+
+.follow { background: var(--panel); border-radius: 20px; padding: 32px 24px; align-items: flex-start; }
+footer { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 0.92rem; color: var(--soft); padding-top: 24px; border-top: 1px solid var(--line); }
+footer a { text-decoration: none; }
+footer a:hover, .weeks a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+@media (max-width: 480px) {
+  body { font-size: 16px; }
+  .page { gap: 72px; padding-inline: 20px; }
+  .weeks li { grid-template-columns: 3.9rem 1fr auto; }
+}
+
+.back { text-decoration: none; color: var(--soft); }
+.steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 2rem 1fr; gap: 8px; padding-block: 14px; border-top: 1px solid var(--line); }
+.steps li:last-child { border-bottom: 1px solid var(--line); }
+.steps li::before { content: counter(s); color: var(--faint); font-variant-numeric: tabular-nums; }
+.team { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.team li { display: grid; grid-template-columns: 1fr 5.2rem; gap: 4px 16px; padding-block: 16px; border-top: 1px solid var(--line); align-items: center; }
+.team li:last-child { border-bottom: 1px solid var(--line); }
+.team .n { font-weight: 500; }
+.team .j { color: var(--soft); font-size: 0.93rem; grid-column: 1; }
+.team .r { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; color: var(--soft); font-variant-numeric: tabular-nums; text-align: right; }
+.team .m { height: 4px; border-radius: 2px; background: var(--line); position: relative; }
+.team .m i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--accent); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pair > div { min-width: 0; background: var(--panel); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+.tag { font-size: 0.82rem; font-weight: 500; }
+.tag.ok { color: var(--accent); }
+.tag.no { color: var(--soft); }
+.more { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.more li { border-top: 1px solid var(--line); }
+.more li:last-child { border-bottom: 1px solid var(--line); }
+.more a { display: flex; justify-content: space-between; gap: 12px; padding-block: 15px; text-decoration: none; font-weight: 500; }
+.more a span { color: var(--faint); font-weight: 400; }
+@media (max-width: 480px) { .pair { grid-template-columns: 1fr; } }
+</style>
+<div class="page">
+  <div>
+    <header class="bar"><a class="back" href="https://claude.ai/artifact/W9sF86GQ1Qn3B7FUjSTB68">← Average Joe Matt</a><span class="day num">Day 28 · October 3</span></header>
+    <section class="hero">
+      <p class="kicker">The AI</p>
+      <h1>Eight AI coaches. One job each. Every prediction checked.</h1>
+      <p class="soft">They are software I built with Claude, not people. Here is what they do and how often they are right.</p>
+      <div class="today">
+        <p class="soft">Right so far</p>
+        <p class="big">41<span>of 96 predictions</span></p>
+        <div class="track" role="img" aria-label="41 of 96 predictions right, 43 percent"><i style="width:43%"></i></div>
+        <p>That is a little worse than a coin flip. Finding out whether they get better is part of the experiment.</p>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <p class="kicker">How it works</p>
+    <h2>The same three steps, every day.</h2>
+    <ol class="steps">
+      <li><span>My scale, wrist strap, bed sensor and food log record the day.</span></li>
+      <li><span>Each morning the coaches read it, write to me, and make predictions with a date on them.</span></li>
+      <li><span>When the date comes, code compares the prediction with what happened. No coach marks its own work.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <p class="kicker">The team</p>
+    <h2>Who they are, and their record.</h2>
+    <ul class="team"><li><span class="n">Eli Marsh</span><span class="j">Lead. Turns the others into one plan for the day.</span><span class="r">no bets</span></li><li><span class="n">Lisa Park</span><span class="j">Sleep</span><span class="r">10 of 23<span class="m"><i style="width:43%"></i></span></span></li><li><span class="n">Henning Brandt</span><span class="j">The statistician. Asks whether a pattern is real.</span><span class="r">9 of 18<span class="m"><i style="width:50%"></i></span></span></li><li><span class="n">Marcus Webb</span><span class="j">Food and protein</span><span class="r">6 of 20<span class="m"><i style="width:30%"></i></span></span></li><li><span class="n">Nathan Reeves</span><span class="j">Mind and habits</span><span class="r">6 of 14<span class="m"><i style="width:43%"></i></span></span></li><li><span class="n">Max Reyes</span><span class="j">Training</span><span class="r">5 of 11<span class="m"><i style="width:45%"></i></span></span></li><li><span class="n">James Okafor</span><span class="j">Blood tests and long-term health</span><span class="r">3 of 4<span class="m"><i style="width:75%"></i></span></span></li><li><span class="n">Amara Patel</span><span class="j">Blood sugar. Sitting out until I wear a sensor again.</span><span class="r">2 of 6<span class="m"><i style="width:33%"></i></span></span></li></ul>
+  </section>
+
+  <section>
+    <p class="kicker">Two real examples</p>
+    <h2>One they got right, one they got wrong.</h2>
+    <div class="pair">
+      <div><span class="tag ok">Right</span><p><b>Henning said my morning recovery score would land near 84.</b></p><p class="soft">It came in at 97, inside the range he gave. Checked October 3.</p></div>
+      <div><span class="tag no">Wrong</span><p><b>Marcus said that if dinner fell through, I would eat about 46 g of protein that day.</b></p><p class="soft">I ate 166 g. Checked October 3.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">This week</p>
+    <h2>When two of them disagree, they bet.</h2>
+    <div class="next">
+      <p class="small">Settles Monday, October 5</p>
+      <p><b>Will my recovery average reach 81.6 this week?</b></p>
+      <p class="soft">Lisa says yes. Max says no. Recovery is my wrist strap’s morning score out of 100.</p>
+    </div>
+    <p class="soft">Three more bets settle on October 7, 12 and 16.</p>
+  </section>
+
+  <section>
+    <p class="kicker">Go deeper</p>
+    <ul class="more">
+      <li><a href="https://averagejoematt.com/next/coaching/">What each coach wrote today <span>→</span></a></li>
+      <li><a href="https://averagejoematt.com/next/method/">Every prediction they got wrong <span>→</span></a></li>
+      <li><a href="https://averagejoematt.com/next/method/">How the checking works <span>→</span></a></li>
+    </ul>
+  </section>
+</div>
