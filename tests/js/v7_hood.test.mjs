@@ -181,3 +181,30 @@ test("getJSON drains a non-2xx body before returning null — an unread body hol
   // a fetch that rejects returns null
   assert.equal(await H.getJSON("/api/x", async () => { throw new Error("offline"); }), null);
 });
+
+// ── R7 fix 8 (#4329) ────────────────────────────────────────────────────────────
+// The two rows /api/wrong served on 2026-10-03, verbatim.
+const R7_BAND = { id: "95b56f31b17c", date: "2026-10-03", coach: "nutrition", believed: "total protein would come in at 46.0 g ±73.1 (one standard deviation of his last 30 days)", number: "total protein measured 166.0 g on October 1 — the call was 46.0 g ±73.1 (one standard deviation of his last 30 days)", what_changed: "It landed 120.0 g from the call, outside the ±73.1 band.", verdict: "refuted" };
+const R7_DEEP = { id: "4abf3b180ed5", date: "2026-10-03", coach: "sleep", believed: "deep would trend up", number: "measured falling: the smoothed average of deep fell 8% across its last 7 readings — the call was rising", what_changed: "The trend ran down, the opposite of the call, so it was graded refuted.", verdict: "refuted" };
+
+test("R7 fix 8: a band wider than its call is glossed with the arithmetic it implies — never left to read as a broken number", () => {
+  const s = H.correctionSentences(R7_BAND, NAMES);
+  assert.match(s.said, /total protein would come in at 46\.0 g give or take 73\.1 \(one standard deviation of his last 30 days\) — a band wider than the call itself: anything up to 119\.1 g would have counted\.$/);
+  assert.equal(H.bandGloss("recovery score would come in at 52.9 give or take 18.3"), "", "a band narrower than the call needs no gloss");
+  assert.equal(H.bandGloss("deep would trend up"), "");
+  assert.equal(H.bandGloss("x would come in at 10 give or take 25"), " — a band wider than the call itself: anything up to 35.0 would have counted");
+});
+
+test("R7 fix 8: the engine's short label 'deep' is spelled through the coaches page's metric words", () => {
+  const s = H.correctionSentences(R7_DEEP, NAMES);
+  assert.match(s.said, /: the share of deep sleep would trend up\.$/);
+  assert.equal(s.happened, "Measured falling: the smoothed average of the share of deep sleep fell 8 percent across its last 7 readings — the call was rising.");
+  assert.equal(H.spellMetrics("deep sleep ran long"), "deep sleep ran long", "'deep sleep' is already words");
+});
+
+test("R7 fix 8: the third sentence is labelled for what it holds — how the call was graded, not a change", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../site/assets/js/v7_hood.js", import.meta.url), "utf8");
+  assert.ok(src.includes("<b>How it was graded.</b>"));
+  assert.ok(!src.includes("<b>What we changed.</b>"));
+});

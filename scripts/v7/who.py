@@ -110,6 +110,9 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
     return (
         "    <h1>Who he is</h1>\n"
         '    <p class="v7-job">In his own words, with the photo and the day count.</p>\n'
+        # R7 fix 9: the JS-off sentence. His paragraph and the photographs are static; the counts are not.
+        '    <noscript><p class="who-small">His paragraph and the photographs are on this page as written. The day count and the numbers are drawn '
+        "from the site’s served data when scripts run; with scripts off they are not shown.</p></noscript>\n"
         + _entry("who-fold", "In his own words", fold, "who-fold")
         + _entry("who-photos", "The photographs", _photo_strip())
         + _entry("who-since", 'Since <span id="who-since-day" data-src="api_journey.journey.started_date">the day it began</span>')

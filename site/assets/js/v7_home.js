@@ -9,7 +9,8 @@
 // The pure builders are exported so the node tests can drive them from fixtures; mount()
 // is the only thing that touches the DOM, and only when the Home slots are on the page.
 import { tryJSON, esc, todayPT } from "/assets/js/evidence_shared.js";
-import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText, servedWindow } from "/assets/js/entry_age.js";
+import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText, servedWindow, goalWindowText } from "/assets/js/entry_age.js";
+import { metricKnown, metricParts } from "/assets/js/v7_coaches.js";
 
 const HORIZON = 30; // the day the next photo is due (the first, day 1, is on the fold — #3761)
 const DAY1_PHOTO_DATE = "2026-09-06"; // the day the fold's photograph was taken (its file name carries the same date)
@@ -130,7 +131,7 @@ export function aliveLine(throughDate, calibration, cadence, throughSrc = "vital
   const c = calibration && calibration.platform && calibration.platform.strata && calibration.platform.strata.coaches;
   if (c && num(c.n) !== null && num(c.confirmed) !== null) {
     parts.push(`the coaches’ checked calls so far, by the site’s own count: <b>${span("calibration.platform.strata.coaches.confirmed", String(c.confirmed))} of ${span("calibration.platform.strata.coaches.n", String(c.n))}</b> right`);
-  } else parts.push("no checked coach call is served yet");
+  } else parts.push(calibration ? "no checked coach call is on the record yet" : "the coaches’ record is not served right now"); // R7 fix 9: a 404 is not "none yet"
   const ch = cadence && cadence.chronicle;
   if (ch && !ch.paused && ch.next_date) parts.push(`next write-up <b>${time(ch.next_date, "content_cadence.chronicle.next_date")}</b>`);
   else if (ch && ch.paused) parts.push("the write-up is paused");
@@ -186,15 +187,20 @@ export function weighinsBlock(progress, journey) {
     gapNote += `${gapNote ? "; " : ""}the scale was skipped on ${skipped} of the ${n} days`;
   }
   let goal = "";
-  if (j.projected_goal_date) goal = ` The served date to goal is ${dayInWords(j.projected_goal_date)}.`;
+  // R7 fix 5: a month, a year and the engine's own range — never a bare weekday-and-day.
+  const gw = goalWindowText(j);
+  if (gw) goal = ` <span${src("journey.{projected_goal_date,projected_goal_date_earliest,projected_goal_date_latest}")}>${esc(gw)}</span>`;
   else if (num(j.weighin_span_days) !== null) goal = ` No date to goal is served — ${span("journey.weighin_span_days", String(j.weighin_span_days))} days of weigh-ins is too few to forecast one.`;
   else goal = " No date to goal is served.";
   return `${svg}<p class="v7h-small"${src("weight_progress + journey.{day_n,weighin_count,weighin_span_days,projected_goal_date}")}>${esc(gapNote)}${gapNote ? "." : ""}${goal}</p>`;
 }
 
 // ── in his words ───────────────────────────────────────────────────────────────
+// `decisions` is the served list; null/undefined is a fetch that failed — "not served right
+// now", never "no notes of his are on file" (R7 fix 9: a 404 is not a fact about him).
 export function wordsBlock(decisions, pulse) {
-  const notes = (Array.isArray(decisions) ? decisions : [])
+  if (!Array.isArray(decisions)) return pending("The record of his notes");
+  const notes = decisions
     .map((d, i) => ({ i, note: String(d.note || "").trim(), at: d.note_at || "", date: d.date || "" }))
     .filter((d) => d.note);
   const out = [];
@@ -230,8 +236,38 @@ export function wordsBlock(decisions, pulse) {
   return out.join("");
 }
 
+// The steps sentence (R7 fix 3). The count is an INSTRUMENT READING, printed as one: the served
+// average with its n, the instrument only when /api/source_freshness serves the step datatype
+// as recorded (the phone's health app — the one source of the series), and — when the served
+// day rows carry one — the count on the day of the most recent walk with a served distance,
+// both figures side by side. No verdict about him ("the weak spot") and no claim about WHY the
+// two differ: nothing served says, so the page puts the two numbers together and stops.
+export function stepsSentence(training, freshness) {
+  const w = (training && training.walking) || {};
+  const steps = num(w.avg_daily_steps);
+  if (steps === null) return "";
+  const ah = ((freshness && freshness.sources) || []).find((x) => x && x.id === "apple_health");
+  const dt = ah && (ah.datatypes || []).find((d) => d && d.key === "steps");
+  const byPhone = Boolean(dt && dt.dark !== true);
+  const sn = num(w.avg_daily_steps_n);
+  const avg = span("training_overview.walking.avg_daily_steps", fmtInt(steps));
+  const over = sn !== null ? `, averaged over ${span("training_overview.walking.avg_daily_steps_n", String(sn))} days` : "";
+  let s = byPhone ? ` <span${src("source_freshness.sources[apple_health].datatypes[steps]")}>His phone’s health app</span> counted ${avg} steps a day${over}` : ` The step count on record is ${avg} a day${over}`;
+  const rows = Array.isArray(w.daily_steps_trend) ? w.daily_steps_trend : [];
+  const sessions = (training && training.cardio_sessions) || [];
+  for (let i = 0; i < sessions.length; i++) {
+    const x = sessions[i];
+    if (!x || !/walk/i.test(String(x.sport || "")) || num(x.distance_mi) === null) continue;
+    const row = rows.find((r) => r && r.date === x.date && num(r.steps) !== null);
+    if (!row) continue;
+    s += ` — and ${span(`training_overview.walking.daily_steps_trend[${x.date}].steps`, fmtInt(row.steps))} on ${esc(dayInWords(x.date))}, the day of the ${span(`training_overview.cardio_sessions[${i}].distance_mi`, fmt1(x.distance_mi))}-mile walk`;
+    break;
+  }
+  return `${s}.`;
+}
+
 // ── is he okay this week ───────────────────────────────────────────────────────
-export function okayBlock(sleep, vitals, nutrition, training, pulse) {
+export function okayBlock(sleep, vitals, nutrition, training, pulse, freshness) {
   const out = [];
   // Sleep
   const sd = (sleep && sleep.sleep_detail) || {};
@@ -242,9 +278,9 @@ export function okayBlock(sleep, vitals, nutrition, training, pulse) {
   const nightWord = night ? `${weekdayOf(night)} night` : "Last night";
   let s = "";
   if (bed !== null && strap !== null) {
-    s = Math.abs(bed - strap) < 0.3
-      ? `${nightWord} he slept ${span("sleep_detail.total_sleep_hours", fmt1(bed))} hours — the wrist strap and the bed sensor agree.`
-      : `${nightWord} the bed sensor read ${span("sleep_detail.total_sleep_hours", fmt1(bed))} hours of sleep and the wrist strap ${span("sleep_detail.whoop_hours", fmt1(strap))}.`;
+    // R7 fix 10: ONE sleep sentence on every v7 page — both instruments, each with its figure
+    // (Home said "8.9 — they agree" while Today printed 8.8 for the same night).
+    s = `${nightWord} the bed sensor read ${span("sleep_detail.total_sleep_hours", fmt1(bed))} hours of sleep and the wrist strap ${span("sleep_detail.whoop_hours", fmt1(strap))}.`;
   } else if (bed !== null || strap !== null) {
     const one = bed !== null ? ["sleep_detail.total_sleep_hours", bed, "the bed sensor"] : ["sleep_detail.whoop_hours", strap, "the wrist strap"];
     s = `${nightWord} he slept ${span(one[0], fmt1(one[1]))} hours, by ${one[2]}; the other sensor has nothing for the night.`;
@@ -314,14 +350,13 @@ export function okayBlock(sleep, vitals, nutrition, training, pulse) {
       tr += ` ${esc(weekdayOf(day))}: ${list}.`;
     }
   }
+  // R7 fix 3: the lift glyph speaks for LIFTING only — "rest day" beside a four-hour walk on the
+  // same day read as a contradiction. A day without a lifting session says exactly that.
   const lift = pulse && pulse.pulse && pulse.pulse.glyphs && pulse.pulse.glyphs.lift;
   const today = pulse && pulse.pulse && pulse.pulse.date;
-  if (lift && lift.label && today) tr += ` <span${src("pulse.glyphs.lift.label")}>${esc(weekdayOf(today))}: ${esc(String(lift.label).toLowerCase())}.</span>`;
-  const steps = num(w.avg_daily_steps);
-  if (steps !== null) {
-    const sn = num(w.avg_daily_steps_n);
-    tr += ` ${steps < 5000 ? "Steps are the weak spot: " : "Steps: "}${span("training_overview.walking.avg_daily_steps", fmtInt(steps))} a day${sn !== null ? `, averaged over ${span("training_overview.walking.avg_daily_steps_n", String(sn))} days` : ""}.`;
-  }
+  if (lift && today && lift.trained_today === false) tr += ` <span${src("pulse.glyphs.lift.trained_today")}>No lifting ${esc(weekdayOf(today))}.</span>`;
+  else if (lift && lift.label && today) tr += ` <span${src("pulse.glyphs.lift.label")}>${esc(weekdayOf(today))}: ${esc(String(lift.label).toLowerCase())}.</span>`;
+  tr += stepsSentence(training, freshness);
   out.push(`<p><span class="v7h-k">Training</span>${tr || "No training figures are served."}</p>`);
   return out.join("");
 }
@@ -369,7 +404,10 @@ export function recordBlock(calibration, wrong, predictions, freshness, pulse) {
     }
   });
   if (skips.length) items.push(`<li><b>What he skips, counted:</b> ${skips.join(" · ")}.</li>`);
-  return items.length ? `<ul class="v7h-refuse">${items.join("")}</ul>` : '<p class="v7h-note">Nothing else is on the record yet.</p>';
+  if (items.length) return `<ul class="v7h-refuse">${items.join("")}</ul>`;
+  // R7 fix 9: "nothing else is on the record" is a fact only when every feed answered.
+  const allServed = [calibration, wrong, predictions, freshness, pulse].every(Boolean);
+  return allServed ? '<p class="v7h-note">Nothing else is on the record yet.</p>' : pending("The rest of the record");
 }
 
 // ── how it works ───────────────────────────────────────────────────────────────
@@ -412,28 +450,41 @@ export function nextWeighinText(journey, through = todayPT()) {
 }
 
 // ── what resolves next ─────────────────────────────────────────────────────────
-const METRIC_WORDS = {
-  recovery_score: "the night’s recovery",
-  recovery_score_7day_avg: "the seven-night average recovery",
-  sleep_duration_hours: "the night’s sleep, in hours",
-  total_sleep_hours: "the night’s sleep, in hours",
-  hrv: "heart-rate variability",
-  weight_lbs: "his weight",
-};
+// The metric's words are v7_coaches.js's (ONE rule for every windowed form — R7 fix 2); a
+// metric with no words prints no criterion at all, never a field name.
 const COND_WORDS = { lt: "under", lte: "at or under", gt: "over", gte: "or better", eq: "exactly" };
 function criterionWords(c) {
-  if (!c || !c.metric || num(c.threshold) === null) return "";
-  const m = METRIC_WORDS[c.metric];
-  if (!m) return "";
+  if (!c || !c.metric || num(c.threshold) === null || !metricKnown(c.metric)) return "";
+  const { what, unit } = metricParts(c.metric);
   const cond = COND_WORDS[c.condition] || "";
   if (!cond) return "";
-  return c.condition === "gte" ? `${m} reads ${c.threshold} ${cond}` : `${m} reads ${cond} ${c.threshold}`;
+  const thr = `${c.threshold}${unit ? ` ${unit}` : ""}`;
+  return c.condition === "gte" ? `${what} reads ${thr} ${cond}` : `${what} reads ${cond} ${thr}`;
 }
 
-export function nextRows(docket, predictions, cadence, journey, coaches) {
-  const rows = [];
+// The graded-calls row (R7 fix 1). `earliest_due` on or after the data-through day is the next
+// call coming due; BEFORE it, the calls are overdue and the page says so — the count from
+// `due_now`, the oldest day in words — in a row that sorts first and carries no day in the
+// When column (a past day there read as the next thing to come back for).
+export function dueRow(predictions, through) {
   const due = predictions && predictions.overall && predictions.overall.due;
-  if (due && due.earliest_due) rows.push({ date: due.earliest_due, src: "predictions.overall.due.earliest_due", html: `<td${src("predictions.overall.due.earliest_due")}>The next graded call of any kind comes due. Graded by code.</td>` });
+  if (!due || !due.earliest_due) return null;
+  const day = String(due.earliest_due).slice(0, 10);
+  const thr = String(through || due.as_of || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(thr) || day >= thr) {
+    return { date: day, src: "predictions.overall.due.earliest_due", html: `<td${src("predictions.overall.due.earliest_due")}>The next graded call of any kind comes due. Graded by code.</td>` };
+  }
+  const n = num(due.due_now);
+  const many = n !== null && n > 1;
+  const count = n !== null && n > 0 ? `${span("predictions.overall.due.due_now", countWord(n, { capital: true }))} graded call${many ? "s are" : " is"}` : "A graded call is";
+  const oldest = `${many ? "the oldest" : "it"} was due ${time(day, "predictions.overall.due.earliest_due")}`;
+  return { date: day, overdue: true, src: "predictions.overall.due.earliest_due", html: `<td${src("predictions.overall.due.{due_now,earliest_due}")}>${count} overdue — ${oldest}. Graded by code.</td>` };
+}
+
+export function nextRows(docket, predictions, cadence, journey, coaches, through = "") {
+  const rows = [];
+  const due = dueRow(predictions, through);
+  if (due) rows.push(due);
   (Array.isArray(docket) ? docket : []).forEach((d, i) => {
     if (!d || !d.resolution_date) return;
     const a = d.coach_a;
@@ -444,24 +495,30 @@ export function nextRows(docket, predictions, cadence, journey, coaches) {
     const words = criterionWords(d.criterion);
     let text = "";
     if (yes && words) text = `${esc(coachName(coaches, yes))} says ${words} that day; ${esc(coachName(coaches, no))} says it won’t.`;
-    else text = `${esc(coachName(coaches, a))} and ${esc(coachName(coaches, b))} disagree${d.topic ? ` on ${esc(String(d.topic).replace(/:.*$/, "").toLowerCase())}` : ""}.`;
+    // no criterion in words → the names only; the served `topic` is the model's working title
+    // ("fuel-cognition link mechanistic validity") and is not printed (R7 fix 2)
+    else text = `${esc(coachName(coaches, a))} and ${esc(coachName(coaches, b))} disagree.`;
     rows.push({ date: d.resolution_date, src: `coach_docket.open[${i}].resolution_date`, html: `<td${src(`coach_docket.open[${i}]`)}>${text} Graded by code.</td>` });
   });
   const ch = cadence && cadence.chronicle;
   if (ch && !ch.paused && ch.next_date) rows.push({ date: ch.next_date, src: "content_cadence.chronicle.next_date", html: `<td${src("content_cadence.chronicle.next_date")}>The next write-up — drafted that day, published once Matthew has read it.</td>` });
   const j = journey || {};
   if (num(j.day_n) !== null && j.day_n < HORIZON && j.started_date) rows.push({ date: isoPlus(j.started_date, HORIZON - 1), src: "journey.started_date + 29 days", html: `<td${src("journey.started_date + 29 days")}>Day ${HORIZON} — and the next photo.</td>` });
-  rows.sort((x, y) => String(x.date).localeCompare(String(y.date)));
+  rows.sort((x, y) => Number(Boolean(y.overdue)) - Number(Boolean(x.overdue)) || String(x.date).localeCompare(String(y.date)));
   return rows;
 }
 
-export function nextBlock(docket, predictions, cadence, journey, coaches, through = todayPT()) {
-  const rows = nextRows(docket, predictions, cadence, journey, coaches);
+// `served` false = a feed this entry stands on did not answer: with no row to print the entry
+// says "not served right now", never "nothing is on the docket" (R7 fix 9).
+export function nextBlock(docket, predictions, cadence, journey, coaches, through = todayPT(), served = true) {
+  const rows = nextRows(docket, predictions, cadence, journey, coaches, through);
   if (!rows.length) {
+    if (!served) return pending("What resolves next");
     const nw = nextWeighinText(journey, through);
     return `<p class="v7h-note">Nothing is on the docket and no graded call is due.${nw ? ` ${nw.charAt(0).toUpperCase()}${nw.slice(1)}.` : ""}</p>`;
   }
-  const body = rows.map((r) => `<tr><td class="v7h-td-d"${src(r.src)}><time datetime="${esc(r.date)}">${esc(dayLabel(r.date))}</time></td>${r.html}</tr>`).join("");
+  const when = (r) => (r.overdue ? `<td class="v7h-td-d"${src(r.src)}>Overdue</td>` : `<td class="v7h-td-d"${src(r.src)}><time datetime="${esc(r.date)}">${esc(dayLabel(r.date))}</time></td>`);
+  const body = rows.map((r) => `<tr>${when(r)}${r.html}</tr>`).join("");
   return `<table><thead><tr><th>When</th><th>What</th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -473,7 +530,7 @@ export function followBlock(subs, cadence, journey, through = todayPT()) {
   }
   const parts = [`<span${src("sub_count.count")}>${esc(count)}</span>`];
   const ch = cadence && cadence.chronicle;
-  const next = ch && !ch.paused && ch.next_date ? `The next write-up is ${time(ch.next_date, "content_cadence.chronicle.next_date")}` : "The next write-up is not yet scheduled";
+  const next = ch && !ch.paused && ch.next_date ? `The next write-up is ${time(ch.next_date, "content_cadence.chronicle.next_date")}` : cadence ? "The next write-up is not yet scheduled" : "The next write-up’s day is not served right now";
   const nw = nextWeighinText(journey, through);
   parts.push(`${next}${nw ? `; ${nw}` : ""}.`);
   parts.push('<a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a>');
@@ -550,18 +607,19 @@ export async function mount() {
   put("v7h-weighins-body", weighinsBlock(progress, journey));
   const wm = marginParts(journey && journey.started_date);
   if (wm) setMargin(document.getElementById("v7h-weighins"), { d: wm.d, mo: wm.mo, w: "to today" }, "journey.started_date");
-  put("v7h-words-body", wordsBlock(decisions && decisions.decisions, pulse));
+  put("v7h-words-body", wordsBlock(decisions ? decisions.decisions || [] : null, pulse));
   const notes = ((decisions && decisions.decisions) || []).filter((d) => d && d.note);
   if (notes.length) setMargin(document.getElementById("v7h-words"), marginParts(notes[0].note_at ? instantDayInWords(notes[0].note_at) && new Date(Date.parse(notes[0].note_at)).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) : notes[0].date), `decisions[0].${notes[0].note_at ? "note_at" : "date"}`);
-  put("v7h-okay-body", okayBlock(sleep, vitals, nutrition, training, pulse));
+  put("v7h-okay-body", okayBlock(sleep, vitals, nutrition, training, pulse, freshness));
   setMargin(document.getElementById("v7h-okay"), marginParts(through), throughSrc);
   put("v7h-record-body", recordBlock(calibration, wrong, predictions, freshness, pulse));
   setMargin(document.getElementById("v7h-record"), marginParts(through), throughSrc);
   put("v7h-how-body", howBlock(freshness, coachesR, receipts, subs));
   setMargin(document.getElementById("v7h-how"), { d: "§", mo: "how", w: "it works" });
-  put("v7h-next-body", nextBlock(docket, predictions, cadence, journey, coaches, through));
-  const rows = nextRows(docket, predictions, cadence, journey, coaches);
-  if (rows.length) setMargin(document.getElementById("v7h-next"), marginParts(rows[0].date), rows[0].src);
+  put("v7h-next-body", nextBlock(docket, predictions, cadence, journey, coaches, through, Boolean(docketR && predictions && cadence)));
+  // the margin is the next day to come back for — never an overdue row's past day (R7 fix 1)
+  const upcoming = nextRows(docket, predictions, cadence, journey, coaches, through).filter((r) => !r.overdue);
+  if (upcoming.length) setMargin(document.getElementById("v7h-next"), marginParts(upcoming[0].date), upcoming[0].src);
   put("v7h-follow-body", followBlock(subs, cadence, journey, through));
   setMargin(document.getElementById("v7h-follow"), { d: "→", mo: "next", w: "page" });
 }
