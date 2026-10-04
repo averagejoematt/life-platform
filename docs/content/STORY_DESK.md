@@ -51,6 +51,23 @@ python3 scripts/season_rebuild.py --weeks 5 --out <dir>
 
 Publishing is a separate, owner-approved promote step. Staging never publishes.
 
+## His answers also reach the front page (#4584)
+
+Each answered question in a reply to the Monday email is written twice. The `STORYQA#W` row the
+chronicle reads as `owner_voice` is unchanged. Then each answer is also written to the
+owner-words store (`lambdas/content/owner_words.py`): one entry per answered question,
+channel `email`, the question as its `prompt`, and the answer as he typed it. An unanswered
+question writes nothing. An answer marked "off record" is stored and never served.
+
+That store has one other door, the MCP tool `log_owner_note` (his Claude chat), and one way
+out, `GET /api/owner_words`. The newest clean entry from the last seven days leads the
+front page's `his_words` block, word for word. Any filter hit, an off-record marker, or a
+vocabulary that could not be loaded holds the entry. A held entry is stored and never served.
+
+The reply only lands if the address he replies from is in the parser's `ALLOWED_SENDERS`
+(`cdk/stacks/operational_stack.py`). The questions are mailed to `EMAIL_RECIPIENT`, and a
+reply from an address outside that list is dropped with a log line (#4546).
+
 ## The dead-men
 
 `lambdas/operational/story_season_qa.py` (#4539) runs three checks inside the nightly

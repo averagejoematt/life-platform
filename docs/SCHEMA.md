@@ -252,6 +252,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#pending_writes` / `PENDING#<YYYYMMDDTHHMMSSZ>-<hash8>` | **chat writes queued for Matthew's approval (#4078)** — `pending_id` (the sk suffix), `status` (`pending` → `approving` → `approved`, or → `discarded`; a failed approval returns to `pending` with `last_error`), `target_tool` (a registered WRITE tool, derived via `mcp/audit.py::is_write_tool`), `target_args_json` (the exact arguments as canonical JSON TEXT — not a map, so ints and floats round-trip without a Decimal cast), `content_hash` (sha256 of tool + args; an identical open item is returned instead of duplicated), `summary`, `context`, `enqueued_at` + `enqueued_epoch` (int; age is computed from it, never parsed), and on resolution `resolved_at` / `resolution_note` / `result_excerpt` + a 90-day `ttl`. **Open rows never carry a `ttl`** — a pending row that self-expired would be the silent loss this partition exists to end. **Tier 2 owner-only** (a row carries whatever the target tool accepts). SYSTEM_STATE (ADR-077 ruling 2026-09-23): a workflow buffer; an approved write lands in its target partition under that partition's own class | `mcp/tools_pending_writes.py` (`manage_pending_writes` enqueue/approve/discard) | `get_capture_queues` (`pending_writes` section), `lambdas/operational/pending_writes_qa.py` (qa-smoke `data:pending_writes_age`, WARN past 3 days) | system_state | empty until the first chat enqueue |
 | `…SOURCE#reader_feedback` / `FEEDBACK#<sha256[:12]>` | **the two-question reader door (#4182)** — one row per distinct (reader, page, answer, text): `id` (the sk suffix — `sha256(sha256(idempotency identity)[:16]:page:made_sense:looking_for)[:12]`, never the clock), `page` (a site pathname matching `^/[a-z0-9/_-]{0,80}$`), `made_sense` (`yes`/`partly`/`no`), `looking_for` (HTML-stripped free text ≤500, may be empty, blocked-vice screened at the door), `status` (`unread`), `submitted_at` (ISO UTC, a field — not in the key). Written with `attribute_not_exists(sk)`, so a replay is a no-op. **No email, no ip_hash, no address.** Owner-read only; never served publicly | `lambdas/web/site_api_social_engage.py` (`POST /api/page_feedback`) | owner read via `aws dynamodb query` (an MCP read is a named residual) | system_state | empty until the site form ships |
 | `…SOURCE#morning_note` / `MORNING_NOTE#<PT day>` | **the morning note (#4189)** — the owner's four words before the number, one row per Pacific day: `date` (the PT day, also the sk suffix), `sleep_word` / `body_word` / `mood_word` (1–24 chars each, letters/spaces/hyphens only, blocked-vice + tool-call-residue screened at the door), `felt_recovered` (bool — his call, not the recovery score's), `written_at` (ISO UTC instant, a field), `tier` (the brief's ruling scale: `1` = words + day public; `2` = presence only), `source` (`site_api_morning_note`), `replaced` (only on an explicit `replace: true` overwrite). Written with `attribute_not_exists(sk)` — a second note the same day is REFUSED (409) unless the owner says `replace: true`. **No row = no note that morning; never a default (ADR-104).** Privacy: **public by owner ruling 2026-09-26** (DATA_GOVERNANCE Tier 0; the brief's "Tier 1") — the words and the day are served on `/api/morning_note` | `lambdas/web/site_api_social_note.py` (`POST /api/morning_note`, owner token = `content.ritual_link.sign_morning_note_token`) | `coach.morning_note` (the ONE derivation) → `GET /api/morning_note`, `mcp/tools_coach_packet.py` `morning_note`, `coach.coach_input_facts.coach_inputs` (every coach) | raw_timeseries | empty until the owner's first note |
+| `…SOURCE#owner_words` / `WORDS#<PT day>#<sha256(channel, prompt, text)[:12]>` | **his own words, from chat or email (#4584)** — `text` (EXACTLY as received: no trim, no copyedit, no marker removed), `date` (the PT day the words are about), `received_at` (ISO UTC instant, a field), `channel` (`chat` \| `email`), `prompt` (the question they answer, optional), `verdict` (`clean`/`held`), `hold_kinds` (kinds only — never the matched term), `off_record` (bool), `source` (`owner_words`); email rows add `week`, `q`, `source_key`. Written with `attribute_not_exists(sk)`, so a replay writes nothing twice. **No row = he said nothing through either door; a held row is stored and never served, and the served payload cannot tell it from silence (ADR-104).** Privacy: a clean entry is public by owner decision 2026-10-04 (DATA_GOVERNANCE Tier 0); a held one is never served | `mcp/tools_owner_words.py` (`log_owner_note`, channel `chat`), `emails.insight_email_parser_lambda` (each answered Story Desk question, channel `email`) — both through `content.owner_words` | `GET /api/owner_words` (`web.site_api_thirdwall`) → `/api/edition` `his_words` (`web.site_api_edition`) | raw_timeseries | empty until his first note |
 | `…SOURCE#{journal_analysis, health_check, dropbox_tracker, hevy_id_map, routine_index, email_log#<type>, google_calendar, composite_scores, sleep_unified}` | caches, trackers, sent-mail archive, dead partitions | various (email_log: email lambdas; hevy_id_map: routine_repo) | various | system_state | ✓ (email_log#daily_brief) |
 | `INGEST_HEALTH#<source>`, `CANARY#<…>`, `ALERTSTATE#<…>`, `ENTITY_REGISTRY#current`, `BEHAVIOR_REGISTRY#current`, `USER#admin#SOURCE#deletion_log` | ingest liveness, synthetic monitors, alert dedup, static registries, deletion audit | ingestion_framework, operational lambdas | freshness checker, monitors | system_state (#951 — INGEST_HEALTH#/ALERTSTATE#/registries are sks on already-classified pks; CANARY#* and `deletion_log` classified directly) | n/v |
 
@@ -267,7 +268,7 @@ The former "families NOT in the phase-taxonomy registry" gap is closed — every
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `habit_causality`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`, `flourishing`, `private_intake`, `felt_probe`, `morning_note`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `habit_causality`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`, `flourishing`, `private_intake`, `felt_probe`, `morning_note`, `owner_words`
 
 Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `weight_episodes`, `training_reference`, and `macrofactor_meals` are derived/computed partitions, not raw ingested data (the last is a recomputable projection over the raw `macrofactor` food log — see below). `evening_ritual` is reader/self-reported, not device-ingested — see below.
 
@@ -1511,6 +1512,46 @@ instruction to quote verbatim or not at all). Pair contract:
 item 3 answered "Tier 1"): the words and the day are served and may be quoted verbatim on
 Home and This week. The site half (the owner-only box on Today, the Home line) is a
 follow-up lane after the route is live.
+
+---
+
+### owner_words (#4584 — his own words, from chat or email)
+
+**SOT for:** the words the site prints as his own (`/api/edition`'s `his_words`, ahead of the
+`/api/decisions` note). Owner decision 2026-10-04: he supplies them "either via email or my
+claude chat program", and a clean note is public.
+
+**Data source:** the owner, through two doors, both writing through `lambdas/content/owner_words.py`:
+- **chat** — the MCP tool `log_owner_note` (`mcp/tools_owner_words.py`): `text` (required, verbatim),
+  optional `prompt`, `off_record`, `date` (default PT today; never after it).
+- **email** — his reply to the Story Desk's Monday questions (`[SQ-W<n>]`, #4546), via
+  `insight-email-parser`: one entry per ANSWERED question, the question as `prompt`, the answer as typed
+  (`story_questions.parse_reply(..., keep_raw=True)`'s `raw`: his lines and the newlines between them, the
+  `Q2:` label removed, nothing else). The chronicle's `STORYQA#W` row is written first and unchanged.
+
+**Key:** `pk = USER#matthew#SOURCE#owner_words`, `sk = WORDS#YYYY-MM-DD#<sha256(channel, prompt, text)[:12]>`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string | His words EXACTLY as received — never trimmed, copyedited or stripped of a marker |
+| `date` | string | The Pacific day the words are about (the sk's day) |
+| `received_at` | string | ISO-8601 UTC instant the store received them (a field, never part of the key) |
+| `channel` | string | `chat` or `email` |
+| `prompt` | string | The question the words answer — optional; screened with the words, since it is served beside them |
+| `verdict` | string | `clean` or `held` — a hit, an off-record marker or flag, tool-call residue, more than 4,000 characters, or an unloadable vocabulary holds |
+| `hold_kinds` | list | The KIND of each hold (`vice`, `pii`, `real_name`, `off_record`, `tool_call_residue`, `too_long`, `filter_unavailable`) — never the matched term |
+| `off_record` | bool | He marked it so (the flag, or "off record"/"OTR" in the text) — stored, never served |
+| `source` | string | Always `"owner_words"` |
+| `week`, `q`, `source_key` | number/number/string | Email rows only: the Story Desk week, the question number, the inbound message's S3 key |
+
+**Idempotency:** `attribute_not_exists(sk)` on a content-hash key — a replayed tool call or a redelivered
+email returns the entry already stored and writes nothing. **Absence semantics at birth (ADR-104/154):** no
+row = nothing said; a failed read is `read_failed` (the route answers 503; the edition block is
+`unavailable`), never silence. Silence prints as "Nothing in his own words yet." and is never filled.
+
+**Consumers:** `GET /api/owner_words` (re-screens every entry, then the Third Wall's all-or-nothing verbatim
+rule; up to the 10 newest served entries: `text`, `date`, `date_text`, `channel`, `prompt`) → `/api/edition`
+`his_words` (the newest entry within 7 days leads, exactly as typed, with its date and prompt).
 
 ---
 

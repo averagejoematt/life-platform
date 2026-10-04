@@ -246,6 +246,7 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "predictions": {"record"},
         "calibration": {"record"},
         "decisions": {"his_words", "life.mind"},
+        "owner_words": {"his_words", "life.mind"},  # #4584: either source failing is a failed read of his words
     }
     offenders = []
     for key, fed in feeds.items():
@@ -477,3 +478,60 @@ def test_todays_zero_training_minutes_is_not_a_day_without_training():
     past = _edition(wire)["blocks"]["week"]["data"]
     assert past["measures"]["training"]["data"]["text"] == "Trained on 5 of 6 days recorded."
     assert {"label": "Training", "text": "No training recorded."} in past["detail"][1]["facts"]
+
+
+# ── #4584: his own words — the owner-words store leads, the decisions note is the fallback ──
+#
+# tests/fixtures/edition_wire_4582/owner_words.json is the route's SILENCE body (the store had no
+# entry when the fixture was cut; the route was not yet deployed, so it is the handler's own output,
+# pinned to the handler below — not a live capture).
+
+
+def _owner_words(*entries):
+    return {"state": "ok" if entries else "absent", "entries": list(entries), "count": len(entries), "sentence": None}
+
+
+def _entry(text, day, prompt=None, channel="chat"):
+    return {"text": text, "date": day, "date_text": "", "channel": channel, "prompt": prompt}
+
+
+def test_the_owner_words_fixture_is_the_routes_own_silence_body():
+    from content import owner_words as _ow
+
+    body = _json.load(open(os.path.join(_WIRE, "owner_words.json"), encoding="utf-8"))
+    body.pop("_meta")
+    assert body == _ow.public_view([])
+
+
+def test_a_fresh_owner_note_leads_his_words_exactly_as_typed_with_its_date_and_prompt():
+    wire = _wire()
+    typed = "  honestly tired —  but still here,, and the walk helped  "
+    wire["owner_words"] = _owner_words(_entry(typed, "2026-10-02", prompt="How did the week feel?"), _entry("older", "2026-09-30"))
+    block = _edition(wire)["blocks"]["his_words"]
+    assert block["state"] == "ok" and block["source"] == "/api/owner_words" and block["as_of"] == "2026-10-02"
+    assert block["data"]["text"] == typed, "served byte for byte: no trim, no tidy"
+    assert block["data"]["prompt"] == "How did the week feel?" and block["data"]["date_text"] == "Friday, October 2"
+    mind = _edition(wire)["blocks"]["life"]["data"]["rows"]["mind"]
+    assert mind["state"] == "ok" and mind["as_of"] == "2026-10-02"
+
+
+def test_silence_or_an_old_owner_note_falls_back_to_the_decisions_note():
+    """Mutation control: with no served entry (silence and a held entry are the same payload), or with
+    only an entry older than the decisions note, the block is exactly what the decisions note alone says."""
+    baseline = _edition(_wire())["blocks"]["his_words"]
+    assert baseline["source"] == "/api/decisions"
+    for owner in (_owner_words(), _owner_words(_entry("very old words", "2026-09-01"))):
+        wire = _wire()
+        wire["owner_words"] = owner
+        assert _edition(wire)["blocks"]["his_words"] == baseline
+
+
+def test_a_stale_owner_note_newer_than_the_decisions_note_is_served_dated():
+    wire = _wire()
+    note_day = _edition(wire)["blocks"]["his_words"]["as_of"]
+    newer = "2026-09-25"
+    assert newer > note_day
+    wire["owner_words"] = _owner_words(_entry("words from last week", newer))
+    block = _edition(wire)["blocks"]["his_words"]
+    assert block["state"] == "stale" and block["source"] == "/api/owner_words" and block["data"]["text"] == "words from last week"
+    assert block["absent_text"] == "Nothing new in his own words since Friday, September 25."
