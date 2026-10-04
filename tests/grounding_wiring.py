@@ -325,6 +325,23 @@ SURFACES = {
             "night": _NO_NIGHT_MAP,
         },
     ),
+    # #4583: the board's daily moves (COACH#eli_marsh / MOVES#), served as
+    # /api/coaching-dashboard.moves and the edition's coach lines. `check_line` judges every
+    # line against the day's ONE fact sheet: exact number allow-list with the unit-voids-benign
+    # rule, dates and freshness here, plus served-fact, reader-check, restatement and
+    # metric-binding refusals of its own. coach_moves.py (the invoke site) delegates here.
+    "lambdas/coach/coach_moves_sheet.py::check_line": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": _THIRD_PERSON_SURFACE,
+            "night": (
+                "not armed, same residual as the lead read it inherits from: the sheet's recovery / heart-rate "
+                "variability / sleep figures are the lead read's cited block (web.vitals_resolver, each with its own "
+                "as-of date), not a night-keyed map of stored whoop rows; passing a guessed map would flag every vitals "
+                "figure. Arming waits on the lead read citing the night map (#4188's own residual)."
+            ),
+        },
+    ),
     # #4188: the head coach's DAILY lead read (COACH#eli_marsh / LEAD_DAILY#), served as
     # /api/coaching-dashboard.lead_daily and the coaching door's first read. Every figure is
     # pre-computed into a `cited` block; `check()` refuses any number token not in it (exact,

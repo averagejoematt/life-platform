@@ -19,6 +19,13 @@ date or a stale "Day N"/starting-weight framing, and this text is published to
 generated/coach_daily.json and rendered on the coach pages. `_grounding_findings`
 is the registered surface (tests/grounding_wiring.py) and arms the numbers, dates
 and freshness classes; both checks are fail-closed and both must pass.
+
+#4583 — this job also writes the board's daily MOVES before the reflections: one fact
+sheet for the day built from served values, one Haiku call choosing at most three
+speakers and each one's move, one Sonnet call per chosen coach, every line refused in
+code unless it is a move grounded on the sheet, and two opposed lines opening a dated
+Dispute Docket bet. The whole stage is `coach.coach_moves`; `{"force_moves": true}` in
+the event re-runs it on a day whose row already exists.
 """
 
 import json
@@ -29,7 +36,7 @@ from datetime import datetime, timezone
 import boto3
 from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
-from coach import audience_guard, coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
+from coach import audience_guard, coach_derived_prose, coach_moves, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import er03_gate
@@ -252,6 +259,20 @@ def lambda_handler(event, context):
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     reg = persona_registry.load_registry(s3, S3_BUCKET).get("personas", {})
     today = pacific_today()
+    _voices: dict = {}
+
+    def voices(coach_id):
+        if coach_id not in _voices:
+            _voices[coach_id] = _voice(s3, (reg.get(coach_id) or {}).get("coach_config_key", coach_id))
+        return _voices[coach_id]
+
+    # #4583: the board's daily moves FIRST — one fact sheet, one cast call, at most three
+    # lines, each refused in code unless it is a move grounded on the sheet. Written to
+    # COACH#eli_marsh / MOVES#{date} before the per-coach reflections below, so a slow
+    # reflection loop can never cost the day its moves. Never raises.
+    names = {cid: (reg.get(cid) or {}).get("name") or cid for cid in persona_registry.OPERATIONAL_COACH_IDS}
+    moves = coach_moves.run(table, names=names, voices=voices, today=today, force=bool((event or {}).get("force_moves")))
+    logger.info("[coach_daily] moves: %s", moves)
 
     reflections, skipped = {}, []
     for coach_id in persona_registry.OPERATIONAL_COACH_IDS:
@@ -260,7 +281,7 @@ def lambda_handler(event, context):
         if not facts:
             skipped.append(coach_id)
             continue  # honest empty — nothing to reflect on yet
-        voice_rules, example = _voice(s3, persona.get("coach_config_key", coach_id))
+        voice_rules, example = voices(coach_id)
 
         # #2889: hash-and-reuse BEFORE any generation. The reused text was gate-passed
         # when it was written AND has just been re-gated against today (see _reuse_or_none).
@@ -295,4 +316,4 @@ def lambda_handler(event, context):
         CacheControl="max-age=3600",
     )
     logger.info("[coach_daily] wrote %d reflections, skipped %s", len(reflections), skipped)
-    return {"written": len(reflections), "skipped": skipped}
+    return {"written": len(reflections), "skipped": skipped, "moves": moves}
