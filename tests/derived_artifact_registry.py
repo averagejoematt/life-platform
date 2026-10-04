@@ -280,6 +280,17 @@ ARTIFACTS: dict[str, dict] = {
             "is written by v4_apply_chrome.py, reconciled above."
         ),
     ),
+    "scripts/v8_build_appendix.py": _builder(
+        "scripts/v8_build_appendix.py",
+        step="python3 scripts/v8_build_appendix.py, on the PR that edits scripts/v8_appendix_pages.json",
+        reason=(
+            "#4586: writes site/next/v8/appendix/index.html — the preview's one list of pages off the "
+            "usual path. Its only input is the checked-in scripts/v8_appendix_pages.json, so the PR that "
+            "edits the list is the PR that must regenerate it; tests/test_v8_appendix_4586.py::"
+            "test_the_page_is_exactly_what_the_generator_writes reds a stale or hand-edited page "
+            "byte-for-byte in the code lane, on that same PR. Not a deploy step: nothing live feeds it."
+        ),
+    ),
     "scripts/v4_build_methods.py": _builder(
         "scripts/v4_build_methods.py",
         step="deploy/sync_site_to_s3.sh",
