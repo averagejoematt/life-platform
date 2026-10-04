@@ -223,9 +223,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/coach/persona_registry.py:by_coach_config_key": (
         "#3609 box 2 widen: exercised only by tests/test_persona_registry.py (also named in docs/ADD_A_COACH.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
-    "lambdas/coach/persona_registry.py:by_short_id": (
-        "#3609 box 2 widen: exercised only by tests/test_persona_registry.py (also named in docs/ADD_A_COACH.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
     "lambdas/coach/spiral_breaker.py:is_suppressed": (
         "#3609 box 2 widen: exercised only by tests/test_spiral_breaker.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),

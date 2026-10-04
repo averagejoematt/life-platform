@@ -69,6 +69,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/coaches": "handle_coaches",
     "/api/constellation": "handle_constellation",
     "/api/content_cadence": "handle_content_cadence",  # #1972 — chronicle/podcast next-installment line
+    "/api/edition": "handle_edition",  # #4582 — the front page's one composed document (inline in _dispatch_route)
     "/api/correlations": "handle_correlations",
     "/api/current_challenge": "handle_current_challenge",
     "/api/cycle_compare": "handle_cycle_compare",
