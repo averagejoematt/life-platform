@@ -73,7 +73,7 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 )
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
@@ -999,8 +999,8 @@ def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_c
     start_w = p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = p.get("goal_weight_lbs", 185)
     total_loss = round(start_w - goal_w)
-    cal_target = p.get("calorie_target", 1800)
-    pro_target = p.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    pro_target = PLAN_DAILY_PROTEIN_MIN_G
 
     existing_texts = [h.get("hypothesis", "")[:100] for h in existing_hypotheses]
     existing_block = ""

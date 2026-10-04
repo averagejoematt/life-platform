@@ -786,6 +786,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # in ONE module and retiring the MCP second load model. Pure repo shape — a second
         # load derivation is exactly a PR's own diff.
         "test_training_load_worked_set_4075.py",
+        # #4540: an os.walk AST sweep of lambdas/ + mcp/ for a read of the profile row's
+        # calorie/protein target or a stale 1800/190 literal beside a nutrition-target name.
+        # Pure repo shape — a reintroduced profile-target read is exactly a PR's own diff.
+        "test_protein_contract.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own

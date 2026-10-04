@@ -1082,6 +1082,22 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
     ),
+    "structural::test_protein_contract.py": MutationSpec(
+        gate_id="structural::test_protein_contract.py",
+        target="tests/test_protein_contract.py",
+        detects=(
+            "a consumer under lambdas/ or mcp/ reading the profile row's nutrition target with the stale literal default — "
+            '`profile.get("calorie_target", 1800)` — instead of the plan figure generated into common/constants.py '
+            "(#4540: the row said 1,800 kcal / 190 g while the sealed plan says 1,500 / 170, and 18 modules restated it)"
+        ),
+        plants=(
+            (
+                "lambdas/emails/_census_probe_4540.py",
+                '"""probe."""\n\n\ndef targets(profile):\n    return profile.get("calorie_target", 1800)\n',
+            ),
+        ),
+        track=False,  # the guard os.walks lambdas/ + mcp/ on disk, so an untracked module is in scope
+    ),
     "structural::test_training_load_worked_set_4075.py": MutationSpec(
         gate_id="structural::test_training_load_worked_set_4075.py",
         target="tests/test_training_load_worked_set_4075.py",
@@ -1828,6 +1844,20 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "different constant spelling (e.g. `math.e ** (1.92*x)` or a named constant), and any load model that is not "
         "TRIMP-shaped at all.",
         proved_on="2026-09-23",
+    ),
+    "structural::test_protein_contract.py": _proof(
+        "structural::test_protein_contract.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 5 passed in 3.24s | mutated: 1 failed, 4 passed in 3.18s "
+        ":: tests/test_protein_contract.py::test_no_consumer_reads_the_profile_targets_or_retypes_them | reverted: 5 passed in 3.18s",
+        "Covers the SET: every .py under lambdas/ and mcp/ on disk (os.walk, so an untracked module is in scope), parsed to an AST. "
+        'Two shapes red it: a `.get("calorie_target" | "protein_target_g")` off a profile-named receiver or with a numeric '
+        "default, and a 1800 / 190 numeric literal whose call, keyword, dict pair or statement names a nutrition target. Run against "
+        "origin/main at 83f3bd53e the same detector returned 86 findings across 18 modules (the six the issue named plus twelve). "
+        'STILL INVISIBLE, stated: a profile target read through a helper (`_num(row, "calorie_target")`, `row["calorie_target"]`) '
+        "off a receiver not named for the profile; a wrong figure that is neither 1800 nor 190 (mcp/tools_nutrition.py's 180 g and "
+        "owner_redlines' 180 / 200 are a different authority and are not held here); a figure inside prose or a prompt string; and "
+        "PROTEIN_FLOOR reads of the row's `protein_floor_g` (it agrees with the plan today, and coach/lead_daily_read.py still reads it).",
+        proved_on="2026-10-03",
     ),
     "structural::test_training_load_worked_set_4075.py": _proof(
         "structural::test_training_load_worked_set_4075.py",

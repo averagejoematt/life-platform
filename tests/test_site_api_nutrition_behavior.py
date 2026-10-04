@@ -364,15 +364,16 @@ def test_a_real_adherence_rate_is_still_published_when_protein_was_logged():
 # ── #2337: both branches read the configured protein lines ────────────────────
 
 
-def test_the_empty_state_serves_the_configured_protein_lines_not_the_defaults(monkeypatch):
+def test_the_empty_state_serves_the_same_plan_protein_line_the_populated_state_does(monkeypatch):
     """The empty branch used to hardcode 190/170 in three places while the populated
     branch read the profile, so the two states could state different targets for the
-    same field — and with the source quiet, the hardcoded one was the live one."""
+    same field — and with the source quiet, the hardcoded one was the live one.
+    #4540: both branches now carry the plan's floor; the profile row is not read."""
     monkeypatch.setattr(nut, "_get_profile", lambda: {"protein_target_g": 205, "protein_floor_g": 185})
     body = overview(FakeSources())
-    assert body["nutrition"]["protein_target_g"] == 205
-    assert body["nutrition"]["protein_floor_g"] == 185
-    assert body["loss_rate"]["protein_floor_g"] == 185, "the loss_rate copy drifted independently"
+    assert body["nutrition"]["protein_target_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G
+    assert body["nutrition"]["protein_floor_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G
+    assert body["loss_rate"]["protein_floor_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G, "the loss_rate copy drifted independently"
 
 
 def test_both_branches_agree_on_the_protein_lines_for_one_profile(monkeypatch):
@@ -508,20 +509,21 @@ def test_a_logged_zero_calorie_fast_day_is_reported_as_zero_not_as_unlogged():
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_protein_target_and_floor_come_from_the_profile_not_from_literals(monkeypatch):
-    """One protein story on every door: the serving layer must publish whatever
-    canonical_facts' producer wrote, so a profile change moves every surface."""
+def test_the_protein_target_and_floor_come_from_the_plan_not_the_profile_row(monkeypatch):
+    """One protein story on every door (#4540): the serving layer publishes the plan's
+    floor on both lines — the same generated constant canonical_facts' producer writes —
+    whatever the profile row says."""
     monkeypatch.setattr(nut, "_get_profile", lambda: {"protein_target_g": 205, "protein_floor_g": 185})
     n = overview(FakeSources(macrofactor=[mf("2026-05-06", total_protein_g=190)]))["nutrition"]
-    assert n["protein_target_g"] == 205
-    assert n["protein_floor_g"] == 185
+    assert n["protein_target_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G
+    assert n["protein_floor_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G
 
 
-def test_a_missing_profile_falls_back_to_the_documented_190_target_and_170_floor(monkeypatch):
+def test_a_missing_profile_changes_nothing_about_the_plan_protein_line(monkeypatch):
     monkeypatch.setattr(nut, "_get_profile", lambda: {})
     n = overview(FakeSources(macrofactor=[mf("2026-05-06", total_protein_g=190)]))["nutrition"]
-    assert n["protein_target_g"] == 190
-    assert n["protein_floor_g"] == 170
+    assert n["protein_target_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G
+    assert n["protein_floor_g"] == nut.PLAN_DAILY_PROTEIN_MIN_G
 
 
 def test_protein_target_is_hit_at_exactly_the_target_not_only_above_it():
@@ -532,8 +534,9 @@ def test_protein_target_is_hit_at_exactly_the_target_not_only_above_it():
     assert n["protein_hit_pct"] == 100
 
 
-def test_the_floor_is_graded_separately_and_more_days_clear_the_floor_than_the_target():
-    # 4 days: 200, 180, 175, 160  → target 190: 1 hit (25%); floor 170: 3 hits (75%)
+def test_the_floor_and_the_target_grade_the_same_plan_line():
+    # 4 days: 200, 180, 175, 160  → the plan's one line, 170: 3 hits (75%) on BOTH fields (#4540 —
+    # the 190 "stretch target" that used to grade 1 of 4 was the profile row's, never the plan's)
     src = FakeSources(
         macrofactor=[
             mf("2026-05-05", total_protein_g=200),
@@ -543,8 +546,8 @@ def test_the_floor_is_graded_separately_and_more_days_clear_the_floor_than_the_t
         ]
     )
     n = overview(src)["nutrition"]
-    assert n["protein_hit_days"] == 1
-    assert n["protein_hit_pct"] == 25
+    assert n["protein_hit_days"] == 3
+    assert n["protein_hit_pct"] == 75
     assert n["protein_floor_hit_days"] == 3
     assert n["protein_floor_hit_pct"] == 75
 
@@ -1009,7 +1012,7 @@ def test_potassium_sufficiency_is_read_from_the_most_recent_day():
 
 
 def test_lean_mass_grounds_the_protein_target_in_grams_per_kilo_of_lean_mass():
-    # 150 lb lean = 68.0388 kg. target 190 g / 68.0388 = 2.7925... -> 2.79
+    # 150 lb lean = 68.0388 kg. the plan's 170 g floor / 68.0388 = 2.4986... -> 2.5
     # Helms floor 2.3 g/kg -> 68.0388 * 2.3 = 156.489 -> 156
     src = FakeSources(
         macrofactor=[mf("2026-05-06", total_calories_kcal=2000)],
@@ -1018,7 +1021,7 @@ def test_lean_mass_grounds_the_protein_target_in_grams_per_kilo_of_lean_mass():
     lm = overview(src)["lean_mass"]
     assert lm["lean_mass_lb"] == 150.0
     assert lm["lean_mass_kg"] == 68.0
-    assert lm["target_g_per_kg_lean"] == 2.79
+    assert lm["target_g_per_kg_lean"] == round(nut.PLAN_DAILY_PROTEIN_MIN_G / (150 * 0.453592), 2)
     assert lm["floor_g_per_kg_lean"] == 2.3
     assert lm["floor_protein_g"] == 156
 

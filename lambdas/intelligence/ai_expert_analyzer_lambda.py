@@ -157,7 +157,10 @@ def _latest_item(source):
     return strava_read_seam(source, items[0] if items else None)
 
 
-from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import (
+    EXPERIMENT_START_DATE as EXPERIMENT_START,  # ADR-058
+    PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
+)
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
 _CANON_FACTS_CACHE: dict[str, Any] = {}
@@ -325,10 +328,9 @@ def gather_data_for_expert(expert_key):
         avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
         avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None
         avg_fiber = round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None
-        # Phase-3: target from the canonical facts (computed_metrics), not a hardcoded 190
-        # that drifts from scoring_engine/profile. avg_pro is the real intake (~140).
-        _facts = _load_canonical_facts()
-        protein_target = int(_facts.get("protein_g_target") or 190)
+        # #4540: the plan's floor (generated from the plan root), the same figure scoring_engine
+        # and canonical_facts carry — not the profile row, not a stored copy of it.
+        protein_target = PLAN_DAILY_PROTEIN_MIN_G
         adherence = round(sum(1 for v in pro_vals if v >= protein_target) / len(pro_vals) * 100) if pro_vals else None
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
@@ -1372,7 +1374,7 @@ def generate_synthesis(all_coach_outputs):
     _f = _load_canonical_facts()
     _fact_bits = []
     if _f.get("protein_g_avg") is not None:
-        _fact_bits.append(f"protein intake avg {_f['protein_g_avg']:g} g (target {int(_f.get('protein_g_target') or 190)} g)")
+        _fact_bits.append(f"protein intake avg {_f['protein_g_avg']:g} g (plan floor {PLAN_DAILY_PROTEIN_MIN_G} g)")
     if _f.get("recovery_pct") is not None:
         _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
     if _f.get("hrv_ms") is not None:

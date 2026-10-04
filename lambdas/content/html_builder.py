@@ -10,7 +10,12 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import (
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
+    PLAN_DAILY_CALORIES_TARGET,
+    PLAN_DAILY_PROTEIN_MIN_G,
+)  # ADR-058
 from common.digest_utils import compute_confidence
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 from health.scoring_engine import habitify_reading  # #4362
@@ -919,8 +924,8 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         carbs = safe_float(mf, "total_carbs_g")
         fiber = safe_float(mf, "total_fiber_g")
 
-        cal_target = profile.get("calorie_target", 1800)
-        protein_target = profile.get("protein_target_g", 190)
+        cal_target = PLAN_DAILY_CALORIES_TARGET
+        protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
         if cals is not None:
             cal_pct = round(cals / cal_target * 100) if cal_target else 0

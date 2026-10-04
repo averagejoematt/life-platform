@@ -16,6 +16,7 @@ from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from health import (
     nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
     nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
@@ -49,12 +50,6 @@ _RDO_IMPACT_R = 0.15
 _TARGET_RATE_LB_WK = 3
 _KCAL_PER_LB = 3500
 _REQUIRED_DEFICIT_KCAL = round(_TARGET_RATE_LB_WK * _KCAL_PER_LB / 7)  # 1500
-
-# Last-resort protein lines, used ONLY when canonical_facts carries a value that will not
-# coerce. The authoritative default lives in the `_prof.get(<key>, <default>)` call itself,
-# whose literal shape tests/test_protein_contract.py pins against the producer.
-_PROTEIN_TARGET_FALLBACK_G = 190.0
-_PROTEIN_FLOOR_FALLBACK_G = 170.0
 
 
 def _num(v):
@@ -285,32 +280,16 @@ def nutrition_overview(*, _g) -> dict:
     d30 = _experiment_date(30)
     d7 = _experiment_date(7)
 
-    # One protein story on every door: target (stretch) and floor (graded) are the
-    # SAME profile values daily_metrics_compute writes into canonical_facts
-    # (protein_g_target/protein_g_floor). This page used to hardcode 190 and call it
-    # the "floor" while the coaches graded against the real 170 floor — a reader
-    # crossing doors saw two truths.
-    # #2221: coerced through `_num` like every other read — a non-numeric
-    # protein_target_g in canonical_facts used to 500 the whole nutrition door rather
-    # than fall back to the documented default. Found by the derived AST guard in
-    # tests/test_site_api_nutrition_behavior.py, not by any marker.
+    # One protein story on every door (#4540): the plan root states ONE protein line — a
+    # floor — and this door, daily_metrics_compute (canonical_facts' protein_g_target /
+    # protein_g_floor) and every email read the SAME generated constant. The profile row's
+    # separate stretch "target" was never the plan and is no longer read anywhere; both
+    # served fields stay (the front-end reads both) and carry the plan's figure.
     #
-    # #2337: read ABOVE the empty-branch return, so the genesis/no-data branch serves
-    # the same configured numbers the populated branch does. It used to hardcode 190
-    # and 170 in three further places below; with MacroFactor quiet (#2326) the empty
-    # branch is the LIVE branch, so those copies were the ones a reader actually saw.
-    #
-    # The `.get("<key>", <default>)` LITERAL shape is load-bearing:
-    # tests/test_protein_contract.py regex-matches key+default here against
-    # daily_metrics_compute's producer so the doors cannot tell two protein truths
-    # again. Keep the literal; add the guard around it, never instead of it.
-    _prof = _get_profile()
-    protein_target = _num(_prof.get("protein_target_g", 190))
-    if protein_target is None:
-        protein_target = _PROTEIN_TARGET_FALLBACK_G
-    protein_floor = _num(_prof.get("protein_floor_g", 170))
-    if protein_floor is None:
-        protein_floor = _PROTEIN_FLOOR_FALLBACK_G
+    # #2337: set ABOVE the empty-branch return, so the genesis/no-data branch serves the
+    # same numbers the populated branch does. tests/test_protein_contract.py holds the SET
+    # of readers to the constant, not this one site.
+    protein_target = protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -711,8 +690,7 @@ def nutrition_overview(*, _g) -> dict:
         "deficit_published": deficit_published,
         "trend_check": trend_check,
         "protein_hit_pct": protein_hit_pct,
-        # The floor (170) is what "the protein floor holds" language grades against —
-        # the target (190) is the stretch line, not the floor.
+        # The plan's floor is what "the protein floor holds" language grades against.
         "protein_floor_hit_pct": floor_hit_pct,
         "protein_floor_g": protein_floor,
     }

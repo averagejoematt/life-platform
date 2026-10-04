@@ -325,7 +325,7 @@ def test_packet_calendar_block_covers_the_window_and_the_genesis():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_packet_profile_lines_prefer_profile_over_fallbacks():
+def test_packet_profile_lines_prefer_profile_over_fallbacks_except_the_plan_targets():
     data = _empty_data(start=GENESIS, end="2026-08-09")
     data["profile"] = {
         "journey_start_date": GENESIS,
@@ -340,7 +340,10 @@ def test_packet_profile_lines_prefer_profile_over_fallbacks():
     assert "Journey start weight: 331.0 lbs" in text
     assert "Goal weight: 199 lbs" in text
     assert "Age: 41" in text
-    assert "Targets: 2100 cal, 205g protein" in text
+    # #4540: the nutrition targets are the PLAN's — the profile row's copies (1,800 / 190 live,
+    # 2100 / 205 here) are not read, whatever they say.
+    assert f"Targets: {cd.PLAN_DAILY_CALORIES_TARGET} cal, {cd.PLAN_DAILY_PROTEIN_MIN_G}g protein" in text
+    assert "2100" not in text and "205g" not in text
 
 
 def test_packet_profile_falls_back_when_fields_are_absent():
@@ -351,7 +354,7 @@ def test_packet_profile_falls_back_when_fields_are_absent():
     assert f"Journey start weight: {cd.EXPERIMENT_BASELINE_WEIGHT_LBS} lbs" in text
     assert "Goal weight: 185 lbs" in text
     assert "Age: 37" in text
-    assert "Targets: 1800 cal, 190g protein" in text
+    assert f"Targets: {cd.PLAN_DAILY_CALORIES_TARGET} cal, {cd.PLAN_DAILY_PROTEIN_MIN_G}g protein" in text
 
 
 def test_packet_weight_story_uses_the_in_window_anchor_not_the_30_day_read():

@@ -1125,13 +1125,13 @@ def test_nutrition_macro_grid_arithmetic():
     mf = {"total_calories_kcal": 1480, "total_protein_g": 185.4, "total_fat_g": 55.2, "total_carbs_g": 120.6, "total_fiber_g": 31.4}
     html = _training(data=_data(macrofactor=mf))
     assert ">1,480</p>" in html  # fmt_num
-    assert "Calories/1500" in html  # the target ships with the number
+    assert f"Calories/{hb.PLAN_DAILY_CALORIES_TARGET}" in html  # the plan's target ships with the number (#4540)
     assert ">185g</p>" in html  # round(185.4)
-    assert "Protein/190g" in html
+    assert f"Protein/{hb.PLAN_DAILY_PROTEIN_MIN_G}g" in html
     assert ">55g</p>" in html and ">121g</p>" in html  # round(55.2), round(120.6)
     assert "Fiber: 31g" in html
     # cal_pct = round(1480 / 1500 * 100) = round(98.67) = 99 -> inside 85..110 -> green
-    # prot_pct = round(185.4 / 190 * 100) = round(97.58) = 98 -> >= 95 -> green
+    # prot_pct = round(185.4 / 170 * 100) = round(109.06) = 109 -> >= 95 -> green
     assert html.count("#22c55e") >= 2
 
 
@@ -2037,7 +2037,9 @@ _DEGRADE_CASES = [
     ("Scorecard", lambda: _scorecards(component_scores={"sleep_quality": "eighty"})),
     ("Essential Seven", lambda: _scorecards(component_details={"habits_mvp": {}}, profile=_profile(habit_registry={"A": 5}))),
     ("Training Report", lambda: _training(data=_data(strava={"activities": [{"moving_time_seconds": "1200"}]}))),
-    ("Nutrition Report", lambda: _training(data=_data(macrofactor={"total_calories_kcal": 1480}), profile=_profile(calorie_target="x"))),
+    # #4540: the calorie target is a generated constant now, so a bad PROFILE value can no longer
+    # break this section; the remaining unguarded shape is a non-string nutritionist note.
+    ("Nutrition Report", lambda: _training(data=_data(macrofactor={"total_calories_kcal": 1480}), training_nutrition={"nutrition": 1234})),
     ("Habits Deep-Dive", lambda: _training(data=_data(habitify={"habits": {}}), profile=_profile(habit_registry={"A": 5}))),
     ("Supplements", lambda: _training(data=_data(supplements_today={"supplements": [None]}))),
     ("CGM Spotlight", lambda: _training(data=_data(apple={"blood_glucose_avg": 96}, apple_7d=[1, 2, 3]))),

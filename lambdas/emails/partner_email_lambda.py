@@ -39,7 +39,12 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import (
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
+    PLAN_DAILY_CALORIES_TARGET,
+    PLAN_DAILY_PROTEIN_MIN_G,
+)  # ADR-058
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -249,8 +254,8 @@ def gather_all():
     # ── Nutrition ──
     cals = [safe_float(r, "total_calories_kcal") for r in raw["macrofactor"].values() if safe_float(r, "total_calories_kcal")]
     prots = [safe_float(r, "total_protein_g") for r in raw["macrofactor"].values() if safe_float(r, "total_protein_g")]
-    cal_target = profile.get("calorie_target", 1800)
-    prot_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    prot_target = PLAN_DAILY_PROTEIN_MIN_G
     cal_hit_rate = round(sum(1 for c in cals if c <= cal_target * 1.1) / len(cals) * 100) if cals else None
     prot_hit_rate = round(sum(1 for p in prots if p >= prot_target) / len(prots) * 100) if prots else None
     days_logged = len(raw["macrofactor"])
