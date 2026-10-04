@@ -462,7 +462,8 @@ def inference_receipt() -> dict:
             "unpriced_features": sum(1 for f in features if f["month_est_cost_usd"] is None),
             # The one genuinely unattributable slice, named rather than hidden:
             # bedrock_client.feature_name() falls back to "unknown" when no Lambda name
-            # resolves and the context label is not allowlisted — a local or MCP session.
+            # resolves, the context label is not allowlisted and the caller is not a
+            # workstation. Since #4589 a workstation call is booked to "dev-session" instead.
             "unattributed_label": "unknown",
             "unattributed_usd": unattributed,
             "note": (
@@ -472,9 +473,10 @@ def inference_receipt() -> dict:
                 f"meter — the models/features ratio above must stay under {_DRIFT_RATIO_BAR}, the same bar "
                 "the cost-metric-drift-sustained alarm uses (#2883). One row is one Lambda, not one "
                 "budget-guard feature: several features can share an emitter, which is why the "
-                "per-feature budget ledger leaves those rows ungraded. Calls made outside a Lambda "
-                "(a local or MCP session) carry no function name and land in the 'unknown' row rather "
-                "than being dropped or reassigned."
+                "per-feature budget ledger leaves those rows ungraded. Calls made from a workstation "
+                "(a development session, such as rebuilding the season by hand) carry no function name "
+                "and are booked to the 'dev-session' row; any other call with no name lands in the "
+                "'unknown' row. Neither is dropped or reassigned."
             ),
         }
         note = (

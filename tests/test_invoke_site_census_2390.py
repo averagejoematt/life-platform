@@ -259,6 +259,14 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         "generation that is gated there, not an unregistered one.",
         gated_by="lambdas/coach/coach_chat_grounding.py::build_grounder",
     ),
+    "lambdas/coach/coach_moves.py": _ex(
+        DELEGATED_GATED,
+        "the board's daily moves (#4583): one Haiku cast call whose JSON is admitted in code (roster, sidelined coaches, move rules, "
+        "the docket's criterion gate) and never served, and one Sonnet call per chosen coach whose line is stored ONLY after "
+        "coach_moves_sheet.check_line passes it (numbers, dates, freshness, served facts, reader checks, restatement); a refused "
+        "line is held and the coach is silent.",
+        gated_by="lambdas/coach/coach_moves_sheet.py::check_line",
+    ),
     "lambdas/coach/telegram_group.py": _ex(
         DELEGATED_GATED,
         "the board room (epic #2363) — the group-chat half of the same Telegram transport, split out of the worker for its size "

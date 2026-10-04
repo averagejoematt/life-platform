@@ -165,6 +165,9 @@ def _drive(monkeypatch, entry, generate_should_run):
     monkeypatch.setattr(writer.persona_registry, "load_registry", lambda *a, **kw: {"personas": {"sleep_coach": PERSONA}})
     monkeypatch.setattr(writer, "_gather_facts", lambda *a, **kw: FACTS)
     monkeypatch.setattr(writer, "_voice", lambda *a, **kw: (VOICE, EXAMPLE))
+    # #4583: the moves stage runs first in the same handler; this file proves the reflection
+    # reuse path, so the stage is stubbed (its own offline tests are test_coach_moves_4583.py).
+    monkeypatch.setattr(writer.coach_moves, "run", lambda *a, **kw: {"status": "stubbed"})
     monkeypatch.setattr(writer, "_generate", _generate)
     out = writer.lambda_handler({}, None)
     return out, calls, table
@@ -220,6 +223,9 @@ def test_a_generation_that_fails_the_gate_is_never_cached(monkeypatch):
     monkeypatch.setattr(writer.persona_registry, "load_registry", lambda *a, **kw: {"personas": {"sleep_coach": PERSONA}})
     monkeypatch.setattr(writer, "_gather_facts", lambda *a, **kw: FACTS)
     monkeypatch.setattr(writer, "_voice", lambda *a, **kw: (VOICE, EXAMPLE))
+    # #4583: the moves stage runs first in the same handler; this file proves the reflection
+    # reuse path, so the stage is stubbed (its own offline tests are test_coach_moves_4583.py).
+    monkeypatch.setattr(writer.coach_moves, "run", lambda *a, **kw: {"status": "stubbed"})
     monkeypatch.setattr(writer, "_generate", lambda *a, **kw: fabricated)
     out = writer.lambda_handler({}, None)
     assert out["skipped"] == ["sleep_coach"]

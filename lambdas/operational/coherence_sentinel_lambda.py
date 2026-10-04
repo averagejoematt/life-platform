@@ -68,6 +68,7 @@ _s3 = boto3.client("s3", region_name=REGION)
 # All three rosters below are derived from the canonical persona registry, never
 # re-typed (#2334; guard: tests/test_coach_roster_set_guard_2334.py) — this file
 # held THREE hand-typed copies, two of them in different orders.
+from coach import narrative_cadence  # #4589: the twice-weekly narrative cadence (fresh floor below)
 from coach.persona_registry import OPERATIONAL_COACH_IDS, OPERATIONAL_SHORT_IDS
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
@@ -236,7 +237,10 @@ def _gather_facts_and_narratives():
     # by the PT generation day, so the UTC frame called PT-today's row "yesterday's"
     # every PT evening and routed it into the #2792 stale-served branch below.
     _now = pacific_time.pacific_now()
-    _fresh_floor = (_now - timedelta(days=1)).strftime("%Y-%m-%d")
+    # #4589: the V2 coach narratives are written twice a week, so the newest one is up to
+    # `max_gap_days()` old BY DESIGN (4 for Monday/Thursday). A 1-day floor would drop them from
+    # coverage on every off day; the #2792 own-day override below keeps the wider window honest.
+    _fresh_floor = (_now - timedelta(days=narrative_cadence.max_gap_days())).strftime("%Y-%m-%d")
     _today = _now.strftime("%Y-%m-%d")
     _own_day_cache: dict = {}
     # The served coach essays + the integrator synthesis.
@@ -267,7 +271,7 @@ def _gather_facts_and_narratives():
                         facts_overrides[f"expert:{key}"] = {"facts": _own_day_cache[_gen_day], "as_of": _gen_day}
     # ADR-104: the V2 operational-coach narratives (daily brief) — previously the
     # highest-traffic coach surface with NO Sentinel coverage. Latest OUTPUT# per
-    # coach, but only if served today/yesterday: the facts are the LATEST record,
+    # coach, but only if served within the cadence's gap (#4589): the facts are the LATEST record,
     # so checking an old narrative against new facts would manufacture false
     # contradictions (the day-boundary-skew lesson).
     for coach_id in V2_COACHES:

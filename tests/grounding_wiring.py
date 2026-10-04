@@ -325,6 +325,23 @@ SURFACES = {
             "night": _NO_NIGHT_MAP,
         },
     ),
+    # #4583: the board's daily moves (COACH#eli_marsh / MOVES#), served as
+    # /api/coaching-dashboard.moves and the edition's coach lines. `check_line` judges every
+    # line against the day's ONE fact sheet: exact number allow-list with the unit-voids-benign
+    # rule, dates and freshness here, plus served-fact, reader-check, restatement and
+    # metric-binding refusals of its own. coach_moves.py (the invoke site) delegates here.
+    "lambdas/coach/coach_moves_sheet.py::check_line": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": _THIRD_PERSON_SURFACE,
+            "night": (
+                "not armed, same residual as the lead read it inherits from: the sheet's recovery / heart-rate "
+                "variability / sleep figures are the lead read's cited block (web.vitals_resolver, each with its own "
+                "as-of date), not a night-keyed map of stored whoop rows; passing a guessed map would flag every vitals "
+                "figure. Arming waits on the lead read citing the night map (#4188's own residual)."
+            ),
+        },
+    ),
     # #4188: the head coach's DAILY lead read (COACH#eli_marsh / LEAD_DAILY#), served as
     # /api/coaching-dashboard.lead_daily and the coaching door's first read. Every figure is
     # pre-computed into a `cited` block; `check()` refuses any number token not in it (exact,
@@ -833,6 +850,14 @@ SURFACE_FACETS = {
         "Fail-closed: `run` regenerates once when `check()` returns reasons and, if any survive, returns `held` before "
         "the write — nothing is stored, and the door falls back to its existing chain. A quality-gate regeneration must "
         "re-pass the same check or it is discarded.",
+    ),
+    "lambdas/coach/coach_moves_sheet.py::check_line": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "lambdas/coach/coach_moves.py::run@reasons",
+        "The board's daily moves are served as /api/coaching-dashboard.moves and the edition's coach lines. Fail-closed: "
+        "`coach_moves.run` regenerates a refused line once with the reasons named and, if any survive, records the coach in "
+        "`held` and stores no line for it — that coach is silent today. Nothing refused is written to the served `lines`.",
     ),
     "lambdas/compute/coach_memoir_lambda.py::gate_check": _facet(
         PUBLIC,
