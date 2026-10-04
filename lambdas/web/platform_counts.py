@@ -45,7 +45,7 @@ GUARDS (all of which still red on a genuinely wrong count):
 # number does NOT belong in this file, it belongs in PLATFORM_STATS.
 DISCOVERED_COUNTS = {
     "data_sources": 20,
-    "mcp_tools": 86,
+    "mcp_tools": 87,
     "lambdas": 106,
     "alarms": 129,
     "cdk_stacks": 10,

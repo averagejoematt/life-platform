@@ -1978,6 +1978,20 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/content/owner_words.py",
+      "partition": "owner_words",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/owner_words.py",
+      "partition": "owner_words",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/content/recap_data.py",
       "partition": "computed_metrics",
       "via": "local-seam"
@@ -7555,11 +7569,11 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 735,
+      "edges": 737,
       "lambdas": 106,
-      "mcp_tool_modules": 34,
-      "mcp_tools": 86,
-      "partitions": 113,
+      "mcp_tool_modules": 35,
+      "mcp_tools": 87,
+      "partitions": 114,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 17,
@@ -7570,8 +7584,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 359,
-        "sites_resolved": 911,
-        "sites_total": 1270
+        "sites_resolved": 913,
+        "sites_total": 1272
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8007,6 +8021,11 @@
     },
     "nutrition_review": {
       "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "owner_words": {
+      "class": "raw_timeseries",
       "ingestion": false,
       "privacy_tier": "public"
     },
