@@ -1114,6 +1114,22 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard rglobs lambdas/ + mcp/ on disk, so an untracked module is in scope
     ),
+    "structural::test_coach_count_comparison_guard_4585.py": MutationSpec(
+        gate_id="structural::test_coach_count_comparison_guard_4585.py",
+        target="tests/test_coach_count_comparison_guard_4585.py",
+        detects=(
+            "a reader-served site module that prints a coach count — here the record's own words, "
+            "`${r.confirmed} of ${r.n} checked calls right` off `by_coach` — with no coachComparison()/comparisonText() "
+            "beside it (#4585, epic #4580 rule 3: no coach number without what a simple guess would have scored)"
+        ),
+        plants=(
+            (
+                "site/assets/js/_census_probe_4585.js",
+                "export const line = (d) => `${d.by_coach.sleep.confirmed} of ${d.by_coach.sleep.n} checked calls right`;\n",
+            ),
+        ),
+        track=False,  # the guard globs site/assets/js on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1870,6 +1886,21 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "excluded, warm-ups excluded, HR-covered cardio not re-charged). STILL INVISIBLE, stated: a second lifting "
         "load term spelled with different constant names, or one that inlines its rate as a bare literal.",
         proved_on="2026-09-23",
+    ),
+    "structural::test_coach_count_comparison_guard_4585.py": _proof(
+        "structural::test_coach_count_comparison_guard_4585.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 8 passed in 1.04s | mutated: 1 failed, 7 passed in 0.89s "
+        ":: tests/test_coach_count_comparison_guard_4585.py::test_no_reader_page_shows_a_coach_count_without_its_comparison "
+        "| reverted: 8 passed in 0.95s",
+        "Covers the SET: every module under site/assets/js and every inline <script> in every served site/**/*.html (legacy/ "
+        "excluded — never linked), plus every importer of a formatter's count-bearing export (coach_today.chooseTodaysRead / "
+        "recordLine, coach_roster.rateText / rateWord / retiredSeatNote), plus a static sweep of site/**/*.html|json for a "
+        "baked-in 'K of N checked calls'. In-file mutation control: stripping the comparison call out of EVERY live compliant "
+        "member reds each one. STILL INVISIBLE, stated: the guard is per FILE, so a file that renders the comparison in one "
+        "view and a count in another is green; a count read through a field the markers do not name (a bare `.record.n`, "
+        "`c.confirmed of c.n` off /api/calibration.coaches with no other marker) is not seen; MCP tools and emails are not "
+        "reader pages and are out of scope.",
+        proved_on="2026-10-03",
     ),
 }
 

@@ -9,6 +9,7 @@ import { lineChart, dualWeight, nDots } from "/assets/js/charts.js";
 import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note, warmup } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
+import { coachComparison } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 
 export async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
 
@@ -232,7 +233,11 @@ export function renderWrong(d) {
     return `<tr><td class="rd-name">${esc(c.coach)}</td><td class="num">${fmt(c.confirmed)} of ${fmt(n)}</td><td class="num">${fmt(c.refuted)}</td><td>${c.through ? esc(fmtShort(c.through)) : "—"}</td></tr>`;
   }).join("");
   const ledger = lr
-    ? sec("The prediction ledger — every checked call, one record per coach", `<table class="rd-tbl"><thead><tr><th>coach</th><th>checked calls right</th><th>refuted</th><th>through</th></tr></thead><tbody>${lr}</tbody></table>`)
+    ? sec(
+        "The prediction ledger — every checked call, one record per coach",
+        `<table class="rd-tbl"><thead><tr><th>coach</th><th>checked calls right</th><th>refuted</th><th>through</th></tr></thead><tbody>${lr}</tbody></table>` +
+          coachComparison(pr.comparison, { cls: "correlative" }), // #4585: the ledger never appears alone
+      )
     : "";
   const mr = (pr.refuted_recent || []).map((m) =>
     `<tr class="rd-flag"><td class="rd-name">${esc(String(m.date || "").slice(0, 10))}</td><td>${esc(m.coach)}</td><td>${esc(m.what)}</td></tr>`).join("");
@@ -535,7 +540,8 @@ export function renderCalibration(d) {
     .join("");
   const board = sec(
     "The scoreboard — by coach",
-    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
+    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>` +
+      coachComparison(d && d.comparison, { cls: "correlative" }), // #4585: the scoreboard never appears alone
   );
   const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
   return _sealBlock(d && d.prereg_seal) + pair + relTbl + board + hypLine + _judgeBlock() + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
@@ -594,7 +600,9 @@ export function renderPredictions(d) {
   // The seal renders even at zero — a skeptic can verify the pre-registration
   // exists and is unedited before the first call has come due.
   if (!(o.total > 0) && !list.length) return _sealBlock(d && d.prereg_seal) + empty("No scored predictions yet — the prediction ledger restarts with each genesis rather than carrying old scores forward. Coaches log forward calls that get auto-graded against measured outcomes as target dates pass, so the track record rebuilds honestly from day one. It fills in as the first calls come due.");
-  const head = figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]);
+  const head =
+    figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]) +
+    (resolved > 0 ? coachComparison(d && d.comparison, { cls: "correlative" }) : ""); // #4585: the count never appears alone
   const badge = (s) => s === "confirmed" ? "rd-badge-live" : "";
   // #3480: a pre-registered claim carries two dates — the instant it was FROZEN
   // (pre_registered_at) and the day it grades FROM (date = genesis). Before the

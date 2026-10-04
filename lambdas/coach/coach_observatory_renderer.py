@@ -80,7 +80,10 @@ DOMAIN_COACH_MAP = {
 # `title`), so this surface now derives entirely rather than keeping its own copy.
 # `include=("operational", "retired")` keeps the retired training_coach entry
 # resolvable, for cross-coach references inside historical OUTPUT#/ENSEMBLE# records.
-from coach import coach_record  # #4220: the ONE per-coach record producer
+from coach import (
+    coach_baseline,  # #4585: what a simple guess scored on the same calls
+    coach_record,  # #4220: the ONE per-coach record producer
+)
 from coach.persona_registry import (
     OPERATIONAL_SHORT_IDS,  # #3172: the ai_analysis EXPERT# keyspace
     display_map as _registry_display_map,
@@ -498,7 +501,7 @@ def _render_coach_card(domain, include_threads=True):
     # conversation-sourced self-calibration learnings (#1481, ADR-141), shown NEXT TO the
     # record, never inside it.
     track_record = None
-    record = coach_record.for_coach(table, coach_id, genesis=EXPERIMENT_START)
+    record, comparison = coach_baseline.for_coach(table, coach_id, genesis=EXPERIMENT_START)  # #4585: one read, both
     conversation_count = 0
     try:
         cutoff = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")  # #2414: PT — sk days are Pacific
@@ -534,6 +537,8 @@ def _render_coach_card(domain, include_threads=True):
             "hit_rate_pct": round(100 * record["confirmed"] / record["n"], 0),
             "conversation_learnings": conversation_count,
             "summary": summary,
+            # #4585 / epic #4580 rule 3: the record never appears alone.
+            "comparison": comparison,
         }
 
     # ── 6c. Proactivity track record (#1382) ─────────────────────────────────

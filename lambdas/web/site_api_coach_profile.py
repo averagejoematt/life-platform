@@ -22,6 +22,7 @@ the split, and it is why nothing here imports the facade — no import cycle.
 from boto3.dynamodb.conditions import Key
 from coach import (
     audience_guard,  # #4213: the by-coach slots serve the public twin or nothing
+    coach_baseline,  # #4585: the record and what a simple guess scored, from one read
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_record,  # #4220: the ONE record producer — K of N through <day>, from the PREDICTION# ledger
@@ -138,7 +139,7 @@ def _track_record(coach_id, *, _g):
     result per prediction, and never a row that names no prediction."""
     _reader_reason = _g["_reader_reason"]
     table = _g["table"]
-    record = coach_record.for_coach(table, coach_id, genesis=_g["EXPERIMENT_START"])
+    record, comparison = coach_baseline.for_coach(table, coach_id, genesis=_g["EXPERIMENT_START"])  # #4585: one read, both
     recent = []
     seen = set()
     try:
@@ -184,6 +185,9 @@ def _track_record(coach_id, *, _g):
         "hit_rate_pct": round(confirmed / decided * 100, 1) if decided else None,
         "record": record,  # #4220: {confirmed, refuted, n, through} — None when the ledger read failed
         "headline": coach_record.headline(record),
+        # #4585 / epic #4580 rule 3: the record never appears alone — what a simple guess
+        # scored on the same calls (None only when the ledger read failed, like `record`).
+        "comparison": comparison,
         "preliminary": (decided or 0) < 12,
         "n_note": "preliminary — fewer than 12 decided predictions" if (decided or 0) < 12 else f"n={decided} decided",
         "recent": recent,
@@ -591,7 +595,7 @@ def handle_coaches(event, *, _g):
             # trail carries a docket re-recorded daily, #4216, and printed Webb "80% · n=25"
             # beside the scorecard's 0 of 5). `_track_record` still feeds the coach page's
             # self-assessed report card; it no longer feeds a headline.
-            record = coach_record.for_coach(_g["table"], pid, genesis=_g["EXPERIMENT_START"])
+            record, comparison = coach_baseline.for_coach(_g["table"], pid, genesis=_g["EXPERIMENT_START"])  # #4585: one read, both
             coaches.append(
                 {
                     "persona_id": pid,
@@ -603,6 +607,7 @@ def handle_coaches(event, *, _g):
                     "board_role": p.get("board_role"),
                     "headline_stat": coach_record.headline(record),
                     "record": record,  # {confirmed, refuted, n, through} — K of N through <day>
+                    "comparison": comparison,  # #4585: what a simple guess scored on the same calls
                     "tier": "staff",
                     "latest_checked": latest_checked.for_coach(_g["table"], pid),
                     # #4217: the coach's domain instrument ({source, datatype} or null) —
@@ -631,6 +636,7 @@ def handle_coaches(event, *, _g):
                     "board_role": lead.get("board_role"),
                     "headline_stat": "runs the program",
                     "record": None,  # #4220: no graded calls — null, never a zero record
+                    "comparison": None,  # #4585: no count, so nothing to compare
                     "tier": "lead",
                     "latest_checked": None,  # E1: the lead makes no graded calls — null, never a placeholder
                     "instrument": None,  # #4217: the lead reads the whole board; no single sensor is his

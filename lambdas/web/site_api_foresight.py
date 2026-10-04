@@ -23,7 +23,10 @@ import re
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
-from coach import coach_record  # #4220 — the ONE per-coach record producer (K of N through <day>)
+from coach import (
+    coach_baseline,  # #4585 — what a simple guess scored on the same calls
+    coach_record,  # #4220 — the ONE per-coach record producer (K of N through <day>)
+)
 from coach.prediction_grading import EWMA_PRIOR_LAG  # #4218 — the directional slope's lag, in words
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1197
 
@@ -476,8 +479,10 @@ def wrong(*, _g) -> dict:
         # row carrying the grader's reason text — joined on prediction_id; a counted
         # refutation with no learning is templated from the ledger row itself.
         ledger, recent_misses, obituaries = [], [], []
+        all_decided = []  # #4585: the comparison's row-set — every coach's counted resolutions
         for c in _WRONG_COACHES:
             record, decided = coach_record.for_coach_with_rows(table, f"{c}_coach", genesis=EXPERIMENT_START)
+            all_decided.extend(decided)
             if record and record["n"]:
                 ledger.append({"coach": c, **record})
             refuted = [row for row in decided if coach_record.graded_status(row) == "refuted"]
@@ -549,7 +554,12 @@ def wrong(*, _g) -> dict:
                     "caught_undetailed": numeric_caught,
                     "recent": catches[:25],
                 },
-                "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                "predictions": {
+                    "by_coach": ledger,
+                    "refuted_recent": recent_misses[:25],
+                    # #4585 / epic #4580 rule 3: the ledger's counts never appear alone.
+                    "comparison": coach_baseline.comparison_block(all_decided),
+                },
                 # #1377 (The Wrong Feed): one obituary card per graded failure. The
                 # headline "graded failures" count DERIVES from this list (obituary_count
                 # == len(obituaries) by construction) — the front-end renders one card per

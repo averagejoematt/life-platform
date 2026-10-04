@@ -75,6 +75,14 @@ _PROJECTION_NAMES = {
     "#ph": "phase",
     "#tomb": "tombstone",
     "#sk": "sk",
+    # #4585: what the "nothing changes" comparison (coach.coach_baseline) reads off the SAME
+    # rows the record counts — its frozen verdict, which of the four records a call is, and
+    # the stated confidence the engine's skill score uses. Never a second query.
+    "#bl": "baseline",
+    "#ev": "evaluation",
+    "#pr": "pre_registered",
+    "#src": "source",
+    "#conf": "confidence",
 }
 
 

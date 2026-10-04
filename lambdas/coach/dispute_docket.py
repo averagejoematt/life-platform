@@ -93,6 +93,8 @@ from botocore.exceptions import ClientError
 from common.constants import EXPERIMENT_START_DATE  # the void rule's genesis (#4216); a re-anchor ships in every bundle (#781)
 from common.numeric import decimals_to_float, floats_to_decimal  # the ONE canonical walker pair (#1207)
 
+from coach import coach_baseline  # #4585 — the "nothing changes" rule beside each docket grade
+
 logger = logging.getLogger("dispute-docket")
 logger.setLevel(logging.INFO)
 
@@ -620,7 +622,7 @@ def _write_docket_learning(coach_id, today_str, docket, outcome, concession=None
     return _put_unique(item, "docket LEARNING#")
 
 
-def _write_docket_prediction(coach_id, docket, outcome, actual, today_str):
+def _write_docket_prediction(coach_id, docket, outcome, actual, today_str, baseline=None):
     """A resolved PREDICTION# record — the docket position enters the coach's
     Brier scoreboard through calibration_core like every other graded call.
     Written ALREADY RESOLVED (status confirmed/refuted), so the evaluator's
@@ -650,6 +652,10 @@ def _write_docket_prediction(coach_id, docket, outcome, actual, today_str):
         "created_at": docket.get("opened_at", ""),
         "resolved_at": datetime.now(timezone.utc).isoformat(),
     }
+    if baseline:
+        # #4585: the "nothing changes" rule's answer to the same criterion, frozen beside
+        # the grade (coach.coach_baseline.docket_stamp — one answer, both coaches' rows).
+        item["baseline"] = baseline
     return _put_unique(item, "docket PREDICTION#")
 
 
@@ -851,8 +857,9 @@ def _resolve_one(docket, due_date, today_str, data_cache, resolved, voided, wait
     # Bayesian update — not idempotent — runs only when the PREDICTION# row is NEW.
     _write_docket_learning(winner, today_str, docket, "confirmed")
     _write_docket_learning(loser, today_str, docket, "refuted", concession=concession)
-    winner_pred = _write_docket_prediction(winner, docket, "confirmed", actual, today_str)
-    loser_pred = _write_docket_prediction(loser, docket, "refuted", actual, today_str)
+    baseline = coach_baseline.docket_stamp(docket, bool(holds), data_cache, _ev._get_source_data, _ev._extract_metric_series)  # #4585
+    winner_pred = _write_docket_prediction(winner, docket, "confirmed", actual, today_str, baseline)
+    loser_pred = _write_docket_prediction(loser, docket, "refuted", actual, today_str, baseline)
     subdomain = docket.get("subdomain", "general")
     if winner_pred:
         _update_bayesian_confidence(winner, subdomain, "success")
