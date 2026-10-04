@@ -62,10 +62,26 @@ def built_page_findings(page: str, module: str) -> list[str]:
         if not re.search(rf"Tier {tier} From about {pct}%", text):
             out.append(f"the page does not state tier {tier} as 'From about {pct}%' — the governor's band is {pct}% of the ceiling")
     early = float(re.search(r"EARLY_MONTH_DAYS = ([\d.]+)", gov).group(1))
-    if f"in the first {early:g} days of a month" not in text:
-        out.append(f"the page does not say 'in the first {early:g} days of a month' — EARLY_MONTH_DAYS is {early:g}")
     if "min(projected_tier, actual_tier + 1)" not in gov:
         out.append("the governor no longer caps the tier at one step above actual spend — the page says it does")
+    g = re.search(r"GOVERNOR = \{ shares: \[(\d+) / (\d+), (\d+) / \2, (\d+) / \2\], earlyDays: (\d+), windowDays: (\d+) \}", module)
+    usd_steps = sorted(
+        float(usd) for usd, _tier in re.findall(r"\((\d+), (\d)\)", re.search(r"_TIER_THRESHOLDS = \[(.*?)\]", gov).group(1))
+    )
+    window = re.search(r"trailing_start = max\(now - timedelta\(days=(\d+)\), month_start\)", gov)
+    if not g:
+        out.append("ck_built.js no longer declares GOVERNOR = { shares, earlyDays, windowDays }")
+    else:
+        if [float(g.group(1)), float(g.group(3)), float(g.group(4))] != usd_steps or float(g.group(2)) != ref:
+            out.append(f"ck_built.js GOVERNOR.shares disagree with the governor's thresholds {usd_steps} over {ref:g}")
+        if float(g.group(5)) != early:
+            out.append(f"ck_built.js GOVERNOR.earlyDays is {g.group(5)}; EARLY_MONTH_DAYS is {early:g}")
+        if not window or g.group(6) != window.group(1):
+            out.append(
+                f"ck_built.js GOVERNOR.windowDays is {g.group(6)}; the governor's trailing window is {window.group(1) if window else 'not found'} days"
+            )
+    if "tier = min(projected_tier, actual_tier)" not in gov:
+        out.append("the governor no longer holds the tier to actual spend in the early-month window — the page says it does")
     stack = (ROOT / "cdk" / "stacks" / "operational_stack.py").read_text(encoding="utf-8")
     cadence = re.search(r'schedule="cron\(0 0/(\d+) \* \* \? \*\)",\s*# every \d+h[^\n]*Cost Explorer', stack)
     if not cadence or f"every {cadence.group(1)} hours" not in text:
@@ -73,10 +89,22 @@ def built_page_findings(page: str, module: str) -> list[str]:
             f"the page's forecast cadence does not match the cost governor's schedule ({cadence.group(1) if cadence else 'not found'}h)"
         )
 
-    # 3. Who approves what.
+    # 3. Who approves what (ADR-158: code ships on green; only the IAM/CDK deploy waits).
     ci = (ROOT / ".github" / "workflows" / "ci-cd.yml").read_text(encoding="utf-8")
-    if not re.search(r"^\s+environment: production\b", ci, re.M):
-        out.append("ci-cd.yml has no `environment: production` job — the page says the release pipeline stops for approval")
+    gated = re.findall(r"^  ([\w-]+):\n(?:(?!^  [\w-]+:\n).)*?^    environment: production\b", ci, re.M | re.S)
+    if gated != ["deploy-iam"]:
+        out.append(
+            f"ci-cd.yml's jobs behind `environment: production` are {gated}, not ['deploy-iam'] — the page says only a permissions change waits"
+        )
+    for said in (
+        "approves one thing by hand: a change to what the programs are permitted to do",
+        "Permissions only",
+        "The one thing I approve by hand",
+    ):
+        if said not in text:
+            out.append(f"the page no longer says {said!r} — the approval claim must be one statement in the row, the picture and the draft")
+    if "public demonstration of engineering practice" not in (ROOT / "docs" / "PROPORTIONALITY.md").read_text(encoding="utf-8"):
+        out.append("docs/PROPORTIONALITY.md no longer states the 'public demonstration of engineering practice' standard the page restates")
     agent = (ROOT / "remediation" / "agent.py").read_text(encoding="utf-8")
     if '"Bash(gh pr merge *)"' not in agent:
         out.append("remediation/agent.py no longer disallows `gh pr merge` — the page says the repair agent cannot merge")
