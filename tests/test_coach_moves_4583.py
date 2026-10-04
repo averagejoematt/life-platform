@@ -558,3 +558,27 @@ def test_a_calendar_day_is_a_date_not_a_figure_and_a_bare_small_count_is_not_a_f
     assert S.figures_in("I expect 309 by Saturday, October 10.") == [309.0]
     assert S.off_sheet_figures("I think two of us agree, and 7 lb is not on the sheet.", S.allowed_for(sheet)[0]) == [7.0]
     assert S.off_sheet_figures("I expect the loss of 3.6 lb a week to hold.", S.allowed_for(sheet)[0]) == []
+
+
+def test_a_cast_that_names_coaches_by_name_is_recognised(sheet):
+    """The first live run (2026-10-04) cast three speakers by NAME; every one was dropped as
+    "not on the roster" and the front page served no line. This is that wire."""
+    names = {"mind_coach": "Nathan Reeves", "labs_coach": "Dr. James Okafor", "nutrition_coach": "Marcus Webb", "sleep_coach": "Lisa Park"}
+    raw = {
+        "speakers": [
+            {"coach_id": "Marcus Webb", "move": "question"},
+            {"coach_id": "nathan reeves", "move": "call"},
+            {"coach_id": "James Okafor", "move": "reply", "replies_to": "Marcus Webb"},
+        ]
+    }
+    plan = M.admit_cast(raw, sheet, ELIGIBLE, TODAY, names)
+    got = {s["coach_id"]: s for s in plan["speakers"]}
+    assert not [d for d in plan["dropped"] if "not eligible" in d["reason"]], plan["dropped"]
+    assert {"nutrition_coach", "mind_coach"} <= set(got), plan
+    if "labs_coach" in got:
+        assert got["labs_coach"]["replies_to"] == "nutrition_coach"
+    # Control: without the names the same cast is refused, which is the live failure.
+    refused = M.admit_cast(raw, sheet, ELIGIBLE, TODAY)
+    assert not refused["speakers"] and len(refused["dropped"]) == 3
+    # A name that is nobody's still finds nobody.
+    assert M.admit_cast({"speakers": [{"coach_id": "Somebody Else", "move": "call"}]}, sheet, ELIGIBLE, TODAY, names)["speakers"] == []

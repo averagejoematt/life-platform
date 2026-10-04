@@ -73,6 +73,7 @@ CAST_PROMPT = (
     + "\n".join(f'- "{k}": {v}' for k, v in sheet_mod.MOVE_WORDS.items())
     + "\nA coach speaks only with something NEW to say: an opinion, a forecast, a disagreement, a question. "
     "Restating today's numbers is not a move — a coach with nothing to add stays silent. Never pick a sidelined coach. "
+    "Refer to every coach by its id exactly as given (for example sleep_coach), never by name, in coach_id, replies_to and bet sides. "
     "A reply names the coach it answers in replies_to. A reaction names the graded result in result (its prediction_id). "
     "A change of mind is only for a coach whose earlier position appears below.\n"
     "If two of your speakers would genuinely disagree about something a number will settle within 3 to 30 days, "
@@ -132,10 +133,53 @@ def parse_json(text: str) -> Optional[dict]:
     return out if isinstance(out, dict) else None
 
 
-def admit_cast(raw: Optional[dict], sheet: dict, eligible: list, today: str) -> dict:
+def _coach_ref(value: Any, names: Optional[dict]) -> str:
+    """A coach reference from the model -> its id. The cast model sees every coach by NAME
+    and answered with names on the first live run (2026-10-04: three speakers cast, all three
+    dropped as "not on the roster", zero lines served). An id passes through; a name — with
+    or without an honorific, in any case — resolves to its id; anything else is returned
+    unchanged and is then refused by the roster check, as before."""
+    ref = str(value or "").strip()
+    if not ref or not names or ref in names:
+        return ref
+    from coach import persona_registry  # lazy, as elsewhere in this module
+
+    plain = persona_registry.plain_name(ref).casefold()
+    for cid, name in names.items():
+        if persona_registry.plain_name(name).casefold() == plain:
+            return cid
+    return ref
+
+
+def _with_ids(raw: dict, names: Optional[dict]) -> dict:
+    """The model's cast with every coach reference resolved to an id (speakers, replies_to,
+    bet sides). Pure; the admission rules below see ids only."""
+    if not names:
+        return raw
+    out = dict(raw)
+    out["speakers"] = [
+        (
+            {
+                **s,
+                "coach_id": _coach_ref(s.get("coach_id"), names),
+                "replies_to": _coach_ref(s.get("replies_to"), names) or s.get("replies_to"),
+            }
+            if isinstance(s, dict)
+            else s
+        )
+        for s in raw.get("speakers") or []
+    ]
+    bet = raw.get("bet")
+    if isinstance(bet, dict) and isinstance(bet.get("sides"), dict):
+        out["bet"] = {**bet, "sides": {_coach_ref(k, names): v for k, v in bet["sides"].items()}}
+    return out
+
+
+def admit_cast(raw: Optional[dict], sheet: dict, eligible: list, today: str, names: Optional[dict] = None) -> dict:
     """Code admits the model's cast. Returns {speakers, bet, dropped}; `bet` is
-    {raw, normalized, coaches, description} or None."""
-    raw = raw or {}
+    {raw, normalized, coaches, description} or None. ``names`` ({coach_id: name}) lets a
+    coach the model referred to by name be recognised."""
+    raw = _with_ids(raw or {}, names)
     graded_ids = {g["prediction_id"] for g in sheet.get("graded") or [] if g.get("prediction_id")}
     has_prior = set((sheet.get("positions") or {}).keys()) | {y.get("coach_id") for y in sheet.get("yesterday") or []}
     speakers: list = []
@@ -292,7 +336,7 @@ def run(
             model_name=CAST_MODEL,
         )
         usages.append((CAST_MODEL, dict((cast_resp or {}).get("usage") or {})))
-        plan = admit_cast(parse_json(_text_of(cast_resp)), sheet, eligible, today)
+        plan = admit_cast(parse_json(_text_of(cast_resp)), sheet, eligible, today, names)
         bet = plan["bet"]
 
         lines: list = []
