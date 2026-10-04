@@ -151,7 +151,8 @@ def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[
             aired.add(int(e.get("week")))
         except (TypeError, ValueError):
             continue
-    pending = doc.get("pending") if isinstance(doc.get("pending"), dict) else {}
+    raw = doc.get("pending")
+    pending: dict = raw if isinstance(raw, dict) else {}
     try:
         held_week: Optional[int] = int(pending.get("week")) if pending.get("reason") == HOLD_REASON else None
     except (TypeError, ValueError):

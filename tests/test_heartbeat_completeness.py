@@ -1293,6 +1293,7 @@ EXEMPTION_MAX_AGE_DAYS = 365
 
 def _age_days(datestr):
     try:
+        # utc-exempt(#4539): the age of a ledger DATE against a 365-day cap — not any handler's "today".
         return (date.today() - datetime.strptime(datestr, "%Y-%m-%d").date()).days
     except ValueError:
         return None
@@ -1344,6 +1345,7 @@ def test_exemptions_are_dated_and_reasoned():
             _, d, reason = entry[0], entry[1], entry[2]
             try:
                 when = datetime.strptime(d, "%Y-%m-%d").date()
+                # utc-exempt(#4539): a ledger date vs the runner's day — no handler clock is paired with it.
                 if when > date.today():
                     problems.append(f"  {fn}: exemption dated in the future ({d})")
             except ValueError:
@@ -1439,10 +1441,21 @@ STORY_SEASON_DEADMEN = {
 
 
 def _story_season_qa():
-    sys.path.insert(0, LAMBDAS_DIR)
-    from operational import story_season_qa  # noqa: PLC0415
-
-    return story_season_qa
+    """The detector's module-level constants, read from SOURCE (ast.literal_eval) — never imported: this file
+    is a static sweep of cdk/ and must not take on a lambda module's runtime imports."""
+    with open(os.path.join(LAMBDAS_DIR, "operational", "story_season_qa.py"), encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    consts = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            try:
+                consts[node.targets[0].id] = ast.literal_eval(node.value)
+            except ValueError:
+                continue
+    needed = ("EPISODE_CHECK", "LEDGER_CHECK", "QUESTIONS_CHECK", "QUESTIONS_WEEKDAY", "QUESTIONS_HOUR_UTC", "QUESTIONS_MINUTE_UTC")
+    missing = [k for k in needed if k not in consts]
+    assert not missing, f"story_season_qa no longer declares {missing} as module-level literals — this enrolment reads nothing"
+    return type("StorySeasonConstants", (), consts)
 
 
 def test_story_season_deadmen_are_enrolled():
@@ -1452,11 +1465,8 @@ def test_story_season_deadmen_are_enrolled():
         ssq.LEDGER_CHECK,
         ssq.QUESTIONS_CHECK,
     }, "STORY_SEASON_DEADMEN and story_season_qa's check ids diverged — a dead-man was added or dropped on one side only"
-    with open(os.path.join(LAMBDAS_DIR, "operational", "qa_smoke_lambda.py"), encoding="utf-8") as f:
-        tree = ast.parse(f.read())
-    steps = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "check_steps")
-    wired = [n for n in ast.walk(steps) if isinstance(n, ast.Attribute) and n.attr == "check_story_season"]
-    assert len(wired) == 1, "story_season_qa.check_story_season is not registered in qa_smoke_lambda.check_steps() — a dead dead-man"
+    # The leg's registration in the nightly run list is asserted where the detector is exercised
+    # (tests/test_chronicle_status_row_deadman_3563.py) — this file stays a static sweep of cdk/.
     missing = {"qa-smoke-failures", "qa-smoke-heartbeat"} - cdk_alarm_names()
     assert not missing, f"the alarms the season dead-men ride no longer exist: {sorted(missing)}"
     assert (
