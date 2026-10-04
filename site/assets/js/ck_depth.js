@@ -43,6 +43,8 @@ export const MEASURES = {
   training: { name: "Training time", unit: "minutes", write: (v) => `${whole(v)} minutes`, about: "Minutes of training recorded each day." },
 };
 
+// Own keys only: the measure name arrives from the address bar.
+export const isMeasure = (m) => Object.prototype.hasOwnProperty.call(MEASURES, String(m));
 export const trendHref = (base, measure, lift = "", from = "") => `${base}trend/?m=${encodeURIComponent(measure)}${lift ? `&x=${encodeURIComponent(lift)}` : ""}${isDay(from) ? `&from=${from}` : ""}`;
 export const dayHref = (base, iso) => `${base}day/?d=${encodeURIComponent(iso)}`;
 
@@ -52,8 +54,9 @@ export function seriesOf(measure, src, today = "") {
   const pick = (rows, field) => (rows || []).filter((r) => r && isDay(r.date) && num(r[field]) !== null).map((r) => ({ date: r.date, value: r[field] }));
   const pulse = src.pulse && src.pulse.pulse_history;
   const food = src.nutrition && src.nutrition.nutrition_trend;
-  const out =
-    {
+  // A Map, not an object literal: the measure comes from the address bar, and a name like
+  // "constructor" must find nothing rather than an inherited method.
+  const readers = new Map(Object.entries({
       weight: () => pick(pulse, "weight_lbs"),
       steps: () => pick(pulse, "steps").filter((p) => p.date !== today),
       sleep: () => pick(pulse, "sleep_hours"),
@@ -63,7 +66,8 @@ export function seriesOf(measure, src, today = "") {
       carbs: () => pick(food, "carbs_g"),
       fat: () => pick(food, "fat_g"),
       training: () => pick(src.training && src.training.daily_modality_minutes_30d, "total_min").filter((p) => p.date !== today || p.value > 0),
-    }[measure] || (() => []);
+  }));
+  const out = readers.get(measure) || (() => []);
   return out().sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -290,6 +294,33 @@ export function relatedHTML(measure, base, from = "") {
   return `<ul class="ck-rows ck-rows--more">${keys.map((k) => `<li><a href="${esc(trendHref(base, k, "", from))}">${esc(MEASURES[k].name)} <span aria-hidden="true">→</span></a></li>`).join("")}</ul>`;
 }
 
+// ── every trend, in four areas ─────────────────────────────────────────────────
+// One index, one template behind every link. It is a table of contents for the depth
+// layer, reached from a day or a trend — never a set of sections in the site's menu.
+export const TREND_AREAS = [
+  { name: "Body", measures: ["weight"] },
+  { name: "Food", measures: ["calories", "protein", "carbs", "fat"] },
+  { name: "Training", measures: ["training", "steps"] },
+  { name: "Sleep", measures: ["sleep", "recovery"] },
+];
+// The lifts done in at least two sessions, most frequent first.
+export function liftNames(workouts, min = 2) {
+  const count = new Map();
+  for (const w of workouts || []) {
+    for (const e of w.exercises || []) {
+      if (e && e.name && (e.sets || []).some(isWork)) count.set(e.name, (count.get(e.name) || 0) + 1);
+    }
+  }
+  return [...count].filter(([, n]) => n >= min).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
+}
+export function trendIndexHTML(base, workouts) {
+  const link = (href, text) => `<li><a href="${esc(href)}">${esc(text)} <span aria-hidden="true">→</span></a></li>`;
+  const areas = TREND_AREAS.map((a) => `<p class="ck-label">${esc(a.name)}</p><ul class="ck-rows ck-rows--more">${a.measures.map((m) => link(trendHref(base, m), MEASURES[m].name)).join("")}</ul>`);
+  const lifts = liftNames(workouts);
+  if (lifts.length) areas.push(`<p class="ck-label">Each lift</p><ul class="ck-rows ck-rows--more">${lifts.map((n) => link(trendHref(base, "lift", n), n)).join("")}</ul>`);
+  return areas.join("");
+}
+
 // ── mount ──────────────────────────────────────────────────────────────────────
 const fill = (id, html) => {
   const el = document.getElementById(id);
@@ -327,7 +358,17 @@ async function mountDay(base) {
 const COUNTS = new Set(["steps", "protein", "calories", "carbs", "fat", "training"]);
 
 async function mountTrend(base) {
-  const measure = param("m") || "weight";
+  const measure = param("m");
+  if (!measure) {
+    const src = await load({ workouts: "/api/workouts" });
+    fill("ck-label", "The detail");
+    fill("ck-title", "Every trend");
+    document.title = "Every trend — Average Joe Matt";
+    fill("ck-about", soft("Each one is a single measure over the whole experiment. Every reading links back to its day."));
+    fill("ck-chart", trendIndexHTML(base, src.workouts && src.workouts.workouts));
+    for (const id of ["ck-recent-section", "ck-extra-section", "ck-related-section"]) document.getElementById(id)?.remove();
+    return;
+  }
   const lift = param("x");
   const from = isDay(param("from")) ? param("from") : "";
   const today = todayPT();
@@ -346,7 +387,7 @@ async function mountTrend(base) {
       ? "The most reps in one set, each session."
       : "Estimated one-rep max from the best set of each session: the load times one plus reps over thirty. It is an estimate, so a set of 12 at 175 lb can be compared with a set of 5 at 205.";
     write = bodyweight ? (v) => `${whole(v)} reps` : (v) => `${whole(v)} lb`;
-  } else if (MEASURES[measure]) {
+  } else if (isMeasure(measure)) {
     const food = ["protein", "calories", "carbs", "fat"].includes(measure);
     const src = await load(food ? { nutrition: "/api/nutrition_overview", meals: "/api/frequent_meals" } : measure === "training" ? { training: "/api/training_overview" } : { pulse: "/api/pulse_history" });
     points = seriesOf(measure, src, today);
@@ -384,6 +425,8 @@ async function mountTrend(base) {
   const related = relatedHTML(measure, base, from);
   fill("ck-related", related);
   if (!related) document.getElementById("ck-related-section")?.remove();
+  const all = document.getElementById("ck-all");
+  if (all) all.href = `${base}trend/`;
 }
 
 export async function mount() {

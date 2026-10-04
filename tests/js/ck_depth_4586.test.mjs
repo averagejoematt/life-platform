@@ -148,3 +148,22 @@ test("macro share is worked from the logged grams and needs all three", () => {
 test("the steps trend says how steps are counted and that some days read low", () => {
   assert.match(D.MEASURES.steps.about, /A day they were not carried reads low/);
 });
+
+test("a measure name from the address bar finds only real measures", () => {
+  for (const hostile of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    assert.equal(D.isMeasure(hostile), false, hostile);
+    assert.deepEqual(D.seriesOf(hostile, SRC), [], hostile);
+  }
+  assert.equal(D.isMeasure("steps"), true);
+});
+
+test("the index lists every measure once, in four areas, and each lift done at least twice", () => {
+  const html = D.trendIndexHTML(BASE, SRC.workouts.workouts);
+  for (const area of ["Body", "Food", "Training", "Sleep", "Each lift"]) assert.match(html, new RegExp(`<p class="ck-label">${area}</p>`));
+  const listed = D.TREND_AREAS.flatMap((a) => a.measures);
+  assert.deepEqual([...listed].sort(), Object.keys(D.MEASURES).sort(), "every measure is in exactly one area");
+  assert.match(html, /trend\/\?m=lift&amp;x=Bench%20Press%20\(Barbell\)">Bench Press \(Barbell\) /);
+  const names = D.liftNames(SRC.workouts.workouts);
+  assert.ok(names.includes("Bench Press (Barbell)") && !names.includes("Stretching") && !names.includes("Cycling"));
+  assert.doesNotMatch(D.trendIndexHTML(BASE, []), /Each lift/);
+});

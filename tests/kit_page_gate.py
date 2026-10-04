@@ -58,7 +58,8 @@ KIT_PAGES = {
     "/next/v8/coaches/": 4,
     "/next/v8/day/": 4,
     "/next/v8/day/?d=2026-10-02": 4,  # a lifting day: the longest a day page gets
-    "/next/v8/trend/": 4,
+    "/next/v8/trend/": 4,  # the index of every trend
+    "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
 }
 
