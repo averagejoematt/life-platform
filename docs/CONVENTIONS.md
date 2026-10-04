@@ -1323,6 +1323,15 @@ a grant that moved.
   Same shape as §9's "a gate that cannot fail", pointed at your own verification: a green claim
   in a PR body displaces the check rather than leaving a gap someone notices.
 
+- **A site PR that reads a route added in the same merge rolls back on its first site deploy
+  (2026-10-04).** `site-deploy.yml` finishes before the code deploy does; its convergence gate
+  refuses to measure pages whose route is not live, and the auto-rollback restores the old
+  pages. It is the gate working, not a broken deploy: wait until `curl /api/<route>` returns
+  200, then `gh run rerun <the site-deploy run>`. Two neighbours from the same day: lanes that
+  each add a page to `tests/kit_page_gate.py` conflict one after another, so merge each lane's
+  branch into the next and land ONE integration PR; and CI's render gate measures a kit page
+  slightly taller than a Mac does, so leave a tenth of a phone screen under a page's budget.
+
 ---
 
 ## 8. The wiki stays true — the four-layer contract
