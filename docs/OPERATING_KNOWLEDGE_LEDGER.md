@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-10-01 (Session BC: +1 feedback +1 project, both narrative; snapshot and counters updated in the same edit as the rows). Prior: 2026-10-01 (Session BB: +1 feedback +1 project, both narrative; snapshot and counters updated in the same edit as the rows). Prior: 2026-09-29 (Session AZ: +1 project, the session record; snapshot and counters updated in the same edit as the row). Prior: 2026-09-28 (Session AY: +3 feedback +2 reference +4 project — seven inherited from Session AX / the Sonnet burn-down whose wraps had not landed rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-27 (Session AW: +3 feedback +3 reference +4 project, all narrative). Prior: 2026-09-25 (Session AT: +4 reference +3 project +1 index — four of them inherited from Sessions AR/AS, whose wraps never landed the rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-22 (Session AQ: +2 reference +1 project this session — the second, the TTL-0 cache-policy constraint, from the attended afternoon; snapshot and counters updated from the rows in the same edit). Prior: 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 527** — feedback 37 · reference 294 · security 1 · project 191 · user 1 · index 3
+**Files in the memory index snapshot: 531** — feedback 40 · reference 294 · security 1 · project 192 · user 1 · index 3
 
-**Rule-class files (feedback + reference + security): 332** — homed-here 85 · already-homed 194 · superseded 7 · narrative 35 · off-repo 11
+**Rule-class files (feedback + reference + security): 335** — homed-here 86 · already-homed 196 · superseded 7 · narrative 35 · off-repo 11
 
-**Program/session files (project): 191** — already-homed 15 · superseded 1 · narrative 172 · off-repo 2 · index 1
+**Program/session files (project): 192** — already-homed 15 · superseded 1 · narrative 172 · off-repo 3 · index 1
 
 **Out of scope: user 1 · index 3**
 <!-- LEDGER-COVERAGE:END -->
@@ -83,6 +83,7 @@ feedback_instagram_story_post_rulings_2026_09_27.md
 feedback_loads_public_ruling_2026_09_26.md
 feedback_never_ask_inline_overnight.md
 feedback_no_cycle_count_on_the_site_2026_09_26.md
+feedback_no_topless_photos_on_the_site_2026_10_03.md
 feedback_pacific_time_in_messages.md
 feedback_partial_acceptance_is_not_a_close.md
 feedback_prod_deploy_authorization.md
@@ -95,7 +96,9 @@ feedback_rulings_2026_09_30_session_bb.md
 feedback_rulings_2026_10_02_session_bd.md
 feedback_sensitive_content.md
 feedback_session_aw_deploy_grant_2026_09_26.md
+feedback_site_clean_direction_confirmed_2026_10_03.md
 feedback_site_ground_up_rethink_2026_09_26.md
+feedback_site_job_the_cafe_test_2026_10_03.md
 feedback_site_pacific_time.md
 feedback_site_v6_overnight_authority_2026_09_25.md
 feedback_spend_the_fable_budget_before_reset_2026_09_26.md
@@ -201,6 +204,7 @@ project_phase_taxonomy.md
 project_phenoage_privacy.md
 project_plan_then_execute_2026_08_22.md
 project_platform_audit_2026.md
+project_platform_plan_2026_10_03.md
 project_podcasts_google_tts.md
 project_pr_render_gate_408.md
 project_pre13_deferred.md
@@ -613,6 +617,7 @@ user_who_is_matthew.md
 | `feedback_instagram_story_post_rulings_2026_09_27.md` | feedback | — narrative: dated owner rulings on one post series, recorded where the posts are built | narrative |
 | `feedback_never_ask_inline_overnight.md` | feedback | — off-repo: the unattended-driver brief that carries this rule lives in `~/.claude/plans/`, outside this tree | off-repo |
 | `feedback_no_cycle_count_on_the_site_2026_09_26.md` | feedback | `docs/SITE_TRANSFORMATION_V7.md` §0/§14 and ADR-157 (the cycle count is internal; the public frame is the experiment and the day); the mechanism is the vocabulary ledger's `cycle` row in `ledgers/site_vocabulary_residue.py` (shrink-only, 2 unlisted pages) | homed-here |
+| `feedback_no_topless_photos_on_the_site_2026_10_03.md` | feedback | `tests/test_site_chrome.py` (`test_the_shirtless_day_one_photograph_is_on_no_reader_surface`) guards the one image (#3761); the wider rule — no shirtless photo on any reader surface, prototype or card — is an owner ruling with no repo home yet | homed-here |
 | `feedback_partial_acceptance_is_not_a_close.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §2.1 + `.claude/skills/land/SKILL.md` §5 | already-homed |
 | `feedback_prod_deploy_authorization.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §5 (placed by #3264) | already-homed |
 | `feedback_rest_and_params_multifactor.md` | feedback | `docs/DECISIONS.md` (ADR-066/068: rest is a multi-factor coach judgment, never auto-set) | already-homed |
@@ -621,7 +626,9 @@ user_who_is_matthew.md
 | `feedback_rulings_2026_09_30_session_bb.md` | feedback | — narrative: dated owner rulings, each recorded on its own issue (#4503, #4255, #4267) | narrative |
 | `feedback_rulings_2026_10_02_session_bd.md` | feedback | — narrative: dated owner rulings, each recorded on its own issue (#4261, #4343/#4547, #3761, #4544) | narrative |
 | `feedback_sensitive_content.md` | feedback | the mechanism: `docs/DATA_GOVERNANCE.md` + the content filter in `deploy/sync_site_to_s3.sh`; the vocabulary itself is OFF-repo by design (#2503) | already-homed |
+| `feedback_site_clean_direction_confirmed_2026_10_03.md` | feedback | `docs/design/v8/README.md` + `site/assets/css/clean.css` and its drift checks in `scripts/check_css_tokens.py` (#4581) | already-homed |
 | `feedback_site_ground_up_rethink_2026_09_26.md` | feedback | `docs/SITE_TRANSFORMATION_V7.md` (§0 the ruling verbatim, §2 the order rule, §12 the cut-over bar) and ADR-157 — the site is one serialised investigation, nine reachable pages, graded against a Reddit/HN reader and the subject | homed-here |
+| `feedback_site_job_the_cafe_test_2026_10_03.md` | feedback | `docs/design/v8/README.md` states the approved direction; epic #4580's Problem and rules carry the owner's test and the review loop | already-homed |
 | `feedback_site_pacific_time.md` | feedback | `docs/CONVENTIONS.md` §7 (DATE# keys and reader-facing dates are Pacific) + `docs/IDEMPOTENCY.md` | homed-here |
 | `feedback_site_v6_overnight_authority_2026_09_25.md` | feedback | — narrative: a dated one-night owner grant (merge authority on #4182's site PRs, the pillars call delegated, boards standing in for the interview); the durable rule it produced is ADR-156 | narrative |
 | `feedback_squash_merge_drops_unpushed_commits.md` | feedback | `docs/CONVENTIONS.md` §3 | already-homed |
@@ -630,6 +637,7 @@ user_who_is_matthew.md
 | `feedback_verify_agent_findings.md` | feedback | `.claude/agents/finding-verifier.md` + `docs/OPERATING_DISCIPLINE.md` §1.1 | already-homed |
 | `feedback_verify_sources_from_registry.md` | feedback | `CLAUDE.md` (read the registry facets) + `lambdas/ingestion/source_registry.py` | already-homed |
 | `feedback_watchers_exit_on_terminal_not_green.md` | feedback | `docs/OPERATING_DISCIPLINE.md` §3.5 | already-homed |
+| `project_platform_plan_2026_10_03.md` | project | — off-repo: the plan covers private career and commercial options and lives in `~/.claude/plans/`; its build work is epic #4580 | off-repo |
 | `project_session_ah_2026_09_16.md` | project | session record — the night's work, its numbers and the four text-match catches; the RULES it produced are homed in their own reference rows | narrative |
 | `project_session_ai_2026_09_17.md` | project | session record — the corrections, the closures and their live evidence; the RULES it produced are homed in their own reference rows | narrative |
 | `reference_a_cancelled_ci_rollup_hides_real_failures.md` | reference | `docs/CONVENTIONS.md` §4 (CI gate ordering) — the rule is "a `cancelled` rollup is not a timeout; enumerate the failed STEPS before concluding" | already-homed |
