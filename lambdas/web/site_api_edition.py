@@ -397,6 +397,15 @@ def _by_date(rows: Any, field: str) -> dict:
     return {str(r.get("date")): _num(r.get(field)) for r in rows or [] if isinstance(r, dict) and r.get("date")}
 
 
+def _training_minutes(rows: Any, today: str) -> dict:
+    """Training minutes by day. Today's zero is NOT a reading: the day is not over, so a
+    session not yet logged must not count as a day without training."""
+    minutes = _by_date(rows, "total_min")
+    if not minutes.get(today):
+        minutes.pop(today, None)
+    return minutes
+
+
 def _measure(
     src: Any, what: str, body: dict | None, days: list, values: dict | None, sentence: Callable[[list], str | None], bar=None
 ) -> dict:
@@ -428,7 +437,7 @@ def _rows_by_date(rows: Any) -> dict:
     return {str(r.get("date")): r for r in rows or [] if isinstance(r, dict) and r.get("date")}
 
 
-def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, food_row: dict | None) -> dict:
+def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, food_row: dict | None, is_today: bool = False) -> dict:
     """One day, opened: every fact a route served for that day, in plain words. A measure
     with no reading that day is left out — the day says what was recorded, nothing else."""
     facts, summary = [], []
@@ -447,7 +456,7 @@ def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, foo
         kinds = [f"{_fmt_num(t[k])} minutes of {word}" for k, word in _MODALITY_WORDS if _num(t.get(k))]
         facts.append({"label": "Training", "text": "; ".join(kinds) or f"{_fmt_num(total)} minutes"})
         summary.append("trained")
-    elif training_row is not None:
+    elif training_row is not None and not is_today:
         facts.append({"label": "Training", "text": "No training recorded."})
         summary.append("no training recorded")
     if hours is not None:
@@ -501,7 +510,7 @@ def _week(b: dict, today: str) -> dict:
             "Training",
             training,
             days,
-            _by_date((training or {}).get("daily_modality_minutes_30d"), "total_min"),
+            _training_minutes((training or {}).get("daily_modality_minutes_30d"), today),
             count_text("Trained", trained),
             trained,
         ),
@@ -535,7 +544,7 @@ def _week(b: dict, today: str) -> dict:
     by_pulse, by_training = _rows_by_date(history), _rows_by_date((training or {}).get("daily_modality_minutes_30d"))
     by_food = _rows_by_date((nutrition or {}).get("nutrition_trend"))
     # Newest first: the day a returning reader came for is the first one they can open.
-    detail = [_day_detail(d, by_pulse.get(d), by_training.get(d), by_food.get(d)) for d in reversed(days)]
+    detail = [_day_detail(d, by_pulse.get(d), by_training.get(d), by_food.get(d), d == today) for d in reversed(days)]
     data = {"days": days, "order": list(parts), "measures": parts, "detail": detail, "weight_series": series}
     return _block("ok", today, src, "Nothing is recorded in these seven days.", data)
 
