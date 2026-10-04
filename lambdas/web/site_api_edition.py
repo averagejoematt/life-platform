@@ -90,10 +90,10 @@ HIS_WORDS_STALE_DAYS = 7
 MAX_COACH_LINES = 3
 CACHE_SECONDS = 300  # the neighbours' cache (/api/coach_docket, /api/decisions, /api/calibration)
 
-# TODO(#4583): the coach lines below restate the served daily coach text; #4583 replaces
-# this producer with a daily line that is a move, not numbers restated. Until then every
-# coach_lines block says so with ``voice: "restated"``.
+# The older coach text restates the day's numbers; a block built from it says so with
+# ``voice: "restated"``. It stands in only when no current day of moves (#4583) is served.
 COACH_VOICE = "restated"
+COACH_VOICE_MOVE = "move"  # #4583: each line is a move a coach made today, checked in code against one fact sheet
 
 # TODO(scorecard follow-up under epic #4580): the "More than weight" rows (body, training,
 # sleep, food, mind, the AI) need rules no route serves today. The block ships ``absent``
@@ -368,10 +368,52 @@ def _today(journey_body: dict | None, today: str) -> dict:
     return _block("ok", last, src, "No weigh-in yet.", data)
 
 
-def _coach_lines(dashboard: dict | None, today: str, persona_of_short) -> dict:
+def _coach_moves(moves: Any, today: str, persona_of) -> dict | None:
+    """The day's coach moves (#4583) as the block, or None when there is no current day of
+    them and the older restated text should stand in.
+
+    A day the coaches were cast and none had anything to say is a day of moves: the block
+    is ``absent`` with that sentence, never yesterday's restated numbers."""
+    if not isinstance(moves, dict) or not parse_day_key(str(moves.get("date") or "")):
+        return None
+    day = str(moves["date"])
+    age = _days_between(day, today)
+    if age is None or age < 0 or age > COACH_STALE_DAYS:
+        return None
+    src = SOURCES["dashboard"]
+    lines = []
+    for ln in moves.get("lines") or []:
+        text = str((ln or {}).get("text") or "").strip() if isinstance(ln, dict) else ""
+        if not text or not ln.get("move") or not honest_text(text):
+            continue
+        bet = ln.get("bet") if isinstance(ln.get("bet"), dict) else None
+        lines.append(
+            {
+                "coach": plain_name(ln.get("name")),
+                "domain": domain_words(persona_of(str(ln.get("coach_id") or ""))),
+                "text": _HONORIFIC.sub("", text),
+                "as_of": day,
+                "move": ln["move"],
+                "move_label": ln.get("move_label"),
+                "replies_to": plain_name(ln.get("replies_to_name")) or None,
+                "bet_settles": (bet or {}).get("resolution_date") or None,
+                "truncated": False,
+                "when_text": None,
+            }
+        )
+    lines = lines[:MAX_COACH_LINES]
+    if not lines:
+        return _block("absent", day, src, f"No coach had anything to say on {day_in_words(day)}.", voice=COACH_VOICE_MOVE)
+    return _block("ok", day, src, "The coaches have written nothing yet.", {"lines": lines, "mixed_days": False}, voice=COACH_VOICE_MOVE)
+
+
+def _coach_lines(dashboard: dict | None, today: str, persona_of_short, persona_of=None) -> dict:
     src = SOURCES["dashboard"]
     if dashboard is None:
         return _unavailable(src, "What the coaches said today")
+    moves = _coach_moves(dashboard.get("moves"), today, persona_of) if persona_of else None
+    if moves is not None:
+        return moves
     lines = []
     for c in dashboard.get("coaches") or []:
         if not isinstance(c, dict) or c.get("absent"):
@@ -522,7 +564,7 @@ def compose(
         "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of),
         "next": _next(b["cadence"], b["docket"], today, persona_of, metric_words),
         "today": _today(b["journey"], today),
-        "coach_lines": _coach_lines(b["dashboard"], today, persona_of_short),
+        "coach_lines": _coach_lines(b["dashboard"], today, persona_of_short, persona_of),
         "scorecard": _scorecard(),
         "record": _record(b["predictions"], b["calibration"], today),
         "his_words": _his_words(b["decisions"], today),

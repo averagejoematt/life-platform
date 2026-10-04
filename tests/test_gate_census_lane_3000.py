@@ -509,7 +509,12 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 769  # 768 -> 769 (2026-10-03, #4585 no coach count without its comparison): ONE entrant,
+BASELINE_TOTAL_GATES = 771  # 769 -> 771 (2026-10-04, #4586 the kit page gate): TWO entrants, one gate seen twice —
+# `guard::tests/kit_page_gate.py` (the script) and `ci::v4-gate.yml::render-accuracy-gate::4` (its step in the PR render
+# job). Both PROVEN on arrival (GUARD_PROOFS / CI_PROOFS in scripts/gate_census_proofs.py: front-page budget 6 -> 3, exit 1;
+# reverted, exit 0). Nothing leaves. MEASURED on `scripts/gate_census.py`'s build_census(): main 769 {proven 243,
+# unproven 514, not-applicable 7, attempted-unproven 5} -> this lane 771 {245, 514, 7, 5}.
+# PRIOR: 769  # 768 -> 769 (2026-10-03, #4585 no coach count without its comparison): ONE entrant,
 # `structural::test_coach_count_comparison_guard_4585.py` (new: globs site/assets/js + rglobs site/**/*.html|json), PROVEN on
 # arrival (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED on
 # `scripts/gate_census.py --json`: main 768 {proven 242, unproven 514, not-applicable 7, attempted-unproven 5} -> this lane

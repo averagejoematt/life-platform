@@ -1,0 +1,79 @@
+{
+ "episodes": [
+  {
+   "week": 4,
+   "title": "EP4 · The Body Answers Back",
+   "date": "2026-10-01",
+   "url": "/panelcast/wk4.mp3",
+   "bytes": 4200960,
+   "duration_sec": 420,
+   "byline": "Elena + Marcus Webb",
+   "guest_id": "nutrition_coach",
+   "guest_name": "Marcus Webb",
+   "excerpt": "Day 24. Twenty-three straight training days. Recovery at 54 percent. Marcus Webb is zero for nine on the season — and yet the team keeps returning to his warnings. Elena Voss talks with Webb about what the numbers are finally starting to sa",
+   "transcript_url": "/panelcast/wk4.transcript.json",
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 3,
+   "title": "EP3 · Storming Mode",
+   "date": "2026-09-24",
+   "url": "/panelcast/wk3.mp3",
+   "bytes": 4533120,
+   "duration_sec": 453,
+   "byline": "Elena + Max Reyes",
+   "guest_id": "physical_coach",
+   "guest_name": "Max Reyes",
+   "excerpt": "Day 17: the scan says 11.4 pounds of fat, one pound of question. But the rate flag is live, protein is short of the floor, and the man training every day says he doesn't want a day off.",
+   "transcript_url": "/panelcast/wk3.transcript.json",
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 2,
+   "title": "EP2 · Nine Days and Counting",
+   "date": "2026-09-17",
+   "url": "/panelcast/wk2.mp3",
+   "bytes": 4370160,
+   "duration_sec": 436,
+   "byline": "Elena + Lisa Park",
+   "guest_id": "sleep_coach",
+   "guest_name": "Lisa Park",
+   "excerpt": "Day 10, nine straight training days, 975 minutes this week — and the scale is moving fast. Lisa Park opens 1-0 on her first graded call, but says she cannot fully read the recovery numbers without data Matthew hasn't given her yet.",
+   "transcript_url": "/panelcast/wk2.transcript.json",
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 1,
+   "title": "EP1 · The Strap Said 76%",
+   "date": "2026-09-10",
+   "url": "/panelcast/wk1.mp3",
+   "bytes": 4043040,
+   "duration_sec": 404,
+   "byline": "Elena + Nathan Reeves",
+   "guest_id": "mind_coach",
+   "guest_name": "Nathan Reeves",
+   "excerpt": "Day 3 of the experiment: the body is recovering well, but the man rated himself 2 out of 10. Nathan Reeves — the team's behavioral psychiatrist — names the gap the instruments couldn't close.",
+   "transcript_url": "/panelcast/wk1.transcript.json",
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 0,
+   "title": "EP0 · Before the Numbers",
+   "date": "2026-09-05",
+   "url": "/panelcast/wk0.mp3",
+   "bytes": 4020240,
+   "duration_sec": 401,
+   "byline": "Elena + Eli Marsh",
+   "guest_id": "eli_marsh",
+   "guest_name": "Eli Marsh",
+   "excerpt": "Sixteen predictions are sealed, thirteen data sources are live, and tomorrow morning a Withings scale in Seattle will produce the first real number of a twelve-month experiment. Eli Marsh joins Elena Voss to talk about what it means to put ",
+   "transcript_url": "/panelcast/wk0.transcript.json",
+   "image_url": "",
+   "image_credit": ""
+  }
+ ]
+}

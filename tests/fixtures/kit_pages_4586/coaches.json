@@ -1,0 +1,195 @@
+{
+ "coaches": [
+  {
+   "persona_id": "eli_marsh",
+   "name": "Eli Marsh",
+   "tier": "lead",
+   "record": null,
+   "latest_checked": null,
+   "absent": false,
+   "reason": null
+  },
+  {
+   "persona_id": "sleep_coach",
+   "name": "Lisa Park",
+   "tier": "staff",
+   "record": {
+    "confirmed": 10,
+    "refuted": 13,
+    "n": 23,
+    "through": "2026-10-03"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260912_slow_wave_sleep_should_increase_as_adeno",
+    "claim": "Slow-wave sleep should increase as adenosine accumulation rises with training volume during weeks two and three (2026-09-13 through 2026-09-27)",
+    "created_date": "2026-09-12",
+    "pre_registered_at": null,
+    "outcome_date": "2026-10-03",
+    "metric": "deep_pct",
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": -0.0796,
+    "status": "refuted"
+   },
+   "absent": false,
+   "reason": null
+  },
+  {
+   "persona_id": "nutrition_coach",
+   "name": "Marcus Webb",
+   "tier": "staff",
+   "record": {
+    "confirmed": 6,
+    "refuted": 14,
+    "n": 20,
+    "through": "2026-10-03"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260919_if_dinner_is_disrupted_the_day_s_protei",
+    "claim": "If dinner is disrupted, the day's protein total will collapse to approximately 46g without a backup plan.",
+    "created_date": "2026-09-19",
+    "pre_registered_at": null,
+    "outcome_date": "2026-10-03",
+    "metric": "total_protein_g",
+    "eval_type": "point",
+    "condition": "within",
+    "threshold": 46,
+    "actual_value": 166.0,
+    "status": "refuted"
+   },
+   "absent": false,
+   "reason": null
+  },
+  {
+   "persona_id": "mind_coach",
+   "name": "Nathan Reeves",
+   "tier": "staff",
+   "record": {
+    "confirmed": 6,
+    "refuted": 8,
+    "n": 14,
+    "through": "2026-10-03"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260919_the_journaling_silence_will_lift_as_prot",
+    "claim": "The journaling silence will lift as protein intake continues to recover toward the 190g target.",
+    "created_date": "2026-09-19",
+    "pre_registered_at": null,
+    "outcome_date": "2026-10-03",
+    "metric": "total_protein_g",
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": -0.0954,
+    "status": "refuted"
+   },
+   "absent": false,
+   "reason": null
+  },
+  {
+   "persona_id": "physical_coach",
+   "name": "Max Reyes",
+   "tier": "staff",
+   "record": {
+    "confirmed": 5,
+    "refuted": 6,
+    "n": 11,
+    "through": "2026-10-02"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260918_the_rebound_in_recovery_ewma_is_more_con",
+    "claim": "The rebound in recovery EWMA is more consistent with regression toward the mean than with an intervention taking hold.",
+    "created_date": "2026-09-18",
+    "pre_registered_at": null,
+    "outcome_date": "2026-10-02",
+    "metric": "recovery_score",
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": -0.0882,
+    "status": "refuted"
+   },
+   "absent": false,
+   "reason": null
+  },
+  {
+   "persona_id": "glucose_coach",
+   "name": "Amara Patel",
+   "tier": "staff",
+   "record": {
+    "confirmed": 2,
+    "refuted": 4,
+    "n": 6,
+    "through": "2026-09-30"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260909_nocturnal_glucose_dips_will_trigger_cort",
+    "claim": "Nocturnal glucose dips will trigger cortisol counter-regulation, fragmenting slow-wave sleep and degrading next-day insulin sensitivity, creating a bidirectional loop between CGM and sleep architecture.",
+    "created_date": "2026-09-09",
+    "pre_registered_at": null,
+    "outcome_date": "2026-09-30",
+    "metric": "deep_pct",
+    "eval_type": "directional",
+    "condition": "down",
+    "threshold": null,
+    "actual_value": 0.0035,
+    "status": "refuted"
+   },
+   "absent": true,
+   "reason": "no sensor since 2026-08-27"
+  },
+  {
+   "persona_id": "labs_coach",
+   "name": "James Okafor",
+   "tier": "staff",
+   "record": {
+    "confirmed": 3,
+    "refuted": 1,
+    "n": 4,
+    "through": "2026-10-03"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260919_recovery_rebound_is_regression_to_mean_a",
+    "claim": "Recovery rebound is regression-to-mean after September 10th trough, not a real adaptation",
+    "created_date": "2026-09-19",
+    "pre_registered_at": null,
+    "outcome_date": "2026-10-03",
+    "metric": "recovery_score",
+    "eval_type": "directional",
+    "condition": "up",
+    "threshold": null,
+    "actual_value": -0.0434,
+    "status": "refuted"
+   },
+   "absent": false,
+   "reason": null
+  },
+  {
+   "persona_id": "explorer_coach",
+   "name": "Henning Brandt",
+   "tier": "staff",
+   "record": {
+    "confirmed": 9,
+    "refuted": 9,
+    "n": 18,
+    "through": "2026-10-03"
+   },
+   "latest_checked": {
+    "prediction_id": "pred_20260919_tomorrow_s_recovery_will_be_83_7_with_a",
+    "claim": "Tomorrow's recovery will be 83.7% with an 80% interval of 57.6–100%.",
+    "created_date": "2026-09-19",
+    "pre_registered_at": null,
+    "outcome_date": "2026-10-03",
+    "metric": "recovery_score",
+    "eval_type": "point",
+    "condition": "within",
+    "threshold": 83.7,
+    "actual_value": 97.0,
+    "status": "confirmed"
+   },
+   "absent": false,
+   "reason": null
+  }
+ ]
+}

@@ -317,3 +317,55 @@ def test_edition_is_registered_as_a_get_route():
     assert '"/api/edition": None' in src
     assert 'if path == "/api/edition" and method == "GET":' in src
     assert "handle_edition(lambda p, qs: _dispatch_route(" in src
+
+
+def _moves(day, lines):
+    return {"date": day, "generated_at": f"{day}T19:00:00+00:00", "lines": lines, "absent": [], "silent": []}
+
+
+_MOVE_LINE = {
+    "coach_id": "sleep_coach",
+    "name": "Dr. Lisa Park",
+    "move": "call",
+    "move_label": "A call",
+    "text": "I think the recovery score holds above 80 this week.",
+    "date": _CAPTURE_DAY,
+    "replies_to": None,
+    "replies_to_name": None,
+    "bet": {"description": "recovery stays above 80", "resolution_date": "2026-10-10"},
+}
+
+
+def test_edition_serves_the_days_coach_moves_when_a_current_day_exists():
+    """#4583: a current day of moves replaces the restated text, tagged ``voice: move``."""
+    wire = _wire()
+    wire["dashboard"]["moves"] = _moves(_CAPTURE_DAY, [_MOVE_LINE])
+    block = _edition(wire)["blocks"]["coach_lines"]
+    assert block["state"] == "ok" and block["voice"] == "move" and block["as_of"] == _CAPTURE_DAY
+    (line,) = block["data"]["lines"]
+    assert line["coach"] == "Lisa Park" and line["domain"] == "sleep" and line["move"] == "call"
+    assert line["text"] == _MOVE_LINE["text"] and line["bet_settles"] == "2026-10-10"
+
+
+def test_a_day_no_coach_spoke_is_stated_not_backfilled_with_restated_numbers():
+    wire = _wire()
+    wire["dashboard"]["moves"] = _moves(_CAPTURE_DAY, [])
+    block = _edition(wire)["blocks"]["coach_lines"]
+    assert block["state"] == "absent" and block["voice"] == "move" and block["data"] is None
+    assert block["absent_text"] == "No coach had anything to say on Saturday, October 3."
+
+
+def test_stale_or_missing_moves_fall_back_to_the_restated_text():
+    """Mutation control for the two tests above: without a current day the old path stands."""
+    for moves in (None, _moves("2026-09-30", [_MOVE_LINE]), {"date": "not-a-day", "lines": [_MOVE_LINE]}):
+        wire = _wire()
+        wire["dashboard"]["moves"] = moves
+        assert _edition(wire)["blocks"]["coach_lines"]["voice"] == "restated"
+
+
+def test_a_move_line_with_a_deficit_figure_or_a_cycle_count_is_dropped():
+    wire = _wire()
+    bad = dict(_MOVE_LINE, text="I think the 900 kcal deficit is too steep.")
+    wire["dashboard"]["moves"] = _moves(_CAPTURE_DAY, [bad, _MOVE_LINE])
+    lines = _edition(wire)["blocks"]["coach_lines"]["data"]["lines"]
+    assert [ln["text"] for ln in lines] == [_MOVE_LINE["text"]]
