@@ -222,6 +222,21 @@ WEEK_SURFACES: tuple = (
         locator="/api/source_freshness",
         facts=((FACT_CYCLE_GENESIS, FactRef("experiment.genesis")),),
     ),
+    Surface(
+        id="api_edition",
+        label="/api/edition — the front page's one composed document (#4582)",
+        producer="lambdas/web/site_api_edition.py",
+        kind="http_json",
+        locator="/api/edition",
+        facts=(
+            (FACT_DAY_N, FactRef("day_n", as_of_path="as_of")),
+            (FACT_CYCLE_GENESIS, FactRef("blocks.today.data.start_date")),
+            (FACT_BASELINE_WEIGHT, FactRef("blocks.today.data.start_weight_lbs")),
+            (FACT_CURRENT_WEIGHT, FactRef("blocks.today.data.weight_lbs", as_of_path="blocks.today.data.date")),
+            (FACT_WEEK_LABEL, FactRef("blocks.chapter.data.week_label", as_of_path="blocks.chapter.data.date")),
+        ),
+        default_as_of_path="as_of",
+    ),
 )
 
 #: Modules that restate a week fact but have NO nightly-fetchable served artifact, each

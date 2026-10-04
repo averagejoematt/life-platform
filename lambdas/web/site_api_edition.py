@@ -54,6 +54,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
+from coach.persona_registry import plain_name as _registry_plain_name
 from common import subscriber_cadence as sc
 from common.pacific_time import day_in_words, pacific_date_of, pacific_day_n, parse_day_key, parse_iso_utc
 
@@ -138,12 +139,8 @@ _SENTENCE_END = re.compile(r"[.!?][\"”’)]?(?=\s|$)")
 
 
 def plain_name(name: Any) -> str:
-    """'Dr. Marcus Webb' -> 'Marcus Webb'.
-
-    Local until #4578 lands ``persona_registry.plain_name()`` (the registry-derived form
-    with its set guard); switch to it when that PR is on main.
-    """
-    return _HONORIFIC.sub("", str(name or "")).strip()
+    """A persona's name with no honorific — the registry's one spelling of the rule (#4578)."""
+    return _registry_plain_name(name)
 
 
 def _days_between(earlier: str | None, later: str) -> int | None:

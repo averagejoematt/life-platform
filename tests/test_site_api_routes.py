@@ -129,8 +129,8 @@ from web import site_api_edition as _ed  # noqa: E402
 from web.prediction_reason import metric_words as _metric_words  # noqa: E402
 
 _WIRE = os.path.join(ROOT, "tests", "fixtures", "edition_wire_4582")
-_TODAY = "2026-10-03"
-_NOW = _dt(2026, 10, 4, 2, 29, tzinfo=_tz.utc)
+_CAPTURE_DAY = "2026-10-03"
+_CAPTURE_INSTANT = _dt(2026, 10, 4, 2, 29, tzinfo=_tz.utc)
 _STATES = {"ok", "absent", "stale", "unavailable"}
 _CONTRACT_KEYS = ("state", "as_of", "source", "absent_text", "data")
 
@@ -142,8 +142,8 @@ def _wire():
 def _edition(bodies):
     return _ed.compose(
         bodies,
-        today=_TODAY,
-        now=_NOW,
+        today=_CAPTURE_DAY,
+        now=_CAPTURE_INSTANT,
         start_date="2026-09-06",
         persona_of=_personas.resolve,
         persona_of_short=lambda sid: _personas.by_short_id(sid)[1],
@@ -184,7 +184,7 @@ def test_edition_every_block_carries_the_contract_on_the_wire():
     """Every block (and nested part) has state/as_of/source/absent_text/data; the document
     has ONE Pacific as_of and day_n, and the blocks arrive in page order."""
     doc = _edition(_wire())
-    assert doc["as_of"] == _TODAY and doc["day_n"] == 28
+    assert doc["as_of"] == _CAPTURE_DAY and doc["day_n"] == 28
     assert list(doc["blocks"]) == list(_ed.ORDER) == doc["order"]
     offences = [o for name, block in _parts(doc) for o in _contract_offences(name, block)]
     assert not offences, offences
