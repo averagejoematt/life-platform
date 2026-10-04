@@ -10,12 +10,7 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
-from common.constants import (
-    EXPERIMENT_BASELINE_WEIGHT_LBS,
-    EXPERIMENT_START_DATE,
-    PLAN_DAILY_CALORIES_TARGET,
-    PLAN_DAILY_PROTEIN_MIN_G,
-)  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import compute_confidence
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
 from health.scoring_engine import habitify_reading  # #4362
