@@ -249,6 +249,29 @@ def _public_decision_note(text):
     return scrubbed.strip()
 
 
+def handle_owner_words(event, *, _g):
+    """GET /api/owner_words (#4584) — his own words, from his Claude chat or his email replies, word for word.
+
+    ``content.owner_words.read_public`` decides what is servable (a held or off-record entry is simply absent, so the
+    payload cannot tell it from silence). Each entry then meets THIS module's all-or-nothing verbatim rule, the same
+    serve-time screen as every other human line on the wall — and the text served is the STORED text, untouched (the
+    rule only decides yes or no). Silence is the plain sentence the payload carries. A failed read is a 503, never
+    shown as silence. Read-only; up to the last ``SERVE_LIMIT`` served entries, newest first.
+    """
+    from content import owner_words as _ow
+
+    payload = _ow.read_public(_g["table"])
+    if payload.get("state") == _ow.STATE_READ_FAILED:
+        return _g["_error"](503, "owner words read unavailable")
+    note = _g["_public_decision_note"]
+    entries = [e for e in payload.get("entries") or [] if note(e.get("text")) and (not e.get("prompt") or note(e.get("prompt")))]
+    if entries:
+        body = {"state": _ow.STATE_OK, "entries": entries, "count": len(entries), "sentence": None}
+    else:
+        body = {"state": _ow.STATE_ABSENT, "entries": [], "count": 0, "sentence": _ow.SILENCE_SENTENCE}
+    return _ok(body, cache_seconds=300)
+
+
 def handle_decisions(event, *, _g):
     """GET /api/decisions — the widened Third Wall for logged decisions (#1569).
 

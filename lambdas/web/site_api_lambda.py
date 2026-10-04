@@ -82,6 +82,7 @@ from web.site_api_coach import (
     handle_field_notes,
     handle_journal_quotes,
     handle_month_rollup,
+    handle_owner_words,
     handle_panel_ledger,
     handle_predictions,
     handle_recap,
@@ -372,6 +373,7 @@ ROUTES = {
     "/api/vacation_fund": handle_vacation_fund,
     "/api/content_cadence": handle_content_cadence,  # #1972 — chronicle/podcast next-installment line
     "/api/edition": None,  # #4582: the front page's one document — composed in _dispatch_route below
+    "/api/owner_words": handle_owner_words,  # #4584: his own words (chat + email), verbatim; what /api/edition's his_words reads first
     "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
     # #1379: the Daily Fingerprint (dateless = today; ?date=YYYY-MM-DD handled inline below) + the Wall (all-attempts field)
