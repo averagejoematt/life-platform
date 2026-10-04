@@ -1,0 +1,286 @@
+{
+ "persona_id": "glucose_coach",
+ "name": "Amara Patel",
+ "tier": "staff",
+ "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice — correlative, never causal. The personality is a lens on real numbers, not a real person.",
+ "philosophy": null,
+ "absent": true,
+ "reason": "no sensor since 2026-08-27",
+ "latest_checked": {
+  "prediction_id": "pred_20260909_nocturnal_glucose_dips_will_trigger_cort",
+  "claim": "Nocturnal glucose dips will trigger cortisol counter-regulation, fragmenting slow-wave sleep and degrading next-day insulin sensitivity, creating a bidirectional loop between CGM and sleep architecture.",
+  "created_date": "2026-09-09",
+  "pre_registered_at": null,
+  "outcome_date": "2026-09-30",
+  "metric": "deep_pct",
+  "eval_type": "directional",
+  "condition": "down",
+  "threshold": null,
+  "actual_value": 0.0035,
+  "status": "refuted"
+ },
+ "stance": {
+  "source": "absent",
+  "headline_read": "",
+  "stage": {}
+ },
+ "trait_scores": {
+  "note": "The trace is right there — calls a meal response after two repetitions, updates the mechanism just as fast.",
+  "disclosure": "Authored character design — fixed numbers written into the cast by the author, not generated and not measured."
+ },
+ "character": {
+  "principles": [
+   "Glucose variability matters more than average glucose.",
+   "Every spike tells a story — trace the meal, timing, and context.",
+   "Time-in-range is the longevity metric; fasting glucose is the clinical metric."
+  ],
+  "arc": "From orientation and fascination to forming hypotheses to testing them against incoming data to building a personalized glucose model"
+ },
+ "report_card": {
+  "track_record": {
+   "record": {
+    "confirmed": 2,
+    "refuted": 4,
+    "n": 6,
+    "through": "2026-09-30"
+   },
+   "comparison": {
+    "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+   },
+   "recent": [
+    {
+     "date": "2026-09-30",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "predicted down, metric flat (slope=0.0035, within ±0.02 noise band) — no movement to confirm the call"
+    },
+    {
+     "date": "2026-09-28",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score=64.00 on 2026-09-28 vs predicted 59 ±18.5929 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=18.5929)); |Δ|=5.00 → within tolerance"
+    },
+    {
+     "date": "2026-09-28",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "deep_pct trend=up (slope=0.1123), predicted=down"
+    },
+    {
+     "date": "2026-09-25",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6158 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=18.6158)); |Δ|=6.10 → within tolerance"
+    },
+    {
+     "date": "2026-09-23",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score=44.00 on 2026-09-10 vs predicted 66.2 ±17.9239 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=17.9239)); |Δ|=22.20 → outside tolerance"
+    }
+   ]
+  }
+ },
+ "dossier": {
+  "commitments": [
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-01"
+   },
+   {
+    "date": "2026-09-23",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-30"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-19",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-26"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-17",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-24"
+   },
+   {
+    "date": "2026-09-17",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-24"
+   },
+   {
+    "date": "2026-09-16",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-23"
+   },
+   {
+    "date": "2026-09-15",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-22"
+   },
+   {
+    "date": "2026-09-15",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-22"
+   },
+   {
+    "date": "2026-09-14",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-14",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-13",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-20"
+   },
+   {
+    "date": "2026-09-13",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-20"
+   },
+   {
+    "date": "2026-09-11",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-18"
+   },
+   {
+    "date": "2026-09-11",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-18"
+   },
+   {
+    "date": "2026-09-09",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-16"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-06",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-13"
+   },
+   {
+    "date": "2026-09-06",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-13"
+   }
+  ]
+ }
+}

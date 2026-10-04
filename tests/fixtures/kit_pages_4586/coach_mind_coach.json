@@ -1,0 +1,303 @@
+{
+ "persona_id": "mind_coach",
+ "name": "Nathan Reeves",
+ "tier": "staff",
+ "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice — correlative, never causal. The personality is a lens on real numbers, not a real person.",
+ "philosophy": null,
+ "absent": false,
+ "reason": null,
+ "latest_checked": {
+  "prediction_id": "pred_20260920_if_journaling_resumes_alongside_protein",
+  "claim": "If journaling resumes alongside protein recovery to ~145g, the fuel-cognition link gains credibility as explanation for the silence.",
+  "created_date": "2026-09-20",
+  "pre_registered_at": null,
+  "outcome_date": "2026-10-04",
+  "metric": "total_protein_g",
+  "eval_type": "point",
+  "condition": "within",
+  "threshold": 145,
+  "actual_value": 153.0,
+  "status": "confirmed"
+ },
+ "stance": {
+  "source": "stance",
+  "headline_read": "Matthew's recovery score spiked sharply outside my prediction band while journaling remains silent and deep sleep continues its downward drift—a divergence that now reads less like metabolic constraint and more like a fracture between what his devices are narrating and what his embodied state actually is. I'm holding the hypothesis that he may be experiencing physiological rebound without psychological integration, and I'm uncertain whether his silence reflects depletion or deliberate withdrawal.",
+  "focused_on_now": [
+   "Whether the recovery spike represents genuine restoration or statistical mean reversion masking internal depletion—my prediction miss here forced me to recalibrate how much I trust device stability as a proxy for his actual state.",
+   "The emotional texture of his journaling silence: does it feel heavy (something unready to name) or empty (no signal available)? This distinction determines whether I'm looking at resistance or exhaustion.",
+   "The three-way opposition now widened: recovery climbing, deep sleep declining, journaling flat despite protein recovery. This triad suggests his body may be executing a rebound his mind hasn't integrated yet."
+  ],
+  "set_aside_for_now": [
+   "Protein as a primary lever—it recovered but didn't unlock the writing, so I'm deprioritizing metabolic optimization as the intervention point.",
+   "Device calibration or wearable literacy—the volatility in his recovery signal is real, but chasing sensor accuracy feels like a distraction from the deeper question of whether he trusts his own felt sense.",
+   "Recovery prediction modeling—my confidence here is too low to justify continued refinement; I'm pivoting toward phenomenology instead."
+  ],
+  "stage": {
+   "rationale": "Matthew has entered a phase where external signals are actively contradicting each other and my models are failing to predict them. The recovery spike outside my tolerance band, combined with declining deep sleep and persistent journaling silence, signals that I've been treating metrics as confirmatory when they're actually becoming diagnostic of a gap between device narration and lived experience. This is no longer about fuel or signal literacy—it's about whether he can trust his own instruments to reflect his actual state.",
+   "label": "Metric-State Divergence Under Scrutiny"
+  },
+  "how_my_read_changed": "My previous stance held that protein recovery might unlock journaling and that device volatility was the primary noise source. I've now moved away from both. The protein recovery without journaling rebound forced me to concede that the fuel-cognition link is incomplete or wrong. The recovery spike outside my prediction band taught me that I was overweighting device stability as a proxy for his state—volatility is the signal, not the noise. I'm now asking whether he's experiencing physiological rebound without psychological integration, which is a fundamentally different question than 'what's blocking his writing?'",
+  "confidence_note": "My confidence across protein, recovery, and the protein-journaling coupling remains low. I've been wrong about the mechanism twice now, which has made me more cautious about causal claims. I'm holding my hypotheses more lightly and leaning harder on his phenomenological report—what does the gap feel like from the inside?—rather than trying to infer state from device narration.",
+  "as_of": "2026-10-04",
+  "grounding_flag": false
+ },
+ "trait_scores": {
+  "note": "Names a pattern in days but prescribes in weeks — sits with a read before revising it.",
+  "disclosure": "Authored character design — fixed numbers written into the cast by the author, not generated and not measured."
+ },
+ "character": {
+  "principles": [
+   "What someone avoids reveals more than what they pursue.",
+   "Patterns beneath the surface drive the behaviors above it.",
+   "The gap between intention and action is where the real work lives."
+  ],
+  "arc": "From observing defense patterns to naming them to understanding the person beneath the numbers"
+ },
+ "report_card": {
+  "track_record": {
+   "record": {
+    "confirmed": 7,
+    "refuted": 8,
+    "n": 15,
+    "through": "2026-10-04"
+   },
+   "comparison": {
+    "sentence": "Too few checked calls yet (15) to compare them with a simple guess."
+   },
+   "recent": [
+    {
+     "date": "2026-10-04",
+     "status": "confirmed",
+     "metric": "total_protein_g",
+     "reason": "total_protein_g=153.00 on 2026-10-03 vs predicted 145 ±71.3729 (±1 SD of the trailing 30-day personal series (n=20 readings, SD=71.3729)); |Δ|=8.00 → within tolerance"
+    },
+    {
+     "date": "2026-10-03",
+     "status": "refuted",
+     "metric": "total_protein_g",
+     "reason": "total_protein_g trend=down (slope=-0.0954), predicted=up"
+    },
+    {
+     "date": "2026-10-02",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score=98.00 on 2026-10-02 vs predicted 54.7 ±21.4282 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=21.4282)); |Δ|=43.30 → outside tolerance"
+    },
+    {
+     "date": "2026-10-01",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.1015), predicted=up"
+    },
+    {
+     "date": "2026-10-01",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.1015), predicted=up"
+    },
+    {
+     "date": "2026-10-01",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score=62.00 on 2026-10-01 vs predicted 59.3 ±21.1555 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=21.1555)); |Δ|=2.70 → within tolerance"
+    }
+   ]
+  }
+ },
+ "dossier": {
+  "commitments": [
+   {
+    "date": "2026-10-03",
+    "text": "I've asked him to reflect on whether his journaling silence feels like resistance or depletion.",
+    "status": "pending",
+    "due_date": "2026-10-10"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to reflect on what the four days of silence felt like—resistance or absence.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to reflect on whether his journaling silence feels heavy or empty before we move forward.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to notice the quality of his silence today — whether it feels like resistance or like flatness.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-01",
+    "text": "I've asked him to reflect on the nature of his silence and respond with genuine introspection.",
+    "status": "pending",
+    "due_date": "2026-10-08"
+   },
+   {
+    "date": "2026-10-01",
+    "text": "I've asked him to identify which of the three commitments feels most possible today.",
+    "status": "pending",
+    "due_date": "2026-10-08"
+   },
+   {
+    "date": "2026-09-30",
+    "text": "I've asked him to examine the quality of his journaling silence and what it feels like from within.",
+    "status": "pending",
+    "due_date": "2026-10-07"
+   },
+   {
+    "date": "2026-09-30",
+    "text": "I've asked him to explore whether the two silences feel like one shared problem or two separate ones.",
+    "status": "pending",
+    "due_date": "2026-10-07"
+   },
+   {
+    "date": "2026-09-30",
+    "text": "I've asked him to describe what the silence feels like from inside this week.",
+    "status": "pending",
+    "due_date": "2026-10-07"
+   },
+   {
+    "date": "2026-09-30",
+    "text": "I've asked him to notice whether recovery feels real in his body or comes from the device reading.",
+    "status": "pending",
+    "due_date": "2026-10-07"
+   },
+   {
+    "date": "2026-09-29",
+    "text": "I've asked him to reflect on what the blank page actually feels like — a weight or a quiet.",
+    "status": "pending",
+    "due_date": "2026-10-06"
+   },
+   {
+    "date": "2026-09-29",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-06"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-01"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-01"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-16",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-23"
+   },
+   {
+    "date": "2026-09-16",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-23"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-09",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-16"
+   },
+   {
+    "date": "2026-09-09",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-16"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-06",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-13"
+   },
+   {
+    "date": "2026-09-06",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-13"
+   }
+  ]
+ }
+}

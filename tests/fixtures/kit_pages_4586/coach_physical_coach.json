@@ -1,0 +1,450 @@
+{
+ "persona_id": "physical_coach",
+ "name": "Max Reyes",
+ "tier": "staff",
+ "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice — correlative, never causal. The personality is a lens on real numbers, not a real person.",
+ "philosophy": null,
+ "absent": false,
+ "reason": null,
+ "latest_checked": {
+  "prediction_id": "pred_20260920_if_recovery_stays_elevated_and_the_noctu",
+  "claim": "If recovery stays elevated and the nocturnal glucose hypothesis from CGM data fails to explain a ceiling, we will have a cleaner directional read by September 30th.",
+  "created_date": "2026-09-20",
+  "pre_registered_at": null,
+  "outcome_date": "2026-10-04",
+  "metric": "recovery_score",
+  "eval_type": "directional",
+  "condition": "up",
+  "threshold": null,
+  "actual_value": -0.0434,
+  "status": "refuted"
+ },
+ "stance": {
+  "source": "ladder",
+  "headline_read": "At this weight, total mass coming down is what most reduces health risk. Body composition nuance comes later.",
+  "focused_on_now": [
+   "weight trending down at all",
+   "blood pressure and resting heart rate",
+   "reducing metabolic load"
+  ],
+  "set_aside_for_now": [
+   "body-fat percentage precision",
+   "muscle-vs-fat partitioning",
+   "DEXA detail"
+  ],
+  "stage": {
+   "label": "Move the scale and protect the engine.",
+   "rationale": "At this weight, total mass coming down is what most reduces health risk. Body composition nuance comes later."
+  },
+  "how_my_read_changed": "",
+  "confidence_note": "",
+  "as_of": null,
+  "grounding_flag": false,
+  "graduation_gate": "A steady downward weight trend over a month unlocks the 'recomposition' rung.",
+  "band_metric": "weight_lbs",
+  "current_value": 312.11,
+  "rung": {
+   "stage_id": "foundation",
+   "entry": {
+    "metric": "weight_lbs",
+    "min": 270,
+    "max": null
+   },
+   "headline": "Move the scale and protect the engine.",
+   "read_of_him": "At this weight, total mass coming down is what most reduces health risk. Body composition nuance comes later.",
+   "cares_most": [
+    "weight trending down at all",
+    "blood pressure and resting heart rate",
+    "reducing metabolic load"
+   ],
+   "cares_less_right_now": [
+    "body-fat percentage precision",
+    "muscle-vs-fat partitioning",
+    "DEXA detail"
+   ],
+   "plan": "Prioritize sustainable weight loss and basic cardiometabolic markers; preserve lean mass with protein and resistance.",
+   "graduation_gate": "A steady downward weight trend over a month unlocks the 'recomposition' rung.",
+   "watches": []
+  },
+  "ladder": [
+   {
+    "stage_id": "foundation",
+    "headline": "Move the scale and protect the engine."
+   },
+   {
+    "stage_id": "recomposition",
+    "headline": "Lose fat, keep muscle."
+   },
+   {
+    "stage_id": "composition",
+    "headline": "Now we shape it."
+   },
+   {
+    "stage_id": "longevity",
+    "headline": "Build the body that lasts."
+   }
+  ]
+ },
+ "trait_scores": {
+  "note": "Operates in months — won't chase a weekly fluctuation, and won't soften a DEXA verdict either.",
+  "disclosure": "Authored character design — fixed numbers written into the cast by the author, not generated and not measured."
+ },
+ "character": {
+  "principles": [
+   "Consistency beats heroic sessions.",
+   "Strength and aerobic capacity are complementary, not rivals.",
+   "Preserve the habit when capacity is low — reduced sessions count.",
+   "Lean mass preservation during a deficit is non-negotiable past 35."
+  ],
+  "arc": "From DEXA baseline to tracking composition trajectory to increasingly vocal about lean mass preservation"
+ },
+ "report_card": {
+  "track_record": {
+   "record": {
+    "confirmed": 5,
+    "refuted": 8,
+    "n": 13,
+    "through": "2026-10-04"
+   },
+   "comparison": {
+    "sentence": "Too few checked calls yet (13) to compare them with a simple guess."
+   },
+   "recent": [
+    {
+     "date": "2026-10-04",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.0434), predicted=up"
+    },
+    {
+     "date": "2026-10-04",
+     "status": "refuted",
+     "metric": "weight_lbs",
+     "reason": "predicted down, metric flat (slope=-0.0076, within ±0.02 noise band) — no movement to confirm the call"
+    },
+    {
+     "date": "2026-10-02",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.0882), predicted=up"
+    },
+    {
+     "date": "2026-10-01",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.1015), predicted=up"
+    },
+    {
+     "date": "2026-09-30",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.0719), predicted=down"
+    },
+    {
+     "date": "2026-09-29",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.0428), predicted=down"
+    }
+   ]
+  }
+ },
+ "dossier": {
+  "commitments": [
+   {
+    "date": "2026-10-03",
+    "text": "I've asked him to reopen food logging and log tonight's dinner to restart protein visibility.",
+    "status": "pending",
+    "due_date": "2026-10-10"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to stabilize his protein intake upward toward the 190 g target.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to resume daily food logging starting today to track protein intake.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to resume food logging, specifically dinner, this week.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to clarify why his step count dropped 36% from baseline.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to clarify dinner consistency this week and report any unusual fatigue or cold sensitivity.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to clarify dinner consistency this week and report any unusual fatigue or cold sensitivity.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to identify the reason for his recent step contraction.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to log daily thyroid symptoms — fatigue rating and cold sensitivity — through April.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to activate his thyroid symptom log.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-01"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-01"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2027-03-13"
+   },
+   {
+    "date": "2026-09-23",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-30"
+   },
+   {
+    "date": "2026-09-23",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-30"
+   },
+   {
+    "date": "2026-09-23",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-30"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-17",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-09-24"
+   },
+   {
+    "date": "2026-09-17",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-24"
+   },
+   {
+    "date": "2026-09-16",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-09-23"
+   },
+   {
+    "date": "2026-09-16",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-23"
+   },
+   {
+    "date": "2026-09-15",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-22"
+   },
+   {
+    "date": "2026-09-14",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-13",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-13",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-20"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-10",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-17"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-06",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-13"
+   }
+  ]
+ }
+}
