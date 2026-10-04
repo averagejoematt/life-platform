@@ -2,11 +2,11 @@
 
 **Driving instruction:** the owner read the overnight candidate pages and said they looked "so bare bones … only podcast+chronicle", asked whether expert red teams and research on comparable sites had been done (they had not), and then steered the session: grade it honestly, research what makes such a site break out, keep the character sheet and badges, lose no good content, serve a daily reader and a weekly one, and make open design calls without asking ("you just fill in the blanks or recommend"). He will supply his own words by email or through his Claude chat.
 
-## Shipped: 2 PRs merged and deployed to the preview (main green at 9e03b929); 2 more open at wrap
+## Shipped: 4 PRs merged (main at 01994e30); the first three are live on the preview, the fourth was deploying at wrap
 - **#4602** → #4586: the preview front page shows progress to goal, the last seven days as rows of dots, the coaches with the open bet, a labelled one-sentence chapter with Read and Listen, and "the rest of it" as doors. `/api/edition` gained a `week` block and a `life` block; eight routes joined its `SOURCES`.
 - **#4603** → #4586: each of the last seven days opens in place to what was recorded that day; today's unlogged training is no reading, never a day without training.
-- **#4605** (open, checks running at wrap) → #4586: a page per day (`/next/v8/day/?d=`) and a page per trend (`/next/v8/trend/?m=`, and `?m=lift&x=`), plus one index of trends. A lift's trend is its best set by estimated one-rep max; daily counts are bars from zero with a target line and a seven-day average; each lift shows the best set last time. Steps left the front page's day.
-- **#4606** (open, checks running at wrap) → #4583: the coach-moves cast recognises a coach referred to by name.
+- **#4605** → #4586 (merged 19:15Z; `/next/v8/day/` and `/next/v8/trend/` returned 200 at 19:30Z): a page per day (`/next/v8/day/?d=`) and a page per trend (`/next/v8/trend/?m=`, and `?m=lift&x=`), plus one index of trends. A lift's trend is its best set by estimated one-rep max; daily counts are bars from zero with a target line and a seven-day average; each lift shows the best set last time. Steps left the front page's day.
+- **#4606** → #4583 (merged 19:29Z; its deploy was still running at wrap, so the function is unverified live): the coach-moves cast recognises a coach referred to by name.
 - **Filed:** #4604 (five served, sitemap-listed pages still show the count of earlier starts), #4607 (`/api/edition` takes about five seconds uncached).
 - **Research, private and off-repo:** two reports under `~/.claude/plans/averagejoematt-platform-plan/reports/` ("Journey site design research", "Journey site breakout and virality") with their notes. A content map of all 95 live pages was published privately to the owner.
 
@@ -41,8 +41,8 @@
 
 ## Residual / next picks
 - **#4607** first: `/api/edition` takes about five seconds uncached; it gates the cut-over and flaps the latency alarm on every cold preview load.
-- **#4586**: land PR #4605 (day and trend pages). Then the agreed build order — the owner's words at the top; a page for each settled prediction and the latest on the front page; the front page reshaped into a fixed top line, his dated note, the last settled call and the next, a Today band and a This week band; coaches at three distances; one signature daily mark proposed on a real screen; the character sheet presented plainly; the appendix. Take "The rest of it" off the front page, make the seven-day list one link, and drop the list of individual lifts from the trend index.
-- **#4583**: land PR #4606; read `MOVES#<date>` after the next 19:00 UTC run and judge the lines; the 14-day box has not started.
+- **#4586**: the agreed build order — the owner's words at the top; a page for each settled prediction and the latest on the front page; the front page reshaped into a fixed top line, his dated note, the last settled call and the next, a Today band and a This week band; coaches at three distances; one signature daily mark proposed on a real screen; the character sheet presented plainly; the appendix. Take "The rest of it" off the front page, make the seven-day list one link, and drop the list of individual lifts from the trend index.
+- **#4583**: confirm #4606 deployed (`coach-daily-reflection` updated after 19:29Z on 10-04); read `MOVES#<date>` after the next 19:00 UTC run and judge the lines; the 14-day box has not started.
 - **#4584**: a lane is building the owner's-words channel (an MCP tool for his Claude chat, and his email replies to the Monday questions) with one store, one filter and one route; find its PR, review, land and prove it with one real note. PR #4596 is superseded; close it with a note once the replacement merges.
 - **#4585**: the back-fill is still the owner's write; the Coaches page's examples must be checkable calls (threshold, result, what the simple guess said), not a conditional.
 - **#4604**: five served, sitemap-listed pages still show the count of earlier starts; the owner rules per page.
