@@ -47,9 +47,12 @@ SCHEDULE AND DEAD-MAN (the registry — `JOB` below is the one declaration)
   Pacific day is the same in both, so "tomorrow" is always the next PT day.
   Every run that reaches an HONEST terminal outcome (drafted, exists, no_session, skipped,
   blocked) emits `LifePlatform/HevyRoutine::PredraftOutcome{Job=nightly_predraft}` = 1 via EMF
-  (stdout — no IAM). A run that crashes, or a rule that stops firing, emits nothing, and
-  `nightly-predraft-missing` (24 consecutive empty hourly buckets, missing = BREACHING) goes
-  red at the close of the 02:00–03:00Z bucket: the draft is missing by 03:00Z.
+  (stdout — no IAM). A run that FAILS emits the same series at 0 with `Outcome: failed` (#4568);
+  a rule that stops firing (or a run killed before its last line) emits nothing. The alarm
+  `nightly-predraft-missing` is `Sum < 1` over 24 consecutive hourly buckets with missing =
+  BREACHING, so it goes red at the close of the 02:00–03:00Z bucket in BOTH cases — and the
+  bucket's SampleCount tells them apart: 1 (Sum 0) is a run that crashed, 0 is a run that never
+  happened. Before #4568 a crash emitted nothing and the two read the same.
 
 THE READ SIDE
   `predraft_for(target_date)` is what `plan_next_session` stage 1 attaches as `predraft`, so
@@ -104,7 +107,10 @@ NO_SESSION = "no_session"
 SKIPPED_OWNER_ROUTINE = "skipped_owner_routine"
 BLOCKED_STALE_INPUTS = "blocked_stale_inputs"
 HONEST_OUTCOMES = (DRAFTED, EXISTS, NO_SESSION, SKIPPED_OWNER_ROUTINE, BLOCKED_STALE_INPUTS)
-FAILED = "failed"  # NOT honest-terminal: emits no PredraftOutcome, so the dead-man fires
+FAILED = "failed"  # NOT honest-terminal: emits PredraftOutcome = 0, so the dead-man (Sum < 1) still fires
+GENERATOR_VARIANTS = ("ideal", "floor", "re_entry")
+"""The variants `routine_generator` persists for a lifting session — with the date and the archetype,
+each is one routine PARTITION (`_new_routine_id`, #3115)."""
 
 
 # ── THE seam ────────────────────────────────────────────────────────────────────────────
@@ -219,25 +225,59 @@ def _blocks_served_session(ir: Any, session: dict[str, Any], performed: set[str]
 
 
 # ── write side ──────────────────────────────────────────────────────────────────────────
-def _mark_draft(target_date: str, primary_id: str, session: dict[str, Any], run_at: str, preexisting: frozenset[str] = frozenset()) -> None:
+def _draft_partitions(target_date: str, session: dict[str, Any]) -> set[str]:
+    """The routine ids a draft of `session` on `target_date` lands on. Ids are SEMANTIC since #3115
+    — `sha256(target_date, archetype, variant)` — so a draft does not mint a routine: it becomes the
+    next VERSION of whatever already sits on that partition (`routine_repo.draft_versioned`)."""
+    from training.routine_generator import _new_routine_id
+
+    archetype = str(session.get("archetype") or "").lower()
+    return {_new_routine_id(target_date, archetype, variant) for variant in GENERATOR_VARIANTS}
+
+
+def _mark_draft(
+    target_date: str,
+    primary_id: str,
+    session: dict[str, Any],
+    run_at: str,
+    before: dict[str, int] | None = None,
+    owner_ids: frozenset[str] = frozenset(),
+) -> None:
     """Stamp the marker on EVERY routine the draft just persisted (ideal + its floor / re-entry
     siblings — `_action_draft` writes all of them), each as its next version, before stage 2 (see
     module doc). Only `primary_id` is red-teamed; the siblings are marked so a re-run does not read
-    them as the owner's routines. `preexisting` (#4110) are the routines on the date BEFORE the draft —
-    an owner routine for a different session can share the date now, and it is never versioned over."""
+    them as the owner's routines.
+
+    WHICH routines the draft persisted is read off the VERSION, never the id (#4568). `before` is
+    {routine_id: version} for the date as it stood before the draft: a routine the draft wrote is one
+    that is new OR whose version moved. The earlier rule — "any id already on the date is not ours"
+    (#4110) — was wrong the first night a draft landed on an existing partition: ids are derived
+    from (date, archetype, variant), so a draft for a date that already held an ARCHIVED lower/ideal
+    became that routine's next version, was skipped as pre-existing, and the run died with nothing
+    marked (2026-10-03: 8409f757… v2 archived → v3 drafted → "not readable back").
+
+    `owner_ids` are the live routines the pre-draft did not author. A draft that moved one of them
+    is refused here by name — `run` skips before drafting when a partition is the owner's, so this
+    is the backstop for an id recipe that drifts from `_draft_partitions`."""
     from training.routine_repo import put_versioned
 
-    marked = False
-    for ir in _routines_for(target_date):
-        if getattr(ir, "status", None) == "archived" or ir.routine_id in preexisting:
-            continue
-        role = PRIMARY if ir.routine_id == primary_id else SIBLING
-        marked = marked or role == PRIMARY
+    before = before or {}
+    written = [
+        ir
+        for ir in _routines_for(target_date)
+        if getattr(ir, "status", None) != "archived" and (ir.routine_id not in before or int(ir.version) != int(before[ir.routine_id]))
+    ]
+    trampled = sorted(ir.routine_id for ir in written if ir.routine_id in owner_ids)
+    if trampled:
+        raise RuntimeError(f"the draft for {target_date} versioned over routine(s) the pre-draft did not author: {trampled}")
+    if primary_id not in {ir.routine_id for ir in written}:
+        raise LookupError(f"drafted routine {primary_id} is not readable back for {target_date}")
+    for ir in written:
         ir.inputs_snapshot = {
             **(getattr(ir, "inputs_snapshot", None) or {}),
             MARKER: {
                 "engine": ENGINE_VERSION,
-                "role": role,
+                "role": PRIMARY if ir.routine_id == primary_id else SIBLING,
                 "primary_routine_id": primary_id,
                 "drafted_at": run_at,
                 "session_label": session.get("label"),
@@ -249,8 +289,6 @@ def _mark_draft(target_date: str, primary_id: str, session: dict[str, Any], run_
         ir.parent_version = ir.version
         ir.version = int(ir.version) + 1
         put_versioned(ir)
-    if not marked:
-        raise LookupError(f"drafted routine {primary_id} is not readable back for {target_date}")
 
 
 def _draft(target_date: str) -> dict[str, Any]:
@@ -327,6 +365,22 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         routine_id = mine[0].routine_id
         out["resumed"] = True
     else:
+        # #4568: a draft lands on the (date, archetype, variant) partition. An ARCHIVED routine there
+        # is simply re-drafted as its next version; a LIVE one the pre-draft did not author would be
+        # versioned over (and its Hevy link carried), so that is a skip — before anything is written.
+        taken = _draft_partitions(target, session)
+        in_the_way = [r for r in others if r.routine_id in taken]
+        if in_the_way:
+            out.update(
+                outcome=SKIPPED_OWNER_ROUTINE,
+                reason=(
+                    f"a live routine the pre-draft did not author already holds the partition a {session.get('archetype')} draft for "
+                    "this date is written to (same date, archetype and variant, a different session) — drafting would version over "
+                    "it, so nothing is drafted; archive it or draft in chat"
+                ),
+                routines=[{"routine_id": r.routine_id, "status": r.status, "hevy_linked": bool(r.hevy_routine_id)} for r in in_the_way],
+            )
+            return out
         drafted = _draft(target)
         if drafted.get("status") != "drafted" or not drafted.get("ideal_routine_id"):
             out.update(
@@ -336,7 +390,14 @@ def run(target_date: str | None = None) -> dict[str, Any]:
             )
             return out
         routine_id = drafted["ideal_routine_id"]
-        _mark_draft(target, routine_id, session, run_at, frozenset(r.routine_id for r in existing))
+        _mark_draft(
+            target,
+            routine_id,
+            session,
+            run_at,
+            {r.routine_id: int(r.version) for r in existing},
+            frozenset(r.routine_id for r in others),
+        )
 
     res = _stage_2(target, routine_id)
     rec = (res or {}).get("critics") or {}
@@ -356,10 +417,13 @@ def run(target_date: str | None = None) -> dict[str, Any]:
 
 
 # ── the dead-man datapoint ──────────────────────────────────────────────────────────────
-def emf_line(outcome: str) -> str | None:
-    """The EMF record for an honest terminal outcome; None otherwise (absence IS the signal)."""
-    if outcome not in HONEST_OUTCOMES:
-        return None
+def emf_line(outcome: str) -> str:
+    """The EMF record for a run's outcome: 1 for an honest terminal outcome, 0 for anything else.
+
+    #4568: a failed run used to emit NOTHING, so the dead-man could not tell a run that crashed
+    from a rule that never fired. It now emits the same series at 0 — the alarm is `Sum < 1`, so a
+    0 keeps the bucket breaching exactly as absence did, while the datapoint (SampleCount 1) and its
+    `Outcome` property say the run happened and failed."""
     dims = JOB["metric_dimension"]
     return json.dumps(
         {
@@ -374,23 +438,21 @@ def emf_line(outcome: str) -> str | None:
                 ],
             },
             **dims,
-            JOB["metric_name"]: 1,
+            JOB["metric_name"]: 1 if outcome in HONEST_OUTCOMES else 0,
             "Outcome": outcome,
         }
     )
 
 
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
-    """The scheduled entry. Never raises: a failure is logged with its class and emits NO
-    datapoint, so the dead-man — not a misattributed warmer Errors alarm — reports it."""
+    """The scheduled entry. Never raises: a failure is logged with its class and emits the
+    datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it."""
     try:
         result = run((event or {}).get("target_date"))
-    except Exception as e:  # noqa: BLE001 — reported by name; the dead-man carries the absence
+    except Exception as e:  # noqa: BLE001 — reported by name; the dead-man reads the 0
         logger.exception("nightly pre-draft failed")
         result = {"job": JOB["name"], "outcome": FAILED, "error": f"{type(e).__name__}: {e}"[:300]}
-    line = emf_line(result.get("outcome", FAILED))
-    if line:
-        print(line)
+    print(emf_line(result.get("outcome") or FAILED))
     logger.info("NIGHTLY_PREDRAFT %s", json.dumps(result, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(result, default=str), "headers": {"Content-Type": "application/json"}}
 

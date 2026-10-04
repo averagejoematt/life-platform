@@ -168,8 +168,8 @@ def test_cdk_rule_and_deadman_match_the_job_declaration():
     assert npd.JOB["deadman_period_s"] * npd.JOB["deadman_periods"] == 86400
 
 
-def test_emf_line_carries_the_alarms_metric_identity_and_only_for_honest_outcomes():
-    for outcome in npd.HONEST_OUTCOMES:
+def test_emf_line_carries_the_alarms_metric_identity_and_is_1_only_for_honest_outcomes():
+    for outcome in (*npd.HONEST_OUTCOMES, npd.FAILED):
         rec = json.loads(npd.emf_line(outcome))
         spec = rec["_aws"]["CloudWatchMetrics"][0]
         assert spec["Namespace"] == npd.JOB["metric_namespace"]
@@ -177,8 +177,10 @@ def test_emf_line_carries_the_alarms_metric_identity_and_only_for_honest_outcome
         assert spec["Dimensions"] == [sorted(npd.JOB["metric_dimension"])]
         for k, v in npd.JOB["metric_dimension"].items():
             assert rec[k] == v
-        assert rec[npd.JOB["metric_name"]] == 1
-    assert npd.emf_line(npd.FAILED) is None, "a failed run must emit NOTHING — the dead-man reads absence"
+        assert rec["Outcome"] == outcome
+        # #4568: a failed run emits the SAME series at 0 — the alarm is Sum < 1, so the bucket still
+        # breaches, and the datapoint's presence is what separates a crash from a run that never happened
+        assert rec[npd.JOB["metric_name"]] == (0 if outcome == npd.FAILED else 1), outcome
 
 
 # ── 2. the rule's input ↔ the handler's dispatch ─────────────────────────────────────
@@ -322,12 +324,20 @@ def test_a_refused_draft_is_blocked_not_overridden(repo):
     assert out["outcome"] == npd.BLOCKED_STALE_INPUTS and out["gaps"] == [{"input": "recovery"}]
 
 
-def test_a_crash_is_failed_and_emits_no_datapoint(capsys):
-    with patch.object(npd, "run", side_effect=RuntimeError("boom")):
-        resp = npd.lambda_entry(dict(npd.JOB["event"]))
-    body = json.loads(resp["body"])
-    assert body["outcome"] == npd.FAILED and "RuntimeError" in body["error"]
-    assert npd.JOB["metric_name"] not in capsys.readouterr().out
+def test_a_failed_run_emits_the_deadman_series_at_zero_never_nothing_and_never_one(capsys):
+    """#4568: both failure shapes — a raise, and a `failed` outcome `run` returns — put a datapoint
+    on the dead-man's series, at 0 (so `Sum < 1` still breaches) and named `failed`."""
+    offenders = []
+    for name, behaviour in (("raised", {"side_effect": RuntimeError("boom")}), ("returned", {"return_value": {"outcome": npd.FAILED}})):
+        with patch.object(npd, "run", **behaviour):
+            resp = npd.lambda_entry(dict(npd.JOB["event"]))
+        body = json.loads(resp["body"])
+        lines = [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.startswith("{") and '"_aws"' in ln]
+        if body["outcome"] != npd.FAILED or len(lines) != 1 or lines[0][npd.JOB["metric_name"]] != 0 or lines[0]["Outcome"] != npd.FAILED:
+            offenders.append((name, body, lines))
+        if name == "raised" and "RuntimeError" not in body.get("error", ""):
+            offenders.append((name, "the error class is not named", body))
+    assert not offenders, offenders
 
 
 # ── the writer ↔ reader marker contract ──────────────────────────────────────────────
@@ -471,3 +481,101 @@ def test_mutation_control_a_date_only_skip_would_block_the_friday_predraft():
     with patch.object(npd, "_blocks_served_session", lambda ir, session, performed: npd._is_owner_routine(ir)):
         out, _r = _run_with([_ir(**OWNER_LOWER), *STALE_V03], _v04_session("upper_volume", "upper"), PERFORMED_LOWER)
     assert out["outcome"] == npd.SKIPPED_OWNER_ROUTINE
+
+
+# ── #4568: the draft lands on a partition that is ALREADY on the date ─────────────────
+# The 2026-10-03 repo state, read from DynamoDB: routine ids are sha256(date, archetype, variant)
+# (#3115), and both of that night's partitions were on file — drafted 10-01 for lower-heavy, then
+# archived (version 2). `draft_versioned` re-drafted each as version 3; the marker step skipped every
+# id that pre-existed, found no primary, and the run died "not readable back".
+DAY_4568 = "2026-10-03"
+LIVE_IDEAL_4568 = "8409f7572482db0730afa60666695ad8"
+LIVE_FLOOR_4568 = "bb42b0ffd793f5d60a1c5f73ec3f8792"
+
+
+class _VersionedRepo(_Repo):
+    """`_Repo` plus the real repo's one write rule: a VERSION#<n> item is immutable."""
+
+    def put_versioned(self, ir):
+        held = self.items.get(ir.routine_id)
+        if held and int(held["version"]) >= int(ir.version):
+            raise AssertionError(f"VERSION#{int(ir.version):06d} of {ir.routine_id} already exists")
+        return super().put_versioned(ir)
+
+
+def _generator_draft_4568(target_date, archetype="lower"):
+    """`_action_draft`'s persistence, on the real seams: the generator's id recipe and `draft_versioned`."""
+    from training import routine_repo
+    from training.routine_generator import _new_routine_id
+
+    ids = {}
+    for variant in ("ideal", "floor"):
+        ids[variant] = _new_routine_id(target_date, archetype, variant)
+        routine_repo.draft_versioned(
+            RoutineSpec(
+                routine_id=ids[variant],
+                target_date=target_date,
+                archetype=archetype,
+                variant=variant,
+                created_by="cron",
+                inputs_snapshot={"calendar": {"session_role": "lower_volume"}},
+            )
+        )
+    return {"status": "drafted", "ideal_routine_id": ids["ideal"], "floor_routine_id": ids["floor"]}
+
+
+def _run_4568(on_file):
+    r = _VersionedRepo(on_file)
+    drafts = []
+
+    def draft(target_date):
+        drafts.append(target_date)
+        return _generator_draft_4568(target_date)
+
+    with (
+        patch("training.routine_repo.get_current", side_effect=r.get_current),
+        patch("training.routine_repo.put_versioned", side_effect=r.put_versioned),
+        patch("training.routine_repo.list_by_date_range", side_effect=r.list_by_date_range),
+        patch.object(npd, "scheduled_session", return_value=_v04_session("lower_volume", "lower")),
+        patch.object(npd, "_block_record", return_value=[]),
+        patch.object(npd, "_draft", side_effect=draft),
+        patch.object(npd, "_stage_2", side_effect=_fake_stage_2(r)),
+    ):
+        out = npd.run(DAY_4568)
+        out["_reader"] = npd.predraft_for(DAY_4568)["status"]
+    return out, r, drafts
+
+
+def _on_file_4568(**kw):
+    """The two routines on 2026-10-03 before the 02:00Z run, with the fields the run reads."""
+    base = dict(target_date=DAY_4568, archetype="lower", version=2, parent_version=1, created_by="cron")
+    base.update(inputs_snapshot={"calendar": {"session_role": "lower_heavy"}}, **kw)
+    return [RoutineSpec(routine_id=LIVE_IDEAL_4568, **base), RoutineSpec(routine_id=LIVE_FLOOR_4568, variant="floor", **base)]
+
+
+def test_a_draft_onto_an_archived_partition_is_marked_and_red_teamed_4568():
+    """The night that failed: the archived lower/ideal + lower/floor for the date are re-drafted as
+    their next versions — the SAME ids — and the run must mark them and reach stage 2."""
+    on_file = _on_file_4568(status="archived")
+    assert {r.routine_id for r in on_file} <= npd._draft_partitions(
+        DAY_4568, {"archetype": "lower"}
+    ), "the fixture is not the wire: the live 2026-10-03 routine ids are no longer what the id recipe derives"
+    out, r, drafts = _run_4568(on_file)
+    assert out["outcome"] == npd.DRAFTED and out["routine_id"] == LIVE_IDEAL_4568, out
+    assert drafts == [DAY_4568]
+    ideal, floor = r.get_current(LIVE_IDEAL_4568), r.get_current(LIVE_FLOOR_4568)
+    assert ideal.inputs_snapshot[npd.MARKER]["role"] == npd.PRIMARY and floor.inputs_snapshot[npd.MARKER]["role"] == npd.SIBLING
+    assert (ideal.status, floor.status) == ("draft", "draft")
+    # v2 archived → v3 the draft → v4 the marker (→ v5 the critics, primary only)
+    assert (int(ideal.version), int(floor.version)) == (5, 4)
+    assert out["_reader"] == "ready", "the evening chat's stage 1 must find the draft waiting"
+
+
+def test_a_live_routine_on_the_drafts_partition_is_never_drafted_over_4568():
+    """Same partition, but LIVE and not the pre-draft's (a lower-heavy draft for the date, the
+    sequence now serving lower-volume): the role does not block, the partition does — a draft would
+    become that routine's next version. Skipped before anything is written."""
+    out, r, drafts = _run_4568(_on_file_4568(status="draft"))
+    assert out["outcome"] == npd.SKIPPED_OWNER_ROUTINE, out
+    assert {x["routine_id"] for x in out["routines"]} == {LIVE_IDEAL_4568, LIVE_FLOOR_4568}
+    assert drafts == [] and r.puts == 0 and out["_reader"] == "none"
