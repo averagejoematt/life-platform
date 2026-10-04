@@ -77,10 +77,26 @@ def plain_name(name) -> str:
 
 
 def _plain_registry(data):
-    """The registry with every persona ``name`` passed through ``plain_name``."""
-    for p in (data.get("personas") or {}).values():
-        if isinstance(p, dict) and isinstance(p.get("name"), str):
+    """The registry with the honorific removed from every persona ``name`` — and from any
+    OTHER persona's name where a prose field cites one (``short_bio``, ``retirement_note``).
+
+    The S3 copy of this file has no deploy path (it is excluded from the config-twin sync
+    because the file is bundled into the zip), yet ``load_registry`` prefers S3 when handed
+    a client — so a copy that predates the ruling may be what loads. Normalising here makes
+    the answer the same whichever copy it was.
+    """
+    people = [p for p in (data.get("personas") or {}).values() if isinstance(p, dict)]
+    for p in people:
+        if isinstance(p.get("name"), str):
             p["name"] = plain_name(p["name"])
+    surnames = sorted({re.escape(p["name"].split()[-1]) for p in people if len(str(p.get("name") or "").split()) >= 2})
+    if not surnames:
+        return data
+    cited = re.compile(r"\bDr\.?\s+((?:[A-Z][\w'-]+\s+)?(?:%s))\b" % "|".join(surnames))
+    for p in people:
+        for field, value in p.items():
+            if field != "name" and isinstance(value, str) and "Dr" in value:
+                p[field] = cited.sub(r"\1", value)
     return data
 
 

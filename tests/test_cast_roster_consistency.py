@@ -599,8 +599,8 @@ def test_registry_and_rendered_surfaces_derive_plain_names(monkeypatch):
 
     stale = {
         "personas": {
-            "sleep_coach": {"name": "Dr. Lisa Park", "operational": True, "short_id": "sleep"},
-            "eli_marsh": {"name": "Dr. Eli Marsh", "lead": True},
+            "sleep_coach": {"name": "Dr. Lisa Park", "operational": True, "short_id": "sleep", "short_bio": "Works beside Dr. Eli Marsh."},
+            "eli_marsh": {"name": "Dr. Eli Marsh", "lead": True, "short_bio": "Reads Dr. Park's sleep call first. Cites Dr. Peter Attia."},
         }
     }
     monkeypatch.setitem(persona_registry._cache, "data", persona_registry._plain_registry(stale))
@@ -612,6 +612,8 @@ def test_registry_and_rendered_surfaces_derive_plain_names(monkeypatch):
         *(v["name"] for v in persona_registry.display_map().values()),
         story_dossier.display_name("Dr. Lisa Park"),
         persona_registry.LEAD_FALLBACK_NAME,
+        persona_registry.resolve("sleep_coach")["short_bio"],
+        persona_registry.resolve("eli_marsh")["short_bio"],
         v4_proof.coaching_read_block_html(
             {
                 "weekly_priority": {"text": "One clear call.", "coach_name": "Dr. Eli Marsh"},
@@ -621,6 +623,7 @@ def test_registry_and_rendered_surfaces_derive_plain_names(monkeypatch):
         ),
     ]
     assert "Lisa Park" in rendered and "Eli Marsh" in rendered
+    assert "Dr. Peter Attia" in persona_registry.resolve("eli_marsh")["short_bio"], "a real clinician's title is not ours to drop"
     assert "Lisa Park" in rendered[-1] and "Eli Marsh" in rendered[-1]
     rx = _honorific_pattern_for(("Park", "Marsh"))
     bad = [r for r in rendered if rx.search(r)]
