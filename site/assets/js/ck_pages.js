@@ -166,6 +166,25 @@ export function weekHTML(block) {
   return `<ul class="ck-rows">${rows}</ul>`;
 }
 
+// Each of the seven days, newest first, opens in place to what was recorded that day. The
+// disclosure is the browser's own <details>: no script, and it works with scripts off
+// once the rows are in the page.
+export function daysHTML(block, todayIso = "") {
+  const detail = usable(block) ? block.data.detail || [] : [];
+  if (!detail.length) return "";
+  const rows = detail
+    .map((d) => {
+      const words = dayInWords(d.date);
+      const [weekday, monthDay] = [words.split(",")[0], (words.split(", ")[1] || "").replace(/^[A-Za-z]+ /, "")];
+      const key = d.date === todayIso ? "Today" : `${weekday.slice(0, 3)} ${monthDay}`;
+      const facts = (d.facts || []).map((f) => `<li><span class="ck-rows__key">${esc(f.label)}</span><span>${esc(f.text)}</span></li>`).join("");
+      const body = facts ? `<details><summary>${esc(d.summary)}</summary><ul class="ck-rows">${facts}</ul></details>` : `<span class="ck-soft">${esc(d.summary)}</span>`;
+      return `<li><span class="ck-rows__key"><time datetime="${esc(d.date)}">${esc(key)}</time></span>${body}</li>`;
+    })
+    .join("");
+  return `<ul class="ck-rows">${rows}</ul>`;
+}
+
 // ── the whole thing: one fact per area, each a door ────────────────────────────
 // Body, sleep and food are already on the page in the seven-day rows, so the doors here
 // are the areas the page has not shown. `hrefs` maps an area to the page that holds it.
@@ -394,6 +413,7 @@ async function mountFront(edition, b) {
   fill("ck-today", todayHTML(b.today, edition));
   fill("ck-chart", chartHTML(usable(b.week) ? b.week.data.weight_series : null, { sentence: false }));
   fill("ck-week", weekHTML(b.week));
+  fill("ck-days", daysHTML(b.week, edition.as_of));
   fill("ck-chapter", `${chapterHTML(b.chapter, b.next, { heading: "h2", player: false, listenHref: `${base}story/` })}<p><a class="ck-link" href="${esc(base)}story/">Every chapter and episode</a></p>`);
   fill("ck-coach-lines", coachLinesHTML(b.coach_lines));
   fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
