@@ -73,6 +73,7 @@ SOURCES = {
     "predictions": "/api/predictions",
     "calibration": "/api/calibration",
     "decisions": "/api/decisions",
+    "tuesday": "/api/tuesday_question",
 }
 
 #: The two public manifests are S3 objects under generated/ (CloudFront strips the prefix).
@@ -449,10 +450,31 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
     return _block("ok", as_of, src, "No coach call has been checked yet.", data)
 
 
-def _his_words(decisions: dict | None, today: str) -> dict:
+def _tuesday_words(tuesday: dict | None, today: str) -> dict | None:
+    """His answer to the Tuesday question (#4584), printed exactly as stored, when it is
+    within the freshness bound. None otherwise — the older source then decides the block.
+    A held reply is served upstream as silence, so it can never reach here."""
+    week = (tuesday or {}).get("latest_answered")
+    answer = week.get("answer") if isinstance(week, dict) else None
+    if not isinstance(answer, dict) or not str(answer.get("text") or "").strip():
+        return None
+    day = str(answer.get("date") or "")
+    age = _days_between(day, today) if parse_day_key(day) else None
+    if age is None or age < 0 or age > HIS_WORDS_STALE_DAYS:
+        return None
+    data = {"text": str(answer["text"]), "date": day, "date_text": day_in_words(day), "question": str(week.get("question") or "") or None}
+    return _block("ok", day, SOURCES["tuesday"], "Nothing in his own words yet.", data)
+
+
+def _his_words(decisions: dict | None, tuesday: dict | None, today: str) -> dict:
     src = SOURCES["decisions"]
-    if decisions is None:
-        return _unavailable(src, "His own words")
+    # Either source failing is a failed read of his words: a missing Tuesday answer must
+    # never be read as silence, nor covered by an older note.
+    if decisions is None or tuesday is None:
+        return _unavailable([SOURCES["tuesday"], src], "His own words")
+    answered = _tuesday_words(tuesday, today)
+    if answered is not None:
+        return answered
     notes = [
         d
         for d in decisions.get("decisions") or []
@@ -525,7 +547,7 @@ def compose(
         "coach_lines": _coach_lines(b["dashboard"], today, persona_of_short),
         "scorecard": _scorecard(),
         "record": _record(b["predictions"], b["calibration"], today),
-        "his_words": _his_words(b["decisions"], today),
+        "his_words": _his_words(b["decisions"], b["tuesday"], today),
         "catch_up": _catch_up(b["journal"], today),
         "follow": _follow(b["cadence"], now, today),
     }

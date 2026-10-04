@@ -233,6 +233,7 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "predictions": {"record"},
         "calibration": {"record"},
         "decisions": {"his_words"},
+        "tuesday": {"his_words"},
     }
     offenders = []
     for key, fed in feeds.items():
@@ -317,3 +318,37 @@ def test_edition_is_registered_as_a_get_route():
     assert '"/api/edition": None' in src
     assert 'if path == "/api/edition" and method == "GET":' in src
     assert "handle_edition(lambda p, qs: _dispatch_route(" in src
+
+
+def _tuesday(text, day, question="What did this week ask of you?"):
+    week = {
+        "asked_on": day,
+        "question": question,
+        "state": "answered",
+        "sentence": "",
+        "answer": {"text": text, "date": day, "received_at": f"{day}T03:00:00+00:00", "messages": 1},
+    }
+    return {"state": "answered", "sentence": "", "latest": week, "latest_answered": week}
+
+
+def test_a_fresh_tuesday_answer_leads_his_words_exactly_as_typed():
+    """#4584: his reply is served byte for byte, with its question and date."""
+    wire = _wire()
+    typed = "honestly  tired — but still here"
+    wire["tuesday"] = _tuesday(typed, "2026-09-30")
+    block = _edition(wire)["blocks"]["his_words"]
+    assert block["state"] == "ok" and block["source"] == "/api/tuesday_question" and block["as_of"] == "2026-09-30"
+    assert block["data"]["text"] == typed and block["data"]["question"] == "What did this week ask of you?"
+
+
+def test_an_old_or_withheld_tuesday_answer_does_not_lead():
+    """Mutation control: past the freshness bound, or with no answer served (silence and a
+    held reply are the same payload), the block is whatever the older source says."""
+    baseline = _edition(_wire())["blocks"]["his_words"]
+    for tuesday in (
+        _tuesday("old words", "2026-09-20"),
+        {"state": "no_answer", "sentence": "x", "latest": {"answer": None}, "latest_answered": None},
+    ):
+        wire = _wire()
+        wire["tuesday"] = tuesday
+        assert _edition(wire)["blocks"]["his_words"] == baseline
