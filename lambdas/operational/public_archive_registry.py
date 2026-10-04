@@ -134,6 +134,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/benchmark_trends",
     "/api/broadcast",
     "/api/calibration",
+    "/api/calls",
     "/api/challenge_catalog",
     "/api/challenges",
     "/api/character",
