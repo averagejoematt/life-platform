@@ -83,7 +83,7 @@ CAST_PROMPT = (
     '"replies_to": null, "result": null}}], "bet": null}}'
 )
 
-LINE_RULES = (
+LINE_PROMPT = (
     "You are an AI coach on a public health-experiment site, writing ONE short line for today's front page. "
     "Rules you must obey:\n"
     f"- {sheet_mod.MAX_WORDS - 10} words at most. One or two sentences. No preamble, no sign-off, no lists.\n"
@@ -301,7 +301,7 @@ def run(
             target_name = names.get(sp.get("replies_to") or "", "")
             rules, example = voices(cid)
             system = (
-                LINE_RULES
+                LINE_PROMPT
                 + (f"\n\nYour voice rules: {rules}" if rules else "")
                 + (f"\n\nA sample of your voice:\n{example}" if example else "")
             )
