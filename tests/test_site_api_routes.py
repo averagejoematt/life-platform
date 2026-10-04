@@ -178,6 +178,10 @@ def _parts(doc):
     for k in ("chapter", "bet"):
         if k in nxt:
             yield f"next.{k}", nxt[k]
+    for k, row in ((blocks.get("life") or {}).get("data") or {}).get("rows", {}).items():
+        yield f"life.{k}", row
+    for k, part in ((blocks.get("week") or {}).get("data") or {}).get("measures", {}).items():
+        yield f"week.{k}", part
 
 
 def test_edition_every_block_carries_the_contract_on_the_wire():
@@ -197,6 +201,7 @@ def test_edition_every_block_carries_the_contract_on_the_wire():
         "date": "2026-10-03",
         "start_weight_lbs": 327.3,
         "start_date": "2026-09-06",
+        "goal_weight_lbs": 185.0,
         "change_lbs": -16.3,
     }
     assert b["coach_lines"]["voice"] == "restated" and len(b["coach_lines"]["data"]["lines"]) <= 3
@@ -228,11 +233,19 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "panelcast": {"chapter.podcast"},
         "cadence": {"next.chapter"},
         "docket": {"next.bet"},
-        "journey": {"today"},
+        "journey": {"today", "life.body"},
+        "sleep": {"life.sleep"},
+        "session": {"life.training"},
+        "nutrition": {"life.food", "week.food"},
+        "pulse": {"week.weight", "week.sleep"},
+        "training": {"week.training"},
+        "habits": {"life.habits"},
+        "supplements": {"life.supplements"},
+        "experiments": {"life.experiments"},
         "dashboard": {"coach_lines"},
         "predictions": {"record"},
         "calibration": {"record"},
-        "decisions": {"his_words"},
+        "decisions": {"his_words", "life.mind"},
     }
     offenders = []
     for key, fed in feeds.items():
@@ -369,3 +382,56 @@ def test_a_move_line_with_a_deficit_figure_or_a_cycle_count_is_dropped():
     wire["dashboard"]["moves"] = _moves(_CAPTURE_DAY, [bad, _MOVE_LINE])
     lines = _edition(wire)["blocks"]["coach_lines"]["data"]["lines"]
     assert [ln["text"] for ln in lines] == [_MOVE_LINE["text"]]
+
+
+def test_the_whole_life_rows_state_one_served_fact_per_area_in_order():
+    """#4586: body, training, sleep, food, habits, supplements, experiments, mind — each a
+    fact from its own route, none with a verdict."""
+    life = _edition(_wire())["blocks"]["life"]
+    assert life["state"] == "ok" and life["data"]["order"] == list(_ed.LIFE_ORDER)
+    rows = life["data"]["rows"]
+    text = {k: (r["data"] or {}).get("text") for k, r in rows.items()}
+    assert text["body"] == "16.3 lb down so far; 126 lb to go to reach 185."
+    assert text["training"] == "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+    assert text["sleep"] == "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+    assert text["food"] == "At or above the 170 g protein floor on 9 of 28 logged days."
+    assert text["habits"] == "5 of 7 daily habits kept on Friday, October 2."
+    assert text["supplements"] == "21 in the daily stack."
+    assert text["experiments"] == "None running right now; 1 ready to start."
+    assert rows["mind"]["state"] == "stale" and rows["mind"]["absent_text"].startswith("Nothing new in his own words since")
+    for row in rows.values():
+        assert not ({"verdict", "status", "going_well"} & set(row.get("data") or {})), "a row carries a verdict (#4595 owns the rules)"
+
+
+def test_a_whole_life_row_with_nothing_or_an_old_fact_says_so():
+    wire = _wire()
+    wire["session"] = {"date": "2026-10-02", "state": "served", "exercises": [{"name": "Squat (Barbell)"}]}
+    wire["habits"] = {"habit_streaks": {"as_of_date": "2026-09-28", "tier0_done": 5, "tier0_total": 7}}
+    wire["experiments"] = {"experiments": [{"name": "Morning light", "status": "active"}, {"name": "X", "status": "backlog"}]}
+    rows = _edition(wire)["blocks"]["life"]["data"]["rows"]
+    assert rows["training"]["state"] == "absent" and rows["training"]["absent_text"] == "No session is planned for today."
+    assert rows["habits"]["state"] == "stale" and rows["habits"]["absent_text"] == "Nothing newer than Monday, September 28."
+    assert rows["experiments"]["data"]["text"] == "Running now: Morning light."
+
+
+def test_the_last_seven_days_carry_one_value_per_day_and_never_a_zero_for_a_gap():
+    """#4586: seven Pacific days ending on the edition's day; a day with no reading is None."""
+    week = _edition(_wire())["blocks"]["week"]
+    assert week["state"] == "ok"
+    d = week["data"]
+    assert d["days"] == ["2026-09-27", "2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03"]
+    m = d["measures"]
+    assert m["weight"]["data"]["values"] == [314.5, 313.2, 312.3, 311.4, 311.7, 311.0, 311.0]
+    assert m["weight"]["data"]["text"] == "311 lb, down 3.5 across 7 weigh-ins."
+    assert m["training"]["data"]["text"] == "Trained on 7 of 7 days recorded."
+    assert m["sleep"]["data"]["text"] == "Slept 7 hours or more on 7 of 7 days recorded."
+    assert m["food"]["data"]["values"][0] is None and m["food"]["data"]["met"][0] is None
+    assert m["food"]["data"]["text"] == "At or above 170 g protein on 2 of 3 days recorded."
+    assert d["weight_series"][0] == {"date": "2026-09-06", "lbs": 327.3} and d["weight_series"][-1]["date"] == "2026-10-03"
+
+
+def test_a_measure_with_no_reading_this_week_is_absent_not_a_row_of_zeroes():
+    wire = _wire()
+    wire["training"] = {"daily_modality_minutes_30d": [{"date": "2026-09-01", "total_min": 60}]}
+    part = _edition(wire)["blocks"]["week"]["data"]["measures"]["training"]
+    assert part["state"] == "absent" and part["data"] is None and part["absent_text"] == "Training has no reading in these seven days."

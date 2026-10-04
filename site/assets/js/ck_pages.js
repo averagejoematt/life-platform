@@ -23,6 +23,7 @@ export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture
 // ── small helpers ──────────────────────────────────────────────────────────────
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const fmt1 = (v) => (num(v) === null ? "" : v.toFixed(1));
+const trim1 = (v) => (num(v) === null ? "" : String(Number(v.toFixed(1))));
 const usable = (b) => !!b && (b.state === "ok" || b.state === "stale") && b.data != null;
 const soft = (text) => (text ? `<p class="ck-soft">${esc(text)}</p>` : "");
 const small = (text) => (text ? `<p class="ck-small">${esc(text)}</p>` : "");
@@ -91,23 +92,32 @@ export function playerHTML(podcast) {
   return `<audio controls preload="none" src="${esc(p.mp3_url)}" aria-label="${esc(p.title || "This week’s podcast episode")}"></audio>${small(who)}`;
 }
 
-export function chapterHTML(block, nextBlock, { heading = "h1" } = {}) {
+export function chapterHTML(block, nextBlock, { heading = "h1", player = true, listenHref = "" } = {}) {
   if (!usable(block)) return absent(block, "The latest chapter is not served right now.");
   const c = block.data;
   const fresh = block.state === "ok";
   const week = c.week_label || "";
   const badge = fresh ? `New this week${week ? ` · ${week}` : ""}` : `The latest chapter${week ? ` · ${week}` : ""}`;
   const read = c.url ? `<a class="ck-btn" href="${esc(c.url)}">Read${num(c.read_minutes) !== null ? ` · ${c.read_minutes} min` : ""}</a>` : "";
+  const pod = c.podcast;
+  const hasPod = usable(pod) && pod.data.mp3_url;
+  const listen =
+    !player && hasPod && listenHref
+      ? `<a class="ck-btn ck-btn--ghost" href="${esc(listenHref)}">Listen${num(pod.data.duration_minutes) !== null ? ` · ${pod.data.duration_minutes} min` : ""}</a>`
+      : "";
   const nextCh = nextBlock && nextBlock.data && nextBlock.data.chapter;
   const nextDate = usable(nextCh) ? dayInWords(nextCh.data.date) : "";
   const nextLine = nextDate ? `Next chapter due ${nextDate}.` : (nextCh && nextCh.state !== "ok" && nextCh.absent_text) || "";
+  // The front page runs one sentence of the chapter's own summary; Story runs it whole.
+  const dek = player ? c.dek : summarySentence(c.dek) || c.dek;
   return [
     `<span class="ck-badge">${esc(badge)}</span>`,
     `<${heading}>${esc(c.title)}</${heading}>`,
-    c.dek ? `<p class="ck-premise ck-soft">${esc(c.dek)}</p>` : "",
-    read ? `<div class="ck-actions">${read}</div>` : "",
-    playerHTML(c.podcast),
-    small(`Written by AI from the record on ${shortDay(c.date)}; Matthew reads it before it publishes.${nextLine ? ` ${nextLine}` : ""}`),
+    small(`Written by AI from the record on ${shortDay(c.date)}. Matthew reads each chapter before it publishes.`),
+    dek ? `<p class="ck-premise ck-soft">${esc(dek)}</p>` : "",
+    read || listen ? `<div class="ck-actions">${read}${listen}</div>` : "",
+    player ? playerHTML(pod) : "",
+    !player && hasPod && pod.data.guest ? small(`On the podcast: ${pod.data.guest_domain ? `the ${pod.data.guest_domain} coach, ` : ""}${pod.data.guest}.${nextLine ? ` ${nextLine}` : ""}`) : small(nextLine),
   ].join("");
 }
 
@@ -120,7 +130,59 @@ export function todayHTML(block, edition) {
   const ch = num(t.change_lbs);
   const since = shortDay(t.start_date);
   const change = ch === null || !since ? "" : ch < 0 ? ` Down ${fmt1(-ch)} since ${since}.` : ch > 0 ? ` Up ${fmt1(ch)} since ${since}.` : ` The same as ${since}.`;
-  return `<div class="ck-today"><div class="ck-num"><b>${esc(fmt1(t.weight_lbs))}</b><span class="ck-soft">${esc(when + change)}</span></div></div>`;
+  return `<div class="ck-today"><div class="ck-num"><b>${esc(fmt1(t.weight_lbs))}</b><span class="ck-soft">${esc(when + change)}</span></div>${progressHTML(t)}</div>`;
+}
+
+// Start to goal as one track: how much of the distance is covered. Drawn only when the
+// start, the goal and the current weight are all served and the goal lies below the start.
+export function progressHTML(t) {
+  const [start, goal, now] = [num(t && t.start_weight_lbs), num(t && t.goal_weight_lbs), num(t && t.weight_lbs)];
+  if (start === null || goal === null || now === null || start <= goal) return "";
+  const pct = Math.max(0, Math.min(100, Math.round((100 * (start - now)) / (start - goal))));
+  return `<div class="ck-track" role="img" aria-label="${fmt1(start - now)} of ${fmt1(start - goal)} pounds lost"><i style="width:${pct}%"></i></div><div class="ck-ends"><span>${esc(`${trim1(start)} at the start`)}</span><span>${esc(`${trim1(Math.max(0, now - goal))} to go to ${trim1(goal)}`)}</span></div>`;
+}
+
+// ── the last seven days ────────────────────────────────────────────────────────
+// One row per measure: seven dots where the measure has a daily bar (filled = met, open =
+// not met, nothing = no reading that day), then the block's own sentence.
+const WEEK_LABELS = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
+export function weekHTML(block) {
+  if (!usable(block)) return absent(block, "The last seven days are not served right now.");
+  const measures = block.data.measures || {};
+  const rows = (block.data.order || Object.keys(measures))
+    .map((key) => {
+      const m = measures[key];
+      const label = WEEK_LABELS[key] || key;
+      if (!usable(m)) return `<li><span class="ck-rows__key">${esc(label)}</span><span class="ck-soft">${esc((m && m.absent_text) || "Not served right now.")}</span></li>`;
+      const met = m.data.met || [];
+      const done = met.filter((x) => x === true).length;
+      const seen = met.filter((x) => x !== null && x !== undefined).length;
+      const dots = met.length
+        ? `<span role="img" aria-label="${done} of ${seen} days">${met.map((x) => (x === true ? '<i class="ck-dot" aria-hidden="true"></i>' : x === false ? '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>' : "")).join("")}</span><br>`
+        : "";
+      return `<li><span class="ck-rows__key">${esc(label)}</span><span>${dots}${esc(m.data.text || "")}</span></li>`;
+    })
+    .join("");
+  return `<ul class="ck-rows">${rows}</ul>`;
+}
+
+// ── the whole thing: one fact per area, each a door ────────────────────────────
+// Body, sleep and food are already on the page in the seven-day rows, so the doors here
+// are the areas the page has not shown. `hrefs` maps an area to the page that holds it.
+const LIFE_LABELS = { training: "Training", habits: "Habits", supplements: "Supplements", experiments: "Experiments", mind: "Mind", body: "Body", sleep: "Sleep", food: "Food" };
+export function lifeHTML(block, hrefs = {}, keys = ["training", "habits", "supplements", "experiments", "mind"]) {
+  if (!usable(block)) return absent(block, "How the whole thing is going is not served right now.");
+  const rows = block.data.rows || {};
+  const items = keys
+    .filter((k) => rows[k])
+    .map((k) => {
+      const r = rows[k];
+      const text = usable(r) && r.data.text ? (r.state === "stale" ? `${r.data.text} ${r.absent_text}` : r.data.text) : r.absent_text || "Not served right now.";
+      const line = `${LIFE_LABELS[k] || k}: ${text}`;
+      return hrefs[k] ? `<li><a href="${esc(hrefs[k])}">${esc(line)} <span aria-hidden="true">→</span></a></li>` : `<li><a>${esc(line)}</a></li>`;
+    })
+    .join("");
+  return items ? `<ul class="ck-rows ck-rows--more">${items}</ul>` : absent(block, "Nothing is recorded yet.");
 }
 
 // ── today: what the coaches said ───────────────────────────────────────────────
@@ -167,7 +229,7 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span>of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))} Finding out whether they get better is part of the experiment.</p></div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span>of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -234,7 +296,7 @@ export function episodeRowsHTML(episodes) {
 
 // ── the weight chart ───────────────────────────────────────────────────────────
 // One line, the last point labelled, and the sentence above it says what it shows.
-export function chartHTML(weights) {
+export function chartHTML(weights, { sentence: withSentence = true } = {}) {
   const pts = (weights || []).filter((w) => w && w.date && num(w.lbs) !== null).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (pts.length < 2) return "";
   const t = (iso) => Date.parse(`${iso}T12:00:00Z`);
@@ -248,7 +310,7 @@ export function chartHTML(weights) {
   const last = pts[pts.length - 1];
   const aria = `Weight from ${fmt1(first.lbs)} pounds on ${shortDay(first.date)} to ${fmt1(last.lbs)} on ${shortDay(last.date)}, ${pts.length} weigh-ins`;
   const sentence = `My weight at every weigh-in: ${fmt1(first.lbs)} lb on ${shortDay(first.date)}, ${fmt1(last.lbs)} on ${shortDay(last.date)}.`;
-  return `<p class="ck-soft">${esc(sentence)}</p><svg class="ck-chart" viewBox="0 0 640 196" role="img" aria-label="${esc(aria)}"><polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/><polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>`;
+  return `${withSentence ? `<p class="ck-soft">${esc(sentence)}</p>` : ""}<svg class="ck-chart" viewBox="0 0 640 196" role="img" aria-label="${esc(aria)}"><polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/><polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${fmt1(first.lbs)}`)}</span><span>${esc(`${shortDay(last.date)} · ${fmt1(last.lbs)}`)}</span></div>`;
 }
 
 // ── the team ───────────────────────────────────────────────────────────────────
@@ -293,7 +355,8 @@ export function verdictsHTML(coachesBody) {
   if (!right && !wrong) return "";
   const card = (call, tag, cls) => {
     if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-    const result = call.eval_type === "point" && num(call.actual_value) !== null ? `The result was ${Number(call.actual_value.toFixed(1))}. ` : "";
+    const inRange = call.status === "confirmed" && /interval|range|between/i.test(call.claim) ? ", inside the range given" : "";
+    const result = call.eval_type === "point" && num(call.actual_value) !== null ? `The result was ${Number(call.actual_value.toFixed(1))}${inRange}. ` : "";
     return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.coach)}: “${esc(call.claim)}”</b></p>${soft(`${result}Checked ${shortDay(call.outcome_date)}.`)}</div>`;
   };
   return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
@@ -314,19 +377,28 @@ const fill = (id, html) => {
   return el;
 };
 
+const DOORS = { training: "/cockpit/", habits: "/data/habits/", supplements: "/protocols/", experiments: "/protocols/experiments/", mind: "/data/mind/" };
+
 async function mountFront(edition, b) {
-  // The person leads: fresh words sit above the chapter; silence is one plain line lower down.
-  const words = document.createElement("section");
-  words.className = "ck-section";
-  words.innerHTML = hisWordsHTML(b.his_words);
-  const anchor = document.getElementById(hisWordsFresh(b.his_words) ? "ck-chapter" : "catchup");
-  if (anchor) anchor.before(words);
-  fill("ck-chapter", chapterHTML(b.chapter, b.next));
+  // The person leads: fresh words sit above everything else. Silence is not a section —
+  // the Mind row lower down carries it as one plain line.
+  if (hisWordsFresh(b.his_words)) {
+    const words = document.createElement("section");
+    words.className = "ck-section";
+    words.innerHTML = hisWordsHTML(b.his_words);
+    const anchor = document.getElementById("today");
+    if (anchor) anchor.before(words);
+  }
+  const base = document.body.dataset.ckBase || "/";
   fill("ck-today-label", esc(`Today · ${dayInWords(edition.as_of)}`));
   fill("ck-today", todayHTML(b.today, edition));
+  fill("ck-chart", chartHTML(usable(b.week) ? b.week.data.weight_series : null, { sentence: false }));
+  fill("ck-week", weekHTML(b.week));
+  fill("ck-chapter", `${chapterHTML(b.chapter, b.next, { heading: "h2", player: false, listenHref: `${base}story/` })}<p><a class="ck-link" href="${esc(base)}story/">Every chapter and episode</a></p>`);
   fill("ck-coach-lines", coachLinesHTML(b.coach_lines));
-  fill("ck-record", [recordLine(b.record) || (b.record && b.record.absent_text) || "", betLine(b.next)].filter(Boolean).map((s) => esc(s)).join(" "));
-  fill("ck-catchup", catchUpHTML(b.catch_up, b.chapter));
+  fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
+  fill("ck-bet", betHTML(b.next));
+  fill("ck-life", lifeHTML(b.life, DOORS));
 }
 
 async function mountStart(edition, b) {

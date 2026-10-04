@@ -20,7 +20,7 @@ page height depends on the day's data, so a long chapter title on a Wednesday mu
 revert a deploy. The fixtures pin the data, so the verdict is about the page.
 
 MUTATION CONTROL (always runs first): the same harness is pointed at an over-long edition
-— the catch-up list inflated to 60 chapters — and MUST report the height failure. A gate
+— the coach lines inflated to 40 — and MUST report the height failure. A gate
 that cannot fail that page is blind, and the run exits 2 without grading anything.
 
 Usage:
@@ -80,10 +80,10 @@ def _fixtures():
 
 
 def _over_long(fixtures):
-    """The mutation: an edition whose catch-up list is far past any budget."""
+    """The mutation: an edition whose coach lines run far past any budget."""
     mutated = copy.deepcopy(fixtures)
-    items = mutated["**/api/edition"]["blocks"]["catch_up"]["data"]["items"]
-    mutated["**/api/edition"]["blocks"]["catch_up"]["data"]["items"] = [dict(items[i % len(items)]) for i in range(60)]
+    lines = mutated["**/api/edition"]["blocks"]["coach_lines"]["data"]["lines"]
+    mutated["**/api/edition"]["blocks"]["coach_lines"]["data"]["lines"] = [dict(lines[i % len(lines)]) for i in range(40)]
     return mutated
 
 
