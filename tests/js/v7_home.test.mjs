@@ -284,7 +284,7 @@ test("R7 fix 2: a windowed metric reads in words by RULE; a metric with no words
   const text = rows.map((r) => strip(r.html));
   assert.match(text[1], /says the seven-day average protein reads 190 grams or better that day/);
   assert.match(text[2], /says the seven-night average share of deep sleep reads 26 or better that day/);
-  assert.match(text[3], /^Dr\. Nathan Reeves and nutrition disagree\. Graded by code\.$/);
+  assert.match(text[3], /^Nathan Reeves and nutrition disagree\. Graded by code\.$/);
   for (const t of text) {
     assert.doesNotMatch(t, /fuel-cognition|mechanistic|7day|some new engine field/i, t);
     assert.doesNotMatch(t, /\b[a-z]+_[a-z_]+\b/, t);
