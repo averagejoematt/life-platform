@@ -142,11 +142,17 @@ _QUOTE_HEADER = re.compile(r"^\s*On .{3,120}wrote:\s*$|^-{2,}\s*Original Message
 _OFF = re.compile(r"\b(?:off[ -]?(?:the[ -])?record|OTR)\b", re.IGNORECASE)
 
 
-def parse_reply(body: str, questions: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: bool = False) -> List[Dict[str, Any]]:
     """Pair answers with questions from a reply body. Handles the two ways people answer:
-    inline (typed under each quoted 'Q3: …' line) and top-posted ('1. …' / 'Q1: …' above the quote)."""
+    inline (typed under each quoted 'Q3: …' line) and top-posted ('1. …' / 'Q1: …' above the quote).
+
+    ``keep_raw`` (#4584) adds ``raw`` to each answer: his lines exactly as typed, joined by the newlines he typed
+    (blank lines inside an answer kept, the 'Q2:' / '2.' label he typed before it removed, nothing else touched).
+    It is what the owner-words store keeps. The default output — what the chronicle's ``owner_voice`` reads — is
+    unchanged."""
     lines = (body or "").replace("\r\n", "\n").split("\n")
     answers: Dict[int, List[str]] = {}
+    raws: Dict[int, List[str]] = {}
     quoted_q: Dict[int, str] = {}
     current: Optional[int] = None
     seen_inline = False
@@ -167,21 +173,32 @@ def parse_reply(body: str, questions: Optional[List[str]] = None) -> List[Dict[s
             current = int(m.group(1))
             if m.group(2).strip():
                 answers.setdefault(current, []).append(m.group(2).strip())
+                raws.setdefault(current, []).append(m.group(2))
             continue
         n = _NUM_LINE.match(raw)
         if n and not seen_inline:
             current = int(n.group(1))
             answers.setdefault(current, []).append(n.group(2).strip())
+            raws.setdefault(current, []).append(n.group(2))
             continue
         if current is not None and raw.strip() and not raw.strip().startswith("—"):
             answers.setdefault(current, []).append(raw.strip())
+            raws.setdefault(current, []).append(raw)
+        elif current is not None and not raw.strip() and current in raws:
+            raws[current].append(raw)  # a blank line inside an answer; trailing ones are dropped below
     out = []
     for q_no in sorted(answers):
         text = " ".join(answers[q_no]).strip()
         if not text:
             continue
         q_text = questions[q_no - 1] if questions and 0 < q_no <= len(questions) else quoted_q.get(q_no)
-        out.append({"q": q_no, "question": q_text, "answer": _clean(text), "off_record": bool(_OFF.search(text))})
+        a = {"q": q_no, "question": q_text, "answer": _clean(text), "off_record": bool(_OFF.search(text))}
+        if keep_raw:
+            kept = list(raws.get(q_no) or [])
+            while kept and not kept[-1].strip():
+                kept.pop()
+            a["raw"] = "\n".join(kept)
+        out.append(a)
     return out
 
 
