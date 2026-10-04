@@ -58,7 +58,7 @@ VERDICT_HELD = "held"
 HOLD_OFF_RECORD = "off_record"
 HOLD_FILTER_UNAVAILABLE = "filter_unavailable"
 HOLD_TOO_LONG = "too_long"
-HOLD_RESIDUE = "tool_call_residue"
+HOLD_TOOL_MARKUP = "tool_call_residue"
 
 #: The longest entry the page will carry. Longer words are still stored, word for word, and held.
 MAX_CHARS = 4000
@@ -80,7 +80,7 @@ SAID_OFF_RECORD = "Stored as off the record. It never goes on the site."
 SAID_HELD = "Stored, and held: the privacy filter matched something in it, so it does not go on the site."
 SAID_UNAVAILABLE = "Stored, and held: the privacy filter could not be loaded, so it does not go on the site."
 SAID_TOO_LONG = f"Stored, and held: it is longer than {MAX_CHARS} characters, so it does not go on the site."
-SAID_RESIDUE = "Stored, and held: it carries tool-call markup, so it does not go on the site."
+SAID_TOOL_MARKUP = "Stored, and held: it carries tool-call markup, so it does not go on the site."
 
 
 def _off_marker() -> "re.Pattern[str]":
@@ -112,7 +112,7 @@ def screen(text: str, *, off_record: bool = False, vocabulary: Optional[Dict[str
         from privacy import broadcast_sensitivity_gate, content_filter_channel
 
         if find_tool_call_residue(text) is not None:
-            kinds.append(HOLD_RESIDUE)
+            kinds.append(HOLD_TOOL_MARKUP)
         data = vocabulary if vocabulary is not None else content_filter_channel.load(require=True)
         if not data:
             return VERDICT_HELD, kinds + [HOLD_FILTER_UNAVAILABLE]
@@ -155,7 +155,7 @@ def verdict_in_words(entry: Dict[str, Any]) -> str:
         (HOLD_OFF_RECORD, SAID_OFF_RECORD),
         (HOLD_FILTER_UNAVAILABLE, SAID_UNAVAILABLE),
         (HOLD_TOO_LONG, SAID_TOO_LONG),
-        (HOLD_RESIDUE, SAID_RESIDUE),
+        (HOLD_TOOL_MARKUP, SAID_TOOL_MARKUP),
     ):
         if kind in kinds:
             return said

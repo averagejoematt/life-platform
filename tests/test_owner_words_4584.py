@@ -140,7 +140,7 @@ HITS = [
     ("call me on 206-555-0142 about it", "pii"),
     ("off record: the knee is worse than I let on", ow.HOLD_OFF_RECORD),
     ("OTR the knee is worse", ow.HOLD_OFF_RECORD),
-    ("fine week</parameter>", ow.HOLD_RESIDUE),
+    ("fine week</parameter>", ow.HOLD_TOOL_MARKUP),
     ("x" * (ow.MAX_CHARS + 1), ow.HOLD_TOO_LONG),
 ]
 
