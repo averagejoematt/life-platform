@@ -1,0 +1,184 @@
+{
+ "predictions": [
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Protein intake at 146.5 g per day is insufficient to defend lean mass at a 3.6 lbs per week loss rate",
+   "status": "pending",
+   "date": "2026-10-03",
+   "due_date": "2026-10-17",
+   "metric": "total_protein_g",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Tomorrow's recovery will reach approximately 75.8%, a single-day rebound from the September 30 low",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-11-01",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Running average of recovery across 27 data points since September 6 is moving downward",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Recovery will reach 64.7% tomorrow with an 80% interval of 41.9–87.5%.",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Recovery score will rebound toward regression-to-mean levels",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Daily steps would consistently meet target across the first 14 days of this experiment",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-23",
+   "metric": "steps",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Recovery score will be 85.3% tomorrow with 80% confidence interval of 60.9–100%",
+   "status": "pending",
+   "date": "2026-09-26",
+   "due_date": "2032-04-13",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Weight will continue to decline, but body composition question remains open.",
+   "status": "pending",
+   "date": "2026-09-25",
+   "due_date": "2026-10-23",
+   "metric": "weight_lbs",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Recovery trend is pointing the right direction and may establish as a confirmed trajectory.",
+   "status": "pending",
+   "date": "2026-09-25",
+   "due_date": "2026-10-09",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "The model expects 84.8% recovery tomorrow (from the night of 2026-09-22 baseline).",
+   "status": "pending",
+   "date": "2026-09-24",
+   "due_date": "2032-04-11",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Weight will trend downward over the first 14 days under a caloric deficit.",
+   "status": "pending",
+   "date": "2026-09-23",
+   "due_date": "2026-10-21",
+   "metric": "weight_lbs",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Daily steps will consistently meet the target on each of the first 14 days.",
+   "status": "pending",
+   "date": "2026-09-23",
+   "due_date": "2026-10-14",
+   "metric": "steps",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Weight will be approximately 315 lbs tomorrow morning, within an 80% interval of 310.9–319.1 lbs.",
+   "status": "pending",
+   "date": "2026-09-22",
+   "due_date": "2026-10-20",
+   "metric": "weight_lbs",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Recovery score will be approximately 86.1% tomorrow, within an 80% interval of 61.1–100%, consistent with mean reversion rather than confirmed directional improvement.",
+   "status": "pending",
+   "date": "2026-09-22",
+   "due_date": "2026-10-06",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Weight loss trajectory from September 6th directional prediction will continue tracking downward.",
+   "status": "pending",
+   "date": "2026-09-21",
+   "due_date": "2026-10-19",
+   "metric": "weight_lbs",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "If protein EWMA holds at 170g or above for seven consecutive days and step etiology is resolved, Zone 2 training escalation can resume.",
+   "status": "pending",
+   "date": "2026-09-21",
+   "due_date": "2027-03-10",
+   "metric": "total_protein_g",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Tomorrow's recovery score will rebound to approximately 54.7%, but this represents regression-to-mean rather than intervention effect.",
+   "status": "pending",
+   "date": "2026-09-12",
+   "due_date": "2032-03-30",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "text": "Weight tomorrow morning will be 326.8 lbs",
+   "status": "pending",
+   "date": "2026-09-10",
+   "due_date": "2026-10-08",
+   "metric": "weight_lbs",
+   "eval_type": "point"
+  }
+ ]
+}

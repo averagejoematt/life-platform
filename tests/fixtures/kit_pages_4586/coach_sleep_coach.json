@@ -1,0 +1,396 @@
+{
+ "persona_id": "sleep_coach",
+ "name": "Lisa Park",
+ "tier": "staff",
+ "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice — correlative, never causal. The personality is a lens on real numbers, not a real person.",
+ "philosophy": null,
+ "absent": false,
+ "reason": null,
+ "latest_checked": {
+  "prediction_id": "pred_20260913_slow_wave_sleep_will_increase_as_trainin",
+  "claim": "Slow-wave sleep will increase as training volume builds and adenosine accumulation rises",
+  "created_date": "2026-09-13",
+  "pre_registered_at": null,
+  "outcome_date": "2026-10-04",
+  "metric": "deep_pct",
+  "eval_type": "directional",
+  "condition": "up",
+  "threshold": null,
+  "actual_value": -0.1209,
+  "status": "refuted"
+ },
+ "stance": {
+  "source": "stance",
+  "headline_read": "I remain cautious about deep sleep trend interpretation given early-window noise and the absence of the Zone 2 training driver I predicted would activate slow-wave increases. The recent downward refutation doesn't shift my core mechanistic read—I predicted upward movement contingent on structured adenosine accumulation that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on protocol stability, protein intake stabilization, and waiting for the training data that would reshape architecture.",
+  "focused_on_now": [
+   "Whether the simplified three-word check is generating usable signal after protocol redesign",
+   "Protein intake stabilization at threshold as a mechanistic lever for slow-wave architecture",
+   "Thermal environment context to anchor deep sleep variability interpretation",
+   "Arrival of Zone 2 training volume in Strava as the key predictor for adenosine-driven slow-wave increases",
+   "Persistent sensor-subjective divergence from late September and whether it reflects device construction or genuine physiological decoupling"
+  ],
+  "set_aside_for_now": [
+   "Recovery score directional claims until morning logging resumes and subjective validation is possible",
+   "Deep sleep percentile ranking until five consecutive same-direction observations accumulate",
+   "Resting heart rate trend interpretation pending thermal and training context",
+   "HRV autocorrelation analysis without subjective sleep quality anchoring"
+  ],
+  "stage": {
+   "label": "Protocol stabilization, signal waiting",
+   "rationale": "Matthew is in a holding pattern after 38 days with high rapport but incomplete behavioral compliance on logging. The simplified protocol is now active but signal quality remains unproven. The deep sleep refutation is consistent with noise in the absence of the mechanistic driver (Zone 2 adenosine accumulation) I predicted would activate increases. He's waiting for the levers—protein intake sustained at threshold, structured training volume—to appear before architecture changes become interpretable."
+  },
+  "how_my_read_changed": "",
+  "confidence_note": "My general confidence remains low (0.2) reflecting the wide prediction intervals and unresolved device-subjective divergence. Sleep duration confidence is moderate (0.467) after the September 12 recalibration; recovery and HRV confidence are lower (0.444 and 0.667 respectively) due to refuted directional calls and the 16-day logging gap that blocks subjective validation. I am more confident in naming what I don't know than in claiming signal where noise remains plausible.",
+  "as_of": "2026-10-04",
+  "grounding_flag": false
+ },
+ "trait_scores": {
+  "note": "A careful reader of converging signals — quick to say she was wrong, slow to say she's sure.",
+  "disclosure": "Authored character design — fixed numbers written into the cast by the author, not generated and not measured."
+ },
+ "character": {
+  "principles": [
+   "Sleep is not a reward for finishing your day. It's the foundation for tomorrow.",
+   "Architecture matters more than duration — 7 hours of good sleep beats 9 hours of fragmented sleep.",
+   "Social jetlag is the silent killer of consistency."
+  ],
+  "arc": "From establishing baseline to identifying Matthew's sleep signature to becoming the early warning system"
+ },
+ "report_card": {
+  "track_record": {
+   "record": {
+    "confirmed": 10,
+    "refuted": 14,
+    "n": 24,
+    "through": "2026-10-04"
+   },
+   "comparison": {
+    "sentence": "Across 24 checked calls, so far they do not beat a simple guess."
+   },
+   "recent": [
+    {
+     "date": "2026-10-04",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "deep_pct trend=down (slope=-0.1209), predicted=up"
+    },
+    {
+     "date": "2026-10-03",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "deep_pct trend=down (slope=-0.0796), predicted=up"
+    },
+    {
+     "date": "2026-10-02",
+     "status": "confirmed",
+     "metric": "sleep_duration_hours",
+     "reason": "sleep_duration_hours=8.61 on 2026-09-26 vs predicted 7.8 ±1.2107 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=1.2107)); |Δ|=0.81 → within tolerance"
+    },
+    {
+     "date": "2026-10-01",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": "deep_pct trend=down (slope=-0.0836), predicted=up"
+    },
+    {
+     "date": "2026-09-30",
+     "status": "confirmed",
+     "metric": "sleep_duration_hours",
+     "reason": "sleep_duration_hours=6.69 on 2026-09-24 vs predicted 7.4 ±1.1787 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=1.1787)); |Δ|=0.71 → within tolerance"
+    },
+    {
+     "date": "2026-09-27",
+     "status": "confirmed",
+     "metric": "sleep_duration_hours",
+     "reason": "sleep_duration_hours=7.55 on 2026-09-27 vs predicted 7.2 ±1.2952 (±1 SD of the trailing 30-day personal series (n=31 readings, SD=1.2952)); |Δ|=0.35 → within tolerance"
+    }
+   ]
+  }
+ },
+ "dossier": {
+  "commitments": [
+   {
+    "date": "2026-10-03",
+    "text": "I've asked him to resume morning logging with three-word notes when device readings feel misaligned with how he actually feels.",
+    "status": "pending",
+    "due_date": "2026-10-10"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to restore the morning sleep quality and room temperature check-in, trying a simpler format if needed.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to provide a morning note with his subjective feeling and room temperature.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-02",
+    "text": "I've asked him to register one word—good, okay, or rough—each morning before checking his device.",
+    "status": "pending",
+    "due_date": "2026-10-09"
+   },
+   {
+    "date": "2026-10-01",
+    "text": "I've asked him to report his morning felt sense and room temperature for September 29.",
+    "status": "pending",
+    "due_date": "2026-10-08"
+   },
+   {
+    "date": "2026-09-30",
+    "text": "I've asked him to maintain protein at 145 g daily for a week while tracking sleep quality.",
+    "status": "pending",
+    "due_date": "2026-10-07"
+   },
+   {
+    "date": "2026-09-30",
+    "text": "I've asked him to send a one-word morning check-in (good, okay, or rough) tomorrow.",
+    "status": "pending",
+    "due_date": "2026-10-07"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-26",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-03"
+   },
+   {
+    "date": "2026-09-25",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-02"
+   },
+   {
+    "date": "2026-09-24",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-10-01"
+   },
+   {
+    "date": "2026-09-23",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-30"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-22",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-29"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-21",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-28"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-20",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-09-27"
+   },
+   {
+    "date": "2026-09-19",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-26"
+   },
+   {
+    "date": "2026-09-19",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-26"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-18",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-09-25"
+   },
+   {
+    "date": "2026-09-17",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-24"
+   },
+   {
+    "date": "2026-09-17",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-24"
+   },
+   {
+    "date": "2026-09-15",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-22"
+   },
+   {
+    "date": "2026-09-15",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-22"
+   },
+   {
+    "date": "2026-09-15",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-22"
+   },
+   {
+    "date": "2026-09-14",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-14",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-14",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-21"
+   },
+   {
+    "date": "2026-09-13",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-20"
+   },
+   {
+    "date": "2026-09-13",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-20"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-12",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-19"
+   },
+   {
+    "date": "2026-09-11",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-18"
+   },
+   {
+    "date": "2026-09-11",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-18"
+   },
+   {
+    "date": "2026-09-10",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-17"
+   },
+   {
+    "date": "2026-09-09",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-16"
+   },
+   {
+    "date": "2026-09-09",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-16"
+   },
+   {
+    "date": "2026-09-08",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-15"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   },
+   {
+    "date": "2026-09-07",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-09-14"
+   }
+  ]
+ }
+}

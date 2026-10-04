@@ -436,6 +436,32 @@ def handle_review_pack_reply(reply_text, subject, sender, dry_run=False):
     return {"applied": applied, "unresolved": unresolved}
 
 
+def _store_owner_words(body_text, week, received_at, source_key):
+    """#4584: one owner-words entry per answered question of a Story Desk reply (channel ``email``, the question as
+    the prompt, the answer exactly as typed, off record when he marked it). Unanswered questions write nothing.
+
+    Fails closed and loud: an entry the filter could not screen is stored HELD (never served) and counted on
+    ``InsightParseFailure``, the parser's existing alarmed metric; any write failure is persisted to the parser's
+    dead-letter prefix and counted the same way. Returns the number of entries newly written."""
+    from content import owner_words
+
+    try:
+        answers = story_questions.parse_reply(body_text, keep_raw=True)
+        entries = owner_words.entries_from_story_reply(answers, week=week, received_at=received_at, source_key=source_key)
+        written = 0
+        for entry in entries:
+            _stored, created = owner_words.record(table, entry, stamp=experiment_stamp_for)
+            written += int(created)
+            if owner_words.HOLD_FILTER_UNAVAILABLE in (entry.get("hold_kinds") or []):
+                _emit_parse_failure_metric("owner_words_filter_unavailable")
+        print(f"[INFO] owner-words: {len(entries)} answer(s), {written} new entr{'y' if written == 1 else 'ies'}")
+        return written
+    except Exception as e:  # noqa: BLE001 — the chronicle's row is already written; this must not undo it
+        print(f"[ERROR] owner-words store failed: {type(e).__name__}")
+        _persist_failure_envelope(source_key, "owner_words_write_failed", {"key": source_key, "week": week, "error": str(e)})
+        return 0
+
+
 def lambda_handler(event, context):
     try:
         """
@@ -563,15 +589,20 @@ def lambda_handler(event, context):
                 sq_answers = story_questions.parse_reply(body_text)
                 print(f"[INFO] story-questions reply for week {sq_week}: {len(sq_answers)} answer(s)")
                 if sq_answers and not dry_run:
+                    sq_received_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                     sq_row = story_questions.qa_row(
                         f"USER#{USER_ID}#SOURCE#insights",
                         sq_week,
                         sq_answers,
-                        received_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        received_at=sq_received_at,
                         source_key=key,
                     )
                     sq_row.update(experiment_stamp_for(sq_row["pk"], sq_row["sk"]))  # #3599
                     table.put_item(Item=sq_row)
+                    # #4584: each answer ALSO lands in the owner-words store, word for word, with its question as the
+                    # prompt. After the chronicle's row, and never able to undo it: a failure here is persisted and
+                    # counted, and the chronicle still has his voice.
+                    _store_owner_words(body_text, sq_week, sq_received_at, key)
                     send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
                 continue
 

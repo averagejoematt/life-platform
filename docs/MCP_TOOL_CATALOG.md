@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-30
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-10-04
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-30 | **Total tools:** 86
+**Version:** v8.6.0 | **Last updated:** 2026-10-04 | **Total tools:** 87
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 86 Tools — by module
+## All 87 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -54,6 +54,7 @@
 | `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
+| `mcp/tools_owner_words.py` | 1 |
 | `mcp/tools_pending_writes.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
 | `mcp/tools_platform.py` | 3 |
@@ -282,6 +283,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_coach_correction` | item_number=, signal=, coach=, surface=, correction, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. |
+
+### mcp.tools_owner_words (`mcp/tools_owner_words.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `log_owner_note` | text, prompt=, off_record=, date= | #4584: store Matthew's OWN words for the site's 'in his own words' block, exactly as he said them. Call it only when he asks for something he said to go on the site or 'on the record' (e.g. 'put this on the site: …', 'log this as my note: …', 'my answer to this week's question is …'). text = his words VERBATIM — copy them character for character: never summarise, paraphrase, correct, tidy, translate or add to them, and never write words for him. If he has not given the exact words, ask him for them instead of calling. prompt = the question his words answer, if there is one. off_record = true when he says it is off the record (stored, never published). date = the day the words are about, YYYY-MM-DD, default today (Pacific). A clean note is PUBLIC on averagejoematt.com word for word; anything the privacy filter matches is held (stored, never published). The result's `verdict` says which, in plain words — tell him that sentence as it is. |
 
 ### mcp.tools_pending_writes (`mcp/tools_pending_writes.py`)
 
