@@ -52,6 +52,7 @@ only way to know why is this row.
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import logging
 import os
 from typing import Any
@@ -210,7 +211,15 @@ def _week_totals(table, start: str, end: str) -> dict[str, Any]:
 
     days = recap_data._day_range(start, end)
     allf = [recap_data.day_facts(table, d, experiment_start=EXPERIMENT_START_DATE) for d in days]
-    weighed = [x.weight_lb for x in allf if x.weight_lb is not None]
+    # The week's change runs from the last weigh-in BEFORE the week (the day before's
+    # carried-forward weight) to the week's last, so consecutive weeks sum to the total.
+    # First-to-last inside the week dropped the boundary day's change (wk4: −3.5 drawn,
+    # −2.9 real).
+    before = (dt.date.fromisoformat(start) - dt.timedelta(days=1)).isoformat()
+    prior = (
+        recap_data.day_facts(table, before, experiment_start=EXPERIMENT_START_DATE).weight_lb if before >= EXPERIMENT_START_DATE else None
+    )
+    weighed = ([prior] if prior is not None else []) + [x.weight_lb for x in allf if x.weight_lb is not None]
     pcts = [x.tier0_pct for x in allf if x.tier0_pct is not None]
     worst = min(((k, v) for x in allf for k, v in x.component_scores.items()), key=lambda kv: kv[1], default=None)
     totals: dict[str, Any] = {

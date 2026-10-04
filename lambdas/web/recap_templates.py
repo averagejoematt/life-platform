@@ -196,7 +196,7 @@ def _weight_copy(facts) -> dict[str, Any]:
 def _workout_copy(facts) -> dict[str, Any]:
     if not facts.workouts:
         raise RecapNullFact("no workouts — this template should not have been picked")
-    sets = sum(w.n_sets for w in facts.workouts)
+    sets = sum(w.n_working_sets for w in facts.workouts)
     vol = sum(w.volume_lbs for w in facts.workouts)
     titles = ", ".join(_session_label(w.title) for w in facts.workouts)
     lines = [f"{sets} working sets", f"{vol:,.0f} lb moved"]

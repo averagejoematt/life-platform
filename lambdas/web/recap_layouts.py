@@ -1081,7 +1081,7 @@ def caption_for_beat(layout: str, facts, *, day_label: str, date_label: str) -> 
             bits.append(f"{facts.lb_to_goal:.0f} lb to go.")
     elif layout == "session" and facts.workouts:
         w = facts.workouts[0]
-        bits.append(f"{_session_label(w.title)}. {w.n_sets} working sets, {w.volume_lbs:,.0f} lb moved.")
+        bits.append(f"{_session_label(w.title)}. {w.n_working_sets} working sets, {w.volume_lbs:,.0f} lb moved.")
     else:
         if facts.grade_letter:
             bits.append(f"Today graded {facts.grade_letter}.")
