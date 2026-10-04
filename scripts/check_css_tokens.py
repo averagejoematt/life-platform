@@ -91,6 +91,17 @@ known tokens.
    `_fetch_live_issues`). That half needs network, so it is NEVER called from `check()`
    (what the offline pytest gate runs) — only from `main()`, run directly.
 
+7. THE KIT (#4581) — a page that loads `site/assets/css/clean.css` is built from the v8
+   kit (docs/design/v8/README.md), the one look the owner approved on 2026-10-03, and
+   DESIGN_SYSTEM_V5 no longer governs it. Checks 1 and 4 would hold such a page to the
+   --fs-* triad and the nine v5 breakpoints, so check 5 SKIPS a kit page — and holds it
+   to the kit's own, narrower rules instead (`kit_page_findings`): no page-scoped
+   `<style>`, no v5 sheet beside the kit, no font CDN, no inline style beyond a meter
+   width. The sheet is held to the freeze (`kit_sheet_findings`): under 12 KB, one
+   typeface, no colour outside its token blocks, the accent only where the approved
+   sources put it, AA contrast for every text token on both grounds in both themes.
+   The exemption is keyed on what the page LOADS, so a v5 page is swept exactly as before.
+
 Exit 0 clean, 1 with findings. Run:  python3 scripts/check_css_tokens.py
                                       python3 scripts/check_css_tokens.py --verify-issues  (+network)
 Enforced by tests/test_css_tokens.py.
@@ -599,6 +610,125 @@ def inline_style_findings(name: str, text: str) -> list:
     return breakpoint_findings_in(name, masked) + font_size_findings(name, masked) + sanction_issue_ref_findings(name, masked)
 
 
+# (#4581) The kit. See check 7 in the module docstring.
+KIT_SHEET = "clean.css"
+KIT_MAX_BYTES = 12 * 1024
+_KIT_LINK = re.compile(r'<link[^>]+href="/assets/css/clean[.\w]*\.css"')
+_KIT_FOREIGN = ("/assets/css/tokens.css", "/assets/css/fonts.css", "fonts.googleapis.com", "fonts.gstatic.com")
+_KIT_STYLE_ATTR = re.compile(r'\sstyle="([^"]*)"')
+_KIT_WIDTH_ONLY = re.compile(r"width:\s*[\d.]+%;?")
+_CSS_RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
+_KIT_TEXT_TOKENS = ("--ck-fg", "--ck-soft", "--ck-faint", "--ck-accent")
+_KIT_GROUNDS = ("--ck-bg", "--ck-panel")
+# Every selector allowed to paint with the accent — progress and "new", the focus ring,
+# and nothing else (the approved sources' own uses, minus the section labels). A new
+# selector reaching for the accent is the clutter the kit exists to stop.
+KIT_ACCENT_USES = frozenset(
+    {
+        "a:focus-visible",
+        ".ck-badge",
+        ".ck-track i",
+        ".ck-meter i",
+        ".ck-dot",
+        ".ck-rows--chapters .ck-rows__now a",
+        ".ck-verdicts__tag--right",
+        ".ck-quote--chapter",
+        ".ck-chart__line",
+        ".ck-chart__now",
+    }
+)
+
+
+def is_kit_page(text: str) -> bool:
+    """(#4581) True when the page loads the kit sheet — the ONE fact that moves a page
+    from DESIGN_SYSTEM_V5 to docs/design/v8. Keyed on the stylesheet link, never on a
+    path list, so the exemption cannot be claimed by a page that still wears v5."""
+    return bool(_KIT_LINK.search(text))
+
+
+def kit_page_findings(name: str, text: str) -> list:
+    """(#4581) The kit's rules for a page that loads it. Returns finding strings."""
+    findings = []
+    if STYLE_BLOCK.search(text):
+        findings.append(f"{name}: a kit page carries a page-scoped <style> block — the kit is the only source of its look (docs/design/v8)")
+    for foreign in _KIT_FOREIGN:
+        if foreign in text:
+            findings.append(f"{name}: a kit page also loads `{foreign}` — clean.css is self-contained, one typeface, self-hosted")
+    for i, line in enumerate(text.splitlines(), 1):
+        for m in _KIT_STYLE_ATTR.finditer(line):
+            if not _KIT_WIDTH_ONLY.fullmatch(m.group(1).strip()):
+                findings.append(f'{name}:{i}: inline style="{m.group(1)}" on a kit page — only a meter/track `width:N%` is allowed')
+    return findings
+
+
+def _relative_luminance(hexval: str) -> float:
+    h = hexval.lstrip("#")
+    chans = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+    r, g, b = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in chans]
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(a: str, b: str) -> float:
+    """WCAG 2.x contrast ratio of two #rrggbb colours."""
+    hi, lo = sorted((_relative_luminance(a), _relative_luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def kit_palettes(text: str) -> Dict[str, Dict[str, str]]:
+    """(#4581) {"light": {token: hex}, "dark": {token: hex}} read from the kit sheet's
+    own `:root` block and its `:root[data-theme="dark"]` block."""
+    out: Dict[str, Dict[str, str]] = {}
+    for theme, selector in (("light", r":root"), ("dark", r':root\[data-theme="dark"\]')):
+        m = re.search(r"(?:^|\n)\s*" + selector + r"\s*\{([^}]*)\}", strip_comments(text))
+        out[theme] = dict(re.findall(r"(--ck-[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\b", m.group(1))) if m else {}
+    return out
+
+
+def kit_contrast_table(text: str) -> List[Tuple[str, str, str, float]]:
+    """(#4581) (theme, text token, ground token, ratio) for every text token on every
+    ground it is painted on, plus the accent on its wash (the badge) and the page colour
+    on the ink (the button)."""
+    rows = []
+    for theme, pal in kit_palettes(text).items():
+        pairs = [(t, g) for t in _KIT_TEXT_TOKENS for g in _KIT_GROUNDS] + [("--ck-accent", "--ck-accent-wash"), ("--ck-bg", "--ck-fg")]
+        for t, g in pairs:
+            if t in pal and g in pal:
+                rows.append((theme, t, g, contrast_ratio(pal[t], pal[g])))
+    return rows
+
+
+def kit_sheet_findings(name: str, text: str) -> list:
+    """(#4581) The freeze, as assertions over the kit sheet. Returns finding strings."""
+    findings = []
+    size = len(text.encode("utf-8"))
+    if size >= KIT_MAX_BYTES:
+        findings.append(f"{name}: {size} bytes — the kit stays under {KIT_MAX_BYTES} (12 KB)")
+    body = token_definition_mask(text)  # token blocks blanked: a colour lives ONLY there
+    for lineno, hexval in raw_hex_findings(body):
+        findings.append(f"{name}:{lineno}: raw hex colour `{hexval}` outside the token blocks — the kit has eight colours, all tokens")
+    known = set(PROP_DEF.findall(strip_comments(text)))
+    findings.extend(undefined_var_findings(name, text, known))
+    code = strip_comments(body)
+    if len(re.findall(r"@font-face\b", code)) != 1:
+        findings.append(f"{name}: the kit declares exactly ONE @font-face (one typeface, one file)")
+    for selector, decls in _CSS_RULE.findall(code):
+        selector = " ".join(selector.split())
+        for fam in re.findall(r"font-family\s*:\s*([^;}]+)", decls):
+            if selector != "@font-face" and fam.strip() != "var(--ck-sans)":
+                findings.append(f"{name}: `{selector}` sets font-family `{fam.strip()}` — one typeface, via var(--ck-sans)")
+        if re.search(r"var\(--ck-accent\)", decls):
+            for one in (x.strip() for x in selector.split(",")):
+                if one not in KIT_ACCENT_USES:
+                    findings.append(f'{name}: `{one}` paints with the accent — it is for progress and "new" only (KIT_ACCENT_USES)')
+    table = kit_contrast_table(text)
+    if len(table) != 2 * (len(_KIT_TEXT_TOKENS) * len(_KIT_GROUNDS) + 2):
+        findings.append(f"{name}: could not read both palettes — the contrast check would be vacuous ({len(table)} pairs)")
+    for theme, t, g, ratio in table:
+        if ratio < 4.5:
+            findings.append(f"{name}: {theme} `{t}` on `{g}` is {ratio:.2f}:1 — text needs 4.5:1 (AA)")
+    return findings
+
+
 def defined_props(*files: Path) -> set:
     props = set()
     for f in files:
@@ -632,7 +762,13 @@ def check() -> list:
     # (#1974) …and across the GENERATED surface the stylesheet sweep never reached: the
     # inline <style> blocks the v4 generators emit, plus the built pages they write.
     for label, path in generated_style_sources():
-        findings.extend(inline_style_findings(label, path.read_text(errors="replace")))
+        page = path.read_text(errors="replace")
+        if is_kit_page(page):
+            # (#4581) A kit page answers to docs/design/v8, not to the v5 type scale.
+            findings.extend(kit_page_findings(label, page))
+            continue
+        findings.extend(inline_style_findings(label, page))
+    findings.extend(kit_sheet_findings(KIT_SHEET, (CSS_DIR / KIT_SHEET).read_text()))
     # (#3542) …and across the JS surface it never reached either: a matchMedia()
     # boundary is a §10.1 breakpoint that happens to be spelled in JavaScript.
     for label, path in js_sources():
