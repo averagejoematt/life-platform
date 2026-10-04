@@ -978,6 +978,7 @@ def private_rows():
 EXEMPT = {
     "/legacy/": "verbatim pre-v4 archive, private rollback surface — never QA-swept by policy (ADR-071)",
     "/next/": "v7 preview subtree (#4182, plan §1b), noindex + unlinked from the live pages; struck at cut-over when the nine get real rows",
+    "/kit/": "v8 kit specimen (#4581): the twelve components on one unlisted, noindex page — a build reference, not a reader page; scripts/check_css_tokens.py holds it to the kit rules",
     "/index.html": "the '/' entry covers it (directory index)",
 }
 

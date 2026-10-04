@@ -2,6 +2,13 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
+> **Superseded for pages built from the kit (2026-10-03, #4581).** A reader page that
+> loads `site/assets/css/clean.css` follows [design/v8/README.md](design/v8/README.md),
+> the direction the owner approved on 2026-10-03: one typeface, one accent, twelve
+> components. The type triad, the ember accent, the `--fs-*` scale and the breakpoint
+> set below do not apply to it. This document still governs every page that does not
+> load `clean.css`.
+
 Extends (does **not** replace) `DESIGN_SYSTEM_V4_THE_MEASURED_LIFE.md` and
 `site/assets/css/tokens.css`. v4 gave us the *materials* (palette, type triad,
 spacing, signatures). v5 gives us the *through-line*: one editorial spine and a
