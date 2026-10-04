@@ -102,6 +102,7 @@ except Exception:  # pragma: no cover - defensive guard, not expected in practic
 
 # ── Split logic modules — the handler bodies live here; delegated to at call time. ──
 from web import (
+    site_api_calls as _calls,
     site_api_coach_ledger as _ledger,
     site_api_coach_narrative as _narrative,
     site_api_coach_profile as _profile,
@@ -352,6 +353,11 @@ def handle_ai_analysis(event):
 def handle_calibration(event):
     """GET /api/calibration — delegated to web.site_api_coach_ledger."""
     return _ledger.handle_calibration(event, _g=globals())
+
+
+def handle_calls(event):
+    """GET /api/calls — delegated to web.site_api_calls (#4586: one page per settled call)."""
+    return _calls.handle_calls(event, _g=globals())
 
 
 def handle_coach(event):

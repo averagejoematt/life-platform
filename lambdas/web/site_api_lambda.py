@@ -70,6 +70,7 @@ from web.site_api_coach import (
     _regeneration_paused,
     handle_ai_analysis,
     handle_calibration,
+    handle_calls,
     handle_coach,
     handle_coach_analysis,
     handle_coach_docket,
@@ -521,6 +522,7 @@ ROUTES = {
     # Coaching Dashboard
     "/api/coaching-dashboard": None,  # GET — assembled coaching dashboard data
     # Prediction Ledger + Coach Timeline
+    "/api/calls": None,  # #4586: every settled, checkable coach call (GET, optional ?id=) — a page per call
     "/api/predictions": None,  # GET with ?status=&coach_id=&limit= query params
     "/api/coach_timeline": None,  # GET with ?coach_id= query param
 }
@@ -702,6 +704,8 @@ def _dispatch_route(event, path, method):
     # stakes; open positions + resolved history (losses never buried).
     if path == "/api/coach_docket":
         return handle_coach_docket(event)
+    if path == "/api/calls":
+        return handle_calls(event)
     if path == "/api/panel_ledger":
         return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):

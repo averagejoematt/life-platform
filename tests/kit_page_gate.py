@@ -61,9 +61,13 @@ KIT_PAGES = {
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
+    "/next/v8/call/": 4,  # the newest settled call above the list of all of them
+    "/next/v8/call/?id=sleep-20260907-8436f03290": 4,  # one number call
+    "/next/v8/call/?id=bet-20260930-994b3d89f6": 4,  # a bet: both sides' words, the longest a call page gets
+    "/next/v8/call/?id=sleep-20260907-0000000000": 4,  # an address that names no call: one sentence and the list
 }
 
-#: route glob -> fixture file. Every route ck_pages.js reads.
+#: route glob -> fixture file. Every route the kit pages' modules read.
 ROUTES = {
     "**/api/edition": "edition.json",
     "**/journal/posts.json": "posts.json",
@@ -76,6 +80,7 @@ ROUTES = {
     "**/api/training_overview": "training_overview.json",
     "**/api/nutrition_overview": "nutrition_overview.json",
     "**/api/frequent_meals": "frequent_meals.json",
+    "**/api/calls": "calls.json",  # ck_call.js — this route's own output for tests/fixtures/calls_wire_4586/
 }
 
 _FORBIDDEN = (
