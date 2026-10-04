@@ -81,16 +81,16 @@
     "note": "ADDED 2026-08-28 (Session I). Lit 2026-08-26T10:25 PT; crosses the 72h bar 2026-08-29 ~10:25 PT, hence cited now. The alarm's own CDK comment (cdk/stacks/monitoring_prediction_alarms.py:65-73) says it 'fires on the CURRENT corpus the day it deploys (28/50 pending are legacy qualitative rows) and clears as the evaluator retires them at window end (_retire_ungradeable) — deliberate, same posture as #727'. The firing is therefore expected. WHAT IS NOT EXPECTED, and is why this note exists rather than a bare 'deliberate': measured LifePlatform/Predictions daily 2026-08-23..08-26, GradableShare rises 0.3951 / 0.4024 / 0.4024 / 0.4556 while UngradeablePendingCount is FLAT at 49 / 49 / 49 / 49. The share is improving because the GRADABLE numerator is growing, not because legacy rows are being retired. _retire_ungradeable only retires a record once its domain-clamped window has ELAPSED, so a flat 49 is consistent with 'no window has elapsed yet' AND with 'the retirement is not running' — this note does NOT claim to distinguish them, because I did not read the pending corpus out of DynamoDB. That is the open question. RE-DERIVE, do not trust this note: if UngradeablePendingCount is still exactly 49 at the next wrap, the stated clearing mechanism is not the one clearing it and this earns an issue. The 14-day issueless_ancient_reds rule forces a #N by 2026-09-09."
   },
   "qa-smoke-failures": {
-    "added": "2026-10-03",
-    "cause": "cross_surface:coach_vs_engine",
-    "cause_observed": "2026-10-02T18:31Z",
-    "citation": "#4569 — the nutrition coach's served summary cites 166 g protein against the engine's served 146.5 g (2026-10-02 18:31Z qa-smoke: 3 claims extracted, 2 compared). New episode 2026-10-02; the earlier 106.9 g weekly-read cause is closed."
+    "added": "2026-10-04",
+    "cause": "cross_surface:coach_consistency,cross_surface:coach_vs_engine,hooks:liveness_matrix",
+    "cause_observed": "2026-10-03T18:31Z",
+    "citation": "#4593 — the season promote published week 4 without chronicle-approve's side effects, so the week-07 share kit is missing (hooks:liveness_matrix: 1 of 22 cells MISSING, chronicle/share_kit unreadable). The two cross_surface coach causes in the same run (coach_vs_engine, coach_consistency) were the checker judging a named single-day protein figure against the window mean; PR 4574 fixed and deployed that on 2026-10-04 03:22Z and they should be absent from the 2026-10-04 18:30Z run."
   },
   "qa-smoke-warnings": {
-    "added": "2026-10-03",
-    "cause": "recall:corpus_freshness",
-    "cause_observed": "2026-10-02T18:31Z",
-    "citation": "Dated, self-clearing: the Story Desk season promote (#4531, 2026-10-01/02) wrote the rewritten chronicle rows directly, bypassing chronicle-approve's publish-time recall indexer; the nightly recall-freshness leg SELF-HEALED it at 2026-10-02 18:31Z ('re-indexed 2026-09-29'). Expiry: clears at the 2026-10-03 nightly run, which should find no missed week. If still lit after that run, re-derive — the warning is then a different cause."
+    "added": "2026-10-04",
+    "cause": "data:orphan_routine_drafts,weeks:fact_agreement",
+    "cause_observed": "2026-10-03T18:31Z",
+    "citation": "#4593 — weeks:fact_agreement reads the week-4 share kit as UNREACHABLE (HTTP 404), the same missing artifact. The run's second cause, data:orphan_routine_drafts, is 5 routine drafts dated 2026-09-26/27 never committed or archived — owner-archivable with manage_hevy_routine; it rides this citation until the kit is built."
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -119,12 +119,6 @@
     "citation": "#3830 — a FIRED-AND-CLEARED flap that is fully explained and is the root of tonight's fleet-rollback incident. ALARM 2026-09-15T19:55:44Z -> OK 20:10:44Z (15 min, one cycle). Cause: a single Bedrock `ServiceUnavailableException` — a vendor 503 — on the canary's `anthropic` check at 19:54:50Z, with DDB, S3, MCP and the subscribe flow all round-tripping clean in the same run. The alarm is CORRECT and needed no change: it fired on a real failed inference round-trip and cleared on the next clean one. What it exposed is that ONE datapoint had three consumers with three different confidences: the canary's own email path SUPPRESSED it as a first occurrence, this alarm fired and self-cleared, and the CI/CD smoke gate treated it as gating and auto-reverted 85 Lambdas (run 35013357326). Fixed by PR #3831, merged 28247778f and DEPLOYED 2026-09-16T01:26:13Z (verified in the deployed bundle): `LANE_EXTERNAL_TRANSIENT` + `lane_for_result` classify the FAILURE MODE, not just the check, so a vendor transient is counted in `failed_external_transient` and excluded from `failed_deploy_health` — the only key the smoke oracle gates on. A recurrence of THIS alarm is now expected to be non-gating; if a future 503 ever reverts a deploy again, that is a NEW finding, not this one.",
     "note": "Deliberately cited rather than suppressed, and the alarm is deliberately NOT retuned. A 15-minute flap on a real vendor outage is this alarm doing its job — it is the only instrument of the three that got the confidence level right, being loud without being destructive. #3830's remaining half (acceptance box 3) is retry-before-gate: making a SINGLE first-occurrence datapoint incapable of reverting a fleet, which is the property the canary's own email suppression already has and the deploy gate still does not. Until that lands, a SECOND transient inside one smoke window could still gate. Recorded 2026-09-16 by Session AF, the session that caused, diagnosed and fixed the episode in the same night."
   },
-  "nightly-predraft-missing": {
-    "added": "2026-10-03",
-    "cause": "predraft-run-failed",
-    "cause_observed": "2026-10-03T02:00:40Z",
-    "citation": "#4568 — the 2026-10-03 02:00Z run failed (LookupError: drafted routine 8409f757… is not readable back for 2026-10-03, mcp/nightly_predraft.py:253); a failed run emits no PredraftOutcome, so the 24x1h dead-man went ALARM at 04:01Z. The 10-02 run was healthy. Supersedes the dead-man's birth-state entry."
-  },
   "daily-brief-duration-high": {
     "added": "2026-09-29",
     "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the remaining-time-floor budget box) was not exercised. RE-CITED 2026-09-30 (Session BA): the 2026-09-29 17:00Z brief ran 733 s with 5 quality holds (same class); PR 4443 (rewrite revises the draft) and PR 4466 (lead read's own rubric) deployed after it — proof due at the 2026-09-30 17:00Z brief under #4343.",
@@ -141,5 +135,23 @@
     "cause_observed": "2026-10-01",
     "cause": "rolling-24h threshold at the measured baseline",
     "citation": "#4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision visual QA + attended dry runs) cross it. Incident row 2026-09-30 (Session BB)."
+  },
+  "chronicle-delivery-heartbeat": {
+    "added": "2026-10-04",
+    "cause": "week-4-not-delivered",
+    "cause_observed": "2026-10-02T19:10Z",
+    "citation": "#4593 — week 4 was published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; last delivery 2026-09-25T18:00Z. Clears when week 5 delivers through the approve path (Friday 2026-10-09 18:00Z) or the owner has week 4 sent."
+  },
+  "swallowed-permission-denial": {
+    "added": "2026-10-04",
+    "cause": "qa-smoke-share-kit-accessdenied",
+    "cause_observed": "2026-10-03T18:32Z",
+    "citation": "#4593 — one episode, ALARM 2026-10-03T18:32Z, OK 18:47Z (describe-alarm-history). It coincides with the 18:31Z qa-smoke run's AccessDenied GetObject on the missing week-07 share kit; that link is inferred from the timestamps, not read from the metric's source line."
+  },
+  "nightly-predraft-missing": {
+    "added": "2026-10-04",
+    "cause": "predraft-run-failed",
+    "cause_observed": "2026-10-03T02:00:40Z",
+    "citation": "#4568 — one episode: the 2026-10-03 02:00Z run failed (the draft landed on an archived routine's id and the read-back treated it as not ours), the dead-man went ALARM at 04:01Z, and it cleared after the 2026-10-04 02:00Z run drafted on fresh ids. PR 4572 (merged, deployed 2026-10-04 03:25Z) marks a draft by its version and emits a failed outcome; its live proof is the first night whose date already holds an archived draft."
   }
 }

@@ -629,6 +629,9 @@ jobs:
       # only then — an additive-IAM diff carried over from an earlier merge does not re-park
       # every later code deploy behind the owner.
       cdk_changed: ${{ steps.plan.outputs.cdk_changed }}
+      # #4589: the resolved deploy base (#4472), read by visual-qa's reader-surface gate.
+      # Empty = unresolved, which that gate reads as RUN, never as a skip.
+      deploy_base: ${{ steps.base.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1351,15 +1354,29 @@ jobs:
     name: Visual + AI-vision QA
     runs-on: ubuntu-latest
     timeout-minutes: 50
-    needs: [reconcile, deploy]   # #1173: reconcile listed to read build_sha
+    needs: [reconcile, plan, deploy]   # #1173: reconcile listed to read build_sha; #4589: plan for deploy_base
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
+          fetch-depth: 0   # #4589: the reader-surface gate diffs deploy_base..HEAD
 
       - uses: ./.github/actions/setup-ci
         with:
           python-cache: 'pip'
+
+      - name: Reader-surface gate (#4589 — the AI judge runs only when a reader surface changed)
+        id: reader_surface
+        env:
+          DEPLOY_BASE: ${{ needs.plan.outputs.deploy_base }}
+        run: |
+          # The owner's ruling (platform plan 2026-10-03, decision 4): the AI checks run only
+          # when reader pages change. scripts/reader_surface.py derives the surface (site/, the
+          # site-API request-time import closure, the judges + this wiring, bundled config) and
+          # diffs the deploy base (#4472) against the reconciled tree. An unresolved base, a
+          # non-ancestor or any error is RUN. The deterministic sweep below runs either way;
+          # only --ai-qa is dropped on a SKIP, and the verdict line says why.
+          python3 scripts/reader_surface.py --base "${DEPLOY_BASE}" --github-output
 
       - name: Install Playwright + Chromium
         # The one install step list for every visual-QA job (#4254): pinned playwright +
@@ -1376,6 +1393,9 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run visual + AI-vision QA sweep
+        env:
+          RUN_AI: ${{ steps.reader_surface.outputs.run_ai }}
+          SKIP_REASON: ${{ steps.reader_surface.outputs.reason }}
         run: |
           # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
           # time; the deterministic sweep runs the full surface.
@@ -1386,7 +1406,14 @@ jobs:
           # its own elapsed days; a threshold meter carrying its own explanation) were
           # rolling back healthy deploys. It still runs FULL-SURFACE in the daily
           # standalone (visual-qa.yml), where it reports without holding a rollback.
-          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+          # #4589: --ai-qa only when the reader-surface gate said RUN (its verdict line is above).
+          # The tier-3 budget pause is unchanged — it lives inside the judge and applies on RUN.
+          if [ "${RUN_AI}" = "false" ]; then
+            echo "::notice title=AI-vision skipped (#4589)::${SKIP_REASON}"
+            python3 tests/visual_qa.py --screenshot
+          else
+            python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+          fi
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |

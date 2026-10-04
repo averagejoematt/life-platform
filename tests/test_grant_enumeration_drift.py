@@ -216,6 +216,13 @@ _CONTENT_FILTER_WATCH: dict[str, str] = {
     # held`), so a hold is queryable after the fact rather than merely absent, and the
     # separate recap-card-no-invocations-24h alarm covers the "stopped running at all" case
     # this exemption does not.
+    # #4583, 2026-10-03. coach_moves_sheet.check_line reads the vocabulary through
+    # privacy_guard.find_violations; an unavailable channel raises, which check_line turns
+    # into the refusal `privacy_unchecked` — every line that day is HELD and the coach is
+    # silent. The failure direction is "publish nothing", the bluesky/recap shape, never a
+    # silent no-op scrub; each held line and its reason is stored on the day's MOVES# row.
+    "lambdas/compute/coach_daily_reflection_lambda.py": "exempt 2026-10-03 (#4583): the daily moves fail CLOSED — an "
+    "unavailable vocabulary holds every line (reason `privacy_unchecked` on the MOVES# row's `held`), publishing nothing",
     "lambdas/web/recap_card_lambda.py": "exempt 2026-09-13 (#3741): fails CLOSED to a held card on an owner-only, "
     "hand-posted surface — the failure publishes nothing; every run records its verdict in SOURCE#recap_cards",
     # #4584, 2026-10-03. The Tuesday answer (coach.telegram_tuesday -> content.tuesday_question.screen) fails CLOSED:

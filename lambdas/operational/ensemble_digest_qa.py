@@ -58,6 +58,7 @@ from __future__ import annotations
 from datetime import timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from coach import narrative_cadence
 from common.constants import EXPERIMENT_START_DATE
 
 PK = "ENSEMBLE#digest"
@@ -75,11 +76,21 @@ DUE_HOUR_UTC = 17
 GRACE_MINUTES = 60
 
 # See "WHY THE WINDOW IS THREE DAYS" above: detection horizon, not an audit horizon.
+# #4589: the digest is now fanned out only on NARRATIVE days (coach/narrative_cadence.py,
+# Monday and Thursday) — the same cadence constant the producer reads, so an off day is
+# never a hole. The window is now the cadence's longest gap + 1 (5 for Mon/Thu), never less
+# than the original 3, so at least one due cycle is always inside it; a hole still reports
+# FAIL on the day it opens and WARN until it ages out, never longer than one more cycle.
 WINDOW_DAYS = 3
 
 
+def window_days() -> int:
+    """Read at call time, so the window follows the cadence constant the producer reads."""
+    return max(WINDOW_DAYS, narrative_cadence.max_gap_days() + 1)
+
+
 def _due_dates(now_utc):
-    """The cycle dates whose write window has CLOSED, newest first.
+    """The NARRATIVE-day cycle dates whose write window has CLOSED, newest first (#4589).
 
     `cycle_date` is `pacific_today()` at invoke time; the cron fires at 17:00 UTC,
     which is 10:00 PT on the SAME calendar date, so the cycle date equals the UTC
@@ -88,7 +99,7 @@ def _due_dates(now_utc):
     """
     cutoff = now_utc.replace(hour=DUE_HOUR_UTC, minute=0, second=0, microsecond=0) + timedelta(minutes=GRACE_MINUTES)
     latest = now_utc.date() if now_utc >= cutoff else now_utc.date() - timedelta(days=1)
-    dates = [latest - timedelta(days=i) for i in range(WINDOW_DAYS)]
+    dates = [d for d in (latest - timedelta(days=i) for i in range(window_days())) if narrative_cadence.is_narrative_day(d)]
     # Pre-genesis cycles are not expected: the reset tombstones the previous cycle's
     # rows and no digest is written before Day 1 (a future genesis runs a countdown).
     # The genesis bound is a LEXICOGRAPHIC compare on the ISO day string, not a

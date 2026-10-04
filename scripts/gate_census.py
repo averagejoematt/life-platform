@@ -427,7 +427,10 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
     # ── #2938: the gate that was PROVEN unable to fail, then repaired ────────────
     # This is the first entry recorded from a LIVE PRODUCTION OBSERVATION rather than a
     # deliberately planted mutation — the defect was already running when it was found.
-    "ci::ci-cd.yml::visual-qa::4": Proof(
+    # #4589 (2026-10-04): re-pointed ::4 -> ::5 — the reader-surface gate step was inserted ahead
+    # of this one; the gate is unchanged on RUN (same command below). The decision-level proof
+    # (tests/test_ai_gate_must_run_2938.py) was re-run against the current tree: 11 passed.
+    "ci::ci-cd.yml::visual-qa::5": Proof(
         gate_name="visual-qa / Run visual + AI-vision QA sweep",
         # #3251 (C1, 2026-08-30): --reader-truth left the per-deploy copies; the prose judge
         # runs in visual-qa.yml's daily fire only. tests/test_ci_ai_gate_cadence_3251.py

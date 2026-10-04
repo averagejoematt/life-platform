@@ -6340,7 +6340,7 @@
         }
       ],
       "stack": "compute_stack",
-      "timeout_seconds": 180
+      "timeout_seconds": 300
     },
     "coach-ensemble-digest": {
       "declared_alarm": null,
