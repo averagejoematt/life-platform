@@ -1,0 +1,89 @@
+{
+ "posts": [
+  {
+   "week": 4,
+   "label": "Week 4",
+   "sequence": 7,
+   "title": "The Body Answers Back",
+   "date": "2026-09-29",
+   "stats_line": "Day 18 to Day 24 · 312.3 lbs (-2.6 this week) · 7 training sessions",
+   "url": "/journal/posts/week-07/",
+   "excerpt": "*He has trained every day for 23 days straight — his deliberate choice — and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.*…",
+   "word_count": 1086,
+   "has_board_interview": true,
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 3,
+   "label": "Week 3",
+   "sequence": 6,
+   "title": "Storming Mode",
+   "date": "2026-09-22",
+   "stats_line": "Day 11 to Day 17 · 315.0 lbs (-3.9 this week) · 7 training sessions",
+   "url": "/journal/posts/week-06/",
+   "excerpt": "*Editor's note, October 2026 — Margaret Calloway: this installment was rewritten after a review of the season found it stated the plan's nutrition targets incorrectly and drew conclusions from them. It now reports the week from the full data.*\n\n*Day 17: the scale reads 315.0 lbs and a…",
+   "word_count": 1258,
+   "has_board_interview": true,
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 2,
+   "label": "Week 2",
+   "sequence": 5,
+   "title": "Nine Days and No Rest",
+   "date": "2026-09-15",
+   "stats_line": "Day 4 to Day 10 · 318.9 lbs (-8.4 this week) · 7 training sessions",
+   "url": "/journal/posts/week-05/",
+   "excerpt": "*Editor's note, October 2026 — Margaret Calloway: this installment was rewritten after a review of the season found it stated the plan's nutrition targets incorrectly and drew conclusions from them. It now reports the week from the full data.*\n\n*Day 10, and he has trained every day since Day 2:…",
+   "word_count": 1150,
+   "has_board_interview": true,
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 1,
+   "label": "Week 1",
+   "sequence": 4,
+   "title": "The Strap Said 76%",
+   "date": "2026-09-08",
+   "stats_line": "Day 1 to Day 3 · 327.3 lbs (+0.0 this week) · 2 training sessions",
+   "url": "/journal/posts/week-04/",
+   "excerpt": "*Editor's note, October 2026 — Margaret Calloway: this installment was rewritten after a review of the season found it stated the plan's nutrition targets incorrectly and drew conclusions from them. It now reports the week from the full data.*\n\n*Day 3 of the experiment: the body is recovering well,…",
+   "word_count": 978,
+   "has_board_interview": true,
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 0,
+   "label": "Prologue · Part II",
+   "sequence": 3,
+   "title": "The Plan, On the Record",
+   "date": "2026-09-05",
+   "stats_line": "326.2 lbs at the start · 185 lbs the target · 16 board predictions filed | Prologue — the plan before Day 1",
+   "url": "/journal/posts/week-03/",
+   "excerpt": "Tomorrow morning — September 6, 2026 — a scale in a quiet bathroom records the first number of a twelve-month experiment. Today, while that number is still a blank, we are doing the thing that separates a documented experiment from a highlight reel: writing the whole plan down, in public, before…",
+   "word_count": 1615,
+   "has_board_interview": false,
+   "image_url": "",
+   "image_credit": ""
+  },
+  {
+   "week": 0,
+   "label": "Prologue · Part I",
+   "sequence": 1,
+   "title": "Before the Numbers",
+   "date": "2026-08-31",
+   "stats_line": "Prologue | Before Day 1 | Seattle, WA",
+   "url": "/journal/posts/week-01/",
+   "excerpt": "*Editor's note, October 2026 — Margaret Calloway: this prologue was rewritten with the plan's final figures. The earlier version quoted working numbers from before the plan was frozen.*\n\nTomorrow morning, Matthew will step onto a Withings scale in Seattle and read a number he already knows. This is…",
+   "word_count": 1138,
+   "has_board_interview": false,
+   "image_url": "",
+   "image_credit": ""
+  }
+ ],
+ "updated_at": "2026-10-02T18:33:13.403163+00:00"
+}
