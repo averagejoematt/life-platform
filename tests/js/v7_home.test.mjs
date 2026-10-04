@@ -121,8 +121,11 @@ test("the weigh-in strip is drawn to the day, and the gaps are counted from the 
 });
 
 test("the alive line carries the ONE data-through, K of N from one producer, the next write-up", () => {
-  const html = H.aliveLine("2026-09-26", { platform: { strata: { coaches: { n: 37, confirmed: 18 } } } }, cadence);
-  assert.match(strip(html), /^Data through Saturday, September 26 · the coaches’ checked calls so far, by the site’s own count: 18 of 37 right · next write-up Wednesday, September 30$/);
+  const cmp = { sentence: "Across 37 checked calls, so far they do not beat a simple guess." };
+  const html = H.aliveLine("2026-09-26", { platform: { strata: { coaches: { n: 37, confirmed: 18 } } }, comparison: cmp }, cadence);
+  assert.match(strip(html), /^Data through Saturday, September 26 · the coaches’ checked calls so far, by the site’s own count: 18 of 37 right · Across 37 checked calls, so far they do not beat a simple guess · next write-up Wednesday, September 30$/);
+  // #4585: the count never rides alone — an absent comparison is said as an absence, never dropped.
+  assert.match(strip(H.aliveLine("2026-09-26", { platform: { strata: { coaches: { n: 37, confirmed: 18 } } } }, cadence)), /18 of 37 right · What a simple guess would have scored on these calls is not available right now ·/);
   assert.match(html, /data-src="calibration\.platform\.strata\.coaches\.confirmed"/);
   assert.match(strip(H.aliveLine("2026-09-26", null, { chronicle: { paused: true } })), /the coaches’ record is not served right now · the write-up is paused/);
 });

@@ -25,6 +25,7 @@
 
 import { chooseTodaysRead, ptDate } from "/assets/js/coach_today.js";
 import { dayInWords, dataThrough, countWord } from "/assets/js/entry_age.js";
+import { coachComparison } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 
 const PT = "America/Los_Angeles";
 const esc = (s) =>
@@ -507,6 +508,8 @@ export function readHTML(pick, profile, now, calibration) {
     const t = tally(recent);
     parts.push(`<p class="v7c-dated">The last ${numberWords(t.n)} checked call${t.n === 1 ? "" : "s"}, newest first — ${numberWords(t.right)} right, ${numberWords(t.wrong)} wrong:</p>`);
     parts.push(`<ul class="v7c-ledger" data-src="api_coach_${esc(pid)}.report_card.track_record.recent">${recent.map(lineHTML).join("")}</ul>`);
+    const tr = profile && profile.report_card && profile.report_card.track_record;
+    parts.push(coachComparison(tr && tr.comparison, { cls: "v7c-note", src: `api_coach_${pid}.report_card.track_record.comparison.sentence` })); // #4585
   }
   // the read itself: the guarded slot, linted; a hit folds under <details>, never rewritten
   const text = String(c.position_summary || "").trim();
@@ -517,6 +520,12 @@ export function readHTML(pick, profile, now, calibration) {
   else parts.push(`<p class="v7c-absent">No public read is served for today.</p>`);
   const reason = reasonSentence(pick, calibration);
   if (reason) parts.push(`<p class="v7c-note" data-src="${esc(reason.src)}">${esc(reason.text)}</p>`);
+  // #4585: a "K of N held up" reason is a coach count — it never appears alone.
+  if (reason && pick.rule === "record") {
+    const sid = shortId(c.coach_id);
+    const r = (calibration && Array.isArray(calibration.coaches) ? calibration.coaches : []).find((x) => x && x.coach_id === sid);
+    parts.push(coachComparison(r && r.comparison, { cls: "v7c-note", src: `api_calibration.coaches[${sid}].comparison.sentence` }));
+  }
   // the standing ask, counted
   const ask = standingAsk(profile && profile.dossier && profile.dossier.commitments);
   const n = askCount(profile && profile.recent_outputs);
@@ -562,11 +571,12 @@ export function docketHTML(rows) {
     .join("\n");
 }
 
-export function recordHTML(rec) {
+export function recordHTML(rec, comparison) {
   if (!rec.soFar) return "";
   let s = `<p>All coaches together, by the site’s scorekeeper: <b class="v7c-num" data-src="api_calibration.platform.strata.coaches">${rec.soFar.k} of ${rec.soFar.n}</b> checked calls right so far`;
   if (rec.allTime) s += `; <span class="v7c-num" data-src="api_calibration.platform.lifetime.strata.coaches">${rec.allTime.k} of ${rec.allTime.n}</span> all time`;
-  return `${s}.</p>`;
+  // #4585 / epic #4580 rule 3: the count never appears alone.
+  return `${s}.</p>` + coachComparison(comparison, { cls: "v7c-note", src: "api_calibration.comparison.sentence" });
 }
 export function rosterHTML(rows) {
   if (!rows.length) return "";
@@ -644,7 +654,7 @@ export async function run(doc) {
   if (!cal) setHTML("v7c-record-body", NOT_SERVED("The record is"));
   else if (!rec.soFar) setHTML("v7c-record-body", `<p class="v7c-absent">No checked call yet.</p>`);
   else {
-    setHTML("v7c-record-body", recordHTML(rec));
+    setHTML("v7c-record-body", recordHTML(rec, cal.comparison));
     setHTML("v7c-record-m", marginHTML(rec.through));
   }
   const roster = rosterRows(coachesApi, cal, topPid);

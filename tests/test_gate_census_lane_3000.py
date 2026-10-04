@@ -509,7 +509,12 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 768  # 767 -> 768 (2026-10-03, #4540 nutrition targets derive from the plan): ONE entrant,
+BASELINE_TOTAL_GATES = 769  # 768 -> 769 (2026-10-03, #4585 no coach count without its comparison): ONE entrant,
+# `structural::test_coach_count_comparison_guard_4585.py` (new: globs site/assets/js + rglobs site/**/*.html|json), PROVEN on
+# arrival (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED on
+# `scripts/gate_census.py --json`: main 768 {proven 242, unproven 514, not-applicable 7, attempted-unproven 5} -> this lane
+# 769 {243, 514, 7, 5}.
+# PRIOR: 768  # 767 -> 768 (2026-10-03, #4540 nutrition targets derive from the plan): ONE entrant,
 # `structural::test_protein_contract.py` (the file existed; it becomes a census gate because it now os.walks lambdas/ + mcp/),
 # PROVEN on arrival (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED by id-set
 # diff on `scripts/gate_census.py --json`, this tree vs a `git archive origin/main` export at 83f3bd53e (git-init'd, fully

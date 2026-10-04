@@ -110,7 +110,7 @@ EWMA_DECAY = 0.87
 # + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
-from coach import commitment_grading  # noqa: E402  (#3553 — the follow-through ledger's semantics + its dead-man)
+from coach import coach_baseline, commitment_grading  # noqa: E402  (#4585 the rule beside each grade; #3553 the follow-through ledger)
 from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observation floor + the provisional-grade rules, reasoned out there
     EWMA_MIN_OBSERVATIONS,
     EWMA_MIN_PRIOR_POINTS,
@@ -798,7 +798,7 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
 # =============================================================================
 
 
-def _update_prediction_status(prediction, evaluation):
+def _update_prediction_status(prediction, evaluation, baseline=None):
     """Update a prediction record with its evaluation outcome."""
     try:
         pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
@@ -817,6 +817,7 @@ def _update_prediction_status(prediction, evaluation):
                 ":notes": outcome_notes,
             },
         )
+        coach_baseline.write_stamp(table, pk, sk, baseline)
         logger.info("Updated prediction %s -> %s", evaluation.get("prediction_id", "?"), evaluation["status"])
     except Exception as e:
         logger.error("Failed to update prediction %s: %s", evaluation.get("prediction_id", "?"), e)
@@ -961,6 +962,9 @@ def _write_learning_record(coach_id, today_str, evaluation):
 # =============================================================================
 
 
+_BASELINE_IO = (_get_source_data, _extract_metric_series, DIRECTIONAL_NOISE_THRESHOLD)  # #4585: the rule reads the grader's own data path
+
+
 def _evaluate_all(predictions, today_str):
     """
     Evaluate all pending predictions.
@@ -1089,7 +1093,8 @@ def _evaluate_all(predictions, today_str):
         evaluations.append(evaluation)
 
         # Write status update to prediction record
-        _update_prediction_status(pred, evaluation)
+        _bl = coach_baseline.stamp_at_grading(pred, eval_spec, result, status, data_cache, *_BASELINE_IO)  # #4585
+        _update_prediction_status(pred, evaluation, _bl)
 
         # Update Bayesian confidence if applicable
         if bayesian_update and coach_id and subdomain:

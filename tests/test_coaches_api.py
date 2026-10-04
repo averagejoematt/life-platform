@@ -782,6 +782,13 @@ def _assert_one_record(short_id, coaches, calibration, predictions, wrong):
         assert wrong_by[short_id] == {"coach": short_id, **record}, f"{short_id}: /api/wrong.by_coach disagrees"
     else:
         assert short_id not in wrong_by
+    # #4585: the comparison rides beside the record on every endpoint, counted over the SAME
+    # decided rows — so its records agree everywhere the count does.
+    served_cmp = roster[f"{short_id}_coach"]["comparison"]
+    assert served_cmp is not None, f"{short_id}: /api/coaches served a record without its comparison"
+    for label, other in (("calibration", cal["comparison"]), ("predictions", pred["comparison"])):
+        assert other["records"] == served_cmp["records"], f"{short_id}: /api/{label}.comparison disagrees with /api/coaches"
+    assert sum(r["graded"] for r in served_cmp["records"].values()) + served_cmp["unclassified"] == record["n"], short_id
     _assert_obituaries_are_the_record(short_id, record, wrong)
     return record
 

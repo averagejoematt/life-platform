@@ -236,6 +236,8 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
         "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
+        "test_coach_count_comparison_guard_4585.py",  # #4585: glob/rglob sweep — every site/ module + inline script that shows a coach count renders its comparison
+        "test_coach_baseline_4585.py",  # #4585: glob sweep — every lambdas/web record producer serves `comparison` beside the record
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
