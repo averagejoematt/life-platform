@@ -142,6 +142,7 @@ from web.site_api_data import (
     handle_what_changed,
 )
 from web.site_api_diary import handle_diary_shelf  # #1846 — the consent-gated diary shelf (/story/diary/)
+from web.site_api_edition import handle_edition  # #4582 — the front page's one composed document
 from web.site_api_fingerprint import handle_fingerprint, handle_wall  # #1379 — the Daily Fingerprint + the Wall
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
@@ -370,6 +371,7 @@ ROUTES = {
     "/api/journey": handle_journey,
     "/api/vacation_fund": handle_vacation_fund,
     "/api/content_cadence": handle_content_cadence,  # #1972 — chronicle/podcast next-installment line
+    "/api/edition": None,  # #4582: the front page's one document — composed in _dispatch_route below
     "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
     # #1379: the Daily Fingerprint (dateless = today; ?date=YYYY-MM-DD handled inline below) + the Wall (all-attempts field)
@@ -704,6 +706,10 @@ def _dispatch_route(event, path, method):
         return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):
         return handle_coach(event)
+    # #4582: the front page's ONE document, composed in-process from the routes this
+    # function dispatches (never an HTTP call to itself) under one Pacific as_of.
+    if path == "/api/edition" and method == "GET":
+        return handle_edition(lambda p, qs: _dispatch_route({"rawPath": p, "queryStringParameters": qs, "headers": {}}, p, "GET"))
     if path == "/api/coaching-dashboard":
         try:
             # Registry-derived (coaching-team v2). The retired training seat stays
