@@ -283,6 +283,7 @@ SOURCE_CLASS: dict[str, str] = {
     "mood": RAW_TIMESERIES,
     "evening_ritual": RAW_TIMESERIES,  # ADR-124 one-tap connection self-report (born cycle 11; same class as state_of_mind)
     "morning_note": RAW_TIMESERIES,  # #4189: the owner's four words before the number (MORNING_NOTE#<PT day>) — a logged self-report fact, same class as evening_ritual
+    "owner_words": RAW_TIMESERIES,  # #4584: his own words from chat or email, verbatim (WORDS#<PT day>#<hash>) — same class as morning_note
     "travel": RAW_TIMESERIES,
     "interactions": RAW_TIMESERIES,
     "exposures": RAW_TIMESERIES,

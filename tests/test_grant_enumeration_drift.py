@@ -225,6 +225,10 @@ _CONTENT_FILTER_WATCH: dict[str, str] = {
     "unavailable vocabulary holds every line (reason `privacy_unchecked` on the MOVES# row's `held`), publishing nothing",
     "lambdas/web/recap_card_lambda.py": "exempt 2026-09-13 (#3741): fails CLOSED to a held card on an owner-only, "
     "hand-posted surface — the failure publishes nothing; every run records its verdict in SOURCE#recap_cards",
+    # #4584, 2026-10-04. The parser screens each Story Desk answer it copies into the owner-words store
+    # (content.owner_words.screen). An unavailable vocabulary HOLDS the entry (stored, never served) — the "publish
+    # nothing" direction — and the parser emits InsightParseFailure for it, which this alarm already watches.
+    "lambdas/emails/insight_email_parser_lambda.py": "alarm:life-platform-insight-email-parser-parse-failure",
 }
 
 

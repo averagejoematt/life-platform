@@ -73,6 +73,8 @@ SOURCES = {
     "predictions": "/api/predictions",
     "calibration": "/api/calibration",
     "decisions": "/api/decisions",
+    # #4584: his own words from his Claude chat or his email replies, verbatim — read before the decisions note.
+    "owner_words": "/api/owner_words",
     # The whole-life rows (#4586): one served fact per area of his life, each a door.
     "sleep": "/api/sleep_detail",
     "session": "/api/session",
@@ -797,10 +799,9 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
     return _block("ok", as_of, src, "No coach call has been checked yet.", data)
 
 
-def _his_words(decisions: dict | None, today: str) -> dict:
+def _decision_note(decisions: dict, today: str) -> dict:
+    """The older source: the newest logged decision carrying his verbatim note (#1569)."""
     src = SOURCES["decisions"]
-    if decisions is None:
-        return _unavailable(src, "His own words")
     notes = [
         d
         for d in decisions.get("decisions") or []
@@ -815,6 +816,51 @@ def _his_words(decisions: dict | None, today: str) -> dict:
     if age is not None and age > HIS_WORDS_STALE_DAYS:
         return _block("stale", day, src, f"Nothing new in his own words since {day_in_words(day)}.", data)
     return _block("ok", day, src, "Nothing in his own words yet.", data)
+
+
+def _owner_entry(owner_words: dict, today: str) -> dict | None:
+    """The newest served owner-words entry (#4584) as a block, EXACTLY as typed, with its date and prompt — or None
+    when there is none. A held entry is never served upstream, so it cannot reach here."""
+    src = SOURCES["owner_words"]
+    entries = [
+        e
+        for e in owner_words.get("entries") or []
+        if isinstance(e, dict) and isinstance(e.get("text"), str) and e["text"].strip() and parse_day_key(str(e.get("date") or ""))
+    ]
+    if not entries:
+        return None
+    latest = max(entries, key=lambda e: str(e["date"]))
+    day = str(latest["date"])
+    age = _days_between(day, today)
+    if age is None or age < 0:
+        return None
+    data = {
+        "text": latest["text"],
+        "date": day,
+        "date_text": day_in_words(day),
+        "prompt": latest.get("prompt") or None,
+        "channel": latest.get("channel"),
+    }
+    if age > HIS_WORDS_STALE_DAYS:
+        return _block("stale", day, src, f"Nothing new in his own words since {day_in_words(day)}.", data)
+    return _block("ok", day, src, "Nothing in his own words yet.", data)
+
+
+def _his_words(decisions: dict | None, owner_words: dict | None, today: str) -> dict:
+    """His words lead with the newest owner-words entry inside the freshness bound; else the decisions note; else,
+    when neither is fresh, whichever is newer (dated stale). A failed read of EITHER source is ``unavailable``: a
+    missing entry must never read as silence, nor be covered by an older note."""
+    if decisions is None or owner_words is None:
+        return _unavailable([SOURCES["owner_words"], SOURCES["decisions"]], "His own words")
+    entry = _owner_entry(owner_words, today)
+    if entry is not None and entry["state"] == "ok":
+        return entry
+    note = _decision_note(decisions, today)
+    if entry is None or note["state"] == "ok":
+        return note
+    if note["state"] == "absent" or str(entry["as_of"]) >= str(note["as_of"] or ""):
+        return entry
+    return note
 
 
 def _catch_up(journal: dict | None, today: str) -> dict:
@@ -865,7 +911,7 @@ def compose(
     """
     b = {k: bodies.get(k) for k in SOURCES}
     day_n = pacific_day_n(start_date, today) or None
-    his_words = _his_words(b["decisions"], today)
+    his_words = _his_words(b["decisions"], b["owner_words"], today)
     blocks = {
         "premise": _premise(today),
         "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of),
