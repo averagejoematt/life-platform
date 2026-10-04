@@ -9,7 +9,7 @@ from privacy import privacy_guard as pg  # noqa: E402
 
 
 def test_clean_text_passes():
-    txt = "Dr. Marcus Webb reviewed the protein numbers; Dr. Amara Patel flagged the micronutrients."
+    txt = "Marcus Webb reviewed the protein numbers; Amara Patel flagged the micronutrients."
     assert pg.is_clean(txt)
     assert pg.find_violations(txt) == []
     assert pg.assert_clean(txt) == txt  # returns text, no raise

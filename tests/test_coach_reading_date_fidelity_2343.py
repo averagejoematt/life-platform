@@ -3,7 +3,7 @@
 MEASURED, 2026-08-08 (all three mechanisms proposed at filing were wrong):
 
   /api/vitals              as_of_date 2026-08-08 · recovery 31.0 · hrv 32.0
-  /api/coaching-dashboard  Dr. Marcus Webb, analysis_generated_at 2026-08-08T17:02:13Z
+  /api/coaching-dashboard  Marcus Webb, analysis_generated_at 2026-08-08T17:02:13Z
                            "… Whoop shows 55% recovery and HRV at 42 ms …"
 
 55 / 42 are 2026-08-07's REAL Whoop readings, exact on both metrics — the day was

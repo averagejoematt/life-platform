@@ -49,6 +49,7 @@ from decimal import Decimal
 
 import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
+from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.pacific_time import pacific_clock_label, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
@@ -461,8 +462,8 @@ def _fetch_execution_metrics(date_str, profile):
     Returns a compact dict with enough context for Haiku evaluation.
     """
     metrics = {}
-    cal_target = profile.get("calorie_target", 1800)
-    prot_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    prot_target = PLAN_DAILY_PROTEIN_MIN_G
 
     # Nutrition (MacroFactor)
     mf = fetch_date("macrofactor", date_str)
@@ -1113,7 +1114,7 @@ def _compute_slow_drift(yesterday_str, profile):
 
         if len(wt_vals) >= 8:  # Attia: need >=8 measurements for regression
             # Check complete nutrition log days (Henning: >=11 of last 14 days)
-            cal_target = profile.get("calorie_target", 1800)
+            cal_target = PLAN_DAILY_CALORIES_TARGET
             mf_recs = fetch_range("macrofactor", (yest - timedelta(days=14)).isoformat(), yesterday_str)
             complete_days = sum(1 for r in mf_recs if safe_float(r, "total_calories_kcal", 0) >= cal_target * 0.65)
 
@@ -1729,9 +1730,9 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
             return None, ""
 
         # ── Build prescription ────────────────────────────────────────────────
-        cal_target = profile.get("calorie_target", 1800)
+        cal_target = PLAN_DAILY_CALORIES_TARGET
         new_ceiling = cal_target + DEFICIT_KCAL_INCREASE
-        prot_target = profile.get("protein_target_g", 190)
+        prot_target = PLAN_DAILY_PROTEIN_MIN_G
 
         rate_str = f"{rate_lbs_week:.1f} lbs/wk" if rate_lbs_week else "unknown"
 

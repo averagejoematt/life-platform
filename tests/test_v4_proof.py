@@ -224,16 +224,16 @@ class TestCoachingReadBlock:
     shell."""
 
     READ = {
-        "weekly_priority": {"text": "Restart your logging this week — the system runs blind without it.", "coach_name": "Dr. Eli Marsh"},
+        "weekly_priority": {"text": "Restart your logging this week — the system runs blind without it.", "coach_name": "Eli Marsh"},
         "coaches": [
             {
-                "name": "Dr. Nathan Reeves",
+                "name": "Nathan Reeves",
                 "title": "Psychiatrist — Behavioral Patterns",
                 "coach_id": "mind",
                 "position_summary": "Food logging ceased on June 24th — twelve days of silence.",
             },
             {
-                "name": "Dr. Victor Reyes",
+                "name": "Victor Reyes",
                 "title": "Longevity & Body Composition",
                 "coach_id": "physical",
                 "position_summary": "Twelve days without logged meals created a blind spot.",
@@ -246,13 +246,13 @@ class TestCoachingReadBlock:
         html = v4_proof.coaching_read_block_html(self.READ)
         # the AC: actual coach voices are carried in the served no-JS HTML.
         assert "Restart your logging this week" in html
-        assert "Dr. Eli Marsh" in html
+        assert "Eli Marsh" in html
         # #1115: the integrator's priority is labeled at its true (week) altitude,
         # never presented as today's line.
         assert "The week's call" in html
-        assert "Dr. Nathan Reeves" in html and "Psychiatrist" in html
+        assert "Nathan Reeves" in html and "Psychiatrist" in html
         assert "twelve days of silence" in html
-        assert "Dr. Victor Reyes" in html
+        assert "Victor Reyes" in html
         assert "as of 2026-07-07" in html
         assert html.startswith("<noscript>") and html.endswith("</noscript>")
 
@@ -267,7 +267,8 @@ class TestCoachingReadBlock:
         html = v4_proof.coaching_read_block_html(
             {"weekly_priority": {}, "coaches": [{"name": "Dr. X", "title": "", "position_summary": "A read."}], "as_of": "2026-07-07"}
         )
-        assert "A read." in html and "Dr. X" in html
+        assert "A read." in html and ">X<" in html.replace(" ", "")
+        assert "Dr. X" not in html  # #4564: a pre-ruling API name is baked without the honorific
         # #1115: the priority block is labeled at week altitude now
         assert "The week's call" not in html and "The one priority" not in html  # no priority block when text is absent
 
@@ -315,15 +316,15 @@ class TestCoachingReadBlock:
             "_fetch_json",
             lambda path, timeout=8: {
                 "_meta": {"generated_at": "2026-07-08T01:31:08+00:00"},
-                "weekly_priority": {"text": " the call ", "coach_name": "Dr. Eli Marsh", "generated_at": "2026-07-07T14:03:02+00:00"},
+                "weekly_priority": {"text": " the call ", "coach_name": "Eli Marsh", "generated_at": "2026-07-07T14:03:02+00:00"},
                 "coaches": [
-                    {"coach_id": "mind", "name": "Dr. Nathan Reeves", "title": "Psychiatrist", "position_summary": " a read "},
-                    {"coach_id": "sleep", "name": "Dr. Lisa Park", "title": "Sleep", "position_summary": ""},  # empty -> dropped
+                    {"coach_id": "mind", "name": "Nathan Reeves", "title": "Psychiatrist", "position_summary": " a read "},
+                    {"coach_id": "sleep", "name": "Lisa Park", "title": "Sleep", "position_summary": ""},  # empty -> dropped
                 ],
             },
         )
         out = v4_proof.load_coaching_read()
-        assert out["weekly_priority"] == {"text": "the call", "coach_name": "Dr. Eli Marsh"}
+        assert out["weekly_priority"] == {"text": "the call", "coach_name": "Eli Marsh"}
         # honest absence — the coach with an empty read is omitted, never fabricated.
         assert [c["coach_id"] for c in out["coaches"]] == ["mind"]
         assert out["coaches"][0]["position_summary"] == "a read"

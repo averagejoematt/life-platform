@@ -103,7 +103,7 @@ _ANCHOR_WINDOW_CHARS = 24
 # `qa-smoke-failures` alarm:
 #
 #   "On September 12th, his Whoop recorded 73% recovery, 36.4 ms HRV, and 60 bpm
-#    resting heart rate — solid single-night readings…"   (Dr. Max Reyes)
+#    resting heart rate — solid single-night readings…"   (Max Reyes)
 #
 # Every number is right. 73 / 36.42 / 60 is `DATE#2026-09-13` verbatim, and that
 # record's night is 2026-09-12 — which is not the coach's coinage but the platform's
@@ -1007,7 +1007,7 @@ def _claims_by_quantity(coaches, served_protein: dict | None = None) -> tuple[di
 # `/api/coaching-dashboard` the head coach's weekly read is `weekly_priority` and its
 # daily read is `lead_daily` — each `{text, coach_name, ...}` — and that is where the
 # 2026-09-25 specimen lives ("his average intake has dropped to 106.9 grams across 14
-# logged days", Dr. Eli Marsh). Measured 2026-09-27 16:12Z: reading `coaches[]` alone,
+# logged days", Eli Marsh). Measured 2026-09-27 16:12Z: reading `coaches[]` alone,
 # both legs extracted 0 claims and passed green while that sentence was still served
 # against an engine `avg_protein_g` of 153.5. The slot rides the name, so a finding says
 # WHERE on the page the figure sits, not only who wrote it.

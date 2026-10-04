@@ -37,6 +37,7 @@ import v4_chrome  # noqa: E402
 UNLISTED_PAGES = {
     "/mind/": "0-second redirect stub to /data/reading/ — chrome-free by design (#1104)",
     "/subscribe/confirm/": "email-flow landing — reached from the confirmation email, never from menus",
+    "/kit/": "v8 kit specimen (#4581) — a build reference reached by direct URL only; noindex, in no menu and no sitemap",
 }
 
 HREF = re.compile(r'href=\\?"([^"\\]+)\\?"')  # plain hrefs + hrefs escaped in embedded JSON

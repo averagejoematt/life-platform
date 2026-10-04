@@ -101,7 +101,7 @@ def test_run_turn_returns_bubbles_and_grounds_the_joined_text():
 
     result = coach_chat.run_turn(
         coach_id="sleep_coach",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="",
         memory_block="",
         facts_block="",
@@ -120,7 +120,7 @@ def test_run_turn_returns_bubbles_and_grounds_the_joined_text():
 def test_run_turn_enforces_emoji_ceiling_before_gating():
     result = coach_chat.run_turn(
         coach_id="sleep_coach",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="",
         memory_block="",
         facts_block="",
@@ -137,7 +137,7 @@ def test_run_turn_enforces_emoji_ceiling_before_gating():
 def test_run_turn_consecutive_emoji_rule_uses_the_flag():
     result = coach_chat.run_turn(
         coach_id="sleep_coach",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="",
         memory_block="",
         facts_block="",
@@ -154,7 +154,7 @@ def test_run_turn_consecutive_emoji_rule_uses_the_flag():
 def test_held_reply_stays_one_bubble():
     result = coach_chat.run_turn(
         coach_id="sleep_coach",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="",
         memory_block="",
         facts_block="",
@@ -172,7 +172,7 @@ def test_held_reply_stays_one_bubble():
 
 
 def test_system_prompt_names_the_delimiter_and_ceiling():
-    sysp = coach_chat.build_system_prompt("persona", "", "", "Dr. Lisa Park")
+    sysp = coach_chat.build_system_prompt("persona", "", "", "Lisa Park")
     assert coach_chat.BUBBLE_DELIM in sysp
     assert str(coach_chat.MAX_BUBBLES) in sysp
 
@@ -304,7 +304,7 @@ def test_summary_written_for_last_unsummarized_past_day():
         ]
     )
     caller = lambda body: {"content": [{"type": "text", "text": "Matthew reported poor sleep; you tied it to a short opportunity."}]}
-    out = ccs.ensure_daily_summary(table, pk, "Dr. Lisa Park", caller, today="2026-08-09", cycle=13)
+    out = ccs.ensure_daily_summary(table, pk, "Lisa Park", caller, today="2026-08-09", cycle=13)
     assert out == "2026-08-08"  # the most recent PAST day, not the oldest
     row = table.put_calls[-1]
     assert row["sk"] == "CHAT#summary#2026-08-08"
@@ -619,7 +619,7 @@ def test_headcoach_route_resolves_eli_not_string_surgery():
     from coach.persona_registry import persona_for_telegram_route
 
     pid, p = persona_for_telegram_route("headcoach")
-    assert pid == "eli_marsh" and p["name"] == "Dr. Eli Marsh"
+    assert pid == "eli_marsh" and p["name"] == "Eli Marsh"
     # ADR-153 amendment 2026-08-12: the Performance seat answers on its PRIMARY
     # route, not a succession alias. That distinction is load-bearing — only the
     # primary route is used for OUTBOUND, so an alias-only seat could be texted
@@ -661,7 +661,7 @@ def test_eli_voice_spec_loads_offline():
     from coach import persona_core
 
     spec = persona_core.load_voice_spec("eli_marsh", force_refresh=True)
-    assert spec and spec["display_name"] == "Dr. Eli Marsh"
+    assert spec and spec["display_name"] == "Eli Marsh"
     assert persona_core.texting_block(spec).startswith("HOW YOU TEXT")
     block = persona_core.persona_block("eli_marsh")
     assert "YOUR SHARED STANDARD" in block and "one decision" in block.lower()
@@ -671,7 +671,7 @@ def test_eli_voice_spec_loads_offline():
 
 
 def test_system_prompt_carries_the_conversation_rules():
-    sysp = coach_chat.build_system_prompt("persona", "", "", "Dr. Lisa Park")
+    sysp = coach_chat.build_system_prompt("persona", "", "", "Lisa Park")
     assert "shared memory, not a to-do list" in sysp
     assert "never restate a number" in sysp
     assert "Do NOT open with your domain data" in sysp
@@ -680,7 +680,7 @@ def test_system_prompt_carries_the_conversation_rules():
 
 
 def test_colleagues_block_joins_the_prompt_between_persona_and_memory():
-    sysp = coach_chat.build_system_prompt("persona", "MEMORY", "FACTS", "Dr. Lisa Park", colleagues_block="YOUR COLLEAGUES:\n- X")
+    sysp = coach_chat.build_system_prompt("persona", "MEMORY", "FACTS", "Lisa Park", colleagues_block="YOUR COLLEAGUES:\n- X")
     assert "YOUR COLLEAGUES" in sysp
     assert sysp.index("YOUR COLLEAGUES") < sysp.index("MEMORY")
 
@@ -692,11 +692,11 @@ def test_worker_colleagues_block_names_and_pronouns():
 
     with mock.patch.object(worker, "_s3_client", return_value=None):
         block = worker._colleagues_block("sleep_coach")
-    assert "Dr. Nathan Reeves (he/him)" in block
-    assert "Dr. Max Reyes (he/him)" in block
-    assert "Dr. Lisa Park" not in block  # never lists the coach to themself
-    assert "Dr. Amara Patel (she/her)" in block  # consulting tier is citable by name
-    assert "Dr. Sarah Chen" not in block  # retired seats are not colleagues to cite
+    assert "Nathan Reeves (he/him)" in block
+    assert "Max Reyes (he/him)" in block
+    assert "Lisa Park" not in block  # never lists the coach to themself
+    assert "Amara Patel (she/her)" in block  # consulting tier is citable by name
+    assert "Sarah Chen" not in block  # retired seats are not colleagues to cite
 
 
 # ── B10: team texture + track-record humility (#2496) ────────────────────────
@@ -735,8 +735,8 @@ def _thread(
         "topic": topic,
         "created_at": when,
         "turns": [
-            {"speaker": a, "name": "Dr. Lisa Park", "line": "He is under-slept because he is under-fed.", "kind": "position"},
-            {"speaker": b, "name": "Dr. Nathan Reeves", "line": "The deficit is 500 kcal and it is not the cause.", "kind": "reply"},
+            {"speaker": a, "name": "Lisa Park", "line": "He is under-slept because he is under-fed.", "kind": "position"},
+            {"speaker": b, "name": "Nathan Reeves", "line": "The deficit is 500 kcal and it is not the cause.", "kind": "reply"},
         ],
     }
     rec.update(fields)
@@ -836,7 +836,7 @@ def test_the_team_room_names_the_day_the_colleague_and_both_recorded_lines():
     from coach import coach_team_texture as ctt
 
     assert ctt.TEAM_ROOM_HEADING in block
-    assert "Sunday 2026-08-09 — you and Dr. Nathan Reeves went back and forth about" in block
+    assert "Sunday 2026-08-09 — you and Nathan Reeves went back and forth about" in block
     assert "He is under-slept because he is under-fed." in block
     assert "The deficit is 500 kcal and it is not the cause." in block
 
@@ -967,7 +967,7 @@ def test_run_turn_passes_persona_id_through_to_the_refusal():
     result = coach_chat.run_turn(
         coach_id="some-route-string-not-a-persona-id",
         persona_id="nutrition_coach",
-        coach_name="Dr. Marcus Webb",
+        coach_name="Marcus Webb",
         persona_block="",
         memory_block="",
         facts_block="",
@@ -988,7 +988,7 @@ def test_run_turn_falls_back_to_coach_id_when_no_persona_id_given():
     run_turn falls back to coach_id."""
     result = coach_chat.run_turn(
         coach_id="sleep_coach",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="",
         memory_block="",
         facts_block="",

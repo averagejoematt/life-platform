@@ -250,11 +250,15 @@ class TestScoreRecovery:
 
 
 class TestScoreNutrition:
+    @pytest.fixture(autouse=True)
+    def _plan_targets(self, monkeypatch):
+        # #4540: targets are the plan's generated constants, not the profile row. Pin them to
+        # the figures this class's arithmetic was written against.
+        monkeypatch.setattr(se, "PLAN_DAILY_CALORIES_TARGET", 2000)
+        monkeypatch.setattr(se, "PLAN_DAILY_PROTEIN_MIN_G", 180)
+
     def _profile(self):
         return {
-            "calorie_target": 2000,
-            "protein_target_g": 180,
-            "protein_floor_g": 150,
             "calorie_tolerance_pct": 10,
             "calorie_penalty_threshold_pct": 25,
             "fat_target_g": 65,

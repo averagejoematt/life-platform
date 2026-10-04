@@ -19,7 +19,8 @@
 // The pure helpers are exported and unit-tested (tests/js/v7_numbers.test.mjs); none
 // reads the wall clock.
 import { tryJSON, esc, fmt } from "/assets/js/evidence_shared.js";
-import { dayInWords, dayLabel, dataThrough } from "/assets/js/entry_age.js";
+import { dayInWords, dayLabel, dataThrough, goalWindowText } from "/assets/js/entry_age.js";
+import { nextWriteUpLine, nextWeighInLine } from "/assets/js/v7_week.js";
 import { weightTrendChart, lineChart, barChart } from "/assets/js/charts.js";
 import { weightFoldLine } from "/assets/js/evidence_body.js";
 import { sleepFold } from "/assets/js/evidence_sleep.js";
@@ -75,8 +76,19 @@ export function weightGoalSentence(j) {
     bits.push(`About <span data-src="api_journey.journey.weekly_rate_lbs">${esc(one(Math.abs(Number(r))))}</span> lb a week ${Number(r) < 0 ? "down" : "up"} so far${n}${j.rate_provisional ? ", provisional" : ""}${ci}.`);
   }
   if (!j.projected_goal_date) bits.push("No date to goal.");
-  else bits.push(`The engine dates the goal ${esc(dayInWords(j.projected_goal_date))}.`);
+  else bits.push(`<span data-src="api_journey.journey.{projected_goal_date,projected_goal_date_earliest,projected_goal_date_latest}">${esc(goalWindowText(j))}</span>`); // R7 fix 5: month, year, range
   return bits.join(" ");
+}
+
+/** The weight sentence, with ONE day count (R7 fix 6). The shared /data/ line counts the span
+ *  between the first and last weigh-in (`weighin_span_days`, 27) where Home and Who he is count
+ *  the days of the experiment (`day_n`, 28) — one span, two numbers. Here the count is the
+ *  experiment's day when it is served; the shared line stands untouched when it is not. */
+export function weightLine(j, today) {
+  const line = weightFoldLine(j, today);
+  const n = j && Number(j.day_n);
+  if (!line || !Number.isInteger(n) || n < 1) return line;
+  return line.replace(/, (\d+) weigh-ins in \d+ days\.$/, `, $1 weigh-ins in ${n} days.`);
 }
 
 /** The weigh-ins as served, oldest first, only the usable rows. */
@@ -106,10 +118,13 @@ export function eatingSeries(trend) {
 }
 
 // ── training ─────────────────────────────────────────────────────────────────
-/** The served day rows, oldest first, with a `label` (the day of the month) for the bars. */
-export function trainingSeries(daily) {
+/** The served day rows, oldest first, with a `label` (the day of the month) for the bars. With a
+ *  served start day, only the rows on or after it: the feed's trailing window can open a day
+ *  early, and "28 of 29 days since September 6" counted a day before the start (R7 fix 6). */
+export function trainingSeries(daily, startedDate) {
+  const from = isIso(startedDate) ? iso(startedDate) : "";
   return (Array.isArray(daily) ? daily : [])
-    .filter((r) => r && isIso(r.date) && r.total_min != null && Number.isFinite(Number(r.total_min)))
+    .filter((r) => r && isIso(r.date) && r.total_min != null && Number.isFinite(Number(r.total_min)) && (!from || iso(r.date) >= from))
     .map((r) => ({ ...r, date: iso(r.date), total_min: Number(r.total_min) }))
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((r, i, all) => ({ ...r, label: barLabel(r.date, i, all.length) }));
@@ -124,7 +139,7 @@ export function barLabel(date, i, n) {
 
 /** "Trained on k of n days since <day>: … " — every count a served field, the day in words. */
 export function trainingSentence(t, startedDate) {
-  const days = trainingSeries(t && t.daily_modality_minutes_30d);
+  const days = trainingSeries(t && t.daily_modality_minutes_30d, startedDate);
   if (!days.length) return "";
   const trained = days.filter((d) => d.total_min > 0).length;
   const tr = (t && t.training) || {};
@@ -190,10 +205,16 @@ const ABSENT = [
   { id: "garmin", label: "Garmin" },
 ];
 
+const NOT_SERVED = "not served right now";
+const NO_ROW = "nothing on record";
+const notServed = (what) => `<p class="nm-note">${esc(what)} is not served right now.</p>`;
+
 const dayCount = (n) => (Number.isFinite(Number(n)) ? `${num(Math.round(Number(n)))} day${Math.round(Number(n)) === 1 ? "" : "s"}` : "");
 
 /** [{id, label, text, src}] — the text is HTML with the count wrapped in its data-src. A row whose
- *  field is not in the payload says so, in the same register; a row that is being recorded says that. */
+ *  feed did not answer says "not served right now"; a served feed with no row for the instrument
+ *  says "nothing on record" (R7 fix 9 — two different facts, and neither is "the payload"); a row
+ *  that is being recorded says that. */
 export function absenceRows({ freshness, pulse } = {}) {
   const sources = (freshness && freshness.sources) || [];
   const ah = sources.find((s) => s && s.id === "apple_health") || null;
@@ -202,22 +223,22 @@ export function absenceRows({ freshness, pulse } = {}) {
   const journal = pulse && pulse.pulse && pulse.pulse.glyphs && pulse.pulse.glyphs.journal;
   return ABSENT.map((row) => {
     if (row.id === "journal") {
-      if (!journal) return { ...row, text: "not in today’s payload", src: "api_pulse.pulse.glyphs.journal" };
+      if (!journal) return { ...row, text: pulse ? NO_ROW : NOT_SERVED, src: "api_pulse.pulse.glyphs.journal" };
       if (journal.written_today) return { ...row, text: "an entry today", src: "api_pulse.pulse.glyphs.journal.written_today" };
       const gap = Number(journal.gap_days);
       return { ...row, text: Number.isFinite(gap) && gap > 0 ? `nothing written for <span data-src="api_pulse.pulse.glyphs.journal.gap_days">${esc(dayCount(gap))}</span>` : "no entry on record", src: "api_pulse.pulse.glyphs.journal.gap_days" };
     }
     if (row.id === "garmin") {
-      if (!garmin) return { ...row, text: "not in today’s payload", src: "api_source_freshness.sources[garmin]" };
+      if (!garmin) return { ...row, text: freshness ? NO_ROW : NOT_SERVED, src: "api_source_freshness.sources[garmin]" };
       const dk = garmin.days_dark;
       const paused = garmin.status === "paused";
       const count = Number.isFinite(Number(dk)) ? `<span data-src="api_source_freshness.sources[garmin].days_dark">${esc(dayCount(dk))}</span> without a record` : "no record since it stopped";
       return { ...row, text: paused ? `paused — ${count}; it cannot report, so the gap is a hole in the record, not a fact about him` : count, src: "api_source_freshness.sources[garmin].days_dark" };
     }
     const src = `api_source_freshness.sources[apple_health].datatypes[${row.key}]`;
-    if (!dts) return { ...row, text: "not in today’s payload", src };
+    if (!dts) return { ...row, text: freshness ? NO_ROW : NOT_SERVED, src };
     const dt = dts.find((d) => d && d.key === row.key);
-    if (!dt) return { ...row, text: "not in today’s payload", src };
+    if (!dt) return { ...row, text: NO_ROW, src };
     const floor = dt.age_days == null && dt.age_floor_days != null ? `more than <span data-src="${src}.age_floor_days">${esc(dayCount(dt.age_floor_days))}</span>` : `<span data-src="${src}.age_days">${esc(dayCount(dt.age_days))}</span>`;
     if (!dt.dark) return { ...row, text: `being recorded; last reading ${esc(dayInWords(dt.last_seen) || "on record")}`, src };
     if (row.id === "cgm") return { ...row, text: `no sensor worn; ${floor} without a reading`, src };
@@ -286,10 +307,11 @@ function renderWeight(journey, wp, today) {
   const sec = document.getElementById("nm-weight");
   const j = journey && journey.journey;
   const rows = weightSeries(wp && wp.weight_progress);
-  if (!j || !rows.length) return fill(sec, '<p class="nm-note">No weigh-in served yet.</p>');
+  if (!journey || !wp) return fill(sec, notServed("The weigh-in record"));
+  if (!j || !rows.length) return fill(sec, '<p class="nm-note">No weigh-in is on record yet.</p>');
   const since = j.started_date ? dayInWords(j.started_date, { weekday: false }) : "";
   const chart = weightTrendChart(rows, { label: `Weight, lb — every weigh-in${since ? ` since ${since}` : ""}` });
-  const line = weightFoldLine(j, today);
+  const line = weightLine(j, today);
   fill(
     sec,
     chart +
@@ -307,7 +329,8 @@ function renderSleep(sleep) {
   const sec = document.getElementById("nm-sleep");
   const rows = sleepSeries(sleep && sleep.sleep_trend);
   const fold = sleepFold(sleep);
-  if (!rows.length && !fold) return fill(sec, '<p class="nm-note">No night served yet.</p>');
+  if (!sleep) return fill(sec, notServed("The sleep record"));
+  if (!rows.length && !fold) return fill(sec, '<p class="nm-note">No night is on record yet.</p>');
   const chart = lineChart(rows, { valueKey: "hours", dateKey: "date", unit: " h", label: "Hours asleep a night", spine: true, emptyMsg: "No night served yet." });
   const s = (sleep && sleep.sleep_detail) || {};
   const through = s.as_of_date || (rows.length ? rows[rows.length - 1].date : "");
@@ -327,7 +350,8 @@ function renderEating(nut) {
   const sec = document.getElementById("nm-eating");
   const rows = eatingSeries(nut && nut.nutrition_trend);
   const fold = nutritionFold(nut, null);
-  if (!rows.length && !fold) return fill(sec, '<p class="nm-note">No logged day served yet.</p>');
+  if (!nut) return fill(sec, notServed("The food log"));
+  if (!rows.length && !fold) return fill(sec, '<p class="nm-note">No logged day is on record yet.</p>');
   const chart = lineChart(rows, { valueKey: "calories", dateKey: "date", unit: "", label: "Calories logged a day", spine: true, emptyMsg: "No logged day served yet." });
   const n = (nut && nut.nutrition) || {};
   const through = n.latest_date || n.as_of || (rows.length ? rows[rows.length - 1].date : "");
@@ -345,8 +369,9 @@ function renderEating(nut) {
 
 function renderTraining(t, startedDate) {
   const sec = document.getElementById("nm-training");
-  const rows = trainingSeries(t && t.daily_modality_minutes_30d);
-  if (!rows.length) return fill(sec, '<p class="nm-note">No training day served yet.</p>');
+  if (!t) return fill(sec, notServed("The training record"));
+  const rows = trainingSeries(t.daily_modality_minutes_30d, startedDate);
+  if (!rows.length) return fill(sec, '<p class="nm-note">No training day is on record yet.</p>');
   const since = isIso(startedDate) ? ` since ${dayInWords(startedDate, { weekday: false })}` : "";
   const chart = barChart(rows, { valueKey: "total_min", labelKey: "label", label: `Minutes trained a day${since} — the label is the day of the month` });
   const through = rows[rows.length - 1].date;
@@ -367,7 +392,8 @@ function renderLabs(labs) {
   const sec = document.getElementById("nm-labs");
   const L = labs && labs.labs;
   const fold = labsFold(labs);
-  if (!L || !fold) return fill(sec, '<p class="nm-note">No blood test served yet.</p>');
+  if (!labs) return fill(sec, '<p class="nm-note">The blood tests are not served right now.</p>');
+  if (!L || !fold) return fill(sec, '<p class="nm-note">No blood test is on record yet.</p>');
   const chart = labsBars(flaggedByCategory(L.biomarkers));
   const rows = labRows(L.biomarkers);
   fill(
@@ -399,13 +425,39 @@ function renderEngine(ch) {
   const body = document.getElementById("nm-engine-body");
   if (!body) return;
   const k = engineKey(ch);
-  if (!k) { body.innerHTML = '<p class="nm-note">Not served today.</p>'; return; }
+  if (!k) { body.innerHTML = ch ? '<p class="nm-note">No score is on record yet.</p>' : notServed("The engine’s score"); return; }
   const rows = k.rows.map((r) => `<tr><td>${esc(r.name)}</td><td class="n">${r.score != null ? esc(one(r.score)) : "—"}</td><td class="muted">${esc(r.note)}</td></tr>`).join("");
   body.innerHTML = `<p class="nm-key">${k.key}</p>` + (rows ? `<table data-src="api_character.pillars[]"><thead><tr><th>area</th><th>score</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : "");
 }
 
+/** The page's last entry (R7 fix 10): the two dated things to come back for — the next write-up
+ *  (a held draft's served words win) and the next weigh-in, in the one spelling every v7 page
+ *  uses. { html, day } — html "" when neither is served. */
+export function nextEntry({ cad, pending, journey, clock }) {
+  const lines = [];
+  const wu = nextWriteUpLine(cad, pending);
+  if (wu) lines.push(`<p class="nm-small" data-src="${pending && pending.display ? "journal_posts.pending.display" : "api_content_cadence.chronicle.next_date"}">${esc(wu)}</p>`);
+  const w = nextWeighInLine(journey, clock);
+  if (w.text) {
+    const t = w.text.charAt(0).toUpperCase() + w.text.slice(1);
+    lines.push(`<p class="nm-small">${esc(t).replace(esc(dayInWords(w.day)), `<time datetime="${esc(w.day)}" data-src="api_journey.journey.last_weighin_date">${esc(dayInWords(w.day))}</time>`)}.</p>`);
+  }
+  const c = cad && cad.chronicle;
+  const day = (pending && pending.expected_date) || (c && !c.paused && c.next_date) || w.day || "";
+  return { html: lines.join(""), day };
+}
+
+function renderNext({ cad, pending, journey, clock }) {
+  const sec = document.getElementById("nm-next");
+  if (!sec) return;
+  const n = nextEntry({ cad, pending, journey, clock });
+  if (!n.html) return fill(sec, cad && journey ? '<p class="nm-note">Nothing is scheduled.</p>' : notServed("What comes next"));
+  fill(sec, n.html);
+  if (n.day) setMargin(sec, n.day);
+}
+
 async function main() {
-  const [journey, wp, sleep, nut, training, labs, freshness, pulse, character] = await Promise.all([
+  const [journey, wp, sleep, nut, training, labs, freshness, pulse, character, cad, postsJson] = await Promise.all([
     tryJSON("/api/journey"),
     tryJSON("/api/weight_progress"),
     tryJSON("/api/sleep_detail"),
@@ -415,6 +467,8 @@ async function main() {
     tryJSON("/api/source_freshness"),
     tryJSON("/api/pulse"),
     tryJSON("/api/character"),
+    tryJSON("/api/content_cadence"),
+    tryJSON("/journal/posts.json"),
   ]);
   const j = journey && journey.journey;
   const through = j && j.last_weighin_date;
@@ -428,6 +482,7 @@ async function main() {
   renderLabs(labs);
   renderAbsent(freshness, pulse);
   renderEngine(character);
+  renderNext({ cad, pending: postsJson && postsJson.pending, journey, clock: (pulse && pulse.pulse && pulse.pulse.date) || today });
 }
 
 if (typeof document !== "undefined" && document.getElementById("nm-weight")) {

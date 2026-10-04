@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 const H = await import("../../site/assets/js/v7_hood.js");
 
-const COACHES = { count: 8, coaches: [{ persona_id: "sleep_coach", name: "Dr. Lisa Park" }, { persona_id: "nutrition_coach", name: "Dr. Marcus Webb" }, { persona_id: "eli_marsh", name: "Dr. Eli Marsh" }] };
+const COACHES = { count: 8, coaches: [{ persona_id: "sleep_coach", name: "Lisa Park" }, { persona_id: "nutrition_coach", name: "Marcus Webb" }, { persona_id: "eli_marsh", name: "Eli Marsh" }] };
 const NAMES = H.coachNames(COACHES);
 const FRESH = { summary: { fresh: 11, stale: 1, paused: 1, total: 13 }, sources: [
   { id: "whoop", last_update: "2026-09-26", status: "fresh" },
@@ -57,8 +57,8 @@ test("the cost line is the month-to-date receipt for the served subscriber count
 });
 
 test("the coach on a card is named from the roster, or plainly", () => {
-  assert.equal(H.coachName("sleep", NAMES), "Dr. Lisa Park");
-  assert.equal(H.coachName("eli_marsh", NAMES), "Dr. Eli Marsh");
+  assert.equal(H.coachName("sleep", NAMES), "Lisa Park");
+  assert.equal(H.coachName("eli_marsh", NAMES), "Eli Marsh");
   assert.equal(H.coachName("explorer", NAMES), "the explorer coach");
   assert.equal(H.coachName("", NAMES), "a coach");
 });
@@ -90,7 +90,7 @@ test("fit for the screen: the coaches page's public lint is the gate (an ISO dat
 
 test("three sentences per correction — what we said · what happened · what we changed — dates in words, symbols spelled", () => {
   const s = H.correctionSentences(NEW[0], NAMES);
-  assert.equal(s.said, "Dr. Lisa Park’s call, as the engine recorded it: recovery score would come in at 52.9 give or take 18.3 (one standard deviation of his last 30 days).");
+  assert.equal(s.said, "Lisa Park’s call, as the engine recorded it: recovery score would come in at 52.9 give or take 18.3 (one standard deviation of his last 30 days).");
   assert.equal(s.happened, "Recovery score measured 73.0 on September 13 — the call was 52.9 give or take 18.3 (one standard deviation of his last 30 days).");
   assert.equal(s.changed, "It landed 20.1 from the call, outside the band of 18.3 either way. Graded refuted by code on Saturday, September 26.");
   assert.equal(s.changedBody, "It landed 20.1 from the call, outside the band of 18.3 either way.");
@@ -111,7 +111,7 @@ test("a docket-settled card with no measured value says so, never invents one", 
 
 test("the pre-#4226 shape never reaches the screen: machine strings stay in the folded record", () => {
   const s = H.correctionSentences(OLD, NAMES);
-  assert.equal(s.said, "Dr. Marcus Webb made a dated call; its wording is in the record below.");
+  assert.equal(s.said, "Marcus Webb made a dated call; its wording is in the record below.");
   assert.equal(s.happened, "Recovery score measured 0.08.");
   assert.equal(s.changed, "The engine’s reason is in the record below. Graded refuted by code on Saturday, September 26.");
   for (const v of [s.said, s.happened, s.changed]) assert.ok(!/\d{4}-\d{2}-\d{2}/.test(v) && !/[a-z]+_[a-z]+/.test(v), v);
@@ -180,4 +180,31 @@ test("getJSON drains a non-2xx body before returning null — an unread body hol
   assert.equal(await H.getJSON("/api/x", throwing), null);
   // a fetch that rejects returns null
   assert.equal(await H.getJSON("/api/x", async () => { throw new Error("offline"); }), null);
+});
+
+// ── R7 fix 8 (#4329) ────────────────────────────────────────────────────────────
+// The two rows /api/wrong served on 2026-10-03, verbatim.
+const R7_BAND = { id: "95b56f31b17c", date: "2026-10-03", coach: "nutrition", believed: "total protein would come in at 46.0 g ±73.1 (one standard deviation of his last 30 days)", number: "total protein measured 166.0 g on October 1 — the call was 46.0 g ±73.1 (one standard deviation of his last 30 days)", what_changed: "It landed 120.0 g from the call, outside the ±73.1 band.", verdict: "refuted" };
+const R7_DEEP = { id: "4abf3b180ed5", date: "2026-10-03", coach: "sleep", believed: "deep would trend up", number: "measured falling: the smoothed average of deep fell 8% across its last 7 readings — the call was rising", what_changed: "The trend ran down, the opposite of the call, so it was graded refuted.", verdict: "refuted" };
+
+test("R7 fix 8: a band wider than its call is glossed with the arithmetic it implies — never left to read as a broken number", () => {
+  const s = H.correctionSentences(R7_BAND, NAMES);
+  assert.match(s.said, /total protein would come in at 46\.0 g give or take 73\.1 \(one standard deviation of his last 30 days\) — a band wider than the call itself: anything up to 119\.1 g would have counted\.$/);
+  assert.equal(H.bandGloss("recovery score would come in at 52.9 give or take 18.3"), "", "a band narrower than the call needs no gloss");
+  assert.equal(H.bandGloss("deep would trend up"), "");
+  assert.equal(H.bandGloss("x would come in at 10 give or take 25"), " — a band wider than the call itself: anything up to 35.0 would have counted");
+});
+
+test("R7 fix 8: the engine's short label 'deep' is spelled through the coaches page's metric words", () => {
+  const s = H.correctionSentences(R7_DEEP, NAMES);
+  assert.match(s.said, /: the share of deep sleep would trend up\.$/);
+  assert.equal(s.happened, "Measured falling: the smoothed average of the share of deep sleep fell 8 percent across its last 7 readings — the call was rising.");
+  assert.equal(H.spellMetrics("deep sleep ran long"), "deep sleep ran long", "'deep sleep' is already words");
+});
+
+test("R7 fix 8: the third sentence is labelled for what it holds — how the call was graded, not a change", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../site/assets/js/v7_hood.js", import.meta.url), "utf8");
+  assert.ok(src.includes("<b>How it was graded.</b>"));
+  assert.ok(!src.includes("<b>What we changed.</b>"));
 });

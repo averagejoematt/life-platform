@@ -25,7 +25,6 @@ counts), journal entries are counted, never read, and nothing here is a cycle co
 from __future__ import annotations
 
 import datetime as _dt
-import re
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -692,7 +691,9 @@ def load_plan() -> Dict[str, Any]:
 
 def display_name(name: Optional[str]) -> str:
     """Reader-facing coach name: the AI personas carry no honorific (owner ruling 2026-10-02)."""
-    return re.sub(r"^Dr\.\s+", "", name or "")
+    from coach.persona_registry import plain_name
+
+    return plain_name(name)
 
 
 def roster() -> List[Dict[str, Any]]:
@@ -762,8 +763,8 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "weekly_team": [c["name"] for c in team],
         "weekly_team_count": len(team),
         "pre_registration_filers": "sixteen calls under eight names; six of those names sit on the weekly team",
-        "not_on_the_weekly_team": "Dr. Sarah Chen (the two training calls)",
-        "same_seat_two_names": "the physical seat's two calls were filed as 'Dr. Victor Reyes'; that seat is Dr. Max Reyes on the weekly team",
+        "not_on_the_weekly_team": "Sarah Chen (the two training calls)",
+        "same_seat_two_names": "the physical seat's two calls were filed as 'Victor Reyes'; that seat is Max Reyes on the weekly team",
     }
     dossier["data_caveats"] = [
         *(["nutrition for " + ", ".join(nutrition["not_yet_exported_dates"]) + " is not yet exported"] if nye else []),

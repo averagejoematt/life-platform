@@ -6,7 +6,7 @@ board (site_api_ai_lambda COACH_ROSTER) carried a one-line "lens" self and the
 observatory experts (ai_expert_analyzer_lambda EXPERT_PERSONAS) a third
 hand-written self — three disconnected minds per character. This module renders
 the SAME voice-spec fields into a compact persona block those surfaces share,
-so Dr. Lisa Park sounds like Dr. Lisa Park everywhere.
+so Lisa Park sounds like Lisa Park everywhere.
 
 Design constraints:
 - Byte-stable per coach: the block derives only from the voice-spec JSON

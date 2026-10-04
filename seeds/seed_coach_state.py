@@ -25,14 +25,14 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 REGION = "us-west-2"
 
 COACHES = [
-    {"coach_id": "sleep_coach", "display_name": "Dr. Lisa Park", "domain": "sleep_science"},
-    {"coach_id": "nutrition_coach", "display_name": "Dr. Marcus Webb", "domain": "nutrition"},
-    {"coach_id": "training_coach", "display_name": "Dr. Sarah Chen", "domain": "exercise_physiology"},
-    {"coach_id": "mind_coach", "display_name": "Dr. Nathan Reeves", "domain": "psychiatry"},
-    {"coach_id": "physical_coach", "display_name": "Dr. Victor Reyes", "domain": "body_composition"},
-    {"coach_id": "glucose_coach", "display_name": "Dr. Amara Patel", "domain": "metabolic_health"},
-    {"coach_id": "labs_coach", "display_name": "Dr. James Okafor", "domain": "clinical_pathology"},
-    {"coach_id": "explorer_coach", "display_name": "Dr. Henning Brandt", "domain": "biostatistics"},
+    {"coach_id": "sleep_coach", "display_name": "Lisa Park", "domain": "sleep_science"},
+    {"coach_id": "nutrition_coach", "display_name": "Marcus Webb", "domain": "nutrition"},
+    {"coach_id": "training_coach", "display_name": "Sarah Chen", "domain": "exercise_physiology"},
+    {"coach_id": "mind_coach", "display_name": "Nathan Reeves", "domain": "psychiatry"},
+    {"coach_id": "physical_coach", "display_name": "Victor Reyes", "domain": "body_composition"},
+    {"coach_id": "glucose_coach", "display_name": "Amara Patel", "domain": "metabolic_health"},
+    {"coach_id": "labs_coach", "display_name": "James Okafor", "domain": "clinical_pathology"},
+    {"coach_id": "explorer_coach", "display_name": "Henning Brandt", "domain": "biostatistics"},
 ]
 
 CONFIDENCE_SUBDOMAINS = {

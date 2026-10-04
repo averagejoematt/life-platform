@@ -390,6 +390,10 @@ def test_gather_all_mood_aggregates_fall_back_through_the_field_ladder(monkeypat
 
 
 def test_gather_all_nutrition_hit_rates_use_the_ten_percent_calorie_grace(monkeypatch):
+    # #4540: targets are the plan's generated constants (the profile row is not read); pinned
+    # here to the figures this fixture's arithmetic was written against.
+    monkeypatch.setattr(partner, "PLAN_DAILY_CALORIES_TARGET", 1800)
+    monkeypatch.setattr(partner, "PLAN_DAILY_PROTEIN_MIN_G", 190)
     _wire_gather(monkeypatch)
     nu = partner.gather_all()["nutrition"]
     assert nu["calories_avg"] == 2050.0
@@ -504,7 +508,7 @@ He is also proud of showing up anyway.
 **🧠 WHAT'S HAPPENING UNDERNEATH — DR. CONTI
 He is measuring instead of feeling.
 
-🤝 HOW TO SHOW UP FOR HIM — DR. MURTHY
+🤝 HOW TO SHOW UP FOR HIM — MURTHY
 Sit with him without a plan.
 
 💪 HIS BODY THIS WEEK — THE CHAIR

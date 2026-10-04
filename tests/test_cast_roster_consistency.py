@@ -20,7 +20,7 @@ Two failure modes it must resist:
     green — the "gate that was never running" shape (#1908/#1920). Both are
     asserted non-empty first.
   * Off-roster names are not all retired personas. `Coach Maya Rodriguez` and
-    `Dr. Kai Nakamura` ARE in config/personas.json (non-operational); `Dr. Lena
+    `Kai Nakamura` ARE in config/personas.json (non-operational); `Dr. Lena
     Johansson`, `Sofia Herrera` and `Raj Mehta` are in no registry at all. So the
     check is "on the LIVE roster", never "absent from the retired list".
 """
@@ -146,8 +146,8 @@ def test_supplement_registry_attributions_are_all_operational():
     """The #3520 instance, named so a regression reads as itself in CI output.
 
     `/api/supplements` serves this registry verbatim and the front-end prints
-    `src: {board}` on every card. It carried Dr. Kai Nakamura x7, Dr. Victor Reyes x9 and
-    Dr. Sarah Chen x5 — three names `/api/coaches` does not serve, one of them a coach
+    `src: {board}` on every card. It carried Kai Nakamura x7, Victor Reyes x9 and
+    Sarah Chen x5 — three names `/api/coaches` does not serve, one of them a coach
     retired at the cycle-13 genesis.
     """
     roster = _roster()
@@ -172,17 +172,18 @@ def test_supplement_guard_would_reject_a_retired_attribution():
     made the predicate permissive fails here first.
     """
     roster = _roster()
-    for retired in ("Dr. Kai Nakamura", "Dr. Victor Reyes", "Dr. Sarah Chen"):
+    for retired in ("Kai Nakamura", "Victor Reyes", "Sarah Chen"):
         assert retired not in roster, f"{retired} is back on the live roster — this control is now inert"
         offenders = [(v, "l_threonate") for v in (retired,) if v not in roster and v not in ROLE_LABELS]
         assert offenders, f"the guard's predicate accepts {retired!r} in a supplement `board` field"
 
 
 def test_marcus_webb_prefix_is_normalised():
-    """One entry read `Marcus Webb` where every other use carries the `Dr.` prefix."""
+    """One spelling per coach. Was: one entry read `Marcus Webb` where every other carried `Dr.`;
+    since #4564 (owner ruling 2026-10-02) the plain name IS the one spelling."""
     vals = {v for v, _ in _values("site/config/challenges_catalog.json", "board_recommender")}
-    assert "Marcus Webb" not in vals
-    assert "Dr. Marcus Webb" in vals
+    assert "Dr. Marcus Webb" not in vals
+    assert "Marcus Webb" in vals
 
 
 # ── prove it fires ───────────────────────────────────────────────────────────
@@ -204,7 +205,7 @@ def test_guard_rejects_a_name_in_no_registry_at_all():
     the check cannot be phrased against a known-retired set.
     """
     roster = _roster()
-    for orphan in ("Dr. Lena Johansson", "Sofia Herrera", "Raj Mehta", "Dr. Kai Nakamura"):
+    for orphan in ("Dr. Lena Johansson", "Sofia Herrera", "Raj Mehta", "Kai Nakamura"):
         assert orphan not in roster
 
 
@@ -219,9 +220,9 @@ def test_guard_would_fail_on_an_injected_off_roster_name():
 # ── #2384: reader-bound PROMPT LITERALS ──────────────────────────────────────
 #
 # Config was only half the fork surface. `wednesday_chronicle_lambda.py`'s
-# fallback prompt staged interviews with "Dr. Nakamura (neuroscience)" — a
+# fallback prompt staged interviews with "Nakamura (neuroscience)" — a
 # persona off the live roster — and `chronicle_email_sender_lambda.py` mapped a
-# retired key to "Dr. Kai Nakamura", so a chronicle draft could interview a
+# retired key to "Kai Nakamura", so a chronicle draft could interview a
 # coach that does not exist. This section scans the SET of prompt-building
 # modules (every .py under lambdas/emails/ + lambdas/intelligence/, discovered
 # by glob, never hand-listed) for persona names off the live cast.
@@ -235,7 +236,7 @@ def test_guard_would_fail_on_an_injected_off_roster_name():
 #     appear in a prompt literal (#1891's harm class);
 #   * the known phantom corpus: names that shipped on surfaces but exist in NO
 #     registry at all (#1904's bulk, plus this issue's finds).
-# Each root also matches its bare/honorific surname forms ("Dr. Nakamura",
+# Each root also matches its bare/honorific surname forms ("Nakamura",
 # "Rodriguez would say") when the surname is unambiguous vs the live cast.
 #
 # Docstrings are deliberately EXCLUDED: incident history lives there (e.g.
@@ -243,8 +244,8 @@ def test_guard_would_fail_on_an_injected_off_roster_name():
 # never reaches a reader. Comments are invisible to the AST already.
 
 # #3520: `deploy/` joined the scan set. `deploy/seed_genesis_preregistration.py`
-# hand-typed a `COACHES` roster naming `Dr. Sarah Chen` (retired at the cycle-13 genesis)
-# and `Dr. Victor Reyes` (a byline the live cast does not use) — and that list is the
+# hand-typed a `COACHES` roster naming `Sarah Chen` (retired at the cycle-13 genesis)
+# and `Victor Reyes` (a byline the live cast does not use) — and that list is the
 # input to the FROZEN, content-hash-sealed pre-registration, i.e. the one reader-bound
 # artifact that can never be corrected after the fact. It sat outside the guard purely
 # because the guard's scan set was "prompt-building lambdas" rather than "code that puts a
@@ -256,7 +257,7 @@ PROMPT_LITERAL_DIRS = ("lambdas/emails", "lambdas/intelligence", "deploy")
 # reasoning as the config guard above.
 PHANTOM_NAMES = {
     "Dr. Elena Rodriguez": "hand-invented behaviourist (monday_compass fallback, #2384)",
-    "Dr. Daniel Murthy": "phantom rename of vivek_murthy (chronicle sender map, #2384)",
+    "Daniel Murthy": "phantom rename of vivek_murthy (chronicle sender map, #2384)",
     "Dr. Lena Johansson": "in no registry (#1904)",
     "Sofia Herrera": "in no registry (#1904)",
     "Raj Mehta": "in no registry (#1904)",
@@ -271,7 +272,7 @@ PROMPT_LITERAL_ALLOWLIST = {
     # its Rodriguez/Murthy sections are registry board personas, kept by
     # explicit decision. Restructuring the sections onto the live roster is a
     # product call, not a guard call.
-    "lambdas/emails/partner_email_lambda.py": {"Coach Maya Rodriguez", "Dr. Vivek Murthy"},
+    "lambdas/emails/partner_email_lambda.py": {"Coach Maya Rodriguez", "Vivek Murthy"},
     # Owner-private digests (to Matthew only): their offline FALLBACK prompts
     # keep the Maya Rodriguez behavioural section that the live board config
     # also still stages for these features.
@@ -283,7 +284,7 @@ PROMPT_LITERAL_ALLOWLIST = {
     # three real experts the fictional board was modelled on — the script cannot find
     # what it exists to remove without quoting it, and the same three names are entries
     # in its `privacy absolutes` deny vocabulary. The REPLACEMENT half is not
-    # allowlisted and is checked like any other literal: it named "Dr. Nakamura" until
+    # allowlisted and is checked like any other literal: it named "Nakamura" until
     # #3520 and now names the live cast, which is what this guard is for.
     "deploy/restart_leadin_repair.py": {"Peter Attia", "Andrew Huberman", "Layne Norton"},
     # Frozen one-time scripts under deploy/archive/. These cite real researchers and
@@ -322,7 +323,7 @@ def _forbidden_roots() -> dict:
         if name and name not in live_cast:
             roots[name] = f"registry persona {key!r} is off the live cast"
         # The registry KEY encodes the real-expert inspiration where it differs
-        # from the display name (andrew_huberman -> "Dr. Kai Nakamura").
+        # from the display name (andrew_huberman -> "Kai Nakamura").
         if key.endswith("_coach") or p.get("lead") or p.get("type") in ("narrator", "meta"):
             continue
         real = key.removesuffix("_interim").replace("_", " ").title()
@@ -343,7 +344,7 @@ def _forbidden_patterns() -> dict:
         add(rf"\b{re.escape(root)}\b", root)
         surname = _strip_honorific(root).split()[-1]
         if surname not in live_surnames:
-            # bare + honorific short forms: "Dr. Nakamura", "Rodriguez would say"
+            # bare + honorific short forms: "Nakamura", "Rodriguez would say"
             add(rf"\b(?:Dr\.?\s+|Coach\s+)?{re.escape(surname)}\b", root)
     return {re.compile(p, re.IGNORECASE): roots for p, roots in pats.items()}
 
@@ -411,7 +412,7 @@ def test_prompt_literal_scan_set_is_not_empty():
     assert len(deploy_modules) >= 20, f"only {len(deploy_modules)} deploy/ modules discovered — the #3520 widening is inert"
     roots = _forbidden_roots()
     assert len(roots) >= 8, f"forbidden set collapsed to {sorted(roots)}"
-    for expected in ("Dr. Kai Nakamura", "Coach Maya Rodriguez", "Andrew Huberman", "Dr. Elena Rodriguez"):
+    for expected in ("Kai Nakamura", "Coach Maya Rodriguez", "Andrew Huberman", "Dr. Elena Rodriguez"):
         assert expected in roots, f"{expected!r} missing from the derived forbidden set"
 
 
@@ -451,14 +452,14 @@ def test_prompt_guard_catches_a_planted_retired_name(tmp_path):
     """Mutation proof: a retired name planted in a scanned prompt literal is caught."""
     planted = tmp_path / "planted_lambda.py"
     planted.write_text(
-        '"""Module docstring — Dr. Kai Nakamura here must NOT trip the guard."""\n'
+        '"""Module docstring — Kai Nakamura here must NOT trip the guard."""\n'
         "PROMPT = (\n"
         '    "About twice a month you include a Board interview — "\n'
-        '    "Dr. Nakamura is enthusiastic and tangential (neuroscience)."\n'
+        '    "Nakamura is enthusiastic and tangential (neuroscience)."\n'
         ")\n"
     )
     offenders = _prompt_literal_offenders(planted, "lambdas/emails/planted_lambda.py")
-    assert offenders, "a planted retired short-form name (Dr. Nakamura) was not caught"
+    assert offenders, "a planted retired short-form name (Nakamura) was not caught"
     docstring_hits = [o for o in offenders if o[1] == 1]
     assert not docstring_hits, "the guard is reading docstrings — incident history would red the build"
 
@@ -466,7 +467,7 @@ def test_prompt_guard_catches_a_planted_retired_name(tmp_path):
 def test_prompt_guard_catches_a_full_retired_name_and_a_real_expert():
     patterns = _forbidden_patterns()
     for planted in (
-        "an interview with Dr. Kai Nakamura",
+        "an interview with Kai Nakamura",
         "Coach Maya Rodriguez reads the picture",
         "as Andrew Huberman says",
         "Rodriguez would say",
@@ -477,8 +478,8 @@ def test_prompt_guard_catches_a_full_retired_name_and_a_real_expert():
 def test_prompt_guard_does_not_flag_the_live_cast():
     patterns = _forbidden_patterns()
     for fine in (
-        "Dr. Marcus Webb is blunt and practical",
-        "Dr. Reyes is precise",
+        "Marcus Webb is blunt and practical",
+        "Reyes is precise",
         "Elena Voss, embedded journalist",
         "The Chair synthesises",
     ):
@@ -494,3 +495,171 @@ def test_prompt_guard_allowlist_is_per_file_not_global(tmp_path):
     assert _prompt_literal_offenders(
         planted, "lambdas/emails/wednesday_chronicle_lambda.py"
     ), "a private-sender allowance leaked into a reader-bound module — a retired name could return"
+
+
+# ── #4564: no honorific on an AI persona, on ANY surface ─────────────────────
+#
+# Owner ruling 2026-10-02: the coaches are AI personas with domains and track records,
+# not credentialed doctors — "Dr. " + a persona's name is a claim a cold reader takes
+# literally. The registry (`config/personas.json`) carries plain names and
+# `persona_registry.plain_name` is the one spelling of the rule; everything else
+# derives from it.
+#
+# Guarded as a SET, not as the list of files that happened to carry the honorific on
+# the day: every tracked text file under the trees that feed a reader (served config,
+# the static site, the lambdas' prompts/fallbacks/emails, the MCP descriptions, the
+# site generators and the setup/seed scripts that name a coach) is scanned for
+# `Dr. <persona>` in the full-name AND the bare-surname form, with the names DERIVED
+# from the registry — a coach added tomorrow is covered without touching this file.
+# Comments and docstrings are scanned too, deliberately: a "Dr. Park" in a comment is
+# what the next hand-written prompt gets copied from.
+HONORIFIC_SCAN_ROOTS = ("lambdas", "mcp", "config", "site", "scripts", "setup", "seeds", "deploy")
+HONORIFIC_SCAN_SUFFIXES = (".py", ".json", ".js", ".mjs", ".html", ".css", ".md", ".txt", ".xml", ".sh", ".yml", ".yaml")
+
+# What keeps the name it was written with, and why. A sealed artifact is content-
+# addressed (editing it breaks its hash — the issue's second bullet); the rest are
+# verbatim historical RECORDS, not surfaces. `test_honorific_kept_verbatim_paths_are_real`
+# reds on an entry that no longer exists or no longer carries the honorific, so this
+# cannot quietly outlive its reason.
+HONORIFIC_KEPT_VERBATIM = (
+    ("deploy/generated/", "the sealed, sha256-pinned pre-registration artifacts — never edited; they keep the names they were sealed with"),
+    ("deploy/seed_genesis_preregistration.py", "quotes, in comments, the bylines the sealed cycle-16 artifacts literally carry"),
+    ("deploy/prereg_truth_gate.py", "quotes the sealed artifacts' byline in the incident note it exists for"),
+    ("site/legacy/", "the frozen pre-v4 archive — unlinked from the UI (CLAUDE.md) and not regenerated"),
+    ("config/portraits/", "`_meta.prompt` is the provenance record of the prompt each illustration was generated with; never rendered"),
+    (
+        "site/assets/js/portrait_data.js",
+        "generated from config/portraits/ by scripts/v4_build_portraits.py — carries the same provenance record",
+    ),
+    ("config/coaches/tuning_log.json", "hand-appended, dated record of owner tuning decisions; no reader"),
+    ("scripts/gate_census_proofs.py", "mutation-proof records quote the planted strings verbatim"),
+)
+
+
+def _honorific_pattern():
+    """`Dr. <First> <Last>` / `Dr. <Last>` for every persona in the registry, derived.
+
+    Case-insensitive: the email section headers print the byline in capitals
+    (`DR. LISA PARK — SLEEP`), and that is the form a subscriber actually reads."""
+    names = {persona_registry.plain_name(p.get("name")) for p in persona_registry.personas().values() if p.get("name")}
+    surnames = {n.split()[-1] for n in names if len(n.split()) >= 2}
+    assert len(surnames) >= 10, f"only {len(surnames)} persona surnames derived — the honorific guard would scan for nothing"
+    return _honorific_pattern_for(sorted(map(re.escape, surnames)))
+
+
+def _honorific_scan_files():
+    import subprocess
+
+    out = subprocess.run(["git", "ls-files", "--", *HONORIFIC_SCAN_ROOTS], cwd=_REPO, capture_output=True, text=True, check=True).stdout
+    return [f for f in out.splitlines() if f.endswith(HONORIFIC_SCAN_SUFFIXES)]
+
+
+def _honorific_offenders(files, read=None):
+    rx = _honorific_pattern()
+    kept = tuple(prefix for prefix, _ in HONORIFIC_KEPT_VERBATIM)
+    offenders = []
+    for rel in files:
+        if rel.startswith(kept):
+            continue
+        try:
+            text = read(rel) if read else (_REPO / rel).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for ln, line in enumerate(text.splitlines(), 1):
+            for m in rx.finditer(line):
+                offenders.append((rel, ln, m.group(0)))
+    return offenders
+
+
+def test_no_surface_renders_an_honorific_on_a_persona():
+    """#4564 — the SET: no tracked reader-feeding file says 'Dr. ' + a persona name."""
+    files = _honorific_scan_files()
+    assert len(files) > 500, f"only {len(files)} files scanned — the sweep is not walking the tree"
+    for root in HONORIFIC_SCAN_ROOTS:
+        assert any(f.startswith(root + "/") for f in files), f"scan root {root}/ contributed no file — a renamed tree left the guard"
+    offenders = _honorific_offenders(files)
+    assert not offenders, (
+        f"{len(offenders)} place(s) put 'Dr.' on an AI persona (#4564, owner ruling 2026-10-02 — use the registry's plain name, "
+        "or `persona_registry.plain_name` on a stored one):\n" + "\n".join(f"    {rel}:{ln}: {hit!r}" for rel, ln, hit in offenders[:40])
+    )
+
+
+def test_registry_and_rendered_surfaces_derive_plain_names(monkeypatch):
+    """#4564 — the DERIVATION: a stale 'Dr.' source still renders plain on what derives from the registry.
+
+    The S3 twin of config/personas.json lags a merge until the site deploy syncs it, and the
+    live API a site build bakes from lags until the site-api deploys; neither may put the
+    honorific back. Fed a pre-ruling registry / API body, every rendered string is plain.
+    """
+    import v4_proof
+    from content import story_dossier
+
+    for pid, p in persona_registry.personas().items():
+        assert not re.match(r"\s*Dr\b", p.get("name") or ""), f"config/personas.json: {pid} is named {p.get('name')!r}"
+
+    stale = {
+        "personas": {
+            "sleep_coach": {"name": "Dr. Lisa Park", "operational": True, "short_id": "sleep", "short_bio": "Works beside Dr. Eli Marsh."},
+            "eli_marsh": {"name": "Dr. Eli Marsh", "lead": True, "short_bio": "Reads Dr. Park's sleep call first. Cites Dr. Peter Attia."},
+        }
+    }
+    monkeypatch.setitem(persona_registry._cache, "data", persona_registry._plain_registry(stale))
+    monkeypatch.setitem(persona_registry._cache, "ts", __import__("time").time())
+    rendered = [
+        persona_registry.display_name("sleep_coach"),
+        persona_registry.lead_name(),
+        *persona_registry.short_id_names().values(),
+        *(v["name"] for v in persona_registry.display_map().values()),
+        story_dossier.display_name("Dr. Lisa Park"),
+        persona_registry.LEAD_FALLBACK_NAME,
+        persona_registry.resolve("sleep_coach")["short_bio"],
+        persona_registry.resolve("eli_marsh")["short_bio"],
+        v4_proof.coaching_read_block_html(
+            {
+                "weekly_priority": {"text": "One clear call.", "coach_name": "Dr. Eli Marsh"},
+                "coaches": [{"name": "Dr. Lisa Park", "title": "Sleep", "position_summary": "A read."}],
+                "as_of": "2026-10-02",
+            }
+        ),
+    ]
+    assert "Lisa Park" in rendered and "Eli Marsh" in rendered
+    assert "Dr. Peter Attia" in persona_registry.resolve("eli_marsh")["short_bio"], "a real clinician's title is not ours to drop"
+    assert "Lisa Park" in rendered[-1] and "Eli Marsh" in rendered[-1]
+    rx = _honorific_pattern_for(("Park", "Marsh"))
+    bad = [r for r in rendered if rx.search(r)]
+    assert not bad, f"a registry-derived surface still renders the honorific: {bad}"
+
+
+def _honorific_pattern_for(surnames):
+    return re.compile(r"\bDr\.?\s+(?:[A-Za-z][\w'-]+\s+)?(?:%s)\b" % "|".join(surnames), re.IGNORECASE)
+
+
+def test_honorific_guard_catches_a_planted_honorific():
+    """Negative control: both name forms, in every file type, are caught — and the kept set is not a hole."""
+    planted = {
+        "lambdas/emails/planted_4564.py": 'PROMPT = "Dr. Lisa Park is gentle but firm."\n',
+        "site/assets/js/planted_4564.js": 'const who = "Dr. Webb";\n',
+        "config/planted_4564.json": '{"name": "Dr Max Reyes"}\n',
+        "lambdas/emails/planted_header_4564.py": 'HEADER = "DR. JAMES OKAFOR — MONTHLY TRAJECTORY REVIEW"\n',
+        "site/legacy/planted_4564.html": "<p>Dr. Lisa Park</p>\n",  # kept verbatim — must NOT be reported
+        "lambdas/emails/fine_4564.py": 'PROMPT = "Lisa Park is gentle. Dr. Peter Attia is a real clinician, not a persona."\n',
+    }
+    offenders = _honorific_offenders(list(planted), read=planted.__getitem__)
+    assert {(rel, hit) for rel, _, hit in offenders} == {
+        ("lambdas/emails/planted_4564.py", "Dr. Lisa Park"),
+        ("site/assets/js/planted_4564.js", "Dr. Webb"),
+        ("config/planted_4564.json", "Dr Max Reyes"),
+        ("lambdas/emails/planted_header_4564.py", "DR. JAMES OKAFOR"),
+    }, offenders
+
+
+def test_honorific_kept_verbatim_paths_are_real():
+    """Every kept path still exists AND still carries the honorific — else the entry is a dead hole."""
+    files = _honorific_scan_files()
+    rx = _honorific_pattern()
+    for prefix, reason in HONORIFIC_KEPT_VERBATIM:
+        members = [f for f in files if f.startswith(prefix)]
+        assert members, f"kept-verbatim entry {prefix!r} matches no tracked file ({reason})"
+        assert any(
+            rx.search((_REPO / f).read_text(encoding="utf-8", errors="ignore")) for f in members
+        ), f"kept-verbatim entry {prefix!r} no longer carries any honorific — delete the entry"

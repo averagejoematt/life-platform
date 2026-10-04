@@ -212,7 +212,7 @@ class TestProjectionCarriesEveryEmittedField:
         (item,) = body["predictions"]
         assert item == {
             "coach_id": "sleep",
-            "coach_name": "Dr. Lisa Park",
+            "coach_name": "Lisa Park",
             "text": "Sleep debt clears by Thursday",
             "confidence": 0.8,
             "status": "confirmed",
@@ -253,7 +253,7 @@ class TestProjectionCarriesEveryEmittedField:
         fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": []})
         monkeypatch.setattr(api, "table", fake)
         body = _body(api.handle_predictions({}))
-        # Dr. Sarah Chen, the retired training seat (2 sealed pre-registered calls
+        # Sarah Chen, the retired training seat (2 sealed pre-registered calls
         # per the issue's live proof) — the live registry, not a fake.
         assert body["by_coach"]["training"]["retired"] is True
         assert body["by_coach"]["sleep"]["retired"] is False

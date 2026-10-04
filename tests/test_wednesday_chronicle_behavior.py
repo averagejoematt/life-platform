@@ -902,8 +902,8 @@ def test_an_untitled_draft_is_labelled_untitled_rather_than_crashing():
 
 
 def test_a_board_interview_is_rendered_as_a_blockquote():
-    html = m.markdown_to_html("He asked about the plateau.\n\n> Dr. Park was unimpressed.\n\nThe answer stayed with him.")
-    assert "<blockquote>Dr. Park was unimpressed.</blockquote>" in html
+    html = m.markdown_to_html("He asked about the plateau.\n\n> Park was unimpressed.\n\nThe answer stayed with him.")
+    assert "<blockquote>Park was unimpressed.</blockquote>" in html
 
 
 def test_the_closing_signature_is_rendered_as_a_signature_line():
@@ -914,15 +914,15 @@ def test_a_board_interview_at_the_very_end_of_an_installment_is_not_dropped():
     """The buffer is flushed after the loop, so an interview as the closing beat
     survives. Pinned because losing it would be invisible: has_board_interview
     would still be stored True while the quote vanished from email and journal."""
-    html = m.markdown_to_html("He asked about the plateau.\n\n> Dr. Park had the last word.")
-    assert "<blockquote>Dr. Park had the last word.</blockquote>" in html
+    html = m.markdown_to_html("He asked about the plateau.\n\n> Park had the last word.")
+    assert "<blockquote>Park had the last word.</blockquote>" in html
 
 
 def test_a_blockquote_without_a_space_is_still_recognised_as_an_interview():
     """#2221 (was a tranche-3 xfail): the markdown blockquote marker is ">"; the space
     after it is optional. All THREE matchers were strict — the handler's has_board
     detector, markdown_to_html, and scripts/v4_build_journal.py (the public page)."""
-    body = "He asked about the plateau.\n\n>Dr. Park was unimpressed.\n\nHe let it sit."
+    body = "He asked about the plateau.\n\n>Park was unimpressed.\n\nHe let it sit."
     assert any(line.strip().startswith(">") for line in body.split("\n"))
     assert "<blockquote>" in m.markdown_to_html(body)
 
@@ -1401,7 +1401,7 @@ def test_a_published_week_is_logged_for_the_status_page(publish_env):
 
 
 def test_a_board_interview_is_flagged_on_the_stored_installment(publish_env):
-    publish_env["state"]["ai"] = RAW_INSTALLMENT.replace("What happens next", "> Dr. Park was blunt about it.\n\nWhat happens next")
+    publish_env["state"]["ai"] = RAW_INSTALLMENT.replace("What happens next", "> Park was blunt about it.\n\nWhat happens next")
     m.lambda_handler({}, None)
     assert _stored_installment(publish_env)["has_board_interview"] is True
 

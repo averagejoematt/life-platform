@@ -449,7 +449,7 @@ def _write_readout(out_dir: Path) -> None:
         '  <li class="rd-card" style="--coach:#DD7A37;"><button type="button"'
         ' class="rd-btn" style="all:unset;cursor:pointer;display:block;">'
         '<span class="rd-body"><span class="rd-top"><span class="rd-dom label">sleep coach</span>'
-        '<span class="rd-name">Dr. Elena Voss</span></span>'
+        '<span class="rd-name">Elena Voss</span></span>'
         '<span class="rd-say">Consolidation over duration this week — the fragmented nights cost more than the short ones.</span>'
         '<span class="rd-asof label">as of today</span></span></button></li>\n'
         "</ul>\n"
@@ -607,7 +607,7 @@ def _write_sigils_tier_emblems(out_dir: Path) -> None:
         + "</div></div>"
     )
     calls = (
-        'document.getElementById("sg-1").innerHTML = sigil({ id: "elena_voss", name: "Dr. Elena Voss" });\n'
+        'document.getElementById("sg-1").innerHTML = sigil({ id: "elena_voss", name: "Elena Voss" });\n'
         '  document.getElementById("sg-2").innerHTML = sigil({ id: "marcus_webb", name: "Marcus Webb" });\n'
         '  document.getElementById("sg-3").innerHTML = sigil({ id: "sarah_chen", name: "Sarah Chen" });\n'
         + "\n  ".join(

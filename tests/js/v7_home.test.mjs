@@ -40,8 +40,8 @@ const progress = [
 const posts = [{ date: "2026-09-22", title: "The Silence and the Signal" }];
 const cadence = { chronicle: { paused: false, next_date: "2026-09-30" } };
 const coaches = [
-  { persona_id: "sleep_coach", name: "Dr. Lisa Park" },
-  { persona_id: "mind_coach", name: "Dr. Nathan Reeves" },
+  { persona_id: "sleep_coach", name: "Lisa Park" },
+  { persona_id: "mind_coach", name: "Nathan Reeves" },
 ];
 const docket = [
   {
@@ -124,7 +124,7 @@ test("the alive line carries the ONE data-through, K of N from one producer, the
   const html = H.aliveLine("2026-09-26", { platform: { strata: { coaches: { n: 37, confirmed: 18 } } } }, cadence);
   assert.match(strip(html), /^Data through Saturday, September 26 · the coaches’ checked calls so far, by the site’s own count: 18 of 37 right · next write-up Wednesday, September 30$/);
   assert.match(html, /data-src="calibration\.platform\.strata\.coaches\.confirmed"/);
-  assert.match(strip(H.aliveLine("2026-09-26", null, { chronicle: { paused: true } })), /no checked coach call is served yet · the write-up is paused/);
+  assert.match(strip(H.aliveLine("2026-09-26", null, { chronicle: { paused: true } })), /the coaches’ record is not served right now · the write-up is paused/);
 });
 
 test("what resolves next: sorted by date, the docket in plain words, and the honest empty state", () => {
@@ -133,7 +133,7 @@ test("what resolves next: sorted by date, the docket in plain words, and the hon
     rows.map((r) => r.date),
     ["2026-09-27", "2026-09-30", "2026-10-05", "2026-10-07"],
   );
-  assert.match(strip(rows[3].html), /Dr\. Lisa Park says the seven-night average recovery reads 80 or better that day; Dr\. Nathan Reeves says it won’t\. Graded by code\./);
+  assert.match(strip(rows[3].html), /Lisa Park says the seven-night average recovery reads 80 or better that day; Nathan Reeves says it won’t\. Graded by code\./);
   const empty = strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches, "2026-09-26"));
   assert.match(empty, /^Nothing is on the docket and no graded call is due\. The next weigh-in is due Sunday, September 27\.$/);
 });
@@ -182,10 +182,10 @@ test("is he okay: the refusals are kept verbatim and absence is stated as absenc
     { pulse: { date: "2026-09-26", glyphs: { lift: { label: "Rest day" } } } },
   );
   const text = strip(html);
-  assert.match(text, /Friday night he slept 8\.6 hours — the wrist strap and the bed sensor agree\./);
+  assert.match(text, /Friday night the bed sensor read 8\.6 hours of sleep and the wrist strap 8\.6\./);
   assert.match(text, /He logged food every day from September 6 to Friday, September 25 — 20 days — averaging 1,577 calories and 153 g of protein\./);
   assert.match(text, /The site does not publish a calorie deficit: its estimate is larger than it is willing to vouch for\./);
-  assert.match(text, /Friday: a 72-minute walk\. Saturday: rest day\. Steps are the weak spot: 2,245 a day, averaged over 20 days\./);
+  assert.match(text, /Friday: a 72-minute walk\. Saturday: rest day\. The step count on record is 2,245 a day, averaged over 20 days\./);
   for (const f of ["nutrition_overview.nutrition.protein_floor_g", "nutrition_overview.nutrition.days_logged", "vitals.hrv_avg_window_days", "training_overview.training.strength_sessions_30d", "training_overview.walking.total_walks_30d", "training_overview.walking.avg_daily_steps_n"]) {
     assert.ok(html.includes(`data-src="${f}"`), `${f} is cited`);
   }
@@ -198,15 +198,15 @@ test("is he okay: the refusals are kept verbatim and absence is stated as absenc
 
 test("also on the record: two counts that disagree are both left up; the skips are counted", () => {
   const html = H.recordBlock(
-    { coaches: [{ coach_id: "nutrition", coach_name: "Dr. Marcus Webb", n: 5, confirmed: 0 }, { coach_id: "sleep", coach_name: "Dr. Lisa Park", n: 17, confirmed: 7 }] },
+    { coaches: [{ coach_id: "nutrition", coach_name: "Marcus Webb", n: 5, confirmed: 0 }, { coach_id: "sleep", coach_name: "Lisa Park", n: 17, confirmed: 7 }] },
     { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }, { coach: "sleep", confirmed: 7, refuted: 10 }] } },
     { commitments: { lifetime: { unresolved: 468, graded: 49, kept: 37 } } },
     { pacific_today: "2026-09-26", sources: [{ id: "garmin", label: "Garmin", status: "paused", last_update: "2026-06-15" }, { id: "apple_health", label: "Apple Health", status: "fresh", datatypes: [{ key: "cgm", label: "CGM (glucose)" }], dark_datatypes: [{ label: "CGM (glucose)", days_dark: 30 }] }] },
     { pulse: { glyphs: { journal: { gap_days: 17 } } } },
   );
   const text = strip(html);
-  assert.match(text, /Dr\. Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s two counts\. The other says 20 of 25\. The two disagree, and both are left up\./);
-  assert.doesNotMatch(text, /Dr\. Lisa Park/, "a coach whose two counts agree is not on the record");
+  assert.match(text, /Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s two counts\. The other says 20 of 25\. The two disagree, and both are left up\./);
+  assert.doesNotMatch(text, /Lisa Park/, "a coach whose two counts agree is not on the record");
   assert.match(text, /468 asks expired .* Of the 49 that were checked, he kept 37\./);
   assert.match(text, /What he skips, counted: journal 17 days · blood-sugar sensor 30 days · Garmin 103 days, paused by the platform, not by him\./);
 });
@@ -226,7 +226,7 @@ test("every number carries its served field, dates are words not ISO, and the ru
   const text = strip(all);
   assert.doesNotMatch(text, /\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of|chronicle|cockpit)\b/i);
   // R5 §d — house jargon a reader meets in the fold: "scorekeeper" and "the engine's count" are gone
-  assert.doesNotMatch(text + strip(H.recordBlock({ coaches: [{ coach_id: "nutrition", coach_name: "Dr. Marcus Webb", n: 5, confirmed: 0 }] }, { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }] } }, null, null, null)), /scorekeeper|engine’s count|engine's count/i);
+  assert.doesNotMatch(text + strip(H.recordBlock({ coaches: [{ coach_id: "nutrition", coach_name: "Marcus Webb", n: 5, confirmed: 0 }] }, { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }] } }, null, null, null)), /scorekeeper|engine’s count|engine's count/i);
   assert.doesNotMatch(text, /\d{4}-\d{2}-\d{2}/, "no ISO date reaches the reader");
   // The fold's figures each name their field.
   for (const f of ["journey.current_weight_lbs", "journey.lost_lbs", "journey.day_n", "journey.start_weight_lbs", "journey.weighin_count", "journey.weekly_rate_lbs"]) {
@@ -253,4 +253,77 @@ test("every number carries its served field, dates are words not ISO, and the ru
 test("the margin: day, three-letter month, weekday", () => {
   assert.deepEqual(H.marginParts("2026-09-26"), { d: "26", mo: "Sep", w: "Saturday" });
   assert.equal(H.marginParts("nope"), null);
+});
+
+// ── R7 (#4329): the ten fixes, Home's share ─────────────────────────────────────
+const R7_DOCKET = [
+  { coach_a: "physical_coach", coach_b: "sleep_coach", sides: { physical_coach: false, sleep_coach: true }, criterion: { metric: "recovery_score_7day_avg", condition: "gte", threshold: 81.6 }, resolution_date: "2026-10-05", topic: "Recovery score directional trend confirmation" },
+  { coach_a: "mind_coach", coach_b: "nutrition_coach", sides: { nutrition_coach: true, mind_coach: false }, criterion: { metric: "total_protein_g_7day_avg", condition: "gte", threshold: 190 }, resolution_date: "2026-10-12", topic: "Fuel-cognition link mechanistic validity" },
+  { coach_a: "sleep_coach", coach_b: "physical_coach", sides: { sleep_coach: false, physical_coach: true }, criterion: { metric: "deep_pct_7day_avg", condition: "gte", threshold: 26 }, resolution_date: "2026-10-16", topic: "Deep sleep spike interpretation: signal vs. noise" },
+  { coach_a: "mind_coach", coach_b: "nutrition_coach", sides: {}, criterion: { metric: "some_new_engine_field", condition: "gte", threshold: 3 }, resolution_date: "2026-10-20", topic: "Fuel-cognition link mechanistic validity" },
+];
+
+test("R7 fix 1: an earliest_due before the data-through day is OVERDUE — counted, the oldest day in words, sorted first, never 'the next call'", () => {
+  const preds = { overall: { due: { as_of: "2026-10-03", due_now: 2, earliest_due: "2026-09-27" } } };
+  const rows = H.nextRows([], preds, cadence, { ...journey, day_n: 40 }, coaches, "2026-10-03");
+  assert.equal(rows[0].overdue, true);
+  assert.equal(strip(rows[0].html), "Two graded calls are overdue — the oldest was due Sunday, September 27. Graded by code.");
+  const block = H.nextBlock([], preds, cadence, { ...journey, day_n: 40 }, coaches, "2026-10-03");
+  assert.match(strip(block), /Overdue\s*Two graded calls are overdue/);
+  assert.doesNotMatch(strip(block), /Sun Sep 27/, "no past day in the When column");
+  assert.doesNotMatch(strip(block), /The next graded call/);
+  // one overdue call; and a due day on or after the data-through day is still "the next"
+  assert.equal(strip(H.dueRow({ overall: { due: { due_now: 1, earliest_due: "2026-09-27" } } }, "2026-10-03").html), "One graded call is overdue — it was due Sunday, September 27. Graded by code.");
+  const next = H.dueRow({ overall: { due: { due_now: 0, earliest_due: "2026-10-05" } } }, "2026-10-03");
+  assert.equal(next.overdue, undefined);
+  assert.match(strip(next.html), /^The next graded call of any kind comes due\./);
+});
+
+test("R7 fix 2: a windowed metric reads in words by RULE; a metric with no words prints the names only — never the topic, never a field name", () => {
+  const rows = H.nextRows(R7_DOCKET, null, null, null, coaches, "2026-10-03");
+  const text = rows.map((r) => strip(r.html));
+  assert.match(text[1], /says the seven-day average protein reads 190 grams or better that day/);
+  assert.match(text[2], /says the seven-night average share of deep sleep reads 26 or better that day/);
+  assert.match(text[3], /^Nathan Reeves and nutrition disagree\. Graded by code\.$/);
+  for (const t of text) {
+    assert.doesNotMatch(t, /fuel-cognition|mechanistic|7day|some new engine field/i, t);
+    assert.doesNotMatch(t, /\b[a-z]+_[a-z_]+\b/, t);
+  }
+});
+
+test("R7 fix 3: steps are an instrument reading — the count, its n, the same-day walk beside it; no verdict and no cause", () => {
+  const training = {
+    training: { strength_sessions_30d: 25, window_days: 28 },
+    walking: { total_walks_30d: 18, avg_daily_steps: 3450, avg_daily_steps_n: 27, daily_steps_trend: [{ date: "2026-10-02", steps: 1113 }, { date: "2026-10-03", steps: 9913 }] },
+    cardio_sessions: [{ date: "2026-10-03", sport: "Walk", distance_mi: 12.0, minutes: 241 }, { date: "2026-10-02", sport: "Cycling", distance_mi: 11.8, minutes: 50 }],
+  };
+  const fresh = { sources: [{ id: "apple_health", datatypes: [{ key: "steps", dark: false }] }] };
+  const s = H.stepsSentence(training, fresh);
+  assert.equal(strip(s).trim(), "His phone’s health app counted 3,450 steps a day, averaged over 27 days — and 9,913 on Saturday, October 3, the day of the 12.0-mile walk.");
+  for (const f of ["training_overview.walking.avg_daily_steps", "training_overview.walking.daily_steps_trend[2026-10-03].steps", "training_overview.cardio_sessions[0].distance_mi", "source_freshness.sources[apple_health].datatypes[steps]"]) {
+    assert.ok(s.includes(`data-src="${f}"`), `${f} is cited`);
+  }
+  // no freshness → no instrument named; no same-day row → the count alone; never the verdict
+  assert.equal(strip(H.stepsSentence({ walking: { avg_daily_steps: 3450, avg_daily_steps_n: 27 } }, null)).trim(), "The step count on record is 3,450 a day, averaged over 27 days.");
+  assert.equal(H.stepsSentence({ walking: {} }, fresh), "");
+  const okay = strip(H.okayBlock(null, null, null, training, { pulse: { date: "2026-10-03", glyphs: { lift: { label: "Rest day", trained_today: false } } } }, fresh));
+  assert.doesNotMatch(okay, /weak spot|rest day|not always on him|undercount/i);
+  assert.match(okay, /Saturday: a 241-minute walk \(12\.0 miles\)\. No lifting Saturday\. His phone’s health app counted/);
+});
+
+test("R7 fix 5: the date to goal is a month, a year and the engine's range — never a bare weekday and day", () => {
+  const j = { ...journey, day_n: 28, weighin_count: 20, projected_goal_date: "2027-06-09", projected_goal_date_earliest: "2027-05-22", projected_goal_date_latest: "2027-09-22" };
+  const text = strip(H.weighinsBlock(progress, j));
+  assert.match(text, /At this rate the goal lands around June 2027 — between May and September 2027\.$/);
+  assert.doesNotMatch(text, /Wednesday, June 9|served date to goal/);
+});
+
+test("R7 fix 9: a failed fetch is 'not served right now' — never a fact about him or the record", () => {
+  assert.equal(strip(H.wordsBlock(null, null)), "The record of his notes is not served right now.");
+  assert.equal(strip(H.wordsBlock([], null)), "No notes of his are on file.");
+  assert.equal(strip(H.recordBlock(null, null, null, null, null)), "The rest of the record is not served right now.");
+  assert.equal(strip(H.recordBlock({ coaches: [] }, { predictions: {} }, {}, { sources: [] }, { pulse: {} })), "Nothing else is on the record yet.");
+  assert.equal(strip(H.nextBlock([], null, null, null, [], "2026-10-03", false)), "What resolves next is not served right now.");
+  assert.match(strip(H.followBlock(null, null, null, "2026-10-03")), /The next write-up’s day is not served right now\./);
+  assert.match(strip(H.aliveLine("2026-10-03", { platform: {} }, null)), /no checked coach call is on the record yet/);
 });

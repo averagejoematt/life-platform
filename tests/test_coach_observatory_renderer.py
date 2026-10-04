@@ -341,7 +341,7 @@ def test_card_renders_output_content_and_coach_identity(monkeypatch):
     _install(monkeypatch, [_output(content="Full-length coach output.", created_at="2026-08-09T12:00:00Z")])
     card = cobs._render_coach_card("sleep")
     assert card["analysis"] == "Full-length coach output."
-    assert card["coach_name"] == "Dr. Lisa Park"
+    assert card["coach_name"] == "Lisa Park"
     assert card["coach_initials"] == "LP"
     # #2757: title/color now derive from the persona registry (config/personas.json)
     # rather than a hand-typed copy that had drifted from it.
@@ -467,7 +467,7 @@ def test_card_names_the_other_coach_in_an_active_disagreement(monkeypatch):
         },
     ]
     _install(monkeypatch, rows)
-    assert cobs._render_coach_card("sleep")["cross_coach_reference"] == "Dr. Nathan Reeves's notes on evening screen time"
+    assert cobs._render_coach_card("sleep")["cross_coach_reference"] == "Nathan Reeves's notes on evening screen time"
 
 
 def test_card_reads_disagreements_stored_as_a_json_string(monkeypatch):
@@ -480,7 +480,7 @@ def test_card_reads_disagreements_stored_as_a_json_string(monkeypatch):
         },
     ]
     _install(monkeypatch, rows)
-    assert cobs._render_coach_card("sleep")["cross_coach_reference"] == "Dr. Amara Patel's notes on late carbs"
+    assert cobs._render_coach_card("sleep")["cross_coach_reference"] == "Amara Patel's notes on late carbs"
 
 
 def test_card_falls_back_to_team_input_request(monkeypatch):

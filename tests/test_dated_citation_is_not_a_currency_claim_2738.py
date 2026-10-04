@@ -34,7 +34,7 @@ _COCKPIT = {"recovery_pct": 57.0, "hrv_ms": 39.8, "rhr_bpm": 61.0, "sleep_hours"
 
 def test_the_live_2026_08_15_payload_no_longer_fires():
     """The regression proper."""
-    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Dr. Marcus Webb", "position_summary": _WEBB_PROSE}])
+    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Marcus Webb", "position_summary": _WEBB_PROSE}])
     assert ok, msg
 
 
@@ -52,7 +52,7 @@ def test_a_date_before_the_figure():
 def test_an_undated_stale_claim_still_fails():
     """The half that must NOT regress — this is the whole point of the check."""
     ok, msg = wq.assess_cross_surface_vitals(
-        _COCKPIT, [{"name": "Dr. Marcus Webb", "position_summary": "Recovery is 40% today and HRV sits at 35.3 ms."}]
+        _COCKPIT, [{"name": "Marcus Webb", "position_summary": "Recovery is 40% today and HRV sits at 35.3 ms."}]
     )
     assert not ok
     assert "recovery 40" in msg
@@ -63,7 +63,7 @@ def test_last_night_is_a_CURRENT_claim_not_a_historical_one():
     listed 'last night' as a historical anchor, which would have blinded the sleep
     check entirely; tests/test_genesis_week_coach_vitals_2113.py caught it."""
     assert wq.vitals_cited_in("You slept 6.1 hours last night.") == {"sleep": [6.1]}
-    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Dr. Lisa Park", "position_summary": "You slept 6.1 hours last night."}])
+    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Lisa Park", "position_summary": "You slept 6.1 hours last night."}])
     assert not ok and "sleep 6.1" in msg
 
 

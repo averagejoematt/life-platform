@@ -24,6 +24,7 @@ does NOT import the facade; no import cycle.
 import re
 
 from boto3.dynamodb.conditions import Key
+from coach.persona_registry import plain_name
 from common.text_guards import strip_tool_call_residue  # #4190 — defence in depth, serve-time
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -137,7 +138,8 @@ def handle_diary_reactions(event, *, _g):
             # of the sk collision #1756 fixed in storage.
             "uid": i.get("entry_uid") or "",
             "coach_id": i.get("coach_id"),
-            "coach_name": i.get("coach_name"),
+            # #4564: rows written before the 2026-10-02 ruling stored the byline with an honorific
+            "coach_name": plain_name(i.get("coach_name")) or i.get("coach_name"),
             "tone": i.get("tone", "reflective"),
             "theme": i.get("theme"),
             "tier": i.get("tier"),

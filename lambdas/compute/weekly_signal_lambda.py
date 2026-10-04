@@ -89,10 +89,10 @@ OBSERVATORY_ROTATION = [
 
 BOARD_ROTATION = [
     {"name": "The Chair", "title": "Board Chair"},
-    {"name": "Dr. Chen", "title": "Behavioral Science"},
-    {"name": "Dr. Okafor", "title": "Longevity Medicine"},
-    {"name": "Dr. Park", "title": "Sleep & Circadian"},
-    {"name": "Dr. Patrick", "title": "Metabolic Health"},
+    {"name": "Sarah Chen", "title": "Behavioral Science"},
+    {"name": "James Okafor", "title": "Longevity Medicine"},
+    {"name": "Lisa Park", "title": "Sleep & Circadian"},
+    {"name": "Amara Patel", "title": "Metabolic Health"},
 ]
 
 

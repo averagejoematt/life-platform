@@ -577,7 +577,7 @@ def _preamble(monkeypatch, **over):
     _freeze(monkeypatch)
     monkeypatch.setattr(ic, "table", over.pop("table", FakeTable()))
     args = {
-        "coach_name": "Dr. Lisa Park",
+        "coach_name": "Lisa Park",
         "domain": "sleep",
         "goals": {"targets": {}},
         "inventory": {},

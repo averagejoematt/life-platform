@@ -39,6 +39,9 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         "    <h1>What he’s trying</h1>\n"
         '    <p class="v7-job">What he takes and tests, what each one should move, and how we’d know.</p>\n'
         '    <p class="tr-through" id="tr-through" data-src="api_supplements.as_of_date"></p>\n'
+        # R7 fix 9: the JS-off sentence.
+        '    <noscript><p class="tr-note">Every line on this page is drawn from the site’s served data when scripts run. '
+        "With scripts off the entries below stay empty — nothing on this page is a claim.</p></noscript>\n"
         + _entry("tr-takes", "What he takes")
         + _entry("tr-testing", "What he’s testing")
         + _entry("tr-calls", "His calls, in his words")

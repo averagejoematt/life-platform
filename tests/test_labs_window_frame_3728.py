@@ -289,7 +289,7 @@ class TestThePreambleNamesTheThirdState:
         _freeze(monkeypatch)
         monkeypatch.setattr(ic, "table", RecordingTable())
         return ic.build_coach_preamble(
-            coach_name="Dr. James Okafor",
+            coach_name="James Okafor",
             domain="labs",
             goals={"targets": {}},
             inventory=inventory,

@@ -229,13 +229,14 @@ function renderPhotos(journey) {
   if (dates.length) setMargin(sec, dates[dates.length - 1]);
 }
 
-function renderSince(progress, journey) {
+function renderSince(progress, journey, served = true) {
   const sec = document.getElementById("who-since");
   const j = journey || {};
   const day = document.getElementById("who-since-day");
   if (day && isIso(j.started_date)) day.textContent = dayInWords(j.started_date, { weekday: false });
   const svg = stripSvg(progress);
-  if (!svg) return fill(sec, '<p class="who-note">No weigh-ins are served yet.</p>');
+  // R7 fix 9: a failed fetch is "not served right now", never "no weigh-ins yet".
+  if (!svg) return fill(sec, `<p class="who-note">${served ? "No weigh-ins are on the record yet." : "The weigh-in record is not served right now."}</p>`);
   fill(sec, `${svg}<p class="who-small">${sinceSentence(progress, journey)}</p>`);
   if (j.started_date) setMargin(sec, j.started_date);
 }
@@ -267,7 +268,7 @@ async function main() {
   const journey = journeyJson && journeyJson.journey;
   renderFold(journey, receipts, subs);
   renderPhotos(journey);
-  renderSince(progressJson && progressJson.weight_progress, journey);
+  renderSince(progressJson && progressJson.weight_progress, journey, Boolean(progressJson));
   renderCheck(freshness, coaches, receipts);
   renderReturn(cad, postsJson && postsJson.pending);
 }

@@ -286,7 +286,9 @@ class TestExpertRoster:
         """Derived over the whole registry: a new coach cannot ship with an empty
         byline field, which would render as a blank prompt line for readers."""
         for key, persona in az.EXPERT_PERSONAS.items():
-            assert len(str(persona.get(field, "")).strip()) >= 10, f"{key}.{field} is empty/stub"
+            # a name is short by nature once it carries no honorific (#4564: "Max Reyes" is nine characters)
+            floor = 5 if field == "name" else 10
+            assert len(str(persona.get(field, "")).strip()) >= floor, f"{key}.{field} is empty/stub"
 
     def test_unknown_expert_key_yields_an_honest_note_not_a_crash(self):
         data = az.gather_data_for_expert("astrology")
@@ -509,14 +511,14 @@ class TestNutritionSnapshot:
         assert data["avg_calories"] == 2200 and data["avg_protein_g"] == 160.0
         assert data["days_tracked"] == 2
 
-    def test_the_protein_target_comes_from_the_canonical_facts_not_a_literal(self, table):
-        """Phase-3: a hardcoded 190 drifts from scoring_engine/profile and puts a
-        different target in front of every coach."""
+    def test_the_protein_target_is_the_plans_floor_not_a_stored_copy_or_a_literal(self, table):
+        """#4540: every computed_metrics row written before the fix froze the profile row's
+        190 g. The coach's target is the plan's floor, whatever a stored row still says."""
         table.add("computed_metrics", TODAY, protein_g_target=Decimal("205"))
-        table.add("macrofactor", TODAY, total_calories_kcal=Decimal("2000"), total_protein_g=Decimal("210"))
+        table.add("macrofactor", TODAY, total_calories_kcal=Decimal("2000"), total_protein_g=Decimal(str(az.PLAN_DAILY_PROTEIN_MIN_G)))
         data = az.gather_data_for_expert("nutrition")
-        assert data["protein_target_g"] == 205
-        assert data["protein_adherence_pct"] == 100
+        assert data["protein_target_g"] == az.PLAN_DAILY_PROTEIN_MIN_G
+        assert data["protein_adherence_pct"] == 100  # a day AT the floor has met it
 
     def test_adherence_is_the_share_of_days_at_or_above_the_target(self, table):
         table.add("computed_metrics", TODAY, protein_g_target=Decimal("200"))

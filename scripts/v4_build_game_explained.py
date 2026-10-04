@@ -94,9 +94,9 @@ def load_config() -> dict:
 # ── Cast guard (drift tripwire #3 — #1891) ──────────────────────────────────
 # The pillar `owner` fields are the only place this page names coaching staff.
 # They were authored in the pilot era and never got the cast rename that mapped
-# peter_attia → Dr. Victor Reyes in config/personas.json, so /method/game/
+# peter_attia → Victor Reyes in config/personas.json, so /method/game/
 # published "owner Dr. Peter Attia" — a real, non-consenting clinician presented
-# as platform staff — while /api/coaches one door away named Dr. Amara Patel.
+# as platform staff — while /api/coaches one door away named Amara Patel.
 # Two fail-closed checks now run at render time, so a stale owner cannot ship:
 #
 #   1. Every owner resolves to the LIVE PUBLIC ROSTER (persona_registry's

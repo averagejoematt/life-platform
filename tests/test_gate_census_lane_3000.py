@@ -509,7 +509,12 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 767  # 768 -> 767 (2026-10-01, #4255 one Lambda deploy path, re-synced onto #4497's 768): ONE leaves,
+BASELINE_TOTAL_GATES = 768  # 767 -> 768 (2026-10-03, #4540 nutrition targets derive from the plan): ONE entrant,
+# `structural::test_protein_contract.py` (the file existed; it becomes a census gate because it now os.walks lambdas/ + mcp/),
+# PROVEN on arrival (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED by id-set
+# diff on `scripts/gate_census.py --json`, this tree vs a `git archive origin/main` export at 83f3bd53e (git-init'd, fully
+# added): main 767 {proven 241, unproven 514, not-applicable 7, attempted-unproven 5} -> this lane 768 {242, 514, 7, 5}.
+# PRIOR: 767  # 768 -> 767 (2026-10-01, #4255 one Lambda deploy path, re-synced onto #4497's 768): ONE leaves,
 # one RELOCATES, nothing enters as new. Leaves: `ci::ci-cd.yml::deploy::6` (`deploy / Deploy Lambdas`, the per-function matrix
 # loop — deleted; unproven, its residue line goes). Relocates, verdict unchanged (unproven): `guard::deploy/deploy_and_verify.sh`
 # -> `guard::deploy/archive/onetime/deploy_and_verify.sh` (archived; residue line re-keyed, not absorbed). MEASURED by id-set

@@ -116,7 +116,7 @@ def test_operational_personas_have_unique_colors():
     Scoped to `operational` only: guest/board personas (`peter_attia`,
     `rhonda_patrick`, `eli_marsh`, `margaret_calloway`, `elena_voss`, ...) are a
     separate id-space with their own reused-palette conventions (e.g.
-    `layne_norton`/`nutrition_coach` sharing "Dr. Marcus Webb" intentionally) and
+    `layne_norton`/`nutrition_coach` sharing "Marcus Webb" intentionally) and
     are never rendered side-by-side with the operational roster the way the
     coaching dashboard/observatory/coach-analysis surfaces render all 7 at once.
     """
@@ -329,12 +329,12 @@ def test_board_persona_keys_resolve():
 
 def test_accessors_resolve_known_coach():
     pid, p = persona_registry.by_coach_config_key("sleep_coach")
-    assert pid == "sleep_coach" and p["name"] == "Dr. Lisa Park"
+    assert pid == "sleep_coach" and p["name"] == "Lisa Park"
     pid2, _ = persona_registry.by_short_id("training")
     assert pid2 == "training_coach"
     pid3, _ = persona_registry.by_engine_id("explorer_coach")
     assert pid3 == "explorer_coach"
-    assert persona_registry.display_name("glucose_coach") == "Dr. Amara Patel"
+    assert persona_registry.display_name("glucose_coach") == "Amara Patel"
     assert len(persona_registry.operational_personas()) == 7  # 8 → 7: training_coach retired 2026-08-10
     assert "the_chair" in persona_registry.board_personas()
     # The tier constants mirror the registry flags (coaching-team v2).
@@ -356,7 +356,7 @@ def test_accessors_resolve_known_coach():
 
 
 def test_lead_persona_nonoperational_with_distinct_voice():
-    """The Principal Investigator (Dr. Eli Marsh) is the lead ABOVE the 8 coaches —
+    """The Principal Investigator (Eli Marsh) is the lead ABOVE the 8 coaches —
     a non-operational orchestrator persona. He must NOT be operational (that would
     pull him into the compute engine / break the 8-coach invariants), and his TTS
     voice must not clash with any coach or Elena."""

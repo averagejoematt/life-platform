@@ -1,0 +1,167 @@
+<title>Average Joe Matt</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm column, one idea per section, generous space between sections.
+   One typeface, three sizes that matter, one accent used only for progress. */
+:root {
+  --bg: #FFFFFF;
+  --fg: #0E1113;
+  --soft: #5B646B;
+  --faint: #8A9399;
+  --line: #E6E9EB;
+  --panel: #F5F7F8;
+  --accent: #0A7A5A;
+  --accent-wash: #E7F3EF;
+  --sans: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0D0F10; --fg: #F2F4F5; --soft: #A3ACB2; --faint: #7A848A; --line: #23282B; --panel: #15191B; --accent: #3FC59B; --accent-wash: #11261F; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0D0F10; --fg: #F2F4F5; --soft: #A3ACB2; --faint: #7A848A; --line: #23282B; --panel: #15191B; --accent: #3FC59B; --accent-wash: #11261F; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.page { max-width: 680px; margin: 0 auto; padding-inline: 24px; padding-block: 0 96px; display: flex; flex-direction: column; gap: 88px; }
+a { color: inherit; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, p, ul { margin: 0; }
+h1 { font-size: clamp(2rem, 7.4vw, 3rem); line-height: 1.1; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+h2 { font-size: clamp(1.45rem, 5vw, 1.9rem); line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; text-wrap: balance; }
+.soft { color: var(--soft); }
+.small { font-size: 0.88rem; color: var(--faint); }
+.num { font-variant-numeric: tabular-nums; }
+
+.bar { display: flex; justify-content: space-between; align-items: center; padding-block: 20px; font-size: 0.95rem; }
+.bar .brand { font-weight: 600; letter-spacing: -0.01em; }
+.bar .day { color: var(--soft); }
+
+section { display: flex; flex-direction: column; gap: 20px; }
+.kicker { font-size: 0.88rem; color: var(--accent); font-weight: 500; }
+
+/* 1 — who, and where he is today */
+.hero { gap: 32px; }
+.who { display: flex; align-items: center; gap: 14px; }
+.who img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: block; }
+.who div { display: flex; flex-direction: column; line-height: 1.3; }
+.who b { font-weight: 600; }
+.today { display: flex; flex-direction: column; gap: 14px; padding-top: 28px; border-top: 1px solid var(--line); }
+.today .big { font-size: clamp(3.6rem, 17vw, 5.5rem); line-height: 1; letter-spacing: -0.045em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.today .big span { font-size: 0.26em; letter-spacing: 0; font-weight: 500; color: var(--soft); margin-left: 6px; }
+.track { height: 6px; border-radius: 3px; background: var(--line); position: relative; }
+.track i { position: absolute; inset: 0 auto 0 0; width: 11.5%; border-radius: 3px; background: var(--accent); }
+.ends { display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+.btn { background: var(--fg); color: var(--bg); text-decoration: none; font-weight: 500; padding: 13px 22px; border-radius: 999px; }
+.link { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+
+/* 2 — the story so far */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--sans); font-size: 13px; fill: var(--faint); }
+.weeks { list-style: none; padding: 0; display: flex; flex-direction: column; }
+.weeks li { display: grid; grid-template-columns: 4.6rem 1fr auto; gap: 12px; align-items: baseline; padding-block: 15px; border-top: 1px solid var(--line); }
+.weeks li:last-child { border-bottom: 1px solid var(--line); }
+.weeks .w { color: var(--faint); font-size: 0.88rem; }
+.weeks a { text-decoration: none; font-weight: 500; min-width: 0; }
+.weeks .lb { color: var(--soft); font-variant-numeric: tabular-nums; font-size: 0.95rem; white-space: nowrap; }
+.weeks li.now a { color: var(--accent); }
+
+/* 3 — the AI */
+.stat { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.stat b { font-size: clamp(2.6rem, 11vw, 3.6rem); line-height: 1; letter-spacing: -0.04em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.next { background: var(--panel); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 8px; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.three div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.three b { font-size: 1.5rem; letter-spacing: -0.02em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.three span { font-size: 0.88rem; color: var(--soft); }
+
+.follow { background: var(--panel); border-radius: 20px; padding: 32px 24px; align-items: flex-start; }
+footer { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 0.92rem; color: var(--soft); padding-top: 24px; border-top: 1px solid var(--line); }
+footer a { text-decoration: none; }
+footer a:hover, .weeks a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+@media (max-width: 480px) {
+  body { font-size: 16px; }
+  .page { gap: 72px; padding-inline: 20px; }
+  .weeks li { grid-template-columns: 3.9rem 1fr auto; }
+}
+</style>
+
+<div class="page">
+  <div>
+    <header class="bar">
+      <span class="brand">Average Joe Matt</span>
+      <span class="day num">Day 28 · October 3</span>
+    </header>
+
+    <section class="hero">
+      <div class="who">
+        <img src="data:image/jpeg;base64,{{PHOTO}}" alt="Matthew in the gym" width="480" height="480">
+        <div><b>Matthew</b><span class="soft">Seattle</span></div>
+      </div>
+      <h1>I’m losing 142 pounds in public, coached by a team of AI I built with Claude.</h1>
+      <div class="today">
+        <p class="soft">This morning</p>
+        <p class="big">311.0<span>lb</span></p>
+        <p>Down <b class="num">16.3 lb</b> in 28 days.</p>
+        <div class="track" role="img" aria-label="11.5 percent of the way from 327.3 to 185 pounds"><i></i></div>
+        <div class="ends"><span>327.3 start</span><span>185 goal</span></div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#follow">Follow the story</a>
+        <a class="link" href="https://claude.ai/artifact/DVx8KKLSMuJJpFF1emBBds">How the AI works</a>
+      </div>
+    </section>
+  </div>
+
+  <section id="story">
+    <p class="kicker">The story so far</p>
+    <h2>Four weeks in. One chapter a week.</h2>
+    {{CHART}}
+    <ul class="weeks">
+      <li class="now"><span class="w">Week 4</span><a href="https://averagejoematt.com/journal/">The Body Answers Back</a><span class="lb">312.3</span></li>
+      <li><span class="w">Week 3</span><a href="https://averagejoematt.com/journal/">Storming Mode</a><span class="lb">315.0</span></li>
+      <li><span class="w">Week 2</span><a href="https://averagejoematt.com/journal/">Nine Days and No Rest</a><span class="lb">318.9</span></li>
+      <li><span class="w">Week 1</span><a href="https://averagejoematt.com/journal/">The Strap Said 76%</a><span class="lb">327.3</span></li>
+    </ul>
+    <p class="soft">Each chapter is a five-minute read and a seven-minute podcast. The next one is out Wednesday, October 7.</p>
+  </section>
+
+  <section id="ai">
+    <p class="kicker">The AI</p>
+    <h2>Eight AI coaches read my data every morning. Code checks whether they were right.</h2>
+    <div class="stat"><b>41 of 96</b><span class="soft">predictions right so far</span></div>
+    <p>Each coach has one job: sleep, food, training, mind. They make predictions with dates on them, and they often disagree. Nobody grades their own work, and the misses stay up.</p>
+    <div class="next">
+      <p class="small">Settles Monday, October 5</p>
+      <p><b>Will my recovery average reach 81.6 this week?</b></p>
+      <p class="soft">The sleep coach says yes. The training coach says no.</p>
+    </div>
+    <p><a class="link" href="https://claude.ai/artifact/DVx8KKLSMuJJpFF1emBBds">Meet the coaches</a></p>
+  </section>
+
+  <section id="built">
+    <p class="kicker">How it was built</p>
+    <h2>I built all of it by talking to Claude.</h2>
+    <p>I describe what I want and Claude writes the code. Seven months in, it runs every day on its own, and all of it is public.</p>
+    <div class="three">
+      <div><b>106</b><span>programs running</span></div>
+      <div><b>13</b><span>devices and apps</span></div>
+      <div><b>4,858</b><span>changes to the code</span></div>
+    </div>
+    <p><a class="link" href="https://averagejoematt.com/story/build/">Read the build log</a></p>
+  </section>
+
+  <section id="follow" class="follow">
+    <h2>Follow along.</h2>
+    <p class="soft">The numbers on Sunday, the story on Wednesday. No more than three emails a week.</p>
+    <a class="btn" href="https://averagejoematt.com/next/subscribe/">Follow by email</a>
+  </section>
+
+  <footer>
+    <a href="https://averagejoematt.com/next/cockpit/">Today</a>
+    <a href="https://averagejoematt.com/next/data/">The numbers</a>
+    <a href="https://averagejoematt.com/next/coaching/">The coaches</a>
+    <a href="https://averagejoematt.com/journal/">Every chapter</a>
+    <a href="https://github.com/averagejoematt/life-platform">The code</a>
+  </footer>
+</div>

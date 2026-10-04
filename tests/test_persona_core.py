@@ -173,8 +173,8 @@ def test_registry_meta_resolves_canonical_names():
     from coach import persona_registry
 
     reg = persona_registry.load_registry(force_refresh=True)
-    assert reg["personas"]["nutrition_coach"]["name"] == "Dr. Marcus Webb"
-    assert reg["personas"]["sleep_coach"]["name"] == "Dr. Lisa Park"
+    assert reg["personas"]["nutrition_coach"]["name"] == "Marcus Webb"
+    assert reg["personas"]["sleep_coach"]["name"] == "Lisa Park"
 
 
 # ── P8: the summarizer folds board Q&A in ─────────────────────────────────────

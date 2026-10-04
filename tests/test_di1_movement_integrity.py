@@ -213,7 +213,7 @@ def test_coach_guard_withholds_undertraining_when_strava_paused():
     """A Hevy day + paused Strava: the position_summary must withhold the under-training
     verdict, name the unavailable source(s) + reason, and still reflect the Hevy session.
 
-    This is the regression test that keeps Dr. Chen from relapsing into six days of
+    This is the regression test that keeps Chen from relapsing into six days of
     "you're under-training" off a Hevy-blind, Strava-dead read.
     """
     state = {"strava": "paused", "garmin": "rate_limited", "steps": "missing"}

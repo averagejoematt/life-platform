@@ -57,6 +57,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import d2f
 from common.pacific_time import pacific_day_n
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
@@ -402,7 +403,9 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         # rate drawn as fact is the #551 / ADR-105 failure, and this card is public.
         facts.rate_provisional = bool(computed.get("rate_provisional", True))
         facts.protein_g = computed.get("protein_g_avg")
-        facts.protein_target_g = computed.get("protein_g_target")
+        # #4540: the plan's floor, not the day's stored copy — every computed_metrics row
+        # written before this landed froze the profile row's 190 g, which was never the plan.
+        facts.protein_target_g = float(PLAN_DAILY_PROTEIN_MIN_G) if computed.get("protein_g_target") is not None else None
         facts.tier0_streak = computed.get("tier0_streak")
         # The platform's own verdict on the day, and what earned it. 53 fields were sitting
         # here while the first cards drew four (#3741 rework).

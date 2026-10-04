@@ -243,7 +243,7 @@ def _current_cycle():
 # Shared coach id/name maps for the calibration + predictions surfaces —
 # REGISTRY-DERIVED (coaching-team v2): these are career-backed history surfaces,
 # so retired coaches stay in the walk and their records keep their real byline
-# (Dr. Sarah Chen's predictions remain hers after the 2026-08-10 retirement).
+# (Sarah Chen's predictions remain hers after the 2026-08-10 retirement).
 from coach.persona_registry import (
     personas as _personas,  # noqa: E402
     short_id_names as _short_id_names,  # noqa: E402
@@ -254,7 +254,7 @@ _CALIB_COACH_NAMES = _short_id_names(include_retired=True)
 # #3520: which of those short ids belong to a RETIRED seat. The walk deliberately
 # includes retired coaches — their career records are real and stay under their real
 # byline — but the surface said nothing about it, so /coaching/scorecard/ listed
-# "Dr. Sarah Chen  0 DECIDED" beside seven operational coaches with no way for a reader
+# "Sarah Chen  0 DECIDED" beside seven operational coaches with no way for a reader
 # to tell that one of them left at the cycle-13 genesis. Derived from the registry's own
 # `retired` flag, never a name list.
 _RETIRED_SHORT_IDS = frozenset(

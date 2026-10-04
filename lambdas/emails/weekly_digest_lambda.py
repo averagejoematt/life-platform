@@ -42,7 +42,12 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
 from common import digest_utils, send_ledger  # shared query_range impls (#970); the DIL-025 replay guard (#3113)
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import (
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
+    PLAN_DAILY_CALORIES_TARGET,
+    PLAN_DAILY_PROTEIN_MIN_G,
+)  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
 from common.digest_utils import (
@@ -684,16 +689,16 @@ RULES:
 
 Write exactly these six sections with these exact headers:
 
-🏋️ DR. MAX REYES — PERFORMANCE COACH
+🏋️ MAX REYES — PERFORMANCE COACH
 Training quality, Zone 2 adequacy, TSB/CTL/ATL, periodisation, recovery. Is Matthew building fitness or just accumulating fatigue? What does the Banister model + day grades say about his readiness?
 
-🥗 DR. MARCUS WEBB — NUTRITIONIST
+🥗 MARCUS WEBB — NUTRITIONIST
 Calorie/protein adherence, macro balance, meal timing patterns. Is nutrition supporting or undermining training and recovery? Reference hit rates and specific shortfalls.
 
-😴 DR. LISA PARK — SLEEP & CIRCADIAN SPECIALIST
+😴 LISA PARK — SLEEP & CIRCADIAN SPECIALIST
 Sleep architecture (REM%, deep%), efficiency, sleep debt, upstream causes. What's driving sleep quality — duration, architecture, or efficiency? Connect to training load and day grades.
 
-🩺 DR. JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE
+🩺 JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE
 Long-term trajectory. What does the 4-week trend say? What leading indicator is most encouraging or concerning? What data gaps matter most?
 
 🧠 COACH MAYA RODRIGUEZ — BEHAVIOURAL PERFORMANCE
@@ -765,8 +770,8 @@ def call_haiku(data, profile):
         _week_num = max(1, (_days_in + 6) // 7)
         _start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
         _goal_w = profile.get("goal_weight_lbs", 185)
-        _cal = profile.get("calorie_target", 1800)
-        _pro = profile.get("protein_target_g", 190)
+        _cal = PLAN_DAILY_CALORIES_TARGET
+        _pro = PLAN_DAILY_PROTEIN_MIN_G
         if _week_num <= 4:
             _stage = "Foundation Stage — habit formation + consistency over intensity"
             _coaching_note = (

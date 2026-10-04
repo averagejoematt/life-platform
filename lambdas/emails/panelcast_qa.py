@@ -198,7 +198,7 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
 # instructed to fail exactly what the deterministic check fails; a calibration test asserts
 # each constant and its rubric text agree (tests/test_panelcast_repair.py).
 _INTRO_RUBRIC = (
-    "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the head "
+    "The two speakers are ELENA VOSS (the host — an embedded journalist) and ELI MARSH (the guest — the head "
     "coach MATT cast to lead the coaching staff; MATT himself designed and built the experiment and the platform). "
     "MATT is the third-person SUBJECT of the experiment; he is NOT "
     "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
@@ -207,12 +207,12 @@ _INTRO_RUBRIC = (
     f"item (more than {_QA_MAX_CONSECUTIVE_INTRO} consecutive turn from one speaker fails). The hook is a single solo "
     "turn; from the second turn on it is a real two-person back-and-forth, never a stretch of one person talking.\n"
     "3. At least one point of GENUINE friction/disagreement — Eli is not just agreeing with Elena throughout.\n"
-    "4. Dr. Eli Marsh (the PI) names the over-optimization / 'measuring a life instead of living it' RISK himself, in his own words.\n"
+    "4. Eli Marsh (the PI) names the over-optimization / 'measuring a life instead of living it' RISK himself, in his own words.\n"
     "5. No abrupt, unbridged topic jumps.\n"
     "6. Closes on the series' standing open question (does the tech genuinely make a life better, or theater).\n"
     "7. ACCURACY — applies ONLY to MATT (the subject): the script must not assert any specific life event, loss, "
     "death, illness, relocation, city, or date about MATT that isn't in the GROUND TRUTH. Do NOT flag the names, "
-    "titles, or roles of Elena Voss or Dr. Eli Marsh — they are real show personas, not inventions. Only invented "
+    "titles, or roles of Elena Voss or Eli Marsh — they are real show personas, not inventions. Only invented "
     "facts about MATT fail this item.\n"
     "8. NO DANGLING THREAD: every question or challenge one speaker raises is actually answered in the next turn; "
     "no topic the SCRIPT itself raises is then dropped; never two same-speaker turns where a reply is clearly "
@@ -267,7 +267,7 @@ _CRAFT_TURING_ITEM = (
     "hedge throat-clearing, or a neat summary bow at the end."
 )
 _INTRO_CRAFT_RUBRIC = (
-    "This is EPISODE 0 (the trailer) of a narrative podcast — host ELENA VOSS and guest DR. ELI MARSH. Judge ONLY "
+    "This is EPISODE 0 (the trailer) of a narrative podcast — host ELENA VOSS and guest ELI MARSH. Judge ONLY "
     "the show-craft; structure and accuracy are judged elsewhere.\n"
     "1. " + _CRAFT_TURING_ITEM + "\n"
     "2. HUMOUR & HUMAN TEXTURE: this must feel like a show a stranger would keep listening to, not a briefing — at "

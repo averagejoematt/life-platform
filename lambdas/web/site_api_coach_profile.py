@@ -56,7 +56,7 @@ def _registry(*, _g):
 
 # Last-resort byline if the registry module itself failed to import. Pinned equal
 # to config/personas.json's lead by tests/test_board_lead_single_character.py.
-_LEAD_FALLBACK = ("Dr. Eli Marsh", "Principal Investigator — Program Lead")
+_LEAD_FALLBACK = ("Eli Marsh", "Principal Investigator — Program Lead")
 
 
 def _lead_byline(*, _g):

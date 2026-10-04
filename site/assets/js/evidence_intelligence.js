@@ -461,7 +461,7 @@ const _OPEN_ARTIFACT_LINE =
 // pattern. A reset wipes the SEASON view honestly to zero; it must never wipe
 // the platform's actual track record out of sight along with it.
 // #3520: the scorecard walks retired seats too — their career records are real and keep
-// their real byline — but it said nothing about it, so a stranger met "Dr. Sarah Chen"
+// their real byline — but it said nothing about it, so a stranger met "Sarah Chen"
 // alongside seven current coaches with no way to tell she left at the cycle-13 genesis.
 // The flag is served by /api/calibration and /api/predictions, derived from the persona
 // registry's own `retired` field; the page never decides who is retired.

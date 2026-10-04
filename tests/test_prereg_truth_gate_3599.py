@@ -169,7 +169,7 @@ def test_the_retired_coach_is_named_not_merely_counted(sealed):
 def test_the_mismatched_byline_names_both_spellings(sealed):
     offenders = [f for f in _audit(sealed) if f.kind == gate.COACH_NAME_MISMATCH]
     assert [f.where for f in offenders] == ["coaches.physical_coach"]
-    assert "Dr. Victor Reyes" in offenders[0].detail and "Dr. Max Reyes" in offenders[0].detail
+    assert "Dr. Victor Reyes" in offenders[0].detail and "'Max Reyes'" in offenders[0].detail
 
 
 # ── negative control ─────────────────────────────────────────────────────────
