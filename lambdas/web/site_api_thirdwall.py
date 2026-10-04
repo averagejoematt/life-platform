@@ -249,6 +249,35 @@ def _public_decision_note(text):
     return scrubbed.strip()
 
 
+def handle_tuesday_question(event, *, _g):
+    """GET /api/tuesday_question (#4584) — the week's question and his reply, word for word.
+
+    `content.tuesday_question.read_public` decides what is answerable (a held reply, or any
+    hold on any reply to that question, serves as no answer); the reply then passes THIS
+    module's all-or-nothing verbatim rule, so it meets the same serve-time screen as every
+    other human line on the wall. Silence is the plain sentence the payload carries, never
+    generated text. A failed read is a 503, never shown as silence.
+    """
+    from content import tuesday_question as _tq
+
+    _error = _g["_error"]
+    payload = _tq.read_public(_g["table"])
+    if payload.get("state") == _tq.STATE_READ_FAILED:
+        return _error(503, "Tuesday question read unavailable")
+    for key in ("latest", "latest_answered"):
+        week = payload.get(key)
+        if not week or not week.get("answer"):
+            continue
+        if not (_public_decision_note(week["answer"]["text"]) and _public_decision_note(week.get("question"))):
+            payload[key] = {**week, "answer": None, "state": _tq.STATE_NO_ANSWER, "sentence": _tq.SILENCE_SENTENCE}
+    if payload.get("latest_answered") and payload["latest_answered"].get("answer") is None:
+        payload["latest_answered"] = None
+    latest = payload.get("latest") or {}
+    if latest:
+        payload["state"], payload["sentence"] = latest["state"], latest["sentence"]
+    return _ok(payload, cache_seconds=300)
+
+
 def handle_decisions(event, *, _g):
     """GET /api/decisions — the widened Third Wall for logged decisions (#1569).
 

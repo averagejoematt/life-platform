@@ -630,6 +630,32 @@ class ServeStack(Stack):
             )
         )
 
+        # The Tuesday question (#4584, epic #4580): one question on the lead's line,
+        # Tuesday evening Pacific; his reply leads Wednesday's edition. A THIRD rule on
+        # this existing worker rather than a new function — the worker is the only one
+        # holding the Telegram store — and no other scheduled function fires in a
+        # Tuesday-evening window (the two rules above are morning sends).
+        #
+        # DST, chosen explicitly: cron(0 2 ? * WED *) is 02:00 UTC Wednesday = 19:00 PDT /
+        # 18:00 PST Tuesday — evening in both offsets, outside coach_outbound's 21:00–07:00
+        # quiet hours in both. The handler re-checks that it is Tuesday in Pacific time
+        # (the cron's weekday is a UTC weekday). Its dead-man is the nightly qa-smoke leg
+        # story_season:tuesday_question, pinned to these literals by
+        # tests/test_heartbeat_completeness.py.
+        tuesday_question_rule = events.Rule(
+            self,
+            "TuesdayQuestion",
+            rule_name="telegram-tuesday-question",
+            description="Tuesday-evening PT question on the lead's Telegram line; the reply leads Wednesday's edition (#4584)",
+            schedule=events.Schedule.cron(minute="0", hour="2", week_day="WED"),
+        )
+        tuesday_question_rule.add_target(
+            targets.LambdaFunction(
+                telegram_worker_fn,
+                event=events.RuleTargetInput.from_object({"kind": "tuesday_question"}),
+            )
+        )
+
         # The sweep's LIVENESS signal — the absence-is-failure shape monitoring_stack's
         # `_heartbeat_alarm` uses for every other silent daily producer (SampleCount < 1
         # over N whole days, treat_missing=BREACHING, digest not page).

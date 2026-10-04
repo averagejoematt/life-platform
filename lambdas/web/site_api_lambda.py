@@ -85,6 +85,7 @@ from web.site_api_coach import (
     handle_panel_ledger,
     handle_predictions,
     handle_recap,
+    handle_tuesday_question,
     handle_voice_fidelity,
     handle_weekly_priority,
 )
@@ -674,6 +675,10 @@ def _dispatch_route(event, path, method):
     # #1569: logged decisions carrying a verbatim note (the widened Third Wall).
     if path == "/api/decisions":
         return handle_decisions(event)
+    # #4584: the Tuesday question and his verbatim Telegram reply — what /api/edition's
+    # his_words block reads first. Read-only; a held reply is never served.
+    if path == "/api/tuesday_question":
+        return handle_tuesday_question(event)
     # #1574: coach reactions to Video Diary entries — the lab-notes Third Wall,
     # polarity inverted (the coach reacts to the human). Optional ?date=, ?limit=.
     if path == "/api/diary_reactions":

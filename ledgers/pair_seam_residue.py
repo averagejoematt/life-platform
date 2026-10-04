@@ -610,6 +610,26 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "None. Pinned by tests/test_walking_volume_3930.py::test_the_hourly_rejoin_heals_an_unknown_block_once_the_"
         "wearable_lands_and_then_writes_nothing and ::test_the_0925_treadmill_replays_joined_on_the_live_fixture.",
     ),
+    # #4584 (2026-10-03): the Tuesday question picks one of Monday's questions off the STORYQ# send marker.
+    "chronicle::lambdas/content/tuesday_question.py::read": (
+        "2026-10-03",
+        "#4584: `monday_questions` reads ONE field, `questions_json`, off the `STORYQ#W{n:03d}` marker that "
+        "`wednesday_chronicle_lambda._send_story_questions` writes as `json.dumps(questions)` — a JSON list of strings. "
+        "VERIFIED, not assumed: a drift cannot put a wrong question in front of him — a missing marker, a renamed field "
+        "or an unparseable value reads as [] and the pick falls back to `story_questions.FALLBACK` (fixed text), and "
+        "every picked question still passes the deterministic guard at send time. Pinned by "
+        "tests/test_tuesday_question_4584.py::test_the_monday_marker_shape_is_the_senders (the writer's own source).",
+    ),
+    # #4584 (2026-10-03): ... and skips the ones he already answered by email (the STORYQA# rows).
+    "insights::lambdas/content/tuesday_question.py::read": (
+        "2026-10-03",
+        "#4584: `answered_by_email` reads the `STORYQA#W{week:03d}#` rows' `answers_json[].q` — the rows "
+        "`insight_email_parser_lambda` writes through `content.story_questions.qa_row` from `parse_reply`, the SAME "
+        "module whose `QA_SK_PREFIX` the reader imports, so the prefix cannot drift apart. VERIFIED, not assumed: a "
+        "drift reads as 'nothing answered' and at worst re-asks a question he already answered by email — it can "
+        "never suppress or fabricate an answer. Pinned by "
+        "tests/test_tuesday_question_4584.py::test_an_email_answer_written_by_the_desk_is_seen (qa_row round trip).",
+    ),
     # #4412 (2026-10-01): the cardio-HR join also reads the WHOOP workout rows (WHOOP pushes only some to Strava).
     "whoop::lambdas/training/cardio_hr_store.py::read": (
         "2026-10-01",

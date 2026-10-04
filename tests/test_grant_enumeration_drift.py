@@ -218,6 +218,13 @@ _CONTENT_FILTER_WATCH: dict[str, str] = {
     # this exemption does not.
     "lambdas/web/recap_card_lambda.py": "exempt 2026-09-13 (#3741): fails CLOSED to a held card on an owner-only, "
     "hand-posted surface — the failure publishes nothing; every run records its verdict in SOURCE#recap_cards",
+    # #4584, 2026-10-03. The Tuesday answer (coach.telegram_tuesday -> content.tuesday_question.screen) fails CLOSED:
+    # an unavailable vocabulary HOLDS the reply (stored, never served), so the failure direction is "publish nothing".
+    # It is not silent either — the owner is told in the same Telegram exchange ("the privacy filter could not be
+    # loaded"), and the reply row records `hold_kinds: [filter_unavailable]`. The serve side re-screens through
+    # site_api_lambda, which carries alarm:site-api-content-filter-fallback.
+    "lambdas/coach/telegram_worker_lambda.py": "exempt 2026-10-03 (#4584): the Tuesday answer fails CLOSED to a held "
+    "reply (never served), the owner is told so in the ack, and the row records hold_kinds=[filter_unavailable]",
 }
 
 

@@ -389,6 +389,11 @@ def handle_decisions(event):
     return _thirdwall.handle_decisions(event, _g=globals())
 
 
+def handle_tuesday_question(event):
+    """GET /api/tuesday_question — delegated to web.site_api_thirdwall (#4584)."""
+    return _thirdwall.handle_tuesday_question(event, _g=globals())
+
+
 def handle_diary_reactions(event):
     """GET /api/diary_reactions — delegated to web.site_api_thirdwall."""
     return _thirdwall.handle_diary_reactions(event, _g=globals())

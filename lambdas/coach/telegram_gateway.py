@@ -94,13 +94,30 @@ def extract_message(update: dict) -> dict:
     coach turn and never reaches inference; it is a capture, routed by ``kind`` and
     answered deterministically. A photo with no usable size is still nothing at all —
     the array is what makes it a photo, not the key's presence.
+
+    #4584 added a third, narrower one: a voice note that replies to a message (see
+    ``_is_voice_reply``). A bare voice note is still nothing.
     """
     msg = (update or {}).get("message") or {}
     if msg.get("text"):
         return msg
     if _has_photo(msg):
         return msg
+    if _is_voice_reply(msg):
+        return msg
     return {}
+
+
+def _is_voice_reply(message: dict) -> bool:
+    """#4584: a voice note that REPLIES to a message. Only the Tuesday question can make use of one (it answers that
+    the channel cannot transcribe it); a bare voice note stays what it was — nothing at all."""
+    voice = (message or {}).get("voice")
+    return isinstance(voice, dict) and bool(voice.get("file_id")) and bool((message.get("reply_to_message") or {}).get("message_id"))
+
+
+def reply_to_message_id(message: dict):
+    """The id of the message this one quotes, or None (#4584: how the Tuesday question recognises its answer)."""
+    return ((message or {}).get("reply_to_message") or {}).get("message_id")
 
 
 def _has_photo(message: dict) -> bool:
@@ -210,6 +227,19 @@ def route(event: dict, *, secret: Optional[str], routing: dict, allowed_chat_ids
     coach_id = resolve_coach(bot_key, routing)
     chat_id = authorize_chat(message, allowed_chat_ids)
 
+    if not message.get("text") and _is_voice_reply(message):
+        # #4584: never a coach turn and never inference — the worker answers it only when it quotes the Tuesday
+        # question, and otherwise drops it, which is what a voice note always got before.
+        return {
+            "kind": "voice_reply",
+            "coach_id": coach_id,
+            "chat_id": chat_id,
+            "bot_key": bot_key,
+            "reply_to_message_id": reply_to_message_id(message),
+            "message_id": message.get("message_id"),
+            "update_id": update.get("update_id"),
+        }
+
     if _has_photo(message):
         # A capture, not a turn. Discriminated on `kind` for the same reason the
         # scheduled events are (telegram_worker_lambda's handler doc): a malformed
@@ -244,6 +274,8 @@ def route(event: dict, *, secret: Optional[str], routing: dict, allowed_chat_ids
         # here because only the gateway sees the raw update; harmlessly empty in a 1:1.
         "mentions": extract_mentions(message),
         "reply_to_bot": extract_reply_to_bot(message),
+        # #4584: the quoted message's id — the only thing that makes a text an answer to the Tuesday question.
+        "reply_to_message_id": reply_to_message_id(message),
         # Telegram redelivers pending updates after an outage/late webhook
         # registration — update_id is the dedupe key, date the staleness signal.
         "update_id": update.get("update_id"),

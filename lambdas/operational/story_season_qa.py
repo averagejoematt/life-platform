@@ -80,9 +80,24 @@ QUESTIONS_GRACE_HOURS = 1
 # The rule's first live send. A Monday before it was never owed a send.
 QUESTIONS_FIRST_SEND = "2026-10-05"
 
+# (e) `TuesdayQuestion` (#4584) — cdk/stacks/serve_stack.py, a rule on telegram-coach-worker:
+# 02:00 UTC Wednesday = Tuesday evening PT in both offsets. Pinned to the rule's own cron by
+# tests/test_heartbeat_completeness.py, the same way (d) is.
+TUESDAY_WEEKDAY = "WED"
+TUESDAY_HOUR_UTC = 2
+TUESDAY_MINUTE_UTC = 0
+TUESDAY_GRACE_HOURS = 1
+# The first UTC Wednesday a send is owed. Set a week past the PR's filing so a merge that waits
+# on the owner-run `cdk deploy LifePlatformServe` (the new rule's Lambda::Permission + the
+# partition grant) is not red before the rule exists; move it if the deploy lands later.
+TUESDAY_FIRST_SEND = "2026-10-14"
+TUESDAY_SUFFIX = "tuesday_question"
+TUESDAY_PREFIX = "TUESDAYQ#"
+
 EPISODE_CHECK = "story_season:episode_or_hold"
 LEDGER_CHECK = "story_season:ledger_advanced"
 QUESTIONS_CHECK = "story_season:monday_questions"
+TUESDAY_CHECK = "story_season:tuesday_question"
 
 _WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
@@ -190,12 +205,50 @@ def ledger_gaps(weeks: dict[int, dict], ledger_rows: list[dict]) -> list[str]:
     ]
 
 
+def _last_slot(now: datetime, weekday: str, hour: int, minute: int, grace_hours: int) -> datetime:
+    """The newest weekly UTC slot whose grace has elapsed."""
+    ref = now.astimezone(timezone.utc) - timedelta(hours=grace_hours)
+    slot = ref.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    slot -= timedelta(days=(slot.weekday() - _WEEKDAYS.index(weekday)) % 7)
+    return slot if slot <= ref else slot - timedelta(days=7)
+
+
 def last_questions_send(now: datetime) -> datetime:
     """The newest scheduled `StoryQuestionsMonday` instant whose grace has elapsed."""
-    ref = now.astimezone(timezone.utc) - timedelta(hours=QUESTIONS_GRACE_HOURS)
-    slot = ref.replace(hour=QUESTIONS_HOUR_UTC, minute=QUESTIONS_MINUTE_UTC, second=0, microsecond=0)
-    slot -= timedelta(days=(slot.weekday() - _WEEKDAYS.index(QUESTIONS_WEEKDAY)) % 7)
-    return slot if slot <= ref else slot - timedelta(days=7)
+    return _last_slot(now, QUESTIONS_WEEKDAY, QUESTIONS_HOUR_UTC, QUESTIONS_MINUTE_UTC, QUESTIONS_GRACE_HOURS)
+
+
+def last_tuesday_send(now: datetime) -> datetime:
+    """The newest scheduled `TuesdayQuestion` instant whose grace has elapsed."""
+    return _last_slot(now, TUESDAY_WEEKDAY, TUESDAY_HOUR_UTC, TUESDAY_MINUTE_UTC, TUESDAY_GRACE_HOURS)
+
+
+def grade_tuesday_question(table: Any, user_prefix: str, check: Any, now: datetime) -> None:
+    """(e) the Tuesday question went out: a SENT `TUESDAYQ#<PT Tuesday>#Q` row for the newest owed slot. The row's
+    day is the Pacific date of the UTC slot (the previous calendar day in both offsets)."""
+    from common.pacific_time import PACIFIC
+
+    slot = last_tuesday_send(now)
+    if slot.date().isoformat() < TUESDAY_FIRST_SEND:
+        check.ok(f"no Tuesday question owed for {slot.date().isoformat()} (first live send {TUESDAY_FIRST_SEND})")
+        return
+    day = slot.astimezone(PACIFIC).date().isoformat()
+    want = f"{TUESDAY_PREFIX}{day}#Q"
+    try:
+        item = table.get_item(Key={"pk": f"{user_prefix}{TUESDAY_SUFFIX}", "sk": want}).get("Item") or {}
+    except Exception as e:  # noqa: BLE001 — a read failure is NOT liveness (#2662)
+        check.warn(f"the tuesday_question partition could not be read (no verdict was reached): {e}")
+        return
+    if item.get("status") == "sent" and parse_iso_utc(item.get("sent_at")) is not None:
+        check.ok(f"the Tuesday question for {day} was sent {item.get('sent_at')} ({want})")
+        return
+    state = f"its row says status={item.get('status')!r}" if item else "no row exists"
+    check.fail(
+        f"TuesdayQuestion was due {slot.isoformat()} (Tuesday {day} PT) and {want} is not sent — {state}. "
+        "Wednesday's edition leads with nothing in his words. Check /aws/lambda/telegram-coach-worker for "
+        "'[tuesday-question]' (reason dark = the lead's bot has no token or private chat id; send_failed = Telegram "
+        'refused). A re-send is {"kind": "tuesday_question", "force": true} — idempotent on the row unless it failed.'
+    )
 
 
 def check_story_season(
@@ -211,9 +264,12 @@ def check_story_season(
     episode_c = check_cls(EPISODE_CHECK, "Data Freshness", partition)
     ledger_c = check_cls(LEDGER_CHECK, "Data Freshness", partition)
     questions_c = check_cls(QUESTIONS_CHECK, "Data Freshness", partition)
-    out = [episode_c, ledger_c, questions_c]
+    tuesday_c = check_cls(TUESDAY_CHECK, "Data Freshness", partition)
+    out = [episode_c, ledger_c, questions_c, tuesday_c]
     now = pt_now().astimezone(timezone.utc)
     pk = f"{user_prefix}{CHRONICLE_SUFFIX}"
+    # (e) reads its own partition, so a chronicle read failure below cannot silence it.
+    grade_tuesday_question(table, user_prefix, tuesday_c, now)
 
     try:
         rows = _query(
@@ -226,7 +282,7 @@ def check_story_season(
         ledger_rows = _query(table, pk, LEDGER_PREFIX, "sk, phase, tombstone")
         markers = _query(table, pk, QUESTIONS_PREFIX, "sk, sent_at")
     except Exception as e:  # noqa: BLE001 — a read failure is NOT liveness (#2662)
-        for c in out:
+        for c in (episode_c, ledger_c, questions_c):
             c.warn(f"the chronicle partition could not be read (no verdict was reached): {e}")
         return out
 

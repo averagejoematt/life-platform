@@ -84,6 +84,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/experiment_vote": "_handle_experiment_vote",
     "/api/experiments": "handle_experiments",
     "/api/decisions": "handle_decisions",
+    "/api/tuesday_question": "handle_tuesday_question",  # #4584 — the Tuesday question + his verbatim reply
     "/api/diary_reactions": "handle_diary_reactions",  # #1574 — coach reactions to diary entries (GET, consent-gated)
     "/api/diary_shelf": "handle_diary_shelf",  # #1846 — consent-gated diary shelf on /story (GET, fail-closed, withheld counted)
     "/api/field_notes": "handle_field_notes",

@@ -51,6 +51,22 @@ python3 scripts/season_rebuild.py --weeks 5 --out <dir>
 
 Publishing is a separate, owner-approved promote step. Staging never publishes.
 
+## The Tuesday question (#4584)
+
+`lambdas/content/tuesday_question.py`. Tuesday evening Pacific, the `TuesdayQuestion` rule on
+`telegram-coach-worker` (02:00 UTC Wednesday = 19:00 PDT / 18:00 PST) asks ONE question on the
+lead's Telegram line. The question is one of Monday's — the first he has not already answered by
+email that still passes the guard's deterministic halves (no forbidden topic, no absolute claim) —
+or, with no Monday set, one of the desk's fixed questions. No model call, no coach voice.
+
+His reply must quote the question (it is sent with `force_reply`, so his phone opens the reply box
+on it). It is stored word for word as `TUESDAYQ#<PT Tuesday>#R#<received_at>` and screened by the
+fail-closed content filter; any hit, an "off record" marker, or an unavailable vocabulary HOLDS it,
+and one hold withholds every reply to that question. `GET /api/tuesday_question` serves the latest
+question and the newest clean answer; silence (and a hold, which reads the same) is the fixed
+sentence "No answer to this week's question is on the record." A voice note gets a fixed "type it"
+answer — the channel does not transcribe.
+
 ## The dead-men
 
 `lambdas/operational/story_season_qa.py` (#4539) runs three checks inside the nightly
@@ -61,6 +77,7 @@ Publishing is a separate, owner-approved promote step. Staging never publishes.
 | `story_season:episode_or_hold` | A published week has no Panel episode 48 h after it published and no hold naming that week, or its hold is more than 7 days old. The hold is the public `pending` marker in `/panelcast/episodes.json`. A re-hold rewrites the marker's date, so the week's own overdue clock also counts. |
 | `story_season:ledger_advanced` | A published week has no visible `LEDGER#{date}` row. The next installment would pick the season up from before that week. |
 | `story_season:monday_questions` | Monday's `StoryQuestionsMonday` send (16:00 UTC) left no `STORYQ#W{n}` marker an hour later. |
+| `story_season:tuesday_question` | Tuesday's `TuesdayQuestion` send (02:00 UTC Wednesday) left no sent `TUESDAYQ#<PT Tuesday>#Q` row an hour later. |
 
 A read that fails or comes back empty is a warn with no verdict, never a pass.
 

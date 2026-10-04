@@ -837,6 +837,20 @@ def telegram_worker() -> list[iam.PolicyStatement]:
                 },
             },
         ),
+        # #4584: the Tuesday question and his verbatim replies. Its own statement for the
+        # #3758 reason above (removable independently; no widening of the COACH# grant),
+        # one partition named in full. PutItem only: the send's reserve-then-send claim is
+        # a conditional put, and nothing on this path updates or deletes.
+        iam.PolicyStatement(
+            sid="DynamoDBTuesdayQuestionWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["USER#matthew#SOURCE#tuesday_question"],
+                },
+            },
+        ),
         # #3758: the photo itself. The worker's FIRST S3 write of any kind, scoped to
         # the one prefix the source registry declares for it (`raw_layout.prefix`).
         # No ListBucket and no delete: a capture path writes, and a capture path that

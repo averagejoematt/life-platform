@@ -466,7 +466,9 @@ def _season(iso_utc, rows=None, ledgers=None, markers=None, doc=None, http=(200,
         table, USER_PREFIX, Check, CONTENT_TRUTH, _pt_now(iso_utc), site_base_url=SITE, budget=ProbeBudget(opener=opener)
     )
     by = {c.name: c for c in out}
-    assert set(by) == {ssq.EPISODE_CHECK, ssq.LEDGER_CHECK, ssq.QUESTIONS_CHECK}
+    # #4584 added the fourth check, the Tuesday question; it reads its own partition and is exercised in
+    # tests/test_tuesday_question_4584.py.
+    assert set(by) == {ssq.EPISODE_CHECK, ssq.LEDGER_CHECK, ssq.QUESTIONS_CHECK, ssq.TUESDAY_CHECK}
     return by, table, fetched
 
 
@@ -587,7 +589,9 @@ def test_the_dead_man_and_the_sender_name_the_same_week():
 
 def test_no_verdict_is_never_reported_as_green():
     by, _, _ = _season("2026-10-03T18:30:00", raises=RuntimeError("AccessDenied"))
-    assert all(c.passed is None and "no verdict" in c.message for c in by.values())
+    # The chronicle-partition checks. #4584's Tuesday check reads a different partition, and on this date owes no
+    # send by the clock alone; its own unreadable-partition case is pinned in tests/test_tuesday_question_4584.py.
+    assert all(c.passed is None and "no verdict" in c.message for n, c in by.items() if n != ssq.TUESDAY_CHECK)
     by, _, _ = _season("2026-10-03T18:30:00", rows=[r for r in SEASON_ROWS if r.get("phase") == "pilot"])
     assert by[ssq.EPISODE_CHECK].passed is None and by[ssq.LEDGER_CHECK].passed is None
     for http in ((503, "upstream"), (200, "<html>"), (200, '{"pending": {}}')):

@@ -54,7 +54,16 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway, telegram_group, telegram_reply_gate
+from coach import (
+    coach_chat,
+    coach_outbound,
+    coach_reactions,
+    coach_voice,
+    telegram_gateway,
+    telegram_group,
+    telegram_reply_gate,
+    telegram_tuesday,
+)
 from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
@@ -1118,6 +1127,8 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         return _event_outbound()
     if (event or {}).get("kind") == "progress_photo":
         return _progress_photo(event or {})
+    if (event or {}).get("kind") in ("tuesday_question", "voice_reply"):  # #4584 — coach.telegram_tuesday
+        return telegram_tuesday.handle(event or {})
 
     order = event or {}
     coach_id = order.get("coach_id")
@@ -1132,6 +1143,12 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     if _seen_update(_partition_id(coach_id), order.get("update_id")):
         logger.info("[telegram] duplicate update %s for %s — skipping", order.get("update_id"), coach_id)
         return {"ok": True, "reason": "duplicate"}
+
+    # #4584: his answer to the Tuesday question is a record, not a coach turn — checked before the staleness skip
+    # (a late answer is still his answer) and before any inference.
+    answered = telegram_tuesday.answer(order)
+    if answered is not None:
+        return answered
 
     # A backlogged message from hours ago reads as a bot waking up, not a person
     # answering. Skip inference; the message stays visible in the Telegram chat.

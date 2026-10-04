@@ -1437,6 +1437,9 @@ STORY_SEASON_DEADMEN = {
     "story_season:episode_or_hold": "a published chronicle week with no Panel episode and no named dated hold, or a hold grown old",
     "story_season:ledger_advanced": "a published week that left no LEDGER# row for the next installment to read",
     "story_season:monday_questions": "the StoryQuestionsMonday rule on wednesday-chronicle not sending (no STORYQ# marker)",
+    # #4584: a THIRD rule on telegram-coach-worker, whose event-sweep heartbeat (COVERAGE above)
+    # cannot see a dead Tuesday rule — the same one-row-per-function blindness (d) exists for.
+    "story_season:tuesday_question": "the TuesdayQuestion rule on telegram-coach-worker not sending (no sent TUESDAYQ#<day>#Q row)",
 }
 
 
@@ -1452,7 +1455,18 @@ def _story_season_qa():
                 consts[node.targets[0].id] = ast.literal_eval(node.value)
             except ValueError:
                 continue
-    needed = ("EPISODE_CHECK", "LEDGER_CHECK", "QUESTIONS_CHECK", "QUESTIONS_WEEKDAY", "QUESTIONS_HOUR_UTC", "QUESTIONS_MINUTE_UTC")
+    needed = (
+        "EPISODE_CHECK",
+        "LEDGER_CHECK",
+        "QUESTIONS_CHECK",
+        "QUESTIONS_WEEKDAY",
+        "QUESTIONS_HOUR_UTC",
+        "QUESTIONS_MINUTE_UTC",
+        "TUESDAY_CHECK",
+        "TUESDAY_WEEKDAY",
+        "TUESDAY_HOUR_UTC",
+        "TUESDAY_MINUTE_UTC",
+    )
     missing = [k for k in needed if k not in consts]
     assert not missing, f"story_season_qa no longer declares {missing} as module-level literals — this enrolment reads nothing"
     return type("StorySeasonConstants", (), consts)
@@ -1464,6 +1478,7 @@ def test_story_season_deadmen_are_enrolled():
         ssq.EPISODE_CHECK,
         ssq.LEDGER_CHECK,
         ssq.QUESTIONS_CHECK,
+        ssq.TUESDAY_CHECK,
     }, "STORY_SEASON_DEADMEN and story_season_qa's check ids diverged — a dead-man was added or dropped on one side only"
     # The leg's registration in the nightly run list is asserted where the detector is exercised
     # (tests/test_chronicle_status_row_deadman_3563.py) — this file stays a static sweep of cdk/.
@@ -1503,6 +1518,39 @@ def test_story_questions_rule_and_its_deadman_keep_one_clock():
     ]
     assert len(payloads) == 1, "the rule no longer sends the {story_questions: true} event the sender keys on"
     assert "wednesday-chronicle" in scheduled_lambdas()
+
+
+def test_tuesday_question_rule_and_its_deadman_keep_one_clock():
+    """#4584: the same pin as the Monday one, for the TuesdayQuestion rule on telegram-coach-worker
+    (serve_stack.py). Moving the rule moves the detector or reds here."""
+    ssq = _story_season_qa()
+    with open(os.path.join(CDK_STACKS_DIR, "serve_stack.py"), encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    rules = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and _is_call_to(n, "Rule")
+        and len(n.args) > 1
+        and isinstance(n.args[1], ast.Constant)
+        and n.args[1].value == "TuesdayQuestion"
+    ]
+    assert len(rules) == 1, f"expected exactly one TuesdayQuestion rule in serve_stack.py, found {len(rules)}"
+    assert not (isinstance(_kw(rules[0], "enabled"), ast.Constant) and _kw(rules[0], "enabled").value is False)
+    cron = _kw(rules[0], "schedule")
+    assert isinstance(cron, ast.Call) and _is_call_to(cron, "cron"), "TuesdayQuestion is no longer a Schedule.cron(...)"
+    got = {kw.arg: kw.value.value for kw in cron.keywords if isinstance(kw.value, ast.Constant)}
+    want = {"minute": str(ssq.TUESDAY_MINUTE_UTC), "hour": str(ssq.TUESDAY_HOUR_UTC), "week_day": ssq.TUESDAY_WEEKDAY}
+    assert got == want, f"TuesdayQuestion fires at {got}; story_season_qa expects a send at {want}"
+    payloads = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Dict)
+        and any(isinstance(k, ast.Constant) and k.value == "kind" for k in n.keys)
+        and any(isinstance(v, ast.Constant) and v.value == "tuesday_question" for v in n.values)
+    ]
+    assert len(payloads) == 1, "the rule no longer sends the {kind: tuesday_question} event the worker keys on"
+    assert "telegram-coach-worker" in scheduled_lambdas()
 
 
 # ── #3506: the cadence assertion's own must-fail control ─────────────────────
