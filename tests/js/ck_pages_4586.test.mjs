@@ -91,6 +91,7 @@ test("his words are quoted only when fresh; silence prints the block's sentence"
   assert.equal(P.hisWordsFresh(fresh), true);
   assert.match(P.hisWordsHTML(fresh), /In my words · October 1/);
   assert.match(P.hisWordsHTML(fresh), /“Right now I still feel good\.”/);
+  assert.match(P.hisWordsHTML({ ...fresh, data: { ...fresh.data, question: "What did this week ask of you?" } }), /Asked: What did this week ask of you\?/);
 });
 
 test("the bet card states the question, the date and both sides", () => {

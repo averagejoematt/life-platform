@@ -75,7 +75,8 @@ export function hisWordsFresh(block) {
 export function hisWordsHTML(block) {
   if (hisWordsFresh(block)) {
     const d = block.data;
-    return `${label(`In my words · ${shortDay(d.date) || d.date_text || ""}`)}<p class="ck-quote">“${esc(d.text)}”</p>`;
+    const asked = d.question ? small(`Asked: ${d.question}`) : "";
+    return `${label(`In my words · ${shortDay(d.date) || d.date_text || ""}`)}<p class="ck-quote">“${esc(d.text)}”</p>${asked}`;
   }
   return `${label("In my words")}${absent(block, "Nothing in his own words is served right now.")}`;
 }
