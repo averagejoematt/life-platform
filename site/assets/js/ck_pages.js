@@ -16,6 +16,7 @@
 // from fixtures; mount() is the only thing that touches the DOM.
 import { tryJSON, esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
+import { comparisonText } from "/assets/js/coach_comparison.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -141,8 +142,8 @@ export function coachLinesHTML(block) {
 // One sentence pair: the count and what a simple guess would have done. With either half
 // missing the block is `unavailable` upstream and this prints its sentence instead.
 export function recordLine(block) {
-  if (!usable(block) || !block.data.count_text || !block.data.comparison_text) return "";
-  return `${block.data.count_text} ${block.data.comparison_text}`;
+  if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
+  return `${block.data.count_text} ${comparisonText({ sentence: block.data.comparison_text })}`;
 }
 export function betLine(nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
@@ -152,16 +153,21 @@ export function betLine(nextBlock) {
   if (names.length < 2 || !day) return "";
   return `A bet between ${listWords(names)} settles ${day}.`;
 }
+// The big count on Coaches. The comparison beside it is the edition's one sentence, read
+// through the shared comparison reader (#4585) so a missing sentence is the same honest
+// absence line every other page prints — and then no count is drawn at all. The
+// record-by-record comparison is one tap away on the scorecard.
 export function recordBigHTML(block) {
-  if (!usable(block) || num(block.data.right) === null || num(block.data.decided) === null || !block.data.comparison_text) {
+  if (!usable(block) || num(block.data.right) === null || num(block.data.decided) === null) {
     return absent(block, "The coaches’ record is not served right now.");
   }
   const d = block.data;
+  if (!String(d.comparison_text || "").trim()) return soft(comparisonText(null));
   const track =
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span>of ${d.decided} checked calls</span></p>${track}<p>${esc(d.comparison_text)} Finding out whether they get better is part of the experiment.</p></div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span>of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))} Finding out whether they get better is part of the experiment.</p></div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
