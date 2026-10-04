@@ -166,7 +166,9 @@ def measure(browser, base_url, fixtures, pages, out_dir=None, axe=True):
                         res["findings"].append(f"renders {what}: {text[max(0, hit.start() - 30):hit.end() + 30]!r}")
                 if out_dir:
                     os.makedirs(out_dir, exist_ok=True)
-                    page.screenshot(path=os.path.join(out_dir, (path.strip("/").replace("/", "_") or "root") + ".png"), full_page=True)
+                    page.screenshot(
+                        path=os.path.join(out_dir, (re.sub(r"[^A-Za-z0-9._-]+", "_", path).strip("_") or "root") + ".png"), full_page=True
+                    )
             if axe:
                 for v in run_axe(page):
                     if v["impact"] in AXE_GATING_IMPACTS:
