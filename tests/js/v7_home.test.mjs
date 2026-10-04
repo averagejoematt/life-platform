@@ -77,17 +77,20 @@ test("the lead sentence: the day-only branches, and the day in words", () => {
   assert.match(eve, /It begins Sunday, September 6\./);
 });
 
-test("the day-1 photograph's caption: the served start in words, day 1, the served start weight (#3761)", () => {
-  assert.equal(strip(H.photoCaption(journey)), "Sunday, September 6 — day 1, 327.3 lb");
+test("the fold photograph's caption: its date in words, in the gym, the day number from the served start (#3761)", () => {
+  // owner ruling 2026-10-03: the fold holds the clothed gym photograph, never a shirtless one
+  assert.equal(strip(H.photoCaption(journey)), "Thursday, September 24 — in the gym, day 19");
   const html = H.photoCaption(journey);
-  assert.match(html, /<time datetime="2026-09-06" data-src="journey\.started_date">/);
-  assert.match(html, /data-src="journey\.start_weight_lbs"/);
-  assert.match(html, /data-src="journey\.started_date → photo date">1</);
+  assert.match(html, /<time datetime="2026-09-24">/);
+  assert.match(html, /data-src="journey\.started_date → photo date">19</);
+  assert.doesNotMatch(html, /lb/);
   // the day number is computed from the served start, never typed
-  assert.equal(strip(H.photoCaption({ ...journey, started_date: "2026-09-05" })), "Sunday, September 6 — day 2");
+  assert.equal(strip(H.photoCaption({ ...journey, started_date: "2026-09-01" })), "Thursday, September 24 — in the gym, day 24");
   assert.equal(H.photoCaption({}), "");
-  assert.equal(H.photoCaption({ ...journey, started_date: "2026-09-07" }), "");
-  assert.doesNotMatch(html, /2026-09-06</);
+  assert.equal(H.photoCaption({ ...journey, started_date: "2026-09-25" }), "");
+  assert.doesNotMatch(html, /2026-09-24</);
+  // a photo taken on the served start day still carries that morning's weigh-in
+  assert.equal(strip(H.photoCaption(journey, "2026-09-06", "")), "Sunday, September 6 — day 1, 327.3 lb");
 });
 
 test("no rendered line still says the first photo is due — the next one is", () => {
