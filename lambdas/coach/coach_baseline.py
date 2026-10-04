@@ -453,11 +453,6 @@ def comparison_block(decided: Iterable[dict]) -> dict:
     }
 
 
-def comparison_from_rows(rows: Iterable[Any], *, genesis: str | None) -> dict:
-    """``comparison_block`` over a coach partition's rows — the record's own decided set."""
-    return comparison_block(coach_record.decided_rows(rows, genesis=genesis))
-
-
 def for_coach(table: Any, coach_id: str, *, genesis: str | None) -> tuple[dict | None, dict | None]:
     """``(record, comparison)`` for one coach from ONE read of its PREDICTION# partition —
     the record and the comparison counted over the same decided rows. ``(None, None)``

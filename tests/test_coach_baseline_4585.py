@@ -196,11 +196,13 @@ def test_when_the_rule_wins_the_sentence_says_so():
     assert "the guess was right more often, on too few calls to tell" in small["sentence"]
 
 
-def test_comparison_from_rows_counts_only_this_experiments_record():
+def test_the_comparison_counts_only_this_experiments_record():
     archived = dict(_row("old", "confirmed", baseline=_scored(True)), phase="pilot", tombstone=True)
     pre_genesis = dict(_row("pre", "confirmed", baseline=_scored(True)), outcome_date="2000-01-01")
     live = _row("live", "refuted", baseline=_scored(False))
-    block = cb.comparison_from_rows([archived, pre_genesis, live], genesis=GENESIS)
+    from coach import coach_record
+
+    block = cb.comparison_block(coach_record.decided_rows([archived, pre_genesis, live], genesis=GENESIS))
     assert block["records"]["direction"]["graded"] == 1
 
 

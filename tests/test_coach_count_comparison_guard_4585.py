@@ -71,7 +71,7 @@ NOT_A_COACH_COUNT = {
 }
 
 #: static file -> why a baked-in "K of N checked calls" is allowed to stand.
-STATIC_EXEMPT = {
+BAKED_HISTORY = {
     "site/story/build/beats.json": (
         "the build story quotes the #4220 defect's own wrong counts (one record printed three ways) as history — "
         "a narrative about a bug, not the coaches' record"
@@ -134,7 +134,7 @@ def static_offenders() -> list[str]:
         if p.suffix not in (".html", ".json") or not p.is_file() or not _served(p):
             continue
         rel = _rel(p)
-        if rel in STATIC_EXEMPT:
+        if rel in BAKED_HISTORY:
             continue
         hits = STATIC_COUNT_RE.findall(p.read_text(encoding="utf-8", errors="replace"))
         if hits:
@@ -181,7 +181,7 @@ def test_every_escape_hatch_is_live():
     for rel, (exports, _why) in FORMATTERS.items():
         for name in exports:
             assert re.search(rf"export\s+(?:async\s+)?function\s+{name}\b|export\s+const\s+{name}\b", code[rel]), f"{rel}: no export {name}"
-    for rel in STATIC_EXEMPT:
+    for rel in BAKED_HISTORY:
         p = ROOT / rel
         assert p.is_file() and STATIC_COUNT_RE.search(p.read_text(encoding="utf-8")), f"{rel}: static exemption is stale"
 
