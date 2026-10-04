@@ -38,7 +38,7 @@ test("the cost paragraphs reconcile: the daily rate has its window, both forecas
   assert.match(html, /The ceiling is \$215 a month for the whole cloud bill, AI included\. It rises to \$252 when reader traffic is high\. As of October 4, \$60\.84 is spent this month\. Nothing is paused\./);
   assert.match(html, /AI cost \$14\.35 a day over the days of this month so far\. That is a recent rate, not a monthly average\. One day, October 2, was \$42\.70 of the total\. Everything that is not AI costs \$2\.24 a day and never pauses\./);
   assert.match(html, /counting the scheduled programs only, is \$222\.73, above the ceiling\. Counting everything, including AI used to test and build the system, it is \$514\.39, above the ceiling\./);
-  assert.match(html, /Nothing is paused yet because in the first 5 days of a month only money actually spent can raise the tier, and \$60\.84 is under the first step of \$157\.67\. After day 5 a forecast this high starts tier 1\. Tier 2 needs \$157\.67 actually spent, and tier 3 needs \$186\.33\./);
+  assert.match(html, /Nothing is paused yet because in the first 5 days of a month only money actually spent can raise the tier, and \$60\.84 is under the first step of \$157\.67\. After day 5 a forecast this high starts tier 1\. A forecast lifts the tier one step at most, so tier 2 waits for \$157\.67 actually spent and tier 3 for \$186\.33\./);
   assert.match(html, /On these figures the bill passes the ceiling unless the pauses start or the pace drops\. This month has not yet shown which\./);
 });
 

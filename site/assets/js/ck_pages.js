@@ -338,7 +338,7 @@ export function callVerdictsHTML(callsBody, base = "/") {
   const card = (call, tag, cls) => {
     if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call with a page has been found ${tag.toLowerCase()} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
-    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p>${soft(day ? `Checked ${day}.` : "")}<p><a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">The whole call</a></p></div>`;
+    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p>${soft(day ? `Checked ${day}. The whole call says what counted as right.` : "")}<p><a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">The whole call</a></p></div>`;
   };
   return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
 }
@@ -400,7 +400,6 @@ async function mountFront(edition, b) {
     fill("ck-call", `${last}${next}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`);
     if (next) document.getElementById("ck-bet")?.remove();
   }
-  if (calls && calls.simple_guess_words) fill("ck-guess", esc(calls.simple_guess_words));
   fill("ck-lead-read", F.leadReadHTML(read, base));
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
   const sheet = sheetLine(character);

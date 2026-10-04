@@ -79,7 +79,7 @@ test("the running record is counts in a sentence, never a percentage", () => {
 test("the front page's last settled call is one block that opens its page", () => {
   const html = C.lastCallHTML(BODY, BASE);
   assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Saturday, October 3<\/p>/);
-  assert.match(html, /<b>Henning Brandt called his morning recovery score at about 83\.7\.<\/b> It came in at 97\./);
+  assert.match(html, /<b>Henning Brandt called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 83\.7 for September 20\. A call like this counts as right within 22\.5 either way, his usual day-to-day swing\.<\/b> It came in at 97\./, "the card says which day the call was for and what counts as right");
   assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right<\/span>/);
   assert.match(html, /The simple guess: not checked on this call yet\./);
   assert.match(html, /href="\/next\/v8\/call\/\?id=explorer-20260919-aecd9fef2c">The whole call<\/a>/);
@@ -117,7 +117,7 @@ test("the list is every settled call newest first, the older ones folded away", 
   assert.equal(hrefs.length, 33);
   assert.match(html, /^<ul class="ck-rows ck-rows--more"><li><a href="[^"]+">October 3: Henning Brandt called his morning recovery score at about 83\.7\. <span>Right<\/span><\/a><\/li>/);
   assert.match(html, /<details><summary>25 earlier calls<\/summary>/);
-  assert.match(html, /<span>Settled<\/span>/, "a bet's row says settled, not right or wrong");
+  assert.match(html, /<span>Marcus Webb was right; Amara Patel was wrong\.<\/span>/, "a bet row says who was right");
   assert.match(html, /72 more checked calls have no page here/);
   assert.equal(C.listHTML(null, BASE), "");
 });

@@ -95,7 +95,7 @@ export function lastCallHTML(callsBody, base) {
   const day = dayInWords(call.settled_date);
   const guess = call.simple_guess && call.simple_guess.short ? `The simple guess: ${call.simple_guess.short}.` : "";
   const said = call.kind === "bet" ? esc(call.verdict_text) : tag(verdictWord(call));
-  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "The last settled call")}</p><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
+  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "The last settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
 }
 
 // "Next: <question> settles <day>." — the day is written here from the served date so the
@@ -109,7 +109,7 @@ export function nextCallHTML(callsBody) {
 }
 
 // ── the list ───────────────────────────────────────────────────────────────────
-const row = (base) => (c) => `<li><a href="${esc(callHref(base, c.id))}">${esc(`${shortDay(c.settled_date)}: ${c.called_short}`)} <span>${esc(verdictWord(c) || "Settled")}</span></a></li>`;
+const row = (base) => (c) => `<li><a href="${esc(callHref(base, c.id))}">${esc(`${shortDay(c.settled_date)}: ${c.called_short}`)} <span>${esc(verdictWord(c) || (c.kind === "bet" && c.verdict_text) || "Settled")}</span></a></li>`;
 export function listHTML(callsBody, base) {
   const calls = callsOf(callsBody);
   if (!calls.length) return "";

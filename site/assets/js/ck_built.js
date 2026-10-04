@@ -133,7 +133,7 @@ export function costHTML(receipts) {
     const early = elapsed !== null && elapsed < GOVERNOR.earlyDays;
     if (tier === 0 && forecast >= t1) {
       const why = early ? `Nothing is paused yet because in the first ${GOVERNOR.earlyDays} days of a month only money actually spent can raise the tier, and ${usd(mtd)} is under the first step of ${usd(t1)}. ` : "";
-      out.push(para(`${why}After day ${GOVERNOR.earlyDays} a forecast this high starts tier 1. Tier 2 needs ${usd(t1)} actually spent, and tier 3 needs ${usd(t2)}.`));
+      out.push(para(`${why}After day ${GOVERNOR.earlyDays} a forecast this high starts tier 1. A forecast lifts the tier one step at most, so tier 2 waits for ${usd(t1)} actually spent and tier 3 for ${usd(t2)}.`));
     }
     if ((all !== null && all > ceiling) || forecast > ceiling) {
       out.push(para("On these figures the bill passes the ceiling unless the pauses start or the pace drops. This month has not yet shown which."));

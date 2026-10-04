@@ -108,12 +108,12 @@ export function badgesHTML(body) {
   const earned = all.filter((a) => a.earned && a.earned_date).sort((a, b) => String(b.earned_date).localeCompare(String(a.earned_date)));
   if (!earned.length) return soft(`None of the ${all.length} badges has been earned yet.`);
   // A badge whose description only repeats its name ("Lost 10 lbs" / "Lost 10 lbs from
-  // starting weight") prints the description alone.
+  // starting weight") prints the name alone.
   const rows = earned
     .map((a) => {
       const desc = String(a.description || "");
       const repeats = desc.toLowerCase().startsWith(String(a.label).toLowerCase());
-      const text = repeats ? esc(`${desc}.`) : `${esc(a.label)}${desc ? ` <span class="ck-soft">${esc(desc)}.</span>` : ""}`;
+      const text = repeats ? esc(a.label) : `${esc(a.label)}${desc ? ` <span class="ck-soft">${esc(desc)}.</span>` : ""}`;
       return `<li><span class="ck-rows__key">${esc(shortDay(a.earned_date))}</span><span>${text}</span></li>`;
     })
     .join("");
