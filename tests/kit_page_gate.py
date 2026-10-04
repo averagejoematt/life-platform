@@ -8,7 +8,7 @@ serve of site/ with the data routes mocked by committed fixtures
 (tests/fixtures/kit_pages_4586/ — live captures of 2026-10-03, never fetched):
 
   1. HEIGHT. A page taller than its phone-screen budget fails: six screens for the front
-     page, four elsewhere. The owner approved "about three and a half phone screens, one
+     page, four elsewhere (the appendix, a reference list, carries its own). The owner approved "about three and a half phone screens, one
      idea per section"; a page that grows past its budget has stopped being that page.
   2. No horizontal overflow at 390 px.
   3. No JS error, and the page reaches its ready mark (`data-ck-ready`).
@@ -61,6 +61,10 @@ KIT_PAGES = {
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
+    # The appendix is a reference list, not a reading page: one two-line row per live page that
+    # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
+    # room for a few more rows, so a list that doubles still fails here.
+    "/next/v8/appendix/": 11,
 }
 
 #: route glob -> fixture file. Every route ck_pages.js reads.
