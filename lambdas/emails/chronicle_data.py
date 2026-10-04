@@ -10,6 +10,7 @@ from ai.ai_context import build_experiment_phase_context, format_experiment_phas
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 from common.digest_utils import d2f, safe_float
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from content import story_checks  # #4538: the off-record label is the story door's, not a second copy
 from experiment.phase_filter import singleton_visible
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 
@@ -519,7 +520,7 @@ def build_data_packet(data):
     packet.append("")
 
     # --- Journal entries (DEEP BACKGROUND — never quote directly) ---
-    packet.append("=== JOURNAL (OFF THE RECORD — never quote directly) ===")
+    packet.append(story_checks.OFF_RECORD_JOURNAL_HEADER)  # #4538: one label, stated once, shared with the story door
     for entry in sorted(data["journal_entries"], key=lambda e: e.get("sk", "")):
         template = entry.get("template", "?")
         date = entry.get("date", entry.get("sk", "").split("#")[1] if "#" in entry.get("sk", "") else "?")

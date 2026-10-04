@@ -291,7 +291,7 @@ def _safety_gate(text: str) -> list:
         reasons.append("report-card-tone")
     if _CAUSAL_RE.search(t):
         reasons.append("causal-claim")
-    return reasons
+    return reasons + _panel_desk().door_reasons(t)  # #4538: the shared story door — no cycle/attempt counts, off-record stays off
 
 
 # ── synthesis + publish ──────────────────────────────────────────────────────
@@ -1752,11 +1752,13 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
     except Exception:
         existing = []
-    _hook = _short_title(
-        script.get("episode_title"),
-        beats.get("title"),
-        script.get("pull_quote"),
-        review.get("pull_quote"),
+    _hook = _panel_desk().door_safe(  # #4538: a counted title is not published — the episode keeps its bare number
+        _short_title(
+            script.get("episode_title"),
+            beats.get("title"),
+            script.get("pull_quote"),
+            review.get("pull_quote"),
+        )
     )
     # Editorial cover art (Part II — atmospheric, free-license; fail-soft, kill-switch
     # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
@@ -1783,7 +1785,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         "byline": f"Elena + {label_of[guest_id]}",
         "guest_id": guest_id,  # throughline: front-end links the byline → /story/coaches/<guest_id>
         "guest_name": label_of[guest_id],
-        "excerpt": (script.get("pull_quote") or post.get("excerpt") or "")[:240],
+        "excerpt": _panel_desk().door_safe((script.get("pull_quote") or post.get("excerpt") or "")[:240]),
         "image_url": _cover.get("image_url", ""),
         "image_credit": _cover.get("image_credit", ""),
     }
