@@ -27,12 +27,6 @@
       "added": "2026-09-27",
       "pr": "#4189 (Refs #4182)",
       "reason": "the morning note (GET served note / POST owner write) — new site-api route; the site half is a follow-up lane. Remove once deploy_site_api.sh has landed it and the schema baseline is captured."
-    },
-    {
-      "route": "/api/calls",
-      "added": "2026-10-04",
-      "pr": "Refs #4586 (epic #4580)",
-      "reason": "every settled, checkable coach call (GET, optional ?id=) — new read-only site-api route shipped with its preview page site/next/v8/call/ (noindex, linked from nothing yet). Until deploy_site_api.sh lands it the page prints one sentence ('The settled calls are not served right now.'). Remove once the route is live and the schema baseline is captured."
     }
   ]
 }
