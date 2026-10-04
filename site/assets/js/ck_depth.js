@@ -54,21 +54,33 @@ export function seriesOf(measure, src, today = "") {
   const pick = (rows, field) => (rows || []).filter((r) => r && isDay(r.date) && num(r[field]) !== null).map((r) => ({ date: r.date, value: r[field] }));
   const pulse = src.pulse && src.pulse.pulse_history;
   const food = src.nutrition && src.nutrition.nutrition_trend;
-  // A Map, not an object literal: the measure comes from the address bar, and a name like
-  // "constructor" must find nothing rather than an inherited method.
-  const readers = new Map(Object.entries({
-      weight: () => pick(pulse, "weight_lbs"),
-      steps: () => pick(pulse, "steps").filter((p) => p.date !== today),
-      sleep: () => pick(pulse, "sleep_hours"),
-      recovery: () => pick(pulse, "recovery_pct"),
-      protein: () => pick(food, "protein_g"),
-      calories: () => pick(food, "calories"),
-      carbs: () => pick(food, "carbs_g"),
-      fat: () => pick(food, "fat_g"),
-      training: () => pick(src.training && src.training.daily_modality_minutes_30d, "total_min").filter((p) => p.date !== today || p.value > 0),
-  }));
-  const out = readers.get(measure) || (() => []);
-  return out().sort((a, b) => a.date.localeCompare(b.date));
+  // A switch on literal names: the measure comes from the address bar, so nothing is ever
+  // looked up or called by a name the reader supplied.
+  const read = () => {
+    switch (measure) {
+      case "weight":
+        return pick(pulse, "weight_lbs");
+      case "steps":
+        return pick(pulse, "steps").filter((p) => p.date !== today);
+      case "sleep":
+        return pick(pulse, "sleep_hours");
+      case "recovery":
+        return pick(pulse, "recovery_pct");
+      case "protein":
+        return pick(food, "protein_g");
+      case "calories":
+        return pick(food, "calories");
+      case "carbs":
+        return pick(food, "carbs_g");
+      case "fat":
+        return pick(food, "fat_g");
+      case "training":
+        return pick(src.training && src.training.daily_modality_minutes_30d, "total_min").filter((p) => p.date !== today || p.value > 0);
+      default:
+        return [];
+    }
+  };
+  return read().sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // ── a lift ─────────────────────────────────────────────────────────────────────
