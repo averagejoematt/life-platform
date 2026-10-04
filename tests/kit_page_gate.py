@@ -5,7 +5,7 @@ kit_page_gate.py — the pre-merge gate for the kit pages of the living front pa
 
 What it holds, per page in KIT_PAGES, rendered at a phone (390x844) from a local static
 serve of site/ with the data routes mocked by committed fixtures
-(tests/fixtures/kit_pages_4586/ — live captures of 2026-10-03, never fetched):
+(tests/fixtures/kit_pages_4586/ — live captures of 2026-10-03 and 2026-10-04, never fetched):
 
   1. HEIGHT. A page taller than its phone-screen budget fails: six screens for the front
      page, four elsewhere (the appendix, a reference list, carries its own). The owner approved "about three and a half phone screens, one
@@ -61,19 +61,33 @@ KIT_PAGES = {
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
+    # One page per AI coach, one template: seven short sections (watching, next, the longer
+    # view, the record, disagreements, the character, the terms) — six screens, as the front page.
+    "/next/v8/coach/?c=sleep_coach": 6,  # a watch list the coach wrote, three open bets
+    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the longer view is served
+    "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
+    "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
+    "/next/v8/coach/": 4,  # no coach named: one sentence and the way back
     # The appendix is a reference list, not a reading page: one two-line row per live page that
     # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
     # room for a few more rows, so a list that doubles still fails here.
     "/next/v8/appendix/": 11,
 }
 
-#: route glob -> fixture file. Every route ck_pages.js reads.
+#: route glob -> fixture file. Every route ck_pages.js, ck_depth.js and ck_coach.js read.
 ROUTES = {
     "**/api/edition": "edition.json",
     "**/journal/posts.json": "posts.json",
     "**/panelcast/episodes.json": "episodes.json",
     "**/api/coaches": "coaches.json",
-    "**/api/coach_docket": "coach_docket.json",
+    "**/api/coach_docket": "coach_docket_full.json",  # every field the coach page reads; the same four dates
+    "**/api/coach/sleep_coach": "coach_sleep_coach.json",
+    "**/api/coach/physical_coach": "coach_physical_coach.json",
+    "**/api/coach/glucose_coach": "coach_glucose_coach.json",
+    "**/api/coach/eli_marsh": "coach_eli_marsh.json",
+    "**/api/predictions?coach_id=sleep&*": "predictions_sleep.json",
+    "**/api/predictions?coach_id=physical&*": "predictions_physical.json",
+    "**/api/predictions?coach_id=glucose&*": "predictions_glucose.json",
     "**/api/timeline": "timeline.json",
     "**/api/pulse_history": "pulse_history.json",
     "**/api/workouts": "workouts.json",

@@ -1,0 +1,24 @@
+{
+ "predictions": [
+  {
+   "coach_id": "glucose",
+   "coach_name": "Amara Patel",
+   "text": "Nocturnal glucose dips are contributing to deep sleep decline through counter-regulatory cortisol fragmentation of slow-wave sleep.",
+   "status": "pending",
+   "date": "2026-09-25",
+   "due_date": "2026-10-16",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "glucose",
+   "coach_name": "Amara Patel",
+   "text": "Nocturnal glucose dips will trigger cortisol counter-regulation, fragmenting slow-wave sleep and contributing to the recovery ceiling observed in Whoop data.",
+   "status": "pending",
+   "date": "2026-09-15",
+   "due_date": "2026-11-03",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  }
+ ]
+}
