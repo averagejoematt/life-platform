@@ -17,12 +17,12 @@
 <body data-ck-page="trend" data-ck-base="/next/v8/">
 <div class="ck-page">
   <header class="ck-header">
-    <a class="ck-header__back" href="/next/v8/">← Average Joe Matt</a>
+    <a class="ck-header__back" id="ck-back" href="/next/v8/">← Average Joe Matt</a>
   </header>
 
   <main class="ck-main" id="main">
     <section class="ck-section ck-section--tight">
-      <p class="ck-label">Over the whole experiment</p>
+      <p class="ck-label" id="ck-label">Over the whole experiment</p>
       <h1 id="ck-title">Loading.</h1>
       <div id="ck-about"></div>
       <noscript><p class="ck-soft">This page is drawn from the site’s served data when scripts run.</p></noscript>
@@ -33,7 +33,7 @@
     </section>
 
     <section class="ck-section">
-      <p class="ck-label">Most recent</p>
+      <p class="ck-label">Every reading, newest first</p>
       <h2>Day by day.</h2>
       <p class="ck-soft">Each day opens to everything recorded on it.</p>
       <div id="ck-recent"></div>
@@ -41,8 +41,12 @@
 
     <section class="ck-section" id="ck-extra-section">
       <p class="ck-label">Food</p>
-      <h2>What I eat most.</h2>
+      <h2>What I log most.</h2>
       <div class="ck-section ck-section--tight" id="ck-extra"></div>
+    </section>
+    <section class="ck-section" id="ck-related-section">
+      <p class="ck-label">Related</p>
+      <div id="ck-related"></div>
     </section>
   </main>
 

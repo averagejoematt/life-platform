@@ -19,13 +19,13 @@ import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 
 const LB_PER_KG = 2.20462;
+const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const trim1 = (v) => (num(v) === null ? "" : String(Number(v.toFixed(1))));
 const whole = (v) => (num(v) === null ? "" : Math.round(v).toLocaleString("en-US"));
 const lb = (kg) => (num(kg) === null ? null : Math.round(kg * LB_PER_KG));
 const soft = (t) => (t ? `<p class="ck-soft">${esc(t)}</p>` : "");
 const shortDay = (iso) => dayInWords(iso, { weekday: false });
-const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 const byDate = (rows) => Object.fromEntries((rows || []).filter((r) => r && isDay(r.date)).map((r) => [r.date, r]));
 const shift = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 
@@ -43,7 +43,7 @@ export const MEASURES = {
   training: { name: "Training time", unit: "minutes", write: (v) => `${whole(v)} minutes`, about: "Minutes of training recorded each day." },
 };
 
-export const trendHref = (base, measure, lift) => `${base}trend/?m=${encodeURIComponent(measure)}${lift ? `&x=${encodeURIComponent(lift)}` : ""}`;
+export const trendHref = (base, measure, lift = "", from = "") => `${base}trend/?m=${encodeURIComponent(measure)}${lift ? `&x=${encodeURIComponent(lift)}` : ""}${isDay(from) ? `&from=${from}` : ""}`;
 export const dayHref = (base, iso) => `${base}day/?d=${encodeURIComponent(iso)}`;
 
 // One {date, value} series for a measure from the served bodies. Null readings are dropped:
@@ -70,10 +70,15 @@ export function seriesOf(measure, src, today = "") {
 // ── a lift ─────────────────────────────────────────────────────────────────────
 // A session's working sets for one exercise (warm-ups set aside), heaviest load first in
 // the summary: "3 sets at 175 lb: 12, 12 and 10 reps".
-const isWork = (s) => s && s.type !== "warmup" && num(s.reps) !== null;
+const isWarm = (s) => s && s.type === "warmup";
+const isWork = (s) => s && !isWarm(s) && num(s.reps) !== null;
+const MILES_PER_M = 1 / 1609.344;
+// Estimated one-rep max (Epley): load x (1 + reps / 30). An ESTIMATE, named as one wherever
+// it is shown; it lets a 175 lb set of 12 be compared with a 205 lb set of 5.
+export const epley = (loadLb, reps) => (num(loadLb) === null || num(reps) === null || reps < 1 ? null : reps === 1 ? loadLb : loadLb * (1 + reps / 30));
 export function liftSummary(exercise) {
   const sets = (exercise.sets || []).filter(isWork);
-  const warm = (exercise.sets || []).length - sets.length;
+  const warm = (exercise.sets || []).filter(isWarm).length;
   if (!sets.length) return warm ? `${warm} warm-up ${warm === 1 ? "set" : "sets"} only.` : "";
   const groups = [];
   for (const s of sets) {
@@ -91,49 +96,75 @@ export function liftSummary(exercise) {
     })
     .join("; ");
 }
-// The heaviest working load for one exercise in each session it appears in.
+// One point per session for one exercise: its best working set. With a load, "best" is the
+// highest estimated one-rep max and the point carries the set it came from ("175 lb x 12");
+// for a bodyweight exercise it is the most reps in a set.
 export function liftSeries(workouts, name) {
   return (workouts || [])
     .map((w) => {
       const ex = (w.exercises || []).find((e) => e && e.name === name);
-      const loads = ex ? (ex.sets || []).filter(isWork).map((s) => lb(s.weight_kg)).filter((v) => v) : [];
-      return loads.length && isDay(w.date) ? { date: w.date, value: Math.max(...loads) } : null;
+      const sets = ex ? (ex.sets || []).filter(isWork) : [];
+      if (!sets.length || !isDay(w.date)) return null;
+      const loaded = sets.filter((s) => lb(s.weight_kg));
+      if (!loaded.length) {
+        const reps = Math.max(...sets.map((s) => s.reps));
+        return { date: w.date, value: reps, set: `${Math.round(reps)} reps`, bodyweight: true };
+      }
+      const best = loaded.map((s) => ({ load: lb(s.weight_kg), reps: Math.round(s.reps), max: epley(lb(s.weight_kg), s.reps) })).sort((a, b) => b.max - a.max)[0];
+      return { date: w.date, value: Math.round(best.max), set: `${best.load} lb × ${best.reps}` };
     })
     .filter(Boolean)
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // ── the chart: one line, both ends labelled, and a sentence saying what it shows ─
-export function trendChartHTML(points, write, name) {
+export function trendChartHTML(points, write, name, { fromZero = false } = {}) {
   const pts = (points || []).filter((p) => p && isDay(p.date) && num(p.value) !== null);
   if (pts.length < 2) return "";
   const t = (iso) => Date.parse(`${iso}T12:00:00Z`);
   const [t0, t1] = [t(pts[0].date), t(pts[pts.length - 1].date)];
   const lo = Math.min(...pts.map((p) => p.value));
   const hi = Math.max(...pts.map((p) => p.value));
+  // A count (steps, grams, minutes) is scaled from zero, so a height means an amount. A
+  // level is scaled to its own range and drawn as a line alone: filling under it would
+  // make its lowest reading look like nothing.
+  const floor = fromZero ? 0 : lo;
   const x = (p) => 8 + (624 * (t(p.date) - t0)) / (t1 - t0 || 1);
-  const y = (p) => 20 + (122 * (hi - p.value)) / (hi - lo || 1);
+  const y = (p) => 20 + (122 * (hi - p.value)) / (hi - floor || 1);
   const line = pts.map((p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(" ");
+  const area = fromZero ? `<polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/>` : "";
   const [first, last] = [pts[0], pts[pts.length - 1]];
   const aria = `${name} from ${write(first.value)} on ${shortDay(first.date)} to ${write(last.value)} on ${shortDay(last.date)}, ${pts.length} readings, lowest ${write(lo)}, highest ${write(hi)}`;
-  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}"><polygon class="ck-chart__area" points="8.0,164 ${line} 632.0,164"/><polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>`;
+  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${area}<polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>`;
 }
-export function trendSentence(points, write) {
+export function trendSentence(points, write, { average = true, floor = null, floorWords = "" } = {}) {
   const pts = points || [];
   if (!pts.length) return "";
   const values = pts.map((p) => p.value);
   const [lo, hi] = [Math.min(...values), Math.max(...values)];
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
   if (pts.length === 1) return `One reading so far: ${write(pts[0].value)} on ${shortDay(pts[0].date)}.`;
-  return `${pts.length} readings from ${shortDay(pts[0].date)} to ${shortDay(pts[pts.length - 1].date)}. Lowest ${write(lo)}, highest ${write(hi)}, average ${write(mean)}.`;
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  const parts = [`${pts.length} readings from ${shortDay(pts[0].date)} to ${shortDay(pts[pts.length - 1].date)}.`, `Lowest ${write(lo)}, highest ${write(hi)}${average ? `, average ${write(mean(values))}` : ""}.`];
+  if (floor !== null) parts.push(`At or above ${floorWords || write(floor)} on ${values.filter((v) => v >= floor).length} of ${values.length} days.`);
+  return parts.join(" ");
+}
+// The last seven readings against the seven before: two averages, said plainly. "" until
+// there are fourteen readings to compare.
+export function weekOnWeek(points, write) {
+  const v = (points || []).map((p) => p.value);
+  if (v.length < 14) return "";
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  return `The last seven readings average ${write(mean(v.slice(-7)))}; the seven before, ${write(mean(v.slice(-14, -7)))}.`;
 }
 // The most recent readings, newest first, each a door to its day.
-export function recentRowsHTML(points, write, base, limit = 10) {
-  const rows = [...(points || [])].reverse().slice(0, limit);
+export function recentRowsHTML(points, write, base, first = 7) {
+  const rows = [...(points || [])].reverse();
   if (!rows.length) return "";
-  return `<ul class="ck-rows ck-rows--chapters">${rows
-    .map((p) => `<li><span class="ck-rows__key">${esc(fmtShort(p.date))}</span><a href="${esc(dayHref(base, p.date))}">${esc(dayInWords(p.date).split(",")[0])}</a><span class="ck-rows__value">${esc(write(p.value))}</span></li>`)
-    .join("")}</ul>`;
+  const li = (p) => `<li><a href="${esc(dayHref(base, p.date))}">${esc(`${fmtShort(p.date)} · ${dayInWords(p.date).split(",")[0]} · ${p.set && !p.bodyweight ? `${p.set} · est. max ${write(p.value)}` : write(p.value)}`)} <span aria-hidden="true">→</span></a></li>`;
+  const list = (items) => `<ul class="ck-rows ck-rows--more">${items.map(li).join("")}</ul>`;
+  const rest = rows.slice(first);
+  // The newest week is on the page; the rest is one tap away, never dropped.
+  return `${list(rows.slice(0, first))}${rest.length ? `<details><summary>The ${rest.length} earlier ${rest.length === 1 ? "reading" : "readings"}</summary>${list(rest)}</details>` : ""}`;
 }
 
 // ── the day page ───────────────────────────────────────────────────────────────
@@ -142,14 +173,14 @@ export function latestDay(src) {
   return days[days.length - 1] || "";
 }
 // The day's measured facts, each a door to its trend. A measure with no reading is absent.
-export function dayFactsHTML(iso, src, base) {
+export function dayFactsHTML(iso, src, base, today = "") {
   const p = byDate(src.pulse && src.pulse.pulse_history)[iso] || {};
-  const row = (measure, value) => {
+  const row = (measure, value, note = "") => {
     const m = MEASURES[measure];
-    return num(value) === null ? "" : `<li><span class="ck-rows__key">${esc(m.name)}</span><a href="${esc(trendHref(base, measure))}">${esc(m.write(value))}</a><span class="ck-rows__value" aria-hidden="true">→</span></li>`;
+    return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
-  const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct), row("steps", p.steps)].join("");
-  return rows ? `<ul class="ck-rows ck-rows--chapters">${rows}</ul>` : soft("Nothing was measured on this day.");
+  const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct), row("steps", p.steps, iso === today ? " so far today" : "")].join("");
+  return rows ? `<ul class="ck-rows ck-rows--more">${rows}</ul>` : soft("Nothing was measured on this day.");
 }
 // What was lifted: every exercise with its working sets, each a door to that lift's trend.
 export function dayLiftsHTML(iso, src, base) {
@@ -164,14 +195,19 @@ export function dayLiftsHTML(iso, src, base) {
   if (!session || !(session.exercises || []).length) return otherLine || soft("No training was recorded on this day.");
   const named = session.exercises.filter((e) => e && e.name);
   const worked = named.filter((e) => (e.sets || []).some(isWork));
-  // An entry with only warm-up sets (a few minutes on the bike, stretching) is named in one
-  // line, not given a row that says nothing.
-  const warm = named.filter((e) => !(e.sets || []).some(isWork)).map((e) => e.name);
-  const warmLine = warm.length ? soft(`Warm-up: ${warm.join(", ")}.`) : "";
+  // Timed or distance work (the bike, stretching, a carry) has no reps: it is named with its
+  // distance when one was recorded, not given a row of sets it does not have.
+  const timed = named
+    .filter((e) => !(e.sets || []).some(isWork))
+    .map((e) => {
+      const metres = (e.sets || []).reduce((a, x) => a + (num(x && x.distance_m) || 0), 0);
+      return metres > 0 ? `${e.name} (${trim1(metres * MILES_PER_M)} miles)` : e.name;
+    });
+  const warmLine = timed.length ? soft(`Also in the session: ${timed.join(", ")}.`) : "";
   const rows = worked
-    .map((e) => `<li><a class="ck-coach__who" href="${esc(trendHref(base, "lift", e.name))}">${esc(e.name)}</a><span>${esc(liftSummary(e))}</span></li>`)
+    .map((e) => `<li><a class="ck-coach__who" href="${esc(trendHref(base, "lift", e.name, iso))}">${esc(e.name)}</a><span>${esc(liftSummary(e))}</span></li>`)
     .join("");
-  const head = num(session.duration_min) !== null ? soft(`${whole(session.duration_min)} minutes, ${worked.length} ${worked.length === 1 ? "exercise" : "exercises"}. Each one opens its own trend.`) : "";
+  const head = num(session.duration_min) !== null ? soft(`${whole(session.duration_min)} minutes in the session. Warm-up sets are left out; each lift opens its own trend.`) : "";
   return `${head}${rows ? `<ul class="ck-coach">${rows}</ul>` : ""}${warmLine}${otherLine}`;
 }
 // What was eaten: the day's totals. The log's individual entries are not public.
@@ -181,10 +217,10 @@ export function dayFoodHTML(iso, src, base) {
   const floor = num(src.nutrition && src.nutrition.nutrition && src.nutrition.nutrition.protein_floor_g);
   const row = (measure, value, note = "") => {
     const m = MEASURES[measure];
-    return num(value) === null ? "" : `<li><span class="ck-rows__key">${esc(m.name)}</span><a href="${esc(trendHref(base, measure))}">${esc(m.write(value))}${esc(note)}</a><span class="ck-rows__value" aria-hidden="true">→</span></li>`;
+    return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
   const versus = floor !== null && num(f.protein_g) !== null ? (f.protein_g >= floor ? `, at or above the ${whole(floor)} g floor` : `, under the ${whole(floor)} g floor`) : "";
-  return `<ul class="ck-rows ck-rows--chapters">${row("calories", f.calories)}${row("protein", f.protein_g, versus)}${row("carbs", f.carbs_g)}${row("fat", f.fat_g)}</ul>`;
+  return `<ul class="ck-rows ck-rows--more">${row("calories", f.calories)}${row("protein", f.protein_g, versus)}${row("carbs", f.carbs_g)}${row("fat", f.fat_g)}</ul>`;
 }
 export function dayNavHTML(iso, src, base) {
   const known = new Set([...Object.keys(byDate(src.pulse && src.pulse.pulse_history)), ...Object.keys(byDate(src.workouts && src.workouts.workouts))]);
@@ -199,9 +235,16 @@ export function frequentMealsHTML(body) {
   const meals = ((body && body.meals) || []).filter((m) => m && m.name && num(m.frequency) !== null).slice(0, 8);
   if (!meals.length) return "";
   const days = num(body.period_days);
-  return `${soft(days ? `What I logged most often over ${whole(days)} days.` : "What I logged most often.")}<ul class="ck-rows ck-rows--chapters">${meals
-    .map((m) => `<li><span class="ck-rows__key">${whole(m.frequency)} times</span><span>${esc(m.name)}</span><span class="ck-rows__value">${num(m.avg_protein_g) !== null ? `${whole(m.avg_protein_g)} g protein` : ""}</span></li>`)
+  return `${soft(`The foods I logged most often${days ? ` over ${whole(days)} days` : ""}, with the protein in one serving.`)}<ul class="ck-rows ck-rows--chapters">${meals
+    .map((m) => `<li><span class="ck-rows__key">${whole(m.frequency)} times</span><span>${esc(m.name)}</span><span class="ck-rows__value">${num(m.avg_protein_g) !== null ? `${whole(m.avg_protein_g)} g` : ""}</span></li>`)
     .join("")}</ul>`;
+}
+// The other trends a reader on this one is most likely to want next.
+const RELATED = { protein: ["calories", "carbs", "fat"], calories: ["protein", "carbs", "fat"], carbs: ["calories", "protein", "fat"], fat: ["calories", "protein", "carbs"], weight: ["calories", "steps", "training"], steps: ["training", "weight"], sleep: ["recovery"], recovery: ["sleep", "training"], training: ["steps", "recovery"] };
+export function relatedHTML(measure, base, from = "") {
+  const keys = measure === "lift" ? ["training", "weight"] : RELATED[measure] || [];
+  if (!keys.length) return "";
+  return `<ul class="ck-rows ck-rows--more">${keys.map((k) => `<li><a href="${esc(trendHref(base, k, "", from))}">${esc(MEASURES[k].name)} <span aria-hidden="true">→</span></a></li>`).join("")}</ul>`;
 }
 
 // ── mount ──────────────────────────────────────────────────────────────────────
@@ -216,6 +259,8 @@ async function load(routes) {
   return Object.fromEntries(entries);
 }
 
+const todayPT = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+
 async function mountDay(base) {
   const src = await load({ pulse: "/api/pulse_history", workouts: "/api/workouts", training: "/api/training_overview", nutrition: "/api/nutrition_overview" });
   const iso = isDay(param("d")) ? param("d") : latestDay(src);
@@ -229,46 +274,71 @@ async function mountDay(base) {
   fill("ck-title", esc(dayInWords(iso)));
   document.title = `${dayInWords(iso)} — Average Joe Matt`;
   fill("ck-nav", dayNavHTML(iso, src, base));
-  fill("ck-facts", dayFactsHTML(iso, src, base));
+  fill("ck-facts", dayFactsHTML(iso, src, base, todayPT()));
   fill("ck-lifts", dayLiftsHTML(iso, src, base));
   fill("ck-food", dayFoodHTML(iso, src, base));
 }
 
+// How each measure is drawn and described: a COUNT is scaled from zero and has a meaningful
+// average; a LEVEL (weight, sleep, recovery, a lift) is a line with no average.
+const COUNTS = new Set(["steps", "protein", "calories", "carbs", "fat", "training"]);
+
 async function mountTrend(base) {
   const measure = param("m") || "weight";
   const lift = param("x");
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const from = isDay(param("from")) ? param("from") : "";
+  const today = todayPT();
   let points = [];
   let name = "";
   let about = "";
   let write = (v) => trim1(v);
   let extra = "";
+  let sentenceOpts = { average: false };
   if (measure === "lift" && lift) {
     const src = await load({ workouts: "/api/workouts" });
     points = liftSeries(src.workouts && src.workouts.workouts, lift);
     name = lift;
-    about = "The heaviest working set in each session.";
-    write = (v) => `${whole(v)} lb`;
+    const bodyweight = points.length && points.every((p) => p.bodyweight);
+    about = bodyweight
+      ? "The most reps in one set, each session."
+      : "Estimated one-rep max from the best set of each session: the load times one plus reps over thirty. It is an estimate, so a set of 12 at 175 lb can be compared with a set of 5 at 205.";
+    write = bodyweight ? (v) => `${whole(v)} reps` : (v) => `${whole(v)} lb`;
   } else if (MEASURES[measure]) {
     const food = ["protein", "calories", "carbs", "fat"].includes(measure);
     const src = await load(food ? { nutrition: "/api/nutrition_overview", meals: "/api/frequent_meals" } : measure === "training" ? { training: "/api/training_overview" } : { pulse: "/api/pulse_history" });
     points = seriesOf(measure, src, today);
     ({ name, about, write } = MEASURES[measure]);
-    if (food) extra = frequentMealsHTML(src.meals);
+    sentenceOpts = { average: COUNTS.has(measure) };
+    if (measure === "protein") {
+      const floor = num(src.nutrition && src.nutrition.nutrition && src.nutrition.nutrition.protein_floor_g);
+      if (floor !== null) sentenceOpts = { ...sentenceOpts, floor, floorWords: `my ${whole(floor)} g floor` };
+    }
+    if (measure === "protein" || measure === "calories") extra = frequentMealsHTML(src.meals);
+  }
+  if (from) {
+    const back = document.getElementById("ck-back");
+    if (back) {
+      back.href = dayHref(base, from);
+      back.textContent = `← ${dayInWords(from)}`;
+    }
   }
   if (!name) {
     fill("ck-title", "Not a measure");
     fill("ck-about", soft("This address does not name a measure the site records."));
     return;
   }
+  fill("ck-label", esc(measure === "training" ? "The last 30 days" : "Over the whole experiment"));
   fill("ck-title", esc(name));
   document.title = `${name} — Average Joe Matt`;
   fill("ck-about", soft(about));
-  fill("ck-chart", points.length ? `${soft(trendSentence(points, write))}${trendChartHTML(points, write, name)}` : soft("Nothing has been recorded for this yet."));
+  const chart = trendChartHTML(points, write, name, { fromZero: COUNTS.has(measure) });
+  fill("ck-chart", points.length ? `${soft(trendSentence(points, write, sentenceOpts))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft("Nothing has been recorded for this yet."));
   fill("ck-recent", recentRowsHTML(points, write, base));
   fill("ck-extra", extra);
-  const extraSection = document.getElementById("ck-extra-section");
-  if (extraSection && !extra) extraSection.remove();
+  if (!extra) document.getElementById("ck-extra-section")?.remove();
+  const related = relatedHTML(measure, base, from);
+  fill("ck-related", related);
+  if (!related) document.getElementById("ck-related-section")?.remove();
 }
 
 export async function mount() {
