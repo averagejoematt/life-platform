@@ -1073,7 +1073,11 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
         ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
         # #4546: the SES receipt rule (insight-capture) writes raw/inbound_email/ — the old "inbound-email/*" grant matched
         # nothing, so every reply since 2026-02-27 died on GetObject. Both kept until the old prefix is proven empty.
-        needs_s3_read=["raw/inbound_email/*", "inbound-email/*", "generated/qa_archive/text/*"],
+        # #4584: + config/content_filter.json — each Story Desk answer also lands in the owner-words store, screened by
+        # the fail-closed content filter (content.owner_words.screen -> content_filter_channel). Without this read the
+        # vocabulary is unloadable and every email entry is HELD (stored, never published) and counted on
+        # InsightParseFailure — fail closed, never a silent pass. One object, read-only.
+        needs_s3_read=["raw/inbound_email/*", "inbound-email/*", "generated/qa_archive/text/*", "config/content_filter.json"],
         needs_s3_write=["dead-letter-archive/insight-email-parser/*"],
         needs_dlq=True,
         extra_statements=[
