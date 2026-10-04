@@ -61,9 +61,10 @@ KIT_PAGES = {
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
+    "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
 }
 
-#: route glob -> fixture file. Every route ck_pages.js reads.
+#: route glob -> fixture file. Every route the kit modules read.
 ROUTES = {
     "**/api/edition": "edition.json",
     "**/journal/posts.json": "posts.json",
@@ -76,6 +77,9 @@ ROUTES = {
     "**/api/training_overview": "training_overview.json",
     "**/api/nutrition_overview": "nutrition_overview.json",
     "**/api/frequent_meals": "frequent_meals.json",
+    "**/api/platform_stats": "platform_stats.json",
+    "**/api/receipts": "receipts.json",
+    "**/api/predictions": "predictions.json",
 }
 
 _FORBIDDEN = (
