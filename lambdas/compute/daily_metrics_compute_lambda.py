@@ -53,7 +53,7 @@ from decimal import Decimal
 
 import boto3
 from common.compute_metadata import tag_record  # #2811: hoisted — it was imported locally in three functions
-from common.constants import EXPERIMENT_START_DATE  # #4184: the trajectory RATE is experiment-scoped, not cross-phase
+from common.constants import EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G  # #4184: the RATE is experiment-scoped; #4540: plan targets
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
@@ -1025,8 +1025,8 @@ def assemble_data(yesterday_str, profile):
     _mf_rows = fetch_range("macrofactor", nutrition_logging.window_start(_pt_today, EXPERIMENT_START_DATE), _pt_today)
     _protein = nutrition_logging.protein_intake(_mf_rows, _pt_today, EXPERIMENT_START_DATE)
     protein_g_avg = _protein["avg_g"]
-    protein_g_target = float(profile.get("protein_target_g", 190))
-    protein_g_floor = float(profile.get("protein_floor_g", 170))
+    protein_g_target = float(PLAN_DAILY_PROTEIN_MIN_G)
+    protein_g_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
 
     elapsed = time.time() - t0_timer
     logger.info(

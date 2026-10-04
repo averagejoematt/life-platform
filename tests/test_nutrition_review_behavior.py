@@ -884,16 +884,18 @@ def test_the_average_row_is_the_mean_of_the_shown_days():
 
 
 def test_the_snapshot_states_the_targets_it_is_grading_against():
+    # #4540: the plan's targets — the profile row's copies are not read, whatever they say.
     html = _table({"2026-06-06": _mf_day(cal=1800)}, {"calorie_target": 2000, "protein_target_g": 175})
     footer = [r for r in _rows(html) if r and "Targets" in r[0]][0][0]
-    assert "2000 kcal" in footer
-    assert "175g protein" in footer
+    assert f"{m.PLAN_DAILY_CALORIES_TARGET} kcal" in footer
+    assert f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
+    assert "2000 kcal" not in footer and "175g" not in footer
 
 
-def test_a_profile_with_no_targets_falls_back_to_the_documented_defaults():
+def test_a_profile_with_no_targets_still_states_the_plans():
     html = _table({"2026-06-06": _mf_day(cal=1800)}, {})
     footer = [r for r in _rows(html) if r and "Targets" in r[0]][0][0]
-    assert "1800 kcal" in footer and "190g protein" in footer
+    assert f"{m.PLAN_DAILY_CALORIES_TARGET} kcal" in footer and f"{m.PLAN_DAILY_PROTEIN_MIN_G}g protein" in footer
 
 
 def test_calories_over_target_are_flagged_differently_from_calories_on_target():
@@ -1039,14 +1041,22 @@ def test_a_week_without_a_dexa_scan_reports_dexa_as_absent(frozen_clock):
     assert _payload()["dexa"] is None
 
 
-def test_the_prompt_carries_the_profile_targets_the_panel_grades_against():
+def test_the_prompt_carries_the_plan_targets_the_panel_grades_against():
     p = _payload(profile={"calorie_target": 2000, "protein_target_g": 175, "goal_weight_lbs": 250})
-    assert p["profile_targets"] == {"calorie_target": 2000, "protein_target_g": 175, "goal_weight_lbs": 250}
+    assert p["profile_targets"] == {
+        "calorie_target": m.PLAN_DAILY_CALORIES_TARGET,
+        "protein_target_g": m.PLAN_DAILY_PROTEIN_MIN_G,
+        "goal_weight_lbs": 250,
+    }
 
 
-def test_missing_profile_targets_fall_back_to_the_documented_defaults():
+def test_missing_profile_targets_change_nothing_about_the_plan_targets():
     p = _payload(profile={})
-    assert p["profile_targets"] == {"calorie_target": 1800, "protein_target_g": 190, "goal_weight_lbs": 185}
+    assert p["profile_targets"] == {
+        "calorie_target": m.PLAN_DAILY_CALORIES_TARGET,
+        "protein_target_g": m.PLAN_DAILY_PROTEIN_MIN_G,
+        "goal_weight_lbs": 185,
+    }
 
 
 def test_last_weeks_review_is_included_when_one_exists():
@@ -1574,8 +1584,8 @@ def test_the_panel_prompt_receives_the_weeks_real_numbers(handler_env):
 def test_the_panel_prompt_states_the_targets_being_graded(handler_env):
     m.lambda_handler({}, None)
     system, _ = handler_env["calls"]["anthropic"][0]
-    assert "1800 kcal" in system
-    assert "190g" in system
+    assert f"{m.PLAN_DAILY_CALORIES_TARGET} kcal" in system
+    assert f"{m.PLAN_DAILY_PROTEIN_MIN_G}g" in system
 
 
 def test_the_panel_is_told_which_week_of_the_journey_this_is(handler_env, frozen_clock):
@@ -1669,7 +1679,7 @@ def test_a_config_driven_panel_prompt_is_used_when_the_board_config_loads(handle
     handler_env["monkeypatch"].setattr(m, "_build_nutrition_prompt_from_config", lambda cal, pro: f"BOARD PROMPT {cal}/{pro}")
     m.lambda_handler({}, None)
     system, _ = handler_env["calls"]["anthropic"][0]
-    assert system == "BOARD PROMPT 1800/190"
+    assert system == f"BOARD PROMPT {m.PLAN_DAILY_CALORIES_TARGET}/{m.PLAN_DAILY_PROTEIN_MIN_G}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

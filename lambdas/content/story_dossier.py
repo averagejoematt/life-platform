@@ -68,6 +68,14 @@ def season_weeks(genesis: str = GENESIS, through: Optional[str] = None) -> List[
     return weeks
 
 
+def week_containing(day: str) -> Optional[Dict[str, Any]]:
+    """The season week a calendar day falls in, or None before genesis. ONE definition: the Monday questions
+    sender and its dead-man (`operational.story_season_qa`, #4539) must name the same week or the dead-man
+    looks for a marker the sender never writes."""
+    through = (_d(day) + _dt.timedelta(days=7)).isoformat()
+    return next((w for w in season_weeks(through=through) if w["start"] <= day <= w["end"]), None)
+
+
 def _dates(start: str, end: str) -> List[str]:
     a, b = _d(start), _d(end)
     return [(a + _dt.timedelta(days=i)).isoformat() for i in range((b - a).days + 1)]

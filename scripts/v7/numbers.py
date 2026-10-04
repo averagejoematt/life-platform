@@ -52,6 +52,9 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         "    <h1>His numbers</h1>\n"
         '    <p class="v7-job">The evidence: weight, sleep, eating, training, blood tests — one chart and one sentence each.</p>\n'
         '    <p class="nm-through" id="nm-through" data-src="api_journey.journey.last_weighin_date"></p>\n'
+        # R7 fix 9: the JS-off sentence — honest AND audible, where "Not loaded yet." alone was mute.
+        '    <noscript><p class="nm-note">Every number and chart on this page is drawn from the site’s served data when scripts run. '
+        "With scripts off the entries below stay empty — nothing on this page is a claim.</p></noscript>\n"
         + "".join(_entry(a, h) for a, h in SECTIONS)
         + '    <details class="nm-engine" id="nm-engine">\n'
         "      <summary>The engine’s score</summary>\n"
@@ -59,4 +62,6 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
         "        " + _PENDING + "\n"
         "      </div>\n"
         "    </details>\n"
+        # R7 fix 10: the page ends on the dated things to come back for, like every other v7 page.
+        + _entry("nm-next", "Next")
     )

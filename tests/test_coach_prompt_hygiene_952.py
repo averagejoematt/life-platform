@@ -193,11 +193,11 @@ class TestAiUnavailableSentinelHeld:
 class TestBodIntroFromProfile:
     def test_phase_targets_follow_the_registry_not_a_literal(self):
         line = ai_calls._bod_phase_targets({"latest_weight": 240}, PROFILE)
-        assert line == "Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit, 1800 cal daily."
+        assert line == f"Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit, {ai_calls.PLAN_DAILY_CALORIES_TARGET} cal daily."
 
     def test_phase_1_is_derived_not_hardcoded(self):
         line = ai_calls._bod_phase_targets({"latest_weight": 297.2}, PROFILE)
-        assert line == "Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily."
+        assert line == f"Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, {ai_calls.PLAN_DAILY_CALORIES_TARGET} cal daily."
 
     def test_final_phase_when_below_every_band(self):
         line = ai_calls._bod_phase_targets({"latest_weight": 180}, PROFILE)
@@ -217,7 +217,7 @@ class TestBodIntroFromProfile:
             "calorie_target": Decimal("1800"),
         }
         line = ai_calls._bod_phase_targets({"latest_weight": Decimal("240")}, profile)
-        assert line == "Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit, 1800 cal daily."
+        assert line == f"Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit, {ai_calls.PLAN_DAILY_CALORIES_TARGET} cal daily."
 
     def test_no_phase_registry_fails_soft_to_empty(self):
         assert ai_calls._bod_phase_targets({}, {}) == ""
@@ -245,7 +245,7 @@ class TestBodIntroFromProfile:
         intro = ai_calls._build_daily_bod_intro_from_config({"latest_weight": 240}, PROFILE)
         assert intro is not None
         assert "36yo" not in intro
-        assert "Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit, 1800 cal daily." in intro
+        assert f"Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit, {ai_calls.PLAN_DAILY_CALORIES_TARGET} cal daily." in intro
         assert "Phase 1 Ignition" not in intro
 
     def test_stale_literals_are_gone_from_the_module_source(self):

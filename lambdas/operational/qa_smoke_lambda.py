@@ -70,6 +70,7 @@ from operational import (
     qa_check_oauth_door,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
+    story_season_qa,  # noqa: E402  (#4539 dead-men: episode-or-hold, ledger advanced, Monday questions)
     supplement_join_qa,  # noqa: E402  (#4245 dead-man: the supplement join going dark)
     week_agreement_qa,  # noqa: E402  (#3615 boxes 2+3: same-week fact + absence agreement)
     weight_truth_qa,  # noqa: E402
@@ -1205,6 +1206,14 @@ def check_steps():
         (
             "chronicle_status_row",
             lambda: chronicle_status_row_qa.check_chronicle_status_row_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now),
+        ),
+        # #4539 dead-men: a published week with no Panel episode or hold in 48h, a hold past 7 days,
+        # a week with no LEDGER# row, a Monday questions send that never went out.
+        (
+            "story_season",
+            lambda: story_season_qa.check_story_season(
+                table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()
+            ),
         ),
         # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
         (

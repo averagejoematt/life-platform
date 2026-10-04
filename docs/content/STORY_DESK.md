@@ -27,7 +27,7 @@ The desk is the pipeline that makes that hold without hand correction.
 | **Ledger** | `lambdas/content/story_ledger.py` | One `LEDGER#{date}` row per published installment: threads (open / advanced / resolved / retired), the Panel's bets and their results, who was featured, the leads and beats used, and an arc note per character. Read through `singleton_visible`, so a reset's tombstones can never become last week's memory. |
 | **Desk** | `lambdas/content/story_desk.py` | One structured call returns the week's **story budget**: lead, secondary stories, omissions with reasons, a tone calibrated to the data, the coach to feature, last week's bet scored and the next one set, and an action for every open thread. The rubric is written in the module. Code then validates what a schema can't express. |
 | **Writers** | `lambdas/content/story_writers.py` | Elena's long-form post and the Panel script, both written from the same budget, dossier and ledger, plus the previous installment. |
-| **Checks** | `lambdas/content/story_checks.py` | Four checks. Completeness: `stop_reason`, the last sentence, the footer. The story door: no cycle or attempt counts, no machinery words, no export lag told as silence. Number grounding against the dossier. The Panel renderer's spoken-word rules, run before staging rather than at render. A failure buys one corrective rewrite; a second failure stops the week. |
+| **Checks** | `lambdas/content/story_checks.py` | Four checks. Completeness: `stop_reason`, the last sentence, the footer. The story door: no cycle or attempt counts, no off-record specifics, no machinery words, no export lag told as silence — its reader-surface half (`reader_surface`) is also run by the chronicle handler, the recap and the Panel at their own chokepoints, so a legacy writer cannot bypass it (#4538). Number grounding against the dossier. The Panel renderer's spoken-word rules, run before staging rather than at render. A failure buys one corrective rewrite; a second failure stops the week. |
 
 ## The rubric, in one paragraph
 
@@ -51,11 +51,23 @@ python3 scripts/season_rebuild.py --weeks 5 --out <dir>
 
 Publishing is a separate, owner-approved promote step. Staging never publishes.
 
+## The dead-men
+
+`lambdas/operational/story_season_qa.py` (#4539) runs three checks inside the nightly
+`life-platform-qa-smoke` invoke. A red one reaches the owner through `qa-smoke-failures`.
+
+| Check | Reds when |
+|---|---|
+| `story_season:episode_or_hold` | A published week has no Panel episode 48 h after it published and no hold naming that week, or its hold is more than 7 days old. The hold is the public `pending` marker in `/panelcast/episodes.json`. A re-hold rewrites the marker's date, so the week's own overdue clock also counts. |
+| `story_season:ledger_advanced` | A published week has no visible `LEDGER#{date}` row. The next installment would pick the season up from before that week. |
+| `story_season:monday_questions` | Monday's `StoryQuestionsMonday` send (16:00 UTC) left no `STORYQ#W{n}` marker an hour later. |
+
+A read that fails or comes back empty is a warn with no verdict, never a pass.
+
 ## What it does not do (yet)
 
 - The weekly `wednesday-chronicle` and `coach-panel-podcast` lambdas still run their own
   prompts. Moving them onto the desk is #4535 / #4536. The Panel half waits on #4514
   (PR #4522) so two lanes don't edit one file.
-- The dead-men (a published week with no episode in 48h, a hold older than 7 days) are #4539.
 - Count-claim predictions are still graded by slope upstream (#4541). The dossier carries that
   caveat to the writers.

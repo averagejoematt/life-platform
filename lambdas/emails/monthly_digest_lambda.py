@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 _logger_std = logging.getLogger()
@@ -111,9 +111,9 @@ from emails.monthly_digest_render import (  # noqa: E402,F401
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 GOAL_WEIGHT_LBS = 220.0
-# Nutrition constants — used as fallback when profile targets are absent
-PROTEIN_TARGET_G = 180
-CALORIE_TARGET = 1800
+# Nutrition targets — the plan's (#4540), never the profile row
+PROTEIN_TARGET_G = PLAN_DAILY_PROTEIN_MIN_G
+CALORIE_TARGET = PLAN_DAILY_CALORIES_TARGET
 
 # The sources `gather_all` reads for BOTH arms. Every entry must reach the letter:
 # `eightsleep` sat here with no extractor and no reader, so two full DynamoDB range
@@ -288,14 +288,14 @@ def ex_hevy(recs):
 def ex_macrofactor(recs, profile=None):
     """Extract MacroFactor nutrition summary.
 
-    Uses profile calorie_target / protein_target_g when available;
-    falls back to module-level CALORIE_TARGET / PROTEIN_TARGET_G constants.
+    Targets are the plan's (module-level CALORIE_TARGET / PROTEIN_TARGET_G, derived from
+    common.constants); `profile` is accepted for call compatibility and not read for them.
     Field names match the actual DynamoDB schema (total_calories_kcal, total_protein_g).
     """
     if not recs:
         return None
-    prot_target = (profile or {}).get("protein_target_g", PROTEIN_TARGET_G)
-    cal_target = (profile or {}).get("calorie_target", CALORIE_TARGET)
+    prot_target = PROTEIN_TARGET_G
+    cal_target = CALORIE_TARGET
     cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
     prots = [float(r["total_protein_g"]) for r in recs if "total_protein_g" in r]
     # ADR-104/105 (#1658): each rate is computed over the days it was MEASURED on,

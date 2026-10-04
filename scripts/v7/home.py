@@ -1,18 +1,20 @@
 """scripts/v7/home.py — the v7 Home body: the log's front page (#4182, Prototype C screen I).
 
 THE FRAME. A logbook kept in public: every block is a dated entry with the day in the
-margin. Home is "the case so far", in the design source's order — the fold (the honest
-day-1 photograph beside the number, its day and range, and the this-week line), the lead
+margin. Home is "the case so far", in the design source's order — the fold (the dated
+gym photograph beside the number, its day and range, and the this-week line), the lead
 sentence (day N of an experiment run in public, with the day-only branches), the alive
 line (data through · the coaches' checked calls K of N · next write-up), every weigh-in
 so far, in his words, is he okay this week, also on the record, how it works, what
 resolves next, follow.
 
-WHAT IS STATIC. The headings, the entry order, the day-1 photograph (#3761 — the owner
-chose it and said yes to publishing it on 2026-09-26; re-saved with no EXIF) with its alt
-text, and one "loading the numbers" line per slot. The photo's caption is poured by JS
-(`photoCaption`: the date from `journey.started_date`, the weight from
-`journey.start_weight_lbs`). Every number, date and served sentence is poured by
+WHAT IS STATIC. The headings, the entry order, the fold's photograph (#3761 — the clothed
+gym photograph of 2026-09-24, re-saved with no EXIF; OWNER RULING 2026-10-03: no shirtless
+photograph on any reader surface, so the day-1 photograph this frame first held is gone
+from the site and `tests/test_site_chrome.py` keeps it gone) with its alt text, and one
+"loading the numbers" line per slot. The photo's caption is poured by JS (`photoCaption`:
+the photo's date in words, "in the gym", and the day number computed from
+`journey.started_date`). Every number, date and served sentence is poured by
 `site/assets/js/v7_home.js` from the served endpoints — nothing here is a number, so the
 static page can never go stale, and it reads correctly with scripts off (the slots say
 plainly that the numbers load from the site's served data).
@@ -32,9 +34,10 @@ from __future__ import annotations
 CSS = "/assets/css/v7_home.css"
 JS = "/assets/js/v7_home.js"
 
-# The day-1 photograph (#3761): two widths, the reader's browser picks by the frame's size.
-DAY1_PHOTO = "/assets/images/photo-2026-09-06-day1"
-DAY1_ALT = "Matthew on day 1, Sunday September 6, front view"
+# The fold's photograph (#3761): the clothed gym photograph, two widths, the reader's browser
+# picks by the frame's size. Never a shirtless one (owner ruling 2026-10-03).
+FOLD_PHOTO = "/assets/images/photo-2026-09-24-gym"
+FOLD_ALT = "Matthew in the gym on Thursday September 24, a mirror photo"
 
 
 def photo_img(stem: str, alt: str, sizes: str, loading: str = "eager") -> str:
@@ -62,8 +65,8 @@ def _entry(slot: str, heading: str | None, inner: str, margin_kind: str = "date"
 def body(base: str) -> str:  # noqa: ARG001 — every link on Home is off-site (the repo, mail); no page link, by the reach rule
     fold = (
         '<div class="v7h-fold">'
-        f'<figure class="v7h-photo" id="v7h-photo">{photo_img(DAY1_PHOTO, DAY1_ALT, "(min-width: 601px) 150px, 116px")}'
-        '<figcaption class="v7h-cap" id="v7h-photo-cap">Day one, front view.</figcaption></figure>'
+        f'<figure class="v7h-photo" id="v7h-photo">{photo_img(FOLD_PHOTO, FOLD_ALT, "(min-width: 601px) 150px, 116px")}'
+        '<figcaption class="v7h-cap" id="v7h-photo-cap">In the gym.</figcaption></figure>'
         f'<div id="v7h-number">{_PENDING}</div>'
         "</div>"
         f'<div id="v7h-lead">{_PENDING}</div>'

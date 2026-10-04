@@ -39,7 +39,7 @@ export function nutritionFold(d, mg) {
 
 // The §0 verdict (P0.1): mono states the figures, serif judges the trade. Computed
 // only from the protein pct + avg_deficit — no fabricated mechanism, just the honest
-// read. Every "floor" word here grades the FLOOR pct (170), not the 190 stretch target.
+// read. Every "floor" word here grades the FLOOR pct — the plan's one protein line (#4540).
 export function nutritionVerdict(n) {
   // #2360: nothing logged, nothing to grade. The API now publishes null rates for an
   // empty set, but the guard lives here too: a `0` reaching this function — from a
@@ -105,8 +105,9 @@ export function nutritionHero(n) {
 }
 
 // §2 lead (P0.2) — promote the protein signal to THE weighted headline. Graded against
-// the FLOOR (the same 170 g the coaches grade against — one story on both doors), with
-// the 190 g target shown as the stretch line. Ember-as-warning when the floor isn't
+// the FLOOR (the plan's figure the coaches grade against — one story on both doors). A
+// target is named beside it only when the payload carries one that DIFFERS from the floor
+// (#4540: the plan states one line, so today it does not). Ember-as-warning when the floor isn't
 // cleared (never an ember "win" block, honouring HARD RULE 3). Falls back to the old
 // target-graded read if the payload predates the floor fields.
 export function nutritionProteinLead(n) {
@@ -125,7 +126,7 @@ export function nutritionProteinLead(n) {
   const sub = [
     n.avg_protein_g != null ? `${fmt(n.avg_protein_g)} g avg` : null,
     hasFloor ? `floor ${fmt(n.protein_floor_g)} g` : null,
-    n.protein_target_g != null ? `target ${fmt(n.protein_target_g)} g` : null,
+    n.protein_target_g != null && !(hasFloor && Number(n.protein_target_g) === Number(n.protein_floor_g)) ? `target ${fmt(n.protein_target_g)} g` : null,
     (days != null && hitDays != null)
       ? (hitDays === 0 ? `${hasFloor ? "floor" : "target"} missed every logged day · 0/${fmt(days)}` : `cleared ${fmt(hitDays)}/${fmt(days)} days`)
       : null,
@@ -149,8 +150,8 @@ export function nutritionLossRate(lr, n) {
     (lr.protein_floor_hit_pct ?? lr.protein_hit_pct) != null ? `protein floor ${n ? _hitPhrase(n, lr.protein_floor_hit_pct != null, lr.protein_floor_hit_pct ?? lr.protein_hit_pct) : `${fmt(lr.protein_floor_hit_pct ?? lr.protein_hit_pct)}% of days`}` : null,
   ].filter(Boolean).join(" → ");
   const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";
-  // "The floor" here means the real floor (170) the coaches grade against, not the
-  // 190 stretch target — the pct must match the word.
+  // "The floor" here means the plan's floor the coaches grade against — the pct must
+  // match the word.
   const fp = lr.protein_floor_hit_pct ?? lr.protein_hit_pct;
   let floorClause;
   if (fp === 0) floorClause = ", and that floor's being missed every logged day";
@@ -165,11 +166,15 @@ export function nutritionLossRate(lr, n) {
 // SIGNATURE 2 human voice). Data-derived, correlative, no causal claim.
 export function nutritionProteinAnnotation(n) {
   const avg = n.avg_protein_g, tgt = n.protein_target_g, hit = n.protein_hit_pct;
-  const floor = n.protein_floor_g, floorHit = n.protein_floor_hit_pct;
+  // #4540: the plan states ONE protein line. When the served target IS the floor, the
+  // two-line phrasing ("under the target — and under the floor too") would say one
+  // figure twice, so the floor clause only speaks when the lines differ.
+  const sameLine = n.protein_floor_g != null && tgt != null && Number(n.protein_floor_g) === Number(tgt);
+  const floor = sameLine ? null : n.protein_floor_g, floorHit = sameLine ? null : n.protein_floor_hit_pct;
   if (avg == null || tgt == null) return "";
   const gap = Math.round(Number(tgt) - Number(avg));
-  // Floor (170) and target (190) are distinct lines — "the floor" must never name
-  // the 190 stretch target (the cross-door contradiction a skeptic caught).
+  // When floor and target are distinct lines, "the floor" must never name the target
+  // (the cross-door contradiction a skeptic caught).
   let txt;
   if (floor != null && floorHit === 0) {
     txt = `The ember line stays under the dotted ${fmt(tgt)} g target the whole way — and under the ${fmt(floor)} g floor too, every logged day, about ${fmt(gap)} g short of target on average. On a cut, the floor is the line that decides how much muscle the deficit costs.`;
@@ -183,7 +188,7 @@ export function nutritionProteinAnnotation(n) {
   return `<p class="tv-human nut-anno">${esc(txt)}</p>`;
 }
 
-// §2 lean-mass protein floor (P1.4) — grounds the abstract 190 g target in the real
+// §2 lean-mass protein floor (P1.4) — grounds the abstract protein target in the real
 // g/kg-lean muscle-retention floor (needs Withings lean mass for the exact value).
 export function nutritionProteinFloor(lm, target) {
   if (!lm || lm.lean_mass_lb == null) return "";

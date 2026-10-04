@@ -257,3 +257,14 @@ test("getJSON drains a non-2xx body before returning null — the unread /api/se
   assert.equal(await T.getJSON("/api/session", throwing), null);
   assert.equal(await T.getJSON("/api/session", async () => { throw new Error("offline"); }), null);
 });
+
+// ── R7 fix 10 (#4329) ───────────────────────────────────────────────────────────
+test("R7 fix 10: last night by BOTH instruments, each with its figure — only for the same night, only when both are served", () => {
+  const v = { night_of: "2026-10-02", sleep_hours: 8.8 };
+  const both = T.bothSensorsLine(v, { sleep_detail: { total_sleep_hours: 8.9, whoop_hours: 8.8, night_of: "2026-10-02" } });
+  assert.match(both, /^That night the bed sensor read <span[^>]*>8\.9<\/span> hours of sleep and the wrist strap <span[^>]*>8\.8<\/span>\.$/);
+  assert.match(both, /data-src="api_sleep_detail\.sleep_detail\.total_sleep_hours"/);
+  assert.equal(T.bothSensorsLine(v, { sleep_detail: { total_sleep_hours: 8.9, whoop_hours: 8.8, night_of: "2026-10-01" } }), "", "another night is not this night");
+  assert.equal(T.bothSensorsLine(v, { sleep_detail: { whoop_hours: 8.8, night_of: "2026-10-02" } }), "");
+  assert.equal(T.bothSensorsLine(v, null), "");
+});

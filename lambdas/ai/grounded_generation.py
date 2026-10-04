@@ -68,6 +68,8 @@ import datetime as _dt
 import json
 import re
 
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row's stale target
+
 # The tight canonical-contradiction detector (SS-10). Dual path: package-style
 # (bundled lambdas/), flat (layer / flattened bundle). Fail-soft to None — the
 # number gate still runs; only the vitals-contradiction check is skipped.
@@ -508,7 +510,7 @@ def authoritative_facts_block(facts: dict) -> str:
         _pwin = f" over the last {int(_pd)} logged days" if _pd else ""
         lines.append(
             f"  - Protein INTAKE averages {facts['protein_g_avg']:g} g a day{_pwin} "
-            f"(target {int(facts.get('protein_g_target') or 190)} g, floor {int(facts.get('protein_g_floor') or 170)} g). "
+            f"(the plan's protein floor is {PLAN_DAILY_PROTEIN_MIN_G} g a day; the plan names no separate protein target). "
             f"His actual intake is ~{facts['protein_g_avg']:g} g — never state intake as the target or floor"
             + (f"; when you cite this average, name its window ({int(_pd)} logged days)." if _pd else ".")
         )

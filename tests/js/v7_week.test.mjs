@@ -146,3 +146,21 @@ test("the next weigh-in line is entry_age's one spelling: due, or the counted si
 test("the roster map reads persona_id → name", () => {
   assert.deepEqual(W.coachNames({ coaches: [{ persona_id: "sleep_coach", name: "Lisa Park" }, { persona_id: "x" }] }), { sleep_coach: "Lisa Park" });
 });
+
+// ── R7 (#4329) ──────────────────────────────────────────────────────────────────
+test("R7 fix 4: the opening lines drop markdown emphasis marks — the words between are untouched", () => {
+  const served = { title: "The Body Answers Back", excerpt: "*He has trained every day for 23 days straight — his deliberate choice — and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.*…" };
+  const lines = W.openingLines(served);
+  assert.ok(!/[*_]/.test(lines), lines);
+  assert.match(lines, /^He has trained every day for 23 days straight — his deliberate choice — /);
+  assert.match(lines, /define the coming week\.…$/);
+  assert.equal(W.stripEmphasis("_really_ and **bold** and ***both***"), "really and bold and both");
+  // not emphasis: an underscore inside a word, a spaced asterisk, an unmatched mark
+  assert.equal(W.stripEmphasis("a snake_case_name, 2 * 3 * 4, and one *lone mark"), "a snake_case_name, 2 * 3 * 4, and one *lone mark");
+  assert.equal(W.stripEmphasis(null), "");
+});
+
+test("R7 fix 9: a field-notes fetch that failed is 'not served right now', never 'no notes have been put to him'", () => {
+  assert.equal(W.testimonyLine(null).text, "The notes put to him are not served right now.");
+  assert.equal(W.testimonyLine({ entries: [] }).text, "No notes have been put to him yet.");
+});

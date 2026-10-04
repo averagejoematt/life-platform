@@ -31,7 +31,7 @@ from typing import Any, Optional
 import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
 from common.pacific_time import pacific_today
 from health.scoring_engine import habitify_reading  # #4362
 
@@ -252,8 +252,8 @@ def daily_brief_shared_system(
         phase_block,
         "",
         "## Profile snapshot (stable across this brief)",
-        f"- Calorie target: {profile.get('calorie_target', '?')} kcal",
-        f"- Protein target: {profile.get('protein_target_g', '?')} g",
+        f"- Calorie target: {PLAN_DAILY_CALORIES_TARGET} kcal",
+        f"- Protein floor: {PLAN_DAILY_PROTEIN_MIN_G} g",
         f"- Goals: {', '.join(profile.get('active_goals', [])) or 'unspecified'}",
     ]
     if day_grade is not None and grade is not None:
@@ -409,8 +409,8 @@ def call_training_nutrition_coach(
     # IC-24: Data quality (critical for nutrition coaching)
     data_quality_block, _quality_scores = _compute_data_quality(data, profile)
 
-    cal_target = profile.get("calorie_target", 1800)
-    protein_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    protein_target = PLAN_DAILY_PROTEIN_MIN_G
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
 
@@ -600,9 +600,9 @@ def _bod_phase_targets(data, profile):
         deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
         if deficit:
             targets.append(f"{int(float(deficit))} kcal deficit")
-        cal_target = profile.get("calorie_target")
-        if cal_target:
-            targets.append(f"{int(float(cal_target))} cal daily")
+        # #4540: the plan's calorie target (generated into common/constants.py from the plan root),
+        # not the profile row's `calorie_target` — the row said 1,800 against a plan of 1,500.
+        targets.append(f"{PLAN_DAILY_CALORIES_TARGET} cal daily")
 
         return f"{label}: {', '.join(targets)}." if targets else f"{label}."
     except Exception as e:
@@ -1048,7 +1048,7 @@ YESTERDAY'S SIGNALS:
 - TSB (training stress balance): {data_summary.get("tsb")}{data_summary.get("tsb_basis_note") or ""}
 - Sleep: {data_summary.get("sleep_duration_hrs")}hrs, score {data_summary.get("sleep_score")}, efficiency {data_summary.get("sleep_efficiency_pct")}%. {sleep_arch}
 - 7-day sleep debt: {data.get("sleep_debt_7d_hrs")}hrs
-- Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{profile.get("protein_target_g", 190)}g
+- Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{PLAN_DAILY_PROTEIN_MIN_G}g
 - Glucose: avg {data_summary.get("glucose_avg")} mg/dL, TIR {data_summary.get("glucose_tir")}%, overnight low {data_summary.get("glucose_min")} mg/dL
 - Gait: walking speed {data_summary.get("walking_speed_mph")} mph, step length {data_summary.get("walking_step_length_in")} in, asymmetry {data_summary.get("walking_asymmetry_pct")}%
 - Steps: {data_summary.get("steps")}

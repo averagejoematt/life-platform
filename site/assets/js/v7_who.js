@@ -1,11 +1,10 @@
 // v7_who.js — the v7 "Who he is" page (#4182, plan §2a row 7; Prototype C screen V).
 //
-// One page, four entries and a return line, every number served: the fold (the day-1
-// photograph, its caption's date, day number and weight from the served journey; his
-// paragraph is static, verbatim),
+// One page, four entries and a return line, every number served: the fold (his
+// paragraph, static, verbatim),
 // the receipts strip in one line (the weight now and since the day it began, the day count,
 // data through, the cost this month for the subscriber count, the code), the photographs —
-// three, dated, in order, each September caption's day number computed from the served start
+// two, dated, in order, each September caption's day number computed from the served start
 // date and never typed, then the next photo's due date (#3761) — the weigh-in line
 // drawn to the DAY from /api/weight_progress with one sentence, how to check (the same four
 // plain sentences Home's "How it works" carries, from the same served counts), and the dated
@@ -20,7 +19,7 @@
 import { esc, tryJSON } from "/assets/js/evidence_shared.js";
 import { dayInWords, dataThrough, countWord, nextWriteUpText } from "/assets/js/entry_age.js";
 
-const HORIZON = 30; // the day the next photo is due (#3761 — the day-1 photo is published)
+const HORIZON = 30; // the day the next photo is due (#3761)
 const REPO_URL = "https://github.com/averagejoematt/life-platform";
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -207,9 +206,6 @@ function fill(section, html) {
 
 function renderFold(journey, receipts, subs) {
   const sec = document.getElementById("who-fold");
-  const cap = document.getElementById("who-photo-cap");
-  const capHtml = photoCaption(journey, cap && cap.getAttribute("data-photo-date"));
-  if (cap && capHtml) cap.innerHTML = capHtml;
   const strip = document.getElementById("who-receipts");
   if (strip) strip.innerHTML = receiptItems(journey, receipts, subs).join(" · ");
   const j = journey || {};
@@ -217,7 +213,7 @@ function renderFold(journey, receipts, subs) {
 }
 
 // The words each September photograph's caption carries after its date (the file's date is the key).
-const PHOTO_WORDS = { "2026-09-06": "", "2026-09-24": "in the gym" };
+const PHOTO_WORDS = { "2026-09-24": "in the gym" };
 
 function renderPhotos(journey) {
   const sec = document.getElementById("who-photos");
@@ -233,13 +229,14 @@ function renderPhotos(journey) {
   if (dates.length) setMargin(sec, dates[dates.length - 1]);
 }
 
-function renderSince(progress, journey) {
+function renderSince(progress, journey, served = true) {
   const sec = document.getElementById("who-since");
   const j = journey || {};
   const day = document.getElementById("who-since-day");
   if (day && isIso(j.started_date)) day.textContent = dayInWords(j.started_date, { weekday: false });
   const svg = stripSvg(progress);
-  if (!svg) return fill(sec, '<p class="who-note">No weigh-ins are served yet.</p>');
+  // R7 fix 9: a failed fetch is "not served right now", never "no weigh-ins yet".
+  if (!svg) return fill(sec, `<p class="who-note">${served ? "No weigh-ins are on the record yet." : "The weigh-in record is not served right now."}</p>`);
   fill(sec, `${svg}<p class="who-small">${sinceSentence(progress, journey)}</p>`);
   if (j.started_date) setMargin(sec, j.started_date);
 }
@@ -271,7 +268,7 @@ async function main() {
   const journey = journeyJson && journeyJson.journey;
   renderFold(journey, receipts, subs);
   renderPhotos(journey);
-  renderSince(progressJson && progressJson.weight_progress, journey);
+  renderSince(progressJson && progressJson.weight_progress, journey, Boolean(progressJson));
   renderCheck(freshness, coaches, receipts);
   renderReturn(cad, postsJson && postsJson.pending);
 }

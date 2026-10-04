@@ -981,6 +981,26 @@ def _handler_core(event: dict, context) -> dict:
             "body": json.dumps({"status": "privacy_hold", "week": week_num, "violations": [t for _, t in e.violations]}),
         }
 
+    # ── Story door (#4538, fail-closed) — the ONE shared reader-surface check, at the one point every writer passes
+    # (the desk, the legacy writer, a reused cache): no cycle/reset/attempt count in the title, the stat line or the
+    # body, and no off-record specifics. The desk's writers already rewrite against it; this is what holds the week
+    # when a rewrite did not clear it, or when the writer was not the desk.
+    from content import story_checks
+
+    _door = story_checks.reader_surface(f"{title}\n{stats_line}\n{raw_installment}")
+    if _door:
+        logger.error(f"[story-door] BLOCKED chronicle week {week_num} — {_door}")
+        return _held_week(
+            week_num,
+            "story_door_hold",
+            f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear "
+            "the platform's automatic check on what the series puts on the record. No content was published "
+            "or stored for this week.",
+            json.dumps({"status": "story_door_hold", "week": week_num, "findings": _door}),
+            status_code=200,
+            dry_run=_dry,
+        )
+
     # ── #405: the per-chronicle share kit — machine-made from ALREADY-PUBLISHED fields
     # only (title, honest stats line, an excerpt of the prose, the canonical post URL).
     # Text/JSON only (the honest-stats OG card is drawn by the daily og sweep via the
@@ -1232,14 +1252,7 @@ def _send_story_questions(event):
     from content import story_dossier, story_ledger, story_questions
 
     today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()  # pacific_today() is a YYYY-MM-DD string
-    upcoming = next(
-        (
-            w
-            for w in story_dossier.season_weeks(through=(today + timedelta(days=7)).isoformat())
-            if w["start"] <= today.isoformat() <= w["end"]
-        ),
-        None,
-    )
+    upcoming = story_dossier.week_containing(today.isoformat())  # #4539: the one definition the dead-man shares
     if upcoming is None:
         return {"statusCode": 200, "body": json.dumps({"status": "no_week"})}
     n = upcoming["week"]

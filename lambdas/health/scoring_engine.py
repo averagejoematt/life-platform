@@ -19,6 +19,8 @@ Extraction order per review:
 from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
+from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+
 # Public type aliases used across this module.
 Numeric = Union[int, float]
 # #2638: `Optional[Numeric]`, not `Optional[int]`. Every scorer returns
@@ -113,9 +115,10 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     protein = safe_float(mf, "total_protein_g")
     fat = safe_float(mf, "total_fat_g")
     carbs = safe_float(mf, "total_carbs_g")
-    cal_target = profile.get("calorie_target", 1800)
-    protein_target = profile.get("protein_target_g", 190)
-    protein_floor = profile.get("protein_floor_g", 170)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    # #4540: the plan states ONE protein line, a floor. The profile row's separate 190 g
+    # "target" was never the plan; a day at or over the floor has met it.
+    protein_target = protein_floor = PLAN_DAILY_PROTEIN_MIN_G
     cal_tolerance = profile.get("calorie_tolerance_pct", 10) / 100
     cal_penalty = profile.get("calorie_penalty_threshold_pct", 25) / 100
     details = {
@@ -143,10 +146,8 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
         weights.append(0.40)
         details["cal_score"] = cal_score
     if protein is not None:
-        if protein >= protein_target:
+        if protein >= protein_floor:
             prot_score = 100
-        elif protein >= protein_floor:
-            prot_score = 80 + 20 * (protein - protein_floor) / (protein_target - protein_floor)
         else:
             prot_score = max(0, 80 * protein / protein_floor)
         prot_score = clamp(round(prot_score))
