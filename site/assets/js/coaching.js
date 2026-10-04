@@ -32,6 +32,7 @@
     Experiment  → the cross-week arc (/api/experiment_synthesis), unchanged.
 */
 import { pageData } from "/assets/js/page_data.js"; // #3048 — per-page start section, JSON island
+import { coachComparison, comparisonText } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis, preStart, genesisCount } from "/assets/js/coach_popover.js"; // + #949 pre-start gate; #4182 the kicker's Day N
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
@@ -216,6 +217,7 @@ function coachReportHTML(rc) {
   // through September 28" — counts, not a percentage, below n = 10).
   if (tr.headline && tr.decided) h += `<p class="cr-rate">${esc(tr.headline)}</p>`;
   else h += `<p class="cr-rate">${tr.hit_rate_pct == null ? `Score unlocks as predictions resolve <span class="label">— first calls land in the coming weeks</span>` : esc(tr.hit_rate_pct) + "% hit-rate" + ` <span class="label">${esc(tr.n_note || "")}</span>`}</p>`;
+  if (tr.decided || tr.hit_rate_pct != null) h += coachComparison(tr.comparison, { cls: "cr-cmp label" }); // #4585: never the count alone
   if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
   else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
   if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
@@ -588,7 +590,7 @@ async function renderToday(mount) {
         `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}${lateWords(daysOverdue(ask, now)) ? ` · ${esc(lateWords(daysOverdue(ask, now)))}` : ""}</span></p>`;
     }
     const rec = recordLine(preds && preds.overall);
-    if (rec) h += `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>`;
+    if (rec) h += `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>` + coachComparison(preds && preds.comparison, { cls: "ct-record label" }); // #4585
     h += `</section>`;
   } else if (chosen) {
     // > 7 days: no read on the first screen. Say why, then the standing stances.
@@ -988,7 +990,7 @@ async function renderByCoach(read, id) {
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     // #4220: the ONE record's headline when served; the legacy rate line only for an older response.
     const trLine = tr.headline && tr.decided ? tr.headline : tr.hit_rate_pct != null ? tr.hit_rate_pct + "% hit-rate " + (tr.n_note || "") : "accruing";
-    h += `<p class="bc-track label">track record: ${esc(trLine)}</p>`;
+    h += `<p class="bc-track label">track record: ${esc(trLine)}</p>` + coachComparison(tr.comparison, { cls: "bc-track label" }); // #4585
   }
   // 3.2) CONVERSATIONS WITH MATTHEW (#1483, ADR-142 theme-referenceable tier) — the
   // coach ALLUDES to private check-in conversations. The payload carries ONLY the
@@ -1437,6 +1439,7 @@ async function renderScorecard(read, id) {
       `<div class="sc-tile"><span class="sc-n">${o.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.pending || 0}</span><span class="sc-l label">still open</span></div>` +
       `</div>`;
+    if (decided) h += coachComparison(data.comparison, { cls: "dx-prose sc-note" }); // #4585: the tiles never appear alone
     if (!decided) {
       // #3046 (was #1371): due-vs-pending context comes from the API's `due`
       // block, computed server-side from the evaluator's OWN domain-clamped
@@ -1554,6 +1557,7 @@ async function renderScorecard(read, id) {
     `<div class="sc-tile"><span class="sc-n">${c.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.pending || 0}</span><span class="sc-l label">still open</span></div>` +
     `</div>`;
+  if (decidedC) h += coachComparison(c.comparison, { cls: "dx-prose sc-note" }); // #4585: the tiles never appear alone
   if (!decidedC) {
     const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${rateText(cl.confirmed, cl.decided, cl.hit_rate_pct, data.percent_floor)} ${rateWord(cl.decided, data.percent_floor)}) across the whole record so far.` : "";
     // #3046: count only falsifiable calls; observational claims are labeled in the list below.
@@ -1755,7 +1759,8 @@ async function wireMachineryRibbon(tabsEl) {
         (o.due && !o.due.due_now && o.due.earliest_due
           ? `none checked yet — the first comes due ${o.due.earliest_due}`
           : "none checked yet — each is checked once its window closes");
-      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(tally)} →</button>`);
+      const cmp = recordLine(o) ? ` — ${esc(comparisonText(preds && preds.comparison))}` : ""; // #4585: a count never rides alone
+      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(tally)}${cmp} →</button>`);
     }
     if (!bits.length) return;
     const rib = document.createElement("div");

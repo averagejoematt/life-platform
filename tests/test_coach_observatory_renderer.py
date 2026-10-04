@@ -771,7 +771,7 @@ def test_card_omits_track_record_when_nothing_has_resolved(monkeypatch):
 def test_card_track_record_failed_ledger_read_is_absence(monkeypatch):
     monkeypatch.setattr(cobs, "EXPERIMENT_START", "2026-08-01")
     _install(monkeypatch, [_output(content="analysis")])
-    monkeypatch.setattr(cobs.coach_record, "for_coach", lambda *a, **k: None)
+    monkeypatch.setattr(cobs.coach_record, "for_coach_with_rows", lambda *a, **k: (None, []))  # #4585: the card reads record + rows once
     track = cobs._render_coach_card("sleep")["track_record"]
     assert track == {"record": None, "summary": "record unavailable"}
 

@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from boto3.dynamodb.conditions import Key
 from coach import (
+    coach_baseline,  # #4585: the "nothing changes" rule served beside every coach count
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
@@ -331,6 +332,11 @@ _PREDICTION_PROJECTION_FIELDS = (
     # resolution date that decides which cycle a graded call belongs to.
     "prediction_id",
     "outcome_date",
+    # #4585: the "nothing changes" rule's frozen verdict (coach.coach_baseline) and the
+    # docket marker that makes a docket position a yes/no bet — both read by the
+    # `comparison` block served beside every count on this module's two endpoints.
+    "baseline",
+    "source",
 )
 
 
@@ -630,10 +636,13 @@ def handle_calibration(event, *, _g):
         hyp_rows = fetched.pop("hypothesis-ledger")
 
         per_coach = []
+        season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
         platform_pairs = []  # season
         platform_career_pairs = []  # career (all cycles, #1376)
         for cid, name in _CALIB_COACH_NAMES.items():
             summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
+            coach_decided = coach_record.decided_rows(fetched[cid], genesis=EXPERIMENT_START)
+            season_decided.extend(coach_decided)
             platform_pairs.extend(pairs)
             platform_career_pairs.extend(career_pairs)
             per_coach.append(
@@ -645,6 +654,8 @@ def handle_calibration(event, *, _g):
                     # #4220: K of N through <day> — the ONE record producer's block, over the
                     # same rows the Brier numbers beside it were scored on.
                     "record": coach_record.record_from_rows(fetched[cid], genesis=EXPERIMENT_START),
+                    # #4585: the record never appears alone — the same rows, scored by a guess.
+                    "comparison": coach_baseline.comparison_block(coach_decided),
                     "lifetime": career_summary,
                 }
             )
@@ -706,6 +717,9 @@ def handle_calibration(event, *, _g):
             {
                 "platform": platform,
                 "coaches": per_coach,
+                # #4585 / epic #4580 rule 3: no coach count without what a simple guess would
+                # have scored — four separate records, never added together.
+                "comparison": coach_baseline.comparison_block(season_decided),
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
@@ -861,6 +875,7 @@ def handle_predictions(event, *, _g):
             )
         all_predictions = []
         by_coach = {}
+        season_decided = []  # #4585: the comparison's row-set — the decided rows `record` counts
         # The real graded calls live in PREDICTION# records (status set by the daily
         # coach-prediction-evaluator), NOT in OUTPUT#.predictions (which was a list of
         # natural-language strings with no status — the old read returned all-zero).
@@ -910,6 +925,9 @@ def handle_predictions(event, *, _g):
                 # career and in season alike — the same row-set `record` is counted from.
                 records = coach_record.resolved_once(fetched.get(cid, []))
                 by_coach[cid]["record"] = coach_record.record_from_rows(records, genesis=EXPERIMENT_START)
+                coach_decided = coach_record.decided_rows(records, genesis=EXPERIMENT_START)
+                season_decided.extend(coach_decided)
+                by_coach[cid]["comparison"] = coach_baseline.comparison_block(coach_decided)  # #4585
                 for rec in records:
                     ev = rec.get("evaluation") or {}
                     ungradeable = not prediction_windows.is_gradeable(ev)
@@ -1062,6 +1080,11 @@ def handle_predictions(event, *, _g):
                     },
                 },
                 "by_coach": by_coach,
+                # #4585 / epic #4580 rule 3: the record never appears alone. The "nothing
+                # changes" rule's right / scored / unscorable counts per record (number calls,
+                # direction calls, yes/no bets, sealed day-one predictions — never summed), and
+                # the ONE sentence a page prints beside the count.
+                "comparison": coach_baseline.comparison_block(season_decided),
                 # #4220: below this many decided calls a rendered record prints counts, not a %.
                 "percent_floor": coach_record.PERCENT_FLOOR,
                 "predictions": all_predictions,

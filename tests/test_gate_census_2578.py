@@ -1041,7 +1041,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # holding nutrition targets to the plan constants — arrives PROVEN via the re-runnable harness (MutationSpec +
         # proof, ARMED 1/1). Id-set diff vs a `git archive origin/main` export at 83f3bd53e (git-init'd, fully added):
         # 767 {241, 514, 7, 5} -> 768 {242, 514, 7, 5}; one entrant, nothing leaves, unproven does not move.
-        <= 242
+        # Upper bound 242 -> 243 (2026-10-03, #4585): structural::test_coach_count_comparison_guard_4585.py — the site/ sweep
+        # holding every coach count beside its comparison — arrives PROVEN via the re-runnable harness (MutationSpec + proof,
+        # ARMED 1/1). Measured on `scripts/gate_census.py --json`: 768 {242, 514, 7, 5} -> 769 {243, 514, 7, 5}.
+        <= 243
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -11,6 +11,7 @@
 import { tryJSON, esc, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText, servedWindow, goalWindowText } from "/assets/js/entry_age.js";
 import { metricKnown, metricParts } from "/assets/js/v7_coaches.js";
+import { comparisonText } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 
 const HORIZON = 30; // the day the next photo is due (#3761)
 const FOLD_PHOTO_DATE = "2026-09-24"; // the day the fold's photograph was taken (its file name carries the same date)
@@ -134,6 +135,7 @@ export function aliveLine(throughDate, calibration, cadence, throughSrc = "vital
   const c = calibration && calibration.platform && calibration.platform.strata && calibration.platform.strata.coaches;
   if (c && num(c.n) !== null && num(c.confirmed) !== null) {
     parts.push(`the coaches’ checked calls so far, by the site’s own count: <b>${span("calibration.platform.strata.coaches.confirmed", String(c.confirmed))} of ${span("calibration.platform.strata.coaches.n", String(c.n))}</b> right`);
+    parts.push(span("calibration.comparison.sentence", comparisonText(calibration.comparison).replace(/\.$/, ""))); // #4585: the count never rides alone
   } else parts.push(calibration ? "no checked coach call is on the record yet" : "the coaches’ record is not served right now"); // R7 fix 9: a 404 is not "none yet"
   const ch = cadence && cadence.chronicle;
   if (ch && !ch.paused && ch.next_date) parts.push(`next write-up <b>${time(ch.next_date, "content_cadence.chronicle.next_date")}</b>`);
@@ -380,6 +382,8 @@ export function recordBlock(calibration, wrong, predictions, freshness, pulse) {
     );
   });
   const life = predictions && predictions.commitments && predictions.commitments.lifetime;
+  // #4585: the per-coach counts above never appear alone — the comparison follows them.
+  if (items.length) items.push(`<li>${span("calibration.comparison.sentence", comparisonText(calibration && calibration.comparison))}</li>`);
   if (life && num(life.unresolved) !== null) {
     let s = `<li><b>${span("predictions.commitments.lifetime.unresolved", fmtInt(life.unresolved))} asks expired</b> with no follow-up from the coach who made them, over the whole record.`;
     if (num(life.graded) !== null && num(life.kept) !== null) s += ` Of the ${span("predictions.commitments.lifetime.graded", fmtInt(life.graded))} that were checked, he kept ${span("predictions.commitments.lifetime.kept", fmtInt(life.kept))}.`;
