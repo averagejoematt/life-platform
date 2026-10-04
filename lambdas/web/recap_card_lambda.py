@@ -215,7 +215,10 @@ def _week_totals(table, start: str, end: str) -> dict[str, Any]:
     # carried-forward weight) to the week's last, so consecutive weeks sum to the total.
     # First-to-last inside the week dropped the boundary day's change (wk4: −3.5 drawn,
     # −2.9 real).
-    before = (dt.date.fromisoformat(start) - dt.timedelta(days=1)).isoformat()
+    from common.pacific_time import parse_day_key
+
+    first = parse_day_key(start)
+    before = (first - dt.timedelta(days=1)).isoformat() if first else ""
     prior = (
         recap_data.day_facts(table, before, experiment_start=EXPERIMENT_START_DATE).weight_lb if before >= EXPERIMENT_START_DATE else None
     )
