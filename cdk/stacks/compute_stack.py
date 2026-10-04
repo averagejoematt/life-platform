@@ -146,6 +146,8 @@ class ComputeStack(Stack):
         # CC-08: per-coach daily reflection batch. Runs at noon PT — AFTER the
         # daily brief (17:00 UTC) has written today's COACH#/OUTPUT# records.
         # Haiku, budget-tier>=2 self-skip, ER-03-gated, writes generated/coach_daily.json.
+        # #4583: + the board's daily moves first (one Haiku cast + up to six Sonnet line
+        # calls) — 300 s covers that on top of the reflection loop's measured ~50 s.
         create_platform_lambda(
             self,
             "CoachDailyReflection",
@@ -153,7 +155,7 @@ class ComputeStack(Stack):
             handler="compute.coach_daily_reflection_lambda.lambda_handler",
             source_file="lambdas/compute/coach_daily_reflection_lambda.py",
             schedule="cron(0 19 * * ? *)",  # 19:00 UTC = 12:00 PM PT, after the daily brief
-            timeout_seconds=180,
+            timeout_seconds=300,
             memory_mb=256,
             custom_policies=rp.compute_coach_daily_reflection(),
             **shared,
