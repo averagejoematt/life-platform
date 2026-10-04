@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/assets/css/clean.css">
   <script src="/assets/js/boot_theme.js"></script>
 </head>
-<body data-ck-page="front">
+<body data-ck-page="front" data-ck-base="/next/v8/">
 <div class="ck-page">
   <header class="ck-header">
     <span class="ck-header__brand">Average Joe Matt</span>
@@ -29,22 +29,34 @@
       <noscript><p class="ck-soft">The dated parts of this page are drawn from the site’s served data when scripts run.</p></noscript>
     </section>
 
-    <section class="ck-section ck-lead" id="ck-chapter"><p class="ck-soft">Loading.</p></section>
-
     <section class="ck-section" id="today">
       <p class="ck-label" id="ck-today-label">Today</p>
       <div id="ck-today"><p class="ck-soft">Loading.</p></div>
-      <h2>What the coaches are saying today</h2>
-      <div id="ck-coach-lines"></div>
-      <p class="ck-soft" id="ck-record"></p>
-      <p><a class="ck-link" href="/next/v8/coaches/">All the coaches, and how often they’re right</a></p>
+      <div id="ck-chart"></div>
     </section>
 
-    <section class="ck-section" id="catchup">
-      <p class="ck-label">New here? Catch up</p>
-      <h2>The story so far.</h2>
-      <div id="ck-catchup"></div>
-      <p><a class="ck-link" href="/next/v8/start/">The story in two minutes</a></p>
+    <section class="ck-section">
+      <p class="ck-label">The last seven days</p>
+      <h2>How the week went.</h2>
+      <p class="ck-soft">A filled dot is a day I trained, slept seven hours, or ate my protein floor.</p>
+      <div id="ck-week"></div>
+    </section>
+
+    <section class="ck-section">
+      <p class="ck-label">The AI coaches</p>
+      <h2>What the coaches are saying.</h2>
+      <div id="ck-coach-lines"></div>
+      <div id="ck-bet"></div>
+      <p class="ck-soft" id="ck-record"></p>
+      <p><a class="ck-link" href="/next/v8/coaches/">The team, and how often they’re right</a></p>
+    </section>
+
+    <section class="ck-section ck-lead" id="ck-chapter"></section>
+
+    <section class="ck-section">
+      <p class="ck-label">More than weight</p>
+      <h2>The rest of it.</h2>
+      <div id="ck-life"></div>
     </section>
 
     <section class="ck-section ck-follow" id="follow">
@@ -55,7 +67,7 @@
   </main>
 
   <footer class="ck-footer">
-    <a href="/next/v8/start/">New here?</a>
+    <a href="/next/v8/start/">Start here</a>
     <a href="/next/v8/story/">The story</a>
     <a href="/next/v8/coaches/">The AI coaches</a>
     <a href="https://github.com/averagejoematt/life-platform" rel="noopener">The code</a>

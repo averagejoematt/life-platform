@@ -29,8 +29,8 @@ test("a fresh chapter leads with its badge, title, player and the AI byline", ()
   assert.match(html, /New this week · Week 4/);
   assert.match(html, /<h1>The Body Answers Back<\/h1>/);
   assert.match(html, /<audio controls preload="none" src="\/panelcast\/wk4\.mp3"/);
-  assert.match(html, /Written by AI from the record on September 29; Matthew reads it before it publishes\./);
-  assert.match(html, /Next chapter due Wednesday, October 7\./);
+  assert.match(html, /Written by AI from the record on September 29\. Matthew reads each chapter before it publishes\./);
+  assert.ok(html.indexOf("Written by AI") < html.indexOf("He has trained"), "the AI label sits above the AI's words");
 });
 
 test("a stale chapter is not called new, and an unserved one prints its sentence", () => {
@@ -109,7 +109,6 @@ test("one right and one wrong, each with a plain measured result", () => {
   assert.equal(wrong.status, "refuted");
   assert.equal(wrong.eval_type, "point");
   const html = P.verdictsHTML(load("coaches"));
-  assert.match(html, /The result was 97\. Checked October 3\./);
   assert.match(html, /The result was 166\. Checked October 3\./);
   assert.equal(P.verdictsHTML({ coaches: [] }), "");
 });
@@ -143,4 +142,41 @@ test("nothing the builders emit carries an honorific or an ISO date", () => {
   assert.doesNotMatch(all, /\bDr\.\s/);
   assert.doesNotMatch(all, /\b20\d\d-\d\d-\d\d\b/);
   assert.doesNotMatch(all, /undefined|NaN/);
+});
+
+test("the front page runs one sentence of the chapter, a Listen button and no idle player", () => {
+  const html = P.chapterHTML(B.chapter, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });
+  assert.doesNotMatch(html, /<audio/);
+  assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
+  assert.match(html, /answer back\.<\/p>/);
+  assert.doesNotMatch(html, /He is down 15 pounds/);
+  assert.match(html, /On the podcast: the food coach, Marcus Webb\. Next chapter due Wednesday, October 7\./);
+});
+
+test("progress runs from the start to the goal, and is not drawn without a goal", () => {
+  const html = P.todayHTML(B.today, edition);
+  assert.match(html, /<i style="width:11%"><\/i>/);
+  assert.match(html, /327\.3 at the start<\/span><span>126 to go to 185</);
+  assert.equal(P.progressHTML({ ...B.today.data, goal_weight_lbs: null }), "");
+});
+
+test("the seven days show a dot per recorded day and the block's own sentence", () => {
+  const html = P.weekHTML(B.week);
+  assert.match(html, /Trained on 7 of 7 days recorded\./);
+  assert.match(html, /aria-label="2 of 3 days"/);
+  assert.equal((html.split("At or above")[0].split("Food")[1].match(/ck-dot/g) || []).length, 4, "three days recorded: two met, one open (the open dot carries two class tokens)");
+  const gone = { ...B.week, data: { ...B.week.data, measures: { ...B.week.data.measures, sleep: { state: "unavailable", absent_text: "Sleep is not served right now.", data: null } } } };
+  assert.match(P.weekHTML(gone), /Sleep is not served right now\./);
+});
+
+test("the rest of it is one served fact per area, each a door", () => {
+  const html = P.lifeHTML(B.life, { habits: "/data/habits/", supplements: "/protocols/" });
+  assert.match(html, /<a href="\/data\/habits\/">Habits: 5 of 7 daily habits kept on Friday, October 2\./);
+  assert.match(html, /Supplements: 21 in the daily stack\./);
+  assert.match(html, /Mind: Nothing new in his own words since Wednesday, September 23\./);
+  assert.doesNotMatch(html, /Body:/);
+});
+
+test("a right call that gave a range says the result fell inside it", () => {
+  assert.match(P.verdictsHTML(load("coaches")), /The result was 97, inside the range given\. Checked October 3\./);
 });

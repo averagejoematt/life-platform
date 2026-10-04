@@ -59,7 +59,7 @@ from common import subscriber_cadence as sc
 from common.pacific_time import day_in_words, pacific_date_of, pacific_day_n, parse_day_key, parse_iso_utc
 
 #: The page order. The front page renders blocks in exactly this sequence.
-ORDER = ("premise", "chapter", "next", "today", "coach_lines", "scorecard", "record", "his_words", "catch_up", "follow")
+ORDER = ("premise", "chapter", "next", "today", "week", "life", "coach_lines", "scorecard", "record", "his_words", "catch_up", "follow")
 
 #: Upstream key -> the route (or public file) it is read from. The key is the ``bodies``
 #: key ``compose()`` reads; the value is what every block's ``source`` names.
@@ -73,6 +73,16 @@ SOURCES = {
     "predictions": "/api/predictions",
     "calibration": "/api/calibration",
     "decisions": "/api/decisions",
+    # The whole-life rows (#4586): one served fact per area of his life, each a door.
+    "sleep": "/api/sleep_detail",
+    "session": "/api/session",
+    "nutrition": "/api/nutrition_overview",
+    "habits": "/api/habit_streaks",
+    "supplements": "/api/supplements",
+    "experiments": "/api/experiments",
+    # The last seven days (#4586): one value per day per measure.
+    "pulse": "/api/pulse_history",
+    "training": "/api/training_overview",
 }
 
 #: The two public manifests are S3 objects under generated/ (CloudFront strips the prefix).
@@ -360,12 +370,254 @@ def _today(journey_body: dict | None, today: str) -> dict:
         "date": last,
         "start_weight_lbs": start,
         "start_date": j.get("started_date"),
+        "goal_weight_lbs": j.get("goal_weight_lbs"),
         "change_lbs": round(current - start, 1) if isinstance(start, (int, float)) else None,
     }
     age = _days_between(last, today)
     if age is not None and age > WEIGHIN_STALE_DAYS:
         return _block("stale", last, src, f"No weigh-in since {day_in_words(last)}.", data)
     return _block("ok", last, src, "No weigh-in yet.", data)
+
+
+# ── the last seven days (#4586) ─────────────────────────────────────────────────
+# Seven Pacific days ending today, one value per day per measure, plus one plain sentence
+# per measure. A day with no reading is None — never a zero, never carried forward. `met`
+# marks a day against a stated bar (trained at all; 7 hours; the plan's protein floor): a
+# fact about that day, not a verdict on the week.
+WEEK_DAYS = 7
+SLEEP_BAR_HOURS = 7.0
+
+
+def _week_days(today: str) -> list:
+    end = parse_day_key(today)
+    return [(end - timedelta(days=i)).isoformat() for i in range(WEEK_DAYS - 1, -1, -1)] if end else []
+
+
+def _by_date(rows: Any, field: str) -> dict:
+    return {str(r.get("date")): _num(r.get(field)) for r in rows or [] if isinstance(r, dict) and r.get("date")}
+
+
+def _measure(
+    src: Any, what: str, body: dict | None, days: list, values: dict | None, sentence: Callable[[list], str | None], bar=None
+) -> dict:
+    if body is None:
+        return _unavailable(src, what)
+    series = [values.get(d) if values else None for d in days]
+    seen = [d for d, v in zip(days, series) if v is not None]
+    if not seen:
+        return _block("absent", None, src, f"{what} has no reading in these seven days.")
+    data = {"values": series, "text": sentence(series)}
+    if bar is not None:
+        data["met"] = [None if v is None else bool(bar(v)) for v in series]
+    return _block("ok", seen[-1], src, f"{what} has no reading in these seven days.", data)
+
+
+def _week(b: dict, today: str) -> dict:
+    days = _week_days(today)
+    pulse, training, nutrition = b["pulse"], b["training"], b["nutrition"]
+    history = (pulse or {}).get("pulse_history")
+    floor = _num(((nutrition or {}).get("nutrition") or {}).get("protein_floor_g"))
+
+    def weight_text(v: list) -> str | None:
+        seen = [x for x in v if x is not None]
+        if len(seen) < 2:
+            return f"{_fmt_num(seen[-1])} lb at the one weigh-in in these seven days."
+        change = round(seen[-1] - seen[0], 1)
+        way = "down" if change < 0 else "up" if change > 0 else "level"
+        moved = f"{way} {_fmt_num(abs(change))}" if change else "level"
+        return f"{_fmt_num(seen[-1])} lb, {moved} across {len(seen)} weigh-ins."
+
+    def count_text(label: str, bar) -> Callable[[list], str | None]:
+        def text(v: list) -> str | None:
+            seen = [x for x in v if x is not None]
+            return f"{label} on {sum(1 for x in seen if bar(x))} of {len(seen)} days recorded."
+
+        return text
+
+    def trained(x: float) -> bool:
+        return x > 0
+
+    def slept(x: float) -> bool:
+        return x >= SLEEP_BAR_HOURS
+
+    def fed(x: float) -> bool:
+        return floor is not None and x >= floor
+
+    parts = {
+        "weight": _measure(SOURCES["pulse"], "The weight", pulse, days, _by_date(history, "weight_lbs"), weight_text),
+        "training": _measure(
+            SOURCES["training"],
+            "Training",
+            training,
+            days,
+            _by_date((training or {}).get("daily_modality_minutes_30d"), "total_min"),
+            count_text("Trained", trained),
+            trained,
+        ),
+        "sleep": _measure(
+            SOURCES["pulse"],
+            "Sleep",
+            pulse,
+            days,
+            _by_date(history, "sleep_hours"),
+            count_text(f"Slept {_fmt_num(SLEEP_BAR_HOURS)} hours or more", slept),
+            slept,
+        ),
+        "food": _measure(
+            SOURCES["nutrition"],
+            "The food log",
+            nutrition if floor is not None else None,
+            days,
+            _by_date((nutrition or {}).get("nutrition_trend"), "protein_g"),
+            count_text(f"At or above {_fmt_num(floor)} g protein", fed),
+            fed,
+        ),
+    }
+    src = [SOURCES["pulse"], SOURCES["training"], SOURCES["nutrition"]]
+    if all(p["state"] == "unavailable" for p in parts.values()):
+        return _unavailable(src, "The last seven days")
+    series = [
+        {"date": str(r["date"]), "lbs": r["weight_lbs"]}
+        for r in history or []
+        if isinstance(r, dict) and r.get("date") and _num(r.get("weight_lbs")) is not None and str(r["date"]) <= today
+    ]
+    return _block(
+        "ok",
+        today,
+        src,
+        "Nothing is recorded in these seven days.",
+        {"days": days, "order": list(parts), "measures": parts, "weight_series": series},
+    )
+
+
+# ── the whole-life rows (#4586) ─────────────────────────────────────────────────
+# One served FACT per area, each a door to its own page. No verdict on any row: whether an
+# area is "going well" is decided by written rules that are not built yet (the scorecard,
+# #4595). A row whose source failed is `unavailable`; one with nothing to say is `absent`;
+# one whose fact is older than LIFE_STALE_DAYS says which day it is from.
+LIFE_ORDER = ("body", "training", "sleep", "food", "habits", "supplements", "experiments", "mind")
+LIFE_STALE_DAYS = 2
+_RUNNING = {"active", "running", "in_progress"}
+
+
+def _num(value: Any) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _row(src: Any, what: str, body: dict | None, build: Callable[[dict], tuple | None], nothing: str, today: str) -> dict:
+    """One whole-life row. ``build(body)`` returns ``(text, as_of)`` or None for nothing to say."""
+    if body is None:
+        return _unavailable(src, what)
+    made = build(body)
+    if not made:
+        return _block("absent", None, src, nothing)
+    text, as_of = made
+    age = _days_between(as_of, today) if as_of else None
+    if age is not None and age > LIFE_STALE_DAYS:
+        return _block("stale", as_of, src, f"Nothing newer than {day_in_words(as_of)}.", {"text": text})
+    return _block("ok", as_of or today, src, nothing, {"text": text})
+
+
+def _life_body(body: dict) -> tuple | None:
+    j = body.get("journey") or {}
+    lost, left, goal = _num(j.get("lost_lbs")), _num(j.get("remaining_lbs")), _num(j.get("goal_weight_lbs"))
+    if j.get("pre_start") or lost is None or left is None or goal is None:
+        return None
+    way = "down" if lost >= 0 else "up"
+    return f"{_fmt_num(abs(lost))} lb {way} so far; {_fmt_num(left)} lb to go to reach {_fmt_num(goal)}.", j.get("last_weighin_date")
+
+
+def _life_training(today: str) -> Callable[[dict], tuple | None]:
+    def build(body: dict) -> tuple | None:
+        names = [str(e.get("name")) for e in body.get("exercises") or [] if isinstance(e, dict) and e.get("name")]
+        if body.get("state") != "served" or str(body.get("date") or "") != today or not names:
+            return None
+        rest = len(names) - 2
+        more = f" and {rest} more" if rest > 0 else ""
+        return f"Planned for today: {', '.join(names[:2])}{more}.", today
+
+    return build
+
+
+def _life_sleep(body: dict) -> tuple | None:
+    d = body.get("sleep_detail") or {}
+    hours, recovery, night = _num(d.get("total_sleep_hours")), _num(d.get("recovery_score")), d.get("night_of")
+    if hours is None or not parse_day_key(str(night or "")):
+        return None
+    rec = f"; recovery {_fmt_num(recovery)} out of 100" if recovery is not None else ""
+    # The night of the 3rd is the sleep he woke from on the 4th: the row is about that morning.
+    return f"Slept {_fmt_num(hours)} hours on the night of {day_in_words(night)}{rec}.", d.get("as_of_date") or night
+
+
+def _life_food(body: dict) -> tuple | None:
+    n = body.get("nutrition") or {}
+    hit, logged, floor = _num(n.get("protein_floor_hit_days")), _num(n.get("days_logged")), _num(n.get("protein_floor_g"))
+    if hit is None or not logged or floor is None:
+        return None
+    return f"At or above the {_fmt_num(floor)} g protein floor on {int(hit)} of {int(logged)} logged days.", n.get("latest_date")
+
+
+def _life_habits(body: dict) -> tuple | None:
+    h = body.get("habit_streaks") or {}
+    done, total, day = _num(h.get("tier0_done")), _num(h.get("tier0_total")), h.get("as_of_date")
+    if done is None or not total or not parse_day_key(str(day or "")):
+        return None
+    return f"{int(done)} of {int(total)} daily habits kept on {day_in_words(day)}.", day
+
+
+def _life_supplements(body: dict) -> tuple | None:
+    count = sum(len((g or {}).get("items") or []) for g in (body.get("groups") or {}).values() if isinstance(g, dict))
+    if not count:
+        return None
+    return f"{count} in the daily stack.", body.get("as_of_date")
+
+
+def _life_experiments(today: str) -> Callable[[dict], tuple | None]:
+    def build(body: dict) -> tuple | None:
+        rows = [e for e in body.get("experiments") or [] if isinstance(e, dict)]
+        if not rows:
+            return None
+        running = [str(e.get("name")) for e in rows if e.get("status") in _RUNNING and e.get("name")]
+        ready = sum(1 for e in rows if e.get("status") == "available")
+        if running:
+            more = f" and {len(running) - 1} more" if len(running) > 1 else ""
+            return f"Running now: {running[0]}{more}.", today
+        return f"None running right now; {ready} ready to start.", today
+
+    return build
+
+
+def _life_mind(his_words: dict) -> dict:
+    src = his_words.get("source")
+    if his_words.get("state") == "unavailable":
+        return _unavailable(src, "His own words")
+    day = his_words.get("as_of")
+    if his_words.get("state") == "ok" and day:
+        return _block("ok", day, src, "Nothing in his own words yet.", {"text": f"His latest words are from {day_in_words(day)}."})
+    return _block(his_words.get("state") or "absent", day, src, his_words.get("absent_text") or "Nothing in his own words yet.")
+
+
+def _life(b: dict, his_words: dict, today: str) -> dict:
+    parts = {
+        "body": _row(SOURCES["journey"], "The weight so far", b["journey"], _life_body, "No weigh-in yet.", today),
+        "training": _row(
+            SOURCES["session"], "Today's session", b["session"], _life_training(today), "No session is planned for today.", today
+        ),
+        "sleep": _row(SOURCES["sleep"], "Last night's sleep", b["sleep"], _life_sleep, "No sleep has been recorded yet.", today),
+        "food": _row(SOURCES["nutrition"], "The food log", b["nutrition"], _life_food, "No food has been logged yet.", today),
+        "habits": _row(SOURCES["habits"], "The daily habits", b["habits"], _life_habits, "No habits have been recorded yet.", today),
+        "supplements": _row(
+            SOURCES["supplements"], "The supplement stack", b["supplements"], _life_supplements, "No supplements are listed.", today
+        ),
+        "experiments": _row(
+            SOURCES["experiments"], "The experiments", b["experiments"], _life_experiments(today), "No experiments are listed.", today
+        ),
+        "mind": _life_mind(his_words),
+    }
+    src = sorted({str(x) for p in parts.values() for x in (p["source"] if isinstance(p["source"], list) else [p["source"]]) if x})
+    if all(p["state"] == "unavailable" for p in parts.values()):
+        return _unavailable(src, "How the whole thing is going")
+    return _block("ok", today, src, "Nothing is recorded yet.", {"order": list(LIFE_ORDER), "rows": parts})
 
 
 def _coach_moves(moves: Any, today: str, persona_of) -> dict | None:
@@ -559,15 +811,18 @@ def compose(
     """
     b = {k: bodies.get(k) for k in SOURCES}
     day_n = pacific_day_n(start_date, today) or None
+    his_words = _his_words(b["decisions"], today)
     blocks = {
         "premise": _premise(today),
         "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of),
         "next": _next(b["cadence"], b["docket"], today, persona_of, metric_words),
         "today": _today(b["journey"], today),
+        "week": _week(b, today),
+        "life": _life(b, his_words, today),
         "coach_lines": _coach_lines(b["dashboard"], today, persona_of_short, persona_of),
         "scorecard": _scorecard(),
         "record": _record(b["predictions"], b["calibration"], today),
-        "his_words": _his_words(b["decisions"], today),
+        "his_words": his_words,
         "catch_up": _catch_up(b["journal"], today),
         "follow": _follow(b["cadence"], now, today),
     }
