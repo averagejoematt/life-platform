@@ -11,8 +11,9 @@
 import { tryJSON, esc, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, instantDayInWords, countWord, dayLabel, nextWeighInText, servedWindow } from "/assets/js/entry_age.js";
 
-const HORIZON = 30; // the day the next photo is due (the first, day 1, is on the fold — #3761)
-const DAY1_PHOTO_DATE = "2026-09-06"; // the day the fold's photograph was taken (its file name carries the same date)
+const HORIZON = 30; // the day the next photo is due (#3761)
+const FOLD_PHOTO_DATE = "2026-09-24"; // the day the fold's photograph was taken (its file name carries the same date)
+const FOLD_PHOTO_WORDS = "in the gym"; // the words its caption carries after the date
 
 // ── small helpers ──────────────────────────────────────────────────────────────
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -43,10 +44,12 @@ const coachName = (coaches, id) => {
 };
 
 // ── the fold ───────────────────────────────────────────────────────────────────
-// The photograph's caption: its date in words, the day of the experiment it was taken on
-// (computed from the served start, never typed), and — on day 1 only — the served start
-// weight, which is the weigh-in of that same morning. "" when the start is not served.
-export function photoCaption(journey, photoDate = DAY1_PHOTO_DATE) {
+// The photograph's caption: its date in words, the words the page gives it, the day of the
+// experiment it was taken on (computed from the served start, never typed), and — on day 1
+// only — the served start weight, which is the weigh-in of that same morning.
+// photoCaption(journey) → "Thursday, September 24 — in the gym, day 19". "" when the start
+// is not served.
+export function photoCaption(journey, photoDate = FOLD_PHOTO_DATE, what = FOLD_PHOTO_WORDS) {
   const j = journey || {};
   if (!j.started_date || !photoDate) return "";
   const n = dayNum(photoDate) - dayNum(j.started_date) + 1;
@@ -56,7 +59,7 @@ export function photoCaption(journey, photoDate = DAY1_PHOTO_DATE) {
   const day = `day ${span("journey.started_date → photo date", String(n))}`;
   const w = num(j.start_weight_lbs);
   const weight = n === 1 && w !== null ? `, ${span("journey.start_weight_lbs", fmt1(w), "num")} lb` : "";
-  return `${when} — ${day}${weight}`;
+  return `${when} — ${what ? `${esc(what)}, ` : ""}${day}${weight}`;
 }
 
 export function numberBlock(journey) {
