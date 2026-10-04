@@ -58,6 +58,8 @@ test("coach lines render at most what is served, and silence is a sentence", () 
   assert.equal((html.match(/<li>/g) || []).length, 3);
   assert.match(html, /Lisa Park · sleep/);
   assert.match(P.coachLinesHTML({ state: "absent", absent_text: "The coaches have written nothing yet.", data: null }), /The coaches have written nothing yet\./);
+  const reply = { state: "ok", data: { lines: [{ coach: "Max Reyes", domain: "training", text: "I disagree.", replies_to: "Lisa Park" }] } };
+  assert.match(P.coachLinesHTML(reply), /Max Reyes · training · replying to Lisa Park/);
 });
 
 test("the coaches' count never renders without its comparison", () => {

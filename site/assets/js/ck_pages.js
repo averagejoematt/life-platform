@@ -127,7 +127,7 @@ export function coachLinesHTML(block) {
   if (!lines.length) return absent(block, "The coaches have written nothing yet.");
   const rows = lines
     .map((l) => {
-      const who = [l.coach, l.domain].filter(Boolean).join(" · ");
+      const who = [l.coach, l.domain, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
       const when = l.when_text ? ` <span class="ck-small">${esc(l.when_text)}</span>` : "";
       return `<li><span class="ck-coach__who">${esc(who)}</span><span>“${esc(l.text)}”${when}</span></li>`;
     })
