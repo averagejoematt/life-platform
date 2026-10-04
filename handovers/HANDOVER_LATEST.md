@@ -1,66 +1,67 @@
-# Handover — Session BF: reader-truth fixes landed, the v7 cut-over withdrawn, and the living front page begun (2026-10-03 00:03Z → 10-04 ~05:20Z, Fable 5.1, owner on hand until ~04:30Z)
+# Handover — Session BG: the living front page's engine landed and four candidate pages are on preview (2026-10-04 04:37Z → ~10:00Z, Fable 5.1, overnight, owner asleep)
 
-**Driving instruction:** "review handover and backlog and let's figure out what we should work on", then "yes do all of them" (the v7 R7 read, the reader-truth lanes before Wednesday, a closure sweep). Mid-session the owner ruled the site still misses its job and asked for a ground-up plan; he approved one look ("definitely WAY better": clean, organized, professional) and said "go ahead with the plan". The plan itself is private and off-repo; the build work it produced is epic #4580.
+**Driving instruction:** the owner's overnight prompt for epic #4580: wait for Session BF's wrap; confirm #4578 and #4592 landed (finish them if not); run #4583, #4584, #4585 and #4589 as background lanes; build all four pages on the preview path from the kit and `/api/edition` as candidates (no cut-over, the live front page untouched); file the scorecard story; leave a morning note and wrap. Merges and deploys for these stories were approved; other AWS writes were to be listed, not made.
 
-## Shipped: 10 PRs merged, all deployed (main green at 83cbc85d)
-- **#4579** → #3761: the shirtless day-1 photograph is off every reader surface (owner ruling 10-03); Home's fold holds the clothed gym photograph; a sweep keeps it gone.
-- **#4571** → #4329: R7, the five-persona read of the nine `/next/` pages (personas 8·7·7·7·7, axe 0, sweep 2 A / 5 B / 2 C).
-- **#4576** → #4329: R7's ten page fixes on the preview pages.
-- **#4572** → #4568: the nightly pre-draft marks a draft by its version and emits a `failed` outcome.
-- **#4574** → #4569: qa-smoke judges a coach's protein figure against the window it names.
-- **#4575** → #4539: Story Desk dead-men (episode-or-hold in 48 h, ledger row, Monday questions send) inside the nightly qa-smoke.
-- **#4573** → #4538: one shared reader-surface check on the chronicle, recap and Panel paths.
-- **#4577** → #4540: every consumer derives the plan's 1,500 kcal / 170 g floor (18 modules, 86 sites); a sweep guards the set.
-- **#4578** → #4564: the AI coaches carry no "Dr." on any reader surface; the registry normalises every loaded copy.
-- **#4591** → #4581: the kit — `site/assets/css/clean.css` (10.4 KB), twelve `ck-` components, an unlisted specimen at `/kit/`, the approved sources under `docs/design/v8/`.
+## Shipped: 5 PRs merged, all deployed (main green at 11f525bd)
+- **#4592** → #4582: `GET /api/edition`, the front page's one composed document (one Pacific `as_of`, one `day_n`, ten blocks, each with state / as_of / source / an absence sentence / data). Finished at the merge checklist: registered in the week-agreement registry as a compared surface; the test's capture pins named for what they are; names through `persona_registry.plain_name`.
+- **#4597** → #4583: the daily coach line is a move. `coach-daily-reflection` builds one fact sheet, one call casts at most three speakers, one short call per speaker, and code refuses a numbers-only line or a value not on the sheet; two opposed lines open a docket bet. Stored at `COACH#eli_marsh / MOVES#{date}`, served as `/api/coaching-dashboard` `moves`. Added cost about 0.75 USD a month typical, 1.40 worst case.
+- **#4598** → #4589: long coach narratives go to Monday and Thursday (`lambdas/coach/narrative_cadence.py`); the two AI judges in CI run only on reader-surface diffs (`scripts/reader_surface.py`); a workstation's Bedrock calls are labelled `dev-session`. The October 1–2 jump is attributed on the issue.
+- **#4599** → #4585: the coaches' record never appears alone. A "nothing changes" rule is scored at grading time; `/api/predictions`, `/api/calibration`, `/api/coaches`, the coach report card and `/api/wrong` serve a `comparison` block; a set guard holds every site module that prints a coach count.
+- **#4600** → #4586: four candidate pages at `/next/v8/` (front page), `/next/v8/start/`, `/next/v8/story/`, `/next/v8/coaches/`, built from `clean.css` and one script (`site/assets/js/ck_pages.js`); the edition's `coach_lines` serves the day's moves when a current day exists; `tests/kit_page_gate.py` holds the phone-height budget on the PR.
+- **CDK `LifePlatformCompute`** deployed from main at 08:17Z for #4597: the reflection job's timeout 180 → 300 s and one read-only `ssm:GetParameter` grant on `/life-platform/experiment-cycle`.
+- **#4595 filed** (Next): the whole-life scorecard by written rule, the second-release story for the block `/api/edition` serves as not built.
 
 ## Verified live
-- `/api/nutrition_overview` serves `protein_target_g` 170.0 and `protein_floor_g` 170.0 (190 / 170 the day before). The owner reconciled `PROFILE#v1` at 2026-10-04T03:50Z (UPDATED_OLD 1800 / 190).
-- `/api/coaches` carries no "Dr." (2026-10-04 05:02Z, after CI/CD succeeded on 83cbc85d).
-- `/next/` and `/next/story/about/` no longer reference the day-1 photograph; `/kit/` returns 200.
-- `life-platform-qa-smoke`, `life-platform-mcp-warmer` and `wednesday-chronicle` were redeployed 03:22–03:25Z; `nightly-predraft-missing` returned to OK after the 10-04 02:00Z run (on the old code, fresh ids).
-- `site/assets/js/v7_home.js` live carries the R7 "are overdue" wording.
-- SSM `/life-platform/remediation-mode` = `off` (owner decision; was `shadow`).
+- `/api/coaches` carries no "Dr." (05:56Z) — #4578.
+- `/api/edition` (07:55Z, then again through the pages at 09:46Z): `as_of` 2026-10-04, day 29; 311.0 lb, −16.3 since September 6; "41 of 96 checked calls right. So far they do not beat a simple guess."; scorecard absent; his words stale since September 23.
+- `/api/coaching-dashboard` serves `moves` (null: the job's first scheduled run is 19:00 UTC on 10-04).
+- `/api/predictions` serves `comparison` with `scored_complete: false`; each coach on `/api/coaches` carries its own block (09:04Z).
+- `coach-daily-reflection` timeout reads 300 live; fleet code updated 08:52–08:57Z by CI run 37189661306.
+- The four preview pages return 200 and render with live data at 390×844: 3.95, 3.62, 2.84 and 3.96 phone screens, no sideways overflow, no JS error. Screenshots: `~/Desktop/v8-preview-2026-10-04/`.
+- The 95-of-96 count on #4585 reproduces from the back-fill's read-only dry run; the #4589 attribution matches `LifePlatform/AI::EstimatedCostUSD` for `CallerClass=dev-session` (13.52 / 15.66 / 1.50 USD on Oct 1 / 2 / 3).
 
-## Decisions the owner made
-- The site's job (the "cafe test"), the approved look, no shirtless photos, the v7 cut-over withdrawn (PR 4316 closed unmerged), and "go ahead with the plan": a dated living front page with depth in layers, four pages first, cut over only after his yes on every screen and five real readers.
-- Merges and deploys for the epic's stories are approved; other AWS writes still need his go.
+## Held for the owner
+- **PR #4596** (#4584, the Tuesday question) is open, reconciled with main and complete, and NOT merged. It adds one EventBridge rule, which epic #4580's rule 5 forbids in this release, and `LifePlatformServe` needs an owner-required deploy (a `Lambda::Permission` and one `PutItem` grant). Merging first would park main's deploy at the IAM gate. To ship before Tuesday 2026-10-06 19:00 PDT: merge, then `bash deploy/cdk_deploy.sh LifePlatformServe -- --require-approval never` from main.
+- **The #4585 back-fill** (a DynamoDB write): `python3 scripts/backfill_coach_baseline_4585.py`, then `--apply`.
+- **Memory backup to S3** was not run this wrap (an AWS write outside the stories).
 
 ## Gotchas
-- **A closure sweep found none of the nine shipped Story Desk stories closable** — each has an unmet box (table on #4531). The Panel's state reads still have no tombstone or cycle filter (#4536); the legacy chronicle editor pass is still the live fallback (#4535).
-- **The season promote bypassed `chronicle-approve`'s side effects for week 4**: no delivery email, no share kit. Four alarms trace to it (#4593).
-- **AI "cold readers" do not predict the owner.** A 27-agent prototype run scored everything 22–24 and he rejected all six pages. Calibrate on something he can open; go deep on one screen.
-- **A merge train launched seconds after a push sees zero checks** and stops; wait for the runs to attach.
-- **A sibling PR can re-add what a sweep removed** between a lane's last run and its merge (#4574 added a "Dr." in a comment; #4576's test expected one). Re-run the lane's own guard on the merged tree.
-- The projection of 256 USD for October is inflated by a 42.70 USD one-day jump on 10-01/02 that coincides with the season rebuild run from a workstation (inference from the dates; #4589 attributes it).
+- **An additive IAM grant that rides with a non-IAM change is OWNER-REQUIRED at CI's gate.** #4597's one read-only grant shared its stack with a timeout change; three deploy runs on main failed at Plan (08:01–08:12Z) and nothing deployed until `cdk_deploy.sh LifePlatformCompute` ran from main. The next merge's run then deployed the union.
+- **A sibling lane's guard can catch a file it never saw.** #4599's coach-count guard failed `ck_pages.js` only after both were on one tree, and its statistics helper staled `docs/engines/HYPOTHESIS.md`'s verified stamp, which reddened Docs CI on main until #4600 carried the re-verify (about 40 minutes).
+- **A new CI step that imports a test helper inherits the helper's whole import graph.** `kit_page_gate.py` first imported `pr_render_gate` and `a11y_audit`; the dark-flag sweep traced both to `boto3`, which the render job does not install. The gate now carries its own static server and axe runner.
+- **The served comparison sentence becomes twenty lines on a phone once the back-fill runs** (four records, each with its own clause). The Coaches preview page keeps the edition's one sentence and leaves the record-by-record text on the scorecard; the edition's `record` block needs a short post-back-fill sentence (#4585).
+- **The manifest's chapter excerpts are cut mid-sentence after the editor's note**, so Start here shows the code-rendered stats line for weeks 1–3 instead of a sentence.
+- **The front page's coach lines are still the older restated text** until the moves job first runs; on 10-04 the page shows three October 3 lines under "today", one of them the eleven-day journal claim #4583 exists to stop.
+- **`deploy_site_api.sh` at 06:01Z returned at about 07:55Z.** The bundle built in seconds; the cause of the gap was not established (the suspects are the script's own verify invoke and a permission prompt). CI had already deployed the same sha, so the run was redundant.
 
 ## Residual / next picks
-- **#4592** (open PR for #4582, `/api/edition`): held at the merge checklist — register `site_api_edition.py` in `WEEK_SURFACES` (or `UNREGISTERED_PRODUCERS`) for `tests/test_week_agreement_3615.py`, and freeze or register `_TODAY` for `tests/test_wallclock_fixture_bombs_2376.py`. Then merge and `deploy_site_api.sh`.
-- **#4583** the daily coach voice, **#4584** the Tuesday question, **#4585** the coaches' record beside a simple guess, **#4589** the cost attribution and cuts — the next lanes.
-- **#4586** four pages on preview from the kit and `/api/edition`; the owner reviews one screen at a time.
-- **#4587** five real readers and **#4590** the interview — owner-gated.
-- **#4581**: the chart's two labels render at about 7 px on a phone in the kit; fix when the first page is built.
-- **#4593**: share the publish-time side effects between approve and promote; build the week-07 share kit.
-- **#4540**: stays open as the carrier for one ruling — protein floor 170 g (the plan) or 180 g (`training/owner_redlines.py`, the MCP default, the critics).
-- **#4564**: one persona is still titled "Psychiatrist"; live proof of plain names in the next daily brief and Panel episode.
-- **#4568**: live proof needs a night whose date already holds an archived draft.
-- **#4569**: confirm the two `cross_surface` legs are absent from the 2026-10-04 18:30Z qa-smoke run.
-- **#4539**: the Monday 2026-10-05 18:30Z run is the first real read of `story_season:monday_questions`.
-- **#4546**: `ALLOWED_SENDERS` does not include the address the questions email is sent to; a reply from that inbox is dropped.
-- **#4531**: nine stories with named unmet boxes; the first live desk week is Wednesday 2026-10-07 — read `desk_findings_json` before approving.
-- not-work — the S3 delete and CloudFront invalidation for the two day-1 image objects: an owner AWS write, commands given in session.
-- not-work — whether to email the rebuilt week 4: an owner decision recorded on #4593.
-- not-work — whether a doctor reviews the plan: only the owner knows; the site needs one true sentence.
-- not-work — #4257 (#4544 steps 2–3), #4259 worktree archive ruling, #4261, #4191, #4076, #4431: owner acts or rulings, unchanged.
+- **#4586**: the owner reviews the four candidate pages one screen at a time, top of the front page first; each screen needs his recorded yes. Named gaps are on PR #4600: the kit has no player component, the scorecard section is left out, static first-person copy is draft wording, Coaches sits at 3.96 of 4 screens.
+- **#4584**: PR #4596 held on two owner calls (a schedule the epic forbids; an owner-required Serve deploy). Live proof needs a real reply after Tuesday's send.
+- **#4583**: live proof — read `MOVES#2026-10-04` after 19:00 UTC, then 14 consecutive days with no unresolved same-day contradiction. Owner calls on the PR: keep or retire the older per-coach reflections; show silent coaches or not.
+- **#4585**: the back-fill is the owner's write; the owner rules which reading the rule starts from; then the edition's `record` block gets a short per-record sentence.
+- **#4589**: live proofs due — the Tuesday 2026-10-06 off-day brief, the first judge skip on a producer-only deploy, the 14-day projection. Owner calls on the PR: confirm Monday and Thursday; the `qa-level=lean` dial.
+- **#4582**: the page-side contract test and a schema baseline capture for `/api/edition` (the dated `_exemptions.json` entry).
+- **#4595**: the scorecard by written rule (Next); four owner rulings listed in the issue.
+- **#4581**: the kit chart's two SVG labels render at about 7 px on a phone; the preview pages put the end labels under the chart instead.
+- **#4587** five real readers and **#4590** the interview — owner-gated, unchanged.
+- **#4588**: the cut-over, only after every screen has his yes.
+- **#4540**: still the carrier for the protein floor ruling (170 g or 180 g).
+- **#4546**: `ALLOWED_SENDERS` does not include the address the Monday questions email is sent to.
+- **#4593**: the missed week-4 email and the share kit.
+- **#4531**: the first live desk week is Wednesday 2026-10-07 — read `desk_findings_json` before approving.
+- not-work — the memory backup to S3 (`aws s3 sync … claude-memory-backup/`): an AWS write outside the stories; run it at the next attended wrap.
+- not-work — whether a doctor reviews the plan: only the owner knows; Start here says nothing about it until he does.
+- not-work — the S3 delete for the old day-1 photo: an owner AWS write, commands given in Session BF.
+- not-work — #4257 (the refill plan's one promotion) is owner-held; it was not promoted.
 
-**Build beat:** none — the reader-visible changes are truth fixes on preview pages and a parts catalogue; the front page they serve has not shipped
-**Docs:** docs/alarm_citations.json and docs/OPERATING_KNOWLEDGE_LEDGER.md (this wrap); docs/design/v8/, docs/DESIGN_SYSTEM_V5.md, docs/CONVENTIONS.md §9, docs/PROPORTIONALITY.md, docs/content/STORY_DESK.md, docs/engines/SCORING.md and COACH_STANCE.md rode their PRs
-**Decisions:** none filed — the withdrawal of the v7 cut-over amends ADR-157; the amendment is carried by #4588 and lands with the cut-over it replaces
-**Main:** green (83cbc85d)
-**Incidents:** none
+**Build beat:** none — the front page these pieces serve is still a preview, and the one reader-visible change (the comparison beside each coach count) reads its full form only after the owner's back-fill
+**Docs:** docs/PROPORTIONALITY.md (the kit page gate row, this wrap); docs/engines/HYPOTHESIS.md re-verified in #4600; docs/SCHEMA.md, docs/CONVENTIONS.md §9, docs/PROPORTIONALITY.md and docs/qa/SURFACE_DRIFT_EXEMPTIONS.md rode the lane PRs
+**Decisions:** none needed — the cadence and gating changes are the owner's stated cuts and carry PROPORTIONALITY rows; no governance rule moved
+**Main:** green (11f525bd)
+**Incidents:** none — three Plan-red deploy runs (08:01–08:12Z) were the IAM gate working as designed and cleared in 51 minutes; Docs CI was red on main for about 40 minutes
 **Stash/hooks:** clean
-**Closures:** #4329, #4330 commented · DoD: scanned 2, hits 1 (#4330 post-close comment, advisory), blocking=none
-**Backlog:** Now live — epic #4580 filed with ten stories (#4581–#4590); #4593 filed (Next); no promotion made
-**Alarms:** 3 lit (`qa-smoke-failures`, `qa-smoke-warnings`, `chronicle-delivery-heartbeat`) and 2 flaps (`swallowed-permission-denial`, `nightly-predraft-missing`), all cited — #4593 and #4568
+**Closures:** none — no issues closed this session (every PR used Refs) · DoD: scanned 2, hits 1 (#4330 post-close comment from Session BF, advisory), blocking=none
+**Backlog:** Now live (opus 19 startable, sonnet 3, fable 2); #4595 filed to Next; no promotion made — the refill plan's pick, #4257, is owner-held
+**Alarms:** all cited — the battery found no uncited alarm red over 72 h and no uncited flap
 **CI warnings:** 5 — all `SKIPPED in CI — no playwright/chromium`, #3640's deliberate skip notice; no action
-**Ledger:** Story Desk dead-men row added in #4575; the kit's drift checks extend the existing css-tokens gate
+**Ledger:** Kit page gate row added (this wrap); the reader-surface gate row rode #4598
