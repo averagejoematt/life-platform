@@ -1,0 +1,145 @@
+// tests/js/ck_call_4586.test.mjs — #4586: a page for each settled coach call. Driven from
+// tests/fixtures/kit_pages_4586/calls.json, which is GET /api/calls' own output for the
+// captured rows (tests/test_site_api_calls_4586.py pins the two equal); no builder reads
+// the wall clock.
+import "./support/loader.mjs";
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const C = await import("../../site/assets/js/ck_call.js");
+const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
+const BODY = JSON.parse(readFileSync(join(FIX, "calls.json"), "utf8"));
+const BASE = "/next/v8/";
+const NUMBER = "sleep-20260907-8436f03290";
+const BET = "bet-20260930-994b3d89f6";
+const clone = (v) => JSON.parse(JSON.stringify(v));
+
+test("a call is found by its own id, and an address that names none finds nothing", () => {
+  assert.equal(C.findCall(BODY, NUMBER).coach_name, "Lisa Park");
+  assert.equal(C.findCall(BODY, "sleep-20260907-0000000000"), null);
+  assert.equal(C.findCall(BODY, "__proto__"), null);
+  assert.equal(C.findCall(null, NUMBER), null);
+  assert.equal(C.findCall({ state: "unavailable", calls: [] }, NUMBER), null);
+});
+
+test("the call is shown in the coach's own words, with who, when and what it means", () => {
+  const html = C.claimHTML(C.findCall(BODY, NUMBER));
+  assert.match(html, /<p class="ck-small">Lisa Park · logged September 7<\/p>/);
+  assert.match(html, /<b>“Recovery score is expected to climb back to roughly 61% tomorrow/);
+  assert.match(html, /his morning recovery score \(his wrist strap’s morning score out of 100\) at about 61 for September 8\./);
+  const sealed = C.claimHTML(C.callsOf(BODY).find((c) => c.sealed));
+  assert.match(sealed, / · sealed September 5, before day one<\/p>/);
+});
+
+test("what happened carries the verdict as the kit's tag, beside the simple guess", () => {
+  const right = C.outcomeHTML(C.findCall(BODY, NUMBER));
+  assert.match(right, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right<\/span><p><b>Morning recovery score came in at 67 against a call of 61/);
+  assert.match(right, /Lisa Park was right\. Checked September 21\./);
+  assert.match(right, /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess, that nothing changes, has not been checked against this call yet\.<\/p>/);
+  const wrong = C.outcomeHTML(C.callsOf(BODY).find((c) => c.verdict === "wrong"));
+  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong<\/span>/);
+});
+
+test("a call the simple guess was checked on says what it said and whether it was right", () => {
+  const call = clone(C.findCall(BODY, NUMBER));
+  call.simple_guess = { state: "scored", right: true, text: "The simple guess was that it would stay at 62, the last reading before the call. That guess was also right.", short: "also right" };
+  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag ck-verdicts__tag--right">The simple guess: right<\/span><p>The simple guess was that it would stay at 62/);
+  call.simple_guess = { ...call.simple_guess, right: false, short: "wrong" };
+  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag">The simple guess: wrong<\/span>/);
+});
+
+test("a bet shows both coaches' words and who was right", () => {
+  const bet = C.findCall(BODY, BET);
+  const claim = C.claimHTML(bet);
+  assert.match(claim, /<p class="ck-small">A bet opened September 23<\/p>/);
+  assert.match(claim, /Marcus Webb said yes: “Any carb reduction/);
+  assert.match(claim, /Amara Patel said no: “Evening carb reduction/);
+  const out = C.outcomeHTML(bet);
+  assert.match(out, /ck-verdicts__tag--right">Right<\/span><p><b>Marcus Webb said yes\.<\/b>/);
+  assert.match(out, /<span class="ck-verdicts__tag">Wrong<\/span><p><b>Amara Patel said no\.<\/b>/);
+  assert.match(out, /It came in at 59\. Checked September 30\./);
+  assert.equal(C.verdictWord(bet), "");
+});
+
+test("the running record is counts in a sentence, never a percentage", () => {
+  const html = C.recordHTML(C.findCall(BODY, NUMBER), BODY);
+  assert.match(html, /<p>Lisa Park: 10 of 24 checked calls right\.<\/p><p class="ck-soft" data-coach-comparison>Across 24 checked calls, so far they do not beat a simple guess\.<\/p>/);
+  const bare = clone(C.findCall(BODY, NUMBER));
+  bare.records[0].comparison = null;
+  assert.match(C.recordHTML(bare, BODY), /What a simple guess would have scored on these calls is not available right now\./, "a count never stands alone");
+  assert.match(html, /The record counts every checked call, including the ones with no page of their own\./);
+  assert.doesNotMatch(html, /%/);
+  const both = C.recordHTML(C.findCall(BODY, BET), BODY);
+  assert.match(both, /Marcus Webb: 7 of 23 checked calls right\..*Amara Patel: 2 of 6 checked calls right\./);
+});
+
+test("the front page's last settled call is one block that opens its page", () => {
+  const html = C.lastCallHTML(BODY, BASE);
+  assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Saturday, October 3<\/p>/);
+  assert.match(html, /<b>Henning Brandt called his morning recovery score at about 83\.7\.<\/b> It came in at 97\./);
+  assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right<\/span>/);
+  assert.match(html, /The simple guess: not checked on this call yet\./);
+  assert.match(html, /href="\/next\/v8\/call\/\?id=explorer-20260919-aecd9fef2c">The whole call<\/a>/);
+  assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|%/);
+});
+
+test("the last settled call is nothing at all when the route is not served or empty", () => {
+  assert.equal(C.lastCallHTML(null, BASE), "");
+  assert.equal(C.lastCallHTML({}, BASE), "");
+  assert.equal(C.lastCallHTML({ state: "unavailable", calls: [], absent_text: C.NOT_SERVED }, BASE), "");
+  assert.equal(C.lastCallHTML({ state: "absent", calls: [] }, BASE), "");
+  assert.equal(C.lastCallHTML({ state: "ok", calls: [{ id: "x" }] }, BASE), "", "a call missing its sentences is not drawn");
+});
+
+test("a bet as the last settled call names who was right instead of one tag", () => {
+  const html = C.lastCallHTML({ ...BODY, calls: [C.findCall(BODY, BET)] }, BASE);
+  assert.match(html, /Settled Wednesday, September 30/);
+  assert.match(html, /<p>Marcus Webb was right; Amara Patel was wrong\.<\/p>/);
+});
+
+test("what settles next is one sentence with its day in words", () => {
+  assert.equal(
+    C.nextCallHTML(BODY),
+    '<p class="ck-soft">Next: the bet between Max Reyes and Lisa Park on whether the 7-day average of his morning recovery score will be at or above 81.6 settles Monday, October 5.</p>',
+  );
+  assert.equal(C.nextCallHTML(null), "");
+  assert.equal(C.nextCallHTML({ next: { state: "absent", data: null, absent_text: "No call or bet has a settle date right now." } }), "");
+  assert.equal(C.nextCallHTML({ next: { state: "ok", data: { question: "a call", due_date: "soon" } } }), "", "an unusable date draws nothing");
+});
+
+test("the list is every settled call newest first, the older ones folded away", () => {
+  const html = C.listHTML(BODY, BASE);
+  const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
+  assert.equal(hrefs.length, 33);
+  assert.match(html, /^<ul class="ck-rows ck-rows--more"><li><a href="[^"]+">October 3: Henning Brandt called his morning recovery score at about 83\.7\. <span>Right<\/span><\/a><\/li>/);
+  assert.match(html, /<details><summary>25 earlier calls<\/summary>/);
+  assert.match(html, /<span>Settled<\/span>/, "a bet's row says settled, not right or wrong");
+  assert.match(html, /72 more checked calls have no page here/);
+  assert.equal(C.listHTML(null, BASE), "");
+});
+
+test("each page names itself from the call", () => {
+  const meta = C.metaFor(C.findCall(BODY, NUMBER));
+  assert.equal(meta.title, "Lisa Park called his morning recovery score at about 61: right — Average Joe Matt");
+  assert.equal(meta.description, "Lisa Park called his morning recovery score at about 61. It came in at 67. Right.");
+  assert.equal(C.metaFor(C.findCall(BODY, BET)).description, "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 on September 30. It came in at 59. Marcus Webb was right; Amara Patel was wrong.");
+  assert.equal(C.metaFor(null).title, "A coach’s call, checked — Average Joe Matt");
+});
+
+test("Back returns where the reader came from on this site, else the front page", () => {
+  const origin = "https://averagejoematt.com";
+  assert.deepEqual(C.backTarget(`${origin}/next/v8/coaches/?x=1`, origin, BASE), { href: "/next/v8/coaches/?x=1", text: "← Back" });
+  assert.deepEqual(C.backTarget("https://news.ycombinator.com/item?id=1", origin, BASE), { href: BASE, text: "← Average Joe Matt" });
+  assert.deepEqual(C.backTarget("", origin, BASE), { href: BASE, text: "← Average Joe Matt" });
+  assert.deepEqual(C.backTarget("javascript:alert(1)", origin, BASE), { href: BASE, text: "← Average Joe Matt" });
+});
+
+test("no coach on any call page carries an honorific, and no sentence a count of earlier starts", () => {
+  const all = BODY.calls.map((c) => C.claimHTML(c) + C.outcomeHTML(c) + C.recordHTML(c, BODY)).join("") + C.listHTML(BODY, BASE);
+  assert.doesNotMatch(all, /\bDr\.\s/);
+  assert.doesNotMatch(all, /\bcycle \d|\bundefined\b|\bNaN\b/);
+});

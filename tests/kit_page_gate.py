@@ -74,9 +74,13 @@ KIT_PAGES = {
     # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
     # room for a few more rows, so a list that doubles still fails here.
     "/next/v8/appendix/": 11,
+    "/next/v8/call/": 4,  # the newest settled call above the list of all of them
+    "/next/v8/call/?id=sleep-20260907-8436f03290": 4,  # one number call
+    "/next/v8/call/?id=bet-20260930-994b3d89f6": 4,  # a bet: both sides' words, the longest a call page gets
+    "/next/v8/call/?id=sleep-20260907-0000000000": 4,  # an address that names no call: one sentence and the list
 }
 
-#: route glob -> fixture file. Every route the kit modules read.
+#: route glob -> fixture file. Every route the kit pages' modules read.
 ROUTES = {
     "**/api/edition": "edition.json",
     "**/journal/posts.json": "posts.json",
@@ -103,6 +107,7 @@ ROUTES = {
     "**/api/platform_stats": "platform_stats.json",
     "**/api/receipts": "receipts.json",
     "**/api/predictions": "predictions.json",
+    "**/api/calls": "calls.json",  # ck_call.js — this route's own output for tests/fixtures/calls_wire_4586/
 }
 
 _FORBIDDEN = (
