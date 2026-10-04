@@ -63,10 +63,10 @@ KIT_PAGES = {
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
     "/next/v8/sheet/": 4,  # the character sheet, plainly: one level, seven areas, the earned badges
     "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
-    # One page per AI coach, one template: seven short sections (watching, next, the longer
-    # view, the record, disagreements, the character, the terms) — six screens, as the front page.
+    # One page per AI coach, one template: the record first, then what settles next, the
+    # bets, the watch list, the longer view, the character and the terms — six screens at most.
     "/next/v8/coach/?c=sleep_coach": 6,  # a watch list the coach wrote, three open bets
-    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the longer view is served
+    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the coach has a longer view
     "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
     "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
     "/next/v8/coach/": 4,  # no coach named: one sentence and the way back

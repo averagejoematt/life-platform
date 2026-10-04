@@ -44,65 +44,98 @@ test("the top says what the coach is for, that it is software, and how it is wri
   assert.match(html, /Reads Matthew’s sleep, and the score out of 100 his wrist strap gives each morning\./);
   assert.match(html, /Software Matthew built with Claude\. Not a person, and not a clinician\./);
   assert.ok(html.includes(SLEEP.trait_scores.note), "the served one-line disposition, verbatim");
-  assert.match(html, /How the character is written, by its author\./);
+  assert.match(html, /How the author wrote this character\./);
   assert.match(C.whoHTML(GLUCOSE), /<b>Sitting out: no sensor since August 27\.<\/b>/);
   assert.doesNotMatch(C.whoHTML(SLEEP), /Sitting out/);
 });
 
-test("watching now is the coach's own served list, with whose words they are and their date", () => {
+test("watching now shows ONE item in the coach's own words with its date; the rest is one tap away", () => {
   const html = C.watchingHTML(SLEEP);
-  assert.match(html, /In the coach’s own words, written October 4\./);
-  for (const item of SLEEP.stance.focused_on_now) assert.ok(text(html).includes(item), item);
-  assert.match(html, /<details><summary>Two more<\/summary>/, "three on the page, the rest one tap away");
-  assert.match(html, /<summary>What it has set aside for now<\/summary>/);
-  assert.match(html, /The latest thing it asked of Matthew, October 3: “I've asked him to resume morning logging[^”]*”\s*Due October 10\./);
-  assert.doesNotMatch(html, /How its read changed/, "an empty served field prints nothing");
+  assert.match(html, /In Lisa Park’s own words, written October 4\./);
+  const [onPage, behind] = [html.split("<details>")[0], html.slice(html.indexOf("<details>"))];
+  assert.ok(onPage.includes(`“${SLEEP.stance.focused_on_now[0]}.”`), "the first item, verbatim, in quotation marks");
+  for (const item of SLEEP.stance.focused_on_now.slice(1)) {
+    assert.ok(!text(onPage).includes(item), `not on the page: ${item}`);
+    assert.ok(text(behind).includes(item), `one tap away: ${item}`);
+  }
+  assert.match(html, /<details><summary>Four more on the list<\/summary>/);
+  assert.match(html, /<summary>What Lisa Park has set aside for now<\/summary>/);
+  assert.match(html, /The latest thing Lisa Park asked of Matthew, October 3: “I've asked him to resume morning logging[^”]*”\s*Due October 10\./);
+  assert.doesNotMatch(html, /read changed/, "an empty field prints nothing");
+});
+
+test("a watch item that uses a known term gets the plain line directly under it, not behind a tap", () => {
+  // The second item on the live list carries "slow-wave"; put first, it must be glossed in place.
+  const p = structuredClone(SLEEP);
+  p.stance.focused_on_now = [SLEEP.stance.focused_on_now[1], SLEEP.stance.focused_on_now[0]];
+  const onPage = C.watchingHTML(p).split("<details>")[0];
+  assert.match(onPage, /slow-wave architecture\.”<\/p><p class="ck-soft">Deep sleep: also called slow-wave sleep: the share of the night spent in the deepest stage\.<\/p>/);
+  assert.deepEqual(C.glossLines("Recovery and HRV"), ["Recovery: his wrist strap’s morning score out of 100.", "HRV: heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it."]);
+  assert.deepEqual(C.glossLines(SLEEP.stance.focused_on_now[0]), [], "no known term, no line");
 });
 
 test("a watch list that belongs to the stage says it is the author's and is not this week's", () => {
   const html = C.watchingHTML(PHYSICAL);
   assert.match(html, /Set by the author for the stage Matthew is in\. Not written this week\./);
-  assert.match(html, /Weight trending down at all\./);
-  assert.doesNotMatch(html, /In the coach’s own words/);
+  assert.match(html, /“Weight trending down at all\.”/);
+  assert.doesNotMatch(html, /own words/);
 });
 
 test("a coach that changed its read shows the change, in its words, one tap away", () => {
   const html = C.watchingHTML(MIND);
-  assert.match(html, /<details><summary>How its read changed<\/summary><p class="ck-soft">“My previous stance held/);
+  assert.match(html, /<details><summary>How Nathan Reeves’s read changed<\/summary><p class="ck-soft">“My previous stance held/);
 });
 
 test("a benched coach, the lead and a missing profile each get a plain sentence, never a blank", () => {
-  assert.match(C.watchingHTML(GLUCOSE), /Amara Patel is sitting out \(no sensor since August 27\), so there is nothing for it to watch/);
-  assert.match(C.watchingHTML(LEAD), /The lead keeps no watch list of its own/);
-  assert.match(C.watchingHTML(null), /not served right now/);
-  assert.match(C.longerHTML(GLUCOSE), /Nothing further out is served while Amara Patel is sitting out\./);
+  assert.match(C.watchingHTML(GLUCOSE), /Amara Patel is sitting out \(no sensor since August 27\) and has nothing to watch until the readings come back\./);
+  assert.match(C.watchingHTML(LEAD), /Eli Marsh is the lead and keeps no watch list: the lead reads what the other coaches report\./);
+  assert.match(C.watchingHTML(null), /not available right now/);
+  assert.match(C.longerHTML(GLUCOSE), /Amara Patel has no longer view on record while sitting out\./);
   for (const build of [C.watchingHTML, C.longerHTML, C.recordHTML, C.personaHTML]) assert.ok(build(null).length > 20, build.name);
 });
 
-test("next names the first date something settles, counts the open calls and lists the soonest", () => {
+test("next names the first date something settles, gives the whole count and lists the two soonest real calls", () => {
   const html = C.nextHTML(SLEEP, DOCKET, CALLS.sleep, NAMES, TODAY);
-  assert.match(html, /<b>Monday, October 5:<\/b> a bet against Max Reyes settles, and a call comes due to be checked\./);
-  assert.match(html, /21 calls are waiting to be checked, each by the date beside it\./);
+  assert.match(html, /<b>Monday, October 5:<\/b> a bet against Max Reyes settles\./);
+  assert.match(html, /21 calls are waiting to be checked\./, "the whole count is never hidden");
   assert.equal((html.match(/<time /g) || []).length, 2, "the two soonest calls");
-  assert.match(html, /<time datetime="2026-10-05">Oct 5<\/time>/);
-  assert.match(html, /on September 20 based on current model/, "an ISO date inside a served sentence is put into words");
+  assert.match(html, /<time datetime="2026-10-06">Oct 6<\/time>/);
+  assert.match(html, /Ten older calls are still waiting to be checked\./);
   assert.doesNotMatch(text(html), /\b20\d\d-\d\d-\d\d\b/);
-  assert.match(html, /Three open bets against another coach: they are under Disagreements, below\./);
+  assert.match(html, /Three open bets against another coach: the next section has them\./);
 });
 
-test("calls past their date are counted as late and never listed as upcoming", () => {
-  const later = C.nextHTML(SLEEP, DOCKET, CALLS.sleep, NAMES, "2026-10-08");
-  assert.match(later, /21 calls are waiting to be checked, each by the date beside it\. Three are past their date and not checked yet\./);
-  assert.match(later, /<b>Thursday, October 8:<\/b> a call comes due to be checked\./);
-  // A due date years out carries its year, so it cannot be read as this year's.
-  const far = C.nextHTML(SLEEP, { open: [], resolved: [] }, CALLS.sleep, NAMES, "2027-01-01");
-  assert.match(far, /<time datetime="2029-07-01">Jul 1, 2029<\/time>/);
+test("a call about a day before it was said, a 'tomorrow' long gone and a due date in another year are counted, not listed", () => {
+  const html = C.nextHTML(SLEEP, DOCKET, CALLS.sleep, NAMES, TODAY);
+  // The live capture's own specimen: said September 21 about September 20, due October 5.
+  const past = CALLS.sleep.predictions.find((c) => /on 2026-09-20 based on current model/.test(c.text));
+  assert.equal(past.date, "2026-09-21");
+  assert.equal(C.statedDay(past), "2026-09-20");
+  assert.equal(C.isUpcoming(past, TODAY), false);
+  assert.doesNotMatch(html, /90\.9%/);
+  assert.doesNotMatch(html, /tomorrow/i, "no weeks-old 'tomorrow' is listed as coming up");
+  const upcoming = CALLS.sleep.predictions.filter((c) => C.isUpcoming(c, TODAY));
+  assert.equal(upcoming.length, 11);
+  for (const c of upcoming) assert.equal(c.due_date.slice(0, 4), "2026", c.text);
+  assert.ok(CALLS.sleep.predictions.some((c) => c.due_date > "2027"), "the capture does carry due dates years out");
+  // The rule, on its own terms.
+  const call = (o) => ({ status: "pending", text: "x", date: "2026-10-03", due_date: "2026-10-17", ...o });
+  assert.equal(C.isUpcoming(call({}), TODAY), true, "names no day: listed");
+  assert.equal(C.isUpcoming(call({ text: "Recovery tomorrow will be 80", date: "2026-10-04" }), TODAY), true, "tomorrow really is ahead");
+  assert.equal(C.isUpcoming(call({ text: "Recovery tomorrow will be 80", date: "2026-09-25" }), TODAY), false);
+  assert.equal(C.isUpcoming(call({ due_date: "2032-04-13" }), TODAY), false);
+  assert.equal(C.isUpcoming(call({ due_date: "2026-10-01" }), TODAY), false, "past its date");
+  // Mutation control: with nothing left to list, the count and the older-calls sentence still print.
+  const later = C.nextHTML(SLEEP, { open: [], resolved: [] }, CALLS.sleep, NAMES, "2027-01-01");
+  assert.doesNotMatch(later, /<time /);
+  assert.match(later, /21 calls are waiting to be checked\./);
+  assert.match(later, /21 older calls are still waiting to be checked\./);
 });
 
 test("next says so when the calls or the bets are not served, and the lead has nothing to settle", () => {
-  assert.match(C.nextHTML(SLEEP, DOCKET, null, NAMES, TODAY), /This coach’s open calls are not served right now\./);
-  assert.match(C.nextHTML(SLEEP, null, CALLS.sleep, NAMES, TODAY), /The bets between coaches are not served right now\./);
-  assert.match(C.nextHTML(LEAD, DOCKET, { predictions: [] }, NAMES, TODAY), /The lead makes no dated calls of its own and has no bet open/);
+  assert.match(C.nextHTML(SLEEP, DOCKET, null, NAMES, TODAY), /Lisa Park’s open calls are not available right now\./);
+  assert.match(C.nextHTML(SLEEP, null, CALLS.sleep, NAMES, TODAY), /The bets between coaches are not available right now\./);
+  assert.match(C.nextHTML(LEAD, DOCKET, { predictions: [] }, NAMES, TODAY), /Eli Marsh is the lead\. The lead makes no dated calls and has no bet open, so nothing is waiting to settle\./);
   assert.match(C.nextHTML(SLEEP, DOCKET, { predictions: [] }, NAMES, TODAY), /Lisa Park has no call waiting to be checked\./);
   assert.deepEqual(C.pendingCalls(CALLS.physical, "sleep_coach"), [], "another coach's calls are never this coach's");
 });
@@ -113,24 +146,31 @@ test("the longer view is the served ladder of stages, the current one marked; wi
   assert.equal((html.match(/<li>/g) || []).length, PHYSICAL.stance.ladder.length);
   assert.match(html, /<b>Move the scale and protect the engine\.<\/b> Now\./);
   assert.equal((html.match(/ Now\./g) || []).length, 1);
-  assert.match(html, /What moves it on: A steady downward weight trend over a month/);
+  assert.match(html, /What opens the next stage: A steady downward weight trend over a month/);
   assert.match(html, /The plan for this stage: Prioritize sustainable weight loss/);
-  assert.match(C.longerHTML(SLEEP), /^<p class="ck-soft">No longer view is served for Lisa Park: nothing on record looks further ahead than the dated calls above\.<\/p>$/);
-  assert.match(C.longerHTML(LEAD), /No longer view is served for Eli Marsh/);
+  assert.equal(C.longerHTML(SLEEP), '<p class="ck-soft">Lisa Park has no longer view on record yet.</p>');
+  assert.match(C.longerHTML(LEAD), /Eli Marsh has no longer view on record yet\./);
 });
 
 test("the record is a count beside the comparison, never a percentage and never alone", () => {
   const html = C.recordHTML(SLEEP);
   assert.match(html, /<p class="ck-big">10<span>of 24 checked calls<\/span><\/p>/);
-  assert.match(html, /Across 24 checked calls, so far they do not beat a simple guess\./);
-  assert.match(html, /Through October 4\./);
+  // The route serves the comparison for this coach's calls alone, so the sentence says whose.
+  assert.equal(SLEEP.report_card.track_record.comparison.sentence, "Across 24 checked calls, so far they do not beat a simple guess.");
+  assert.match(html, /Across Lisa Park’s 24 checked calls, so far they do not beat a simple guess\. The simple guess is that nothing changes from the last reading\./);
+  assert.match(html, /Lisa Park’s calls alone through October 4\./);
+  assert.equal((html.match(/The simple guess is/g) || []).length, 1);
+  assert.match(C.recordHTML(PHYSICAL), /Too few checked calls yet \(13\) to compare them with a simple guess\. The simple guess is/, "any other wording is printed untouched");
+  const other = structuredClone(SLEEP);
+  other.report_card.track_record.comparison.sentence = "Across 96 checked calls, so far they do not beat a simple guess.";
+  assert.doesNotMatch(C.recordHTML(other), /Lisa Park’s 96/, "a count that is not this coach's is never given this coach's name");
   for (const p of ALL) assert.doesNotMatch(text(C.recordHTML(p)), /%|ck-meter|ck-track/, p.name);
   // Mutation control: the same record with its comparison gone draws no count at all.
   const bare = structuredClone(SLEEP);
   bare.report_card.track_record.comparison = null;
   assert.doesNotMatch(C.recordHTML(bare), /ck-big|10/);
   assert.match(C.recordHTML(bare), /What a simple guess would have scored on these calls is not available right now\./);
-  assert.match(C.recordHTML(LEAD), /The lead makes no checked calls, so it has no record of its own\./);
+  assert.match(C.recordHTML(LEAD), /Eli Marsh is the lead\. The lead makes no checked calls, so there is no record here\./);
 });
 
 test("the newest right call and the newest wrong call are shown in reader words", () => {
@@ -152,7 +192,7 @@ test("an open bet is a dated yes-or-no question with each coach's side, by name"
   assert.match(html, /Lisa Park says yes\. Max Reyes says no\./);
   assert.match(html, /Lisa Park says no\. Max Reyes says yes\./, "the deep-sleep bet, where the sides are the other way round");
   assert.match(html, /<details><summary>What each one argued<\/summary><p class="ck-soft"><b>Lisa Park:<\/b> “/);
-  assert.match(html, /No bet of this coach’s has settled yet\./);
+  assert.match(html, /No bet of Lisa Park’s has settled yet\./);
   assert.doesNotMatch(text(html), /_coach|brier|recovery_score/i, "no machine name");
 });
 
@@ -163,15 +203,15 @@ test("a settled bet says who was right, who was wrong and the result — the los
   assert.match(html, /The question was: Will the night’s recovery be under 70 on Wednesday, September 30\?/);
   assert.match(html, /Marcus Webb was right\. Amara Patel was wrong\. The result was 59\./);
   assert.match(C.disagreementsHTML(LEAD, DOCKET, NAMES), /Eli Marsh has no bet against another coach, open or settled\./);
-  assert.match(C.disagreementsHTML(SLEEP, null, NAMES), /not served right now/);
+  assert.match(C.disagreementsHTML(SLEEP, null, NAMES), /not available right now/);
 });
 
 test("the character notes are the served ones, marked as the author's design", () => {
   const html = C.personaHTML(SLEEP);
   assert.match(html, /Written by the author as character design\. Not generated day to day, and not a measurement\./);
   assert.ok(html.includes(`“${SLEEP.character.principles[0]}”`));
-  assert.match(html, /<summary>Two more of its rules<\/summary>/);
-  assert.match(html, /The arc it was given: from establishing baseline to/);
+  assert.match(html, /<summary>Two more of this coach’s rules<\/summary>/);
+  assert.match(html, /The arc this coach was given: from establishing baseline to/);
   assert.ok(C.personaHTML(LEAD).includes(`“${LEAD.philosophy}”`), "the lead's served philosophy");
 });
 
@@ -187,7 +227,7 @@ test("when the coach's own route is not served, the roster still names it and ca
   const view = C.coachView("sleep_coach", null, ROSTER);
   assert.equal(view.name, "Lisa Park");
   assert.equal(view.partial, true);
-  assert.match(C.watchingHTML(view), /not served right now/);
+  assert.match(C.watchingHTML(view), /not available right now/);
   assert.match(C.recordHTML(view), /What a simple guess would have scored/, "this roster capture carries no comparison, so no count is drawn");
   assert.equal(C.coachView("nope_coach", null, ROSTER), null);
   assert.equal(C.coachView("sleep_coach", {}, null), null);
@@ -200,6 +240,12 @@ test("standing rules: no honorific, no leaked non-value, no count of earlier sta
     const page = [C.whoHTML(p), C.watchingHTML(p), C.nextHTML(p, DOCKET, calls, NAMES, TODAY), C.longerHTML(p), C.recordHTML(p), C.verdictsHTML(p), C.disagreementsHTML(p, DOCKET, NAMES), C.personaHTML(p)].join(" ");
     const plain = text(page);
     assert.doesNotMatch(plain, /\bDr\.\s/, p.name);
+    assert.doesNotMatch(plain, /\bis served\b|\bnot served\b|\bserved for\b/, `${p.name}: plain words, not "served"`);
+    // The page's own sentences (everything outside quotation marks) never give a persona a
+    // gendered pronoun, and never call the coach "it".
+    const own = plain.replace(/“[^”]*”/g, " ");
+    assert.doesNotMatch(own, /\b(she|her|hers|he's|she's)\b/i, p.name);
+    assert.doesNotMatch(own, /\b(it|its) (asked|bets|has set|was given|reads|keeps)\b|\bfor it to\b|\bits (own|read|rules|record)\b/i, p.name);
     assert.doesNotMatch(plain, /\bundefined\b|\bNaN\b|\[object Object\]|\bnull\b/, p.name);
     assert.doesNotMatch(plain, /\b20\d\d-\d\d-\d\d\b/, p.name);
     assert.doesNotMatch(plain, /\b(cycle|attempt)s?\b|\bresets?\b|earlier starts?|\d+(st|nd|rd|th) start/i, p.name);
