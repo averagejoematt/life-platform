@@ -316,10 +316,15 @@ LEDGER: dict[str, dict] = {
     UNKNOWN_KEY: _row(
         owner="lambdas/ai/bedrock_client.py::feature_name() residual",
         attribution=EXCLUSIVE,
-        attribution_keys=("unknown",),
+        # #4589: `dev-session` is the SAME residual, now named — feature_name() books an unlabelled
+        # WORKSTATION call there instead of `unknown`. Claimed here so the ratchet keeps grading the
+        # dollars it always graded (continuous with the founding month) and the dimension is never
+        # an unclaimed one at close.
+        attribution_keys=("unknown", "dev-session"),
         founding_usd=UNKNOWN_FOUNDING_USD,
         monthly_budget_usd=33.19,
-        note="every call that reaches the chokepoint with no lambda name and no allowlisted CI label. "
+        note="every call that reaches the chokepoint with no lambda name and no allowlisted CI label "
+        "(`dev-session` when the caller class says workstation, #4589; `unknown` otherwise). "
         "DOWN-ONLY: shrinking is the proof attribution landed (ratchet the budget down when it does); "
         "growing past the committed value reds the close",
     ),

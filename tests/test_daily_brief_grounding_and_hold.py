@@ -33,6 +33,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(ROOT / "lambdas" / "emails"))
@@ -46,6 +48,17 @@ os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 
 from ai import ai_calls  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _every_day_is_a_narrative_day(monkeypatch):
+    """#4589: the long per-coach narratives run on Monday/Thursday only (coach/narrative_cadence.py).
+    These tests pin the pipeline's per-coach hold behaviour, not the cadence, so they run on a narrative day whatever the wall
+    clock says. The cadence itself is pinned in tests/test_narrative_cadence_4589.py."""
+    from coach import narrative_cadence
+
+    monkeypatch.setattr(narrative_cadence, "NARRATIVE_WEEKDAYS", tuple(range(7)))
+
 
 # Far-past fixture dates on purpose (see module docstring).
 PROFILE = {

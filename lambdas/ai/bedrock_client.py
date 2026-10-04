@@ -146,6 +146,16 @@ _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
 #   • The residual is still "unknown", deliberately — the historical series stays
 #     continuous, and a SHRINKING `unknown` is itself the proof the attribution
 #     landed. It is a residual bucket, not an error state.
+#   • #4589: a call that is neither in Lambda nor labelled, made from a WORKSTATION
+#     (`caller_class()` == dev-session), is booked to the one fixed label
+#     `DEV_SESSION_FEATURE` instead of the residual. Measured 2026-10-01..03: 30.65 USD
+#     of self-metered spend sat in `unknown` — 68% of all AI spend those three days —
+#     and every dollar of it was dev-session (two Story Desk season rebuilds and a fix
+#     run, all Sonnet 4.6, hours 19–21Z Oct 1 and 01–03Z Oct 2). The CallerClass
+#     dimension already knew it was a workstation; the per-feature ranking and the
+#     receipt did not, so the largest row read as "no name". One fixed value, not a
+#     free-form label: the cardinality bound above is unchanged in kind (+1 value).
+#     CI keeps the `unknown` residual — its two gates are labelled by `attributed_to`.
 ATTRIBUTABLE_FEATURES: frozenset = frozenset(
     {
         # tests/visual_ai_qa.py — the Claude-vision judge. Screenshot IMAGE input
@@ -164,6 +174,9 @@ ATTRIBUTABLE_FEATURES: frozenset = frozenset(
         "comprehension_qa",
     }
 )
+
+# #4589: the per-feature label every unlabelled WORKSTATION call carries (see the bullet above).
+DEV_SESSION_FEATURE = "dev-session"
 
 _FEATURE = contextvars.ContextVar("bedrock_feature", default="")
 
@@ -187,16 +200,19 @@ def attributed_to(feature: str):
 def feature_name() -> str:
     """The `LambdaFunction` dimension value for the call being metered.
 
-    Lambda runtime name → allowlisted context label → `"unknown"`. See the block
-    comment above for why each step is in that order. Reads the environment live
-    (not the module-level `_LAMBDA_NAME` snapshot) so the precedence rule is
-    testable without reimporting the module.
+    Lambda runtime name → allowlisted context label → `"dev-session"` for an unlabelled
+    workstation call (#4589) → `"unknown"`. See the block comment above for why each
+    step is in that order. Reads the environment live (not the module-level
+    `_LAMBDA_NAME` snapshot) so the precedence rule is testable without reimporting
+    the module.
     """
     lam = (os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or "").strip()
     if lam:
         return lam
     label = _FEATURE.get()
-    return label if label in ATTRIBUTABLE_FEATURES else "unknown"
+    if label in ATTRIBUTABLE_FEATURES:
+        return label
+    return DEV_SESSION_FEATURE if caller_class() == CALLER_CLASS_DEV_SESSION else "unknown"
 
 
 # ── Caller-class attribution (#2892) ────────────────────────────────────────

@@ -102,6 +102,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # #4589: the reader-surface gate diffs main against its state 24 h / 7 d ago
 
       # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
@@ -164,6 +166,25 @@ jobs:
               echo "Full-surface AI-vision pass: ON (${{ github.event_name }}, UTC day $(date -u +%u))"
             else
               echo "Full-surface AI-vision pass: OFF (deterministic + reader-truth only; UTC day $(date -u +%u), not Sunday)"
+            fi
+          fi
+          # #4589 (owner ruling, platform plan 2026-10-03 decision 4): on a SCHEDULED fire at the
+          # standard level, each AI judge runs only when a reader surface changed on main since that
+          # judge's own previous fire — 24 h for the daily reader-truth pass, 7 days for the Sunday
+          # full-surface vision pass. scripts/reader_surface.py derives the surface and resolves
+          # every uncertainty to RUN. A manual dispatch and qa-level=full are explicit asks and are
+          # never gated; the deterministic sweep is never gated. Nightly content truth still runs in
+          # the qa-smoke Lambda (reader_truth check), which this gate does not touch.
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$LEVEL" = "standard" ]; then
+            if [ -n "$RT" ]; then
+              V=$(python3 scripts/reader_surface.py --since-hours 24)
+              echo "$V"
+              case "$V" in *"(#4589): SKIP"*) RT=""; echo "::notice title=reader-truth skipped (#4589)::$V" ;; esac
+            fi
+            if [ -n "$AI" ]; then
+              V=$(python3 scripts/reader_surface.py --since-hours 168)
+              echo "$V"
+              case "$V" in *"(#4589): SKIP"*) AI=""; echo "::notice title=AI-vision skipped (#4589)::$V" ;; esac
             fi
           fi
           echo "ai_qa_flag=$AI" >> "$GITHUB_OUTPUT"

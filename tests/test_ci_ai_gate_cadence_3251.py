@@ -33,9 +33,28 @@ def _invocations(name: str) -> list[str]:
     return [ln.strip() for ln in lines]
 
 
+# #4589 (owner ruling, platform plan 2026-10-03 decision 4): ci-cd.yml's deploy-time copy runs the
+# vision judge only when scripts/reader_surface.py says a reader surface changed. On SKIP it runs this
+# exact deterministic-only invocation — the one sanctioned second line, and only behind RUN_AI=false.
+_GATED_SKIP_INVOCATION = "python3 tests/visual_qa.py --screenshot"
+
+
+def _ai_invocations(name: str) -> list[str]:
+    """The judge-running invocation(s): every sweep line except #4589's guarded SKIP line."""
+    invs = _invocations(name)
+    if name == "ci-cd.yml":
+        text = (WF / name).read_text(encoding="utf-8")
+        skip = [c for c in invs if c == _GATED_SKIP_INVOCATION]
+        assert len(skip) == 1, f"{name}: expected exactly one #4589 SKIP invocation, got {skip}"
+        guard = text.index('if [ "${RUN_AI}" = "false" ]; then')
+        assert guard < text.index(_GATED_SKIP_INVOCATION + "\n"), f"{name}: the SKIP invocation is not behind the RUN_AI=false guard"
+        invs = [c for c in invs if c != _GATED_SKIP_INVOCATION]
+    return invs
+
+
 def test_per_deploy_copies_run_the_vision_gate_only():
     for name in PER_DEPLOY:
-        invs = _invocations(name)
+        invs = _ai_invocations(name)
         assert len(invs) == 1, f"{name}: expected exactly one sweep invocation, got {invs}"
         (cmd,) = invs
         flags = cmd.split()
@@ -56,10 +75,13 @@ def test_daily_standalone_is_the_prose_judges_home():
         'RT="--reader-truth"' in text
     ), f"{STANDALONE}: the cadence step no longer defaults --reader-truth ON — the only CI prose check went dark"
     cleared = text.count('RT=""')
-    assert cleared == 2, (
-        f"{STANDALONE}: RT is cleared in {cleared} branches; exactly two (qa-level off, lean) are sanctioned — "
-        "a third silently removes the platform's only CI prose truth-check"
+    assert cleared == 3, (
+        f"{STANDALONE}: RT is cleared in {cleared} branches; exactly three are sanctioned — qa-level off, lean, and "
+        "#4589's reader-surface SKIP (owner ruling 2026-10-03) — a fourth silently removes the platform's only CI "
+        "prose truth-check"
     )
+    # The #4589 clear is the one that is conditional on a computed diff: it must sit inside the SKIP arm.
+    assert 'case "$V" in *"(#4589): SKIP"*) RT=""' in text, f"{STANDALONE}: the third RT clear is not the #4589 SKIP arm"
     assert text.index('RT="--reader-truth"') < text.index('RT=""'), f"{STANDALONE}: the default must be set before any branch clears it"
 
 
@@ -67,7 +89,7 @@ def test_gate_census_records_the_live_per_deploy_command():
     census = (ROOT / "scripts" / "gate_census.py").read_text(encoding="utf-8")
     m = re.search(r'"ci::ci-cd\.yml::visual-qa::\d+": Proof\(.*?command="([^"]+)"', census, re.S)
     assert m, "the per-deploy visual-qa census entry vanished from scripts/gate_census.py"
-    (live,) = _invocations("ci-cd.yml")
+    (live,) = _ai_invocations("ci-cd.yml")
     assert m.group(1) == live, f"gate census says {m.group(1)!r} but ci-cd.yml runs {live!r} — update the census with the workflow (#3251)"
 
 
