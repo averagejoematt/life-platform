@@ -594,8 +594,10 @@ def test_nutrition_averages_are_the_mean_of_the_logged_days():
     assert s["days_logged"] == 3
 
 
-def test_hit_rates_are_the_share_of_days_that_met_the_target():
-    # module defaults: CALORIE_TARGET 1800, PROTEIN_TARGET_G 180.
+def test_hit_rates_are_the_share_of_days_that_met_the_target(monkeypatch):
+    # Pinned for the arithmetic below: CALORIE_TARGET 1800, PROTEIN_TARGET_G 180.
+    monkeypatch.setattr(m, "CALORIE_TARGET", 1800)
+    monkeypatch.setattr(m, "PROTEIN_TARGET_G", 180)
     # calories <= 1800 on 2 of 3 (1700, 1800); protein >= 180 on 2 of 3 (180, 200).
     recs = [_mf(1700, 180), _mf(1900, 200), _mf(1800, 170)]
     s = m.ex_macrofactor(recs)
@@ -603,12 +605,16 @@ def test_hit_rates_are_the_share_of_days_that_met_the_target():
     assert s["protein_hit_rate"] == 67  # round(2 / 3 * 100)
 
 
-def test_the_targets_come_from_the_profile_when_it_has_them():
-    recs = [_mf(1700, 180)]
-    s = m.ex_macrofactor(recs, {"calorie_target": 1600, "protein_target_g": 175})
-    assert (s["calorie_target"], s["protein_target"]) == (1600, 175)
-    assert s["calorie_hit_rate"] == 0  # 1700 > 1600
-    assert s["protein_hit_rate"] == 100  # 180 >= 175
+def test_the_targets_are_the_plans_whatever_the_profile_row_says():
+    """#4540: the profile row held 1,800 / 190 against a plan of 1,500 / 170."""
+    from common import constants
+
+    assert (m.CALORIE_TARGET, m.PROTEIN_TARGET_G) == (constants.PLAN_DAILY_CALORIES_TARGET, constants.PLAN_DAILY_PROTEIN_MIN_G)
+    recs = [_mf(m.CALORIE_TARGET + 100, m.PROTEIN_TARGET_G)]
+    s = m.ex_macrofactor(recs, {"calorie_target": 9999, "protein_target_g": 1})
+    assert (s["calorie_target"], s["protein_target"]) == (m.CALORIE_TARGET, m.PROTEIN_TARGET_G)
+    assert s["calorie_hit_rate"] == 0  # 100 over the plan's target
+    assert s["protein_hit_rate"] == 100  # at the plan's floor
 
 
 def test_missing_profile_targets_fall_back_to_the_module_defaults():

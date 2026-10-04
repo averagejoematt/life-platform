@@ -20,7 +20,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET  # ADR-058
 from common.pacific_time import PACIFIC
 
 from content import labs_scope  # #3728 — the /api/labs scope block
@@ -316,9 +316,7 @@ def sanitize_for_demo(html, data, profile):
         cal = mf.get("total_calories_kcal")
         if cal:
             html = html.replace(str(round(float(cal))), mask)
-        cal_target = profile.get("calorie_target")
-        if cal_target:
-            html = html.replace(str(round(float(cal_target))), mask)
+        html = html.replace(str(PLAN_DAILY_CALORIES_TARGET), mask)
 
     if "protein" in rv:
         mask = rv["protein"]

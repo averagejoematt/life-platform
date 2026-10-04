@@ -995,7 +995,10 @@ class TestAssembleData:
         data, _, _ = dmc.assemble_data(YESTERDAY, _profile(protein_target_g=190, protein_floor_g=170))
         assert data["protein_g_avg"] == 150.0
         assert (data["protein_g_avg_days"], data["protein_g_avg_since"]) == (2, "2026-05-01")
-        assert (data["protein_g_target"], data["protein_g_floor"]) == (190.0, 170.0)
+        # #4540: BOTH canonical protein lines are the plan's floor — the profile row's 190 g
+        # "target" (handed in above) is not read; the plan states one line.
+        plan_floor = float(dmc.PLAN_DAILY_PROTEIN_MIN_G)
+        assert (data["protein_g_target"], data["protein_g_floor"]) == (plan_floor, plan_floor)
 
     def test_strava_multi_device_duplicates_are_collapsed_and_totals_restated(self, table, frozen_clock):
         acts = [

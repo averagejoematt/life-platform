@@ -662,10 +662,11 @@ class TestFetchExecutionMetrics:
         assert "calories_logged" not in m and "protein_g" not in m
 
     def test_a_log_below_sixty_five_percent_of_target_is_flagged_incomplete(self, table):
-        """0.65 × 1800 = 1170; 1100 is below it."""
-        seed(table, _date_row("macrofactor", YESTERDAY, total_calories_kcal=1100, food_log=[{"a": 1}]))
+        """0.65 × the plan's calorie target (#4540: 1,500 → 975); 900 is below it."""
+        assert 900 < 0.65 * di.PLAN_DAILY_CALORIES_TARGET
+        seed(table, _date_row("macrofactor", YESTERDAY, total_calories_kcal=900, food_log=[{"a": 1}]))
         m = di._fetch_execution_metrics(YESTERDAY, self.PROFILE)
-        assert "nutrition_note" in m and "1100" in m["nutrition_note"]
+        assert "nutrition_note" in m and "900" in m["nutrition_note"]
 
     def test_a_log_at_or_above_the_incompleteness_floor_is_not_flagged(self, table):
         seed(table, _date_row("macrofactor", YESTERDAY, total_calories_kcal=1170, food_log=[]))
@@ -1247,8 +1248,9 @@ class TestWeightPlateau:
         assert [d for d in di._compute_slow_drift(YESTERDAY, {}) if d["metric"] == "Weight Plateau"] == []
 
     def test_a_log_day_below_sixty_five_percent_of_target_is_not_a_complete_day(self, monkeypatch):
-        """0.65 × 1800 = 1170; days logged at 1100 do not count."""
-        self._fetcher(monkeypatch, weights=[300.0] * 10, mf_records=self._mf(14, kcal=1100))
+        """0.65 × the plan's calorie target (#4540: 1,500 → 975); days logged at 900 do not count."""
+        assert 900 < 0.65 * di.PLAN_DAILY_CALORIES_TARGET
+        self._fetcher(monkeypatch, weights=[300.0] * 10, mf_records=self._mf(14, kcal=900))
         assert [d for d in di._compute_slow_drift(YESTERDAY, {}) if d["metric"] == "Weight Plateau"] == []
 
     def test_a_genuine_loss_rate_is_not_reported_as_a_plateau(self, monkeypatch):
@@ -1649,10 +1651,12 @@ class TestDeficitCeiling:
         assert di._compute_deficit_ceiling_alert(YESTERDAY, habits, [], {})[0] is None
 
     def test_the_prescription_names_the_exact_new_calorie_ceiling(self, monkeypatch):
-        """1700 + 200 = 1900 kcal for 5 days."""
+        """The plan's target + 200 kcal for 5 days — the profile row's own figures are not read (#4540)."""
         self._fetcher(monkeypatch, weights=[300.0 - 0.5 * i for i in range(8)])
         block = di._compute_deficit_ceiling_alert(YESTERDAY, [], [], {"calorie_target": 1700, "protein_target_g": 200})[1]
-        assert "1700 → 1900 kcal/day" in block and "Maintain protein at 200g" in block
+        kcal, prot = di.PLAN_DAILY_CALORIES_TARGET, di.PLAN_DAILY_PROTEIN_MIN_G
+        assert f"{kcal} → {kcal + 200} kcal/day" in block and f"Maintain protein at {prot}g" in block
+        assert "1700 → 1900" not in block and "200g" not in block  # the row's own figures never surface
         assert "Reassess trend at day 5" in block
 
     def test_the_alert_carries_the_medical_disclaimer(self, monkeypatch):
