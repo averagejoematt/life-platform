@@ -24,15 +24,15 @@
     <section class="ck-section ck-section--tight">
       <p class="ck-label">How it’s built</p>
       <h1>What runs, what it costs, and what has broken.</h1>
-      <p class="ck-premise">This site is one person’s health data, read by a set of AI coaches whose predictions are graded by code. Matthew is not an engineer. He decided what the system does, set its limits and approves its releases. The code was written with an AI assistant, Claude.</p>
+      <p class="ck-premise">One person’s health data, read by AI coaches whose predictions are graded by code. Matthew is not an engineer. He decided what the system does and set its limits. The code was written with an AI assistant, Claude.</p>
     </section>
 
     <section class="ck-section">
       <p class="ck-label">What runs</p>
       <h2>One picture.</h2>
       <svg width="100%" height="318" viewBox="0 0 340 318" preserveAspectRatio="xMinYMin meet" role="img" aria-labelledby="ck-pic-title ck-pic-desc" font-size="13">
-        <title id="ck-pic-title">What runs, and where a person approves</title>
-        <desc id="ck-pic-desc">Devices and apps are read on a timer. Readings go into one store. AI coaches read the store, write and make predictions. A checker written in code grades every prediction. The site publishes the result. Separately, a change to the code passes automated checks and then Matthew’s approval before it reaches any of the running parts.</desc>
+        <title id="ck-pic-title">What runs, and the one place a person approves</title>
+        <desc id="ck-pic-desc">Devices and apps are read on a timer. Readings go into one store. AI coaches read the store, write and make predictions. A checker written in code grades every prediction. The site publishes the result. Separately, a change to the code goes through automated checks and then reaches the running parts. Only a change to what the programs are permitted to do also waits for Matthew’s approval.</desc>
         <g fill="var(--ck-panel)">
           <rect x="0" y="0" width="178" height="50" rx="12"/>
           <rect x="0" y="66" width="178" height="50" rx="12"/>
@@ -46,7 +46,7 @@
         <g fill="none" stroke="var(--ck-faint)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M89 52v10m-4-4 4 4 4-4M89 118v10m-4-4 4 4 4-4M89 184v10m-4-4 4 4 4-4M89 250v10m-4-4 4 4 4-4"/>
           <path d="M273 52v10m-4-4 4 4 4-4M273 118v10m-4-4 4 4 4-4"/>
-          <path d="M184 4h7v306h-7M205 157h-10m4-4-4 4 4 4"/>
+          <path d="M184 4h7v306h-7M205 91h-10m4-4-4 4 4 4M205 157h-10m4-4-4 4 4 4"/>
         </g>
         <g fill="currentColor" font-size="15" font-weight="500">
           <text x="14" y="22">Devices and apps</text>
@@ -66,16 +66,17 @@
           <text x="14" y="304">Shows hits and misses</text>
           <text x="220" y="40">Drafted with AI</text>
           <text x="220" y="106">Automated tests</text>
-          <text x="220" y="172">Approves it</text>
+          <text x="220" y="172">Permissions only</text>
         </g>
       </svg>
-      <p class="ck-soft">A change to program code reaches the running parts only after the checks and the approval. Page files are the exception, covered below.</p>
+      <p class="ck-soft">A change goes live when the automated checks pass. Only a change to what the programs are permitted to do waits for Matthew.</p>
     </section>
 
     <section class="ck-section">
       <p class="ck-label">The numbers</p>
       <h2>Counted, with dates.</h2>
       <div class="ck-section" id="ck-numbers"></div>
+      <p>This is more machinery than one person’s data needs. That is deliberate: it is a working tool and also a public demonstration of engineering practice.</p>
       <noscript><p class="ck-soft">These numbers are read from the site’s public data when scripts run, so none is printed here without its date.</p></noscript>
     </section>
 
@@ -83,38 +84,35 @@
       <p class="ck-label">Cost</p>
       <h2>A ceiling, and what switches off.</h2>
       <div class="ck-section ck-section--tight" id="ck-cost"></div>
-      <p>A program forecasts the month-end bill every 8 hours and sets a tier from it. Each AI feature reads the tier before it runs.</p>
+      <p>A program forecasts the month-end bill every 8 hours and sets a tier.</p>
       <ul class="ck-rows">
-        <li><span class="ck-rows__key">Tier 0</span><span>Everything runs.</span></li>
-        <li><span class="ck-rows__key">Tier 1</span><span>From about 73% of the ceiling. Three internal AI passes stop. Nothing a reader sees changes.</span></li>
-        <li><span class="ck-rows__key">Tier 2</span><span>From about 87%. The coaches’ daily commentary, the weekly brief, the weekly written instalment and the podcast stop.</span></li>
-        <li><span class="ck-rows__key">Tier 3</span><span>From about 97%. All AI stops. A reader’s question gets a “paused” answer and the daily email goes out with data only.</span></li>
+        <li><span class="ck-rows__key">Tier 1</span><span>From about 73% of the ceiling. Behind-the-scenes AI stops. Nothing a reader sees changes.</span></li>
+        <li><span class="ck-rows__key">Tier 2</span><span>From about 87%. The coaches’ daily commentary and the weekly writing and podcast stop.</span></li>
+        <li><span class="ck-rows__key">Tier 3</span><span>From about 97%. All AI stops. A reader’s question gets a “paused” answer.</span></li>
       </ul>
-      <p class="ck-soft">A forecast alone can raise the tier by one step at most, and by none in the first 5 days of a month. The stricter tiers need money actually spent.</p>
     </section>
 
     <section class="ck-section">
       <p class="ck-label">Who decides</p>
-      <h2>What a person approves.</h2>
+      <h2>What a person approves, and what he does not.</h2>
       <ul class="ck-rows">
-        <li><span class="ck-rows__key">Limits</span><span>The monthly ceiling and the order in which features pause were decided in advance and written into code.</span></li>
-        <li><span class="ck-rows__key">Approval</span><span>The release pipeline stops for Matthew’s approval before program code reaches production. A change that widens a permission is held for him by name. Page files and routine dependency updates go out behind automated checks alone. A repair agent runs three times a week. It can propose a fix and cannot merge one.</span></li>
-        <li><span class="ck-rows__key">Controls</span><span>Tests run on every change. After a site deploy a script opens the pages in a browser, and a failed check rolls the deploy back. Alarms watch what runs. Code checks AI text for numbers that are not in the data.</span></li>
-        <li><span class="ck-rows__key">In public</span><span>Every graded prediction is published, right or wrong. The cost figures on this page are read live. The code and the incident log are public.</span></li>
+        <li><span class="ck-rows__key">Limits</span><span>The monthly ceiling and the order of the pauses were decided in advance and written into code.</span></li>
+        <li><span class="ck-rows__key">Approval</span><span>Matthew approves one thing by hand: a change to what the programs are permitted to do. Everything else, program code and pages alike, goes live when the automated checks pass, with no manual approval step. A repair agent runs three times a week. It can propose a fix and cannot apply one.</span></li>
+        <li><span class="ck-rows__key">Controls</span><span>Tests run on every change. After an update a script opens the pages in a browser, and a failed check undoes the update. Alarms watch what runs.</span></li>
+        <li><span class="ck-rows__key">In public</span><span>Every graded prediction is published, right or wrong. The code and the incident log are public.</span></li>
       </ul>
     </section>
 
     <section class="ck-section">
       <p class="ck-label">What broke</p>
-      <h2>Failures, and what changed.</h2>
-      <p class="ck-soft">Newest first. Each one opens to the cause, how it was found and what changed.</p>
+      <h2>Failures, newest first.</h2>
       <ul class="ck-rows">
-        <li><span class="ck-rows__key"><time datetime="2026-10-04">Oct 4</time></span><details><summary>The coaches’ new daily lines went live and showed none.</summary><p class="ck-soft">The AI chose three coaches to speak and named each one. The code expected an internal id, refused all three, and the page said no coach had anything to say. The tests had passed. Found by a person reading the first live output, not by a monitor. Changed: the code accepts a name, and that live output is now a test case. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/pull/4606" rel="noopener">The fix</a></p></details></li>
-        <li><span class="ck-rows__key"><time datetime="2026-10-03">Oct 3</time></span><details><summary>Two AI coaches gave opposite accounts of the same food log.</summary><p class="ck-soft">One said logging had resumed. Another said it had been quiet for four days. A third cited an 11-day gap where the site showed 24. There was no single fact sheet for the day. Changed: the daily job was rebuilt so every coach reads one sheet, and code refuses a line that cites a value not on it. Its 14-day live proof is not finished. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/issues/4583" rel="noopener">The issue</a></p></details></li>
+        <li><span class="ck-rows__key"><time datetime="2026-10-04">Oct 4</time></span><details open><summary>The coaches’ new daily lines passed their tests, went live and showed none.</summary><p class="ck-soft">What happened: on its first real run the AI chose three coaches to speak and the code refused all three. Impact: the preview front page said no coach had anything to say that day. Cause: the AI named each coach, and the code only recognised a short code for each. How it was found: a person read the first live output. No monitor flagged it. What changed: the code accepts a name, and that output is now a test case. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/pull/4606" rel="noopener">The fix</a></p></details></li>
+        <li><span class="ck-rows__key"><time datetime="2026-10-03">Oct 3</time></span><details><summary>Two AI coaches gave opposite accounts of the same food log.</summary><p class="ck-soft">One said logging had resumed. Another said it had been quiet for four days. A third cited an 11-day gap where the site showed 24. The coaches had no shared list of the day’s facts. Changed: the daily job was rebuilt so every coach reads one list, and code refuses a line that cites a value not on it. It has not yet run 14 days without a contradiction. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/issues/4583" rel="noopener">The issue</a></p></details></li>
         <li><span class="ck-rows__key"><time datetime="2026-09-26">Sept 26</time></span><details><summary>A nutrient score reported a shortfall that was not there.</summary><p class="ck-soft">The score counted food only and was published as total intake. It put one vitamin at 5% of its target on days the supplement record showed more than the full target, and the coaches were told to act on it. Changed: food, supplements and total are now three separate numbers. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/issues/4244" rel="noopener">The issue</a></p></details></li>
         <li><span class="ck-rows__key"><time datetime="2026-09-01">Sept 1</time></span><details><summary>The public ask-the-coaches feature returned errors for about 34 hours, across launch day.</summary><p class="ck-soft">A quality check was given a 10-second limit, taken from a code comment that said it needed 2 to 5 seconds. Measured, its typical run was over 10. A monitor caught the failure the first morning. Nobody read that alarm for about 31 hours. Changed: the check was removed from the reader’s path. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/blob/main/docs/INCIDENT_LOG.md" rel="noopener">The incident log</a></p></details></li>
-        <li><span class="ck-rows__key"><time datetime="2026-08-26">Aug 26</time></span><details><summary>A feature passed its tests, was closed as done, and had never worked.</summary><p class="ck-soft">It was meant to tell a harmless failed check from a real one. One network call returned a log with the needed line missing, and the feature fell back silently to the old behaviour. Found within the hour by using it on real work, not by an alarm. Changed: fixed the same day, and accepted only on a live result. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/blob/main/docs/INCIDENT_LOG.md" rel="noopener">The incident log</a></p></details></li>
-        <li><span class="ck-rows__key"><time datetime="2026-08-11">Aug 11</time></span><details><summary>The AI judge that blocks bad coach text passed invented numbers.</summary><p class="ck-soft">Three test texts with made-up figures scored 92, 92 and 82 out of 100 and passed. The judge’s instructions had no rule about invented numbers. A separate check written in code did catch them, and none is known to have reached a reader. Found the first time the judge was measured against labelled examples. Changed: the blocking step now uses the code check’s verdict. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/blob/main/docs/INCIDENT_LOG.md" rel="noopener">The incident log</a></p></details></li>
+        <li><span class="ck-rows__key"><time datetime="2026-08-26">Aug 26</time></span><details><summary>A feature passed its tests, was closed as done, and had never worked.</summary><p class="ck-soft">It was meant to tell a harmless failed check from a real one. One lookup came back with the needed line missing, and the feature quietly did nothing. Found within the hour by using it on real work, not by an alarm. Changed: fixed the same day, and accepted only on a live result. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/blob/main/docs/INCIDENT_LOG.md" rel="noopener">The incident log</a></p></details></li>
+        <li><span class="ck-rows__key"><time datetime="2026-08-11">Aug 11</time></span><details><summary>The AI judge that blocks bad coach text passed invented numbers.</summary><p class="ck-soft">Three test texts with made-up figures scored 92, 92 and 82 out of 100 and passed. The judge’s instructions had no rule about invented numbers. A separate check written in code did catch them, and none is known to have reached a reader. Found the first time the judge was measured against examples with known answers. Changed: the blocking step now uses the code check’s verdict. <a class="ck-link" href="https://github.com/averagejoematt/life-platform/blob/main/docs/INCIDENT_LOG.md" rel="noopener">The incident log</a></p></details></li>
       </ul>
     </section>
 
@@ -122,14 +120,12 @@
       <p class="ck-label">In his words</p>
       <h2>What I decided, and what I can’t verify myself.</h2>
       <p class="ck-small">Draft wording. Matthew has not rewritten this yet.</p>
-      <p>I decided what gets measured and what the goal is. I decided that the coaches’ predictions would be graded by code against a simple guess, and that the result would be printed when they lose. I set the monthly ceiling and chose what pauses first.</p>
-      <p>I did not write the code. An AI assistant wrote it at my direction, and I cannot tell by reading a change whether it is correct. On a long working session I let the assistant merge and deploy inside rules I set, and I see the result, not every line.</p>
-      <p>What I can check myself is whether a number about my own day is true, because I lived the day. For the rest I rely on the tests, the browser checks, the alarms and the published record of misses. When those fail, the failure goes in the list above.</p>
+      <p>I decided what gets measured, what the goal is, and that the coaches would be graded by code against a simple guess and the result printed when they lose. I set the monthly ceiling and chose what pauses first.</p>
+      <p>I did not write the code and I cannot tell by reading a change whether it is correct. The one thing I approve by hand is a change to what the programs are permitted to do. Everything else goes live when the automated checks pass. I see the result, not every line.</p>
+      <p>What I can check myself is whether a number about my own day is true. For the rest I rely on the tests, the alarms and the published record of misses.</p>
     </section>
 
     <section class="ck-section ck-section--tight">
-      <p class="ck-label">The code</p>
-      <p>All of it is public, with the incident log and the record of each decision.</p>
       <div class="ck-actions">
         <a class="ck-btn" href="https://github.com/averagejoematt/life-platform" rel="noopener">Read the code</a>
         <a class="ck-link" href="/next/v8/">Back</a>
