@@ -23,7 +23,7 @@ test("a lift is summarised by its working sets, in pounds, warm-ups set aside", 
 
 test("a day lists what was lifted, each exercise a door to its own trend", () => {
   const html = D.dayLiftsHTML("2026-10-02", SRC, BASE);
-  assert.match(html, /155 minutes in the session\. Warm-up sets are left out; each lift opens its own trend\./);
+  assert.match(html, /155 minutes in the session, 22,356 lb moved in working sets\. Warm-up sets are left out; each lift opens its own trend\./);
   assert.match(html, /href="\/next\/v8\/trend\/\?m=lift&amp;x=Bench%20Press%20\(Barbell\)&amp;from=2026-10-02">Bench Press \(Barbell\)<\/a>/);
   assert.match(html, /Also in the session: Cycling \(11\.8 miles\), Stretching\./);
   assert.doesNotMatch(html, /[Ww]arm-up: Cycling/, "timed work is not a warm-up");
@@ -116,4 +116,35 @@ test("the day page offers the day before and after only when they exist", () => 
   const nav = D.dayNavHTML("2026-10-03", SRC, BASE);
   assert.match(nav, /d=2026-10-02">← Friday</);
   assert.doesNotMatch(nav, /Sunday/);
+});
+
+test("a daily count is drawn as bars from zero, with the target and the days that met it", () => {
+  const pts = D.seriesOf("protein", SRC);
+  const html = D.barChartHTML(pts, D.MEASURES.protein.write, "Protein", { target: 170, targetWords: "the 170 g floor" });
+  assert.equal((html.match(/<rect /g) || []).length, pts.length, "one bar per day");
+  assert.equal((html.match(/<rect class="ck-chart__now"/g) || []).length, pts.filter((p) => p.value >= 170).length, "a dark bar for each day at the floor");
+  assert.match(html, /stroke-dasharray/);
+  assert.match(html, /Dashed line: the 170 g floor\. Dark bars are days at or above it\. The line is the average of the seven days ending on that day\./);
+  assert.doesNotMatch(html, /<text/, "no text inside the drawing");
+  const plain = D.barChartHTML(pts, D.MEASURES.protein.write, "Protein");
+  assert.doesNotMatch(plain, /ck-chart__now|stroke-dasharray|Dashed/, "no target given, none drawn");
+  assert.equal(D.barChartHTML(pts.slice(0, 1), D.MEASURES.protein.write, "Protein"), "");
+});
+
+test("each lift on a day says what the best set was last time, and the session's total load", () => {
+  const html = D.dayLiftsHTML("2026-10-02", SRC, BASE);
+  assert.match(html, /Bench Press \(Barbell\)<\/a><span>3 sets at 175 lb[^<]*<\/span><span class="ck-small">Last time, Sep 29: 205 lb × 5\.<\/span>/);
+  assert.match(html, /155 minutes in the session, [\d,]+ lb moved in working sets\./);
+  const first = { ...SRC, workouts: { workouts: SRC.workouts.workouts.filter((w) => w.date >= "2026-10-02") } };
+  assert.match(D.dayLiftsHTML("2026-10-02", first, BASE), /First time recorded\./);
+});
+
+test("macro share is worked from the logged grams and needs all three", () => {
+  assert.equal(D.macroShare({ protein_g: 172, carbs_g: 118, fat_g: 48 }), "Of the calories from those three: protein 43%, carbs 30%, fat 27%.");
+  assert.equal(D.macroShare({ protein_g: 172, carbs_g: null, fat_g: 48 }), "");
+  assert.match(D.dayFoodHTML("2026-10-02", SRC, BASE), /Of the calories from those three: protein 43%/);
+});
+
+test("the steps trend says how steps are counted and that some days read low", () => {
+  assert.match(D.MEASURES.steps.about, /A day they were not carried reads low/);
 });

@@ -442,12 +442,9 @@ def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, foo
     with no reading that day is left out — the day says what was recorded, nothing else."""
     facts, summary = [], []
     p, t, f = pulse_row or {}, training_row or {}, food_row or {}
-    weight, hours, recovery, steps = (
-        _num(p.get("weight_lbs")),
-        _num(p.get("sleep_hours")),
-        _num(p.get("recovery_pct")),
-        _num(p.get("steps")),
-    )
+    # Steps are deliberately not a fact on the front page's day: the count reads low on days
+    # the phone is not carried, so it is shown only on its own trend page, with that caveat.
+    weight, hours, recovery = _num(p.get("weight_lbs")), _num(p.get("sleep_hours")), _num(p.get("recovery_pct"))
     if weight is not None:
         facts.append({"label": "Weight", "text": f"{weight:.1f} lb"})
         summary.append(f"{weight:.1f} lb")
@@ -467,8 +464,6 @@ def _day_detail(day: str, pulse_row: dict | None, training_row: dict | None, foo
     if protein is not None:
         kcal = f", {int(calories):,} kcal" if calories is not None else ""
         facts.append({"label": "Food", "text": f"{_fmt_num(protein)} g protein{kcal}"})
-    if steps is not None:
-        facts.append({"label": "Steps", "text": f"{int(steps):,}"})
     return {"date": day, "summary": " · ".join(summary) or "Nothing recorded yet.", "facts": facts}
 
 

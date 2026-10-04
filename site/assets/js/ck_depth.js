@@ -33,7 +33,7 @@ const shift = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86
 // key -> its name, unit, where its daily values come from and how a value is written.
 export const MEASURES = {
   weight: { name: "Weight", unit: "lb", write: (v) => `${v.toFixed(1)} lb`, about: "Every weigh-in since the start." },
-  steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "Steps counted each day." },
+  steps: { name: "Steps", unit: "steps", write: (v) => whole(v), about: "Steps as my phone and watch counted them. A day they were not carried reads low, so some days here are lower than the training recorded suggests." },
   sleep: { name: "Sleep", unit: "hours", write: (v) => `${trim1(v)} hours`, about: "Hours asleep each night." },
   recovery: { name: "Recovery", unit: "out of 100", write: (v) => `${whole(v)} out of 100`, about: "My wrist strap’s morning score out of 100." },
   protein: { name: "Protein", unit: "g", write: (v) => `${whole(v)} g`, about: "Grams of protein logged each day." },
@@ -137,6 +137,31 @@ export function trendChartHTML(points, write, name, { fromZero = false } = {}) {
   const aria = `${name} from ${write(first.value)} on ${shortDay(first.date)} to ${write(last.value)} on ${shortDay(last.date)}, ${pts.length} readings, lowest ${write(lo)}, highest ${write(hi)}`;
   return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${area}<polyline class="ck-chart__line" points="${line}"/><circle class="ck-chart__now" cx="${x(last).toFixed(1)}" cy="${y(last).toFixed(1)}" r="5"/></svg><div class="ck-ends"><span>${esc(`${shortDay(first.date)} · ${write(first.value)}`)}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>`;
 }
+// A daily COUNT as bars from zero. A bar at or above the target is drawn in the accent (the
+// kit's colour for progress); the line over the bars is the average of the seven readings
+// ending on that day; the dashed rule is the target. No text is set inside the drawing —
+// at phone width it would be too small to read — so the caption says what each mark is.
+export function barChartHTML(points, write, name, { target = null, targetWords = "" } = {}) {
+  const pts = (points || []).filter((p) => p && isDay(p.date) && num(p.value) !== null);
+  if (pts.length < 2) return "";
+  const hi = Math.max(...pts.map((p) => p.value), target || 0);
+  const slot = 624 / pts.length;
+  const w = Math.max(2, slot * 0.72);
+  const y = (v) => 20 + (136 * (hi - v)) / (hi || 1);
+  const bars = pts
+    .map((p, i) => `<rect class="${target !== null && p.value >= target ? "ck-chart__now" : "ck-chart__area"}" x="${(8 + i * slot + (slot - w) / 2).toFixed(1)}" y="${y(p.value).toFixed(1)}" width="${w.toFixed(1)}" height="${(156 - y(p.value)).toFixed(1)}"/>`)
+    .join("");
+  const avg = pts.map((p, i) => {
+    const win = pts.slice(Math.max(0, i - 6), i + 1).map((q) => q.value);
+    return win.length === 7 ? `${(8 + i * slot + slot / 2).toFixed(1)},${y(win.reduce((a, b) => a + b, 0) / 7).toFixed(1)}` : "";
+  }).filter(Boolean);
+  const line = avg.length > 1 ? `<polyline class="ck-chart__line" points="${avg.join(" ")}"/>` : "";
+  const rule = target !== null ? `<line x1="8" x2="632" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 5"/>` : "";
+  const [first, last] = [pts[0], pts[pts.length - 1]];
+  const aria = `${name}, ${pts.length} days from ${shortDay(first.date)} to ${shortDay(last.date)}, highest ${write(Math.max(...pts.map((p) => p.value)))}${target !== null ? `, target ${write(target)}` : ""}`;
+  const key = [target !== null ? `Dashed line: ${targetWords || write(target)}. Dark bars are days at or above it.` : "", line ? "The line is the average of the seven days ending on that day." : ""].filter(Boolean).join(" ");
+  return `<svg class="ck-chart" viewBox="0 0 640 164" role="img" aria-label="${esc(aria)}">${bars}${rule}${line}</svg><div class="ck-ends"><span>${esc(shortDay(first.date))}</span><span>${esc(`${shortDay(last.date)} · ${write(last.value)}`)}</span></div>${key ? `<p class="ck-small">${esc(key)}</p>` : ""}`;
+}
 export function trendSentence(points, write, { average = true, floor = null, floorWords = "" } = {}) {
   const pts = points || [];
   if (!pts.length) return "";
@@ -204,10 +229,17 @@ export function dayLiftsHTML(iso, src, base) {
       return metres > 0 ? `${e.name} (${trim1(metres * MILES_PER_M)} miles)` : e.name;
     });
   const warmLine = timed.length ? soft(`Also in the session: ${timed.join(", ")}.`) : "";
+  const all = (src.workouts && src.workouts.workouts) || [];
+  const before = (name) => {
+    const prior = liftSeries(all, name).filter((pt) => pt.date < iso);
+    const last = prior[prior.length - 1];
+    return last ? `Last time, ${fmtShort(last.date)}: ${last.set}.` : "First time recorded.";
+  };
   const rows = worked
-    .map((e) => `<li><a class="ck-coach__who" href="${esc(trendHref(base, "lift", e.name, iso))}">${esc(e.name)}</a><span>${esc(liftSummary(e))}</span></li>`)
+    .map((e) => `<li><a class="ck-coach__who" href="${esc(trendHref(base, "lift", e.name, iso))}">${esc(e.name)}</a><span>${esc(liftSummary(e))}</span><span class="ck-small">${esc(before(e.name))}</span></li>`)
     .join("");
-  const head = num(session.duration_min) !== null ? soft(`${whole(session.duration_min)} minutes in the session. Warm-up sets are left out; each lift opens its own trend.`) : "";
+  const moved = worked.reduce((sum, e) => sum + (e.sets || []).filter(isWork).reduce((a, x) => a + (lb(x.weight_kg) || 0) * x.reps, 0), 0);
+  const head = num(session.duration_min) !== null ? soft(`${whole(session.duration_min)} minutes in the session${moved > 0 ? `, ${whole(moved)} lb moved in working sets` : ""}. Warm-up sets are left out; each lift opens its own trend.`) : "";
   return `${head}${rows ? `<ul class="ck-coach">${rows}</ul>` : ""}${warmLine}${otherLine}`;
 }
 // What was eaten: the day's totals. The log's individual entries are not public.
@@ -220,7 +252,18 @@ export function dayFoodHTML(iso, src, base) {
     return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
   const versus = floor !== null && num(f.protein_g) !== null ? (f.protein_g >= floor ? `, at or above the ${whole(floor)} g floor` : `, under the ${whole(floor)} g floor`) : "";
-  return `<ul class="ck-rows ck-rows--more">${row("calories", f.calories)}${row("protein", f.protein_g, versus)}${row("carbs", f.carbs_g)}${row("fat", f.fat_g)}</ul>`;
+  return `<ul class="ck-rows ck-rows--more">${row("calories", f.calories)}${row("protein", f.protein_g, versus)}${row("carbs", f.carbs_g)}${row("fat", f.fat_g)}</ul>${soft(macroShare(f))}`;
+}
+// Where the day's calories came from, from the logged grams (4 kcal a gram for protein and
+// carbohydrate, 9 for fat). "" unless all three were logged.
+export function macroShare(f) {
+  const [p, c, fat] = [num(f && f.protein_g), num(f && f.carbs_g), num(f && f.fat_g)];
+  if (p === null || c === null || fat === null) return "";
+  const kcal = [p * 4, c * 4, fat * 9];
+  const total = kcal[0] + kcal[1] + kcal[2];
+  if (!(total > 0)) return "";
+  const pct = kcal.map((k) => Math.round((100 * k) / total));
+  return `Of the calories from those three: protein ${pct[0]}%, carbs ${pct[1]}%, fat ${pct[2]}%.`;
 }
 export function dayNavHTML(iso, src, base) {
   const known = new Set([...Object.keys(byDate(src.pulse && src.pulse.pulse_history)), ...Object.keys(byDate(src.workouts && src.workouts.workouts))]);
@@ -331,7 +374,9 @@ async function mountTrend(base) {
   fill("ck-title", esc(name));
   document.title = `${name} — Average Joe Matt`;
   fill("ck-about", soft(about));
-  const chart = trendChartHTML(points, write, name, { fromZero: COUNTS.has(measure) });
+  const chart = COUNTS.has(measure)
+    ? barChartHTML(points, write, name, { target: sentenceOpts.floor ?? null, targetWords: sentenceOpts.floorWords ? sentenceOpts.floorWords.replace(/^my /, "the ") : "" })
+    : trendChartHTML(points, write, name);
   fill("ck-chart", points.length ? `${soft(trendSentence(points, write, sentenceOpts))}${chart}${COUNTS.has(measure) ? soft(weekOnWeek(points, write)) : ""}` : soft("Nothing has been recorded for this yet."));
   fill("ck-recent", recentRowsHTML(points, write, base));
   fill("ck-extra", extra);

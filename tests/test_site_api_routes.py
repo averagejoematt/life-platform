@@ -448,8 +448,9 @@ def test_each_of_the_seven_days_opens_to_what_was_recorded_that_day():
         {"label": "Training", "text": "241 minutes of walking"},
         {"label": "Sleep", "text": "8.8 hours; recovery 98 out of 100"},
         {"label": "Food", "text": "153 g protein, 1,732 kcal"},
-        {"label": "Steps", "text": "9,913"},
     ]
+    # Steps stay off the front page's day (unreliable on days the phone is not carried).
+    assert "Steps" not in [f["label"] for d in detail for f in d["facts"]]
     oldest = detail[-1]
     assert "Food" not in [f["label"] for f in oldest["facts"]], "no food row was served for that day: the day must not invent one"
 
