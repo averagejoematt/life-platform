@@ -56,6 +56,10 @@ KIT_PAGES = {
     "/next/v8/start/": 4,
     "/next/v8/story/": 4,
     "/next/v8/coaches/": 4,
+    "/next/v8/day/": 4,
+    "/next/v8/day/?d=2026-10-02": 4,  # a lifting day: the longest a day page gets
+    "/next/v8/trend/": 4,
+    "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
 }
 
 #: route glob -> fixture file. Every route ck_pages.js reads.
@@ -66,6 +70,11 @@ ROUTES = {
     "**/api/coaches": "coaches.json",
     "**/api/coach_docket": "coach_docket.json",
     "**/api/timeline": "timeline.json",
+    "**/api/pulse_history": "pulse_history.json",
+    "**/api/workouts": "workouts.json",
+    "**/api/training_overview": "training_overview.json",
+    "**/api/nutrition_overview": "nutrition_overview.json",
+    "**/api/frequent_meals": "frequent_meals.json",
 }
 
 _FORBIDDEN = (
