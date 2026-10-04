@@ -338,7 +338,7 @@ export function callVerdictsHTML(callsBody, base = "/") {
   const card = (call, tag, cls) => {
     if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call with a page has been found ${tag.toLowerCase()} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
-    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p>${soft(day ? `Checked ${day}. The whole call says what counted as right.` : "")}<p><a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">The whole call</a></p></div>`;
+    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(day ? `Checked ${day}. ` : "")}<a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">What counted as right</a></p></div>`;
   };
   return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
 }
@@ -432,7 +432,7 @@ async function mountCoaches(edition, b) {
   fill("ck-record-big", recordBigHTML(b.record));
   fill("ck-team", teamHTML(coaches, base) || soft("The team is not served right now."));
   const pair = callVerdictsHTML(calls, base);
-  fill("ck-verdicts", pair ? `${pair}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>` : verdictsHTML(coaches) || soft("No checked call is served right now."));
+  fill("ck-verdicts", pair || verdictsHTML(coaches) || soft("No checked call is served right now."));
   const bet = b.next && b.next.data && b.next.data.bet;
   fill("ck-bet", `${betHTML(b.next)}${soft(moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""))}`);
 }
