@@ -110,9 +110,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `engagement_state`, `experiments`, `field_notes`, `forecast`, `habit_scores`, `hypotheses`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
 
-### raw_timeseries (42)
+### raw_timeseries (43)
 
-`apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `morning_note`, `notion`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
+`apple_health`, `bluesky`, `day_grade`, `eightsleep`, `evening_ritual`, `exposures`, `felt_probe`, `flourishing`, `food_delivery`, `food_responses`, `garmin`, `habit_causality`, `habitify`, `hevy`, `instagram`, `interactions`, `journal_quotes`, `life_events`, `macrofactor`, `macrofactor_meals`, `macrofactor_workouts`, `mastodon`, `measurements`, `mood`, `morning_note`, `notion`, `owner_words`, `private_intake`, `ruck_log`, `sick_days`, `state_of_mind`, `strava`, `temptations`, `tiktok`, `time_affluence`, `todoist`, `training_notes`, `travel`, `weather`, `whoop`, `withings`, `x`, `youtube`
 
 ### system_state (20)
 
@@ -120,7 +120,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-735 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+737 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -200,6 +200,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `morning_note` | site_api_social_note.py | morning_note.py |
 | `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_fulfillment.py, site_api_mind.py, site_api_pulse.py, story_dossier.py, tools_journal.py, tools_social_connection.py |
 | `nutrition_review` | nutrition_review_lambda.py | nutrition_review_lambda.py |
+| `owner_words` | — | owner_words.py |
 | `panelcast` | coach_panel_podcast_lambda.py, podcast_script_v2.py | coach_panel_podcast_lambda.py, podcast_script_v2.py, site_api_coach_ledger.py |
 | `pending_writes` | — | — |
 | `platform_memory` | daily_insight_compute_lambda.py, failure_pattern_compute_lambda.py, hypothesis_engine_lambda.py, weekly_plate_lambda.py | daily_insight_compute_lambda.py, weekly_plate_lambda.py |
@@ -238,7 +239,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**86 tools across 34 modules** (AST-counted from `mcp/registry.py`;
+**87 tools across 35 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -507,7 +508,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1270 total · 911 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1272 total · 913 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 82 resolved · 0 dynamic of 82 scheduled lambdas (106 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

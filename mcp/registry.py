@@ -158,6 +158,7 @@ from mcp.tools_memory import (
 )
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
+from mcp.tools_owner_words import LOG_OWNER_NOTE_DESCRIPTION, LOG_OWNER_NOTE_INPUT, tool_log_owner_note  # #4584
 from mcp.tools_pending_writes import MANAGE_PENDING_WRITES_DESCRIPTION, MANAGE_PENDING_WRITES_INPUT, tool_manage_pending_writes  # #4078
 from mcp.tools_plan import tool_plan_next_session
 
@@ -189,7 +190,12 @@ from mcp.tools_strength import tool_get_exercise_history, tool_get_muscle_volume
 # tools_calendar retired v3.7.46 (ADR-030) — google_calendar import removed
 # #3668: the derived surface index + the waiter. Two tools, full coverage, and the
 # MCP_TOOL_AUDIT tool-count discipline preserved (59 endpoints, not 59 new tools).
-from mcp.tools_surfaces import tool_describe_platform_surfaces, tool_get_platform_surface
+from mcp.tools_surfaces import (  # #4584: the two input schemas moved beside their tools (pays log_owner_note's lines)
+    DESCRIBE_PLATFORM_SURFACES_INPUT,
+    GET_PLATFORM_SURFACE_INPUT,
+    tool_describe_platform_surfaces,
+    tool_get_platform_surface,
+)
 from mcp.tools_todoist import close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
 from mcp.tools_training_notes import tool_get_exercise_notes
@@ -2114,6 +2120,11 @@ TOOLS = {
         },
     },
     # #4078: chat's "queued pending approval" made real — enqueue / list / approve / discard.
+    # #4584: his own words from chat, stored verbatim; a clean note is public (owner decision 2026-10-04).
+    "log_owner_note": {
+        "fn": tool_log_owner_note,
+        "schema": {"name": "log_owner_note", "description": LOG_OWNER_NOTE_DESCRIPTION, "inputSchema": LOG_OWNER_NOTE_INPUT},
+    },
     "manage_pending_writes": {
         "fn": tool_manage_pending_writes,
         "schema": {
@@ -2128,16 +2139,7 @@ TOOLS = {
         "schema": {
             "name": "describe_platform_surfaces",
             "description": DESCRIBE_PLATFORM_SURFACES_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "keyword": {"type": "string", "description": "Substring filter over surface name / question / example phrasing."},
-                    "include_excluded": {"type": "boolean", "description": "Also list reader-only surfaces + their exclusion reasons."},
-                    "detail": {"type": "boolean", "description": "Include the derivation chain and phase-read counts behind each rule."},
-                    "limit": {"type": "integer", "description": "Max surfaces to return (default 200, cap 300)."},
-                },
-                "required": [],
-            },
+            "inputSchema": DESCRIBE_PLATFORM_SURFACES_INPUT,
         },
     },
     "get_platform_surface": {
@@ -2145,16 +2147,7 @@ TOOLS = {
         "schema": {
             "name": "get_platform_surface",
             "description": GET_PLATFORM_SURFACE_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Surface name from describe_platform_surfaces ('/api/...' also accepted)."},
-                    "params": {"type": "object", "description": "Query parameters for the surface (see its `params` in the index)."},
-                    "question": {"type": "string", "description": "The question you are answering — recorded verbatim if this is a miss."},
-                    "explain_against": {"type": "string", "description": "A second surface name; reconciles the two surfaces' rules."},
-                },
-                "required": ["name"],
-            },
+            "inputSchema": GET_PLATFORM_SURFACE_INPUT,
         },
     },
     "get_experiment_cycle": {

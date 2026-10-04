@@ -309,6 +309,11 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         READ_BEFORE_WRITE,
         "enqueue returns the open row with the same sha256(tool, args); approve/discard are conditional puts on status, so a replay performs nothing twice",
     ),
+    # ── #4584 ──────────────────────────────────────────────────────────────────
+    "log_owner_note": (
+        CONTENT_KEY,
+        "sk is WORDS#<day>#sha256(channel, prompt, text)[:12] under attribute_not_exists(sk); a replay returns the stored entry and writes nothing",
+    ),
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (
         DETERMINISTIC_KEY,

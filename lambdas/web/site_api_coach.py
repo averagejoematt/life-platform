@@ -30,7 +30,7 @@ surface are all unchanged. No contract change.
       (guarded reads of pre-computed prose: the staleness refusal + the #802
       regeneration-paused disclosure are what make these one concern)
   web/site_api_thirdwall.py       — /api/field_notes, /api/decisions,
-      /api/journal_quotes, /api/diary_reactions
+      /api/journal_quotes, /api/diary_reactions, /api/owner_words
       (the human voice on the record, all four screened all-or-nothing through the
       one `_public_decision_note` rule — #1568/#1569/#1675)
 
@@ -38,6 +38,7 @@ Endpoints:
   /api/coach_docket     — the Dispute Docket (#1386): open positions with frozen stakes + resolved history
   /api/field_notes      — weekly Field Notes (optional ?week= param)
   /api/decisions        — logged decisions carrying a verbatim note (#1569, the widened Third Wall)
+  /api/owner_words      — his own words from chat or email, verbatim, newest first (#4584)
   /api/journal_quotes   — consent-per-line verbatim journal pull-quotes (#1568, ADR-142)
   /api/ai_analysis      — cached AI expert analysis (?expert= param)
   /api/coach_analysis   — coach intelligence dashboard (?domain= param)
@@ -393,6 +394,11 @@ def handle_coaches(event):
 def handle_decisions(event):
     """GET /api/decisions — delegated to web.site_api_thirdwall."""
     return _thirdwall.handle_decisions(event, _g=globals())
+
+
+def handle_owner_words(event=None):
+    """GET /api/owner_words — his own words, verbatim (#4584); delegated to web.site_api_thirdwall."""
+    return _thirdwall.handle_owner_words(event or {}, _g=globals())
 
 
 def handle_diary_reactions(event):
