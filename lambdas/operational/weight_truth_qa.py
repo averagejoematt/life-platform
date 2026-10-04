@@ -18,6 +18,8 @@ split as `assess_hero_weight` and the `reader_truth_qa` helper.
 import re
 from datetime import date as _date, timedelta as _timedelta
 
+from operational.protein_window_claims import protein_window_tags, served_protein_windows
+
 # Rounding and a same-day reweigh, not a cycle-old figure. The live gap was 3.5 lb.
 CROSS_SURFACE_WEIGHT_TOL_LBS = 1.5
 
@@ -892,7 +894,12 @@ def _days_and_gap_claims(prose: str) -> list[tuple[str, float]]:
     return out
 
 
-def coach_quantity_claims(coach: dict) -> dict:
+# ── #4569: a protein figure is judged against the window it names ─────────────
+# The engine serves protein for three windows (the window mean, the recent N-day
+# average, each logged day); `protein_window_claims` decides which one a figure names.
+
+
+def coach_quantity_claims(coach: dict, served_protein: dict | None = None) -> dict:
     """Every numeric claim one coach's served prose makes, by quantity.
 
     Returns ``{quantity: [(value, "current"|"trend_end")]}`` — reuses #4180's
@@ -901,6 +908,10 @@ def coach_quantity_claims(coach: dict) -> dict:
     docstring), and appends weight/rate/days-logged/log-gap via their own
     extractors, all tagged ``"current"`` (none of the four fixtures behind
     #4186 need trend detection on those quantities).
+
+    With `served_protein` (`served_protein_windows`, #4569) a protein figure that names
+    a window the engine serves under its own field is re-tagged ``"served_day"`` /
+    ``"recent_window"`` (`protein_window_tags`); without it nothing changes.
     """
     prose = " ".join(str(coach.get(k) or "") for k in _PROSE_FIELDS)
     current, trend_end, _trend_start = classify_claims(prose, _CLAIM_PATTERNS, _CLAIM_DOMAIN)
@@ -915,6 +926,9 @@ def coach_quantity_claims(coach: dict) -> dict:
         out.setdefault("rate", []).append((v, "current"))
     for quantity, v in _days_and_gap_claims(prose):
         out.setdefault(quantity, []).append((v, "current"))
+    tags = protein_window_tags(prose, served_protein)
+    if tags and "protein" in out:
+        out["protein"] = [(v, tags.get(v, cls)) for v, cls in out["protein"]]
     return out
 
 
@@ -968,7 +982,7 @@ def _rate_value(v: float) -> float:
     return abs(v)
 
 
-def _claims_by_quantity(coaches) -> tuple[dict, int]:
+def _claims_by_quantity(coaches, served_protein: dict | None = None) -> tuple[dict, int]:
     """``({quantity: [(value, cls, coach_name)]}, skipped_count)`` across every
     served coach — `skipped_count` is `classify_claims`'s `trend_start` figures,
     which never reach `coach_quantity_claims`'s return at all (they are never a
@@ -980,7 +994,7 @@ def _claims_by_quantity(coaches) -> tuple[dict, int]:
         if not isinstance(c, dict):
             continue
         name = c.get("name") or c.get("persona_id") or "coach"
-        for quantity, entries in coach_quantity_claims(c).items():
+        for quantity, entries in coach_quantity_claims(c, served_protein).items():
             for value, cls in entries:
                 out.setdefault(quantity, []).append((value, cls, name))
         prose = " ".join(str(c.get(k) or "") for k in _PROSE_FIELDS)
@@ -1013,7 +1027,13 @@ def served_coach_texts(dashboard) -> list:
     return out
 
 
-def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None):
+def _own_window(cls: str) -> bool:
+    """#4569: True for the two `protein_window_tags` classes — a figure for a window the
+    engine serves under its own field, never comparable to the window mean."""
+    return cls in ("served_day", "recent_window")
+
+
+def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None, served_protein: dict | None = None):
     """Two coach texts served on ONE page must not state the same quantity with
     different values — protein, weight, loss rate, recovery, HRV, RHR, sleep
     hours, days logged (#4186).
@@ -1028,17 +1048,25 @@ def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None
     here at all (see `classify_claims`) — it is not a claim, so it cannot
     disagree with one.
 
+    #4569: a figure tagged for its own served window (`protein_window_tags` — one named
+    day's intake, or the recent-window average) is a DIFFERENT fact from the window mean
+    another coach cites, so it is left out of the pairwise comparison and counted. It is
+    not unjudged: `assess_cross_surface_coach_vs_engine` holds it to the engine's field
+    for that window. An unnamed window is still no excuse — the rule above stands.
+
     Returns (ok, message) — the message ALWAYS carries the claim count (extracted
     / compared / skipped), pass or fail, per #4186's dead-man requirement.
     """
-    claims, trend_start_skipped = _claims_by_quantity(coaches)
+    claims, trend_start_skipped = _claims_by_quantity(coaches, served_protein)
     extracted = sum(len(v) for v in claims.values()) + trend_start_skipped
+    own_window = sum(1 for entries in claims.values() for _v, cls, _n in entries if _own_window(cls))
     disagreements = []
     compared = 0
     for quantity, entries in claims.items():
         tol = _rate_tolerance(rate_ci) if quantity == "rate" else COACH_CONSISTENCY_TOL.get(quantity)
         if tol is None:
             continue
+        entries = [e for e in entries if not _own_window(e[1])]
         for i in range(len(entries)):
             for j in range(i + 1, len(entries)):
                 v1, _c1, n1 = entries[i]
@@ -1051,13 +1079,16 @@ def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None
                     unit = _CLAIM_UNIT.get(quantity, "")
                     disagreements.append(f"{quantity}: {n1} cites {v1:g}{unit} vs {n2} cites {v2:g}{unit}")
 
-    note = f" (claims: {extracted} extracted, {compared} compared, {trend_start_skipped} skipped as trend-start)"
+    note = (
+        f" (claims: {extracted} extracted, {compared} compared, {trend_start_skipped} skipped as trend-start, "
+        f"{own_window} left to the engine leg — a named day or recent window)"
+    )
     if disagreements:
         return False, "coach texts disagree with each other — " + "; ".join(sorted(set(disagreements))[:6]) + note
     return True, "coach texts agree with each other on every shared quantity" + note
 
 
-def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None):
+def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None, served_protein: dict | None = None):
     """Every protein / loss-rate / log-gap figure a coach states must agree with
     the engine's own served fact for the window the sentence names (#4186) —
     `nutrition_overview`'s `avg_protein_g`/`lag_days`, `journey`'s
@@ -1079,10 +1110,16 @@ def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None):
     `avg_protein_g` already IS the engine's rolling/aggregate figure; a
     `trend_start` never reaches here).
 
+    #4569: "the window the sentence names" is now read for protein, the one quantity
+    the engine serves for three windows. A ``"served_day"`` figure already equals the
+    engine's value for the day the coach named (that is what earns the tag), so it is
+    counted as agreeing; a ``"recent_window"`` figure is compared against
+    `pro_avg_recent_g` instead of `avg_protein_g`, and can still fail.
+
     Returns (ok, message) — always carries the claim count, per #4186's
     dead-man requirement.
     """
-    claims, trend_start_skipped = _claims_by_quantity(coaches)
+    claims, trend_start_skipped = _claims_by_quantity(coaches, served_protein)
     extracted = sum(len(v) for v in claims.values()) + trend_start_skipped
 
     engine_facts: dict = {}
@@ -1099,7 +1136,7 @@ def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None):
             rate_ci = (lo, hi)
 
     disagreements = []
-    compared = 0
+    compared = named_day = 0
     for quantity, entries in claims.items():
         truth = engine_facts.get(quantity)
         if truth is None:
@@ -1111,17 +1148,25 @@ def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None):
         tol = _rate_tolerance(rate_ci) if quantity == "rate" else COACH_CONSISTENCY_TOL.get(quantity)
         if tol is None:
             continue
-        for value, _cls, name in entries:
+        for value, cls, name in entries:
             compared += 1
-            a, b = (_rate_value(value), _rate_value(truth)) if quantity == "rate" else (value, truth)
+            if cls == "served_day":
+                named_day += 1
+                continue  # equals the engine's value for the day the coach named — see `protein_window_tags`
+            fact, window = truth, ""
+            if cls == "recent_window":
+                recent = served_protein or {}
+                fact, window = float(recent["recent_g"]), f" ({recent['recent_days']}-day average)"
+            a, b = (_rate_value(value), _rate_value(fact)) if quantity == "rate" else (value, fact)
             if abs(a - b) > tol:
                 unit = _CLAIM_UNIT.get(quantity, "")
-                disagreements.append(f"{quantity}: {name} cites {value:g}{unit} vs engine {truth:g}{unit}")
+                disagreements.append(f"{quantity}: {name} cites {value:g}{unit} vs engine {fact:g}{unit}{window}")
 
     no_field = extracted - compared - trend_start_skipped
     note = (
         f" (claims: {extracted} extracted, {compared} compared, "
-        f"{trend_start_skipped} skipped as trend-start, {no_field} skipped — no served engine field for that quantity)"
+        f"{trend_start_skipped} skipped as trend-start, {no_field} skipped — no served engine field for that quantity, "
+        f"{named_day} matched the engine's value for a day the coach named)"
     )
     if disagreements:
         return False, "coach text disagrees with the engine's own served fact — " + "; ".join(sorted(set(disagreements))[:6]) + note
@@ -1201,8 +1246,11 @@ def checks(check_cls, site_base_url, partition, timeout=15, table=None):
             _lo, _hi = served_journey.get("weekly_rate_ci_low"), served_journey.get("weekly_rate_ci_high")
             if _lo is not None and _hi is not None:
                 _rate_ci = (_lo, _hi)
-        c_ok, c_msg = assess_cross_surface_coach_consistency(served_coaches, rate_ci=_rate_ci)
-        e_ok, e_msg = assess_cross_surface_coach_vs_engine(served_coaches, nutrition=served_nutrition, journey=served_journey)
+        _served_protein = served_protein_windows(payloads.get("/api/nutrition_overview"))
+        c_ok, c_msg = assess_cross_surface_coach_consistency(served_coaches, rate_ci=_rate_ci, served_protein=_served_protein)
+        e_ok, e_msg = assess_cross_surface_coach_vs_engine(
+            served_coaches, nutrition=served_nutrition, journey=served_journey, served_protein=_served_protein
+        )
         coach_agreement_checks = [
             consistency_check.ok(c_msg) if c_ok else consistency_check.fail(c_msg),
             vs_engine_check.ok(e_msg) if e_ok else vs_engine_check.fail(e_msg),
