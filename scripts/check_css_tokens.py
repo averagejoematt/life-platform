@@ -635,7 +635,7 @@ KIT_ACCENT_USES = frozenset(
         ".ck-quote--chapter",
         ".ck-chart__line",
         ".ck-chart__now",
-        ".ck-mark__down",  # the daily mark: a day the scale went down is progress (a proposal, #4586)
+        ".ck-mark__gone",  # the daily mark: the pounds gone are progress (a proposal, #4586)
     }
 )
 

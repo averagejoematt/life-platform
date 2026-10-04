@@ -30,51 +30,47 @@ const dayBefore = (iso) => {
 };
 
 // ── the daily mark ─────────────────────────────────────────────────────────────
-// One stripe a day for the last four weeks, in a frame that never changes: green when the
-// scale went down from the weigh-in before, dark when it went up or held, a short tick
-// when there was no weigh-in. The same drawing is the link-preview image, so it carries
-// no axis — the caption beside it carries the one plain number.
+// One column a day for the last four weeks, in a frame that never changes. The frame's
+// height is the whole distance from the start weight to the goal: the green cap hanging
+// from the top is what is gone as of that day, the grey beneath it is what is left. A day
+// with no weigh-in leaves a gap. One encoding, no axis; the caption carries the number.
+// The same drawing is meant to be the link-preview image.
 export const MARK_DAYS = 28;
-export function markDays(series, todayIso, days = MARK_DAYS) {
+export function markDays(series, todayIso, start, goal, days = MARK_DAYS) {
   const byDay = new Map((series || []).filter((w) => w && w.date && num(w.lbs) !== null).map((w) => [w.date, w.lbs]));
-  const sorted = [...byDay.keys()].sort();
+  const span = num(start) !== null && num(goal) !== null && start > goal ? start - goal : null;
   const out = [];
   let iso = todayIso;
   for (let i = 0; i < days && iso; i += 1) {
     const lbs = byDay.has(iso) ? byDay.get(iso) : null;
-    let kind = "none";
-    if (lbs !== null) {
-      const before = sorted.filter((d) => d < iso).pop();
-      kind = before === undefined ? "first" : lbs < byDay.get(before) ? "down" : "up";
-    }
-    out.unshift({ date: iso, lbs, kind });
+    const gone = lbs === null || span === null ? null : Math.max(0, Math.min(1, (start - lbs) / span));
+    out.unshift({ date: iso, lbs, gone });
     iso = dayBefore(iso);
   }
   return out;
 }
-export function markSentence(cells) {
-  const down = cells.filter((c) => c.kind === "down").length;
-  const up = cells.filter((c) => c.kind === "up").length;
-  const none = cells.filter((c) => c.kind === "none").length;
-  const parts = [`${down} ${down === 1 ? "day" : "days"} down`, `${up} up or level`];
-  if (none) parts.push(`${none} with no weigh-in`);
-  return `The last ${cells.length} days: ${parts.join(", ")}.`;
+export function markSentence(cells, start, goal) {
+  const weighed = cells.filter((c) => c.gone !== null);
+  if (!weighed.length) return "";
+  const last = weighed[weighed.length - 1];
+  const missed = cells.length - weighed.length;
+  return `The last ${cells.length} days: ${fmt1(start - last.lbs)} of the ${fmt1(start - goal)} pounds to the goal are gone as of the latest weigh-in${missed ? `; ${missed} ${missed === 1 ? "day has" : "days have"} no weigh-in` : ""}.`;
 }
-export function markHTML(series, todayIso, { width = 640, height = 96 } = {}) {
+export function markHTML(series, todayIso, start, goal, { width = 640, height = 120 } = {}) {
   if (!todayIso) return "";
-  const cells = markDays(series, todayIso);
-  if (!cells.some((c) => c.lbs !== null)) return "";
+  const cells = markDays(series, todayIso, start, goal);
+  if (!cells.some((c) => c.gone !== null)) return "";
   const gap = 4;
   const w = (width - gap * (cells.length - 1)) / cells.length;
   const rects = cells
     .map((c, i) => {
+      if (c.gone === null) return "";
       const x = (i * (w + gap)).toFixed(1);
-      if (c.kind === "none") return `<rect class="ck-mark__none" x="${x}" y="${height - 6}" width="${w.toFixed(1)}" height="6" rx="2"/>`;
-      const cls = c.kind === "down" ? "ck-mark__down" : c.kind === "up" ? "ck-mark__up" : "ck-mark__first";
-      return `<rect class="${cls}" x="${x}" y="0" width="${w.toFixed(1)}" height="${height}" rx="3"/>`;
+      const cap = Math.max(c.gone > 0 ? 2 : 0, c.gone * height);
+      return `<rect class="ck-mark__left" x="${x}" y="0" width="${w.toFixed(1)}" height="${height}" rx="2"/><rect class="ck-mark__gone" x="${x}" y="0" width="${w.toFixed(1)}" height="${cap.toFixed(1)}" rx="2"/>`;
     })
     .join("");
-  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells))}">${rects}</svg>`;
+  return `<svg class="ck-mark" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(markSentence(cells, start, goal))}">${rects}</svg>`;
 }
 // "312.1 lb · Day 29 · 15.2 down, 127.1 to go to 185" — the mark's one line of numbers,
 // the weight in bold. Returns HTML.
@@ -111,18 +107,19 @@ export function morningLine(week, todayIso) {
   }
   return `${fmt1(now)} lb.`;
 }
-const RECOVERY_GLOSS = "recovery is the wrist strap’s morning score out of 100";
-// Step counts are left off this page: the served counts are unreliable (a caveat sits on
-// their trend page).
-function factRows(facts, { skip = [], floorMet = null } = {}) {
+const RECOVERY_GLOSS = "Recovery is the wrist strap’s morning score out of 100.";
+// One day's facts as one line: "241 minutes of walking · 8.8 hours of sleep; recovery 98
+// out of 100 · 153 g protein, 1,732 kcal, under the protein floor". Step counts are left
+// out: the served counts are unreliable (a caveat sits on their trend page).
+export function factLine(facts, { skip = [], floorMet = null } = {}) {
   return (facts || [])
     .filter((f) => f && f.label && f.text && f.label !== "Steps" && !skip.includes(f.label))
     .map((f) => {
-      let text = f.text;
-      if (f.label === "Food" && floorMet !== null) text += floorMet ? ", at or above the protein floor" : ", under the protein floor";
-      return `<li><span class="ck-rows__key">${esc(f.label)}</span><span>${esc(text)}</span></li>`;
+      if (f.label === "Sleep") return `slept ${f.text.replace(/^(\d[\d.]*) hours/, "$1 hours")}`;
+      if (f.label === "Food" && floorMet !== null) return `${f.text}, ${floorMet ? "at or above" : "under"} the protein target`;
+      return f.text;
     })
-    .join("");
+    .join(" · ");
 }
 export function todayBandHTML(edition, b, base = "/") {
   const todayIso = (edition && edition.as_of) || "";
@@ -132,26 +129,26 @@ export function todayBandHTML(edition, b, base = "/") {
   const today = detail.find((d) => d.date === todayIso);
   const yIso = dayBefore(todayIso);
   const yesterday = detail.find((d) => d.date === yIso);
-  const out = [];
+  const rows = [];
   const morning = morningLine(week, todayIso);
-  const dayLink = (iso, text) => `<p><a class="ck-link" href="${esc(base)}day/?d=${esc(iso)}">${esc(text)}</a></p>`;
+  const row = (key, text, href) => `<li><span class="ck-rows__key">${esc(key)}</span><span>${esc(text)}${href ? ` <a class="ck-link" href="${esc(href)}">The full day</a>` : ""}</span></li>`;
   if (today) {
-    const rows = `${morning ? `<li><span class="ck-rows__key">Weight</span><span>${esc(morning)}</span></li>` : ""}${factRows(today.facts, { skip: morning ? ["Weight"] : [] })}`;
-    out.push(`<p class="ck-label">This morning</p><ul class="ck-rows">${rows}</ul>`);
-    if (/recovery/i.test(rows)) out.push(small(`${RECOVERY_GLOSS.charAt(0).toUpperCase()}${RECOVERY_GLOSS.slice(1)}.`));
+    const rest = factLine(today.facts, { skip: ["Weight"] });
+    rows.push(row("This morning", [morning || factLine(today.facts.filter((f) => f.label === "Weight")), rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
   } else {
-    out.push(`<p class="ck-label">This morning</p>${soft("Nothing recorded yet today.")}`);
+    rows.push(row("This morning", "Nothing recorded yet today."));
   }
   if (yesterday) {
     const days = week.data.days || [];
     const food = week.data.measures && week.data.measures.food;
     const met = usable(food) ? (food.data.met || [])[days.indexOf(yIso)] : null;
-    const rows = factRows(yesterday.facts, { skip: ["Weight"], floorMet: met === true ? true : met === false ? false : null });
-    out.push(`<p class="ck-label">Yesterday, ${esc(weekdayOf(yIso))}</p>${rows ? `<ul class="ck-rows">${rows}</ul>` : soft("Nothing else was recorded.")}${dayLink(yIso, "Everything recorded yesterday")}`);
+    const line = factLine(yesterday.facts, { skip: ["Weight"], floorMet: met === true ? true : met === false ? false : null });
+    rows.push(row(`Yesterday, ${weekdayOf(yIso)}`, line || "Nothing else was recorded.", `${base}day/?d=${yIso}`));
   }
   const plan = b.life && usable(b.life) && b.life.data.rows && b.life.data.rows.training;
-  if (usable(plan) && /^Planned for today/.test(plan.data.text || "")) out.push(soft(plan.data.text));
-  return out.join("");
+  if (usable(plan) && /^Planned for today: /.test(plan.data.text || "")) rows.push(row("Planned", plan.data.text.replace(/^Planned for today: /, "")));
+  const html = `<ul class="ck-rows">${rows.join("")}</ul>`;
+  return /recovery/i.test(html) ? `${html}${small(RECOVERY_GLOSS)}` : html;
 }
 // What the coaches said today: each line a move, or the block's own plain sentence.
 export function coachTodayHTML(block) {
@@ -167,11 +164,14 @@ export function coachTodayHTML(block) {
 }
 
 // ── the This week band ─────────────────────────────────────────────────────────
-// A measure is "going well" when it was met on at least five days in seven (or the same
-// share of the days recorded); the weight is going well when it ended the week lower than
-// it began. The rule is printed under the lists, so the sort is checkable.
+// A measure is "going well" when its target was met on at least five days in seven (or the
+// same share of the days recorded); the weight is going well when it ended the week lower
+// than it began. The rule is printed under the lists, so the sort is checkable. Training is
+// left out of the sort: its only daily test is "trained", which every day passes, and an
+// unbroken run of training days is the thing the coaches are arguing about, not a win.
 export const WELL_SHARE = 5 / 7;
-const WEEK_NAMES = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Protein" };
+const WEEK_NAMES = { weight: "Weight", sleep: "Sleep", food: "Protein" };
+const WEEK_UNSORTED = new Set(["training"]);
 const WEEK_TRENDS = { weight: "weight", training: "training", sleep: "sleep", food: "protein" };
 export function weekSort(week) {
   const well = [];
@@ -180,7 +180,7 @@ export function weekSort(week) {
   const measures = week.data.measures || {};
   for (const key of week.data.order || Object.keys(measures)) {
     const m = measures[key];
-    if (!usable(m) || !m.data.text) continue;
+    if (WEEK_UNSORTED.has(key) || !usable(m) || !m.data.text) continue;
     const item = { key, name: WEEK_NAMES[key] || key, text: m.data.text };
     if (key === "weight") {
       const v = (m.data.values || []).filter((x) => num(x) !== null);
@@ -201,14 +201,14 @@ export function weekSortHTML(week, base = "/") {
     `<ul class="ck-rows">${items.map((i) => `<li><a class="ck-rows__key" href="${esc(base)}trend/?m=${esc(WEEK_TRENDS[i.key] || i.key)}">${esc(i.name)}</a><span>${esc(i.text)}</span></li>`).join("")}</ul>`;
   const part = (title, items, none) => `<p class="ck-label">${esc(title)}</p>${items.length ? list(items) : soft(none)}`;
   return [
-    part("Going well", well, "Nothing met its mark on five days in seven this week."),
+    part("Going well", well, "Nothing met its target on five days in seven this week."),
     part("Not going well", notWell, "Nothing fell short this week."),
-    small("Going well means the mark was met on at least five days in seven, or the scale ended the week lower than it began."),
+    small("Going well means the target was met on at least five days in seven, or the scale ended the week lower than it began."),
   ].join("");
 }
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.
 export function firstSentences(text, max = 260) {
-  const sentences = String(text || "").replace(/\s+/g, " ").trim().match(/[^.!?]+[.!?]+(?=\s|$)/g) || [];
+  const sentences = String(text || "").replace(/\s+/g, " ").trim().match(/(?:[^.!?]|[.!?](?!\s|$))+[.!?]+(?=\s|$)/g) || [];
   let out = "";
   for (const s of sentences) {
     if (out && (out + s).length > max) break;
@@ -220,7 +220,10 @@ export function firstSentences(text, max = 260) {
 // The lead coach's weekly read (GET /api/weekly_priority): who, when, and its opening.
 export function leadReadHTML(body, base = "/") {
   const text = body && typeof body.weekly_priority === "string" ? body.weekly_priority : "";
-  const lead = firstSentences(text);
+  // The read usually opens with a recap of numbers the page already shows; what a weekly
+  // reader wants is what the lead asked for, so start from the sentence that names it.
+  const at = text.search(/[^.!?]*\bpriority\b/i);
+  const lead = firstSentences(at > 0 ? text.slice(at).trim() : text);
   const day = dayInWords(body && body.data_through);
   if (!lead || !day || !body.coach_name) return soft("The lead coach’s read of the week is not served right now.");
   const first = String(body.coach_name).split(" ")[0];

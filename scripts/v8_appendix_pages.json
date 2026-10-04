@@ -18,7 +18,7 @@
     {"url": "/method/explorer/", "title": "Explorer", "line": "The raw record for the day as a plain table.", "kind": "data"},
     {"url": "/data/glucose/", "title": "Glucose and meals", "line": "Blood sugar against meals, for the periods a sensor is worn.", "kind": "data"},
     {"url": "/data/habits/", "title": "Habits", "line": "Daily habits as a ninety-day grid, with where the misses fall.", "kind": "data"},
-    {"url": "/method/kitchen/", "title": "Kitchen", "line": "A placeholder for what meals do to blood sugar.", "kind": "data"},
+    {"url": "/method/kitchen/", "title": "Kitchen", "line": "Planned: what meals do to blood sugar. Nothing is here yet.", "kind": "data"},
     {"url": "/data/ledger/", "title": "Ledger", "line": "Money given, earned and forfeited under the experiment’s rules.", "kind": "data"},
     {"url": "/data/mind/", "title": "Mood and journal", "line": "How the week felt, set beside what the numbers said.", "kind": "data"},
     {"url": "/data/nutrition/", "title": "Nutrition", "line": "Calories and protein against target, and where the deficit comes from.", "kind": "data"},

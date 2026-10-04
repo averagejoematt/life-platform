@@ -19,6 +19,7 @@ import { dayInWords } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import * as F from "/assets/js/ck_front.js";
 import { sheetLine } from "/assets/js/ck_sheet.js";
+import { lastCallHTML, nextCallHTML } from "/assets/js/ck_call.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -301,8 +302,12 @@ export function teamHTML(coachesBody, base = "") {
 // measured result ("point") shows its number; a direction call's stored result is a slope,
 // which is not a reader's number, so it shows the date alone.
 export function verdictPick(coachesBody) {
+  // A conditional ("If dinner is disrupted…") is graded on its outcome with the condition
+  // never checked, so it is no example of a right or a wrong call. A claim that quotes a
+  // raw date is machine wording and is passed over too.
+  const conditional = /^\s*(if|once|when|unless|should)\b/i;
   const calls = ((coachesBody && coachesBody.coaches) || [])
-    .filter((c) => c && c.latest_checked && c.latest_checked.claim)
+    .filter((c) => c && c.latest_checked && c.latest_checked.claim && !conditional.test(c.latest_checked.claim) && !/\b20\d\d-\d\d-\d\d\b/.test(c.latest_checked.claim))
     .map((c) => ({ coach: c.name, ...c.latest_checked }));
   const newest = (status) => {
     const of = calls.filter((c) => c.status === status).sort((a, b) => String(b.outcome_date).localeCompare(String(a.outcome_date)));
@@ -318,6 +323,22 @@ export function verdictsHTML(coachesBody) {
     const inRange = call.status === "confirmed" && /interval|range|between/i.test(call.claim) ? ", inside the range given" : "";
     const result = call.eval_type === "point" && num(call.actual_value) !== null ? `The result was ${Number(call.actual_value.toFixed(1))}${inRange}. ` : "";
     return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.coach)}: “${esc(call.claim)}”</b></p>${soft(`${result}Checked ${shortDay(call.outcome_date)}.`)}</div>`;
+  };
+  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+}
+
+// The same pair from the settled calls that have a page (GET /api/calls): the newest right
+// and the newest wrong, each a call that named its number, its day and its result, and each
+// a door to its own page. "" when the route has nothing, so the caller can fall back.
+export function callVerdictsHTML(callsBody, base = "/") {
+  const calls = ((callsBody && callsBody.calls) || []).filter((c) => c && c.id && c.called_short && c.kind !== "bet");
+  const pick = (verdict) => calls.find((c) => c.verdict === verdict) || null;
+  const [right, wrong] = [pick("right"), pick("wrong")];
+  if (!right && !wrong) return "";
+  const card = (call, tag, cls) => {
+    if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call with a page has been found ${tag.toLowerCase()} yet.`)}</div>`;
+    const day = shortDay(call.settled_date);
+    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p>${soft(day ? `Checked ${day}.` : "")}<p><a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">The whole call</a></p></div>`;
   };
   return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
 }
@@ -339,12 +360,19 @@ const fill = (id, html) => {
 
 async function mountFront(edition, b) {
   const base = document.body.dataset.ckBase || "/";
-  // The fixed top: his own dated note (or the plain sentence that there is none), the
-  // record beside the premise, the daily mark, and the next call with its date.
-  fill("ck-words", hisWordsHTML(b.his_words));
+  // The fixed top: the record beside the premise, the daily mark, his own dated note when
+  // there is a fresh one, and the coaches' last settled call with the next one due.
   fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
-  fill("ck-mark", F.markHTML(usable(b.week) ? b.week.data.weight_series : null, edition.as_of));
+  const t = usable(b.today) ? b.today.data : {};
+  fill("ck-mark", F.markHTML(usable(b.week) ? b.week.data.weight_series : null, edition.as_of, t.start_weight_lbs, t.goal_weight_lbs));
   fill("ck-mark-caption", F.markCaption(b.today, edition) || esc((b.today && b.today.absent_text) || ""));
+  // His words lead when they are fresh. Silence is not a headline: the plain sentence that
+  // there is nothing new sits at the foot of the week instead.
+  if (hisWordsFresh(b.his_words)) fill("ck-words", hisWordsHTML(b.his_words));
+  else {
+    document.getElementById("ck-words")?.remove();
+    fill("ck-words-absent", esc((b.his_words && b.his_words.absent_text) || ""));
+  }
   fill("ck-bet", betHTML(b.next));
   // Today: the last 24 hours.
   fill("ck-today-label", esc(`Today · ${dayInWords(edition.as_of)}`));
@@ -358,11 +386,25 @@ async function mountFront(edition, b) {
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
   fill("ck-quotes", F.quotesHTML(b.chapter, null, base));
-  const [read, transcript, character] = await Promise.all([tryJSON("/api/weekly_priority"), transcriptUrl ? tryJSON(transcriptUrl) : null, tryJSON("/api/character")]);
+  const [calls, read, transcript, character] = await Promise.all([
+    tryJSON("/api/calls"),
+    tryJSON("/api/weekly_priority"),
+    transcriptUrl ? tryJSON(transcriptUrl) : null,
+    tryJSON("/api/character"),
+  ]);
+  // The last settled call, and the next one with its date. Until the route answers, the
+  // bet card above stands in for "next".
+  const last = lastCallHTML(calls, base);
+  if (last) {
+    const next = nextCallHTML(calls);
+    fill("ck-call", `${last}${next}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`);
+    if (next) document.getElementById("ck-bet")?.remove();
+  }
+  if (calls && calls.simple_guess_words) fill("ck-guess", esc(calls.simple_guess_words));
   fill("ck-lead-read", F.leadReadHTML(read, base));
-  const sheet = sheetLine(character);
-  if (sheet) fill("ck-sheet-line", `<a class="ck-link" href="${esc(base)}sheet/">${esc(`The whole of it: ${sheet.charAt(0).toLowerCase()}${sheet.slice(1)}`)}</a>`);
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
+  const sheet = sheetLine(character);
+  if (sheet) fill("ck-sheet-line", `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>`);
 }
 
 async function mountStart(edition, b) {
@@ -386,10 +428,12 @@ async function mountStory(edition, b) {
 }
 
 async function mountCoaches(edition, b) {
-  const [coaches, docket] = await Promise.all([tryJSON("/api/coaches"), tryJSON("/api/coach_docket")]);
+  const base = document.body.dataset.ckBase || "/";
+  const [coaches, docket, calls] = await Promise.all([tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")]);
   fill("ck-record-big", recordBigHTML(b.record));
-  fill("ck-team", teamHTML(coaches, document.body.dataset.ckBase || "/") || soft("The team is not served right now."));
-  fill("ck-verdicts", verdictsHTML(coaches) || soft("No checked call is served right now."));
+  fill("ck-team", teamHTML(coaches, base) || soft("The team is not served right now."));
+  const pair = callVerdictsHTML(calls, base);
+  fill("ck-verdicts", pair ? `${pair}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>` : verdictsHTML(coaches) || soft("No checked call is served right now."));
   const bet = b.next && b.next.data && b.next.data.bet;
   fill("ck-bet", `${betHTML(b.next)}${soft(moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""))}`);
 }

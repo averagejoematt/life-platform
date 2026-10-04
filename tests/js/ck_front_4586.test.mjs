@@ -21,27 +21,31 @@ const TODAY = edition.as_of;
 const SERIES = B.week.data.weight_series;
 const GONE = { state: "unavailable", absent_text: "Not served right now.", data: null };
 
+const START = B.today.data.start_weight_lbs;
+const GOAL = B.today.data.goal_weight_lbs;
+
 test("the mark is always 28 cells ending today, whatever was recorded", () => {
-  const cells = F.markDays(SERIES, TODAY);
+  const cells = F.markDays(SERIES, TODAY, START, GOAL);
   assert.equal(cells.length, F.MARK_DAYS);
   assert.equal(cells[cells.length - 1].date, TODAY);
-  assert.equal(F.markDays([], TODAY).length, F.MARK_DAYS);
-  assert.ok(F.markDays([], TODAY).every((c) => c.kind === "none"));
+  assert.ok(F.markDays([], TODAY, START, GOAL).every((c) => c.gone === null));
 });
 
-test("a cell is down or up against the weigh-in before it, and a missed day is not a guess", () => {
-  const cells = F.markDays([{ date: "2026-10-01", lbs: 312 }, { date: "2026-10-03", lbs: 311 }, { date: "2026-10-04", lbs: 311.5 }], "2026-10-04", 5);
-  assert.deepEqual(cells.map((c) => c.kind), ["none", "first", "none", "down", "up"]);
-  const level = F.markDays([{ date: "2026-10-03", lbs: 311 }, { date: "2026-10-04", lbs: 311 }], "2026-10-04", 2);
-  assert.equal(level[1].kind, "up", "a level day is not counted as down");
+test("a column's green is the share of the whole distance gone that day; a missed day is a gap, never a guess", () => {
+  const cells = F.markDays([{ date: "2026-10-02", lbs: 300 }, { date: "2026-10-04", lbs: 250 }], "2026-10-04", 350, 150, 3);
+  assert.deepEqual(cells.map((c) => c.gone), [0.25, null, 0.5]);
+  const over = F.markDays([{ date: "2026-10-04", lbs: 360 }], "2026-10-04", 350, 150, 1);
+  assert.equal(over[0].gone, 0, "above the start weight draws no green, never a negative bar");
+  assert.equal(F.markDays(SERIES, TODAY, START, null)[27].gone, null, "no goal: no drawing");
 });
 
-test("the mark draws one rect per day and says what it shows to a screen reader", () => {
-  const html = F.markHTML(SERIES, TODAY);
-  assert.equal((html.match(/<rect /g) || []).length, F.MARK_DAYS);
-  assert.match(html, /role="img" aria-label="The last 28 days: \d+ days? down, \d+ up or level/);
-  assert.equal(F.markHTML([], TODAY), "", "no weigh-ins: no drawing");
-  assert.equal(F.markHTML(SERIES, ""), "");
+test("the mark draws two rects per weighed day and says what it shows to a screen reader", () => {
+  const html = F.markHTML(SERIES, TODAY, START, GOAL);
+  const weighed = F.markDays(SERIES, TODAY, START, GOAL).filter((c) => c.gone !== null).length;
+  assert.equal((html.match(/<rect /g) || []).length, 2 * weighed);
+  assert.match(html, /role="img" aria-label="The last 28 days: 16\.3 of the 142\.3 pounds to the goal are gone as of the latest weigh-in/);
+  assert.equal(F.markHTML([], TODAY, START, GOAL), "", "no weigh-ins: no drawing");
+  assert.equal(F.markHTML(SERIES, "", START, GOAL), "");
 });
 
 test("the mark's caption carries the day, the weight and the distance, from served numbers", () => {
@@ -56,14 +60,16 @@ test("this morning's weight is set against the weigh-in before it", () => {
   assert.equal(F.morningLine(GONE, TODAY), "");
 });
 
-test("the Today band is this morning and yesterday, and links yesterday's full day", () => {
+test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
-  assert.match(html, /<p class="ck-label">This morning<\/p>/);
-  assert.match(html, /<p class="ck-label">Yesterday, Friday<\/p>/);
-  assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-02">Everything recorded yesterday<\/a>/);
-  assert.doesNotMatch(html, /Steps/, "step counts stay off the front page");
-  assert.match(html, /recovery is the wrist strap’s morning score out of 100|Recovery is the wrist strap’s morning score out of 100/);
+  assert.match(html, /<span class="ck-rows__key">This morning<\/span><span>311\.0 lb, the same as Friday\./);
+  assert.match(html, /<span class="ck-rows__key">Yesterday, Friday<\/span>/);
+  assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-02">The full day<\/a>/);
+  assert.match(html, /at or above the protein target/);
+  assert.doesNotMatch(html, /Steps|9,913|1,113/, "step counts stay off the front page");
+  assert.match(html, /Recovery is the wrist strap’s morning score out of 100\./);
   assert.doesNotMatch(html, /Thursday|October 1/, "nothing older than yesterday");
+  assert.ok((html.match(/<li>/g) || []).length <= 3, "at most three rows");
   assert.match(F.todayBandHTML(edition, { ...B, week: GONE }, "/"), /Not served right now\./);
 });
 
@@ -90,7 +96,8 @@ test("the week is sorted by the printed rule: five days in seven, or a lower sca
   assert.match(html, /<p class="ck-label">Going well<\/p>/);
   assert.match(html, /<p class="ck-label">Not going well<\/p>/);
   assert.match(html, /href="\/next\/v8\/trend\/\?m=protein">Protein<\/a>/);
-  assert.match(html, /Going well means the mark was met on at least five days in seven/);
+  assert.match(html, /Going well means the target was met on at least five days in seven/);
+  assert.doesNotMatch(html, /Train/, "an unbroken run of training days is not sorted as a win");
   assert.match(F.weekSortHTML(GONE), /Not served right now\./);
 });
 
@@ -109,7 +116,9 @@ test("first sentences are whole sentences inside the limit", () => {
 test("the lead coach's read is quoted with its author, as an AI, and its date", () => {
   const html = F.leadReadHTML(load("weekly_priority"), "/next/v8/");
   assert.match(html, /Eli Marsh, the AI lead coach, on Monday, September 28/);
-  assert.match(html, /“I'm watching Matthew execute with precision/);
+  assert.match(html, /“The one priority I've asked him to address next is his protein intake/);
+  assert.doesNotMatch(html, /execute with precision/, "the recap of numbers is skipped for what the lead asked for");
+  assert.match(F.leadReadHTML({ weekly_priority: "A plain read. Nothing else.", coach_name: "Eli Marsh", data_through: "2026-09-28" }), /“A plain read\. Nothing else\.”/);
   assert.match(F.leadReadHTML(null), /not served right now/);
   assert.match(F.leadReadHTML({ weekly_priority: "A read.", coach_name: "Eli Marsh" }), /not served right now/, "no date, no quote");
 });
@@ -139,7 +148,7 @@ test("the follow box says what arrives next and when", () => {
 
 test("nothing the builders emit carries an honorific, an ISO date in text, or a first-person line", () => {
   const all = [
-    F.markCaption(B.today, edition), F.todayBandHTML(edition, B, "/"), F.coachTodayHTML(B.coach_lines), F.weekSortHTML(B.week, "/"),
+    String(F.markCaption(B.today, edition)), F.todayBandHTML(edition, B, "/"), F.coachTodayHTML(B.coach_lines), F.weekSortHTML(B.week, "/"),
     F.followLine(B.next), F.weekSpan(B.week),
   ].join("\n").replace(/<[^>]+>/g, " ");
   assert.doesNotMatch(all, /\bDr\.\s/);

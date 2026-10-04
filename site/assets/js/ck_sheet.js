@@ -107,7 +107,16 @@ export function badgesHTML(body) {
   if (!all.length) return soft("The badges are not served right now.");
   const earned = all.filter((a) => a.earned && a.earned_date).sort((a, b) => String(b.earned_date).localeCompare(String(a.earned_date)));
   if (!earned.length) return soft(`None of the ${all.length} badges has been earned yet.`);
-  const rows = earned.map((a) => `<li><span class="ck-rows__key">${esc(shortDay(a.earned_date))}</span><span>${esc(a.label)}${a.description ? ` <span class="ck-soft">${esc(a.description)}.</span>` : ""}</span></li>`).join("");
+  // A badge whose description only repeats its name ("Lost 10 lbs" / "Lost 10 lbs from
+  // starting weight") prints the description alone.
+  const rows = earned
+    .map((a) => {
+      const desc = String(a.description || "");
+      const repeats = desc.toLowerCase().startsWith(String(a.label).toLowerCase());
+      const text = repeats ? esc(`${desc}.`) : `${esc(a.label)}${desc ? ` <span class="ck-soft">${esc(desc)}.</span>` : ""}`;
+      return `<li><span class="ck-rows__key">${esc(shortDay(a.earned_date))}</span><span>${text}</span></li>`;
+    })
+    .join("");
   return `${soft(`${earned.length} of ${all.length} earned so far.`)}<ul class="ck-rows">${rows}</ul>`;
 }
 

@@ -103,14 +103,24 @@ test("the bet card states the question, the date and both sides", () => {
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-05" }] }, "2026-10-05"), "");
 });
 
-test("one right and one wrong, each with a plain measured result", () => {
+test("one right and one wrong, never a conditional or a claim that quotes a raw date", () => {
   const { right, wrong } = P.verdictPick(load("coaches"));
   assert.equal(right.status, "confirmed");
   assert.equal(wrong.status, "refuted");
-  assert.equal(wrong.eval_type, "point");
-  const html = P.verdictsHTML(load("coaches"));
-  assert.match(html, /The result was 166\. Checked October 3\./);
+  for (const c of [right, wrong]) assert.doesNotMatch(c.claim, /^\s*(if|once|when)\b|\b20\d\d-\d\d-\d\d\b/i);
   assert.equal(P.verdictsHTML({ coaches: [] }), "");
+});
+
+test("the showcase pair comes from the settled calls that have a page, each a door to it", () => {
+  const calls = load("calls");
+  const html = P.callVerdictsHTML(calls, "/next/v8/");
+  const right = calls.calls.find((c) => c.verdict === "right" && c.kind !== "bet");
+  const wrong = calls.calls.find((c) => c.verdict === "wrong" && c.kind !== "bet");
+  assert.ok(html.includes(right.called_short.replace(/’/g, "’")) || html.includes("Right"));
+  assert.match(html, new RegExp(`href="/next/v8/call/\\?id=${right.id}"`));
+  if (wrong) assert.match(html, new RegExp(`href="/next/v8/call/\\?id=${wrong.id}"`));
+  assert.equal(P.callVerdictsHTML(null), "");
+  assert.equal(P.callVerdictsHTML({ calls: [] }), "");
 });
 
 test("the recap skips an editor's note and never prints a clipped sentence", () => {
