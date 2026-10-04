@@ -935,7 +935,7 @@ def test_packet_empty_week_still_renders_every_mandatory_section():
         "=== DAY GRADES ===",
         "=== HABIT PERFORMANCE ===",
         "=== NUTRITION ===",
-        "=== JOURNAL (OFF THE RECORD — never quote directly) ===",
+        cd.story_checks.OFF_RECORD_JOURNAL_HEADER,  # #4538: the story door's one label, not a second copy
         "=== STATE OF MIND (How We Feel) ===",
         "=== WEATHER (Seattle) ===",
     ):

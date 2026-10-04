@@ -65,6 +65,33 @@ def test_ordinary_language_passes(text):
     assert story_checks.story_door(text) == [], text
 
 
+def test_the_shared_reader_surface_check_blocks_counts_and_off_record_specifics():
+    """#4538: ``reader_surface`` is the one function all three publishing paths call. A numbered label is not a
+    tally, a bare relation word without the possessive is not a third party, and the journal's label says so."""
+    blocked = [
+        "The Seventeenth Start",
+        "16 prior attempts",
+        "his third try at this",
+        "his wife had noticed first",
+        "Matt's boss moved the deadline",
+        "the hours his day job takes",
+        "since he took the job at Initech",
+    ]
+    assert [t for t in blocked if not story_checks.reader_surface(t)] == []
+    passes = [
+        "Day 3 starts with a walk",
+        "week two tries his patience",
+        "the second session of the week",
+        "his training partner is the plan itself",
+        "the job at hand is sleep",
+        "a family of metrics that move together",
+    ]
+    assert {t: story_checks.reader_surface(t) for t in passes if story_checks.reader_surface(t)} == {}
+    assert story_checks.story_door("The Seventeenth Start") == story_checks.reader_surface("The Seventeenth Start")  # one check
+    label = story_checks.OFF_RECORD_JOURNAL_HEADER
+    assert "OFF THE RECORD" in label and "third party" in label and "career" in label
+
+
 def test_backstage_words_are_blocked():
     assert story_checks.story_door("the desk flagged something worth putting on the table")
 

@@ -6,6 +6,19 @@ memory. Facade state via `_g` (the module's live globals), the #1654 split shape
 
 import json
 
+from content import story_checks
+
+
+def door_reasons(text: str) -> list:
+    """The shared reader-surface check (#4538) as a Panel hold reason: a cycle/reset/attempt count or an off-record
+    specific in a spoken line holds the episode, exactly as a blocked vice does — on the desk AND the legacy writer."""
+    return ["story-door"] if story_checks.reader_surface(text) else []
+
+
+def door_safe(text: str) -> str:
+    """A title or excerpt that fails the door is not published: the episode falls back to its bare number."""
+    return "" if story_checks.reader_surface(text or "") else (text or "")
+
 
 def desk_episode(post: dict, *, _g) -> dict | None:
     """The Story Desk's episode for this week's chronicle, or None (legacy path)."""
@@ -32,6 +45,8 @@ def publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False, *, _
     ]
     turns = [t for t in turns if t["line"]]
     unsafe = [r for t in turns for r in _g["_safety_gate"](t["line"])]
+    # the title and the excerpt are reader copy too, and neither is a spoken turn (#4538)
+    unsafe += door_reasons(f"{ep.get('title') or post.get('title') or ''}\n{ep.get('excerpt') or ''}")
     if unsafe:
         if dry_run:
             return _g["_dry"](week, "HOLD", stage="desk-safety", reasons=sorted(set(unsafe)))

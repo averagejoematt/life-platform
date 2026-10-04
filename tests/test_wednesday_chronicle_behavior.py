@@ -1040,6 +1040,18 @@ def test_an_installment_that_fails_the_privacy_gate_is_never_stored_or_mailed(en
     assert _stored_installment(env) is None
 
 
+def test_a_title_that_counts_attempts_holds_the_week_at_the_story_door(env):
+    """#4538 (owner ruling 2026-09-26): the handler's own chokepoint runs the shared reader-surface check on the
+    title, the stat line and the body — whichever writer produced them. The fixture's clean title publishes in every
+    other test of this file; the same installment under a counted title is held, unstored and unmailed."""
+    env["state"]["ai"] = RAW_INSTALLMENT.replace(TITLE, "The Fifteenth Reset, or: What the Body Remembers")
+    resp = m.lambda_handler({}, None)
+    body = json.loads(resp["body"])
+    assert body["status"] == "story_door_hold" and "Fifteenth Reset" in body["findings"][0]
+    assert env["ses"].sent == [] and _stored_installment(env) is None
+    assert _pending_marker(env)["reason"] == "story_door_hold"
+
+
 def test_a_privacy_held_week_leaves_a_marker_explaining_the_gap(env):
     def _boom(text, context=""):
         raise privacy_guard.PrivacyViolation([("name", "a real public figure")])

@@ -103,3 +103,20 @@ def test_an_unsafe_desk_line_is_held_not_voiced(monkeypatch):
     ep = dict(DESK["episode"], turns=[{"speaker": "elena", "line": "He weighed 312 pounds and that led to the drop."}])
     out = panel._publish_desk_episode(4, {"date": "2026-09-29"}, ep, dry_run=True)
     assert "HOLD" in json.dumps(out)
+
+
+def test_a_counted_title_or_line_is_blocked_on_the_panel_desk_and_legacy_paths(monkeypatch):
+    """#4538: one shared check (content.story_checks.reader_surface) guards the Panel on both writers. The desk
+    path holds on a counted title or excerpt (neither is a spoken turn); the per-line gate both writers share
+    holds on a counted line; the legacy writer's title and excerpt fall back to nothing rather than publish."""
+    _wire(monkeypatch)
+    post = {"date": "2026-09-29"}
+    assert "PUBLISH" in json.dumps(panel._publish_desk_episode(4, post, DESK["episode"], dry_run=True))  # mutation control
+    for field in ("title", "excerpt"):
+        out = json.dumps(panel._publish_desk_episode(4, post, dict(DESK["episode"], **{field: "The Fifteenth Reset"}), dry_run=True))
+        assert "HOLD" in out and "story-door" in out, field
+    assert "story-door" in panel._safety_gate("That makes sixteen attempts, by his own count.")
+    assert "story-door" in panel._safety_gate("You could hear it when his wife asked about the plan.")
+    assert panel._safety_gate("Day 3 starts with a walk, and the second session went long.") == []  # ordinary speech passes
+    desk = panel._panel_desk()
+    assert desk.door_safe("The Seventeenth Start") == "" and desk.door_safe("The Body Answers Back") == "The Body Answers Back"
