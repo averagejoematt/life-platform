@@ -179,6 +179,17 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
             logger.error("[recap] privacy violation — dropping recap: %s", e)
             return None
 
+        # Guard 4b — the story door (#4538): the same reader-surface check the chronicle and the Panel face. A recap
+        # that counts cycles/resets/attempts, or carries off-record specifics, is dropped — every reader-visible field.
+        from content import story_checks
+
+        door = story_checks.reader_surface(
+            "\n".join([story, out["where_we_are_now"], *(b["beat"] for b in beats), *out["threads_to_watch"]])
+        )
+        if door:
+            logger.error("[recap] story-door findings — dropping recap: %s", door)
+            return None
+
         # Guard 5 — thin history: with <2 published installments, keep only the
         # one-line story_so_far (the prompt is told this, but enforce it too).
         if len(allowed) < 2:

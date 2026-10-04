@@ -149,6 +149,20 @@ def test_privacy_gate_drops_recap(monkeypatch):
     assert chron.build_recap(_data()) is None
 
 
+def test_story_door_drops_a_recap_that_counts_attempts(monkeypatch):
+    """#4538: the recap faces the same shared check as the chronicle and the Panel — in every reader-visible field."""
+    clean = {"story_so_far": "He began again.", "recent_beats": [], "where_we_are_now": "Steady.", "threads_to_watch": ["the rest day"]}
+    _mock_llm(monkeypatch, clean)
+    assert chron.build_recap(_data())["story_so_far"] == "He began again."  # mutation control: clean copy survives
+    for field, bad in (
+        ("story_so_far", "This is his sixteenth attempt, and it shows."),
+        ("where_we_are_now", "Fifteen resets in, the plan holds."),
+        ("threads_to_watch", ["whether cycle 17 outlasts the others"]),
+    ):
+        _mock_llm(monkeypatch, {**clean, field: bad})
+        assert chron.build_recap(_data()) is None, field
+
+
 def test_build_recap_is_failsoft(monkeypatch):
     def _raise(system, user):
         raise RuntimeError("bedrock down")
