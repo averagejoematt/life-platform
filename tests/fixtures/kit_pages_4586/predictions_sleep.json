@@ -1,0 +1,214 @@
+{
+ "predictions": [
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery score tomorrow will be 90.6% with 80% interval running from 66.8% to 100%",
+   "status": "pending",
+   "date": "2026-10-03",
+   "due_date": "2026-10-17",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Once morning notes resume and protein stabilizes above 145 grams, the recovery interval will narrow in a defensible direction",
+   "status": "pending",
+   "date": "2026-10-03",
+   "due_date": "2026-10-17",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery will be around 75.8% tomorrow",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery score tomorrow will be 64.7%",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery running average shows downward movement over the last seven days",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "If protein holds above 145 grams for three consecutive days, deep sleep architecture improvement will become interpretable",
+   "status": "pending",
+   "date": "2026-10-02",
+   "due_date": "2026-10-16",
+   "metric": "total_protein_g",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery tomorrow will be approximately 64.7%, with an 80% confidence interval of 41.9–87.5%.",
+   "status": "pending",
+   "date": "2026-10-01",
+   "due_date": "2026-10-15",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery running average over the past seven days has declined, but this is likely regression-to-mean rather than a confirmed directional trend.",
+   "status": "pending",
+   "date": "2026-10-01",
+   "due_date": "2026-10-15",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery score will be approximately 85.3% tomorrow, with 80% confidence interval of 60.9–100%",
+   "status": "pending",
+   "date": "2026-09-26",
+   "due_date": "2032-04-13",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery will be 89.1% tomorrow (80% prediction interval 64.6–100%)",
+   "status": "pending",
+   "date": "2026-09-25",
+   "due_date": "2026-10-09",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Protein EWMA approaching 151.6g/day will activate protein-slow-wave hypothesis once protein stabilizes and subjective sleep quality data is available",
+   "status": "pending",
+   "date": "2026-09-24",
+   "due_date": "2026-10-08",
+   "metric": "total_protein_g",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Model expects 84.8% recovery tomorrow (80% interval 60.5–100%)",
+   "status": "pending",
+   "date": "2026-09-24",
+   "due_date": "2026-10-08",
+   "metric": "recovery_score",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery score will be 83.7% tomorrow (80% confidence interval 58–100%).",
+   "status": "pending",
+   "date": "2026-09-23",
+   "due_date": "2026-10-07",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Protein-slow-wave hypothesis could activate once protein EWMA reaches 145g+ threshold.",
+   "status": "pending",
+   "date": "2026-09-23",
+   "due_date": "2026-10-14",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Protein hypothesis will activate once protein EWMA holds at 145g or above for a sustained week.",
+   "status": "pending",
+   "date": "2026-09-22",
+   "due_date": "2029-07-03",
+   "metric": "total_protein_g",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Recovery score is expected to hold around 90.9% on 2026-09-20 based on current model",
+   "status": "pending",
+   "date": "2026-09-21",
+   "due_date": "2026-10-05",
+   "metric": "recovery_score",
+   "eval_type": "point"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Once protein EWMA escalation holds for another week at 145+ g/day, deep sleep percentage should show measurable improvement as the protein-slow-wave mechanism activates.",
+   "status": "pending",
+   "date": "2026-09-20",
+   "due_date": "2029-07-01",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Protein intake gap (currently 102.3 g/day vs. 190 g target) is suppressing slow-wave architecture through tryptophan availability and anabolic signaling pathways.",
+   "status": "pending",
+   "date": "2026-09-18",
+   "due_date": "2026-10-09",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Deep sleep percentage will rise as Zone 2 training volume builds, driven by adenosine accumulation from sustained aerobic work.",
+   "status": "pending",
+   "date": "2026-09-18",
+   "due_date": "2026-10-09",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Deep sleep percentage will rise as Zone 2 training volume builds and adenosine accumulation increases, measured against the current 21.1% EWMA baseline.",
+   "status": "pending",
+   "date": "2026-09-17",
+   "due_date": "2026-10-08",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  },
+  {
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "text": "Slow-wave sleep will increase in weeks two and three as training volume builds, contingent on Zone 2 work beginning.",
+   "status": "pending",
+   "date": "2026-09-15",
+   "due_date": "2026-10-06",
+   "metric": "deep_pct",
+   "eval_type": "directional"
+  }
+ ]
+}
