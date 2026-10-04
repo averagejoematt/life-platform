@@ -1,7 +1,7 @@
 """Privacy guard — the chronicle generator must never name real public figures.
 
-The platform casts a *fictional* Board of Directors (Dr. Victor Reyes, Dr. Kai
-Nakamura, Dr. Marcus Webb, Dr. Lisa Park, …). The live Elena prompt builds those
+The platform casts a *fictional* Board of Directors (Victor Reyes, Kai
+Nakamura, Marcus Webb, Lisa Park, …). The live Elena prompt builds those
 names from the S3 board config, but the in-code `_FALLBACK_ELENA_PROMPT` (which
 fires only if that S3 load fails) once hardcoded the real public figures the
 personas are modelled on — a leak that would have published real people as
@@ -29,6 +29,4 @@ def test_fallback_prompt_references_the_fictional_board():
     # Guard the positive: the fallback's Board paragraph must name fictional personas,
     # so a future edit that strips the names doesn't quietly regress to generic-or-real.
     text = _SRC.read_text()
-    assert any(
-        n in text for n in ("Dr. Reyes", "Dr. Nakamura", "Dr. Webb", "Dr. Park")
-    ), "fallback Board paragraph lost its fictional persona names"
+    assert any(n in text for n in ("Reyes", "Nakamura", "Webb", "Park")), "fallback Board paragraph lost its fictional persona names"

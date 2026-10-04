@@ -71,7 +71,7 @@ def test_corrections_ride_user_message_not_cached_system(monkeypatch):
     )
     assert "315" in corrections_block  # guard: the block really carries the corrected figure
 
-    system_prefix = "You are Dr. Sarah Chen, metabolic specialist. " + "voice rules " * 400  # the cached prefix
+    system_prefix = "You are Sarah Chen, metabolic specialist. " + "voice rules " * 400  # the cached prefix
     user_message = "TODAY'S DATA: weight 321.4 lbs\n\n" + corrections_block
 
     ai_calls.call_anthropic(user_message, system=system_prefix, cache_system=True, max_tokens=10)

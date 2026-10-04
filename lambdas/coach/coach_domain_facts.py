@@ -422,7 +422,7 @@ def _weekly_priority_lines(table) -> list:
 
 
 def _labs_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
-    """Dr. Adaeze Obi (labs): the real draw record, read from the SAME facts the analyzer uses.
+    """Adaeze Obi (labs): the real draw record, read from the SAME facts the analyzer uses.
 
     #3792: there was no `labs` entry in _PACKS at all, so the labs coach received NO domain
     facts and narrated its own window from persona memory. Live on 2026-09-15T17:07Z, five

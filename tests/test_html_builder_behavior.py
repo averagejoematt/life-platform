@@ -1532,12 +1532,12 @@ def test_v2_coach_headers_derive_their_display_name_from_the_persona_registry():
     display name for that coach, upper-cased — never a hand-typed literal.
 
     `DR. VICTOR REYES — PHYSICAL INTELLIGENCE` survived the 2026-08-10 rename
-    to Dr. Max Reyes for six weeks because the header string was typed, not
+    to Max Reyes for six weeks because the header string was typed, not
     derived, so nothing pointed at `config/coaches/physical_coach.json`. This
     reads the expected name LIVE from `persona_registry.display_name` — the
     same registry `content.brief_format.v2_coach_header_titles` calls —
     imported independently here (not reached via `hb`) rather than hardcoding
-    "Dr. Max Reyes": a future rename updates the registry and this assertion
+    "Max Reyes": a future rename updates the registry and this assertion
     together, so the test never goes stale the way the header did.
 
     Mutation control (#4360, run by hand, not part of the suite — restoring a
@@ -1551,7 +1551,7 @@ def test_v2_coach_headers_derive_their_display_name_from_the_persona_registry():
           -k test_v2_coach_headers_derive_their_display_name_from_the_persona_registry -q
 
     fails with "physical_coach's header does not carry persona_registry's
-    current display name 'Dr. Max Reyes'" — restoring the real code makes it
+    current display name 'Max Reyes'" — restoring the real code makes it
     pass again.
     """
     from coach.persona_registry import display_name as _persona_display_name
@@ -1579,7 +1579,7 @@ _RETIRED_OR_CURRENT_HAND_TYPED_V2_COACH_HEADER_NAMES = (
     "DR. MARCUS WEBB",
     "DR. SARAH CHEN",
     "DR. NATHAN REEVES",
-    "DR. VICTOR REYES",  # retired 2026-08-10 -> Dr. Max Reyes; the literal this issue found stale
+    "DR. VICTOR REYES",  # retired 2026-08-10 -> Max Reyes; the literal this issue found stale
     "DR. AMARA PATEL",
     "DR. JAMES OKAFOR",
     "DR. HENNING BRANDT",

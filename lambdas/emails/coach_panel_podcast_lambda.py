@@ -528,7 +528,7 @@ def _load_bible() -> dict:
         return {}
 
 
-INTRO_GUEST_ID = "eli_marsh"  # Dr. Eli Marsh — Principal Investigator (the lead)
+INTRO_GUEST_ID = "eli_marsh"  # Eli Marsh — Principal Investigator (the lead)
 # Per-voice loudness trim (dB) — only used by the legacy Chirp stitch path.
 _INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
 # Episode 0 is synthesized single-pass via Gemini (genuine conversation). Map the
@@ -569,7 +569,7 @@ INTRO_COLD_OPEN = (
 def _intro_guest() -> dict:
     p = persona_registry.resolve(INTRO_GUEST_ID, s3, S3_BUCKET) or {}
     return {
-        "name": p.get("name", "Dr. Eli Marsh"),
+        "name": p.get("name", "Eli Marsh"),
         "role": p.get("board_role", "Principal Investigator"),
         "bio": p.get("short_bio", ""),
         "philosophy": p.get("philosophy", ""),
@@ -587,12 +587,12 @@ def _build_intro_script(bible: dict, zeitgeist: list | None = None) -> list:
 def _gate_intro(turns: list, allowed_numbers) -> list:
     """Resolve the two speakers + ER-03 + the Day-Zero hallucination guard (drop any
     line fabricating elapsed time, results, a back-catalogue, or a starting weight)."""
-    eli_aliases = {"eli", "eli_marsh", "dr. eli marsh", "eli marsh", "marsh", "guest", "principal investigator", "pi"}
+    eli_aliases = {"eli", "eli_marsh", "eli marsh", "marsh", "guest", "principal investigator", "pi"}
     clean, dropped = [], 0
     for t in turns:
         if not isinstance(t, dict):
             continue
-        raw = (t.get("speaker") or "").strip().lower()
+        raw = persona_registry.plain_name(t.get("speaker")).lower()  # a model may still label him with the old honorific (#4564)
         if raw in ("elena", "host", "elena_voss"):
             spk = ELENA
         elif raw in eli_aliases:
@@ -622,7 +622,7 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
             "week": 0,
             "title": ep.get("title"),
             "summary": (
-                "Episode 0 introduced the show — who Elena and Matt are, the eight-coach AI team Dr. Eli Marsh runs, "
+                "Episode 0 introduced the show — who Elena and Matt are, the eight-coach AI team Eli Marsh runs, "
                 "and the central bet: can technology and a person's own data genuinely improve a whole life, or is it just "
                 "over-optimization theater?"
             ),
@@ -776,7 +776,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
         + _chars.get("matthew", "")
         + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
-        "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
+        "Elena Voss (host, embedded journalist); Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
         "team — Matt himself designed and built the experiment and the platform)."
     )
 
@@ -924,7 +924,7 @@ def _run_intro(dry_run: bool = False) -> dict:
     # Structured transcript for the on-page reader (speaker-attributed turns + the
     # host's questions as in-page chapter anchors). No audio timestamps exist
     # (single-pass Gemini), so chapters jump within the transcript, not the audio.
-    _name_of = {ELENA: "Elena", INTRO_GUEST_ID: "Dr. Eli Marsh"}
+    _name_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli Marsh"}
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/wk0.transcript.json",
@@ -932,7 +932,7 @@ def _run_intro(dry_run: bool = False) -> dict:
             {
                 "week": 0,
                 "title": "EP0 · Welcome to The Measured Life",
-                "byline": "Elena + Dr. Eli Marsh",
+                "byline": "Elena + Eli Marsh",
                 "turns": [{"speaker": t["speaker"], "name": _name_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns],
             },
             ensure_ascii=False,
@@ -949,7 +949,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         "title": "Episode 0 — Welcome to The Measured Life",
         "date": pacific_today(),
         **published,  # url/bytes/duration_sec from the compressed publish (#1018)
-        "byline": "Elena + Dr. Eli Marsh",
+        "byline": "Elena + Eli Marsh",
         "excerpt": "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
         "transcript_url": "/panelcast/wk0.transcript.json",
     }
@@ -995,7 +995,7 @@ _SENSITIVE_WEEK_RE = re.compile(
 def _gemini_voice(persona_id: str) -> str:
     """Gender-correct Gemini voice, sourced from the persona registry (config/personas.json
     tts_voice) — the single source of truth. The old hardcoded GEMINI_VOICE table had drifted
-    out of sync with persona genders (Dr. Marcus Webb → a female voice, Dr. Sarah Chen → a male
+    out of sync with persona genders (Marcus Webb → a female voice, Sarah Chen → a male
     one). The registry's tts_voice ("en-US-Chirp3-HD-Charon") shares the voice name with Gemini,
     so the suffix IS the Gemini voice. Falls back to the legacy table only if the registry lacks one."""
     tts = persona_registry.tts_voice(persona_id, s3, S3_BUCKET) or ""

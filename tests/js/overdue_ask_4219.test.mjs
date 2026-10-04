@@ -17,16 +17,16 @@ const { daysOverdue, lateWords } = await import("../../site/assets/js/entry_age.
 const NOW = new Date("2026-09-26T19:31:00Z"); // 12:31 PT, Saturday Sep 26
 const row = (coach_id, coach_name, text) => ({ coach_id, coach_name, text, asked_on: "2026-09-12", due: "2026-09-19", status: "pending", check: null, evidence_link: null });
 const OPEN_ACTIONS_0926 = [
-  row("sleep_coach", "Dr. Lisa Park", "Start logging the daily 1-to-5 subjective feeling scale before checking the app"),
-  row("sleep_coach", "Dr. Lisa Park", "(stand-in text 2)"),
-  row("nutrition_coach", "Dr. Marcus Webb", "(stand-in text 3)"),
-  row("mind_coach", "Dr. Nathan Reeves", "(stand-in text 4)"),
-  row("mind_coach", "Dr. Nathan Reeves", "(stand-in text 5)"),
-  row("physical_coach", "Dr. Max Reyes", "(stand-in text 6)"),
-  row("labs_coach", "Dr. James Okafor", "(stand-in text 7)"),
-  row("labs_coach", "Dr. James Okafor", "(stand-in text 8)"),
-  row("labs_coach", "Dr. James Okafor", "(stand-in text 9)"),
-  row("labs_coach", "Dr. James Okafor", "(stand-in text 10)"),
+  row("sleep_coach", "Lisa Park", "Start logging the daily 1-to-5 subjective feeling scale before checking the app"),
+  row("sleep_coach", "Lisa Park", "(stand-in text 2)"),
+  row("nutrition_coach", "Marcus Webb", "(stand-in text 3)"),
+  row("mind_coach", "Nathan Reeves", "(stand-in text 4)"),
+  row("mind_coach", "Nathan Reeves", "(stand-in text 5)"),
+  row("physical_coach", "Max Reyes", "(stand-in text 6)"),
+  row("labs_coach", "James Okafor", "(stand-in text 7)"),
+  row("labs_coach", "James Okafor", "(stand-in text 8)"),
+  row("labs_coach", "James Okafor", "(stand-in text 9)"),
+  row("labs_coach", "James Okafor", "(stand-in text 10)"),
 ];
 
 const text = (html) => {
@@ -52,15 +52,15 @@ test("every open ask overdue: the one ask carries its lateness, and the line say
   const line = text(tq.askLine({ open_actions: OPEN_ACTIONS_0926 }, NOW));
   assert.equal(
     line,
-    "The one ask: “Start logging the daily 1-to-5 subjective feeling scale before checking the app” — Dr. Lisa Park, asked September 12, due September 19 — 7 days late. All ten open asks are past due."
+    "The one ask: “Start logging the daily 1-to-5 subjective feeling scale before checking the app” — Lisa Park, asked September 12, due September 19 — 7 days late. All ten open asks are past due."
   );
   assert.equal(line.split("past due").length - 1, 1);
 });
 
 test("a current ask leads over overdue ones, and the late ones are counted, not hidden", () => {
-  const current = { coach_id: "physical_coach", coach_name: "Dr. Max Reyes", text: "reach 170 g protein per day for seven consecutive days", asked_on: "2026-09-25", due: "2026-10-02", status: "pending" };
+  const current = { coach_id: "physical_coach", coach_name: "Max Reyes", text: "reach 170 g protein per day for seven consecutive days", asked_on: "2026-09-25", due: "2026-10-02", status: "pending" };
   const line = text(tq.askLine({ open_actions: OPEN_ACTIONS_0926.slice(0, 3).concat([current]) }, NOW));
-  assert.equal(line, "The one ask: “reach 170 g protein per day for seven consecutive days” — Dr. Max Reyes, asked September 25, due October 2. Three earlier asks are past due.");
+  assert.equal(line, "The one ask: “reach 170 g protein per day for seven consecutive days” — Max Reyes, asked September 25, due October 2. Three earlier asks are past due.");
   assert.ok(!/late/.test(line));
 });
 

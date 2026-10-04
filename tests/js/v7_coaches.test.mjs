@@ -34,13 +34,13 @@ test("the written time is words, Pacific: Park's 17:01:48Z read is one minute pa
 
 test("the ledger line (#4230): a value call quotes the actual; a directional call says the direction came true and never quotes the slope", () => {
   const value = { claim: "Recovery lands near 60", created_date: "2026-09-10", outcome_date: "2026-09-24", metric: "recovery_score", eval_type: "interval", condition: "gte", threshold: 60, actual_value: 24, status: "refuted" };
-  const l = V.ledgerLine(value, "Dr. Lisa Park");
+  const l = V.ledgerLine(value, "Lisa Park");
   assert.equal(l.verdict, "wrong");
   assert.equal(l.text, "On Thursday, September 10, Park said the night’s recovery would be at or above 60 — it came in at 24.");
   assert.equal(l.checked, "Checked Thursday, September 24.");
   assert.equal(l.claim, "Recovery lands near 60");
   const dir = { claim: null, created_date: "2026-09-17", outcome_date: "2026-09-24", metric: "recovery_score", eval_type: "directional", condition: "up", threshold: null, actual_value: 0.1439, status: "confirmed" };
-  const d = V.ledgerLine(dir, "Dr. Max Reyes");
+  const d = V.ledgerLine(dir, "Max Reyes");
   assert.equal(d.verdict, "right");
   assert.equal(d.text, "On Thursday, September 17, Reyes said the night’s recovery would go up over the checked window — the direction came true.");
   assert.ok(!d.text.includes("0.14"), "the slope must never print as a level");
@@ -57,7 +57,7 @@ test("the recent list: the grader's reason strings become right/wrong lines, who
     { date: "2026-09-10", status: "refuted", metric: "total_calories_kcal_7day_avg", reason: "dispute docket resolved: total_calories_kcal_7day_avg >= 2200 on 2026-08-10" },
     { date: "2026-09-09", status: "pending", metric: "hrv", reason: "" },
   ];
-  const lines = V.recentLines(recent, "Dr. Lisa Park");
+  const lines = V.recentLines(recent, "Lisa Park");
   assert.equal(lines.length, 3, "a pending row is not a checked call");
   assert.equal(lines[0].text, "For Saturday, September 12, Park said the night’s recovery would land near 52.9, give or take 18.6 — it came in at 59.");
   assert.equal(lines[0].checked, "Checked Friday, September 25.");
@@ -119,14 +119,14 @@ const FRESH_LIVE = {
 // glucose, labs → labs; mind, explorer and the lead carry null.
 const COACHES_LIVE = {
   coaches: [
-    { persona_id: "eli_marsh", name: "Dr. Eli Marsh", tier: "lead", instrument: null, absent: false, reason: null },
-    { persona_id: "sleep_coach", name: "Dr. Lisa Park", tier: "staff", instrument: { source: "whoop", datatype: null }, absent: false, reason: null },
-    { persona_id: "nutrition_coach", name: "Dr. Marcus Webb", tier: "staff", instrument: { source: "macrofactor", datatype: null }, absent: false, reason: null },
-    { persona_id: "mind_coach", name: "Dr. Nathan Reeves", tier: "staff", instrument: null, absent: false, reason: null },
-    { persona_id: "physical_coach", name: "Dr. Max Reyes", tier: "staff", instrument: { source: "hevy", datatype: null }, absent: false, reason: null },
-    { persona_id: "glucose_coach", name: "Dr. Amara Patel", tier: "staff", instrument: { source: "apple_health", datatype: "cgm" }, absent: true, reason: "no sensor since 2026-08-27" },
-    { persona_id: "labs_coach", name: "Dr. James Okafor", tier: "staff", instrument: { source: "labs", datatype: null }, absent: false, reason: null },
-    { persona_id: "explorer_coach", name: "Dr. Henning Brandt", tier: "staff", instrument: null, absent: false, reason: null },
+    { persona_id: "eli_marsh", name: "Eli Marsh", tier: "lead", instrument: null, absent: false, reason: null },
+    { persona_id: "sleep_coach", name: "Lisa Park", tier: "staff", instrument: { source: "whoop", datatype: null }, absent: false, reason: null },
+    { persona_id: "nutrition_coach", name: "Marcus Webb", tier: "staff", instrument: { source: "macrofactor", datatype: null }, absent: false, reason: null },
+    { persona_id: "mind_coach", name: "Nathan Reeves", tier: "staff", instrument: null, absent: false, reason: null },
+    { persona_id: "physical_coach", name: "Max Reyes", tier: "staff", instrument: { source: "hevy", datatype: null }, absent: false, reason: null },
+    { persona_id: "glucose_coach", name: "Amara Patel", tier: "staff", instrument: { source: "apple_health", datatype: "cgm" }, absent: true, reason: "no sensor since 2026-08-27" },
+    { persona_id: "labs_coach", name: "James Okafor", tier: "staff", instrument: { source: "labs", datatype: null }, absent: false, reason: null },
+    { persona_id: "explorer_coach", name: "Henning Brandt", tier: "staff", instrument: null, absent: false, reason: null },
   ],
 };
 // the pre-deploy /api/coaches (the b2 capture): no coach carries an `instrument` key
@@ -195,7 +195,7 @@ test("#4217: the docket row carries the engine's reason — the ISO date never r
     criterion: { condition: "lt", metric: "recovery_score", threshold: 70 },
     sides: { glucose_coach: false, nutrition_coach: true }, resolution_date: "2026-09-30", opened_date: "2026-09-23",
   };
-  const names = { glucose_coach: "Dr. Amara Patel", nutrition_coach: "Dr. Marcus Webb" };
+  const names = { glucose_coach: "Amara Patel", nutrition_coach: "Marcus Webb" };
   const reasons = V.absentReasons(COACHES_LIVE);
   const r = V.docketRow(item, names, V.darkCoaches(FRESH_LIVE, COACHES_LIVE), null, reasons);
   assert.equal(r.no.dark, true);
@@ -203,7 +203,7 @@ test("#4217: the docket row carries the engine's reason — the ISO date never r
   assert.equal(r.yes.why, "");
   const html = V.docketHTML([r]);
   assert.ok(html.includes("named, not quoted: no sensor since Thursday, August 27."));
-  assert.ok(html.includes("Dr. Amara Patel is named but not quoted: no sensor since Thursday, August 27."));
+  assert.ok(html.includes("Amara Patel is named but not quoted: no sensor since Thursday, August 27."));
   assert.ok(!html.includes("2026-08-27"), "the ISO string never prints");
   // no served reason: the instrument words, as before
   const plain = V.docketRow(item, names, new Set(["glucose_coach"]), null);
@@ -245,19 +245,19 @@ test("the docket row: yes/no sides, the engine's last seven nightly readings bet
   };
   const trend = ["2026-09-18", "2026-09-19", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26"].map((d, i) => ({ date: d, recovery_score: [70, 98, 90, 78, 80, 86, 99, 77][i] }));
   const sleep = { sleep_trend: trend, sleep_detail: { avg_recovery_window: 73.9, avg_window_days: 21 } };
-  const names = { mind_coach: "Dr. Nathan Reeves", sleep_coach: "Dr. Lisa Park" };
+  const names = { mind_coach: "Nathan Reeves", sleep_coach: "Lisa Park" };
   const r = V.docketRow(item, names, new Set(), sleep);
   assert.equal(r.question, "Will the seven-night average recovery be 80 or better on Wednesday, October 7?", "the question comes from the criterion, not the served topic prose");
   assert.equal(r.topic, item.topic);
-  assert.equal(r.yes.name, "Dr. Lisa Park");
-  assert.equal(r.no.name, "Dr. Nathan Reeves");
+  assert.equal(r.yes.name, "Lisa Park");
+  assert.equal(r.no.name, "Nathan Reeves");
   assert.deepEqual(r.engine.readings, ["98", "90", "78", "80", "86", "99", "77"]);
   assert.equal(r.engine.span, "September 19 to September 26");
   assert.equal(r.engine.avg, "73.9");
-  assert.equal(r.settled, "Code, on Wednesday, October 7: the seven-night average recovery at or above 80 and Dr. Lisa Park wins. The loser’s miss stays on the record.");
+  assert.equal(r.settled, "Code, on Wednesday, October 7: the seven-night average recovery at or above 80 and Lisa Park wins. The loser’s miss stays on the record.");
   // a dark instrument: named, not quoted
   const glucose = { ...item, coach_a: "glucose_coach", coach_b: "nutrition_coach", sides: { glucose_coach: false, nutrition_coach: true }, claims: { glucose_coach: "secret", nutrition_coach: "calories" }, criterion: { condition: "lt", metric: "recovery_score", threshold: 70 } };
-  const g = V.docketRow(glucose, { glucose_coach: "Dr. Amara Patel", nutrition_coach: "Dr. Marcus Webb" }, new Set(["glucose_coach"]), sleep);
+  const g = V.docketRow(glucose, { glucose_coach: "Amara Patel", nutrition_coach: "Marcus Webb" }, new Set(["glucose_coach"]), sleep);
   assert.equal(g.no.dark, true);
   assert.equal(g.no.claim, "");
   assert.equal(g.yes.claim, "calories");
@@ -284,10 +284,10 @@ test("the record is K of N so far / all time from platform.strata.coaches — ne
   assert.ok(html.includes("18 of 37") && html.includes("31 of 84") && html.includes("all time"));
   assert.ok(!/%|percent/.test(html));
   const roster = { coaches: [
-    { persona_id: "eli_marsh", name: "Dr. Eli Marsh", domain: "orchestration", tier: "lead" },
-    { persona_id: "sleep_coach", name: "Dr. Lisa Park", domain: "sleep_science", tier: "staff" },
-    { persona_id: "labs_coach", name: "Dr. James Okafor", domain: "clinical_pathology", tier: "staff" },
-    { persona_id: "explorer_coach", name: "Dr. Henning Brandt", domain: "biostatistics_n1_research", tier: "staff" },
+    { persona_id: "eli_marsh", name: "Eli Marsh", domain: "orchestration", tier: "lead" },
+    { persona_id: "sleep_coach", name: "Lisa Park", domain: "sleep_science", tier: "staff" },
+    { persona_id: "labs_coach", name: "James Okafor", domain: "clinical_pathology", tier: "staff" },
+    { persona_id: "explorer_coach", name: "Henning Brandt", domain: "biostatistics_n1_research", tier: "staff" },
   ] };
   const rows = V.rosterRows(roster, cal, "sleep_coach");
   assert.deepEqual(rows.map((r) => r.id), ["eli_marsh", "labs_coach", "explorer_coach"], "the coach at the top is not repeated");
@@ -298,7 +298,7 @@ test("the record is K of N so far / all time from platform.strata.coaches — ne
 });
 
 test("readHTML: the ledger line opens the read; a null latest_checked is absence; guarded slots only; no cycle/reset/attempt word", () => {
-  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "Last night the strap logged a recovery of 86.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record", reason: "chosen: the best checked record since Day 1 — 7 of 17 held up" };
+  const pick = { coach: { coach_id: "sleep", name: "Lisa Park", position_summary: "Last night the strap logged a recovery of 86.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record", reason: "chosen: the best checked record since Day 1 — 7 of 17 held up" };
   const profile = {
     latest_checked: { claim: null, created_date: "2026-09-12", outcome_date: "2026-09-25", metric: "recovery_score", eval_type: "interval", condition: "gte", threshold: 52.9, actual_value: 59, status: "confirmed" },
     report_card: { track_record: { recent: [{ date: "2026-09-25", status: "confirmed", metric: "recovery_score", reason: "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6" }] } },
@@ -323,7 +323,7 @@ test("R6 fix 2: the public-text lint flags an ISO date, a percent sign or a bran
   assert.deepEqual(V.lintPublic("On the night of September 23 the strap logged a recovery of 86."), ["a “night of” log opener"], "R6 named the night-of opener by itself");
   assert.deepEqual(V.lintPublic("Last night the strap logged a recovery of 86."), []);
   assert.deepEqual(V.lintPublic(""), []);
-  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
+  const pick = { coach: { coach_id: "sleep", name: "Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
   const html = V.readHTML(pick, { latest_checked: null }, new Date(), null);
   assert.ok(html.includes("<summary>The read, as served</summary>"), "the linted read is under details");
   assert.ok(html.includes("Whoop logged 86%"), "the served text is not rewritten");
@@ -339,7 +339,7 @@ test("R6 fix 2: the docket question from the criterion, each condition in words"
 });
 
 test("R6 fix 1: 'No checked call yet.' prints only when the ledger line is null AND the recent list is empty", () => {
-  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "A clean read.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
+  const pick = { coach: { coach_id: "sleep", name: "Lisa Park", position_summary: "A clean read.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "freshest" };
   const withRecent = { latest_checked: null, report_card: { track_record: { recent: [{ date: "2026-09-25", status: "confirmed", metric: "recovery_score", reason: "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 ±18.6" }] } } };
   const html = V.readHTML(pick, withRecent, new Date(), null);
   assert.ok(!html.includes("No checked call yet."), "a null ledger line above a checked list would contradict the list");
@@ -354,7 +354,7 @@ test("R6 fix 3: the reason is a sentence with its producer; the late line names 
   assert.equal(rec.src, "api_calibration.coaches[sleep]");
   assert.equal(V.reasonSentence({ rule: "lead" }, null).src, "api_coaching-dashboard.lead_daily");
   assert.equal(V.reasonSentence({ rule: "ask" }, null).text, "At the top because the open ask is this coach’s.");
-  const pick = { coach: { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "A clean read.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record" };
+  const pick = { coach: { coach_id: "sleep", name: "Lisa Park", position_summary: "A clean read.", analysis_generated_at: "2026-09-25T17:01:48Z" }, rule: "record" };
   const profile = { latest_checked: null, recent_outputs: [{ date: "2026-09-25", summary: "Log four words each morning" }, { date: "2026-09-24", summary: "Note two words each morning" }], dossier: { commitments: [{ date: "2026-09-25", text: "Log sleep quality each morning", status: "pending", due_date: "2026-10-02" }] } };
   const html = V.readHTML(pick, profile, new Date(), cal);
   assert.ok(html.includes("Nothing has come back yet, and there is no channel yet to receive one."));
@@ -364,19 +364,19 @@ test("R6 fix 3: the reason is a sentence with its producer; the late line names 
 
 test("found by render 2026-09-26: a point call (condition within) lands NEAR the number — never 'would be within 61'", () => {
   const lc = { claim: "Recovery score will reach approximately 61% tomorrow", created_date: "2026-09-08", outcome_date: "2026-09-22", metric: "recovery_score", eval_type: "point", condition: "within", threshold: 61.0, actual_value: 64.0, status: "confirmed" };
-  const l = V.ledgerLine(lc, "Dr. Henning Brandt");
+  const l = V.ledgerLine(lc, "Henning Brandt");
   assert.equal(l.text, "On Tuesday, September 8, Brandt said the night’s recovery would land near 61 — it came in at 64.");
   assert.ok(!l.text.includes("within"));
   // the other live shape (api_coach_sleep_coach.latest_checked, 02:47Z 09-27): Park's "around 52.9%"
   const park = { claim: "Tomorrow morning's recovery will be around 52.9%", created_date: "2026-09-12", outcome_date: "2026-09-26", metric: "recovery_score", eval_type: "point", condition: "within", threshold: 52.9, actual_value: 73.0, status: "refuted" };
-  const pl = V.ledgerLine(park, "Dr. Lisa Park");
+  const pl = V.ledgerLine(park, "Lisa Park");
   assert.equal(pl.verdict, "wrong");
   assert.equal(pl.text, "On Saturday, September 12, Park said the night’s recovery would land near 52.9 — it came in at 73.");
   // no tolerance is served live → no "give or take"; a served one prints
   assert.ok(!pl.text.includes("give or take"));
-  assert.ok(V.ledgerLine({ ...park, tolerance: 18.25 }, "Dr. Lisa Park").text.includes("would land near 52.9, give or take 18.3 —"));
+  assert.ok(V.ledgerLine({ ...park, tolerance: 18.25 }, "Lisa Park").text.includes("would land near 52.9, give or take 18.3 —"));
   // a bound call keeps its side
-  const b = V.ledgerLine({ ...lc, eval_type: "interval", condition: "gte" }, "Dr. Henning Brandt");
+  const b = V.ledgerLine({ ...lc, eval_type: "interval", condition: "gte" }, "Henning Brandt");
   assert.ok(b.text.includes("would be at or above 61"));
 });
 
@@ -384,13 +384,13 @@ test("found by render 2026-09-26: the docket criterion in the recent list is wor
   assert.equal(V.criterionWords("total_calories_kcal_7day_avg >= 2200 on 2026-08-10"), "the seven-day average calories at or above 2200 on Monday, August 10");
   assert.equal(V.criterionWords("recovery_score < 70"), "the night’s recovery under 70");
   assert.equal(V.criterionWords("something the grader wrote in prose 2026-08-10"), "");
-  const odd = V.recentLine({ date: "2026-09-26", status: "refuted", metric: "recovery_score", reason: "dispute docket resolved: prose with a date 2026-08-10" }, "Dr. Henning Brandt");
+  const odd = V.recentLine({ date: "2026-09-26", status: "refuted", metric: "recovery_score", reason: "dispute docket resolved: prose with a date 2026-08-10" }, "Henning Brandt");
   assert.equal(odd.text, "A disagreement settled by code, on the night’s recovery.");
   assert.ok(!/\d{4}-\d{2}-\d{2}/.test(odd.text));
 });
 
 test("found by render 2026-09-26: the coach's own wording of the checked call is linted like the read — a percent sign folds it under details, unrewritten", () => {
-  const pick = { coach: { coach_id: "explorer", name: "Dr. Henning Brandt", position_summary: "Two contingent predictions are now live.", analysis_generated_at: "2026-09-26T17:08:28Z" }, rule: "freshest" };
+  const pick = { coach: { coach_id: "explorer", name: "Henning Brandt", position_summary: "Two contingent predictions are now live.", analysis_generated_at: "2026-09-26T17:08:28Z" }, rule: "freshest" };
   const lc = { claim: "Recovery score will reach approximately 61% tomorrow with 80% confidence interval of 33.3–88.6%", created_date: "2026-09-08", outcome_date: "2026-09-22", metric: "recovery_score", eval_type: "point", condition: "within", threshold: 61.0, actual_value: 64.0, status: "confirmed" };
   const html = V.readHTML(pick, { latest_checked: lc }, new Date(), null);
   const main = html.replace(/<details[\s\S]*?<\/details>/g, "");

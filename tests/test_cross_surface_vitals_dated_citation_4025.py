@@ -2,7 +2,7 @@
 a PAST reading BY DATE is not a currency claim.
 
 THE LIVE FAILURE, 2026-09-21. `qa-smoke-failures` lit on `cross_surface:vitals`:
-"Dr. Nathan Reeves cites recovery 97% vs cockpit 90%". The card (`/api/coaching-
+"Nathan Reeves cites recovery 97% vs cockpit 90%". The card (`/api/coaching-
 dashboard` coaches[2], `coach_id "mind"`, `published_vitals.recovery_pct 90.0`,
 `recovery_as_of 2026-09-21`) reads:
 
@@ -46,7 +46,7 @@ COCKPIT_09_21 = {
 }
 
 _NATHAN_REEVES = {
-    "name": "Dr. Nathan Reeves",
+    "name": "Nathan Reeves",
     "published_vitals": {"recovery_pct": 90.0, "recovery_as_of": "2026-09-21"},
     "position_summary": (
         "There's a question underneath all the metrics — what did his body actually feel like on September "
@@ -77,7 +77,7 @@ def test_the_09_21_specimen_fails_without_history_the_old_way():
     with no history to consult, is the FAIL that was actually live."""
     ok, msg = wq.assess_cross_surface_vitals(COCKPIT_09_21, [_NATHAN_REEVES])
     assert not ok
-    assert "recovery 97" in msg and "Dr. Nathan Reeves" in msg
+    assert "recovery 97" in msg and "Nathan Reeves" in msg
     assert "no per-day history supplied" in msg, msg
 
 
@@ -93,7 +93,7 @@ def test_a_citation_matching_no_day_in_the_window_still_fails():
     (once lived in the partition) but sits well outside the trailing window, so the
     exemption must not reach it."""
     coach = {
-        "name": "Dr. Sarah Chen",
+        "name": "Sarah Chen",
         "position_summary": "Your Whoop recovery came in at 59%, HRV at 42 ms, resting HR at 59.",
     }
     # 59% never appears anywhere in the trailing-14-day history supplied.

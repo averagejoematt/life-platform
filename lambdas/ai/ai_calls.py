@@ -1824,7 +1824,7 @@ AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
 DECISION CLASS CEILING: {brief.get('decision_class_ceiling', 'observational')}
 EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary framing.')}
 
-VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". This narrative goes to Matthew alone — address him as "you" here. A reader-facing version is condensed from it and can add nothing, so obey the READER RULES now. Never refer to yourself in third person.
+VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I", never your own name. This narrative goes to Matthew alone — address him as "you" here. A reader-facing version is condensed from it and can add nothing, so obey the READER RULES now. Never refer to yourself in third person.
 
 MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
@@ -2150,7 +2150,7 @@ Write your {domain_label} coaching section now."""
         # Step 6.4 (#1896): self-graded-verdict gate — BLOCKING (regenerate once,
         # then hold), the same ADR-108 shape as presence-ack above. The other
         # deterministic gates check claims about MATTHEW; none checked a claim the
-        # coach makes about ITSELF. On 2026-07-27 Dr. Webb published "I called lunch
+        # coach makes about ITSELF. On 2026-07-27 Webb published "I called lunch
         # wrong… that's a prediction miss, and I'm logging it as one" with every
         # stored PREDICTION# still pending and the same paragraph admitting "I have
         # zero food logs" — then persisted the fabricated verdict to THREAD# so it

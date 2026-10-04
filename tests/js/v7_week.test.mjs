@@ -39,7 +39,7 @@ const DOCKET = {
     { coach_a: "mind_coach", coach_b: "sleep_coach", resolution_date: "2026-10-07" },
   ],
 };
-const NAMES = { glucose_coach: "Dr. Amara Patel", nutrition_coach: "Dr. Marcus Webb", sleep_coach: "Dr. Lisa Park" };
+const NAMES = { glucose_coach: "Amara Patel", nutrition_coach: "Marcus Webb", sleep_coach: "Lisa Park" };
 
 test("the margin is the served day, split for the column", () => {
   assert.deepEqual(W.marginParts("2026-09-22"), { d: "22", mo: "Sep", w: "Tuesday" });
@@ -122,7 +122,7 @@ test("next: the panel line says plainly when no episode is scheduled", () => {
 });
 
 test("next: the first bet settling on or after today, both coaches named", () => {
-  assert.deepEqual(W.nextBet(DOCKET, "2026-09-26", NAMES), { date: "2026-09-30", a: "Dr. Amara Patel", b: "Dr. Marcus Webb", index: 0 });
+  assert.deepEqual(W.nextBet(DOCKET, "2026-09-26", NAMES), { date: "2026-09-30", a: "Amara Patel", b: "Marcus Webb", index: 0 });
   const later = W.nextBet(DOCKET, "2026-10-01", NAMES);
   assert.equal(later.date, "2026-10-07");
   assert.equal(later.a, "mind"); // no roster → the id, humanised
@@ -144,7 +144,7 @@ test("the next weigh-in line is entry_age's one spelling: due, or the counted si
 });
 
 test("the roster map reads persona_id → name", () => {
-  assert.deepEqual(W.coachNames({ coaches: [{ persona_id: "sleep_coach", name: "Dr. Lisa Park" }, { persona_id: "x" }] }), { sleep_coach: "Dr. Lisa Park" });
+  assert.deepEqual(W.coachNames({ coaches: [{ persona_id: "sleep_coach", name: "Lisa Park" }, { persona_id: "x" }] }), { sleep_coach: "Lisa Park" });
 });
 
 // ── R7 (#4329) ──────────────────────────────────────────────────────────────────

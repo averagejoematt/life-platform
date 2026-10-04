@@ -169,7 +169,7 @@ def test_run_turn_applies_the_style_gate_before_grounding():
 
     result = coach_chat.run_turn(
         coach_id="sleep",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="p",
         memory_block="m",
         facts_block="f",
@@ -192,7 +192,7 @@ def test_run_turn_alternation_flows_through():
 
     out = coach_chat.run_turn(
         coach_id="sleep",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         persona_block="p",
         memory_block="m",
         facts_block="f",

@@ -436,7 +436,7 @@ def _persona_names():
     """The sanctioned, named coach/board personas — DERIVED from the canonical
     persona registry (`config/personas.json` via `persona_registry`, the same
     source site_api_coach.py reads), never hardcoded here (a local list would
-    drift from the registry — AC #1634). Naming one of these (e.g. "Dr. Sarah
+    drift from the registry — AC #1634). Naming one of these (e.g. "Sarah
     Chen") is EXPECTED and correct board behavior, not a fourth-wall break.
     Empty list on any failure → the judge prompt still states the vendor/model
     contract, just without the explicit roster to anchor on. Fail-soft."""
@@ -497,7 +497,7 @@ def _judge(transcript, persona_names=None):
     (a permanently-red AI-judged alarm gets ignored). None on any failure.
 
     The character contract is stated EXPLICITLY (#1634): the board speaks through
-    NAMED, sanctioned coach personas (e.g. "Dr. Sarah Chen") — naming one is
+    NAMED, sanctioned coach personas (e.g. "Sarah Chen") — naming one is
     EXPECTED and correct, never a violation. The fourth-wall break is naming the
     underlying AI VENDOR or MODEL (Claude, Anthropic, GPT, Haiku, Sonnet,
     Bedrock, …) or otherwise stepping out of the persona. Leaving the judge to

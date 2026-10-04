@@ -889,22 +889,18 @@ def test_the_year_elapsed_percentage_uses_the_real_length_of_the_year(monkeypatc
 BOARD = {
     "members": {
         "chen": {
-            "name": "Dr. Sarah Chen",
+            "name": "Sarah Chen",
             "active": True,
             "emoji": "🏋️",
             "voice": {"tone": "Precise, periodisation-first", "catchphrase": "Build the base."},
-            "features": {
-                "monthly_digest": {"section_header": "🏋️ DR. SARAH CHEN — MONTHLY TRAINING REVIEW", "prompt_focus": "Training arc."}
-            },
+            "features": {"monthly_digest": {"section_header": "🏋️ SARAH CHEN — MONTHLY TRAINING REVIEW", "prompt_focus": "Training arc."}},
         },
         "webb": {
-            "name": "Dr. Marcus Webb",
+            "name": "Marcus Webb",
             "active": True,
             "emoji": "🥗",
             "voice": {"tone": "Blunt and practical"},
-            "features": {
-                "monthly_digest": {"section_header": "🥗 DR. MARCUS WEBB — MONTHLY NUTRITION REVIEW", "prompt_focus": "Adherence."}
-            },
+            "features": {"monthly_digest": {"section_header": "🥗 MARCUS WEBB — MONTHLY NUTRITION REVIEW", "prompt_focus": "Adherence."}},
         },
     }
 }
@@ -919,7 +915,7 @@ def _with_board(monkeypatch, config):
 def test_the_board_prompt_names_every_configured_advisor(monkeypatch):
     _with_board(monkeypatch, BOARD)
     prompt = m._build_monthly_prompt_from_config()
-    assert "DR. SARAH CHEN" in prompt and "DR. MARCUS WEBB" in prompt
+    assert "SARAH CHEN" in prompt and "MARCUS WEBB" in prompt
 
 
 def test_the_board_prompt_carries_each_advisors_brief_and_voice(monkeypatch):
@@ -947,11 +943,11 @@ def test_an_inactive_advisor_is_left_off_the_monthly_board(monkeypatch):
     config["members"]["webb"]["active"] = False
     _with_board(monkeypatch, config)
     prompt = m._build_monthly_prompt_from_config()
-    assert "DR. SARAH CHEN" in prompt and "DR. MARCUS WEBB" not in prompt
+    assert "SARAH CHEN" in prompt and "MARCUS WEBB" not in prompt
 
 
 def test_a_board_with_nobody_assigned_to_this_email_falls_back(monkeypatch):
-    _with_board(monkeypatch, {"members": {"chen": {"name": "Dr. Sarah Chen", "active": True, "features": {"weekly_digest": {}}}}})
+    _with_board(monkeypatch, {"members": {"chen": {"name": "Sarah Chen", "active": True, "features": {"weekly_digest": {}}}}})
     assert m._build_monthly_prompt_from_config() is None
 
 
@@ -971,7 +967,7 @@ def test_an_advisor_with_no_configured_header_gets_one_derived_from_their_name(m
     config = {
         "members": {
             "okafor": {
-                "name": "Dr. James Okafor",
+                "name": "James Okafor",
                 "active": True,
                 "emoji": "🩺",
                 "features": {"monthly_digest": {"prompt_focus": "Trajectory."}},
@@ -980,13 +976,13 @@ def test_an_advisor_with_no_configured_header_gets_one_derived_from_their_name(m
     }
     _with_board(monkeypatch, config)
     prompt = m._build_monthly_prompt_from_config()
-    assert "🩺 DR. JAMES OKAFOR" in prompt
+    assert "🩺 JAMES OKAFOR" in prompt
     assert "Trajectory." in prompt
 
 
 def test_an_advisor_with_no_configured_brief_is_still_given_a_default_instruction(monkeypatch):
     config = {
-        "members": {"okafor": {"name": "Dr. James Okafor", "active": True, "features": {"monthly_digest": {"section_header": "🩺 OKAFOR"}}}}
+        "members": {"okafor": {"name": "James Okafor", "active": True, "features": {"monthly_digest": {"section_header": "🩺 OKAFOR"}}}}
     }
     _with_board(monkeypatch, config)
     assert "Provide your monthly analysis." in m._build_monthly_prompt_from_config()
@@ -1349,9 +1345,9 @@ def test_each_extractor_runs_once_per_arm(monkeypatch, frozen_monday):
 # ══════════════════════════════════════════════════════════════════════════════
 
 COMMENTARY = (
-    "🏋️ DR. SARAH CHEN — MONTHLY TRAINING REVIEW\n"
+    "🏋️ SARAH CHEN — MONTHLY TRAINING REVIEW\n"
     "Volume climbed steadily through the month.\n"
-    "🥗 DR. MARCUS WEBB — MONTHLY NUTRITION REVIEW\n"
+    "🥗 MARCUS WEBB — MONTHLY NUTRITION REVIEW\n"
     "Protein adherence held.\n"
     "💡 INSIGHT OF THE MONTH\n"
     "Add one Zone 2 session per week."
@@ -1448,7 +1444,7 @@ def test_the_letter_is_headlined_with_the_month_and_the_comparison_month():
 
 def test_the_letter_carries_every_advisor_section_from_the_commentary():
     body = _text(_html())
-    assert "DR. SARAH CHEN" in body and "DR. MARCUS WEBB" in body
+    assert "SARAH CHEN" in body and "MARCUS WEBB" in body
     assert "Volume climbed steadily through the month." in body
 
 
@@ -1629,7 +1625,7 @@ def test_the_letter_renders_even_when_the_board_commentary_is_empty():
 # lacks the exact VS16 variation selector) has their header rendered as ordinary body prose — the section silently loses its
 # heading. The renderer must derive the header set from the same board config the prompt was built from.
 def test_an_advisor_added_to_the_board_still_gets_a_rendered_section_header():
-    commentary = "🧬 DR. HENNING BRANDT — MONTHLY RIGOR REVIEW\nThe n behind each claim held up.\n"
+    commentary = "🧬 HENNING BRANDT — MONTHLY RIGOR REVIEW\nThe n behind each claim held up.\n"
     d = _data()
     html = m.build_html(d, GOALS, commentary, d["windows"])
     # NB the original assertion could never pass for ANY advisor, built-in ones

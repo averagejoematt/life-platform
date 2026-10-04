@@ -6,7 +6,7 @@ ALARM; by 10-03 it had reddened `coach_consistency` too):
 
   "Logging resumed on October 1st. He logged 1,560 kcal and 166g protein, anchored by
    a pound of flank steak at dinner — his best single-day protein number in a while."
-                                                             (Dr. Marcus Webb)
+                                                             (Marcus Webb)
 
 166 g is right: it is the MacroFactor row for 2026-10-01, and `/api/nutrition_overview`
 served it at the same instant as `latest_protein_g` 166.0 / `latest_date` 2026-10-01

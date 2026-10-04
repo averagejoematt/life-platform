@@ -278,5 +278,5 @@ def test_every_fallback_literal_equals_the_registry_lead():
 def test_the_predicate_rejects_the_original_defect():
     """Negative control: the exact string that shipped must not validate."""
     roster = _roster_names()
-    assert "Dr. Kai Nakamura" not in roster, "the retired integrator byline is back on the roster"
+    assert "Kai Nakamura" not in roster, "the retired integrator byline is back on the roster"
     assert "Integrative Health Director" not in {p.get("board_role") for p in _personas().values()}

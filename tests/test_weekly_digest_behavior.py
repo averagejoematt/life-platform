@@ -355,10 +355,10 @@ def sub_row(sk, **fields):
 
 # A realistic Board commentary: six advisor sections then the pattern block.
 BOARD_TEXT = (
-    "🏋️ DR. SARAH CHEN — SPORTS SCIENTIST\nTraining load is climbing steadily.\n"
-    "🥗 DR. MARCUS WEBB — NUTRITIONIST\nProtein adherence held.\n"
-    "😴 DR. LISA PARK — SLEEP & CIRCADIAN SPECIALIST\nEfficiency slipped.\n"
-    "🩺 DR. JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE\nThe 4-week line is flat.\n"
+    "🏋️ SARAH CHEN — SPORTS SCIENTIST\nTraining load is climbing steadily.\n"
+    "🥗 MARCUS WEBB — NUTRITIONIST\nProtein adherence held.\n"
+    "😴 LISA PARK — SLEEP & CIRCADIAN SPECIALIST\nEfficiency slipped.\n"
+    "🩺 JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE\nThe 4-week line is flat.\n"
     "🧠 COACH MAYA RODRIGUEZ — BEHAVIOURAL PERFORMANCE\nThe gap is on weekends.\n"
     "🎯 THE CHAIR — VERDICT & PRIORITY\nOne priority: protect sleep.\n"
     "💡 PATTERN OF THE WEEK\nEfficiency fell as strain rose two days earlier."
@@ -1917,7 +1917,7 @@ class TestBuildHtmlSections:
 
     def test_the_board_sections_and_the_pattern_block_are_split_apart(self):
         html = wd.build_html(digest_data(), BOARD_TEXT, profile_row())
-        assert "DR. SARAH CHEN" in html
+        assert "SARAH CHEN" in html
         assert "PATTERN OF THE WEEK" in html
         # the pattern block gets the amber insight card, the advisors do not
         assert "#92400e" in html
@@ -2532,7 +2532,7 @@ class TestLambdaHandler:
         wd.lambda_handler({}, None)
         html = wired["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
         assert "temporarily unavailable" in html
-        assert "DR. SARAH CHEN" not in html
+        assert "SARAH CHEN" not in html
 
     def test_a_genuine_board_commentary_is_filed_into_the_insight_ledger(self, wired):
         wd.lambda_handler({}, None)

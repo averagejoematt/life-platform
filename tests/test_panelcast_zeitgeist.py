@@ -187,7 +187,7 @@ def _capture_invoke(monkeypatch, reply_text="[]"):
 
 
 def test_intro_prompt_carries_block_and_omits_when_empty(monkeypatch):
-    monkeypatch.setattr(panel, "_intro_guest", lambda: {"name": "Dr. Eli Marsh", "role": "PI", "philosophy": "", "expertise": []})
+    monkeypatch.setattr(panel, "_intro_guest", lambda: {"name": "Eli Marsh", "role": "PI", "philosophy": "", "expertise": []})
     bodies = _capture_invoke(monkeypatch)
     panel._build_intro_script({"characters": {}}, zeitgeist=list(HEADLINES))
     user = bodies[-1]["messages"][0]["content"]
@@ -203,8 +203,8 @@ def _weekly_beats(zeitgeist=None):
         "date": "2026-08-01",
         "title": "Week 3",
         "chronicle": "A solid week.",
-        "coach_reads": [{"id": "sleep_coach", "name": "Dr. Sarah Chen", "summary": "Sleep held steady.", "themes": []}],
-        "guest": {"id": "sleep_coach", "name": "Dr. Sarah Chen", "summary": "Sleep held steady.", "themes": []},
+        "coach_reads": [{"id": "sleep_coach", "name": "Sarah Chen", "summary": "Sleep held steady.", "themes": []}],
+        "guest": {"id": "sleep_coach", "name": "Sarah Chen", "summary": "Sleep held steady.", "themes": []},
         "presence_note": "",
         "phase_block": "week one, day three",
         "last_open_bet": None,
@@ -327,7 +327,7 @@ def test_run_weekly_fetches_once_and_feeds_builders_and_ground_truth(monkeypatch
     assert fetches == [1]  # ONE fetch per run
     assert builder_beats[0]["zeitgeist"] == list(HEADLINES)  # both builders read beats["zeitgeist"]
     assert "TOPICAL HEADLINES provided to the writer" in judged_gt[0] and HEADLINES[1] in judged_gt[0]
-    assert "Dr. Sarah Chen: Sleep held steady." in judged_gt[0]  # the real material is still the ground truth
+    assert "Sarah Chen: Sleep held steady." in judged_gt[0]  # the real material is still the ground truth
 
 
 def test_run_weekly_empty_fetch_leaves_generation_path_unchanged(monkeypatch):

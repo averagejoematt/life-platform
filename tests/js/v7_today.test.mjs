@@ -127,9 +127,9 @@ test("the ask is linted before it prints: an ISO date, a percent, a brand or sec
   assert.deepEqual(T.lintAsk("Matthew, weigh in before coffee."), ["second person"]);
   assert.deepEqual(T.lintAsk("Weigh in before coffee, Matthew."), ["second person"]);
   assert.deepEqual(T.lintAsk("Matthew weighed in before coffee."), []);
-  const dirty = { open_actions: [row("Dr. Lisa Park", "Check your Whoop recovery on 2026-09-27", "2026-09-28")] };
+  const dirty = { open_actions: [row("Lisa Park", "Check your Whoop recovery on 2026-09-27", "2026-09-28")] };
   const body = T.askBody(dirty, NOW);
-  assert.match(body, /^The ask is not in public words today — Dr\. Lisa Park, asked September 12, due September 28\./);
+  assert.match(body, /^The ask is not in public words today — Lisa Park, asked September 12, due September 28\./);
   assert.match(body, /<details class="td-details"><summary>The ask, as served<\/summary>/);
   assert.match(body, /<span data-verbatim>Check your Whoop recovery on 2026-09-27<\/span>/);
   assert.match(body, /it carries an ISO date, a device brand, second person\. Served without edits\./);
@@ -137,29 +137,29 @@ test("the ask is linted before it prints: an ISO date, a percent, a brand or sec
   assert.equal(body.split("Check your Whoop").length - 1, 1);
   assert.ok(body.indexOf("Check your Whoop") > body.indexOf("<details"));
   // a clean ask prints as before, verbatim, unfolded
-  assert.doesNotMatch(T.askBody({ open_actions: [row("Dr. Lisa Park", "Weigh in before coffee.", "2026-09-28")] }, NOW), /<details/);
+  assert.doesNotMatch(T.askBody({ open_actions: [row("Lisa Park", "Weigh in before coffee.", "2026-09-28")] }, NOW), /<details/);
 });
 
 test("the ask due today says 'due today', never '0 days late' (#4224)", () => {
-  const today = { open_actions: [row("Dr. Max Reyes", "Log the walk before noon.", "2026-09-26")] };
+  const today = { open_actions: [row("Max Reyes", "Log the walk before noon.", "2026-09-26")] };
   const body = T.askBody(today, NOW);
   assert.match(body, /due today, September 26\./);
   assert.doesNotMatch(body, /0 days late|late/);
   // due tomorrow: plain; due yesterday: late, no "today"
-  assert.match(T.askBody({ open_actions: [row("Dr. Max Reyes", "Log the walk.", "2026-09-27")] }, NOW), /due September 27\.$/);
-  const late = T.askBody({ open_actions: [row("Dr. Max Reyes", "Log the walk.", "2026-09-25")] }, NOW);
+  assert.match(T.askBody({ open_actions: [row("Max Reyes", "Log the walk.", "2026-09-27")] }, NOW), /due September 27\.$/);
+  const late = T.askBody({ open_actions: [row("Max Reyes", "Log the walk.", "2026-09-25")] }, NOW);
   assert.match(late, /due September 25 — <strong class="tq-late">1 day late<\/strong>\./);
   assert.doesNotMatch(late, /due today/);
 });
 
 test("the one ask: the first current ask leads; when every ask is late the first leads with its lateness", () => {
-  const late = { open_actions: [row("Dr. Lisa Park", "Start logging the daily 1-to-5 subjective feeling scale before checking the app", "2026-09-19"), row("Dr. Lisa Park", "(stand-in 2)", "2026-09-19")] };
+  const late = { open_actions: [row("Lisa Park", "Start logging the daily 1-to-5 subjective feeling scale before checking the app", "2026-09-19"), row("Lisa Park", "(stand-in 2)", "2026-09-19")] };
   assert.equal(T.chosenAsk(late, NOW).text, "Start logging the daily 1-to-5 subjective feeling scale before checking the app");
   const body = T.askBody(late, NOW);
   assert.ok(!/The one ask:/.test(body), "the heading carries the key; the line does not repeat it");
   assert.match(body, /7 days late/);
   assert.match(body, /data-verbatim/);
-  const mixed = { open_actions: [row("Dr. Lisa Park", "(late)", "2026-09-19"), row("Dr. Max Reyes", "(current)", "2026-09-28")] };
+  const mixed = { open_actions: [row("Lisa Park", "(late)", "2026-09-19"), row("Max Reyes", "(current)", "2026-09-28")] };
   assert.equal(T.chosenAsk(mixed, NOW).text, "(current)");
   assert.equal(T.chosenAsk({ open_actions: [] }, NOW), null);
   assert.equal(T.askBody({ open_actions: [] }, NOW), "");

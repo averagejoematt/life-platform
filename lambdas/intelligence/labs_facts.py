@@ -5,7 +5,7 @@ with ``'H'``/``'L'`` values — a schema that has never existed. SCHEMA.md (the
 authoritative field reference) says a labs draw record stores a nested
 ``biomarkers`` map plus an ``out_of_range`` key list with ``out_of_range_count``
 and ``total_biomarkers``. Against every real draw the old hunt returned
-``flagged=[] / flagged_count=0`` and Dr. Okafor narrated the empty extraction as
+``flagged=[] / flagged_count=0`` and Okafor narrated the empty extraction as
 "zero results … a total sync failure" while /api/labs served 8 draws with 26
 flagged biomarkers (ADR-104 breach — the ground itself was mis-extracted).
 

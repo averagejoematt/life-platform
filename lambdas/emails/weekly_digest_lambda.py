@@ -689,16 +689,16 @@ RULES:
 
 Write exactly these six sections with these exact headers:
 
-🏋️ DR. MAX REYES — PERFORMANCE COACH
+🏋️ MAX REYES — PERFORMANCE COACH
 Training quality, Zone 2 adequacy, TSB/CTL/ATL, periodisation, recovery. Is Matthew building fitness or just accumulating fatigue? What does the Banister model + day grades say about his readiness?
 
-🥗 DR. MARCUS WEBB — NUTRITIONIST
+🥗 MARCUS WEBB — NUTRITIONIST
 Calorie/protein adherence, macro balance, meal timing patterns. Is nutrition supporting or undermining training and recovery? Reference hit rates and specific shortfalls.
 
-😴 DR. LISA PARK — SLEEP & CIRCADIAN SPECIALIST
+😴 LISA PARK — SLEEP & CIRCADIAN SPECIALIST
 Sleep architecture (REM%, deep%), efficiency, sleep debt, upstream causes. What's driving sleep quality — duration, architecture, or efficiency? Connect to training load and day grades.
 
-🩺 DR. JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE
+🩺 JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE
 Long-term trajectory. What does the 4-week trend say? What leading indicator is most encouraging or concerning? What data gaps matter most?
 
 🧠 COACH MAYA RODRIGUEZ — BEHAVIOURAL PERFORMANCE

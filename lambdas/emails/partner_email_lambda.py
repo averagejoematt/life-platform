@@ -425,14 +425,14 @@ Coach Maya Rodriguez specialises in the psychology of behaviour change. She read
 3 short paragraphs. Cover: What is Matthew's emotional state this week? What's driving it?
 What should Partner know about where he is right now — not just the data, but the person?
 
-🧠 WHAT'S HAPPENING UNDERNEATH — DR. REEVES
-Dr. Nathan Reeves is a psychiatrist who pays attention to what's not being said.
+🧠 WHAT'S HAPPENING UNDERNEATH — REEVES
+Nathan Reeves is a psychiatrist who pays attention to what's not being said.
 3 short paragraphs. Cover: What psychological patterns are showing up this week?
 What might Matthew be protecting himself from? What does Partner need to understand
 about how to reach him — not what to do, but how to be with him?
 
-🤝 HOW TO SHOW UP FOR HIM — DR. MURTHY
-Dr. Vivek Murthy is the world's leading expert on connection and loneliness.
+🤝 HOW TO SHOW UP FOR HIM — MURTHY
+Vivek Murthy is the world's leading expert on connection and loneliness.
 His research shows close relationships are the single strongest predictor of health outcomes.
 3 short paragraphs. What does Matthew actually need from Partner this week?
 Specific to where he is right now. End with one concrete, small thing she can do in the next 48 hours.

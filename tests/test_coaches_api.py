@@ -83,7 +83,7 @@ def test_coach_page_shape_and_stance_rung():
     resp = api.handle_coach({"rawPath": "/api/coach/sleep_coach"})
     data = _body(resp)
     assert data["persona_id"] == "sleep_coach"
-    assert data["name"] == "Dr. Lisa Park"
+    assert data["name"] == "Lisa Park"
     assert "AI character" in data["disclosure"]
     # stance resolves to the entry rung from the baseline weight (~306 -> foundation)
     assert data["stance"]["band_metric"] == "weight_lbs"
@@ -156,7 +156,7 @@ def test_lead_coach_detail_route_shape():
     data = _body(api.handle_coach({"rawPath": "/api/coach/eli_marsh"}))
     assert data["persona_id"] == api.persona_registry.LEAD_PERSONA_ID
     assert data["tier"] == "lead"
-    assert data["name"] == "Dr. Eli Marsh"
+    assert data["name"] == "Eli Marsh"
     assert "AI character" in data["disclosure"]
     # lead extras are config-authored persona fields
     assert data["philosophy"] and "One experiment at a time" in data["philosophy"]

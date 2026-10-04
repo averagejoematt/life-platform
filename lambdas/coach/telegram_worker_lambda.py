@@ -336,7 +336,7 @@ def _turns_today(thread: list) -> int:
 
 def _colleagues_block(self_persona_id: str, allow_referral: bool = False) -> str:
     """The staff roster, from THIS coach's seat — real names + pronouns, so a
-    cross-reference is 'Dr. Nathan Reeves (he)' and never 'the mind coach (her)'.
+    cross-reference is 'Nathan Reeves (he)' and never 'the mind coach (her)'.
     Consulting specialists are included: citable-by-name is their whole tier.
     Fail-soft "" — a roster miss never blocks the reply.
 
@@ -1069,7 +1069,7 @@ def _resolve_persona(coach_id: str) -> tuple:
     # own voice — worse than an honest failure, and undetectable from the
     # reply. Found 2026-08-12 when the `training` succession alias retired
     # (ADR-153 amendment): the route stopped resolving and the derivation
-    # silently produced `training_coach`, i.e. Dr. Sarah Chen, retired since
+    # silently produced `training_coach`, i.e. Sarah Chen, retired since
     # the cycle-13 genesis. Refuse instead, and say so.
     derived = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
     if _persona_is_retired(derived):

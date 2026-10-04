@@ -672,7 +672,7 @@ except ImportError:  # pragma: no cover — flat/layer bundle layout
 # ── #1896: a coach's own track-record claims ────────────────────────────────
 # The gates above check claims about MATTHEW (his numbers, his dates, his logged
 # behavior). None of them check a claim the coach makes about ITSELF — and on
-# 2026-07-27 Dr. Webb published "I called lunch wrong… That's a prediction miss,
+# 2026-07-27 Webb published "I called lunch wrong… That's a prediction miss,
 # and I'm logging it as one" while every stored PREDICTION# was status=pending
 # and the same paragraph admitted "I have zero food logs. Nothing." The verdict
 # was then persisted as a THREAD# row and baked into the committed noscript, so

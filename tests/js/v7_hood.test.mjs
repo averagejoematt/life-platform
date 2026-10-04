@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 const H = await import("../../site/assets/js/v7_hood.js");
 
-const COACHES = { count: 8, coaches: [{ persona_id: "sleep_coach", name: "Dr. Lisa Park" }, { persona_id: "nutrition_coach", name: "Dr. Marcus Webb" }, { persona_id: "eli_marsh", name: "Dr. Eli Marsh" }] };
+const COACHES = { count: 8, coaches: [{ persona_id: "sleep_coach", name: "Lisa Park" }, { persona_id: "nutrition_coach", name: "Marcus Webb" }, { persona_id: "eli_marsh", name: "Eli Marsh" }] };
 const NAMES = H.coachNames(COACHES);
 const FRESH = { summary: { fresh: 11, stale: 1, paused: 1, total: 13 }, sources: [
   { id: "whoop", last_update: "2026-09-26", status: "fresh" },
@@ -57,8 +57,8 @@ test("the cost line is the month-to-date receipt for the served subscriber count
 });
 
 test("the coach on a card is named from the roster, or plainly", () => {
-  assert.equal(H.coachName("sleep", NAMES), "Dr. Lisa Park");
-  assert.equal(H.coachName("eli_marsh", NAMES), "Dr. Eli Marsh");
+  assert.equal(H.coachName("sleep", NAMES), "Lisa Park");
+  assert.equal(H.coachName("eli_marsh", NAMES), "Eli Marsh");
   assert.equal(H.coachName("explorer", NAMES), "the explorer coach");
   assert.equal(H.coachName("", NAMES), "a coach");
 });
@@ -90,7 +90,7 @@ test("fit for the screen: the coaches page's public lint is the gate (an ISO dat
 
 test("three sentences per correction — what we said · what happened · what we changed — dates in words, symbols spelled", () => {
   const s = H.correctionSentences(NEW[0], NAMES);
-  assert.equal(s.said, "Dr. Lisa Park’s call, as the engine recorded it: recovery score would come in at 52.9 give or take 18.3 (one standard deviation of his last 30 days).");
+  assert.equal(s.said, "Lisa Park’s call, as the engine recorded it: recovery score would come in at 52.9 give or take 18.3 (one standard deviation of his last 30 days).");
   assert.equal(s.happened, "Recovery score measured 73.0 on September 13 — the call was 52.9 give or take 18.3 (one standard deviation of his last 30 days).");
   assert.equal(s.changed, "It landed 20.1 from the call, outside the band of 18.3 either way. Graded refuted by code on Saturday, September 26.");
   assert.equal(s.changedBody, "It landed 20.1 from the call, outside the band of 18.3 either way.");
@@ -111,7 +111,7 @@ test("a docket-settled card with no measured value says so, never invents one", 
 
 test("the pre-#4226 shape never reaches the screen: machine strings stay in the folded record", () => {
   const s = H.correctionSentences(OLD, NAMES);
-  assert.equal(s.said, "Dr. Marcus Webb made a dated call; its wording is in the record below.");
+  assert.equal(s.said, "Marcus Webb made a dated call; its wording is in the record below.");
   assert.equal(s.happened, "Recovery score measured 0.08.");
   assert.equal(s.changed, "The engine’s reason is in the record below. Graded refuted by code on Saturday, September 26.");
   for (const v of [s.said, s.happened, s.changed]) assert.ok(!/\d{4}-\d{2}-\d{2}/.test(v) && !/[a-z]+_[a-z]+/.test(v), v);

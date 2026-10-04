@@ -10,7 +10,7 @@ sentence (#4180):
     days" vs `/api/nutrition_overview` `avg_protein_g` 153.3
   * a logging gap: Webb "The food log went dark after September 19th … Six days
     without logs" vs `/api/nutrition_overview` `days_logged` 20 / `lag_days` 0
-  * loss rate: Eli "3.7 pounds per week" vs Dr. Okafor "−4.4 lb/week" vs
+  * loss rate: Eli "3.7 pounds per week" vs Okafor "−4.4 lb/week" vs
     `/api/journey` `weekly_rate_lbs` −4.58, CI [−4.86, −2.66]
 
 `cross_surface:*` stayed green through all of it — nothing compared a coach to
@@ -54,7 +54,7 @@ WEBB_GAP = {
     "position_summary": "The food log went dark after September 19th … Six days without logs",
 }
 ELI_RATE = {"name": "Eli Marsh", "position_summary": "3.7 pounds per week"}
-OKAFOR_RATE = {"name": "Dr. Okafor", "position_summary": "−4.4 lb/week"}
+OKAFOR_RATE = {"name": "Okafor", "position_summary": "−4.4 lb/week"}
 
 NUTRITION_09_25 = {"avg_protein_g": 153.3, "days_logged": 20, "lag_days": 0}
 JOURNEY_09_25 = {"weekly_rate_lbs": -4.58, "weekly_rate_ci_low": -4.86, "weekly_rate_ci_high": -2.66}
@@ -269,7 +269,7 @@ def test_mutation_disabling_number_words_reds_fixture_ii(monkeypatch):
 
 # ── the WIRE shape: the lead coach is page-level, not in `coaches[]` ─────────
 #
-# Measured live 2026-09-27 16:12Z on `/api/coaching-dashboard`: Dr. Eli Marsh's
+# Measured live 2026-09-27 16:12Z on `/api/coaching-dashboard`: Eli Marsh's
 # 106.9g sentence is served in `weekly_priority.text` (the head coach's weekly read),
 # NOT in `coaches[]` — the fixtures above put him in `coaches[]`, which the wire never
 # does. Reading `coaches[]` alone, both legs extracted 0 claims and passed green
@@ -284,7 +284,7 @@ WIRE_DASHBOARD_09_27 = {
             "average intake has dropped to 106.9 grams across 14 logged days, well short of the 170-gram floor that "
             "preserves lean mass during a deficit."
         ),
-        "coach_name": "Dr. Eli Marsh",
+        "coach_name": "Eli Marsh",
         "coach_title": "Principal Investigator — Program Lead",
         "generated_at": "2026-09-21T14:02:56.543529+00:00",
         "as_of_day_n": 16,
@@ -292,9 +292,9 @@ WIRE_DASHBOARD_09_27 = {
     },
     "lead_daily": None,
     "coaches": [
-        {"name": "Dr. Lisa Park", "position_summary": ""},
+        {"name": "Lisa Park", "position_summary": ""},
         {
-            "name": "Dr. Marcus Webb",
+            "name": "Marcus Webb",
             "position_summary": (
                 "The six-day logging gap since September 19th is blocking my directional read, but today's log tells "
                 "a clear story: 182g protein, 1,761 kcal, with the steak dinner anchoring 106g in a single sitting."
@@ -309,12 +309,12 @@ JOURNEY_09_27 = {"weekly_rate_lbs": -4.04, "weekly_rate_ci_low": -4.55, "weekly_
 def test_served_coach_texts_reads_the_page_level_lead_slots():
     texts = wq.served_coach_texts(WIRE_DASHBOARD_09_27)
     names = [t["name"] for t in texts]
-    assert "Dr. Eli Marsh (weekly_priority)" in names
+    assert "Eli Marsh (weekly_priority)" in names
     # an empty/None slot adds nothing; coaches[] rides through as served
     assert not any("lead_daily" in n for n in names)
-    assert "Dr. Marcus Webb" in names and len(texts) == 3
-    daily = dict(WIRE_DASHBOARD_09_27, lead_daily={"text": "protein averaged 120g this week", "coach_name": "Dr. Eli Marsh"})
-    assert "Dr. Eli Marsh (lead_daily)" in [t["name"] for t in wq.served_coach_texts(daily)]
+    assert "Marcus Webb" in names and len(texts) == 3
+    daily = dict(WIRE_DASHBOARD_09_27, lead_daily={"text": "protein averaged 120g this week", "coach_name": "Eli Marsh"})
+    assert "Eli Marsh (lead_daily)" in [t["name"] for t in wq.served_coach_texts(daily)]
     assert wq.served_coach_texts(None) == [] and wq.served_coach_texts({"coaches": None}) == []
 
 
@@ -330,7 +330,7 @@ def test_checks_fails_the_wire_shaped_09_27_page_naming_both_values_and_the_slot
     by_name = {c.name: c for c in wq.checks(_FakeCheck, "http://example.test", "content_truth")}
     vs_engine = by_name["cross_surface:coach_vs_engine"]
     assert vs_engine.passed is False, vs_engine.message
-    assert "Dr. Eli Marsh (weekly_priority) cites 106.9g vs engine 153.5g" in vs_engine.message
+    assert "Eli Marsh (weekly_priority) cites 106.9g vs engine 153.5g" in vs_engine.message
     assert "1 compared" in vs_engine.message
     # the dead-man: both legs' counts reach the log on every run, not only on a failure
     out = capsys.readouterr().out

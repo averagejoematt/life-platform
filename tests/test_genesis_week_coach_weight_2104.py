@@ -2,7 +2,7 @@
 this cycle's body, at any age.
 
 THE LIVE FAILURE (cycle 12, genesis 2026-08-03). `/api/coaching-dashboard` published,
-from Dr. Victor Reyes:
+from Victor Reyes:
 
     "I have one weight reading: 317.0 lbs via Withings."
 
@@ -200,7 +200,7 @@ def test_the_published_prose_still_fails_the_cross_surface_check():
     """This is not a mute. The exact card that was live must still be a failure."""
     ok, msg = wq.assess_cross_surface_weight(
         {"weight_lbs": 322},
-        [{"name": "Dr. Victor Reyes", "position_summary": "I have one weight reading: 317.0 lbs via Withings."}],
+        [{"name": "Victor Reyes", "position_summary": "I have one weight reading: 317.0 lbs via Withings."}],
     )
     assert ok is False
     assert "317.0" in msg and "322" in msg
@@ -212,7 +212,7 @@ def test_the_honest_absence_prose_clears_the_check():
         {"weight_lbs": 322},
         [
             {
-                "name": "Dr. Victor Reyes",
+                "name": "Victor Reyes",
                 "position_summary": "No weigh-in has landed in this cycle yet, so I have no bodyweight to read from.",
             }
         ],
@@ -224,7 +224,7 @@ def test_a_dated_pre_cycle_citation_would_also_clear_the_check():
     """The rider's sanctioned escape hatch and the check's exemption are one seam."""
     ok, msg = wq.assess_cross_surface_weight(
         {"weight_lbs": 322},
-        [{"name": "Dr. Victor Reyes", "position_summary": "The last reading was 316.97 lbs as of 2026-08-01, before this cycle began."}],
+        [{"name": "Victor Reyes", "position_summary": "The last reading was 316.97 lbs as of 2026-08-01, before this cycle began."}],
     )
     assert ok, msg
 

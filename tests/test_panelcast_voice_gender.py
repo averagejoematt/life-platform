@@ -1,7 +1,7 @@
 """Guard: every podcast persona's TTS voice must match the persona's gender.
 
 Regression test for the 2026-06-21 bug where the panelcast's hardcoded voice table had
-Dr. Marcus Webb (male) on a female voice and Dr. Sarah Chen (female) on a male one. The
+Marcus Webb (male) on a female voice and Sarah Chen (female) on a male one. The
 registry (config/personas.json) is the single source of truth; the panelcast now derives
 the Gemini voice from each persona's tts_voice suffix, so this test locks the source clean.
 """
@@ -48,15 +48,15 @@ FEMALE_VOICES = {
 # Expected gender per persona, by their (fictional) display name.
 EXPECTED_GENDER = {
     "elena_voss": "F",  # Elena Voss
-    "eli_marsh": "M",  # Dr. Eli Marsh
-    "sleep_coach": "F",  # Dr. Lisa Park
-    "training_coach": "F",  # Dr. Sarah Chen
-    "nutrition_coach": "M",  # Dr. Marcus Webb
-    "mind_coach": "M",  # Dr. Nathan Reeves
-    "physical_coach": "M",  # Dr. Victor Reyes
-    "glucose_coach": "F",  # Dr. Amara Patel
-    "labs_coach": "M",  # Dr. James Okafor
-    "explorer_coach": "M",  # Dr. Henning Brandt
+    "eli_marsh": "M",  # Eli Marsh
+    "sleep_coach": "F",  # Lisa Park
+    "training_coach": "F",  # Sarah Chen
+    "nutrition_coach": "M",  # Marcus Webb
+    "mind_coach": "M",  # Nathan Reeves
+    "physical_coach": "M",  # Victor Reyes
+    "glucose_coach": "F",  # Amara Patel
+    "labs_coach": "M",  # James Okafor
+    "explorer_coach": "M",  # Henning Brandt
 }
 
 

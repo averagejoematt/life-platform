@@ -1077,7 +1077,7 @@ def _get_training_recommendation(args):
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# #28 — EXERCISE VARIETY SCORING (Sponsor: Dr. Sarah Chen)
+# #28 — EXERCISE VARIETY SCORING (Sponsor: Sarah Chen)
 # ═══════════════════════════════════════════════════════════════════════
 
 

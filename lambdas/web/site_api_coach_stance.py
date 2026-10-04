@@ -366,7 +366,7 @@ def _team_tensions(*, _g):
 
 
 def _lead_block(team_focus, *, _g):
-    """The Principal Investigator (Dr. Eli Marsh) — the lead above the 8 coaches.
+    """The Principal Investigator (Eli Marsh) — the lead above the 8 coaches.
     A non-operational orchestrator persona; surfaced as the head of the team."""
     _registry = _g["_registry"]
     lp = _registry().get("personas", {}).get("eli_marsh")

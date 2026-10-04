@@ -49,8 +49,8 @@ def test_publish_gate_passes_clean_entry():
         "question": "Is the glucose spike the supplement, or just a bad night's sleep?",
         "note": "Great question — exactly the confound we test for.",
         "responses": [
-            {"name": "Dr. Lisa Park", "text": "The sleep data points at the short night, not the supplement."},
-            {"name": "Dr. Amara Patel", "text": "I disagree slightly — the meal response window matters more here."},
+            {"name": "Lisa Park", "text": "The sleep data points at the short night, not the supplement."},
+            {"name": "Amara Patel", "text": "I disagree slightly — the meal response window matters more here."},
         ],
     }
     assert pba.assert_entry_publishable(entry) is entry

@@ -1,6 +1,6 @@
 """tests/test_coach_weight_recency_1924.py — #1924: the OTHER coach generator's weigh-in date.
 
-THE LIVE FAILURE (2026-08-01). `/api/coaching-dashboard` published, from Dr. Victor
+THE LIVE FAILURE (2026-08-01). `/api/coaching-dashboard` published, from Victor
 Reyes:
 
     "The weight anchor I'm working from is 321.1 lbs at Day 1, and the latest
@@ -150,7 +150,7 @@ def test_dating_the_citation_clears_the_check():
         {"weight_lbs": 317.0},
         [
             {
-                "name": "Dr. Victor Reyes",
+                "name": "Victor Reyes",
                 "position_summary": "The most recent weigh-in is 316.3 lbs as of 2026-07-28; he is at 317.0 lbs now.",
             }
         ],
@@ -172,7 +172,7 @@ def test_an_undated_out_of_tolerance_weight_still_blocks():
 
     ok, msg = wq.assess_cross_surface_weight(
         {"weight_lbs": 317.0},
-        [{"name": "Dr. Victor Reyes", "position_summary": "He is at 321.1 lbs."}],
+        [{"name": "Victor Reyes", "position_summary": "He is at 321.1 lbs."}],
     )
     assert not ok
     assert "321.1" in msg
@@ -186,7 +186,7 @@ def test_the_exact_live_failure_now_passes():
         {"weight_lbs": 317.0},
         [
             {
-                "name": "Dr. Victor Reyes",
+                "name": "Victor Reyes",
                 "position_summary": "The weight anchor I'm working from is 321.1 lbs at Day 1, and the latest reading is 316.3 lbs.",
             }
         ],

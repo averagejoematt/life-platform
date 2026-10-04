@@ -37,7 +37,7 @@ def _open_item(coach_id="mind", date="2026-07-09", uid="aaaa1111", **over):
         "sk": f"CHECKIN#{date}#{uid}",
         "record_type": "coach_checkin",
         "coach_id": coach_id,
-        "coach_name": "Dr. Nathan Reeves",
+        "coach_name": "Nathan Reeves",
         "question": "What's been taking up the most mental space this week?",
         "tags": ["mood"],
         "status": cc.STATUS_OPEN,
@@ -242,7 +242,7 @@ def test_pick_coach_rotation_ties_resolve_by_canonical_order():
 
 
 def test_prompt_encodes_autonomy_rules_and_json_shape():
-    body = cc.build_generation_prompt("mind", "Dr. Nathan Reeves", "Bio.", {"presence": {}}, 3)
+    body = cc.build_generation_prompt("mind", "Nathan Reeves", "Bio.", {"presence": {}}, 3)
     system = body["system"][0]["text"]
     assert "AUTONOMY-SUPPORTIVE" in system
     assert "did you take your supplements?" in system  # the forbidden example is spelled out
@@ -318,7 +318,7 @@ def test_log_skip_is_zero_penalty(monkeypatch):
 
 
 def test_log_finds_item_without_coach_hint(monkeypatch):
-    fake = FakeDdbTable(rows=[_open_item(coach_id="glucose", coach_name="Dr. Amara Patel")])
+    fake = FakeDdbTable(rows=[_open_item(coach_id="glucose", coach_name="Amara Patel")])
     monkeypatch.setattr(tcc, "_table_ref", fake)
     out = tcc.tool_log_coach_checkin({"checkin_id": "CHECKIN#2026-07-09#aaaa1111", "answer": "the sensor lapsed while traveling"})
     assert out["status"] == "saved"
@@ -345,7 +345,7 @@ def test_recent_checkins_block_formats_answers_and_skips():
         ),
         _open_item(
             coach_id="nutrition",
-            coach_name="Dr. Marcus Webb",
+            coach_name="Marcus Webb",
             uid="ffff6666",
             status=cc.STATUS_SKIPPED,
             skipped=True,
@@ -357,7 +357,7 @@ def test_recent_checkins_block_formats_answers_and_skips():
     assert "RECENT COACH CHECK-IN ANSWERS" in block
     assert 'A (verbatim): "It was travel, mostly."' in block
     assert "(declined to answer — respect that)" in block
-    assert "Dr. Marcus Webb" in block
+    assert "Marcus Webb" in block
     assert "gggg7777" not in block and block.count("Q:") == 2
 
 

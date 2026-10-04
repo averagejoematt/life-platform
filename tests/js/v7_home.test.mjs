@@ -40,8 +40,8 @@ const progress = [
 const posts = [{ date: "2026-09-22", title: "The Silence and the Signal" }];
 const cadence = { chronicle: { paused: false, next_date: "2026-09-30" } };
 const coaches = [
-  { persona_id: "sleep_coach", name: "Dr. Lisa Park" },
-  { persona_id: "mind_coach", name: "Dr. Nathan Reeves" },
+  { persona_id: "sleep_coach", name: "Lisa Park" },
+  { persona_id: "mind_coach", name: "Nathan Reeves" },
 ];
 const docket = [
   {
@@ -133,7 +133,7 @@ test("what resolves next: sorted by date, the docket in plain words, and the hon
     rows.map((r) => r.date),
     ["2026-09-27", "2026-09-30", "2026-10-05", "2026-10-07"],
   );
-  assert.match(strip(rows[3].html), /Dr\. Lisa Park says the seven-night average recovery reads 80 or better that day; Dr\. Nathan Reeves says it won’t\. Graded by code\./);
+  assert.match(strip(rows[3].html), /Lisa Park says the seven-night average recovery reads 80 or better that day; Nathan Reeves says it won’t\. Graded by code\./);
   const empty = strip(H.nextBlock([], {}, { chronicle: { paused: true } }, { ...journey, day_n: 40 }, coaches, "2026-09-26"));
   assert.match(empty, /^Nothing is on the docket and no graded call is due\. The next weigh-in is due Sunday, September 27\.$/);
 });
@@ -198,15 +198,15 @@ test("is he okay: the refusals are kept verbatim and absence is stated as absenc
 
 test("also on the record: two counts that disagree are both left up; the skips are counted", () => {
   const html = H.recordBlock(
-    { coaches: [{ coach_id: "nutrition", coach_name: "Dr. Marcus Webb", n: 5, confirmed: 0 }, { coach_id: "sleep", coach_name: "Dr. Lisa Park", n: 17, confirmed: 7 }] },
+    { coaches: [{ coach_id: "nutrition", coach_name: "Marcus Webb", n: 5, confirmed: 0 }, { coach_id: "sleep", coach_name: "Lisa Park", n: 17, confirmed: 7 }] },
     { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }, { coach: "sleep", confirmed: 7, refuted: 10 }] } },
     { commitments: { lifetime: { unresolved: 468, graded: 49, kept: 37 } } },
     { pacific_today: "2026-09-26", sources: [{ id: "garmin", label: "Garmin", status: "paused", last_update: "2026-06-15" }, { id: "apple_health", label: "Apple Health", status: "fresh", datatypes: [{ key: "cgm", label: "CGM (glucose)" }], dark_datatypes: [{ label: "CGM (glucose)", days_dark: 30 }] }] },
     { pulse: { glyphs: { journal: { gap_days: 17 } } } },
   );
   const text = strip(html);
-  assert.match(text, /Dr\. Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s two counts\. The other says 20 of 25\. The two disagree, and both are left up\./);
-  assert.doesNotMatch(text, /Dr\. Lisa Park/, "a coach whose two counts agree is not on the record");
+  assert.match(text, /Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s two counts\. The other says 20 of 25\. The two disagree, and both are left up\./);
+  assert.doesNotMatch(text, /Lisa Park/, "a coach whose two counts agree is not on the record");
   assert.match(text, /468 asks expired .* Of the 49 that were checked, he kept 37\./);
   assert.match(text, /What he skips, counted: journal 17 days · blood-sugar sensor 30 days · Garmin 103 days, paused by the platform, not by him\./);
 });
@@ -226,7 +226,7 @@ test("every number carries its served field, dates are words not ISO, and the ru
   const text = strip(all);
   assert.doesNotMatch(text, /\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of|chronicle|cockpit)\b/i);
   // R5 §d — house jargon a reader meets in the fold: "scorekeeper" and "the engine's count" are gone
-  assert.doesNotMatch(text + strip(H.recordBlock({ coaches: [{ coach_id: "nutrition", coach_name: "Dr. Marcus Webb", n: 5, confirmed: 0 }] }, { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }] } }, null, null, null)), /scorekeeper|engine’s count|engine's count/i);
+  assert.doesNotMatch(text + strip(H.recordBlock({ coaches: [{ coach_id: "nutrition", coach_name: "Marcus Webb", n: 5, confirmed: 0 }] }, { predictions: { by_coach: [{ coach: "nutrition", confirmed: 20, refuted: 5 }] } }, null, null, null)), /scorekeeper|engine’s count|engine's count/i);
   assert.doesNotMatch(text, /\d{4}-\d{2}-\d{2}/, "no ISO date reaches the reader");
   // The fold's figures each name their field.
   for (const f of ["journey.current_weight_lbs", "journey.lost_lbs", "journey.day_n", "journey.start_weight_lbs", "journey.weighin_count", "journey.weekly_rate_lbs"]) {
@@ -284,7 +284,7 @@ test("R7 fix 2: a windowed metric reads in words by RULE; a metric with no words
   const text = rows.map((r) => strip(r.html));
   assert.match(text[1], /says the seven-day average protein reads 190 grams or better that day/);
   assert.match(text[2], /says the seven-night average share of deep sleep reads 26 or better that day/);
-  assert.match(text[3], /^Dr\. Nathan Reeves and nutrition disagree\. Graded by code\.$/);
+  assert.match(text[3], /^Nathan Reeves and nutrition disagree\. Graded by code\.$/);
   for (const t of text) {
     assert.doesNotMatch(t, /fuel-cognition|mechanistic|7day|some new engine field/i, t);
     assert.doesNotMatch(t, /\b[a-z]+_[a-z_]+\b/, t);
