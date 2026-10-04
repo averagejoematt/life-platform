@@ -1232,14 +1232,7 @@ def _send_story_questions(event):
     from content import story_dossier, story_ledger, story_questions
 
     today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()  # pacific_today() is a YYYY-MM-DD string
-    upcoming = next(
-        (
-            w
-            for w in story_dossier.season_weeks(through=(today + timedelta(days=7)).isoformat())
-            if w["start"] <= today.isoformat() <= w["end"]
-        ),
-        None,
-    )
+    upcoming = story_dossier.week_containing(today.isoformat())  # #4539: the one definition the dead-man shares
     if upcoming is None:
         return {"statusCode": 200, "body": json.dumps({"status": "no_week"})}
     n = upcoming["week"]

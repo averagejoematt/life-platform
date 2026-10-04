@@ -1100,11 +1100,19 @@ COVERAGE = {
         "#2820: subscriber-facing mid-gap note, but explicitly cadence POLISH, not the every-Wednesday promise — the promise "
         "carries the delivery dead-man; a deliberate pause here is separately visible via its #1951 kill-switch-skip alarm.",
     ),
+    # #4539 re-dated this row. Its 2026-07-19 reason ended "a missing episode is visible on
+    # the site and in the operator's week", and that was not true: episodes 1 and 2 went
+    # ungenerated for three weeks (#4365) and the week-3 hold sat from 2026-09-25 with nobody
+    # looking. The census still grades the function's INVOCATIONS; the OUTPUT now has its own
+    # dead-man (STORY_SEASON_DEADMEN below), which is what the 4th element cites.
     "coach-panel-podcast": (
         CENSUS,
-        "2026-07-19",
-        "Weekly Panel episode whose generation is deliberately hold/budget-gated (SS-02) — absent output is a sanctioned state; "
-        "a missing episode is visible on the site and in the operator's week.",
+        "2026-10-03",
+        "Panel episode whose generation is deliberately hold/budget-gated (SS-02), so an invocation that publishes nothing is "
+        "a sanctioned state the census cannot tell from a skip. The output is graded instead: the nightly qa-smoke leg "
+        "story_season:episode_or_hold reds a published chronicle week with no episode and no named dated hold, and a hold "
+        "past its escalation age (#4539).",
+        "qa-smoke-failures",
     ),
     "dashboard-refresh": (
         CENSUS,
@@ -1285,6 +1293,7 @@ EXEMPTION_MAX_AGE_DAYS = 365
 
 def _age_days(datestr):
     try:
+        # utc-exempt(#4539): the age of a ledger DATE against a 365-day cap — not any handler's "today".
         return (date.today() - datetime.strptime(datestr, "%Y-%m-%d").date()).days
     except ValueError:
         return None
@@ -1336,6 +1345,7 @@ def test_exemptions_are_dated_and_reasoned():
             _, d, reason = entry[0], entry[1], entry[2]
             try:
                 when = datetime.strptime(d, "%Y-%m-%d").date()
+                # utc-exempt(#4539): a ledger date vs the runner's day — no handler clock is paired with it.
                 if when > date.today():
                     problems.append(f"  {fn}: exemption dated in the future ({d})")
             except ValueError:
@@ -1410,6 +1420,89 @@ def test_non_scheduled_emitter_alarms_are_real():
         "NON_SCHEDULED_EMITTERS names an alarm cdk/stacks/*.py does not create — the channel is uncovered "
         "and the row says otherwise:\n" + "\n".join(bad)
     )
+
+
+# ── #4539: the Story Desk season dead-men ────────────────────────────────────
+# COVERAGE asks "did the function run". The Story Desk's failures were all runs that
+# happened and left nothing: a Panel invoke that published no episode (#4365, three
+# weeks), a hold nobody re-read, a publish whose fail-soft ledger write was lost, and a
+# SECOND EventBridge rule on a function whose first rule still fires — which the
+# function-name ledger above cannot see by construction (scheduled_lambdas() keeps one
+# row per function).
+#
+# Each entry is {qa-smoke check id: the absence it detects}. The checks live in
+# lambdas/operational/story_season_qa.py and ride the nightly life-platform-qa-smoke
+# invoke, so their own liveness is qa-smoke-heartbeat and their red is qa-smoke-failures.
+STORY_SEASON_DEADMEN = {
+    "story_season:episode_or_hold": "a published chronicle week with no Panel episode and no named dated hold, or a hold grown old",
+    "story_season:ledger_advanced": "a published week that left no LEDGER# row for the next installment to read",
+    "story_season:monday_questions": "the StoryQuestionsMonday rule on wednesday-chronicle not sending (no STORYQ# marker)",
+}
+
+
+def _story_season_qa():
+    """The detector's module-level constants, read from SOURCE (ast.literal_eval) — never imported: this file
+    is a static sweep of cdk/ and must not take on a lambda module's runtime imports."""
+    with open(os.path.join(LAMBDAS_DIR, "operational", "story_season_qa.py"), encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    consts = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            try:
+                consts[node.targets[0].id] = ast.literal_eval(node.value)
+            except ValueError:
+                continue
+    needed = ("EPISODE_CHECK", "LEDGER_CHECK", "QUESTIONS_CHECK", "QUESTIONS_WEEKDAY", "QUESTIONS_HOUR_UTC", "QUESTIONS_MINUTE_UTC")
+    missing = [k for k in needed if k not in consts]
+    assert not missing, f"story_season_qa no longer declares {missing} as module-level literals — this enrolment reads nothing"
+    return type("StorySeasonConstants", (), consts)
+
+
+def test_story_season_deadmen_are_enrolled():
+    ssq = _story_season_qa()
+    assert set(STORY_SEASON_DEADMEN) == {
+        ssq.EPISODE_CHECK,
+        ssq.LEDGER_CHECK,
+        ssq.QUESTIONS_CHECK,
+    }, "STORY_SEASON_DEADMEN and story_season_qa's check ids diverged — a dead-man was added or dropped on one side only"
+    # The leg's registration in the nightly run list is asserted where the detector is exercised
+    # (tests/test_chronicle_status_row_deadman_3563.py) — this file stays a static sweep of cdk/.
+    missing = {"qa-smoke-failures", "qa-smoke-heartbeat"} - cdk_alarm_names()
+    assert not missing, f"the alarms the season dead-men ride no longer exist: {sorted(missing)}"
+    assert (
+        COVERAGE["coach-panel-podcast"][3] == "qa-smoke-failures" and "story_season:episode_or_hold" in COVERAGE["coach-panel-podcast"][2]
+    )
+
+
+def test_story_questions_rule_and_its_deadman_keep_one_clock():
+    """The dead-man computes when a send was owed from constants; this pins them to the
+    rule's own cron, so moving StoryQuestionsMonday moves the detector or reds here."""
+    ssq = _story_season_qa()
+    with open(os.path.join(CDK_STACKS_DIR, "email_stack.py"), encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    rules = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and _is_call_to(n, "Rule")
+        and len(n.args) > 1
+        and isinstance(n.args[1], ast.Constant)
+        and n.args[1].value == "StoryQuestionsMonday"
+    ]
+    assert len(rules) == 1, f"expected exactly one StoryQuestionsMonday rule in email_stack.py, found {len(rules)}"
+    assert not (isinstance(_kw(rules[0], "enabled"), ast.Constant) and _kw(rules[0], "enabled").value is False)
+    cron = _kw(rules[0], "schedule")
+    assert isinstance(cron, ast.Call) and _is_call_to(cron, "cron"), "StoryQuestionsMonday is no longer a Schedule.cron(...)"
+    got = {kw.arg: kw.value.value for kw in cron.keywords if isinstance(kw.value, ast.Constant)}
+    want = {"minute": str(ssq.QUESTIONS_MINUTE_UTC), "hour": str(ssq.QUESTIONS_HOUR_UTC), "week_day": ssq.QUESTIONS_WEEKDAY}
+    assert got == want, f"StoryQuestionsMonday fires at {got}; story_season_qa expects a send at {want}"
+    payloads = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Dict) and any(isinstance(k, ast.Constant) and k.value == "story_questions" for k in n.keys)
+    ]
+    assert len(payloads) == 1, "the rule no longer sends the {story_questions: true} event the sender keys on"
+    assert "wednesday-chronicle" in scheduled_lambdas()
 
 
 # ── #3506: the cadence assertion's own must-fail control ─────────────────────

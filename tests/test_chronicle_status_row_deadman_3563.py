@@ -39,6 +39,7 @@ every delivery before it is a breach.
 """
 
 import datetime as dt
+import json
 import os
 import sys
 
@@ -332,3 +333,270 @@ def test_the_check_is_wired_into_the_nightly_run_list():
 
     labels = [label for label, _ in qa.check_steps()]
     assert "chronicle_status_row" in labels
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #4539 — the Story Desk's dead-men (operational/story_season_qa.py)
+#
+# Housed in this module because it is the chronicle partition's dead-man family and
+# shares its paginated, condition-reading FakeTable. Enrolment (the heartbeat ledger
+# row, the leg's registration, the Monday rule's cron) is asserted in
+# tests/test_heartbeat_completeness.py.
+#
+# THE FIXTURES ARE THE LIVE ROWS, read read-only 2026-10-03: the six published
+# cycle-17 installments, the five LEDGER# rows the season promote wrote, and the
+# five episodes /panelcast/episodes.json serves. The pilot-phase, draft and unlisted
+# rows are kept on purpose — the check has to exclude them, and a fixture holding
+# only season rows could not show that it does.
+# ══════════════════════════════════════════════════════════════════════════════
+
+from operational import story_season_qa as ssq  # noqa: E402
+from operational.census_probe import ProbeBudget  # noqa: E402
+
+_REBUILT = "story-desk season rebuild (#4537)"
+SEASON_ROWS = [
+    {"sk": "DATE#2026-02-22", "date": "2026-02-22", "phase": "pilot", "cycle": "5", "status": "published", "week_number": "1"},
+    {
+        "sk": "DATE#2026-02-28",
+        "date": "2026-08-31",
+        "phase": "experiment",
+        "cycle": "17",
+        "status": "published",
+        "week_number": "0",
+        "approved_at": "2026-10-02T18:31:35Z",
+        "rebuilt_by": _REBUILT,
+    },
+    {
+        "sk": "DATE#2026-07-21",
+        "date": "2026-09-05",
+        "phase": "experiment",
+        "cycle": "17",
+        "status": "published",
+        "week_number": "1",
+        "unlisted": True,
+        "approved_at": "2026-07-24T18:00:44.139427+00:00",
+    },
+    {"sk": "DATE#2026-09-01", "date": "2026-09-01", "phase": "pilot", "cycle": "15", "status": "draft", "week_number": "1"},
+    {"sk": "DATE#2026-09-05", "date": "2026-09-05", "phase": "experiment", "cycle": "17", "status": "published", "week_number": "0"},
+    {
+        "sk": "DATE#2026-09-08",
+        "date": "2026-09-08",
+        "phase": "experiment",
+        "status": "published",
+        "week_number": "1",
+        "approved_at": "2026-09-11T18:00:44.191941+00:00",
+        "delivered_at": "2026-09-11T18:00:47.104442+00:00",
+    },
+    {
+        "sk": "DATE#2026-09-15",
+        "date": "2026-09-15",
+        "phase": "experiment",
+        "status": "published",
+        "week_number": "2",
+        "approved_at": "2026-09-18T18:00:44.273958+00:00",
+        "delivered_at": "2026-09-18T18:00:47.261917+00:00",
+    },
+    {
+        "sk": "DATE#2026-09-22",
+        "date": "2026-09-22",
+        "phase": "experiment",
+        "status": "published",
+        "week_number": "3",
+        "approved_at": "2026-09-25T18:00:43.932235+00:00",
+        "delivered_at": "2026-09-25T18:00:47.026077+00:00",
+    },
+    {
+        "sk": "DATE#2026-09-29",
+        "date": "2026-09-29",
+        "phase": "experiment",
+        "status": "published",
+        "week_number": "4",
+        "approved_at": "2026-10-02T18:31:37Z",
+    },
+    {"sk": "RAWCACHE#2026-09-29", "week_number": "4"},
+    {"sk": "RECAP#2026-09-29", "status": "published"},
+    {"sk": "RECAP#latest", "status": "published"},
+]
+SEASON_LEDGERS = [
+    {"sk": f"LEDGER#{d}", "record_type": "story_ledger", "cycle": "17", "phase": "experiment"}
+    for d in ("2026-08-31", "2026-09-08", "2026-09-15", "2026-09-22", "2026-09-29")
+]
+# /panelcast/episodes.json as served 2026-10-03 (the fields this check reads, plus the title).
+SEASON_EPISODES = [
+    {"week": 4, "title": "EP4 · The Body Answers Back", "date": "2026-10-01", "url": "/panelcast/wk4.mp3"},
+    {"week": 3, "title": "EP3 · Storming Mode", "date": "2026-09-24", "url": "/panelcast/wk3.mp3"},
+    {"week": 2, "title": "EP2 · Nine Days and Counting", "date": "2026-09-17", "url": "/panelcast/wk2.mp3"},
+    {"week": 1, "title": "EP1 · The Strap Said 76%", "date": "2026-09-10", "url": "/panelcast/wk1.mp3"},
+    {"week": 0, "title": "EP0 · Before the Numbers", "date": "2026-09-05", "url": "/panelcast/wk0.mp3"},
+]
+SITE = "https://averagejoematt.com"
+
+
+def _episodes(weeks, pending=None):
+    doc = {"episodes": [e for e in SEASON_EPISODES if e["week"] in weeks]}
+    if pending:
+        doc["pending"] = pending
+    return doc
+
+
+def _hold(week, noted_at):
+    """The marker exactly as coach_panel_podcast_lambda._set_pending writes it from _hold_and_alert
+    (pinned to the producer by test_the_hold_marker_fixture_is_the_producers_shape)."""
+    return {
+        "week": week,
+        "reason": "held_for_review",
+        "display": "This week's episode is in final review — it'll drop here as soon as it clears the quality bar.",
+        "expected_date": None,
+        "noted_at": noted_at,
+    }
+
+
+def _season(iso_utc, rows=None, ledgers=None, markers=None, doc=None, http=(200, None), raises=None):
+    rows = SEASON_ROWS if rows is None else rows
+    ledgers = SEASON_LEDGERS if ledgers is None else ledgers
+    table = FakeTable({INSTALLMENT_PK: list(rows) + list(ledgers) + list(markers or [])}, raises=raises)
+    body = json.dumps(_episodes({0, 1, 2, 3, 4}) if doc is None else doc) if http[1] is None else http[1]
+    fetched = []
+
+    def opener(url, timeout):
+        fetched.append(url)
+        return http[0], body
+
+    out = ssq.check_story_season(
+        table, USER_PREFIX, Check, CONTENT_TRUTH, _pt_now(iso_utc), site_base_url=SITE, budget=ProbeBudget(opener=opener)
+    )
+    by = {c.name: c for c in out}
+    assert set(by) == {ssq.EPISODE_CHECK, ssq.LEDGER_CHECK, ssq.QUESTIONS_CHECK}
+    return by, table, fetched
+
+
+def _as_of(day):
+    """The season rows as they stood on `day`: nothing approved later exists yet."""
+    return [r for r in SEASON_ROWS if (r.get("approved_at") or r.get("date") or "")[:10] <= day and "rebuilt_by" not in r]
+
+
+def test_the_live_season_is_green_on_all_three_checks():
+    by, table, fetched = _season("2026-10-03T18:30:00")
+    assert all(c.passed is True for c in by.values()), {n: c.message for n, c in by.items()}
+    assert "5 published season week" in by[ssq.EPISODE_CHECK].message  # weeks 0-4: pilot, draft and unlisted rows excluded
+    assert set(table.pks_read) == {INSTALLMENT_PK} and fetched == [SITE + "/panelcast/episodes.json"]
+    assert all(c.partition == CONTENT_TRUTH for c in by.values())
+
+
+def test_HISTORY_episodes_1_and_2_would_have_alarmed_two_days_after_each_week_published():
+    """#4365: weeks 1 and 2 published 09-11 and 09-18; their episodes first existed 10-02."""
+    by, _, _ = _season("2026-09-13T17:59:00", rows=_as_of("2026-09-13"), doc=_episodes({0}))
+    assert by[ssq.EPISODE_CHECK].passed is True and "inside its 48 h window" in by[ssq.EPISODE_CHECK].message
+    by, _, _ = _season("2026-09-13T18:30:00", rows=_as_of("2026-09-13"), doc=_episodes({0}))
+    assert by[ssq.EPISODE_CHECK].passed is False and "week 1" in by[ssq.EPISODE_CHECK].message
+    by, _, _ = _season("2026-09-20T18:30:00", rows=_as_of("2026-09-20"), doc=_episodes({0}))
+    msg = by[ssq.EPISODE_CHECK].message
+    assert by[ssq.EPISODE_CHECK].passed is False and "week 1" in msg and "week 2" in msg and "week 0" not in msg
+
+
+def test_HISTORY_the_week_3_hold_is_sanctioned_for_a_week_and_then_escalates():
+    """Held 2026-09-25 (the day is the record; the instant is the Friday publish it followed)."""
+    hold = _hold(3, "2026-09-25T18:05:00+00:00")
+    rows = _as_of("2026-10-01")
+    by, _, _ = _season("2026-10-01T18:30:00", rows=rows, doc=_episodes({0, 1, 2}, hold))
+    assert by[ssq.EPISODE_CHECK].passed is True and "week 3 held since 2026-09-25" in by[ssq.EPISODE_CHECK].message
+    by, _, _ = _season("2026-10-02T18:30:00", rows=rows, doc=_episodes({0, 1, 2}, hold))
+    assert by[ssq.EPISODE_CHECK].passed is False and "HELD more than 7 days" in by[ssq.EPISODE_CHECK].message
+
+
+def test_MUTATION_a_re_hold_cannot_keep_a_hold_young():
+    """_set_pending rewrites noted_at on every retry. The overdue clock is the one a retry cannot reset."""
+    fresh = _hold(3, "2026-10-04T18:00:00+00:00")
+    by, _, _ = _season("2026-10-05T18:30:00", rows=_as_of("2026-10-01"), doc=_episodes({0, 1, 2}, fresh))
+    assert by[ssq.EPISODE_CHECK].passed is False and "week 3 held since 2026-10-04" in by[ssq.EPISODE_CHECK].message
+
+
+def test_MUTATION_only_a_named_dated_hold_on_that_week_excuses_a_missing_episode():
+    for pending in (
+        _hold(2, "2026-09-26T18:00:00+00:00"),  # a hold on ANOTHER week excuses nothing
+        {**_hold(3, "2026-09-26T18:00:00+00:00"), "reason": "awaiting_material"},  # not a hold: the week IS published
+        _hold(3, None),  # undated
+    ):
+        by, _, _ = _season("2026-09-28T18:30:00", rows=_as_of("2026-09-28"), doc=_episodes({0, 1, 2}, pending))
+        assert by[ssq.EPISODE_CHECK].passed is False and "NO Panel episode" in by[ssq.EPISODE_CHECK].message, pending
+
+
+def test_the_hold_marker_fixture_is_the_producers_shape():
+    """Fixture must be the wire: every key and the reason literal this check reads are what the Panel writes."""
+    src = open(os.path.join(_REPO, "lambdas", "emails", "coach_panel_podcast_lambda.py"), encoding="utf-8").read()
+    setter = src[src.index("def _set_pending(") : src.index("def ", src.index("def _set_pending(") + 10)]
+    for key in _hold(3, "x"):
+        assert f'"{key}":' in setter, f"_set_pending no longer writes {key!r}"
+    holder = src[src.index("def _hold_and_alert(") :]
+    assert f'"{ssq.HOLD_REASON}"' in holder[: holder.index("\ndef ")], "_hold_and_alert no longer publishes HOLD_REASON"
+    assert 'Key=f"{PREFIX}/episodes.json"' in setter and ssq.EPISODES_PATH == "/panelcast/episodes.json"
+
+
+def test_MUTATION_a_week_with_no_ledger_row_reds_by_name():
+    by, _, _ = _season("2026-10-03T18:30:00", ledgers=[r for r in SEASON_LEDGERS if r["sk"] != "LEDGER#2026-09-29"])
+    assert by[ssq.LEDGER_CHECK].passed is False
+    assert "week 4" in by[ssq.LEDGER_CHECK].message and "LEDGER#2026-09-29" in by[ssq.LEDGER_CHECK].message
+    assert by[ssq.EPISODE_CHECK].passed is True  # independent verdicts
+
+
+def test_MUTATION_a_tombstoned_ledger_row_is_not_a_ledger():
+    dead = [{**r, "tombstone": True} if r["sk"] == "LEDGER#2026-09-22" else r for r in SEASON_LEDGERS]
+    by, _, _ = _season("2026-10-03T18:30:00", ledgers=dead)
+    assert by[ssq.LEDGER_CHECK].passed is False and "week 3" in by[ssq.LEDGER_CHECK].message
+
+
+def test_week_0_is_filed_under_its_date_attribute_not_its_url_slot():
+    """The prologue's sk is DATE#2026-02-28 and its ledger is LEDGER#2026-08-31."""
+    weeks = ssq.published_weeks(SEASON_ROWS)
+    assert sorted(weeks) == [0, 1, 2, 3, 4] and "2026-08-31" in weeks[0]["dates"]
+    assert weeks[0]["published"].isoformat() == "2026-09-05T00:00:00+00:00"  # the plan post, the week's first appearance
+
+
+def _marker(week, sent_at="2026-10-05T16:00:21.412233+00:00"):
+    """The row wednesday_chronicle_lambda._send_story_questions puts after SES accepts."""
+    return {"sk": f"STORYQ#W{week:03d}", "questions_json": "[]", "sent_at": sent_at, "message_id": "0101-test", "phase": "experiment"}
+
+
+def test_the_monday_questions_send_is_owed_from_its_first_live_monday():
+    by, _, _ = _season("2026-10-03T18:30:00")
+    assert by[ssq.QUESTIONS_CHECK].passed is True and "2026-09-28" in by[ssq.QUESTIONS_CHECK].message  # before the rule existed
+    by, _, _ = _season("2026-10-05T16:30:00")
+    assert by[ssq.QUESTIONS_CHECK].passed is True  # inside the grace hour: still last week's slot
+    by, _, _ = _season("2026-10-05T18:30:00")
+    assert by[ssq.QUESTIONS_CHECK].passed is False and "STORYQ#W005" in by[ssq.QUESTIONS_CHECK].message
+    by, _, _ = _season("2026-10-05T18:30:00", markers=[_marker(5)])
+    assert by[ssq.QUESTIONS_CHECK].passed is True
+    by, _, _ = _season("2026-10-11T18:30:00", markers=[_marker(4)])  # last week's marker is not this week's send
+    assert by[ssq.QUESTIONS_CHECK].passed is False
+    by, _, _ = _season("2026-10-12T18:30:00", markers=[_marker(5)])
+    assert by[ssq.QUESTIONS_CHECK].passed is False and "STORYQ#W006" in by[ssq.QUESTIONS_CHECK].message
+
+
+def test_the_dead_man_and_the_sender_name_the_same_week():
+    """One definition (story_dossier.week_containing), and the sender calls it."""
+    from content import story_dossier
+
+    assert ssq.week_containing is story_dossier.week_containing
+    assert story_dossier.week_containing("2026-10-05")["week"] == 5 and story_dossier.week_containing("2026-09-06")["week"] == 1
+    assert story_dossier.week_containing("2026-09-05") is None  # before genesis: no week, no send owed
+    sender = open(os.path.join(_REPO, "lambdas", "emails", "wednesday_chronicle_lambda.py"), encoding="utf-8").read()
+    body = sender[sender.index("def _send_story_questions(") : sender.index("def lambda_handler(")]
+    assert "story_dossier.week_containing(" in body and "season_weeks(" not in body
+    assert f'f"{ssq.QUESTIONS_PREFIX}{{n:03d}}"' in body
+
+
+def test_no_verdict_is_never_reported_as_green():
+    by, _, _ = _season("2026-10-03T18:30:00", raises=RuntimeError("AccessDenied"))
+    assert all(c.passed is None and "no verdict" in c.message for c in by.values())
+    by, _, _ = _season("2026-10-03T18:30:00", rows=[r for r in SEASON_ROWS if r.get("phase") == "pilot"])
+    assert by[ssq.EPISODE_CHECK].passed is None and by[ssq.LEDGER_CHECK].passed is None
+    for http in ((503, "upstream"), (200, "<html>"), (200, '{"pending": {}}')):
+        by, _, _ = _season("2026-10-03T18:30:00", http=http)
+        assert by[ssq.EPISODE_CHECK].passed is None and "no verdict" in by[ssq.EPISODE_CHECK].message, http
+        assert by[ssq.LEDGER_CHECK].passed is True  # the ledger verdict does not depend on the site read
+
+
+def test_the_story_season_leg_is_wired_into_the_nightly_run_list():
+    import qa_smoke_lambda as qa
+
+    assert "story_season" in [label for label, _ in qa.check_steps()]
