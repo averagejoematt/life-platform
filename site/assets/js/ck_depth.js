@@ -227,7 +227,7 @@ export function dayFactsHTML(iso, src, base, today = "") {
     const m = MEASURES[measure];
     return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
-  const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct), row("steps", p.steps, iso === today ? " so far today" : "")].join("");
+  const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct)].join(""); // step counts are left out: the stored day totals are unreliable (#4628)
   return rows ? `<ul class="ck-rows ck-rows--more">${rows}</ul>` : soft("Nothing was measured on this day.");
 }
 // What was lifted: every exercise with its working sets, each a door to that lift's trend.

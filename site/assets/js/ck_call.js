@@ -17,7 +17,7 @@
 import { tryJSON, esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { coachComparison } from "/assets/js/coach_comparison.js";
-import { ruleFor, verdictTag, verdictText, callVerdictTag, callVerdictText, cardLabel, gradedOnText } from "/assets/js/ck_verdict.js";
+import { ruleFor, verdictTag, verdictText, callVerdictTag, callVerdictText, cardLabel, gradedOnText, showcasePair } from "/assets/js/ck_verdict.js";
 
 export const NOT_SERVED = "The settled calls are not served right now.";
 export const NO_SUCH_CALL = "No settled call has this address.";
@@ -90,15 +90,22 @@ export function recordHTML(call, body) {
 }
 
 // ── for the front page ─────────────────────────────────────────────────────────
-// The newest settled call as one compact block that opens its page:
-// "Settled <day>: <coach> called X. It came in at Y. Right · within Z either way. The simple guess: …"
+// One settled call as a compact block that opens its page. It leads with the clearest miss
+// on record (the wrong call that landed the most allowed distances out), because a wide
+// hit as the lead example reads as soft grading; with no miss it is the tightest hit, and
+// with neither the newest call. The label is the day it settled, whichever call it is.
+// "Settled <day>: <coach> called X. It came in at Y. Wrong · not within Z either way."
+// The simple guess is said here only once it has a result on this call.
 export function lastCallHTML(callsBody, base) {
-  const call = callsOf(callsBody)[0];
+  const all = callsOf(callsBody);
+  const pair = showcasePair(all);
+  const call = pair.wrong || pair.right || all[0];
   if (!call) return "";
   const day = dayInWords(call.settled_date);
-  const guess = call.simple_guess && call.simple_guess.short ? `The simple guess: ${call.simple_guess.short}.` : "";
+  const g = call.simple_guess;
+  const guess = g && g.state === "scored" && g.short ? `The simple guess: ${g.short}.` : "";
   const said = call.kind === "bet" ? esc(call.verdict_text) : callVerdictTag(call);
-  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "The last settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
+  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
 }
 
 // "Next: <question> settles <day>." — the day is written here from the served date so the

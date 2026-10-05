@@ -61,7 +61,7 @@ test("the recent list: the grader's reason strings become right/wrong lines, who
   assert.equal(lines.length, 3, "a pending row is not a checked call");
   assert.equal(lines[0].text, "For Saturday, September 12, Park said the night’s recovery would land near 52.9, give or take 18.6 — it came in at 59.");
   assert.equal(lines[0].checked, "Checked Friday, September 25.");
-  assert.equal(lines[1].text, "Park said the night’s sleep, in hours would go down over the checked window — it went up.");
+  assert.equal(lines[1].text, "Park said the night’s hours of sleep would go down over the checked window — it went up.");
   assert.ok(!lines[1].text.includes("0.0247"));
   assert.equal(lines[2].text, "A disagreement settled by code: the seven-day average calories at or above 2200 on Monday, August 10.", "the criterion in words — no ISO date, no snake_case on the main screen");
   assert.deepEqual(V.tally(lines), { right: 1, wrong: 2, n: 3 });

@@ -83,6 +83,10 @@ export function numbersHTML(src) {
  *  A sentence whose fields are not all there is left out whole, never printed with a
  *  stand-in. tests/js/ck_built_4586.test.mjs removes each field in turn and checks the
  *  sentence goes; tests/test_built_page_facts_4586.py checks the route still serves them. */
+/** The control on building and testing. Source: lambdas/ai/dev_session_cap.py (#4623);
+ *  tests/test_built_page_facts_4586.py holds the two amounts equal to that module's. */
+export const BUILD_CAP = "Building and testing has its own limit: AI calls made from his laptop stop at $5 in one run and $10 in any 24 hours, until he names a higher number.";
+
 export const COST_FIELDS = {
   spent: ["base_ceiling_usd", "ceiling_usd", "month_to_date_usd"],
   ordinary: ["typical_day.usd", "typical_day.days_counted", "typical_day.window_end", "typical_day.month_days", "typical_day.month_usd"],
@@ -162,6 +166,9 @@ export function costHTML(receipts) {
       ),
     );
   }
+  // Everything past the three plain figures sits behind one disclosure: the high days, the
+  // forecasts and how a forecast moves the tier. A reader who wants the sums opens it.
+  const more = [];
   if (high) {
     const times = high.multiple === 2 ? "twice" : `${whole(high.multiple)} times`;
     const n = high.dates.length;
@@ -172,7 +179,7 @@ export function costHTML(receipts) {
     const ranAs = withChecks ? "ran on a schedule or as a check on a deploy" : "ran on a schedule";
     const covered = Number.isFinite(t) && Number.isFinite(high.first) && (recent || high.first >= t - GOVERNOR.windowDays * 86400000);
     const what = share !== null && covered ? ` Of the AI spend ${window}, ${whole(share)}% ${ranAs}. The rest was building and testing the system.` : "";
-    out.push(para(`${days}${over}${what}`));
+    more.push(para(`${days}${over}${what}`));
   }
 
   // Both forecasts, what each one assumes, and what they say against the ceiling.
@@ -182,7 +189,7 @@ export function costHTML(receipts) {
     const by = day(receipts.month_end_date);
     const banked = high && forecast > ceiling && usual.month <= ceiling && forecast - high.above <= ceiling ? " because of the high days already spent" : "";
     const wide = all === null || all <= forecast ? "" : ` If building and testing also carried on at that pace every day, it would be ${usd(all)}.`;
-    out.push(
+    more.push(
       para(
         `The forecast that sets the tier is what is spent plus ${programs} at their pace ${window}: ${usd(forecast)} by ${by || "month end"}, ${side(forecast)}${banked}.${wide}`,
       ),
@@ -190,10 +197,12 @@ export function costHTML(receipts) {
     const [t1, t2] = GOVERNOR.shares.map((share) => ceiling * share);
     const early = elapsed !== null && elapsed < GOVERNOR.earlyDays;
     if (tier === 0 && forecast >= t1) {
-      const why = early ? `Nothing is paused yet because in the first ${GOVERNOR.earlyDays} days of a month only money actually spent can raise the tier, and ${usd(mtd)} is under the first step of ${usd(t1)}. ` : "";
-      out.push(para(`${why}After day ${GOVERNOR.earlyDays} a forecast this high starts tier 1. A forecast lifts the tier one step at most, so tier 2 waits for ${usd(t1)} actually spent and tier 3 for ${usd(t2)}.`));
+      const why = early ? `Nothing is paused yet because in the first ${GOVERNOR.earlyDays} days of a month only money actually spent can raise the tier, and ${usd(mtd)} is under tier 1’s line of ${usd(t1)}. ` : "";
+      more.push(para(`${why}After day ${GOVERNOR.earlyDays} a forecast this high starts tier 1. A forecast can lift the tier only one step above what the money actually spent supports: tier 2 needs ${usd(t1)} actually spent and tier 3 needs ${usd(t2)}.`));
     }
   }
+  out.push(para(BUILD_CAP));
+  if (more.length) out.push(`<details><summary>The high days, the forecast and how it moves the tier</summary><div class="ck-section ck-section--tight">${more.join("")}</div></details>`);
   return out.join("");
 }
 

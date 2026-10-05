@@ -62,7 +62,7 @@ test("the cost paragraphs add up: an ordinary day, the high days with dates, and
   assert.match(html, /An ordinary day costs \$4\.57, AI included: the middle day of the 30 days to October 4\. 31 days like it come to \$141\.67, under the ceiling\./);
   assert.match(html, /3 days this month each cost more than twice that: October 1, 2 and 3, \$59\.70 together, \$45\.99 more than 3 ordinary days\. Of the AI spend this month so far, 26% ran on a schedule\. The rest was building and testing the system\./);
   assert.match(html, /The forecast that sets the tier is what is spent plus the scheduled programs at their pace this month so far: \$221\.83 by October 31, above the ceiling because of the high days already spent\. If building and testing also carried on at that pace every day, it would be \$496\.08\./);
-  assert.match(html, /Nothing is paused yet because in the first 5 days of a month only money actually spent can raise the tier, and \$64\.01 is under the first step of \$157\.67\. After day 5 a forecast this high starts tier 1\. A forecast lifts the tier one step at most, so tier 2 waits for \$157\.67 actually spent and tier 3 for \$186\.33\./);
+  assert.match(html, /Nothing is paused yet because in the first 5 days of a month only money actually spent can raise the tier, and \$64\.01 is under tier 1’s line of \$157\.67\. After day 5 a forecast this high starts tier 1\. A forecast can lift the tier only one step above what the money actually spent supports: tier 2 needs \$157\.67 actually spent and tier 3 needs \$186\.33\./);
   assert.doesNotMatch(html, /\$13\.75|a day over|Counting everything/, "the recent AI rate read as a monthly bill, and the all-in figure was printed without what it assumes");
   // A reader can check the sums: the day times the days is the month, and it is the served figure.
   const t = SRC.receipts.typical_day;
@@ -133,4 +133,17 @@ test("once the forecast counts the checks on each deploy, both sentences that de
   assert.match(counted, /% ran on a schedule or as a check on a deploy\. The rest/);
   const absent = B.costHTML({ ...SRC.receipts, projected_classes: undefined });
   assert.match(absent, /what is spent plus the scheduled programs at their pace/, "a missing list changes no sentence");
+});
+
+test("three plain figures stand in the open; the high days, the forecast and the tier sums sit behind one disclosure (red team, round 7)", () => {
+  const html = B.costHTML(SRC.receipts);
+  const [open, folded] = html.split("<details>");
+  assert.ok(folded, "one disclosure");
+  assert.equal((html.match(/<details>/g) || []).length, 1);
+  assert.match(open, /\$64\.01 is spent this month/);
+  assert.match(open, /An ordinary day costs \$4\.57/);
+  assert.ok(open.includes(B.BUILD_CAP), "the limit on building and testing is said in the open");
+  assert.doesNotMatch(open, /forecast|tier 2|\$496/, "no forecast arithmetic above the fold");
+  assert.match(folded, /The forecast that sets the tier/);
+  assert.match(folded, /days this month each cost more than/);
 });

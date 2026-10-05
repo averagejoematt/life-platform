@@ -76,12 +76,13 @@ test("the running record is counts in a sentence, never a percentage", () => {
 });
 
 test("the front page's last settled call is one block that opens its page", () => {
+  // It leads with the clearest miss on record, not the newest call (red team, round 7).
   const html = C.lastCallHTML(BODY, BASE);
-  assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Saturday, October 3<\/p>/);
-  assert.match(html, /<b>Henning Brandt called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 83\.7 for September 20\. A call like this counts as right within 22\.5 either way, his usual day-to-day swing\.<\/b> It came in at 97\./, "the card says which day the call was for and what counts as right");
-  assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 22\.5 either way<\/span>/);
-  assert.match(html, /The simple guess: not checked on this call yet\./);
-  assert.match(html, /href="\/next\/v8\/call\/\?id=explorer-20260919-aecd9fef2c">The whole call<\/a>/);
+  assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Thursday, September 24<\/p>/);
+  assert.match(html, /<b>Lisa Park called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 66\.2 for September 11\. A call like this counts as right within 17\.9 either way, his usual day-to-day swing\.<\/b> It came in at 24\./, "the card says which day the call was for and what counts as right");
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span>/);
+  assert.doesNotMatch(html, /The simple guess/, "the guess is said only once it has a result on this call");
+  assert.match(html, /href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|%/);
 });
 

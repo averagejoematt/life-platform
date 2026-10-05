@@ -85,9 +85,9 @@ export function timeInWords(iso) {
 // every metric of a served docket to words.
 const METRIC_BASE = {
   recovery_score: ["the night’s recovery", "night"],
-  sleep_duration_hours: ["the night’s sleep, in hours", "night"],
-  sleep_hours: ["the night’s sleep, in hours", "night"],
-  total_sleep_hours: ["the night’s sleep, in hours", "night"],
+  sleep_duration_hours: ["the night’s hours of sleep", "night"],
+  sleep_hours: ["the night’s hours of sleep", "night"],
+  total_sleep_hours: ["the night’s hours of sleep", "night"],
   sleep_score: ["the night’s sleep score", "night"],
   hrv: ["heart-rate variability", "night"],
   hrv_ms: ["heart-rate variability", "night"],
