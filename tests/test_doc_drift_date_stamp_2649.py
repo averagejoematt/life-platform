@@ -126,38 +126,10 @@ def _drift_set(strict=True) -> frozenset:
 
 @pytest.fixture
 def doc_text():
-    """Restore ARCHITECTURE.md byte-for-byte however the test exits.
-
-    #4622: the `<N> Lambdas` phrase under test is first PINNED to ground truth. On a branch
-    that adds a Lambda, the doc's phrase is stale by construction (#3984 — the bot fixes it
-    on main), and in ARCHITECTURE.md it sits on the date-stamp line past the gate's 80-char
-    report snippet. That pre-existing drift line made both set-based cases unsatisfiable:
-    ageing the date changed the snippet's TEXT (case A "grew"), and a planted 999 changed
-    nothing visible (case B "did not grow"). Pinning the line under test makes the cases
-    about the plant alone, on any branch; on a counter-clean main it is a no-op.
-    """
+    """Restore ARCHITECTURE.md byte-for-byte however the test exits."""
     original = _DOC.read_text(encoding="utf-8")
-    pinned = _pin_lambda_phrase(original)
-    if pinned != original:
-        _DOC.write_text(pinned, encoding="utf-8")
-    try:
-        yield pinned
-    finally:
-        _DOC.write_text(original, encoding="utf-8")
-
-
-def _pin_lambda_phrase(text: str) -> str:
-    """The first `<N> Lambdas` phrase rewritten to the gate's own discovered count."""
-    import re as _re
-
-    sys.path.insert(0, str(_REPO / "deploy"))
-    os.environ.setdefault("AWS_REGION", "us-west-2")
-    from sync_doc_metadata import _auto_discover_lambda_count
-
-    truth = _auto_discover_lambda_count()
-    if not truth:
-        return text
-    return _re.sub(r"\b\d+ Lambdas\b", f"{truth} Lambdas", text, count=1)
+    yield original
+    _DOC.write_text(original, encoding="utf-8")
 
 
 def _stale_the_date(text: str) -> str:
