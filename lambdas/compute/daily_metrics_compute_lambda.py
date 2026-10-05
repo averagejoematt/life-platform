@@ -55,7 +55,7 @@ import boto3
 from common.compute_metadata import tag_record  # #2811: hoisted — it was imported locally in three functions
 from common.constants import EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G  # #4184: the RATE is experiment-scoped; #4540: plan targets
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
-from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.pacific_time import PACIFIC, pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import (
@@ -71,7 +71,11 @@ from health import (
 from intelligence import weight_recency  # #2221: ONE definition of the week-ago weigh-in
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
-from compute.computed_metrics_contract import carry_coowned_fields  # #3443: the co-owned write contract
+from compute.computed_metrics_contract import (  # #3443: the co-owned write contract; #4637: the window anchor + lag mark
+    carry_coowned_fields,
+    computed_lag_days,
+    window_anchor,
+)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -584,6 +588,10 @@ def store_computed_metrics(
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "algo_version": ALGO_VERSION,
     }
+    # #4637: computed-at against the row's date — 1 on the scheduled run, >=2 on a late recompute.
+    _lag = computed_lag_days(date_str, pacific_now().date())
+    if _lag is not None:
+        item["computed_lag_days"] = Decimal(str(_lag))
     # #1843 AC1: diary-day intervention flag — written whenever the caller passes a
     # count, INCLUDING 0 (honest absence, never a gap), so "diary_sessions" in item is
     # a reliable presence test for the correlation/hypothesis engines. Skipped only on
@@ -924,7 +932,13 @@ def assemble_data(yesterday_str, profile):
     directly without re-deriving from the data dict.
     """
     t0_timer = time.time()
-    today = pacific_now().date()
+    # #4637: `today` is the TARGET's morning-after, not the wall clock. On the scheduled
+    # run the two are the same day; on a late / back-filled recompute they are not, and
+    # every window below ([today - N, target], the readiness input, the load model, the
+    # weight trajectory and the protein window) must describe the target's period.
+    # Nothing in this function may read the clock for a window —
+    # tests/test_late_recompute_windows_4637.py fails if one does.
+    today = window_anchor(yesterday_str)
 
     # Single-day records
     whoop = fetch_date("whoop", yesterday_str)
@@ -1002,7 +1016,11 @@ def assemble_data(yesterday_str, profile):
     # are weight_trend's, shared with site_api_journey.journey(), so the two producers of
     # one number cannot drift apart again (the yesterday-ended window did, 2026-09-27).
     _goal = float(profile.get("goal_weight_lbs", 185.0))
-    weight_traj = weight_trend.fetch_experiment_trajectory(fetch_range, today, EXPERIMENT_START_DATE, _goal, ref_dt=pacific_now())
+    # #4637: the reference DAY is the anchor too (weight_trajectory only ever renders
+    # `ref` as a day — its window cutoff and the projected goal date). Noon keeps a
+    # fractional-day projection off the midnight boundary, the same for every run.
+    _ref_dt = datetime(today.year, today.month, today.day, 12, tzinfo=PACIFIC)
+    weight_traj = weight_trend.fetch_experiment_trajectory(fetch_range, today, EXPERIMENT_START_DATE, _goal, ref_dt=_ref_dt)
 
     # Habitify 7-day (tier-2 habit frequency scoring)
     habitify_7d = fetch_range("habitify", (today - timedelta(days=7)).isoformat(), yesterday_str)
@@ -1167,6 +1185,9 @@ def lambda_handler(event, context):
             "computed_at": datetime.now(timezone.utc).isoformat(),
             "algo_version": ALGO_VERSION,
         }
+        _lag = computed_lag_days(yesterday_str, pacific_now().date())  # #4637: the sick-day row carries the same mark
+        if _lag is not None:
+            _sick_item["computed_lag_days"] = Decimal(str(_lag))
         if _vice_streaks:
             _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
 
