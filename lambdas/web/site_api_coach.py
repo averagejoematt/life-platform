@@ -105,6 +105,7 @@ except Exception:  # pragma: no cover - defensive guard, not expected in practic
 from web import (
     site_api_calls as _calls,
     site_api_coach_ledger as _ledger,
+    site_api_coach_moves as _moves,
     site_api_coach_narrative as _narrative,
     site_api_coach_profile as _profile,
     site_api_coach_stance as _stance,
@@ -359,6 +360,11 @@ def handle_calibration(event):
 def handle_calls(event):
     """GET /api/calls — delegated to web.site_api_calls (#4586: one page per settled call)."""
     return _calls.handle_calls(event, _g=globals())
+
+
+def handle_coach_moves(event):
+    """GET /api/coach_moves?date= — delegated to web.site_api_coach_moves (#4648: one day's coach lines)."""
+    return _moves.handle_coach_moves(event, table=table)
 
 
 def handle_coach(event):
