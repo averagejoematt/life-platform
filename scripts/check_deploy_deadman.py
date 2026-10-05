@@ -46,7 +46,8 @@ Usage:
   python3 scripts/check_deploy_deadman.py              # classify; exit 0/1/2
   python3 scripts/check_deploy_deadman.py --hours 6    # deadline after a green Plan
   python3 scripts/check_deploy_deadman.py --alert      # + tracking issue / dispatch
-  python3 scripts/check_deploy_deadman.py --deploy-base  # #4472: print plan's diff base (exit 0) or nothing (exit 2)
+  python3 scripts/check_deploy_deadman.py --deploy-base  # #4472: print plan's diff base (exit 0) or nothing (exit 2);
+                                                         # #4250: a reconcile-commit push gets its parent while that run is alive
   python3 scripts/check_deploy_deadman.py --stale-lambdas  # #4472: live Lambdas whose build_info.git_sha lacks their source (AWS read)
 """
 
@@ -196,6 +197,76 @@ def last_deployed_sha(runs: list[dict], jobs_for, now: datetime) -> str | None:
         if classify_run(run, jobs_for(run), now)["state"] == DEPLOYED:
             return run.get("head_sha") or None
     return None
+
+
+# ── #4250 box 3: a reconcile-commit push never plans a second deploy of the same tree ────
+#
+# The reconcile bot's push (ci-cd.yml Job 0) is made with a PAT, so it mints its OWN CI/CD
+# run about 40 s after the run that pushed it. Both runs check out the same reconciled
+# tree, and both read the same last-deployed base before either has deployed — so both
+# planned, and both ran, the same fleet deploy. Measured on main 2026-10-04: the four
+# pairs 9ee097f5a/17172a064, 040638856/11f525bdd, 968deb0fd/5272712f0 and
+# b1e73c342/355289363 each shipped the fleet twice back to back (10–13 min apiece), the
+# second for a bot commit that moved one docs line. Skipping `platform_counts.py` in the
+# plan loop (#4498) could not see it: the fleet trigger was the MERGE's files, re-read
+# through the shared base, not anything the bot commit carried.
+#
+# The rule: when THIS push is a reconcile commit that itself moves no deployable path, and
+# the run at its parent sha is alive (or already deployed), that run owns the deploy of
+# this tree — its `reconcile` job built exactly this sha — so the base is the parent and
+# the plan sees only the bot commit's own files. Anything else falls through to the
+# ordinary #4472 base: a parent run that is red, undeployed, missing or unreadable leaves
+# this run deploying exactly as before, so it still retries a merge whose own run failed.
+
+RECONCILE_SUBJECT_PREFIX = "chore(reconcile)"
+RECONCILE_MARKER = "[skip-reconcile]"
+
+
+def reconcile_push_base(runs: list[dict], jobs_for, now: datetime, parent_sha: str | None) -> str | None:
+    """`parent_sha` when the newest push run at that sha is in flight or deployed; else
+    None (the caller then uses the ordinary base). Pure given `jobs_for`."""
+    if not parent_sha:
+        return None
+    ordered = sorted(runs, key=lambda r: str(r.get("created_at") or ""), reverse=True)
+    for run in ordered:
+        if run.get("head_sha") == parent_sha and run.get("event") == "push":
+            return parent_sha if classify_run(run, jobs_for(run), now)["state"] in (IN_FLIGHT, DEPLOYED) else None
+    return None
+
+
+def reconcile_push_parent(head: str | None, cwd: str | None = None) -> str | None:
+    """The parent sha of `head` when `head` is the checked-out commit, is a reconcile bot
+    commit (subject prefix + marker, one parent) and its OWN diff moves no deployable path
+    other than the counter file plan already ignores. None otherwise, and None on any git
+    failure — never a guessed parent. Judged on the commit's content, not its author: a
+    hand-pushed commit carrying the marker AND real code is planned the ordinary way."""
+    if not head:
+        return None
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=120, check=True).stdout.strip()
+
+    try:
+        if git("rev-parse", "HEAD") != head:
+            return None
+        subject = git("log", "-1", "--format=%s", head)
+        if not subject.startswith(RECONCILE_SUBJECT_PREFIX) or RECONCILE_MARKER not in subject:
+            return None
+        parents = git("rev-list", "--parents", "-n", "1", head).split()[1:]
+        if len(parents) != 1:
+            return None
+        # The bundled-config set comes from THIS script's checkout (plan runs it from the
+        # reconciled tree), not from `cwd`, so the git side can be replayed in a bare repo.
+        build = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy", "build_bundle.py")
+        bundled = subprocess.run(
+            [sys.executable, build, "--print-bundled-config-paths"], capture_output=True, text=True, timeout=120, check=True
+        ).stdout.split()
+        moved = git("diff", "--name-only", parents[0], head, "--", "lambdas/", "mcp/", "mcp_server.py", *bundled).split()
+        if any(path not in STALE_SHARED_EXCLUDE for path in moved):
+            return None
+        return parents[0]
+    except Exception:  # noqa: BLE001 - unreadable is "not a reconcile push": the ordinary base applies
+        return None
 
 
 def verdict(rows: list[dict], hours: float = DEADLINE_HOURS) -> dict:
@@ -610,7 +681,16 @@ def main(argv: list[str] | None = None) -> int:
         # window prints nothing and exits INDETERMINATE — plan then deploys everything.
         try:
             runs, jobs_for = collect()
-            sha = last_deployed_sha(runs, jobs_for, now)
+            # #4250: a reconcile-commit push defers to the live run that pushed it.
+            parent = reconcile_push_parent(os.environ.get("GITHUB_SHA")) if os.environ.get("GITHUB_EVENT_NAME") == "push" else None
+            owner = reconcile_push_base(runs, jobs_for, now, parent)
+            if owner:
+                print(
+                    f"deploy-base: this push is a reconcile commit and the run at its parent {owner[:9]} is alive or "
+                    "deployed; that run ships this tree, so the base is the parent (#4250)",
+                    file=sys.stderr,
+                )
+            sha = owner or last_deployed_sha(runs, jobs_for, now)
         except Exception as e:  # noqa: BLE001 - unreadable is INDETERMINATE, never a guessed base
             print(f"deploy-base INDETERMINATE: {e}", file=sys.stderr)
             return EXIT_INDETERMINATE

@@ -3032,7 +3032,15 @@ CI_PROOFS["ci::ci-cd.yml::plan::7"] = {
         "2026-09-30. M1: 3 failed, 41 passed — test_last_deployed_sha_skips_cancelled_failed_and_in_flight_runs, "
         "test_deploy_base_mode_prints_only_the_sha_or_exits_indeterminate, test_superseded_run_a_rolls_into_run_b_plan. "
         "M2: 1 failed, 43 passed — superseded run A's merge is missing from B's plan: {'mcp/tools_health.py'}. "
-        "RESTORED: 44 passed. LIVE read-only: --deploy-base printed ff6f20ceb… (exit 0)."
+        "RESTORED: 44 passed. LIVE read-only: --deploy-base printed ff6f20ceb… (exit 0). "
+        "#4250 (2026-10-05), the reconcile-push exception in the same script, three mutations against the real file, "
+        "baseline 50 passed: (a) reconcile_push_base() returning the parent whatever the parent run's state — 2 failed, "
+        "48 passed (plan-red / deploy-cancelled / deploy-failed / nothing-owed all resolved the parent); (b) "
+        "reconcile_push_parent()'s own-diff check replaced by `if False:` — 1 failed, 49 passed (a marker commit "
+        "carrying a shared module, a bundled config or mcp/ resolved a parent); (c) main()'s `owner or` dropped — "
+        "1 failed, 49 passed (the bot push re-planned the merge's module). RESTORED: 50 passed, script md5 cd4b4678… "
+        "before and after. LIVE read-only against main's history and the Actions API: 11f525bdd -> parent 040638856, "
+        "17172a064 -> parent 9ee097f5a; 6db5d7c59, whose parent run went red at Plan, -> no exception."
     ),
     "scope": (
         "The step's `|| true` is deliberate: an unresolved base is an empty output, and the Detect step then deploys "
