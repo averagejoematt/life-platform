@@ -92,6 +92,151 @@ def test_the_shared_reader_surface_check_blocks_counts_and_off_record_specifics(
     assert "OFF THE RECORD" in label and "third party" in label and "career" in label
 
 
+# The rule is a structure — a number beside the restart vocabulary — so every shape gets a specimen, not one phrase.
+COUNT_SHAPES = {
+    "ordinal + noun": ["the 17th start", "the twenty-first restart", "the experiment's seventeenth iteration", "his 17th go at this"],
+    "cardinal + nouns": [
+        "16 earlier starts",
+        "sixteen earlier starts",
+        "17 restarts",
+        "16 false starts",
+        "a 17-attempt history",
+        "twenty-one resets",
+    ],
+    "noun + number": ["Attempt 17", "attempt #17", "reset 15", "Reset No. 15", "start number 17", "Cycle Seventeen", "#attempt17"],
+    "a count of times": [
+        "started 16 times before",
+        "17 times he has started",
+        "17th time's the charm",
+        "the seventeenth time he has started",
+    ],
+    "a tally": [
+        "16 lost · 0 kept",
+        "sixteen lost and none kept",
+        "Sixteen times the weight came off since 2012. Zero times it stayed off.",
+    ],
+}
+
+# Numbers a writer legitimately puts beside the same words: the day and week of the experiment, dates, clock
+# times, years, lifts and sleep stages. Each of these was a finding on some draft of the rule.
+LEGITIMATE_NUMBERS = [
+    "Day 17 of the experiment",
+    "Day 3 starts with a walk",
+    "Day 12 starts",
+    "Week 17 starts Monday",
+    "Week 4 of The Measured Life",
+    "week 3 closes in 6 days",
+    "episode 4 starts with Elena",
+    "October 4 starts cold",
+    "Oct. 4 starts cold",
+    "on the 4th starts a deload",
+    "since the September 6 start",
+    "the September 6th start",
+    "9/6 starts the count",
+    "2026-09-06 starts it",
+    "2026 starts",
+    "5:30 starts are hard",
+    "at 5 starts the walk",
+    "the five start times",
+    "two attempts at 225",
+    "his second attempt at 225",
+    "he will attempt 225",
+    "he will attempt 5 reps",
+    "an attempt at a personal best",
+    "the first attempt",
+    "5 cycles of REM",
+    "four sleep cycles",
+    "90-minute cycles",
+    "the cycle two days ago",
+    "a reset three weeks in",
+    "reset 3 times a week",
+    "for the second time this week he skipped breakfast",
+    "down 13.5 lb in 21 days",
+    "He weighed 313.8 lb on Saturday, September 26",
+    "he lost 16, kept 12 off",
+]
+
+# What the series has actually published this season (titles are public). The check must hold none of them.
+PUBLISHED_TITLES = [
+    "Before the Numbers",
+    "The Plan, On the Record",
+    "The Strap Said 76%",
+    "Nine Days and No Rest",
+    "Storming Mode",
+    "The Body Answers Back",
+    "EP2 · Nine Days and Counting",
+]
+
+
+def test_the_count_rule_is_keyed_on_structure_not_on_one_phrase():
+    """Owner rulings 2026-09-19 ("remove attempt 17") and 2026-09-26 (no "17th start", "16 earlier starts", attempt
+    or reset count). One test, every offender reported: a shape the rule misses names itself."""
+    missed = {shape: [t for t in texts if not story_checks.reader_surface(t)] for shape, texts in COUNT_SHAPES.items()}
+    assert {k: v for k, v in missed.items() if v} == {}
+
+
+def test_legitimate_numbers_beside_the_same_words_are_not_findings():
+    """The chronicle chokepoint HOLDS the week on a finding, so a false positive costs a week (mutation control for
+    the test above: a rule that blocked everything would fail here)."""
+    wrong = {t: story_checks.reader_surface(t) for t in LEGITIMATE_NUMBERS + PUBLISHED_TITLES if story_checks.reader_surface(t)}
+    assert wrong == {}
+
+
+def test_the_founding_incident_title_is_blocked():
+    """The title the series published on 2026-09-08, since superseded by the season rebuild (it is quoted in
+    ``docs/design/v7/R6_BUILT_PAGES_REDTEAM.md``). The check names the phrase, once."""
+    findings = story_checks.reader_surface("The Fifteenth Reset, or: What the Body Remembers")
+    assert len(findings) == 1 and "'Fifteenth Reset'" in findings[0]
+
+
+# Every string the recap cards printed before the 2026-09-19 ruling removed them (PR #3935, ``web/recap_layouts``:
+# the serial marker, the stakes line and block, the captions, the hashtag, the milestone label).
+RECAP_CARD_SPECIMENS = [
+    "DAY 8  ·  ATTEMPT #17",
+    "WEEK 2  ·  ATTEMPT #17",
+    "Day 7 · attempt #17",
+    "Day 11 · attempt #17 · the detail",
+    "Day 0 · attempt #17",
+    "16 lost · 0 kept",
+    "0 times it stayed off",
+    "attempt seventeen · instrumented · graded daily, bad days included",
+    "Sixteen times the weight came off since 2012. Zero times it stayed off.",
+    "#attempt17 #proofnotpromises #quantifiedself #weightlossjourney #buildinpublic",
+    "most moved this attempt",
+]
+# What the cards print today. The recap rule passes these; so must the shared check, or it could not be wired there.
+RECAP_CARD_CLEAN = [
+    "DAY 8  ·  THE EXPERIMENT",
+    "proof, not promises",
+    "Day 9 tomorrow  ·  week 2 closes in 6 days",
+    "most moved so far",
+    "MILESTONE  ·  FIRST 10 LB",
+    "3 weigh-ins this cycle — not enough for a line yet",
+    "#proofnotpromises #quantifiedself #weightlossjourney #buildinpublic",
+]
+
+
+def _the_recap_rule_blocks(text: str) -> bool:
+    """The recap cards' own predicate, verbatim from ``tests/test_recap_panel_3741.py``
+    (``test_no_card_counts_attempts_or_prior_episodes``): four literal substrings."""
+    low = text.lower()
+    return "attempt" in low or "16 lost" in low or "stayed off" in low or "sixteen" in low
+
+
+def test_the_shared_check_blocks_everything_the_recap_card_rule_blocks():
+    """The recap cards hold ADR-157 point 5 with their own literal rule. Wiring them onto the shared check is a
+    follow-up, so this proves the swap would lose nothing: on the same fixtures the shared check (in the
+    ``constructed`` mode a card surface uses) blocks at least what the recap rule blocks, and passes what it passes."""
+    assert all(_the_recap_rule_blocks(t) for t in RECAP_CARD_SPECIMENS)  # the fixtures are the recap rule's own
+    not_blocked = [t for t in RECAP_CARD_SPECIMENS if _the_recap_rule_blocks(t) and not story_checks.reader_surface(t, constructed=True)]
+    assert not_blocked == []
+    # Prose mode — what the chronicle and the Panel run — blocks every specimen that carries a number. The one that
+    # carries none ("this attempt") is the frame word alone, which only a constructed surface can afford to refuse.
+    assert [t for t in RECAP_CARD_SPECIMENS if not story_checks.reader_surface(t)] == ["most moved this attempt"]
+    wrong = [t for t in RECAP_CARD_CLEAN if _the_recap_rule_blocks(t) or story_checks.reader_surface(t, constructed=True)]
+    assert wrong == []
+
+
 def test_backstage_words_are_blocked():
     assert story_checks.story_door("the desk flagged something worth putting on the table")
 
