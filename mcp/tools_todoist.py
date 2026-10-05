@@ -91,6 +91,49 @@ def _get_todoist_range(days=30):
     return query_source("todoist", str(start), str(end))
 
 
+# ── Priority, read side (#4635) ───────────────────────────────────────────────
+# The Todoist API's priority is 1 = normal … 4 = very urgent; the app's "p1" is API 4.
+# Two generations of stored row exist and this is the ONE place that tells them apart:
+#   * a row carrying `priority_counts_vendor` (written since #4635) — the count per
+#     API integer as the vendor sent it; the p1..p4 view is derived from it here.
+#   * an older row carrying only `priority_breakdown` — written with the labels
+#     reversed (API 1 was called "p1_urgent"). The counts are right and the labels are
+#     exactly mirrored, so the vendor's counts are recovered by reading the labels
+#     backwards. The stored row is not rewritten by a reader.
+PRIORITY_SCALE_NOTE = (
+    "Todoist API scale: 4 = urgent (the app's p1), 3 = high (p2), 2 = medium (p3), 1 = normal (p4, no flag). "
+    "A task's `priority` is the API integer; `priority_breakdown` is in the app's p1..p4 order."
+)
+#: The one wording of the scale the model is told, shared by both write tools' schemas.
+PRIORITY_DESCRIPTION = (
+    "Todoist API priority, sent as given: 4=urgent (the app's p1) 3=high (p2) 2=medium (p3) 1=normal (p4, no flag). "
+    "Omit on create for normal."
+)
+_LABEL_BY_VENDOR = {4: "p1_urgent", 3: "p2_high", 2: "p3_medium", 1: "p4_normal"}
+_LEGACY_LABEL_BY_VENDOR = {1: "p1_urgent", 2: "p2_high", 3: "p3_medium", 4: "p4_normal"}
+
+
+def vendor_priority_counts(item):
+    """Count of active tasks per Todoist API priority ("1".."4") for one stored day,
+    or None when the row carries no priority data at all (never a fabricated zero)."""
+    stored = item.get("priority_counts_vendor")
+    if isinstance(stored, dict) and stored:
+        return {str(p): int(stored.get(str(p), 0)) for p in _LABEL_BY_VENDOR}
+    legacy = item.get("priority_breakdown")
+    if isinstance(legacy, dict) and legacy:
+        return {str(p): int(legacy.get(label, 0)) for p, label in _LEGACY_LABEL_BY_VENDOR.items()}
+    return None
+
+
+def priority_breakdown(item):
+    """The app-order p1..p4 breakdown for one stored day, correct for both row
+    generations. `{}` when the row has no priority data."""
+    counts = vendor_priority_counts(item)
+    if counts is None:
+        return {}
+    return {label: counts[str(p)] for p, label in _LABEL_BY_VENDOR.items()}
+
+
 def _rolling_avg(series, window=7):
     """Compute rolling average for a list of (date, value) tuples."""
     result = []
@@ -125,7 +168,7 @@ def get_task_load_summary(days: int = 7):
         active = int(latest.get("active_count", 0))
         overdue = int(latest.get("overdue_count", 0))
         due_today = int(latest.get("due_today_count", 0))
-        priority = latest.get("priority_breakdown", {})
+        priority = priority_breakdown(latest)
         by_project = latest.get("completions_by_project", {})
 
         # Cognitive load signal
@@ -150,6 +193,7 @@ def get_task_load_summary(days: int = 7):
                 "p3_medium": int(priority.get("p3_medium", 0)),
                 "p4_normal": int(priority.get("p4_normal", 0)),
             },
+            "priority_scale": PRIORITY_SCALE_NOTE,
             "recent_completions": {
                 "days": days,
                 "average_per_day": avg_recent,
@@ -184,7 +228,8 @@ def get_todoist_day(date: str = None):
             "active_count": int(item.get("active_count", 0)),
             "overdue_count": int(item.get("overdue_count", 0)),
             "due_today_count": int(item.get("due_today_count", 0)),
-            "priority_breakdown": item.get("priority_breakdown", {}),
+            "priority_breakdown": priority_breakdown(item),
+            "priority_scale": PRIORITY_SCALE_NOTE,
             "completions_by_project": item.get("completions_by_project", {}),
             "completed_tasks": item.get("completed_tasks", []),
             "tasks_due_today": item.get("tasks_due_today", []),
@@ -204,7 +249,8 @@ def update_todoist_task(args):
                 Use 'every!' (with exclamation) to reschedule from completion date, NOT from original due date.
                 This prevents pile-up when tasks are missed.
     due_date:   Hard date override YYYY-MM-DD (use for first-fire date when also setting recurrence via due_string).
-    priority:   1=urgent, 2=high, 3=medium, 4=normal (Todoist uses 4=p1 internally but API accepts 1-4).
+    priority:   the Todoist API integer, sent as given — 4=urgent (the app's p1), 3=high (p2),
+                2=medium (p3), 1=normal (p4, no flag).
     Returns the updated task.
 
     #1495: like every other tool in the registry, this takes a single `args`
@@ -261,7 +307,10 @@ def create_todoist_task(args):
     due_string: e.g. 'every! Sunday', 'every! month', 'Mar 20'.
                 Always use 'every!' for recurring tasks (completion-based scheduling).
     due_date:   YYYY-MM-DD for a specific one-time date.
-    priority:   1=urgent, 2=high, 3=medium, 4=normal.
+    priority:   the Todoist API integer, sent as given — 4=urgent (the app's p1), 3=high (p2),
+                2=medium (p3), 1=normal (p4, no flag). Omitted → 1, the vendor's own default
+                (#4635: this defaulted to 4, so every task created without a priority was
+                created at the vendor's most urgent level).
 
     #1495: like every other tool in the registry, this takes a single `args`
     dict — mcp.handler.handle_tools_call dispatches ALL tools positionally
@@ -277,7 +326,7 @@ def create_todoist_task(args):
         project_id = args.get("project_id")
         due_string = args.get("due_string")
         due_date = args.get("due_date")
-        priority = args.get("priority", 4)
+        priority = args.get("priority", 1)
         description = args.get("description")
         labels = args.get("labels")
 
