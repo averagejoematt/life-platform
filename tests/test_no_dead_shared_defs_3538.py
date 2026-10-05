@@ -325,9 +325,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/ingestion/source_registry.py:qa_required_oauth_source_ids": (
         "#3609 box 2 widen: exercised only by tests/test_oauth_alarm_coverage.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
-    "lambdas/ingestion/source_registry.py:raw_date_key_candidates": (
-        "#3609 box 2 widen: exercised only by tests/test_dil028_raw_layout_replay.py (also named in docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
     "lambdas/ingestion/source_registry.py:retired_source_ids": (
         "#3609 box 2 widen (SCAN_PACKAGES now derives from build_bundle.stage_tree()'s own output, not a common/ai-only literal): zero references ANYWHERE in the repo for this def — not a test, not a doc, not even a comment. The strongest deletion candidate this widen surfaced; registered rather than deleted so the package-list fix stays a structural change and a follow-up owns the delete decision by name."
     ),

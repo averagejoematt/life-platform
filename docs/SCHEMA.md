@@ -419,10 +419,13 @@ This population is the denominator of every all-time "top N%" distance/elevation
 | `active_count` | number | Active tasks at time of sync |
 | `overdue_count` | number | Overdue tasks |
 | `due_today_count` | number | Tasks due today |
-| `priority_breakdown` | object | Count by priority level (p1-p4) |
+| `priority_counts_vendor` | object | **The stored fact (#4635).** Active-task count per Todoist API priority integer, keyed by that integer as the vendor sent it (`"1"`..`"4"`; `"unknown"` only when a task carried no usable priority). The API scale is 1 = normal … 4 = urgent. Absent on rows written before #4635. |
+| `priority_breakdown` | object | **Derived** from `priority_counts_vendor` in the app's order: `p1_urgent` = API 4, `p2_high` = API 3, `p3_medium` = API 2, `p4_normal` = API 1. On a row WITHOUT `priority_counts_vendor` the labels are mirrored (API 1 was stored as `p1_urgent`); `mcp/tools_todoist.py::priority_breakdown` is the read seam that returns the right view for both generations, and `deploy/repair_vendor_flags_4635.py` rewrites the old rows. |
 | `completed_tasks` | list | List of completed task objects |
 | `completions_by_project` | object | Completion count per project |
 | `tasks_due_today` | list | List of today's due tasks |
+
+A task object's `priority` (in `completed_tasks` and `tasks_due_today`) is the Todoist API integer exactly as sent — 4 is the app's p1. It is omitted when the vendor sent none; it is never defaulted.
 
 ### apple_health
 
@@ -606,6 +609,20 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 | `sleep_onset_hour` | number | Hour of sleep onset (derived) |
 | `wake_hour` | number | Hour of wake (derived) |
 | `sleep_midpoint_hour` | number | Midpoint hour (derived) |
+| `vendor_incomplete` | boolean | The vendor's `incomplete` flag for this day entry, as sent (#4635). Stored for True AND False. **Absent = never read** (a row written before #4635, or a payload without the key) — not "complete". |
+| `vendor_processing` | boolean | The vendor's `processing` flag, only when sent (#4635) |
+| `vendor_lag_minutes` | number | The vendor's `lagMinutes`, only when sent, unrounded (#4635) |
+
+**What `vendor_incomplete` does and does not say (#4635).** It is the vendor's statement,
+at the moment of the fetch, that the night's record is not final. It is not a
+short-night detector. Measured on the 2026-09/10 archive: of 9 flagged nights, 8
+reappear in the next evening's payload unflagged with identical durations and a revised
+score (by up to 7 points), and 1 is a genuinely short record; an unflagged night can
+also fall far short of the wrist device. The stored row is the flagged fetch — a
+stored date is not re-fetched — so on a flagged night the durations are the vendor's
+final ones in 8 of 8 re-seen cases while `sleep_score` is the provisional one. The
+writer stores the night as sent and never drops, alters or promotes it; whether a
+flagged night belongs in an average, and with what label, is a read-side decision.
 
 **SoT ruling — sleep duration/staging (#2921):** Whoop (wrist HRV/motion) and Eight
 Sleep (mattress pressure sensor) each independently measure sleep duration, stage
