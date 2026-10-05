@@ -2039,6 +2039,7 @@ Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM 
 | `consecutive_logging_days` | number | Streak of days with nutrition logged |
 | `habit_streak_t0` | number | Consecutive days all Tier 0 habits completed |
 | `computed_at` | string | ISO timestamp of computation |
+| `computed_lag_days` | number | Pacific days between the row's `date` and the day it was written (#4637). `1` = the scheduled morning-after run; `>= 2` = a late or back-filled recompute (`event["date"]`). Written on scored and sick-day rows alike; absent on rows written before #4637. Trailing windows are anchored on `date + 1` regardless of this value. |
 
 ---
 
