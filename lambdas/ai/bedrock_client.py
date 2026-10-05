@@ -606,6 +606,27 @@ def budget_stop_cls() -> type[BaseException]:
         return _BudgetGuardUnavailable
 
 
+def _dev_cap_check() -> None:
+    """#4589: refuse a laptop dev-session call that has reached its spend cap. A missing
+    module degrades to "no cap", the same shape as the tier-3 stop; the refusal itself
+    (a BudgetExceeded) propagates."""
+    try:
+        from ai import dev_session_cap
+    except ImportError:
+        return
+    dev_session_cap.check(caller_class(), _cw)
+
+
+def _dev_cap_record(usage: dict, model_id: str) -> None:
+    """#4589: add one billed call's estimated cost to this run's tally. Fail-open."""
+    try:
+        from ai import dev_session_cap
+
+        dev_session_cap.record(caller_class(), estimate_cost_usd(usage, model_id))
+    except Exception:  # noqa: BLE001 — never break a call that already succeeded
+        pass
+
+
 def _note_truncation(parsed: dict, bedrock_body: dict, model_id: str) -> None:
     """Meter responses that stopped at `max_tokens` (#2893). Strictly fail-open.
 
@@ -808,6 +829,9 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
             raise BudgetExceeded("AI paused — monthly budget ceiling reached (tier 3). Auto-resumes at month rollover.")
     except ImportError:
         pass
+    # #4589: a laptop dev session is capped per run and per trailing day. Never applies
+    # inside a Lambda container, in CI or to the scheduled platform.
+    _dev_cap_check()
 
     model_id = resolve_model_id(model_name or body.get("model"))
     bedrock_body = {k: v for k, v in body.items() if k != "model"}
@@ -830,6 +854,7 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     parsed = json.loads(resp["body"].read())
     # G1: meter token usage + estimated spend at the single chokepoint. Fail-open.
     _emit_usage_metrics(parsed.get("usage") or {}, model_id)
+    _dev_cap_record(parsed.get("usage") or {}, model_id)
     # #2893: meter billed-but-unparseable output at the same chokepoint. Fail-open.
     _note_truncation(parsed, bedrock_body, model_id)
     # #2888: meter cache_control that asked for caching and got none. Fail-open.
@@ -957,6 +982,7 @@ def embed_text(text: str, *, dimensions: int | None = None, model_id: str | None
             raise BudgetExceeded("AI paused — monthly budget ceiling reached (tier 3). Auto-resumes at month rollover.")
     except ImportError:
         pass
+    _dev_cap_check()  # #4589
 
     body = {"inputText": text, "dimensions": dims, "normalize": bool(normalize)}
     resp = _client().invoke_model(
@@ -969,4 +995,5 @@ def embed_text(text: str, *, dimensions: int | None = None, model_id: str | None
     # Titan reports inputTextTokenCount (no output tokens) — meter it fail-open.
     tok = int(parsed.get("inputTextTokenCount", 0) or 0)
     _emit_usage_metrics({"input_tokens": tok, "output_tokens": 0}, mid)
+    _dev_cap_record({"input_tokens": tok, "output_tokens": 0}, mid)
     return parsed.get("embedding") or []
