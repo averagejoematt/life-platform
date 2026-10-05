@@ -370,6 +370,7 @@ _SHARE_PCT_FIELDS = frozenset(
         "accuracy_pct",
         "adherence_pct",
         "agreement_rate_pct",
+        "ai_scheduled_share_pct",  # #4650: the governor's prod_class_share (a 0-1 share of AI spend) x 100
         "android_fat_pct",
         "arms_pct",
         "avg_pct",

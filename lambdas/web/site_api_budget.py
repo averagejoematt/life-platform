@@ -638,6 +638,8 @@ def _daily_spend(cw, now) -> list:
     Today is never included (incomplete), and a day whose neighbour reading is missing is
     left out rather than estimated.
     """
+    # utc-exempt(#2414): the governor's month-to-date counter and CloudWatch's daily buckets
+    # are both UTC (the AWS billing day) — a Pacific day here would straddle two buckets.
     today = now.date()
     start = datetime.combine(today - timedelta(days=_TYPICAL_WINDOW_DAYS), datetime.min.time(), tzinfo=timezone.utc)
     r = cw.get_metric_statistics(
