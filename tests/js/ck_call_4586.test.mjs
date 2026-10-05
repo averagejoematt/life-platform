@@ -103,7 +103,8 @@ test("a bet as the last settled call names who was right instead of one tag", ()
 test("what settles next is one sentence with its day in words", () => {
   assert.equal(
     C.nextCallHTML(BODY),
-    '<p class="ck-soft">Next: the bet between Max Reyes and Lisa Park on whether the 7-day average of his morning recovery score will be at or above 81.6 settles Monday, October 5.</p>',
+    // #4618: a next-day number call is due the day its sentence names, so it is what settles next.
+    '<p class="ck-soft">Next: Lisa Park’s call that his morning recovery score will be about 90.6 settles Sunday, October 4.</p>',
   );
   assert.equal(C.nextCallHTML(null), "");
   assert.equal(C.nextCallHTML({ next: { state: "absent", data: null, absent_text: "No call or bet has a settle date right now." } }), "");

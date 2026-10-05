@@ -30,6 +30,8 @@ from datetime import datetime, timedelta, timezone
 
 from experiment.measurable_metrics import base_metric as base_metric_key  # #3551: aggregate keys grade their base metric's unit
 
+from coach import prediction_windows  # #4618: the day a number call names + the bound on a due date
+
 GRADEABLE_BY_DETERMINISTIC = "deterministic"
 GRADEABLE_BY_NONE = "none"
 
@@ -154,7 +156,9 @@ def _metric_names(metric_hint):
 
 def classify_claim_shape(claim, metric_hint=None):
     """Deterministic claim-shape classifier: {'shape': 'level' | 'other', 'target',
-    'unit', 'window_hint', 'target_date'}.
+    'unit', 'window_hint', 'target_date', 'named_day'}. ``named_day`` (#4618) is the ISO
+    day stated right after the number as the day it is FOR ("…59.3% on the night of
+    2026-09-15"), None when the sentence states none there.
 
     A LEVEL claim states a numeric value OF THE METRIC — the metric is named, and a
     level cue ('will be', 'will read', 'sits at', 'around', '~', ...) ties a number
@@ -169,7 +173,7 @@ def classify_claim_shape(claim, metric_hint=None):
     protocol inputs), which is why the number must be anchored to the metric name.
     """
     text = str(claim or "")
-    none = {"shape": "other", "target": None, "unit": None, "window_hint": None, "target_date": None}
+    none = {"shape": "other", "target": None, "unit": None, "window_hint": None, "target_date": None, "named_day": None}
     if not text.strip() or not metric_hint:
         return none
     lowered = text.lower()
@@ -202,6 +206,7 @@ def classify_claim_shape(claim, metric_hint=None):
                 "unit": unit,
                 "window_hint": when.group(1).lower() if when else None,
                 "target_date": date_m.group(1) if date_m else None,
+                "named_day": prediction_windows.day_named_after_number(after),
             }
     return none
 
@@ -274,6 +279,13 @@ def resolve_eval_spec(claim, metric_hint, pred, generation_date, tolerance_for, 
     NEVER handed to direction inference, whatever the extractor said. Everything
     else takes the directional path exactly as before.
 
+    #4618 — a number call's target day comes from its OWN sentence. "…roughly 59%
+    tomorrow" is a call about the day after filing whatever the extractor's free-text
+    ``timeframe_hint`` says (the hint used to win, which stored that call with a target
+    fourteen days out). And a number stated FOR a day already past when the call is filed
+    ("…would land around 59.3% on the night of 2026-09-15", filed the 17th) is not a
+    forecast: it is emitted as an observation, never as a pending call.
+
     Returns (eval_spec, window_days, shape).
     """
     shape = classify_claim_shape(claim, metric_hint) if metric_hint else {"shape": "other", "window_hint": None, "target_date": None}
@@ -288,6 +300,11 @@ def resolve_eval_spec(claim, metric_hint, pred, generation_date, tolerance_for, 
         except (TypeError, ValueError):
             pass
     if shape.get("shape") == "level":
+        _day, basis = prediction_windows.sentence_target_day(claim, generation_date)
+        if basis in ("tomorrow", "tonight"):
+            window_days = 1
+        elif prediction_windows.names_day_already_past(shape.get("named_day"), generation_date):
+            return build_prediction_eval_spec(metric_hint, None, window_days), window_days, "level"
         tol = tolerance_for(metric_hint)
         if tol:
             tolerance, rule, _n = tol
@@ -314,25 +331,30 @@ def prediction_window_days(timeframe_hint, default=14):
     coach_state_updater prediction loop."""
     if not timeframe_hint:
         return default
-    tf = timeframe_hint.lower()
+    # #4618: an ISO date in the hint is a date, not a day count — "night of 2026-09-19,
+    # next day" was read as a 2,026-day window (due 2032).
+    tf = _DATE_RE.sub(" ", timeframe_hint.lower())
     # #3551: a one-day call is a one-day window — 'tomorrow' used to fall through to
     # the 14-day default, which is how a next-morning level forecast got graded as a
     # two-week trend.
     if "tomorrow" in tf or "tonight" in tf or "today" in tf:
         return 1
+    days = default
     if "week" in tf:
         try:
-            return int(re.search(r"(\d+)", tf).group(1)) * 7
+            days = int(re.search(r"(\d+)", tf).group(1)) * 7
         except (AttributeError, ValueError):
             return default
-    if "month" in tf:
+    elif "month" in tf:
         return 30
-    if "day" in tf:
+    elif "day" in tf:
         try:
-            return int(re.search(r"(\d+)", tf).group(1))
+            days = int(re.search(r"(\d+)", tf).group(1))
         except (AttributeError, ValueError):
             return default
-    return default
+    # #4618: a window past a year was never a window — it is some other number in the
+    # hint ("145+ g/day … another week" = 1,015 days). An unusable hint is the default.
+    return days if 1 <= days <= prediction_windows.MAX_DUE_DAYS else default
 
 
 def infer_subdomain(metric_hint):
@@ -354,7 +376,13 @@ def build_prediction_record(coach_id, generation_date, claim, eval_spec, confide
     slug = re.sub(r"[^a-z0-9]+", "_", claim.lower()[:40]).strip("_")
     pred_id = f"pred_{generation_date.replace('-', '')}_{slug}"
     status, gradeable_by = emission_status(eval_spec)
-    return {
+    subdomain = infer_subdomain(eval_spec.get("metric"))
+    # #4618: the write-time bound. A call due more than a year out is refused as a
+    # pending call and filed as an observation, with the reason on the row.
+    refused = prediction_windows.refuse_due(generation_date, eval_spec, subdomain) if status == "pending" else None
+    if refused:
+        status, gradeable_by = OBSERVATION_STATUS, GRADEABLE_BY_NONE
+    record = {
         "pk": f"COACH#{coach_id}",
         "sk": f"PREDICTION#{pred_id}",
         "prediction_id": pred_id,
@@ -363,7 +391,7 @@ def build_prediction_record(coach_id, generation_date, claim, eval_spec, confide
         "claim_natural": claim,
         "evaluation": eval_spec,
         "confidence": confidence,
-        "subdomain": infer_subdomain(eval_spec.get("metric")),
+        "subdomain": subdomain,
         "confounders_noted": [],
         "status": status,
         "gradeable_by": gradeable_by,
@@ -374,3 +402,6 @@ def build_prediction_record(coach_id, generation_date, claim, eval_spec, confide
         "surfaced_to_subject": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if refused:
+        record["emission_refused"] = refused
+    return record
