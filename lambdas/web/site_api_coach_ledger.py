@@ -762,6 +762,82 @@ def handle_calibration(event, *, _g):
         )
 
 
+#: #4607 — the fields the front page's record line is computed from, and nothing else: a
+#: strict SUBSET of ``_PREDICTION_PROJECTION_FIELDS`` (pinned by
+#: tests/test_edition_latency_4607.py), all scalars. The identity and cycle keys
+#: (``prediction_id``, ``outcome_date``, ``phase``, ``tombstone``) are the ones
+#: ``coach_record`` reads; ``status``/``outcome``/``confidence`` are the grade and the Brier
+#: pair. The maps and prose the two full routes also carry (``evaluation``, ``baseline``,
+#: ``claim_natural``, ``outcome_notes`` …) are what made the same partitions cost megabytes.
+_RECORD_PROJECTION_FIELDS = ("status", "outcome", "confidence", "tombstone", "phase", "prediction_id", "outcome_date")
+
+
+def edition_record(*, _g):
+    """The five facts /api/edition's record line prints, from ONE narrow partition sweep (#4607).
+
+    The front page read ``/api/predictions`` and ``/api/calibration`` whole for
+    ``overall.confirmed``, ``overall.decided`` and the coaches' stratum (``brier_skill``,
+    ``n``). Measured 2026-10-04: those two reads were 7.8 MB of the 10.0 MB of DynamoDB
+    JSON one edition request parsed, and ~3.0 s of its ~4.8 s in the Lambda — each walks all
+    coach PREDICTION# partitions with the full projection, and the calibration route adds
+    the paginated CALIB# ledger, none of which the record line reads.
+
+    NOT a second derivation of the record. The rows are the same unfiltered career
+    partitions (``_query_partition`` — same key condition, order and Limit, so the same
+    page), run through the same functions in the same order the two routes use:
+    ``coach_record.resolved_once`` → ``coach_record.counts_this_cycle`` → the
+    ``status`` tally ``handle_predictions`` keeps, and
+    ``calibration_core.pairs_from_prediction_records`` → ``score_strata`` for the stratum
+    ``handle_calibration`` serves. Only the projection is narrower, and every field those
+    functions read is in it. A stratum's own numbers depend on its own pairs only, so
+    scoring the coaches' stratum without the hypothesis and forecast strata returns the
+    same ``strata.coaches``. tests/test_edition_latency_4607.py runs the two routes and
+    this reader over one fake table and asserts the record block is identical.
+
+    Returns ``{"predictions": {...}, "calibration": {...}}`` — each the subset of that
+    route's body the record line reads, in the route's own shape. Raises when every
+    partition read failed (the same "a total outage is a failure, not a zero" rule as
+    ``handle_predictions``, #2658); the caller serves the block unavailable.
+    """
+    _query_partition = _g["_query_partition"]
+    _parallel_fetch = _g["_parallel_fetch"]
+    EXPERIMENT_START = _g["EXPERIMENT_START"]
+    failures: list = []
+    fetched = _parallel_fetch(
+        {
+            cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _query_partition(pk, "PREDICTION#", _RECORD_PROJECTION_FIELDS))
+            for cid in _CALIB_COACH_NAMES
+        },
+        failures=failures,
+    )
+    if failures and len(failures) == len(_CALIB_COACH_NAMES):
+        raise RuntimeError(f"all {len(failures)} coach partition reads failed: {sorted(failures)}")
+    if failures:
+        logger.error(f"[edition-record] degraded — {len(failures)} of {len(_CALIB_COACH_NAMES)} partitions failed: {sorted(failures)}")
+    confirmed = refuted = 0
+    coach_pairs: list = []
+    for cid in _CALIB_COACH_NAMES:
+        records = coach_record.resolved_once(fetched.get(cid, []))
+        season = [r for r in records if coach_record.counts_this_cycle(r, EXPERIMENT_START)]
+        for rec in season:
+            status = rec.get("status", "pending")  # the bucket key handle_predictions tallies
+            if status == "confirmed":
+                confirmed += 1
+            elif status == "refuted":
+                refuted += 1
+        coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
+    today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
+    return {
+        "predictions": {
+            "overall": {"confirmed": confirmed, "refuted": refuted, "decided": confirmed + refuted, "due": {"as_of": today_pt}}
+        },
+        "calibration": {
+            "platform": {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}},
+            "as_of": today_pt,
+        },
+    }
+
+
 def handle_voice_fidelity(event, *, _g):
     """GET /api/voice_fidelity — the blind voice-fidelity scoreboard (#545).
 
