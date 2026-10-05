@@ -721,6 +721,29 @@ None of them was a no-op. None bumped `test_count`; `78a1c9c2f` deleted the left
 is the bot's intended job. The commit body names the sha it reconciled and the paths it moved, so
 the share by cause can be re-measured from `git log --grep='chore(reconcile)'`.
 
+**A bot commit's own run never ships the merge a second time (#4250 box 3, 2026-10-04).**
+The bot pushes with a PAT, so its commit gets its own CI/CD run about 40 s after the run that
+pushed it. Both runs check out the same reconciled tree. Since #4472 both also read the same
+last-deployed base before either has deployed, so both planned the merge's files and both ran
+the fleet deploy: four pairs on 2026-10-04 (`9ee097f5a`/`17172a064`, `040638856`/`11f525bdd`,
+`968deb0fd`/`5272712f0`, `b1e73c342`/`355289363`), 10–13 min each, the second for a bot commit
+that moved one docs line. `check_deploy_deadman.py --deploy-base` now returns the bot commit's
+**parent** when that push is a reconcile commit that moves no deployable path itself and the
+run at the parent sha is in flight or deployed. That run built this tree and ships it, and the
+bot's run plans nothing. If the parent run is red, dropped, missing or unreadable, the ordinary
+base applies and the bot's run deploys as before, so it still retries a merge whose own run
+failed (`928f4b977`/`6db5d7c59`, 2026-10-05). One gap is accepted: a parent run that was alive
+when the bot's run planned and failed afterwards leaves the merge undeployed. That run is red,
+the deploy dead-man names it, and the next push's plan carries its files (#4472).
+
+**Re-measured 2026-10-05 03:30Z (`git log origin/main --first-parent`).** 7 days: 22 bot commits
+of 164 (13.4 %), none touching `test_count`. Since #4364 (`ccd091c2c`, 2026-09-27): 25 of 186
+(13.4 %); one touched `test_count`, the one-time deletion. Since #4498 (`07bc75d17`): 8 of 82
+(9.8 %). The trailing 30 days still read 262 of 908 (28.9 %) because 22 of those days predate
+#4364; the 30-day figure the issue asks for is first clean on 2026-10-27. By path since #4364:
+`docs/PROPORTIONALITY.md` 11, `model/platform_model.json` 9, `docs/DEPENDENCY_GRAPH.md` 8,
+`docs/ARCHITECTURE.md` 7, `lambdas/web/platform_counts.py` 6 (`adrs`, `lambdas`, `mcp_tools`).
+
 **When the reconcile job itself reds, check in this order:**
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
    Do NOT widen the whitelist reflexively; inspect the generator diff, fix main
