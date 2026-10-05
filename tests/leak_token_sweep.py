@@ -107,14 +107,14 @@ FORBIDDEN_TOKENS = [
     ),
     # Tombstone JSON leaking to the public (would mean a tombstoned record made it through)
     ("Tombstone leak", re.compile(r'"tombstone"\s*:\s*true'), []),
-    # #4191: the chronicle's bracketed machine header — `[Weight: X lbs | Week Grade: avg X |
-    # T0 Streak: X days]`, the card-engine parsing hook the prompt asks for — printed as
-    # PROSE. The writer stores the whole envelope as content_markdown and, until #4191,
-    # truncated it straight into the manifest excerpt, so /story/ and the home teaser opened
-    # on the bracket. /journal/posts.json is exempt ONLY while its stored excerpts predate the
-    # fix (a stored artifact does not change at deploy); lift the exemption once the manifest
-    # has been re-rendered (deploy/restart_leadin_pages.py --apply, or the next publish).
-    ("Chronicle stat-line bracket as prose", re.compile(r"\[Weight:[^\]]*\]"), ["/journal/posts.json"]),
+    # #4191: the chronicle's bracketed machine header printed as PROSE — the legacy writer's
+    # `[Weight: X lbs | Week Grade: avg X | T0 Streak: X days]` and the Story Desk's
+    # `[Day 4 to Day 10 · 318.9 lbs (…) · 7 training sessions]`. The header is the model's
+    # wire format: the writer drops it at the store (content.chronicle_schema.strip_stat_header)
+    # and every reader surface strips it again for rows stored earlier. No exemption — the
+    # manifest's excerpts were re-rendered (0 matches live, 2026-10-04), so a bracket in
+    # /journal/posts.json is a finding like any other.
+    ("Chronicle stat-line bracket as prose", re.compile(r"\[(?:Weight:|Day \d+ to Day \d+ ·)[^\]]*\]"), []),
     # The builder-only segment of that header on a PAGE. The manifest carries it legitimately
     # in its `stats_line` data field (the card engine reads it there), so the JSON is exempt.
     ("Chronicle T0 Streak segment on a page", re.compile(r"\bT0 Streak:"), ["/journal/posts.json"]),

@@ -777,6 +777,18 @@ Then watch the alarm `life-platform-garmin-data-ingestion-errors` return to OK w
 ### Eight Sleep: JWT auth failure
 Eight Sleep uses username/password → JWT (no OAuth). If the JWT refresh fails, the function will write to the DLQ. Check logs for the specific error. Resolution may require re-entering credentials in Secrets Manager if the account password changed.
 
+### Notion journal: no full re-sync yet, and how the reconcile decides (#4631)
+
+**No full re-sync of the journal (`{"full_sync": true}`, or a wide `start`/`end` backfill) until the #4631 fixes are merged, deployed and proven** — proven means the first production run that re-fetches an old-dated page has logged its reconcile decision with the row count unchanged. The legacy-key migration runs only after that, with the journal row count and the enriched-row count recorded before and after (counts only). Before the fix, a re-sync would have stripped the enrichment from every entry it re-keyed and could have deleted same-day entries outright; DynamoDB holds the only processed copy of most of them.
+
+How `notion-journal-ingestion` treats the multi-per-day templates (`MULTI_PER_DAY` in `lambdas/ingestion/notion_lambda.py`):
+
+- A run that reaches a date with one page in hand (an old page edited today, a page created today and dated back) writes that page and **leaves the date's other rows alone**. Holding one page of a date is not a view of the whole date.
+- A stored row is removed in two cases only: the same Notion page was just written under its stable key and its `enriched_*`/`defense_*` fields were read and carried across first; or a whole-date re-query of Notion no longer returns the row's page. A failed or inconsistent re-query, an unreadable row, or a row with no `notion_page_id` removes nothing.
+- Each `(date, template)` the run touches logs one line, counts only — no key, page id or text:
+  `[E-6] reconcile decision date=… template=… outcome=done rows_before=N written=W rekeyed_removed=R vendor_absent_removed=A kept_unwritten=K requery=… rows_after=M`.
+  `rows_after = rows_before + (new pages) − A`; a re-key leaves the count unchanged. Find them with `filter @message like /reconcile decision/` on `/aws/lambda/notion-journal-ingestion`.
+
 ### MacroFactor: Function not triggered
 Ensure your export CSV is dropped into the correct S3 path: `s3://matthew-life-platform/uploads/macrofactor/`. The filename does not matter but the prefix does. The primary path is Dropbox poll → S3 → `macrofactor-data-ingestion` (S3 trigger).
 

@@ -196,7 +196,7 @@ from mcp.tools_surfaces import (  # #4584: the two input schemas moved beside th
     tool_describe_platform_surfaces,
     tool_get_platform_surface,
 )
-from mcp.tools_todoist import close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
+from mcp.tools_todoist import PRIORITY_DESCRIPTION, close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
 from mcp.tools_training_notes import tool_get_exercise_notes
 
@@ -1242,7 +1242,7 @@ TOOLS = {
                     "due_date": {"type": "string", "description": "First-fire date YYYY-MM-DD."},
                     "content": {"type": "string", "description": "New task name."},
                     "description": {"type": "string", "description": "Task description/notes."},
-                    "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "priority": {"type": "integer", "description": PRIORITY_DESCRIPTION},
                     "project_id": {"type": "string", "description": "Move to project ID."},
                 },
                 "required": ["task_id"],
@@ -1261,7 +1261,7 @@ TOOLS = {
                     "project_id": {"type": "string", "description": "Todoist project id. Omit for Inbox."},
                     "due_string": {"type": "string", "description": "e.g. 'every! Sunday', 'every! month'. Use every! for recurring."},
                     "due_date": {"type": "string", "description": "YYYY-MM-DD for one-time or first-fire date."},
-                    "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "priority": {"type": "integer", "description": PRIORITY_DESCRIPTION},
                     "description": {"type": "string", "description": "Task description."},
                 },
                 "required": ["content"],
