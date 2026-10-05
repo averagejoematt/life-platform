@@ -433,9 +433,30 @@ def test_the_edition_marks_every_read_it_makes(monkeypatch):
 REVIEWED_CEILING_MS = 2160
 
 
+def latency_budget_offences(sources=None, costs=None, ceiling=None):
+    """Why the edition's upstream set is over its reviewed latency budget — [] when it is not.
+
+    Pure, and here rather than in the module: nothing in a Lambda calls it (#3538). Defaults to the module's own ``SOURCES`` / ``SOURCE_COST_MS`` /
+    ``SOURCE_COST_CEILING_MS``; the arguments exist so the guard can be shown to fail."""
+    sources = ed.SOURCES if sources is None else sources
+    costs = ed.SOURCE_COST_MS if costs is None else costs
+    ceiling = ed.SOURCE_COST_CEILING_MS if ceiling is None else ceiling
+    out = [f"{key}: an upstream with no reviewed cost in SOURCE_COST_MS" for key in sources if key not in costs]
+    out += [f"{key}: a cost for an upstream SOURCES no longer reads" for key in costs if key not in sources]
+    out += [
+        f"{key}: cost {costs[key]!r} is not a whole number of milliseconds above zero"
+        for key in sources
+        if key in costs and not (isinstance(costs[key], int) and not isinstance(costs[key], bool) and costs[key] > 0)
+    ]
+    total = sum(v for k, v in costs.items() if k in sources and isinstance(v, int) and not isinstance(v, bool))
+    if total > ceiling:
+        out.append(f"the upstreams cost {total} ms together, over the reviewed ceiling of {ceiling} ms")
+    return out
+
+
 def test_every_upstream_has_a_reviewed_cost_and_the_sum_is_under_the_reviewed_ceiling():
     assert len(ed.SOURCES) >= 18, "the upstream set shrank below what this guard was written over"
-    assert ed.latency_budget_offences() == [], ed.latency_budget_offences()
+    assert latency_budget_offences() == [], latency_budget_offences()
     assert ed.SOURCE_COST_CEILING_MS == REVIEWED_CEILING_MS, (
         f"the edition's cost ceiling moved to {ed.SOURCE_COST_CEILING_MS} ms without the reviewed pin "
         f"({REVIEWED_CEILING_MS} ms) moving with it — change REVIEWED_CEILING_MS here in the same PR, and say why"
@@ -448,16 +469,16 @@ def test_MUST_FAIL_an_upstream_added_without_a_budget_change_is_refused():
     """The mutations, run against the decision function over the module's real tables."""
     grown = {**ed.SOURCES, "glucose": "/api/glucose_overview"}
     # 1. A new upstream with no cost at all.
-    assert ed.latency_budget_offences(sources=grown) == ["glucose: an upstream with no reviewed cost in SOURCE_COST_MS"]
+    assert latency_budget_offences(sources=grown) == ["glucose: an upstream with no reviewed cost in SOURCE_COST_MS"]
     # 2. A new upstream with an honest cost: over the ceiling, by name.
     costed = {**ed.SOURCE_COST_MS, "glucose": 300}
-    (offence,) = ed.latency_budget_offences(sources=grown, costs=costed)
+    (offence,) = latency_budget_offences(sources=grown, costs=costed)
     assert "over the reviewed ceiling" in offence
     # 3. A zero or missing-number cost is not a way in.
-    assert ed.latency_budget_offences(sources=grown, costs={**ed.SOURCE_COST_MS, "glucose": 0}) == [
+    assert latency_budget_offences(sources=grown, costs={**ed.SOURCE_COST_MS, "glucose": 0}) == [
         "glucose: cost 0 is not a whole number of milliseconds above zero"
     ]
     # 4. A cost left behind by a removed upstream is named too.
-    assert ed.latency_budget_offences(costs={**ed.SOURCE_COST_MS, "gone": 5}) == ["gone: a cost for an upstream SOURCES no longer reads"]
+    assert latency_budget_offences(costs={**ed.SOURCE_COST_MS, "gone": 5}) == ["gone: a cost for an upstream SOURCES no longer reads"]
     # 5. Only an explicit ceiling change lets the costed upstream through.
-    assert ed.latency_budget_offences(sources=grown, costs=costed, ceiling=ed.SOURCE_COST_CEILING_MS + 300) == []
+    assert latency_budget_offences(sources=grown, costs=costed, ceiling=ed.SOURCE_COST_CEILING_MS + 300) == []

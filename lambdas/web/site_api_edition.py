@@ -1017,27 +1017,6 @@ SOURCE_COST_MS = {
 SOURCE_COST_CEILING_MS = 2160
 
 
-def latency_budget_offences(sources: Any = None, costs: Any = None, ceiling: Any = None) -> list:
-    """Why the edition's upstream set is over its reviewed latency budget — [] when it is not.
-
-    Pure. Defaults to the module's own ``SOURCES`` / ``SOURCE_COST_MS`` /
-    ``SOURCE_COST_CEILING_MS``; the arguments exist so the guard can be shown to fail."""
-    sources = SOURCES if sources is None else sources
-    costs = SOURCE_COST_MS if costs is None else costs
-    ceiling = SOURCE_COST_CEILING_MS if ceiling is None else ceiling
-    out = [f"{key}: an upstream with no reviewed cost in SOURCE_COST_MS" for key in sources if key not in costs]
-    out += [f"{key}: a cost for an upstream SOURCES no longer reads" for key in costs if key not in sources]
-    out += [
-        f"{key}: cost {costs[key]!r} is not a whole number of milliseconds above zero"
-        for key in sources
-        if key in costs and not (isinstance(costs[key], int) and not isinstance(costs[key], bool) and costs[key] > 0)
-    ]
-    total = sum(v for k, v in costs.items() if k in sources and isinstance(v, int) and not isinstance(v, bool))
-    if total > ceiling:
-        out.append(f"the upstreams cost {total} ms together, over the reviewed ceiling of {ceiling} ms")
-    return out
-
-
 #: #4607 — narrow readers: one read that serves several ``SOURCES`` keys, each as the subset
 #: of that route's body the edition reads, in the route's own shape. ``handle_edition`` hands
 #: them in; ``read_bodies`` without them reads every key through its route, as before.
