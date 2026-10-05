@@ -160,6 +160,9 @@
     "lambdas/emails/ai_review_pack_lambda.py": {
       "function": "ai-review-pack"
     },
+    "lambdas/emails/habit_skip_review_lambda.py": {
+      "function": "habit-skip-review"
+    },
     "lambdas/emails/insight_email_parser_lambda.py": {
       "function": "insight-email-parser"
     },

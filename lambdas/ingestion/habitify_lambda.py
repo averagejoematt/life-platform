@@ -164,6 +164,20 @@ LOGS_WINDOW_PAD_DAYS = 2
 # status (#3666's upgrade-only guard — the Lambda re-writes every day 24x/day).
 TERMINAL_STATUSES = ("completed", "skipped")
 
+# #4622 (owner ruling 2026-10-04): a daily habit has two FINAL states, completed or failed.
+# Habitify's bedtime automation marks anything left unlogged as `skipped`, so a stored
+# `skipped` means "unconfirmed — not logged yet", a queue the owner settles later. It stays
+# protected against a platform-ASSUMED miss (a failed logs GET, a vanished habit), but an
+# owner-authored `failed` (`miss_source == "vendor"`) replaces it — exactly as `completed`
+# always could. `completed` itself stays fully terminal.
+SETTLEABLE_STATUSES = ("skipped",)
+
+
+def _settles_a_skip(prev_status, cur: dict) -> bool:
+    """True when `cur` is the owner resolving a stored `skipped` day to `failed`."""
+    return prev_status in SETTLEABLE_STATUSES and cur.get("status") == "failed" and cur.get("miss_source") == "vendor"
+
+
 # AWS clients used directly by the supplement bridge (post-store hook needs DDB
 # access independent of the framework's table reference).
 _dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -702,7 +716,9 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
       1. **A stored completion disappears.** `completed`/`skipped` are decisions the owner
          made. A later run that cannot see them (a logs GET that failed, a habit renamed
          or archived upstream, a vendor blip) must not overwrite them with `failed`.
-         Restored here, with the original `completed_at` instant.
+         Restored here, with the original `completed_at` instant. The one exception
+         (#4622): a stored `skipped` is an unconfirmed day, so an owner-authored `failed`
+         (`miss_source == "vendor"`) settles it — see `SETTLEABLE_STATUSES`.
       2. **`pending` is finalised early.** A 17:05 PT run writes `pending` for the evening
          habits; nothing may turn that into `failed` while the Pacific day is still open.
          Once the day HAS closed, `pending -> failed` is the correct, allowed resolution —
@@ -742,7 +758,7 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
         if not isinstance(cur, dict):
             continue
         cur_status = cur.get("status")
-        if prev_status in TERMINAL_STATUSES and cur_status not in TERMINAL_STATUSES:
+        if prev_status in TERMINAL_STATUSES and cur_status not in TERMINAL_STATUSES and not _settles_a_skip(prev_status, cur):
             cur["status"] = prev_status
             if prev.get("completed_at"):
                 cur["completed_at"] = prev["completed_at"]

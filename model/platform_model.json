@@ -977,7 +977,7 @@
     "ai_features": 20,
     "alarms": 133,
     "emf_namespaces": 32,
-    "schedules": 91,
+    "schedules": 92,
     "secrets": 30
   },
   "edges": [
@@ -6679,6 +6679,20 @@
       "stack": "ingestion_stack",
       "timeout_seconds": 300
     },
+    "habit-skip-review": {
+      "declared_alarm": null,
+      "handler": "emails.habit_skip_review_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/habit_skip_review_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 ? * SAT *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 60
+    },
     "habitify-data-ingestion": {
       "declared_alarm": null,
       "handler": "ingestion.habitify_lambda.lambda_handler",
@@ -7570,7 +7584,7 @@
       "contracts_known": 12,
       "contracts_ratchet": 12,
       "edges": 737,
-      "lambdas": 106,
+      "lambdas": 107,
       "mcp_tool_modules": 35,
       "mcp_tools": 87,
       "partitions": 114,
@@ -7578,8 +7592,8 @@
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 17,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 82,
-      "schedules": 91
+      "scheduled_lambdas": 83,
+      "schedules": 92
     },
     "coverage": {
       "edge_sites": {
@@ -7589,7 +7603,7 @@
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 82
+        "resolved": 83
       }
     },
     "non_census_families": [
@@ -8553,6 +8567,13 @@
       "lambda": "coach-prediction-evaluator",
       "resolution": "constant",
       "stack": "compute_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 ? * SAT *)",
+      "lambda": "habit-skip-review",
+      "resolution": "constant",
+      "stack": "email_stack",
       "utc": "16:00"
     },
     {
