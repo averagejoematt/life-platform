@@ -19,7 +19,8 @@ module-level binding. This module does NOT import the facade; no import cycle.
 
 import calendar
 import json
-from datetime import datetime, timezone
+import statistics
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.pacific_time import parse_iso_utc  # #1964: the ONE ISO-8601 parser
@@ -53,6 +54,8 @@ __all__ = [
     "_ceiling_window_clause",
     "_price_for_model",
     "_projection_scope",
+    "_scheduled_share_pct",
+    "_typical_day",
     "inference_receipt",
     "receipts",
 ]
@@ -602,6 +605,129 @@ def _budget_history(cw, month_start, now) -> list:
         return []
 
 
+# ── #4650: the ordinary day, and the days that were not ──────────────────────────
+# The two forecasts above answer "where does THIS month land at the recent pace". Neither
+# answers what a reader of a cost page actually asks — "what does this cost in an ordinary
+# month" — and on 2026-10-04 the broad one read $514 beside a $215 ceiling because two days
+# of development spend were multiplied across the month. September's whole AWS bill was
+# $137.15.
+#
+# So the route also serves a spike-free day: the MEDIAN of daily whole-bill spend over the
+# last `_TYPICAL_WINDOW_DAYS` complete UTC days, with its window named, and — separately —
+# this month's days that ran above `_HIGH_DAY_MULTIPLE` times it, dated. It is served here
+# rather than worked out in a page so there is one number, not one per consumer.
+#
+# It is a SUMMARY of the governor's own published series (LifePlatform/Budget::
+# EstimatedMonthToDateSpend — the series `history` already draws), not a second
+# implementation of the governor's projection: nothing here extrapolates, and no tier reads it.
+_TYPICAL_WINDOW_DAYS = 30
+# Below this many measurable days a median is not an "ordinary day", it is a handful of
+# days — the block is withheld (None) and a consumer says nothing.
+_TYPICAL_MIN_DAYS = 14
+_HIGH_DAY_MULTIPLE = 2
+
+
+def _daily_spend(cw, now) -> list:
+    """[(date, usd)] of whole-bill spend per complete UTC day, oldest first.
+
+    The governor emits a running month-to-date total on every run and its first run of a
+    UTC day is at 00:00, so a day's Minimum is the total as that day OPENED. A day's spend
+    is therefore the next day's opening total minus its own. The counter resets at the
+    month boundary, so a month's LAST day is closed with its own Maximum instead (its last
+    run is 16:00 UTC — that day reads a few hours short; a median does not move on it).
+    Today is never included (incomplete), and a day whose neighbour reading is missing is
+    left out rather than estimated.
+    """
+    today = now.date()
+    start = datetime.combine(today - timedelta(days=_TYPICAL_WINDOW_DAYS), datetime.min.time(), tzinfo=timezone.utc)
+    r = cw.get_metric_statistics(
+        Namespace="LifePlatform/Budget",
+        MetricName="EstimatedMonthToDateSpend",
+        StartTime=start,
+        EndTime=now,
+        Period=86400,
+        Statistics=["Minimum", "Maximum"],
+    )
+    by_day = {}
+    for p in r.get("Datapoints", []):
+        if p.get("Minimum") is None or p.get("Maximum") is None:
+            continue
+        by_day[p["Timestamp"].astimezone(timezone.utc).date()] = (float(p["Minimum"]), float(p["Maximum"]))
+    out = []
+    for d in sorted(by_day):
+        if d < start.date() or d >= today:
+            continue
+        opened, high = by_day[d]
+        nxt = d + timedelta(days=1)
+        if nxt.month != d.month:
+            spend = high - opened
+        elif nxt in by_day:
+            spend = by_day[nxt][0] - opened
+        else:
+            continue
+        if spend >= 0:
+            out.append((d, spend))
+    return out
+
+
+def _typical_day(cw, now) -> tuple:
+    """(typical_day, high_days) for /api/receipts — both None when there is no honest answer.
+
+    typical_day: the median day, the window it was taken over, and that day repeated for
+      every day of the current month (`month_usd` is `usd` x `month_days`, from the ROUNDED
+      figure, so a reader who multiplies the two printed numbers gets the third).
+    high_days: this month's complete days above `_HIGH_DAY_MULTIPLE` x the median — dated,
+      their total, and how much of that total is above what the same number of ordinary
+      days would have cost. An empty `days` list is an answer ("none this month").
+    """
+    try:
+        series = _daily_spend(cw, now)
+    except Exception as e:  # noqa: BLE001 — a bonus block, never a dependency of the receipt
+        logger.warning(f"[receipts] typical day unavailable: {e}")
+        return None, None
+    if len(series) < _TYPICAL_MIN_DAYS:
+        return None, None
+    usd = round(statistics.median(v for _, v in series), 2)
+    month_days = calendar.monthrange(now.year, now.month)[1]
+    typical = {
+        "usd": usd,
+        "days_counted": len(series),
+        "window_start": series[0][0].isoformat(),
+        "window_end": series[-1][0].isoformat(),
+        "month_days": month_days,
+        "month_usd": round(usd * month_days, 2),
+        "basis": (
+            "Median whole-bill spend per complete UTC day (AI and everything else), from the "
+            "cost governor's running month-to-date total. A median, so a few unusually "
+            "expensive days do not move it; month_usd is that day repeated for every day of "
+            "the current month, not a forecast."
+        ),
+    }
+    high = [(d, v) for d, v in series if (d.year, d.month) == (now.year, now.month) and v > _HIGH_DAY_MULTIPLE * usd]
+    total = round(sum(round(v, 2) for _, v in high), 2)
+    high_days = {
+        "multiple": _HIGH_DAY_MULTIPLE,
+        "days": [{"date": d.isoformat(), "usd": round(v, 2)} for d, v in high],
+        "total_usd": total,
+        "above_typical_usd": round(total - usd * len(high), 2),
+    }
+    return typical, high_days
+
+
+def _scheduled_share_pct(breakdown):
+    """The share of recent AI spend that ran on a schedule, as a percentage — or None.
+
+    The governor's `prod_class_share` (#2892), over the same trailing window as `ai_daily`.
+    It is what says WHAT a run of high days was: the rest is the episodic classes — AI used
+    to build and test the system. None when the governor measured no split; never a guess.
+    """
+    try:
+        share = (breakdown or {}).get("prod_class_share")
+        return None if share is None else round(float(share) * 100, 1)
+    except (TypeError, ValueError):
+        return None
+
+
 def receipts() -> dict:
     """GET /api/receipts — the live bill and the budget tier, as an instrument (#1397)."""
     try:
@@ -659,6 +785,8 @@ def receipts() -> dict:
         scope = _projection_scope(breakdown)
         projected_all = scope["projected_all_classes_usd"]
 
+        typical_day, high_days = _typical_day(cw, now)
+
         payload = {
             "as_of": now.isoformat(timespec="seconds"),
             "stale": stale,
@@ -707,6 +835,11 @@ def receipts() -> dict:
             "non_ai_daily_usd": (breakdown or {}).get("non_ai_daily"),
             "computed_at": (breakdown or {}).get("computed_at"),
             "history": _budget_history(cw, month_start, now),
+            # #4650: what an ordinary day costs, and this month's days that were not ordinary —
+            # so no consumer has to read a monthly bill out of a forecast (see _typical_day).
+            "typical_day": typical_day,
+            "high_days": high_days,
+            "ai_scheduled_share_pct": _scheduled_share_pct(breakdown),
             # ── #3555: the per-feature note, corrected ────────────────────────────
             # This key used to read "the per-Lambda metric stream carries no model
             # dimension, so pricing it would mean inventing a model mix" — a withholding
