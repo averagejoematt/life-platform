@@ -25,6 +25,9 @@
       "ai_daily_usd": {
         "type": "number"
       },
+      "ai_scheduled_share_pct": {
+        "type": "number"
+      },
       "as_of": {
         "type": "string"
       },
@@ -93,6 +96,35 @@
         },
         "length_sample": 0,
         "type": "array"
+      },
+      "high_days": {
+        "keys": {
+          "above_typical_usd": {
+            "type": "number"
+          },
+          "days": {
+            "items": {
+              "keys": {
+                "date": {
+                  "type": "string"
+                },
+                "usd": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "multiple": {
+            "type": "integer"
+          },
+          "total_usd": {
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
       "history": {
         "items": {
@@ -175,6 +207,32 @@
       },
       "tier_semantics": {
         "type": "string"
+      },
+      "typical_day": {
+        "keys": {
+          "basis": {
+            "type": "string"
+          },
+          "days_counted": {
+            "type": "integer"
+          },
+          "month_days": {
+            "type": "integer"
+          },
+          "month_usd": {
+            "type": "number"
+          },
+          "usd": {
+            "type": "number"
+          },
+          "window_end": {
+            "type": "string"
+          },
+          "window_start": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"
