@@ -211,7 +211,8 @@ def scoreboard(dossier: Dict[str, Any], ledger: Dict[str, Any]) -> Dict[str, Any
         "lost_total": abs(w["total_change_lbs"]) if w.get("total_change_lbs") is not None else None,
         "to_next_waypoint": w.get("lbs_to_next_waypoint"),
         "next_waypoint": (w.get("next_plan_waypoint") or {}).get("lbs"),
-        "training_streak_days": t.get("consecutive_training_days_through_week_end"),
+        # #4678: the loaded-lifting streak (`training.training_streaks`), never the any-Hevy-row active-day count
+        "loaded_lifting_streak_days": t.get("consecutive_loaded_lifting_days_through_week_end"),
         "bets_right": sum(1 for b in bets if b["result"] == "right"),
         "bets_wrong": sum(1 for b in bets if b["result"] == "wrong"),
         "coach_board": [{"coach": n.replace("Dr. ", ""), "right": r, "wrong": wr} for n, r, wr in board],
@@ -228,8 +229,8 @@ def scoreboard_line(sb: Dict[str, Any]) -> str:
             parts.append(f"{sb['weight_now']:g} lb at the first weigh-in")
         else:
             parts.append(f"{sb['weight_from']:g} → {sb['weight_now']:g} lb")
-    if sb.get("training_streak_days"):
-        parts.append(f"{sb['training_streak_days']} straight training days")
+    if (sb.get("loaded_lifting_streak_days") or 0) >= 2:  # one day is not a streak
+        parts.append(f"{sb['loaded_lifting_streak_days']} straight lifting days")
     if sb.get("bets_right") or sb.get("bets_wrong"):
         parts.append(f"on-air bets {sb['bets_right']}–{sb['bets_wrong']}")
     if sb.get("coach_board"):

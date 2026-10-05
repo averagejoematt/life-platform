@@ -169,6 +169,8 @@ def _family(title: str) -> str:
 
 
 def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
+    from training import training_streaks  # THE one definition of a loaded session (#4105)
+
     rows = sorted(_rows(table, "hevy", wk["start"], wk["end"]), key=lambda r: str(r.get("start_time") or r.get("sk") or ""))
     sessions = []
     for r in rows:
@@ -179,6 +181,7 @@ def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
                 "date": r.get("date") or r["sk"][5:15],
                 "title": r.get("title"),
                 "block": _family(r.get("title") or ""),
+                "loaded": training_streaks.is_loaded_session(r),  # a working set with weight on a non-cardio exercise
                 "programmed": bool(r.get("hevy_routine_id")) and ad.get("status") == "matched",
                 "minutes": round((_f(r.get("duration_sec")) or 0) / 60),
                 "sets": int(_f(r.get("set_count")) or 0),
@@ -229,12 +232,17 @@ def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
                 walks.append(
                     {"date": d, "miles": _r(_f(a.get("distance_miles"))), "minutes": round((_f(a.get("moving_time_seconds")) or 0) / 60)}
                 )
-    # consecutive training days ending at the window's end (looks back across weeks)
-    trail = {(r.get("date") or r["sk"][5:15]) for r in _rows(table, "hevy", GENESIS, wk["end"])}
-    streak, day = 0, _d(wk["end"])
-    while day.isoformat() in trail:
-        streak += 1
-        day -= _dt.timedelta(days=1)
+    # The streak is the LOADED-lifting streak ending at the window's end, looking back across weeks (#4678): the
+    # same predicate and day-walk the routine notes and the coach packet read (`training.training_streaks`,
+    # #4067/#4411). It used to count every date with ANY Hevy row — treadmill, bike and walking blocks included —
+    # so a programme that logs cardio in Hevy on the off days could only ever grow it.
+    lifting_days = {
+        (r.get("date") or r["sk"][5:15])
+        for r in _rows(table, "hevy", GENESIS, wk["end"])
+        if not r.get("tombstone") and training_streaks.is_loaded_session(r)
+    }
+    day_after_end = (_d(wk["end"]) + _dt.timedelta(days=1)).isoformat()
+    streak = training_streaks.streak_before(lifting_days, day_after_end)
     day_before = (_d(wk["start"]) - _dt.timedelta(days=1)).isoformat()
     blocks_before = {_family(r.get("title") or "") for r in _rows(table, "hevy", GENESIS, day_before)} if day_before >= GENESIS else set()
     blocks_now = [s["block"] for s in sessions]
@@ -244,7 +252,13 @@ def _training(table, wk: Dict[str, Any]) -> Dict[str, Any]:
         "session_count": len(sessions),
         "programmed_count": sum(1 for s in sessions if s["programmed"]),
         "rest_days_in_window": [d for d in _dates(wk["start"], wk["end"]) if d not in {s["date"] for s in sessions}],
-        "consecutive_training_days_through_week_end": streak,
+        "consecutive_loaded_lifting_days_through_week_end": streak,
+        "lifting_streak_definition": (
+            "consecutive days, ending on the window's last day, with a session that carried load (a working set with weight "
+            "on a non-cardio exercise). Walk, treadmill, bike and other cardio-only days are not counted, so it is shorter "
+            "than the run of days he was active. It is a count of lifting days and not a fatigue measure: never present it "
+            "as a reason he needs rest."
+        ),
         "minutes_total": sum(s["minutes"] for s in sessions),
         "longest_session_min": max((s["minutes"] for s in sessions), default=None),
         "new_programme_blocks_this_week": new_blocks,
