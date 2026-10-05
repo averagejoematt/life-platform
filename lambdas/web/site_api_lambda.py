@@ -74,6 +74,7 @@ from web.site_api_coach import (
     handle_coach,
     handle_coach_analysis,
     handle_coach_docket,
+    handle_coach_moves,
     handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
@@ -525,6 +526,7 @@ ROUTES = {
     "/api/coaching-dashboard": None,  # GET — assembled coaching dashboard data
     # Prediction Ledger + Coach Timeline
     "/api/calls": None,  # #4586: every settled, checkable coach call (GET, optional ?id=) — a page per call
+    "/api/coach_moves": None,  # #4648: one day's coach lines (GET, ?date=YYYY-MM-DD) — what the day page reads
     "/api/predictions": None,  # GET with ?status=&coach_id=&limit= query params
     "/api/coach_timeline": None,  # GET with ?coach_id= query param
 }
@@ -708,6 +710,8 @@ def _dispatch_route(event, path, method):
         return handle_coach_docket(event)
     if path == "/api/calls":
         return handle_calls(event)
+    if path == "/api/coach_moves":
+        return handle_coach_moves(event)
     if path == "/api/panel_ledger":
         return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):

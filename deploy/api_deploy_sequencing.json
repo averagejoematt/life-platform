@@ -27,6 +27,12 @@
       "added": "2026-09-27",
       "pr": "#4189 (Refs #4182)",
       "reason": "the morning note (GET served note / POST owner write) — new site-api route; the site half is a follow-up lane. Remove once deploy_site_api.sh has landed it and the schema baseline is captured."
+    },
+    {
+      "route": "/api/coach_moves",
+      "added": "2026-10-04",
+      "pr": "Refs #4648",
+      "reason": "one day's coach lines by date (GET ?date=YYYY-MM-DD) — new site-api route read by the preview day page (ck_depth.js) in the same PR. Until it is live the page prints no coach section. Remove once deploy_site_api.sh has landed it and the schema baseline is captured."
     }
   ]
 }

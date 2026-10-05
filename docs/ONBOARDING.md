@@ -59,7 +59,7 @@ Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
     │
     ▼
 MCP Lambda (87 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
-site-api Lambda (~140 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
+site-api Lambda (~141 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
 ~107 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 10 CDK stacks. Run-rate: ~$172/mo measured (2026-08, n=25) against a $215 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
