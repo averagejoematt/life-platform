@@ -2552,6 +2552,9 @@ Stores Wednesday Chronicle installments by Elena Voss. Also published to S3 blog
 | `thesis` | string | The central argument/idea of this installment |
 | `body` | string | Full article text (HTML) |
 | `word_count` | number | Approximate word count |
+| `stats_line` | string | The week's numbers as one line (the dek under the title; the card engine and the manifest read it here) |
+| `stats` | map | The same numbers, structured (#4191): `weight_lbs`, `week_grade_avg`, `t0_streak_days` — a key is absent when the line does not carry that number; the map is absent when it carries none. Derived from `stats_line` at write (`content.chronicle_schema.stats_fields`) |
+| `content_markdown` | string | The quoted title, a blank line, the body. The model's bracketed stat header is dropped at the store (#4191, `strip_stat_header`); rows written before that still hold it, so reader surfaces go through `chronicle_schema.body_markdown` |
 | `s3_key` | string | S3 path of published blog post |
 | `installment_number` | number | Sequential installment number |
 | `board_interview` | boolean | Whether this installment includes a BoD interview |
