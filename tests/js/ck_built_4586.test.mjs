@@ -123,3 +123,14 @@ test("nothing leaks: no ISO date, no non-value, no machine register", () => {
   assert.doesNotMatch(html, /\b20\d\d-\d\d-\d\d\b|undefined|NaN|\[object Object\]/);
   assert.doesNotMatch(html, /\bserved\b/, "reader copy says 'as of', never 'served'");
 });
+
+test("once the forecast counts the checks on each deploy, both sentences that describe it say so (#4652)", () => {
+  const before = B.costHTML(SRC.receipts);
+  assert.match(before, /what is spent plus the scheduled programs at their pace/);
+  assert.match(before, /% ran on a schedule\. The rest/);
+  const counted = B.costHTML({ ...SRC.receipts, projected_classes: [...SRC.receipts.projected_classes, "ci"] });
+  assert.match(counted, /what is spent plus the scheduled programs and the checks on each deploy at their pace/);
+  assert.match(counted, /% ran on a schedule or as a check on a deploy\. The rest/);
+  const absent = B.costHTML({ ...SRC.receipts, projected_classes: undefined });
+  assert.match(absent, /what is spent plus the scheduled programs at their pace/, "a missing list changes no sentence");
+});

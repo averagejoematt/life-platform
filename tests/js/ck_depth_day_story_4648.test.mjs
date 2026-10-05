@@ -53,9 +53,8 @@ test("a day with a settled call shows the call, its rule, the verdict and a link
   const call = CALLS.calls.find((c) => c.settled_date === "2026-10-02");
   const html = D.daySettledHTML("2026-10-02", CALLS, BASE);
   assert.match(html, /<h2>A call was checked this day\.<\/h2>/);
-  assert.ok(html.includes(call.called), "the served sentence, which carries the rule it was checked by");
-  assert.match(html, /counts as right within 1\.2 hours either way/);
-  assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right<\/span>/);
+  assert.ok(html.includes(call.called_short), "the served short sentence; the rule rides the shared tag (#4647)");
+  assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 1\.2 hours either way<\/span>/);
   assert.match(html, /It came in at 8\.6 hours\./);
   assert.ok(html.includes(`href="/next/v8/call/?id=${call.id}"`));
   assert.doesNotMatch(html, /<details>/);
@@ -64,7 +63,7 @@ test("a day with a settled call shows the call, its rule, the verdict and a link
 test("a bet settled that day is tagged with the sentence naming both coaches", () => {
   const html = D.daySettledHTML("2026-09-30", CALLS, BASE);
   assert.match(html, /<h2>2 calls were checked this day\.<\/h2>/);
-  assert.match(html, /<span class="ck-verdicts__tag">Marcus Webb was right; Amara Patel was wrong\.<\/span>/);
+  assert.match(html, /<span class="ck-soft">Marcus Webb was right; Amara Patel was wrong\.<\/span>/);
   assert.match(html, /href="\/next\/v8\/call\/\?id=bet-20260930-994b3d89f6"/);
 });
 
@@ -75,7 +74,8 @@ test("a day with many settled calls shows two and folds the rest, every one stil
   assert.match(html, /<h2>4 calls were checked this day\.<\/h2>/);
   assert.match(html, /<details><summary>2 more settled this day<\/summary>/);
   for (const c of day) assert.ok(html.includes(`id=${c.id}"`), c.id);
-  assert.match(html, /<span class="ck-verdicts__tag">Wrong<\/span>/);
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · [^<]+<\/span>/);
+  assert.doesNotMatch(html, /ck-verdicts__tag[^>]*>(Right|Wrong)</, "no verdict without its rule");
 });
 
 test("both on one day: the coaches first, then what settled", () => {

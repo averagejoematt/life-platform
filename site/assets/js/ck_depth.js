@@ -23,6 +23,7 @@
 import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { callHref, callsOf } from "/assets/js/ck_call.js";
+import { callVerdictTag } from "/assets/js/ck_verdict.js";
 
 const LB_PER_KG = 2.20462;
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -317,11 +318,11 @@ export function daySaidHTML(iso, movesBody, base) {
 }
 // One settled call on a day: the served `called` sentence (it carries the rule the call
 // was checked by), what happened, the verdict, and the door to the call's own page.
-// TODO(#4647): switch the verdict and its rule to the shared verdict-tag helper once it lands.
 function settledRow(call, base) {
-  const word = call.kind === "bet" ? "" : call.verdict === "right" ? "Right" : call.verdict === "wrong" ? "Wrong" : "";
-  const verdict = word ? `<span class="ck-verdicts__tag${word === "Right" ? " ck-verdicts__tag--right" : ""}">${word}</span>` : `<span class="ck-verdicts__tag">${esc(call.verdict_text || "Settled")}</span>`;
-  return `<li>${verdict}<span>${esc(call.called || call.called_short)}</span><span class="ck-soft">${esc(call.happened_short)}</span><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></li>`;
+  // A bet has a verdict per side, so the route's own sentence stands; any other call takes
+  // the shared tag, which never prints a verdict without the rule that decided it (#4647).
+  const verdict = call.kind === "bet" ? `<span class="ck-soft">${esc(call.verdict_text || "Settled")}</span>` : callVerdictTag(call);
+  return `<li>${verdict}<span>${esc(call.called_short || call.called)}</span><span class="ck-soft">${esc(call.happened_short)}</span><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></li>`;
 }
 // Every call settled on the day, from GET /api/calls. "" when none settled that day. Under
 // the coaches' lines it takes a label, not a second heading: the two are one part of the day.

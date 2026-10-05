@@ -148,6 +148,10 @@ export function costHTML(receipts) {
   const recent = elapsed !== null && elapsed < GOVERNOR.windowDays;
   const window = recent ? "this month so far" : `over the last ${GOVERNOR.windowDays} days`;
 
+  // The forecast counts the classes the route names in `projected_classes`. Once the checks
+  // that run on each deploy are among them (#4652), both sentences that describe it say so.
+  const withChecks = Array.isArray(receipts.projected_classes) && receipts.projected_classes.includes("ci");
+  const programs = withChecks ? "the scheduled programs and the checks on each deploy" : "the scheduled programs";
   // An ordinary day, and a month of them. Then the days that were not ordinary, dated.
   const usual = ordinary(receipts);
   const high = usual && highDays(receipts);
@@ -165,8 +169,9 @@ export function costHTML(receipts) {
     const over = high.above > 0 ? `, ${usd(high.above)} more than ${n === 1 ? "an ordinary day" : `${whole(n)} ordinary days`}.` : ".";
     // What the AI spend was, said only when the rate's window covers every high day.
     const share = num(receipts.ai_scheduled_share_pct);
+    const ranAs = withChecks ? "ran on a schedule or as a check on a deploy" : "ran on a schedule";
     const covered = Number.isFinite(t) && Number.isFinite(high.first) && (recent || high.first >= t - GOVERNOR.windowDays * 86400000);
-    const what = share !== null && covered ? ` Of the AI spend ${window}, ${whole(share)}% ran on a schedule. The rest was building and testing the system.` : "";
+    const what = share !== null && covered ? ` Of the AI spend ${window}, ${whole(share)}% ${ranAs}. The rest was building and testing the system.` : "";
     out.push(para(`${days}${over}${what}`));
   }
 
@@ -179,7 +184,7 @@ export function costHTML(receipts) {
     const wide = all === null || all <= forecast ? "" : ` If building and testing also carried on at that pace every day, it would be ${usd(all)}.`;
     out.push(
       para(
-        `The forecast that sets the tier is what is spent plus the scheduled programs at their pace ${window}: ${usd(forecast)} by ${by || "month end"}, ${side(forecast)}${banked}.${wide}`,
+        `The forecast that sets the tier is what is spent plus ${programs} at their pace ${window}: ${usd(forecast)} by ${by || "month end"}, ${side(forecast)}${banked}.${wide}`,
       ),
     );
     const [t1, t2] = GOVERNOR.shares.map((share) => ceiling * share);
