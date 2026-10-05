@@ -266,7 +266,13 @@ def test_a_stamped_row_serves_the_guess_on_its_page():
 
 
 def test_next_names_the_next_bet_or_call_to_settle_and_its_day():
-    nxt = _doc()["next"]
+    # #4618: a number call is due on the day its sentence names, not after a 14-day domain
+    # minimum — "recovery score tomorrow will be 90.6%", filed October 3, settles October 4.
+    first = _doc()["next"]
+    assert first["state"] == "ok" and first["as_of"] == "2026-10-04"
+    assert first["data"]["kind"] == "number" and first["data"]["coach_names"] == ["Lisa Park"]
+    assert first["data"]["text"] == "Next: Lisa Park’s call that his morning recovery score will be about 90.6 settles Sunday, October 4."
+    nxt = _doc(today="2026-10-05")["next"]
     assert nxt["state"] == "ok" and nxt["as_of"] == "2026-10-05"
     assert nxt["data"]["kind"] == "bet" and nxt["data"]["coach_names"] == ["Max Reyes", "Lisa Park"]
     assert nxt["data"]["text"] == (
@@ -378,7 +384,7 @@ def test_an_id_serves_one_call_and_an_unknown_id_is_a_404_with_a_sentence(monkey
     assert one["statusCode"] == 200
     body = _body(one)
     assert body["call"]["kind"] == "bet" and body["as_of"] == "2026-09-30" and "calls" not in body
-    assert body["next"]["data"]["due_date"] == "2026-10-05"
+    assert body["next"]["data"]["due_date"] == "2026-10-04"  # #4618: a next-day number call is due the next day
     for bad in ("sleep-20260907-0000000000", "../etc/passwd", "__proto__"):
         miss = api.handle_calls({"queryStringParameters": {"id": bad}})
         assert miss["statusCode"] == 404
