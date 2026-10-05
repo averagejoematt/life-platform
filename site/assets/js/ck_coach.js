@@ -9,8 +9,9 @@
 // view and how the character is written.
 //
 // One template for every coach, read from routes the site already serves:
-//   /api/coach/<persona_id>   stance (watch list, stage ladder), record, checked calls,
-//                             the newest ask, the authored character notes
+//   /api/coach/<persona_id>   stance (the coach's own watch list) with the author's stage
+//                             ladder beside it (#4649), record, checked calls, the newest
+//                             ask, the authored character notes
 //   /api/coach_docket         open and settled bets between two coaches
 //   /api/predictions          this coach's pending calls and the date each is due
 //   /api/coaches              the roster: every coach's name, and the fallback when the
@@ -22,6 +23,12 @@
 // percentage is drawn (counts only) and the count never appears without the comparison
 // (#4585); no honorific; an ISO date inside served text is put into words; the page's own
 // sentences name the coach or say "this coach" — never a gendered pronoun for a persona.
+//
+// Three distances on one page, each built only from served fields (#4649): SHORT is what
+// settles next and the watch list (stance.focused_on_now, or the stage's own list when the
+// coach has written none that is served); MEDIUM is the stage Matthew is in, its plan and
+// the test that opens the next one (stance.rung, stance.graduation_gate); LONG is the
+// stages after it (stance.ladder). A watch item the route withholds is simply not here.
 //
 // A deep page: it exists only as the destination of a coach's name, has no index of its
 // own, and goes back to where the reader came from.
@@ -131,7 +138,11 @@ export function watchingHTML(p, shown = 1) {
   if (!p || p.partial) return soft("What this coach is watching is not available right now.");
   if (p.absent) return soft(`${p.name} is sitting out${p.reason ? ` (${wordDates(p.reason)})` : ""} and has nothing to watch until the readings come back.`);
   const st = p.stance || {};
-  const items = words(st.focused_on_now);
+  const own = words(st.focused_on_now);
+  // The coach's own list first. With none served, the list the author set for the stage
+  // Matthew is in (served beside the stance) — said to be the author's, never the coach's.
+  const staged = own.length ? [] : words(st.rung && st.rung.cares_most);
+  const items = own.length ? own : staged;
   const ask = standingAsk(p.dossier && p.dossier.commitments);
   const askLine = ask
     ? `<p class="ck-soft">${esc(`The latest thing ${p.name} asked of Matthew, ${shortDay(ask.date)}: “${wordDates(ask.text)}”${isDay(ask.due_date) ? ` Due ${shortDay(ask.due_date)}.` : ""}`)}</p>`
@@ -143,16 +154,16 @@ export function watchingHTML(p, shown = 1) {
   // Whose words these are, and how old. A list the coach wrote carries its date; a list
   // that belongs to the coach's current stage is the author's, and is not this week's.
   const whose =
-    st.source === "stance" && isDay(st.as_of)
+    own.length && st.source === "stance" && isDay(st.as_of)
       ? `In ${p.name}’s own words, written ${shortDay(st.as_of)}.`
-      : st.source === "ladder"
+      : st.source === "ladder" || staged.length
         ? "Set by the author for the stage Matthew is in. Not written this week."
         : "As recorded, with no date on it.";
   const first = items.slice(0, shown);
   const firstHTML = first.map((t) => `<p>“${esc(cap(period(wordDates(t))))}”</p>${glossLines(t).map((g) => soft(g)).join("")}`).join("");
   const rest = items.slice(shown);
   const more = rest.length ? `<details><summary>${esc(`${cap(countWord(rest.length))} more on the list`)}</summary>${list(rest)}</details>` : "";
-  const aside = words(st.set_aside_for_now);
+  const aside = words(own.length || st.source === "ladder" ? st.set_aside_for_now : st.rung && st.rung.cares_less_right_now);
   const asideHTML = aside.length ? `<details><summary>${esc(`What ${p.name} has set aside for now`)}</summary>${list(aside)}</details>` : "";
   const changed = String(st.how_my_read_changed || "").trim();
   const changedHTML = changed ? `<details><summary>${esc(`How ${p.name}’s read changed`)}</summary><p class="ck-soft">“${esc(wordDates(changed))}”</p></details>` : "";
@@ -226,25 +237,33 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
   return out.join("");
 }
 
-// ── the longer view ────────────────────────────────────────────────────────────
-// On the wire only as a ladder of stages (the author's, keyed on where Matthew is now)
-// with the gate that opens the next one. A coach with no ladder gets the plain sentence:
-// nothing here is composed to fill the gap.
+// ── this stage, and the stages after it ────────────────────────────────────────
+// The medium and the long distance, both from the author's ladder of stages (keyed on
+// where Matthew is now), which the route serves whether or not the coach has written a
+// stance. MEDIUM: the stage he is in, its plan and the test that opens the next one.
+// LONG: the stages after it. A coach with no ladder gets the plain sentence: nothing here
+// is composed to fill the gap.
 export function longerHTML(p) {
   if (!p || p.partial) return soft("The longer view is not available right now.");
   if (p.absent) return soft(`${p.name} has no longer view on record while sitting out.`);
   const st = p.stance || {};
-  const ladder = (Array.isArray(st.ladder) ? st.ladder : []).filter((s) => s && String(s.headline || "").trim());
-  if (ladder.length < 2) return soft(`${p.name} has no longer view on record yet.`);
+  const all = (Array.isArray(st.ladder) ? st.ladder : []).filter(Boolean);
+  const named = all.filter((s) => String(s.headline || "").trim());
+  if (named.length < 2) return soft(`${p.name} has no longer view on record yet.`);
   const nowId = st.rung && st.rung.stage_id;
-  const rows = ladder.map((s) => `<li><span>${s.stage_id === nowId ? `<b>${esc(period(s.headline))}</b> Now.` : esc(period(s.headline))}</span></li>`).join("");
+  const at = all.findIndex((s) => s.stage_id === nowId);
+  const now = at >= 0 && String(all[at].headline || "").trim() ? all[at] : null;
+  const after = at >= 0 ? all.slice(at + 1).filter((s) => String(s.headline || "").trim()) : named;
   const plan = st.rung && String(st.rung.plan || "").trim();
   const gate = String(st.graduation_gate || "").trim();
+  // One line, in the served order: a row per stage cost the page a fifth of a phone screen.
+  const later = after.map((s) => period(s.headline)).join(" ");
   return [
     small("The stages this coach works through, set by the author."),
-    `<ol class="ck-rows ck-rows--steps">${rows}</ol>`,
+    now ? `<p><b>This stage:</b> ${esc(period(now.headline))}</p>` : "",
     plan ? `<p>${esc(`The plan for this stage: ${period(plan)}`)}</p>` : "",
     gate ? soft(`What opens the next stage: ${period(gate)}`) : "",
+    later ? soft(`${now || plan || gate ? "Further out, the stages after it, in order:" : "The stages, in order:"} ${later}`) : soft("This is the last stage on the list."),
   ].join("");
 }
 

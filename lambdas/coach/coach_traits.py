@@ -18,6 +18,10 @@ Every score is authored against two anchors, in this order:
 If a voice spec changes character, update the score here in the same PR —
 `tests/test_coach_traits.py` enforces structure, a human enforces fidelity.
 
+A note describes software, so it carries no gendered pronoun (#4649): write what the
+character does ("quick to admit a wrong call"), never "she"/"he"/"his"/"her". The same
+test file enforces it.
+
 Shared axes (0-100) so the numbers are comparable across the cast; each pole is
 labelled so a bar reads as a position between two temperaments, not a grade.
 """
@@ -35,11 +39,11 @@ TRAIT_AXES = [
 COACH_TRAITS = {
     "sleep_coach": {
         "scores": {"evidence_bar": 60, "boldness": 25, "revision_speed": 85, "intervention_urge": 40, "range": 45},
-        "note": "A careful reader of converging signals — quick to say she was wrong, slow to say she's sure.",
+        "note": "A careful reader of converging signals — quick to admit a wrong call, slow to claim certainty.",
     },
     "nutrition_coach": {
         "scores": {"evidence_bar": 70, "boldness": 85, "revision_speed": 75, "intervention_urge": 70, "range": 25},
-        "note": "Flat statements inside his lane, hedges the moment he leaves it — unsentimental when a call misses.",
+        "note": "Flat statements inside the food lane, hedges the moment a question leaves it — unsentimental when a call misses.",
     },
     "mind_coach": {
         "scores": {"evidence_bar": 55, "boldness": 30, "revision_speed": 35, "intervention_urge": 20, "range": 60},
@@ -55,11 +59,11 @@ COACH_TRAITS = {
     },
     "labs_coach": {
         "scores": {"evidence_bar": 85, "boldness": 70, "revision_speed": 55, "intervention_urge": 50, "range": 35},
-        "note": "Two draws make a trend, one makes a caveat — bold only where a clinical threshold backs him.",
+        "note": "Two draws make a trend, one makes a caveat — bold only where a clinical threshold backs the call.",
     },
     "explorer_coach": {
         "scores": {"evidence_bar": 50, "boldness": 30, "revision_speed": 90, "intervention_urge": 15, "range": 95},
-        "note": "A low bar to notice, a high bar to act — delighted to be refuted, and every domain is his domain.",
+        "note": "A low bar to notice, a high bar to act — delighted to be refuted, and every domain is fair game.",
     },
     # #1112 — the head coach (lead tier). Authored against the eli_marsh persona
     # (config/personas.json philosophy) + his board_of_directors.json voice: the

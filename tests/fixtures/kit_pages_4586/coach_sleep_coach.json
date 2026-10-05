@@ -22,13 +22,7 @@
  "stance": {
   "source": "stance",
   "headline_read": "I remain cautious about deep sleep trend interpretation given early-window noise and the absence of the Zone 2 training driver I predicted would activate slow-wave increases. The recent downward refutation doesn't shift my core mechanistic read—I predicted upward movement contingent on structured adenosine accumulation that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on protocol stability, protein intake stabilization, and waiting for the training data that would reshape architecture.",
-  "focused_on_now": [
-   "Whether the simplified three-word check is generating usable signal after protocol redesign",
-   "Protein intake stabilization at threshold as a mechanistic lever for slow-wave architecture",
-   "Thermal environment context to anchor deep sleep variability interpretation",
-   "Arrival of Zone 2 training volume in Strava as the key predictor for adenosine-driven slow-wave increases",
-   "Persistent sensor-subjective divergence from late September and whether it reflects device construction or genuine physiological decoupling"
-  ],
+  "focused_on_now": [],
   "set_aside_for_now": [
    "Recovery score directional claims until morning logging resumes and subjective validation is possible",
    "Deep sleep percentile ranking until five consecutive same-direction observations accumulate",
@@ -42,10 +36,53 @@
   "how_my_read_changed": "",
   "confidence_note": "My general confidence remains low (0.2) reflecting the wide prediction intervals and unresolved device-subjective divergence. Sleep duration confidence is moderate (0.467) after the September 12 recalibration; recovery and HRV confidence are lower (0.444 and 0.667 respectively) due to refuted directional calls and the 16-day logging gap that blocks subjective validation. I am more confident in naming what I don't know than in claiming signal where noise remains plausible.",
   "as_of": "2026-10-04",
-  "grounding_flag": false
+  "grounding_flag": false,
+  "graduation_gate": "",
+  "band_metric": "weight_lbs",
+  "current_value": 312.11,
+  "rung": {
+   "stage_id": "foundation",
+   "entry": {
+    "metric": "weight_lbs",
+    "min": 270,
+    "max": null
+   },
+   "headline": "Get enough hours, regularly.",
+   "read_of_him": "At this stage the single biggest lever is total sleep and a consistent bedtime. Architecture can wait.",
+   "cares_most": [
+    "time in bed most nights",
+    "a roughly consistent bedtime"
+   ],
+   "cares_less_right_now": [
+    "deep/REM percentages",
+    "perfect sleep scores",
+    "advanced protocols"
+   ],
+   "plan": "Anchor a bedtime window and protect duration. Volume and regularity first; quality follows.",
+   "graduation_gate": "",
+   "watches": []
+  },
+  "ladder": [
+   {
+    "stage_id": "foundation",
+    "headline": "Get enough hours, regularly."
+   },
+   {
+    "stage_id": "consistency",
+    "headline": "Make the timing tight."
+   },
+   {
+    "stage_id": "architecture",
+    "headline": "Now we care about the stages."
+   },
+   {
+    "stage_id": "optimize",
+    "headline": "Protect what works."
+   }
+  ]
  },
  "trait_scores": {
-  "note": "A careful reader of converging signals — quick to say she was wrong, slow to say she's sure.",
+  "note": "A careful reader of converging signals — quick to admit a wrong call, slow to claim certainty.",
   "disclosure": "Authored character design — fixed numbers written into the cast by the author, not generated and not measured."
  },
  "character": {
