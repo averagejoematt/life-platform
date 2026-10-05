@@ -32,6 +32,7 @@ import { tryJSON, esc, fmtShort, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, countWord } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import { COACH_JOBS } from "/assets/js/ck_pages.js";
+import { verdictTag } from "/assets/js/ck_verdict.js";
 import { docketQuestion, recentLines, ledgerLine, standingAsk, shortId } from "/assets/js/v7_coaches.js";
 
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -285,11 +286,11 @@ export function verdictsHTML(p) {
   if (!p) return "";
   const { right, wrong } = verdictPair(p);
   if (!right && !wrong) return "";
-  const card = (line, tag, cls) =>
+  const card = (line, tag) =>
     line
-      ? `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
-      : `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+      ? `<div>${verdictTag(tag === "Right", line.rule)}<p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
+      : `<div>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+  return `<div class="ck-verdicts">${card(right, "Right")}${card(wrong, "Wrong")}</div>`;
 }
 
 // ── disagreements ──────────────────────────────────────────────────────────────
