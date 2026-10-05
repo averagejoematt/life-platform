@@ -322,6 +322,11 @@ def _fetch_prediction_partition(coach_pk):
     return _ledger._fetch_prediction_partition(coach_pk, _g=globals())
 
 
+def edition_record():
+    """The record line's five facts from one narrow sweep (#4607) — delegated to web.site_api_coach_ledger."""
+    return _ledger.edition_record(_g=globals())
+
+
 def _commitment_block():
     """Delegated to web.site_api_coach_ledger._commitment_block (#3553)."""
     return _ledger._commitment_block(_g=globals())
