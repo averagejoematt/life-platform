@@ -1019,6 +1019,17 @@ COVERAGE = {
     # in place of the former TODO. Still not a ledger row — no `schedule=`, so absence
     # is not this file's question; error coverage is the CDK declaration's.
     "weekly-plate": (CENSUS, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
+    # #4622: the Saturday skipped-habits queue sends NOTHING on an empty week by design, so
+    # its reader cannot notice a missing issue — silence is the normal good-week state. What
+    # separates "nothing skipped" from "never ran" is the run itself: every invocation emits
+    # LifePlatform/Email::HabitSkipReviewRun (EMF), which makes it a ledger producer the
+    # census grades on its weekly cadence (FIRST_DUE in sentinel_producer_census until the
+    # first Saturday fire). No dedicated alarm: one owner email a week does not earn one.
+    "habit-skip-review": (
+        CENSUS,
+        "2026-10-04",
+        "Owner email that is silent on an empty week by design; its death is measured by the producer census, not noticed by a reader.",
+    ),
     # #2820: the stale "Operator email" rationale predated #1951 lifting this to a
     # real subscriber send (2026-08-03). Same one-metric delivery dead-man as the
     # chronicle sender.

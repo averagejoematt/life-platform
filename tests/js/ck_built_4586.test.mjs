@@ -15,8 +15,8 @@ const SRC = { stats: load("platform_stats"), receipts: load("receipts"), predict
 
 test("the programs block leads with the timer count and never prints the total as a figure", () => {
   const html = B.programsHTML(SRC.stats, SRC.coaches);
-  assert.match(html, /<b>82<\/b>/);
-  assert.match(html, /programs run on a timer\. Another 24 run when called\. They read 20 sources of data: devices, apps and lab results\. 8 AI coaches write and predict\./);
+  assert.match(html, /<b>83<\/b>/);
+  assert.match(html, /programs run on a timer\. Another 23 run when called\. They read 20 sources of data: devices, apps and lab results\. 8 AI coaches write and predict\./);
   assert.match(html, /As of October 4\./);
   assert.doesNotMatch(html, /106|served/, "the total sat beside '106 checked calls' and read as one number");
   assert.match(B.programsHTML(null, null), /not available right now/);

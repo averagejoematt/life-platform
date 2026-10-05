@@ -126,6 +126,11 @@ FIRST_DUE: dict[str, dict] = {
         "reason": "quarterly cron(0 15 1 1,4,7,10 ? *) added 2026-07-05 (#662), after the July 1 fire — zero invocations "
         "in 440 days is its designed state until the October 1 run.",
     },
+    "habit-skip-review": {
+        "first_due": "2026-10-10",
+        "reason": "weekly cron(0 16 ? * SAT *) added 2026-10-04 (#4622); zero invocations is its designed state until the "
+        "first Saturday fire after the EmailStack deploy.",
+    },
 }
 
 # ── on-demand: silence carries no information (the census's named residual) ──

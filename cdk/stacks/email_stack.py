@@ -11,7 +11,7 @@ Lambdas (11):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
   wednesday-chronicle, weekly-plate, monday-compass, partner-weekly-email,
   evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12),
-  weekly-signal (PB-06)
+  weekly-signal (PB-06), habit-skip-review (#4622)
 
 """
 
@@ -314,6 +314,24 @@ class EmailStack(Stack):
             memory_mb=512,
             environment=_email_env,
             custom_policies=rp.email_monday_compass(),
+            **shared,
+        )
+
+        # #4622: the Saturday skipped-habits queue. Saturday 16:00 UTC (fixed, no DST drift —
+        # 09:00 PDT). Reads the previous seven Pacific days of stored habitify records and mails
+        # the owner ONE list of daily habits still `skipped` (sends nothing on an empty week;
+        # every run emits an EMF run record). No AI, no secret: its role is a LeadingKeys-scoped
+        # Query on the habitify partition + SES, nothing else.
+        create_platform_lambda(
+            self,
+            "HabitSkipReview",
+            function_name="habit-skip-review",
+            handler="emails.habit_skip_review_lambda.lambda_handler",
+            source_file="lambdas/emails/habit_skip_review_lambda.py",
+            schedule="cron(0 16 ? * SAT *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            custom_policies=rp.email_habit_skip_review(),
             **shared,
         )
 
