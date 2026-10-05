@@ -62,7 +62,7 @@ test("this morning's weight is set against the weigh-in before it", () => {
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
-  assert.match(html, /<span class="ck-rows__key">This morning<\/span><span>311\.0 lb, the same as Friday\./);
+  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>311\.0 lb, the same as Friday\./);
   assert.match(html, /<span class="ck-rows__key">Yesterday, Friday<\/span>/);
   assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-02">The full day<\/a>/);
   assert.match(html, /at or above the protein target/);

@@ -230,6 +230,9 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
       .map((c) => `<li><span class="ck-rows__key"><time datetime="${esc(c.due_date)}">${esc(fmtShort(c.due_date))}</time></span><span>“${esc(wordDates(c.text))}” <span class="ck-small">${esc(isDay(c.date) ? `Said ${fmtShort(c.date)}.` : "")}</span></span></li>`)
       .join("");
     if (rows) out.push(`<ul class="ck-rows">${rows}</ul>`);
+    // Every waiting call is accounted for: the ones shown, the rest still ahead, the older.
+    const later = Math.max(0, ahead.length - shown);
+    if (rows && later) out.push(soft(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`));
     if (older) out.push(soft(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`));
   }
   if (!docket) out.push(soft("The bets between coaches are not available right now."));

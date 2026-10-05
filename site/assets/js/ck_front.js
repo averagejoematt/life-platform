@@ -134,9 +134,9 @@ export function todayBandHTML(edition, b, base = "/") {
   const row = (key, text, href) => `<li><span class="ck-rows__key">${esc(key)}</span><span>${esc(text)}${href ? ` <a class="ck-link" href="${esc(href)}">The full day</a>` : ""}</span></li>`;
   if (today) {
     const rest = factLine(today.facts, { skip: ["Weight"] });
-    rows.push(row("This morning", [morning || factLine(today.facts.filter((f) => f.label === "Weight")), rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
+    rows.push(row("Today so far", [morning || factLine(today.facts.filter((f) => f.label === "Weight")), rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
   } else {
-    rows.push(row("This morning", "Nothing recorded yet today."));
+    rows.push(row("Today so far", "Nothing recorded yet today."));
   }
   if (yesterday) {
     const days = week.data.days || [];
