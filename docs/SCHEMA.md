@@ -1023,6 +1023,8 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `DATE#YYYY-MM-DD#journal#solo_recording#N` | Solo Recording — local-Whisper solo-diary transcript (#1573, numbered/stable-suffix) |
 | `DATE#YYYY-MM-DD#journal#journal#N` | Fallback for unstructured entries without a Template property (numbered) |
 
+`#N` on the multi-per-day templates is a stable suffix — the last 12 hex characters of the Notion page id (#476). Rows written before #476 still carry a positional `#1`, `#2`, …; a row moves to its stable key the next time its page is re-fetched, taking its `enriched_*`/`defense_*` fields with it, and no other row of the date is touched (#4631 — the reconcile's rules are in `docs/RUNBOOK.md`, "Notion journal").
+
 **Common fields (all templates):**
 
 | Field | Type | Description |
