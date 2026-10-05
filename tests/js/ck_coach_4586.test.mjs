@@ -180,7 +180,8 @@ test("the newest right call and the newest wrong call are shown in reader words"
   assert.match(wrong.text, /Park said the share of deep sleep would go up over the checked window — it went down\./);
   assert.equal(wrong.checked, "Checked Sunday, October 4.");
   const html = C.verdictsHTML(SLEEP);
-  assert.match(html, /ck-verdicts__tag--right">Right</);
+  assert.match(html, /ck-verdicts__tag--right">Right · within 1\.2 either way</);
+  assert.match(html, /ck-verdicts__tag">Wrong · by which way the trend went over the checked window</);
   assert.doesNotMatch(text(html), /slope|trend=|_pct|\b20\d\d-\d\d-\d\d\b/, "the grader's working never reaches the page");
   assert.equal(C.verdictsHTML(LEAD), "", "no checked call: the mount prints the absence sentence");
 });
