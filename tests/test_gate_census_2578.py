@@ -1046,7 +1046,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # ARMED 1/1). Measured on `scripts/gate_census.py --json`: 768 {242, 514, 7, 5} -> 769 {243, 514, 7, 5}.
         # Upper bound 243 -> 245 (2026-10-04, #4586): the kit page gate arrives PROVEN as its guard script and as its CI
         # step (GUARD_PROOFS / CI_PROOFS). Measured: 769 {243, 514, 7, 5} -> 771 {245, 514, 7, 5}.
-        <= 245
+        # Upper bound 245 -> 246 (2026-10-04, #4652): registry PROJECTED_CALLER_CLASSES::ci arrives PROVEN (REGISTRY_PROOFS)
+        # as the sealed-unproven EPISODIC_CALLER_CLASSES::ci leaves the residue ledger — one in, one out, total unchanged.
+        # Measured: 771 {245, 514, 7, 5} -> 771 {246, 513, 7, 5}.
+        <= 246
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
