@@ -235,6 +235,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
+        "test_journal_row_cowriters_4677.py",  # #4677: rglob sweep — a module that names the journal partition and writes must be a declared co-writer, or its attributes are erased on re-ingest
         "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
         "test_coach_count_comparison_guard_4585.py",  # #4585: glob/rglob sweep — every site/ module + inline script that shows a coach count renders its comparison
         "test_built_page_facts_4586.py",  # #4586: every static fact on the "How it's built" page against its source (model, governor, workflows, incident log) — repo tree only

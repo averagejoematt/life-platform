@@ -1040,7 +1040,7 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `DATE#YYYY-MM-DD#journal#solo_recording#N` | Solo Recording — local-Whisper solo-diary transcript (#1573, numbered/stable-suffix) |
 | `DATE#YYYY-MM-DD#journal#journal#N` | Fallback for unstructured entries without a Template property (numbered) |
 
-`#N` on the multi-per-day templates is a stable suffix — the last 12 hex characters of the Notion page id (#476). Rows written before #476 still carry a positional `#1`, `#2`, …; a row moves to its stable key the next time its page is re-fetched, taking its `enriched_*`/`defense_*` fields with it, and no other row of the date is touched (#4631 — the reconcile's rules are in `docs/RUNBOOK.md`, "Notion journal").
+`#N` on the multi-per-day templates is a stable suffix — the last 12 hex characters of the Notion page id (#476). Rows written before #476 still carry a positional `#1`, `#2`, …; a row moves to its stable key the next time its page is re-fetched, taking every co-owned attribute with it (below), and no other row of the date is touched (#4631 — the reconcile's rules are in `docs/RUNBOOK.md`, "Notion journal").
 
 **Common fields (all templates):**
 
@@ -1163,6 +1163,8 @@ Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extrac
 | `enriched_defense_context` | string | 1-sentence description of what's being defended against |
 | `enriched_emotional_depth` | number | 1-5 emotional depth rating (1=very surface/avoidant, 5=deep processing) |
 | `defense_enriched_at` | string | ISO timestamp of defense enrichment |
+
+**Co-owned attributes — what a re-ingest carries (#4677).** The ingester rebuilds a journal row from what Notion sent and writes it whole, on first sight of a page and on every later edit. Attributes another pipeline merged onto the row afterwards are copied from the stored row first: every attribute whose name starts with a family declared in `lambdas/ingestion/journal_row_contract.py` (`JOURNAL_ROW_COWRITERS`) — today `enriched_` (journal-enrichment), `vocal_` (the vocal-metrics backfill) and `defense_` (a retired pass). Only attributes the fresh item lacks are copied, so a stored value never replaces one Notion just sent, and nothing outside those families is copied. A pipeline that starts writing onto journal rows declares its family there; `tests/test_journal_row_cowriters_4677.py` fails until it does. If the stored row cannot be read, the row is not rewritten on that run.
 
 **Vocal metrics fields (#1842, `channel` = `video_diary` / `solo_recording` only):**
 
