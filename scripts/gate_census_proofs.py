@@ -3086,3 +3086,26 @@ CI_PROOFS["ci::config-drift.yml::drift::7"]["scope"] += (
     "deploy from a lane branch main has not absorbed reads stale (diverged); a bundle whose sha this checkout cannot "
     "resolve takes the LastModified basis, named in the log."
 )
+# #4652 (2026-10-04): `ci` moved from EPISODIC_CALLER_CLASSES to PROJECTED_CALLER_CLASSES — the #3554
+# premise guard measured it billing 30 days in 30 — so the entrant below replaces the sealed-unproven
+# `EPISODIC_CALLER_CLASSES::ci` line, which leaves ledgers/gate_census_unproven_residue.py in the same diff.
+REGISTRY_PROOFS["registry::lambdas/operational/cost_governor_lambda.py::PROJECTED_CALLER_CLASSES::ci"] = {
+    "gate_name": "PROJECTED_CALLER_CLASSES[ci]",
+    "command": "python3 -m pytest tests/test_caller_class_attribution_2892.py -q -p no:cacheprovider",
+    "mutation": (
+        "`ci` moved back: PROJECTED_CALLER_CLASSES = ('prod-cron', 'remediation') and EPISODIC_CALLER_CLASSES = "
+        "('ci', 'dev-session') in the real tracked lambdas/operational/cost_governor_lambda.py."
+    ),
+    "observed": (
+        "MUTATED: 7 failed, 35 passed — test_partition_covers_the_whole_registry_and_does_not_overlap, "
+        "test_ci_is_projected_so_its_run_rate_reaches_the_month_end_number, "
+        "test_a_ci_that_bills_every_day_is_no_longer_a_standing_violation, test_share_splits_prod_from_dev_ci, "
+        "test_the_premise_measurement_reaches_the_persisted_breakdown and two parameters of "
+        "test_self_report_can_never_claim_the_projected_class. REVERTED: 42 passed. Both watched 2026-10-04."
+    ),
+    "scope": (
+        "Proves the partition and the arithmetic on a recorded split (SSM budget-breakdown, 2026-10-05T00:00Z); the live "
+        "effect on the published projection is read from the breakdown after the governor's next run, not from this suite."
+    ),
+    "proved_on": "2026-10-04",
+}

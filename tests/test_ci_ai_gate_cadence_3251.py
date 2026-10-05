@@ -36,7 +36,9 @@ def _invocations(name: str) -> list[str]:
 # #4589 (owner ruling, platform plan 2026-10-03 decision 4): ci-cd.yml's deploy-time copy runs the
 # vision judge only when scripts/reader_surface.py says a reader surface changed. On SKIP it runs this
 # exact deterministic-only invocation — the one sanctioned second line, and only behind RUN_AI=false.
-_GATED_SKIP_INVOCATION = "python3 tests/visual_qa.py --screenshot"
+_GATED_SKIP_INVOCATION = (
+    'python3 tests/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"'  # #4652: the skip is recorded by the sweep
+)
 
 
 def _ai_invocations(name: str) -> list[str]:

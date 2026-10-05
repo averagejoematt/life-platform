@@ -21,8 +21,8 @@ days remaining, and only spend that will recur belongs in that multiplication.
 LifePlatform/AI::EstimatedCostUSD (prod-cron | ci | dev-session | remediation,
 derived from the execution context, not self-reported); this Lambda reads that
 split, applies the prod-class SHARE to the authoritative AWS/Bedrock trailing
-figure, and projects on that — reporting the dev/CI remainder as its own
-breakdown line. Before #2892 a single dev session ($18.33 on 2026-08-10 against
+figure, and projects on that — reporting the excluded remainder as its own
+breakdown line (dev-session only since #4652; `ci` joined the projection). Before #2892 a single dev session ($18.33 on 2026-08-10 against
 a ~$1.9/day steady state) extrapolated into a permanent run-rate change and
 tripped tiers. Fail-closed: with no CallerClass datapoints (nothing redeployed
 yet, or CloudWatch unreadable) the share is None and the arithmetic is
@@ -151,14 +151,26 @@ except ImportError:  # pragma: no cover - packaging drift; the class split degra
 #                   so its trailing rate genuinely repeats; excluding a real
 #                   recurring cost would systematically UNDER-project, which is
 #                   the opposite of what this guard is for.
-#   • ci          — tracks merge cadence, which tracks a human's session.
+#   • ci          — GitHub Actions. JOINED THE PROJECTION 2026-10-04 (#4652). It was
+#                   excluded as "tracks merge cadence, which tracks a human's session",
+#                   and the #3554 premise guard then measured that claim false on every
+#                   run it ever made: 12 of 12 days when filed, 30 of 30 on 2026-10-05.
+#                   The class is two things — scheduled workflows (the daily reader-truth
+#                   pass, the Sunday full-surface vision pass: a calendar, like prod-cron)
+#                   and per-deploy judges that ran on 25 of the same 30 days. Neither half
+#                   bills like a person, so the class is projected whole. Splitting it
+#                   would need a fifth CallerClass and would leave BOTH halves over the
+#                   25/30 bar; leaving it out under-projected by its full run-rate, which
+#                   is the opposite of what this guard is for (same reason as remediation).
 #   • dev-session — a laptop or an MCP session. The $18.33 on 2026-08-10.
-# The last two are EPISODIC: their trailing rate says what a human did last week,
-# not what the calendar will do next week. They are still fully counted in ACTUAL
-# month-to-date spend — see _decide_tier: the tier is bounded by actual mtd, so
-# this changes only the FORWARD extrapolation, never the money already spent.
-PROJECTED_CALLER_CLASSES = ("prod-cron", "remediation")
-EPISODIC_CALLER_CLASSES = ("ci", "dev-session")
+# dev-session is the one EPISODIC class: its trailing rate says what a human did last
+# week, not what the calendar will do next week (10 billing days of 30 on 2026-10-05).
+# It is still fully counted in ACTUAL month-to-date spend — see _decide_tier: the tier
+# is bounded by actual mtd, so this changes only the FORWARD extrapolation, never the
+# money already spent. The premise guard keeps measuring it: a dev-session that starts
+# billing 25 days in 30 will be named in `episodic_premise_violations` the same way.
+PROJECTED_CALLER_CLASSES = ("prod-cron", "remediation", "ci")
+EPISODIC_CALLER_CLASSES = ("dev-session",)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ACCT = os.environ.get("CDK_ACCOUNT", "205930651321")

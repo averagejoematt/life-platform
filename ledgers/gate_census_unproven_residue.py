@@ -298,7 +298,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::lambdas/intelligence/intelligence_common.py::_VALIDATOR_CHECKS::null_claim_vs_data": "2026-09-05 seal (#3536)",
     "registry::lambdas/intelligence/intelligence_common.py::_VALIDATOR_CHECKS::overconfidence": "2026-09-05 seal (#3536)",
     "registry::lambdas/intelligence/intelligence_common.py::_VALIDATOR_CHECKS::stale_action": "2026-09-05 seal (#3536)",
-    "registry::lambdas/operational/cost_governor_lambda.py::EPISODIC_CALLER_CLASSES::ci": "2026-09-05 seal (#3536)",
     "registry::lambdas/operational/cost_governor_lambda.py::EPISODIC_CALLER_CLASSES::dev-session": "2026-09-05 seal (#3536)",
     "registry::lambdas/operational/cost_governor_lambda.py::PROJECTED_CALLER_CLASSES::prod-cron": "2026-09-05 seal (#3536)",
     "registry::lambdas/operational/cost_governor_lambda.py::PROJECTED_CALLER_CLASSES::remediation": "2026-09-05 seal (#3536)",
