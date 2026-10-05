@@ -329,38 +329,6 @@ def _character(p, *, _g):
     }
 
 
-def _working_hypotheses(coach_id, limit=6, *, _g):
-    """Live working hypotheses: open THREAD# (observation/prediction/concern) + pending
-    PREDICTION# claims. Already-computed by the coach engine; read-only here."""
-    table = _g["table"]
-    out = []
-    try:
-        tr = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("THREAD#"), "Limit": 25}
-            )
-        )
-        for it in tr.get("Items", []):
-            d = _decimal_to_float(it)
-            if (d.get("status") or "").lower() in ("open", "active") and d.get("summary"):
-                out.append({"claim": d["summary"], "kind": d.get("type") or "thread", "since": d.get("created_date")})
-    except Exception as _e:
-        logger.warning(f"[coach] threads: {_e}")
-    try:
-        pr = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"), "Limit": 25}
-            )
-        )
-        for it in pr.get("Items", []):
-            d = _decimal_to_float(it)
-            if (d.get("status") or "").lower() in ("pending", "confirming") and d.get("claim_natural"):
-                out.append({"claim": d["claim_natural"], "kind": "prediction", "status": d.get("status"), "since": d.get("created_date")})
-    except Exception as _e:
-        logger.warning(f"[coach] predictions: {_e}")
-    return out[:limit]
-
-
 def _coach_daily(coach_id, *, _g):
     """CC-08: today's cached daily reflection for a coach (generated/coach_daily.json),
     or None. Read-only over the batch-written artifact — never inferenced here."""
@@ -671,7 +639,6 @@ def handle_coach(event, *, _g):
     _track_record = _g["_track_record"]
     _tuning_log_for = _g["_tuning_log_for"]
     _voice_subset = _g["_voice_subset"]
-    _working_hypotheses = _g["_working_hypotheses"]
     if not _COACH_MODULES:
         return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
     try:
@@ -702,7 +669,9 @@ def handle_coach(event, *, _g):
             latest = _stance_latest(pid)
             stance = _stance_from_latest(latest) if latest else {"source": "none", "headline_read": "", "stage": {}}
         else:
-            stance = _stance_block(pid, weight)
+            # #4649: a coach that has written a stance still serves the author's stage
+            # ladder beside it (it used to be one or the other).
+            stance = _g["_stance_with_ladder"](_stance_block(pid, weight), pid, weight)
         return _ok(
             {
                 "persona_id": pid,
@@ -723,7 +692,6 @@ def handle_coach(event, *, _g):
                 # #1113: authored (deterministic, human-written) trait scores — the
                 # cast sheet, labelled as authored fiction-design by its own disclosure.
                 "trait_scores": coach_traits.traits_for(pid),
-                "working_hypotheses": _working_hypotheses(pid),
                 # E1 / #4182: "On <date> I said <claim> — it came in at <value>" (null when none graded).
                 "latest_checked": latest_checked.for_coach(_g["table"], pid),
                 # #4217: the instrument on the wire + the absence verdict (see above).

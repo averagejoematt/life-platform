@@ -237,11 +237,6 @@ def _character(p):
     return _profile._character(p, _g=globals())
 
 
-def _working_hypotheses(coach_id, limit=6):
-    """Delegated to web.site_api_coach_profile._working_hypotheses."""
-    return _profile._working_hypotheses(coach_id, limit, _g=globals())
-
-
 def _coach_daily(coach_id):
     """Delegated to web.site_api_coach_profile._coach_daily."""
     return _profile._coach_daily(coach_id, _g=globals())
@@ -280,6 +275,11 @@ def _stance_held_since(coach_id, current_stage_label):
 def _stance_block(coach_id, weight_lbs):
     """Delegated to web.site_api_coach_stance._stance_block."""
     return _stance._stance_block(coach_id, weight_lbs, _g=globals())
+
+
+def _stance_with_ladder(stance, coach_id, weight_lbs):
+    """Delegated to web.site_api_coach_stance.stance_with_ladder (#4649)."""
+    return _stance.stance_with_ladder(stance, coach_id, weight_lbs, _g=globals())
 
 
 def _integrator_digest():

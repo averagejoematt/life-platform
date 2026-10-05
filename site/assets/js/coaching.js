@@ -237,12 +237,6 @@ function coachCharacterHTML(c) {
   if (c.arc) h += `<p class="cc-arc label">their arc: ${esc(c.arc)}</p>`;
   return h + `</section>`;
 }
-function coachHypothesesHTML(hyps) {
-  if (!(hyps && hyps.length)) return "";
-  return `<section class="coach-hyp"><p class="dx-kicker label">working hypotheses · live bets</p><ul class="ch-list">` +
-    hyps.map((x) => `<li class="ch-${esc(x.kind || "thread")}"><span class="label">${esc(x.kind || "thread")}</span> ${esc(x.claim)}</li>`).join("") +
-    `</ul></section>`;
-}
 function disclose(summary, innerHTML) {
   if (!innerHTML) return "";
   return `<details class="coach-more"><summary class="dx-kicker label">${esc(summary)}</summary>${innerHTML}</details>`;
@@ -402,9 +396,8 @@ function coachLiveRecordHTML(d) {
     h += `<p class="cl-empty dx-prose">No evidence-derived stance yet — the opinion engine writes its first weekly read once the data accrues.` +
       (st.stage && st.stage.label ? ` Until then the authored starting scaffold has them at <strong>${esc(String(st.stage.label).replace(/[.\s]+$/, ""))}</strong>.` : "") + `</p>`;
   }
-  const hyps = (d.working_hypotheses || []).filter((x) => x && x.claim);
-  if (hyps.length) h += coachHypothesesHTML(hyps);
-  else if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
+  // #4649: /api/coach/<id> no longer carries `working_hypotheses` (it was [] for every coach).
+  if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
   else h += `<p class="cl-empty dx-prose">No open calls on the board yet — when this coach makes a falsifiable prediction it shows here, then gets graded on the <a href="/coaching/scorecard/">scorecard</a>, hit or miss.</p>`;
   const trail = (d.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
   const outs = (d.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
@@ -988,7 +981,6 @@ async function renderByCoach(read, id) {
   }
 
   // 3) LIVE BETS + a thin track strip (the accountability, not a whole section).
-  h += coachHypothesesHTML(coach.working_hypotheses);
   const tr = (coach.report_card && coach.report_card.track_record) || {};
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     // #4220: the ONE record's headline when served; the legacy rate line only for an older response.
