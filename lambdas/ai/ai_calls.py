@@ -102,6 +102,7 @@ from ai.ai_transport import (  # noqa: F401
     _validate_ai_output,
     call_anthropic,
 )
+from ai.forecast_prompt import forecast_prompt_lines  # #4672 — the forecast line names its day
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -1751,14 +1752,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
                 def _fnum(v):
                     return float(v) if isinstance(v, (_Dec, int, float)) else None
 
-                for _f in _fx[0].get("forecasts", []):
-                    _p, _lo, _hi = _fnum(_f.get("point")), _fnum(_f.get("lo")), _fnum(_f.get("hi"))
-                    if _p is None or _lo is None or _hi is None:
-                        continue
-                    _fx_lines.append(
-                        f"  - {_f.get('metric', '?')} {_f.get('frame', '')}: the model expects {_p:g}{_f.get('unit', '')} "
-                        f"(80% interval {_lo:g}-{_hi:g})"
-                    )
+                _fx_lines.extend(forecast_prompt_lines(_fx[0].get("forecasts", [])))
                 _cov = _fx[0].get("coverage") or {}
                 if _cov.get("n_resolved") and _fnum(_cov.get("coverage_pct")) is not None:
                     _fx_lines.append(
