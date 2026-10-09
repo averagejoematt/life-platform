@@ -28,6 +28,7 @@ asserted below in both directions.
 from __future__ import annotations
 
 import datetime
+import os
 import re
 import subprocess
 import sys
@@ -141,13 +142,30 @@ def test_END_TO_END_the_real_pipeline_refuses_and_writes_nothing():
     `--reanchor-of 2026-09-06` it proceeds past [0a] and stops later for an unrelated
     reason. This re-runs the refusing half only — the accepting half would continue into
     a real pipeline.
+
+    The refusal depends on the outgoing cycle's AGE, so the subprocess runs with its clock
+    pinned to `_TODAY` (a `sitecustomize` that swaps `restart_cadence`'s `datetime` for one
+    whose `date.today()` is `_TODAY`). Unpinned, this test went red on 2026-10-06, the day
+    cycle 17 passed 30 days: the refusal stopped firing and the pipeline ran on into its
+    AWS steps. The subprocess also gets fake AWS credentials and no profile, so a clock pin
+    that ever stops working fails on an invalid token — never on a live account.
     """
+    shim = ROOT / "tests" / "_cadence_clock_shim"
+    env = {k: v for k, v in os.environ.items() if k not in ("AWS_PROFILE", "AWS_SESSION_TOKEN", "AWS_DEFAULT_PROFILE")}
+    env.update(
+        AWS_ACCESS_KEY_ID="FAKEKEY",
+        AWS_SECRET_ACCESS_KEY="FAKESECRET",
+        CADENCE_TEST_TODAY=_TODAY.isoformat(),
+        CADENCE_TEST_DEPLOY_DIR=str(ROOT / "deploy"),
+        PYTHONPATH=os.pathsep.join(p for p in (str(shim), env.get("PYTHONPATH", "")) if p),
+    )
     proc = subprocess.run(
         [sys.executable, str(ROOT / "deploy" / "restart_pipeline.py"), "--genesis", "2026-09-20", "--apply"],
         cwd=ROOT,
         capture_output=True,
         text=True,
         timeout=300,
+        env=env,
     )
     assert proc.returncode == 6, f"expected the cadence exit code 6, got {proc.returncode}\n{proc.stdout[-2000:]}"
     assert "CADENCE PREFLIGHT FAILED" in proc.stdout
