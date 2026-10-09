@@ -58,18 +58,36 @@ def test_query_filter_includes_last_edited_time(monkeypatch):
 # ── E-6: deletion reconcile ───────────────────────────────────────────────────
 
 
-def test_reconcile_removes_orphans_keeps_written(monkeypatch):
+def test_reconcile_removes_only_what_the_vendor_view_proves_gone(monkeypatch):
+    """#476 removed every row the run did not write. #4631 narrowed it: that deleted same-day
+    siblings whenever a run reached a date with one page in hand. A row now goes only when a
+    whole-date view of Notion no longer returns its page; a row with no page id is never
+    proven gone, so it stays. (The sibling cases: tests/test_notion_reconcile_siblings_4631.py.)"""
+    kept = "DATE#2026-07-01#journal#stressor#aaaaaaaaaaaa"
+    gone = "DATE#2026-07-01#journal#stressor#bbbbbbbbbbbb"
     existing = [
-        {"sk": "DATE#2026-07-01#journal#stressor#aaaaaaaaaaaa"},  # kept (written)
-        {"sk": "DATE#2026-07-01#journal#stressor#1"},  # legacy #seq orphan → delete
-        {"sk": "DATE#2026-07-01#journal#stressor#bbbbbbbbbbbb"},  # deleted-in-notion → delete
+        {"sk": kept, "notion_page_id": "p-aaaaaaaaaaaa"},  # written this run
+        {"sk": "DATE#2026-07-01#journal#stressor#1"},  # legacy #seq, no page id → cannot be proven gone
+        {"sk": gone, "notion_page_id": "p-bbbbbbbbbbbb"},  # deleted in Notion → the vendor view omits it
+        {"sk": "DATE#2026-07-01#journal#stressor#cccccccccccc", "notion_page_id": "p-cccccccccccc"},  # sibling, still in Notion
     ]
     deleted = []
-    monkeypatch.setattr(nl.table, "query", lambda **kw: {"Items": existing})
+    monkeypatch.setattr(nl.table, "query", lambda **kw: {"Items": [e for e in existing if e["sk"] not in deleted]})
     monkeypatch.setattr(nl.table, "delete_item", lambda Key: deleted.append(Key["sk"]))
 
-    nl._reconcile_deleted("2026-07-01", "Stressor", {"DATE#2026-07-01#journal#stressor#aaaaaaaaaaaa"})
-    assert set(deleted) == {"DATE#2026-07-01#journal#stressor#1", "DATE#2026-07-01#journal#stressor#bbbbbbbbbbbb"}
+    # No whole-date view → nothing is deleted.
+    nl._reconcile_deleted("2026-07-01", "Stressor", {kept}, stored_rows=existing, fetched_page_ids={"p-aaaaaaaaaaaa"})
+    assert deleted == []
+
+    nl._reconcile_deleted(
+        "2026-07-01",
+        "Stressor",
+        {kept},
+        stored_rows=existing,
+        fetched_page_ids={"p-aaaaaaaaaaaa"},
+        vendor_page_ids=lambda d: {"p-aaaaaaaaaaaa", "p-cccccccccccc"},
+    )
+    assert deleted == [gone]
 
 
 # ── X-7: raw archive ──────────────────────────────────────────────────────────

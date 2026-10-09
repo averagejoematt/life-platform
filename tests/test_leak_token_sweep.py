@@ -455,14 +455,24 @@ _LIVE_4191_EXCERPT = (
 )
 
 
-def test_4191_stat_line_bracket_flags_a_page_but_not_the_manifests_stored_excerpt():
-    """The live 2026-09-26 excerpt on a PAGE is a finding; on /journal/posts.json it is the
-    stored artifact the fix cannot change at deploy, exempt until the manifest is re-rendered."""
+def test_4191_stat_line_bracket_flags_a_page_and_the_manifest_alike():
+    """The live 2026-09-26 excerpt is a finding on a PAGE and — the manifest having been
+    re-rendered — on /journal/posts.json too: the exemption for stored excerpts is lifted."""
     page = f"<p class='dx-prose'>{_LIVE_4191_EXCERPT}</p>"
     assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", page))
     assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/", page))
     manifest = '{"posts": [{"excerpt": "' + _LIVE_4191_EXCERPT.replace("\n", "\\n") + '"}]}'
-    assert not any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/journal/posts.json", manifest))
+    assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/journal/posts.json", manifest))
+
+
+def test_4191_the_story_desk_header_is_the_same_finding():
+    """The Story Desk's header carries no "Weight:" — a token keyed on that word alone is
+    blind to it. The un-bracketed dek (the stat row a reader is meant to see) is clean."""
+    desk = "[Day 4 to Day 10 · 318.9 lbs (-8.4 this week) · 7 training sessions]"
+    page = f"<p class='dx-prose'>{desk} Sunday morning in Seattle.</p>"
+    assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", page))
+    dek = "<p class='dx-meta'>Day 4 to Day 10 · 318.9 lbs (-8.4 this week) · 7 training sessions</p>"
+    assert not any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", dek))
 
 
 def test_4191_t0_streak_segment_flags_a_page_but_the_manifests_field_is_legitimate():

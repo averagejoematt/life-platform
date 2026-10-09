@@ -419,10 +419,13 @@ This population is the denominator of every all-time "top N%" distance/elevation
 | `active_count` | number | Active tasks at time of sync |
 | `overdue_count` | number | Overdue tasks |
 | `due_today_count` | number | Tasks due today |
-| `priority_breakdown` | object | Count by priority level (p1-p4) |
+| `priority_counts_vendor` | object | **The stored fact (#4635).** Active-task count per Todoist API priority integer, keyed by that integer as the vendor sent it (`"1"`..`"4"`; `"unknown"` only when a task carried no usable priority). The API scale is 1 = normal … 4 = urgent. Absent on rows written before #4635. |
+| `priority_breakdown` | object | **Derived** from `priority_counts_vendor` in the app's order: `p1_urgent` = API 4, `p2_high` = API 3, `p3_medium` = API 2, `p4_normal` = API 1. On a row WITHOUT `priority_counts_vendor` the labels are mirrored (API 1 was stored as `p1_urgent`); `mcp/tools_todoist.py::priority_breakdown` is the read seam that returns the right view for both generations, and `deploy/repair_vendor_flags_4635.py` rewrites the old rows. |
 | `completed_tasks` | list | List of completed task objects |
 | `completions_by_project` | object | Completion count per project |
 | `tasks_due_today` | list | List of today's due tasks |
+
+A task object's `priority` (in `completed_tasks` and `tasks_due_today`) is the Todoist API integer exactly as sent — 4 is the app's p1. It is omitted when the vendor sent none; it is never defaulted.
 
 ### apple_health
 
@@ -606,6 +609,20 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 | `sleep_onset_hour` | number | Hour of sleep onset (derived) |
 | `wake_hour` | number | Hour of wake (derived) |
 | `sleep_midpoint_hour` | number | Midpoint hour (derived) |
+| `vendor_incomplete` | boolean | The vendor's `incomplete` flag for this day entry, as sent (#4635). Stored for True AND False. **Absent = never read** (a row written before #4635, or a payload without the key) — not "complete". |
+| `vendor_processing` | boolean | The vendor's `processing` flag, only when sent (#4635) |
+| `vendor_lag_minutes` | number | The vendor's `lagMinutes`, only when sent, unrounded (#4635) |
+
+**What `vendor_incomplete` does and does not say (#4635).** It is the vendor's statement,
+at the moment of the fetch, that the night's record is not final. It is not a
+short-night detector. Measured on the 2026-09/10 archive: of 9 flagged nights, 8
+reappear in the next evening's payload unflagged with identical durations and a revised
+score (by up to 7 points), and 1 is a genuinely short record; an unflagged night can
+also fall far short of the wrist device. The stored row is the flagged fetch — a
+stored date is not re-fetched — so on a flagged night the durations are the vendor's
+final ones in 8 of 8 re-seen cases while `sleep_score` is the provisional one. The
+writer stores the night as sent and never drops, alters or promotes it; whether a
+flagged night belongs in an average, and with what label, is a read-side decision.
 
 **SoT ruling — sleep duration/staging (#2921):** Whoop (wrist HRV/motion) and Eight
 Sleep (mattress pressure sensor) each independently measure sleep duration, stage
@@ -1023,6 +1040,8 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `DATE#YYYY-MM-DD#journal#solo_recording#N` | Solo Recording — local-Whisper solo-diary transcript (#1573, numbered/stable-suffix) |
 | `DATE#YYYY-MM-DD#journal#journal#N` | Fallback for unstructured entries without a Template property (numbered) |
 
+`#N` on the multi-per-day templates is a stable suffix — the last 12 hex characters of the Notion page id (#476). Rows written before #476 still carry a positional `#1`, `#2`, …; a row moves to its stable key the next time its page is re-fetched, taking every co-owned attribute with it (below), and no other row of the date is touched (#4631 — the reconcile's rules are in `docs/RUNBOOK.md`, "Notion journal").
+
 **Common fields (all templates):**
 
 | Field | Type | Description |
@@ -1144,6 +1163,8 @@ Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extrac
 | `enriched_defense_context` | string | 1-sentence description of what's being defended against |
 | `enriched_emotional_depth` | number | 1-5 emotional depth rating (1=very surface/avoidant, 5=deep processing) |
 | `defense_enriched_at` | string | ISO timestamp of defense enrichment |
+
+**Co-owned attributes — what a re-ingest carries (#4677).** The ingester rebuilds a journal row from what Notion sent and writes it whole, on first sight of a page and on every later edit. Attributes another pipeline merged onto the row afterwards are copied from the stored row first: every attribute whose name starts with a family declared in `lambdas/ingestion/journal_row_contract.py` (`JOURNAL_ROW_COWRITERS`) — today `enriched_` (journal-enrichment), `vocal_` (the vocal-metrics backfill) and `defense_` (a retired pass). Only attributes the fresh item lacks are copied, so a stored value never replaces one Notion just sent, and nothing outside those families is copied. A pipeline that starts writing onto journal rows declares its family there; `tests/test_journal_row_cowriters_4677.py` fails until it does. If the stored row cannot be read, the row is not rewritten on that run.
 
 **Vocal metrics fields (#1842, `channel` = `video_diary` / `solo_recording` only):**
 
@@ -2039,6 +2060,7 @@ Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM 
 | `consecutive_logging_days` | number | Streak of days with nutrition logged |
 | `habit_streak_t0` | number | Consecutive days all Tier 0 habits completed |
 | `computed_at` | string | ISO timestamp of computation |
+| `computed_lag_days` | number | Pacific days between the row's `date` and the day it was written (#4637). `1` = the scheduled morning-after run; `>= 2` = a late or back-filled recompute (`event["date"]`). Written on scored and sick-day rows alike; absent on rows written before #4637. Trailing windows are anchored on `date + 1` regardless of this value. |
 
 ---
 
@@ -2552,6 +2574,9 @@ Stores Wednesday Chronicle installments by Elena Voss. Also published to S3 blog
 | `thesis` | string | The central argument/idea of this installment |
 | `body` | string | Full article text (HTML) |
 | `word_count` | number | Approximate word count |
+| `stats_line` | string | The week's numbers as one line (the dek under the title; the card engine and the manifest read it here) |
+| `stats` | map | The same numbers, structured (#4191): `weight_lbs`, `week_grade_avg`, `t0_streak_days` — a key is absent when the line does not carry that number; the map is absent when it carries none. Derived from `stats_line` at write (`content.chronicle_schema.stats_fields`) |
+| `content_markdown` | string | The quoted title, a blank line, the body. The model's bracketed stat header is dropped at the store (#4191, `strip_stat_header`); rows written before that still hold it, so reader surfaces go through `chronicle_schema.body_markdown` |
 | `s3_key` | string | S3 path of published blog post |
 | `installment_number` | number | Sequential installment number |
 | `board_interview` | boolean | Whether this installment includes a BoD interview |

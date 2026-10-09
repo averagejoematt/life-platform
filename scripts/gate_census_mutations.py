@@ -1130,6 +1130,29 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard globs site/assets/js on disk, so an untracked module is in scope
     ),
+    "structural::test_journal_row_cowriters_4677.py": MutationSpec(
+        gate_id="structural::test_journal_row_cowriters_4677.py",
+        target="tests/test_journal_row_cowriters_4677.py",
+        detects=(
+            "a NEW pipeline that merges an attribute onto a Notion journal row with update_item and is not declared in "
+            "ingestion/journal_row_contract.py — so the ingester's full-item put erases what it wrote the next time the "
+            "page is edited (#4677: the vocal metrics were the third writer onto a row whose carried set was a hand list of two)"
+        ),
+        plants=(
+            (
+                "scripts/_census_probe_4677.py",
+                # Assembled: the guard this proves sweeps scripts/ for a module that spells the partition
+                # AND a write call, and this module is a file under scripts/.
+                _lit(
+                    'PK = "USER#matthew#SOURCE#',
+                    'notion"\n\n\ndef write(table, sk):\n    table.update',
+                    '_item(Key={"pk": PK, "sk": sk}, UpdateExpression="SET probe_score = :v", ',
+                    'ExpressionAttributeValues={":v": 1})\n',
+                ),
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ mcp/ scripts/ deploy/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1901,6 +1924,25 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "`c.confirmed of c.n` off /api/calibration.coaches with no other marker) is not seen; MCP tools and emails are not "
         "reader pages and are out of scope.",
         proved_on="2026-10-03",
+    ),
+    "structural::test_journal_row_cowriters_4677.py": _proof(
+        "structural::test_journal_row_cowriters_4677.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 5 passed in 0.37s | mutated: 1 failed, 4 passed in 0.38s "
+        ":: tests/test_journal_row_cowriters_4677.py::test_every_module_that_writes_beside_the_journal_partition_is_declared_or_explained "
+        "| reverted: 5 passed in 0.36s",
+        "Covers the SET: every .py under lambdas/ mcp/ scripts/ deploy/ on disk (rglob, archive/ excluded) that spells the "
+        "journal partition key AND issues a DynamoDB write must be a declared co-writer in ingestion/journal_row_contract.py "
+        "or carry a stated reason in the test's NOT_A_JOURNAL_ROW_WRITER (stale entries red too). The same file drives each "
+        "declared co-writer's REAL update expression and reds on an attribute outside its declared families, proves a newly "
+        "declared family is carried with no ingester edit, and pins the ingester's put_item to one function that carries "
+        "first. Hand mutations on 2026-10-05 against the real files, each watched RED and restored: the vocal_ family "
+        "dropped from the contract (5 failed), the same-key carry removed (3 failed), the re-key carry removed (1 failed), "
+        "the one-row-a-day path putting directly (4 failed), the backfill writing an attribute outside vocal_ (2 failed), "
+        "an unreadable stored row rewritten anyway (1 failed), the carry copying every stored attribute (2 failed), a stored "
+        "value overriding the fresh vendor value (1 failed). STILL INVISIBLE, stated: a writer handed a journal row's key by "
+        "another module without spelling the partition itself; a co-writer whose update expression is built somewhere the "
+        "driver does not exercise; `phase`, which is re-derived from the date rather than carried.",
+        proved_on="2026-10-05",
     ),
 }
 

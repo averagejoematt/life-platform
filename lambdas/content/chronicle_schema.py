@@ -117,10 +117,15 @@ def installment_from_stats(title: str, stats: dict, body_markdown: str) -> dict:
 # The model returns the installment as an ENVELOPE: a quoted title line, a blank line,
 # the bracketed machine header ``[Weight: X lbs | Week Grade: avg X | T0 Streak: X days]``,
 # a blank line, then the body. ``parse_installment`` peels the header into the
-# ``stats_line`` field at write time, and the stored ``content_markdown`` keeps the WHOLE
-# envelope — the raw artifact that continuity, the recap, the podcast, the recall index
-# and six deploy scripts all read in that shape. Anything that shows ``content_markdown``
-# to a READER goes through ``body_markdown`` first: the manifest excerpt, the RSS
+# ``stats_line`` field at write time. The envelope is the MODEL's wire format only: the
+# writer's one store chokepoint (emails/chronicle_store.store_installment) drops the
+# bracketed header with ``strip_stat_header`` and writes the numbers as the structured
+# ``stats`` map (``stats_fields``), so a stored ``content_markdown`` is ``"title"`` +
+# body — the shape the Story Desk season rebuild already wrote. The Story Desk's header
+# is ``[Day 4 to Day 10 · 318.9 lbs (…) · 7 training sessions]`` — no ``Weight:`` in it —
+# so nothing here may key on that word alone. Rows stored before this still hold the
+# envelope, so anything that shows ``content_markdown`` to a READER still goes through
+# ``body_markdown`` first: the manifest excerpt, the RSS
 # description, the recall snippet. One derivation, here, shared by the Lambda writer
 # (emails/chronicle_render.py), the restart re-renderer (deploy/restart_leadin_pages.py)
 # and the site build (scripts/v4_build_rss.py) — never a second copy of the strip.
@@ -132,6 +137,9 @@ STAT_LINE_RE = re.compile(r"^\s*\[[^\]]*\]\s*$")
 # The header flowed into whitespace-collapsed text (a recall snippet); a storage cap may
 # have cut it before the closing bracket, so an unterminated tail counts too.
 _STAT_LINE_INLINE_RE = re.compile(r"\[[^\]]*Weight:[^\]]*(?:\]|$)")
+# The same header at the very head of a flowed snippet, whatever its segments are (the
+# Story Desk's carries no "Weight:"). Only applied once the envelope head has matched.
+_STAT_LINE_HEAD_RE = re.compile(r"^\s*\[[^\]]*(?:\]|$)")
 _QUOTED_TITLE_RE = re.compile(r"^\s*[“\"]([^”\"]+)[”\"]\s*$")
 # A recall snippet's head: the indexed text is ``title + subtitle + envelope``, so it
 # opens ``The X Week N of The Measured Life "The X"`` before the first sentence.
@@ -220,8 +228,65 @@ def clean_snippet(text) -> str:
     envelope read clean without a re-embed (the embedded text itself is untouched)."""
     s = " ".join(str(text or "").split())
     s = _STAT_LINE_INLINE_RE.sub(" ", s)
-    s = _SNIPPET_HEAD_RE.sub("", s)
+    s, head = _SNIPPET_HEAD_RE.subn("", s)
+    if head:  # what follows the envelope head is the header slot — bracketed, it is the machine line
+        s = _STAT_LINE_HEAD_RE.sub("", s)
     return " ".join(s.split()).strip()
+
+
+def strip_stat_header(raw_markdown) -> str:
+    """The model's envelope minus its bracketed machine header: ``"title"`` / blank /
+    ``[…]`` / blank / body → ``"title"`` / blank / body. What the writer STORES as
+    ``content_markdown`` (the numbers travel in ``stats_line`` and ``stats``).
+
+    Only the header slot is touched — the first non-blank line after the first line,
+    and only when the whole line is bracketed — so a bracketed line in the body is
+    prose and stays, and text with no header comes back unchanged. Idempotent.
+    """
+    text = str(raw_markdown or "").strip()
+    lines = text.split("\n")
+    n = len(lines)
+    i = 0
+    while i < n and not lines[i].strip():
+        i += 1
+    if i < n and STAT_LINE_RE.match(lines[i]):  # no title line at all — the header is first
+        head: list = []
+    else:
+        head = lines[: i + 1]
+        i += 1
+        while i < n and not lines[i].strip():
+            i += 1
+        if i >= n or not STAT_LINE_RE.match(lines[i]):
+            return text
+    j = i + 1
+    while j < n and not lines[j].strip():
+        j += 1
+    return "\n".join(head + ([""] if head else []) + lines[j:]).strip()
+
+
+_ANY_WEIGHT_RE = re.compile(r"(?:Weight:\s*)?(\d+(?:\.\d+)?)\s*lbs?\b", re.I)
+
+
+def stats_fields(stats_line) -> dict:
+    """The stat line as a structured field — ``{weight_lbs, week_grade_avg,
+    t0_streak_days}`` — holding only the numbers the line actually carries (a key is
+    ABSENT, never zero or null, when its number is not there: the Story Desk's line has
+    a weight and no grade or streak; a prologue's has none). Numbers are returned as
+    ``str``/``int`` so the caller can build a ``Decimal`` without a float round-trip.
+    Reads the same ``stats_line`` the card engine reads — one source, no second parse
+    of the prose."""
+    text = re.sub(r"^\[|\]$", "", str(stats_line or "").strip())
+    out: dict = {}
+    m = _ANY_WEIGHT_RE.search(text)
+    if m:
+        out["weight_lbs"] = m.group(1)
+    m = re.search(r"Week Grade:\s*(?:avg\s*)?(\d+(?:\.\d+)?)", text)
+    if m:
+        out["week_grade_avg"] = m.group(1)
+    m = re.search(r"T0 Streak:\s*(\d+)", text)
+    if m:
+        out["t0_streak_days"] = int(m.group(1))
+    return out
 
 
 # ── #4363: the narrator is an AI character, and she has no real-world career ────
