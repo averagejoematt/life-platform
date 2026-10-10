@@ -112,6 +112,7 @@ def test_the_ledger_holds_a_dated_call_citing_the_dark_cgm_and_keeps_its_record(
         "reason": ABSENT_REASON,
         "instrument": {"source": "apple_health", "datatype": "cgm"},
         "last_seen": CGM_LAST_SEEN,
+        "gap": {"start": CGM_LAST_SEEN, "end": None},  # #4702: the gap it fell in (open)
         "said_on": "2026-09-13",
         "text": "Not quoted: this was said on September 13 and rests on his glucose sensor, which had sent no reading since August 27.",
     }

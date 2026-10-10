@@ -154,9 +154,9 @@ def handle_coach_docket(event, *, _g):
     # is not served — a stake "based on CGM data" from a coach with no CGM is not a
     # position a reader can weigh. The entry names why under `absent`. Resolved history
     # is untouched. Fail-open with a logged warning; the renderer keeps its own guard.
-    try:
-        from health import instrument_presence as _presence
+    from health import instrument_presence as _presence
 
+    try:
         absent = _presence.absent_coaches(_g["table"])
     except Exception as _pe:
         logger.warning(f"[coach_docket] instrument presence check failed (fail-open): {_pe}")
@@ -166,8 +166,9 @@ def handle_coach_docket(event, *, _g):
     # after the sensor's last reading. Every claim (open OR resolved, either coach) that
     # cites a dark instrument and is dated after its last reading is held; the entry names
     # why under `unsourced` (web.claim_sourcing). The concession quotes the loser's claim
-    # verbatim, so it is held by the same rule.
-    dark = claim_sourcing.dark_instruments(absent)
+    # verbatim, so it is held by the same rule. #4702: "dark" is the interval form — a gap
+    # that has since CLOSED still holds what was said inside it (gap_history never raises).
+    dark = claim_sourcing.gap_instruments(absent, _presence.gap_history(_g["table"]))
     try:
         items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
             "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
@@ -472,17 +473,23 @@ PRESENCE_JOB = "__instrument_presence__"
 
 
 def _instrument_presence_safe(*, _g):
-    """`health.instrument_presence.absent_coaches` — the SAME derivation every other
-    claim-sourcing route reads — fail-open (#4217): a sentinel read failing must not take
-    the ledger down, it only means nothing is held. Never raises, so as a `_parallel_fetch`
-    job it can never be counted as a failed coach partition."""
-    try:
-        from health import instrument_presence as _presence
+    """The interval form every other claim-sourcing route reads (#4702) —
+    `claim_sourcing.gap_instruments(absent_coaches, gap_history)` — fail-open (#4217): a
+    sentinel or history read failing must not take the ledger down, it only means less is
+    held. Never raises, so as a `_parallel_fetch` job it can never be counted as a failed
+    coach partition. Both reads ride this ONE job, so the pool still runs one wave."""
+    from health import instrument_presence as _presence
 
-        return _presence.absent_coaches(_g["table"])
+    try:
+        absent = _presence.absent_coaches(_g["table"])
     except Exception as _pe:  # noqa: BLE001
         logger.warning(f"[/api/predictions] instrument presence check failed (fail-open): {_pe}")
-        return {}
+        absent = {}
+    try:
+        return claim_sourcing.gap_instruments(absent, _presence.gap_history(_g["table"]))
+    except Exception as _ge:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument gap history failed (fail-open): {_ge}")
+        return claim_sourcing.gap_instruments(absent)
 
 
 def _parallel_fetch(jobs, *, failures=None):
@@ -984,7 +991,7 @@ def handle_predictions(event, *, _g):
         # had sent no reading by the day they were said keeps its date and its place in
         # the record; its `text` is "" and `unsourced` says why. Before this the call
         # page withheld a claim this ledger still quoted.
-        _dark = claim_sourcing.dark_instruments(fetched.pop(PRESENCE_JOB, None) or {})
+        _dark = fetched.pop(PRESENCE_JOB, None) or []  # #4702: already the interval form
         _fetch_failures[:] = [f for f in _fetch_failures if f != PRESENCE_JOB]
         # #2658: `_parallel_fetch` catches each partition error individually, so a total
         # outage never reached the handler-wide guard below — it produced a fully zeroed
@@ -1133,7 +1140,7 @@ def handle_predictions(event, *, _g):
                             "graded_on_data": _graded_on_data,
                             "subdomain": rec.get("subdomain", ""),
                             # #4701: present only on a held row — the same note shape the docket,
-                            # call and coach routes serve (reason, instrument, last_seen, said_on, text).
+                            # call and coach routes serve (reason, instrument, gap, said_on, text; #4702).
                             **({"unsourced": _held} if _held else {}),
                             # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
                             **({"reader_plain": False} if _plain_label is False else {}),

@@ -56,13 +56,13 @@ from web import claim_sourcing  # noqa: E402
 BET = "bet-20260930-994b3d89f6"
 HELD_SENTENCE = "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
 _WIRE = os.path.join(_REPO, "tests", "fixtures", "calls_wire_4586")
+#: The interval form (#4702) of the live 2026-09-26 state: cgm dark since 2026-08-27, one OPEN gap.
 CGM_DARK = [
     {
         "source": "apple_health",
         "datatype": "cgm",
         "label": "CGM (glucose)",
-        "last_seen": CGM_LAST_SEEN,
-        "reason": ABSENT_REASON,
+        "gaps": [{"start": CGM_LAST_SEEN, "end": None, "reason": ABSENT_REASON}],
     }
 ]
 
@@ -91,6 +91,7 @@ def test_the_specimen_is_held_and_says_why_in_words():
         "reason": ABSENT_REASON,
         "instrument": {"source": "apple_health", "datatype": "cgm"},
         "last_seen": CGM_LAST_SEEN,
+        "gap": {"start": CGM_LAST_SEEN, "end": None},
         "said_on": "2026-09-23",
         "text": HELD_SENTENCE,
     }
@@ -121,18 +122,20 @@ def test_the_domain_word_alone_is_not_a_citation():
 
 
 def test_an_instrument_with_no_reading_on_record_holds_any_dated_citation():
-    dark = [{**CGM_DARK[0], "last_seen": None, "reason": "no sensor recorded"}]
+    dark = [{**CGM_DARK[0], "gaps": [{"start": None, "end": None, "reason": "no sensor recorded"}]}]
     note = claim_sourcing.unsourced([GLUCOSE_DOCKET_CLAIM], "2026-09-23", dark)
     assert note and note["text"].endswith("which had no reading on record.")
 
 
-def test_dark_instruments_reads_the_absent_map_once_per_instrument():
+def test_gap_instruments_reads_the_absent_map_once_per_instrument():
     absent = {
         "glucose_coach": {"source": "apple_health", "datatype": "cgm", "label": "CGM (glucose)", "last_seen": "2026-08-27", "reason": "x"},
         "other": {"source": "apple_health", "datatype": "cgm", "label": "CGM (glucose)", "last_seen": "2026-08-27", "reason": "x"},
     }
-    assert [d["datatype"] for d in claim_sourcing.dark_instruments(absent)] == ["cgm"]
-    assert claim_sourcing.dark_instruments(None) == []
+    rows = claim_sourcing.gap_instruments(absent)
+    assert [d["datatype"] for d in rows] == ["cgm"]
+    assert rows[0]["gaps"] == [{"start": "2026-08-27", "end": None, "reason": "x"}], "one OPEN gap per dark instrument"
+    assert claim_sourcing.gap_instruments(None) == []
 
 
 def test_dated_rows_lose_their_words_not_their_place():
@@ -318,6 +321,7 @@ def test_the_coach_page_and_roster_hold_dated_words_citing_the_dark_sensor(monke
     state.update({"last_seen": CGM_LAST_SEEN, "reason": ABSENT_REASON})
     checked = {"claim": "Nocturnal glucose dips will create a loop between CGM and sleep architecture.", "created_date": "2026-09-09"}
     monkeypatch.setattr(prof, "_absent_coaches", lambda _g: {"glucose_coach": dict(state)})
+    monkeypatch.setattr(prof.instrument_presence, "gap_history", lambda table, now=None, instruments=None: [])  # the open gap decides
     monkeypatch.setattr(latest_checked, "for_coach", lambda table, pid: dict(checked))
     monkeypatch.setattr(
         sac, "_recent_outputs", lambda pid, limit=25: [{"date": "2026-09-26", "summary": GLUCOSE_POSITION_SUMMARY, "themes": ["CGM"]}]
