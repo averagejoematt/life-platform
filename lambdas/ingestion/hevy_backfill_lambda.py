@@ -23,6 +23,11 @@ Architecture (verified against live API + OpenAPI 2026-05-25):
         → walk pages 1..page_count (capped at MAX_PAGES_PER_RUN)
         → on a COMPLETE, error-free walk, set since = poll-start-time; a
           truncated walk keeps the old since so nothing is silently skipped
+          (and, #4643, records a FAILED run so a permanent truncation is visible)
+        → an event failing on QUARANTINE_AFTER consecutive runs is quarantined
+          (USER#system / INGESTION_QUARANTINE#hevy#WORKOUT#<id>) and stops
+          holding the cursor (#4643)
+        → a 401/403 latches the shared auth breaker for 24h (#4643)
 
 Idempotent: same workout id → upsert, no dupe. Page-based pagination
 (NOT cursor) because Hevy's API uses that shape.
@@ -67,6 +72,22 @@ try:
 except ImportError:  # pragma: no cover — layer-module fallback
     _INGEST_HEALTH_AVAILABLE = False
 
+# #4643: the auth circuit breaker. The registry has declared hevy `oauth: True` ("routes
+# through auth_breaker") since #1960, but nothing here ever wrote the marker or emitted
+# IngestAuthHealthy, and a revoked key failed every hourly run three times (two async
+# retries) into the dead-letter queue. With the breaker the first failure latches the
+# marker and the async retries short-circuit to a 200 skip. What reads it: the
+# DIMENSIONLESS fleet alarm `ingest-auth-unhealthy-24h` (any 0 fires it) and, via the
+# liveness sentinel's auth-class failures, `ingest-consecutive-failures-hevy`. There is
+# NO per-source `ingest-auth-unhealthy-hevy` alarm (cdk/stacks/monitoring_stack.py's
+# per-source auth loop does not list hevy) — the Source=hevy twin is emitted unwatched.
+try:
+    from common.auth_breaker import check_breaker, clear_failure, mark_failure
+
+    _HAS_AUTH_BREAKER = True
+except ImportError:  # pragma: no cover — bundle fallback
+    _HAS_AUTH_BREAKER = False
+
 try:
     from common.platform_logger import get_logger
 
@@ -79,6 +100,106 @@ except ImportError:
 # Safety cap. Each page is at most 10 events × max pages = max events per run.
 MAX_PAGES_PER_RUN = int(os.environ.get("HEVY_BACKFILL_MAX_PAGES", "30"))
 PAGE_SIZE = int(os.environ.get("HEVY_BACKFILL_PAGE_SIZE", "10"))
+
+#: #4643: HTTP codes that mean the API key is dead (401 revoked/invalid, 403 the account
+#: lost API access). Read from HevyAPIError.status, never parsed out of the message.
+_AUTH_STATUSES = (401, 403)
+
+#: #4643: one event that fails on this many CONSECUTIVE runs is quarantined — recorded
+#: under USER#system / INGESTION_QUARANTINE#hevy#WORKOUT#<id> and no longer allowed to
+#: hold the cursor. Before this, one
+#: permanently failing event froze `since` forever: every hourly run re-walked the same
+#: window, failed the same event, and never advanced, while newer workouts were still
+#: ingested (idempotent upserts) so nothing downstream looked wrong.
+QUARANTINE_AFTER = int(os.environ.get("HEVY_QUARANTINE_AFTER", "3"))
+#: Stored beside the `since` cursor (USER#system / INGESTION_STATE#hevy), NOT in the hevy
+#: source partition: every reader of USER#matthew#SOURCE#hevy assumes it holds workouts,
+#: and an unbounded `sk >= DATE#…` query (routine_title._query_performed) returned a
+#: QUARANTINE# row there as an empty projected item that counted as one more session.
+QUARANTINE_PK = "USER#system"
+QUARANTINE_SK_PREFIX = f"INGESTION_QUARANTINE#{SOURCE}#WORKOUT#"
+
+
+def _is_auth_failure(exc: Exception) -> bool:
+    """A Hevy call that failed BECAUSE OF the credential (#4643)."""
+    return getattr(exc, "status", None) in _AUTH_STATUSES
+
+
+def _load_event_failures() -> dict | None:
+    """Every quarantine/streak record for hevy, keyed by workout id — one query per run.
+
+    Returns None when the read fails. None means "cannot count", and the caller then
+    treats every event failure as cursor-blocking, exactly as before #4643: quarantine
+    is the one path that lets an event be skipped, so it must fail CLOSED.
+    """
+    try:
+        from boto3.dynamodb.conditions import Key
+
+        kwargs: dict = {"KeyConditionExpression": Key("pk").eq(QUARANTINE_PK) & Key("sk").begins_with(QUARANTINE_SK_PREFIX)}
+        out: dict = {}
+        while True:
+            resp = _table.query(**kwargs)
+            for it in resp.get("Items", []):
+                wid = str(it.get("workout_id") or str(it.get("sk", ""))[len(QUARANTINE_SK_PREFIX) :])  # noqa: E203
+                out[wid] = it
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                return out
+            kwargs["ExclusiveStartKey"] = lek
+    except Exception as e:  # noqa: BLE001
+        logger.warning("hevy quarantine read failed — every event failure blocks the cursor this run: %s: %s", type(e).__name__, e)
+        return None
+
+
+def _note_event_failure(wid: str, ev_type: str, exc: Exception, prior: dict | None) -> bool:
+    """Count one more consecutive failure for `wid`; return True when it is now quarantined.
+
+    The record lives in the USER#system partition, never the hevy source partition, so no
+    workout reader can see it. A failed write returns False — the event then blocks the
+    cursor, never the other way round.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    prior = prior or {}
+    count = int(prior.get("fail_count") or 0) + 1
+    quarantined = bool(prior.get("quarantined")) or count >= QUARANTINE_AFTER
+    item = {
+        "pk": QUARANTINE_PK,
+        "sk": f"{QUARANTINE_SK_PREFIX}{wid}",
+        "workout_id": wid,
+        "event_type": ev_type,
+        "fail_count": count,
+        "first_failed_at": prior.get("first_failed_at") or now,
+        "last_failed_at": now,
+        "last_error": f"{type(exc).__name__}: {exc}"[:500],
+        "quarantined": quarantined,
+    }
+    if quarantined:
+        item["quarantined_at"] = prior.get("quarantined_at") or now
+    try:
+        _table.put_item(Item=item)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("hevy failure-count write failed for %s (event keeps blocking the cursor): %s", wid, e)
+        return False
+    if quarantined:
+        logger.error(
+            "hevy event %s QUARANTINED after %d consecutive failing runs — the cursor may advance past it. "
+            "Inspect pk=%s sk=%s%s; re-ingest by editing the workout in Hevy once fixed. Last error: %s",
+            wid,
+            count,
+            QUARANTINE_PK,
+            QUARANTINE_SK_PREFIX,
+            wid,
+            item["last_error"],
+        )
+    return quarantined
+
+
+def _clear_event_failure(wid: str) -> None:
+    """The event processed cleanly — its failure streak (or quarantine) is over."""
+    try:
+        _table.delete_item(Key={"pk": QUARANTINE_PK, "sk": f"{QUARANTINE_SK_PREFIX}{wid}"})
+    except Exception as e:  # noqa: BLE001
+        logger.warning("hevy failure-count clear failed for %s: %s", wid, e)
 
 
 def _derive_training_notes(rec: dict) -> None:
@@ -316,6 +437,30 @@ def lambda_handler(event: dict, context: Any) -> dict:
         logger.info("cardio-hr rejoin_workout: %s", json.dumps(res, default=str))
         return {"statusCode": 200, "body": json.dumps(res, default=str)}
 
+    # #4643: a latched auth breaker short-circuits the poll for 24h. This is also what the
+    # two async retries of the run that latched it land on, so they return 200 instead of
+    # failing into the dead-letter queue. The skip is a continued FAILURE for liveness —
+    # the streak grows with zero data, the running-but-dead case (notion's idiom).
+    if _HAS_AUTH_BREAKER:
+        marker = check_breaker(_table, source_name=SOURCE, user_id=USER_ID, logger=logger)
+        if marker:
+            logger.warning(
+                "auth_breaker_skip source=hevy marked_at=%s error=%s", marker.get("marked_at"), str(marker.get("error", ""))[:80]
+            )
+            _record_health(attempted=True, succeeded=False, exc="auth")
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "source": "hevy",
+                        "skipped": "auth_failure_circuit_breaker",
+                        "marked_at": marker.get("marked_at"),
+                        "error": marker.get("error"),
+                    },
+                    default=str,
+                ),
+            }
+
     poll_started_at = datetime.now(timezone.utc).isoformat()
     since = load_since()
     is_initial = since == INITIAL_SINCE
@@ -324,15 +469,22 @@ def lambda_handler(event: dict, context: Any) -> dict:
     ingested = 0
     deleted = 0
     errors = 0
+    blocking_errors = 0  # #4643: errors that hold the cursor (a quarantined event does not)
     failed_ids: list[str] = []
+    quarantined_ids: list[str] = []
     pages_walked = 0
     total_pages_observed = 0
     truncated = False
+    event_failures = _load_event_failures()
 
     try:
         page = 1
         while page <= MAX_PAGES_PER_RUN:
             payload = fetch_events_page(since, page=page, page_size=PAGE_SIZE)
+            if page == 1 and _HAS_AUTH_BREAKER:
+                # An authenticated page succeeding IS the proof the key works — clear here
+                # (emits IngestAuthHealthy=1) so a quiet hour also feeds the alarm's recovery.
+                clear_failure(_table, source_name=SOURCE, user_id=USER_ID, logger=logger)
             pages_walked += 1
             total_pages_observed = int(payload.get("page_count", 0))
             events_list = payload.get("events") or []
@@ -374,10 +526,18 @@ def lambda_handler(event: dict, context: Any) -> dict:
                             rec["set_count"],
                             rec["total_volume_kg"],
                         )
+                    if event_failures and wid in event_failures:
+                        _clear_event_failure(wid)
                 except Exception as e:
                     errors += 1
                     failed_ids.append(wid)
                     logger.exception("hevy backfill event error %s: %s", wid, e)
+                    # #4643: count the streak; past QUARANTINE_AFTER the event stops holding
+                    # the cursor. A failed count read (None) means every failure blocks.
+                    if event_failures is not None and _note_event_failure(wid, ev_type, e, event_failures.get(wid)):
+                        quarantined_ids.append(wid)
+                    else:
+                        blocking_errors += 1
                     # Don't break the page loop on one bad record — continue
 
             if total_pages_observed and page >= total_pages_observed:
@@ -397,14 +557,15 @@ def lambda_handler(event: dict, context: Any) -> dict:
                 )
                 break
 
-        # Save new high-water mark only on a COMPLETE, error-free walk.
+        # Save new high-water mark only on a COMPLETE walk with no cursor-blocking error.
         # On failures or truncation we keep the old since so the next run
-        # retries the window (upserts are idempotent — no double-count).
-        if errors == 0 and not truncated:
+        # retries the window (upserts are idempotent — no double-count). A
+        # quarantined event (#4643) is the one failure that does not hold it.
+        if blocking_errors == 0 and not truncated:
             save_since(poll_started_at)
-            logger.info("hevy backfill since advanced to %s", poll_started_at)
+            logger.info("hevy backfill since advanced to %s (quarantined this run: %s)", poll_started_at, quarantined_ids[:10])
         elif truncated:
-            logger.warning(
+            logger.warning(  # #4643: also recorded as a FAILED run below — no longer silent
                 "hevy backfill truncated at %d/%d pages; since NOT advanced (#475). "
                 "Raise HEVY_BACKFILL_MAX_PAGES for a one-off catch-up if the backlog persists.",
                 pages_walked,
@@ -412,14 +573,22 @@ def lambda_handler(event: dict, context: Any) -> dict:
             )
         else:
             logger.warning(
-                "hevy backfill had %d error(s); since NOT advanced. Failed ids: %s",
+                "hevy backfill had %d cursor-blocking error(s) (%d total); since NOT advanced. Failed ids: %s",
+                blocking_errors,
                 errors,
                 failed_ids[:10],
             )
 
     except HevyAPIError as e:
         logger.error("hevy backfill fatal API error: %s", e)
-        _record_health(attempted=True, succeeded=False, exc=e)
+        if _is_auth_failure(e):
+            # #4643: latch the breaker (24h) before raising — the async retries of THIS
+            # event then short-circuit to a 200 skip instead of reaching the DLQ.
+            if _HAS_AUTH_BREAKER:
+                mark_failure(_table, source_name=SOURCE, user_id=USER_ID, error_msg=e, logger=logger)
+            _record_health(attempted=True, succeeded=False, exc="auth")
+        else:
+            _record_health(attempted=True, succeeded=False, exc=e)
         # Raise (not a 200/500 dict) so the Lambda Errors metric + async retry/DLQ
         # paths engage — a swallowed fatal was how Hevy could die invisibly (#466).
         raise
@@ -433,16 +602,27 @@ def lambda_handler(event: dict, context: Any) -> dict:
     # #4412: the wearable usually lands AFTER the Hevy session (WHOOP → Strava → hourly pull), so
     # the join is re-derived every run over the last two Pacific days — written only when it changed.
     cardio_rejoin = _rejoin_cardio_hr()
-    _record_health(attempted=True, succeeded=(errors == 0), exc=None if errors == 0 else "parse")
+    # #4643: a truncated walk is a FAILED run. It used to record success whenever no event
+    # errored, so a backlog the cap could never clear — `since` frozen, every run walking the
+    # same 30 newest pages — read as a healthy source forever. It is not a parse fault; the
+    # walk ran out of capacity, which ingest_health files as "transport".
+    if errors:
+        _record_health(attempted=True, succeeded=False, exc="parse")
+    elif truncated:
+        _record_health(attempted=True, succeeded=False, exc="transport")
+    else:
+        _record_health(attempted=True, succeeded=True, exc=None)
 
     summary = {
         "source": "hevy",
         "initial_run": is_initial,
         "since": since,
-        "new_since": poll_started_at if errors == 0 and not truncated else since,
+        "new_since": poll_started_at if blocking_errors == 0 and not truncated else since,
         "ingested": ingested,
         "deleted": deleted,
         "errors": errors,
+        "blocking_errors": blocking_errors,
+        "quarantined": quarantined_ids[:10],
         "pages_walked": pages_walked,
         "total_pages": total_pages_observed,
         "truncated": truncated,
