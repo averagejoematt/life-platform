@@ -1099,6 +1099,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "standing": "stated_default",
             "note": "Hevy's events feed reports updated and deleted workouts at any age; deletes are tombstoned (#475).",
         },
+        # #4643: opt-in provider reconciliation. Hevy's API has a one-call all-time count
+        # (GET /v1/workouts/count) and no rate-limit degradation, so a daily compare of that
+        # count with the stored, non-tombstoned DATE#…#WORKOUT# rows catches a drop the events
+        # cursor walked past. hevy_backfill_lambda.reconcile, HevyReconciliation rule.
+        "provider_reconcile": True,
     },
     "measurements": {
         "label": "Tape measure",
