@@ -114,6 +114,10 @@ SITE_RULINGS = {
     # #4245: the same one day — Habitify's statuses tell a scheduled supplement miss from no record
     ("nutrition_overview", "_query_source", "'habitify'", "site_api_nutrition.py"): CLAMPED,
     ("nutrition_overview", "_query_source", "'training_reference'", "site_api_nutrition.py"): CROSS,
+    # #4607: /api/edition's narrow reads — the same clamped 30-day windows as their routes.
+    ("edition_nutrition", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
+    ("edition_training", "_query_source", "'strava'", "site_api_training.py"): CLAMPED,  # _experiment_date(30)
+    ("edition_training", "_query_source", "'apple_health'", "site_api_training.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "s", "site_api_nutrition.py"): CLAMPED,  # whoop/habitify/strava over start

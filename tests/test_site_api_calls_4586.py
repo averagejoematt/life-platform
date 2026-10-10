@@ -360,6 +360,12 @@ def _wire(monkeypatch, fail=()):
     monkeypatch.setattr(api, "_docket_rows", lambda prefix, limit, newest_first: docket["resolved" if prefix == "RESOLVED#" else "open"])
     monkeypatch.setattr(api, "EXPERIMENT_START", GENESIS)
     monkeypatch.setattr(api, "datetime", _Clock)
+    # #4673: the route also asks which instruments are dark. This file pins the captured
+    # rows' pages with every sensor reading; tests/test_claim_sourcing_4673.py drives the
+    # dark case over the same wire.
+    from health import instrument_presence
+
+    monkeypatch.setattr(instrument_presence, "absent_coaches", lambda table, now=None, instruments=None: {})
     return api
 
 

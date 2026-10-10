@@ -34,6 +34,7 @@ from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-
 from health import instrument_presence  # #4217: the absent coach — the same liveness /api/source_freshness serves
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 
+from web import claim_sourcing  # #4673: dated words citing a sensor with no reading that day are not quoted
 from web.site_api_common import (
     USER_PREFIX,
     _decimal_to_float,
@@ -543,6 +544,18 @@ def _absent_coaches(_g):
         return {}
 
 
+def _held_positions(dossier, dark):
+    """#4673: the dossier's open docket positions, less any whose words cite a sensor that had
+    sent no reading by the day the item opened. Those are DROPPED, never blanked — the dossier
+    renderer quotes `my_claim` between quotation marks — and counted under `unsourced`; the
+    docket itself (/api/coach_docket) names the held side and why."""
+    if not dark or not isinstance(dossier, dict) or not isinstance(dossier.get("docket_positions"), list):
+        return dossier
+    kept = [p for p in dossier["docket_positions"] if not claim_sourcing.unsourced([p.get("my_claim")], p.get("date"), dark)]
+    held = len(dossier["docket_positions"]) - len(kept)
+    return {**dossier, "docket_positions": kept, "unsourced": held} if held else dossier
+
+
 def handle_coaches(event, *, _g):
     """GET /api/coaches — the roster (CC-01). Shaped-empty 200 by design."""
     _COACH_MODULES = _g["_COACH_MODULES"]
@@ -556,6 +569,7 @@ def handle_coaches(event, *, _g):
         order = persona_registry.OPERATIONAL_COACH_IDS
         coaches = []
         absent = _absent_coaches(_g)
+        dark = claim_sourcing.dark_instruments(absent)  # #4673
         for pid, p in ops.items():
             # #4220: the record is the PREDICTION# ledger's, counted by the ONE producer
             # (coach.coach_record) that /api/calibration, /api/predictions and /api/wrong
@@ -577,7 +591,11 @@ def handle_coaches(event, *, _g):
                     "record": record,  # {confirmed, refuted, n, through} — K of N through <day>
                     "comparison": comparison,  # #4585: what a simple guess scored on the same calls
                     "tier": "staff",
-                    "latest_checked": latest_checked.for_coach(_g["table"], pid),
+                    # #4673: a graded call whose words cite a sensor with no reading on the
+                    # day it was made keeps its line but not its words (`claim` "" + `unsourced`).
+                    "latest_checked": claim_sourcing.scrub_one(
+                        latest_checked.for_coach(_g["table"], pid), dark, day_key="created_date", text_keys=("claim",)
+                    ),
                     # #4217: the coach's domain instrument ({source, datatype} or null) —
                     # registry-derived, served so the renderer reads it rather than keeping
                     # its own table — and whether it is dark right now.
@@ -658,7 +676,13 @@ def handle_coach(event, *, _g):
         # engine's own words ("no sensor since <YYYY-MM-DD>"; the page puts the date in
         # words). History (stance_history, recent_outputs, the dossier) stays: those are
         # dated records, not today's argument.
-        absent_state = None if is_lead else _absent_coaches(_g).get(pid)
+        absent = _absent_coaches(_g)
+        absent_state = None if is_lead else absent.get(pid)
+        # #4673: the dated records #4217 left as history are history — but a record whose
+        # words cite a sensor that had sent no reading by its own date is not quoted, from
+        # this coach or any other (web.claim_sourcing). Liveness is per INSTRUMENT, so the
+        # lead's page is held to it too.
+        dark = claim_sourcing.dark_instruments(absent)
         if absent_state:
             stance = {"source": "absent", "headline_read": "", "stage": {}}
         elif is_lead:
@@ -693,13 +717,17 @@ def handle_coach(event, *, _g):
                 # cast sheet, labelled as authored fiction-design by its own disclosure.
                 "trait_scores": coach_traits.traits_for(pid),
                 # E1 / #4182: "On <date> I said <claim> — it came in at <value>" (null when none graded).
-                "latest_checked": latest_checked.for_coach(_g["table"], pid),
+                "latest_checked": claim_sourcing.scrub_one(
+                    latest_checked.for_coach(_g["table"], pid), dark, day_key="created_date", text_keys=("claim",)
+                ),
                 # #4217: the instrument on the wire + the absence verdict (see above).
                 "instrument": None if is_lead else instrument_presence.served_instrument(pid),
                 "absent": bool(absent_state),
                 "reason": absent_state.get("reason") if absent_state else None,
                 "stance": stance,
-                "stance_history": _stance_history(pid),
+                "stance_history": claim_sourcing.scrub_rows(
+                    _stance_history(pid), dark, day_key="as_of", text_keys=("headline_read", "how_my_read_changed")
+                ),
                 # The lead has no generation voice spec (config/coaches/{id}.json) —
                 # null is the honest value, and the front-end omits the section.
                 "voice": _voice_subset(p["coach_config_key"]) if p.get("coach_config_key") else None,
@@ -709,13 +737,15 @@ def handle_coach(event, *, _g):
                     "quality_trend": _quality_trend(pid),
                     "tuning_log": _tuning_log_for(pid),
                 },
-                "recent_outputs": _recent_outputs(pid),
+                "recent_outputs": claim_sourcing.scrub_rows(
+                    _recent_outputs(pid), dark, day_key="date", text_keys=("summary",), list_keys=("themes",)
+                ),
                 # #1483 (ADR-142 tier 2): semi-private conversation references —
                 # sanctioned fields only; the words exchanged never cross the wire.
                 "conversations": _conversation_references(pid),
                 # #1387: the dossier — what this coach knows, verbatim from COACH#
                 # memory (privacy-filtered, correction-aware, no LLM in the path).
-                "dossier": _dossier_block(pid),
+                "dossier": _held_positions(_dossier_block(pid), dark),
                 # #4188: the lead's daily read lives in its own LEAD_DAILY# row (the CC-08
                 # reflection batch covers staff only). `daily` keeps its string type for
                 # every consumer; `lead_daily` carries the text WITH its cited block.

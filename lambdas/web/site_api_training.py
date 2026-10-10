@@ -92,6 +92,99 @@ def _compute_muscle_volume(hevy_items, num_weeks, start_date=None, end_date=None
     return out
 
 
+def _act_minutes(a):
+    return float(a.get("duration_minutes") or a.get("moving_time_minutes") or (a.get("moving_time_seconds") or 0) / 60 or 0)
+
+
+def _flatten_day_activities(day_items):
+    """Day-level Strava rows -> their activities, each stamped with its row's day (`_day_date`).
+
+    A row with no `activities` list stands in as one activity itself. The stamp is written
+    onto the row's own dicts, as it always was."""
+    out: list[dict[str, Any]] = []
+    for s in day_items:
+        acts = s.get("activities") or []
+        if acts:
+            for a in acts:
+                a["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
+            out.extend(acts)
+        else:
+            # Fallback: treat day record itself as a single activity
+            s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
+            out.append(s)
+    return out
+
+
+def _dedup_whoop(activities):
+    """Deduplicate WHOOP auto-detected activities that overlap with Garmin recordings.
+
+    WHOOP pushes duplicate workouts to Strava (often with 0 distance). If a Garmin activity of
+    the same sport_type exists on the same day, drop the WHOOP duplicate."""
+    by_day_type = {}
+    for a in activities:
+        key = (a.get("_day_date", ""), (a.get("sport_type") or "").lower())
+        by_day_type.setdefault(key, []).append(a)
+    deduped = []
+    for key, group in by_day_type.items():
+        if len(group) > 1:
+            non_whoop = [a for a in group if (a.get("device_name") or "").upper() != "WHOOP"]
+            deduped.extend(non_whoop if non_whoop else [group[0]])
+        else:
+            deduped.extend(group)
+    return deduped
+
+
+_MODALITY_MAP = {
+    "WeightTraining": "strength",
+    "Workout": "strength",
+    "Walk": "walking",
+    "Hike": "hiking",
+    "Ride": "cycling",
+    "VirtualRide": "cycling",
+    "Stretch": "stretching",
+    "Yoga": "stretching",
+    "Soccer": "soccer",
+    "Breathwork": "breathwork",
+}
+_MOD_KEYS = ["strength", "walking", "cycling", "stretching", "soccer", "hiking", "breathwork", "other"]
+
+
+def _daily_modality_minutes(activities_30d, ah_30d, experiment_start: str) -> list:
+    """`daily_modality_minutes_30d`: one row per Pacific day (genesis-clamped, at most 30),
+    minutes per modality from the deduplicated Strava activities plus Apple Health breathwork."""
+    from collections import defaultdict as _dd2
+
+    _daily_mod: dict[str, dict[str, float]] = _dd2(lambda: _dd2(float))
+    for a in activities_30d:
+        _dm_date = a.get("_day_date", "")
+        _dm_sport = a.get("sport_type") or a.get("type") or "Other"
+        _dm_mapped = _MODALITY_MAP.get(_dm_sport, "other")
+        _dm_dur = _act_minutes(a)
+        _daily_mod[_dm_date][_dm_mapped] += _dm_dur
+    # Add Apple Health breathwork minutes
+    for h in ah_30d:
+        _bw_d = h.get("date") or h.get("sk", "").replace("DATE#", "")
+        _bw_min = float(h.get("breathwork_minutes") or 0)
+        if _bw_min > 0:
+            _daily_mod[_bw_d]["breathwork"] += _bw_min
+    daily_modality_minutes_30d = []
+    _exp_start_date = datetime.strptime(experiment_start, "%Y-%m-%d")
+    _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
+    _mod_range = min(30, _days_since_exp)
+    for i in range(_mod_range):
+        dt = datetime.now(PT) - timedelta(days=_mod_range - 1 - i)
+        _dm_d = dt.strftime("%Y-%m-%d")
+        _dm_entry = {"date": _dm_d}
+        _dm_total = 0
+        for _mk in _MOD_KEYS:
+            _mv = round(_daily_mod.get(_dm_d, {}).get(_mk, 0.0))
+            _dm_entry[_mk + "_min"] = _mv
+            _dm_total += _mv
+        _dm_entry["total_min"] = _dm_total
+        daily_modality_minutes_30d.append(_dm_entry)
+    return daily_modality_minutes_30d
+
+
 def training_overview(*, _g) -> dict:
     """
     GET /api/training_overview
@@ -137,49 +230,10 @@ def training_overview(*, _g) -> dict:
         pct = round(wa / z2_target * 100) if (wa is not None and z2_target) else None
         return wa, pct
 
-    # Flatten nested activities lists from day-level Strava records
-    all_activities_30d: list[dict[str, Any]] = []
-    for s in strava_30d:
-        acts = s.get("activities") or []
-        if acts:
-            for a in acts:
-                a["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
-            all_activities_30d.extend(acts)
-        else:
-            # Fallback: treat day record itself as a single activity
-            s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
-            all_activities_30d.append(s)
-
-    # Deduplicate WHOOP auto-detected activities that overlap with Garmin recordings.
-    # WHOOP pushes duplicate workouts to Strava (often with 0 distance). If a Garmin
-    # activity of the same sport_type exists on the same day, drop the WHOOP duplicate.
-    def _dedup_whoop(activities):
-        by_day_type = {}
-        for a in activities:
-            key = (a.get("_day_date", ""), (a.get("sport_type") or "").lower())
-            by_day_type.setdefault(key, []).append(a)
-        deduped = []
-        for key, group in by_day_type.items():
-            if len(group) > 1:
-                non_whoop = [a for a in group if (a.get("device_name") or "").upper() != "WHOOP"]
-                deduped.extend(non_whoop if non_whoop else [group[0]])
-            else:
-                deduped.extend(group)
-        return deduped
-
-    all_activities_30d = _dedup_whoop(all_activities_30d)
-
-    all_activities_90d: list[dict[str, Any]] = []
-    for s in strava_items:
-        acts = s.get("activities") or []
-        if acts:
-            for a in acts:
-                a["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
-            all_activities_90d.extend(acts)
-        else:
-            s["_day_date"] = s.get("date") or s.get("sk", "").replace("DATE#", "")
-            all_activities_90d.append(s)
-    all_activities_90d = _dedup_whoop(all_activities_90d)
+    # Flatten nested activities lists from day-level Strava records, then drop the WHOOP
+    # duplicates (module-level since #4607, shared with `edition_training`).
+    all_activities_30d = _dedup_whoop(_flatten_day_activities(strava_30d))
+    all_activities_90d = _dedup_whoop(_flatten_day_activities(strava_items))
 
     total_workouts_90d = len(all_activities_90d)
     total_workouts_30d = len(all_activities_30d)
@@ -194,9 +248,6 @@ def training_overview(*, _g) -> dict:
     top_activities = sorted(type_counts.items(), key=lambda x: -x[1])[:8]
 
     # Total training minutes and distance (30d)
-    def _act_minutes(a):
-        return float(a.get("duration_minutes") or a.get("moving_time_minutes") or (a.get("moving_time_seconds") or 0) / 60 or 0)
-
     def _act_miles(a):
         if a.get("distance_miles"):
             return float(a["distance_miles"])
@@ -410,47 +461,9 @@ def training_overview(*, _g) -> dict:
     }
 
     # ── V2: Daily modality minutes (30 days) for stacked bar chart ──
-    _MODALITY_MAP = {
-        "WeightTraining": "strength",
-        "Workout": "strength",
-        "Walk": "walking",
-        "Hike": "hiking",
-        "Ride": "cycling",
-        "VirtualRide": "cycling",
-        "Stretch": "stretching",
-        "Yoga": "stretching",
-        "Soccer": "soccer",
-        "Breathwork": "breathwork",
-    }
-    _daily_mod: dict[str, dict[str, float]] = _dd2(lambda: _dd2(float))
-    for a in all_activities_30d:
-        _dm_date = a.get("_day_date", "")
-        _dm_sport = a.get("sport_type") or a.get("type") or "Other"
-        _dm_mapped = _MODALITY_MAP.get(_dm_sport, "other")
-        _dm_dur = _act_minutes(a)
-        _daily_mod[_dm_date][_dm_mapped] += _dm_dur
-    # Add Apple Health breathwork minutes
-    for h in ah_30d:
-        _bw_d = h.get("date") or h.get("sk", "").replace("DATE#", "")
-        _bw_min = float(h.get("breathwork_minutes") or 0)
-        if _bw_min > 0:
-            _daily_mod[_bw_d]["breathwork"] += _bw_min
-    _mod_keys = ["strength", "walking", "cycling", "stretching", "soccer", "hiking", "breathwork", "other"]
-    daily_modality_minutes_30d = []
+    daily_modality_minutes_30d = _daily_modality_minutes(all_activities_30d, ah_30d, EXPERIMENT_START)
     _exp_start_date = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
     _days_since_exp = (datetime.now(timezone.utc) - _exp_start_date.replace(tzinfo=timezone.utc)).days + 1
-    _mod_range = min(30, _days_since_exp)
-    for i in range(_mod_range):
-        dt = datetime.now(PT) - timedelta(days=_mod_range - 1 - i)
-        _dm_d = dt.strftime("%Y-%m-%d")
-        _dm_entry = {"date": _dm_d}
-        _dm_total = 0
-        for _mk in _mod_keys:
-            _mv = round(_daily_mod.get(_dm_d, {}).get(_mk, 0.0))
-            _dm_entry[_mk + "_min"] = _mv
-            _dm_total += _mv
-        _dm_entry["total_min"] = _dm_total
-        daily_modality_minutes_30d.append(_dm_entry)
 
     # Whoop strain (30d)
     whoop_30d = _query_source("whoop", d30, today)
@@ -904,3 +917,48 @@ def workouts(*, _g) -> dict:
             }
         )
     return _ok({"workouts": workouts, "count": len(workouts)}, cache_seconds=900)
+
+
+# ── /api/edition's narrow read (#4607) ─────────────────────────────────────────────
+#: The Strava day-row fields `daily_modality_minutes_30d` depends on: the activities (whole —
+#: the #4419 read seam's multi-device dedup reads their start, device and distance), the day,
+#: the seam's own marker, and the fields a row with no `activities` list is read by when it
+#: stands in as one activity (`_act_minutes`, the sport, the device `_dedup_whoop` checks).
+_EDITION_STRAVA_FIELDS = (
+    "date",
+    "activities",
+    "activities_deduped",
+    "sport_type",
+    "type",
+    "device_name",
+    "duration_minutes",
+    "moving_time_minutes",
+    "moving_time_seconds",
+)
+#: The Apple Health fields the breathwork column reads.
+_EDITION_AH_FIELDS = ("date", "breathwork_minutes")
+
+
+def edition_training(*, _g) -> dict:
+    """`/api/training_overview`'s `daily_modality_minutes_30d` — the one key the front page reads — from two
+    projected reads (#4607).
+
+    The route reads ~790 KB of DynamoDB JSON (90 days of Strava, Garmin, Apple Health twice,
+    Whoop twice, Hevy twice and the training reference) to build a dozen panels; the edition's
+    week block reads only the per-day modality minutes, which come from the 30-day Strava
+    window and Apple Health's breathwork. Same windows, same `_query_source` (so the same
+    phase decision and the same Strava read seam), same flatten → WHOOP dedup → per-day sum
+    — the module-level functions the route itself calls. Returns `{"training": <body subset>}`;
+    a failed read raises and the edition serves the training measure unavailable.
+    """
+    _query_source = _g["_query_source"]
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d30 = _g["_experiment_date"](30)
+    strava_30d = [
+        s
+        for s in _query_source("strava", d30, today, projection=_EDITION_STRAVA_FIELDS)
+        if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30
+    ]
+    ah_30d = _query_source("apple_health", d30, today, projection=_EDITION_AH_FIELDS)
+    minutes = _daily_modality_minutes(_dedup_whoop(_flatten_day_activities(strava_30d)), ah_30d, _g["EXPERIMENT_START"])
+    return {"training": {"daily_modality_minutes_30d": minutes}}

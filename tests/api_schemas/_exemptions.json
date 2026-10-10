@@ -19,10 +19,6 @@
     "category": "write-path",
     "reason": "POST-only \u2014 votes on a challenge (write)"
   },
-  "/api/coach_moves": {
-    "category": "capture-failed",
-    "reason": "#4648 (2026-10-04) \u2014 route not deployed yet, no live GET shape to snapshot (the #1373 /api/character_receipt disposition); post-deploy the driver runs deploy/capture_api_schemas.py --only /api/coach_moves, commits api_coach_moves.json and drops this entry"
-  },
   "/api/cohort_submit": {
     "category": "write-path",
     "reason": "POST-only \u2014 #1394 one-tap weekly cohort single-number submission (write)"

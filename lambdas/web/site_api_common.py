@@ -675,24 +675,30 @@ def _newest_visible(kwargs: dict, derived: bool) -> dict | None:
         kwargs = dict(kwargs, ExclusiveStartKey=last_key)
 
 
-def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool | None = None) -> list:
+def _query_source(source: str, start_date: str, end_date: str, include_pilot: bool | None = None, projection: tuple | None = None) -> list:
     """Query DynamoDB for a source within a date range.
 
     #4088: the phase decision is DERIVED per source (`_resolve_include_pilot`) — a raw
     series reads across every phase inside the caller's date window; an EXPERIMENT_SCOPED
     source keeps the ADR-058 filter. An explicit `include_pilot` wins. A derived read also
     drops superseded (`tombstone=true`) rows.
+
+    #4607: `projection` names the top-level attributes a narrow reader needs. The rows are
+    the SAME rows (same key condition, same filter — DynamoDB filters before it projects,
+    so the phase filter still sees every attribute), carrying only those fields. `sk` and
+    `tombstone` are always projected, so the derived read's tombstone drop and every
+    `date or sk` fallback behave exactly as on a whole read.
     """
     if start_date > end_date:
         return []  # EXPERIMENT_START is in the future — no data yet
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
-    kwargs = with_phase_filter(
-        {
-            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"),
-        },
-        include_pilot=include_pilot,
-    )
+    base: dict = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~")}
+    if projection:
+        fields = list(dict.fromkeys(("sk", "tombstone", *projection)))
+        base["ProjectionExpression"] = ", ".join(f"#qp{i}" for i in range(len(fields)))
+        base["ExpressionAttributeNames"] = {f"#qp{i}": f for i, f in enumerate(fields)}
+    kwargs = with_phase_filter(base, include_pilot=include_pilot)
     # Paginate: a long date range (or large items) can exceed DynamoDB's 1 MB
     # response limit; without the loop, trend endpoints silently truncate.
     items = []

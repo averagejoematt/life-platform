@@ -269,6 +269,22 @@ test("a settled bet says who was right, who was wrong and the result — the los
   assert.match(C.disagreementsHTML(SLEEP, null, NAMES), /not available right now/);
 });
 
+// #4673: /api/coach_docket holds a side whose words cite a sensor that had sent no reading by
+// the day the bet opened — `claims` loses it, `unsourced` names why. The page prints that
+// sentence beside the coach's name where the quote would be; the words never reach it.
+test("a settled bet side the route held prints why beside the name, never the words", () => {
+  const docket = structuredClone(DOCKET);
+  const held = "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.";
+  const bet = docket.resolved.find((d) => d.coach_a === "glucose_coach" || d.coach_b === "glucose_coach");
+  delete bet.claims.glucose_coach;
+  bet.unsourced = { glucose_coach: { reason: "no sensor since 2026-08-27", text: held } };
+  const html = C.disagreementsHTML(GLUCOSE, docket, NAMES);
+  assert.ok(html.includes(`<p class="ck-soft"><b>Amara Patel:</b> ${held}</p>`), html);
+  assert.match(html, /<b>Marcus Webb:<\/b> “Any carb reduction/);
+  assert.doesNotMatch(html, /CGM data/);
+  assert.doesNotMatch(C.disagreementsHTML(GLUCOSE, DOCKET, NAMES), /Not quoted/, "nothing held, nothing said");
+});
+
 test("the character notes are the served ones, marked as the author's design", () => {
   const html = C.personaHTML(SLEEP);
   assert.match(html, /Written by the author as character design\. Not generated day to day, and not a measurement\./);

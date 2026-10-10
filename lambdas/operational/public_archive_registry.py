@@ -121,6 +121,7 @@ SITE_EXCLUDED_SUFFIX_REASON = (
 PARAMETERISED_ROUTES: dict[str, str] = {
     "/api/changes-since": "requires ?ts= — a caller-relative delta, not a standing artefact",
     "/api/coach/": "prefix route requiring a coach id — the roster is archived via /api/coaches",
+    "/api/coach_moves": "takes ?date= — one day's coach lines; whether it joins the archive is held for the owner's ruling (#4615)",
     "/api/coach_timeline": "requires ?coach_id= — per-coach slice of data archived elsewhere",
     "/api/experiment_detail": "requires ?id= — per-experiment slice; the set is archived via /api/experiments",
     "/api/social_context": "requires ?route= — per-route slice of data archived elsewhere",
