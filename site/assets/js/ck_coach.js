@@ -319,11 +319,24 @@ export function verdictsHTML(p) {
 // A bet is a yes-or-no question with a date, built from the docket's criterion; each
 // side is yes or no. What each coach argued is one tap away, in its own words.
 const sideWord = (item, pid) => (item.sides && typeof item.sides[pid] === "boolean" ? (item.sides[pid] ? "yes" : "no") : "");
+// #4673: a side whose words cite a sensor that had sent no reading by the day the bet opened
+// is not quoted; the route serves `unsourced[id].text` instead, and it is printed beside the
+// name in the quote's place. The words are never edited here.
+const heldText = (item, id) => {
+  const held = item.unsourced && Object.prototype.hasOwnProperty.call(item.unsourced, id) ? item.unsourced[id] : null;
+  return held && typeof held.text === "string" ? held.text.trim() : "";
+};
 const argued = (item, pid, names) => {
   const claims = item.claims || {};
+  const who = (id) => (id === pid ? names[pid] || "This coach" : nameOf(names, id));
   const rows = [pid, otherOf(item, pid)]
-    .filter((id) => String(claims[id] || "").trim())
-    .map((id) => `<p class="ck-soft"><b>${esc(id === pid ? names[pid] || "This coach" : nameOf(names, id))}:</b> “${esc(wordDates(claims[id]))}”</p>`)
+    .map((id) =>
+      String(claims[id] || "").trim()
+        ? `<p class="ck-soft"><b>${esc(who(id))}:</b> “${esc(wordDates(claims[id]))}”</p>`
+        : heldText(item, id)
+          ? `<p class="ck-soft"><b>${esc(who(id))}:</b> ${esc(heldText(item, id))}</p>`
+          : "",
+    )
     .join("");
   return rows ? `<details><summary>What each one argued</summary>${rows}</details>` : "";
 };
