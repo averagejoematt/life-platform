@@ -679,6 +679,36 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-13",
     },
+    # #4694: the deterministic audit an UNAPPROVED chronicle must pass before the stale-draft sweep publishes it.
+    # The fixture is the wire: Week 5's own `desk_findings_json`, read back from the live row the 2026-10-09 sweep
+    # published with those findings unresolved.
+    "guard::lambdas/content/autopublish_audit.py": {
+        "gate_name": "lambdas/content/autopublish_audit.py",
+        "command": "python3 -m pytest tests/test_chronicle_autopublish_audit_4694.py -q   # 13 tests; baseline 13 passed",
+        "mutation": (
+            "Three defects planted one at a time in the real tracked tree, each one way to lose the gate. M1: the "
+            "sweep's call site `blocking = _audit_refusal(item)` became `blocking = []` in "
+            "chronicle_approve_lambda.py, so the audit still exists and nothing reads it. M2: the Panel's "
+            '`unsafe += [f"audit: {f}" ...]` line in panelcast_desk.py became `pass`. M3: '
+            '`STYLE_PREFIXES = ("craft:", "repeat:")` became `("",)`, so every finding reads as a style note. '
+            "Each edit changes the file's length, so a stale __pycache__ entry cannot run the original code."
+        ),
+        "observed": (
+            "2026-10-10. M1 RED, 5 failed / 8 passed: the Week 5 specimen held, the no-audit-on-record hold, the "
+            "audit-cannot-run hold, a held week beside an audited one, and the dry-run hold. M2 RED, 1 failed / 12 "
+            "passed: test_the_panel_holds_a_desk_episode_the_desk_left_unaudited. M3 RED, 5 failed / 8 passed, "
+            "including test_style_notes_never_block_and_every_other_finding_does. Restored after each; 13 passed."
+        ),
+        "scope": (
+            "Covers the audit's verdict (desk findings minus craft:/repeat:, no desk record, the reader door re-run "
+            "on the stored text, dated weekdays) and both call sites: the stale-draft sweep and the Panel's desk "
+            "episode. Offline, with the publish side-effects mocked. NOT covered: whether the deployed sweep logs "
+            "the token and whether the `chronicle-autopublish-held` alarm fires. That is the post-deploy proof "
+            "#4694 closes on. Also not covered: the podcast's legacy (non-desk) writer path, which this gate never "
+            "sees."
+        ),
+        "proved_on": "2026-10-10",
+    },
     "guard::deploy/iam_additive_gate.py": {
         "gate_name": "deploy/iam_additive_gate.py",
         "command": (
