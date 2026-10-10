@@ -55,12 +55,14 @@ test("the level says how many areas it came from and the day it is for", () => {
   assert.equal(S.sheetLine({}), "");
 });
 
-test("only earned badges are listed, newest first, each with its date", () => {
+test("only earned badges are listed, newest first, the undated one last", () => {
   const html = S.badgesHTML(achievements);
-  // A badge marked earned with no date to print is not listed ("Lost 20 lbs" in this capture).
-  const earned = achievements.achievements.filter((a) => a.earned && a.earned_date);
+  // Every earned badge is listed and counted, so the count matches summary.earned; one
+  // with no recorded date ("Lost 20 lbs" in this capture) says so and comes last (#4704).
+  const earned = achievements.achievements.filter((a) => a.earned);
   assert.ok(achievements.achievements.some((a) => a.earned && !a.earned_date), "the capture carries an undated earned badge");
-  assert.doesNotMatch(html, /Lost 20 lbs/);
+  assert.equal(earned.length, achievements.summary.earned);
+  assert.match(html, /date not recorded<\/span><span>Lost 20 lbs/);
   assert.equal((html.match(/<li>/g) || []).length, earned.length);
   assert.match(html, new RegExp(`${earned.length} of ${achievements.achievements.length} earned so far\\.`));
   assert.ok(html.indexOf("October 3") < html.indexOf("September 12"), "newest first");
