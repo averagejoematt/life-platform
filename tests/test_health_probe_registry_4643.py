@@ -159,3 +159,15 @@ def test_a_paused_source_is_skipped_by_its_facet_and_everything_else_is_probed(p
         assert stored[fn]["state"] == "paused", fn
     assert body["paused"] == len(paused)
     assert body["passed"] + body["failed"] + body["paused"] == body["total"] == len(phc.PIPELINES)
+
+
+def test_an_enrichment_probe_is_recorded_under_its_own_id_not_its_parents(probe_run):
+    """#4761: the stored row's source_id is what the status page matches against a source;
+    an enrichment function must never carry its parent source's bare id."""
+    _lam, tbl, _body = probe_run
+    stored = {r["function_name"]: r for r in json.loads(tbl.puts[0]["results"])}
+    for fn, _d, src in phc.INGESTION_PROBES:
+        if fn.endswith("-enrichment"):
+            assert stored[fn]["source_id"] == f"{src}:enrichment", fn
+        else:
+            assert stored[fn]["source_id"] == src, fn

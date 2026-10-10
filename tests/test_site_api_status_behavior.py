@@ -846,6 +846,35 @@ def test_a_failed_daily_health_check_turns_its_source_red(monkeypatch):
     assert "health check failed" in c["comment"]
 
 
+def _assert_enrichment_failure_leaves_parent_green(monkeypatch, failure):
+    """#4761: an enrichment function failing to import is not the parent source's ingestion
+    failing. The parent stays on its freshness colour; the failure stays operator-only
+    (counted in `health_check.failed`, never named per source)."""
+    row = _plain_source()
+    b = healthy_platform()
+    b.add(
+        "health_check",
+        days_ago(0),
+        checked_at=FROZEN_NOW.isoformat(),
+        passed=Decimal("20"),
+        failed=Decimal("1"),
+        failures=json.dumps([{k: v.format(id=row["id"]) for k, v in failure.items()}]),
+    )
+    body = Harness(monkeypatch, b.build()).body()
+    c = by_name(body, "data_sources", row["name"])
+    assert c["status"] == "green"
+    assert "health check" not in (c["comment"] or "")
+    assert "enrichment" not in json.dumps(body["health_check"])
+
+
+def test_an_enrichment_probe_failure_leaves_its_parent_source_green(monkeypatch):
+    _assert_enrichment_failure_leaves_parent_green(monkeypatch, {"source_id": "{id}:enrichment", "function_name": "activity-enrichment"})
+
+
+def test_a_pre_4761_enrichment_failure_record_also_leaves_its_parent_green(monkeypatch):
+    _assert_enrichment_failure_leaves_parent_green(monkeypatch, {"source_id": "{id}", "function_name": "activity-enrichment"})
+
+
 def test_a_cloudwatch_alarm_outranks_a_failed_health_check(monkeypatch):
     """Both fire on the same source; the alarm's wording is what a reader gets."""
     row = _alarmable_fresh_source()

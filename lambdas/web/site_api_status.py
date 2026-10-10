@@ -154,6 +154,11 @@ def status(*, _g) -> dict:
             }
             failures = json.loads(hc.get("failures", "[]"))
             for f in failures:
+                # #4761: an enrichment probe failure is not its parent source's ingestion failing.
+                # New records carry "<parent>:enrichment"; the function_name test also covers a
+                # record written before that id existed. Stays in `health_check` counts only.
+                if str(f.get("function_name", "")).endswith("-enrichment") or ":" in str(f.get("source_id", "")):
+                    continue
                 health_check_failures.add(f.get("source_id", ""))
     except Exception as e:
         logger.warning(f"[status] Health check read failed (non-fatal): {e}")
