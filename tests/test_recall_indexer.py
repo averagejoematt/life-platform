@@ -339,6 +339,7 @@ def test_the_autopublish_sweep_indexes_the_week_it_publishes(monkeypatch):
     draft = {"sk": f"DATE#{WEEK_2}", "date": WEEK_2, "status": "draft", "week_number": 1}
     with (
         mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
+        mock.patch.object(mod, "_audit_refusal", return_value=[]),  # #4694: an audited draft — this pins indexing, not the gate
         mock.patch.object(mod, "_publish_to_s3", return_value=[]),
         mock.patch.object(mod, "_invalidate_cloudfront"),
         mock.patch.object(mod, "_commit_recap"),
@@ -363,6 +364,7 @@ def test_indexing_runs_after_the_record_is_marked_published(monkeypatch):
     draft = {"sk": f"DATE#{WEEK_2}", "date": WEEK_2, "status": "draft", "week_number": 1}
     with (
         mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
+        mock.patch.object(mod, "_audit_refusal", return_value=[]),  # #4694: an audited draft — this pins indexing, not the gate
         mock.patch.object(mod, "_publish_to_s3", return_value=[]),
         mock.patch.object(mod, "_invalidate_cloudfront"),
         mock.patch.object(mod, "_commit_recap"),

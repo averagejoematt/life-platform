@@ -234,6 +234,30 @@ def _margaret_haiku_call(system, user, *, _g):
     )
 
 
+def _elena_revision_call(system, user, max_tokens, *, _g):
+    """#4535: Elena's Haiku-tier revision — the WHOLE installment again, so it runs at the
+    measured budget the caller passes (``margaret_editor_pass.revision_max_tokens``), never
+    the critique's flat 1,500 tokens, and it returns ``(text, stop_reason)`` so the pass can
+    refuse a reply the model did not finish. Same model / temperature / cached system
+    prompt as ``_margaret_haiku_call``; only the budget and the stop reason differ.
+
+    No ``timeout`` is passed: ``call_anthropic_raw`` accepts one but ignores it — the real
+    per-attempt limit is the bedrock-runtime client's ``read_timeout`` (180 s,
+    ``ai.bedrock_client``), which already covers an 8,192-token Haiku reply."""
+    from ai.bedrock_client import first_text
+    from common import retry_utils
+
+    body = {
+        "model": _g["AI_MODEL_HAIKU"],
+        "max_tokens": int(max_tokens),
+        "temperature": 0.3,
+        "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+        "messages": [{"role": "user", "content": user}],
+    }
+    resp = retry_utils.call_anthropic_raw(body)
+    return (first_text(resp) or "").strip(), resp.get("stop_reason")
+
+
 def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers, *, _g):
     """#548: Margaret Calloway's red pen. A critique + conditional revision pass
     over Elena's already-drafted, already-grounded (ADR-104) installment —
@@ -265,6 +289,8 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
         due_callbacks = _g["_due_callback_promises"](week_num)
         note_eligible = _mep.editors_note_eligible(_g["_margaret_last_note_date"](), date_str)
         _haiku = _g["_margaret_haiku_call"]
+        _revise = _g["_elena_revision_call"]
+        _revision_budget = _mep.revision_max_tokens(raw_installment)  # #4535: measured from the draft
 
         result = _mep.run_pass(
             raw_installment,
@@ -276,7 +302,8 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
             critique_fn=_haiku,
             # Elena revises in her own voice — elena_prompt IS the system prompt;
             # the revise callable ignores the (unused) system arg run_pass passes it.
-            revise_fn=lambda _system, user: _haiku(elena_prompt, user),
+            # It returns (text, stop_reason): a cut revision falls back to the draft (#4535).
+            revise_fn=lambda _system, user: _revise(elena_prompt, user, _revision_budget),
         )
         if result["revised"]:
             logger.info(f"[margaret] Week {week_num} revised ({result['revision_reason']})")

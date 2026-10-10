@@ -49,7 +49,8 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -68,7 +69,18 @@ import mcp.tools_strength as ts  # noqa: E402
 PK = "USER#matthew#SOURCE#hevy"
 BENCH_TID = "79D0BD87"  # Bench Press (Barbell) -> Chest (primary) + Triceps 0.5 (#4071), pattern Push
 
-_TODAY = ts.pacific_now().date()
+# #4750: a FIXED instant, never the real clock. The old `_TODAY = ts.pacific_now().date()` was read at import
+# while the code under test read the clock at call time, so a CI run crossing Pacific midnight failed with dates
+# one day apart. 23:59:59 PT is the worst edge: one second of real drift would roll the day.
+_TODAY = date(2026, 10, 10)
+_FROZEN_NOW = datetime(2026, 10, 10, 23, 59, 59, tzinfo=ZoneInfo("America/Los_Angeles"))
+
+
+@pytest.fixture(autouse=True)
+def _frozen_pacific_clock(monkeypatch):
+    monkeypatch.setattr(ts, "pacific_now", lambda: _FROZEN_NOW)
+
+
 _EXPERIMENT_DATE = (_TODAY - timedelta(days=3)).isoformat()  # current cycle
 _PILOT_DATE = (_TODAY - timedelta(days=20)).isoformat()  # pre-genesis, INSIDE the 28d window
 _ANCIENT_DATE = (_TODAY - timedelta(days=200)).isoformat()  # pre-genesis, OUTSIDE it

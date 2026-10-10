@@ -525,6 +525,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_iam_twin_free_3336.py",  # #3336: deploy/ tree sweep — no apply script may embed an IAM policy document for a role with a checked-in infra/iam/*.json; the JSON pair is the only apply source
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
+        "test_ingest_ai_budget_rows_4643.py",  # #4643: globs lambdas/ingestion/ + direct imports — a new ingest-path AI caller with no cutoff/ledger row must red pre-merge (~1s)
         # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔
         # lambdas/operational/qa_check_outputs.py). Its verdict is pure repo shape —
         # a producer cron moving without its QA-window mirror must red BEFORE the

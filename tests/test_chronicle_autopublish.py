@@ -50,7 +50,17 @@ def test_missing_or_old_timestamp_is_skipped(mod):
 
 
 def test_sweep_publishes_via_approve_path(mod):
-    draft = {"sk": "DATE#2026-06-10", "date": "2026-06-10", "status": "draft", "generated_at": _iso(72), "week_number": 1}
+    # #4694: only an AUDITED draft publishes itself — the desk's record carries style notes only, and the text is clean
+    draft = {
+        "sk": "DATE#2026-06-10",
+        "date": "2026-06-10",
+        "status": "draft",
+        "generated_at": _iso(72),
+        "week_number": 1,
+        "title": "The Long Middle",
+        "content_markdown": "He trained four times and slept well on the rest days.",
+        "desk_findings_json": json.dumps({"post": ["craft: body is 812 words; the standard is 850-1300"], "episode": []}),
+    }
     with (
         mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
         mock.patch.object(mod, "_publish_to_s3", return_value=["/journal/posts.json"]) as pub,
@@ -67,7 +77,15 @@ def test_sweep_publishes_via_approve_path(mod):
 
 
 def test_sweep_dry_run_publishes_nothing(mod):
-    draft = {"sk": "DATE#2026-06-10", "date": "2026-06-10", "status": "draft", "generated_at": _iso(72), "week_number": 1}
+    draft = {
+        "sk": "DATE#2026-06-10",
+        "date": "2026-06-10",
+        "status": "draft",
+        "generated_at": _iso(72),
+        "week_number": 1,
+        "content_markdown": "He trained four times.",
+        "desk_findings_json": json.dumps({"post": [], "episode": []}),  # #4694: an audited draft
+    }
     with (
         mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
         mock.patch.object(mod, "_publish_to_s3") as pub,
