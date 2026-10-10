@@ -235,6 +235,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
+        "test_upstream_changes_4638.py",  # #4638: rglob sweep — a new Apple Health rebuild-a-day caller falsifies the stated upstream_changes facet
         "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted
         "test_journal_row_cowriters_4677.py",  # #4677: rglob sweep — a module that names the journal partition and writes must be a declared co-writer, or its attributes are erased on re-ingest
         "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
