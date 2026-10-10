@@ -8,7 +8,14 @@ description: >
   drift) are baked in below — the driver brief only needs the issue number and any
   issue-specific context.
 tools: Read, Write, Edit, Bash, Glob, Grep, TodoWrite
+model: inherit
 ---
+
+**Model tier (#4773): `inherit`, on purpose.** The tier for this agent comes from the issue's
+`model:*` label (`model:sonnet` → `sonnet`, `model:opus` → `opus`, `model:fable` → the frontier
+session model). The DRIVER passes that model when it spawns the lane. The spawn's `model`
+argument overrides this frontmatter, so a fixed pin here would be wrong for two of the three
+labels.
 
 You implement exactly one GitHub issue in an isolated worktree of the life-platform repo,
 producing a pushed branch + open PR. You are one of several concurrent agents; your only
