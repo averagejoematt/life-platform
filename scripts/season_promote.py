@@ -15,6 +15,11 @@ owner approved. Every write goes through a path the platform already owns:
   3. LEDGER   one LEDGER#{date} row per installment — the season memory the next week reads.
   4. PAGES    deploy/restart_leadin_pages.run(apply=True) re-renders every journal page and
               the manifest from DDB through the live template (+ CloudFront invalidation).
+  4b. EFFECTS  chronicle-approve's publish-time side effects through its OWN function
+              (chronicle_approve_lambda.publish_side_effects, #4593): the share kit built from the rebuilt row and the
+              recall index run; recap/ledger/panel/mark-published are declined because a step here owns them; delivery
+              is declined — with a no-send decision stamped on the row — unless the owner passes --deliver.
+              ``--effects-only --weeks N --apply`` re-runs just this for already-published rows (the week-4 repair).
   5. PANEL    synthesize each episode with the Panel's own voices and style, publish through
               its own audio publisher, write transcripts, rewrite episodes.json + feed.xml
               through its own index writer, delete the holds and the July placeholder stubs,
@@ -56,7 +61,19 @@ CHRONICLE_PK = "USER#matthew#SOURCE#chronicle"
 PANEL_PK = "USER#matthew#SOURCE#panelcast"
 PANEL_PREFIX = "generated/panelcast"
 HOLD_PREFIX = "panelcast-holds"
-STEPS = ("backup", "chronicle", "ledger", "pages", "panel", "recap")
+STEPS = ("backup", "chronicle", "ledger", "pages", "effects", "panel", "recap")
+
+# #4593: what the promote declines of chronicle-approve's publish-time side effects, and why. Every other effect in
+# chronicle_approve_lambda.SIDE_EFFECTS RUNS (today: s3_artifacts — the share kit this script builds from the rebuilt
+# row — and recall_index). A new side effect added there runs here too unless it is named below with a reason.
+PROMOTE_DECLINES = {
+    "recap": "the promote's recap step rebuilds RECAP#latest from every corrected installment",
+    "ledger": "the promote's ledger step wrote LEDGER# from the audited staging; the row's desk ledger predates the rebuild",
+    "mark_published": "the promote's chronicle step wrote status=published in place",
+    "elena_state": "a multi-week promote would fire her updater out of order; re-run elena-state-updater for the newest week by hand",
+    "panel_podcast": "the promote's panel step publishes this season's episodes itself",
+}
+NO_DELIVER_REASON = "season promote without --deliver: a rebuilt or corrected installment is not mailed unless the owner passes --deliver"
 
 # week → the chronicle row it rebuilds (the sk never moves: the URL slot is sequenced over sks)
 ROWS = {0: "DATE#2026-02-28", 1: "DATE#2026-09-08", 2: "DATE#2026-09-15", 3: "DATE#2026-09-22", 4: "DATE#2026-09-29"}
@@ -306,6 +323,70 @@ def apply_pages() -> None:
     restart_leadin_pages.run(apply=True)
 
 
+def share_kit_json(row: Dict[str, Any], installments: List[Dict[str, Any]]) -> str:
+    """#4593: the week's share kit built from the REBUILT row — the draft kit the approve path would write was built
+    from the superseded draft and is dropped with the other draft_* fields. Slug and label come from the same
+    (date, sk) sequence restart_leadin_pages renders the pages at, so the kit lands at the post's own week-NN."""
+    import restart_leadin_pages as rlp
+    from content import chronicle_share_kit
+    from privacy import privacy_guard
+
+    date_str = str(row.get("date") or str(row.get("sk", "")).replace("DATE#", ""))
+    week = int(row.get("week_number", 0) or 0)
+    all_dates = sorted(x.get("date", "") for x in installments if x.get("date", ""))
+    all_keys = rlp.installment_keys(installments)
+    listed_keys = rlp.installment_keys([x for x in installments if not x.get("unlisted")])
+    sk = str(row.get("sk", ""))
+    seq = rlp.seq_for(date_str, all_dates, week, sk=sk, all_keys=all_keys)
+    label = "From the archive" if row.get("unlisted") else rlp.series_label(date_str, all_dates, week, sk=sk, all_keys=listed_keys)
+    kit = chronicle_share_kit.build_kit(
+        title=row.get("title", ""),
+        stats_line=rlp.display_stats_line(row.get("stats_line", ""), date_str),
+        label=label,
+        date_str=date_str,
+        canonical_url=rlp.CANONICAL_URL_FMT.format(seq=seq),
+        excerpt_source=rlp.body_markdown_from_record(row),
+        week_number=week,
+    )
+    privacy_guard.assert_clean(kit.get("caption", ""), context=f"share kit {sk}")  # parity with the Wednesday writer
+    return json.dumps(kit)
+
+
+def effects_plan(deliver: bool) -> Dict[str, str]:
+    """The decline map this promote passes to publish_side_effects."""
+    decline = dict(PROMOTE_DECLINES)
+    if not deliver:
+        decline["delivery"] = NO_DELIVER_REASON
+    return decline
+
+
+def apply_effects(sks: List[str], deliver: bool = False) -> Dict[str, Dict[str, str]]:
+    """#4593: run — or decline by name, with a reason — every publish-time side effect chronicle-approve runs, through
+    the SAME function (chronicle_approve_lambda.publish_side_effects). Before this, the promote wrote the row and ran
+    none of them: week 4 shipped with no share kit and no email and no recorded decision not to send one."""
+    import boto3
+    import chronicle_approve_lambda as approve
+    import restart_leadin_pages as rlp
+
+    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    installments = rlp.fetch_visible_installments(table)
+    decline = effects_plan(deliver)
+    results: Dict[str, Dict[str, str]] = {}
+    for sk in sks:
+        row = table.get_item(Key={"pk": CHRONICLE_PK, "sk": sk}).get("Item")
+        if not row or row.get("status") != "published":
+            raise SystemExit(f"EFFECTS {sk}: row is {'missing' if not row else row.get('status')!r}, not published — refusing")
+        fresh = next((x for x in installments if x.get("sk") == sk), row)
+        item = dict(row)
+        for f in DRAFT_FIELDS:  # only the kit is written: never a superseded draft page or manifest
+            item.pop(f, None)
+        item["draft_share_kit_json"] = share_kit_json(fresh, installments)
+        date_str = str(row.get("date") or sk.replace("DATE#", ""))
+        results[sk] = approve.publish_side_effects(item, date_str, decline=decline)
+        print(f"EFFECTS {sk}: " + ", ".join(f"{k}={v}" for k, v in results[sk].items()))
+    return results
+
+
 def apply_panel(staging: str, weeks: List[int]) -> None:
     import boto3
     import coach_panel_podcast_lambda as panel
@@ -528,8 +609,20 @@ def audit_gate(staging: str, weeks: List[int]) -> List[str]:
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--staging", required=True)
+    ap.add_argument("--staging", default=None, help="the staging folder (required except with --effects-only)")
     ap.add_argument("--weeks", default="0-4")
+    ap.add_argument(
+        "--deliver",
+        action="store_true",
+        help="#4593: OWNER DECISION — let the effects step invoke chronicle-email-sender (one week only). Without it, "
+        "delivery is declined and a no-send decision is stamped on each row.",
+    )
+    ap.add_argument(
+        "--effects-only",
+        action="store_true",
+        help="#4593 repair: run only the publish-time side effects for already-published rows (no staging, no audit "
+        "gate — nothing is republished). Dry-run unless --apply.",
+    )
     ap.add_argument("--apply", action="store_true", help="OWNER ACT: perform the publish")
     ap.add_argument("--only", default=",".join(STEPS), help=f"comma list of steps from {STEPS}")
     ap.add_argument("--backup-dir", default=None)
@@ -543,6 +636,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     os.environ.setdefault("AWS_MAX_ATTEMPTS", "1")
     a, _, b = args.weeks.partition("-")
     weeks = list(range(int(a), int(b or a) + 1))
+    if args.deliver and len(weeks) != 1:
+        # chronicle-email-sender mails the newest installment of the last 7 days, not a named one
+        raise SystemExit("--deliver takes exactly one week (the sender mails the newest installment, not a named one)")
+    if args.effects_only:
+        sks = [ROWS[w] for w in weeks]
+        print(json.dumps({"effects_for": sks, "decline": effects_plan(args.deliver)}, indent=1))
+        if not args.apply:
+            print("\nDRY RUN — nothing written. Re-run with --apply (owner act).")
+            return 0
+        apply_effects(sks, deliver=args.deliver)
+        return 0
+    if not args.staging:
+        raise SystemExit("--staging is required (except with --effects-only)")
     if args.audit_hashes:
         hashes = staged_hashes(args.staging, weeks)
         print(json.dumps(hashes, indent=1))
@@ -579,6 +685,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         apply_ledger(args.staging, weeks)
     if "pages" in steps:
         apply_pages()
+    if "effects" in steps:
+        apply_effects([ROWS[w] for w in weeks], deliver=args.deliver)
     if "panel" in steps:
         apply_panel(args.staging, weeks)
     if "recap" in steps:

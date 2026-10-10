@@ -466,6 +466,25 @@ def _fetch_prediction_partition(coach_pk, *, _g):
     return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
 
 
+#: #4701: the `_parallel_fetch` job key /api/predictions reads instrument presence under.
+#: Not a short coach id, so it can never collide with a partition key.
+PRESENCE_JOB = "__instrument_presence__"
+
+
+def _instrument_presence_safe(*, _g):
+    """`health.instrument_presence.absent_coaches` — the SAME derivation every other
+    claim-sourcing route reads — fail-open (#4217): a sentinel read failing must not take
+    the ledger down, it only means nothing is held. Never raises, so as a `_parallel_fetch`
+    job it can never be counted as a failed coach partition."""
+    try:
+        from health import instrument_presence as _presence
+
+        return _presence.absent_coaches(_g["table"])
+    except Exception as _pe:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument presence check failed (fail-open): {_pe}")
+        return {}
+
+
 def _parallel_fetch(jobs, *, failures=None):
     """Run {key: thunk} concurrently; a failed job logs and yields [] (the same
     shaped-empty degradation the old sequential per-coach try/except gave).
@@ -954,10 +973,19 @@ def handle_predictions(event, *, _g):
         # #1527: fetch every scanned coach's partition concurrently up front —
         # the loop below stays purely computational.
         _fetch_failures: list = []
-        fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches},
-            failures=_fetch_failures,
-        )
+        _jobs = {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+        # #4701: the instrument-presence read rides the SAME concurrent round as the
+        # partitions (8 coaches + 1 = the pool's 9 workers, one wave), so the #4673 hold
+        # costs this #1527-guarded path no serial round trip. It never raises.
+        _jobs[PRESENCE_JOB] = lambda: _instrument_presence_safe(_g=_g)
+        fetched = _parallel_fetch(_jobs, failures=_fetch_failures)
+        # #4701: the sourcing hold every other route that quotes a dated coach claim
+        # applies (web.claim_sourcing, #4673). A row whose words cite an instrument that
+        # had sent no reading by the day they were said keeps its date and its place in
+        # the record; its `text` is "" and `unsourced` says why. Before this the call
+        # page withheld a claim this ledger still quoted.
+        _dark = claim_sourcing.dark_instruments(fetched.pop(PRESENCE_JOB, None) or {})
+        _fetch_failures[:] = [f for f in _fetch_failures if f != PRESENCE_JOB]
         # #2658: `_parallel_fetch` catches each partition error individually, so a total
         # outage never reached the handler-wide guard below — it produced a fully zeroed
         # scorecard at HTTP 200, which is the exact "absence rendered as zero" this issue
@@ -1071,40 +1099,46 @@ def handle_predictions(event, *, _g):
                             continue
 
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
-                    _row = {
-                        "coach_id": cid,
-                        "coach_name": _pred_coach_names[cid],
-                        "retired": cid in _RETIRED_SHORT_IDS,
-                        "text": rec.get("claim_natural", ""),
-                        "confidence": rec.get("confidence", "medium"),
-                        "status": p_status,
-                        "date": rec.get("created_date", ""),
-                        # #3480: `date` is the EFFECTIVE date (genesis for a
-                        # pre-registered claim — the window it grades from), not
-                        # the moment the coach committed. Serve the freeze instant
-                        # too, so the page can say "made <freeze> · from <genesis>"
-                        # instead of labelling a claim frozen on 09-04 as made on a
-                        # date that has not happened yet (ADR-104: a made-date is
-                        # when it was made). None for in-cycle coach calls, whose
-                        # created_date IS the event time.
-                        "pre_registered_at": rec.get("pre_registered_at"),
-                        # #3511: sealed vs in-cycle, as a boolean the table can render
-                        # without re-deriving it from a nullable timestamp.
-                        "pre_registered": bool(rec.get("pre_registered")),
-                        "due_date": due,
-                        "gradeable": not ungradeable,
-                        "metric": ev.get("metric"),
-                        "eval_type": ev.get("type"),
-                        "outcome_notes": rec.get("outcome_notes") or "",  # kept for compatibility — the grader's raw blob
-                        # #4220: the reason in reader words (None when the grader wrote none)
-                        # and whether a verdict came back from the data at all.
-                        "reason": _reason,
-                        "graded_on_data": _graded_on_data,
-                        "subdomain": rec.get("subdomain", ""),
-                    }
-                    if _plain_label is False:
-                        _row["reader_plain"] = False  # #4714: a sealed bet in words the page labels, never drops
-                    all_predictions.append(_row)
+                    _said = rec.get("claim_natural", "")
+                    _held = claim_sourcing.unsourced([_said], claim_sourcing.claim_day(rec), _dark) if _dark else None
+                    all_predictions.append(
+                        {
+                            "coach_id": cid,
+                            "coach_name": _pred_coach_names[cid],
+                            "retired": cid in _RETIRED_SHORT_IDS,
+                            "text": "" if _held else _said,  # #4701: held words are removed, never edited
+                            "confidence": rec.get("confidence", "medium"),
+                            "status": p_status,
+                            "date": rec.get("created_date", ""),
+                            # #3480: `date` is the EFFECTIVE date (genesis for a
+                            # pre-registered claim — the window it grades from), not
+                            # the moment the coach committed. Serve the freeze instant
+                            # too, so the page can say "made <freeze> · from <genesis>"
+                            # instead of labelling a claim frozen on 09-04 as made on a
+                            # date that has not happened yet (ADR-104: a made-date is
+                            # when it was made). None for in-cycle coach calls, whose
+                            # created_date IS the event time.
+                            "pre_registered_at": rec.get("pre_registered_at"),
+                            # #3511: sealed vs in-cycle, as a boolean the table can render
+                            # without re-deriving it from a nullable timestamp.
+                            "pre_registered": bool(rec.get("pre_registered")),
+                            "due_date": due,
+                            "gradeable": not ungradeable,
+                            "metric": ev.get("metric"),
+                            "eval_type": ev.get("type"),
+                            "outcome_notes": rec.get("outcome_notes") or "",  # kept for compatibility — the grader's raw blob
+                            # #4220: the reason in reader words (None when the grader wrote none)
+                            # and whether a verdict came back from the data at all.
+                            "reason": _reason,
+                            "graded_on_data": _graded_on_data,
+                            "subdomain": rec.get("subdomain", ""),
+                            # #4701: present only on a held row — the same note shape the docket,
+                            # call and coach routes serve (reason, instrument, last_seen, said_on, text).
+                            **({"unsourced": _held} if _held else {}),
+                            # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
+                            **({"reader_plain": False} if _plain_label is False else {}),
+                        }
+                    )
             except Exception as _qe:
                 logger.warning(f"[/api/predictions] {cid}: {_qe}")
 
