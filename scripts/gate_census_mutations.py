@@ -1153,6 +1153,22 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard rglobs lambdas/ mcp/ scripts/ deploy/ on disk, so an untracked module is in scope
     ),
+    "structural::test_key_rotator_grants_4707.py": MutationSpec(
+        gate_id="structural::test_key_rotator_grants_4707.py",
+        target="tests/test_key_rotator_grants_4707.py",
+        detects=(
+            "a NEW Secrets Manager rotation Lambda (it handles the finishSecret step) that is not registered with its "
+            "policy function and rotated secret, so nothing checks that its sm.<method> calls are granted (#4707: the "
+            "key rotator called update_secret_version_stage for seven months on a role that never granted it)"
+        ),
+        plants=(
+            (
+                "lambdas/operational/_census_probe_4707.py",
+                'STEPS = {"' + "finish" + 'Secret": None}\n',
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1943,6 +1959,22 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "another module without spelling the partition itself; a co-writer whose update expression is built somewhere the "
         "driver does not exercise; `phase`, which is re-derived from the date rather than carried.",
         proved_on="2026-10-05",
+    ),
+    "structural::test_key_rotator_grants_4707.py": _proof(
+        "structural::test_key_rotator_grants_4707.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 7 passed in 0.25s | mutated: 1 failed, 6 passed in 0.27s "
+        ":: tests/test_key_rotator_grants_4707.py::test_every_rotation_lambda_is_registered | reverted: 7 passed in 0.25s",
+        "Covers the SET: every .py under lambdas/ on disk (rglob) that handles the Secrets Manager finishSecret step is "
+        "registered in ROTATION_LAMBDAS, and for each one every method called on a boto3.client('secretsmanager') handle is "
+        "mapped through botocore's service model to its API operation and must be granted by a statement in the registered "
+        "policy function whose resource is _secret_arn(<rotated secret>). Hand mutation on 2026-10-10 against the real policy: "
+        "deleting secretsmanager:UpdateSecretVersionStage from operational_key_rotator() (the pre-fix #4707 statement) reds "
+        "test_every_secretsmanager_call_of_every_rotation_lambda_is_granted; in-file controls red on the wrong-secret scope, "
+        "a newly added call and an unknown method. STILL INVISIBLE, stated: a Secrets Manager client reached through a helper "
+        "or another module's handle (only names bound to boto3.client('secretsmanager') in the Lambda file are read); "
+        "grants that live outside the policy function (the create_platform_lambda baseline) are not credited, so such a "
+        "call would red rather than pass; a resource-policy or KMS denial is not modelled.",
+        proved_on="2026-10-10",
     ),
 }
 
