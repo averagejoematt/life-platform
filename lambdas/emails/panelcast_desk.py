@@ -5,8 +5,11 @@ memory. Facade state via `_g` (the module's live globals), the #1654 split shape
 """
 
 import json
+import re
 
 from content import story_checks
+
+_PLACEHOLDER = re.compile(r"^week\s*\d+$", re.I)
 
 
 def door_reasons(text: str) -> list:
@@ -23,8 +26,13 @@ def door_safe(text: str) -> str:
 def episode_title(post: dict, ep: dict) -> str:
     """The episode carries its chapter's title (#4674): the desk writes the episode's own title separately, so the two
     drifted ("Nine Days and No Rest" / "Nine Days and Counting"). The chapter is what the reader sees first and what
-    the journal index prints; the episode falls back to its own title only when the chapter has none."""
-    return post.get("title") or ep.get("title") or ""
+    the journal index prints; the episode falls back to its own title only when the chapter has none. A bare
+    "Week N" is the Panel's placeholder for a week with no published chapter (``_select_week_post``), not a title.
+    Both writers — the desk here and the legacy writer in coach_panel_podcast_lambda — title through this one rule."""
+    chapter = str(post.get("title") or "").strip()
+    if _PLACEHOLDER.match(chapter):
+        chapter = ""
+    return chapter or str(ep.get("title") or "").strip()
 
 
 def desk_episode(post: dict, *, _g) -> dict | None:

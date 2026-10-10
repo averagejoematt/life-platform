@@ -217,9 +217,12 @@ _BACKSTAGE = re.compile(r"\b(?:the desk|desk (?:flagged|noted|says)|dossier|stor
 
 # Terms the reader-vocabulary registry (site/data/glossary.json) rules "cut": a Lambda cannot read the site tree, so
 # this is a copy, and tests/test_story_door_pace_flag_4674.py holds it inside the registry's cut terms (#4674).
+# A word gap matches any spelling a writer or a field name reaches for: "pace flag", "pace_flag", "pace-flag" (the
+# non-breaking and en-dash hyphens too).
 _CUT_TERMS = ("pace flag",)
 _CUT_RES = tuple(
-    (t, re.compile(r"(?<![A-Za-z0-9])" + re.escape(t).replace(r"\ ", r"[\s_]") + r"(?![A-Za-z0-9])", re.I)) for t in _CUT_TERMS
+    (t, re.compile(r"(?<![A-Za-z0-9])" + re.escape(t).replace(r"\ ", r"[\s_\-\u2010\u2011\u2013]+") + r"(?![A-Za-z0-9])", re.I))
+    for t in _CUT_TERMS
 )
 
 # An export lag narrated as a behaviour (#4532). The dossier marks such days NOT_YET_EXPORTED;
@@ -233,8 +236,9 @@ _ABSENCE_AS_BEHAVIOUR = [
 
 def reader_surface(text: str, *, constructed: bool = False) -> List[str]:
     """THE shared reader-surface check (#4538): findings for a cycle/reset/attempt count (ordinal or cardinal,
-    title or body) and for off-record specifics. Pure and deterministic, so every publishing path can afford
-    it at its own chokepoint: the chronicle handler, the recap, the Panel's per-line gate and its titles.
+    title or body), for off-record specifics, and for a term the reader-vocabulary registry cuts (#4674). Pure and
+    deterministic, so every publishing path can afford it at its own chokepoint: the chronicle handler, the recap,
+    the Panel's per-line gate and its titles.
 
     ``constructed=True`` is for a surface with no free prose — a card, a caption, a hashtag line (the recap
     cards' own rule, ``web/recap_layouts``): there the frame word itself is refused, count or no count."""
@@ -245,6 +249,11 @@ def reader_surface(text: str, *, constructed: bool = False) -> List[str]:
     for what, pat in _OFF_RECORD:
         for m in pat.finditer(text or ""):
             findings.append(f"off-record: {what} stays out of reader copy: {m.group(0)!r}")
+    # #4674: a registry-cut term at the final publish check, not only the desk writers' door — the chronicle handler,
+    # the recap and the Panel's titles, excerpts and spoken lines all pass through here.
+    for term, rx in _CUT_RES:
+        for m in rx.finditer(text or ""):
+            findings.append(f"vocabulary: {m.group(0)!r} is a term the site does not use with readers ({term!r} is cut in the registry)")
     return findings
 
 
@@ -257,9 +266,6 @@ def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
     findings = reader_surface(text)
     for m in _BACKSTAGE.finditer(text or ""):
         findings.append(f"backstage: {m.group(0)!r} is the machinery's word, not the reader's — say what the data shows")
-    for term, rx in _CUT_RES:
-        for m in rx.finditer(text or ""):
-            findings.append(f"vocabulary: {m.group(0)!r} is a term the site does not use with readers ({term!r} is cut in the registry)")
     if list(not_yet_exported):
         for pat in _ABSENCE_AS_BEHAVIOUR:
             for m in pat.finditer(text or ""):
