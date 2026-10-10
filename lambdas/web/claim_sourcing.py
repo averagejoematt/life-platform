@@ -81,6 +81,26 @@ def _day(value: Any) -> str | None:
     return text if _DAY_RE.match(text) else None
 
 
+def claim_day(row: Mapping[str, Any] | None) -> str | None:
+    """The day a PREDICTION# row's `claim_natural` was SAID, or None when the row does not say.
+
+    `created_date` when the row carries one. A dispute-docket row (`source ==
+    "dispute_docket"`, `coach.dispute_docket._write_docket_prediction`) carries none — its
+    words are the docket claim, said on the docket's `opened_date`, which the writer stamps
+    as the trailing `YYYY-MM-DD` of `prediction_id` (`docket-<ref>-<opened_date>`; the same
+    suffix `/api/calls` matches a docket row by). Read, never guessed: any other shape is
+    None, and an undated text is quoted (#4701)."""
+    if not isinstance(row, Mapping):
+        return None
+    day = _day(row.get("created_date"))
+    if day:
+        return day
+    pid = str(row.get("prediction_id") or "")
+    if row.get("source") == "dispute_docket" and pid.startswith("docket-"):
+        return _day(pid[-10:])
+    return None
+
+
 def dark_instruments(absent: Mapping[str, Mapping[str, Any]] | None) -> list[dict]:
     """The distinct dark instruments behind an `absent_coaches()` map, each as
     {source, datatype, label, last_seen, reason}. Order is the map's; one row per instrument."""

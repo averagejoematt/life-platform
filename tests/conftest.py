@@ -238,6 +238,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted
         "test_journal_row_cowriters_4677.py",  # #4677: rglob sweep — a module that names the journal partition and writes must be a declared co-writer, or its attributes are erased on re-ingest
         "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
+        "test_predictions_sourcing_hold_4701.py",  # #4701: glob sweep — every lambdas/web claim_natural reader applies claim_sourcing or names its exemption
         "test_coach_count_comparison_guard_4585.py",  # #4585: glob/rglob sweep — every site/ module + inline script that shows a coach count renders its comparison
         "test_built_page_facts_4586.py",  # #4586: every static fact on the "How it's built" page against its source (model, governor, workflows, incident log) — repo tree only
         "test_coach_baseline_4585.py",  # #4585: glob sweep — every lambdas/web record producer serves `comparison` beside the record
