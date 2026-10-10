@@ -417,8 +417,40 @@ def _margaret_haiku_call(system, user):
     return _personas._margaret_haiku_call(system, user, _g=globals())
 
 
+def _elena_revision_call(system, user, max_tokens):
+    return _personas._elena_revision_call(system, user, max_tokens, _g=globals())
+
+
 def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers):
     return _personas._run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers, _g=globals())
+
+
+def _rehearsal_week_end(event):
+    """#4535 past-week mode: the week-end date a REHEARSAL names, or None.
+
+    ``{"dry_run": true, "week": N}`` resolves to the season's week N from the one
+    calendar (``story_dossier.season_weeks`` — Week 1 runs genesis → the first Tuesday,
+    then Wednesday → Tuesday), so the desk builds that window regardless of the run date.
+    ``desk_week_end`` (an explicit date) wins when both are given. Dry runs only: a
+    publishing run stores under today's window, so a past week can never be published
+    over the current one by naming it."""
+    if not event.get("dry_run"):
+        return None
+    if event.get("desk_week_end"):
+        return event["desk_week_end"]
+    week = event.get("week")
+    if week is None or isinstance(week, bool):
+        return None
+    try:
+        n = int(week)
+    except (TypeError, ValueError):
+        return None
+    if n < 1:
+        return None
+    from content import story_dossier
+
+    weeks = story_dossier.season_weeks()
+    return weeks[n - 1]["end"] if n <= len(weeks) else None
 
 
 def _handler_core(event: dict, context) -> dict:
@@ -699,7 +731,8 @@ def _handler_core(event: dict, context) -> dict:
             from content import story_pipeline
 
             # a rehearsal may name the week (#4535 proof): {"dry_run": true, "desk_week_end": "YYYY-MM-DD"}
-            _desk_end = (event.get("desk_week_end") if _dry else None) or _target_date
+            # or {"dry_run": true, "week": N} — the window is the season's week N, never today's.
+            _desk_end = _rehearsal_week_end(event) or _target_date
             _desk = story_pipeline.live_week(table, _desk_end, log=logger.info)
             if _desk is None:
                 logger.info(f"[#4535] story desk declined {_desk_end}: not a season week end — legacy writer")
