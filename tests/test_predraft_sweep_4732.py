@@ -201,6 +201,28 @@ def test_mutation_control_without_the_sweep_the_census_holds_the_pre_drafts():
     assert {EXPIRED_PRIMARY.routine_id, EXPIRED_SIBLING.routine_id, CHAT_DRAFT.routine_id} <= live
 
 
+def test_an_on_demand_run_for_a_future_date_never_archives_a_draft_whose_day_has_not_come():
+    """An on-demand run for D+3 (today = D) must sweep as of the REAL Pacific today, not target − 1:
+    unclamped it treats D+2 as today and archives the real D+1 pre-draft (tonight's) as "expired"."""
+    table = _seeded()
+    with (
+        patch.object(routine_repo, "_table", table),
+        patch("training.routine_repo._live_genesis", return_value=GENESIS),
+        patch.object(npd, "scheduled_session", return_value={"label": "walk", "archetype": "aerobic"}),
+        _frozen_pacific_today(),
+    ):
+        out = npd.run(target_date="2026-10-12")  # D+3 off the frozen TODAY (10-09)
+        tomorrow = routine_repo.get_current(TOMORROW_PRIMARY.routine_id)
+    sweep = out.get("sweep") or {}
+    archived = {a["routine_id"] for a in sweep.get("archived", [])}
+    offenders = []
+    if TOMORROW_PRIMARY.routine_id in archived or tomorrow.status != "draft":
+        offenders.append(("archived the D+1 pre-draft before its day", tomorrow.status, sweep))
+    if (sweep.get("window") or {}).get("end") != TODAY:
+        offenders.append(("the sweep's today is not the real Pacific today", sweep.get("window")))
+    assert not offenders, offenders
+
+
 def test_a_failing_sweep_never_stops_the_nights_draft():
     with (
         patch.object(npd, "sweep_expired", side_effect=RuntimeError("ddb down")),

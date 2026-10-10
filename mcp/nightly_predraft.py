@@ -402,10 +402,13 @@ def run(target_date: str | None = None) -> dict[str, Any]:
     target = target_date or shift_day_key(pacific_today(), JOB["target_offset_days"])
     run_at = datetime.now(timezone.utc).isoformat()
     out: dict[str, Any] = {"job": JOB["name"], "target_date": target, "run_at": run_at, "engine": ENGINE_VERSION}
-    # #4732: archive last nights' leftovers first. "Today" is the run's own day (target − offset), so a
-    # back-dated run never reaches past its own target. Fail-soft: a sweep error is named, never fatal.
+    # #4732: archive last nights' leftovers first. The sweep's "today" is the run's own day (target −
+    # offset) CLAMPED to the real Pacific today: a back-dated run never reaches past its own target, and
+    # an on-demand run for a FUTURE date (e.g. D+3) never treats D+2 as today and archives a real D+1
+    # pre-draft as "expired" before its day. Fail-soft: a sweep error is named, never fatal.
     try:
-        out["sweep"] = sweep_expired(shift_day_key(target, -JOB["target_offset_days"]), run_at)
+        sweep_today = min(shift_day_key(target, -JOB["target_offset_days"]), pacific_today())
+        out["sweep"] = sweep_expired(sweep_today, run_at)
     except Exception as e:  # noqa: BLE001 — the draft still runs; the sweep's failure is on the record
         logger.warning(f"nightly predraft: the expired-draft sweep failed ({type(e).__name__}: {e})")
         out["sweep"] = {"error": f"{type(e).__name__}: {e}"[:300]}
