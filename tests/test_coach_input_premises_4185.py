@@ -428,6 +428,22 @@ def test_4690_an_ask_to_reach_a_protein_level_is_a_goal_not_an_intake_claim():
     assert [f["cited"] for f in ci.served_fact_findings(ate, facts, today="2026-09-26")] == [190.0]
 
 
+def test_4690_a_past_tense_hit_is_judged_and_an_ask_to_hit_is_a_goal():
+    # verifier on PR #4744: a bare "(to) hit N" counted as a goal, so a past-tense intake
+    # report ("managed to hit") went unjudged. Main flags it; so must the fix.
+    facts = _facts_4690()
+
+    def protein(s):
+        return [f["cited"] for f in ci.served_fact_findings(s, facts, today="2026-09-26") if f["metric"] == "protein_g"]
+
+    assert protein("He managed to hit 190 grams of protein daily.") == [190.0]
+    assert protein("He hit 190 grams of protein daily.") == [190.0]
+    # an ask/aim to hit a level is a goal
+    assert protein("I want him to hit 190 grams of protein daily.") == []
+    assert protein("He needs to hit 190 grams of protein daily.") == []
+    assert protein("The aim is to hit 190 grams of protein daily.") == []
+
+
 def test_mutation_control_without_the_target_frame_the_labs_coach_is_held(monkeypatch):
     monkeypatch.setattr(ci, "_target_framed", lambda _s, _v: False)
     facts = _facts("2026-09-25", "2026-09-26")
