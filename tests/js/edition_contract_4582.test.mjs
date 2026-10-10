@@ -15,13 +15,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const P = await import("../../site/assets/js/ck_pages.js");
+const { esc } = await import("../../site/assets/js/evidence_shared.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "edition_contract_4582", "editions.json");
 const { green, cases } = JSON.parse(readFileSync(FIX, "utf8"));
 
 // The edition as the route serves it when that case's upstream fails.
 const editionFor = (name) => ({ ...green, blocks: { ...green.blocks, ...cases[name].blocks } });
-const text = (html) => String(html ?? "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').trim();
 const failed = (b) => !!b && (b.state === "unavailable" || b.state === "absent");
+// A slot that prints a sentence and nothing else: the sentence, escaped, bare or in the
+// kit's one soft/small paragraph. Compared as markup — never stripped or unescaped.
+const prints = (html, sentence) => [esc(sentence), `<p class="ck-soft">${esc(sentence)}</p>`, `<p class="ck-small">${esc(sentence)}</p>`].includes(html);
 
 // Each front-page slot -> the block whose sentence it must print when that block failed.
 // `next` prints its bet part's sentence, or the whole block's when the block is unserved.
@@ -52,19 +55,19 @@ test("with one upstream failing, each front-page slot prints its block's own sen
       const block = pick(ed.blocks);
       if (!failed(block)) continue;
       seenFailing.add(slot);
-      const got = text(slots[slot]);
+      const got = slots[slot];
       if (!got) offences.push(`${name}: ${slot} is blank`);
-      else if (got !== block.absent_text) offences.push(`${name}: ${slot} printed ${JSON.stringify(got)}, not ${JSON.stringify(block.absent_text)}`);
-      if (slots[slot] === greenSlots[slot] && text(greenSlots[slot]) !== block.absent_text) offences.push(`${name}: ${slot} still shows the green content`);
+      else if (!prints(got, block.absent_text)) offences.push(`${name}: ${slot} printed ${JSON.stringify(got)}, not ${JSON.stringify(block.absent_text)}`);
+      if (got === greenSlots[slot] && !prints(greenSlots[slot], block.absent_text)) offences.push(`${name}: ${slot} still shows the green content`);
     }
     // His words: a failed block is never quoted; its sentence sits at the foot of the week.
     if (failed(ed.blocks.his_words)) {
       seenFailing.add("ck-words-absent");
       if (slots["ck-words"] !== null) offences.push(`${name}: ck-words kept for a ${ed.blocks.his_words.state} block`);
-      if (text(slots["ck-words-absent"]) !== ed.blocks.his_words.absent_text) offences.push(`${name}: ck-words-absent is not the block's sentence`);
+      if (!prints(slots["ck-words-absent"], ed.blocks.his_words.absent_text)) offences.push(`${name}: ck-words-absent is not the block's sentence`);
     }
     for (const [slot, html] of Object.entries(slots)) {
-      if (/undefined|NaN|null/.test(text(html))) offences.push(`${name}: ${slot} leaks ${JSON.stringify(text(html))}`);
+      if (/undefined|NaN|>null</.test(String(html))) offences.push(`${name}: ${slot} leaks ${JSON.stringify(html)}`);
     }
   }
   assert.deepEqual(offences, []);
@@ -78,7 +81,7 @@ test("today's weight fails to its sentence and the green weight leaves the mark 
   const weight = green.blocks.today.data.weight_lbs.toFixed(1);
   assert.match(P.frontSlots(green, green.blocks)["ck-mark-caption"], new RegExp(weight.replace(".", "\\.")));
   const slots = P.frontSlots(ed, ed.blocks);
-  assert.equal(text(slots["ck-mark-caption"]), "Today's weight is not served right now.");
+  assert.equal(slots["ck-mark-caption"], esc("Today's weight is not served right now."));
   assert.equal(slots["ck-mark"], "");
 });
 
@@ -87,7 +90,7 @@ test("with every upstream failing, the page still has one day, and the bet slot 
   assert.equal(P.headerDay(ed), P.headerDay(green));
   assert.ok(P.headerDay(ed));
   assert.equal(ed.blocks.next.state, "unavailable");
-  const bet = text(P.frontSlots(ed, ed.blocks)["ck-bet"]);
-  assert.equal(bet, "What comes next is not served right now.");
+  const bet = P.frontSlots(ed, ed.blocks)["ck-bet"];
+  assert.ok(prints(bet, "What comes next is not served right now."), bet);
   assert.doesNotMatch(bet, /No coach bet is waiting/);
 });
