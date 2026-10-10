@@ -114,6 +114,19 @@ DEFAULT_STALE_HOURS = 48
 #                  transport pipe; its tracker lives elsewhere). Default True.
 #   active_api     scheduled API *pull* that must attempt at least daily — the
 #                  silent-auth-rot / 44-day-outage class (pipeline_health_check).
+#   probe_functions
+#                  (#4643) the Lambda functions the daily boot probe
+#                  (pipeline_health_check) invokes with {"healthcheck": true} for this
+#                  source: ((function_name, display_name), …). Covers the source's own
+#                  ingestion function AND any scheduled enrichment that rides on it
+#                  (strava → activity-enrichment, notion → journal-enrichment, the open
+#                  social channels → social-enrichment). A function named on several
+#                  sources is probed once, under the first source in registry order.
+#                  A `paused` source keeps its entry and is reported paused, never
+#                  invoked. Was a hand-written PIPELINES literal that omitted the Hevy
+#                  poller and every enrichment function while still listing the paused
+#                  one. Read by health_probe_targets(); tests/test_health_probe_registry_4643.py
+#                  holds it equal to the scheduled functions in cdk/stacks/ingestion_stack.py.
 #   best_effort    known-brittle by an accepted upstream cause; evaluated + logged
 #                  but excluded from UnhealthySourceCount (pipeline_health_check).
 #   expected_days  expected record days per week for gap reconciliation
@@ -381,6 +394,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "instrument_for": ("sleep_coach",),  # #4217: the sleep/recovery sensor — dark => Park is absent
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("whoop-data-ingestion", "Whoop"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
         "method": "OAuth API pull, 5x daily",
@@ -501,6 +515,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # Weigh-ins are sporadic (often ~weekly); a missed week before alerting.
         "stale_hours": 7 * 24,
         "active_api": True,
+        "probe_functions": (("withings-data-ingestion", "Withings"),),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         "qa_tier": "optional",  # weigh-ins are sporadic — a missing day is behavior
         "method": "OAuth API pull, hourly",
@@ -553,6 +568,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (
+            ("strava-data-ingestion", "Strava"),
+            ("activity-enrichment", "Activity Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         "qa_tier": "optional",  # workouts are event-driven — a missing day is behavior
         "method": "OAuth API pull, hourly",
@@ -612,6 +631,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,  # he sleeps on it every night — passive
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("eightsleep-data-ingestion", "Eight Sleep"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "optional",
         "method": "API pull, hourly",
@@ -648,6 +668,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,  # HAE webhook automations — passive
         "stale_hours": None,
         "active_api": False,  # webhook push — no cron to go stale
+        "probe_functions": (("health-auto-export-webhook", "Health Auto Export"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
         "method": "Health Auto Export webhook, near-real-time",
@@ -898,6 +919,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # within a day of the pipe breaking.
         "stale_hours": 72,
         "active_api": True,
+        "probe_functions": (("todoist-data-ingestion", "Todoist"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": None,
         "method": "API pull, 1x daily (14:00 UTC)",
@@ -922,6 +944,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,  # scheduled API pull writes a record daily
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
         "method": "API pull, hourly",
@@ -1048,6 +1071,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "instrument_for": ("physical_coach",),  # #4217: the lifting log (behavioral — a rest week never darks Reyes)
         "stale_hours": 7 * 24,
         "active_api": True,
+        "probe_functions": (("hevy-backfill", "Hevy Poller"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # lifting is event-driven — gaps are training structure
         "qa_tier": None,
         "method": "API-key pull, hourly (24h)",
@@ -1155,6 +1179,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # server-side OAuth refresh from datacenter IPs. See ADR-074.
         "paused": True,
         "active_api": True,
+        "probe_functions": (("garmin-data-ingestion", "Garmin"),),  # #4643: the daily boot probe's targets
         # Best-effort: still evaluated + logged, excluded from UnhealthySourceCount
         # so the accepted 429 failure can't mask a real source death (2026-06-19).
         "best_effort": True,
@@ -1224,6 +1249,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # public board (the board mirrors the checker's monitored set).
         "monitored": False,
         "active_api": True,
+        "probe_functions": (
+            ("notion-journal-ingestion", "Notion"),
+            ("journal-enrichment", "Journal Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
@@ -1266,6 +1295,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless RSS pull; flip True once the channel id is live
+        "probe_functions": (
+            ("youtube-social-ingestion", "YouTube"),
+            ("social-enrichment", "Social Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
         "method": "Keyless per-channel RSS pull (framework), hourly",
@@ -1309,6 +1342,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,  # registry-resident until the handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public AppView pull; flip True once the handle is live
+        "probe_functions": (
+            ("bluesky-social-ingestion", "Bluesky"),
+            ("social-enrichment", "Social Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
         "method": "Keyless public AppView pull (framework), hourly",
@@ -1348,6 +1385,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public REST pull; flip True once the account is live
+        "probe_functions": (
+            ("mastodon-social-ingestion", "Mastodon"),
+            ("social-enrichment", "Social Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
         "method": "Keyless public REST pull (framework), hourly",
@@ -1383,6 +1424,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("weather-data-ingestion", "Weather"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": None,
         "method": "Open-Meteo API pull, 2x daily",
@@ -1489,6 +1531,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,
         "partition": False,  # a transport pipe — its tracker partition is SYSTEM_STATE
         "active_api": True,
+        "probe_functions": (("dropbox-poll", "Dropbox Poll"),),  # #4643: the daily boot probe's targets
         "expected_days": None,
         "qa_tier": None,
         "method": "Dropbox API poll (MacroFactor CSV transport)",
@@ -2005,6 +2048,25 @@ def best_effort_source_ids() -> set:
     """Known-brittle by accepted upstream cause — evaluated, never counted
     unhealthy. Replaces pipeline_health_check.BEST_EFFORT_SOURCES."""
     return {k for k, v in SOURCE_REGISTRY.items() if v.get("best_effort")}
+
+
+def health_probe_targets() -> list:
+    """[(function_name, display_name, source_id)] for the daily boot probe (#4643).
+
+    Derived from every source's `probe_functions` facet, in registry order, each
+    function once (the first source naming it owns it). Paused sources stay IN the
+    list — the probe reports them `paused` by the same facet and never invokes them —
+    so the status page keeps showing the off-by-design row. Replaces the hand-written
+    pipeline_health_check.PIPELINES ingestion rows."""
+    seen: set = set()
+    out: list = []
+    for key, entry in SOURCE_REGISTRY.items():
+        for fn_name, display in entry.get("probe_functions") or ():
+            if fn_name in seen:
+                continue
+            seen.add(fn_name)
+            out.append((fn_name, display, key))
+    return out
 
 
 def reconciliation_sources() -> list:
