@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-10-10T02:31:42.996324+00:00",
   "fetch_path": "/api/receipts",
   "is_prefix_sample": false,
   "path": "/api/receipts",
@@ -38,30 +38,7 @@
         "type": "number"
       },
       "ceiling_window": {
-        "keys": {
-          "base_ceiling": {
-            "type": "number"
-          },
-          "end_exclusive": {
-            "type": "string"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "reverts_to_base_ceiling": {
-            "type": "number"
-          },
-          "reverts_to_surge_ceiling": {
-            "type": "number"
-          },
-          "start": {
-            "type": "string"
-          },
-          "surge_ceiling": {
-            "type": "number"
-          }
-        },
-        "type": "object"
+        "type": "null"
       },
       "computed_at": {
         "type": "string"
@@ -94,7 +71,7 @@
         "items": {
           "type": "string"
         },
-        "length_sample": 0,
+        "length_sample": 1,
         "type": "array"
       },
       "high_days": {
@@ -138,7 +115,7 @@
           },
           "type": "object"
         },
-        "length_sample": 31,
+        "length_sample": 10,
         "type": "array"
       },
       "month_end_date": {
@@ -198,6 +175,12 @@
       },
       "surge_ceiling_usd": {
         "type": "number"
+      },
+      "surge_engaged_at_bar": {
+        "type": "null"
+      },
+      "surge_held_by": {
+        "type": "string"
       },
       "surge_threshold_uniques": {
         "type": "integer"
