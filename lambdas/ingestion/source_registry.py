@@ -238,8 +238,8 @@ DEFAULT_STALE_HOURS = 48
 #                  'accepted' (ruled). Required on every member of
 #                  UPSTREAM_CHANGES_REQUIRED (the polled/uploaded sources of #4638's
 #                  set; habitify and notion are owned by #4632/#4631). Read by
-#                  upstream_changes_for().
-#   oauth         (#1960) True = a CREDENTIALED API pull whose auth can DIE — an
+#                  tests/test_upstream_changes_4638.py (no runtime reader yet).
+#   oauth          (#1960) True = a CREDENTIALED API pull whose auth can DIE — an
 #                  OAuth token that expires/gets revoked, or a static API key that
 #                  gets rotated. This is exactly the set that routes through
 #                  common/auth_breaker (directly or via the SIMP-2 framework's
@@ -2026,13 +2026,6 @@ def provider_reconcile_source_ids() -> list:
 UPSTREAM_CHANGE_BEHAVIOURS = ("any_age", "inside_window", "not_propagated")
 UPSTREAM_CHANGE_STANDINGS = ("stated_default", "accepted")
 UPSTREAM_CHANGES_REQUIRED = ("apple_health", "hevy", "macrofactor", "strava", "whoop", "withings")
-
-
-def upstream_changes_for(source: str) -> dict | None:
-    """What an edit or a delete made in `source`'s app does to the store (#4638), or
-    None when the source does not state it. See the facet note above SOURCE_REGISTRY."""
-    facet = SOURCE_REGISTRY.get(source, {}).get("upstream_changes")
-    return dict(facet) if facet else None
 
 
 def oauth_source_ids() -> list:

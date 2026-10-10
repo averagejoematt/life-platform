@@ -39,10 +39,14 @@ from ingestion import source_registry as sr  # noqa: E402
 # ── registry facet ──────────────────────────────────────────────────────────────
 
 
+def _facet(source):
+    return sr.SOURCE_REGISTRY.get(source, {}).get("upstream_changes")
+
+
 def test_every_required_source_states_its_upstream_change_behaviour():
     offenders = []
     for key in sr.UPSTREAM_CHANGES_REQUIRED:
-        facet = sr.upstream_changes_for(key)
+        facet = _facet(key)
         if key not in sr.SOURCE_REGISTRY:
             offenders.append(f"{key}: not a registry source")
             continue
@@ -67,14 +71,14 @@ def test_framework_refetch_windows_match_the_stated_windows():
     offenders = []
     for key, path in (("strava", "lambdas/ingestion/strava_lambda.py"), ("whoop", "lambdas/ingestion/whoop_lambda.py")):
         m = re.search(r"refresh_trailing_days=(\d+)", (ROOT / path).read_text())
-        stated = (sr.upstream_changes_for(key) or {}).get("window_days")
+        stated = (_facet(key) or {}).get("window_days")
         if not m or int(m.group(1)) != stated:
             offenders.append(f"{key}: config {m and m.group(1)} vs stated {stated}")
     assert not offenders, offenders
 
 
 def test_apple_health_rebuild_path_has_no_operator_caller_so_nothing_propagates():
-    facet = sr.upstream_changes_for("apple_health") or {}
+    facet = _facet("apple_health") or {}
     assert (facet.get("edits"), facet.get("deletes")) == ("not_propagated", "not_propagated")
     callers = []
     for top in ("lambdas", "scripts", "deploy", "mcp"):
