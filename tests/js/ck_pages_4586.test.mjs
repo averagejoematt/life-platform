@@ -1,7 +1,8 @@
 // tests/js/ck_pages_4586.test.mjs — #4586: the four kit pages of the living front page.
 //
 // The builders are driven from the committed captures in tests/fixtures/kit_pages_4586/
-// (live, 2026-10-03). Nothing here reads the wall clock: every date comes from a fixture.
+// (one live capture, its time in _capture.json — #4671: 2026-10-10 02:38 UTC, edition day
+// October 9). Nothing here reads the wall clock: every date comes from a fixture.
 // What is held: every block prints its own absence sentence instead of a blank; the
 // coaches' count never renders without its comparison; no percentage picture on fewer
 // than 20 calls; his words are quoted only when fresh; no honorific, no ISO date.
@@ -17,24 +18,32 @@ const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const edition = load("edition");
 const B = edition.blocks;
+// The captured chapter (week 5) has no podcast episode yet. WITH_POD is that chapter carrying
+// the week 4 episode as the edition served it on October 3, so the player stays pinned.
+const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
+const WITH_POD = { ...B.chapter, data: { ...B.chapter.data, podcast: POD } };
 const UNAVAILABLE = { state: "unavailable", as_of: null, source: null, absent_text: "The latest chapter is not served right now.", data: null };
 
 test("the header carries the edition's one day and day number, in words", () => {
-  assert.equal(P.headerDay(edition), "Saturday, October 3 · Day 28");
+  assert.equal(P.headerDay(edition), "Friday, October 9 · Day 34");
   assert.equal(P.headerDay({}), "");
 });
 
 test("a fresh chapter leads with its badge, title, player and the AI byline", () => {
-  const html = P.chapterHTML(B.chapter, B.next);
-  assert.match(html, /New this week · Week 4/);
-  assert.match(html, /<h1>The Body Answers Back<\/h1>/);
+  const html = P.chapterHTML(WITH_POD, B.next);
+  assert.match(html, /New this week · Week 5/);
+  assert.match(html, /<h1>Park's Blind Spot<\/h1>/);
   assert.match(html, /<audio controls preload="none" src="\/panelcast\/wk4\.mp3"/);
-  assert.match(html, /Written by AI from the record on September 29\. Matthew reads each chapter before it publishes\./);
-  assert.ok(html.indexOf("Written by AI") < html.indexOf("He has trained"), "the AI label sits above the AI's words");
+  assert.match(html, /Written by AI from the record on October 6\. Matthew reads each chapter before it publishes\./);
+  assert.ok(html.indexOf("Written by AI") < html.indexOf("After 23 consecutive"), "the AI label sits above the AI's words");
+  // As captured: no episode yet, so no player and the block's own sentence.
+  const live = P.chapterHTML(B.chapter, B.next);
+  assert.doesNotMatch(live, /<audio/);
+  assert.match(live, /No podcast episode for this chapter yet\./);
 });
 
 test("a stale chapter is not called new, and an unserved one prints its sentence", () => {
-  assert.match(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /The latest chapter · Week 4/);
+  assert.match(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /The latest chapter · Week 5/);
   assert.doesNotMatch(P.chapterHTML({ ...B.chapter, state: "stale" }, B.next), /New this week/);
   assert.equal(P.chapterHTML(UNAVAILABLE, B.next), '<p class="ck-soft">The latest chapter is not served right now.</p>');
 });
@@ -47,7 +56,7 @@ test("a chapter with no episode says so instead of showing a dead player", () =>
 });
 
 test("today's weight says 'this morning' only on the day it was taken", () => {
-  assert.match(P.todayHTML(B.today, edition), /<b>311\.0<\/b>.*lb this morning\. Down 16\.3 since September 6\./);
+  assert.match(P.todayHTML(B.today, edition), /<b>306\.1<\/b>.*lb this morning\. Down 21\.2 since September 6\./);
   const older = { ...B.today, state: "stale", data: { ...B.today.data, date: "2026-10-01" } };
   assert.match(P.todayHTML(older, edition), /lb on Thursday, October 1\./);
   assert.match(P.todayHTML({ state: "absent", absent_text: "No weigh-in yet.", data: null }, edition), /No weigh-in yet\./);
@@ -55,28 +64,30 @@ test("today's weight says 'this morning' only on the day it was taken", () => {
 
 test("coach lines render at most what is served, and silence is a sentence", () => {
   const html = P.coachLinesHTML(B.coach_lines);
-  assert.equal((html.match(/<li>/g) || []).length, 3);
-  assert.match(html, /Lisa Park · sleep/);
+  assert.equal((html.match(/<li>/g) || []).length, B.coach_lines.data.lines.length);
+  assert.equal(B.coach_lines.data.lines.length, 2);
+  assert.match(html, /Henning Brandt · statistics/);
   assert.match(P.coachLinesHTML({ state: "absent", absent_text: "The coaches have written nothing yet.", data: null }), /The coaches have written nothing yet\./);
   const reply = { state: "ok", data: { lines: [{ coach: "Max Reyes", domain: "training", text: "I disagree.", replies_to: "Lisa Park" }] } };
   assert.match(P.coachLinesHTML(reply), /Max Reyes · training · replying to Lisa Park/);
 });
 
 test("the coaches' count never renders without its comparison", () => {
-  assert.equal(P.recordLine(B.record), "41 of 96 checked calls right. So far they do not beat a simple guess.");
+  assert.equal(P.recordLine(B.record), "56 of 131 checked calls right. So far they do not beat a simple guess.");
   const alone = { ...B.record, data: { ...B.record.data, comparison_text: "" } };
   assert.equal(P.recordLine(alone), "");
   assert.doesNotMatch(P.recordBigHTML(alone), /ck-big/);
-  assert.match(P.recordBigHTML(B.record), /41<span>of 96 checked calls<\/span>/);
+  assert.match(P.recordBigHTML(B.record), /56<span>of 131 checked calls<\/span>/);
   assert.match(P.recordBigHTML(B.record), /So far they do not beat a simple guess\./);
 });
 
 test("no percentage picture on fewer than 20 checked calls", () => {
   const html = P.teamHTML(load("coaches"));
   const row = (name) => html.split("<li>").find((li) => li.includes(name));
-  assert.match(row("Lisa Park"), /10 of 23<span class="ck-meter">/);
-  assert.doesNotMatch(row("Henning Brandt"), /ck-meter/);
-  assert.match(row("Henning Brandt"), /9 of 18/);
+  assert.match(row("Lisa Park"), /15 of 35<span class="ck-meter">/);
+  assert.match(row("Henning Brandt"), /11 of 22<span class="ck-meter">/);
+  assert.doesNotMatch(row("Nathan Reeves"), /ck-meter/);
+  assert.match(row("Nathan Reeves"), /8 of 18/);
   assert.match(row("Eli Marsh"), /no bets/);
   assert.match(row("Amara Patel"), /Sitting out: no sensor since August 27\./);
   const few = { ...B.record, data: { ...B.record.data, right: 3, decided: 7 } };
@@ -96,10 +107,11 @@ test("his words are quoted only when fresh; silence prints the block's sentence"
 
 test("the bet card states the question, the date and both sides", () => {
   const html = P.betHTML(B.next);
-  assert.match(html, /Settles Monday, October 5/);
-  assert.match(html, /Max Reyes says no\. Lisa Park says yes\./);
-  assert.equal(P.betLine(B.next), "A bet between Max Reyes and Lisa Park settles Monday, October 5.");
-  assert.equal(P.moreBetsLine(load("coach_docket"), "2026-10-05"), "Three more bets settle on October 7, 12 and 16.");
+  assert.match(html, /Settles Monday, October 12/);
+  assert.match(html, /Nathan Reeves says no\. Marcus Webb says yes\./);
+  assert.equal(P.betLine(B.next), "A bet between Nathan Reeves and Marcus Webb settles Monday, October 12.");
+  assert.equal(P.moreBetsLine(load("coach_docket"), "2026-10-12"), "One more bet settles on October 16.");
+  assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-12" }, { resolution_date: "2026-10-14" }, { resolution_date: "2026-10-16" }] }, "2026-10-12"), "Two more bets settle on October 14 and 16.");
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-05" }] }, "2026-10-05"), "");
 });
 
@@ -157,24 +169,28 @@ test("nothing the builders emit carries an honorific or an ISO date", () => {
 });
 
 test("the front page runs one sentence of the chapter, a Listen button and no idle player", () => {
-  const html = P.chapterHTML(B.chapter, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });
+  const html = P.chapterHTML(WITH_POD, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });
   assert.doesNotMatch(html, /<audio/);
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
-  assert.match(html, /answer back\.<\/p>/);
-  assert.doesNotMatch(html, /He is down 15 pounds/);
-  assert.match(html, /On the podcast: the food coach, Marcus Webb\. Next chapter due Wednesday, October 7\./);
+  assert.equal((html.match(/ck-premise/g) || []).length, 1, "one paragraph of the chapter");
+  assert.match(html, /<p class="ck-premise ck-soft">After 23 consecutive training days/);
+  assert.match(html, /On the podcast: the food coach, Marcus Webb\. Next chapter due Wednesday, October 14\./);
+  // As captured, with no episode: no Listen button, and the next chapter's day still said.
+  const live = P.chapterHTML(B.chapter, B.next, { heading: "h2", player: false, listenHref: "/next/v8/story/" });
+  assert.doesNotMatch(live, /Listen|<audio/);
+  assert.match(live, /Next chapter due Wednesday, October 14\./);
 });
 
 test("progress runs from the start to the goal, and is not drawn without a goal", () => {
   const html = P.todayHTML(B.today, edition);
-  assert.match(html, /<i style="width:11%"><\/i>/);
-  assert.match(html, /327\.3 at the start<\/span><span>126 to go to 185</);
+  assert.match(html, /<i style="width:15%"><\/i>/);
+  assert.match(html, /327\.3 at the start<\/span><span>121\.1 to go to 185</);
   assert.equal(P.progressHTML({ ...B.today.data, goal_weight_lbs: null }), "");
 });
 
 
 
 test("a right call that gave a range says the result fell inside it", () => {
-  assert.match(P.verdictsHTML(load("coaches")), /The result was 97, inside the range given\. Checked October 3\./);
+  assert.match(P.verdictsHTML(load("coaches")), /The result was 77, inside the range given\. Checked October 9\./);
 });
 

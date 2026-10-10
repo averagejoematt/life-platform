@@ -1,7 +1,8 @@
 // tests/js/ck_front_4586.test.mjs — #4586: the reshaped preview front page.
 //
-// Driven from the committed captures in tests/fixtures/kit_pages_4586/ (live, 2026-10-03
-// and 2026-10-04). Nothing reads the wall clock. What is held: the daily mark draws one
+// Driven from the committed captures in tests/fixtures/kit_pages_4586/ (one live capture,
+// its time in _capture.json — #4671: 2026-10-10 02:38 UTC, edition day October 9). Nothing
+// reads the wall clock. What is held: the daily mark draws one
 // cell per day in a frame that never changes; the Today band is about the last 24 hours
 // and nothing older; the week is sorted by a printed rule; a quote is verbatim or absent;
 // every builder prints a sentence when its data is missing; nothing is first person.
@@ -20,6 +21,13 @@ const B = edition.blocks;
 const TODAY = edition.as_of;
 const SERIES = B.week.data.weight_series;
 const GONE = { state: "unavailable", absent_text: "Not served right now.", data: null };
+
+// The captured chapter (week 5) has no podcast episode yet: WITH_POD carries the week 4 episode
+// as the edition served it on October 3. The captured lead read is null (the route served no
+// weekly priority at capture time): LEAD_READ is the read it served on September 28.
+const POD = { state: "ok", as_of: "2026-10-01", source: "/panelcast/episodes.json", absent_text: "No podcast episode for this chapter yet.", data: { title: "EP4 · The Body Answers Back", guest: "Marcus Webb", guest_domain: "food", duration_sec: 420, duration_minutes: 7, mp3_url: "/panelcast/wk4.mp3", date: "2026-10-01" } };
+const WITH_POD = { ...B.chapter, data: { ...B.chapter.data, podcast: POD } };
+const LEAD_READ = {"weekly_priority": "I'm watching Matthew execute with precision: 43 logged training sessions in 30 days, zero missed zone-2 workouts, and a consistent 1,500-calorie eating window across 21 food-logged days. His weight has dropped 12.8 pounds over three weeks—aggressive and intentional—and his recovery score is holding steady at 89%. On day 23 of the Foundation phase, the structural work is solid. The one priority I've asked him to address next is his protein intake, currently averaging 153.5 grams across logged days against a 170-gram floor. This isn't about motivation; it's about convenience. By locking one meal into a deliberate, low-friction protein choice, he can close this gap and protect lean mass as the caloric deficit compounds through the remaining 11 months.", "coach_name": "Eli Marsh", "data_through": "2026-09-28"};
 
 const START = B.today.data.start_weight_lbs;
 const GOAL = B.today.data.goal_weight_lbs;
@@ -43,38 +51,39 @@ test("the mark draws two rects per weighed day and says what it shows to a scree
   const html = F.markHTML(SERIES, TODAY, START, GOAL);
   const weighed = F.markDays(SERIES, TODAY, START, GOAL).filter((c) => c.gone !== null).length;
   assert.equal((html.match(/<rect /g) || []).length, 2 * weighed);
-  assert.match(html, /role="img" aria-label="The last 28 days: 16\.3 of the 142\.3 pounds to the goal are gone as of the latest weigh-in/);
+  assert.match(html, /role="img" aria-label="The last 28 days: 21\.2 of the 142\.3 pounds to the goal are gone as of the latest weigh-in/);
   assert.equal(F.markHTML([], TODAY, START, GOAL), "", "no weigh-ins: no drawing");
   assert.equal(F.markHTML(SERIES, "", START, GOAL), "");
 });
 
 test("the mark's caption carries the day, the weight and the distance, from served numbers", () => {
-  assert.equal(F.markCaption(B.today, edition), "<b>311.0 lb</b> · Day 28 · 16.3 down, 126.0 to go to 185");
+  assert.equal(F.markCaption(B.today, edition), "<b>306.1 lb</b> · Day 34 · 21.2 down, 121.1 to go to 185");
   const older = { ...B.today, data: { ...B.today.data, date: "2026-10-01" } };
-  assert.match(F.markCaption(older, edition), /311\.0 lb<\/b> on October 1/);
+  assert.match(F.markCaption(older, edition), /306\.1 lb<\/b> on October 1/);
   assert.equal(F.markCaption(GONE, edition), "");
 });
 
 test("this morning's weight is set against the weigh-in before it", () => {
-  assert.equal(F.morningLine(B.week, TODAY), "311.0 lb, the same as Friday.");
+  assert.equal(F.morningLine(B.week, TODAY), "306.1 lb, down 1.1 from Thursday.");
   assert.equal(F.morningLine(GONE, TODAY), "");
 });
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
-  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>311\.0 lb, the same as Friday\./);
-  assert.match(html, /<span class="ck-rows__key">Yesterday, Friday<\/span>/);
-  assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-02">The full day<\/a>/);
-  assert.match(html, /at or above the protein target/);
-  assert.doesNotMatch(html, /Steps|9,913|1,113/, "step counts stay off the front page");
+  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>306\.1 lb, down 1\.1 from Thursday\./);
+  assert.match(html, /<span class="ck-rows__key">Yesterday, Thursday<\/span>/);
+  assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-08">The full day<\/a>/);
+  assert.doesNotMatch(html, /Steps|steps/, "step counts stay off the front page");
   assert.match(html, /Recovery is the wrist strap’s morning score out of 100\./);
-  assert.doesNotMatch(html, /Thursday|October 1/, "nothing older than yesterday");
+  assert.doesNotMatch(html, /Wednesday|October 7/, "nothing older than yesterday");
+  // The food log ends October 5 in this capture: read on October 6, yesterday carries its food.
+  assert.match(F.todayBandHTML({ ...edition, as_of: "2026-10-06" }, B, "/next/v8/"), /146 g protein, 1,632 kcal, under the protein target/);
   assert.ok((html.match(/<li>/g) || []).length <= 3, "at most three rows");
   assert.match(F.todayBandHTML(edition, { ...B, week: GONE }, "/"), /Not served right now\./);
 });
 
 test("a day with nothing recorded yet says so", () => {
-  const future = { ...edition, as_of: "2026-10-05" };
+  const future = { ...edition, as_of: "2026-10-10" };
   assert.match(F.todayBandHTML(future, B, "/"), /Nothing recorded yet today\./);
 });
 
@@ -114,7 +123,8 @@ test("first sentences are whole sentences inside the limit", () => {
 });
 
 test("the lead coach's read is quoted with its author, as an AI, and its date", () => {
-  const html = F.leadReadHTML(load("weekly_priority"), "/next/v8/");
+  assert.match(F.leadReadHTML(load("weekly_priority"), "/next/v8/"), /not served right now/, "the captured read is null: a sentence, never a blank quote");
+  const html = F.leadReadHTML(LEAD_READ, "/next/v8/");
   assert.match(html, /Eli Marsh, the AI lead coach, on Monday, September 28/);
   assert.match(html, /“The one priority I've asked him to address next is his protein intake/);
   assert.doesNotMatch(html, /execute with precision/, "the recap of numbers is skipped for what the lead asked for");
@@ -132,17 +142,18 @@ test("the podcast line is the guest's own first turn, verbatim, and absent when 
 });
 
 test("the chapter and podcast lines are labelled as AI-written and carry Read and Listen", () => {
-  const html = F.quotesHTML(B.chapter, load("transcript_wk4"), "/next/v8/");
-  assert.match(html, /Written by AI from the record on September 29; Matthew reads each chapter before it publishes\./);
+  const html = F.quotesHTML(WITH_POD, load("transcript_wk4"), "/next/v8/");
+  assert.match(html, /Written by AI from the record on October 6; Matthew reads each chapter before it publishes\./);
   assert.match(html, /Marcus Webb, the AI food coach, on the podcast/);
-  assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-07\/">Read · 5 min<\/a>/);
+  assert.match(html, /<a class="ck-btn" href="\/journal\/posts\/week-08\/">Read · 6 min<\/a>/);
+  assert.doesNotMatch(F.quotesHTML(B.chapter, load("transcript_wk4"), "/"), /on the podcast|Listen/, "as captured, no episode: no podcast line");
   assert.match(html, /<a class="ck-btn ck-btn--ghost" href="\/next\/v8\/story\/">Listen · 7 min<\/a>/);
   assert.doesNotMatch(F.quotesHTML(B.chapter, null, "/"), /on the podcast/, "no transcript: no podcast line");
   assert.match(F.quotesHTML(GONE, null), /Not served right now\./);
 });
 
 test("the follow box says what arrives next and when", () => {
-  assert.equal(F.followLine(B.next), "The next chapter and podcast are due Wednesday, October 7. The week’s numbers go out every Sunday.");
+  assert.equal(F.followLine(B.next), "The next chapter and podcast are due Wednesday, October 14. The week’s numbers go out every Sunday.");
   assert.match(F.followLine({}), /most weeks/);
 });
 

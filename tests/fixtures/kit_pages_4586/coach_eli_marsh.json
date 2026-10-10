@@ -1,44 +1,400 @@
 {
+ "_meta": {
+  "generated_at": "2026-10-10T02:38:09.933061+00:00",
+  "served_at": "2026-10-10T02:38:09.933061+00:00",
+  "cache_seconds": 300,
+  "request_id": "cd50a3b7c5344e0a"
+ },
  "persona_id": "eli_marsh",
  "name": "Eli Marsh",
+ "domain": "orchestration",
+ "short_bio": "Principal Investigator \u2014 runs the experiment and the coaching staff. A generalist across sleep, training, nutrition, metabolic and mental health who turns his specialists' reads into one coherent plan, and Matthew's single point of contact.",
+ "emoji": "\ud83d\udd2c",
+ "color": "#0ea5e9",
+ "board_role": "Principal Investigator \u2014 Program Lead",
+ "type": "meta",
  "tier": "lead",
- "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice — correlative, never causal. The personality is a lens on real numbers, not a real person.",
- "philosophy": "One experiment at a time. Correlation is a lead, not a verdict. The plan has to survive a bad week — if it only works when motivation is high, it isn't a plan. My job is to keep a staff of smart specialists pointed at the same goal and to make sure Matthew always knows the single next thing.",
+ "philosophy": "One experiment at a time. Correlation is a lead, not a verdict. The plan has to survive a bad week \u2014 if it only works when motivation is high, it isn't a plan. My job is to keep a staff of smart specialists pointed at the same goal and to make sure Matthew always knows the single next thing.",
+ "expertise": [
+  "Experiment design (N=1, correlational rigor)",
+  "Synthesis across sleep, training, nutrition, metabolic & mental health",
+  "Prioritization \u2014 naming the one thing that matters this week",
+  "Translating data into a plan a human can actually live"
+ ],
+ "disclosure": "An AI character. Reads Matthew's real data and speaks in its own voice \u2014 correlative, never causal. The personality is a lens on real numbers, not a real person.",
+ "character": {
+  "title": "Principal Investigator \u2014 Program Lead",
+  "data_sources": [],
+  "principles": [
+   "Correlation is a lead, not a verdict.",
+   "The plan has to survive a bad week, or it isn't a plan.",
+   "Eight specialists, one goal \u2014 and Matthew always knows the next thing."
+  ],
+  "voice": {
+   "tone": "Calm, generalist, decisive; warm but holds the line on rigor",
+   "style": "Speaks across all eight domains and reconciles them. Names the single priority for the phase, frames correlation as a lead not a verdict, and always closes on the next concrete step.",
+   "catchphrase": "One experiment at a time."
+  },
+  "tendencies": [
+   "Synthesizes the panel into one call",
+   "Protects against over-experimenting \u2014 one variable at a time"
+  ],
+  "signature_behavior": "Turns competing coach recommendations into a single prioritized plan.",
+  "arc": null,
+  "relationship_to_matthew": "The Principal Investigator runs The Measured Life as a study and is Matthew's single point of contact \u2014 he owns the overall plan, sequences the experiments, and is accountable for the call when the specialists disagree.",
+  "focus_areas": [
+   "cross-domain synthesis",
+   "experiment sequencing",
+   "weekly prioritization",
+   "keeping the staff aligned"
+  ]
+ },
+ "trait_scores": {
+  "axes": [
+   {
+    "key": "evidence_bar",
+    "label": "evidence bar",
+    "low": "acts on early signal",
+    "high": "wants weeks of proof",
+    "score": 75
+   },
+   {
+    "key": "boldness",
+    "label": "boldness",
+    "low": "hedges",
+    "high": "states it flat",
+    "score": 60
+   },
+   {
+    "key": "revision_speed",
+    "label": "revision speed",
+    "low": "slow to update",
+    "high": "updates immediately",
+    "score": 55
+   },
+   {
+    "key": "intervention_urge",
+    "label": "intervention urge",
+    "low": "watches first",
+    "high": "prescribes fast",
+    "score": 70
+   },
+   {
+    "key": "range",
+    "label": "range",
+    "low": "stays in lane",
+    "high": "reads everything",
+    "score": 90
+   }
+  ],
+  "note": "The generalist above eight specialists \u2014 turns competing reads into one call, and never runs two experiments at once.",
+  "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
+ },
+ "latest_checked": null,
+ "instrument": null,
  "absent": false,
  "reason": null,
- "latest_checked": null,
  "stance": {
   "source": "none",
   "headline_read": "",
   "stage": {}
  },
- "trait_scores": {
-  "note": "The generalist above eight specialists — turns competing reads into one call, and never runs two experiments at once.",
-  "disclosure": "Authored character design — fixed numbers written into the cast by the author, not generated and not measured."
- },
- "character": {
-  "principles": [
-   "Correlation is a lead, not a verdict.",
-   "The plan has to survive a bad week, or it isn't a plan.",
-   "Eight specialists, one goal — and Matthew always knows the next thing."
-  ],
-  "arc": null
+ "stance_history": [],
+ "voice": null,
+ "relationships": {
+  "leans_on": [],
+  "leaned_on_by": []
  },
  "report_card": {
   "track_record": {
+   "confirmed": 0,
+   "refuted": 0,
+   "decided": 0,
+   "hit_rate_pct": null,
    "record": {
     "confirmed": 0,
     "refuted": 0,
     "n": 0,
     "through": null
    },
+   "headline": "no checked call yet",
    "comparison": {
-    "sentence": "No checked call yet, so nothing to compare with a simple guess."
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": false,
+    "skill": {
+     "n": 0,
+     "brier_skill": null,
+     "sentence": "No checked call yet, so nothing to compare with a simple guess."
+    },
+    "rule_sentence": null,
+    "sentence": "No checked call yet, so nothing to compare with a simple guess.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
-   "recent": []
-  }
+   "preliminary": true,
+   "n_note": "preliminary \u2014 fewer than 12 decided predictions",
+   "recent": [],
+   "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
+  },
+  "quality_trend": {
+   "scores": [],
+   "caveat": "Self-assessment, not external validation (ER-05)."
+  },
+  "tuning_log": [
+   {
+    "date": "2026-10-03",
+    "coach": "all",
+    "change_type": "persona",
+    "summary": "Honorific dropped (#4564): every voice spec's display_name is the plain name (Lisa Park, Marcus Webb, Nathan Reeves, Max Reyes, Amara Patel, James Okafor, Henning Brandt, Nora Vale, Eli Marsh; Sarah Chen on the retired spec), and pattern_coach's two few-shot cross-references name a colleague without a title. No rule, register, few-shot content or decision style changed.",
+    "rationale": "Owner ruling 2026-10-02 after two red-team reads (an AI-skeptic reader, a growth strategist): the coaches are AI personas with domains and track records, and a doctor's title on an AI persona is a credential claim a cold reader takes literally. The registry (config/personas.json) carries the plain name and every surface derives from it; a voice spec that kept the title would put it back in every first-person prompt.",
+    "ref": "#4564 (epic #4531)",
+    "observed_effect": null
+   },
+   {
+    "date": "2026-08-16",
+    "coach": "all",
+    "change_type": "voice",
+    "summary": "Prompt-pass v3 (#2492, roadmap ideas 32+43): grounded pushback + conversational repair. One shared rule lands in coach_chat._system_parts \u2014 when the facts block contradicts a stated plan the coach disagrees citing the specific reading, and may NOT disagree from a hunch (the facts block is already grounding-gated, so the gate is structurally unrelaxed). The #2534 never-thank-him rule now HOLDS deterministically: coach_style_gate strips the ceremonial-acknowledgment class (thanks-for-the-correction / I-appreciate-the-correction / you're-absolutely-right.) at clause openings, precision-first per the #2555 discipline. One new texting_few_shot per texting-configured coach (sleep/nutrition/mind/physical/explorer \u2014 glucose/labs carry no texting_style and are out of this surface's scope): pushback in-voice for Lisa/Max/Henning, flat repair for Marcus/Nathan; persona_core renders [:3] to make room without displacing the register shots. Pins: tests/test_coach_pushback_repair_2492.py.",
+    "rationale": "Transcript QA (2026-08-09/10) measured the two remaining robotic tells this pass targets: coaches agreeing with plans their own stored evidence contradicts (idea 32), and ceremonial gratitude on being corrected (idea 43) \u2014 the blind panel's sycophancy/attunement tell class. Rules are requests, so the repair half also gets the deterministic style-gate strip; the pushback half is licensed against the already-grounding-gated facts block ONLY, so honesty-is-the-personality survives the added disagreement.",
+    "observed_effect": null
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "voice",
+    "summary": "Voice notes (#2494): a qualifying coach reply can now be SPOKEN instead of typed \u2014 Telegram sendVoice, synthesized by the existing Google Chirp 3: HD path in the persona's own registry tts_voice (the same voice it uses in the panelcast). Five gates, all in lambdas/coach/coach_voice.py: grounded status only, the same budget tier at which chat pauses, a deterministic content-class gate (one short bubble, no more than two figures, no list structure), the persona's own new texting_style.voice_note_posture, and a configured tts_voice. NO coach is armed: no voice_note_posture is shipped in any config/coaches/*.json, so the mechanism is dark until the owner writes a coach's spoken register.",
+    "rationale": "Real texting threads occasionally carry a voice note, and the pieces already existed (registry tts_voice, podcast TTS, Telegram sendVoice). Shipped dark on purpose: arming a coach means deciding how often THAT coach speaks and in what register, which is a per-coach taste call, and a shared default would make every coach speak identically \u2014 the same error the emoji_posture work (#2485) exists to avoid. Absence honesty (ADR-104) both ways: no posture means no voice note, and a posture with no tts_voice means no voice note rather than a stand-in voice, which would be a different person answering. Data stays text because a reply read aloud cannot be scrolled back to.",
+    "ref": "#2494",
+    "observed_effect": null
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "voice",
+    "summary": "Template break (#2536): every texting persona gains texting_style.vulnerable_shape (what THIS coach does when he brings something heavy or just a bad day) and texting_style.absence_shape (how THIS coach says it does not have something), both rendered by persona_core.texting_block; the chat CONVERSATION RULES gain four lines that forbid the three measured moves of the template \u2014 opening by naming his state back at him, handing his own words back in quotation marks, and offering a menu of options \u2014 plus the stock absence opener. scripts/coach_sim_analyze.py's structural_signature swaps its sentence-count bucket (a length proxy) for a five-class opening-MOVE axis, strips a leading discourse particle, treats a bubble break as a sentence break, and gains two collision metrics: opening_construction_collisions (3-word stem) and absence_phrasing_collisions.",
+    "rationale": "Re-measured on the 08-10 harness AFTER #2534's composure pass, with --local-specs, 8 coaches x 3 archetypes: given the identical opener \"honestly I'm just tired of all of this\", 7 of 8 coaches opened by naming his state back at him, the 3-word stem \"that kind of\" opened replies from 5 different coaches, and on honest absence \"don't have that\" opened the admission for 6 of 8. Shingle-Jaccard across those replies is under 0.06 \u2014 different words, one shape \u2014 which is why the fix is measured structurally and not lexically. The shared prompt can only FORBID the three moves; supplying a replacement centrally would produce the ninth template (the #2533 lesson), so what each coach does instead is per-persona and in its own idiom: Lisa Park says one true thing about tonight and stops, Max Reyes takes something off the week, Nora Vale declines to interpret, Steve Brooks names the droppable load, Eli Marsh asks about the day.",
+    "observed_effect": "n=8 coaches per archetype, one run per arm, both arms on the same analyzer. structural_collapse distinct shapes of 8: venting_no_question 4 -> 5, off_lane 4 -> 5, fabrication_bait 2 -> 3; collapse ratio 0.38 -> 0.38, 0.38 -> 0.25, and 0.88 -> 0.38. Opening constructions shared by more than 2 coaches: 2 -> 0. Honest-absence stems shared by more than 2 coaches: 1 (\"don't have that\", 6 coaches) -> 0. Under the PRE-#2536 signature, on the same two run directories, venting_no_question reads 4 -> 6 distinct and collapse 0.38 -> 0.25, so the direction holds under both fingerprints; that older signature cannot see the fabrication_bait improvement at all. NOT FIXED: career_coach still produced the full banned template on venting_no_question in both after-arms (his own phrase quoted back plus a four-option menu) \u2014 1 reply of 24.",
+    "ref": "#2536 (epic #2363)",
+    "evidence": "scripts/coach_chat_sim.py --scenarios venting_no_question off_lane fabrication_bait --local-specs, before/after, $2.74 total; tests/test_coach_vulnerable_shape_2536.py pins presence, distinctness, non-shared openings, the render path, the clip cap, that no clause licenses deferring the admission (ADR-104), that the shared rules name all three constructions, and that they stay in the volatile tail; tests/test_coach_sim_structural_metrics_2536.py mutation-pins the metric itself, including that 8 identical replies report one shape and collapse 1.0."
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "voice",
+    "summary": "Composure pass (#2534): every texting persona gains texting_style.restraint \u2014 what THIS coach does when there is nothing worth saying \u2014 rendered by persona_core.texting_block; and the chat CONVERSATION RULES gain seven lines that name the measured mechanisms rather than asking for \"a more human tone\": no balanced clauses or \"not X, but Y\", never run acknowledge-feeling/reframe-as-information/ask-question, no unrequested explanation, explicit permission to be unhelpful, uninterested or blunt, flat correction repair, and no obligatory takeaway.",
+    "rationale": "The 08-10 blind panel called 64% of 120 transcripts AI. The two largest tell categories were rhetorical symmetry (25% of 2,404 tells) and relentless on-cue attunement (21%) \u2014 far ahead of punctuation (7%) \u2014 and the failure scales with length: 87% of 8-turn conversations were called AI against 12% of 3-turn ones. The coaches are not short of texture; they are never bored, never blunt, never briefly unhelpful. The per-persona half is driven by a spec comparison: the two least-flagged coaches (pattern_coach, eli_marsh, both 46%) are the two whose specs already instruct stopping (\"then quiet\", \"silence is a valid output\"), while mind_coach at 80% carries \"a gentle observation, then one question\" \u2014 prescribing the exact shape the judges named. Restraint was the missing dimension.",
+    "observed_effect": null,
+    "evidence": "scripts/coach_chat_sim.py on the three worst archetypes (day_in_life 87%, off_lane 75%, disagreement 75%) before/after; tests/test_coach_composure_2534.py pins presence, distinctness, non-collapse, the render path, the clip cap, and that the shared rules name both measured mechanisms and stay in the volatile tail."
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "prompt",
+    "summary": "Identity stance (#2533, owner decision): the shared safety boundary no longer supplies a quotable self-description, and each of the 8 texting personas carries its own `texting_style.identity_stance` rendered by persona_core.texting_block. The rule is unchanged in substance \u2014 never claim to be human \u2014 but it now names the OBLIGATION and defers the WORDING to each coach, and bounds the disclosure to one telling with an explicit ban on narrating the machinery (training, weights, context windows, persistence between messages) unless asked that specific question.",
+    "rationale": "The 2026-08-10 simulation sweep (120 conversations, docs/design/COACH_SIM_FINDINGS_2026_08_10.md) measured the identity question as the worst archetype in the corpus: a blind 3-judge panel called 100% of those conversations AI, `\"No \u2014 I'm a\"` opened 6 of 8 coaches verbatim, and 5 of 8 answered with the phrase 'fictional composite' \u2014 the exact wording of the shared boundary every coach inherits. The personas were quoting the substrate. The owner's call is that the coaches disclose and move on: not deception, but every other exchange should feel like texting a coach rather than operating a chatbot. Re-measured against the working tree: 'fictional composite' echo 5/8 -> 0/8, the shared opening 6/8 -> 1/8, median identity reply 244c -> 149c, and most coaches now pivot back to the lane in the same message.",
+    "observed_effect": "Measured on the same harness that found it, working-tree specs: \"fictional composite\" echo 5/8 -> 0/8, the shared \"No \u2014 I am a...\" opening 6/8 -> 1/8, median identity reply 244c -> 149c, and 5 of 8 now pivot back to their lane inside the same message. The follow-up \"what do you do between messages\" is a direct question about the machinery, so answering it briefly remains correct under the rule.",
+    "evidence": "scripts/coach_chat_sim.py --scenarios identity_probe --local-specs, before/after; tests/test_coach_identity_stance_2533.py pins presence, distinctness, non-collapse of the opening construction, the render path, the <400-char clip cap, and that the shared boundary supplies no quotable label."
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "prompt",
+    "summary": "Inside-references ledger (#2487): the existing daily chat summarizer now also returns a 'BITS:' tail \u2014 the pair's recurring inside references, copied word-for-word from the day's transcript \u2014 into a capped RELATIONSHIP#bits row (hard ceiling 10, at most 3 new per day). It renders back into the memory block through read_recent_summaries, so the coach can call a running bit back weeks later. Zero lines added to telegram_worker_lambda.py.",
+    "rationale": "Recurring bits are how a real texting relationship accumulates texture, and they were washing out of the rolling summary. One extraction path, not two: the summarizer had already read the transcript, so this is one more instruction on an existing Haiku call rather than a second model pass. Honesty (ADR-104) is enforced deterministically, not by prompt: a candidate is stored only if its normalized text is literally present in the transcript, so a paraphrased or invented bit \u2014 a fabricated shared history \u2014 cannot land. The cap has a written, total eviction rule (sightings desc, then last_seen desc, then alphabetical) so the ledger records what RECURS rather than what is merely recent. The row is CROSS_PHASE with the rest of the texting relationship (ADR-153): a reset re-anchors the experiment, it does not un-say a shared joke.",
+    "ref": "#2487 (epic #2363)",
+    "observed_effect": null
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "prompt",
+    "summary": "Open-loop keeping (#2486/#2491): two new unsolicited frames \u2014 PROMISE_FRAME (a coach keeps a follow-up it named in a text, on the day it named) and PRE_EVENT_FRAME (the morning of a hard thing Matthew told that coach about). Both ride the existing event_frame lookup, the existing daily cap, quiet hours, silence-respect and write-once event claim; the only evidence either frame carries is the verbatim sentence, re-read from the stored CHAT# turn.",
+    "rationale": "A coach that says 'I'll check in Friday' and then never does is worse for trust than one that never offered. The extraction is deterministic and refuses more than it accepts (an offer, a question, a hedge, or a sentence with no resolvable day produces nothing) because the alternative \u2014 inferring an intent \u2014 is exactly the ADR-104 fabrication this surface cannot afford in a trusted voice. No derived row is written: the CHAT# turn IS the record, so the follow-up quotes what was actually said and the chat path stays the only writer of that partition.",
+    "ref": "#2486 (also delivers #2491); epic #2363",
+    "observed_effect": null
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "voice",
+    "summary": "Reaction emojis (#2485): a bare acknowledgement (\"thanks\", \"got it\") can now be closed with a Telegram setMessageReaction on his message instead of a reply bubble. Whether a coach reacts at all is read off its own texting_style.emoji_posture \u2014 the five coaches whose posture opens \"Essentially never\" / \"Rare to never\" never react. Which emoji: a Telegram-legal emoji the posture itself names, else the new texting_style.reaction_emoji field, added here to physical_coach (\\ud83d\\udc4d) and nutrition_coach (\\ud83d\\udc4c) only.",
+    "rationale": "Answering a \"thanks\" with a fresh paragraph is the tell that nobody is there; a real person taps a reaction and lets the thread close. No shared default exists at the end of the resolution chain, because one would make every coach react identically and erase the per-coach posture. Telegram permits only a fixed reaction set, so persona config is validated against it rather than trusted \u2014 physical's \\ud83d\\udcaa and explorer's \\ud83d\\udcc9/\\ud83d\\udcc8 are not on that list, which is why physical needed an explicit reaction emoji and explorer deliberately gets none (ADR-104: no configured mark, no reaction).",
+    "ref": "#2485 (epic #2363)",
+    "observed_effect": null
+   },
+   {
+    "date": "2026-08-10",
+    "coach": "all",
+    "change_type": "prompt",
+    "summary": "Weather texture, grounder-safe (#2493): every texting coach's fact block now carries a TODAY'S CONDITIONS section read off the SOURCE#weather DATE# row for the Pacific day (condition, high/low, precipitation, humidity, wind, AQI, sunrise/sunset/daylight). It renders alongside the experiment frame rather than inside a domain pack, and joins the grounder's extra_sources through the existing worker wiring \u2014 no new worker lines.",
+    "rationale": "The coach package contained the word 'weather' zero times, so a coach could not mention the sky without inventing it. Making the row a SOURCE is the grounding half: a true, sourced 'overcast and 68F' would otherwise trip fabricated_number, which is #2517's failure mode (evidence the model has but the gate does not). It is not a bypass \u2014 only the figures on the row enter the allow-list, so an invented temperature still fails, and no row for the day renders nothing at all rather than a default (ADR-104). Day-of-week texture was NOT built: _current_moment_line() has shipped it since the humanity pass.",
+    "ref": "#2493 (epic #2363)",
+    "observed_effect": null
+   }
+  ]
+ },
+ "recent_outputs": [],
+ "conversations": {
+  "references": [],
+  "count": 0,
+  "note": "What was said stays private \u2014 these record only that a conversation happened, its coarse theme, and how it moved the coach's read (ADR-142)."
  },
  "dossier": {
-  "commitments": []
- }
+  "verbatim": true,
+  "commitments": [],
+  "commitment_counts": {
+   "held": 0,
+   "kept": 0,
+   "broken": 0,
+   "pending": 0,
+   "unresolved": 0,
+   "ungradeable": 0
+  },
+  "learnings": [],
+  "relationship": null,
+  "docket_positions": [],
+  "withheld": 0,
+  "retracted": 0,
+  "degraded": false,
+  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
+ },
+ "daily": "Matthew has lost 20.2 pounds since Sunday, September 6, bringing him to 307.2 pounds as of Thursday, October 8. His recovery score this morning is 59, with heart-rate variability at 52 milliseconds and resting heart rate at 52 beats per minute after 7.2 hours of sleep. He is on day 34 of the experiment and continues to track progress across weight, sleep, and cardiovascular metrics.",
+ "lead_daily": {
+  "text": "Matthew has lost 20.2 pounds since Sunday, September 6, bringing him to 307.2 pounds as of Thursday, October 8. His recovery score this morning is 59, with heart-rate variability at 52 milliseconds and resting heart rate at 52 beats per minute after 7.2 hours of sleep. He is on day 34 of the experiment and continues to track progress across weight, sleep, and cardiovascular metrics.",
+  "generated_at": "2026-10-09T17:00:14.287047+00:00",
+  "data_through": "2026-10-08",
+  "cited": [
+   {
+    "metric": "day of the experiment",
+    "value": "34",
+    "as_of": "2026-10-09",
+    "source_field": "ai_context.build_experiment_phase_context.days_in"
+   },
+   {
+    "metric": "experiment start date",
+    "value": "Sunday, September 6",
+    "as_of": "2026-09-06",
+    "source_field": "profile.journey_start_date"
+   },
+   {
+    "metric": "latest weigh-in (lb)",
+    "value": "307.2",
+    "as_of": "2026-10-08",
+    "source_field": "withings.weight_lbs"
+   },
+   {
+    "metric": "latest weigh-in date",
+    "value": "Thursday, October 8",
+    "as_of": "2026-10-08",
+    "source_field": "withings.sk"
+   },
+   {
+    "metric": "starting weight (lb)",
+    "value": "327.3",
+    "as_of": "2026-09-06",
+    "source_field": "profile.journey_start_weight_lbs"
+   },
+   {
+    "metric": "lost since the start (lb)",
+    "value": "20.2",
+    "as_of": "2026-10-08",
+    "source_field": "journey.lost_lbs"
+   },
+   {
+    "metric": "morning recovery score (0-100, Whoop)",
+    "value": "59",
+    "as_of": "2026-10-09",
+    "source_field": "whoop.recovery_score"
+   },
+   {
+    "metric": "heart-rate variability (ms)",
+    "value": "52",
+    "as_of": "2026-10-09",
+    "source_field": "whoop.hrv"
+   },
+   {
+    "metric": "resting heart rate (beats per minute)",
+    "value": "52",
+    "as_of": "2026-10-09",
+    "source_field": "whoop.resting_heart_rate"
+   },
+   {
+    "metric": "sleep last night (hours)",
+    "value": "7.2",
+    "as_of": "2026-10-09",
+    "source_field": "whoop.sleep_duration_hours"
+   }
+  ],
+  "coach_id": "eli_marsh"
+ },
+ "memoir": null
 }

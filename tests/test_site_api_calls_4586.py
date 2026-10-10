@@ -18,7 +18,8 @@ Pins:
     any sentence the route writes;
   * ``?id=`` serves one call; an unknown id is a 404 with an absence sentence; a failed
     partition read is ``unavailable``, never a shorter list;
-  * the kit page fixture is this route's own output for the wire fixture.
+  * the route's output for the wire fixture is pinned whole (``route_output.json``), and the
+    kit page fixture — a live capture of the deployed route (#4671) — carries the same fields.
 """
 
 from __future__ import annotations
@@ -45,7 +46,8 @@ from web import site_api_calls as calls  # noqa: E402
 GENESIS = "2026-09-06"  # the experiment the captured rows belong to
 TODAY = "2026-10-04"
 _FIX = os.path.join(_REPO, "tests", "fixtures", "calls_wire_4586")
-_KIT = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586", "calls.json")
+_OUT = os.path.join(_FIX, "route_output.json")  # this route's output for the wire fixture, whole
+_KIT = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586", "calls.json")  # the live capture (#4671)
 NAMES = {
     "sleep": "Lisa Park",
     "training": "Sarah Chen",
@@ -371,17 +373,34 @@ def _body(resp):
     return json.loads(resp["body"])
 
 
-def test_the_route_serves_the_list_and_the_kit_fixture_is_its_output(monkeypatch):
+def test_the_route_serves_the_list_and_its_output_is_pinned_whole(monkeypatch):
     api = _wire(monkeypatch)
     resp = api.handle_calls({"queryStringParameters": None})
     assert resp["statusCode"] == 200
     body = _body(resp)
     assert body["state"] == "ok" and body["count"] == 33 and body["today"] == TODAY
     body.pop("_meta", None)
+    with open(_OUT, encoding="utf-8") as fh:
+        out = json.load(fh)
+    out.pop("_meta", None)
+    assert out == body, "tests/fixtures/calls_wire_4586/route_output.json must be this route's output for the wire fixture"
+
+
+def test_the_kit_page_capture_carries_the_fields_this_route_writes(monkeypatch):
+    """The kit page fixture is the DEPLOYED route's output on its capture day (#4671), so it is
+    not this wire's output; it must still be this route's shape — the same top-level fields,
+    and every call the same fields as a call this route writes of its kind."""
+    body = _body(_wire(monkeypatch).handle_calls({"queryStringParameters": None}))
     with open(_KIT, encoding="utf-8") as fh:
         kit = json.load(fh)
-    kit.pop("_meta", None)
-    assert kit == body, "tests/fixtures/kit_pages_4586/calls.json must be this route's output for the wire fixture"
+    assert set(kit) == set(body), f"top-level fields differ: {sorted(set(kit) ^ set(body))}"
+    assert kit["state"] == "ok" and kit["count"] == len(kit["calls"]) > 0
+    shape = {}
+    for call in body["calls"]:
+        shape.setdefault(call["kind"], set(call))
+    for call in kit["calls"]:
+        assert call["kind"] in shape, f"{call['id']}: a kind this route does not write ({call['kind']})"
+        assert set(call) == shape[call["kind"]], f"{call['id']}: fields differ: {sorted(set(call) ^ shape[call['kind']])}"
 
 
 def test_an_id_serves_one_call_and_an_unknown_id_is_a_404_with_a_sentence(monkeypatch):
