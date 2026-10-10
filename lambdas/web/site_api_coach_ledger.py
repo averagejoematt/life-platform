@@ -28,6 +28,7 @@ from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
+    plain_words,  # #4714: a pending call's sentence prints under "Next" — only a plain one is listed
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
@@ -1050,6 +1051,11 @@ def handle_predictions(event, *, _g):
                             _due_dates.append(due)
 
                     if status_filter != "all" and p_status != status_filter:
+                        continue
+
+                    # #4714: counted above (the scorecard keeps the row), but a pending sentence a friend could not read
+                    # is not listed — nothing stands in for it. Judged on the words, so rows written before the rule go too.
+                    if p_status == "pending" and not plain_words.is_plain(rec.get("claim_natural"), plain_words.CALL_MAX_CHARS):
                         continue
 
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})

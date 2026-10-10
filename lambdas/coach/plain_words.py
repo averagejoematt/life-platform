@@ -42,6 +42,13 @@ MAX_CHARS = 80
 LONG_WORD = 11
 MAX_LONG_WORDS = 1
 TOO_LONG_WORD = 13
+# A pending call is a whole sentence, not a watch phrase: it gets a longer cap, the rest of the rule is the same (#4714).
+CALL_MAX_CHARS = 160
+
+# Trade terms a short word can carry past the length rules (#4714): the live sleep page printed "Protein-slow-wave
+# hypothesis could activate once protein EWMA reaches 145g+ threshold." Whole words, any case; a hyphenated
+# compound is matched on its parts ("slow-wave" is "slow wave"). Deliberately short: this is the specimen's class.
+JARGON_TERMS: tuple[str, ...] = ("EWMA", "EMA", "slow wave", "hypothesis", "z-score", "sigma", "baseline-adjusted", "autocorrelation")
 
 # The registry's renamed and cut terms, in registry order. Held equal to the registry by test.
 REGISTRY_TERMS: tuple[str, ...] = ("reset", "chronicle", "model", "as of", "Third Wall", "pillar", "gate", "character level")
@@ -56,16 +63,19 @@ def _term_re(term: str) -> re.Pattern[str]:
 
 
 _REGISTRY_RES = tuple((term, _term_re(term)) for term in REGISTRY_TERMS)
+_JARGON_RES = tuple(
+    (term, re.compile(r"(?<![A-Za-z0-9])" + re.escape(term).replace(r"\ ", r"[\s_-]") + r"(?![A-Za-z0-9])", re.I)) for term in JARGON_TERMS
+)
 
 
-def reasons(text: Any) -> list[str]:
+def reasons(text: Any, max_chars: int = MAX_CHARS) -> list[str]:
     """Why this item is not plain, one short reason per broken rule. Empty when it passes."""
     if not isinstance(text, str) or not text.strip():
         return ["empty"]
     item = text.strip()
     out = []
-    if len(item) > MAX_CHARS:
-        out.append(f"{len(item)} characters (the cap is {MAX_CHARS})")
+    if len(item) > max_chars:
+        out.append(f"{len(item)} characters (the cap is {max_chars})")
     words = [w.replace("’", "'").split("'")[0] for w in _WORD_RE.findall(item)]
     too_long = sorted({w.lower() for w in words if len(w) >= TOO_LONG_WORD})
     if too_long:
@@ -76,26 +86,29 @@ def reasons(text: Any) -> list[str]:
     used = [term for term, rx in _REGISTRY_RES if rx.search(item)]
     if used:
         out.append("a word the site does not use with readers: %s" % ", ".join(used))
+    jargon = [term for term, rx in _JARGON_RES if rx.search(item)]
+    if jargon:
+        out.append("a specialist term: %s" % ", ".join(jargon))
     return out
 
 
-def is_plain(text: Any) -> bool:
+def is_plain(text: Any, max_chars: int = MAX_CHARS) -> bool:
     """True when a friend with no training in the field could read this item."""
-    return not reasons(text)
+    return not reasons(text, max_chars)
 
 
-def plain_items(items: Any) -> list[str]:
+def plain_items(items: Any, max_chars: int = MAX_CHARS) -> list[str]:
     """The items that pass, in their order. Anything else is dropped; nothing replaces it."""
     if not isinstance(items, (list, tuple)):
         return []
-    return [item for item in items if is_plain(item)]
+    return [item for item in items if is_plain(item, max_chars)]
 
 
-def failing(items: Any) -> list[str]:
+def failing(items: Any, max_chars: int = MAX_CHARS) -> list[str]:
     """The non-empty items that do not pass, in their order."""
     if not isinstance(items, (list, tuple)):
         return []
-    return [item for item in items if isinstance(item, str) and item.strip() and not is_plain(item)]
+    return [item for item in items if isinstance(item, str) and item.strip() and not is_plain(item, max_chars)]
 
 
 def correction(items: Iterable[str]) -> str:
@@ -105,7 +118,7 @@ def correction(items: Iterable[str]) -> str:
         return ""
     quoted = "; ".join('"%s"' % item for item in bad)
     return (
-        "\n\nSTRICT CORRECTION: these 'focused_on_now' items are not plain enough for a general reader and "
+        "\n\nSTRICT CORRECTION: these 'focused_on_now' / 'set_aside_for_now' items are not plain enough for a general reader and "
         f"will not be shown: {quoted}. Rewrite every item as one short phrase a friend with no training in "
         f"this field could read: everyday words, at most {MAX_CHARS} characters, no specialist term."
     )
