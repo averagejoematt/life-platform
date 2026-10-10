@@ -13,8 +13,8 @@ It is a REPORT, not a gate. It always exits 0. The coverage passes are what fail
 A label whose file ran no tests is reported with a warning, because a renamed file would
 otherwise leave its label silently empty.
 
-USAGE:
-  python3 scripts/ci_test_sections.py /tmp/junit_parallel.xml /tmp/junit_serial.xml
+USAGE (since the box-4 split, one JUnit per shard leg, all downloaded into shard-out/):
+  python3 scripts/ci_test_sections.py shard-out/junit-parallel-1.xml shard-out/junit-parallel-2.xml shard-out/junit-serial.xml
 """
 
 from __future__ import annotations

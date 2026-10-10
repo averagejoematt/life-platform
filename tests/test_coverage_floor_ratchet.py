@@ -190,9 +190,13 @@ def _ci_text():
 
 
 def _ci_cov_fail_under():
-    m = re.search(r"--cov-fail-under=(\d+)", _ci_text())
-    assert m, "no --cov-fail-under=N found in ci-cd.yml — the enforced coverage gate is missing"
-    return int(m.group(1))
+    # #4252: the floor is graded by `coverage report --fail-under=N` over the combined
+    # shard data (pytest's `--cov-fail-under=N` before the split) — either spelling. The
+    # shard legs pass `--cov-fail-under=0` (a leg grades nothing), which is not a floor.
+    floors = [int(v) for v in re.findall(r"--(?:cov-)?fail-under=(\d+)", _ci_text()) if int(v) != 0]
+    assert floors, "no --fail-under=N / --cov-fail-under=N found in the CI workflows — the enforced coverage gate is missing"
+    assert len(set(floors)) == 1, f"the CI workflows carry different coverage floors: {floors}"
+    return floors[0]
 
 
 def _ci_gap_warn_floor():

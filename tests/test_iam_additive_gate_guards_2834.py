@@ -35,9 +35,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "deploy"))
 sys.path.insert(0, str(ROOT / "cdk"))
 
-import iam_additive_gate as g  # noqa: E402
-import iam_additive_registry as reg  # noqa: E402
-from stacks import constants  # noqa: E402
+from cdk_constants_env import committed_cdk_constants  # noqa: E402
+
+with committed_cdk_constants():  # #4252: order-independent of other modules' env fakes
+    import iam_additive_gate as g  # noqa: E402
+    import iam_additive_registry as reg  # noqa: E402
+    from stacks import constants  # noqa: E402
 
 pytestmark = pytest.mark.deploy_critical
 

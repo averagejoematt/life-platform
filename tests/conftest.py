@@ -470,6 +470,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps the skill registry + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
+        "test_ci_test_shards_4252.py",  # #4252: lists tests/ — every test file in exactly one shard leg; ci-test.yml's matrix + combine step held to it
         # #2848: the operating-knowledge ledger. Verdict is pure repo shape — the committed
         # snapshot vs its rows, and whether every cited home is a tracked path. A PR that
         # renames a homed page or drops a ledger row must red BEFORE the merge; post-merge
@@ -943,6 +944,17 @@ _PREMERGE_TREE_SWEEP_EXCLUDED = {
         "not a population that changes with the repo"
     ),
 }
+
+
+def pytest_ignore_collect(collection_path, config):
+    """#4252: a ci-test.yml shard leg (CI_TEST_SHARD=K/N) collects only its own test
+    files. Unset everywhere else, so every other run collects exactly what it did.
+    The partition contract lives in tests/ci_shard.py."""
+    import ci_shard
+
+    if ci_shard.excluded(str(collection_path), os.environ.get(ci_shard.SHARD_ENV, "")):
+        return True
+    return None
 
 
 def pytest_collection_modifyitems(config, items):

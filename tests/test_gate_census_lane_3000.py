@@ -509,7 +509,15 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 775  # 774 -> 775 (2026-10-09, #4638 the upstream-changes facet guard, stacked on #4636 at
+BASELINE_TOTAL_GATES = 777  # 775 -> 777 (2026-10-10, #4252 box 4 the Unit Tests shard legs): TWO entrants,
+# both PROVEN on arrival (CI_PROOFS in scripts/gate_census_proofs.py, each step's own run body executed + mutated):
+# `ci::ci-test.yml::shard::3` (shard / Install test dependencies) and `ci::ci-test.yml::shard::4` (shard / Coverage
+# pass — this leg's share of tests/). The suite moved from the `test` job into a 3-leg `shard` matrix; `test` keeps its
+# name and now combines the legs' coverage data. Nothing leaves: `test / Test coverage gate (regression floor,
+# ADR-080)` is the same label (now the combine step) and is PROVEN in the same diff, so its line leaves
+# ledgers/gate_census_unproven_residue.py. MEASURED on main 775 {proven 250, unproven 513, not-applicable 7,
+# attempted-unproven 5} -> lane 777 {253, 512, 7, 5}.
+# PRIOR: 775  # 774 -> 775 (2026-10-09, #4638 the upstream-changes facet guard, stacked on #4636 at
 # merge): ONE entrant, `structural::test_upstream_changes_4638.py` (new: rglobs lambdas/ scripts/ deploy/ mcp/ for an
 # Apple Health rebuild-a-day caller, keyword or positional), PROVEN on arrival (MutationSpec + proof in
 # scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED after merging origin/main: main 774
