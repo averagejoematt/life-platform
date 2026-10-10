@@ -34,6 +34,11 @@ try:
 except ImportError:  # bundle stages lambdas/ at the zip root
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
         from panelcast_zeitgeist import zeitgeist_prompt_block
+try:  # #4536: the one Panel state-visibility predicate (tombstone, phase, and genesis)
+    from emails.panelcast_desk import visible as _visible
+except ImportError:
+    if not TYPE_CHECKING:
+        from panelcast_desk import visible as _visible
 
 SHOW_MEMORY_SK = "SHOW#memory"
 MAX_CALLBACKS = 10
@@ -120,10 +125,11 @@ def _fallback(logger, stage: str, stop_reason, detail: str) -> dict:
 
 def load_show_memory(table, user_id, logger) -> dict:
     """The episode-memory ledger — callbacks + guest history. Absence = empty
-    memory (seeded on the first v2 publish), never an error."""
+    memory (seeded on the first v2 publish), never an error. #4536: a tombstoned,
+    other-phase or pre-genesis row is absence too — a wiped cycle is not the show's memory."""
     memory: dict[str, list[dict[str, Any]]] = {"callbacks": [], "guest_history": []}
     try:
-        it = table.get_item(Key={"pk": f"USER#{user_id}#SOURCE#panelcast", "sk": SHOW_MEMORY_SK}).get("Item")
+        it = _visible(table.get_item(Key={"pk": f"USER#{user_id}#SOURCE#panelcast", "sk": SHOW_MEMORY_SK}).get("Item"))
         if it:
             memory["callbacks"] = [dict(c) for c in (it.get("callbacks") or [])][-MAX_CALLBACKS:]
             memory["guest_history"] = [dict(g) for g in (it.get("guest_history") or [])][-MAX_GUEST_HISTORY:]
@@ -140,14 +146,18 @@ def write_show_memory(table, user_id, logger, week, title, pull_quote, guest_id,
         cbs.append({"week": week, "title": title or "", "pull_quote": pull_quote or "", "open_bet": open_bet or ""})
         gh = [g for g in memory["guest_history"] if g.get("week") != week]
         gh.append({"week": week, "coach_id": guest_id, "name": guest_name or guest_id})
+        from experiment.phase_taxonomy import experiment_stamp_for
+
+        pk = f"USER#{user_id}#SOURCE#panelcast"
         table.put_item(
             Item={
-                "pk": f"USER#{user_id}#SOURCE#panelcast",
+                "pk": pk,
                 "sk": SHOW_MEMORY_SK,
                 "record_type": "show_memory",
                 "callbacks": cbs[-MAX_CALLBACKS:],
                 "guest_history": gh[-MAX_GUEST_HISTORY:],
                 "updated_at": datetime.now(timezone.utc).isoformat(),
+                **experiment_stamp_for(pk, SHOW_MEMORY_SK),  # #4536: the reset can tag and wipe it with the cycle
             }
         )
     except Exception as e:
