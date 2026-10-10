@@ -60,6 +60,25 @@ ARCHIVE_START = "2000-01-01"
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
+# #4643: the ER-01 INGEST_HEALTH#<name> sentinel every run writes (record_ingest_health), the
+# same writer notion/dropbox/hevy use — so a dead or erroring enrichment is visible to liveness.
+HEALTH_SOURCE = "activity_enrichment"
+try:
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
+
+def _record_health(*, succeeded: bool, exc=None) -> None:
+    """Best-effort INGEST_HEALTH write for this run (the Lambda ran = attempted). Never raises."""
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    error_class = "none" if succeeded else (exc if isinstance(exc, str) else classify_error(exc))
+    record_ingest_health(table, HEALTH_SOURCE, logger, attempted=True, succeeded=succeeded, error_class=error_class)
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -352,6 +371,7 @@ def enrich_date_range(start_date: str, end_date: str):
 
     enriched_count = 0
     skipped_count = 0
+    malformed_count = 0
 
     for day in target_days:
         date_str = _day_date(day)
@@ -377,6 +397,7 @@ def enrich_date_range(start_date: str, end_date: str):
                 enriched = build_enriched_name(act, recovery, None, None, sorted_elevations, sorted_distances)
             except Exception as exc:  # noqa: BLE001 — one bad row must cost one bad row
                 logger.error(f"[enrichment] {date_str} | skipping malformed activity '{name}': {exc}", exc_info=True)
+                malformed_count += 1  # #4643: the run's health record fails on it, not only the log line
                 updated_activities.append(act)
                 continue
 
@@ -416,7 +437,7 @@ def enrich_date_range(start_date: str, end_date: str):
             )
 
     logger.info(f"[enrichment] Complete — enriched={enriched_count} skipped={skipped_count}")
-    return {"enriched": enriched_count, "skipped": skipped_count, "days_processed": len(target_days)}
+    return {"enriched": enriched_count, "skipped": skipped_count, "malformed": malformed_count, "days_processed": len(target_days)}
 
 
 # ── Lambda handler ────────────────────────────────────────────────────────────
@@ -454,6 +475,9 @@ def lambda_handler(event, context):
             end_date = yesterday
 
         result = enrich_date_range(start_date, end_date)
+        # #4643: a malformed row is a FAILED run for liveness (the window is one day nightly,
+        # so one bad row cannot latch a permanent streak).
+        _record_health(succeeded=not result.get("malformed"), exc="parse")
 
         return {
             "statusCode": 200,
@@ -468,4 +492,5 @@ def lambda_handler(event, context):
         }
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)
+        _record_health(succeeded=False, exc=e)  # #4643
         raise
