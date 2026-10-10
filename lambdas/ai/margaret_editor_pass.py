@@ -36,7 +36,8 @@ gate the whole pass behind `budget_guard.allow("chronicle_editor")`
 (tier-1 pause, matching `coach_narrative`) before even requesting a critique.
 
 Pure functions, no AWS, no HTTP — callers supply `critique_fn` / `revise_fn`
-(each a `(system, user) -> str` callable, typically a thin wrapper around
+(`(system, user) -> str` and `(system, user) -> (str, stop_reason)` callables —
+#4535: the revision reports its stop reason so a cut reply never ships — typically thin wrappers around
 `retry_utils.call_anthropic_api(..., model=AI_MODEL_HAIKU)`), the current
 allow-listed numbers (from `grounded_generation.allowed_numbers`), and the
 due-callback promises (from the PERSONA#elena CALLBACK# ledger, #537).
@@ -71,6 +72,49 @@ MAX_WORD_RATIO = 1.6
 
 # The editor's note is narrative texture, not a weekly fixture.
 NOTE_MIN_DAYS_BETWEEN = 28
+
+# #4535: the revision is the WHOLE installment again, so its output budget is measured
+# from the draft it rewrites — never a flat cap. The old flat 1,500 tokens sat below a
+# 1,200-1,800-word target (~1.3-1.4 tokens per English word ⇒ ~1,600-2,500 tokens), and
+# two installments shipped cut off mid-sentence (wk3 published, wk4 draft). The budget
+# covers the longest revision the word-ratio gate would still accept (MAX_WORD_RATIO ×
+# the draft) at a conservative tokens-per-word, plus the title / stats / footer lines.
+REVISION_TOKENS_PER_WORD = 1.5
+REVISION_FORMAT_TOKENS = 256
+REVISION_MIN_TOKENS = 4096
+REVISION_MAX_TOKENS = 8192
+
+# The closing signature every chronicle installment ends on (the same pattern the Story
+# Desk's writer pins, content/story_writers.CHRONICLE_FOOTER).
+CHRONICLE_FOOTER = r"\*Week \d+ of The Measured Life\*|\*Prologue — The Measured Life\*"
+
+
+def revision_max_tokens(draft_text):
+    """The revision call's output budget, measured from the draft (#4535)."""
+    words = len((draft_text or "").split())
+    need = int(words * MAX_WORD_RATIO * REVISION_TOKENS_PER_WORD) + REVISION_FORMAT_TOKENS
+    return max(REVISION_MIN_TOKENS, min(REVISION_MAX_TOKENS, need))
+
+
+def _split_reply(reply):
+    """A revise_fn reply is ``(text, stop_reason)`` or a bare string (stop_reason unknown)."""
+    if isinstance(reply, tuple) and len(reply) == 2:
+        return reply[0], reply[1]
+    return reply, None
+
+
+def revision_completeness_findings(revised, stop_reason):
+    """Why a revision is NOT a finished installment (#4535), or [] when it is.
+
+    The model's own verdict first — anything but ``end_turn`` means the reply was cut,
+    whatever the text looks like — then the text itself: it must end on the
+    ``*Week N of The Measured Life*`` footer, and the prose before the footer must end
+    on a terminal sentence. Shares ``content.story_checks.completeness`` with the Story
+    Desk so the two writers hold one definition of "finished"."""
+    from content.story_checks import completeness
+
+    return completeness(revised, stop_reason=stop_reason, footer_pattern=CHRONICLE_FOOTER)
+
 
 _FALLBACK_NARRATOR = {
     "name": "Margaret Calloway",
@@ -345,22 +389,39 @@ def _deterministic_ok(text, allowed_numbers):
 def apply_revision(installment_text, critique, allowed_numbers, revise_fn):
     """One conditional Haiku revision. Returns (final_text, applied: bool, reason: str).
 
-    Never regresses: keeps the original unless the revision (a) exists, (b) is not
-    degenerate in length, and (c) passes the same deterministic gates as every other
+    Never regresses: keeps the original unless the revision (a) exists, (b) is a
+    FINISHED installment — the model stopped on ``end_turn``, the prose ends on a
+    terminal sentence and the ``*Week N*`` footer is there (#4535), (c) is not
+    degenerate in length, and (d) passes the same deterministic gates as every other
     narrative surface (ADR-104 number-fabrication + privacy_guard).
+
+    ``revise_fn`` returns ``(text, stop_reason)``; a bare string is accepted (stop
+    reason unknown — the text checks still run).
     """
     if not needs_revision(critique):
         return installment_text, False, "no_revision_needed"
     try:
-        revised = revise_fn(None, build_revision_user_message(installment_text, critique))
+        revised, stop_reason = _split_reply(revise_fn(None, build_revision_user_message(installment_text, critique)))
     except Exception as e:
         logger.warning("[margaret] revision call failed (fail-soft, keeping original): %s", e)
         return installment_text, False, f"revise_call_failed:{e}"
     revised = (revised or "").strip()
     if not revised:
         return installment_text, False, "empty_revision"
-    if not _word_count_sane(installment_text, revised):
+    # #4535: a truncated revision never ships — the draft does, and the fallback is named.
+    # The model's own stop verdict is read first (a cut reply is "truncated" even when it
+    # is also short); the text checks run after the length sanity check.
+    incomplete = revision_completeness_findings(revised, stop_reason)
+    model_cut = stop_reason is not None and stop_reason != "end_turn"
+    if not model_cut and not _word_count_sane(installment_text, revised):
         return installment_text, False, "word_count_degenerate"
+    if incomplete:
+        logger.warning(
+            "[margaret] revision_truncated — keeping Elena's draft (stop_reason=%s): %s",
+            stop_reason,
+            "; ".join(incomplete),
+        )
+        return installment_text, False, f"revision_truncated:{stop_reason}"
     ok, reason = _deterministic_ok(revised, allowed_numbers)
     if not ok:
         logger.warning("[margaret] revision rejected by deterministic gate: %s", reason)
