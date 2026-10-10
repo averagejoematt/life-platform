@@ -68,7 +68,9 @@ _TRUTH_FIELD = {
 MIN_N_FOR_STATS = 5
 
 _ID_LEN = 8
-_HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+_HAIKU_MODEL = model_for("eyeball_estimate")
 
 # Vision prompt — asks ONLY for a macro estimate as strict JSON. It is explicitly told
 # this is a calibration estimate, not a food log, so the model is never in a posture of

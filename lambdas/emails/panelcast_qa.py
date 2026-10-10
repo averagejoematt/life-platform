@@ -9,16 +9,16 @@ import logging
 import os
 import re
 
-from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+from ai.model_routing import model_for  # #4770: the one model registry
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+MODEL = model_for("chronicle.panelcast_qa")
 # #1180: the CRAFT items (read-aloud Turing test, humour/human texture, arc rhythm) are
 # NARRATIVE judgment, not structure — ADR-049 puts that on the Sonnet tier, not Haiku. The
 # structure/accuracy rubrics below stay on Haiku (MODEL); _craft_judge runs on this model.
-CRAFT_MODEL = os.environ.get("AI_MODEL_SONNET", NARRATIVE_MODEL)
+CRAFT_MODEL = model_for("chronicle.panelcast_craft")
 
 # ── QA rigor (automates the manual review loop, 2026-06-17) ───────────────────
 # Two layers on top of the ER-03 + Compassion gates, both catching CRAFT/accuracy

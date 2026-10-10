@@ -102,9 +102,9 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry (each route keeps its env override)
 
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-
+AI_MODEL_HAIKU = model_for("coach_narrative.quality_gate")
 # Quality gate thresholds
 PASS_SCORE_THRESHOLD = 60  # Score below this = failed
 VOICE_DISTINCTIVENESS_MINIMUM = 40  # Below this = flagged as generic

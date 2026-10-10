@@ -16,7 +16,9 @@ import json
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from ai.model_defaults import NARRATIVE_MODEL as WRITER_MODEL  # noqa: E402 — the one narrative default (#4275)
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+WRITER_MODEL = model_for("story.writer")
 
 from content import story_checks, story_craft, story_ledger
 

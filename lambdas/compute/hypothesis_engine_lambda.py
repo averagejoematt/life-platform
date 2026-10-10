@@ -109,10 +109,10 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry (each route keeps its env override)
 
-# AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+AI_MODEL = model_for("hypothesis_engine")
+AI_MODEL_HAIKU = model_for("hypothesis_engine.check")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 CALIBRATION_PK = f"USER#{USER_ID}#SOURCE#calibration"  # #530: resolution ledger (cross_phase)

@@ -525,8 +525,10 @@ def _judge(transcript, persona_names=None):
             "  - coherent: it actually answers the question.\n"
             'Respond ONLY as JSON: {"coherent": bool, "notes": ["short issue", ...]}.\n\n' + json.dumps(transcript, default=str)[:6000]
         )
+        from ai.model_routing import model_for  # #4770: the one model registry (read at call time, as before)
+
         body = {
-            "model": os.environ.get("AI_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+            "model": model_for("website_ai.quality_canary"),
             "max_tokens": 400,
             "system": "Terse QA judge. JSON only.",
             "messages": [{"role": "user", "content": prompt}],

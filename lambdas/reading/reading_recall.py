@@ -25,7 +25,9 @@ logger = logging.getLogger()
 INTERVALS = [3, 7, 16, 35, 90, 180]
 RETENTION_N_GATE = 3  # no retentionScore until this many scored probes exist (§7)
 
-MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("reading.recall")
 
 _GIST_SYSTEM = (
     "You score spaced-retrieval recall for a reader. You receive the prompt asked weeks after a book "

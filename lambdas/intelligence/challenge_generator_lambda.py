@@ -65,7 +65,9 @@ table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
-AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL = model_for("challenge_generator")
 
 CHALLENGES_PK = f"USER#{USER_ID}#SOURCE#challenges"
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"

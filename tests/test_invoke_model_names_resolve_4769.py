@@ -19,7 +19,11 @@ What "statically resolves" covers:
     unset (`ai/model_defaults.py` records that only `AI_MODEL_HAIKU` is set, on 8 functions);
   * a name imported from another module under `lambdas/` or `mcp/` (e.g. `NARRATIVE_MODEL`),
     followed to its binding there;
-  * `a or B` — each operand that resolves is checked.
+  * `a or B` — each operand that resolves is checked;
+  * `model_for("<route>")` / `model_routing.model_for("<route>")` — the #4770 registry call,
+    followed to `ai.model_routing.default_model_for(route)` (the registry's own answer when the
+    route's env var is unset, the same rule as an env default above). An unknown route is an
+    offender, never a skip.
 
 KNOWN GAP (stated, not hidden): a value that is a function parameter, a function-local
 variable, a subscript (`deps["writer_model"]`) or `body["model"]` is only known at run time
@@ -114,6 +118,14 @@ class _Resolver:
             return out or None
         if isinstance(expr, ast.Call) and _is_env_get(expr) and len(expr.args) >= 2:
             return self.resolve(expr.args[1], path, local_imports, depth + 1)
+        route = _registry_route(expr)
+        if route is not None:
+            from ai import model_routing
+
+            try:
+                return [model_routing.default_model_for(route)]
+            except model_routing.UnknownRouteError:
+                return [f"<unknown model route {route!r}>"]
         if isinstance(expr, ast.Name):
             assigns, imports = self._bindings(path)
             if expr.id in local_imports:
@@ -125,6 +137,21 @@ class _Resolver:
                 src, name = imports[expr.id]
                 return self.resolve(ast.Name(id=name), src, {}, depth + 1)
         return None
+
+
+_REGISTRY_RESOLVERS = ("model_for", "default_model_for")
+
+
+def _registry_route(expr: ast.expr) -> str | None:
+    """The literal route of a `model_for("<route>")` registry call (#4770), else None."""
+    if not isinstance(expr, ast.Call) or not expr.args:
+        return None
+    f = expr.func
+    name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else None
+    arg = expr.args[0]
+    if name in _REGISTRY_RESOLVERS and isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+        return arg.value
+    return None
 
 
 def _is_env_get(call: ast.Call) -> bool:

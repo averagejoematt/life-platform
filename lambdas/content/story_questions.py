@@ -74,9 +74,9 @@ def generate(dossier: Dict[str, Any], ledger_view: Dict[str, Any], *, invoke: Op
     try:
         if invoke is None:
             from ai import bedrock_client
-            from ai.model_defaults import NARRATIVE_MODEL
+            from ai.model_routing import model_for
 
-            resp = bedrock_client.invoke_with_retry(body, NARRATIVE_MODEL)
+            resp = bedrock_client.invoke_with_retry(body, model_for("story.questions"))
         else:
             resp = invoke(body, "test")
         if resp.get("stop_reason") != "end_turn":
@@ -274,9 +274,9 @@ def copyedit(answer: str, *, invoke: Optional[Callable[..., Dict[str, Any]]] = N
     try:
         if invoke is None:
             from ai import bedrock_client
-            from ai.model_defaults import NARRATIVE_MODEL
+            from ai.model_routing import model_for
 
-            resp = bedrock_client.invoke_with_retry(body, NARRATIVE_MODEL)
+            resp = bedrock_client.invoke_with_retry(body, model_for("story.questions"))
         else:
             resp = invoke(body, "test")
         if resp.get("stop_reason") != "end_turn":

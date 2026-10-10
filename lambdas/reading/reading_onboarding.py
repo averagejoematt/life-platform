@@ -18,7 +18,9 @@ import logging
 
 logger = logging.getLogger()
 
-MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("reading.onboarding")
 
 # The question bank (calibration §8). Cora picks ~6-8 conversationally and follows
 # threads — this is the pool, not a script. Exclusions are signal too.

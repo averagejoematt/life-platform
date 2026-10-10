@@ -73,7 +73,9 @@ except ImportError:  # pragma: no cover — layer-module fallback (local tooling
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("social_enrichment")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 # Channels this enricher sweeps. Defaults to the one inbound source that exists (#1669);

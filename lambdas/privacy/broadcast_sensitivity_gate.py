@@ -49,6 +49,8 @@ from __future__ import annotations
 import re
 from collections import namedtuple
 
+from ai.model_routing import model_for  # #4770: the one model registry
+
 from privacy import privacy_guard  # ── Verdict seam constants (the stable contract #1672 consumes) ────────────────────
 
 STATUS_ATTR = "sensitivity_status"
@@ -282,7 +284,8 @@ _BUDGET_FEATURE = "broadcast_sensitivity"
 # It passed the bare name "haiku" until #4769, which before #4306 silently fell back to
 # Haiku 4.5 and since #4306 raised UnknownModelError on every call, so the classifier never
 # returned a verdict. Haiku 4.5 is therefore the model this always meant; the tier is unchanged.
-OFFTOPIC_MODEL = "claude-haiku-4-5-20251001"
+# Resolved through the one registry (#4770): route `broadcast_sensitivity` → workhorse → Haiku 4.5.
+OFFTOPIC_MODEL = model_for("broadcast_sensitivity")
 
 _OFFTOPIC_SYSTEM = (
     "You are a topic-relevance gate for a public feed about ONE person's health, fitness, "

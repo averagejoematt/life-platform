@@ -62,7 +62,9 @@ MAX_QUESTION_CHARS = 300
 MAX_ANSWER_CHARS = 4000
 
 # Structured task → Haiku (model tiering, ADR-049); env-overridable.
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("coach_checkin")
 
 SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
 
