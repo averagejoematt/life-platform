@@ -239,9 +239,15 @@ def tokens_for_daily_run(today: str | None = None) -> list:
     pre-start negative value, or an unreadable genesis) keeps the full list —
     once the current cycle has legitimately run longer than that, the
     reset-window entries are dropped so real progress doesn't red the sweep.
+
+    Off-by-one (#4689): the site's counter is days_since_genesis + 1 (genesis day
+    is "Day 1"), and the Day-30+ pattern fires on "Day 30" itself. So the window
+    closes when the DAY NUMBER reaches RESET_WINDOW_DAYS (days_since_genesis ==
+    RESET_WINDOW_DAYS - 1), not one day later — the old `days <= 30` kept the
+    token through the legitimate "Day 31" and the weekly sweep redded on /api/vitals.
     """
     days = days_since_genesis(today)
-    if days is None or days <= RESET_WINDOW_DAYS:
+    if days is None or days + 1 < RESET_WINDOW_DAYS:
         return FORBIDDEN_TOKENS
     return [t for t in FORBIDDEN_TOKENS if t[0] not in RESET_WINDOW_LABELS]
 
