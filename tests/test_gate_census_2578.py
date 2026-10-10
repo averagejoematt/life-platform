@@ -1062,7 +1062,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # the sweep holding the stated apple_health upstream_changes facet to "no rebuild-a-day caller" (keyword OR
         # positional monotonic_guard) — arrives PROVEN via the re-runnable harness (MutationSpec + proof, ARMED 1/1).
         # Measured after merging origin/main: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
-        <= 250
+        # Upper bound 250 -> 251 (2026-10-10, #4694, stacked on #4638): guard::lambdas/content/autopublish_audit.py — the deterministic audit
+        # an unapproved chronicle must pass before the stale-draft sweep publishes it — arrives PROVEN (GUARD_PROOFS: four
+        # mutations, 5/1/5/1 red, restored 14 passed). Measured on top of #4638: 775 {250, 513, 7, 5} -> 776 {251, 513, 7, 5}.
+        <= 251
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

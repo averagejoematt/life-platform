@@ -126,6 +126,12 @@
       "stack": "operational_stack",
       "via": "declaration"
     },
+    "chronicle-autopublish-held": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
     "chronicle-delivery-heartbeat": {
       "kind": "metric",
       "routing": "urgent",
@@ -975,7 +981,7 @@
   ],
   "cost_surface": {
     "ai_features": 20,
-    "alarms": 133,
+    "alarms": 134,
     "emf_namespaces": 32,
     "schedules": 92,
     "secrets": 30
@@ -7562,9 +7568,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 133,
+      "alarms": 134,
       "alarms_by_routing": {
-        "digest": 89,
+        "digest": 90,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,

@@ -6,7 +6,7 @@ memory. Facade state via `_g` (the module's live globals), the #1654 split shape
 
 import json
 
-from content import story_checks
+from content import autopublish_audit, story_checks
 
 
 def door_reasons(text: str) -> list:
@@ -26,7 +26,11 @@ def desk_episode(post: dict, *, _g) -> dict | None:
         it = _g["table"].get_item(Key={"pk": f"USER#{_g['USER_ID']}#SOURCE#chronicle", "sk": f"DATE#{post.get('date')}"}).get("Item") or {}
         raw = it.get("desk_episode_json")
         ep = json.loads(raw) if raw else None
-        return ep if ep and ep.get("turns") else None
+        if ep and ep.get("turns"):
+            # #4694: the desk's own residual findings on THIS script ride along, so the render can refuse an unaudited one
+            ep["_audit_blocking"] = autopublish_audit.episode_blocking(it.get("desk_findings_json"))
+            return ep
+        return None
     except Exception as e:  # noqa: BLE001 — the legacy writer is the fallback, never a crash
         _g["logger"].warning("[panel] desk episode read failed — %s; using the legacy writer", e)
         return None
@@ -47,6 +51,10 @@ def publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False, *, _
     unsafe = [r for t in turns for r in _g["_safety_gate"](t["line"])]
     # the title and the excerpt are reader copy too, and neither is a spoken turn (#4538)
     unsafe += door_reasons(f"{ep.get('title') or post.get('title') or ''}\n{ep.get('excerpt') or ''}")
+    # #4694: an episode script the desk left with a blocking finding (a fact, a body number, an unheld quote …) is not
+    # audited, and the chronicle's approve click never showed it to anyone — HOLD it for a human, loudly (SNS names the
+    # week). Absent the key (an episode handed in by another caller) there is nothing recorded to refuse on.
+    unsafe += [f"audit: {f}" for f in ep.get("_audit_blocking") or []]
     if unsafe:
         if dry_run:
             return _g["_dry"](week, "HOLD", stage="desk-safety", reasons=sorted(set(unsafe)))

@@ -58,6 +58,9 @@ ELENA_STATE_UPDATER_NAME = os.environ.get("ELENA_STATE_UPDATER_NAME", "elena-sta
 COACH_PANEL_PODCAST_NAME = os.environ.get("COACH_PANEL_PODCAST_NAME", "coach-panel-podcast")
 
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
+# #4694: the literal the stale-draft sweep logs when it refuses an unaudited draft — equal to
+# content.autopublish_audit.HELD_TOKEN, and the MetricFilter behind the `chronicle-autopublish-held` alarm.
+HELD_TOKEN = "CHRONICLE-AUTOPUBLISH-HELD"  # noqa: S105 — a log token, not a credential
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -510,6 +513,9 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
 # sweeps drafts older than the review window and publishes them via the SAME path the
 # approve click uses (privacy/vice guards already ran at draft time). "Editor review
 # window + a fail-safe" — how a real team keeps the weekly running.
+# #4694: the fail-safe publishes only what passes the deterministic audit
+# (content/autopublish_audit.py). A draft nobody approved and the audit did not pass
+# stays a draft, and the sweep says so loudly (HELD_TOKEN → an alarm) every day it waits.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -547,13 +553,43 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
     return out
 
 
+def _audit_refusal(item: dict) -> list[str]:
+    """#4694: the blocking items that keep an UNAPPROVED draft from publishing itself (empty = the audit passed).
+
+    Fail-closed: an audit that cannot run is a refusal, never a pass. The approve click does not call this — an owner
+    approval is the other way through."""
+    try:
+        from content import autopublish_audit
+
+        return autopublish_audit.blocking_items(item)
+    except Exception as exc:  # noqa: BLE001 — a broken audit holds the week; it never waves it through
+        return [f"the audit could not run: {exc}"]
+
+
 def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = False) -> list[dict]:
-    """Publish every stale draft via the approve path. Returns what was (would be) published."""
+    """Publish every stale draft that passes the deterministic audit (#4694) via the approve path; HOLD the rest
+    loudly. Returns what was (would be) published — a held week is not in it."""
     drafts = _find_stale_drafts(hours, max_days)
     published = []
     for item in drafts:
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
         wk = item.get("week_number", "?")
+        blocking = _audit_refusal(item)
+        if blocking:
+            # #4694: a draft nobody approved and the audit did not pass stays a draft. Loud: the token below pages
+            # through the `chronicle-autopublish-held` alarm, every day the week sits unapproved inside the window,
+            # and this line names the week. The preview email's approve link still publishes it.
+            logger.error(
+                "%s Week %s (%s) held: unapproved for %sh and the audit found %d blocking item(s); approve it from the "
+                "preview email to publish. %s",
+                HELD_TOKEN,
+                wk,
+                date_str,
+                hours,
+                len(blocking),
+                blocking,
+            )
+            continue
         if dry_run:
             published.append({"date": date_str, "week": wk, "dry_run": True})
             continue
