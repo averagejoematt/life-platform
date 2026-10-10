@@ -1,0 +1,1015 @@
+{
+  "captured_at": "2026-10-10T06:08:58.328283+00:00",
+  "fetch_path": "/api/edition",
+  "is_prefix_sample": false,
+  "path": "/api/edition",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "blocks": {
+        "keys": {
+          "catch_up": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "items": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 7,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "chapter": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "dek": {
+                    "type": "string"
+                  },
+                  "podcast": {
+                    "keys": {
+                      "absent_text": {
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "type": "null"
+                      },
+                      "data": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "read_minutes": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "week_label": {
+                    "type": "string"
+                  },
+                  "word_count": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "coach_lines": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "lines": {
+                    "items": {
+                      "keys": {
+                        "as_of": {
+                          "type": "string"
+                        },
+                        "bet_settles": {
+                          "type": "null"
+                        },
+                        "coach": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        },
+                        "move": {
+                          "type": "string"
+                        },
+                        "move_label": {
+                          "type": "string"
+                        },
+                        "replies_to": {
+                          "type": "null"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "when_text": {
+                          "type": "null"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "mixed_days": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "voice": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "follow": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "next_chapter_date": {
+                    "type": "string"
+                  },
+                  "next_chapter_state": {
+                    "type": "string"
+                  },
+                  "promise": {
+                    "type": "string"
+                  },
+                  "sends": {
+                    "items": {
+                      "keys": {
+                        "conditional": {
+                          "type": "boolean"
+                        },
+                        "next_date": {
+                          "type": "string"
+                        },
+                        "sender": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "his_words": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "date_text": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "life": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "order": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 8,
+                    "type": "array"
+                  },
+                  "rows": {
+                    "keys": {
+                      "body": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "experiments": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "food": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "habits": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "mind": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "type": "null"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sleep": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "supplements": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "training": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 8,
+                "type": "array"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "next": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "bet": {
+                    "keys": {
+                      "absent_text": {
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "type": "string"
+                      },
+                      "data": {
+                        "keys": {
+                          "question": {
+                            "type": "string"
+                          },
+                          "settle_date": {
+                            "type": "string"
+                          },
+                          "sides": {
+                            "items": {
+                              "keys": {
+                                "coach": {
+                                  "type": "string"
+                                },
+                                "says": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "length_sample": 2,
+                            "type": "array"
+                          },
+                          "topic": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "chapter": {
+                    "keys": {
+                      "absent_text": {
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "type": "string"
+                      },
+                      "data": {
+                        "keys": {
+                          "date": {
+                            "type": "string"
+                          },
+                          "drafted_not_promised": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "premise": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "copy_key": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "record": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "beats_simple_guess": {
+                    "type": "boolean"
+                  },
+                  "brier_skill": {
+                    "type": "number"
+                  },
+                  "comparison_text": {
+                    "type": "string"
+                  },
+                  "count_text": {
+                    "type": "string"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "right": {
+                    "type": "integer"
+                  },
+                  "skill_n": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "scorecard": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "null"
+              },
+              "data": {
+                "type": "null"
+              },
+              "source": {
+                "type": "null"
+              },
+              "state": {
+                "type": "string"
+              },
+              "todo": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "today": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "change_lbs": {
+                    "type": "number"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "goal_weight_lbs": {
+                    "type": "number"
+                  },
+                  "start_date": {
+                    "type": "string"
+                  },
+                  "start_weight_lbs": {
+                    "type": "number"
+                  },
+                  "weight_lbs": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "week": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "days": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 7,
+                    "type": "array"
+                  },
+                  "detail": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "facts": {
+                          "items": {
+                            "keys": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "length_sample": 4,
+                          "type": "array"
+                        },
+                        "summary": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 7,
+                    "type": "array"
+                  },
+                  "measures": {
+                    "keys": {
+                      "food": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "met": {
+                                "items": {
+                                  "type": "boolean"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "values": {
+                                "items": {
+                                  "type": "number"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sleep": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "met": {
+                                "items": {
+                                  "type": "boolean"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "values": {
+                                "items": {
+                                  "type": "number"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "training": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "met": {
+                                "items": {
+                                  "type": "boolean"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "values": {
+                                "items": {
+                                  "type": "number"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "weight": {
+                        "keys": {
+                          "absent_text": {
+                            "type": "string"
+                          },
+                          "as_of": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "keys": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "values": {
+                                "items": {
+                                  "type": "number"
+                                },
+                                "length_sample": 7,
+                                "type": "array"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "order": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 4,
+                    "type": "array"
+                  },
+                  "weight_series": {
+                    "items": {
+                      "keys": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "lbs": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 26,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "day_n": {
+        "type": "integer"
+      },
+      "order": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 12,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

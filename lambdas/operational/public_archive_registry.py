@@ -162,6 +162,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/diary_shelf",
     "/api/discoveries",
     "/api/domains",
+    "/api/edition",
     "/api/experiment_library",
     "/api/experiment_synthesis",
     "/api/experiments",
