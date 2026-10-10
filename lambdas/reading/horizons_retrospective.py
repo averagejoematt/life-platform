@@ -145,8 +145,12 @@ def _extract_text(resp: dict) -> str:
 def _default_invoker(body: dict) -> dict:
     """Production invoker: the single Bedrock chokepoint (ADR-062), narrative tier."""
     from ai import bedrock_client
+    from ai.model_defaults import NARRATIVE_MODEL
 
-    return bedrock_client.invoke(body, model_name="sonnet")
+    # #4769: this passed the bare name "sonnet", which `resolve_model_id` has rejected with
+    # UnknownModelError since #4306 — so no retrospective could generate. NARRATIVE_MODEL is
+    # the one mapped narrative-tier name; the tier (Sonnet) is unchanged.
+    return bedrock_client.invoke(body, model_name=NARRATIVE_MODEL)
 
 
 def _default_offtopic_classifier(text: str):

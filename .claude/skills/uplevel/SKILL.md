@@ -44,6 +44,11 @@ Fan out a multi-agent survey (Workflow tool; ~6–8 agents, one per lens):
   Matthew-daily-return, friends/family, QS skeptic). Where does the loop break? What's the first
   moment of boredom or confusion? What would make them come back tomorrow?
 
+**Surveyors run on Sonnet (#4773).** Spawn every survey agent with model `sonnet` (the Agent/Task
+`model` argument, or the Workflow agent's model option). The adversarial verification below and
+the Phase-2 rank-and-pick stay on the strong model: `finding-verifier` is pinned `opus`, and the
+driver does the ranking itself.
+
 Seeds come from the LIVE backlog, not a static list (ADR-099 — GitHub issues are the single
 source of truth for forward work): run the ranked selector below and treat the top rows as
 candidate seeds — it's already sorted by each issue's own stored `Impact × Confidence / Effort`
