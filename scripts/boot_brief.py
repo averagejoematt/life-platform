@@ -244,9 +244,9 @@ def _entered_alarm(item: dict) -> bool:
     try:
         data = item.get("HistoryData")
         data = json.loads(data) if isinstance(data, str) else (data or {})
-        return data.get("newState", {}).get("stateValue") == "ALARM"
+        return (data.get("newState") or {}).get("stateValue") == "ALARM"
     except (ValueError, AttributeError):
-        return "to ALARM" in item.get("HistorySummary", "")
+        return "to ALARM" in (item.get("HistorySummary") or "")
 
 
 def _make_cw_client(region: str):
@@ -273,7 +273,7 @@ def red_alarm_lines(now: _dt.datetime | None = None, client_factory=None, region
             kw = {"StateValue": "ALARM", "AlarmTypes": ["CompositeAlarm", "MetricAlarm"], "MaxRecords": 100}
             while True:
                 resp = cw.describe_alarms(**kw)
-                for a in list(resp.get("MetricAlarms", [])) + list(resp.get("CompositeAlarms", [])):
+                for a in list(resp.get("MetricAlarms") or []) + list(resp.get("CompositeAlarms") or []):
                     since = a.get("StateTransitionedTimestamp") or a.get("StateUpdatedTimestamp")
                     age = now - since if since else _dt.timedelta(0)
                     red.append((age, a.get("AlarmName", "?") + tags, "" if since else " (red since unknown)"))
@@ -281,6 +281,9 @@ def red_alarm_lines(now: _dt.datetime | None = None, client_factory=None, region
                     break
                 kw["NextToken"] = resp["NextToken"]
             hkw = {
+                # The API default is metric alarms only — without this a composite that fired
+                # and cleared in the window is invisible here (#3390/#3503).
+                "AlarmTypes": ["CompositeAlarm", "MetricAlarm"],
                 "HistoryItemType": "StateUpdate",
                 "StartDate": now - _dt.timedelta(hours=FLAP_WINDOW_HOURS),
                 "EndDate": now,
@@ -288,12 +291,12 @@ def red_alarm_lines(now: _dt.datetime | None = None, client_factory=None, region
             }
             for _ in range(_MAX_HISTORY_PAGES):
                 resp = cw.describe_alarm_history(**hkw)
-                for item in resp.get("AlarmHistoryItems", []):
+                for item in resp.get("AlarmHistoryItems") or []:
                     if _entered_alarm(item):
                         name = item.get("AlarmName", "?") + tags
                         ts = item.get("Timestamp")
                         if ts and (name not in fired or ts > fired[name][0]):
-                            fired[name] = (ts, item.get("HistorySummary", ""))
+                            fired[name] = (ts, item.get("HistorySummary") or "")
                 if not resp.get("NextToken"):
                     break
                 hkw["NextToken"] = resp["NextToken"]

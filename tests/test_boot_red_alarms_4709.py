@@ -49,6 +49,54 @@ def test_red_and_flapped_alarms_named_with_duration():
     assert "life-platform-dlq-depth-warning" in out and "fired 9h00m ago" in out
 
 
+class WireFaithfulCW:
+    """Models the CloudWatch API default: with no AlarmTypes, describe_alarms and
+    describe_alarm_history return METRIC alarms only — composites are silently absent
+    (#3390/#3503). A composite is returned only when the caller asks for it."""
+
+    def __init__(self, region):
+        self.region = region
+
+    @staticmethod
+    def _wants_composite(kw):
+        return "CompositeAlarm" in (kw.get("AlarmTypes") or ["MetricAlarm"])
+
+    def describe_alarms(self, **kw):
+        if self.region != "us-west-2":
+            return {}
+        resp = {"MetricAlarms": [{"AlarmName": "metric-red", "StateTransitionedTimestamp": NOW - dt.timedelta(hours=2)}]}
+        if self._wants_composite(kw):
+            resp["CompositeAlarms"] = [
+                {"AlarmName": "life-platform-composite-red", "StateTransitionedTimestamp": NOW - dt.timedelta(days=1, hours=2)}
+            ]
+        return resp
+
+    def describe_alarm_history(self, **kw):
+        if self.region != "us-west-2" or not self._wants_composite(kw):
+            return {"AlarmHistoryItems": []}
+        fired = {"newState": {"stateValue": "ALARM"}}
+        return {
+            "AlarmHistoryItems": [
+                {
+                    "AlarmName": "life-platform-composite-flap",
+                    "AlarmType": "CompositeAlarm",
+                    "Timestamp": NOW - dt.timedelta(hours=6),
+                    "HistoryData": json.dumps(fired),
+                },
+                # a stored null newState must not crash the read (#2307)
+                {"AlarmName": "null-state", "Timestamp": NOW - dt.timedelta(hours=1), "HistoryData": json.dumps({"newState": None})},
+            ]
+        }
+
+
+def test_red_composite_alarm_is_named_at_boot():
+    out = "\n".join(bb.red_alarm_lines(NOW, WireFaithfulCW))
+    assert "RED ALARM   life-platform-composite-red — in ALARM for 1d02h" in out, out
+    assert "metric-red" in out
+    assert "flapped 24h life-platform-composite-flap — fired 6h00m ago" in out, out
+    assert "null-state" not in out and "UNVERIFIED" not in out
+
+
 def test_unreachable_aws_is_unverified_never_blank():
     def boom(region):
         raise RuntimeError("no credentials")
