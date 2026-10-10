@@ -77,6 +77,10 @@ def test_framework_refetch_windows_match_the_stated_windows():
     assert not offenders, offenders
 
 
+def _is_true(node):
+    return isinstance(node, ast.Constant) and node.value is True
+
+
 def test_apple_health_rebuild_path_has_no_operator_caller_so_nothing_propagates():
     facet = _facet("apple_health") or {}
     assert (facet.get("edits"), facet.get("deletes")) == ("not_propagated", "not_propagated")
@@ -84,14 +88,16 @@ def test_apple_health_rebuild_path_has_no_operator_caller_so_nothing_propagates(
     for top in ("lambdas", "scripts", "deploy", "mcp"):
         for path in sorted((ROOT / top).rglob("*.py")):
             text = path.read_text(errors="ignore")
-            if "monotonic_guard" not in text:
+            # Prefilter on the CALLEE, never on the keyword: a positional caller
+            # merge_day_to_dynamo(d, f, None, False) never spells "monotonic_guard" (#4638 verifier).
+            if "merge_day_to_dynamo" not in text:
                 continue
             for node in ast.walk(ast.parse(text)):
                 if not isinstance(node, ast.Call):
                     continue
                 name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
-                rebuild = len(node.args) >= 4 or any(
-                    k.arg == "monotonic_guard" and not (isinstance(k.value, ast.Constant) and k.value.value is True) for k in node.keywords
+                rebuild = (len(node.args) >= 4 and not _is_true(node.args[3])) or any(
+                    k.arg == "monotonic_guard" and not _is_true(k.value) for k in node.keywords
                 )
                 if name == "merge_day_to_dynamo" and rebuild:
                     callers.append(f"{path.relative_to(ROOT)}:{node.lineno}")

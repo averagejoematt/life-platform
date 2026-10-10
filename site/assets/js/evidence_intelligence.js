@@ -628,6 +628,13 @@ export function renderPredictions(d) {
   // the provenance column below would say "in-cycle" for the whole cycle. Sealed rows
   // displace the OLDEST in-cycle rows, the row count stays 40, and the date order the
   // table renders is unchanged.
+  // #4701: a call whose words rest on a sensor that had sent no reading by the day it was
+  // made is served with `text: ""` and an `unsourced` note. Print the note's own sentence
+  // in the call column, never a blank quote — the row keeps its verdict and its date.
+  const callCell = (p) => {
+    const held = p && p.unsourced && typeof p.unsourced.text === "string" ? p.unsourced.text.trim() : "";
+    return held ? `<span class="rd-unit" data-unsourced>${esc(held)}</span>` : esc(p.text);
+  };
   const _ROW_CAP = 40;
   const _sealedRows = list.filter((p) => p.pre_registered);
   const _shown = (list.length > _ROW_CAP && _sealedRows.length)
@@ -636,7 +643,7 @@ export function renderPredictions(d) {
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
         .slice(0, _ROW_CAP)
     : list.slice(0, _ROW_CAP);
-  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
+  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${callCell(p)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>provenance</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest. <strong>sealed</strong> = pre-registered before Day 1 and covered by the published seal above; <strong>in-cycle</strong> = logged by the coach during the cycle.");
 }

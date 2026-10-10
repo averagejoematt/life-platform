@@ -547,16 +547,32 @@ def test_no_strength_records_reports_absence():
     assert m.ex_hevy([]) is None
 
 
+def _hevy_workout(date_str, wid, volume_lbs, title="Push"):
+    """One stored Hevy row = one workout (#4636): sk DATE#<d>#WORKOUT#<id>, set weights in kg.
+    One set of `volume_lbs` lb x 1 rep makes the session's tonnage exactly `volume_lbs`."""
+    return {
+        "pk": f"USER#{m.USER_ID}#SOURCE#hevy",
+        "sk": f"DATE#{date_str}#WORKOUT#{wid}",
+        "date": date_str,
+        "source_workout_id": wid,
+        "title": title,
+        "exercises": [{"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "weight_kg": volume_lbs * 0.45359237, "reps": 1}]}],
+    }
+
+
 def test_strength_workouts_are_counted_across_every_day_in_the_window():
     recs = [
-        {"workouts": [{"title": "Push", "total_volume_lbs": 12000}, {"title": "Pull", "total_volume_lbs": 9000}]},
-        {"workouts": [{"title": "Legs", "total_volume_lbs": 15000}]},
+        _hevy_workout("2026-07-10", "a", 12000, "Push"),
+        _hevy_workout("2026-07-10", "b", 9000, "Pull"),
+        _hevy_workout("2026-07-11", "c", 15000, "Legs"),
     ]
     assert m.ex_hevy(recs)["workout_count"] == 3
 
 
-def test_a_day_record_with_no_workouts_contributes_nothing():
-    assert m.ex_hevy([{"workouts": []}, {}])["workout_count"] == 0
+def test_a_retired_per_day_row_contributes_nothing():
+    """#4636: a per-day `workouts` list is the retired shape (a tombstoned Hevy aggregate is the
+    same sessions again). With no per-workout row the month is ABSENT (None), not a 0-session month."""
+    assert m.ex_hevy([{"workouts": [{"title": "Push", "total_volume_lbs": 12000}]}, {}]) is None
 
 
 # FIXED #1658 (found as a tranche-3 xfail, P3): monthly_digest_lambda.ex_hevy (lines 217-224) builds a full per-workout list
@@ -564,8 +580,10 @@ def test_a_day_record_with_no_workouts_contributes_nothing():
 # that reports the number of sessions but not a pound of the volume behind them is the one number a lifter cares least about;
 # the work is already done and discarded.
 def test_the_monthly_strength_summary_reports_the_volume_it_computed():
-    recs = [{"workouts": [{"title": "Push", "total_volume_lbs": 12000}, {"title": "Pull", "total_volume_lbs": 9000}]}]
-    assert m.ex_hevy(recs)["total_volume_lbs"] == 21000  # 12000 + 9000
+    recs = [_hevy_workout("2026-07-10", "a", 12000, "Push"), _hevy_workout("2026-07-10", "b", 9000, "Pull")]
+    out = m.ex_hevy(recs)
+    assert out["total_volume_lbs"] == 21000  # 12000 + 9000
+    assert out["avg_volume_lbs"] == 10500
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1192,7 +1210,7 @@ def _seeded_table():
         _row_for("chronicling", "2026-07-10", total_score=72, group_scores={"sleep": 80, "food": 60}),
         _row_for("todoist", "2026-07-10", completed_count=6),
         _row_for("todoist", MON_CUR_END, completed_count=4),
-        _row_for("hevy", "2026-07-10", workouts=[{"title": "Push", "total_volume_lbs": 12000}]),
+        _hevy_workout("2026-07-10", "w1", 12000),
         _row_for("character_sheet", MON_CUR_END, character_level=14, character_xp=5000, character_tier="Momentum"),
         _strava_day([_act()], miles=2.0, secs=1800, elev=100, date_str="2026-07-10"),
         # prior arm
@@ -1212,6 +1230,7 @@ def test_gather_reads_both_arms_of_every_source(monkeypatch, frozen_monday):
     assert data["prior"]["whoop"]["days"] == 1
     assert data["cur"]["withings"]["weight_latest"] == 305.0
     assert data["prior"]["withings"]["weight_latest"] == 312.0
+    assert data["cur"]["hevy"]["workout_count"] == 1  # #4636: the per-workout row is counted
 
 
 def test_gather_carries_the_windows_it_read(monkeypatch, frozen_monday):

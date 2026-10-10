@@ -221,6 +221,99 @@ def render_lines(model: dict, now: _dt.datetime | None = None) -> list[str]:
     ]
 
 
+# ---------------------------------------------------------------------------------------
+# #4709 — live red alarms at boot. NOT a model fact (the model carries the estate's shape,
+# not CloudWatch's clock), so it is a separate fail-soft function the SessionStart hook
+# calls; render_lines() stays offline-pure. Read-only: describe_alarms + describe_alarm_history.
+ALARM_REGIONS = ("us-west-2", "us-east-1")
+FLAP_WINDOW_HOURS = 24
+_MAX_HISTORY_PAGES = 5
+
+
+def _fmt_duration(delta: _dt.timedelta) -> str:
+    secs = max(int(delta.total_seconds()), 0)
+    days, rem = divmod(secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    if days:
+        return f"{days}d{hours:02d}h"
+    return f"{hours}h{rem // 60:02d}m"
+
+
+def _entered_alarm(item: dict) -> bool:
+    """A StateUpdate history item whose new state is ALARM (HistoryData is a JSON string)."""
+    try:
+        data = item.get("HistoryData")
+        data = json.loads(data) if isinstance(data, str) else (data or {})
+        return (data.get("newState") or {}).get("stateValue") == "ALARM"
+    except (ValueError, AttributeError):
+        return "to ALARM" in (item.get("HistorySummary") or "")
+
+
+def _make_cw_client(region: str):
+    import boto3
+    from botocore.config import Config
+
+    cfg = Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 1})
+    return boto3.client("cloudwatch", region_name=region, config=cfg)
+
+
+def red_alarm_lines(now: _dt.datetime | None = None, client_factory=None, regions=ALARM_REGIONS) -> list[str]:
+    """One line per alarm in ALARM (name + red duration from StateTransitionedTimestamp,
+    falling back to StateUpdatedTimestamp) and one per alarm that fired and cleared in the
+    last 24h. Any AWS failure yields a single UNVERIFIED line — never blank, never 'none'
+    unless the read succeeded and found nothing."""
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    factory = client_factory or _make_cw_client
+    red: list[tuple[_dt.timedelta, str, str]] = []
+    fired: dict[str, tuple[_dt.datetime, str]] = {}
+    try:
+        for region in regions:
+            cw = factory(region)
+            tags = "" if region == regions[0] else f" [{region}]"
+            kw = {"StateValue": "ALARM", "AlarmTypes": ["CompositeAlarm", "MetricAlarm"], "MaxRecords": 100}
+            while True:
+                resp = cw.describe_alarms(**kw)
+                for a in list(resp.get("MetricAlarms") or []) + list(resp.get("CompositeAlarms") or []):
+                    since = a.get("StateTransitionedTimestamp") or a.get("StateUpdatedTimestamp")
+                    age = now - since if since else _dt.timedelta(0)
+                    red.append((age, a.get("AlarmName", "?") + tags, "" if since else " (red since unknown)"))
+                if not resp.get("NextToken"):
+                    break
+                kw["NextToken"] = resp["NextToken"]
+            hkw = {
+                # The API default is metric alarms only — without this a composite that fired
+                # and cleared in the window is invisible here (#3390/#3503).
+                "AlarmTypes": ["CompositeAlarm", "MetricAlarm"],
+                "HistoryItemType": "StateUpdate",
+                "StartDate": now - _dt.timedelta(hours=FLAP_WINDOW_HOURS),
+                "EndDate": now,
+                "MaxRecords": 100,
+            }
+            for _ in range(_MAX_HISTORY_PAGES):
+                resp = cw.describe_alarm_history(**hkw)
+                for item in resp.get("AlarmHistoryItems") or []:
+                    if _entered_alarm(item):
+                        name = item.get("AlarmName", "?") + tags
+                        ts = item.get("Timestamp")
+                        if ts and (name not in fired or ts > fired[name][0]):
+                            fired[name] = (ts, item.get("HistorySummary") or "")
+                if not resp.get("NextToken"):
+                    break
+                hkw["NextToken"] = resp["NextToken"]
+    except Exception as exc:  # noqa: BLE001 — offline/no creds/throttle must degrade, not crash
+        return [f"  red alarms  UNVERIFIED (CloudWatch read failed: {type(exc).__name__}: {str(exc)[:80]}) — this is not a clean board"]
+    lines: list[str] = []
+    red_names = {n for _, n, _ in red}
+    for age, name, note in sorted(red, key=lambda r: -r[0].total_seconds()):
+        lines.append(f"  RED ALARM   {name} — in ALARM for {_fmt_duration(age)}{note}")
+    for name, (ts, _summary) in sorted(fired.items()):
+        if name not in red_names:
+            lines.append(f"  flapped 24h {name} — fired {_fmt_duration(now - ts)} ago, now cleared")
+    if not lines:
+        lines.append(f"  red alarms  none in ALARM, none fired in the last {FLAP_WINDOW_HOURS}h (read {', '.join(regions)})")
+    return lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", action="store_true", help="emit the facts as JSON (a routine's boot)")

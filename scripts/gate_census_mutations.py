@@ -1169,19 +1169,36 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard rglobs lambdas/ on disk, so an untracked module is in scope
     ),
+    "structural::test_retired_training_shapes_4636.py": MutationSpec(
+        gate_id="structural::test_retired_training_shapes_4636.py",
+        target="tests/test_retired_training_shapes_4636.py",
+        detects=(
+            "a NEW module that reads a stored row's nested per-day `workouts` list — the retired training shape "
+            "(#4636: the monthly digest counted 0 of 24 September sessions reading it, and two MCP views read the "
+            "writerless macrofactor_workouts partition) — outside the one bridge, training/legacy_workouts.py"
+        ),
+        plants=(
+            (
+                "lambdas/training/_census_probe_4636.py",
+                'def sessions(row):\n    return row.get("workouts") or []\n',
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ and mcp/ on disk, so an untracked module is in scope
+    ),
     "structural::test_upstream_changes_4638.py": MutationSpec(
         gate_id="structural::test_upstream_changes_4638.py",
         target="tests/test_upstream_changes_4638.py",
         detects=(
-            "a NEW operator path that rebuilds an Apple Health day authoritatively — a merge_day_to_dynamo(..., "
-            "monotonic_guard=False) caller — while the registry still states apple_health edits and deletes as "
+            "a NEW operator path that rebuilds an Apple Health day authoritatively — a merge_day_to_dynamo caller "
+            "passing monotonic_guard=False POSITIONALLY, in a file that never spells 'monotonic_guard' (the form an "
+            "earlier text prefilter skipped) — while the registry still states apple_health edits and deletes as "
             "not_propagated (#4638: the stated upstream-change behaviour silently stops being true)"
         ),
         plants=(
             (
                 "scripts/_census_probe_4638.py",
                 "from ingestion.health_auto_export_lambda import merge_day_to_dynamo\n\n\n"
-                "def rebuild(date_str, fields):\n    merge_day_to_dynamo(date_str, fields, monotonic_guard=False)\n",
+                "def rebuild(date_str, fields):\n    merge_day_to_dynamo(date_str, fields, None, False)\n",
             ),
         ),
         track=False,  # the guard rglobs lambdas/ scripts/ deploy/ mcp/ on disk, so an untracked module is in scope
@@ -1993,20 +2010,40 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "call would red rather than pass; a resource-policy or KMS denial is not modelled.",
         proved_on="2026-10-10",
     ),
+    "structural::test_retired_training_shapes_4636.py": _proof(
+        "structural::test_retired_training_shapes_4636.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 10 passed in 4.07s | mutated: 1 failed, 9 passed in 3.54s "
+        ":: tests/test_retired_training_shapes_4636.py::test_no_retired_shape_read_outside_the_bridge | reverted: 10 passed in 4.54s",
+        "Covers the SET: every .py under lambdas/ and mcp/ on disk (rglob, AST) is swept for a string naming the "
+        'macrofactor_workouts partition (literal or a SOURCE#macrofactor_workouts key), a `.get("workouts")` or '
+        '`["workouts"]` read, and an import of training.legacy_workouts; every hit is pinned per file with its exact count '
+        "and reason, so a new file, one more occurrence in a pinned file, or a stale pin each red. Hand mutations on "
+        "2026-10-10, each watched RED and restored: reverting the monthly digest's ex_hevy, the tools_training reads and "
+        "the tools_hevy day-supersede each red the guard plus that fix's behaviour pins (3 failed each). STILL INVISIBLE, "
+        "stated: a read of the key spelled through a variable or getattr, a partition name assembled at runtime from "
+        "parts, and readers outside lambdas/ and mcp/ (scripts/, deploy/).",
+        proved_on="2026-10-10",
+    ),
     "structural::test_upstream_changes_4638.py": _proof(
         "structural::test_upstream_changes_4638.py",
-        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 7 passed in 0.53s | mutated: 1 failed, 6 passed in 0.38s "
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 7 passed in 0.69s | mutated: 1 failed, 6 passed in 0.74s "
         ":: tests/test_upstream_changes_4638.py::test_apple_health_rebuild_path_has_no_operator_caller_so_nothing_propagates "
-        "| reverted: 7 passed in 0.34s",
-        "Covers the SET: every .py under lambdas/ scripts/ deploy/ mcp/ on disk (rglob, AST) calling merge_day_to_dynamo with "
-        "monotonic_guard not literally True (or a 4th positional) reds while the registry states apple_health as "
-        "not_propagated; the same file pins the upstream_changes facet on every UPSTREAM_CHANGES_REQUIRED source (closed "
-        "vocabulary, window_days iff inside_window, a note), strava/whoop's window to their refresh_trailing_days, and the "
-        "MacroFactor diary import's authoritative date range. Hand mutations on 2026-10-09 against the real files, each "
-        "watched RED and restored: the empty records not merged into the write set (1 failed), the _format skip removed "
-        "(1 failed), the range bound dropped (1 failed), strava's stated window 3->4 (1 failed), hevy's facet renamed away "
-        "(1 failed), apple_health edits re-stated inside_window (2 failed). STILL INVISIBLE, stated: a rebuild reached "
-        "through another name (an alias or getattr) or by writing the apple_health partition directly.",
+        "| reverted: 7 passed in 0.64s",
+        "Covers the SET: every .py under lambdas/ scripts/ deploy/ mcp/ on disk that spells merge_day_to_dynamo (rglob, "
+        "AST) and calls it with monotonic_guard not literally True — by keyword, or as the 4th positional argument — "
+        "reds while the registry states apple_health as not_propagated. The planted mutation is the POSITIONAL form "
+        "merge_day_to_dynamo(d, f, None, False) in a file that never spells 'monotonic_guard': the earlier prefilter "
+        "(on the text 'monotonic_guard') skipped that file and the gate stayed green; prefiltering on "
+        "'merge_day_to_dynamo' reds it (watched on 2026-10-09: the same plant under the old prefilter ran DARK, 7 passed). "
+        "The keyword form (monotonic_guard=False) was the original plant and was re-run by hand on 2026-10-09 against the "
+        "new prefilter (1 failed). The same file pins the upstream_changes facet on every UPSTREAM_CHANGES_REQUIRED "
+        "source (closed vocabulary, window_days iff inside_window, a note), strava/whoop's window to their "
+        "refresh_trailing_days, and the MacroFactor diary import's authoritative date range. Hand mutations on 2026-10-09 "
+        "against the real files, each watched RED and restored: the empty records not merged into the write set "
+        "(1 failed), the _format skip removed (1 failed), the range bound dropped (1 failed), strava's stated window 3->4 "
+        "(1 failed), hevy's facet renamed away (1 failed), apple_health edits re-stated inside_window (2 failed). STILL "
+        "INVISIBLE, stated: a rebuild reached through another name (an alias, getattr, or **kwargs unpacking) or by "
+        "writing the apple_health partition directly.",
         proved_on="2026-10-09",
     ),
 }
