@@ -226,6 +226,19 @@ DEFAULT_STALE_HOURS = 48
 #                  whose provider exposes a queryable record list AND that aren't
 #                  rate-limit-degraded qualify; garmin is EXPLICITLY excluded
 #                  (ADR-123). Default absent/False. Read by provider_reconcile_source_ids().
+#   upstream_changes
+#                  (#4638) what happens to the STORE when Matthew edits or deletes a
+#                  record in the vendor's app. {edits, deletes, window_days, standing,
+#                  note}: `edits`/`deletes` are each one of UPSTREAM_CHANGE_BEHAVIOURS —
+#                  'any_age' (propagates however old), 'inside_window' (propagates only
+#                  while the day is inside the source's re-fetch window of `window_days`
+#                  days), 'not_propagated' (the store keeps what it first saw).
+#                  `standing` is 'stated_default' (the CURRENT behaviour, recorded so it
+#                  is never unstated, while the owner's ruling on #4638 is pending) or
+#                  'accepted' (ruled). Required on every member of
+#                  UPSTREAM_CHANGES_REQUIRED (the polled/uploaded sources of #4638's
+#                  set; habitify and notion are owned by #4632/#4631). Read by
+#                  tests/test_upstream_changes_4638.py (no runtime reader yet).
 #   oauth          (#1960) True = a CREDENTIALED API pull whose auth can DIE — an
 #                  OAuth token that expires/gets revoked, or a static API key that
 #                  gets rotated. This is exactly the set that routes through
@@ -461,6 +474,19 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # against the API is cheap and catches the late-workout / dropped-day silent
         # drop the DDB-only checks are blind to. whoop_lambda._reconcile.
         "provider_reconcile": True,
+        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=2.
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "not_propagated",
+            "window_days": 2,
+            "standing": "stated_default",
+            "note": (
+                "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
+                "stored record by id; older edits are never re-fetched. A workout deleted in the app keeps its "
+                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused and "
+                "_reconcile is API → store only."
+            ),
+        },
     },
     "withings": {
         "label": "Withings",
@@ -505,6 +531,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #914: weigh-ins are a manual engagement channel — he has to step on the
         # scale. Sporadic (~weekly is healthy), so a lenient ~10d before "quiet".
         "engagement_channel": {"label": "measurement", "stale_days": 10},
+        # #4638: stated default (owner ruling pending). Only today is re-fetched (refresh_today).
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "not_propagated",
+            "window_days": 1,
+            "standing": "stated_default",
+            "note": (
+                "Today is re-fetched every run, so a weigh-in edited the same day propagates; past days are "
+                "fetched only to fill gaps. A measurement deleted in the app is never removed from the store."
+            ),
+        },
     },
     "strava": {
         "label": "Strava",
@@ -552,6 +589,19 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # fix). strava_lambda._reconcile, wired in ingestion_stack. TR-07 generalized
         # this facet so whoop opts in the same way.
         "provider_reconcile": True,
+        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=3 (full replace).
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "not_propagated",
+            "window_days": 3,
+            "standing": "stated_default",
+            "note": (
+                "An edit (rename, sport type, trim) inside the 3-day trailing re-fetch propagates, and so does a "
+                "PARTIAL delete there (the re-fetch is a full replace of the day). A day whose activities are all "
+                "deleted keeps its row (fetch_day returns nothing for an empty day), and an edit older than 3 "
+                "days is never re-fetched; _reconcile is API → store only."
+            ),
+        },
     },
     "eightsleep": {
         "label": "Eight Sleep",
@@ -814,6 +864,22 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "evidence_for": ("steps",),
             },
         ],
+        # #4638: stated default (owner ruling pending). The webhook path is append-only by design:
+        # merge_day_to_dynamo(monotonic_guard=True) never lowers a total, the per-reading maps never
+        # overwrite an existing timestamp, and the rebuild-a-day path (monotonic_guard=False) has no
+        # operator caller. tests/test_upstream_changes_4638.py pins all three facts.
+        "upstream_changes": {
+            "edits": "not_propagated",
+            "deletes": "not_propagated",
+            "window_days": None,
+            "standing": "stated_default",
+            "note": (
+                "A corrected amount is ignored and a deleted reading stays counted: per-reading maps never "
+                "overwrite an existing timestamp, workouts dedup on id (id-less ones are dropped) and additive "
+                "totals can only rise. The rebuild-a-day hook (merge_day_to_dynamo(monotonic_guard=False)) "
+                "exists but no operator path calls it."
+            ),
+        },
     },
     "todoist": {
         "label": "Todoist",
@@ -956,6 +1022,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
         # #3252: the only source that records what he ate.
         "evidence_for": ("nutrition",),
+        # #4638: stated default (owner ruling pending). The diary export is a rolling 7-day window and
+        # its date range is authoritative (macrofactor_lambda.absent_day_items).
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "inside_window",
+            "window_days": 7,
+            "standing": "stated_default",
+            "note": (
+                "Every diary upload re-writes each day it carries, so an edit propagates while the day is in "
+                "the rolling 7-day export. A day emptied or deleted in the app is cleared once an upload "
+                "carries rows on both sides of it: a stored day strictly inside the file's date range with no "
+                "rows is replaced by an explicit empty, tombstoned record. A day older than the export window "
+                "never changes; a daily-summary-format record is not touched by a diary import."
+            ),
+        },
     },
     "hevy": {
         "label": "Hevy",
@@ -979,6 +1060,16 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #3252: strength sessions only. Hevy is ONE of three workout sources, which is
         # the whole point of the facet — Hevy-only evidence cannot carry "no training".
         "evidence_for": ("workout",),
+        # #4638: the one source that already propagates at any age — the events feed carries
+        # updates and deletes, and a delete writes a DELETE#WORKOUT#id tombstone that
+        # hevy_common.resolve_tombstones() consumes (hevy_backfill_lambda, #475).
+        "upstream_changes": {
+            "edits": "any_age",
+            "deletes": "any_age",
+            "window_days": None,
+            "standing": "stated_default",
+            "note": "Hevy's events feed reports updated and deleted workouts at any age; deletes are tombstoned (#475).",
+        },
     },
     "measurements": {
         "label": "Tape measure",
@@ -1929,6 +2020,12 @@ def provider_reconcile_source_ids() -> list:
     provider-API diff that catches a silent drop the DDB high-water mark hides.
     garmin is deliberately absent (ADR-123 — rate-limited/paused, not worth it)."""
     return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("provider_reconcile"))
+
+
+# #4638: the `upstream_changes` facet's vocabulary and the set that must state it.
+UPSTREAM_CHANGE_BEHAVIOURS = ("any_age", "inside_window", "not_propagated")
+UPSTREAM_CHANGE_STANDINGS = ("stated_default", "accepted")
+UPSTREAM_CHANGES_REQUIRED = ("apple_health", "hevy", "macrofactor", "strava", "whoop", "withings")
 
 
 def oauth_source_ids() -> list:

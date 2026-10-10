@@ -509,9 +509,14 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 775  # 774 -> 775 (2026-10-10, #4694 the chronicle auto-publish audit, stacked on #4636): ONE
+BASELINE_TOTAL_GATES = 776  # 775 -> 776 (2026-10-10, #4694 the chronicle auto-publish audit, stacked on #4638): ONE
 # entrant, `guard::lambdas/content/autopublish_audit.py` (new module; classified a guard), PROVEN on arrival (GUARD_PROOFS
-# in scripts/gate_census_proofs.py: four mutations, 5/1/5/1 red, restored 14 passed). Nothing leaves. MEASURED: main 774
+# in scripts/gate_census_proofs.py: four mutations, 5/1/5/1 red, restored 14 passed). Nothing leaves. MEASURED: main 775
+# {proven 250, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 776 {251, 513, 7, 5}.
+# PRIOR: 775  # 774 -> 775 (2026-10-09, #4638 the upstream-changes facet guard, stacked on #4636 at
+# merge): ONE entrant, `structural::test_upstream_changes_4638.py` (new: rglobs lambdas/ scripts/ deploy/ mcp/ for an
+# Apple Health rebuild-a-day caller, keyword or positional), PROVEN on arrival (MutationSpec + proof in
+# scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED after merging origin/main: main 774
 # {proven 249, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 775 {250, 513, 7, 5}.
 # PRIOR: 774  # 773 -> 774 (2026-10-10, #4636 the retired-training-shape guard): ONE entrant,
 # `structural::test_retired_training_shapes_4636.py` (new: rglobs lambdas/ mcp/), PROVEN on arrival (MutationSpec +
