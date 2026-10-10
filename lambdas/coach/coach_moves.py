@@ -88,7 +88,8 @@ LINE_PROMPT = (
     "You are an AI coach on a public health-experiment site, writing ONE short line for today's front page. "
     "Rules you must obey:\n"
     f"- {sheet_mod.MAX_WORDS - 10} words at most. One or two sentences. No preamble, no sign-off, no lists.\n"
-    "- Speak as yourself in the first person ('I think', 'I expect', 'I was wrong'). Say what you THINK, not what the data says: "
+    "- Speak as yourself in the first person ('I think', 'I expect', 'I was wrong'). Say \"I\", never your own name. "
+    "Never refer to yourself in the third person; a result or position marked 'you' is your own. Say what you THINK, not what the data says: "
     "a line that only reports numbers will be refused.\n"
     "- Refer to Matthew in the third person (Matthew / he / his). Never 'you'. Never quote him or write words in his voice.\n"
     "- At most two figures, each exactly as it appears on the fact sheet. No other number, no arithmetic, no rounding. "
@@ -251,7 +252,9 @@ def bet_words(n: dict) -> str:
 
 
 def line_user(sp: dict, sheet: dict, names: dict, spoken: dict, bet: Optional[dict], extra: str) -> str:
-    parts = [sheet_mod.sheet_text(sheet, extra), sheet_mod.context_text(sheet, names)]
+    me = sp["coach_id"]
+    parts = [sheet_mod.sheet_text(sheet, extra), sheet_mod.context_text(sheet, names, speaker=me)]
+    parts.append(f'YOU ARE {names.get(me, me)}. Never write that name; say "I".')
     parts.append(f"YOUR MOVE TODAY: {sheet_mod.MOVE_WORDS[sp['move']]}.")
     if sp.get("about"):
         parts.append(f"What the meeting asked you to say: {sp['about']}")
@@ -262,7 +265,8 @@ def line_user(sp: dict, sheet: dict, names: dict, spoken: dict, bet: Optional[di
     if sp["move"] == "reaction":
         g = next((g for g in sheet.get("graded") or [] if g["prediction_id"] == sp.get("result")), None)
         if g:
-            parts.append(f"The result you are reacting to: {g['coach_id']} predicted '{g['claim']}' — it {g['verdict']}.")
+            owner = "your own call" if g["coach_id"] == me else g["coach_id"]
+            parts.append(f"The result you are reacting to: {owner} predicted '{g['claim']}' — it {g['verdict']}.")
     if bet and sp["coach_id"] in bet["coaches"]:
         side = bet["normalized"]["sides"][sp["coach_id"]]
         other = next(c for c in bet["coaches"] if c != sp["coach_id"])
@@ -363,7 +367,9 @@ def run(
                 )
                 usages.append((LINE_MODEL, dict((resp or {}).get("usage") or {})))
                 text = _text_of(resp)
-                reasons = sheet_mod.check_line(text, sp["move"], sheet, today=today, target_name=target_name, extra=extra)
+                reasons = sheet_mod.check_line(
+                    text, sp["move"], sheet, today=today, target_name=target_name, extra=extra, speaker_name=names.get(cid, "")
+                )
                 reasons += sheet_mod.cross_line_findings(text, accepted_texts, sheet)
                 if not reasons:
                     break

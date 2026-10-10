@@ -330,13 +330,16 @@ def sheet_text(sheet: dict, extra: str = "") -> str:
     return "\n".join(lines)
 
 
-def context_text(sheet: dict, names: dict) -> str:
-    """Positions, yesterday's lines and the sidelined coaches — context only, figures masked."""
+def context_text(sheet: dict, names: dict, speaker: str = "") -> str:
+    """Positions, yesterday's lines and the sidelined coaches — context only, figures masked.
+
+    `speaker` is the coach writing today's line: her own entries read "you" (#4705), never her name,
+    so the model cannot take her own graded call for another coach's."""
     lines = []
     if sheet.get("graded"):
         lines.append("GRADED RESULTS (recent; figures removed):")
         for g in sheet["graded"]:
-            who = names.get(g["coach_id"], g["coach_id"])
+            who = "you (your own call)" if speaker and g["coach_id"] == speaker else names.get(g["coach_id"], g["coach_id"])
             lines.append(f"- [{g['prediction_id']}] {who} predicted: {g['claim']} — {g['verdict']} (graded {g['graded_on']})")
     if sheet.get("absent"):
         lines.append("SIDELINED (cannot speak today):")
@@ -344,10 +347,16 @@ def context_text(sheet: dict, names: dict) -> str:
     if sheet.get("positions"):
         lines.append("EACH COACH'S LAST PUBLIC POSITION (figures removed — use the fact sheet):")
         for cid, p in sheet["positions"].items():
-            lines.append(f"- {names.get(cid, cid)} ({cid}, {p['as_of']}): {p['text']}")
+            if speaker and cid == speaker:
+                lines.append(f"- you (your own last position, {p['as_of']}): {p['text']}")
+            else:
+                lines.append(f"- {names.get(cid, cid)} ({cid}, {p['as_of']}): {p['text']}")
     if sheet.get("yesterday"):
         lines.append("YESTERDAY'S LINES:")
-        lines += [f"- {names.get(y['coach_id'], y['coach_id'])} [{y['move']}]: {y['text']}" for y in sheet["yesterday"]]
+        lines += [
+            f"- {'you' if speaker and y['coach_id'] == speaker else names.get(y['coach_id'], y['coach_id'])} [{y['move']}]: {y['text']}"
+            for y in sheet["yesterday"]
+        ]
     return "\n".join(lines)
 
 
@@ -523,7 +532,20 @@ def binding_findings(text: str, sheet: dict) -> list:
     return out
 
 
-def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, target_name: str = "", extra: str = "") -> list:
+def self_name_findings(text: str, speaker_name: str) -> list:
+    """A line in which the speaker names herself (display name, first name or surname) — a coach says
+    "I", never her own name (#4705, the wording of ai_calls.py's expert narrative rule)."""
+    out = []
+    for part in dict.fromkeys([speaker_name or ""] + (speaker_name or "").split()):
+        part = part.strip()
+        if len(part) >= 2 and re.search(rf"\b{re.escape(part)}\b", text or "", re.IGNORECASE):
+            out.append(f"names_self:{part}")
+    return out
+
+
+def check_line(
+    text: Optional[str], move: str, sheet: dict, *, today: str, target_name: str = "", extra: str = "", speaker_name: str = ""
+) -> list:
     """Reasons to refuse one coach line — [] means it may ship. Fail-closed."""
     t = (text or "").strip()
     if not t:
@@ -534,6 +556,7 @@ def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, targe
     if len(t.split()) > MAX_WORDS:
         reasons.append(f"over_{MAX_WORDS}_words")
     reasons += _rules_findings(t)
+    reasons += self_name_findings(t, speaker_name)
     reasons += restatement_findings(t, move, target_name=target_name)
     allowed, allowed_dates = allowed_for(sheet, extra)
     from ai import grounded_generation as gg

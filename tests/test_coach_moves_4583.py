@@ -582,3 +582,39 @@ def test_a_cast_that_names_coaches_by_name_is_recognised(sheet):
     assert not refused["speakers"] and len(refused["dropped"]) == 3
     # A name that is nobody's still finds nobody.
     assert M.admit_cast({"speakers": [{"coach_id": "Somebody Else", "move": "call"}]}, sheet, ELIGIBLE, TODAY, names)["speakers"] == []
+
+
+# ── a coach never names herself (#4705) ──────────────────────────────────────
+
+# /api/coach_moves?date=2026-10-07, live 2026-10-10 03:04Z (sleep_coach, reaction) — the wire.
+SELF_NAMED = (
+    "I was skeptical when Lisa called the recovery spike genuine architecture rather than noise, "
+    "but today's recovery suggests she was right."
+)
+
+
+def test_a_line_naming_its_own_speaker_is_refused_4705(sheet):
+    reasons = S.check_line(SELF_NAMED, "reaction", sheet, today=TODAY, speaker_name=NAMES["sleep_coach"])
+    assert "names_self:Lisa" in reasons, reasons
+    assert "names_self:Park" in S.check_line("Park would say it held.", "reaction", sheet, today=TODAY, speaker_name="Lisa Park")
+    assert "names_self:Lisa Park" in S.check_line("Lisa Park here: it held.", "reaction", sheet, today=TODAY, speaker_name="Lisa Park")
+    # another coach's name is not the speaker's
+    assert not [r for r in S.check_line(SELF_NAMED, "reaction", sheet, today=TODAY, speaker_name="Max Reyes") if r.startswith("names_self")]
+
+
+def test_the_speakers_own_entries_read_you_4705(sheet):
+    ctx = S.context_text(sheet, NAMES, speaker="sleep_coach")
+    assert "you (your own call) predicted" in ctx and "Lisa Park predicted" not in ctx, ctx
+    other = S.context_text(sheet, NAMES, speaker="mind_coach")
+    assert "Lisa Park predicted" in other
+    sh = S.build_sheet(_inputs(positions={"sleep_coach": {"text": "Sleep held.", "as_of": "2026-10-03"}}), TODAY)
+    assert "you (your own last position" in S.context_text(sh, NAMES, speaker="sleep_coach")
+    assert "Lisa Park (sleep_coach" not in S.context_text(sh, NAMES, speaker="sleep_coach")
+
+
+def test_line_user_and_prompt_tell_the_speaker_who_she_is_4705(sheet):
+    sp = {"coach_id": "sleep_coach", "move": "reaction", "result": "pred_sleep_0930"}
+    user = M.line_user(sp, sheet, NAMES, {}, None, "")
+    assert "YOU ARE Lisa Park" in user
+    assert "your own call predicted" in user and "sleep_coach predicted" not in user, user
+    assert 'Say "I", never your own name' in M.LINE_PROMPT
