@@ -142,8 +142,11 @@ def _publishable(item: dict) -> bool:
     return singleton_visible(item)
 
 
-def _publish_to_s3(item: dict) -> list[str]:
-    """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths."""
+def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
+    """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths.
+
+    The share-kit write stays fail-soft (it never blocks an approval), but #4729: when ``failures`` is passed the
+    reason is appended to it, so ``publish_side_effects`` can report ``failed`` instead of a green ``ran``."""
     if not _publishable(item):
         raise ValueError(
             f"#3485: refusing to publish {item.get('sk') or item.get('date')}: the row is tombstoned or "
@@ -200,6 +203,8 @@ def _publish_to_s3(item: dict) -> list[str]:
             invalidation_paths.append(f"/moments/share-kits/{slug}/kit.json")
         except Exception as exc:
             logger.warning("share kit write failed (non-fatal): %s", exc)
+            if failures is not None:
+                failures.append(f"share kit write failed: {exc}")
 
     return invalidation_paths
 
@@ -450,8 +455,9 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
       delivery stamps a no-send decision on the row (``_record_no_send``).
     defer:   effects from ``DEFERRABLE`` the caller fires once itself after a batch.
 
-    Returns {effect: "ran" | "declined: …" | "deferred"} covering EVERY name in ``SIDE_EFFECTS``.
-    ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
+    Returns {effect: "ran" | "declined: …" | "deferred" | "failed: …"} covering EVERY name in
+    ``SIDE_EFFECTS``. ``s3_artifacts`` reports "failed: <what>" when ``_publish_to_s3`` fail-softs
+    any artifact write (#4729) — a swallowed write is not "ran". ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
     """
     decline = dict(decline or {})
     defer = tuple(defer or ())
@@ -467,8 +473,14 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
         raise ValueError(f"#4593: a declined side effect needs a reason: {blank}")
 
     sk = str(item.get("sk") or "")
+
+    def _s3_artifacts() -> str | None:
+        failures: list = []
+        _invalidate_cloudfront(_publish_to_s3(item, failures=failures))
+        return f"failed: {'; '.join(failures)}" if failures else None  # #4729: a fail-soft write is not "ran"
+
     runners = {
-        "s3_artifacts": lambda: _invalidate_cloudfront(_publish_to_s3(item)),
+        "s3_artifacts": _s3_artifacts,
         "recap": lambda: _commit_recap(item),  # Phase 3: commit the "previously on" recap with the week
         "ledger": lambda: _commit_ledger(item),  # #4533: the season ledger the next week picks the story up from
         "mark_published": lambda: _mark_published(date_str),
@@ -487,8 +499,8 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
         elif effect in defer:
             out[effect] = "deferred"
         else:
-            runners[effect]()
-            out[effect] = "ran"
+            result = runners[effect]()
+            out[effect] = result if isinstance(result, str) and result.startswith("failed") else "ran"
     return out
 
 

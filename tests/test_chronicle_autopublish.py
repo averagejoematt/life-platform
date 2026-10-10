@@ -59,7 +59,7 @@ def test_sweep_publishes_via_approve_path(mod):
         mock.patch.object(mod, "_invoke_email_sender") as sender,
     ):
         out = mod._sweep_stale_drafts(48)
-    pub.assert_called_once_with(draft)
+    pub.assert_called_once_with(draft, failures=[])  # #4729: the fail-soft collector rides as a keyword
     inval.assert_called_once()
     markp.assert_called_once_with("2026-06-10")
     sender.assert_called_once()  # one delivery trigger for the batch
