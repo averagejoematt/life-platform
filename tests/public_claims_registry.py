@@ -278,9 +278,12 @@ def compare_deploy_lanes() -> list[str]:
 
     site = _read(".github/workflows/site-deploy.yml")
     site_yaml = _strip_yaml_comments(site)
-    if re.search(r"^\s*environment:", site_yaml, re.M):
+    # #4257: `ungated-deploy` is the deploy role's IDENTITY for the site jobs (no reviewers,
+    # main-only branch policy), not a gate; any other environment would be one.
+    bound = sorted(set(re.findall(r"^\s*environment:\s*(\S+)", site_yaml, re.M)) - {"ungated-deploy"})
+    if bound:
         findings.append(
-            ".github/workflows/site-deploy.yml now binds a deployment `environment:` — the published claim that "
+            f".github/workflows/site-deploy.yml now binds a deployment `environment:` {bound} — the published claim that "
             "a merged site change 'ships itself' says the site lane is NOT gated. One of the two must change."
         )
     if not re.search(r"^\s*-\s*'site/\*\*'|^\s*-\s*\"site/\*\*\"", site_yaml, re.M):

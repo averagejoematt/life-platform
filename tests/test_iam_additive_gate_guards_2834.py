@@ -388,7 +388,10 @@ def test_the_production_gate_holds_only_the_iam_deploy(wf):
     assert "if: needs.plan.outputs.iam_additive_stacks != '' && needs.plan.outputs.cdk_changed == 'true'" in iam
     assert "concurrency:" not in iam
     deploy = _job(wf, "deploy")
-    assert not re.search(r"^    environment:", deploy, re.M), "code deploys must not wait on the production click (ADR-158)"
+    # #4257: the code deploy binds `ungated-deploy` (no reviewers) — the deploy role's trust
+    # accepts only environment subjects — and never `production`.
+    envs = re.findall(r"^    environment:\s*(\S+)", deploy, re.M)
+    assert envs == ["ungated-deploy"], f"code deploys must not wait on the production click (ADR-158); bound {envs}"
     assert "needs: [reconcile, plan, deploy-iam]" in deploy
     assert "needs.plan.outputs.has_deploys == 'true'" in deploy
     assert "(needs.deploy-iam.result == 'success' || needs.deploy-iam.result == 'skipped')" in deploy

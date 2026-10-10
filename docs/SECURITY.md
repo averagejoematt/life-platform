@@ -145,6 +145,25 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 
 ---
 
+## GitHub token inventory (#4257, measured 2026-10-01)
+
+GitHub Actions reaches AWS through OIDC only (no stored AWS keys — `docs/AWS_ACCESS.md` §4).
+The repo secrets below are the GitHub-side credentials. Measured with
+`gh api repos/averagejoematt/life-platform/actions/secrets` (names + `updated_at` only — the
+API never returns a value or an expiry) and `grep -rn 'secrets\.' .github/`.
+
+| Secret | Set / last rotated | Read by | Least scope | Could `GITHUB_TOKEN` replace it? |
+|---|---|---|---|---|
+| `RECONCILE_PUSH_TOKEN` | 2026-08-30 | `ci-cd.yml` `reconcile` (checkout `token:`, falls back to `github.token`) | fine-grained, this repo only, Contents: read-and-write | **No.** The `main-required-fast-lane` ruleset's bypass actor is a `User` (#2198); `GITHUB_TOKEN` authenticates as `github-actions[bot]`, which that bypass does not match |
+| `GH_BILLING_TOKEN` | 2026-07-26 | `remediation-agent.yml` → `deploy/sentinel_quota.py` (also mirrored in Secrets Manager `life-platform/github-billing`) | user-scoped, billing-usage read only | **No.** `GET /users/{owner}/settings/billing/usage` is a user-level endpoint |
+| `GH_POSTURE_TOKEN` | **not set** (absent from the secrets list) | `remediation-agent.yml` → `deploy/sentinel_github.py` | fine-grained, this repo, Administration: read + Actions: read + Contents: read | **No.** `GITHUB_TOKEN` cannot carry Administration: read. While it is absent, the posture surfaces report `unavailable`, never green |
+| `DEPLOY_GATE_JANITOR_TOKEN` | 2026-08-30 | **nothing** — its only reader, `deploy-gate-janitor.yml`, was deleted by #4497 | — | Not needed at all. **Owner act: delete the secret** and revoke the PAT |
+| `CONTENT_FILTER_JSON` | 2026-08-12 | `ci-lint` content-filter channel | — (vocabulary, not a token) | n/a |
+
+**Expiry is not recorded here** because no API this repo can call returns it; the owner reads
+it from github.com/settings/personal-access-tokens and adds it to this table. That makes
+this inventory's expiry column the one open item of issue 4257's PAT box.
+
 ## Quarterly security checklist
 
 Every 3 months (next: 2026-08-19):

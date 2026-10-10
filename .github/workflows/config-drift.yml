@@ -50,7 +50,7 @@ jobs:
       # setup-python + configure-aws-credentials via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
         with:
-          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       # The derivation is the load-bearing part — if it silently returned an
@@ -167,7 +167,9 @@ jobs:
           #      committed agrees with itself, which is how a comparison gate goes blind
           #      (the 2026-09-14 hevy_template_index class). The ratchet is a THIRD text
           #      that must be edited deliberately.
-          # s3:GetBucketPolicy is already granted to github-actions-deploy-role — no new grant.
+          # s3:GetBucketPolicy is granted to github-actions-readonly-role (S3BucketRead, #4257). The
+          # deploy role this job used before NEVER held it, so this leg read AccessDenied on every
+          # nightly run until #4257 (run 36884994450, 2026-10-01: the job's only error).
           python3 - <<'PYEOF' || rc=1
           import json, subprocess, sys
 
