@@ -455,8 +455,9 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
       delivery stamps a no-send decision on the row (``_record_no_send``).
     defer:   effects from ``DEFERRABLE`` the caller fires once itself after a batch.
 
-    Returns {effect: "ran" | "declined: …" | "deferred"} covering EVERY name in ``SIDE_EFFECTS``.
-    ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
+    Returns {effect: "ran" | "declined: …" | "deferred" | "failed: …"} covering EVERY name in
+    ``SIDE_EFFECTS``. ``s3_artifacts`` reports "failed: <what>" when ``_publish_to_s3`` fail-softs
+    any artifact write (#4729) — a swallowed write is not "ran". ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
     """
     decline = dict(decline or {})
     defer = tuple(defer or ())
@@ -475,7 +476,7 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
 
     def _s3_artifacts() -> str | None:
         failures: list = []
-        _invalidate_cloudfront(_publish_to_s3(item, failures))
+        _invalidate_cloudfront(_publish_to_s3(item, failures=failures))
         return f"failed: {'; '.join(failures)}" if failures else None  # #4729: a fail-soft write is not "ran"
 
     runners = {
