@@ -101,6 +101,14 @@ def test_every_drift_kind_is_reported():
     if r["status"] != "drift" or r["non_lambda"] != ["TopicConfigurations"]:
         failures.append(("non-lambda", r))
 
+    doc = _wire()
+    # An exact second copy of an expected entry: nothing is missing, unexpected or changed,
+    # so only the duplicate-Id branch can turn the verdict to drift.
+    doc["LambdaFunctionConfigurations"].append(copy.deepcopy(doc["LambdaFunctionConfigurations"][1]))
+    r = drift.compare(doc)
+    if r["status"] != "drift" or r["duplicate_ids"] != ["InboundEmailInsightParser"]:
+        failures.append(("duplicate id", r))
+
     r = drift.compare({})  # every notification gone at once — the whole-document replace
     if r["status"] != "drift" or len(r["missing"]) != 4:
         failures.append(("all dropped", r))

@@ -656,13 +656,17 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
             "`missing = [exp_by_id[i] for i in exp_by_id if i not in live_by_id]` became `missing = []`, so a dropped "
             "notification is no longer reported. M2: the docs/RUNBOOK.md heading "
             "`## S3 bucket notifications (ingestion triggers outside CDK)` renamed to `## S3 bucket notes`, i.e. the "
-            "entry the CDK comment and the script's FIX line point to going missing."
+            "entry the CDK comment and the script's FIX line point to going missing. M3a: the verdict "
+            "`drift = bool(missing or unexpected or changed or non_lambda or duplicates)` lost `or duplicates`. M3b: "
+            "`duplicates.append(entry['id'])` in the Id loop became `pass`."
         ),
         "observed": (
             "2026-10-10. BASELINE 6 passed; live `--strict` exit 0, `bucket notification drift: clean`, expected 4, live 4. "
             "M1 RED (2 failed, 4 passed): test_every_drift_kind_is_reported (the `missing` and `all dropped` cases) and "
             "test_cli_exit_codes (`--strict` returned 0 over a document with MeasurementsCSVIngest removed). "
-            "M2 RED (1 failed): test_runbook_entry_the_cdk_comment_points_to_exists. Restored after each; 6 passed."
+            "M2 RED (1 failed): test_runbook_entry_the_cdk_comment_points_to_exists. "
+            "M3a RED and M3b RED (1 failed each): test_every_drift_kind_is_reported, its `duplicate id` case (an exact "
+            "second copy of InboundEmailInsightParser, so nothing is missing/unexpected/changed). Restored after each; 6 passed."
         ),
         "scope": (
             "Covers the comparison (missing, unexpected, changed function/events/prefix/suffix, non-Lambda "
