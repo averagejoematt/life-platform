@@ -98,6 +98,24 @@ _OPENING_BAD = re.compile(
     re.IGNORECASE,
 )
 
+# The scale's direction, said any way a stranger would read it: a figure in pounds, "pounds"/"lb" spelled out, the scale
+# itself, or a weigh-in. The opening must carry one when the week has a weigh-in to report.
+_WEIGHT_WORD = re.compile(r"\b(?:pounds?|lbs?|scale|weigh(?:s|ed|-in|-ins|ing)?|lighter|heavier)\b", re.IGNORECASE)
+# What a stranger cannot read in five seconds: device names and wearable / statistics jargon. The top line above the
+# piece is plain English; the scoreboard and the body carry the instruments.
+_JARGON = re.compile(
+    r"\b(?:WHOOP|Withings|Eight\s+Sleep|Garmin|Oura|Apple\s+Watch|MacroFactor|Hevy|Strava|HRV|RHR|VO2(?:\s*max)?|"
+    r"heart[- ]rate variability|strain score|recovery score|sleep score|z-?scores?|standard deviations?|slopes?|kcal|TDEE)\b",
+    re.IGNORECASE,
+)
+# The podcast's two recurring segments, named on air so a returning listener hears the show's shape (#4545).
+SEGMENTS = (
+    ("the call I got wrong", re.compile(r"\bthe call I got wrong\b", re.IGNORECASE)),
+    ("what we don't know yet", re.compile(r"\bwhat we (?:don['’]t|do not) know yet\b", re.IGNORECASE)),
+)
+
+TOP_LINE_MAX_WORDS = 45
+TOP_LINE_MAX_SENTENCES = 2
 CHRONICLE_WORDS = (850, 1300)
 EPISODE_WORDS = (1150, 1550)
 MAX_FIGURES_PER_PARAGRAPH = 3
@@ -122,8 +140,11 @@ def banned(text: str) -> List[str]:
     return out
 
 
-def chronicle_findings(body: str, *, week: int) -> List[str]:
-    """Craft findings for one chronicle body (title line already removed; footer may remain)."""
+def chronicle_findings(body: str, *, week: int, weight_known: bool = False) -> List[str]:
+    """Craft findings for one chronicle body (title line already removed; footer may remain).
+
+    ``weight_known``: the week has a weigh-in, so the opening must also say which way the scale went (the brief's
+    "the day number and the scale's direction in the first two sentences")."""
     out = banned(body)
     paras = [
         p.strip()
@@ -146,11 +167,48 @@ def chronicle_findings(body: str, *, week: int) -> List[str]:
         first_two = " ".join(re.split(r"(?<=[.!?])\s+", " ".join(paras[:2]))[:3])
         if not re.search(r"\bDay\s+\d+\b|\bday\s+\w+\b", first_two, re.IGNORECASE):
             out.append("craft: the opening does not tell a stranger which day of the experiment this is")
+        if weight_known and not _WEIGHT_WORD.search(first_two):
+            out.append("craft: the opening does not say which way the scale went — the weight belongs in the first two sentences")
     return out
 
 
-def episode_findings(turns: List[Dict[str, Any]]) -> List[str]:
+def top_line_findings(top_line: str) -> List[str]:
+    """The dek's plain-English top line: two short sentences a stranger reads in five seconds — no device names, no
+    wearable or statistics jargon, no more figures than a paragraph may carry."""
+    s = (top_line or "").strip()
+    if not s:
+        return []
     out: List[str] = []
+    for m in _JARGON.finditer(s):
+        out.append(f"top line: {m.group(0)!r} is jargon a stranger cannot read — say it in plain words")
+    sentences = [x for x in re.split(r"(?<=[.!?])\s+", s) if x.strip()]
+    if len(sentences) > TOP_LINE_MAX_SENTENCES:
+        out.append(f"top line: {len(sentences)} sentences (max {TOP_LINE_MAX_SENTENCES})")
+    words = len(s.split())
+    if words > TOP_LINE_MAX_WORDS:
+        out.append(f"top line: {words} words (max {TOP_LINE_MAX_WORDS}) — a stranger reads it in five seconds")
+    n = figures(s)
+    if n > MAX_FIGURES_PER_PARAGRAPH:
+        out.append(f"top line: {n} figures (max {MAX_FIGURES_PER_PARAGRAPH}) — the scoreboard carries the rest")
+    return out
+
+
+def segment_findings(turns: List[Dict[str, Any]]) -> List[str]:
+    """The recurring segments, named aloud and in the brief's order ("The call I got wrong" before "What we don't know yet")."""
+    lines = [str(t.get("line") or "") for t in turns]
+    at: Dict[str, Optional[int]] = {}
+    for name, rx in SEGMENTS:
+        at[name] = next((i for i, line in enumerate(lines) if rx.search(line)), None)
+    out = [f"craft: the episode never names the segment {name!r}" for name, i in at.items() if i is None]
+    first, second = (name for name, _rx in SEGMENTS)
+    if at[first] is not None and at[second] is not None and at[first] > at[second]:
+        out.append(f"craft: {second!r} runs before {first!r} — the segments go in that order")
+    return out
+
+
+def episode_findings(turns: List[Dict[str, Any]], *, segments: bool = False) -> List[str]:
+    """Craft findings for one episode's turns. ``segments``: hold it to the recurring segments (a numbered week)."""
+    out: List[str] = segment_findings(turns) if segments else []
     text = " ".join(str(t.get("line") or "") for t in turns)
     out += banned(text)
     words = len(text.split())
