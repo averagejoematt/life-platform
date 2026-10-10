@@ -57,7 +57,12 @@ KIT_PAGES = {
     "/next/v8/story/": 4,
     "/next/v8/coaches/": 4,
     "/next/v8/day/": 4,
-    "/next/v8/day/?d=2026-10-02": 4,  # a lifting day: the longest a day page gets
+    # The longest a day page gets: seven lifts, three coach lines (the most a day holds) and a
+    # settled call (#4648). What was said and settled is a fifth part of the day, so this one
+    # worst case has five screens; every other day keeps four.
+    "/next/v8/day/?d=2026-10-02": 5,
+    "/next/v8/day/?d=2026-10-01": 4,  # a day with no coach line and no settled call: nothing extra
+    "/next/v8/day/?d=2026-09-24": 4,  # four calls settled: two shown, two folded
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
@@ -107,6 +112,7 @@ ROUTES = {
     "**/api/platform_stats": "platform_stats.json",
     "**/api/receipts": "receipts.json",
     "**/api/predictions": "predictions.json",
+    "**/api/coach_moves?date=2026-10-02": "coach_moves_2026-10-02.json",  # ck_depth.js — the route's own output (#4648)
     "**/api/calls": "calls.json",  # ck_call.js — this route's own output for tests/fixtures/calls_wire_4586/
 }
 

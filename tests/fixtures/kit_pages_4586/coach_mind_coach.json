@@ -22,11 +22,7 @@
  "stance": {
   "source": "stance",
   "headline_read": "Matthew's recovery score spiked sharply outside my prediction band while journaling remains silent and deep sleep continues its downward drift—a divergence that now reads less like metabolic constraint and more like a fracture between what his devices are narrating and what his embodied state actually is. I'm holding the hypothesis that he may be experiencing physiological rebound without psychological integration, and I'm uncertain whether his silence reflects depletion or deliberate withdrawal.",
-  "focused_on_now": [
-   "Whether the recovery spike represents genuine restoration or statistical mean reversion masking internal depletion—my prediction miss here forced me to recalibrate how much I trust device stability as a proxy for his actual state.",
-   "The emotional texture of his journaling silence: does it feel heavy (something unready to name) or empty (no signal available)? This distinction determines whether I'm looking at resistance or exhaustion.",
-   "The three-way opposition now widened: recovery climbing, deep sleep declining, journaling flat despite protein recovery. This triad suggests his body may be executing a rebound his mind hasn't integrated yet."
-  ],
+  "focused_on_now": [],
   "set_aside_for_now": [
    "Protein as a primary lever—it recovered but didn't unlock the writing, so I'm deprioritizing metabolic optimization as the intervention point.",
    "Device calibration or wearable literacy—the volatility in his recovery signal is real, but chasing sensor accuracy feels like a distraction from the deeper question of whether he trusts his own felt sense.",
@@ -39,7 +35,51 @@
   "how_my_read_changed": "My previous stance held that protein recovery might unlock journaling and that device volatility was the primary noise source. I've now moved away from both. The protein recovery without journaling rebound forced me to concede that the fuel-cognition link is incomplete or wrong. The recovery spike outside my prediction band taught me that I was overweighting device stability as a proxy for his state—volatility is the signal, not the noise. I'm now asking whether he's experiencing physiological rebound without psychological integration, which is a fundamentally different question than 'what's blocking his writing?'",
   "confidence_note": "My confidence across protein, recovery, and the protein-journaling coupling remains low. I've been wrong about the mechanism twice now, which has made me more cautious about causal claims. I'm holding my hypotheses more lightly and leaning harder on his phenomenological report—what does the gap feel like from the inside?—rather than trying to infer state from device narration.",
   "as_of": "2026-10-04",
-  "grounding_flag": false
+  "grounding_flag": false,
+  "graduation_gate": "Recovering from a missed day without spiraling, repeatedly, unlocks the 'momentum' rung.",
+  "band_metric": "weight_lbs",
+  "current_value": 312.11,
+  "rung": {
+   "stage_id": "foundation",
+   "entry": {
+    "metric": "weight_lbs",
+    "min": 270,
+    "max": null
+   },
+   "headline": "Build identity, not willpower.",
+   "read_of_him": "",
+   "cares_most": [
+    "showing up imperfectly beats not showing up",
+    "self-compassion on missed days",
+    "noticing the wins"
+   ],
+   "cares_less_right_now": [
+    "optimizing mood",
+    "deep psychological work",
+    "streak perfectionism"
+   ],
+   "plan": "Anchor a simple identity ('I'm someone who moves and logs') and protect it from all-or-nothing thinking.",
+   "graduation_gate": "Recovering from a missed day without spiraling, repeatedly, unlocks the 'momentum' rung.",
+   "watches": []
+  },
+  "ladder": [
+   {
+    "stage_id": "foundation",
+    "headline": "Build identity, not willpower."
+   },
+   {
+    "stage_id": "momentum",
+    "headline": "Let the wins compound."
+   },
+   {
+    "stage_id": "resilience",
+    "headline": "Handle the hard weeks."
+   },
+   {
+    "stage_id": "integration",
+    "headline": ""
+   }
+  ]
  },
  "trait_scores": {
   "note": "Names a pattern in days but prescribes in weeks — sits with a read before revising it.",

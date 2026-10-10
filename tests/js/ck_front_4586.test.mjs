@@ -62,7 +62,7 @@ test("this morning's weight is set against the weigh-in before it", () => {
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
-  assert.match(html, /<span class="ck-rows__key">This morning<\/span><span>311\.0 lb, the same as Friday\./);
+  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>311\.0 lb, the same as Friday\./);
   assert.match(html, /<span class="ck-rows__key">Yesterday, Friday<\/span>/);
   assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-02">The full day<\/a>/);
   assert.match(html, /at or above the protein target/);
@@ -154,4 +154,17 @@ test("nothing the builders emit carries an honorific, an ISO date in text, or a 
   assert.doesNotMatch(all, /\bDr\.\s/);
   assert.doesNotMatch(all, /\b20\d\d-\d\d-\d\d\b/);
   assert.doesNotMatch(all.replace(/“[^”]*”/g, ""), /\b(I|I’m|my|me)\b/, "generated copy is never in his voice");
+});
+
+test("a measure recorded on fewer than five days is not filed as falling short (red team, round 7)", () => {
+  const thin = structuredClone(B.week);
+  thin.data.measures.food.data.met = [true, true, false, null, null, null, null];
+  const { well, notWell, tooFew } = F.weekSort(thin);
+  assert.ok(tooFew.some((x) => x.key === "food"));
+  assert.ok(![...well, ...notWell].some((x) => x.key === "food"));
+  assert.match(F.weekSortHTML(thin, "/"), /<p class="ck-label">Too few days recorded to say<\/p>/);
+  const full = structuredClone(B.week);
+  full.data.measures.food.data.met = [true, true, false, false, false, true, true];
+  assert.ok(F.weekSort(full).notWell.some((x) => x.key === "food"), "four of seven is sorted, and falls short");
+  assert.doesNotMatch(F.weekSortHTML(full, "/"), /Too few days/);
 });

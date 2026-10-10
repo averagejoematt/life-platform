@@ -85,4 +85,9 @@ def build_outcome_notes(evaluation: dict[str, Any], algo_version: str) -> str:
     }
     if evaluation.get("grading_open"):
         notes["grading_open"] = True
+    if evaluation.get("evaluation_type") == "count":
+        # #4541: graded by COUNTING qualifying days, whatever the stored spec says — so
+        # `actual_value` is a day count, and a reader of the row must not read it as the
+        # stored spec's slope or level (coach.latest_checked, web.prediction_reason).
+        notes["graded_as"] = "count"
     return json.dumps(notes)

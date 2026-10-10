@@ -36,9 +36,9 @@ test("a day with no lifting says what else was recorded, or that nothing was", (
 
 test("the day's numbers are doors to their trends, and a missing reading is left out", () => {
   const html = D.dayFactsHTML("2026-10-02", SRC, BASE);
-  assert.match(html, /href="\/next\/v8\/trend\/\?m=steps&amp;from=2026-10-02">Steps: 1,113 </);
+  assert.doesNotMatch(html, /Steps:/, "step counts are left off the day: the stored day totals are unreliable (#4628)");
   assert.match(html, /href="\/next\/v8\/trend\/\?m=weight&amp;from=2026-10-02">Weight: 311\.0 lb </);
-  assert.match(D.dayFactsHTML("2026-10-02", SRC, BASE, "2026-10-02"), /Steps: 1,113 so far today/);
+  assert.doesNotMatch(D.dayFactsHTML("2026-10-02", SRC, BASE, "2026-10-02"), /Steps:/, "today as well");
   const noWeight = { ...SRC, pulse: { pulse_history: [{ date: "2026-10-02", sleep_hours: 8.4 }] } };
   assert.doesNotMatch(D.dayFactsHTML("2026-10-02", noWeight, BASE), /Weight/);
   assert.match(D.dayFactsHTML("2026-01-01", SRC, BASE), /Nothing was measured on this day\./);

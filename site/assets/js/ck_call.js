@@ -17,6 +17,7 @@
 import { tryJSON, esc } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { coachComparison } from "/assets/js/coach_comparison.js";
+import { ruleFor, verdictTag, verdictText, callVerdictTag, callVerdictText, cardLabel, gradedOnText, showcasePair } from "/assets/js/ck_verdict.js";
 
 export const NOT_SERVED = "The settled calls are not served right now.";
 export const NO_SUCH_CALL = "No settled call has this address.";
@@ -31,17 +32,16 @@ export const callsOf = (body) => (body && body.state === "ok" && Array.isArray(b
 // Own-value match only: the id arrives from the address bar and is never used as a key.
 export const findCall = (body, id) => callsOf(body).find((c) => c.id === String(id)) || null;
 
-// "Right" / "Wrong" for a coach's call. A bet has a winner and a loser, so its tag is the
-// sentence naming both and never a single word.
-export const verdictWord = (call) => (call.kind === "bet" ? "" : call.verdict === "right" ? "Right" : "Wrong");
-const tag = (word) => (word ? `<span class="ck-verdicts__tag${word === "Right" ? " ck-verdicts__tag--right" : ""}">${word}</span>` : "");
+// "Right" / "Wrong" for a coach's call is never printed alone (#4647): every tag comes from
+// ck_verdict.js with the rule that decided it. A bet has a winner and a loser, so its line
+// is the sentence naming both, beside the question the bet fixed.
 
 // What the simple guess said, as a tag and a sentence. A call it has not been checked on
 // says so; nothing here fills the gap.
 function guessCard(call) {
   const g = call.simple_guess || {};
-  const word = g.state === "scored" ? (g.right ? "Right" : "Wrong") : "";
-  const head = `<span class="ck-verdicts__tag${word === "Right" ? " ck-verdicts__tag--right" : ""}">The simple guess${word ? `: ${word.toLowerCase()}` : ""}</span>`;
+  // The simple guess is graded by the same rule as the call, so it carries the same one.
+  const head = g.state === "scored" ? verdictTag(!!g.right, ruleFor(call, !!g.right), "The simple guess") : cardLabel("The simple guess");
   return `<div>${head}<p>${esc(g.text || "The simple guess has not been checked against this call yet.")}</p></div>`;
 }
 
@@ -65,15 +65,18 @@ export function claimHTML(call) {
 export function outcomeHTML(call) {
   if (!isCall(call)) return "";
   const checked = shortDay(call.settled_date);
-  const when = checked ? ` Checked ${checked}.` : "";
+  // The day whose reading decided it, then the day the check ran: the two can be days
+  // apart, and the reader is owed both.
+  const graded = gradedOnText(call);
+  const when = `${graded ? ` ${graded}` : ""}${checked ? ` Checked ${checked}.` : ""}`;
   if (call.kind === "bet") {
     const cards = (call.sides || [])
       .filter((s) => s && s.coach_name)
-      .map((s) => `<div>${tag(s.right ? "Right" : "Wrong")}<p><b>${esc(s.coach_name)} said ${esc(s.said)}.</b></p>${soft(`${call.happened}${when}`)}</div>`)
+      .map((s) => `<div>${verdictTag(!!s.right, ruleFor(call, !!s.right))}<p><b>${esc(s.coach_name)} said ${esc(s.said)}.</b></p>${soft(`${call.happened}${when}`)}</div>`)
       .join("");
     return `<div class="ck-verdicts">${cards}</div>${soft((call.simple_guess && call.simple_guess.text) || "")}`;
   }
-  const verdict = `<div>${tag(verdictWord(call))}<p><b>${esc(call.happened)}</b></p>${soft(`${call.verdict_text}${when}`)}</div>`;
+  const verdict = `<div>${callVerdictTag(call)}<p><b>${esc(call.happened)}</b></p>${soft(`${call.verdict_text}${when}`)}</div>`;
   return `<div class="ck-verdicts">${verdict}${guessCard(call)}</div>`;
 }
 
@@ -87,15 +90,22 @@ export function recordHTML(call, body) {
 }
 
 // ── for the front page ─────────────────────────────────────────────────────────
-// The newest settled call as one compact block that opens its page:
-// "Settled <day>: <coach> called X. It came in at Y. Right. The simple guess: …"
+// One settled call as a compact block that opens its page. It leads with the clearest miss
+// on record (the wrong call that landed the most allowed distances out), because a wide
+// hit as the lead example reads as soft grading; with no miss it is the tightest hit, and
+// with neither the newest call. The label is the day it settled, whichever call it is.
+// "Settled <day>: <coach> called X. It came in at Y. Wrong · not within Z either way."
+// The simple guess is said here only once it has a result on this call.
 export function lastCallHTML(callsBody, base) {
-  const call = callsOf(callsBody)[0];
+  const all = callsOf(callsBody);
+  const pair = showcasePair(all);
+  const call = pair.wrong || pair.right || all[0];
   if (!call) return "";
   const day = dayInWords(call.settled_date);
-  const guess = call.simple_guess && call.simple_guess.short ? `The simple guess: ${call.simple_guess.short}.` : "";
-  const said = call.kind === "bet" ? esc(call.verdict_text) : tag(verdictWord(call));
-  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "The last settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
+  const g = call.simple_guess;
+  const guess = g && g.state === "scored" && g.short ? `The simple guess: ${g.short}.` : "";
+  const said = call.kind === "bet" ? esc(call.verdict_text) : callVerdictTag(call);
+  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
 }
 
 // "Next: <question> settles <day>." — the day is written here from the served date so the
@@ -109,23 +119,25 @@ export function nextCallHTML(callsBody) {
 }
 
 // ── the list ───────────────────────────────────────────────────────────────────
-const row = (base) => (c) => `<li><a href="${esc(callHref(base, c.id))}">${esc(`${shortDay(c.settled_date)}: ${c.called_short}`)} <span>${esc(verdictWord(c) || (c.kind === "bet" && c.verdict_text) || "Settled")}</span></a></li>`;
+// A row says the verdict with its rule. A bet's row names who was right; its question, which
+// is the rule, is the row's own sentence.
+const row = (base) => (c) => `<li><a href="${esc(callHref(base, c.id))}">${esc(`${shortDay(c.settled_date)}: ${c.called_short}`)} <span>${esc(c.kind === "bet" ? c.verdict_text || "Settled" : callVerdictText(c))}</span></a></li>`;
 export function listHTML(callsBody, base) {
   const calls = callsOf(callsBody);
   if (!calls.length) return "";
   const first = calls.slice(0, LIST_FIRST).map(row(base)).join("");
   const rest = calls.slice(LIST_FIRST);
   const older = rest.length
-    ? `<details><summary>${rest.length} earlier ${rest.length === 1 ? "call" : "calls"}</summary><ul class="ck-rows ck-rows--more">${rest.map(row(base)).join("")}</ul></details>`
+    ? `<details><summary>${rest.length} earlier ${rest.length === 1 ? "call" : "calls"}</summary><ul class="ck-rows ck-rows--more ck-rows--calls">${rest.map(row(base)).join("")}</ul></details>`
     : "";
   const out = callsBody.excluded && callsBody.excluded.text ? soft(callsBody.excluded.text) : "";
-  return `<ul class="ck-rows ck-rows--more">${first}</ul>${older}${out}`;
+  return `<ul class="ck-rows ck-rows--more ck-rows--calls">${first}</ul>${older}${out}`;
 }
 
 // The page's own title and link-card text, from the call.
 export function metaFor(call) {
   if (!isCall(call)) return { title: "A coach’s call, checked — Average Joe Matt", description: "" };
-  const result = call.kind === "bet" ? call.verdict_text : `${verdictWord(call)}.`;
+  const result = call.kind === "bet" ? call.verdict_text : `${callVerdictText(call)}.`;
   return { title: `${call.title} — Average Joe Matt`, description: `${call.called_short} ${call.happened_short} ${result}` };
 }
 

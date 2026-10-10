@@ -24,7 +24,10 @@ import re
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
-from coach import audience_guard  # #2972 — no owner-directed text on the public seams
+from coach import (
+    audience_guard,  # #2972 — no owner-directed text on the public seams
+    plain_words,  # #4649 — a watch item a general reader cannot read is withheld
+)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 from web.site_api_coach_ledger import _CALIB_COACH_NAMES  # the huddle shows the same calibration the scoreboard does (#538)
@@ -221,11 +224,16 @@ def _stance_from_latest(latest):
     each passes `audience_guard` — the producer (coach_history_summarizer's
     STANCE_SYSTEM_PROMPT) now writes the third-person register, and a stored
     second-person read ("You're still operating under…", a row written before
-    that) degrades to an empty slot, never the owner's letter."""
+    that) degrades to an empty slot, never the owner's letter.
+
+    #4649: `focused_on_now` is printed word for word under "watching now", so each item
+    also passes `plain_words` (the rule is stated in that module). The writer applies the
+    same rule before it stores a stance; running it here too withholds the items stored
+    before the rule existed. A withheld item is absent — nothing stands in for it."""
     return {
         "source": "stance",
         "headline_read": audience_guard.public_or_empty(latest.get("headline_read")),
-        "focused_on_now": audience_guard.public_items(latest.get("focused_on_now", [])),
+        "focused_on_now": plain_words.plain_items(audience_guard.public_items(latest.get("focused_on_now", []))),
         "set_aside_for_now": audience_guard.public_items(latest.get("set_aside_for_now", [])),
         "stage": _public_stage(latest.get("stage")),
         "how_my_read_changed": audience_guard.public_or_empty(latest.get("how_my_read_changed")),
@@ -243,25 +251,15 @@ def _stance_block(coach_id, weight_lbs, *, _g):
     Falls back to the hand-authored weight-band ladder (CC-09) ONLY when no stance
     exists yet — a silent scaffold so the page never blanks, never a parallel read.
     """
-    _S3 = _g["_S3"]
-    _S3_BUCKET = _g["_S3_BUCKET"]
     _stance_from_latest = _g["_stance_from_latest"]
     _stance_latest = _g["_stance_latest"]
-    coach_stance = _g["coach_stance"]
     latest = _stance_latest(coach_id)
     if latest:
         return _stance_from_latest(latest)
 
     # ── Fallback: weight-band ladder, mapped into the same normalized keys ──
-    stance = coach_stance.load_stance(coach_id, _S3, _S3_BUCKET) if coach_stance else {}
-    ladder = stance.get("stage_ladder", [])
-    metric = stance.get("band_metric")
-    value = weight_lbs if metric == "weight_lbs" else None
-    rung = (coach_stance.resolve_stage(ladder, value) if coach_stance else None) or (ladder[0] if ladder else None)
-    # #4213: the authored ladder is guarded like the stance it stands in for — every
-    # prose field, including the stage headline and the graduation gate the page prints.
-    authored_headline = bool((rung or {}).get("headline"))
-    rung = _public_rung(rung)
+    extras = _ladder_extras(coach_id, weight_lbs, _g=_g)
+    rung, authored_headline = extras["rung"], extras.pop("_authored_headline")
     return {
         "source": "ladder",
         "headline_read": rung.get("read_of_him") or "",
@@ -277,13 +275,52 @@ def _stance_block(coach_id, weight_lbs, *, _g):
         "confidence_note": "",
         "as_of": None,
         "grounding_flag": False,
-        # ladder-only extras (kept for the scaffold's graduation framing)
+        # the ladder block (the scaffold's graduation framing) — since #4649 /api/coach/<id>
+        # serves the same five keys beside an evidence-derived stance too (stance_with_ladder)
+        **extras,
+    }
+
+
+def _ladder_extras(coach_id, weight_lbs, *, _g):
+    """The authored stage ladder as served: the five keys `graduation_gate`, `band_metric`,
+    `current_value`, `rung` (the stage Matthew is in) and `ladder` (every stage, in order).
+
+    #4213: the authored ladder is guarded like the stance it stands in for — every prose
+    field, including the stage headline and the graduation gate the page prints.
+    `_authored_headline` is internal to `_stance_block` (it pops it): whether the rung was
+    authored WITH a headline, read before the audience guard may have blanked it."""
+    coach_stance = _g["coach_stance"]
+    stance = coach_stance.load_stance(coach_id, _g["_S3"], _g["_S3_BUCKET"]) if coach_stance else {}
+    ladder = stance.get("stage_ladder", [])
+    metric = stance.get("band_metric")
+    value = weight_lbs if metric == "weight_lbs" else None
+    rung = (coach_stance.resolve_stage(ladder, value) if coach_stance else None) or (ladder[0] if ladder else None)
+    authored_headline = bool((rung or {}).get("headline"))
+    rung = _public_rung(rung)
+    return {
         "graduation_gate": rung.get("graduation_gate"),
         "band_metric": metric,
         "current_value": value,
         "rung": rung,
         "ladder": [{"stage_id": s.get("stage_id"), "headline": audience_guard.public_or_empty(s.get("headline"))} for s in ladder],
+        "_authored_headline": authored_headline,
     }
+
+
+def stance_with_ladder(stance, coach_id, weight_lbs, *, _g):
+    """#4649: an evidence-derived stance with the ladder block beside it.
+
+    Until this, a coach page had a stance OR a ladder: the week a coach wrote its first
+    stance, the stages it works through and the test that opens the next one left the
+    response. The ladder is the author's and is keyed on where Matthew is, so it is true
+    whether or not the coach has written a stance. Only /api/coach/<id> calls this —
+    /api/coach_team reads `rung` to tell a scaffold from a stance and is left as it was.
+    A coach with no authored ladder (the lead) gets the stance back untouched."""
+    if not isinstance(stance, dict) or stance.get("source") != "stance":
+        return stance
+    extras = _ladder_extras(coach_id, weight_lbs, _g=_g)
+    extras.pop("_authored_headline")
+    return {**stance, **extras} if extras["ladder"] else stance
 
 
 # #2385 — the AI writers occasionally emit markdown emphasis despite prompt rules

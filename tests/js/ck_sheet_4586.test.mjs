@@ -49,7 +49,7 @@ test("the level says how many areas it came from and the day it is for", () => {
   assert.match(html, /<p class="ck-big">10<span>level on Saturday, October 3<\/span><\/p>/);
   assert.match(html, /Worked out from 6 of 7 areas; an area with nothing measuring it is left out, not counted as average\./);
   assert.match(S.levelHTML(null), /not served right now/);
-  assert.equal(S.sheetLine(character), "Level 10 across seven areas of his life");
+  assert.equal(S.sheetLine(character), "Level 10 across six of seven areas of his life", "the front page states the same count the sheet does");
   assert.equal(S.sheetLine({}), "");
 });
 
@@ -67,4 +67,9 @@ test("the page carries no emoji, honorific, ISO date or count of earlier starts"
   const text = [S.levelHTML(character), S.areasHTML(character), S.badgesHTML(achievements)].join("\n").replace(/<[^>]+>/g, " ");
   assert.doesNotMatch(text, /\p{Extended_Pictographic}/u);
   assert.doesNotMatch(text, /\bDr\.\s|\b20\d\d-\d\d-\d\d\b|\bcycle\b|\battempt\b|\breset\b/i);
+});
+
+test("an area held for thin coverage prints no score beside a fully measured one (red team, round 7)", () => {
+  assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Too little of this area is measured to score it yet.");
+  assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 2 of 100/);
 });

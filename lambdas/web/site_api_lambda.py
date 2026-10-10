@@ -74,6 +74,7 @@ from web.site_api_coach import (
     handle_coach,
     handle_coach_analysis,
     handle_coach_docket,
+    handle_coach_moves,
     handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
@@ -525,6 +526,7 @@ ROUTES = {
     "/api/coaching-dashboard": None,  # GET — assembled coaching dashboard data
     # Prediction Ledger + Coach Timeline
     "/api/calls": None,  # #4586: every settled, checkable coach call (GET, optional ?id=) — a page per call
+    "/api/coach_moves": None,  # #4648: one day's coach lines (GET, ?date=YYYY-MM-DD) — what the day page reads
     "/api/predictions": None,  # GET with ?status=&coach_id=&limit= query params
     "/api/coach_timeline": None,  # GET with ?coach_id= query param
 }
@@ -708,14 +710,21 @@ def _dispatch_route(event, path, method):
         return handle_coach_docket(event)
     if path == "/api/calls":
         return handle_calls(event)
+    if path == "/api/coach_moves":
+        return handle_coach_moves(event)
     if path == "/api/panel_ledger":
         return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):
         return handle_coach(event)
     # #4582: the front page's ONE document, composed in-process from the routes this
     # function dispatches (never an HTTP call to itself) under one Pacific as_of.
+    #
+    # #4607: every read the edition makes carries `composed_for` — a top-level event key a
+    # Function-URL request cannot set (only headers, query string and body are the caller's),
+    # so a route may leave out work the front page never reads without growing a public knob.
     if path == "/api/edition" and method == "GET":
-        return handle_edition(lambda p, qs: _dispatch_route({"rawPath": p, "queryStringParameters": qs, "headers": {}}, p, "GET"))
+        _ed_event = {"headers": {}, "composed_for": "edition"}
+        return handle_edition(lambda p, qs: _dispatch_route({**_ed_event, "rawPath": p, "queryStringParameters": qs}, p, "GET"))
     if path == "/api/coaching-dashboard":
         try:
             # Registry-derived (coaching-team v2). The retired training seat stays
@@ -819,9 +828,15 @@ def _dispatch_route(event, path, method):
             # — the EXACT function /api/coach/{id} calls (web.site_api_coach) — so
             # this is not a second reader of the COMMITMENT# rows; the privacy pass,
             # corrections/retractions and phase filtering all apply identically.
+            #
+            # #4607: the edition reads `moves` and `coaches` from this body and never
+            # `open_actions`, whose six dossier reads were ~80% of this branch's time
+            # (measured 2026-10-04: 761 of 956 ms). Composed for the edition, the asks are
+            # NOT READ and the key is served `null` — never `[]`, which would say "no asks".
+            _cd_for_edition = event.get("composed_for") == "edition"
             _cd_actions = []
             try:
-                for _cd_domain, _cd_info in _cd_coach_display.items():
+                for _cd_domain, _cd_info in ({} if _cd_for_edition else _cd_coach_display).items():
                     _cd_full_id = _cd_coach_id_map[_cd_domain]
                     if _cd_full_id in _cd_absent:
                         continue  # #4217: an absent coach has no standing ask on the door
@@ -1044,7 +1059,7 @@ def _dispatch_route(event, path, method):
                     "weekly_priority": _cd_priority,
                     "lead_daily": _cd_lead_daily,
                     "moves": _cd_moves_mod.latest_served(table),
-                    "open_actions": _cd_actions,
+                    "open_actions": None if _cd_for_edition else _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,
                     "content_day_span": _cd_day_span,

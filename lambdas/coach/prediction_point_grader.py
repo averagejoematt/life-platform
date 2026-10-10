@@ -43,12 +43,17 @@ def evaluate_condition(actual, condition, threshold):
     return cond_map.get(condition)
 
 
-def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_source_data, extract_metric_series):
+def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_source_data, extract_metric_series, after_day=None):
     """(value, date) of `metric_key` ON `target_date` — the reading that day, else the
     latest within POINT_GRACE_DAYS before it; an aggregate key (`_7day_avg`) is the
     mean of the last N readings on or before the target. (None, None) when nothing
     qualifies. Reads the shared source cache anchored on today (its key is
-    source+lookback, never the end date), then filters by date itself."""
+    source+lookback, never the end date), then filters by date itself.
+
+    `after_day` (#4618) is the day the call was filed: a raw reading on or before it can
+    never settle the call — the coach had already seen it. Without this bound the grace
+    look-back turned "about 61% tomorrow" with no reading tomorrow into a verdict on the
+    filing day's own reading."""
     base = metric_key
     agg_days = None
     for suffix, days in _AGGREGATE_SUFFIXES:
@@ -71,7 +76,7 @@ def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_sourc
     except (TypeError, ValueError):
         return None, None
     d, v = series[-1]
-    if d < floor:
+    if d < floor or (after_day and d <= str(after_day)[:10]):
         return None, None
     return v, d
 
@@ -92,7 +97,13 @@ def evaluate_point(pred, eval_spec, data_cache, today_str, *, get_source_data, e
         except (TypeError, ValueError):
             return None
     actual, on_date = metric_value_on(
-        metric_key, data_cache, today_str, target_date, get_source_data=get_source_data, extract_metric_series=extract_metric_series
+        metric_key,
+        data_cache,
+        today_str,
+        target_date,
+        get_source_data=get_source_data,
+        extract_metric_series=extract_metric_series,
+        after_day=pred.get("created_date"),
     )
     if actual is None:
         return {

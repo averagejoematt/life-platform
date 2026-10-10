@@ -51,6 +51,25 @@ python3 scripts/season_rebuild.py --weeks 5 --out <dir>
 
 Publishing is a separate, owner-approved promote step. Staging never publishes.
 
+## The audit gate (#4549)
+
+No staged installment publishes without an adversarial raw-data audit. After staging, run the
+`story-auditor` agent (`.claude/agents/story-auditor.md`) on the staging folder. It checks claims
+against raw DynamoDB, not just the dossier, and writes `audit.json`. Then:
+
+```bash
+python3 scripts/season_promote.py --staging <dir>            # the plan + any AUDIT GATE refusals, nothing written
+python3 scripts/season_promote.py --staging <dir> --apply    # exit 5 before any write unless the audit passes
+```
+
+`--apply` refuses when `audit.json` is missing, unreadable, not a JSON object, has a `blocking` list
+that is absent, not a list or not empty, has a verdict other than `publishable`, falls under the
+agent's floors (8 claims and 3 raw-verified per week), or is stale. Stale means the audit's
+`staged_sha256` hash for any file that would publish (`wk{N}_chronicle.md`, `_episode.json`,
+`_ledger.json`, `_dossier.json`) does not match the folder now. That ties the audit to the exact
+content, so an audit of an earlier draft cannot pass a re-staged or repaired one. A timestamp
+can't do that. `--audit-hashes` prints the map the auditor records.
+
 ## His answers also reach the front page (#4584)
 
 Each answered question in a reply to the Monday email is written twice. The `STORYQA#W` row the
@@ -86,5 +105,10 @@ A read that fails or comes back empty is a warn with no verdict, never a pass.
 - The weekly `wednesday-chronicle` and `coach-panel-podcast` lambdas still run their own
   prompts. Moving them onto the desk is #4535 / #4536. The Panel half waits on #4514
   (PR #4522) so two lanes don't edit one file.
+- **The audit gate covers `season_promote.py` only.** The live weekly path publishes with no
+  raw-data audit. `wednesday-chronicle` stores a draft, and `chronicle-approve` publishes it on
+  the approve click or through its daily stale-draft sweep. A published week then async-invokes
+  `coach-panel-podcast`, which publishes the episode. Running the same audit before the approval
+  email and attaching its verdict is the live-path follow-up #4549 names.
 - Count-claim predictions are still graded by slope upstream (#4541). The dossier carries that
   caveat to the writers.

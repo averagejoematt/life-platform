@@ -111,7 +111,8 @@ Build the driver tree and diff it against the last close in `docs/COST_TRACKER.m
 - **The platform-vs-feature tree** (the 2026-08-31 panel's decisive cut): split the
   whole bill down a second axis before sizing anything — **the platform running itself**
   (the non-AI floor + `prod-cron` + `remediation` AI) vs **a human building it** (`ci` +
-  `dev-session` AI, episodic by construction). August read 63% of stamped AI spend as
+  `dev-session` AI, episodic by construction — a diligence cut, not the governor's: since
+  #4652 the governor PROJECTS `ci`, which billed 30 days in 30). August read 63% of stamped AI spend as
   episodic: the PRODUCT costs ~July money, BUILDING it is what surged. Then, inside the
   platform branch, attribute to named features (`scripts/ai_spend_attribution.py`
   per-Lambda, per-feature alarm/EMF rent from the ledger) — a cut proposal must name the

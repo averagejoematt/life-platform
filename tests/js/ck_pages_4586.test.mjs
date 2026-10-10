@@ -111,14 +111,16 @@ test("one right and one wrong, never a conditional or a claim that quotes a raw 
   assert.equal(P.verdictsHTML({ coaches: [] }), "");
 });
 
-test("the showcase pair comes from the settled calls that have a page, each a door to it", () => {
+test("the showcase pair leads with the tightest right call and the clearest miss, each a door to its page", () => {
   const calls = load("calls");
   const html = P.callVerdictsHTML(calls, "/next/v8/");
-  const right = calls.calls.find((c) => c.verdict === "right" && c.kind !== "bet");
-  const wrong = calls.calls.find((c) => c.verdict === "wrong" && c.kind !== "bet");
-  assert.ok(html.includes(right.called_short.replace(/’/g, "’")) || html.includes("Right"));
-  assert.match(html, new RegExp(`href="/next/v8/call/\\?id=${right.id}"`));
-  if (wrong) assert.match(html, new RegExp(`href="/next/v8/call/\\?id=${wrong.id}"`));
+  // #4647: not the newest right call (83.7 called, 97 came in, 22.5 allowed either way),
+  // which reads as a miss marked right. The tightest rule on the wire is the pick.
+  assert.match(html, /--right">Right · within 1\.2 hours either way<\/span><p><b>Lisa Park called his sleep time at about 7\.8 hours\.<\/b> It came in at 8\.6 hours\.<\/p>/);
+  assert.match(html, /Graded on the reading for September 26\. Checked October 2\. <a class="ck-link" href="\/next\/v8\/call\/\?id=sleep-20260925-6c64d91f26">The whole call<\/a>/);
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span><p><b>Lisa Park called his morning recovery score at about 66\.2\.<\/b> It came in at 24\.<\/p>/);
+  assert.match(html, /href="\/next\/v8\/call\/\?id=sleep-20260910-09aa1ff6cc"/);
+  assert.doesNotMatch(html, /83\.7/);
   assert.equal(P.callVerdictsHTML(null), "");
   assert.equal(P.callVerdictsHTML({ calls: [] }), "");
 });

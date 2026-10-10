@@ -26,6 +26,13 @@ owner approved. Every write goes through a path the platform already owns:
     python3 scripts/season_promote.py --staging <dir>                # the plan, nothing written
     python3 scripts/season_promote.py --staging <dir> --apply        # owner-approved publish
     python3 scripts/season_promote.py --staging <dir> --apply --only chronicle,pages
+    python3 scripts/season_promote.py --staging <dir> --audit-hashes    # the map the auditor records
+
+THE AUDIT GATE (#4549). ``--apply`` refuses (exit 5, before the backup or any write) unless
+``<staging>/audit.json`` — written by the story-auditor agent (.claude/agents/story-auditor.md) —
+is a JSON object with an empty ``blocking`` list, verdict ``publishable``, the per-week floors on
+``items_checked`` / ``raw_verified``, and a ``staged_sha256`` map whose hash for every file that
+publishes (``AUDITED_FILES`` for each promoted week) matches the staging folder now.
 """
 
 from __future__ import annotations
@@ -437,23 +444,85 @@ for _k, _v in {"TABLE_NAME": TABLE, "S3_BUCKET": BUCKET, "USER_ID": "matthew", "
     os.environ.setdefault(_k, _v)
 
 
+# #4549: the staged files whose content reaches a reader on --apply — the post, the episode, the ledger (LEDGER rows and
+# the Panel's bet record) and the dossier (the stats line). The audit names each one by content hash, so an audit of an
+# earlier draft can never pass a later one: a re-stage, a --repair or a hand edit changes a hash and the gate refuses.
+AUDITED_FILES = ("chronicle.md", "episode.json", "ledger.json", "dossier.json")
+# Floors from .claude/agents/story-auditor.md §Method: 8 claims per week; 15 raw-verified per five-week season (3/week).
+ITEMS_PER_WEEK = 8
+RAW_VERIFIED_PER_WEEK = 3
+
+
+def staged_hashes(staging: str, weeks: List[int]) -> Dict[str, Optional[str]]:
+    """sha256 of every staged file that publishes for ``weeks`` (None = the file is missing). The auditor records this
+    map as ``staged_sha256`` in audit.json (``--audit-hashes`` prints it)."""
+    import hashlib
+
+    out: Dict[str, Optional[str]] = {}
+    for w in weeks:
+        for k in AUDITED_FILES:
+            name = f"wk{w}_{k}"
+            try:
+                with open(os.path.join(staging, name), "rb") as fh:
+                    out[name] = hashlib.sha256(fh.read()).hexdigest()
+            except OSError:
+                out[name] = None
+    return out
+
+
+def _count(v: Any) -> Optional[int]:
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
 def audit_gate(staging: str, weeks: List[int]) -> List[str]:
-    """#4549: an adversarial raw-data audit (the story-auditor agent) must have read THIS staging — newer than every
-    staged installment file — and left zero blocking items. Returns the reasons it refuses (empty = pass)."""
+    """#4549: an adversarial raw-data audit (the story-auditor agent) must have read THIS staging — every file that would
+    publish, by content hash — and left zero blocking items. Fails closed: a missing, unreadable, malformed, stale,
+    under-sized or blocking audit refuses. Returns the reasons it refuses (empty = pass)."""
     path = os.path.join(staging, "audit.json")
     if not os.path.exists(path):
         return ["no audit.json — run the story-auditor agent on this staging folder first"]
     try:
         with open(path, encoding="utf-8") as fh:
             audit = json.load(fh)
-    except ValueError:
-        return ["audit.json is unreadable"]
-    reasons = []
-    newest = max(os.path.getmtime(os.path.join(staging, f"wk{w}_{k}")) for w in weeks for k in ("chronicle.md", "episode.json"))
-    if os.path.getmtime(path) < newest:
-        reasons.append("audit.json is older than a staged installment — the audit did not read what would publish; re-audit")
-    if audit.get("blocking"):
-        reasons.append(f"audit.json lists {len(audit['blocking'])} blocking item(s)")
+    except (OSError, ValueError) as exc:
+        return [f"audit.json is unreadable ({exc.__class__.__name__}) — re-audit"]
+    if not isinstance(audit, dict):
+        return [f"audit.json is malformed — a JSON object is required, found {type(audit).__name__}"]
+    reasons: List[str] = []
+
+    blocking = audit.get("blocking")
+    if not isinstance(blocking, list):
+        reasons.append("audit.json is malformed — `blocking` must be a list (empty when nothing blocks); absent is not zero")
+    elif blocking:
+        reasons.append(f"audit.json lists {len(blocking)} blocking item(s)")
+    if audit.get("verdict") != "publishable":
+        reasons.append(f"audit.json verdict is {audit.get('verdict')!r}, not 'publishable'")
+
+    items, raw = _count(audit.get("items_checked")), _count(audit.get("raw_verified"))
+    if items is None or items < ITEMS_PER_WEEK * len(weeks):
+        reasons.append(
+            f"audit.json items_checked={audit.get('items_checked')!r} — at least {ITEMS_PER_WEEK * len(weeks)} for {len(weeks)} week(s)"
+        )
+    if raw is None or raw < RAW_VERIFIED_PER_WEEK * len(weeks):
+        reasons.append(
+            f"audit.json raw_verified={audit.get('raw_verified')!r} — at least {RAW_VERIFIED_PER_WEEK * len(weeks)} claims checked "
+            f"against raw DynamoDB for {len(weeks)} week(s)"
+        )
+
+    recorded = audit.get("staged_sha256")
+    if not isinstance(recorded, dict):
+        reasons.append(
+            "audit.json has no `staged_sha256` map — it does not name the content it read; re-audit "
+            "(`season_promote.py --staging <dir> --weeks <w> --audit-hashes` prints the map)"
+        )
+        return reasons
+    for name, digest in staged_hashes(staging, weeks).items():
+        if digest is None:
+            reasons.append(f"{name} is missing from staging")
+        elif name not in recorded:
+            reasons.append(f"audit.json does not cover {name} — the audit did not read it; re-audit")
+        elif recorded[name] != digest:
+            reasons.append(f"{name} changed after the audit (sha256 mismatch) — the audit did not read what would publish; re-audit")
     return reasons
 
 
@@ -465,10 +534,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--only", default=",".join(STEPS), help=f"comma list of steps from {STEPS}")
     ap.add_argument("--backup-dir", default=None)
     ap.add_argument("--accept-reviewed", action="store_true", help="the remaining fact-read findings were adjudicated by a person")
+    ap.add_argument(
+        "--audit-hashes",
+        action="store_true",
+        help="print the staged_sha256 map the story-auditor records in audit.json, and exit (no AWS)",
+    )
     args = ap.parse_args(argv)
     os.environ.setdefault("AWS_MAX_ATTEMPTS", "1")
     a, _, b = args.weeks.partition("-")
     weeks = list(range(int(a), int(b or a) + 1))
+    if args.audit_hashes:
+        hashes = staged_hashes(args.staging, weeks)
+        print(json.dumps(hashes, indent=1))
+        return 0 if all(hashes.values()) else 2
     steps = [s for s in args.only.split(",") if s]
     unknown = set(steps) - set(STEPS)
     if unknown:

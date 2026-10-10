@@ -1049,7 +1049,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 245 -> 246 (2026-10-05, #4677): structural::test_journal_row_cowriters_4677.py — the sweep holding
         # every writer beside the journal partition to the co-owned declaration — arrives PROVEN via the re-runnable
         # harness (MutationSpec + proof, ARMED 1/1). Measured: 771 {245, 514, 7, 5} -> 772 {246, 514, 7, 5}.
-        <= 246
+        # Upper bound 246 -> 247 (2026-10-09 merge, #4652): registry PROJECTED_CALLER_CLASSES::ci arrives PROVEN (REGISTRY_PROOFS)
+        # as the sealed-unproven EPISODIC_CALLER_CLASSES::ci leaves the residue ledger — one in, one out, total unchanged.
+        # Measured on top of #4677: 772 {246, 514, 7, 5} -> 772 {247, 513, 7, 5}.
+        <= 247
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

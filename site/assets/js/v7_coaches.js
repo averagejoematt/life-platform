@@ -85,9 +85,9 @@ export function timeInWords(iso) {
 // every metric of a served docket to words.
 const METRIC_BASE = {
   recovery_score: ["the night’s recovery", "night"],
-  sleep_duration_hours: ["the night’s sleep, in hours", "night"],
-  sleep_hours: ["the night’s sleep, in hours", "night"],
-  total_sleep_hours: ["the night’s sleep, in hours", "night"],
+  sleep_duration_hours: ["the night’s hours of sleep", "night"],
+  sleep_hours: ["the night’s hours of sleep", "night"],
+  total_sleep_hours: ["the night’s hours of sleep", "night"],
   sleep_score: ["the night’s sleep score", "night"],
   hrv: ["heart-rate variability", "night"],
   hrv_ms: ["heart-rate variability", "night"],
@@ -190,9 +190,13 @@ export function ledgerLine(lc, who) {
   const on = made ? `On ${made}, ` : "";
   const what = metricWords(lc.metric);
   let text;
+  // `rule` is what decided the verdict, for a page that prints the verdict as a tag
+  // (#4647); "" when the served row carries none.
+  let rule = "";
   if (String(lc.eval_type || "").toLowerCase() === "directional") {
     // actual_value is a slope: say the direction, never the number as a level.
     const dir = conditionWords(lc.condition) || "move";
+    rule = RULE_TREND;
     text = `${on}${name} said ${what} would go ${dir} over the checked window — the direction ${right ? "came true" : "did not come true"}.`;
   } else {
     // a point call ("within" a tolerance of the threshold — the grader's own condition word,
@@ -205,17 +209,20 @@ export function ledgerLine(lc, who) {
     // the live latest_checked serves no tolerance (the recent[] reason strings carry ±SD);
     // "give or take" prints only if a `tolerance` field is ever served, never from elsewhere
     const give = near && fmtNum(lc.tolerance) ? `, give or take ${fmtNum(lc.tolerance)}` : "";
+    if (give) rule = ruleWithin(right, fmtNum(lc.tolerance));
     const call = !thr ? "made a call on it" : near ? `would land near ${thr}${give}` : `would be ${cond} ${thr}`;
     const came = actual ? ` — it came in at ${actual}.` : right ? " — it held." : " — it did not.";
     text = `${on}${name} said ${what} ${call}${came}`;
   }
   const checked = dayInWords(lc.outcome_date);
-  return { verdict: right ? "right" : "wrong", text, checked: checked ? `Checked ${checked}.` : "", claim: lc.claim ? String(lc.claim) : "" };
+  return { verdict: right ? "right" : "wrong", text, rule, checked: checked ? `Checked ${checked}.` : "", claim: lc.claim ? String(lc.claim) : "" };
 }
 
 // ── the recent list: report_card.track_record.recent[] as right/wrong lines ───────
 // Each row is {date, status, metric, reason}; `reason` is the grader's own string. Three
 // shapes are read; anything else prints the verdict, the metric and the checked day only.
+const RULE_TREND = "by which way the trend went over the checked window";
+const ruleWithin = (right, tol) => `${right ? "within" : "not within"} ${tol} either way`;
 const RE_VALUE = /^(\w+)=([-\d.]+) on (\d{4}-\d{2}-\d{2}) vs predicted ([-\d.]+)(?: ±([\d.]+))?/;
 const RE_TREND = /^(\w+) trend=(\w+) \(slope=([-\d.]+)\), predicted=(\w+)/;
 const RE_DOCKET = /^dispute docket resolved: (.+)$/;
@@ -240,20 +247,24 @@ export function recentLine(row, who) {
   const reason = String(row.reason || "");
   const checked = dayInWords(row.date);
   let text;
+  let rule = "";
   let m;
   if ((m = RE_VALUE.exec(reason))) {
     const what = metricWords(m[1]);
     const give = m[5] ? `, give or take ${fmtNum(m[5])}` : "";
+    if (m[5]) rule = ruleWithin(right, fmtNum(m[5]));
     text = `For ${dayInWords(m[3])}, ${name} said ${what} would land near ${fmtNum(m[4])}${give} — it came in at ${fmtNum(m[2])}.`;
   } else if ((m = RE_TREND.exec(reason))) {
+    rule = RULE_TREND;
     text = `${name} said ${metricWords(m[1])} would go ${m[4]} over the checked window — it went ${m[2]}.`;
   } else if ((m = RE_DOCKET.exec(reason))) {
     const crit = criterionWords(m[1]);
+    rule = "by the question the bet fixed when it opened";
     text = crit ? `A disagreement settled by code: ${crit}.` : `A disagreement settled by code, on ${metricWords(row.metric)}.`;
   } else {
     text = `${name}’s call on ${metricWords(row.metric)}.`;
   }
-  return { verdict: right ? "right" : "wrong", text, checked: checked ? `Checked ${checked}.` : "" };
+  return { verdict: right ? "right" : "wrong", text, rule, checked: checked ? `Checked ${checked}.` : "" };
 }
 export function recentLines(recent, who) {
   return (Array.isArray(recent) ? recent : []).map((r) => recentLine(r, who)).filter(Boolean);

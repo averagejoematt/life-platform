@@ -96,6 +96,12 @@ _UNITS = {"sleep_duration_hours": " hours", "weight_lbs": " lb", "total_calories
 #: The grader's marker for a machine spec it graded as a direction (#813 rescue path).
 _REROUTED = "[null-threshold machine spec re-routed to directional]"
 _PREDICTED = re.compile(r"\bpredicted (up|down)\b")
+#: #4541 — the count grader's reason (coach/prediction_count_grader.py): "counted sleep_duration_hours >= 7.5 on 3 of
+#: 7 days 2026-09-06..2026-09-12 (claim: at least 5); ...". `actual_value` on such a row is a DAY COUNT.
+_COUNTED = re.compile(
+    r"^counted \S+ (?P<sym>>=|>|<=|<) (?P<thr>[\d.]+) on (?P<q>\d+) of (?P<n>\d+) days \S+ \(claim: (?P<bound>at least|at most) (?P<k>\d+)\)"
+)
+_SYM_WORDS = {">=": "at or above", ">": "above", "<=": "at or below", "<": "below"}
 
 
 def _num(value: Any) -> str | None:
@@ -137,6 +143,13 @@ def reason_words(record: dict) -> tuple[str | None, bool | None]:
         kind, grader = "directional", grader[len(_REROUTED) :].strip()
     words = metric_words(ev.get("metric"))
     actual = notes.get("actual_value")
+
+    counted = _COUNTED.match(grader) if notes.get("graded_as") == "count" else None
+    if counted and words and status in ("confirmed", "refuted"):
+        unit = _UNITS.get(base_metric(str(ev.get("metric") or "")), "")
+        bar = f"{_SYM_WORDS[counted.group('sym')]} {_num(counted.group('thr'))}{unit}"
+        q, n, bound, k = counted.group("q"), counted.group("n"), counted.group("bound"), counted.group("k")
+        return f"{_cap(words)} came in {bar} on {q} of {n} days — the call needed {bound} {k}", flag
 
     if status == "expired" and kind == "qualitative":
         return "retired ungraded — a call like this has no measurable test", flag

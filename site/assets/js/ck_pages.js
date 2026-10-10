@@ -20,6 +20,7 @@ import { comparisonText } from "/assets/js/coach_comparison.js";
 import * as F from "/assets/js/ck_front.js";
 import { sheetLine } from "/assets/js/ck_sheet.js";
 import { lastCallHTML, nextCallHTML } from "/assets/js/ck_call.js";
+import { verdictTag, callVerdictTag, gradedOnText, showcasePair } from "/assets/js/ck_verdict.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -318,29 +319,34 @@ export function verdictPick(coachesBody) {
 export function verdictsHTML(coachesBody) {
   const { right, wrong } = verdictPick(coachesBody);
   if (!right && !wrong) return "";
-  const card = (call, tag, cls) => {
-    if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+  const card = (call, tag) => {
+    if (!call) return `<div>${soft(`No call has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+    // /api/coaches serves no allowed distance for a number call, so only a direction call
+    // has a rule to print here; any other says plainly that its rule is not served.
+    const rule = call.eval_type === "directional" ? "by the trend in his most recent readings" : "";
     const inRange = call.status === "confirmed" && /interval|range|between/i.test(call.claim) ? ", inside the range given" : "";
     const result = call.eval_type === "point" && num(call.actual_value) !== null ? `The result was ${Number(call.actual_value.toFixed(1))}${inRange}. ` : "";
-    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.coach)}: “${esc(call.claim)}”</b></p>${soft(`${result}Checked ${shortDay(call.outcome_date)}.`)}</div>`;
+    return `<div>${verdictTag(tag === "Right", rule)}<p><b>${esc(call.coach)}: “${esc(call.claim)}”</b></p>${soft(`${result}Checked ${shortDay(call.outcome_date)}.`)}</div>`;
   };
-  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+  return `<div class="ck-verdicts">${card(right, "Right")}${card(wrong, "Wrong")}</div>`;
 }
 
-// The same pair from the settled calls that have a page (GET /api/calls): the newest right
-// and the newest wrong, each a call that named its number, its day and its result, and each
-// a door to its own page. "" when the route has nothing, so the caller can fall back.
+// The same pair from the settled calls that have a page (GET /api/calls), each a door to
+// its own page. The pair is chosen to be checkable at a glance (#4647): the right call
+// whose allowed distance was tightest, and the wrong call that missed by the most. Each
+// carries its rule in the tag and the day its reading was taken. "" when the route has
+// nothing, so the caller can fall back.
 export function callVerdictsHTML(callsBody, base = "/") {
   const calls = ((callsBody && callsBody.calls) || []).filter((c) => c && c.id && c.called_short && c.kind !== "bet");
-  const pick = (verdict) => calls.find((c) => c.verdict === verdict) || null;
-  const [right, wrong] = [pick("right"), pick("wrong")];
+  const { right, wrong } = showcasePair(calls);
   if (!right && !wrong) return "";
-  const card = (call, tag, cls) => {
-    if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call with a page has been found ${tag.toLowerCase()} yet.`)}</div>`;
+  const card = (call, word) => {
+    if (!call) return `<div>${soft(`No call with a page has been found ${word} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
-    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(day ? `Checked ${day}. ` : "")}<a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">What counted as right</a></p></div>`;
+    const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
+    return `<div>${callVerdictTag(call)}<p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(when ? `${when} ` : "")}<a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">The whole call</a></p></div>`;
   };
-  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+  return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>`;
 }
 
 // ── the catch-up list on the front page ────────────────────────────────────────

@@ -80,6 +80,9 @@ from coach.persona_registry import OPERATIONAL_COACH_IDS
 from coach.stance_lint import (  # noqa: F401 — #4217: the lint moved out (module at its size ceiling); _contains_raw_vitals is re-exported for tests/test_coach_stance_engine.py
     claims_change as _claims_change,
     contains_raw_vitals as _contains_raw_vitals,
+    keep_plain as _keep_plain,
+    retry_is_better as _retry_is_better,
+    self_correction as _self_correction,
     vital_hits as _vital_hits,
 )
 
@@ -1152,12 +1155,18 @@ STANCE_SYSTEM_PROMPT = (
     "from your read — NOT from his bodyweight.\n"
     "- Write in the FIRST PERSON ('I'). You ARE this coach. This read is SERVED TO SITE VISITORS: refer to "
     "him in the THIRD person (Matthew / he / his), never 'you', never a name-as-salutation. Plain words (no "
-    "EWMA, autocorrelation, etiology, gate). One paragraph; first sentence at most 25 words.\n\n"
+    "EWMA, autocorrelation, etiology, gate). One paragraph; first sentence at most 25 words.\n"
+    "- 'focused_on_now' and 'set_aside_for_now' are printed word for word for a GENERAL READER: a friend with no "
+    "training in this field. Each item is ONE short phrase in everyday words, at most 12 words and 80 characters, "
+    "with no specialist term and no long technical word. Say 'whether more protein helps his deep sleep', NOT "
+    "'protein stabilization as a mechanistic lever for slow-wave architecture'; 'whether easy cardio shows up in "
+    "his training log', NOT 'Zone 2 volume as the predictor of adenosine-driven change'. At most 4 items in each "
+    "list. An item that is not plain is not shown at all.\n\n"
     "## Output — return ONLY valid JSON, no markdown, no preamble:\n"
     "{\n"
     '  "headline_read": "one tight paragraph: my current read of him, in my domain",\n'
-    '  "focused_on_now": ["what I care most about right now (evidence-derived)"],\n'
-    '  "set_aside_for_now": ["what I am deliberately not chasing yet"],\n'
+    '  "focused_on_now": ["a short plain phrase: what I care most about right now (evidence-derived)"],\n'
+    '  "set_aside_for_now": ["a short plain phrase: what I am deliberately not chasing yet"],\n'
     '  "stage": {"label": "short domain-appropriate stage name", "rationale": "why this stage, from my read"},\n'
     '  "how_my_read_changed": "the genuine evolution vs my prior stance, or \\"\\" if nothing changed",\n'
     '  "confidence_note": "how sure I am, grounded in my track record",\n'
@@ -1213,7 +1222,7 @@ def _build_stance_message(coach_id, compressed, track, prior_stance):
             {
                 "headline_read": prior_stance.get("headline_read", ""),
                 "stage": prior_stance.get("stage", {}),
-                "focused_on_now": prior_stance.get("focused_on_now", []),
+                "focused_on_now": _keep_plain(prior_stance),  # #4649: an old jargon item must not anchor the new list
                 "as_of": prior_stance.get("as_of"),
             }
             if prior_stance
@@ -1390,16 +1399,14 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
         logger.warning("[stance] LLM returned non-dict for %s — skipping stance this run", coach_id)
         return None
 
-    # Self-correct once if the read leaked raw numbers.
-    if _vital_hits(result) > 0:
-        strict = user_message + (
-            "\n\nSTRICT CORRECTION: your previous attempt cited raw numeric values (HRV/RHR/"
-            "weights/percentages). Rewrite with ZERO numbers — describe patterns and positions only."
-        )
+    # Self-correct once if the read leaked raw numbers or wrote a watch item that is not plain (#4649).
+    strict = _self_correction(result)
+    if strict:
+        strict = user_message + strict
         retry = _call_haiku(
             system=STANCE_SYSTEM_PROMPT, user_message=strict, max_tokens=1400, temperature=0.2, schema=_schemas.STANCE_OUTPUT_SCHEMA
         )
-        if isinstance(retry, dict) and _vital_hits(retry) < _vital_hits(result):
+        if _retry_is_better(retry, result):
             result = retry
 
     for field, default in _STANCE_FIELDS.items():
@@ -1429,6 +1436,8 @@ def _write_stance(coach_id, stance):
     # guard runs HERE, at write, not before the ADR-104 gate: the gate must grade what
     # the model actually wrote (the #1699 behavioral class reads second-person slips).
     stance = dict(stance, headline_read=audience_guard.reader_safe(stance.get("headline_read"), coach_id, logger) or "")
+    # #4649: the watch list is printed word for word, so only its plain items are stored (coach.plain_words).
+    stance["focused_on_now"] = _keep_plain(stance, coach_id, logger)
     date = stance.get("as_of")
     ok_hist = _put_item({"pk": f"COACH#{coach_id}", "sk": f"STANCE#{date}", **stance})
     ok_latest = _put_item({"pk": f"COACH#{coach_id}", "sk": "STANCE#latest", **stance})

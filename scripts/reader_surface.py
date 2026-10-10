@@ -39,6 +39,14 @@ result of a diff that was actually computed and actually missed the surface. A s
 never silent — the verdict line names the base, the head, the number of changed files
 and why none of them counted.
 
+A SKIP IS NOT A PASS (#4652, ADR-116)
+-------------------------------------
+The workflows hand the SKIP verdict line to the sweep (`tests/visual_qa.py
+--ai-qa-skipped "<line>"` / `--reader-truth-skipped "<line>"`), and the sweep reports the
+judge as SKIPPED-BY-READER-SURFACE — "not run, not a pass" — on stdout, in the job summary,
+as a `::warning` annotation beside the check, and as `ai_vision_status` /
+`reader_truth_status` in report.json. The deterministic sweep's own result is unchanged.
+
 The budget tier-3 pause is untouched: it lives inside the judges (`visual_ai_qa`'s
 SKIPPED-BY-BUDGET path) and still applies whenever this script says RUN.
 
@@ -67,7 +75,32 @@ SITE_PREFIX = "site/"
 REQUEST_TIME_ENTRIES = (
     "lambdas/web/site_api_lambda.py",
     "lambdas/web/site_api_ai_lambda.py",
+    # #4652: `/api/subscribe*` is a third CloudFront-fronted Function URL (web_stack.py), and
+    # /subscribe/confirm/ — a swept page — renders its answer at load. The drift guard below
+    # found it missing from the two-entry list #4589 shipped.
+    "lambdas/web/email_subscriber_lambda.py",
 )
+
+# #4652 — the drift guard's other half. EVERY Lambda with a Function URL in the two edge stacks
+# is either a request-time entry above or ruled here with the reason no swept page renders it.
+# Keyed by the construct's variable name in the stack; tests/test_ai_check_skip_is_not_a_pass_4652.py
+# reads the stacks and reds on a Function URL that is in neither place, so a new public origin
+# cannot be invisible to this gate by default.
+FUNCTION_URLS_NO_SWEPT_PAGE = {
+    "progress_viewer_fn": "owner-gated photo viewer; its route is deliberately absent from tests/qa_manifest.py (#3760)",
+    "og_image_fn": "returns the link-unfurl PNG at /og; no page the sweep opens renders it",
+    "telegram_webhook_fn": "called by Telegram's servers, not fronted by CloudFront, renders no page",
+}
+
+# #4652 — the judge-running workflows this gate does NOT decide, each with why. site-deploy.yml
+# fires only on its own `paths:` filter, whose first entry is the site tree itself, and the
+# replay over 2026-09-05..10-04 found 111 of its 114 pushes changed a reader surface — so it
+# runs the vision judge on every fire, and a site change can never be skipped by this gate.
+# The same test holds that: a workflow passing --ai-qa / --reader-truth is in WIRING_PATHS
+# (it consults this script) or here, and site-deploy.yml's filter still names SITE_PREFIX.
+UNGATED_JUDGE_WORKFLOWS = {
+    ".github/workflows/site-deploy.yml": "path-triggered on site/** — always runs the vision judge",
+}
 
 # The two AI judges and the harness that drives them. A judge edit must run the judge.
 JUDGE_ENTRIES = (
