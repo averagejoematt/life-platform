@@ -511,7 +511,7 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # (#3315), and the id-set diff is what proves it rather than the intention.
 BASELINE_TOTAL_GATES = 775  # 774 -> 775 (2026-10-10, #4694 the chronicle auto-publish audit, stacked on #4636): ONE
 # entrant, `guard::lambdas/content/autopublish_audit.py` (new module; classified a guard), PROVEN on arrival (GUARD_PROOFS
-# in scripts/gate_census_proofs.py: three mutations, 5/1/5 red, restored 13 passed). Nothing leaves. MEASURED: main 774
+# in scripts/gate_census_proofs.py: four mutations, 5/1/5/1 red, restored 14 passed). Nothing leaves. MEASURED: main 774
 # {proven 249, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 775 {250, 513, 7, 5}.
 # PRIOR: 774  # 773 -> 774 (2026-10-10, #4636 the retired-training-shape guard): ONE entrant,
 # `structural::test_retired_training_shapes_4636.py` (new: rglobs lambdas/ mcp/), PROVEN on arrival (MutationSpec +

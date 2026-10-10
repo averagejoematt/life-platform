@@ -3,7 +3,13 @@
 Specimen: Week 5 (DATE#2026-10-06). Nobody clicked approve; the 2026-10-09 18:00Z sweep published it while its own row
 carried the Story Desk's unresolved findings — a 23-day training streak the dossier contradicts, a "season high" that
 was not one, a quote the platform does not hold, and body weights spoken in the episode. ``WEEK5_DESK_FINDINGS`` below
-is that row's ``desk_findings_json``, read back from DynamoDB on 2026-10-09 (the wire, not a paraphrase of it).
+is ABRIDGED from that row's ``desk_findings_json`` as read back from DynamoDB on 2026-10-09 — not the wire verbatim (a
+public repo does not carry the production row byte for byte). What is kept exact: every finding's prefix and wrapper
+(``craft:``, ``repeat:``, ``quote:``, ``dek: fact:``, ``turn N (elena): body-number:``), which is all the audit reads.
+What is abridged: the two dek ``fact:`` explanations are shortened, and the live row's 5th episode finding — a
+``fact: 'graded_this_week_count' ... not reportable. → N/A`` non-finding the desk wrote under a ``fact:`` prefix — is
+omitted. The live row therefore carries 4 blocking episode findings, not the 3 counted here; the audit blocks that
+N/A line too (any non-style prefix blocks, fail-closed), so the live week is held either way.
 
 The rule held here: an unapproved draft whose audit has a blocking item stays a draft and the sweep logs
 ``HELD_TOKEN`` naming the week (the ``chronicle-autopublish-held`` alarm keys on it); an audited draft publishes as
@@ -191,7 +197,7 @@ def test_the_approve_click_is_still_the_owner_s_way_through(approve):
     ):
         resp = approve._handle({"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve"}})
     assert resp["statusCode"] == 200
-    pub.assert_called_once_with(row)
+    pub.assert_called_once_with(row, failures=[])
     markp.assert_called_once_with("2026-10-06")
 
 
@@ -223,6 +229,18 @@ def test_a_dated_weekday_must_be_the_real_weekday():
     assert autopublish_audit.weekday_mismatches("on Monday, Sept 31", "2026-10-06")  # not a real date
     # a January installment recalling December reads last year's calendar
     assert autopublish_audit.weekday_mismatches("on Thursday, December 31", "2027-01-05") == []
+
+
+def test_a_wrong_dated_weekday_in_the_stored_text_blocks_the_sweep(approve, held):
+    """The weekday check is wired into blocking_items, not just callable: an otherwise-clean draft that names the wrong
+    weekday for a date is held, and the hold carries the weekday finding."""
+    wrong = _draft({"post": [], "episode": []}, content_markdown="He took a rest day on Thursday, October 3, and slept.")
+    assert [b for b in autopublish_audit.blocking_items(wrong) if b.startswith("dated weekday: ")] == [
+        "dated weekday: 'Thursday, October 3' — 2026-10-03 was a Saturday"
+    ]
+    out, put, markp, *_ = _run_sweep(approve, [wrong])
+    assert out == [] and not markp.called
+    assert len(held) == 1 and "2026-10-03 was a Saturday" in held[0]
 
 
 def test_the_stored_text_is_re_run_through_the_reader_door():

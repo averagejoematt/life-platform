@@ -1059,8 +1059,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # sweep holding every read of the retired per-day training shape to training/legacy_workouts.py — arrives PROVEN
         # via the re-runnable harness (MutationSpec + proof, ARMED 1/1). Measured: 773 {248, 513, 7, 5} -> 774 {249, 513, 7, 5}.
         # Upper bound 249 -> 250 (2026-10-10, #4694, stacked on #4636): guard::lambdas/content/autopublish_audit.py — the deterministic audit
-        # an unapproved chronicle must pass before the stale-draft sweep publishes it — arrives PROVEN (GUARD_PROOFS: three
-        # mutations, 5/1/5 red, restored 13 passed). Measured on top of #4636: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
+        # an unapproved chronicle must pass before the stale-draft sweep publishes it — arrives PROVEN (GUARD_PROOFS: four
+        # mutations, 5/1/5/1 red, restored 14 passed). Measured on top of #4636: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
         <= 250
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
