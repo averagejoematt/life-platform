@@ -7,9 +7,8 @@ is ABRIDGED from that row's ``desk_findings_json`` as read back from DynamoDB on
 public repo does not carry the production row byte for byte). What is kept exact: every finding's prefix and wrapper
 (``craft:``, ``repeat:``, ``quote:``, ``dek: fact:``, ``turn N (elena): body-number:``), which is all the audit reads.
 What is abridged: the two dek ``fact:`` explanations are shortened, and the live row's 5th episode finding — a
-``fact: 'graded_this_week_count' ... not reportable. → N/A`` non-finding the desk wrote under a ``fact:`` prefix — is
-omitted. The live row therefore carries 4 blocking episode findings, not the 3 counted here; the audit blocks that
-N/A line too (any non-style prefix blocks, fail-closed), so the live week is held either way.
+``fact: 'graded_this_week_count' ... not reportable. → N/A`` non-finding — is carried in abridged form. It is a
+non-finding the audit ignores (#4749), so the live row has 3 blocking episode findings, not 4.
 
 The rule held here: an unapproved draft whose audit has a blocking item stays a draft and the sweep logs
 ``HELD_TOKEN`` naming the week (the ``chronicle-autopublish-held`` alarm keys on it); an audited draft publishes as
@@ -53,6 +52,8 @@ WEEK5_DESK_FINDINGS = {
         "turn 25 (elena): body-number: '46 pounds'",
         "turn 27 (elena): body-number: '199.8 pounds'",
         "craft: 37 figures across the episode (max 30) — round, gloss, or move to the post",
+        # the live row's N/A non-finding, abridged (#4749): the fact reader saying a fact does not apply
+        "fact: 'graded_this_week_count' — the dossier field is not reportable for this week. → N/A",
     ],
 }
 
@@ -283,3 +284,38 @@ def test_the_held_token_is_one_literal_in_the_lambda_the_module_and_the_metric_f
     assert re.search(r'FilterPattern\.literal\(\'"CHRONICLE-AUTOPUBLISH-HELD"\'\)', block)
     assert '"/aws/lambda/chronicle-approve"' in block[:200]
     assert 'alarm_name="chronicle-autopublish-held"' in block
+
+
+def test_an_na_outcome_never_blocks_whatever_its_prefix_4749():
+    """Week 5's stored findings re-verdicted: 3 blocking episode findings, not 4. Mutation control: drop is_na_outcome -> 4."""
+    blocking = autopublish_audit.desk_blocking(json.dumps(WEEK5_DESK_FINDINGS))
+    assert not any("N/A" in b for b in blocking)
+    for prefix in ("fact:", "dek: fact:", "newgate:", "turn 2 (elena): fact:"):
+        raw = json.dumps({"post": [f"{prefix} 'x' — not reportable. → N/A"], "episode": [f"{prefix} 'x' — nope. -> n/a."]})
+        assert autopublish_audit.desk_blocking(raw) == [], prefix
+    # a real fix that merely mentions N/A still blocks
+    real = json.dumps({"post": ["fact: 'x' — wrong → write N/A days"], "episode": []})
+    assert len(autopublish_audit.desk_blocking(real)) == 1
+
+
+def test_the_fact_reader_does_not_emit_an_na_fix_as_a_finding_4749():
+    from content import story_writers
+
+    reply = {
+        "stop_reason": "end_turn",
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "findings": [
+                            {"claim": "graded_this_week_count", "problem": "not reportable.", "fix": "N/A"},
+                            {"claim": "23 days", "problem": "dossier says 12", "fix": "say 12 days"},
+                        ]
+                    }
+                ),
+            }
+        ],
+    }
+    out = story_writers.fact_check("text", {}, invoke=lambda body, model: reply)
+    assert len(out) == 1 and "23 days" in out[0]

@@ -55,6 +55,16 @@ _DATED_WEEKDAY = re.compile(
 )
 
 
+# An N/A outcome: the fact reader saying a fact does not apply ("... not reportable. → N/A"). It reports nothing wrong,
+# so it never blocks whatever prefix it was written under (#4749).
+_NA_OUTCOME = re.compile(r"(?:→|->)\s*n/?a\.?\s*$", re.IGNORECASE)
+
+
+def is_na_outcome(finding: str) -> bool:
+    """True for a finding whose corrected-wording slot is N/A — a non-finding, not a claim to fix."""
+    return bool(_NA_OUTCOME.search(str(finding or "").strip()))
+
+
 def is_style_finding(finding: str) -> bool:
     """True for a finding that is a writer's note (``craft:``/``repeat:``), however the desk wrapped it."""
     return _WRAPPER.sub("", str(finding or "").strip()).lower().startswith(STYLE_PREFIXES)
@@ -72,7 +82,7 @@ def desk_blocking(raw: Any) -> List[str]:
         return ["the desk's audit record is not {post: [...], episode: [...]}"]
     out: List[str] = []
     for part in ("post", "episode"):
-        out += [f"desk {part}: {f}" for f in found[part] if not is_style_finding(f)]
+        out += [f"desk {part}: {f}" for f in found[part] if not is_style_finding(f) and not is_na_outcome(f)]
     return out
 
 

@@ -353,5 +353,7 @@ def fact_check(
     _noop = re.compile(
         r"(?i)\bno (?:change|error|issue|correction)s? (?:is )?(?:needed|found|here|required|necessary)\b|\bskipping\b|\bthis is accurate\b"
     )
-    real = [f for f in found if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}")]
+    # an N/A fix is the reader saying the fact does not apply ("not reportable") — a non-finding, not a claim to change (#4749)
+    _na = re.compile(r"(?i)^\s*n/?a\.?\s*$")
+    real = [f for f in found if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}") and not _na.match(str(f.get("fix", "")))]
     return [f"fact: {f['claim']!r} — {f['problem']} → {f['fix']}" for f in real]
