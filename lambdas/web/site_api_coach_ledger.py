@@ -28,7 +28,7 @@ from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
-    plain_words,  # #4714: a pending call's sentence prints under "Next" — only a plain one is listed
+    plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
@@ -928,6 +928,9 @@ def handle_predictions(event, *, _g):
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
         coach_filter = qs.get("coach_id", "")
+        # #4714: the coach page's "Next" list is the one request of this shape (ck_coach.js asks
+        # `?coach_id=<id>&status=pending`); only it is held to the plain-words rule below.
+        coach_page_pending = status_filter == "pending" and bool(coach_filter)
         # #2658: `int()` on an unvalidated param raised straight into the handler-wide
         # `except` below, which answered 200 with an empty ledger — a swallowed error
         # rendered as "the coaches have made no predictions" (ADR-104). Reject the bad
@@ -1053,45 +1056,55 @@ def handle_predictions(event, *, _g):
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
-                    # #4714: counted above (the scorecard keeps the row), but a pending sentence a friend could not read
-                    # is not listed — nothing stands in for it. Judged on the words, so rows written before the rule go too.
-                    if p_status == "pending" and not plain_words.is_plain(rec.get("claim_natural"), plain_words.CALL_MAX_CHARS):
-                        continue
+                    # #4714: the plain-words rule applies to ONE list only — the coach page's "Next" (the only
+                    # caller asking for one coach's pending calls), never the full ledger (status=all, the
+                    # method/prediction pages). There, an in-cycle pending call a friend could not read is not
+                    # listed (it is still counted above, so the scorecard keeps the row). A SEALED pre-registered
+                    # bet is never hidden: it was frozen before the experiment began, so it is served whatever its
+                    # length, and only the jargon half of the rule labels it (`reader_plain: False`) for the page.
+                    _plain_label = None
+                    if coach_page_pending and p_status == "pending":
+                        _claim = rec.get("claim_natural")
+                        if rec.get("pre_registered"):
+                            _plain_label = not plain_words.specialist_terms(_claim)
+                        elif not plain_words.is_plain(_claim, plain_words.CALL_MAX_CHARS):
+                            continue
 
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
-                    all_predictions.append(
-                        {
-                            "coach_id": cid,
-                            "coach_name": _pred_coach_names[cid],
-                            "retired": cid in _RETIRED_SHORT_IDS,
-                            "text": rec.get("claim_natural", ""),
-                            "confidence": rec.get("confidence", "medium"),
-                            "status": p_status,
-                            "date": rec.get("created_date", ""),
-                            # #3480: `date` is the EFFECTIVE date (genesis for a
-                            # pre-registered claim — the window it grades from), not
-                            # the moment the coach committed. Serve the freeze instant
-                            # too, so the page can say "made <freeze> · from <genesis>"
-                            # instead of labelling a claim frozen on 09-04 as made on a
-                            # date that has not happened yet (ADR-104: a made-date is
-                            # when it was made). None for in-cycle coach calls, whose
-                            # created_date IS the event time.
-                            "pre_registered_at": rec.get("pre_registered_at"),
-                            # #3511: sealed vs in-cycle, as a boolean the table can render
-                            # without re-deriving it from a nullable timestamp.
-                            "pre_registered": bool(rec.get("pre_registered")),
-                            "due_date": due,
-                            "gradeable": not ungradeable,
-                            "metric": ev.get("metric"),
-                            "eval_type": ev.get("type"),
-                            "outcome_notes": rec.get("outcome_notes") or "",  # kept for compatibility — the grader's raw blob
-                            # #4220: the reason in reader words (None when the grader wrote none)
-                            # and whether a verdict came back from the data at all.
-                            "reason": _reason,
-                            "graded_on_data": _graded_on_data,
-                            "subdomain": rec.get("subdomain", ""),
-                        }
-                    )
+                    _row = {
+                        "coach_id": cid,
+                        "coach_name": _pred_coach_names[cid],
+                        "retired": cid in _RETIRED_SHORT_IDS,
+                        "text": rec.get("claim_natural", ""),
+                        "confidence": rec.get("confidence", "medium"),
+                        "status": p_status,
+                        "date": rec.get("created_date", ""),
+                        # #3480: `date` is the EFFECTIVE date (genesis for a
+                        # pre-registered claim — the window it grades from), not
+                        # the moment the coach committed. Serve the freeze instant
+                        # too, so the page can say "made <freeze> · from <genesis>"
+                        # instead of labelling a claim frozen on 09-04 as made on a
+                        # date that has not happened yet (ADR-104: a made-date is
+                        # when it was made). None for in-cycle coach calls, whose
+                        # created_date IS the event time.
+                        "pre_registered_at": rec.get("pre_registered_at"),
+                        # #3511: sealed vs in-cycle, as a boolean the table can render
+                        # without re-deriving it from a nullable timestamp.
+                        "pre_registered": bool(rec.get("pre_registered")),
+                        "due_date": due,
+                        "gradeable": not ungradeable,
+                        "metric": ev.get("metric"),
+                        "eval_type": ev.get("type"),
+                        "outcome_notes": rec.get("outcome_notes") or "",  # kept for compatibility — the grader's raw blob
+                        # #4220: the reason in reader words (None when the grader wrote none)
+                        # and whether a verdict came back from the data at all.
+                        "reason": _reason,
+                        "graded_on_data": _graded_on_data,
+                        "subdomain": rec.get("subdomain", ""),
+                    }
+                    if _plain_label is False:
+                        _row["reader_plain"] = False  # #4714: a sealed bet in words the page labels, never drops
+                    all_predictions.append(_row)
             except Exception as _qe:
                 logger.warning(f"[/api/predictions] {cid}: {_qe}")
 

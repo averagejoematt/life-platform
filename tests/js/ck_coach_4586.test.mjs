@@ -174,6 +174,17 @@ test("a call about a day before it was said, a 'tomorrow' long gone and a due da
   assert.match(later, /13 older calls are still waiting to be checked\./);
 });
 
+test("a sealed bet the route marks reader_plain:false is listed with a note, never hidden (#4714)", () => {
+  const sealed = { coach_id: "sleep", status: "pending", text: "Sleep EWMA should rise once the fixed bedtime holds.", date: "2026-09-06", due_date: "2026-10-14", pre_registered: true, reader_plain: false };
+  const html = C.nextHTML(SLEEP, { open: [], resolved: [] }, { predictions: [sealed] }, NAMES, TODAY);
+  assert.match(html, /Sleep EWMA should rise/, "the sealed bet is listed");
+  assert.match(html, /Sealed before the experiment began, so it keeps its original wording\./);
+  // the note is the label's alone: a plain sealed bet and an in-cycle call carry none
+  assert.equal(C.sealedNote({ ...sealed, reader_plain: undefined }), "");
+  assert.equal(C.sealedNote({ ...sealed, pre_registered: false }), "");
+  assert.doesNotMatch(C.nextHTML(SLEEP, { open: [], resolved: [] }, { predictions: [{ ...sealed, reader_plain: undefined }] }, NAMES, TODAY), /Sealed before/);
+});
+
 test("next says so when the calls or the bets are not served, and the lead has nothing to settle", () => {
   assert.match(C.nextHTML(SLEEP, DOCKET, null, NAMES, TODAY), /Lisa Park’s open calls are not available right now\./);
   assert.match(C.nextHTML(SLEEP, null, CALLS.sleep, NAMES, TODAY), /The bets between coaches are not available right now\./);

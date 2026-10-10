@@ -86,10 +86,18 @@ def reasons(text: Any, max_chars: int = MAX_CHARS) -> list[str]:
     used = [term for term, rx in _REGISTRY_RES if rx.search(item)]
     if used:
         out.append("a word the site does not use with readers: %s" % ", ".join(used))
-    jargon = [term for term, rx in _JARGON_RES if rx.search(item)]
+    jargon = specialist_terms(item)
     if jargon:
         out.append("a specialist term: %s" % ", ".join(jargon))
     return out
+
+
+def specialist_terms(text: Any) -> list[str]:
+    """The JARGON_TERMS this text uses, in list order — the jargon half of the rule alone, with no length rule.
+    A sealed pre-registered bet is judged on this only, and only to label it: it is never dropped (#4714)."""
+    if not isinstance(text, str):
+        return []
+    return [term for term, rx in _JARGON_RES if rx.search(text)]
 
 
 def is_plain(text: Any, max_chars: int = MAX_CHARS) -> bool:

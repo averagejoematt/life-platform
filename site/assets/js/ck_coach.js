@@ -181,6 +181,10 @@ export function pendingCalls(predictions, pid) {
     .filter((c) => c && c.status === "pending" && isDay(c.due_date) && String(c.text || "").trim() && (!c.coach_id || c.coach_id === short))
     .sort((a, b) => a.due_date.localeCompare(b.due_date) || String(a.date).localeCompare(String(b.date)));
 }
+/** #4714: a sealed bet is shown in the words it was sealed in, even when they are specialist
+ *  words; the route marks those `reader_plain: false` and the page says why it reads that way. */
+export const sealedNote = (call) =>
+  call && call.pre_registered && call.reader_plain === false ? "Sealed before the experiment began, so it keeps its original wording." : "";
 const shiftDay = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 /** The day a call is ABOUT, when its own words name one: a machine date in the sentence,
  *  or "tonight" / "tomorrow" counted from the day it was said. "" when it names none. */
@@ -227,7 +231,7 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
     out.push(soft(`${cap(countWord(calls.length))} ${calls.length === 1 ? "call is" : "calls are"} waiting to be checked.`));
     const rows = ahead
       .slice(0, shown)
-      .map((c) => `<li><span class="ck-rows__key"><time datetime="${esc(c.due_date)}">${esc(fmtShort(c.due_date))}</time></span><span>“${esc(wordDates(c.text))}” <span class="ck-small">${esc(isDay(c.date) ? `Said ${fmtShort(c.date)}.` : "")}</span></span></li>`)
+      .map((c) => `<li><span class="ck-rows__key"><time datetime="${esc(c.due_date)}">${esc(fmtShort(c.due_date))}</time></span><span>“${esc(wordDates(c.text))}” <span class="ck-small">${esc([isDay(c.date) ? `Said ${fmtShort(c.date)}.` : "", sealedNote(c)].filter(Boolean).join(" "))}</span></span></li>`)
       .join("");
     if (rows) out.push(`<ul class="ck-rows">${rows}</ul>`);
     // Every waiting call is accounted for: the ones shown, the rest still ahead, the older.

@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from experiment.measurable_metrics import base_metric as base_metric_key  # #3551: aggregate keys grade their base metric's unit
 
-from coach import plain_words, prediction_windows  # #4618: the day a number call names + the bound on a due date
+from coach import prediction_windows  # #4618: the day a number call names + the bound on a due date
 
 GRADEABLE_BY_DETERMINISTIC = "deterministic"
 GRADEABLE_BY_NONE = "none"
@@ -404,8 +404,4 @@ def build_prediction_record(coach_id, generation_date, claim, eval_spec, confide
     }
     if refused:
         record["emission_refused"] = refused
-    if not plain_words.is_plain(claim, plain_words.CALL_MAX_CHARS):
-        # #4714: the sentence prints under "Next" on the coach page. Marked so a reader can tell it was held (the ledger judges the words itself, so older rows go too);
-        # the call is still graded — status and spec are untouched, so a wording rule never costs the scorecard a row.
-        record["reader_plain"] = False
     return record

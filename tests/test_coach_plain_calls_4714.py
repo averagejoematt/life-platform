@@ -5,9 +5,12 @@ sentence under "Next" (the live sleep page: "Protein-slow-wave hypothesis could 
 reaches 145g+ threshold.") and ``set_aside_for_now``. Held here, no model called:
 
   * the rule catches the EWMA sentence (a trade term a short word carries past the length rules);
-  * a call is flagged ``reader_plain: False`` at emission but stays pending and gradable;
-  * /api/predictions lists only plain pending calls, still counts the held one, and judges the words
-    (so a row written before the rule goes too);
+  * emission writes the call unchanged (no stored flag: the ledger judges the words itself);
+  * the coach page's request (``?coach_id=<id>&status=pending``) lists only plain in-cycle pending calls,
+    still counts the held one, and judges the words (so a row written before the rule goes too);
+  * a SEALED pre-registered bet is always served on that list whatever its length, labelled
+    ``reader_plain: False`` only when it uses a specialist term — never dropped;
+  * every other request shape (``status=all``, no coach, the method/prediction pages) is untouched;
   * the writer asks once more for either list, and stores only plain items in both;
   * the route withholds a stored jargon set-aside item.
 """
@@ -47,42 +50,85 @@ def test_the_rule_catches_the_ewma_sentence_and_keeps_a_plain_call():
     assert plain_words.is_plain("the weighted average of his sleep") and not plain_words.is_plain("his EMA of sleep")
 
 
-def test_emission_flags_a_jargon_call_but_leaves_it_pending_and_gradable():
+def test_emission_writes_a_jargon_call_unchanged_with_no_unread_flag():
     held = prediction_emission.build_prediction_record("sleep_coach", "2026-10-05", EWMA_CALL, SPEC, 0.6, "observational")
     ok = prediction_emission.build_prediction_record("sleep_coach", "2026-10-05", PLAIN_CALL, SPEC, 0.6, "observational")
-    assert held["reader_plain"] is False and "reader_plain" not in ok
+    assert "reader_plain" not in held and "reader_plain" not in ok
     assert (held["status"], held["gradeable_by"], held["evaluation"]) == (ok["status"], ok["gradeable_by"], SPEC)
     assert held["status"] == "pending"
 
 
+# A sealed bet in the shape of the two live cycle-17 rows: past 300 characters, plain words otherwise.
+SEALED_LONG = (
+    "By the end of the first eight weeks his average nightly sleep will be at least thirty minutes longer than in the "
+    "two weeks before the start, because a fixed bedtime and an earlier last meal both push sleep later into the night "
+    "and the watch has shown that pattern in every earlier run of the same kind of plan."
+)
+SEALED_JARGON = "Sleep EWMA should rise once the fixed bedtime holds for three weeks."
+
+
+def _row(pid, claim, **extra):
+    return {
+        "pk": "COACH#sleep_coach",
+        "sk": f"PREDICTION#{pid}",
+        "prediction_id": pid,
+        "status": "pending",
+        "created_date": "2026-10-05",
+        "phase": "experiment",
+        "claim_natural": claim,
+        "evaluation": dict(SPEC),
+        "subdomain": "sleep",
+        "confidence": 0.6,
+        **extra,
+    }
+
+
 def _rows():
-    def row(pid, claim):
-        return {
-            "pk": "COACH#sleep_coach",
-            "sk": f"PREDICTION#{pid}",
-            "prediction_id": pid,
-            "status": "pending",
-            "created_date": "2026-10-05",
-            "phase": "experiment",
-            "claim_natural": claim,
-            "evaluation": dict(SPEC),
-            "subdomain": "sleep",
-            "confidence": 0.6,
-        }
-
-    return [row("p_ewma", EWMA_CALL), row("p_plain", PLAIN_CALL)]
+    return [
+        _row("p_ewma", EWMA_CALL),
+        _row("p_plain", PLAIN_CALL),
+        _row("p_sealed_long", SEALED_LONG, pre_registered=True, pre_registered_at="2026-09-04T12:00:00Z"),
+        _row("p_sealed_jargon", SEALED_JARGON, pre_registered=True, pre_registered_at="2026-09-04T12:00:00Z"),
+    ]
 
 
-def test_the_ledger_lists_only_plain_pending_calls_and_still_counts_the_held_one(monkeypatch):
+def _ask(monkeypatch, qs):
     def hook(table, **kw):
         pk = kw["KeyConditionExpression"]._values[0]._values[1]
         return {"Items": [dict(r) for r in _rows()] if pk == "COACH#sleep_coach" else []}
 
     monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=hook))
-    body = json.loads(api.handle_predictions({})["body"])
-    texts = [p["text"] for p in body["predictions"]]
-    assert texts == [PLAIN_CALL], texts
-    assert body["by_coach"]["sleep"]["total"] == 2 and body["by_coach"]["sleep"]["pending"] == 2
+    return json.loads(api.handle_predictions({"queryStringParameters": qs})["body"])
+
+
+COACH_PAGE = {"coach_id": "sleep", "status": "pending", "limit": "200"}  # ck_coach.js's request
+
+
+def test_the_coach_page_lists_only_plain_in_cycle_calls_and_still_counts_the_held_one(monkeypatch):
+    body = _ask(monkeypatch, COACH_PAGE)
+    in_cycle = [p["text"] for p in body["predictions"] if not p["pre_registered"]]
+    assert in_cycle == [PLAIN_CALL], in_cycle
+    assert body["by_coach"]["sleep"]["total"] == 4 and body["by_coach"]["sleep"]["pending"] == 4
+
+
+def test_a_sealed_pre_registered_bet_is_always_served_and_only_labelled(monkeypatch):
+    assert len(SEALED_LONG) > 300 and not plain_words.is_plain(SEALED_LONG, plain_words.CALL_MAX_CHARS)
+    body = _ask(monkeypatch, COACH_PAGE)
+    sealed = {p["text"]: p for p in body["predictions"] if p["pre_registered"]}
+    # the 300+ character sealed bet is served, with no label: its only fault is its length
+    assert SEALED_LONG in sealed and "reader_plain" not in sealed[SEALED_LONG]
+    # a sealed bet in specialist words is served too, labelled for the page — never dropped
+    assert SEALED_JARGON in sealed and sealed[SEALED_JARGON]["reader_plain"] is False
+    # an in-cycle row never carries the label (it is dropped or plain)
+    assert all("reader_plain" not in p for p in body["predictions"] if not p["pre_registered"])
+
+
+def test_every_other_request_shape_is_unchanged(monkeypatch):
+    every = sorted(r["claim_natural"] for r in _rows())
+    for qs in ({}, {"status": "all"}, {"status": "all", "coach_id": "sleep"}, {"status": "pending"}):
+        body = _ask(monkeypatch, qs)
+        assert sorted(p["text"] for p in body["predictions"]) == every, qs
+        assert all("reader_plain" not in p for p in body["predictions"]), qs
 
 
 def test_the_writer_retries_and_stores_only_plain_set_aside_items(monkeypatch):
