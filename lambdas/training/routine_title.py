@@ -100,19 +100,27 @@ _PERFORMED_SOURCES = ("hevy", LEGACY_WORKOUTS_PARTITION, "macrofactor_export")
 # Variants that are paired with / substitute for a real session — excluded from
 # the routine index used to resolve a performed workout's type.
 _NON_COUNTING_VARIANTS = ("floor", "re_entry")
+# Upper bound of every `DATE#YYYY-MM-DD…` sort key: '~' (0x7E) sorts after every digit and
+# '#', and before nothing a date key can contain — but BELOW `DELETE#`/`QUARANTINE#` (#4643).
+_DATE_SK_CEILING = "DATE#~"
 
 
 def _query_performed(start_date: str) -> list[dict[str, Any]]:
     """Performed workout records on/after start_date across all strength sources.
     Returns the raw items (date + workout_uid + archetype sticker if present).
-    Paginates each source. SK form: DATE#YYYY-MM-DD#WORKOUT#<id>."""
+    Paginates each source. SK form: DATE#YYYY-MM-DD#WORKOUT#<id>.
+
+    The sk range is CLOSED at `DATE#~` (#4643): an open `sk >= DATE#…` also returned every
+    non-workout row that sorts after DATE# in the same partition — the hevy DELETE#WORKOUT#
+    tombstones ('E' > 'A') — and the projection turned each into an empty item that
+    count_distinct_performed counted as one more session (key "None")."""
     rows: list[dict[str, Any]] = []
     for source in _PERFORMED_SOURCES:
         pk = f"USER#{USER_ID}#SOURCE#{source}"
         last_key = None
         while True:
             kwargs: dict[str, Any] = {
-                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start_date}"),
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", _DATE_SK_CEILING),
                 "ProjectionExpression": "#d, workout_uid, archetype, hevy_routine_id",
                 "ExpressionAttributeNames": {"#d": "date"},
             }
