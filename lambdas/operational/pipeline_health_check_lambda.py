@@ -368,7 +368,10 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         result = _probe_lambda(fn_name)
         result["function_name"] = fn_name
         result["display_name"] = display_name
-        result["source_id"] = source_id
+        # #4761: an enrichment function rides on its parent source but is not its ingestion.
+        # Record it under its own id so the status page's `sid in failures` match leaves the
+        # parent source green (the failure stays in the stored health_check, operator-only).
+        result["source_id"] = f"{source_id}:enrichment" if fn_name.endswith("-enrichment") else source_id
         return result
 
     with ThreadPoolExecutor(max_workers=5) as executor:
