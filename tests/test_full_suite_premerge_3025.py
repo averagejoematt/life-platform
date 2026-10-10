@@ -63,14 +63,23 @@ def _coverage_gate_pytest_lines():
     ci-test.yml writes its invocations across backslash-continued lines, so they are
     joined here rather than matched line-wise — a line-wise regex silently reads only
     the first fragment, which carries no `-m` at all.
+
+    #4252: the two passes now live in the `shard` matrix's coverage-pass step (each leg
+    runs one of them; the parallel one over its half of the files) and the floor moved
+    to the `test` job's combine step. Returned PARALLEL first, then serial, whatever
+    order the step's if/else writes them in.
     """
-    src = _read(CI_TEST)
-    block = src[src.index("      - name: Test coverage gate") :]
-    block = block[: block.index("      - name: Coverage regression gate")]
+    block = _shard_step_block()
     joined = re.sub(r"\\\n\s*", " ", block)
     lines = [re.sub(r"\s+", " ", m).strip() for m in re.findall(r"(python3 -m pytest[^\n]*)", joined)]
     assert lines, "ci-test.yml coverage gate no longer runs a pytest command"
-    return lines
+    return sorted(lines, key=lambda ln: "-n auto" not in ln)
+
+
+def _shard_step_block():
+    src = _read(CI_TEST)
+    block = src[src.index("      - name: Coverage pass — this leg's share of tests/") :]
+    return block[: block.index("      - name: Upload this leg's coverage data")]
 
 
 def _coverage_gate_ignores():
@@ -249,26 +258,24 @@ def test_the_postmerge_passes_partition_the_suite_exactly():
 def test_the_coverage_FLOOR_is_measured_over_BOTH_passes_not_one():
     """The splitting hazard that has nothing to do with the partition.
 
-    Coverage is now produced by two invocations. If the floor rode the parallel pass it
-    would grade the suite on a SUBSET and red a correct build; if neither pass appended,
-    the second would overwrite the first and the floor would be graded on the ~48 serial
-    tests alone — which would pass trivially and gate nothing. So: exactly one pass
-    carries `--cov-fail-under`, it is the LAST one, and it is the one that appends.
+    Coverage is produced by several invocations. If the floor rode any one of them it
+    would grade the suite on a SUBSET — redding a correct build, or (on the ~48 serial
+    tests alone) passing trivially and gating nothing.
+
+    #4252: the passes run on separate shard legs, so NO pass carries a floor, an append
+    or the xml report; the `test` job's combine step grades the floor once, over every
+    leg's data, and refuses to run on a missing leg. That step is EXECUTED against real
+    coverage data in tests/test_ci_test_shards_4252.py (union passes where no single leg
+    would; a missing leg and a red leg both red the verdict).
     """
-    lines = _coverage_gate_pytest_lines()
-    with_floor = [i for i, ln in enumerate(lines) if "--cov-fail-under" in ln]
-    assert with_floor == [len(lines) - 1], (
-        f"--cov-fail-under must appear on exactly the LAST pass, found it on pass(es) {with_floor}. "
-        "On an earlier pass it grades a subset of the suite; on none, the floor is not enforced at all."
-    )
-    assert "--cov-append" in lines[-1], (
-        "the floor-carrying pass does not --cov-append, so it OVERWRITES the parallel pass's data and "
-        "the 80% floor is measured over the ~48 serial tests alone — a gate that passes trivially"
-    )
-    assert "--cov-append" not in lines[0], "the first pass must START the coverage data, not append to a stale file"
-    # And the report is written once, by the pass that has all the data.
-    assert "--cov-report=xml:coverage.xml" in lines[-1]
-    assert "xml:coverage.xml" not in lines[0], "a partial-coverage xml would be published as if it were the run's result"
+    for ln in _coverage_gate_pytest_lines():
+        for flag in ("--cov-fail-under", "--cov-append", "xml:coverage.xml"):
+            assert flag not in ln, f"a single pass carries {flag} — it would grade or publish a SUBSET of the suite: {ln}"
+    src = _read(CI_TEST)
+    combine = src[src.index("      - name: Test coverage gate") :]
+    combine = combine[: combine.index("      - name: Coverage regression gate")]
+    assert "coverage combine" in combine and "coverage report --fail-under=" in combine
+    assert "coverage xml -o coverage.xml" in combine
 
 
 def test_every_postmerge_pass_keeps_pipefail_in_its_step():
@@ -277,9 +284,7 @@ def test_every_postmerge_pass_keeps_pipefail_in_its_step():
     gate unable to fail for its whole life. Splitting one piped invocation into two does
     not double the risk; it doubles the number of pipes one `set -o pipefail` has to
     cover, so assert the line is still there and still ABOVE both."""
-    src = _read(CI_TEST)
-    block = src[src.index("      - name: Test coverage gate") :]
-    block = block[: block.index("      - name: Coverage regression gate")]
+    block = _shard_step_block()  # #4252: the passes live in the shard legs' step now
     pipefail = block.index("set -o pipefail")
     for ln in re.finditer(r"python3 -m pytest", block):
         assert ln.start() > pipefail, "a pytest pass runs BEFORE `set -o pipefail` — its exit code is tail's (#2259)"
@@ -320,10 +325,15 @@ def test_ci_test_runs_no_single_file_pytest_step():
 def test_both_coverage_passes_write_the_junit_the_sections_read():
     lines = _coverage_gate_pytest_lines()
     assert len(lines) == 2
-    assert "--junitxml=/tmp/junit_parallel.xml" in lines[0] and "--junitxml=/tmp/junit_serial.xml" in lines[1], lines
+    # #4252: one JUnit per shard leg, uploaded with its coverage data; the sections read
+    # all of them (the leg set itself is held by tests/test_ci_test_shards_4252.py).
+    assert '--junitxml="shard-out/junit-$LEG.xml"' in lines[0] and "--junitxml=shard-out/junit-serial.xml" in lines[1], lines
     src = _read(CI_TEST)
     drift = src[src.index("      - name: Coverage regression gate") :]
-    assert "python3 scripts/ci_test_sections.py /tmp/junit_parallel.xml /tmp/junit_serial.xml" in drift
+    assert (
+        "python3 scripts/ci_test_sections.py shard-out/junit-parallel-1.xml shard-out/junit-parallel-2.xml shard-out/junit-serial.xml"
+        in drift
+    )
     assert "if: always()" in drift[: drift.index("run: |")], "the sections report must run when a coverage pass is red"
 
 

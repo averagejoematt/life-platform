@@ -190,8 +190,10 @@ def _ci_text():
 
 
 def _ci_cov_fail_under():
-    m = re.search(r"--cov-fail-under=(\d+)", _ci_text())
-    assert m, "no --cov-fail-under=N found in ci-cd.yml — the enforced coverage gate is missing"
+    # #4252: the floor is graded by `coverage report --fail-under=N` over the combined
+    # shard data (pytest's `--cov-fail-under=N` before the split) — either spelling.
+    m = re.search(r"--(?:cov-)?fail-under=(\d+)", _ci_text())
+    assert m, "no --fail-under=N / --cov-fail-under=N found in the CI workflows — the enforced coverage gate is missing"
     return int(m.group(1))
 
 

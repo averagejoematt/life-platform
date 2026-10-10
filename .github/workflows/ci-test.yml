@@ -26,24 +26,162 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Unit Tests
-    # #4252: skipped ONLY when another push run owns this exact sha's verdict. The
-    # caller job stays unconditional, so a skip reports as `test / Unit Tests = skipped`.
+  # #4252 box 4: the suite runs as THREE matrix legs on three runners, then `test` below
+  # combines their coverage data and grades the floor once, over the union.
+  #
+  # Before this split the whole suite ran on ONE 4-core runner — the parallel pass
+  # (~985s) then the serial pass (~290s) — and that job alone was 18.5-23.6 min of every
+  # push to main, against the box-4 bar of 20 min wall-clock. Measured on the last green
+  # runs before the split (38026562985, 38022061772): coverage step 1284s / 1263s of a
+  # 21.8 / 21.5 min job. The legs:
+  #   parallel-1, parallel-2  the `-m "not serial"` pass, each collecting only ITS half
+  #                           of the test FILES (CI_TEST_SHARD=K/N, tests/ci_shard.py —
+  #                           a stable crc32 split by file name, exact by construction);
+  #   serial                  the `-m serial` pass, unchanged, on its own runner, so the
+  #                           in-tree writers still never share a checkout with xdist.
+  # tests/test_ci_test_shards_4252.py holds the matrix, the shard count and the
+  # combine step to each other.
+  shard:
+    name: Unit Tests shard (${{ matrix.leg }})
+    # #4252: skipped ONLY when another push run owns this exact sha's verdict.
     if: inputs.owner_run == ''
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      # Every leg runs to its own verdict: one red leg must not cancel the others and
+      # hide THEIR failures until the next push.
+      fail-fast: false
+      matrix:
+        include:
+          - leg: parallel-1
+            shard: '1/2'
+          - leg: parallel-2
+            shard: '2/2'
+          - leg: serial
+            shard: ''
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.build_sha }}   # #1173: the reconciled tree
 
-      # #1349: stamp the job's own start epoch so the duration-budget warning
-      # below can compute wall-clock without depending on an external API call.
-      # Kept BEFORE setup-python (unchanged ordering) so the measured window matches
-      # the original job byte-for-behavior.
+      # #1349: stamp the leg's own start epoch. `test` reads the EARLIEST leg's stamp,
+      # so the duration budget measures the test phase's wall-clock, not one runner's.
       - name: Record job start time (#1349 duration budget)
-        run: echo "UNIT_TESTS_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+        run: |
+          mkdir -p shard-out
+          date +%s > "shard-out/start-${{ matrix.leg }}.epoch"
+
+      # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'  # V2 P4.14: speeds up CI by ~20s per job
+
+      - name: Install test dependencies
+        # Phase 8.2: pytest-cov for coverage report; hypothesis: property tests (#1664).
+        # Versions are READ from requirements-dev.txt, never copied here (CQ-01, #2609) —
+        # a second copy is what made every Dependabot bump born red.
+        run: |
+          # pillow (#2973): lets test_visual_ai_qa's real-downscale test run here
+          # (visual_ai_qa._prepare_image; pytest.importorskip elsewhere).
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-cov pytest-xdist boto3 botocore hypothesis pyyaml pillow)
+          pip install $PINS
+
+      - name: Coverage pass — this leg's share of tests/
+        # #4252: COVERAGE_CORE=sysmon — coverage.py's sys.monitoring tracer (PEP 669; the
+        # Python this job pins supports it). Line coverage only, which is all this repo
+        # measures (no `branch = true`). Measured on a quarter of tests/ (336 files, 7,322
+        # tests, the same interpreter and pins, four xdist workers): no coverage 175s,
+        # default ctrace tracer 273s, sysmon 200s — and the per-file report was
+        # byte-identical between the two tracers (577 rows, same TOTAL), so the floor and
+        # the high-water ratchet read the same number, faster.
+        env:
+          COVERAGE_CORE: sysmon
+          CI_TEST_SHARD: ${{ matrix.shard }}   # '' on the serial leg = not sharded
+          LEG: ${{ matrix.leg }}
+        run: |
+          # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
+          # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`
+          # exited with tail's status (always 0). Both the coverage floor AND every
+          # test failure in this step were therefore silently discarded — this gate has
+          # never once failed a build. Proven locally:
+          #   bash -e -c 'python3 -c "import sys; sys.exit(1)" | tail -100'; echo $?  → 0
+          # Do not remove this line, and do not add another unguarded pipe below it.
+          set -o pipefail
+          # #2692: --durations=25 so the NEXT run can answer "which tests" rather than
+          # only "how long". The wall-clock budget has now been breached four times and
+          # every diagnosis so far has been local, where the suite behaves differently
+          # from this runner — the local/CI gap is half of what the issue asks to
+          # explain, and it cannot be closed from a laptop. This is display-only: no
+          # selection, no threshold, no gate behaviour changes.
+          #
+          # tail widened 100 -> 160 with it. The durations block prints in pytest's
+          # terminal summary alongside the (long) coverage table, so at -100 the very
+          # lines this flag exists to produce were the ones most likely to be cut —
+          # a measurement that silently truncates reports nothing, which is the
+          # failure mode this repo keeps re-learning.
+          # #3835: TWO passes, the same lane #3797 already proved on pr-checks.yml.
+          # This job was a single serial invocation and ran over its 1950s budget on
+          # 8 of 9 consecutive green-main runs (median 2850s = 1.46x).
+          #
+          # The partition is safe only because the two -m expressions are exact
+          # complements over one registered marker; tests/test_full_suite_premerge_3025.py
+          # asserts that for BOTH lanes, so a test cannot fall into neither pass while
+          # both steps stay green.
+          #
+          # #4252: the two passes now run on separate legs. A parallel leg runs the
+          # `-m "not serial"` pass over its half of the FILES; the serial leg runs the
+          # `-m serial` pass over the whole tree. NO leg grades the floor or writes a
+          # report — grading one leg would grade a subset and red a correct build. Each
+          # leaves its raw data file for `test`, which combines every leg's first.
+          if [ "$LEG" = "serial" ]; then
+            echo "::group::Coverage — serial pass (-m serial)"
+            python3 -m pytest tests/ \
+                --ignore=tests/test_integration_aws.py \
+                --cov=lambdas --cov=mcp \
+                --cov-report= \
+                --durations=25 \
+                -m serial \
+                --junitxml=shard-out/junit-serial.xml \
+                -q 2>&1 | tail -160
+          else
+            echo "::group::Coverage — parallel pass (-m 'not serial'), files of shard $CI_TEST_SHARD"
+            python3 -m pytest tests/ \
+                --ignore=tests/test_integration_aws.py \
+                --cov=lambdas --cov=mcp \
+                --cov-report= \
+                --durations=25 \
+                -n auto --dist loadfile -m "not serial" \
+                --junitxml="shard-out/junit-$LEG.xml" \
+                -q 2>&1 | tail -60
+          fi
+          echo "::endgroup::"
+          mv .coverage "shard-out/coverage-$LEG.dat"
+
+      - name: Upload this leg's coverage data + JUnit
+        # always(): a red leg's JUnit is what names its failures in `test`'s sections.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-tests-shard-${{ matrix.leg }}
+          path: shard-out/
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: warn
+
+  test:
+    name: Unit Tests
+    # #4252: the VERDICT job — `test / Unit Tests` is the name scripts/find_test_verdict_owner.py
+    # and check_main_green.py read. It needs every leg, and runs even when a leg is red
+    # (`!cancelled()`) so the red is reported HERE, with the sections, instead of this
+    # job going `skipped`. Skipped, exactly as before, when another push run owns the sha.
+    needs: shard
+    if: ${{ !cancelled() && inputs.owner_run == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.build_sha }}   # #1173: the reconciled tree (coverage reports read its sources)
 
       # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
@@ -61,8 +199,8 @@ jobs:
           pip install $PINS
 
       - name: Name every playwright-gated test skip (#3640)
-        # This job installs no playwright/chromium, so every module in this set
-        # SKIPS silently below (invisible in the tail-truncated pytest summary)
+        # No leg installs playwright/chromium, so every module in this set
+        # SKIPS silently in the shard legs (invisible in the tail-truncated pytest summary)
         # while it can FAIL on any machine that does have chromium. Name each one
         # loudly here so a lane's first red on such a machine is never mistaken
         # for something this job would have caught.
@@ -126,6 +264,14 @@ jobs:
       # it without the fix would have left main with no test signal at all while
       # continuing to report green.
 
+      - name: Download every leg's coverage data + JUnit (#4252)
+        if: always()
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: unit-tests-shard-*
+          path: shard-out
+          merge-multiple: true
+
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor (ADR-080/ADR-107). The codebase is integration-tested
         # (handlers run live; most offline tests are structural/contract), so measured
@@ -145,77 +291,34 @@ jobs:
         # number, move the constant.
         #
         # The floor is CANONICAL in pyproject.toml `[tool.coverage.report] fail_under`;
-        # the explicit `--cov-fail-under` below is belt-and-suspenders and MUST match it —
+        # the explicit `--fail-under` below is belt-and-suspenders and MUST match it —
         # tests/test_coverage_floor_ratchet.py fails if the two (and the gap-warn --floor
         # below) ever drift or drop below the committed RATCHET_FLOOR (up-only). Keep
         # ratcheting up. Scope: lambdas/ + mcp/ only.
         #
-        # #4252: COVERAGE_CORE=sysmon — coverage.py's sys.monitoring tracer (PEP 669; the
-        # Python this job pins supports it). Line coverage only, which is all this repo
-        # measures (no `branch = true`). Measured on a quarter of tests/ (336 files, 7,322
-        # tests, the same interpreter and pins, four xdist workers): no coverage 175s,
-        # default ctrace tracer 273s, sysmon 200s — and the per-file report was
-        # byte-identical between the two tracers (577 rows, same TOTAL), so the floor and
-        # the high-water ratchet read the same number, faster.
+        # #4252: the passes now run in the `shard` legs above; this step COMBINES their
+        # data and grades the floor once over the union. It first refuses a red leg and
+        # a missing leg's data — grading the floor over a subset of the suite is the
+        # exact hazard the old two-pass layout guarded against with --cov-append.
         env:
-          COVERAGE_CORE: sysmon
+          SHARD_RESULT: ${{ needs.shard.result }}
+          EXPECTED_LEGS: 3   # = the shard matrix's legs; tests/test_ci_test_shards_4252.py holds them equal
         run: |
-          # `set -o pipefail` is LOAD-BEARING (#2259). GitHub's default shell is
-          # `bash -e {0}`; `-e` does not imply pipefail, so `pytest … | tail -100`
-          # exited with tail's status (always 0). Both `--cov-fail-under=82` AND every
-          # test failure in this step were therefore silently discarded — this gate has
-          # never once failed a build. Proven locally:
-          #   bash -e -c 'python3 -c "import sys; sys.exit(1)" | tail -100'; echo $?  → 0
-          # Do not remove this line, and do not add another unguarded pipe below it.
           set -o pipefail
-          echo "::group::Coverage report + gate"
-          # #2692: --durations=25 so the NEXT run can answer "which tests" rather than
-          # only "how long". The wall-clock budget has now been breached four times and
-          # every diagnosis so far has been local, where the suite behaves differently
-          # from this runner — the local/CI gap is half of what the issue asks to
-          # explain, and it cannot be closed from a laptop. This is display-only: no
-          # selection, no threshold, no gate behaviour changes.
-          #
-          # tail widened 100 -> 160 with it. The durations block prints in pytest's
-          # terminal summary alongside the (long) coverage table, so at -100 the very
-          # lines this flag exists to produce were the ones most likely to be cut —
-          # a measurement that silently truncates reports nothing, which is the
-          # failure mode this repo keeps re-learning.
-          # #3835: TWO passes, the same lane #3797 already proved on pr-checks.yml.
-          # This job was a single serial invocation and ran over its 1950s budget on
-          # 8 of 9 consecutive green-main runs (median 2850s = 1.46x). The remedy was
-          # already built and merged — it just landed in pr-checks.yml only.
-          #
-          # Coverage is COMBINED across the two passes, not measured on either alone:
-          # pass 1 writes the data and asserts NO floor, pass 2 appends and is the only
-          # step carrying --cov-fail-under and the report. Putting the floor on pass 1
-          # would grade the suite on a subset and red a correct build.
-          #
-          # The partition is safe only because the two -m expressions are exact
-          # complements over one registered marker; tests/test_full_suite_premerge_3025.py
-          # asserts that for BOTH lanes, so a test cannot fall into neither pass while
-          # both steps stay green.
-          echo "::group::Coverage — parallel pass (-m 'not serial')"
-          python3 -m pytest tests/ \
-              --ignore=tests/test_integration_aws.py \
-              --cov=lambdas --cov=mcp \
-              --cov-report= \
-              --durations=25 \
-              -n auto --dist loadfile -m "not serial" \
-              --junitxml=/tmp/junit_parallel.xml \
-              -q 2>&1 | tail -60
-          echo "::endgroup::"
-          echo "::group::Coverage report + gate — serial pass (-m serial, appends)"
-          python3 -m pytest tests/ \
-              --ignore=tests/test_integration_aws.py \
-              --cov=lambdas --cov=mcp --cov-append \
-              --cov-report=term-missing:skip-covered \
-              --cov-report=xml:coverage.xml \
-              --cov-fail-under=82 \
-              --durations=25 \
-              -m serial \
-              --junitxml=/tmp/junit_serial.xml \
-              -q 2>&1 | tail -160
+          echo "::group::Coverage report + gate (combined over every shard leg)"
+          if [ "$SHARD_RESULT" != "success" ]; then
+            echo "::error title=Unit Tests (#4252)::a shard leg did not pass (needs.shard.result=$SHARD_RESULT) — its own job log names the failing tests"
+            exit 1
+          fi
+          shopt -s nullglob
+          DATA=(shard-out/coverage-*.dat)
+          if [ "${#DATA[@]}" != "$EXPECTED_LEGS" ]; then
+            echo "::error title=Unit Tests (#4252)::${#DATA[@]} coverage data file(s) for $EXPECTED_LEGS legs — the floor would grade a subset of the suite"
+            exit 1
+          fi
+          python3 -m coverage combine --keep "${DATA[@]}"
+          python3 -m coverage xml -o coverage.xml
+          python3 -m coverage report --fail-under=82 --skip-covered --show-missing 2>&1 | tail -160
           echo "::endgroup::"
 
       - name: Coverage regression gate + drift warnings (ratchet, #1206/#1349/#1658)
@@ -314,8 +417,11 @@ jobs:
         #      loses --fail-on-regression.
         if: always()
         run: |
-          # #4252: the former single-file steps' labels, as sections (report only, exit 0).
-          python3 scripts/ci_test_sections.py /tmp/junit_parallel.xml /tmp/junit_serial.xml || true
+          # #4252: the former single-file steps' labels, as sections (report only, exit 0),
+          # read from EVERY leg's JUnit.
+          python3 scripts/ci_test_sections.py shard-out/junit-parallel-1.xml shard-out/junit-parallel-2.xml shard-out/junit-serial.xml || true
+          # #4252: the budget measures the test phase — from the EARLIEST leg's start.
+          UNIT_TESTS_START_EPOCH=$(python3 -c 'import glob; v=[int(open(p).read()) for p in glob.glob("shard-out/start-*.epoch")]; print(min(v) if v else "")')
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 82 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \

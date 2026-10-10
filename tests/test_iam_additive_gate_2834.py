@@ -24,8 +24,11 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "deploy"))
 
-import iam_additive_gate as g  # noqa: E402
-import iam_additive_registry as g_reg  # noqa: E402
+from cdk_constants_env import committed_cdk_constants  # noqa: E402
+
+with committed_cdk_constants():  # #4252: order-independent of other modules' env fakes
+    import iam_additive_gate as g  # noqa: E402
+    import iam_additive_registry as g_reg  # noqa: E402
 
 pytestmark = pytest.mark.deploy_critical
 
@@ -929,8 +932,20 @@ def _write_synth(tmp_path: Path, template: dict, stack: str = STACK, account: st
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:
+    # #4252: the CLI runs in CI with no CDK-constant overrides set; other test modules
+    # set fakes (S3_BUCKET=...) at import, so hand the subprocess CI's environment.
+    import os
+
+    from cdk_constants_env import CDK_CONSTANT_ENV_KEYS
+
+    env = {k: v for k, v in os.environ.items() if k not in CDK_CONSTANT_ENV_KEYS}
     return subprocess.run(
-        [sys.executable, str(ROOT / "deploy" / "iam_additive_gate.py"), *args], capture_output=True, text=True, cwd=ROOT, timeout=120
+        [sys.executable, str(ROOT / "deploy" / "iam_additive_gate.py"), *args],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=120,
+        env=env,
     )
 
 

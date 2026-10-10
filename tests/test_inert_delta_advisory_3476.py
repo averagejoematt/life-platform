@@ -30,7 +30,10 @@ import sys
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "deploy"))
 
-import iam_additive_gate as gate  # noqa: E402
+from cdk_constants_env import committed_cdk_constants  # noqa: E402
+
+with committed_cdk_constants():  # #4252: order-independent of other modules' env fakes
+    import iam_additive_gate as gate  # noqa: E402
 
 _DASH = "AWS::CloudWatch::Dashboard"
 

@@ -1062,7 +1062,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # the sweep holding the stated apple_health upstream_changes facet to "no rebuild-a-day caller" (keyword OR
         # positional monotonic_guard) — arrives PROVEN via the re-runnable harness (MutationSpec + proof, ARMED 1/1).
         # Measured after merging origin/main: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
-        <= 250
+        # Upper bound 250 -> 253 (2026-10-10, #4252 box 4, stacked on #4638): the Unit Tests suite split into a 3-leg `shard`
+        # matrix. Two CI steps enter PROVEN (ci-test.yml shard::3 install, shard::4 coverage pass) and the combine step that
+        # replaced the old coverage gate (test::6, same label) is PROVEN too, its residue line leaving — CI_PROOFS, each
+        # step's own run body executed and mutated. Measured: 775 {250, 513, 7, 5} -> 777 {253, 512, 7, 5}.
+        <= 253
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
