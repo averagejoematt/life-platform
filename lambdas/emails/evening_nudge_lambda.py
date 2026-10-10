@@ -27,9 +27,9 @@ from datetime import datetime, timedelta
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
-from common.pacific_time import pacific_today
+from common.pacific_time import pacific_today, shift_day_key
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
-from content.ritual_link import sign_ritual_token
+from content.ritual_link import morning_note_link, sign_ritual_token
 from ingestion.source_registry import day_key_frame_for, manual_capture_sources
 
 logger = logging.getLogger()
@@ -278,6 +278,25 @@ def _build_ritual_section(date_str: str, missing_metrics: list[str]) -> str:
       <div style="background:#eef2ff;border-radius:8px;padding:12px 14px;">
         <p style="font-size:12px;color:#4338ca;font-weight:700;margin:0 0 4px;">🌙 Evening ritual — one tap each, no typing</p>
         {blocks}
+      </div>
+    </div>"""
+
+
+def _build_morning_note_section(today: str) -> str:
+    """#4189: tomorrow morning's link to the cockpit's four-word box — "how do I feel before the
+    number tells me?". The token signs TOMORROW's Pacific day (the write door accepts only today's),
+    so the link opens the box tomorrow and nothing before or after. "" when the secret is
+    unavailable (fail-soft, like the ritual section). Rides along only — never part of the send gate."""
+    tomorrow = shift_day_key(today, 1)
+    secret = _get_ritual_secret() if tomorrow else None
+    if not secret:
+        return ""
+    url = morning_note_link(SITE_URL, secret, tomorrow)
+    return f"""
+    <div style="padding:4px 24px 16px;">
+      <div style="background:#fff7ed;border-radius:8px;padding:12px 14px;">
+        <p style="font-size:12px;color:#9a3412;font-weight:700;margin:0 0 4px;">🌅 Tomorrow morning, before Whoop — four words</p>
+        <p style="font-size:12px;color:#374151;margin:0;"><a href="{url}" style="color:#9a3412;">Open the morning note</a> — sleep, body, mood, and whether you feel recovered. The link works tomorrow only.</p>
       </div>
     </div>"""
 
@@ -554,7 +573,7 @@ def lambda_handler(event, context):
             missing.append(ritual_entry)
         else:
             complete.append(ritual_entry)
-        ritual_html = _build_ritual_section(today, ritual_missing)
+        ritual_html = _build_ritual_section(today, ritual_missing) + _build_morning_note_section(today)  # #4189
 
         # #746: gentle staleness mentions for manual capture sources (journal +
         # manual HAE streams) gone dark past their registry threshold. ADDITIVE —
