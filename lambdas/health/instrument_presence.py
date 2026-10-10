@@ -48,14 +48,20 @@ each run this over the client they already hold; nothing here opens a connection
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from common.numeric import decimals_to_float
 from common.pacific_time import anchor_day_key
 from experiment.phase_filter import with_phase_filter
-from ingestion.source_registry import DEFAULT_STALE_HOURS, SOURCE_REGISTRY, coach_instruments, stale_hours_overrides
+from ingestion.source_registry import (
+    DEFAULT_STALE_HOURS,
+    SOURCE_REGISTRY,
+    coach_instruments,
+    hae_datatype_thresholds,
+    stale_hours_overrides,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +203,148 @@ def absent_coaches(table: Any, now: datetime | None = None, instruments: dict | 
         state = instrument_state(table, instrument, now)
         if state["dark"]:
             out[coach_id] = state
+    return out
+
+
+# ── #4702: the HISTORY of gaps, not just the one that is open now ─────────────────────
+#
+# `absent_coaches` answers "is the sensor dark NOW". A text written during a gap that has
+# since CLOSED needs the other question — "was the sensor dark on THAT day" — and the
+# sentinel cannot answer it (it keeps only the last reading). So the closed gaps are
+# DERIVED from the stored DATE# rows the board's own reads already key on: the days a
+# source wrote a row (a source instrument) or the days any of a datatype's fields appeared
+# on the apple_health row (a datatype instrument — the freshness checker's own presence
+# test, `compute_datatype_liveness`). Consecutive reading days further apart than the
+# instrument's dark threshold bound a gap. No new GSI (ADR-097), no new schedule, no new
+# write: a read over the partition the instrument already lives in.
+#
+# A gap is {start, end}: `start` is the last reading before it, `end` the first reading
+# after it (null while it is still open — that one is `absent_coaches`' to say, and
+# `web.claim_sourcing.gap_instruments` merges the two). A day strictly between them had no
+# reading. Days before the first reading inside the lookback are UNKNOWN, never a gap
+# (#1971 absent-is-unknown), and a behavioral source has no gaps by the same rule that
+# keeps it from ever being dark: a lapse in a hand-kept log is about Matthew, not a sensor.
+
+#: How far back the gap history is read. Mirrors the freshness checker's deep-scan horizon
+#: (HAE_LIVENESS_MAX_LOOKBACK_DAYS); every dated coach text this hold judges is younger.
+GAP_LOOKBACK_DAYS = 400
+
+#: Safety cap on the paginated history read (each page is up to 1 MB of scanned items; the
+#: key-condition floor already bounds it — measured 2026-10-09: cgm 405 rows, whoop 675).
+_GAP_MAX_PAGES = 10
+
+
+def gap_threshold_days(instrument: dict) -> float | None:
+    """The span in days past which two consecutive readings bound a gap — the instrument's
+    own dark threshold (a datatype's registry `stale_days`, a source's `stale_hours` / 24) —
+    or None for an instrument that can never be dark (behavioral)."""
+    source = str(instrument.get("source") or "")
+    datatype = instrument.get("datatype")
+    if datatype:
+        for row in hae_datatype_thresholds():
+            if row.get("key") == datatype:
+                return float(row["stale_days"])
+        return None
+    meta = SOURCE_REGISTRY.get(source) or {}
+    if instrument.get("behavioral") or meta.get("behavioral"):
+        return None
+    return stale_hours_overrides().get(source, DEFAULT_STALE_HOURS) / 24.0
+
+
+def _datatype_fields(datatype: str) -> list[str]:
+    for row in hae_datatype_thresholds():
+        if row.get("key") == datatype:
+            return list(row.get("fields") or [])
+    return []
+
+
+def reading_days(table: Any, instrument: dict, floor_day: str) -> list[str]:
+    """The sorted distinct YYYY-MM-DD days on or after `floor_day` on which the instrument
+    has a reading. Raises on a read failure — `gap_history` decides what that means."""
+    source = str(instrument.get("source") or "")
+    datatype = instrument.get("datatype")
+    fields = _datatype_fields(datatype) if datatype else []
+    if datatype and not fields:
+        return []
+    kwargs: dict[str, Any] = {
+        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").between(f"DATE#{floor_day}", "DATE#~"),
+        "ScanIndexForward": True,
+        "ProjectionExpression": ", ".join(["sk", *fields]),
+    }
+    if fields:
+        cond = Attr(fields[0]).exists()
+        for f in fields[1:]:
+            cond = cond | Attr(f).exists()
+        kwargs["FilterExpression"] = cond
+    kwargs = with_phase_filter(kwargs, include_pilot=True)  # liveness is pipe recency regardless of phase (#1203)
+    days: set[str] = set()
+    for _ in range(_GAP_MAX_PAGES):
+        resp = table.query(**kwargs)
+        for item in resp.get("Items", []):
+            sk = str(item.get("sk") or "")
+            if not sk.startswith("DATE#"):
+                continue
+            if fields and not any(item.get(f) is not None for f in fields):  # a NULL attribute is not a reading
+                continue
+            day = sk[5:15]
+            if len(day) == 10 and day >= floor_day:
+                days.add(day)
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return sorted(days)
+
+
+def gap_reason(start: str | None, end: str | None) -> str:
+    """The engine's words for one gap (the page renders the dates in words)."""
+    if end is None:
+        return _reason(start)
+    return f"no sensor from {start} to {end}"
+
+
+def closed_gaps(days: list[str], threshold_days: float | None) -> list[dict]:
+    """Pure: the CLOSED gaps in a sorted list of reading days — every pair of consecutive
+    readings more than `threshold_days` apart, as {start, end, reason}."""
+    if threshold_days is None:
+        return []
+    out: list[dict] = []
+    for a, b in zip(days, days[1:]):
+        span = (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(a, "%Y-%m-%d")).days
+        if span > threshold_days:
+            out.append({"start": a, "end": b, "reason": gap_reason(a, b)})
+    return out
+
+
+def gap_history(table: Any, now: datetime | None = None, instruments: dict | None = None) -> list[dict]:
+    """One row per distinct coach instrument — {source, datatype, label, gaps} — where
+    `gaps` is every CLOSED gap inside the lookback (`closed_gaps`). The open gap, if any, is
+    `absent_coaches`' verdict and is not repeated here.
+
+    Never raises: an instrument whose history read fails logs a warning and carries no
+    closed gaps, so the routes fail open exactly as they do on a failed sentinel read."""
+    now = now or datetime.now(timezone.utc)
+    floor_day = (now - timedelta(days=GAP_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+    out: list[dict] = []
+    seen: set[tuple[str, str | None]] = set()
+    try:
+        rows = list((instruments if instruments is not None else coach_instruments()).values())
+    except Exception as e:  # noqa: BLE001 — a registry failure must not take a route down
+        logger.warning("instrument_presence: gap history registry read failed: %s", e)
+        return out
+    for instrument in rows:
+        key = (str(instrument.get("source") or ""), instrument.get("datatype") or None)
+        if not key[0] or key in seen:
+            continue
+        seen.add(key)
+        gaps: list[dict] = []
+        threshold = gap_threshold_days(instrument)
+        if threshold is not None:
+            try:
+                gaps = closed_gaps(reading_days(table, instrument, floor_day), threshold)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("instrument_presence: gap history read failed for %s/%s (fail-open): %s", key[0], key[1], e)
+        out.append({"source": key[0], "datatype": key[1], "label": instrument.get("label") or key[0], "gaps": gaps})
     return out
 
 

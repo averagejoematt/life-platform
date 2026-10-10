@@ -13,29 +13,32 @@ argued from readings that did not exist on the day it argued.
 
 The rule
 --------
-A served text is NOT QUOTED when all three hold:
+A served text is NOT QUOTED when both hold:
 
   1. it CITES an instrument — one of that instrument's phrases below appears in it
      (`CITES`; the phrase, not the speaker, decides, so a nutrition-coach sentence "based
-     on CGM data" is held too);
-  2. that instrument is DARK right now — `health.instrument_presence.absent_coaches`, the
-     ONE derivation `/api/source_freshness` serves; and
-  3. the text is dated AFTER the instrument's last reading (`last_seen`), so the instrument
-     had nothing behind it on that day. A text dated on or before `last_seen`, or with no
-     date at all, is quoted — this module never guesses.
+     on CGM data" is held too); and
+  2. the text is dated INSIDE one of that instrument's GAP INTERVALS — strictly after the
+     gap's `start` (the last reading before it) and strictly before its `end` (the first
+     reading after it; null while the gap is still open). On that day the instrument had
+     nothing behind it. A text dated on a reading day, outside every gap, or with no date
+     at all, is quoted — this module never guesses.
+
+The gaps are the INTERVAL FORM `gap_instruments()` builds, and it is the only form any
+route hands this module (#4702):
+  * the OPEN gap is `health.instrument_presence.absent_coaches` — the ONE derivation
+    `/api/source_freshness` serves — from the instrument's `last_seen`, end null;
+  * the CLOSED gaps are `health.instrument_presence.gap_history`, derived from the stored
+    DATE# rows. Before #4702 the hold read only the first, so a text written during a gap
+    was quoted again the day the sensor reported (its `last_seen` moved past the text).
+    A closed gap holds a text exactly as an open one does, whether the sensor is dark now
+    or not.
 
 The words are never edited. A held text is removed from the payload and an `unsourced`
-note takes its place, with the engine's reason, the instrument, its last reading and one
-sentence a page prints beside the speaker's name. Removing (rather than annotating in
-place) is what guards every renderer at once: a page that has never heard of `unsourced`
-simply has nothing to quote.
-
-What this does NOT know
------------------------
-Liveness is a NOW fact: the sentinel carries the last reading, not the history of gaps.
-Once the sensor reports again its `last_seen` moves forward and an older gap is no longer
-visible here, so a text from that gap would be quoted again. Recording gap intervals is
-the follow-up named on #4673; until then the rule covers every gap that is still open.
+note takes its place, with the engine's reason, the instrument, the gap and one sentence a
+page prints beside the speaker's name (naming the gap's start and, once it closed, its
+end). Removing (rather than annotating in place) is what guards every renderer at once: a
+page that has never heard of `unsourced` simply has nothing to quote.
 
 Every phrase table entry is keyed by the instrument as `coach_instruments()` names it
 (`source`, `datatype`); `tests/test_claim_sourcing_4673.py` fails if a registry instrument
@@ -101,26 +104,50 @@ def claim_day(row: Mapping[str, Any] | None) -> str | None:
     return None
 
 
-def dark_instruments(absent: Mapping[str, Mapping[str, Any]] | None) -> list[dict]:
-    """The distinct dark instruments behind an `absent_coaches()` map, each as
-    {source, datatype, label, last_seen, reason}. Order is the map's; one row per instrument."""
-    out: list[dict] = []
-    seen: set[tuple[str, str | None]] = set()
-    for state in (absent or {}).values():
-        key = (str(state.get("source") or ""), state.get("datatype") or None)
-        if not key[0] or key in seen:
+def gap_instruments(absent: Mapping[str, Mapping[str, Any]] | None, history: Iterable[Mapping[str, Any]] | None = None) -> list[dict]:
+    """The INTERVAL FORM every route hands `unsourced` (#4702): one row per instrument that
+    has any gap, {source, datatype, label, gaps: [{start, end, reason}]}.
+
+    `history` is `health.instrument_presence.gap_history(...)` — the CLOSED gaps; `absent`
+    is an `absent_coaches()` map — each dark instrument contributes its OPEN gap
+    {start: last_seen, end: None}. An instrument with no gap at all is left out, so an
+    empty list means nothing can be held."""
+    rows: dict[tuple[str, str | None], dict] = {}
+
+    def _row(source: Any, datatype: Any, label: Any) -> dict | None:
+        key = (str(source or ""), datatype or None)
+        if not key[0]:
+            return None
+        if key not in rows:
+            rows[key] = {"source": key[0], "datatype": key[1], "label": label, "gaps": []}
+        return rows[key]
+
+    for inst in history or []:
+        if not isinstance(inst, Mapping):
             continue
-        seen.add(key)
-        out.append(
-            {
-                "source": key[0],
-                "datatype": key[1],
-                "label": state.get("label"),
-                "last_seen": _day(state.get("last_seen")),
-                "reason": state.get("reason"),
-            }
-        )
-    return out
+        row = _row(inst.get("source"), inst.get("datatype"), inst.get("label"))
+        if row is None:
+            continue
+        for gap in inst.get("gaps") or []:
+            start, end = _day(gap.get("start")), _day(gap.get("end"))
+            if start and end and start < end:  # a closed gap is bounded on both sides, or it is not one
+                row["gaps"].append({"start": start, "end": end, "reason": gap.get("reason")})
+    seen_open: set[tuple[str, str | None]] = set()
+    for state in (absent or {}).values():
+        row = _row(state.get("source"), state.get("datatype"), state.get("label"))
+        if row is None or (row["source"], row["datatype"]) in seen_open:
+            continue
+        seen_open.add((row["source"], row["datatype"]))
+        row["gaps"].append({"start": _day(state.get("last_seen")), "end": None, "reason": state.get("reason")})
+    return [row for row in rows.values() if row["gaps"]]
+
+
+def in_gap(day: str, gap: Mapping[str, Any]) -> bool:
+    """True when `day` falls strictly inside the gap: after its last reading (`start`; a
+    null start is an instrument with no reading on record) and before the reading that
+    closed it (`end`; null while open). A reading day itself is never inside."""
+    start, end = gap.get("start"), gap.get("end")
+    return (not start or start < day) and (not end or day < end)
 
 
 def cites(text: Any, source: str, datatype: str | None = None) -> bool:
@@ -129,36 +156,49 @@ def cites(text: Any, source: str, datatype: str | None = None) -> bool:
     return bool(pattern and isinstance(text, str) and pattern.search(text))
 
 
-def sentence(day: str, instrument: Mapping[str, Any]) -> str:
-    """The one sentence a page prints in place of the held words (dates in words, #4182)."""
+def sentence(day: str, instrument: Mapping[str, Any], gap: Mapping[str, Any]) -> str:
+    """The one sentence a page prints in place of the held words (dates in words, #4182).
+    It names the gap's start and, once the gap has closed, its end (#4702)."""
     noun = CITES.get(
         (str(instrument.get("source") or ""), instrument.get("datatype") or None), (str(instrument.get("label") or "sensor"), ())
     )[0]
-    last = instrument.get("last_seen")
-    since = f"which had sent no reading since {day_in_words(last, weekday=False)}" if last else "which had no reading on record"
+    start, end = gap.get("start"), gap.get("end")
+    if not start:
+        since = "which had no reading on record"
+    elif end:
+        since = (
+            f"which had sent no reading since {day_in_words(start, weekday=False)} "
+            f"and did not report again until {day_in_words(end, weekday=False)}"
+        )
+    else:
+        since = f"which had sent no reading since {day_in_words(start, weekday=False)}"
     return f"Not quoted: this was said on {day_in_words(day, weekday=False)} and rests on his {noun}, {since}."
 
 
-def unsourced(texts: Iterable[Any], day: Any, dark: Iterable[Mapping[str, Any]]) -> dict | None:
+def unsourced(texts: Iterable[Any], day: Any, gapped: Iterable[Mapping[str, Any]]) -> dict | None:
     """The `unsourced` note for texts dated `day`, or None when they may be quoted.
 
-    None unless some text cites a dark instrument AND `day` is a day key after that
-    instrument's last reading (or the instrument has no reading on record at all)."""
+    `gapped` is the interval form (`gap_instruments`). None unless some text cites an
+    instrument AND `day` falls inside one of that instrument's gaps (`in_gap`) — open or
+    closed, whatever the instrument's state is now."""
     on = _day(day)
     if on is None:
         return None
     pool = [t for t in texts if isinstance(t, str) and t.strip()]
-    for inst in dark:
-        last = inst.get("last_seen")
-        if last and on <= last:
+    if not pool:
+        return None
+    for inst in gapped:
+        gap = next((g for g in inst.get("gaps") or [] if in_gap(on, g)), None)
+        if gap is None:
             continue
         if any(cites(t, str(inst.get("source") or ""), inst.get("datatype")) for t in pool):
             return {
-                "reason": inst.get("reason"),
+                "reason": gap.get("reason"),
                 "instrument": {"source": inst.get("source"), "datatype": inst.get("datatype")},
-                "last_seen": last,
+                "last_seen": gap.get("start"),
+                "gap": {"start": gap.get("start"), "end": gap.get("end")},
                 "said_on": on,
-                "text": sentence(on, inst),
+                "text": sentence(on, inst, gap),
             }
     return None
 
