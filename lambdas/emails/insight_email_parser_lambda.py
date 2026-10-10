@@ -170,6 +170,50 @@ ALLOWED_SENDERS = (
     }
 )
 
+# #4546: the reply desk's own sender list — OFF by default (empty). The Story Desk's Monday questions go TO the
+# chronicle's EMAIL_RECIPIENT; a reply typed from that inbox can arrive From an address that is not in
+# ALLOWED_SENDERS, and the parser drops it before the [SQ-W<n>] route ever sees it. An address listed here is
+# accepted for that ONE route only (a [SQ-W<n>] subject — never an insight, never a review-pack correction), and only
+# when SES's own verdict authenticates it (_ses_authenticated below), so a forged From cannot put words in his mouth.
+# Setting it is a CDK environment change on the parser — an owner-approved deploy, never a lane's.
+_env_story_senders = os.environ.get("STORY_REPLY_SENDERS", "")
+STORY_REPLY_SENDERS = frozenset(s.strip().lower() for s in _env_story_senders.split(",") if s.strip())
+
+
+def _ses_authenticated(msg, sender):
+    """True when SES's own Authentication-Results header — the TOPMOST one, which SES prepends on receipt; any
+    header below it came with the message and is the sender's claim, not SES's — says dmarc or dkim passed for the
+    sender's domain. A missing, foreign or failing verdict is False (fail closed)."""
+    domain = sender.rsplit("@", 1)[-1].lower() if "@" in sender else ""
+    headers = msg.get_all("Authentication-Results") or []
+    if not domain or not headers:
+        return False
+    first = re.sub(r"\s+", " ", str(headers[0])).lower()
+    if first.split(";", 1)[0].strip() != "amazonses.com":
+        return False
+    exact = rf"{re.escape(domain)}(?=\s|$)"  # the whole domain: example.com must not match example.com.evil
+    for clause in first.split(";")[1:]:
+        c = clause.strip()
+        if c.startswith("dmarc=pass") and re.search(rf"header\.from={exact}", c):
+            return True
+        if c.startswith("dkim=pass") and re.search(rf"header\.(?:i=@|d=){exact}", c):
+            return True
+    return False
+
+
+def story_reply_sender_verdict(sender, subject, msg):
+    """#4546: how the parser treats a sender — ``"allowed"`` (ALLOWED_SENDERS, every route), ``"story_only"`` (a
+    STORY_REPLY_SENDERS address on a [SQ-W<n>] reply that SES authenticated — the reply desk route only),
+    ``"story_unauthenticated"`` (that address, but SES did not vouch for it), ``"story_unknown_sender"`` (a [SQ-W<n>]
+    reply from anyone else) or ``"rejected"`` (anything else — the parser's existing silent ignore)."""
+    if sender in ALLOWED_SENDERS:
+        return "allowed"
+    if story_questions.week_from_subject(subject) is None:
+        return "rejected"
+    if sender in STORY_REPLY_SENDERS:
+        return "story_only" if _ses_authenticated(msg, sender) else "story_unauthenticated"
+    return "story_unknown_sender"
+
 
 def extract_reply_text(email_body):
     """
@@ -549,11 +593,18 @@ def lambda_handler(event, context):
                 sender_email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", from_addr)
                 sender = sender_email.group(0).lower() if sender_email else ""
 
-                if sender not in ALLOWED_SENDERS:
+                subject = msg.get("Subject", "")
+                verdict = story_reply_sender_verdict(sender, subject, msg)
+                if verdict == "rejected":
                     print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
                     continue
-
-                subject = msg.get("Subject", "")
+                if verdict in ("story_unauthenticated", "story_unknown_sender"):
+                    # #4546: a reply to the desk's questions that we refuse is HIS reply lost — never the silent
+                    # ignore above, or "he did not answer" and "we dropped his answer" read the same. The envelope
+                    # carries who/what only, never the body (his words are not stored from an unvouched message).
+                    print(f"[WARN] story-questions reply refused ({verdict}): {sender}")
+                    _persist_failure_envelope(key, f"story_reply_{verdict}", {"key": key, "sender": sender, "subject": subject[:200]})
+                    continue
                 print(f"[INFO] From: {sender}, Subject: {subject}")
 
                 # Extract text body
@@ -604,6 +655,8 @@ def lambda_handler(event, context):
                     # counted, and the chronicle still has his voice.
                     _store_owner_words(body_text, sq_week, sq_received_at, key)
                     send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
+                continue
+            if verdict != "allowed":  # #4546: a STORY_REPLY_SENDERS address reaches the desk's route and nothing else
                 continue
 
             # #1690 (epic #1687): a reply to the weekly AI review-pack email carrying
