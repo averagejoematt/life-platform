@@ -48,12 +48,12 @@ each run this over the client they already hold; nothing here opens a connection
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from boto3.dynamodb.conditions import Attr, Key
 from common.numeric import decimals_to_float
-from common.pacific_time import anchor_day_key
+from common.pacific_time import anchor_day_key, pacific_date_of, parse_day_key, shift_day_key
 from experiment.phase_filter import with_phase_filter
 from ingestion.source_registry import (
     DEFAULT_STALE_HOURS,
@@ -310,8 +310,10 @@ def closed_gaps(days: list[str], threshold_days: float | None) -> list[dict]:
         return []
     out: list[dict] = []
     for a, b in zip(days, days[1:]):
-        span = (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(a, "%Y-%m-%d")).days
-        if span > threshold_days:
+        da, db = parse_day_key(a), parse_day_key(b)
+        if da is None or db is None:
+            continue
+        if (db - da).days > threshold_days:
             out.append({"start": a, "end": b, "reason": gap_reason(a, b)})
     return out
 
@@ -324,7 +326,7 @@ def gap_history(table: Any, now: datetime | None = None, instruments: dict | Non
     Never raises: an instrument whose history read fails logs a warning and carries no
     closed gaps, so the routes fail open exactly as they do on a failed sentinel read."""
     now = now or datetime.now(timezone.utc)
-    floor_day = (now - timedelta(days=GAP_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+    floor_day = shift_day_key(pacific_date_of(now.isoformat()) or "", -GAP_LOOKBACK_DAYS)
     out: list[dict] = []
     seen: set[tuple[str, str | None]] = set()
     try:
