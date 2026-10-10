@@ -256,3 +256,11 @@ def test_run_capture_scoped_to_an_unknown_path_exits_nonzero_without_network(mon
     monkeypatch.setattr(cas, "build_plan", lambda: [{"path": "/api/a", "action": "capture", "fetch_path": "/api/a", "is_prefix": False}])
     monkeypatch.setattr(cas, "_fetch", lambda *_a, **_k: pytest.fail("no HTTP may happen for an unknown --only path"))
     assert cas.run_capture(dry_run=False, check_drift=True, fail_on_leak=False, only=["/api/nope"]) == 2
+
+
+def test_filter_plan_reaches_a_prefix_route_by_its_slash_variants():
+    plan = [{"path": "/api/coach/", "action": "capture"}, {"path": "/api/coaches", "action": "capture"}]
+    for spelled in ("/api/coach/", "/api/coach", "api/coach/"):
+        assert [p["path"] for p in cas.filter_plan(plan, [spelled])] == ["/api/coach/"]
+    merged = cas.merge_exemptions({"/api/coach/": {"reason": "old"}, "/api/x": {"reason": "kept"}}, {}, ["/api/coach/"])
+    assert merged == {"/api/x": {"reason": "kept"}}

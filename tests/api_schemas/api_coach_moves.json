@@ -1,0 +1,71 @@
+{
+  "captured_at": "2026-10-10T02:31:42.242728+00:00",
+  "fetch_path": "/api/coach_moves",
+  "is_prefix_sample": false,
+  "path": "/api/coach_moves",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "absent_text": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "lines": {
+        "items": {
+          "keys": {
+            "bet_settles": {
+              "type": "null"
+            },
+            "coach": {
+              "type": "string"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "move": {
+              "type": "string"
+            },
+            "move_label": {
+              "type": "string"
+            },
+            "replies_to": {
+              "type": "null"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 2,
+        "type": "array"
+      },
+      "source": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
