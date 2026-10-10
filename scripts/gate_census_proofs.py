@@ -3291,12 +3291,10 @@ CI_PROOFS["ci::ci-test.yml::test::6"] = {
 # (horizons_retrospective, broadcast_sensitivity_gate) were exempt until #4784 gave them mapped
 # names; on the restack onto it they moved onto their ROUTES rows and their exemptions left.
 _MODEL_ROUTING_SUITE = "python3 -m pytest tests/test_model_routing_4770.py -q -p no:cacheprovider"
-_MODEL_ROUTING_SPARED_FILES = {
-    "lambdas/ai/prompt_cache.py": (
-        "prompt_cache.py:143 model literal 'us.anthropic.claude-haiku-4-5-20251001-v1:0'",
-        "and :159 (the two CACHING_DECISIONS measurement records)",
-    ),
-}
+# #4778 (2026-10-10): prompt_cache.CACHING_DECISIONS now names each caller's ROUTES row and
+# resolves its model through model_routing, so it spells no model and its exemption — and this
+# proof row with it — left (the gate retired, it was not re-proved). Empty, shrink-only.
+_MODEL_ROUTING_SPARED_FILES: dict[str, tuple[str, str]] = {}
 REGISTRY_PROOFS.update(
     {
         f"registry::tests/test_model_routing_4770.py::_EXEMPT::{path}": {
