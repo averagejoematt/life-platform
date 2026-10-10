@@ -65,6 +65,18 @@ ALLOWED_WALLCLOCK_GLOBALS = {
 
 _TESTS_DIR = pathlib.Path(__file__).resolve().parent
 _WALLCLOCK_METHODS = {"now", "today", "utcnow"}
+# #4750: the repo's Pacific-frame helpers are wall-clock reads too. `ts.pacific_now()` (Attribute) and a bare
+# `pacific_today()` (Name) both escaped the `.now()/.today()` match above and fired on a PR's CI at 23:52 PDT.
+_WALLCLOCK_FUNCS = _WALLCLOCK_METHODS | {"pacific_now", "pacific_today"}
+
+
+def _is_wallclock_call(n: ast.AST) -> bool:
+    if not isinstance(n, ast.Call):
+        return False
+    f = n.func
+    if isinstance(f, ast.Attribute):
+        return f.attr in _WALLCLOCK_FUNCS
+    return isinstance(f, ast.Name) and f.id in {"pacific_now", "pacific_today"}
 
 
 def _scan_wallclock_globals(root: pathlib.Path) -> dict[str, list[int]]:
@@ -85,11 +97,7 @@ def _scan_wallclock_globals(root: pathlib.Path) -> dict[str, list[int]]:
                 targets, value = [node.target], node.value
             else:
                 continue
-            hits = [
-                n
-                for n in ast.walk(value)
-                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in _WALLCLOCK_METHODS
-            ]
+            hits = [n for n in ast.walk(value) if _is_wallclock_call(n)]
             if not hits:
                 continue
             for t in targets:
@@ -141,3 +149,12 @@ def test_scanner_fires_on_an_injected_module_level_now(tmp_path):
         "from datetime import datetime\n\n\ndef f():\n    x = datetime.now()\n    return x\n"
     )
     assert not any(k.startswith("test_injected_calltime.py:") for k in _scan_wallclock_globals(tmp_path))
+
+
+def test_scanner_fires_on_pacific_helper_reads_4750(tmp_path):
+    """Mutation control (#4750): the Pacific helpers, as attribute or bare-name calls, are caught."""
+    (tmp_path / "test_inj_attr.py").write_text("import m\n\n_TODAY = m.pacific_now().date()\n")
+    (tmp_path / "test_inj_name.py").write_text("from c import pacific_today\n\n_T = [{'d': pacific_today()}]\n")
+    found = _scan_wallclock_globals(tmp_path)
+    assert "test_inj_attr.py:_TODAY" in found
+    assert "test_inj_name.py:_T" in found
