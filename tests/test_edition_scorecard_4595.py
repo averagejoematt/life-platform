@@ -169,6 +169,9 @@ def test_too_few_readings_is_not_enough_data_never_a_guess():
     wire["pulse"] = _pulse(weights=_two_weeks(320.0, 318.0, n_before=3, n_now=2))
     if verdict(wire, "body") != sc.NOT_ENOUGH_DATA:
         offenders.append("body: 2 weigh-ins this week guessed a verdict")
+    wire["pulse"] = _pulse(weights=_two_weeks(320.0, 318.0, n_before=2, n_now=3))
+    if verdict(wire, "body") != sc.NOT_ENOUGH_DATA:
+        offenders.append("body: 2 weigh-ins the week before guessed a verdict")
     # Sleep: 5 good nights of 5 recorded is going well; 4 good of 4 is not enough data.
     wire = _wire()
     wire["pulse"] = _pulse(sleep={d: 8.0 for d in days[:5]})

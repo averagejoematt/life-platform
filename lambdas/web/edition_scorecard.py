@@ -86,7 +86,10 @@ SCORECARD_RULE_TEXT = {
         f"Logged days at or above the plan's protein floor in the last seven. Going well at {FOOD_WELL_DAYS}. "
         f"Fewer than {FOOD_MIN_LOGGED} logged days is not enough data."
     ),
-    "mind": f"Days in the last seven with an entry in his own words. Going well at {MIND_WELL_DAYS}.",
+    "mind": (
+        f"Days in the last seven with an entry in his own words. Going well at {MIND_WELL_DAYS}. "
+        f"When the {MIND_SERVE_LIMIT} newest entries all fall inside the week, the count is not enough data."
+    ),
     "ai": (
         f"The coaches' checked calls against a simple guess that nothing changes from the last reading. "
         f"Going well when they beat it. Fewer than {AI_MIN_CALLS} checked calls is not enough data."

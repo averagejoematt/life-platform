@@ -215,7 +215,7 @@ export function weekSortHTML(week, base = "/") {
   ].join("");
 }
 // ── the whole-life scorecard (#4595) ───────────────────────────────────────────
-// The rows are decided in code (lambdas/web/site_api_edition.py, one written rule per area)
+// The rows are decided in code (lambdas/web/edition_scorecard.py, one written rule per area)
 // and served in /api/edition's `scorecard` block; this only prints them. Each row reads its
 // verdict in words — a dot is never the only carrier — and the rules sit under the rows with
 // the day they were set. A row whose source failed prints its own not-served sentence.

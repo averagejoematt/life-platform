@@ -94,7 +94,7 @@
      "verdict": "not_yet",
      "verdict_text": "Not yet",
      "text": "An entry in his own words on 0 of 7 days.",
-     "rule": "Days in the last seven with an entry in his own words. Going well at 3."
+     "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
     }
    },
    "ai": {
