@@ -903,7 +903,7 @@ _REGISTRY_NAME = re.compile(
 )
 # "ledgers" added #4270 slice 3: the shrink-only ledgers moved out of tests/ keep their
 # registry entries in the census (site_vocabulary_residue.py::BASELINE is 16 proven gates).
-_REGISTRY_ROOTS = ("lambdas", "tests", "scripts", "deploy", "mcp", "ledgers")
+_REGISTRY_ROOTS = ("lambdas", "tests", "scripts", "deploy", "mcp", "ledgers", "qa")  # qa/: #4270 moved qa_manifest out of tests/
 
 
 def _literal_entries(value: ast.expr | None) -> list[str] | None:

@@ -490,7 +490,7 @@ def leg_serving(report, args):
     import subprocess
 
     out = subprocess.run(
-        ["python3", os.path.join(REPO, "tests", "qa_manifest.py"), "--emit", "smoke"],
+        ["python3", os.path.join(REPO, "qa", "qa_manifest.py"), "--emit", "smoke"],
         capture_output=True,
         text=True,
         check=True,

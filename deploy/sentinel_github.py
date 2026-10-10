@@ -99,6 +99,8 @@ PUSH_TRIGGER_GLOBS = (
     "scripts/operating_calendar.py",  # #2832 — the calendar doc derives from its registry
     "scripts/gate_census.py",  # #3000 — docs/PROPORTIONALITY.md's gate_census_count fact
     "scripts/gate_census_precision.py",  # #3000 — gate_census.py's error-bar sibling module
+    "qa/qa_manifest.py",  # #4270 — PAGES fact source, moved out of tests/ (shim left there)
+    "qa/leak_token_sweep.py",  # #4270 — JSON_ENDPOINTS fact source, moved out of tests/ (shim left there)
     # site-deploy.yml (+ v4-gate.yml shares site/**; config/** shared with ci-cd.yml)
     "site/**",
     ".github/workflows/site-deploy.yml",
