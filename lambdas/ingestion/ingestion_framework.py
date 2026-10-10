@@ -625,6 +625,43 @@ def _record_absence_marker(table, s3, config, date_str, logger):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _writeback_credentials(config, secrets_client, secret_data, credentials, logger):
+    """Persist `credentials` to Secrets Manager only when they differ from what was read (#4641).
+
+    Writing back an unchanged secret cost 1,106 PutSecretValue calls in 14 days for
+    nothing; a rotated token still writes, retried once, and a double failure is an
+    ERROR (#481/A-9). Returns True if a write succeeded, False if skipped or failed.
+    """
+    if credentials == secret_data:
+        logger.info("Credentials unchanged - skipping Secrets Manager writeback")
+        return False
+    for _wb_attempt in (1, 2):
+        try:
+            secrets_client.update_secret(
+                SecretId=config.secret_id,
+                SecretString=json.dumps(credentials),
+            )
+            # #2196: the warm container's cached copy is now stale (rotating sources).
+            try:
+                from common.secret_cache import invalidate as _invalidate_secret
+
+                _invalidate_secret(config.secret_id)
+            except Exception:  # pragma: no cover - cache hygiene is best-effort
+                pass
+            logger.info("Credentials updated in Secrets Manager")
+            return True
+        except Exception as e:
+            if _wb_attempt == 1:
+                logger.warning(f"Secret writeback failed (attempt 1/2, retrying): {e}")
+                time.sleep(1)
+            else:
+                logger.error(
+                    f"Secret writeback FAILED twice for {config.secret_id} - the rotated "
+                    f"token may be stranded; re-auth likely needed on the next run: {e}"
+                )
+    return False
+
+
 def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, context, post_store_fn=None):
     """Execute the full ingestion pipeline.
 
@@ -715,35 +752,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
         # manual re-auth. So: retry once, and a double failure is an ERROR
         # ('re-auth likely needed'), never a shrugged-off warning.
         if config.enable_secret_writeback and credentials:
-            for _wb_attempt in (1, 2):
-                try:
-                    secrets_client.update_secret(
-                        SecretId=config.secret_id,
-                        SecretString=json.dumps(credentials),
-                    )
-                    # #2196: the warm container's cached copy is now stale — for a
-                    # rotating-token source (Whoop's single-use refresh_token) a
-                    # stale hit means the NEXT invocation in this container reads
-                    # an already-spent token and burns an exchange to discover it.
-                    # `secret_cache.invalidate` shipped with zero callers; this is
-                    # the writeback point, so this is where it belongs.
-                    try:
-                        from common.secret_cache import invalidate as _invalidate_secret
-
-                        _invalidate_secret(config.secret_id)
-                    except Exception:  # pragma: no cover — cache hygiene is best-effort
-                        pass
-                    logger.info("Credentials updated in Secrets Manager")
-                    break
-                except Exception as e:
-                    if _wb_attempt == 1:
-                        logger.warning(f"Secret writeback failed (attempt 1/2, retrying): {e}")
-                        time.sleep(1)
-                    else:
-                        logger.error(
-                            f"Secret writeback FAILED twice for {config.secret_id} — the rotated "
-                            f"token may be stranded; re-auth likely needed on the next run: {e}"
-                        )
+            _writeback_credentials(config, secrets_client, secret_data, credentials, logger)
     else:
         credentials = authenticate_fn({})
 
