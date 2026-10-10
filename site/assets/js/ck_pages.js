@@ -196,6 +196,10 @@ export function recordBigHTML(block) {
 // ── the bet card ───────────────────────────────────────────────────────────────
 export function betHTML(nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  // #4582: with the whole `next` block unserved there is no bet part at all. Its sentence is
+  // the block's ("What comes next is not served right now."), never "No coach bet is waiting
+  // to settle." — that would state a fact the page could not read.
+  if (!bet) return absent(nextBlock, "What comes next is not served right now.");
   if (!usable(bet) || !bet.data.question) return absent(bet, "No coach bet is waiting to settle.");
   const b = bet.data;
   const sides = (b.sides || []).filter((s) => s.coach).map((s) => `${s.coach} says ${s.says}.`).join(" ");
@@ -365,34 +369,47 @@ const fill = (id, html) => {
   return el;
 };
 
-async function mountFront(edition, b) {
-  const base = document.body.dataset.ckBase || "/";
-  // The fixed top: the record beside the premise, the daily mark, his own dated note when
-  // there is a fresh one, and the coaches' last settled call with the next one due.
-  fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
+// Every front-page slot the edition alone fills, as { element id: html } — `null` removes
+// the element. Pure, so tests/js/edition_contract_4582.test.mjs drives the page's real
+// block-to-slot wiring with the documents the route composes (#4582): one upstream failing
+// must leave its slot printing the block's own sentence, never a blank or another figure.
+export function frontSlots(edition, b, base = "/") {
+  const e = edition || {};
   const t = usable(b.today) ? b.today.data : {};
-  fill("ck-mark", F.markHTML(usable(b.week) ? b.week.data.weight_series : null, edition.as_of, t.start_weight_lbs, t.goal_weight_lbs));
-  fill("ck-mark-caption", F.markCaption(b.today, edition) || esc((b.today && b.today.absent_text) || ""));
   // His words lead when they are fresh. Silence is not a headline: the plain sentence that
   // there is nothing new sits at the foot of the week instead.
-  if (hisWordsFresh(b.his_words)) fill("ck-words", hisWordsHTML(b.his_words));
-  else {
-    document.getElementById("ck-words")?.remove();
-    fill("ck-words-absent", esc((b.his_words && b.his_words.absent_text) || ""));
-  }
-  fill("ck-bet", betHTML(b.next));
-  // Today: the last 24 hours.
-  fill("ck-today-label", esc(`Today · ${dayInWords(edition.as_of)}`));
-  fill("ck-today", F.todayBandHTML(edition, b, base));
-  fill("ck-coach-lines", F.coachTodayHTML(b.coach_lines));
-  // This week: what is going well and not, the lead's read, the chapter and the podcast.
+  const words = hisWordsFresh(b.his_words)
+    ? { "ck-words": hisWordsHTML(b.his_words) }
+    : { "ck-words": null, "ck-words-absent": esc((b.his_words && b.his_words.absent_text) || "") };
   const span = F.weekSpan(b.week);
-  fill("ck-week-label", esc(span ? `This week · ${span}` : "This week"));
-  fill("ck-week", F.weekSortHTML(b.week, base));
-  fill("ck-follow-line", esc(F.followLine(b.next)));
+  return {
+    // The fixed top: the record beside the premise, the daily mark, his own dated note when
+    // there is a fresh one, and the coaches' last settled call with the next one due.
+    "ck-record": esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""),
+    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs),
+    "ck-mark-caption": F.markCaption(b.today, e) || esc((b.today && b.today.absent_text) || ""),
+    ...words,
+    "ck-bet": betHTML(b.next),
+    // Today: the last 24 hours.
+    "ck-today-label": esc(`Today · ${dayInWords(e.as_of)}`),
+    "ck-today": F.todayBandHTML(e, b, base),
+    "ck-coach-lines": F.coachTodayHTML(b.coach_lines),
+    // This week: what is going well and not, the lead's read, the chapter and the podcast.
+    "ck-week-label": esc(span ? `This week · ${span}` : "This week"),
+    "ck-week": F.weekSortHTML(b.week, base),
+    "ck-follow-line": esc(F.followLine(b.next)),
+    "ck-quotes": F.quotesHTML(b.chapter, null, base),
+  };
+}
+
+async function mountFront(edition, b) {
+  const base = document.body.dataset.ckBase || "/";
+  for (const [id, html] of Object.entries(frontSlots(edition, b, base))) {
+    if (html === null) document.getElementById(id)?.remove();
+    else fill(id, html);
+  }
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
-  fill("ck-quotes", F.quotesHTML(b.chapter, null, base));
   const [calls, read, transcript, character] = await Promise.all([
     tryJSON("/api/calls"),
     tryJSON("/api/weekly_priority"),

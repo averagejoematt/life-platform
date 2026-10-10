@@ -1,0 +1,2802 @@
+{
+ "_about": "#4582 — GET /api/edition's own compose() output over tests/fixtures/edition_wire_4582 (today 2026-10-03 PT). `cases[<upstream>]` holds only the blocks that differ from `green` when that upstream's read fails; `all` is every upstream failing. Regenerate with `python3 tests/test_edition_page_contract_4582.py`; held equal by tests/test_edition_page_contract_4582.py.",
+ "green": {
+  "as_of": "2026-10-03",
+  "day_n": 28,
+  "order": [
+   "premise",
+   "chapter",
+   "next",
+   "today",
+   "week",
+   "life",
+   "coach_lines",
+   "scorecard",
+   "record",
+   "his_words",
+   "catch_up",
+   "follow"
+  ],
+  "blocks": {
+   "premise": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "static",
+    "absent_text": "The introduction is not served right now.",
+    "data": {
+     "copy_key": "premise"
+    }
+   },
+   "chapter": {
+    "state": "ok",
+    "as_of": "2026-09-29",
+    "source": [
+     "/journal/posts.json",
+     "/panelcast/episodes.json"
+    ],
+    "absent_text": "No chapter has been published yet.",
+    "data": {
+     "title": "The Body Answers Back",
+     "date": "2026-09-29",
+     "week_label": "Week 4",
+     "dek": "He has trained every day for 23 days straight — his deliberate choice — and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.",
+     "url": "/journal/posts/week-07/",
+     "word_count": 1086,
+     "read_minutes": 5,
+     "podcast": {
+      "state": "ok",
+      "as_of": "2026-10-01",
+      "source": "/panelcast/episodes.json",
+      "absent_text": "No podcast episode for this chapter yet.",
+      "data": {
+       "title": "EP4 · The Body Answers Back",
+       "guest": "Marcus Webb",
+       "guest_domain": "food",
+       "duration_sec": 420,
+       "duration_minutes": 7,
+       "mp3_url": "/panelcast/wk4.mp3",
+       "date": "2026-10-01"
+      }
+     }
+    }
+   },
+   "next": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "/api/content_cadence",
+     "/api/coach_docket"
+    ],
+    "absent_text": "Nothing is scheduled yet.",
+    "data": {
+     "chapter": {
+      "state": "ok",
+      "as_of": "2026-10-07",
+      "source": "/api/content_cadence",
+      "absent_text": "The next chapter is paused.",
+      "data": {
+       "date": "2026-10-07",
+       "drafted_not_promised": true
+      }
+     },
+     "bet": {
+      "state": "ok",
+      "as_of": "2026-10-05",
+      "source": "/api/coach_docket",
+      "absent_text": "No coach bet is waiting to settle.",
+      "data": {
+       "question": "Will the morning recovery score (7-day average) be 81.6 or higher on Monday, October 5?",
+       "topic": "Recovery score directional trend confirmation",
+       "settle_date": "2026-10-05",
+       "sides": [
+        {
+         "coach": "Max Reyes",
+         "says": "no"
+        },
+        {
+         "coach": "Lisa Park",
+         "says": "yes"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "today": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/journey",
+    "absent_text": "No weigh-in yet.",
+    "data": {
+     "weight_lbs": 311.0,
+     "date": "2026-10-03",
+     "start_weight_lbs": 327.3,
+     "start_date": "2026-09-06",
+     "goal_weight_lbs": 185.0,
+     "change_lbs": -16.3
+    }
+   },
+   "week": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "/api/pulse_history",
+     "/api/training_overview",
+     "/api/nutrition_overview"
+    ],
+    "absent_text": "Nothing is recorded in these seven days.",
+    "data": {
+     "days": [
+      "2026-09-27",
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+      "2026-10-03"
+     ],
+     "order": [
+      "weight",
+      "training",
+      "sleep",
+      "food"
+     ],
+     "measures": {
+      "weight": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/pulse_history",
+       "absent_text": "The weight has no reading in these seven days.",
+       "data": {
+        "values": [
+         314.5,
+         313.2,
+         312.3,
+         311.4,
+         311.7,
+         311.0,
+         311.0
+        ],
+        "text": "311 lb, down 3.5 across 7 weigh-ins."
+       }
+      },
+      "training": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/training_overview",
+       "absent_text": "Training has no reading in these seven days.",
+       "data": {
+        "values": [
+         193.0,
+         116.0,
+         137.0,
+         109.0,
+         137.0,
+         155.0,
+         241.0
+        ],
+        "text": "Trained on 7 of 7 days recorded.",
+        "met": [
+         true,
+         true,
+         true,
+         true,
+         true,
+         true,
+         true
+        ]
+       }
+      },
+      "sleep": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/pulse_history",
+       "absent_text": "Sleep has no reading in these seven days.",
+       "data": {
+        "values": [
+         7.5,
+         7.8,
+         8.7,
+         8.2,
+         9.1,
+         8.4,
+         8.8
+        ],
+        "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+        "met": [
+         true,
+         true,
+         true,
+         true,
+         true,
+         true,
+         true
+        ]
+       }
+      },
+      "food": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/nutrition_overview",
+       "absent_text": "The food log has no reading in these seven days.",
+       "data": {
+        "values": [
+         null,
+         null,
+         null,
+         null,
+         186.0,
+         172.0,
+         153.0
+        ],
+        "text": "At or above 170 g protein on 2 of 3 days recorded.",
+        "met": [
+         null,
+         null,
+         null,
+         null,
+         true,
+         true,
+         false
+        ]
+       }
+      }
+     },
+     "detail": [
+      {
+       "date": "2026-10-03",
+       "summary": "311.0 lb · trained · slept 8.8 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "311.0 lb"
+        },
+        {
+         "label": "Training",
+         "text": "241 minutes of walking"
+        },
+        {
+         "label": "Sleep",
+         "text": "8.8 hours; recovery 98 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "153 g protein, 1,732 kcal"
+        }
+       ]
+      },
+      {
+       "date": "2026-10-02",
+       "summary": "311.0 lb · trained · slept 8.4 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "311.0 lb"
+        },
+        {
+         "label": "Training",
+         "text": "155 minutes of strength"
+        },
+        {
+         "label": "Sleep",
+         "text": "8.4 hours; recovery 98 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "172 g protein, 1,568 kcal"
+        }
+       ]
+      },
+      {
+       "date": "2026-10-01",
+       "summary": "311.7 lb · trained · slept 9.1 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "311.7 lb"
+        },
+        {
+         "label": "Training",
+         "text": "137 minutes of strength"
+        },
+        {
+         "label": "Sleep",
+         "text": "9.1 hours; recovery 62 out of 100"
+        },
+        {
+         "label": "Food",
+         "text": "186 g protein, 1,690 kcal"
+        }
+       ]
+      },
+      {
+       "date": "2026-09-30",
+       "summary": "311.4 lb · trained · slept 8.2 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "311.4 lb"
+        },
+        {
+         "label": "Training",
+         "text": "109 minutes of walking"
+        },
+        {
+         "label": "Sleep",
+         "text": "8.2 hours; recovery 59 out of 100"
+        }
+       ]
+      },
+      {
+       "date": "2026-09-29",
+       "summary": "312.3 lb · trained · slept 8.7 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "312.3 lb"
+        },
+        {
+         "label": "Training",
+         "text": "137 minutes of strength"
+        },
+        {
+         "label": "Sleep",
+         "text": "8.7 hours; recovery 54 out of 100"
+        }
+       ]
+      },
+      {
+       "date": "2026-09-28",
+       "summary": "313.2 lb · trained · slept 7.8 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "313.2 lb"
+        },
+        {
+         "label": "Training",
+         "text": "116 minutes of strength"
+        },
+        {
+         "label": "Sleep",
+         "text": "7.8 hours; recovery 64 out of 100"
+        }
+       ]
+      },
+      {
+       "date": "2026-09-27",
+       "summary": "314.5 lb · trained · slept 7.5 h",
+       "facts": [
+        {
+         "label": "Weight",
+         "text": "314.5 lb"
+        },
+        {
+         "label": "Training",
+         "text": "28 minutes of strength; 165 minutes of walking"
+        },
+        {
+         "label": "Sleep",
+         "text": "7.5 hours; recovery 89 out of 100"
+        }
+       ]
+      }
+     ],
+     "weight_series": [
+      {
+       "date": "2026-09-06",
+       "lbs": 327.3
+      },
+      {
+       "date": "2026-09-12",
+       "lbs": 319.7
+      },
+      {
+       "date": "2026-09-15",
+       "lbs": 318.9
+      },
+      {
+       "date": "2026-09-17",
+       "lbs": 317.3
+      },
+      {
+       "date": "2026-09-18",
+       "lbs": 315.1
+      },
+      {
+       "date": "2026-09-19",
+       "lbs": 315.6
+      },
+      {
+       "date": "2026-09-20",
+       "lbs": 316.9
+      },
+      {
+       "date": "2026-09-21",
+       "lbs": 315.8
+      },
+      {
+       "date": "2026-09-22",
+       "lbs": 315.0
+      },
+      {
+       "date": "2026-09-23",
+       "lbs": 315.4
+      },
+      {
+       "date": "2026-09-24",
+       "lbs": 313.7
+      },
+      {
+       "date": "2026-09-25",
+       "lbs": 313.1
+      },
+      {
+       "date": "2026-09-26",
+       "lbs": 313.8
+      },
+      {
+       "date": "2026-09-27",
+       "lbs": 314.5
+      },
+      {
+       "date": "2026-09-28",
+       "lbs": 313.2
+      },
+      {
+       "date": "2026-09-29",
+       "lbs": 312.3
+      },
+      {
+       "date": "2026-09-30",
+       "lbs": 311.4
+      },
+      {
+       "date": "2026-10-01",
+       "lbs": 311.7
+      },
+      {
+       "date": "2026-10-02",
+       "lbs": 311.0
+      },
+      {
+       "date": "2026-10-03",
+       "lbs": 311.0
+      }
+     ]
+    }
+   },
+   "life": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "/api/decisions",
+     "/api/experiments",
+     "/api/habit_streaks",
+     "/api/journey",
+     "/api/nutrition_overview",
+     "/api/session",
+     "/api/sleep_detail",
+     "/api/supplements"
+    ],
+    "absent_text": "Nothing is recorded yet.",
+    "data": {
+     "order": [
+      "body",
+      "training",
+      "sleep",
+      "food",
+      "habits",
+      "supplements",
+      "experiments",
+      "mind"
+     ],
+     "rows": {
+      "body": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/journey",
+       "absent_text": "No weigh-in yet.",
+       "data": {
+        "text": "16.3 lb down so far; 126 lb to go to reach 185."
+       }
+      },
+      "training": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/session",
+       "absent_text": "No session is planned for today.",
+       "data": {
+        "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+       }
+      },
+      "sleep": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/sleep_detail",
+       "absent_text": "No sleep has been recorded yet.",
+       "data": {
+        "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+       }
+      },
+      "food": {
+       "state": "ok",
+       "as_of": "2026-10-02",
+       "source": "/api/nutrition_overview",
+       "absent_text": "No food has been logged yet.",
+       "data": {
+        "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+       }
+      },
+      "habits": {
+       "state": "ok",
+       "as_of": "2026-10-02",
+       "source": "/api/habit_streaks",
+       "absent_text": "No habits have been recorded yet.",
+       "data": {
+        "text": "5 of 7 daily habits kept on Friday, October 2."
+       }
+      },
+      "supplements": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/supplements",
+       "absent_text": "No supplements are listed.",
+       "data": {
+        "text": "21 in the daily stack."
+       }
+      },
+      "experiments": {
+       "state": "ok",
+       "as_of": "2026-10-03",
+       "source": "/api/experiments",
+       "absent_text": "No experiments are listed.",
+       "data": {
+        "text": "None running right now; 1 ready to start."
+       }
+      },
+      "mind": {
+       "state": "stale",
+       "as_of": "2026-09-23",
+       "source": "/api/decisions",
+       "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+       "data": null
+      }
+     }
+    }
+   },
+   "coach_lines": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/coaching-dashboard",
+    "absent_text": "The coaches have written nothing yet.",
+    "data": {
+     "lines": [
+      {
+       "coach": "Lisa Park",
+       "domain": "sleep",
+       "text": "On the night of October 1st, his Whoop captured 98% recovery, 58.8 ms HRV, 54 bpm resting heart rate, and 24.9% deep sleep — objectively strong numbers.",
+       "as_of": "2026-10-03",
+       "data_through": "2026-10-02",
+       "truncated": false,
+       "when_text": null
+      },
+      {
+       "coach": "Nathan Reeves",
+       "domain": "mind",
+       "text": "His recovery on the night of October 1st reached 98%—the highest yet—but his deep sleep is declining and his journal has been silent for eleven days.",
+       "as_of": "2026-10-03",
+       "data_through": "2026-10-02",
+       "truncated": false,
+       "when_text": null
+      },
+      {
+       "coach": "Max Reyes",
+       "domain": "training",
+       "text": "His step count contracted 36% over seven days with no clear cause, and food logging has been quiet for four days.",
+       "as_of": "2026-10-03",
+       "data_through": "2026-10-02",
+       "truncated": false,
+       "when_text": null
+      }
+     ],
+     "mixed_days": false
+    },
+    "voice": "restated"
+   },
+   "scorecard": {
+    "state": "absent",
+    "as_of": null,
+    "source": null,
+    "absent_text": "The scorecard is not built yet.",
+    "data": null,
+    "todo": "epic #4580 — the scorecard rows have no served rules yet"
+   },
+   "record": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "/api/predictions",
+     "/api/calibration"
+    ],
+    "absent_text": "No coach call has been checked yet.",
+    "data": {
+     "right": 41,
+     "decided": 96,
+     "count_text": "41 of 96 checked calls right.",
+     "beats_simple_guess": false,
+     "comparison_text": "So far they do not beat a simple guess.",
+     "brier_skill": -0.0158,
+     "skill_n": 96
+    }
+   },
+   "his_words": {
+    "state": "stale",
+    "as_of": "2026-09-23",
+    "source": "/api/decisions",
+    "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+    "data": {
+     "text": "Yes lets switch to this - i like it - but we dont need to be so prescriptive of DAY of the week, it can just be that order and we flex accordingly",
+     "date": "2026-09-23",
+     "date_text": "Wednesday, September 23"
+    }
+   },
+   "catch_up": {
+    "state": "ok",
+    "as_of": "2026-09-29",
+    "source": "/journal/posts.json",
+    "absent_text": "No chapters yet.",
+    "data": {
+     "items": [
+      {
+       "label": "Prologue · Part I",
+       "title": "Before the Numbers",
+       "url": "/journal/posts/week-01/",
+       "date": "2026-08-31"
+      },
+      {
+       "label": "Prologue · Part II",
+       "title": "The Plan, On the Record",
+       "url": "/journal/posts/week-03/",
+       "date": "2026-09-05"
+      },
+      {
+       "label": "Week 1",
+       "title": "The Strap Said 76%",
+       "url": "/journal/posts/week-04/",
+       "date": "2026-09-08"
+      },
+      {
+       "label": "Week 2",
+       "title": "Nine Days and No Rest",
+       "url": "/journal/posts/week-05/",
+       "date": "2026-09-15"
+      },
+      {
+       "label": "Week 3",
+       "title": "Storming Mode",
+       "url": "/journal/posts/week-06/",
+       "date": "2026-09-22"
+      },
+      {
+       "label": "Week 4",
+       "title": "The Body Answers Back",
+       "url": "/journal/posts/week-07/",
+       "date": "2026-09-29"
+      }
+     ]
+    }
+   },
+   "follow": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "common.subscriber_cadence",
+     "/api/content_cadence"
+    ],
+    "absent_text": "The email schedule is not served right now.",
+    "data": {
+     "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.",
+     "sends": [
+      {
+       "sender": "weekly-signal",
+       "next_date": "2026-10-04",
+       "conditional": false
+      },
+      {
+       "sender": "chronicle-email-sender",
+       "next_date": "2026-10-07",
+       "conditional": true
+      },
+      {
+       "sender": "between-chronicle",
+       "next_date": "2026-10-04",
+       "conditional": true
+      }
+     ],
+     "next_chapter_date": "2026-10-07",
+     "next_chapter_state": "ok"
+    }
+   }
+  }
+ },
+ "cases": {
+  "all": {
+   "blocks": {
+    "chapter": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/journal/posts.json",
+      "/panelcast/episodes.json"
+     ],
+     "absent_text": "The latest chapter is not served right now.",
+     "data": null
+    },
+    "next": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/content_cadence",
+      "/api/coach_docket"
+     ],
+     "absent_text": "What comes next is not served right now.",
+     "data": null
+    },
+    "today": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/journey",
+     "absent_text": "Today's weight is not served right now.",
+     "data": null
+    },
+    "week": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/pulse_history",
+      "/api/training_overview",
+      "/api/nutrition_overview"
+     ],
+     "absent_text": "The last seven days is not served right now.",
+     "data": null
+    },
+    "life": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/owner_words",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "How the whole thing is going is not served right now.",
+     "data": null
+    },
+    "coach_lines": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/coaching-dashboard",
+     "absent_text": "What the coaches said today is not served right now.",
+     "data": null
+    },
+    "record": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/predictions",
+      "/api/calibration"
+     ],
+     "absent_text": "The coaches' record is not served right now.",
+     "data": null
+    },
+    "his_words": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/owner_words",
+      "/api/decisions"
+     ],
+     "absent_text": "His own words is not served right now.",
+     "data": null
+    },
+    "catch_up": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/journal/posts.json",
+     "absent_text": "The list of chapters is not served right now.",
+     "data": null
+    },
+    "follow": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "common.subscriber_cadence",
+      "/api/content_cadence"
+     ],
+     "absent_text": "The email schedule is not served right now.",
+     "data": {
+      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.",
+      "sends": [
+       {
+        "sender": "weekly-signal",
+        "next_date": "2026-10-04",
+        "conditional": false
+       },
+       {
+        "sender": "chronicle-email-sender",
+        "next_date": "2026-10-07",
+        "conditional": true
+       },
+       {
+        "sender": "between-chronicle",
+        "next_date": "2026-10-04",
+        "conditional": true
+       }
+      ],
+      "next_chapter_date": null,
+      "next_chapter_state": "unavailable"
+     }
+    }
+   }
+  },
+  "journal": {
+   "blocks": {
+    "chapter": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/journal/posts.json",
+      "/panelcast/episodes.json"
+     ],
+     "absent_text": "The latest chapter is not served right now.",
+     "data": null
+    },
+    "catch_up": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/journal/posts.json",
+     "absent_text": "The list of chapters is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "panelcast": {
+   "blocks": {
+    "chapter": {
+     "state": "ok",
+     "as_of": "2026-09-29",
+     "source": [
+      "/journal/posts.json",
+      "/panelcast/episodes.json"
+     ],
+     "absent_text": "No chapter has been published yet.",
+     "data": {
+      "title": "The Body Answers Back",
+      "date": "2026-09-29",
+      "week_label": "Week 4",
+      "dek": "He has trained every day for 23 days straight — his deliberate choice — and by Tuesday his recovery score had fallen to 54%, a sign that the body is starting to answer back. He is down 15 pounds total, but the pace flag is live and the streak is the question that will define the coming week.",
+      "url": "/journal/posts/week-07/",
+      "word_count": 1086,
+      "read_minutes": 5,
+      "podcast": {
+       "state": "unavailable",
+       "as_of": null,
+       "source": "/panelcast/episodes.json",
+       "absent_text": "The podcast list is not served right now.",
+       "data": null
+      }
+     }
+    }
+   }
+  },
+  "cadence": {
+   "blocks": {
+    "next": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/content_cadence",
+      "/api/coach_docket"
+     ],
+     "absent_text": "Nothing is scheduled yet.",
+     "data": {
+      "chapter": {
+       "state": "unavailable",
+       "as_of": null,
+       "source": "/api/content_cadence",
+       "absent_text": "The chapter schedule is not served right now.",
+       "data": null
+      },
+      "bet": {
+       "state": "ok",
+       "as_of": "2026-10-05",
+       "source": "/api/coach_docket",
+       "absent_text": "No coach bet is waiting to settle.",
+       "data": {
+        "question": "Will the morning recovery score (7-day average) be 81.6 or higher on Monday, October 5?",
+        "topic": "Recovery score directional trend confirmation",
+        "settle_date": "2026-10-05",
+        "sides": [
+         {
+          "coach": "Max Reyes",
+          "says": "no"
+         },
+         {
+          "coach": "Lisa Park",
+          "says": "yes"
+         }
+        ]
+       }
+      }
+     }
+    },
+    "follow": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "common.subscriber_cadence",
+      "/api/content_cadence"
+     ],
+     "absent_text": "The email schedule is not served right now.",
+     "data": {
+      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.",
+      "sends": [
+       {
+        "sender": "weekly-signal",
+        "next_date": "2026-10-04",
+        "conditional": false
+       },
+       {
+        "sender": "chronicle-email-sender",
+        "next_date": "2026-10-07",
+        "conditional": true
+       },
+       {
+        "sender": "between-chronicle",
+        "next_date": "2026-10-04",
+        "conditional": true
+       }
+      ],
+      "next_chapter_date": null,
+      "next_chapter_state": "unavailable"
+     }
+    }
+   }
+  },
+  "docket": {
+   "blocks": {
+    "next": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/content_cadence",
+      "/api/coach_docket"
+     ],
+     "absent_text": "Nothing is scheduled yet.",
+     "data": {
+      "chapter": {
+       "state": "ok",
+       "as_of": "2026-10-07",
+       "source": "/api/content_cadence",
+       "absent_text": "The next chapter is paused.",
+       "data": {
+        "date": "2026-10-07",
+        "drafted_not_promised": true
+       }
+      },
+      "bet": {
+       "state": "unavailable",
+       "as_of": null,
+       "source": "/api/coach_docket",
+       "absent_text": "The coaches' open bets is not served right now.",
+       "data": null
+      }
+     }
+    }
+   }
+  },
+  "journey": {
+   "blocks": {
+    "today": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/journey",
+     "absent_text": "Today's weight is not served right now.",
+     "data": null
+    },
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/journey",
+        "absent_text": "The weight so far is not served right now.",
+        "data": null
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "dashboard": {
+   "blocks": {
+    "coach_lines": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/coaching-dashboard",
+     "absent_text": "What the coaches said today is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "predictions": {
+   "blocks": {
+    "record": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/predictions",
+      "/api/calibration"
+     ],
+     "absent_text": "The coaches' record is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "calibration": {
+   "blocks": {
+    "record": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/predictions",
+      "/api/calibration"
+     ],
+     "absent_text": "The coaches' record is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "decisions": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/owner_words",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": [
+         "/api/owner_words",
+         "/api/decisions"
+        ],
+        "absent_text": "His own words is not served right now.",
+        "data": null
+       }
+      }
+     }
+    },
+    "his_words": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/owner_words",
+      "/api/decisions"
+     ],
+     "absent_text": "His own words is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "owner_words": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/owner_words",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": [
+         "/api/owner_words",
+         "/api/decisions"
+        ],
+        "absent_text": "His own words is not served right now.",
+        "data": null
+       }
+      }
+     }
+    },
+    "his_words": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": [
+      "/api/owner_words",
+      "/api/decisions"
+     ],
+     "absent_text": "His own words is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "sleep": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/sleep_detail",
+        "absent_text": "Last night's sleep is not served right now.",
+        "data": null
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "session": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/session",
+        "absent_text": "Today's session is not served right now.",
+        "data": null
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "nutrition": {
+   "blocks": {
+    "week": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/pulse_history",
+      "/api/training_overview",
+      "/api/nutrition_overview"
+     ],
+     "absent_text": "Nothing is recorded in these seven days.",
+     "data": {
+      "days": [
+       "2026-09-27",
+       "2026-09-28",
+       "2026-09-29",
+       "2026-09-30",
+       "2026-10-01",
+       "2026-10-02",
+       "2026-10-03"
+      ],
+      "order": [
+       "weight",
+       "training",
+       "sleep",
+       "food"
+      ],
+      "measures": {
+       "weight": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/pulse_history",
+        "absent_text": "The weight has no reading in these seven days.",
+        "data": {
+         "values": [
+          314.5,
+          313.2,
+          312.3,
+          311.4,
+          311.7,
+          311.0,
+          311.0
+         ],
+         "text": "311 lb, down 3.5 across 7 weigh-ins."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/training_overview",
+        "absent_text": "Training has no reading in these seven days.",
+        "data": {
+         "values": [
+          193.0,
+          116.0,
+          137.0,
+          109.0,
+          137.0,
+          155.0,
+          241.0
+         ],
+         "text": "Trained on 7 of 7 days recorded.",
+         "met": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+         ]
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/pulse_history",
+        "absent_text": "Sleep has no reading in these seven days.",
+        "data": {
+         "values": [
+          7.5,
+          7.8,
+          8.7,
+          8.2,
+          9.1,
+          8.4,
+          8.8
+         ],
+         "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+         "met": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+         ]
+        }
+       },
+       "food": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/nutrition_overview",
+        "absent_text": "The food log is not served right now.",
+        "data": null
+       }
+      },
+      "detail": [
+       {
+        "date": "2026-10-03",
+        "summary": "311.0 lb · trained · slept 8.8 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.0 lb"
+         },
+         {
+          "label": "Training",
+          "text": "241 minutes of walking"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.8 hours; recovery 98 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-02",
+        "summary": "311.0 lb · trained · slept 8.4 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.0 lb"
+         },
+         {
+          "label": "Training",
+          "text": "155 minutes of strength"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.4 hours; recovery 98 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-01",
+        "summary": "311.7 lb · trained · slept 9.1 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.7 lb"
+         },
+         {
+          "label": "Training",
+          "text": "137 minutes of strength"
+         },
+         {
+          "label": "Sleep",
+          "text": "9.1 hours; recovery 62 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-30",
+        "summary": "311.4 lb · trained · slept 8.2 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.4 lb"
+         },
+         {
+          "label": "Training",
+          "text": "109 minutes of walking"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.2 hours; recovery 59 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-29",
+        "summary": "312.3 lb · trained · slept 8.7 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "312.3 lb"
+         },
+         {
+          "label": "Training",
+          "text": "137 minutes of strength"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.7 hours; recovery 54 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-28",
+        "summary": "313.2 lb · trained · slept 7.8 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "313.2 lb"
+         },
+         {
+          "label": "Training",
+          "text": "116 minutes of strength"
+         },
+         {
+          "label": "Sleep",
+          "text": "7.8 hours; recovery 64 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-27",
+        "summary": "314.5 lb · trained · slept 7.5 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "314.5 lb"
+         },
+         {
+          "label": "Training",
+          "text": "28 minutes of strength; 165 minutes of walking"
+         },
+         {
+          "label": "Sleep",
+          "text": "7.5 hours; recovery 89 out of 100"
+         }
+        ]
+       }
+      ],
+      "weight_series": [
+       {
+        "date": "2026-09-06",
+        "lbs": 327.3
+       },
+       {
+        "date": "2026-09-12",
+        "lbs": 319.7
+       },
+       {
+        "date": "2026-09-15",
+        "lbs": 318.9
+       },
+       {
+        "date": "2026-09-17",
+        "lbs": 317.3
+       },
+       {
+        "date": "2026-09-18",
+        "lbs": 315.1
+       },
+       {
+        "date": "2026-09-19",
+        "lbs": 315.6
+       },
+       {
+        "date": "2026-09-20",
+        "lbs": 316.9
+       },
+       {
+        "date": "2026-09-21",
+        "lbs": 315.8
+       },
+       {
+        "date": "2026-09-22",
+        "lbs": 315.0
+       },
+       {
+        "date": "2026-09-23",
+        "lbs": 315.4
+       },
+       {
+        "date": "2026-09-24",
+        "lbs": 313.7
+       },
+       {
+        "date": "2026-09-25",
+        "lbs": 313.1
+       },
+       {
+        "date": "2026-09-26",
+        "lbs": 313.8
+       },
+       {
+        "date": "2026-09-27",
+        "lbs": 314.5
+       },
+       {
+        "date": "2026-09-28",
+        "lbs": 313.2
+       },
+       {
+        "date": "2026-09-29",
+        "lbs": 312.3
+       },
+       {
+        "date": "2026-09-30",
+        "lbs": 311.4
+       },
+       {
+        "date": "2026-10-01",
+        "lbs": 311.7
+       },
+       {
+        "date": "2026-10-02",
+        "lbs": 311.0
+       },
+       {
+        "date": "2026-10-03",
+        "lbs": 311.0
+       }
+      ]
+     }
+    },
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/nutrition_overview",
+        "absent_text": "The food log is not served right now.",
+        "data": null
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "habits": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/habit_streaks",
+        "absent_text": "The daily habits is not served right now.",
+        "data": null
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "supplements": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/supplements",
+        "absent_text": "The supplement stack is not served right now.",
+        "data": null
+       },
+       "experiments": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/experiments",
+        "absent_text": "No experiments are listed.",
+        "data": {
+         "text": "None running right now; 1 ready to start."
+        }
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "experiments": {
+   "blocks": {
+    "life": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/decisions",
+      "/api/experiments",
+      "/api/habit_streaks",
+      "/api/journey",
+      "/api/nutrition_overview",
+      "/api/session",
+      "/api/sleep_detail",
+      "/api/supplements"
+     ],
+     "absent_text": "Nothing is recorded yet.",
+     "data": {
+      "order": [
+       "body",
+       "training",
+       "sleep",
+       "food",
+       "habits",
+       "supplements",
+       "experiments",
+       "mind"
+      ],
+      "rows": {
+       "body": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/journey",
+        "absent_text": "No weigh-in yet.",
+        "data": {
+         "text": "16.3 lb down so far; 126 lb to go to reach 185."
+        }
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/session",
+        "absent_text": "No session is planned for today.",
+        "data": {
+         "text": "Planned for today: Deadlift (Trap bar), Squat (Barbell) and 3 more."
+        }
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/sleep_detail",
+        "absent_text": "No sleep has been recorded yet.",
+        "data": {
+         "text": "Slept 8.9 hours on the night of Friday, October 2; recovery 98 out of 100."
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/nutrition_overview",
+        "absent_text": "No food has been logged yet.",
+        "data": {
+         "text": "At or above the 170 g protein floor on 9 of 28 logged days."
+        }
+       },
+       "habits": {
+        "state": "ok",
+        "as_of": "2026-10-02",
+        "source": "/api/habit_streaks",
+        "absent_text": "No habits have been recorded yet.",
+        "data": {
+         "text": "5 of 7 daily habits kept on Friday, October 2."
+        }
+       },
+       "supplements": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/supplements",
+        "absent_text": "No supplements are listed.",
+        "data": {
+         "text": "21 in the daily stack."
+        }
+       },
+       "experiments": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/experiments",
+        "absent_text": "The experiments is not served right now.",
+        "data": null
+       },
+       "mind": {
+        "state": "stale",
+        "as_of": "2026-09-23",
+        "source": "/api/decisions",
+        "absent_text": "Nothing new in his own words since Wednesday, September 23.",
+        "data": null
+       }
+      }
+     }
+    }
+   }
+  },
+  "pulse": {
+   "blocks": {
+    "week": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/pulse_history",
+      "/api/training_overview",
+      "/api/nutrition_overview"
+     ],
+     "absent_text": "Nothing is recorded in these seven days.",
+     "data": {
+      "days": [
+       "2026-09-27",
+       "2026-09-28",
+       "2026-09-29",
+       "2026-09-30",
+       "2026-10-01",
+       "2026-10-02",
+       "2026-10-03"
+      ],
+      "order": [
+       "weight",
+       "training",
+       "sleep",
+       "food"
+      ],
+      "measures": {
+       "weight": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/pulse_history",
+        "absent_text": "The weight is not served right now.",
+        "data": null
+       },
+       "training": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/training_overview",
+        "absent_text": "Training has no reading in these seven days.",
+        "data": {
+         "values": [
+          193.0,
+          116.0,
+          137.0,
+          109.0,
+          137.0,
+          155.0,
+          241.0
+         ],
+         "text": "Trained on 7 of 7 days recorded.",
+         "met": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+         ]
+        }
+       },
+       "sleep": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/pulse_history",
+        "absent_text": "Sleep is not served right now.",
+        "data": null
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/nutrition_overview",
+        "absent_text": "The food log has no reading in these seven days.",
+        "data": {
+         "values": [
+          null,
+          null,
+          null,
+          null,
+          186.0,
+          172.0,
+          153.0
+         ],
+         "text": "At or above 170 g protein on 2 of 3 days recorded.",
+         "met": [
+          null,
+          null,
+          null,
+          null,
+          true,
+          true,
+          false
+         ]
+        }
+       }
+      },
+      "detail": [
+       {
+        "date": "2026-10-03",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "241 minutes of walking"
+         },
+         {
+          "label": "Food",
+          "text": "153 g protein, 1,732 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-02",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "155 minutes of strength"
+         },
+         {
+          "label": "Food",
+          "text": "172 g protein, 1,568 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-01",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "137 minutes of strength"
+         },
+         {
+          "label": "Food",
+          "text": "186 g protein, 1,690 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-30",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "109 minutes of walking"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-29",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "137 minutes of strength"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-28",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "116 minutes of strength"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-27",
+        "summary": "trained",
+        "facts": [
+         {
+          "label": "Training",
+          "text": "28 minutes of strength; 165 minutes of walking"
+         }
+        ]
+       }
+      ],
+      "weight_series": []
+     }
+    }
+   }
+  },
+  "training": {
+   "blocks": {
+    "week": {
+     "state": "ok",
+     "as_of": "2026-10-03",
+     "source": [
+      "/api/pulse_history",
+      "/api/training_overview",
+      "/api/nutrition_overview"
+     ],
+     "absent_text": "Nothing is recorded in these seven days.",
+     "data": {
+      "days": [
+       "2026-09-27",
+       "2026-09-28",
+       "2026-09-29",
+       "2026-09-30",
+       "2026-10-01",
+       "2026-10-02",
+       "2026-10-03"
+      ],
+      "order": [
+       "weight",
+       "training",
+       "sleep",
+       "food"
+      ],
+      "measures": {
+       "weight": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/pulse_history",
+        "absent_text": "The weight has no reading in these seven days.",
+        "data": {
+         "values": [
+          314.5,
+          313.2,
+          312.3,
+          311.4,
+          311.7,
+          311.0,
+          311.0
+         ],
+         "text": "311 lb, down 3.5 across 7 weigh-ins."
+        }
+       },
+       "training": {
+        "state": "unavailable",
+        "as_of": null,
+        "source": "/api/training_overview",
+        "absent_text": "Training is not served right now.",
+        "data": null
+       },
+       "sleep": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/pulse_history",
+        "absent_text": "Sleep has no reading in these seven days.",
+        "data": {
+         "values": [
+          7.5,
+          7.8,
+          8.7,
+          8.2,
+          9.1,
+          8.4,
+          8.8
+         ],
+         "text": "Slept 7 hours or more on 7 of 7 days recorded.",
+         "met": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+         ]
+        }
+       },
+       "food": {
+        "state": "ok",
+        "as_of": "2026-10-03",
+        "source": "/api/nutrition_overview",
+        "absent_text": "The food log has no reading in these seven days.",
+        "data": {
+         "values": [
+          null,
+          null,
+          null,
+          null,
+          186.0,
+          172.0,
+          153.0
+         ],
+         "text": "At or above 170 g protein on 2 of 3 days recorded.",
+         "met": [
+          null,
+          null,
+          null,
+          null,
+          true,
+          true,
+          false
+         ]
+        }
+       }
+      },
+      "detail": [
+       {
+        "date": "2026-10-03",
+        "summary": "311.0 lb · slept 8.8 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.0 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.8 hours; recovery 98 out of 100"
+         },
+         {
+          "label": "Food",
+          "text": "153 g protein, 1,732 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-02",
+        "summary": "311.0 lb · slept 8.4 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.0 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.4 hours; recovery 98 out of 100"
+         },
+         {
+          "label": "Food",
+          "text": "172 g protein, 1,568 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-10-01",
+        "summary": "311.7 lb · slept 9.1 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.7 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "9.1 hours; recovery 62 out of 100"
+         },
+         {
+          "label": "Food",
+          "text": "186 g protein, 1,690 kcal"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-30",
+        "summary": "311.4 lb · slept 8.2 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "311.4 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.2 hours; recovery 59 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-29",
+        "summary": "312.3 lb · slept 8.7 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "312.3 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "8.7 hours; recovery 54 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-28",
+        "summary": "313.2 lb · slept 7.8 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "313.2 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "7.8 hours; recovery 64 out of 100"
+         }
+        ]
+       },
+       {
+        "date": "2026-09-27",
+        "summary": "314.5 lb · slept 7.5 h",
+        "facts": [
+         {
+          "label": "Weight",
+          "text": "314.5 lb"
+         },
+         {
+          "label": "Sleep",
+          "text": "7.5 hours; recovery 89 out of 100"
+         }
+        ]
+       }
+      ],
+      "weight_series": [
+       {
+        "date": "2026-09-06",
+        "lbs": 327.3
+       },
+       {
+        "date": "2026-09-12",
+        "lbs": 319.7
+       },
+       {
+        "date": "2026-09-15",
+        "lbs": 318.9
+       },
+       {
+        "date": "2026-09-17",
+        "lbs": 317.3
+       },
+       {
+        "date": "2026-09-18",
+        "lbs": 315.1
+       },
+       {
+        "date": "2026-09-19",
+        "lbs": 315.6
+       },
+       {
+        "date": "2026-09-20",
+        "lbs": 316.9
+       },
+       {
+        "date": "2026-09-21",
+        "lbs": 315.8
+       },
+       {
+        "date": "2026-09-22",
+        "lbs": 315.0
+       },
+       {
+        "date": "2026-09-23",
+        "lbs": 315.4
+       },
+       {
+        "date": "2026-09-24",
+        "lbs": 313.7
+       },
+       {
+        "date": "2026-09-25",
+        "lbs": 313.1
+       },
+       {
+        "date": "2026-09-26",
+        "lbs": 313.8
+       },
+       {
+        "date": "2026-09-27",
+        "lbs": 314.5
+       },
+       {
+        "date": "2026-09-28",
+        "lbs": 313.2
+       },
+       {
+        "date": "2026-09-29",
+        "lbs": 312.3
+       },
+       {
+        "date": "2026-09-30",
+        "lbs": 311.4
+       },
+       {
+        "date": "2026-10-01",
+        "lbs": 311.7
+       },
+       {
+        "date": "2026-10-02",
+        "lbs": 311.0
+       },
+       {
+        "date": "2026-10-03",
+        "lbs": 311.0
+       }
+      ]
+     }
+    }
+   }
+  }
+ }
+}
