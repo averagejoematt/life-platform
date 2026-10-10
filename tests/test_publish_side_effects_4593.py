@@ -123,7 +123,7 @@ def rec(monkeypatch):
     calls = []
     for h in sorted(_HELPERS - {"_invalidate_cloudfront", "_publish_to_s3"}):
         monkeypatch.setattr(approve, h, lambda *a, _h=h, **k: calls.append(_h))
-    monkeypatch.setattr(approve, "_publish_to_s3", lambda item: calls.append("_publish_to_s3") or ["/x"])
+    monkeypatch.setattr(approve, "_publish_to_s3", lambda item, failures=None: calls.append("_publish_to_s3") or ["/x"])
     monkeypatch.setattr(approve, "_invalidate_cloudfront", lambda paths: calls.append("_invalidate_cloudfront"))
     return calls
 
@@ -278,6 +278,7 @@ def test_promote_effects_write_the_week_07_kit_and_stamp_no_send(monkeypatch):
 
 
 def test_promote_effects_with_deliver_invokes_the_sender_and_stamps_nothing(monkeypatch):
+    monkeypatch.setattr(sp, "_sender_pick", lambda: {"sk": "DATE#2026-09-29"})
     ft, s3_puts, invokes, recall, results = _run_promote_effects(monkeypatch, ["DATE#2026-09-29"], deliver=True)
     assert invokes == ["arn:chronicle-email-sender"]
     assert not [u for u in ft.updates if ":d" in u.get("ExpressionAttributeValues", {})]
@@ -320,3 +321,35 @@ def test_sender_never_mails_a_row_carrying_a_no_send_decision(monkeypatch):
     assert cel._get_this_weeks_installment() is None
     row.pop("delivery_decision")  # control: the same row without the stamp IS deliverable
     assert cel._get_this_weeks_installment()["sk"] == "DATE#2026-09-29"
+
+
+# ── E. #4729: the printed effect map is proof of what happened ───────────────
+
+
+def test_deliver_on_a_week_the_sender_would_not_mail_is_skipped_not_ran(monkeypatch):
+    """The sender mails the NEWEST in-window row; naming an older week must not invoke it nor report delivery=ran."""
+    monkeypatch.setattr(sp, "_sender_pick", lambda: {"sk": "DATE#2026-10-06"})
+    ft, s3_puts, invokes, recall, results = _run_promote_effects(monkeypatch, ["DATE#2026-09-29"], deliver=True)
+    assert invokes == [], "the sender was invoked although it would mail a different row"
+    assert results["DATE#2026-09-29"]["delivery"].startswith("skipped: not the sender's newest in-window row")
+    assert not [u for u in ft.updates if ":d" in u.get("ExpressionAttributeValues", {})], "a skip must not stamp a no-send decision"
+    monkeypatch.setattr(sp, "_sender_pick", lambda: None)
+    _, _, invokes, _, results = _run_promote_effects(monkeypatch, ["DATE#2026-09-29"], deliver=True)
+    assert invokes == [] and results["DATE#2026-09-29"]["delivery"].startswith("skipped:")
+
+
+def test_a_failed_share_kit_put_reports_s3_artifacts_failed(monkeypatch):
+    ft, s3_puts, invokes, recall, results = _run_promote_effects(monkeypatch, ["DATE#2026-09-29"])
+    assert results["DATE#2026-09-29"]["s3_artifacts"] == "ran"  # control
+
+    def boom(**kw):
+        raise RuntimeError("AccessDenied")
+
+    monkeypatch.setattr(approve.s3, "put_object", boom)
+    monkeypatch.setattr(approve.cf, "create_invalidation", lambda **kw: None)
+    only_s3 = {e: "not under test" for e in approve.SIDE_EFFECTS if e not in ("s3_artifacts", "delivery")}
+    only_s3["delivery"] = "not under test"
+    monkeypatch.setattr(approve, "_record_no_send", lambda item, d, r: "declined")
+    item = {"sk": "DATE#x", "phase": "experiment", "draft_share_kit_json": '{"canonical_url": "https://x/week-1/"}'}
+    out = approve.publish_side_effects(item, "x", decline=only_s3)
+    assert out["s3_artifacts"].startswith("failed: share kit write failed") and "AccessDenied" in out["s3_artifacts"]

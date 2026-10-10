@@ -475,25 +475,199 @@ def _activities_missing_from_store(api_activities: list, stored_activities: list
     return missing
 
 
-def _fetch_stored_activities(table, start_date: str, end_date: str) -> list:
-    """Flatten the stored Strava activities across [start_date, end_date] (inclusive)."""
+def _fetch_stored_days(table, start_date: str, end_date: str) -> dict:
+    """The stored Strava activities across [start_date, end_date] (inclusive), by DATE# day.
+
+    #4638: keyed by the row's own sort key (the local day the framework filed it under),
+    so the store → vendor pass below can tell which stored DAY a vendor deletion emptied.
+    """
     from boto3.dynamodb.conditions import Key
 
     pk = f"USER#{USER_ID}#SOURCE#strava"
-    out: list = []
+    out: dict = {}
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
-        "ProjectionExpression": "activities",
+        "ProjectionExpression": "sk, activities",
     }
     while True:
         resp = table.query(**kwargs)
         for item in resp.get("Items", []):
-            out.extend(item.get("activities", []) or [])
+            day = str(item.get("sk", ""))[len("DATE#") :][:10]
+            if day:
+                out.setdefault(day, []).extend(item.get("activities", []) or [])
         lek = resp.get("LastEvaluatedKey")
         if not lek:
             break
         kwargs["ExclusiveStartKey"] = lek
     return out
+
+
+# ── Store → vendor (#4638) ────────────────────────────────────────────────────
+# DI-2 above only looks API → store: it finds what the vendor has and we lack. The
+# opposite direction — what we hold that the vendor no longer has, or holds differently —
+# is what an edit or a delete in the Strava app produces, and nothing looked there. The
+# same 14-day list call answers it, so this pass costs no extra Strava request.
+#
+#   • absent  — a stored strava_id the vendor's trailing list no longer contains.
+#   • changed — a stored id whose name, sport type or duration differs from the vendor's.
+#   • emptied — a stored local day the vendor now has ZERO activities for, where every
+#               stored id on it is absent. That day is rewritten as an explicit empty
+#               record (the "successful list call that returns zero activities for a day
+#               with a stored row writes the empty day" box).
+#
+# Each is a LifePlatform/IngestReconciliation metric with Source=strava. Only the empty
+# day is ever written; an absent activity on a day that still has others, or a changed
+# one, is REPORTED — the 3-day trailing re-fetch (a full replace) heals those inside its
+# window, and older ones stay as first seen (the facet on source_registry says so).
+
+# The field pairs compared for "changed": (stored key from _normalize, Strava API key).
+STORE_VENDOR_COMPARED_FIELDS = (
+    ("name", "name"),
+    ("sport_type", "sport_type"),
+    ("moving_time_seconds", "moving_time"),
+    ("elapsed_time_seconds", "elapsed_time"),
+)
+# A run that would empty more stored days than this writes NONE of them and reports
+# why: a token that silently lost its private-activity scope, or a vendor glitch that
+# returns a short list, must never erase a fortnight of history in one pass.
+MAX_EMPTIED_DAYS_PER_RUN = int(os.environ.get("STRAVA_MAX_EMPTIED_DAYS_PER_RUN", "3"))
+EMPTIED_DAY_REASON = "strava_day_absent_from_vendor_list"
+
+
+def _field_differs(stored_value, api_value) -> bool:
+    """True when a stored field disagrees with the vendor's. A stored value that is absent
+    or blank (a legacy row that never captured the field) is not comparable, never a diff."""
+    if stored_value is None or stored_value == "":
+        return False
+    if isinstance(stored_value, str) or isinstance(api_value, str):
+        return str(stored_value) != str(api_value or "")
+    try:
+        return float(stored_value) != float(api_value)
+    except (TypeError, ValueError):
+        return True
+
+
+def _store_vendor_diff(api_activities: list, stored_by_day: dict, covered_from_ts: float, covered_to_ts: float) -> tuple:
+    """(absent, changed) — stored activities the vendor's list lacks or describes differently.
+
+    Only stored activities whose UTC start falls inside [covered_from_ts, covered_to_ts) are
+    judged: the stored-side read is bracketed ±1 day wider than the API window (#472), and an
+    activity outside the window the vendor was asked about is not evidence of anything.
+    """
+    api_by_id = {str(a.get("id")): a for a in api_activities if a.get("id") is not None}
+    absent: list = []
+    changed: list = []
+    for day in sorted(stored_by_day):
+        for s in stored_by_day[day]:
+            if not isinstance(s, dict):
+                continue
+            sid = str(s.get("strava_id") or "")
+            t = _parse_start(s.get("start_date"))
+            if not sid or t is None or not (covered_from_ts <= t.timestamp() < covered_to_ts):
+                continue
+            api = api_by_id.get(sid)
+            if api is None:
+                absent.append({"id": sid, "date": day})
+                continue
+            fields = [
+                stored_key for stored_key, api_key in STORE_VENDOR_COMPARED_FIELDS if _field_differs(s.get(stored_key), api.get(api_key))
+            ]
+            if fields:
+                changed.append({"id": sid, "date": day, "fields": fields})
+    return absent, changed
+
+
+def _days_to_empty(api_activities: list, stored_by_day: dict, first_day: str, last_day: str) -> list:
+    """Stored local days in [first_day, last_day] the vendor now has zero activities for.
+
+    A day qualifies only when (a) it holds at least one stored activity, (b) no vendor
+    activity's local start date is that day, and (c) EVERY stored activity on it carries a
+    strava_id and none of those ids is still in the vendor list (an id still listed under a
+    different day is an edited start time, not a deletion). Returns [(day, [ids])].
+    """
+    api_days = {str(a.get("start_date_local") or "")[:10] for a in api_activities}
+    api_ids = {str(a.get("id")) for a in api_activities if a.get("id") is not None}
+    out = []
+    for day in sorted(stored_by_day):
+        acts = [a for a in stored_by_day[day] if isinstance(a, dict)]
+        if not acts or not (first_day <= day <= last_day) or day in api_days:
+            continue
+        ids = [str(a.get("strava_id") or "") for a in acts]
+        if not all(ids) or any(i in api_ids for i in ids):
+            continue
+        out.append((day, ids))
+    return out
+
+
+def _empty_day_record(day: str, ids: list) -> dict:
+    """The explicit empty day: the transform() shape over zero activities (every extensive
+    total is a true 0 — a sum over nothing), tombstoned so tombstone-aware readers read the
+    day exactly like a day that never had an activity, and naming what was emptied."""
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "pk": f"USER#{USER_ID}#SOURCE#strava",
+        "sk": f"DATE#{day}",
+        "source": "strava",
+        "date": day,
+        "schema_version": 1,
+        "ingested_at": now,
+        "activity_count": 0,
+        "activities": [],
+        "total_distance_miles": 0,
+        "total_moving_time_seconds": 0,
+        "total_kilojoules": 0,
+        "kilojoules_moving_time_seconds": 0,
+        "total_elevation_gain_feet": 0,
+        "sport_types": [],
+        "total_zone2_seconds": 0,
+        "tombstone": True,
+        "tombstoned_reason": EMPTIED_DAY_REASON,
+        "tombstoned_at": now,
+        "emptied_activity_ids": list(ids),
+    }
+
+
+def _write_empty_days(table, candidates: list, api_activity_count: int) -> dict:
+    """Write each candidate empty day, behind the two guards. Never raises."""
+    if not candidates:
+        return {"emptied": [], "skipped": None}
+    if api_activity_count == 0:
+        # A whole window with no vendor activities while the store holds some is far more
+        # likely a lost scope or a vendor fault than a fortnight of deletions.
+        return {"emptied": [], "skipped": "vendor_list_empty"}
+    if len(candidates) > MAX_EMPTIED_DAYS_PER_RUN:
+        return {"emptied": [], "skipped": f"over_cap({len(candidates)}>{MAX_EMPTIED_DAYS_PER_RUN})"}
+    emptied = []
+    for day, ids in candidates:
+        try:
+            table.put_item(Item=_empty_day_record(day, ids))
+            emptied.append(day)
+            logger.warning("[RECONCILE] #4638 %s: every stored activity %s is gone from Strava — wrote the empty day", day, ids)
+        except Exception as e:  # one failed write must not cost the report
+            logger.error("[RECONCILE] #4638 %s: empty-day write failed (non-fatal): %s", day, e)
+    return {"emptied": emptied, "skipped": None}
+
+
+def _emit_store_vendor_metrics(absent_count: int, changed_count: int, emptied_count: int) -> None:
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/IngestReconciliation",
+            MetricData=[
+                {
+                    "MetricName": name,
+                    "Dimensions": [{"Name": "Source", "Value": "strava"}],
+                    "Value": float(value),
+                    "Unit": "Count",
+                }
+                for name, value in (
+                    ("StoreOnlyActivityCount", absent_count),
+                    ("ChangedActivityCount", changed_count),
+                    ("EmptiedDayCount", emptied_count),
+                )
+            ],
+        )
+    except Exception as e:  # metric emission must never fail the run
+        logger.warning("store→vendor metric emit failed (non-fatal): %s", e)
 
 
 def _emit_reconciliation_metric(missing_count: int) -> None:
@@ -514,7 +688,12 @@ def _emit_reconciliation_metric(missing_count: int) -> None:
 
 
 def _reconcile(event: dict, context) -> dict:
-    """Diff the trailing-window Strava API activity set against the store."""
+    """Diff the trailing-window Strava API activity set against the store, both ways.
+
+    API → store (DI-2): vendor activities the store lacks. Store → vendor (#4638): stored
+    ids the vendor no longer lists, stored ids it describes differently, and stored days it
+    now has nothing for — the last of which is the ONE write this path makes.
+    """
     try:
         dynamodb = boto3.resource("dynamodb", region_name=REGION)
         table = dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
@@ -555,10 +734,31 @@ def _reconcile(event: dict, context) -> dict:
         # Bracket the stored-side fetch by ±1 day — the ingestion-side pattern.
         # Extra stored rows only ADD id/time-tolerance match candidates; they can
         # never create a false gap.
-        stored = _fetch_stored_activities(table, (start - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
+        stored_by_day = _fetch_stored_days(table, (start - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
+        stored = [a for day in sorted(stored_by_day) for a in stored_by_day[day]]
         missing = _activities_missing_from_store(api_activities, stored)
 
         _emit_reconciliation_metric(len(missing))
+
+        # #4638 store → vendor. Judged only a full day inside the API window's edges: a
+        # local day can start up to 14h before its UTC date, so the first and the last
+        # (today, still syncing) days of the window are never judged.
+        absent, changed = _store_vendor_diff(api_activities, stored_by_day, after_ts + 86400, before_ts)
+        candidates = _days_to_empty(
+            api_activities, stored_by_day, (start + timedelta(days=1)).isoformat(), (today - timedelta(days=1)).isoformat()
+        )
+        written = _write_empty_days(table, candidates, len(api_activities))
+        _emit_store_vendor_metrics(len(absent), len(changed), len(written["emptied"]))
+        if absent or changed or candidates:
+            logger.warning(
+                "[RECONCILE] #4638 store→vendor: %d stored ids gone from Strava %s, %d changed %s, empty days %s (skipped=%s)",
+                len(absent),
+                absent,
+                len(changed),
+                changed,
+                written["emptied"],
+                written["skipped"],
+            )
         if missing:
             logger.warning(
                 "[RECONCILE] %d Strava activities missing from store: %s",
@@ -581,6 +781,15 @@ def _reconcile(event: dict, context) -> dict:
                     "stored_activity_count": len(stored),
                     "missing_count": len(missing),
                     "missing_ids": [str(a.get("id")) for a in missing],
+                    "store_vendor": {
+                        "absent_count": len(absent),
+                        "absent": absent,
+                        "changed_count": len(changed),
+                        "changed": changed,
+                        "empty_day_candidates": [day for day, _ in candidates],
+                        "emptied_days": written["emptied"],
+                        "empty_day_writes_skipped": written["skipped"],
+                    },
                 }
             ),
         }

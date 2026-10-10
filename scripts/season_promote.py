@@ -360,6 +360,22 @@ def effects_plan(deliver: bool) -> Dict[str, str]:
     return decline
 
 
+def _sender_pick() -> Dict[str, Any] | None:
+    """The row chronicle-email-sender would mail right now (its own selector, not a copy of it)."""
+    import chronicle_email_sender_lambda as sender
+
+    return sender._get_this_weeks_installment()
+
+
+def delivery_skip_reason(sk: str, pick: Dict[str, Any] | None) -> str:
+    """#4729: the sender mails the newest undelivered in-window row, never a named one. '' when that row is `sk`."""
+    if pick is None:
+        return f"the sender would mail nothing now ({sk} is outside its 7-day window, already delivered, or declined)"
+    if pick.get("sk") != sk:
+        return f"not the sender's newest in-window row (it would mail {pick.get('sk')}, not {sk})"
+    return ""
+
+
 def apply_effects(sks: List[str], deliver: bool = False) -> Dict[str, Dict[str, str]]:
     """#4593: run — or decline by name, with a reason — every publish-time side effect chronicle-approve runs, through
     the SAME function (chronicle_approve_lambda.publish_side_effects). Before this, the promote wrote the row and ran
@@ -372,6 +388,7 @@ def apply_effects(sks: List[str], deliver: bool = False) -> Dict[str, Dict[str, 
     installments = rlp.fetch_visible_installments(table)
     decline = effects_plan(deliver)
     results: Dict[str, Dict[str, str]] = {}
+    sender_pick = _sender_pick() if deliver else None
     for sk in sks:
         row = table.get_item(Key={"pk": CHRONICLE_PK, "sk": sk}).get("Item")
         if not row or row.get("status") != "published":
@@ -382,7 +399,15 @@ def apply_effects(sks: List[str], deliver: bool = False) -> Dict[str, Dict[str, 
             item.pop(f, None)
         item["draft_share_kit_json"] = share_kit_json(fresh, installments)
         date_str = str(row.get("date") or sk.replace("DATE#", ""))
-        results[sk] = approve.publish_side_effects(item, date_str, decline=decline)
+        defer = ()
+        skip_reason = ""
+        if deliver:
+            skip_reason = delivery_skip_reason(sk, sender_pick)
+            if skip_reason:
+                defer = ("delivery",)  # never invoke a sender that would mail a different row
+        results[sk] = approve.publish_side_effects(item, date_str, decline=decline, defer=defer)
+        if skip_reason:
+            results[sk]["delivery"] = f"skipped: {skip_reason}"
         print(f"EFFECTS {sk}: " + ", ".join(f"{k}={v}" for k, v in results[sk].items()))
     return results
 

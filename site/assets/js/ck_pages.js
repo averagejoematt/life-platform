@@ -19,7 +19,7 @@ import { dayInWords } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import * as F from "/assets/js/ck_front.js";
 import { sheetLine } from "/assets/js/ck_sheet.js";
-import { lastCallHTML, nextCallHTML } from "/assets/js/ck_call.js";
+import { lastCallHTML, nextCallHTML, withFrom } from "/assets/js/ck_call.js";
 import { verdictTag, callVerdictTag, gradedOnText, showcasePair } from "/assets/js/ck_verdict.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
@@ -275,7 +275,8 @@ export function chartHTML(weights, { sentence: withSentence = true } = {}) {
 }
 
 // ── the team ───────────────────────────────────────────────────────────────────
-export function teamHTML(coachesBody, base = "") {
+// `from` is the page this list is on, so the coach page returns to it by name (#4675).
+export function teamHTML(coachesBody, base = "", from = "") {
   const coaches = ((coachesBody && coachesBody.coaches) || []).filter((c) => c && c.name);
   if (!coaches.length) return "";
   const n = (c) => (c.record && num(c.record.n)) || 0;
@@ -292,7 +293,7 @@ export function teamHTML(coachesBody, base = "") {
         record = `${r.confirmed} of ${r.n}${meter}`;
       }
       const jobLine = `${job}${job && sitting && !/[.!?]$/.test(job) ? "." : ""}${sitting}`.trim();
-      const name = base && c.persona_id ? `<a class="ck-link" href="${esc(base)}coach/?c=${esc(c.persona_id)}">${esc(c.name)}</a>` : esc(c.name);
+      const name = base && c.persona_id ? `<a class="ck-link" href="${esc(withFrom(`${base}coach/?c=${encodeURIComponent(c.persona_id)}`, from))}">${esc(c.name)}</a>` : esc(c.name);
       return `<li><span class="ck-coach__name">${name}</span><span class="ck-coach__job">${esc(jobLine)}</span><span class="ck-coach__record">${record}</span></li>`;
     })
     .join("")}</ul>`;
@@ -336,7 +337,7 @@ export function verdictsHTML(coachesBody) {
 // whose allowed distance was tightest, and the wrong call that missed by the most. Each
 // carries its rule in the tag and the day its reading was taken. "" when the route has
 // nothing, so the caller can fall back.
-export function callVerdictsHTML(callsBody, base = "/") {
+export function callVerdictsHTML(callsBody, base = "/", from = "") {
   const calls = ((callsBody && callsBody.calls) || []).filter((c) => c && c.id && c.called_short && c.kind !== "bet");
   const { right, wrong } = showcasePair(calls);
   if (!right && !wrong) return "";
@@ -344,7 +345,7 @@ export function callVerdictsHTML(callsBody, base = "/") {
     if (!call) return `<div>${soft(`No call with a page has been found ${word} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
     const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
-    return `<div>${callVerdictTag(call)}<p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(when ? `${when} ` : "")}<a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">The whole call</a></p></div>`;
+    return `<div>${callVerdictTag(call)}<p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(when ? `${when} ` : "")}<a class="ck-link" href="${esc(withFrom(`${base}call/?id=${encodeURIComponent(call.id)}`, from))}">The whole call</a></p></div>`;
   };
   return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>`;
 }
@@ -436,8 +437,8 @@ async function mountCoaches(edition, b) {
   const base = document.body.dataset.ckBase || "/";
   const [coaches, docket, calls] = await Promise.all([tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")]);
   fill("ck-record-big", recordBigHTML(b.record));
-  fill("ck-team", teamHTML(coaches, base) || soft("The team is not served right now."));
-  const pair = callVerdictsHTML(calls, base);
+  fill("ck-team", teamHTML(coaches, base, "coaches") || soft("The team is not served right now."));
+  const pair = callVerdictsHTML(calls, base, "coaches");
   fill("ck-verdicts", pair || verdictsHTML(coaches) || soft("No checked call is served right now."));
   const bet = b.next && b.next.data && b.next.data.bet;
   fill("ck-bet", `${betHTML(b.next)}${soft(moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""))}`);

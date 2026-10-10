@@ -58,6 +58,9 @@ ELENA_STATE_UPDATER_NAME = os.environ.get("ELENA_STATE_UPDATER_NAME", "elena-sta
 COACH_PANEL_PODCAST_NAME = os.environ.get("COACH_PANEL_PODCAST_NAME", "coach-panel-podcast")
 
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
+# #4694: the literal the stale-draft sweep logs when it refuses an unaudited draft — equal to
+# content.autopublish_audit.HELD_TOKEN, and the MetricFilter behind the `chronicle-autopublish-held` alarm.
+HELD_TOKEN = "CHRONICLE-AUTOPUBLISH-HELD"  # noqa: S105 — a log token, not a credential
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -142,8 +145,11 @@ def _publishable(item: dict) -> bool:
     return singleton_visible(item)
 
 
-def _publish_to_s3(item: dict) -> list[str]:
-    """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths."""
+def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
+    """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths.
+
+    The share-kit write stays fail-soft (it never blocks an approval), but #4729: when ``failures`` is passed the
+    reason is appended to it, so ``publish_side_effects`` can report ``failed`` instead of a green ``ran``."""
     if not _publishable(item):
         raise ValueError(
             f"#3485: refusing to publish {item.get('sk') or item.get('date')}: the row is tombstoned or "
@@ -200,6 +206,8 @@ def _publish_to_s3(item: dict) -> list[str]:
             invalidation_paths.append(f"/moments/share-kits/{slug}/kit.json")
         except Exception as exc:
             logger.warning("share kit write failed (non-fatal): %s", exc)
+            if failures is not None:
+                failures.append(f"share kit write failed: {exc}")
 
     return invalidation_paths
 
@@ -450,8 +458,9 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
       delivery stamps a no-send decision on the row (``_record_no_send``).
     defer:   effects from ``DEFERRABLE`` the caller fires once itself after a batch.
 
-    Returns {effect: "ran" | "declined: …" | "deferred"} covering EVERY name in ``SIDE_EFFECTS``.
-    ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
+    Returns {effect: "ran" | "declined: …" | "deferred" | "failed: …"} covering EVERY name in
+    ``SIDE_EFFECTS``. ``s3_artifacts`` reports "failed: <what>" when ``_publish_to_s3`` fail-softs
+    any artifact write (#4729) — a swallowed write is not "ran". ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
     """
     decline = dict(decline or {})
     defer = tuple(defer or ())
@@ -467,8 +476,14 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
         raise ValueError(f"#4593: a declined side effect needs a reason: {blank}")
 
     sk = str(item.get("sk") or "")
+
+    def _s3_artifacts() -> str | None:
+        failures: list = []
+        _invalidate_cloudfront(_publish_to_s3(item, failures=failures))
+        return f"failed: {'; '.join(failures)}" if failures else None  # #4729: a fail-soft write is not "ran"
+
     runners = {
-        "s3_artifacts": lambda: _invalidate_cloudfront(_publish_to_s3(item)),
+        "s3_artifacts": _s3_artifacts,
         "recap": lambda: _commit_recap(item),  # Phase 3: commit the "previously on" recap with the week
         "ledger": lambda: _commit_ledger(item),  # #4533: the season ledger the next week picks the story up from
         "mark_published": lambda: _mark_published(date_str),
@@ -487,8 +502,8 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
         elif effect in defer:
             out[effect] = "deferred"
         else:
-            runners[effect]()
-            out[effect] = "ran"
+            result = runners[effect]()
+            out[effect] = result if isinstance(result, str) and result.startswith("failed") else "ran"
     return out
 
 
@@ -498,6 +513,9 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
 # sweeps drafts older than the review window and publishes them via the SAME path the
 # approve click uses (privacy/vice guards already ran at draft time). "Editor review
 # window + a fail-safe" — how a real team keeps the weekly running.
+# #4694: the fail-safe publishes only what passes the deterministic audit
+# (content/autopublish_audit.py). A draft nobody approved and the audit did not pass
+# stays a draft, and the sweep says so loudly (HELD_TOKEN → an alarm) every day it waits.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -535,13 +553,43 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
     return out
 
 
+def _audit_refusal(item: dict) -> list[str]:
+    """#4694: the blocking items that keep an UNAPPROVED draft from publishing itself (empty = the audit passed).
+
+    Fail-closed: an audit that cannot run is a refusal, never a pass. The approve click does not call this — an owner
+    approval is the other way through."""
+    try:
+        from content import autopublish_audit
+
+        return autopublish_audit.blocking_items(item)
+    except Exception as exc:  # noqa: BLE001 — a broken audit holds the week; it never waves it through
+        return [f"the audit could not run: {exc}"]
+
+
 def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = False) -> list[dict]:
-    """Publish every stale draft via the approve path. Returns what was (would be) published."""
+    """Publish every stale draft that passes the deterministic audit (#4694) via the approve path; HOLD the rest
+    loudly. Returns what was (would be) published — a held week is not in it."""
     drafts = _find_stale_drafts(hours, max_days)
     published = []
     for item in drafts:
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
         wk = item.get("week_number", "?")
+        blocking = _audit_refusal(item)
+        if blocking:
+            # #4694: a draft nobody approved and the audit did not pass stays a draft. Loud: the token below pages
+            # through the `chronicle-autopublish-held` alarm, every day the week sits unapproved inside the window,
+            # and this line names the week. The preview email's approve link still publishes it.
+            logger.error(
+                "%s Week %s (%s) held: unapproved for %sh and the audit found %d blocking item(s); approve it from the "
+                "preview email to publish. %s",
+                HELD_TOKEN,
+                wk,
+                date_str,
+                hours,
+                len(blocking),
+                blocking,
+            )
+            continue
         if dry_run:
             published.append({"date": date_str, "week": wk, "dry_run": True})
             continue

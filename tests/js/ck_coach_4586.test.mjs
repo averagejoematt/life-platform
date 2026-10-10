@@ -37,14 +37,8 @@ test("a coach's name links to its page, and anything that is not a persona id go
   }
 });
 
-test("Back returns to the on-site page the reader came from, otherwise to Coaches", () => {
-  const here = "https://averagejoematt.com/next/v8/coach/?c=sleep_coach";
-  assert.deepEqual(C.backTarget("https://averagejoematt.com/next/v8/?x=1", here, "/next/v8/"), { href: "/next/v8/?x=1", text: "← Back" });
-  const coaches = { href: "/next/v8/coaches/", text: "← The AI coaches" };
-  assert.deepEqual(C.backTarget("", here, "/next/v8/"), coaches, "no referrer");
-  assert.deepEqual(C.backTarget("https://evil.example/next/v8/", here, "/next/v8/"), coaches, "another site");
-  assert.deepEqual(C.backTarget(here, here, "/next/v8/"), coaches, "a reload of this page");
-});
+// Where Back goes (`from=`, by name, else the front page) is one rule for every deep page
+// since #4675: tests/js/ck_deep_links_4675.test.mjs.
 
 test("the top says what the coach is for, that it is software, and how it is written", () => {
   const html = C.whoHTML(SLEEP);
@@ -172,6 +166,17 @@ test("a call about a day before it was said, a 'tomorrow' long gone and a due da
   assert.doesNotMatch(later, /<time /);
   assert.match(later, /13 calls are waiting to be checked\./);
   assert.match(later, /13 older calls are still waiting to be checked\./);
+});
+
+test("a sealed bet the route marks reader_plain:false is listed with a note, never hidden (#4714)", () => {
+  const sealed = { coach_id: "sleep", status: "pending", text: "Sleep EWMA should rise once the fixed bedtime holds.", date: "2026-09-06", due_date: "2026-10-14", pre_registered: true, reader_plain: false };
+  const html = C.nextHTML(SLEEP, { open: [], resolved: [] }, { predictions: [sealed] }, NAMES, TODAY);
+  assert.match(html, /Sleep EWMA should rise/, "the sealed bet is listed");
+  assert.match(html, /Sealed before the experiment began, so it keeps its original wording\./);
+  // the note is the label's alone: a plain sealed bet and an in-cycle call carry none
+  assert.equal(C.sealedNote({ ...sealed, reader_plain: undefined }), "");
+  assert.equal(C.sealedNote({ ...sealed, pre_registered: false }), "");
+  assert.doesNotMatch(C.nextHTML(SLEEP, { open: [], resolved: [] }, { predictions: [{ ...sealed, reader_plain: undefined }] }, NAMES, TODAY), /Sealed before/);
 });
 
 test("next says so when the calls or the bets are not served, and the lead has nothing to settle", () => {

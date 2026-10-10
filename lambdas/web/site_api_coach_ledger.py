@@ -28,6 +28,7 @@ from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
+    plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
@@ -946,6 +947,9 @@ def handle_predictions(event, *, _g):
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
         coach_filter = qs.get("coach_id", "")
+        # #4714: the coach page's "Next" list is the one request of this shape (ck_coach.js asks
+        # `?coach_id=<id>&status=pending`); only it is held to the plain-words rule below.
+        coach_page_pending = status_filter == "pending" and bool(coach_filter)
         # #2658: `int()` on an unvalidated param raised straight into the handler-wide
         # `except` below, which answered 200 with an empty ledger — a swallowed error
         # rendered as "the coaches have made no predictions" (ADR-104). Reject the bad
@@ -1080,6 +1084,20 @@ def handle_predictions(event, *, _g):
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
+                    # #4714: the plain-words rule applies to ONE list only — the coach page's "Next" (the only
+                    # caller asking for one coach's pending calls), never the full ledger (status=all, the
+                    # method/prediction pages). There, an in-cycle pending call a friend could not read is not
+                    # listed (it is still counted above, so the scorecard keeps the row). A SEALED pre-registered
+                    # bet is never hidden: it was frozen before the experiment began, so it is served whatever its
+                    # length, and only the jargon half of the rule labels it (`reader_plain: False`) for the page.
+                    _plain_label = None
+                    if coach_page_pending and p_status == "pending":
+                        _claim = rec.get("claim_natural")
+                        if rec.get("pre_registered"):
+                            _plain_label = not plain_words.specialist_terms(_claim)
+                        elif not plain_words.is_plain(_claim, plain_words.CALL_MAX_CHARS):
+                            continue
+
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
                     _said = rec.get("claim_natural", "")
                     _held = claim_sourcing.unsourced([_said], claim_sourcing.claim_day(rec), _dark) if _dark else None
@@ -1117,6 +1135,8 @@ def handle_predictions(event, *, _g):
                             # #4701: present only on a held row — the same note shape the docket,
                             # call and coach routes serve (reason, instrument, last_seen, said_on, text).
                             **({"unsourced": _held} if _held else {}),
+                            # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
+                            **({"reader_plain": False} if _plain_label is False else {}),
                         }
                     )
             except Exception as _qe:
