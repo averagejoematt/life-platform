@@ -49,6 +49,7 @@ from typing import Any
 from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
 
+from mcp import plan_morning_note  # #4189
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import _catalog_and_ceiling, _days_between, _minus_days, _resolver, _safe, _union_evidence_rows  # noqa: F401 (#4149)
@@ -750,6 +751,7 @@ def tool_plan_next_session(args):
     )
     _merge_walking_volume(block, walk_layer)
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
+    plan_morning_note.attach(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
     _attach_session_loads(block, target_date, catalog_movements)
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
