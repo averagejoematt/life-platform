@@ -233,7 +233,10 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
 
-from intelligence import weight_recency
+from intelligence import (
+    held_record_ttl as _held,  # #4703: a HOLD renews the prior record's ttl
+    weight_recency,
+)
 
 # #2056 (ADR-080 §2): the DATE#-recency helpers moved to intelligence/item_recency.py so
 # this handler stays under its 2,000-line cap while the grounding wiring lands. Private
@@ -1173,7 +1176,7 @@ def generate_and_cache(expert_key, shared_system=None):
             return ""
 
     now = datetime.now(timezone.utc)
-    ttl = int((now + timedelta(days=8)).timestamp())
+    ttl = _held.ttl_from(now, _held.WEEKLY_TTL_DAYS)
 
     item = {
         "pk": CACHE_PK,
@@ -1459,13 +1462,13 @@ def generate_synthesis(all_coach_outputs):
     # #2421/#3018: the Chair's weekly priority AND public_summary — same call, graded together.
     _synth_partial = {"cross_domain_notes": {}, "disagreements": []}
     synthesis = _gate_json_record("weekly_priority", synthesis, ("weekly_priority", "public_summary"), _synth_partial, prompt, api_key)
-    if synthesis is None:
-        return None
+    if synthesis is None:  # #4703: the hold renews the prior record it promises keeps serving
+        return _held.renew_held(table, CACHE_PK, "EXPERT#integrator", _held.WEEKLY_TTL_DAYS)
 
     try:
         # Cache synthesis to DDB
         now = datetime.now(timezone.utc)
-        ttl = int((now + timedelta(days=8)).timestamp())
+        ttl = _held.ttl_from(now, _held.WEEKLY_TTL_DAYS)
         item = {
             "pk": CACHE_PK,
             "sk": "EXPERT#integrator",
@@ -1638,8 +1641,8 @@ def generate_experiment_arc():
 
     # #2421: EXPERT#experiment_arc is read straight onto the story surface — gate it.
     parsed = _gate_json_record("experiment_arc", parsed, "arc", {"throughline": "", "chapters": []}, prompt, api_key)
-    if parsed is None:
-        return None
+    if parsed is None:  # #4703
+        return _held.renew_held(table, CACHE_PK, "EXPERT#experiment_arc", _held.ROLLUP_TTL_DAYS)
 
     try:
         now = datetime.now(timezone.utc)
@@ -1653,7 +1656,7 @@ def generate_experiment_arc():
             "week_count": len(weeks),
             "generated_at": now.isoformat(),
             "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
-            "ttl": int((now + timedelta(days=10)).timestamp()),
+            "ttl": _held.ttl_from(now, _held.ROLLUP_TTL_DAYS),
         }
         table.put_item(Item=item)
         logger.info("Experiment-arc cached: %d weeks, %d chars, %d chapters", len(weeks), len(item["arc"]), len(item["chapters"]))
@@ -1760,8 +1763,8 @@ def generate_month_rollup():
 
     # #2421: EXPERT#integrator_month feeds the site's Month lens — gate it.
     parsed = _gate_json_record("integrator_month", parsed, "narrative", {"headline": ""}, prompt, api_key)
-    if parsed is None:
-        return None
+    if parsed is None:  # #4703
+        return _held.renew_held(table, CACHE_PK, "EXPERT#integrator_month", _held.ROLLUP_TTL_DAYS)
 
     try:
         now = datetime.now(timezone.utc)
@@ -1778,7 +1781,7 @@ def generate_month_rollup():
             "days_in_experiment": day_n,
             "generated_at": now.isoformat(),
             "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
-            "ttl": int((now + timedelta(days=10)).timestamp()),
+            "ttl": _held.ttl_from(now, _held.ROLLUP_TTL_DAYS),
         }
         table.put_item(Item=item)
         logger.info("Month-rollup cached: %d weeks, %d chars", len(weeks), len(item["narrative"]))
@@ -1851,10 +1854,15 @@ def lambda_handler(event, context):
                 else:
                     # #2218: empty generation — never "ok" (chars: 0 reads as success); excluded from synthesis.
                     results[expert_key] = {"status": "skipped_empty", "chars": 0}
+                    _held.renew_held(table, CACHE_PK, f"EXPERT#{expert_key}", _held.WEEKLY_TTL_DAYS)  # #4703: held/empty keeps the prior
             except Exception as e:
                 logger.error(f"Failed to generate {expert_key}: {e}")
                 results[expert_key] = {"status": "error", "error": str(e)}
 
+        # #4703: too many held reads to synthesize — the board-level records are held with them, so renew them.
+        if target == "all" and len(all_outputs) < 3 and any(r.get("status") == "skipped_empty" for r in results.values()):
+            for _sk, _d in _held.BOARD_RECORDS:
+                _held.renew_held(table, CACHE_PK, _sk, _d)
         # Synthesis pass — only when running all experts
         if target == "all" and len(all_outputs) >= 3:
             try:
