@@ -491,6 +491,10 @@ def _refresh_horizons_calibration():
 
 
 def lambda_handler(event: dict, context) -> dict:
+    # #4643: the daily boot probe (pipeline_health_check) invokes this with
+    # {"healthcheck": true} — prove the bundle imports, never call the model.
+    if isinstance(event, dict) and event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Lambda entry point.

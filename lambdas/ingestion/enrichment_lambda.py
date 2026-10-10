@@ -423,6 +423,10 @@ def enrich_date_range(start_date: str, end_date: str):
 
 
 def lambda_handler(event, context):
+    # #4643: the daily boot probe (pipeline_health_check) invokes this with
+    # {"healthcheck": true} — prove the bundle imports, never enrich.
+    if isinstance(event, dict) and event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         today = pacific_today()
         if hasattr(logger, "set_date"):
