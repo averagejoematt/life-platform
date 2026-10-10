@@ -180,6 +180,35 @@ def test_every_coach_instrument_gets_a_gap_list_and_the_cgm_gap_is_derived_from_
         assert by[(behavioral, None)] == [], f"{behavioral} can never be dark, so it has no gaps"
 
 
+@pytest.mark.parametrize(
+    "clock",
+    [
+        datetime(2027, 9, 30, 20, 0, tzinfo=timezone.utc),
+        datetime(2027, 10, 15, 20, 0, tzinfo=timezone.utc),  # past 2026-08-27 + 400 days
+        datetime(2030, 1, 1, 20, 0, tzinfo=timezone.utc),
+    ],
+)
+def test_the_specimen_gap_survives_any_clock_because_the_floor_is_anchored_to_genesis(clock):
+    """A rolling-only lookback dropped the 2026-08-27 gap after 2027-10-01 and quoted the
+    specimen again, though /api/calls still serves every call since EXPERIMENT_START (#4702
+    verifier). The floor is never later than genesis − lookback, so the gap stays."""
+    from health import instrument_presence
+
+    table = FakeDdbTable(store_items=_store(gap=True), query_hook=dispatching_query_hook)
+    by = {(h["source"], h["datatype"]): h["gaps"] for h in instrument_presence.gap_history(table, clock)}
+    assert by[("apple_health", "cgm")] == CLOSED[0]["gaps"]
+    floor = instrument_presence.gap_floor_day(clock)
+    assert floor <= instrument_presence.shift_day_key(instrument_presence.EXPERIMENT_START_DATE, -instrument_presence.GAP_LOOKBACK_DAYS)
+    assert floor < CGM_LAST_SEEN
+
+
+def test_the_floor_still_rolls_back_from_now_while_now_is_near_genesis():
+    from health import instrument_presence
+
+    assert instrument_presence.gap_floor_day(NOW) == "2025-08-02", "genesis 2026-09-06 − 400 days is the earlier floor"
+    assert instrument_presence.gap_floor_day(datetime(2026, 9, 1, 20, 0, tzinfo=timezone.utc)) == "2025-07-28"
+
+
 def test_closed_gaps_only_past_the_instruments_own_dark_threshold():
     from health import instrument_presence
 

@@ -52,6 +52,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from boto3.dynamodb.conditions import Attr, Key
+from common.constants import EXPERIMENT_START_DATE
 from common.numeric import decimals_to_float
 from common.pacific_time import anchor_day_key, pacific_date_of, parse_day_key, shift_day_key
 from experiment.phase_filter import with_phase_filter
@@ -224,10 +225,30 @@ def absent_coaches(table: Any, now: datetime | None = None, instruments: dict | 
 # reading. Days before the first reading inside the lookback are UNKNOWN, never a gap
 # (#1971 absent-is-unknown), and a behavioral source has no gaps by the same rule that
 # keeps it from ever being dark: a lapse in a hand-kept log is about Matthew, not a sensor.
+#
+# The floor is ANCHORED TO GENESIS, not only rolling from now (#4702 verifier): /api/calls
+# composes every call since EXPERIMENT_START and the experiment is terminal (no further
+# resets), so a 2026 text is still served in 2027. A purely rolling window would drop the
+# 2026-08-27 → 2026-10-05 CGM gap once now passed 2027-10-01 and quote the specimen again.
+# `gap_floor_day` therefore takes the EARLIER of (now − lookback) and (genesis − lookback):
+# the second term keeps the last reading before a gap that opened before genesis (the
+# specimen gap predates the 2026-09-06 genesis) in range forever. Read cost grows by about
+# one row per instrument per day — small next to the measured ~130 RCU.
 
-#: How far back the gap history is read. Mirrors the freshness checker's deep-scan horizon
-#: (HAE_LIVENESS_MAX_LOOKBACK_DAYS); every dated coach text this hold judges is younger.
+#: How far back the gap history is read, from now AND from genesis (the earlier floor wins).
+#: Mirrors the freshness checker's deep-scan horizon (HAE_LIVENESS_MAX_LOOKBACK_DAYS).
 GAP_LOOKBACK_DAYS = 400
+
+
+def gap_floor_day(now: datetime) -> str:
+    """The earliest day the gap history reads: min(now − GAP_LOOKBACK_DAYS, genesis −
+    GAP_LOOKBACK_DAYS), as a Pacific YYYY-MM-DD key. Never later than genesis − lookback, so
+    every text served since EXPERIMENT_START is judged against the full gap record."""
+    rolling = shift_day_key(pacific_date_of(now.isoformat()) or "", -GAP_LOOKBACK_DAYS)
+    anchored = shift_day_key(EXPERIMENT_START_DATE, -GAP_LOOKBACK_DAYS)
+    candidates = [d for d in (rolling, anchored) if d]
+    return min(candidates) if candidates else ""
+
 
 #: Safety cap on the paginated history read (each page is up to 1 MB of scanned items; the
 #: key-condition floor already bounds it — measured 2026-10-09: cgm 405 rows, whoop 675).
@@ -320,13 +341,13 @@ def closed_gaps(days: list[str], threshold_days: float | None) -> list[dict]:
 
 def gap_history(table: Any, now: datetime | None = None, instruments: dict | None = None) -> list[dict]:
     """One row per distinct coach instrument — {source, datatype, label, gaps} — where
-    `gaps` is every CLOSED gap inside the lookback (`closed_gaps`). The open gap, if any, is
+    `gaps` is every CLOSED gap on or after `gap_floor_day(now)` (`closed_gaps`). The open gap, if any, is
     `absent_coaches`' verdict and is not repeated here.
 
     Never raises: an instrument whose history read fails logs a warning and carries no
     closed gaps, so the routes fail open exactly as they do on a failed sentinel read."""
     now = now or datetime.now(timezone.utc)
-    floor_day = shift_day_key(pacific_date_of(now.isoformat()) or "", -GAP_LOOKBACK_DAYS)
+    floor_day = gap_floor_day(now)
     out: list[dict] = []
     seen: set[tuple[str, str | None]] = set()
     try:
