@@ -160,13 +160,24 @@ test("nothing usable → empty strings; an unusable data-through cannot judge la
   for (const r of [nextWeighInText("2026-09-21", "2026-09-26"), nextWeighInText("2026-09-26", "2026-09-26")]) assert.doesNotMatch(r.text, /\d{4}-\d{2}-\d{2}/);
 });
 
-test("#4766 dayInWords prints the year for a date outside the current Pacific year", () => {
+test("#4766 dayInWords { yearIfNotCurrent } prints the year for a date outside the current Pacific year", () => {
   const now = new Date("2026-10-10T20:00:00Z");
-  assert.equal(dayInWords("2027-07-02", { now }), "Friday, July 2, 2027");
-  assert.equal(dayInWords("2027-09-18", { now }), "Saturday, September 18, 2027");
-  assert.equal(dayInWords("2027-09-18", { now, weekday: false }), "September 18, 2027");
-  assert.equal(dayInWords("2026-12-31", { now }), "Thursday, December 31");
+  const y = { yearIfNotCurrent: true, now };
+  assert.equal(dayInWords("2027-07-02", y), "Friday, July 2, 2027");
+  assert.equal(dayInWords("2027-09-18", y), "Saturday, September 18, 2027");
+  assert.equal(dayInWords("2027-09-18", { ...y, weekday: false }), "September 18, 2027");
+  assert.equal(dayInWords("2026-12-31", y), "Thursday, December 31");
   // Pacific year, not UTC: 2027-01-01T03:00Z is still 2026-12-31 in Pacific.
-  assert.equal(dayInWords("2027-01-05", { now: new Date("2027-01-01T03:00:00Z") }), "Tuesday, January 5, 2027");
-  assert.equal(dayInWords("2026-12-31", { now: new Date("2027-01-01T03:00:00Z") }), "Thursday, December 31");
+  const nye = { yearIfNotCurrent: true, now: new Date("2027-01-01T03:00:00Z") };
+  assert.equal(dayInWords("2027-01-05", nye), "Tuesday, January 5, 2027");
+  assert.equal(dayInWords("2026-12-31", nye), "Thursday, December 31");
+});
+
+test("#4766 the default dayInWords spelling never depends on the clock (opt-in only)", () => {
+  // The default must stay year-less whatever `now` is — a clock-dependent default turns every
+  // year-less fixture assertion into a New-Year time bomb.
+  for (const now of [new Date("2026-10-10T20:00:00Z"), new Date("2027-01-15T20:00:00Z"), new Date("2031-06-01T20:00:00Z")]) {
+    assert.equal(dayInWords("2027-07-02", { now }), "Friday, July 2");
+    assert.equal(dayInWords("2026-09-22", { now, weekday: false }), "September 22");
+  }
 });
