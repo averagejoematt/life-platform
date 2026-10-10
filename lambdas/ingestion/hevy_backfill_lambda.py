@@ -25,7 +25,8 @@ Architecture (verified against live API + OpenAPI 2026-05-25):
           truncated walk keeps the old since so nothing is silently skipped
           (and, #4643, records a FAILED run so a permanent truncation is visible)
         → an event failing on QUARANTINE_AFTER consecutive runs is quarantined
-          (QUARANTINE#WORKOUT#<id>) and stops holding the cursor (#4643)
+          (USER#system / INGESTION_QUARANTINE#hevy#WORKOUT#<id>) and stops
+          holding the cursor (#4643)
         → a 401/403 latches the shared auth breaker for 24h (#4643)
 
 Idempotent: same workout id → upsert, no dupe. Page-based pagination
@@ -72,10 +73,14 @@ except ImportError:  # pragma: no cover — layer-module fallback
     _INGEST_HEALTH_AVAILABLE = False
 
 # #4643: the auth circuit breaker. The registry has declared hevy `oauth: True` ("routes
-# through auth_breaker") since #1960, so `ingest-auth-unhealthy-hevy` exists — but nothing
-# here ever wrote the marker or emitted IngestAuthHealthy, and a revoked key failed every
-# hourly run three times (two async retries) into the dead-letter queue. With the breaker
-# the first failure latches the marker and the async retries short-circuit to a 200 skip.
+# through auth_breaker") since #1960, but nothing here ever wrote the marker or emitted
+# IngestAuthHealthy, and a revoked key failed every hourly run three times (two async
+# retries) into the dead-letter queue. With the breaker the first failure latches the
+# marker and the async retries short-circuit to a 200 skip. What reads it: the
+# DIMENSIONLESS fleet alarm `ingest-auth-unhealthy-24h` (any 0 fires it) and, via the
+# liveness sentinel's auth-class failures, `ingest-consecutive-failures-hevy`. There is
+# NO per-source `ingest-auth-unhealthy-hevy` alarm (cdk/stacks/monitoring_stack.py's
+# per-source auth loop does not list hevy) — the Source=hevy twin is emitted unwatched.
 try:
     from common.auth_breaker import check_breaker, clear_failure, mark_failure
 
@@ -101,12 +106,18 @@ PAGE_SIZE = int(os.environ.get("HEVY_BACKFILL_PAGE_SIZE", "10"))
 _AUTH_STATUSES = (401, 403)
 
 #: #4643: one event that fails on this many CONSECUTIVE runs is quarantined — recorded
-#: under QUARANTINE#WORKOUT#<id> and no longer allowed to hold the cursor. Before this, one
+#: under USER#system / INGESTION_QUARANTINE#hevy#WORKOUT#<id> and no longer allowed to
+#: hold the cursor. Before this, one
 #: permanently failing event froze `since` forever: every hourly run re-walked the same
 #: window, failed the same event, and never advanced, while newer workouts were still
 #: ingested (idempotent upserts) so nothing downstream looked wrong.
 QUARANTINE_AFTER = int(os.environ.get("HEVY_QUARANTINE_AFTER", "3"))
-QUARANTINE_SK_PREFIX = "QUARANTINE#WORKOUT#"
+#: Stored beside the `since` cursor (USER#system / INGESTION_STATE#hevy), NOT in the hevy
+#: source partition: every reader of USER#matthew#SOURCE#hevy assumes it holds workouts,
+#: and an unbounded `sk >= DATE#…` query (routine_title._query_performed) returned a
+#: QUARANTINE# row there as an empty projected item that counted as one more session.
+QUARANTINE_PK = "USER#system"
+QUARANTINE_SK_PREFIX = f"INGESTION_QUARANTINE#{SOURCE}#WORKOUT#"
 
 
 def _is_auth_failure(exc: Exception) -> bool:
@@ -115,7 +126,7 @@ def _is_auth_failure(exc: Exception) -> bool:
 
 
 def _load_event_failures() -> dict | None:
-    """Every QUARANTINE#WORKOUT# record, keyed by workout id — one query per run.
+    """Every quarantine/streak record for hevy, keyed by workout id — one query per run.
 
     Returns None when the read fails. None means "cannot count", and the caller then
     treats every event failure as cursor-blocking, exactly as before #4643: quarantine
@@ -124,9 +135,7 @@ def _load_event_failures() -> dict | None:
     try:
         from boto3.dynamodb.conditions import Key
 
-        kwargs: dict = {
-            "KeyConditionExpression": Key("pk").eq(f"USER#{USER_ID}#SOURCE#{SOURCE}") & Key("sk").begins_with(QUARANTINE_SK_PREFIX)
-        }
+        kwargs: dict = {"KeyConditionExpression": Key("pk").eq(QUARANTINE_PK) & Key("sk").begins_with(QUARANTINE_SK_PREFIX)}
         out: dict = {}
         while True:
             resp = _table.query(**kwargs)
@@ -145,17 +154,16 @@ def _load_event_failures() -> dict | None:
 def _note_event_failure(wid: str, ev_type: str, exc: Exception, prior: dict | None) -> bool:
     """Count one more consecutive failure for `wid`; return True when it is now quarantined.
 
-    The record deliberately carries NO `source_workout_id` and sorts after every DATE# key
-    ('Q' > 'D'), the same two properties the DELETE#WORKOUT# markers rely on to stay out of
-    every date-range read. A failed write returns False — the event then blocks the cursor,
-    never the other way round.
+    The record lives in the USER#system partition, never the hevy source partition, so no
+    workout reader can see it. A failed write returns False — the event then blocks the
+    cursor, never the other way round.
     """
     now = datetime.now(timezone.utc).isoformat()
     prior = prior or {}
     count = int(prior.get("fail_count") or 0) + 1
     quarantined = bool(prior.get("quarantined")) or count >= QUARANTINE_AFTER
     item = {
-        "pk": f"USER#{USER_ID}#SOURCE#{SOURCE}",
+        "pk": QUARANTINE_PK,
         "sk": f"{QUARANTINE_SK_PREFIX}{wid}",
         "workout_id": wid,
         "event_type": ev_type,
@@ -175,9 +183,10 @@ def _note_event_failure(wid: str, ev_type: str, exc: Exception, prior: dict | No
     if quarantined:
         logger.error(
             "hevy event %s QUARANTINED after %d consecutive failing runs — the cursor may advance past it. "
-            "Inspect sk=%s%s; re-ingest by editing the workout in Hevy once fixed. Last error: %s",
+            "Inspect pk=%s sk=%s%s; re-ingest by editing the workout in Hevy once fixed. Last error: %s",
             wid,
             count,
+            QUARANTINE_PK,
             QUARANTINE_SK_PREFIX,
             wid,
             item["last_error"],
@@ -188,7 +197,7 @@ def _note_event_failure(wid: str, ev_type: str, exc: Exception, prior: dict | No
 def _clear_event_failure(wid: str) -> None:
     """The event processed cleanly — its failure streak (or quarantine) is over."""
     try:
-        _table.delete_item(Key={"pk": f"USER#{USER_ID}#SOURCE#{SOURCE}", "sk": f"{QUARANTINE_SK_PREFIX}{wid}"})
+        _table.delete_item(Key={"pk": QUARANTINE_PK, "sk": f"{QUARANTINE_SK_PREFIX}{wid}"})
     except Exception as e:  # noqa: BLE001
         logger.warning("hevy failure-count clear failed for %s: %s", wid, e)
 

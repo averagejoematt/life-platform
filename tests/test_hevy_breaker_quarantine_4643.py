@@ -5,8 +5,9 @@ Three gaps from the 2026-10-04 data-source sweep, each a failure that would go u
 
   1. A revoked API key failed every hourly run three times (two async retries) into the
      dead-letter queue, while the registry claimed hevy `oauth: True` "routes through
-     auth_breaker" — it never did, so `ingest-auth-unhealthy-hevy` watched a stream
-     nothing wrote.
+     auth_breaker" — it never did, so the IngestAuthHealthy stream (read by the
+     dimensionless `ingest-auth-unhealthy-24h`; there is no per-source hevy auth alarm)
+     never carried a hevy point, and `ingest-consecutive-failures-hevy` was the only page.
   2. A truncated walk (backlog > MAX_PAGES_PER_RUN) froze `since` correctly but recorded
      `succeeded=True`, so a permanent truncation loop was a healthy-looking source.
   3. One permanently failing event froze `since` forever (re-proved below: the pre-fix
@@ -28,6 +29,8 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(ROOT, "lambdas", "ingestion"))
 
 HEVY_PK = "USER#matthew#SOURCE#hevy"
+Q_PK = "USER#system"  # the quarantine lives beside the cursor, never in the workout partition
+Q_SK = "INGESTION_QUARANTINE#hevy#WORKOUT#"
 SINCE = "2026-07-01T00:00:00Z"
 
 
@@ -37,11 +40,15 @@ def _match(cond, item) -> bool:
     vals = exp["values"]
     if op == "AND":
         return _match(vals[0], item) and _match(vals[1], item)
-    attr, val = vals
+    attr, val = vals[0], vals[1]
     if op == "=":
         return item.get(attr.name) == val
     if op == "begins_with":
         return str(item.get(attr.name, "")).startswith(val)
+    if op == ">=":
+        return str(item.get(attr.name, "")) >= val
+    if op == "BETWEEN":
+        return vals[1] <= str(item.get(attr.name, "")) <= vals[2]
     raise NotImplementedError(op)
 
 
@@ -64,10 +71,15 @@ class FakeTable:
         self.items.pop((Key["pk"], Key["sk"]), None)
         return {}
 
-    def query(self, KeyConditionExpression=None, **kw):
+    def query(self, KeyConditionExpression=None, ProjectionExpression=None, ExpressionAttributeNames=None, **kw):
         if self.query_raises:
             raise RuntimeError("ddb down")
-        return {"Items": [dict(it) for _, it in sorted(self.items.items()) if _match(KeyConditionExpression, it)]}
+        hits = [dict(it) for _, it in sorted(self.items.items()) if _match(KeyConditionExpression, it)]
+        if ProjectionExpression:  # DynamoDB semantics: a row with none of the attributes comes back as {}
+            names = ExpressionAttributeNames or {}
+            fields = [names.get(f.strip(), f.strip()) for f in ProjectionExpression.split(",")]
+            hits = [{f: it[f] for f in fields if f in it} for it in hits]
+        return {"Items": hits}
 
 
 @pytest.fixture
@@ -245,9 +257,11 @@ def test_a_repeatedly_failing_event_is_quarantined_and_the_cursor_advances(hevy,
     assert body["quarantined"] == ["w_bad"]
     assert body["blocking_errors"] == 0
     assert len(state["since"]) == 1, "the quarantining run must advance the cursor"
-    rec = tbl.items[(HEVY_PK, "QUARANTINE#WORKOUT#w_bad")]
+    rec = tbl.items[(Q_PK, f"{Q_SK}w_bad")]
     assert rec["quarantined"] is True and rec["fail_count"] == mod.QUARANTINE_AFTER
-    assert "source_workout_id" not in rec  # stays out of exercise_history's gte scan
+    # Nothing the quarantine path writes may land in the workout partition, where every
+    # reader assumes a row is a workout (routine_title counted such a row as a session).
+    assert not [k for k in tbl.items if k[0] == HEVY_PK and k[1] != "AUTH_FAILURE"]
     # The run that quarantined still failed an event — visible to liveness, never silent.
     assert state["health"][-1]["succeeded"] is False
 
@@ -258,11 +272,11 @@ def test_a_clean_retry_clears_the_failure_streak(hevy, monkeypatch):
     _poison(monkeypatch, mod)
     monkeypatch.setattr(mod, "fetch_events_page", _feed(state, [_updated("w_bad")]))
     mod.lambda_handler({}, None)
-    assert (HEVY_PK, "QUARANTINE#WORKOUT#w_bad") in tbl.items
+    assert (Q_PK, f"{Q_SK}w_bad") in tbl.items
 
     monkeypatch.setattr(mod, "write_normalized", lambda rec: None)
     mod.lambda_handler({}, None)
-    assert (HEVY_PK, "QUARANTINE#WORKOUT#w_bad") not in tbl.items
+    assert (Q_PK, f"{Q_SK}w_bad") not in tbl.items
     assert len(state["since"]) == 1
 
 
@@ -270,7 +284,7 @@ def test_quarantine_fails_closed_when_the_streak_cannot_be_read(hevy, monkeypatc
     """Quarantine is the one path that lets an event be skipped, so an unreadable streak
     must mean "every failure blocks" — even an event already past the threshold."""
     mod, tbl, state = hevy
-    tbl.put_item({"pk": HEVY_PK, "sk": "QUARANTINE#WORKOUT#w_bad", "workout_id": "w_bad", "fail_count": 9, "quarantined": True})
+    tbl.put_item({"pk": Q_PK, "sk": f"{Q_SK}w_bad", "workout_id": "w_bad", "fail_count": 9, "quarantined": True})
     tbl.query_raises = True
     _poison(monkeypatch, mod)
     monkeypatch.setattr(mod, "fetch_events_page", _feed(state, [_updated("w_bad")]))
@@ -279,4 +293,28 @@ def test_quarantine_fails_closed_when_the_streak_cannot_be_read(hevy, monkeypatc
     assert body["blocking_errors"] == 1
     assert state["since"] == []
     # An unread streak is not an empty one: it must not be overwritten with a count of 1.
-    assert tbl.items[(HEVY_PK, "QUARANTINE#WORKOUT#w_bad")]["fail_count"] == 9
+    assert tbl.items[(Q_PK, f"{Q_SK}w_bad")]["fail_count"] == 9
+
+
+# ── 4 · no phantom session in the routine-title counters ─────────────────────
+
+
+def test_routine_title_counts_only_workout_rows(monkeypatch):
+    """Verifier finding on this PR: a QUARANTINE# row in the hevy partition came back from
+    routine_title._query_performed's open `sk >= DATE#` query as an empty projected item,
+    and count_distinct_performed counted it (key "None") as one more session. The same
+    held for the pre-existing DELETE#WORKOUT# tombstones. Plant every non-workout sk family
+    that sorts after DATE# and assert the all-time count is exactly the workouts."""
+    from training import routine_title as rt
+
+    tbl = FakeTable()
+    for wid, day in (("a", "2026-09-07"), ("b", "2026-09-08")):
+        tbl.put_item({"pk": HEVY_PK, "sk": f"DATE#{day}#WORKOUT#{wid}", "date": day, "workout_uid": f"hevy:{wid}"})
+    tbl.put_item({"pk": HEVY_PK, "sk": "QUARANTINE#WORKOUT#zz", "workout_id": "zz", "fail_count": 3, "quarantined": True})
+    tbl.put_item({"pk": HEVY_PK, "sk": "DELETE#WORKOUT#yy", "tombstone": True})
+    tbl.put_item({"pk": HEVY_PK, "sk": "AUTH_FAILURE", "error": "401"})
+    monkeypatch.setattr(rt, "_table", lambda: tbl)
+
+    performed = rt._query_performed("2026-09-06")
+    assert rt.count_distinct_performed(performed) == 2
+    assert all(r.get("date") for r in performed), performed
