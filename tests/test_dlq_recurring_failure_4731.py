@@ -203,7 +203,7 @@ def test_a_crash_recurring_across_days_stops_being_reinvoked_and_escalates(env, 
         assert doc["Reason"] == "threshold"
         cw = doc["_aws"]["CloudWatchMetrics"][0]
         assert cw["Namespace"] == "LifePlatform/DLQ"
-        assert cw["Dimensions"] == [["FunctionName"]]
+        assert ["FunctionName"] in cw["Dimensions"]
     assert [d["CumulativeAttempts"] for d in emf] == [3, 4, 5]
 
     # The urgent page names the function, not just a count.

@@ -708,7 +708,9 @@ def escalation_metric_doc(fn_label: str, reason: str, attempts: int, timestamp_m
             "CloudWatchMetrics": [
                 {
                     "Namespace": EMF_NAMESPACE,
-                    "Dimensions": [["FunctionName"]],
+                    # Per function (the alarmable series) + one dimensionless
+                    # aggregate (the ops dashboard's DLQ widget reads it).
+                    "Dimensions": [["FunctionName"], []],
                     "Metrics": [{"Name": ESCALATION_METRIC, "Unit": "Count"}],
                 }
             ],
