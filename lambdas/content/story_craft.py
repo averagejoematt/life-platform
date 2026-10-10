@@ -99,8 +99,8 @@ _OPENING_BAD = re.compile(
 )
 
 # The scale's direction, said any way a stranger would read it: a figure in pounds, "pounds"/"lb" spelled out, the scale
-# itself, or a weigh-in. The opening must carry one when the week has a weigh-in to report.
-_WEIGHT_WORD = re.compile(r"\b(?:pounds?|lbs?|scale|weigh(?:s|ed|-in|-ins|ing)?|lighter|heavier)\b", re.IGNORECASE)
+# itself, his weight, or a weigh-in ("weights" stays out: lifting them says nothing about the scale). The opening must carry one when the week has a weigh-in to report.
+_WEIGHT_WORD = re.compile(r"\b(?:pounds?|lbs?|scale|weigh(?:t|s|ed|-in|-ins|ing)?|lighter|heavier)\b", re.IGNORECASE)
 # What a stranger cannot read in five seconds: device names and wearable / statistics jargon. The top line above the
 # piece is plain English; the scoreboard and the body carry the instruments.
 _JARGON = re.compile(

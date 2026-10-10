@@ -125,6 +125,14 @@ def test_the_opening_says_which_way_the_scale_went():
     with_weight = "Day 24, and Matthew had trained twenty-three days straight. The scale was down fifteen pounds.\n\nMore."
     assert _of(c.chronicle_findings(no_weight, week=4, weight_known=True), "which way the scale went")
     assert not _of(c.chronicle_findings(with_weight, week=4, weight_known=True), "which way the scale went")
+    # the plain word "weight" is the brief's own word for it, so it must satisfy the check (verifier #4746)
+    for said in (
+        "Day 24, and his weight fell again. He trained twenty-three days straight.\n\nMore.",
+        "Day 24, and the weight came off again. He trained twenty-three days straight.\n\nMore.",
+    ):
+        assert not _of(c.chronicle_findings(said, week=4, weight_known=True), "which way the scale went")
+    lifted = "Day 24, and he lifted weights again. He trained twenty-three days straight.\n\nMore."
+    assert _of(c.chronicle_findings(lifted, week=4, weight_known=True), "which way the scale went")
     # a week with no weigh-in cannot be held to it
     assert not _of(c.chronicle_findings(no_weight, week=4, weight_known=False), "which way the scale went")
 
