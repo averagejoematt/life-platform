@@ -14,7 +14,12 @@ nothing read ``stop_reason``, the last sentence or the ``*Week N*`` footer. Pinn
   T5  end to end through the facade: the revision call's stop_reason reaches the gate,
       and a max_tokens stop returns Elena's draft from ``_run_margaret_edit_pass``
   T6  past-week mode: ``{"week": 4, "dry_run": true}`` names 09-23 -> 09-29 whatever
-      today is; a publishing run never resolves a past week
+      today is; a publishing run never resolves a past week — pinned at the helper AND at
+      the handler (``_handler_core`` hands ``story_pipeline.live_week`` '2026-09-29')
+
+Ordering (T1): a revision cut so early it is also length-degenerate still reports
+``revision_truncated:max_tokens`` — the model's stop verdict is read before the ratio check.
+No test here calls Bedrock or any AWS API.
 """
 
 import os
@@ -80,6 +85,15 @@ def test_a_revision_stopped_at_max_tokens_ships_the_draft_and_logs_the_fallback(
     assert (text, applied) == (DRAFT, False)
     assert reason == "revision_truncated:max_tokens"
     assert any("revision_truncated" in w and "max_tokens" in w for w in log.warnings), log.warnings
+
+
+def test_a_short_cut_revision_is_named_truncated_not_degenerate():
+    # ordering: the model's max_tokens verdict is read BEFORE the word-ratio check, so a
+    # reply cut so early it is also degenerate in length still reports revision_truncated
+    short_cut = "He logged every meal this week, and"
+    assert not mep._word_count_sane(DRAFT, short_cut)  # the fixture really is degenerate
+    text, applied, reason = mep.apply_revision(DRAFT, CRITIQUE, ALLOWED, revise_fn=lambda s, u: (short_cut, "max_tokens"))
+    assert (text, applied, reason) == (DRAFT, False, "revision_truncated:max_tokens")
 
 
 def test_max_tokens_is_a_cut_even_when_the_text_happens_to_look_finished():
@@ -180,6 +194,53 @@ def test_week_4_dry_run_names_the_season_week_whatever_the_run_date():
     wk = next(w for w in story_dossier.season_weeks(through=end) if w["end"] == end)
     assert wk["week"] == 4
     assert (wk["start"], wk["end"]) == ("2026-09-23", "2026-09-29")
+
+
+class _DeskReached(BaseException):
+    """Halts the handler at the desk call — a BaseException so the desk's own
+    ``except Exception`` fallback cannot swallow it and run the legacy writer."""
+
+
+def _run_handler_to_the_desk(monkeypatch, event, today_end="2026-10-06"):
+    """Drive ``_handler_core`` up to ``story_pipeline.live_week`` with every AWS / model
+    touch stubbed, and return the week-end date the desk was asked to build."""
+    from content import story_pipeline
+    from health import whole_life_context
+
+    seen = {}
+
+    def _live_week(table, week_end, log=None):
+        seen["week_end"] = week_end
+        raise _DeskReached()
+
+    monkeypatch.setenv("STORY_DESK", "on")
+    monkeypatch.setattr(_budget_guard, "allow", lambda feature: True)
+    monkeypatch.setattr(m, "gather_chronicle_data", lambda: {"dates": {"end": today_end}, "prev_installments": []})
+    monkeypatch.setattr(m, "_existing_installment", lambda date_str: None)
+    monkeypatch.setattr(m, "build_data_packet", lambda data: ("PACKET", 6))
+    monkeypatch.setattr(m, "_load_engagement_signal", lambda: {})
+    monkeypatch.setattr(m, "_elena_notebook_block", lambda week_num: "")
+    monkeypatch.setattr(m, "_build_elena_prompt_from_config", lambda: "ELENA PROMPT")
+    monkeypatch.setattr(m, "_HAS_INSIGHT_WRITER", False)
+    monkeypatch.setattr(whole_life_context, "fetch_full_installment_archive", lambda *a, **k: [])
+    monkeypatch.setattr(m._store, "read_raw_cache", lambda *a, **k: None)  # a publishing run checks the raw cache
+    monkeypatch.setattr(m, "call_anthropic", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no model call in this test")))
+    monkeypatch.setattr(story_pipeline, "live_week", _live_week)
+    try:
+        m._handler_core(event, None)
+    except _DeskReached:
+        pass
+    return seen.get("week_end")
+
+
+def test_the_handler_hands_the_desk_season_week_4_on_a_week_4_rehearsal(monkeypatch):
+    # box 2: {"week": 4, "dry_run": true} builds 09-23 -> 09-29 whatever today's window is
+    assert _run_handler_to_the_desk(monkeypatch, {"dry_run": True, "week": 4}) == "2026-09-29"
+
+
+def test_the_handler_hands_the_desk_todays_window_on_a_publishing_run(monkeypatch):
+    # a publishing run that names a week still builds today's window, never the past one
+    assert _run_handler_to_the_desk(monkeypatch, {"week": 4}, today_end="2026-10-06") == "2026-10-06"
 
 
 def test_past_week_mode_is_rehearsal_only_and_rejects_nonsense():

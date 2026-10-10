@@ -239,7 +239,11 @@ def _elena_revision_call(system, user, max_tokens, *, _g):
     measured budget the caller passes (``margaret_editor_pass.revision_max_tokens``), never
     the critique's flat 1,500 tokens, and it returns ``(text, stop_reason)`` so the pass can
     refuse a reply the model did not finish. Same model / temperature / cached system
-    prompt as ``_margaret_haiku_call``; only the budget and the stop reason differ."""
+    prompt as ``_margaret_haiku_call``; only the budget and the stop reason differ.
+
+    No ``timeout`` is passed: ``call_anthropic_raw`` accepts one but ignores it — the real
+    per-attempt limit is the bedrock-runtime client's ``read_timeout`` (180 s,
+    ``ai.bedrock_client``), which already covers an 8,192-token Haiku reply."""
     from ai.bedrock_client import first_text
     from common import retry_utils
 
@@ -250,7 +254,7 @@ def _elena_revision_call(system, user, max_tokens, *, _g):
         "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user}],
     }
-    resp = retry_utils.call_anthropic_raw(body, timeout=90)
+    resp = retry_utils.call_anthropic_raw(body)
     return (first_text(resp) or "").strip(), resp.get("stop_reason")
 
 
