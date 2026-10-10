@@ -2563,6 +2563,19 @@ REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::Hevy"] 
     "proved_on": "2026-09-26",
 }
 
+# #4674: "pace flag" (cut 2026-10-09) lands at ledger 0; the mutation is the phrase on a reader page.
+REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::pace flag"] = {
+    "gate_name": "BASELINE[pace flag]",
+    "command": "python3 -m pytest tests/test_site_vocabulary_registry.py -q -p no:cacheprovider -k 'ratchets_down and pace'",
+    "mutation": 'site/gear/index.html: "<p>the pace flag is live</p>" inserted after <main id="gr">.',
+    "observed": (
+        "MUTATED: 1 failed — test_builder_vocabulary_only_ratchets_down[pace flag]: 'pace flag' now on 1 reader pages "
+        "(ledger 0), ['site/gear/index.html']. REVERTED: 1 passed. Watched 2026-10-09."
+    ),
+    "scope": "Static HTML main content only; a phrase JS injects at runtime is not seen.",
+    "proved_on": "2026-10-09",
+}
+
 # ── #4182 M4 — the comprehension judge's own CI step ─────────────────────────
 # CI-step proofs live directly in `gate_census.PROVEN_CAN_FAIL` for every other
 # family-1 record (see e.g. "ci::ci-cd.yml::visual-qa::5" there); this one is

@@ -7,7 +7,7 @@ test: one ``focused_on_now`` item is served only when
     it has no word of 13 or more letters,
     it has at most one word of 11 or more letters, and
     it uses none of the reader-vocabulary registry's renamed or cut terms
-    (site/data/glossary.json: reset, chronicle, model, as of, Third Wall, pillar, gate,
+    (site/data/glossary.json: reset, chronicle, model, as of, Third Wall, pillar, pace flag, gate,
     character level).
 
 No model is called anywhere in the check. The fixtures below are the eight items

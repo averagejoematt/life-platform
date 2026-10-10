@@ -5,8 +5,11 @@ memory. Facade state via `_g` (the module's live globals), the #1654 split shape
 """
 
 import json
+import re
 
 from content import autopublish_audit, story_checks
+
+_PLACEHOLDER = re.compile(r"^week\s*\d+$", re.I)
 
 
 def door_reasons(text: str) -> list:
@@ -18,6 +21,18 @@ def door_reasons(text: str) -> list:
 def door_safe(text: str) -> str:
     """A title or excerpt that fails the door is not published: the episode falls back to its bare number."""
     return "" if story_checks.reader_surface(text or "") else (text or "")
+
+
+def episode_title(post: dict, ep: dict) -> str:
+    """The episode carries its chapter's title (#4674): the desk writes the episode's own title separately, so the two
+    drifted ("Nine Days and No Rest" / "Nine Days and Counting"). The chapter is what the reader sees first and what
+    the journal index prints; the episode falls back to its own title only when the chapter has none. A bare
+    "Week N" is the Panel's placeholder for a week with no published chapter (``_select_week_post``), not a title.
+    Both writers — the desk here and the legacy writer in coach_panel_podcast_lambda — title through this one rule."""
+    chapter = str(post.get("title") or "").strip()
+    if _PLACEHOLDER.match(chapter):
+        chapter = ""
+    return chapter or str(ep.get("title") or "").strip()
 
 
 def desk_episode(post: dict, *, _g) -> dict | None:
@@ -50,7 +65,7 @@ def publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False, *, _
     turns = [t for t in turns if t["line"]]
     unsafe = [r for t in turns for r in _g["_safety_gate"](t["line"])]
     # the title and the excerpt are reader copy too, and neither is a spoken turn (#4538)
-    unsafe += door_reasons(f"{ep.get('title') or post.get('title') or ''}\n{ep.get('excerpt') or ''}")
+    unsafe += door_reasons(f"{episode_title(post, ep)}\n{ep.get('excerpt') or ''}")
     # #4694: an episode script the desk left with a blocking finding (a fact, a body number, an unheld quote …) is not
     # audited, and the chronicle's approve click never showed it to anyone — HOLD it for a human, loudly (SNS names the
     # week). Absent the key (an episode handed in by another caller) there is nothing recorded to refuse on.
@@ -81,7 +96,7 @@ def publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False, *, _
         existing = []
     rec = {
         "week": week,
-        "title": f"EP{week} · {ep.get('title') or post.get('title')}",
+        "title": f"EP{week} · {episode_title(post, ep)}",
         "date": post.get("date"),
         **published,
         "byline": f"Elena + {guest_name}",

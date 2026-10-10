@@ -51,7 +51,7 @@ CALL_MAX_CHARS = 160
 JARGON_TERMS: tuple[str, ...] = ("EWMA", "EMA", "slow wave", "hypothesis", "z-score", "sigma", "baseline-adjusted", "autocorrelation")
 
 # The registry's renamed and cut terms, in registry order. Held equal to the registry by test.
-REGISTRY_TERMS: tuple[str, ...] = ("reset", "chronicle", "model", "as of", "Third Wall", "pillar", "gate", "character level")
+REGISTRY_TERMS: tuple[str, ...] = ("reset", "chronicle", "model", "as of", "Third Wall", "pillar", "pace flag", "gate", "character level")
 
 _WORD_RE = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 
