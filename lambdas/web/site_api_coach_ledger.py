@@ -33,7 +33,10 @@ from coach import (
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
-from web import prediction_reason  # #4220: a graded call's reason in reader words
+from web import (
+    claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
+    prediction_reason,  # #4220: a graded call's reason in reader words
+)
 from web.site_api_common import (
     PT,
     USER_PREFIX,
@@ -157,6 +160,13 @@ def handle_coach_docket(event, *, _g):
     except Exception as _pe:
         logger.warning(f"[coach_docket] instrument presence check failed (fail-open): {_pe}")
         absent = {}
+    # #4673: the resolved history was left verbatim, and that is where the defect lived — a
+    # settled bet printed "…based on CGM data" from a side argued on 2026-09-23, four weeks
+    # after the sensor's last reading. Every claim (open OR resolved, either coach) that
+    # cites a dark instrument and is dated after its last reading is held; the entry names
+    # why under `unsourced` (web.claim_sourcing). The concession quotes the loser's claim
+    # verbatim, so it is held by the same rule.
+    dark = claim_sourcing.dark_instruments(absent)
     try:
         items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
             "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
@@ -184,10 +194,14 @@ def handle_coach_docket(event, *, _g):
                 "opened_date": it.get("opened_date"),
                 "stakes": it.get("stakes") or {},
             }
+            if dark:
+                kept, held = claim_sourcing.split_claims(claims, it.get("opened_date"), dark)
+                if held:
+                    entry["claims"], entry["unsourced"] = kept, held
             if sk.startswith("OPEN#"):
                 _dark = {c: absent[c] for c in (entry["coach_a"], entry["coach_b"]) if c in absent}
                 if _dark:
-                    entry["claims"] = {c: t for c, t in dict(claims).items() if c not in _dark}
+                    entry["claims"] = {c: t for c, t in dict(entry["claims"]).items() if c not in _dark}
                     entry["absent"] = {
                         c: {"reason": st.get("reason"), "instrument": {"source": st.get("source"), "datatype": st.get("datatype")}}
                         for c, st in _dark.items()
@@ -205,6 +219,9 @@ def handle_coach_docket(event, *, _g):
                         "concession": concession,
                     }
                 )
+                held_concession = claim_sourcing.unsourced([concession], it.get("opened_date"), dark) if concession else None
+                if held_concession:
+                    entry["concession"], entry["concession_unsourced"] = None, held_concession
                 resolved.append(entry)
     except Exception as _e:
         logger.warning(f"[coach_docket] {_e}")

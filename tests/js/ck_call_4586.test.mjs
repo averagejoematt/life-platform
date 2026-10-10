@@ -63,6 +63,19 @@ test("a bet shows both coaches' words and who was right", () => {
   assert.match(out, /It came in at 59\. Graded on the reading for September 30\. Checked September 30\./);
 });
 
+// #4673: the route holds a side whose words rest on a sensor that had sent no reading by the
+// day the bet opened (claim "" + unsourced). The page prints the route's sentence beside the
+// name in the quote's place; the words never reach it.
+test("a bet side the route held prints why beside the name, never the words", () => {
+  const bet = clone(C.findCall(BODY, BET));
+  const held = "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.";
+  bet.sides = bet.sides.map((s) => (s.coach_id === "glucose" ? { ...s, claim: "", unsourced: { reason: "no sensor since 2026-08-27", text: held } } : s));
+  const claim = C.claimHTML(bet);
+  assert.match(claim, /Marcus Webb said yes: “Any carb reduction/);
+  assert.ok(claim.includes(`<p class="ck-soft">Amara Patel said no. ${held}</p>`), claim);
+  assert.doesNotMatch(claim, /CGM data/);
+});
+
 test("the running record is counts in a sentence, never a percentage", () => {
   const html = C.recordHTML(C.findCall(BODY, NUMBER), BODY);
   assert.match(html, /<p>Lisa Park: 10 of 24 checked calls right\.<\/p><p class="ck-soft" data-coach-comparison>Across 24 checked calls, so far they do not beat a simple guess\.<\/p>/);

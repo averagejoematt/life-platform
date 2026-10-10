@@ -51,9 +51,16 @@ export function claimHTML(call) {
   if (!isCall(call)) return "";
   const logged = shortDay(call.logged_date);
   if (call.kind === "bet") {
+    // #4673: a side whose words rested on a sensor with no reading that day comes with
+    // `unsourced.text` in place of its words; that sentence is printed beside its name.
+    const held = (s) => (s && s.unsourced && typeof s.unsourced.text === "string" ? s.unsourced.text.trim() : "");
     const sides = (call.sides || [])
-      .filter((s) => s && s.coach_name && s.claim)
-      .map((s) => `<p class="ck-soft">${esc(s.coach_name)} said ${esc(s.said)}: “${esc(s.claim)}”</p>`)
+      .filter((s) => s && s.coach_name && (s.claim || held(s)))
+      .map((s) =>
+        s.claim
+          ? `<p class="ck-soft">${esc(s.coach_name)} said ${esc(s.said)}: “${esc(s.claim)}”</p>`
+          : `<p class="ck-soft">${esc(s.coach_name)} said ${esc(s.said)}. ${esc(held(s))}</p>`,
+      )
       .join("");
     return `<div class="ck-bet"><p class="ck-small">${esc(logged ? `A bet opened ${logged}` : "A bet between two coaches")}</p><p><b>${esc(call.called)}</b></p>${sides}</div>`;
   }

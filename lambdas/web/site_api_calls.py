@@ -38,6 +38,11 @@ was graded on whether protein went down, with the condition never checked. So:
   * **bet** — a resolved dispute-docket entry with a graded verdict: the criterion was
     frozen when the bet opened. One page per bet, never one per side.
 
+A coach's words that cite a sensor which had sent no reading by the day they were said
+are never quoted (#4673, ``web.claim_sourcing``): a call whose sentence does is counted under
+``excluded``; a bet keeps its page and the held side carries ``unsourced`` — the reason and
+one sentence — in place of its words.
+
 Everything else is counted under ``excluded`` with its reason, and says so in a sentence.
 Excluded calls STAY in each coach's record: the record is ``coach_record``'s, the one
 producer every other surface prints, and this module never re-counts it.
@@ -65,8 +70,9 @@ from coach.persona_registry import plain_name
 from common.pacific_time import day_in_words, pacific_date_of, shift_day_key
 from experiment.measurable_metrics import AGG_SUFFIXES, base_metric
 from experiment.phase_filter import singleton_visible
+from health import instrument_presence  # #4217/#4673: which instruments are dark, and since when
 
-from web import prediction_reason
+from web import claim_sourcing, prediction_reason
 from web.site_api_common import PT, _decimal_to_float, _error, _ok, logger
 
 SOURCE = "/api/calls"
@@ -88,6 +94,7 @@ FLAT_READ = "graded as no movement by a trend check that reads only the most rec
 NO_READER_WORDS = "no plain-words sentence exists for the measure or the result"
 WITHHELD = "withheld by the privacy filter"
 NO_IDENTITY = "the stored row has no stable identity"
+UNSOURCED = "the sentence rests on a sensor that had sent no reading by the day it was said"
 
 #: A conditional or hedged sentence is not falsifiable by the measure alone.
 _CONDITIONAL_RE = re.compile(r"\b(if|unless|once|when|whenever|assuming|provided|until|may|might|could)\b", re.IGNORECASE)
@@ -297,11 +304,13 @@ def _went(reason: str) -> str | None:
     return None
 
 
-def build_call(short_id: str, name: str, row: dict, record: dict) -> tuple[dict | None, str | None]:
+def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | None = None) -> tuple[dict | None, str | None]:
     """One settled PREDICTION# row as a page body, or ``(None, why_not)``."""
     kind, why = page_kind(row)
     if kind is None:
         return None, why
+    if claim_sourcing.unsourced([row.get("claim_natural")], row.get("created_date"), dark or []):
+        return None, UNSOURCED
     cid = call_id(short_id, row)
     if cid is None:
         return None, NO_IDENTITY
@@ -391,8 +400,12 @@ def _bet_baseline(docket: dict, rows_by_coach: dict) -> Any:
     return None
 
 
-def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict) -> tuple[dict | None, str | None]:
-    """One resolved, graded dispute-docket entry as a page body, or ``(None, why_not)``."""
+def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict, dark: list | None = None) -> tuple[dict | None, str | None]:
+    """One resolved, graded dispute-docket entry as a page body, or ``(None, why_not)``.
+
+    #4673: a side whose words cite a sensor with no reading on the day the bet opened is
+    served with ``claim: ""`` and ``unsourced`` (the reason and the sentence a page prints
+    beside its name). The bet itself, its question and its verdict stand."""
     verdict = docket.get("verdict") or {}
     winner, loser = verdict.get("winner") or docket.get("winner"), verdict.get("loser") or docket.get("loser")
     if verdict.get("outcome") != "graded" or not winner or not loser:
@@ -411,6 +424,7 @@ def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict) -> 
     if not question or not seen or any(s not in names for s in short.values()):
         return None, NO_READER_WORDS
     sides = docket.get("sides") or {}
+    quotable, held = claim_sourcing.split_claims(claims, docket.get("opened_date"), dark or [])
     day = _iso_day(docket.get("resolution_date")) or _iso_day(docket.get("resolved_date"))
     won, lost = names[short[winner]], names[short[loser]]
     yes_no = {c: ("yes" if sides.get(c) else "no") for c in (winner, loser)}
@@ -425,14 +439,15 @@ def build_bet(docket: dict, names: dict, records: dict, rows_by_coach: dict) -> 
             "kind": "bet",
             "coach_id": short[winner],
             "coach_name": won,
-            "claim": str(claims.get(winner) or "").strip(),
+            "claim": str(quotable.get(winner) or "").strip(),
             "sides": [
                 {
                     "coach_id": short[c],
                     "coach_name": names[short[c]],
-                    "claim": str(claims.get(c) or "").strip(),
+                    "claim": str(quotable.get(c) or "").strip(),
                     "said": yes_no[c],
                     "right": c == winner,
+                    **({"unsourced": held[c]} if c in held else {}),
                 }
                 for c in (winner, loser)
             ],
@@ -494,11 +509,20 @@ def next_block(today: str, open_dockets: list, pending: list, names: dict) -> di
     return {"state": "ok", "as_of": due, "source": SOURCE, "absent_text": ABSENT_NEXT, "data": data}
 
 
-def compose(rows_by_coach: dict, names: dict, genesis: str | None, today: str, resolved_dockets: list, open_dockets: list) -> dict:
+def compose(
+    rows_by_coach: dict,
+    names: dict,
+    genesis: str | None,
+    today: str,
+    resolved_dockets: list,
+    open_dockets: list,
+    dark: list | None = None,
+) -> dict:
     """The whole document from the fetched rows. Pure: no clock, no I/O.
 
     ``rows_by_coach`` is ``{short_id: [PREDICTION# rows]}`` exactly as the shared fetch
-    returns them; ``names`` is ``{short_id: plain name}``."""
+    returns them; ``names`` is ``{short_id: plain name}``; ``dark`` is
+    ``claim_sourcing.dark_instruments(...)`` — the instruments with no reading now (#4673)."""
     calls: list[dict] = []
     excluded: dict[str, int] = {}
     records: dict[str, dict] = {}
@@ -512,7 +536,7 @@ def compose(rows_by_coach: dict, names: dict, genesis: str | None, today: str, r
         for row in decided:
             if row.get("source") == "dispute_docket":
                 continue  # one page per BET, built from the docket row below — never one per side
-            call, why = build_call(short_id, names[short_id], row, records[short_id])
+            call, why = build_call(short_id, names[short_id], row, records[short_id], dark)
             if call is None:
                 excluded[str(why)] = excluded.get(str(why), 0) + 1
             else:
@@ -521,7 +545,7 @@ def compose(rows_by_coach: dict, names: dict, genesis: str | None, today: str, r
             if str(row.get("status") or "") == "pending" and coach_record.counts_this_cycle(row, genesis):
                 pending.append((short_id, row))
     for docket in resolved_dockets:
-        bet, why = build_bet(docket, names, records, rows_by_coach)
+        bet, why = build_bet(docket, names, records, rows_by_coach, dark)
         if bet is None:
             excluded[str(why)] = excluded.get(str(why), 0) + 1
         else:
@@ -544,12 +568,24 @@ def compose(rows_by_coach: dict, names: dict, genesis: str | None, today: str, r
                 if not n_out
                 else f"{n_out} more checked {'call has' if n_out == 1 else 'calls have'} no page here: the coach’s sentence was conditional, "
                 "did not state the number or direction that was measured, or was graded on a different day or by a check too coarse to print. "
-                "They still count in each coach’s record."
+                + ("Some rested on a sensor that had sent no reading by the day they were said. " if UNSOURCED in excluded else "")
+                + "They still count in each coach’s record."
             ),
         },
         "simple_guess_words": GUESS_WORDS,
         "next": next_block(today, open_dockets, pending, names),
     }
+
+
+def _absent(_g) -> dict:
+    """#4673: ``{coach_id: instrument_state}`` for the dark instruments — the SAME derivation
+    /api/source_freshness serves. Fail-open with a logged warning, as on /api/coach_docket
+    (#4217): a sentinel read failing must not take the settled calls down."""
+    try:
+        return instrument_presence.absent_coaches(_g["table"])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[/api/calls] instrument presence check failed (fail-open): {exc}")
+        return {}
 
 
 def handle_calls(event, *, _g):
@@ -575,7 +611,8 @@ def handle_calls(event, *, _g):
         }
         rows_by_coach = {cid: [_decimal_to_float(r) for r in fetched.get(cid, [])] for cid in names}
         today = _g["datetime"].now(PT).strftime("%Y-%m-%d")  # the facade's clock hand-off
-        doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"])
+        dark = claim_sourcing.dark_instruments(_absent(_g))
+        doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"], dark)
         if "docket:resolved" in failures or "docket:open" in failures:
             doc["bets_state"] = "unavailable"
             logger.error(f"[/api/calls] degraded — docket reads failed: {sorted(f for f in failures if f.startswith('docket'))}")

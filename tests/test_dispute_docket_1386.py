@@ -1134,7 +1134,27 @@ class TestAbsentCoachDocketServe4217:
         assert entry["claims"]["glucose_coach"] == GLUCOSE_DOCKET_CLAIM
         assert "absent" not in entry
 
-    def test_resolved_history_keeps_every_claim(self, api):
+    def test_resolved_history_keeps_every_claim_said_while_the_sensor_read(self, api):
+        """#4673 narrowed this: resolved history keeps its claims EXCEPT one that cites a
+        sensor with no reading on the day the item opened (tests/test_claim_sourcing_4673.py).
+        An item opened while the CGM still read keeps both sides."""
+        sac, t = api
+        _seed_presence(t, cgm_dark=True)
+        item = glucose_docket_item()
+        item.update(
+            {
+                "sk": "RESOLVED#2026-09-30#glucose_coach__nutrition_coach#recovery",
+                "status": "resolved",
+                "resolved_date": "2026-09-30",
+                "opened_date": "2026-08-20",
+            }
+        )
+        t.put_item(Item=item)
+        entry = self._body(sac.handle_coach_docket({}))["resolved"][0]
+        assert set(entry["claims"]) == {"glucose_coach", "nutrition_coach"}
+
+    def test_resolved_claim_citing_the_dark_sensor_after_its_last_reading_is_held(self, api):
+        """#4673: the live specimen — opened 2026-09-23, CGM last read 2026-08-27."""
         sac, t = api
         _seed_presence(t, cgm_dark=True)
         item = glucose_docket_item()
@@ -1143,7 +1163,8 @@ class TestAbsentCoachDocketServe4217:
         )
         t.put_item(Item=item)
         entry = self._body(sac.handle_coach_docket({}))["resolved"][0]
-        assert set(entry["claims"]) == {"glucose_coach", "nutrition_coach"}
+        assert entry["claims"] == {"nutrition_coach": NUTRITION_DOCKET_CLAIM}
+        assert entry["unsourced"]["glucose_coach"]["reason"] == ABSENT_REASON
 
 
 # ═════════════════════════════════════════════════════════════════════════════
