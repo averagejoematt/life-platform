@@ -73,12 +73,14 @@ paths = ['''tests/test_site_api_derived_phase_4088\.py''']
 # generic-api-key finding at commit ca3352536, tests/js/morning_note_box_4189.test.mjs line 12,
 # `const TOKEN = "<the sequential hex digits 0-f, twice>"`. Not a credential: the fake 32-hex
 # owner grant the morning-note box test parses — the digits 0..f in order, repeated, signing
-# nothing. The follow-up commit builds it with `.repeat(2)` so no literal can match; this entry
-# exists only because the gate scans the PR commit RANGE, which still carries ca3352536.
-description = "tests/js/morning_note_box_4189.test.mjs — the sequential-hex fake grant token 0123456789abcdef x2 in the #4189 box test. A test fixture, not a credential."
+# nothing. The second commit (e4b5429d6) wrote it as `"<0..f once>".repeat(2)`, and the gate
+# flagged that 16-char half the same way (line 13). The third commit builds it as `"ab".repeat(16)`
+# so no literal can match; this entry exists only because the gate scans the PR commit RANGE,
+# which still carries both earlier commits. It matches only the sequential 0..f run, in this file.
+description = "tests/js/morning_note_box_4189.test.mjs — the sequential-hex fake grant token (0123456789abcdef, once or twice) in the #4189 box test. A test fixture, not a credential."
 condition = "AND"
 regexTarget = "match"
-regexes = ['''0123456789abcdef0123456789abcdef''']
+regexes = ['''0123456789abcdef(?:0123456789abcdef)?''']
 paths = ['''tests/js/morning_note_box_4189\.test\.mjs''']
 
 # ── #3620 — the platform's OWN bearer shapes ─────────────────────────────────
