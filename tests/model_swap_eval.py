@@ -131,7 +131,10 @@ REFUSED = "REFUSED"
 MARGIN = 0.10
 PARITY = 0.5
 DEFAULT_SEED = 4771
-DEFAULT_JUDGE = "claude-sonnet-4-6"  # stronger than either workhorse arm; never the candidate (enforced)
+# Stronger than the Haiku workhorse arms; never the candidate (enforced). On the two Sonnet
+# features (coach_brief, memoir) it IS the incumbent — a self-preference risk toward the
+# incumbent, which the report states as a warning rather than hiding (validate_models).
+DEFAULT_JUDGE = "claude-sonnet-4-6"
 JUDGE_MAX_TOKENS = 400
 JUDGE_TASK_CHAR_CAP = 6000  # the task shown to the judge is truncated (and says so) to bound judge cost
 TOKENIZER_MARGIN = 1.3  # docs/AI_MODEL_STRATEGY.md §2: the 5.5 tokenizer reads ~30% more tokens (unverified)
@@ -676,13 +679,22 @@ def _generate(case, model, role, invoker, ledger, row):
     return _bc().first_text(call(dict(case.body)))
 
 
-def validate_models(incumbent, candidate, judge):
-    """Raise ValueError on a comparison this harness must not run."""
+def validate_models(incumbent, candidate, judge) -> list:
+    """Raise ValueError on a comparison this harness must not run; return the warnings a
+    comparison it may run must carry (today: the judge is the incumbent's own model)."""
     r_inc, r_cand, r_judge = resolved(incumbent), resolved(candidate), resolved(judge)
     if r_cand == r_inc:
         raise ValueError(f"candidate {candidate!r} resolves to the incumbent's own profile {r_inc!r} — nothing to compare")
     if r_judge == r_cand:
         raise ValueError(f"the judge {judge!r} resolves to the candidate {r_cand!r}: a model may not judge its own output (#4771)")
+    warnings = []
+    if r_judge == r_inc:
+        warnings.append(
+            f"judge == incumbent: the judge {judge!r} resolves to the incumbent's own profile {r_inc!r}, so any "
+            "self-preference bias favours the incumbent (conservative for a swap, but a candidate loss is weaker evidence). "
+            "Pass --judge with a different model to remove it."
+        )
+    return warnings
 
 
 def run(
@@ -703,7 +715,7 @@ def run(
 
     feature = FEATURES[feature_name]
     incumbent = incumbent or incumbent_model(feature)
-    validate_models(incumbent, candidate, judge)
+    warnings = validate_models(incumbent, candidate, judge)
     cases = build_cases(feature_name, n=n, seed=seed, captured_dir=captured_dir)
     ceiling = ceiling_usd(cases, incumbent, candidate, judge)
     report = {
@@ -720,6 +732,7 @@ def run(
         "sources": sorted({c.source for c in cases}),
         "prompt_provenance": sorted({c.prompt_provenance for c in cases}),
         "ceiling_usd": ceiling,
+        "warnings": warnings,
         "cases": [],
         "errors": [],
         "stopped": None,
@@ -864,6 +877,8 @@ def markdown(report) -> str:
         f"prompts: {'; '.join(report['prompt_provenance'])}",
         "",
     ]
+    for w in report.get("warnings") or []:
+        lines += [f"**Warning:** {w}", ""]
     gf = report.get("gate_failures")
     if gf is not None:
         gates = sorted(set(gf["incumbent"]) | set(gf["candidate"]))

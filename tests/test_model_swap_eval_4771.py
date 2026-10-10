@@ -117,7 +117,41 @@ def test_a_model_may_not_judge_itself_or_be_compared_with_itself():
         mse.validate_models("claude-haiku-4-5-20251001", "us.anthropic.claude-sonnet-4-6", "claude-sonnet-4-6")
     with pytest.raises(ValueError, match="nothing to compare"):
         mse.validate_models("claude-haiku-4-5-20251001", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "claude-sonnet-4-6")
-    mse.validate_models("claude-haiku-4-5-20251001", CANDIDATE, "claude-sonnet-4-6")
+    assert mse.validate_models("claude-haiku-4-5-20251001", CANDIDATE, "claude-sonnet-4-6") == []
+
+
+def test_a_judge_that_is_the_incumbent_is_warned_in_the_report(no_bedrock):
+    # coach_brief and memoir run on Sonnet 4.6 — the default judge. Allowed, but never silent.
+    warnings = mse.validate_models("claude-sonnet-4-6", CANDIDATE, "us.anthropic.claude-sonnet-4-6")
+    assert len(warnings) == 1 and "judge == incumbent" in warnings[0]
+    r = mse.run("memoir", CANDIDATE, dry_run=True)
+    assert r["incumbent"] == "claude-sonnet-4-6" and any("judge == incumbent" in w for w in r["warnings"])
+    assert "judge == incumbent" in mse.markdown(r)
+    assert mse.run("chronicle", CANDIDATE, dry_run=True)["warnings"] == []
+
+
+def test_an_owner_only_field_in_a_candidate_output_blocks(no_bedrock):
+    field = sorted(mse.sem.OWNER_ONLY_FIELDS)[0]
+    r = mse.run("chronicle", CANDIDATE, invoker=_arm_invoker(f"{MARK}. His {field} was logged this week."), judge_invoker=_marker_judge())
+    assert r["verdict"] == mse.BLOCKED_BY_GATE, r["verdict_reason"]
+    assert set(r["gate_failures"]["candidate"]["privacy_owner_only"]) == {c["id"] for c in r["cases"]}
+    assert "privacy_owner_only" not in r["gate_failures"]["incumbent"]
+
+
+def test_an_empty_candidate_output_blocks(no_bedrock):
+    r = mse.run("chronicle", CANDIDATE, invoker=_arm_invoker("   "), judge_invoker=_marker_judge())
+    assert r["verdict"] == mse.BLOCKED_BY_GATE, r["verdict_reason"]
+    assert set(r["gate_failures"]["candidate"]["empty_output"]) == {c["id"] for c in r["cases"]}
+    assert "empty_output" not in r["gate_failures"]["incumbent"]
+
+
+def test_a_labs_coach_brief_that_arranges_a_draw_blocks(no_bedrock):
+    # coach_quality_gate's labs-draw half (#4134) fires only for the labs coach.
+    r = mse.run("coach_brief", CANDIDATE, invoker=_arm_invoker("Schedule the draw."), judge_invoker=_marker_judge())
+    assert r["verdict"] == mse.BLOCKED_BY_GATE, r["verdict_reason"]
+    coach_of = {fx["id"]: fx["coach_id"] for _, fx in mse._inputs_of(mse.os.path.join(mse.FIXTURES, "golden_briefs"))}
+    labs = {c["id"] for c in r["cases"] if coach_of[c["id"]] == "labs_coach"}
+    assert labs and set(r["gate_failures"]["candidate"]["coach_quality_gate_labs_draw"]) == labs
 
 
 def test_a_budget_stop_ends_the_run_incomplete_with_what_was_measured(no_bedrock):
@@ -149,6 +183,13 @@ def test_a_ceiling_over_the_dev_session_cap_refuses_before_any_call(monkeypatch,
     assert r["ceiling_usd"]["total"] > 0.01 and r["cost_usd"]["total"] == 0.0
 
 
+def test_the_ceiling_prices_every_arm_including_the_judge():
+    cases = mse.build_cases("chronicle")
+    ceil = mse.ceiling_usd(cases, "claude-haiku-4-5-20251001", CANDIDATE, mse.DEFAULT_JUDGE)
+    assert ceil["incumbent"] > 0 and ceil["candidate"] > 0 and ceil["judge"] > 0
+    assert abs(ceil["total"] - (ceil["incumbent"] + ceil["candidate"] + ceil["judge"])) < 1e-12
+
+
 def test_billed_dollars_are_metered_per_arm(no_bedrock):
     r = mse.run("chronicle", CANDIDATE, invoker=_arm_invoker(f"{MARK}."), judge_invoker=_marker_judge())
     c = r["cost_usd"]
@@ -160,6 +201,10 @@ def test_billed_dollars_are_metered_per_arm(no_bedrock):
 def test_the_interval_decides_the_verdict():
     assert mse.preference_stats(30, 0, 0)["stat_verdict"] == mse.NON_INFERIOR
     assert mse.preference_stats(0, 0, 30)["stat_verdict"] == mse.INFERIOR
+    # the INFERIOR boundary is parity itself, not the bar: an upper bound in (0.40, 0.50) is INFERIOR
+    s = mse.preference_stats(8, 0, 22)
+    assert mse.PARITY - mse.MARGIN < s["ci95"][1] < mse.PARITY, s["ci95"]
+    assert s["stat_verdict"] == mse.INFERIOR
     s = mse.preference_stats(5, 10, 5)
     assert s["stat_verdict"] == mse.INCONCLUSIVE and s["p"] == 0.5
     lo, hi = s["ci95"]
@@ -230,9 +275,20 @@ def test_incumbents_agree_with_the_model_registry_once_it_lands():
     """Overlap with #4770 / PR #4786: each feature names its registry route. Until
     `ai.model_routing` is on main this skips; the day it lands it checks every route
     exists and resolves to the same model the main-path attribute held."""
+    import importlib
+
     try:
         from ai import model_routing
     except ImportError:
         pytest.skip("ai.model_routing (#4770, PR #4786) is not on this branch yet")
     missing = [f.route for f in mse.FEATURES.values() if f.route not in model_routing.ROUTES]
     assert not missing, f"routes not in model_routing.ROUTES: {missing}"
+    drift = []
+    for f in mse.FEATURES.values():
+        mod, attr = f.main_default
+        held = getattr(importlib.import_module(mod), attr, None)
+        if held is None:
+            continue  # the registry retired the attribute: the route is the only source left
+        if mse.resolved(model_routing.model_for(f.route)) != mse.resolved(held):
+            drift.append((f.name, f.route, model_routing.model_for(f.route), held))
+    assert not drift, f"registry route disagrees with the main-path attribute: {drift}"
