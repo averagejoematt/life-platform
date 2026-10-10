@@ -200,8 +200,14 @@ def test_unit_tests_job_is_skipped_only_by_an_owner():
     assert "if" not in jobs["test"], "ci-cd `test` must stay unconditional (#4252 / #3608)"
     assert "test-owner" in jobs["test"]["needs"]
     assert jobs["test"]["with"]["owner_run"] == "${{ needs.test-owner.outputs.owner_run }}"
-    inner = _load(CI_CD.parent / "ci-test.yml")["jobs"]["test"]
-    assert inner.get("if") == "inputs.owner_run == ''", "ci-test.yml's Unit Tests must skip ONLY on an owner"
+    inner_jobs = _load(CI_CD.parent / "ci-test.yml")["jobs"]
+    # #4252 box 4: the suite runs in the `shard` legs; `test` (Unit Tests) combines them.
+    # The legs skip ONLY on an owner; the verdict job adds just `!cancelled()` so a red
+    # leg is still reported by it (tests/test_ci_test_shards_4252.py holds the rest).
+    assert inner_jobs["shard"].get("if") == "inputs.owner_run == ''", "ci-test.yml's shard legs must skip ONLY on an owner"
+    assert (
+        inner_jobs["test"].get("if") == "${{ !cancelled() && inputs.owner_run == '' }}"
+    ), "ci-test.yml's Unit Tests must skip ONLY on an owner (or a cancelled run)"
     for gated in ("test-critical", "plan", "deploy"):
         needs = jobs[gated].get("needs") or []
         assert "test-owner" not in (needs if isinstance(needs, list) else [needs]), f"{gated} must not wait on test-owner"

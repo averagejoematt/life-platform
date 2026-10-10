@@ -82,7 +82,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "ci::.github/workflows/ci-lint.yml::lint / Syntax check (py_compile)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-test.yml::test / Deprecated secrets scan": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-test.yml::test / Install test dependencies": "2026-09-05 seal (#3536)",
-    "ci::.github/workflows/ci-test.yml::test / Test coverage gate (regression floor, ADR-080)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/codeql.yml::analyze / Initialize CodeQL": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/codeql.yml::analyze / Perform CodeQL analysis": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/config-drift.yml::drift / Report the derived twin set": "2026-09-05 seal (#3536)",
