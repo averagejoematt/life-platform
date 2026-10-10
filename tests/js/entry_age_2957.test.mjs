@@ -159,3 +159,14 @@ test("nothing usable → empty strings; an unusable data-through cannot judge la
   assert.deepEqual(nextWeighInText("2026-09-21", undefined), { text: "the next weigh-in is due Tuesday, September 22", day: "2026-09-22" });
   for (const r of [nextWeighInText("2026-09-21", "2026-09-26"), nextWeighInText("2026-09-26", "2026-09-26")]) assert.doesNotMatch(r.text, /\d{4}-\d{2}-\d{2}/);
 });
+
+test("#4766 dayInWords prints the year for a date outside the current Pacific year", () => {
+  const now = new Date("2026-10-10T20:00:00Z");
+  assert.equal(dayInWords("2027-07-02", { now }), "Friday, July 2, 2027");
+  assert.equal(dayInWords("2027-09-18", { now }), "Saturday, September 18, 2027");
+  assert.equal(dayInWords("2027-09-18", { now, weekday: false }), "September 18, 2027");
+  assert.equal(dayInWords("2026-12-31", { now }), "Thursday, December 31");
+  // Pacific year, not UTC: 2027-01-01T03:00Z is still 2026-12-31 in Pacific.
+  assert.equal(dayInWords("2027-01-05", { now: new Date("2027-01-01T03:00:00Z") }), "Tuesday, January 5, 2027");
+  assert.equal(dayInWords("2026-12-31", { now: new Date("2027-01-01T03:00:00Z") }), "Thursday, December 31");
+});

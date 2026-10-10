@@ -53,12 +53,16 @@ export function entryAgeSuffix(dateStr, now = new Date()) {
 // (`{ weekday: false }` → "September 22"). Pinned to UTC noon so no viewer's offset can move
 // it a day — the same trick ptDaysAgo uses. "" when the date is unusable: an ISO string
 // never falls through to the reader.
-export function dayInWords(dateStr, { weekday = true } = {}) {
+// #4766 — a date outside the CURRENT Pacific year prints its year ("Friday, July 2, 2027"):
+// the goal projection's 2027 window must never read as past dates in October 2026. `now` is
+// injectable so the rule is testable.
+export function dayInWords(dateStr, { weekday = true, now = new Date() } = {}) {
   const iso = String(dateStr || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
   const d = new Date(_utcNoon(iso));
   if (isNaN(d.getTime())) return "";
-  const md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
+  let md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
+  if (d.getUTCFullYear() !== Number(PT_DAY.format(now).slice(0, 4))) md += `, ${d.getUTCFullYear()}`;
   return weekday ? `${d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" })}, ${md}` : md;
 }
 
