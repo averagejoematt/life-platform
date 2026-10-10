@@ -238,11 +238,6 @@ def daily_brief_shared_system(
     marker is silently ignored (prompt_cache.cache_floor(); ADR-049 2026-08-27).
     Re-enable ONLY if the stable prefix measures >= that floor on the wire — not
     on CacheRead>0. #2888 priced the whole prize at ~$0.8-1.1/mo regardless.
-    #4778: the decision and its wire measurement (530 tok minimal shape, Sonnet 4.6,
-    2026-10-10) live in prompt_cache.CACHING_DECISIONS["daily-brief"], whose floor is
-    DERIVED from the model this call resolves to — on a 512-floor 5.5 model the
-    prefix clears, and tests/test_prompt_cache_floor_derivation_4778.py reds until
-    it is re-measured there and re-decided.
     (coach-narrative-orchestrator DOES hit and keeps caching on.) This block is
     still built once and reused across the 4 calls for consistency.
     """
