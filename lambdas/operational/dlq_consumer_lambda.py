@@ -22,6 +22,16 @@ Why v2 (ADR-115):
   queue only after a *confirmed* re-invoke acceptance — a failed re-invoke is
   left on the queue to redrive, so the count keeps climbing rather than resetting.
 
+  #4731: a body hash still reset every DAY — each scheduled run is a new
+  EventBridge event (new `id`/`time`), so a function crashing the same way for
+  five days counted 1,2,3 then 1 again, and was re-invoked every 6 hours. The
+  ledger is now keyed by function + FAILURE SIGNATURE (the async-DLQ
+  `ErrorMessage` attribute, volatile tokens masked); once that row crosses the
+  threshold every further occurrence escalates (page + `LifePlatform/DLQ`
+  `DlqEscalation` EMF metric, dimensioned by FunctionName) and is never
+  re-invoked. Hand-made rules the role cannot list resolve via
+  NON_CDK_RULE_TARGETS instead of archiving as `fn=unknown`.
+
 Classification:
   TRANSIENT — timeout, throttle, transient API error → retry once via Lambda invoke
   PERMANENT — auth failure, missing resource, unretryable → escalate + archive to S3
@@ -56,6 +66,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -194,24 +205,80 @@ def classify_message(message: dict) -> str:
 # ── Stable identity + durable ledger (ADR-115) ──────────────────────────────────
 
 
-def stable_message_id(fn_name: str, body_str: str) -> str:
-    """A content-derived identity that is STABLE across the re-invoke → re-land
-    cycle.
+def function_short_name(fn_name: str | None) -> str:
+    """The bare function name, whatever form the resolver produced.
 
-    The SQS MessageId and ApproximateReceiveCount both reset when a failed
-    re-invoke lands a fresh async-DLQ message, so neither can anchor a durable
-    "failed N times" count. The message *body* (the original invocation event we
-    replay verbatim) is identical across those cycles, so hashing
-    function-name + body gives a key that persists in the ledger while SQS churns
-    the underlying message."""
+    The CDK-rule path resolves to a full function ARN
+    (`arn:aws:lambda:…:function:daily-metrics-compute`) while the non-CDK
+    rule map resolves to the bare name. Both are the SAME function, so the
+    failure ledger must key on one spelling or the same crash splits across two
+    rows that each stay under the threshold (#4731)."""
+    if not fn_name:
+        return ""
+    if ":function:" in fn_name:
+        fn_name = fn_name.split(":function:", 1)[1]
+    return fn_name.split(":", 1)[0]  # drop a :qualifier / :alias
+
+
+# Volatile tokens inside an error message (request ids, timestamps, counts) that
+# would give the same bug a fresh signature on every run.
+_SIG_VOLATILE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|0x[0-9a-f]+|\d+", re.IGNORECASE)
+_SIG_MAX = 300
+
+
+def failure_signature(message: dict) -> str:
+    """What failed, independent of WHICH invocation failed (#4731).
+
+    A Lambda async-DLQ message carries the failing invocation's error in its
+    SQS message attributes — `ErrorMessage` (the exception text, e.g.
+    "'>' not supported between instances of 'int' and 'str'") and `ErrorCode`.
+    The body is the original EventBridge event, whose `id`/`time` change on
+    every scheduled run, so a body hash can never see the 00:00Z crash, the
+    16:40Z crash and tomorrow's crash as the same failure. The error text can.
+
+    Digit runs / uuids / hex are masked so a count or request id inside the
+    message does not mint a new signature. Returns "" when the message carries
+    no error attribute (a hand-sent or non-Lambda message) — the caller then
+    falls back to the body identity."""
+    attrs = message.get("MessageAttributes") or {}
+    raw = ""
+    em = attrs.get("ErrorMessage")
+    if isinstance(em, dict):
+        raw = str(em.get("StringValue") or "")
+    if not raw:
+        return ""
+    sig = _SIG_VOLATILE.sub("#", raw.strip())
+    sig = re.sub(r"\s+", " ", sig)
+    return sig[:_SIG_MAX]
+
+
+def stable_message_id(fn_name: str, body_str: str, signature: str = "") -> str:
+    """A ledger identity that is STABLE across every recurrence of one failure.
+
+    With a failure `signature` (the normal Lambda async-DLQ case) the identity
+    is function + signature (#4731): the same crash on a NEW scheduled event —
+    a fresh SQS MessageId AND a fresh body (`id`/`time`) — lands on the same
+    ledger row, so `cumulative_attempts` keeps climbing across message ids and
+    across days, and the threshold escalation stops the 6-hourly re-invoke.
+
+    Without a signature it falls back to function + body: the SQS MessageId and
+    ApproximateReceiveCount both reset when a failed re-invoke lands a fresh
+    async-DLQ message, but the body we replay verbatim is identical across those
+    cycles (ADR-115)."""
     h = hashlib.sha256()
+    if signature:
+        h.update(b"sig\n")
+        h.update((function_short_name(fn_name) or "unknown").encode("utf-8"))
+        h.update(b"\n")
+        h.update(signature.encode("utf-8"))
+        return h.hexdigest()[:32]
     h.update((fn_name or "unknown").encode("utf-8"))
     h.update(b"\n")
     h.update((body_str or "").encode("utf-8"))
     return h.hexdigest()[:32]
 
 
-def record_failure(stable_id: str, fn_name: str, receive_count: int, body_str: str) -> int:
+def record_failure(stable_id: str, fn_name: str, receive_count: int, body_str: str, signature: str = "") -> int:
     """Atomically add this failure occurrence to the durable ledger and return
     the NEW cumulative attempt count.
 
@@ -232,7 +299,7 @@ def record_failure(stable_id: str, fn_name: str, receive_count: int, body_str: s
             UpdateExpression=(
                 "ADD attempts :inc "
                 "SET fn_name = :fn, last_seen = :now, last_receive_count = :rc, "
-                "body_preview = :bp, #t = :ttl, first_seen = if_not_exists(first_seen, :now)"
+                "body_preview = :bp, failure_signature = :sig, #t = :ttl, first_seen = if_not_exists(first_seen, :now)"
             ),
             ExpressionAttributeNames={"#t": "ttl"},
             ExpressionAttributeValues={
@@ -241,6 +308,7 @@ def record_failure(stable_id: str, fn_name: str, receive_count: int, body_str: s
                 ":now": now_iso,
                 ":rc": Decimal(int(receive_count)),
                 ":bp": (body_str or "")[:500],
+                ":sig": signature or "",
                 ":ttl": Decimal(now + LEDGER_TTL_SECONDS),
             },
             ReturnValues="UPDATED_NEW",
@@ -272,6 +340,34 @@ def mark_escalated(stable_id: str) -> None:
 # message within a single run (the same scheduled rule produces many DLQ msgs).
 _rule_fn_cache: dict[str, str | None] = {}
 
+# Non-CDK EventBridge rules (created by hand, outside `cdk/stacks/`) whose
+# failures land on this DLQ. The consumer's `ResolveRuleTarget` grant is scoped
+# to `rule/LifePlatform*`, so `ListTargetsByRule` on these is AccessDenied and
+# the 16:40Z `daily-metrics-compute` crash archived as `fn=unknown` for five
+# days without a single retry (#4731). Read live 2026-10-10 with
+# `aws events list-targets-by-rule` (read-only); every entry has exactly one
+# Lambda target and no custom Input, so the DLQ body is the plain scheduled
+# event. Deliberately ONLY the idempotent compute chain — the email rules
+# (daily-brief-schedule, weekly-digest-sunday, …) are left unresolved so a
+# failed send is escalated, never silently re-sent. Pinned against
+# `ci/lambda_map.json` by tests/test_dlq_recurring_failure_4731.py.
+NON_CDK_RULE_TARGETS: dict[str, str] = {
+    "character-sheet-compute": "character-sheet-compute",
+    "adaptive-mode-compute": "adaptive-mode-compute",
+    "daily-metrics-compute": "daily-metrics-compute",
+    "daily-insight-compute": "daily-insight-compute",
+    "hypothesis-engine-weekly": "hypothesis-engine",
+}
+
+
+def rule_names(body_obj: dict) -> list[str]:
+    """The EventBridge rule names an event body names in `resources`."""
+    out = []
+    for arn in body_obj.get("resources") or []:
+        if isinstance(arn, str) and ":rule/" in arn:
+            out.append(arn.split(":rule/", 1)[1])
+    return out
+
 
 def _function_from_eventbridge(body_obj: dict) -> str | None:
     """Resolve the target Lambda for an EventBridge-triggered async failure.
@@ -279,12 +375,13 @@ def _function_from_eventbridge(body_obj: dict) -> str | None:
     A Lambda async-DLQ message is the *original invocation event*, not a wrapper
     — so for scheduled ingestion the function name isn't in the payload. But the
     EventBridge event carries the triggering rule ARN in `resources`, and the
-    rule has exactly one Lambda target. Look it up dynamically rather than
-    hard-coding a rule→function map (which would rot as stacks change)."""
-    for arn in body_obj.get("resources") or []:
-        if ":rule/" not in arn:
-            continue
-        rule_name = arn.split(":rule/", 1)[1]
+    rule has exactly one Lambda target. A known non-CDK rule resolves from
+    NON_CDK_RULE_TARGETS (the role cannot list its targets); every CDK rule is
+    looked up dynamically rather than hard-coded (that map would rot as stacks
+    change)."""
+    for rule_name in rule_names(body_obj):
+        if rule_name in NON_CDK_RULE_TARGETS:
+            return NON_CDK_RULE_TARGETS[rule_name]
         if rule_name in _rule_fn_cache:
             return _rule_fn_cache[rule_name]
         target = None
@@ -425,15 +522,23 @@ def page_operator(escalations: list[dict]) -> None:
             f"msg={str(e.get('message_id', '?'))[:16]} "
             f"archive={e.get('s3_key', '')}"
         )
+        if e.get("signature"):
+            lines.append(f"    failure: {str(e['signature'])[:200]}")
     lines.append("")
     lines.append("These are permanently-failing or repeatedly-failing messages, archived to S3.")
+    lines.append("A threshold escalation is NOT re-invoked: the same failure keeps escalating until the function is fixed.")
     lines.append("DLQ: life-platform-ingestion-dlq")
     body = "\n".join(lines)
+
+    # #4731: the subject names the failing function(s) — a page that reads
+    # "1 DLQ failure(s) escalated" every 6 hours is indistinguishable from noise.
+    fns = sorted({str(e.get("function_name") or "unknown") for e in escalations})
+    subject = f"[LP URGENT] DLQ: {', '.join(fns)} failing ({count} escalated)"
 
     try:
         sns.publish(
             TopicArn=ALERTS_TOPIC_ARN,
-            Subject=f"[LP URGENT] {count} DLQ failure(s) escalated"[:100],
+            Subject=subject[:100],
             Message=body,
         )
         logger.info(f"  🚨 Paged operator via SNS: {count} escalation(s)")
@@ -518,15 +623,19 @@ def process_message(msg: dict, stats: dict, escalations: list[dict]) -> None:
     body_str = msg.get("Body", "")
     fn_name = extract_function_name(msg)
     retryable = fn_name is not None
-    fn_label = fn_name or "unknown"
+    fn_label = function_short_name(fn_name) or _unresolved_label(body_str)
 
-    stable_id = stable_message_id(fn_label, body_str)
-    attempts = record_failure(stable_id, fn_label, receive_count, body_str)
+    # #4731: key the ledger on function + failure signature, so the same crash
+    # on a new message id (a new scheduled event) accumulates on one row.
+    signature = failure_signature(msg)
+    stable_id = stable_message_id(fn_label, body_str, signature)
+    attempts = record_failure(stable_id, fn_label, receive_count, body_str, signature)
     classification = classify_message(msg)
 
     logger.info(
         f"Processing {msg_id} (fn={fn_label}, receive_count={receive_count}, "
-        f"cumulative_attempts={attempts}, class={classification}, retryable={retryable})"
+        f"cumulative_attempts={attempts}, class={classification}, retryable={retryable}, "
+        f"signature={signature[:80] or '-'})"
     )
 
     # Escalate on: an explicitly-permanent classification, an unretryable message
@@ -555,17 +664,69 @@ def process_message(msg: dict, stats: dict, escalations: list[dict]) -> None:
     stats["escalated"] += 1
     s3_key = archive_to_s3(msg, reason, retry_attempted=False, attempts=attempts)
     mark_escalated(stable_id)
+    emit_escalation_metric(fn_label, reason, attempts)
     escalations.append(
         {
             "message_id": msg_id,
             "function_name": fn_label,
             "attempts": attempts,
             "classification": reason,
+            "signature": signature,
             "body": body_str,
             "s3_key": s3_key,
         }
     )
     _delete(msg, msg_id)
+
+
+def _unresolved_label(body_str: str) -> str:
+    """Name an unresolvable message by its triggering rule rather than
+    `unknown`, so an escalation still tells the operator WHERE it came from."""
+    try:
+        body = json.loads(body_str or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return "unknown"
+    if isinstance(body, dict):
+        names = rule_names(body)
+        if names:
+            return f"rule/{names[0]}"
+    return "unknown"
+
+
+# CloudWatch Embedded Metric Format: a structured stdout line CloudWatch Logs
+# turns into a metric — no cloudwatch:PutMetricData grant needed (the consumer
+# role has none), so this ships without a CDK/IAM change.
+EMF_NAMESPACE = "LifePlatform/DLQ"
+ESCALATION_METRIC = "DlqEscalation"
+
+
+def escalation_metric_doc(fn_label: str, reason: str, attempts: int, timestamp_ms: int | None = None) -> dict:
+    """One EMF record per escalation, dimensioned by the function name (#4731)."""
+    return {
+        "_aws": {
+            "Timestamp": int(timestamp_ms if timestamp_ms is not None else time.time() * 1000),
+            "CloudWatchMetrics": [
+                {
+                    "Namespace": EMF_NAMESPACE,
+                    # Per function (the alarmable series) + one dimensionless
+                    # aggregate (the ops dashboard's DLQ widget reads it).
+                    "Dimensions": [["FunctionName"], []],
+                    "Metrics": [{"Name": ESCALATION_METRIC, "Unit": "Count"}],
+                }
+            ],
+        },
+        "FunctionName": fn_label or "unknown",
+        ESCALATION_METRIC: 1,
+        "Reason": reason,
+        "CumulativeAttempts": int(attempts),
+    }
+
+
+def emit_escalation_metric(fn_label: str, reason: str, attempts: int) -> None:
+    try:
+        print(json.dumps(escalation_metric_doc(fn_label, reason, attempts)))
+    except Exception as e:  # noqa: BLE001 — a metric line must never block the escalation
+        logger.error(f"  escalation metric emit failed: {e}")
 
 
 def _delete(msg: dict, msg_id: str) -> None:
