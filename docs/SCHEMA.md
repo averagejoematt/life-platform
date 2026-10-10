@@ -695,6 +695,8 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 
 **Delete tombstones** (`sk = DELETE#WORKOUT#<id>`, written by `hevy_backfill_lambda.py` on Hevy deleted-events): `tombstone: true`, `tombstoned_at`, `tombstoned_reason: "hevy_event_delete"`. Reconciled by the next audit pass (the date isn't known at delete time).
 
+**Event failure streak / quarantine** (`pk = USER#system`, `sk = INGESTION_QUARANTINE#hevy#WORKOUT#<id>` — beside the `INGESTION_STATE#hevy` cursor, NOT in the hevy source partition; #4643, written by `hevy_backfill_lambda.py` when one feed event fails to process): `workout_id`, `event_type`, `fail_count` (consecutive failing runs), `first_failed_at`, `last_failed_at`, `last_error`, `quarantined` (true from `HEVY_QUARANTINE_AFTER`, default 3, runs), `quarantined_at`. While `quarantined` is false the event holds the `since` cursor; once true it no longer does. Deleted when the event next processes cleanly. It is kept out of the source partition because sorting after `DATE#` does NOT hide a row from an open-ended `sk >= DATE#…` query — that query returns every later sk, and a projected read then sees it as an empty item (`routine_title._query_performed` counted the `DELETE#WORKOUT#` tombstones above as sessions that way until #4643 closed its range at `DATE#~`).
+
 ### macrofactor
 | Field | Type | Description |
 |-------|------|-------------|

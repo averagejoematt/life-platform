@@ -237,6 +237,15 @@ def _get_this_weeks_installment() -> dict | None:
                 installment.get("delivered_at"),
             )
             return None
+        # #4593: a publish path that declined delivery stamped the decision on the row
+        # (chronicle_approve_lambda.publish_side_effects) — the cron must not send it anyway.
+        if installment.get("delivery_decision") == "no-send":
+            logger.info(
+                "Most recent Chronicle installment (week %s) carries a no-send decision (%s) — no-op",
+                _fmt_week(installment.get("week_number", "?")),
+                installment.get("delivery_decision_reason", ""),
+            )
+            return None
         return installment
     except Exception as exc:
         logger.error("Failed to query Chronicle DDB: %s", exc)

@@ -195,7 +195,19 @@ def _render_monthly_digest():
         return [{"total_score": 74 + (i % 6) * 3, "group_scores": {"body": 78, "mind": 71, "craft": 69}} for i, d in enumerate(days)]
 
     def hevy_list(days):
-        return [{"workouts": [{"title": "Push A", "total_volume_lbs": 14200 + i * 50}]} for i, d in enumerate(days[:8])]
+        # #4636: one stored Hevy row IS one workout (sk DATE#<d>#WORKOUT#<id>, set weights in kg) —
+        # the monthly extractor reads that shape now, not a per-day nested `workouts` list. One set
+        # of (volume) lb x 1 rep keeps each session's tonnage at the golden's 14,200 + 50i lb.
+        return [
+            {
+                "sk": f"DATE#{d}#WORKOUT#w{i}",
+                "date": d,
+                "source_workout_id": f"w{i}",
+                "title": "Push A",
+                "exercises": [{"name": "Bench Press (Barbell)", "sets": [{"weight_kg": (14200 + i * 50) * 0.45359237, "reps": 1}]}],
+            }
+            for i, d in enumerate(days[:8])
+        ]
 
     def strava_list(days):
         return [

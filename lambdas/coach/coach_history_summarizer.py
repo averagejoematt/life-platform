@@ -81,6 +81,7 @@ from coach.stance_lint import (  # noqa: F401 — #4217: the lint moved out (mod
     claims_change as _claims_change,
     contains_raw_vitals as _contains_raw_vitals,
     keep_plain as _keep_plain,
+    keep_plain_aside as _keep_plain_aside,
     retry_is_better as _retry_is_better,
     self_correction as _self_correction,
     vital_hits as _vital_hits,
@@ -1437,7 +1438,8 @@ def _write_stance(coach_id, stance):
     # the model actually wrote (the #1699 behavioral class reads second-person slips).
     stance = dict(stance, headline_read=audience_guard.reader_safe(stance.get("headline_read"), coach_id, logger) or "")
     # #4649: the watch list is printed word for word, so only its plain items are stored (coach.plain_words).
-    stance["focused_on_now"] = _keep_plain(stance, coach_id, logger)
+    aside = _keep_plain_aside(stance)  # #4714: the set-aside list is printed too
+    stance["focused_on_now"], stance["set_aside_for_now"] = _keep_plain(stance, coach_id, logger), aside
     date = stance.get("as_of")
     ok_hist = _put_item({"pk": f"COACH#{coach_id}", "sk": f"STANCE#{date}", **stance})
     ok_latest = _put_item({"pk": f"COACH#{coach_id}", "sk": "STANCE#latest", **stance})

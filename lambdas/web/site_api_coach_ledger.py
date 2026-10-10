@@ -28,6 +28,7 @@ from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
+    plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
@@ -463,6 +464,25 @@ def _fetch_prediction_partition(coach_pk, *, _g):
     that to [] so a single bad partition degrades exactly as it did before."""
     _query_partition = _g["_query_partition"]
     return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
+
+
+#: #4701: the `_parallel_fetch` job key /api/predictions reads instrument presence under.
+#: Not a short coach id, so it can never collide with a partition key.
+PRESENCE_JOB = "__instrument_presence__"
+
+
+def _instrument_presence_safe(*, _g):
+    """`health.instrument_presence.absent_coaches` — the SAME derivation every other
+    claim-sourcing route reads — fail-open (#4217): a sentinel read failing must not take
+    the ledger down, it only means nothing is held. Never raises, so as a `_parallel_fetch`
+    job it can never be counted as a failed coach partition."""
+    try:
+        from health import instrument_presence as _presence
+
+        return _presence.absent_coaches(_g["table"])
+    except Exception as _pe:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument presence check failed (fail-open): {_pe}")
+        return {}
 
 
 def _parallel_fetch(jobs, *, failures=None):
@@ -927,6 +947,9 @@ def handle_predictions(event, *, _g):
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
         coach_filter = qs.get("coach_id", "")
+        # #4714: the coach page's "Next" list is the one request of this shape (ck_coach.js asks
+        # `?coach_id=<id>&status=pending`); only it is held to the plain-words rule below.
+        coach_page_pending = status_filter == "pending" and bool(coach_filter)
         # #2658: `int()` on an unvalidated param raised straight into the handler-wide
         # `except` below, which answered 200 with an empty ledger — a swallowed error
         # rendered as "the coaches have made no predictions" (ADR-104). Reject the bad
@@ -950,10 +973,19 @@ def handle_predictions(event, *, _g):
         # #1527: fetch every scanned coach's partition concurrently up front —
         # the loop below stays purely computational.
         _fetch_failures: list = []
-        fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches},
-            failures=_fetch_failures,
-        )
+        _jobs = {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+        # #4701: the instrument-presence read rides the SAME concurrent round as the
+        # partitions (8 coaches + 1 = the pool's 9 workers, one wave), so the #4673 hold
+        # costs this #1527-guarded path no serial round trip. It never raises.
+        _jobs[PRESENCE_JOB] = lambda: _instrument_presence_safe(_g=_g)
+        fetched = _parallel_fetch(_jobs, failures=_fetch_failures)
+        # #4701: the sourcing hold every other route that quotes a dated coach claim
+        # applies (web.claim_sourcing, #4673). A row whose words cite an instrument that
+        # had sent no reading by the day they were said keeps its date and its place in
+        # the record; its `text` is "" and `unsourced` says why. Before this the call
+        # page withheld a claim this ledger still quoted.
+        _dark = claim_sourcing.dark_instruments(fetched.pop(PRESENCE_JOB, None) or {})
+        _fetch_failures[:] = [f for f in _fetch_failures if f != PRESENCE_JOB]
         # #2658: `_parallel_fetch` catches each partition error individually, so a total
         # outage never reached the handler-wide guard below — it produced a fully zeroed
         # scorecard at HTTP 200, which is the exact "absence rendered as zero" this issue
@@ -1052,13 +1084,29 @@ def handle_predictions(event, *, _g):
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
+                    # #4714: the plain-words rule applies to ONE list only — the coach page's "Next" (the only
+                    # caller asking for one coach's pending calls), never the full ledger (status=all, the
+                    # method/prediction pages). There, an in-cycle pending call a friend could not read is not
+                    # listed (it is still counted above, so the scorecard keeps the row). A SEALED pre-registered
+                    # bet is never hidden: it was frozen before the experiment began, so it is served whatever its
+                    # length, and only the jargon half of the rule labels it (`reader_plain: False`) for the page.
+                    _plain_label = None
+                    if coach_page_pending and p_status == "pending":
+                        _claim = rec.get("claim_natural")
+                        if rec.get("pre_registered"):
+                            _plain_label = not plain_words.specialist_terms(_claim)
+                        elif not plain_words.is_plain(_claim, plain_words.CALL_MAX_CHARS):
+                            continue
+
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
+                    _said = rec.get("claim_natural", "")
+                    _held = claim_sourcing.unsourced([_said], claim_sourcing.claim_day(rec), _dark) if _dark else None
                     all_predictions.append(
                         {
                             "coach_id": cid,
                             "coach_name": _pred_coach_names[cid],
                             "retired": cid in _RETIRED_SHORT_IDS,
-                            "text": rec.get("claim_natural", ""),
+                            "text": "" if _held else _said,  # #4701: held words are removed, never edited
                             "confidence": rec.get("confidence", "medium"),
                             "status": p_status,
                             "date": rec.get("created_date", ""),
@@ -1084,6 +1132,11 @@ def handle_predictions(event, *, _g):
                             "reason": _reason,
                             "graded_on_data": _graded_on_data,
                             "subdomain": rec.get("subdomain", ""),
+                            # #4701: present only on a held row — the same note shape the docket,
+                            # call and coach routes serve (reason, instrument, last_seen, said_on, text).
+                            **({"unsourced": _held} if _held else {}),
+                            # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
+                            **({"reader_plain": False} if _plain_label is False else {}),
                         }
                     )
             except Exception as _qe:
