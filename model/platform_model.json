@@ -2806,6 +2806,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/emails/panelcast_desk.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "partner-weekly-email",
       "module": "lambdas/emails/partner_email_lambda.py",
@@ -7598,7 +7605,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 736,
+      "edges": 737,
       "lambdas": 107,
       "mcp_tool_modules": 35,
       "mcp_tools": 87,
@@ -7613,8 +7620,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 360,
-        "sites_resolved": 919,
-        "sites_total": 1279
+        "sites_resolved": 922,
+        "sites_total": 1282
       },
       "schedule_resolution": {
         "dynamic": 0,
