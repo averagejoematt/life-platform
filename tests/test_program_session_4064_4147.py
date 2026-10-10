@@ -673,3 +673,16 @@ def test_4503_od5_gains_are_rep_triggered_with_no_nutrition_clause_and_protein_g
     prot = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "protein_floor_missed")
     assert green_block.GREEN_BLOCKED_BY == (prot["id"],)
     assert "🟢 block is withheld" in prot["action"] and "NOT blocked" in prot["action"] and "does not grow" not in prot["action"]
+
+
+def test_4503_od4_the_volume_ceiling_tripwire_reads_the_v05_session_ceiling_not_v04s_18():
+    """The `volume_ceiling` tripwire the planner embeds still said `sets_per_session: 18` and "the generator's own
+    `session_set_ceiling` (18)" after OD4 moved the generator to 20 base / 24 with 🟢 — a leftover v0.4 number. It now
+    reads `green_block`'s constants, so the tripwire and the generator cannot disagree again."""
+    from training import green_block
+
+    ceiling = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "volume_ceiling")
+    grid_ceiling = program_structure.week_grid()["session_set_ceiling"]
+    assert ceiling["threshold"]["sets_per_session"] == green_block.BASE_SESSION_SET_CEILING == grid_ceiling == 20
+    assert ceiling["threshold"]["sets_per_session_with_green"] == green_block.GREEN_SESSION_SET_CEILING == 24
+    assert "(18)" not in ceiling["note"] and "green_block" in ceiling["note"]
