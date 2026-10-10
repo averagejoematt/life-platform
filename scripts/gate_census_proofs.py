@@ -3284,3 +3284,36 @@ CI_PROOFS["ci::ci-test.yml::test::6"] = {
     ),
     "proved_on": "2026-10-09",
 }
+# ── #4770 (2026-10-10): the model-routing guard's dated exemption ─────────────────────────
+# tests/test_model_routing_4770.py::_EXEMPT spares one file from the derivation guard (no model
+# choice outside lambdas/ai/model_routing.py). The entry was deleted, alone, on the lane branch
+# and the guard WATCHED naming that file; restoring it re-greened it. The two #4769 callers
+# (horizons_retrospective, broadcast_sensitivity_gate) were exempt until #4784 gave them mapped
+# names; on the restack onto it they moved onto their ROUTES rows and their exemptions left.
+_MODEL_ROUTING_SUITE = "python3 -m pytest tests/test_model_routing_4770.py -q -p no:cacheprovider"
+_MODEL_ROUTING_SPARED_FILES = {
+    "lambdas/ai/prompt_cache.py": (
+        "prompt_cache.py:143 model literal 'us.anthropic.claude-haiku-4-5-20251001-v1:0'",
+        "and :159 (the two CACHING_DECISIONS measurement records)",
+    ),
+}
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/test_model_routing_4770.py::_EXEMPT::{path}": {
+            "gate_name": f"_EXEMPT[{path}]",
+            "command": _MODEL_ROUTING_SUITE,
+            "mutation": f"the `{path}` entry's own line(s) deleted from _EXEMPT, nothing else changed.",
+            "observed": (
+                f"MUTATED: 1 failed, 14 passed — test_no_runtime_module_chooses_a_model_outside_the_registry naming "
+                f"{hit} {more}. REVERTED: 15 passed. Both watched 2026-10-10 on issue-4770-model-routing-registry."
+            ),
+            "scope": (
+                "Keyed by PATH and spares the WHOLE file, not one line; the stale direction is "
+                "test_every_exemption_is_dated_reasoned_and_still_needed (a file that is gone, or an exemption list "
+                "that grows past one, reds)."
+            ),
+            "proved_on": "2026-10-10",
+        }
+        for path, (hit, more) in _MODEL_ROUTING_SPARED_FILES.items()
+    }
+)

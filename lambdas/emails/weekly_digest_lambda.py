@@ -40,7 +40,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+from ai.model_routing import model_for  # #4770: the one model registry
 from common import digest_utils, send_ledger  # shared query_range impls (#970); the DIL-025 replay guard (#3113)
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -811,7 +811,7 @@ def call_haiku(data, profile):
 
     payload = json.dumps(
         {
-            "model": os.environ.get("AI_MODEL", NARRATIVE_MODEL),
+            "model": model_for("weekly_digest"),
             "max_tokens": 1500,
             "messages": [{"role": "user", "content": prompt}],
         }

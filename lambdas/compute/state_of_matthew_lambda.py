@@ -76,7 +76,9 @@ CALIBRATION_PK = f"{USER_PREFIX}calibration"
 AI_ANALYSIS_PK = f"{USER_PREFIX}ai_analysis"
 
 BUDGET_FEATURE = "state_of_matthew"
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("state_of_matthew")
 MAX_TOKENS = 420
 
 # The operational roster, registry-derived (coaching-team v2) — the same map

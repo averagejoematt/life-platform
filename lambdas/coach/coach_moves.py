@@ -35,12 +35,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
-from ai.model_defaults import NARRATIVE_MODEL
+from ai.model_routing import model_for  # #4770: the one model registry
 
 from coach import coach_moves_sheet as sheet_mod
 
@@ -50,8 +49,8 @@ LEAD_ID = "eli_marsh"  # persona_registry.LEAD_PERSONA_ID — the board's day li
 PK = f"COACH#{LEAD_ID}"
 SK_PREFIX = "MOVES#"
 BUDGET_FEATURE = "coach_narrative"
-CAST_MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")  # structured choice
-LINE_MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)  # the line itself (narrative tier)
+CAST_MODEL = model_for("coach_narrative.moves_cast")  # structured choice
+LINE_MODEL = model_for("coach_narrative.moves_line")  # the line itself (narrative tier)
 MAX_SPEAKERS = 3
 CAST_MAX_TOKENS = 500
 LINE_MAX_TOKENS = 160

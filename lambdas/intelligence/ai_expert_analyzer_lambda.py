@@ -96,7 +96,9 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
-AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL = model_for("expert_analyzer")
 
 # #2334: derived from the persona registry; EXPERT_PERSONAS coverage asserted in the set guard.
 # #3018: the integrator's public-audience register, guarded like #2972's public_summary.

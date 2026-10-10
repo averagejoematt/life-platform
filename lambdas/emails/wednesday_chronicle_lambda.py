@@ -49,7 +49,9 @@ RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 # #548: Margaret Calloway's red pen — the Haiku model for her critique + revision
 # calls (kept cheap and separate from Elena's Sonnet narrative voice, ADR-063 budget).
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("chronicle")
 
 # FEAT-12: Preview-before-publish workflow.
 # When PREVIEW_MODE=true (default), the Chronicle is stored as a draft in DynamoDB

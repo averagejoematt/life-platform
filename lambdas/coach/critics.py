@@ -75,7 +75,9 @@ CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_hi
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
 
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+HAIKU_MODEL = model_for("plan_critics")
 MAX_TOKENS = 240  # one JSON object with one ≤200-char sentence; measured, not guessed: ~120 tok typical
 BUDGET_FEATURE = "plan_critics"
 

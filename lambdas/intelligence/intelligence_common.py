@@ -1624,7 +1624,9 @@ Rules:
 - If nothing fits a field, use empty list or "observing" default."""
 
     try:
-        model = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+        from ai.model_routing import model_for  # #4770: the one model registry
+
+        model = model_for("coach_thread_extract")
         body = {"model": model, "max_tokens": 500, "messages": [{"role": "user", "content": prompt}]}
 
         # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).

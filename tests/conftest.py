@@ -234,6 +234,8 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_rate_limit_identity_1221.py",  # #1221: AST sweep — no handler may derive its own client identity
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
+        "test_model_routing_4770.py",  # #4770: glob sweep of lambdas/ + mcp/ — no model literal, model env read or model_defaults import outside ai/model_routing.py
+        "test_invoke_model_names_resolve_4769.py",  # #4769: glob sweep — every statically-known model_name= under lambdas/ + mcp/ resolves at the Bedrock chokepoint
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
         "test_upstream_changes_4638.py",  # #4638: rglob sweep — a new Apple Health rebuild-a-day caller falsifies the stated upstream_changes facet
         "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted

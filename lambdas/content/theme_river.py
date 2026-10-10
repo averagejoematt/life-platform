@@ -42,7 +42,9 @@ WARMING_UP_MIN_DAYS = 14
 # Provenance defaults for the honest empty/offline baseline. Keep in sync with
 # journal_enrichment_lambda.MODEL / SCHEMA_VERSION — the --live build overrides
 # both from the flourishing partition's stored provenance (data-driven).
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import default_model_for  # noqa: E402 — #4770: the one model registry
+
+DEFAULT_MODEL = default_model_for("journal_enrichment")  # the enrichment model, without its runtime env override
 DEFAULT_SCHEMA_VERSION = 2
 
 ARTIFACT_SCHEMA = "theme_river/1"

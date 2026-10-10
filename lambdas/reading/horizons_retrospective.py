@@ -145,8 +145,12 @@ def _extract_text(resp: dict) -> str:
 def _default_invoker(body: dict) -> dict:
     """Production invoker: the single Bedrock chokepoint (ADR-062), narrative tier."""
     from ai import bedrock_client
+    from ai.model_routing import model_for
 
-    return bedrock_client.invoke(body, model_name="sonnet")
+    # #4769: this passed the bare name "sonnet", which `resolve_model_id` has rejected with
+    # UnknownModelError since #4306 — so no retrospective could generate. Route
+    # `horizons_retrospective` (#4770) resolves to the narrative tier, NARRATIVE_MODEL (Sonnet).
+    return bedrock_client.invoke(body, model_name=model_for("horizons_retrospective"))
 
 
 def _default_offtopic_classifier(text: str):

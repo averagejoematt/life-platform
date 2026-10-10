@@ -54,7 +54,9 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("coach_narrative.state_update")
 
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)

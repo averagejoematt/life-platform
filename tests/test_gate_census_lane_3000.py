@@ -509,7 +509,8 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 781  # 779 -> 781 (2026-10-10, #4252 box 4 the Unit Tests shard legs, on top of #4270): TWO entrants,
+BASELINE_TOTAL_GATES = 782  # 781 -> 782 (2026-10-10, #4770 the model-routing registry): ONE entrant, registry::tests/test_model_routing_4770.py::_EXEMPT::lambdas/ai/prompt_cache.py, PROVEN on arrival (REGISTRY_PROOFS; entry deleted -> 1 failed naming prompt_cache.py, restored 15 passed). Nothing leaves; the two #4769 callers resolve through ROUTES rows, so no exemption of theirs enters. MEASURED by id-set diff (scripts/gate_census.py --json) vs a `git archive origin/main` export at 16dcddf20: main 781 {257, 512, 7, 5} -> lane 782 {258, 512, 7, 5}; unproven stays 512.
+# PRIOR: 781  # 779 -> 781 (2026-10-10, #4252 box 4 the Unit Tests shard legs, on top of #4270): TWO entrants,
 # both PROVEN on arrival (CI_PROOFS in scripts/gate_census_proofs.py, each step's own run body executed + mutated):
 # `ci::ci-test.yml::shard::3` (shard / Install test dependencies) and `ci::ci-test.yml::shard::4` (shard / Coverage
 # pass — this leg's share of tests/). The suite moved from the `test` job into a 3-leg `shard` matrix; `test` keeps its

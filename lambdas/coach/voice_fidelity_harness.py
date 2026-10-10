@@ -89,7 +89,9 @@ logger.setLevel(logging.INFO)
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("voice_fidelity")
 
 SCOREBOARD_PK = "VOICEFIDELITY#scoreboard"
 SAMPLES_PER_COACH = 2

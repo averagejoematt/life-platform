@@ -23,7 +23,9 @@ import re
 from typing import Any, Callable, Dict, List, Optional
 
 from ai import structured_json  # the shared JSON seam (#4276)
-from ai.model_defaults import NARRATIVE_MODEL as DESK_MODEL  # noqa: E402 — the one narrative default (#4275/#4278)
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+DESK_MODEL = model_for("story.desk")
 
 from content import story_checks, story_ledger
 
