@@ -28,6 +28,8 @@ Architecture (verified against live API + OpenAPI 2026-05-25):
           (USER#system / INGESTION_QUARANTINE#hevy#WORKOUT#<id>) and stops
           holding the cursor (#4643)
         → a 401/403 latches the shared auth breaker for 24h (#4643)
+    Daily {"reconcile": true} (#4643 box 2): GET /v1/workouts/count vs the stored,
+    non-tombstoned workout rows → MissingActivityCount{Source=hevy}; read-only.
 
 Idempotent: same workout id → upsert, no dupe. Page-based pagination
 (NOT cursor) because Hevy's API uses that shape.
@@ -53,6 +55,7 @@ from training.hevy_common import (
     _table,
     archive_raw,
     fetch_events_page,
+    fetch_workout_count,
     load_since,
     normalize_workout,
     resolve_tombstones,
@@ -413,6 +416,169 @@ def reextract_training_notes(days: int) -> dict:
     return out
 
 
+# ── #4643 box 2: the daily vendor-count reconcile ─────────────────────────────────────
+# Every other Hevy check reads only the store (the liveness sentinel, the 7-day
+# `stale_hours` facet), so a workout the events feed never delivered — or one a
+# quarantine let the cursor walk past — is invisible to all of them. Hevy's API has a
+# one-call count (GET /v1/workouts/count), so this compares the vendor's all-time count
+# with the stored, non-tombstoned workout rows and emits
+# LifePlatform/IngestReconciliation::MissingActivityCount{Source=hevy} (alarmed in
+# monitoring_stack, the strava/whoop idiom). Opt-in via the hevy `provider_reconcile`
+# facet; scheduled by the HevyReconciliation rule in ingestion_stack.
+#
+# READ-ONLY on the store AND the vendor: it writes no row, no health record, no cursor
+# and no breaker marker (an auth failure here is left for the hourly poll to latch).
+# A count is a weaker witness than an id diff — one missing workout and one stale extra
+# row cancel — but it is one call against an unpaginated history of hundreds of
+# workouts, and the store-only surplus is reported in the body so a cancellation leaves
+# a trace.
+RECONCILE_NAMESPACE = "LifePlatform/IngestReconciliation"
+RECONCILE_METRIC = "MissingActivityCount"
+#: Pages of the events feed read past the cursor to discount in-flight changes. The
+#: cursor is normally under an hour old, so page 1 is almost always the whole answer.
+RECONCILE_PENDING_MAX_PAGES = 5
+
+
+def _stored_workout_ids() -> set[str]:
+    """Distinct Hevy workout ids with a live stored row.
+
+    A live row is a `DATE#<day>#WORKOUT#<id>` sk (the bare `DATE#<day>` rows are legacy
+    daily aggregates, not workouts) that is not `tombstone=true` and whose id has no
+    UNRESOLVED `DELETE#WORKOUT#<id>` marker — a pending delete is already gone from the
+    vendor's count, so counting its row would hide a real drop.
+    """
+    from boto3.dynamodb.conditions import Key
+
+    pk = f"USER#{USER_ID}#SOURCE#{SOURCE}"
+    ids: set[str] = set()
+    kwargs: dict = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+        "ProjectionExpression": "sk, #tomb",
+        "ExpressionAttributeNames": {"#tomb": "tombstone"},
+    }
+    while True:
+        resp = _table.query(**kwargs)
+        for it in resp.get("Items", []):
+            sk = str(it.get("sk", ""))
+            if "#WORKOUT#" not in sk or it.get("tombstone"):
+                continue
+            wid = sk.split("#WORKOUT#", 1)[1]
+            if wid:
+                ids.add(wid)
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+
+    prefix = "DELETE#WORKOUT#"
+    kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(prefix), "ProjectionExpression": "sk, resolved_at"}
+    while True:
+        resp = _table.query(**kwargs)
+        for it in resp.get("Items", []):
+            if not it.get("resolved_at"):
+                ids.discard(str(it.get("sk", ""))[len(prefix) :])  # noqa: E203
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return ids
+
+
+def _pending_feed_changes(stored: set[str]) -> tuple[set[str], set[str]]:
+    """(new, deleted) — feed events past the cursor the hourly poll has not applied yet.
+
+    The reconcile runs between polls, so a workout saved since the last poll is in the
+    vendor's count and not yet in the store, and a delete since then is the opposite.
+    Neither is a drop. Only ids the store disagrees with are returned: an 'updated' event
+    for a stored id is an edit and changes no count.
+    """
+    since = load_since()
+    new: set[str] = set()
+    deleted: set[str] = set()
+    for page in range(1, RECONCILE_PENDING_MAX_PAGES + 1):
+        payload = fetch_events_page(since, page=page, page_size=PAGE_SIZE)
+        for ev in payload.get("events") or []:
+            wo = ev.get("workout") or {}
+            wid = str(wo.get("id") or ev.get("id") or "")
+            if not wid:
+                continue
+            if (ev.get("type") or "updated") == "deleted":
+                if wid in stored:
+                    deleted.add(wid)
+                new.discard(wid)
+            elif wid not in stored:
+                new.add(wid)
+        if not payload.get("events") or page >= int(payload.get("page_count") or 0):
+            break
+    return new, deleted
+
+
+def _emit_reconcile_metric(missing: int) -> None:
+    """Best-effort: a CloudWatch blip must not fail the run (the heartbeat sees absence)."""
+    try:
+        import boto3
+
+        boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2")).put_metric_data(
+            Namespace=RECONCILE_NAMESPACE,
+            MetricData=[
+                {
+                    "MetricName": RECONCILE_METRIC,
+                    "Dimensions": [{"Name": "Source", "Value": SOURCE}],
+                    "Value": float(missing),
+                    "Unit": "Count",
+                }
+            ],
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("hevy reconcile metric emit failed (non-fatal): %s: %s", type(e).__name__, e)
+
+
+def reconcile() -> dict:
+    """Compare the vendor's workout count with the stored live rows; emit the shortfall.
+
+    missing = vendor_count - (stored + in-flight new - in-flight deleted), floored at 0.
+    Never raises: a failed vendor or store read returns an `error` body and emits NO
+    datapoint, so one bad day is a gap the two-day heartbeat tolerates, never a false 0.
+    """
+    if _HAS_AUTH_BREAKER:
+        marker = check_breaker(_table, source_name=SOURCE, user_id=USER_ID, logger=logger)
+        if marker:
+            logger.info("[RECONCILE] hevy skipped — auth breaker active (marked_at=%s)", marker.get("marked_at"))
+            return {
+                "mode": "reconcile",
+                "source": SOURCE,
+                "skipped": "auth_failure_circuit_breaker",
+                "marked_at": str(marker.get("marked_at")),
+            }
+    try:
+        vendor_count = fetch_workout_count()
+        stored = _stored_workout_ids()
+        pending_new, pending_deleted = _pending_feed_changes(stored)
+    except Exception as e:  # noqa: BLE001
+        logger.error("[RECONCILE] hevy failed (non-fatal, no datapoint today): %s: %s", type(e).__name__, e)
+        return {"mode": "reconcile", "source": SOURCE, "error": f"{type(e).__name__}: {e}"[:500]}
+
+    expected_stored = len(stored) + len(pending_new) - len(pending_deleted)
+    missing = max(0, vendor_count - expected_stored)
+    store_only = max(0, expected_stored - vendor_count)
+    _emit_reconcile_metric(missing)
+    out = {
+        "mode": "reconcile",
+        "source": SOURCE,
+        "vendor_count": vendor_count,
+        "stored_count": len(stored),
+        "pending_new": sorted(pending_new)[:10],
+        "pending_deleted": sorted(pending_deleted)[:10],
+        "missing_count": missing,
+        "store_only_count": store_only,
+    }
+    if missing or store_only:
+        logger.warning("[RECONCILE] hevy count disagrees: %s", json.dumps(out, default=str))
+    else:
+        logger.info("[RECONCILE] hevy clean: %s", json.dumps(out, default=str))
+    return out
+
+
 def lambda_handler(event: dict, context: Any) -> dict:
     """Scheduled backfill entry point. Polls the events feed since the
     last-known timestamp, ingests new/updated workouts, persists new
@@ -441,6 +607,11 @@ def lambda_handler(event: dict, context: Any) -> dict:
         res = cardio_hr_store.rejoin_one(_table, USER_ID, str(event.get("date") or ""), str(event["rejoin_workout"]))
         logger.info("cardio-hr rejoin_workout: %s", json.dumps(res, default=str))
         return {"statusCode": 200, "body": json.dumps(res, default=str)}
+
+    # #4643 box 2: the daily vendor-count reconcile — `{"reconcile": true}` from the
+    # HevyReconciliation rule. Read-only; it returns before the poll can touch anything.
+    if event and event.get("reconcile"):
+        return {"statusCode": 200, "body": json.dumps(reconcile(), default=str)}
 
     # #4643: a latched auth breaker short-circuits the poll for 24h. This is also what the
     # two async retries of the run that latched it land on, so they return 200 instead of

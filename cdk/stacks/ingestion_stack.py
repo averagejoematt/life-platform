@@ -412,6 +412,27 @@ class IngestionStack(Stack):
             )
         )
 
+        # ── 6b-ii. Hevy reconciliation (#4643) — the strava/whoop source-of-truth diff,
+        # by count: GET /v1/workouts/count vs the stored, non-tombstoned workout rows,
+        # emitting LifePlatform/IngestReconciliation::MissingActivityCount{Source=hevy}
+        # (alarmed in monitoring_stack). Same Lambda, constant input — no new function and
+        # no new grant (DDB Query + PutMetricData + the secret read are already on the role).
+        # READ-ONLY. 18:30 UTC = 11:30 AM PT: half-way between two hourly polls, after the
+        # morning crons settle and clear of the 17:20/18:20 strava/whoop reconciles.
+        # Opt-in via the hevy `provider_reconcile` facet in source_registry.
+        hevy_reconcile_rule = events.Rule(
+            self,
+            "HevyReconciliation",
+            schedule=events.Schedule.cron(hour="18", minute="30"),
+            description="#4643: compare the Hevy workout count with stored rows — emits MissingActivityCount{hevy}",
+        )
+        hevy_reconcile_rule.add_target(
+            targets.LambdaFunction(
+                hevy_backfill,
+                event=events.RuleTargetInput.from_object({"reconcile": True}),
+            )
+        )
+
         # ── #3764: the rebuild's dead-man ────────────────────────────────────────
         # Every way this job can fail ends in the same observable state — an index whose
         # `_built_at` stops moving — and NOT ONE of them raises:

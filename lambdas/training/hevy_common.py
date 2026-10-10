@@ -194,6 +194,20 @@ def fetch_workout(workout_id: str) -> dict:
     return hevy_get(f"/v1/workouts/{workout_id}")
 
 
+def fetch_workout_count() -> int:
+    """The vendor's all-time workout count — GET /v1/workouts/count → {"workout_count": N}.
+
+    #4643: one call, read-only; the daily reconcile compares it with the stored rows.
+    Raises HevyAPIError when the body has no integer count, so a changed response shape
+    is a failed reconcile, never a silent zero.
+    """
+    body = hevy_get("/v1/workouts/count")
+    count = body.get("workout_count") if isinstance(body, dict) else None
+    if isinstance(count, bool) or not isinstance(count, int):
+        raise HevyAPIError(f"Hevy GET /v1/workouts/count → no integer workout_count in {str(body)[:200]}")
+    return count
+
+
 def fetch_events_page(since_iso: str, page: int = 1, page_size: int = 10) -> dict:
     """Fetch one page of the workouts events feed.
 
