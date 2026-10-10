@@ -25,7 +25,7 @@ from typing import Any, Callable, Dict, List, Optional
 from ai import structured_json  # the shared JSON seam (#4276)
 from ai.model_defaults import NARRATIVE_MODEL as DESK_MODEL  # noqa: E402 — the one narrative default (#4275/#4278)
 
-from content import story_ledger
+from content import story_checks, story_ledger
 
 DESK_MAX_TOKENS = 12000  # the craft-standard schema measured past 6000 on wk2 (2026-10-01)
 
@@ -170,9 +170,70 @@ def _schema_less(body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+# ── the absence rule, in code (#4534) ────────────────────────────────────────
+# The rubric says an absence leads only with a consequence in the data; this is the check that holds the
+# model to it. "Lead" here is the lead's SUBJECT — its thread id and angle — never its "why", which may
+# legitimately mention a gap while explaining why something else leads.
+_ABSENCE = re.compile(
+    r"\b(?:gaps?|missing|missed|skip(?:ped|s)?|silen(?:t|ce)|absen(?:t|ce)|unlogged|not\s+logged|didn['’]?t\s+log|"
+    r"stopped\s+logging|no\s+(?:log|logs|entr(?:y|ies)|journal\w*|data)|went\s+(?:quiet|dark)|lapsed?|blank)\b",
+    re.IGNORECASE,
+)
+_JOURNAL = re.compile(r"\b(?:journal\w*|diar(?:y|ies))\b", re.IGNORECASE)
+# a source's reader-facing names, so a lead about "the food log" is matched to macrofactor's watermark
+_SOURCE_WORDS = {"macrofactor": r"food|meals?|nutrition|macros?|calories|protein|macrofactor"}
+
+
+def _subject(story: Dict[str, Any]) -> str:
+    return f"{str(story.get('thread_id') or '').replace('_', ' ')} {story.get('angle') or ''}"
+
+
+def _not_yet_exported_sources(dossier: Dict[str, Any]) -> List[str]:
+    out = {s for s, w in (dossier.get("export_watermarks") or {}).items() if (w or {}).get("not_yet_exported_dates")}
+    if (dossier.get("nutrition") or {}).get("not_yet_exported_dates"):
+        out.add("macrofactor")
+    return sorted(out)
+
+
+def absence_lead_findings(budget: Dict[str, Any], dossier: Dict[str, Any]) -> List[str]:
+    """An absence leads only with a data consequence (#4534).
+
+    * a journal lead is refused outright — journal content is off the record and its presence is not a story
+      this experiment (the dossier's own caveat), so there is no consequence it could cite;
+    * an absence whose source is NOT YET EXPORTED is export lag, never behaviour, so it cannot lead;
+    * any other absence lead must carry, in its evidence, at least one item that is not itself the absence
+      and whose figures are all in the dossier — the consequence the absence had."""
+    lead = budget.get("lead") or {}
+    subject = _subject(lead)
+    if _JOURNAL.search(subject):
+        return [
+            f"lead {lead.get('thread_id')!r} is about the journal — journal presence is never a lead (off the record, no data "
+            "consequence); lead on what the data shows"
+        ]
+    if not _ABSENCE.search(subject):
+        return []
+    for src in _not_yet_exported_sources(dossier):
+        if re.search(rf"\b(?:{_SOURCE_WORDS.get(src, re.escape(src))})\b", subject, re.IGNORECASE):
+            return [f"lead {lead.get('thread_id')!r} is an absence in {src}, whose window is not yet exported — export lag is not a story"]
+    allowed = story_checks.allowed_numbers(dossier)
+    for ev in lead.get("evidence") or []:
+        ev = str(ev)
+        if _ABSENCE.search(ev) or _JOURNAL.search(ev):
+            continue
+        # a measured figure (not a small count of days, which restates the absence) and every figure from the dossier
+        measured = story_checks.ungrounded_numbers(ev, set())
+        if measured and not story_checks.ungrounded_numbers(ev, allowed):
+            return []
+    return [
+        f"lead {lead.get('thread_id')!r} is an absence with no data consequence in its evidence — an absence leads only when "
+        "the dossier shows what it cost; otherwise lead on the week's best story and omit the gap with a reason"
+    ]
+
+
 def validate(budget: Dict[str, Any], dossier: Dict[str, Any], ledger: Dict[str, Any], *, week: int) -> List[str]:
     """Code-side checks a schema cannot express. Empty = the budget is runnable."""
     findings = story_ledger.continuity_findings(ledger, budget, week)
+    findings += absence_lead_findings(budget, dossier)
     roster = {c.get("coach_id") for c in dossier.get("roster", [])}
     for c in budget.get("featured_coaches", []):
         if roster and c not in roster:
