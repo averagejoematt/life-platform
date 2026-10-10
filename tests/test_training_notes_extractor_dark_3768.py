@@ -148,11 +148,13 @@ class _FakeTable:
         return {"Items": []}
 
 
-_TODAY_WORKOUT = [{"date": tn.pacific_today(), "exercises": [{"template_id": "ABC123", "name": "Squat", "notes": "felt strong"}]}]
+def _today_workout() -> list:
+    """Built at CALL time (#4750): an import-time pacific_today() desyncs from the code under test across Pacific midnight."""
+    return [{"date": tn.pacific_today(), "exercises": [{"template_id": "ABC123", "name": "Squat", "notes": "felt strong"}]}]
 
 
 def test_health_reports_dark_when_every_record_is_degraded():
-    t = _FakeTable(_TODAY_WORKOUT, {"ABC123": [{"degraded": True}]})
+    t = _FakeTable(_today_workout(), {"ABC123": [{"degraded": True}]})
     h = tn.training_notes_health(t, lookback_days=14)
     assert h["checked"] is True
     assert h["extractor_dark"] is True
@@ -160,7 +162,7 @@ def test_health_reports_dark_when_every_record_is_degraded():
 
 
 def test_health_reports_dark_when_records_are_missing_entirely():
-    t = _FakeTable(_TODAY_WORKOUT, {})
+    t = _FakeTable(_today_workout(), {})
     h = tn.training_notes_health(t, lookback_days=14)
     assert h["extractor_dark"] is True
     assert h["missing_records"] == 1
@@ -168,7 +170,7 @@ def test_health_reports_dark_when_records_are_missing_entirely():
 
 def test_health_reports_healthy_when_records_are_clean():
     """NEGATIVE CONTROL — `extractor_dark` must be able to be False."""
-    t = _FakeTable(_TODAY_WORKOUT, {"ABC123": [{"degraded": False}]})
+    t = _FakeTable(_today_workout(), {"ABC123": [{"degraded": False}]})
     h = tn.training_notes_health(t, lookback_days=14)
     assert h["extractor_dark"] is False
     assert h["records_found"] == 1 and h["degraded"] == 0
