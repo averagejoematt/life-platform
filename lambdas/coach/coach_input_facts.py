@@ -307,8 +307,9 @@ _INTAKE_FRAME = re.compile(
 # escalation to 190 grams per day is authorized", "the 190-gram target". The average cannot
 # refute a goal, so a protein figure is skipped when EVERY place it is written is framed so.
 _TARGET_BEFORE = re.compile(
-    r"(?:\b(?:target|floor|goal|ceiling|minimum)\s+(?:of\s+)?|\bescalat\w*\s+(?:\w+\s+){0,2}?to\s+|\btowards?\s+)"
-    r"(?:about\s+|around\s+|roughly\s+)?$",
+    r"(?:\b(?:target|floor|goal|ceiling|minimum)\s+(?:of\s+)?|\bescalat\w*\s+(?:\w+\s+){0,2}?to\s+|\btowards?\s+"
+    # #4690: an ask to "reach"/"hit" a level is a goal, not intake ("reach 170 grams of protein daily").
+    r"|\b(?:to|and|or)\s+(?:reach|hit)\s+)" r"(?:about\s+|around\s+|roughly\s+)?$",
     re.IGNORECASE,
 )
 _TARGET_AFTER = re.compile(

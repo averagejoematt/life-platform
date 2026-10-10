@@ -408,6 +408,26 @@ def test_a_target_floor_or_escalation_level_is_not_an_intake_claim():
     assert [f["cited"] for f in ci.served_fact_findings(ate, facts, today="2026-09-26")] == [190.0]
 
 
+# #4690 (served-coach-facts run 37968814056): the physical coach's commitment text asks him
+# to "reach 170 grams of protein daily" — a goal, flagged against the 146 g average.
+PHYSICAL_1008_REACH = "I've asked him to log food consistently and reach 170 grams of protein daily for seven straight days."
+
+
+def _facts_4690():
+    # 26 logged days around 146 g, none within rounding of 170 or 190 (the live shape on 10-09)
+    series = [(f"2026-09-{d:02d}", 146.0 + (d % 5) - 2) for d in range(1, 27)]
+    return {"nutrition": {"days_logged": 26}, "protein_series": series}
+
+
+def test_4690_an_ask_to_reach_a_protein_level_is_a_goal_not_an_intake_claim():
+    facts = _facts_4690()
+    got = [f["cited"] for f in ci.served_fact_findings(PHYSICAL_1008_REACH, facts, today="2026-09-26") if f["metric"] == "protein_g"]
+    assert got == []
+    # a past-tense intake report is still judged
+    ate = "He reached 190 grams of protein daily."
+    assert [f["cited"] for f in ci.served_fact_findings(ate, facts, today="2026-09-26")] == [190.0]
+
+
 def test_mutation_control_without_the_target_frame_the_labs_coach_is_held(monkeypatch):
     monkeypatch.setattr(ci, "_target_framed", lambda _s, _v: False)
     facts = _facts("2026-09-25", "2026-09-26")
