@@ -53,9 +53,9 @@ _INSTANT = datetime(2026, 10, 4, 2, 29, tzinfo=timezone.utc)
 # tests/test_site_api_routes.py::test_edition_one_upstream_failing_leaves_only_its_block_unavailable holds.
 _FEEDS = {
     "dashboard": {"coach_lines"},
-    "training": {"week.training"},
-    "predictions": {"record"},
-    "calibration": {"record"},
+    "training": {"week.training", "scorecard.training"},
+    "predictions": {"record", "scorecard.ai"},
+    "calibration": {"record", "scorecard.ai"},
 }
 
 
@@ -84,6 +84,8 @@ def _parts(doc):
     yield from blocks.items()
     for k, part in ((blocks.get("week") or {}).get("data") or {}).get("measures", {}).items():
         yield f"week.{k}", part
+    for k, row in ((blocks.get("scorecard") or {}).get("data") or {}).get("rows", {}).items():
+        yield f"scorecard.{k}", row  # #4595
 
 
 def _key_of(path):
@@ -214,8 +216,9 @@ def test_a_narrow_reader_that_raises_blanks_exactly_the_keys_it_serves():
     assert [k for k in ed.SOURCES if bodies[k] is None] == ["predictions", "calibration"]
     doc = _compose(bodies)
     assert doc["blocks"]["record"]["state"] == "unavailable" and doc["blocks"]["record"]["data"] is None
+    assert doc["blocks"]["scorecard"]["data"]["rows"]["ai"]["state"] == "unavailable"  # #4595: the AI row reads the record
     baseline = _compose(wire)
-    assert all(doc["blocks"][n] == baseline["blocks"][n] for n in doc["blocks"] if n != "record")
+    assert all(doc["blocks"][n] == baseline["blocks"][n] for n in doc["blocks"] if n not in ("record", "scorecard"))
 
 
 def test_a_narrow_reader_replaces_its_routes_and_nothing_else():

@@ -110,11 +110,6 @@ CACHE_SECONDS = 300  # the neighbours' cache (/api/coach_docket, /api/decisions,
 COACH_VOICE = "restated"
 COACH_VOICE_MOVE = "move"  # #4583: each line is a move a coach made today, checked in code against one fact sheet
 
-# TODO(scorecard follow-up under epic #4580): the "More than weight" rows (body, training,
-# sleep, food, mind, the AI) need rules no route serves today. The block ships ``absent``
-# rather than inventing rules; the follow-up story owns them.
-SCORECARD_TODO = "epic #4580 — the scorecard rows have no served rules yet"
-
 #: Reader words for a coach's domain, keyed by the persona registry's ``domain`` field.
 #: GAP (named in the PR): config/personas.json carries no reader-facing domain word, and the
 #: v7 pages hold two JS copies (v7_home.js COACH_WORDS, v7_coaches.js ROLE_WORDS). The words
@@ -551,8 +546,7 @@ def _week(b: dict, today: str) -> dict:
 
 # ── the whole-life rows (#4586) ─────────────────────────────────────────────────
 # One served FACT per area, each a door to its own page. No verdict on any row: whether an
-# area is "going well" is decided by written rules that are not built yet (the scorecard,
-# #4595). A row whose source failed is `unavailable`; one with nothing to say is `absent`;
+# area is "going well" is decided by the scorecard's written rules (#4595, web/edition_scorecard.py). A row whose source failed is `unavailable`; one with nothing to say is `absent`;
 # one whose fact is older than LIFE_STALE_DAYS says which day it is from.
 LIFE_ORDER = ("body", "training", "sleep", "food", "habits", "supplements", "experiments", "mind")
 LIFE_STALE_DAYS = 2
@@ -760,10 +754,6 @@ def _coach_lines(dashboard: dict | None, today: str, persona_of_short, persona_o
     return _block("ok", newest, src, "The coaches have written nothing yet.", data, voice=COACH_VOICE)
 
 
-def _scorecard() -> dict:
-    return _block("absent", None, None, "The scorecard is not built yet.", todo=SCORECARD_TODO)
-
-
 def _record(predictions: dict | None, calibration: dict | None, today: str) -> dict:
     """The coaches' checked calls — NEVER the count alone (epic #4580 rule 3, #4585).
 
@@ -912,9 +902,14 @@ def compose(
     return a persona dict from the registry; ``metric_words`` is the server-side metric
     vocabulary. Everything a block says is derived from these arguments.
     """
+    # The scorecard's rules live in their own module (#4595), which reads this one's helpers:
+    # imported here, once this module is whole, so neither import is circular.
+    from web.edition_scorecard import scorecard as _scorecard
+
     b = {k: bodies.get(k) for k in SOURCES}
     day_n = pacific_day_n(start_date, today) or None
     his_words = _his_words(b["decisions"], b["owner_words"], today)
+    record = _record(b["predictions"], b["calibration"], today)
     blocks = {
         "premise": _premise(today),
         "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of),
@@ -923,8 +918,8 @@ def compose(
         "week": _week(b, today),
         "life": _life(b, his_words, today),
         "coach_lines": _coach_lines(b["dashboard"], today, persona_of_short, persona_of),
-        "scorecard": _scorecard(),
-        "record": _record(b["predictions"], b["calibration"], today),
+        "scorecard": _scorecard(b, record, today, start_date),
+        "record": record,
         "his_words": his_words,
         "catch_up": _catch_up(b["journal"], today),
         "follow": _follow(b["cadence"], now, today),

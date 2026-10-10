@@ -1,0 +1,142 @@
+{
+ "state": "ok",
+ "as_of": "2026-10-03",
+ "source": [
+  "/api/calibration",
+  "/api/decisions",
+  "/api/nutrition_overview",
+  "/api/owner_words",
+  "/api/predictions",
+  "/api/pulse_history",
+  "/api/training_overview"
+ ],
+ "absent_text": "Nothing is scored this week.",
+ "data": {
+  "order": [
+   "body",
+   "training",
+   "sleep",
+   "food",
+   "mind",
+   "ai"
+  ],
+  "names": {
+   "body": "Body",
+   "training": "Training",
+   "sleep": "Sleep",
+   "food": "Food",
+   "mind": "Mind",
+   "ai": "The AI"
+  },
+  "rows": {
+   "body": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/pulse_history",
+    "absent_text": "Body has no verdict this week.",
+    "data": {
+     "name": "Body",
+     "verdict": "faster_than_planned",
+     "verdict_text": "Faster than planned",
+     "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
+     "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
+    }
+   },
+   "training": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/training_overview",
+    "absent_text": "Training has no verdict this week.",
+    "data": {
+     "name": "Training",
+     "verdict": "not_yet",
+     "verdict_text": "Not yet",
+     "text": "Trained on 7 of 7 days recorded.",
+     "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
+    }
+   },
+   "sleep": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/pulse_history",
+    "absent_text": "Sleep has no verdict this week.",
+    "data": {
+     "name": "Sleep",
+     "verdict": "going_well",
+     "verdict_text": "Going well",
+     "text": "7 hours or more on 7 of 7 nights recorded.",
+     "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
+    }
+   },
+   "food": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/nutrition_overview",
+    "absent_text": "Food has no verdict this week.",
+    "data": {
+     "name": "Food",
+     "verdict": "not_enough_data",
+     "verdict_text": "Not enough data",
+     "text": "3 days logged; 5 are needed.",
+     "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
+    }
+   },
+   "mind": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "/api/owner_words",
+     "/api/decisions"
+    ],
+    "absent_text": "Mind has no verdict this week.",
+    "data": {
+     "name": "Mind",
+     "verdict": "not_yet",
+     "verdict_text": "Not yet",
+     "text": "An entry in his own words on 0 of 7 days.",
+     "rule": "Days in the last seven with an entry in his own words. Going well at 3."
+    }
+   },
+   "ai": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": [
+     "/api/predictions",
+     "/api/calibration"
+    ],
+    "absent_text": "The AI has no verdict this week.",
+    "data": {
+     "name": "The AI",
+     "verdict": "not_yet",
+     "verdict_text": "Not yet",
+     "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
+     "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+    }
+   }
+  },
+  "went_right": {
+   "matthew": {
+    "area": "sleep",
+    "text": "Sleep: 7 hours or more on 7 of 7 nights recorded.",
+    "source": "/api/pulse_history"
+   },
+   "engine": {
+    "area": null,
+    "text": "Nothing this week.",
+    "source": null
+   }
+  },
+  "verdicts": {
+   "going_well": "Going well",
+   "faster_than_planned": "Faster than planned",
+   "not_yet": "Not yet",
+   "not_enough_data": "Not enough data"
+  },
+  "window": {
+   "from": "2026-09-27",
+   "to": "2026-10-03"
+  },
+  "rules_set": "2026-10-09",
+  "rules_set_text": "The rules were set on Friday, October 9."
+ }
+}

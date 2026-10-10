@@ -214,6 +214,47 @@ export function weekSortHTML(week, base = "/") {
     small("Going well means the target was met on at least five days in seven, or the scale ended the week lower than it began. A measure recorded on fewer than five days is not sorted."),
   ].join("");
 }
+// ── the whole-life scorecard (#4595) ───────────────────────────────────────────
+// The rows are decided in code (lambdas/web/site_api_edition.py, one written rule per area)
+// and served in /api/edition's `scorecard` block; this only prints them. Each row reads its
+// verdict in words — a dot is never the only carrier — and the rules sit under the rows with
+// the day they were set. A row whose source failed prints its own not-served sentence.
+const SCORE_LINKS = { body: "trend/?m=weight", training: "trend/?m=training", sleep: "trend/?m=sleep", food: "trend/?m=protein", ai: "coaches/" };
+export function scorecardRows(block) {
+  if (!usable(block)) return [];
+  const rows = block.data.rows || {};
+  return (block.data.order || Object.keys(rows))
+    .map((key) => ({ key, row: rows[key] }))
+    .filter(({ row }) => row && row.state);
+}
+export function scorecardHTML(block, base = "/") {
+  const rows = scorecardRows(block);
+  if (!rows.length) return soft((block && block.absent_text) || "The scorecard is not served right now.");
+  const d = block.data;
+  const items = rows
+    .map(({ key, row }) => {
+      const r = usable(row) ? row.data : null;
+      const name = (r && r.name) || (d.names && d.names[key]) || key;
+      const keyHTML = SCORE_LINKS[key] ? `<a class="ck-rows__key" href="${esc(base)}${SCORE_LINKS[key]}">${esc(name)}</a>` : `<span class="ck-rows__key">${esc(name)}</span>`;
+      if (!r || !r.verdict_text) return `<li>${keyHTML}<span>${esc(row.absent_text || "Not served right now.")}</span></li>`;
+      const dot = r.verdict === "going_well" ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
+      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}</span></li>`;
+    })
+    .join("");
+  const right = d.went_right || {};
+  const line = (who, part) => `<li><span class="ck-rows__key">${esc(who)}</span><span>${esc((part && part.text) || "Nothing this week.")}</span></li>`;
+  const rules = rows
+    .filter(({ row }) => usable(row) && row.data.rule)
+    .map(({ row }) => `<li><span class="ck-rows__key">${esc(row.data.name)}</span><span>${esc(row.data.rule)}</span></li>`)
+    .join("");
+  return [
+    `<p class="ck-label">How the whole thing is going</p>`,
+    `<ul class="ck-rows">${items}</ul>`,
+    `<p class="ck-label">What went right this week</p>`,
+    `<ul class="ck-rows">${line("Matthew", right.matthew)}${line("The engine", right.engine)}</ul>`,
+    rules ? `<details><summary>${esc(`The rules behind each row. ${d.rules_set_text || ""}`.trim())}</summary><ul class="ck-rows">${rules}</ul></details>` : small(d.rules_set_text),
+  ].join("");
+}
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.
 export function firstSentences(text, max = 260) {
   const sentences = String(text || "").replace(/\s+/g, " ").trim().match(/(?:[^.!?]|[.!?](?!\s|$))+[.!?]+(?=\s|$)/g) || [];
