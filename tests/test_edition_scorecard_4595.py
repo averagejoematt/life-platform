@@ -94,7 +94,7 @@ def test_every_row_is_decided_by_a_served_rule_with_the_day_it_was_set():
         d = row["data"]
         if d["verdict"] not in VERDICTS or d["verdict_text"] != ed.VERDICT_WORDS[d["verdict"]]:
             offenders.append(f"{key}: verdict {d['verdict']!r}")
-        if d["rule"] != ed.SCORECARD_RULES[key] or not d["rule"].endswith("."):
+        if d["rule"] != ed.SCORECARD_RULE_TEXT[key] or not d["rule"].endswith("."):
             offenders.append(f"{key}: the rule is not the written one")
         if not d["text"].endswith("."):
             offenders.append(f"{key}: text is not a sentence")

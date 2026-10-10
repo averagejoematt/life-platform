@@ -797,7 +797,7 @@ MIND_WELL_DAYS = 3  # days with an entry in his own words
 MIND_SERVE_LIMIT = 10  # /api/owner_words serves this many entries, newest first (content.owner_words.SERVE_LIMIT)
 AI_MIN_CALLS = 30  # checked calls before the coaches are compared with a simple guess at all
 
-SCORECARD_RULES = {
+SCORECARD_RULE_TEXT = {
     "body": (
         f"The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; "
         f"faster than planned when it fell more than {_fmt_num(BODY_FAST_LBS_PER_WEEK)} lb in the week. "
@@ -839,7 +839,7 @@ def _verdict_row(area: str, src: Any, today: str, verdict: str, text: str) -> di
         "verdict": verdict,
         "verdict_text": VERDICT_WORDS[verdict],
         "text": text,
-        "rule": SCORECARD_RULES[area],
+        "rule": SCORECARD_RULE_TEXT[area],
     }
     return _block("ok", today, src, f"{SCORECARD_NAMES[area]} has no verdict this week.", data)
 
