@@ -76,7 +76,9 @@ dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 
 # AI model constant — read from env so model can be updated without redeployment
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("daily_insight")
 
 # BS-MP3: Decision Fatigue Detector — proactive alert threshold.
 #

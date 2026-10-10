@@ -3216,3 +3216,40 @@ REGISTRY_PROOFS["registry::lambdas/operational/cost_governor_lambda.py::PROJECTE
     ),
     "proved_on": "2026-10-04",
 }
+
+# ── #4770 (2026-10-10): the model-routing guard's three dated exemptions ────────────────
+# tests/test_model_routing_4770.py::_EXEMPT spares three files from the derivation guard
+# (no model choice outside lambdas/ai/model_routing.py). Each entry was deleted, alone, on
+# the lane branch and the guard WATCHED naming that file; restoring it re-greened the file.
+_MODEL_ROUTING_SUITE = "python3 -m pytest tests/test_model_routing_4770.py -q -p no:cacheprovider"
+_MODEL_ROUTING_SPARED_FILES = {
+    "lambdas/ai/prompt_cache.py": (
+        "prompt_cache.py:143 model literal 'us.anthropic.claude-haiku-4-5-20251001-v1:0'",
+        "and :159 (the two CACHING_DECISIONS measurement records)",
+    ),
+    "lambdas/reading/horizons_retrospective.py": ("horizons_retrospective.py:149 literal model_name='sonnet'", "(#4769's first specimen)"),
+    "lambdas/privacy/broadcast_sensitivity_gate.py": (
+        "broadcast_sensitivity_gate.py:318 literal model_name='haiku'",
+        "(#4769's second specimen)",
+    ),
+}
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/test_model_routing_4770.py::_EXEMPT::{path}": {
+            "gate_name": f"_EXEMPT[{path}]",
+            "command": _MODEL_ROUTING_SUITE,
+            "mutation": f"the `{path}` entry's own line(s) deleted from _EXEMPT, nothing else changed.",
+            "observed": (
+                f"MUTATED: 1 failed, 14 passed — test_no_runtime_module_chooses_a_model_outside_the_registry naming "
+                f"{hit} {more}. REVERTED: 15 passed. Both watched 2026-10-10 on issue-4770-model-routing-registry."
+            ),
+            "scope": (
+                "Keyed by PATH and spares the WHOLE file, not one line; the stale direction is "
+                "test_every_exemption_is_dated_reasoned_and_still_needed (a #4769 caller that names its route reds "
+                "until its exemption and _UNCALLED_ROUTES row are deleted)."
+            ),
+            "proved_on": "2026-10-10",
+        }
+        for path, (hit, more) in _MODEL_ROUTING_SPARED_FILES.items()
+    }
+)

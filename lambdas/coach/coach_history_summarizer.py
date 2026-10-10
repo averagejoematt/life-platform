@@ -62,10 +62,10 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 # #2195: the USER# partition owner — same env-var idiom every other reader of the
 # engagement_state singleton uses (daily_brief, daily_debrief, monday_compass, …).
 USER_ID = os.environ.get("USER_ID", "matthew")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry (each route keeps its env override)
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-
+AI_MODEL_HAIKU = model_for("coach_narrative.history_summary")
 # All coach IDs in the system — derived from the canonical persona registry,
 # never re-typed (#2334). The #531 fix below replaced the hand-copied NAME dict
 # after it drifted to the RETIRED cast, but this hand-typed id LIST survived it;

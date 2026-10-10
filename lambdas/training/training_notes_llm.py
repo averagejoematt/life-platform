@@ -31,7 +31,9 @@ from common.numeric import decimals_to_float, floats_to_decimal
 
 logger = logging.getLogger(__name__)
 
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+HAIKU_MODEL = model_for("training_notes")
 # #4643: the budget_guard feature the Haiku tail is gated on — listed in
 # budget_guard._FEATURE_CUTOFF and scripts/ai_budget_ledger.py (tests/test_ingest_ai_budget_rows_4643.py).
 BUDGET_FEATURE = "training_notes"

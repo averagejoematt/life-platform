@@ -24,8 +24,9 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import boto3
-from ai import google_tts, model_defaults  # #4275: model_defaults.NARRATIVE_MODEL is the one Sonnet default
+from ai import google_tts
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.model_routing import model_for  # #4770: the one model registry
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common import media_tombstone  # #4365: a restart tombstone is not a published episode
@@ -49,7 +50,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+MODEL = model_for("chronicle.panel_podcast")
 SITE = "https://averagejoematt.com"
 PREFIX = "generated/panelcast"
 SKIP_TIER = 2  # PG-10
@@ -535,7 +536,7 @@ _INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
 # two speakers to Gemini prebuilt voices; Elena = host (breezy), Eli = guest (informative).
 # Episode 0 is the flagship trailer — use Sonnet (follows the multi-step arc + hard
 # requirements far better than Haiku, which kept dropping Elena's self-intro).
-INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", model_defaults.NARRATIVE_MODEL)
+INTRO_MODEL = model_for("chronicle.panel_podcast_intro")
 INTRO_GEMINI_VOICES = {"Elena": "Aoede", "Eli": "Charon"}
 INTRO_STYLE = (
     "Perform this as a real, warm two-person podcast — NOT a formal reading. Two people who like each other, "

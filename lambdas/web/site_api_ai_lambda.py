@@ -91,7 +91,9 @@ S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 # R17-04: Separate Anthropic key for site-api — injected via CDK env var
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
 # R17-11: env-overridable model string — avoids silent deprecation failures
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("website_ai")
 
 # #387: the prompt's source count derives from the canonical registry — the
 # old hardcoded literal (nineteen) had drifted from the real pipeline board.

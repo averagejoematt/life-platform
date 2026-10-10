@@ -40,7 +40,6 @@ THE ORDER (cost first, then honesty)
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
@@ -53,7 +52,9 @@ LEAD_ID = "eli_marsh"  # persona_registry.LEAD_PERSONA_ID — pinned equal in th
 PK = f"COACH#{LEAD_ID}"
 SK_PREFIX = "LEAD_DAILY#"
 BUDGET_FEATURE = "coach_narrative"
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("coach_narrative.lead_read")
 MAX_WORDS = 90
 MAX_TOKENS = 260
 MIN_FACTS = 3  # fewer than this and there is nothing worth a call

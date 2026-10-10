@@ -1074,7 +1074,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 253 -> 254 (2026-10-10, #4270): registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa (the qa/ dir)
         # arrives PROVEN (REGISTRY_PROOFS). Id-set diff vs a `git archive origin/main` export at 057ec826b:
         # 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}; STRUCTURAL_CLASSES::{static,utility} relocate tests/ -> qa/.
-        <= 254
+        # Upper bound 254 -> 257 (2026-10-10, #4770): registry::tests/test_model_routing_4770.py::_EXEMPT::{prompt_cache,
+        # horizons_retrospective, broadcast_sensitivity_gate} arrive PROVEN (REGISTRY_PROOFS; each entry deleted -> 1 failed
+        # naming that file, restored 15 passed). Measured off origin/main 057ec826b: 779 {254, 513, 7, 5} -> 782 {257, 513, 7, 5}.
+        <= 257
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

@@ -93,7 +93,9 @@ BUDGET_FEATURE = "conversation_enrichment"
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
-MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("conversation_enrichment")
 
 # Fallback coach roster if persona_registry is unavailable (mirrors the
 # coach_checkin FALLBACK_QUESTIONS domains) — collection must fail soft, never hard.

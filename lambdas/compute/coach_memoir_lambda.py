@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 
 import boto3
 from ai import grounded_generation
-from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+from ai.model_routing import model_for  # #4770: the one model registry
 from boto3.dynamodb.conditions import Key
 from coach import persona_registry
 from common import quarter_utils
@@ -53,7 +53,7 @@ logger.setLevel(logging.INFO)
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
-MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)  # narrative tier (CLAUDE.md model-tiering rule)
+MODEL = model_for("coach_narrative.memoir")  # narrative tier (CLAUDE.md model-tiering rule)
 OUTPUT_KEY = "generated/coach_memoirs.json"
 FEATURE = "coach_narrative"  # budget_guard cutoff: paused at tier 2 (ADR-125), same as every other coach narrative
 
