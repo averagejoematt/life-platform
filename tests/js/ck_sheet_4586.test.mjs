@@ -73,3 +73,19 @@ test("an area held for thin coverage prints no score beside a fully measured one
   assert.equal(S.areaLine({ level: 1, raw_score: 59.4, coverage_hold: true }), "Level 1. Too little of this area is measured to score it yet.");
   assert.match(S.areaLine({ level: 2, raw_score: 1.8, score_delta: 0 }), /^Level 2\. Score 2 of 100/);
 });
+
+test("an earned badge with no recorded date is counted and says so, never dated (#4704)", () => {
+  const body = {
+    achievements: [
+      { label: "Lost 5 lbs", earned: true, earned_date: "2026-09-12" },
+      { label: "Lost 20 lbs", earned: true, earned_date: null },
+      { label: "Lost 30 lbs", earned: false },
+    ],
+    summary: { earned: 2, total: 3 },
+  };
+  const html = S.badgesHTML(body);
+  assert.match(html, /2 of 3 earned so far\./, "the count matches summary.earned");
+  assert.equal((html.match(/<li>/g) || []).length, 2);
+  assert.match(html, /date not recorded<\/span><span>Lost 20 lbs/);
+  assert.ok(html.indexOf("Lost 5 lbs") < html.indexOf("Lost 20 lbs"), "the undated badge is listed last");
+});

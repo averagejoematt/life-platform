@@ -111,7 +111,9 @@ export function sheetLine(body) {
 export function badgesHTML(body) {
   const all = ((body && body.achievements) || []).filter((a) => a && a.label);
   if (!all.length) return soft("The badges are not served right now.");
-  const earned = all.filter((a) => a.earned && a.earned_date).sort((a, b) => String(b.earned_date).localeCompare(String(a.earned_date)));
+  // An earned badge whose date was never recorded is still earned: it is counted and
+  // listed last as "date not recorded", never dropped and never given a made-up date (#4704).
+  const earned = all.filter((a) => a.earned).sort((a, b) => String(b.earned_date || "").localeCompare(String(a.earned_date || "")));
   if (!earned.length) return soft(`None of the ${all.length} badges has been earned yet.`);
   // A badge whose description only repeats its name ("Lost 10 lbs" / "Lost 10 lbs from
   // starting weight") prints the name alone.
@@ -120,7 +122,8 @@ export function badgesHTML(body) {
       const desc = String(a.description || "");
       const repeats = desc.toLowerCase().startsWith(String(a.label).toLowerCase());
       const text = repeats ? esc(a.label) : `${esc(a.label)}${desc ? ` <span class="ck-soft">${esc(desc)}.</span>` : ""}`;
-      return `<li><span class="ck-rows__key">${esc(shortDay(a.earned_date))}</span><span>${text}</span></li>`;
+      const when = a.earned_date ? esc(shortDay(a.earned_date)) : "date not recorded";
+      return `<li><span class="ck-rows__key">${when}</span><span>${text}</span></li>`;
     })
     .join("");
   return `${soft(`${earned.length} of ${all.length} earned so far.`)}<ul class="ck-rows">${rows}</ul>`;
