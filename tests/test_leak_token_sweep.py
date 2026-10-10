@@ -423,14 +423,16 @@ def test_every_sweep_caller_handles_unreachable():
         os.path.join("deploy", "restart_verify_rendered.py"),
     }
     callers = set()
-    for base in ("tests", "deploy", "scripts", "lambdas", "mcp"):
+    for base in ("tests", "deploy", "scripts", "lambdas", "mcp", "qa"):
         for dirpath, _dirnames, filenames in os.walk(os.path.join(_REPO, base)):
             for fn in filenames:
                 if not fn.endswith(".py"):
                     continue
                 full = os.path.join(dirpath, fn)
                 rel = os.path.relpath(full, _REPO)
-                if rel == os.path.join("tests", "leak_token_sweep.py") or rel.startswith(os.path.join("tests", "test_")):
+                if rel in (os.path.join("tests", "leak_token_sweep.py"), os.path.join("qa", "leak_token_sweep.py")) or rel.startswith(
+                    os.path.join("tests", "test_")
+                ):
                     continue
                 try:
                     tree = ast.parse(open(full, encoding="utf-8").read())
@@ -439,9 +441,9 @@ def test_every_sweep_caller_handles_unreachable():
                 src_imports_sweep = False
                 calls_sweep = False
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.ImportFrom) and node.module == "leak_token_sweep":
+                    if isinstance(node, ast.ImportFrom) and node.module in ("leak_token_sweep", "qa.leak_token_sweep"):
                         src_imports_sweep = True
-                    if isinstance(node, ast.Import) and any(a.name == "leak_token_sweep" for a in node.names):
+                    if isinstance(node, ast.Import) and any(a.name in ("leak_token_sweep", "qa.leak_token_sweep") for a in node.names):
                         src_imports_sweep = True
                     if isinstance(node, ast.Call):
                         f = node.func

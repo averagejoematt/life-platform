@@ -509,7 +509,8 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 778  # 777 -> 778 (2026-10-10, #4643 box 5): ONE entrant, guard::deploy/
+BASELINE_TOTAL_GATES = 779  # 778 -> 779 (2026-10-10, #4270 the qa/ top-level dir): ONE entrant, registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa, PROVEN on arrival (REGISTRY_PROOFS; ALLOWLIST entry removed -> 1 failed naming qa, restored 4 passed). Nothing leaves.
+# PRIOR: 778  # 777 -> 778 (2026-10-10, #4643 box 5): ONE entrant, guard::deploy/
 # check_bucket_notification_drift.py, PROVEN on arrival (GUARD_PROOFS). Nothing leaves; unproven stays 513.
 # 776 -> 777 (2026-10-10, #4674 the "pace flag" vocabulary ratchet, stacked on #4694 at
 # merge): ONE entrant, `registry::ledgers/site_vocabulary_residue.py::BASELINE::pace flag`, PROVEN on arrival

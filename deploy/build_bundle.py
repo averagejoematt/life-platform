@@ -66,7 +66,7 @@ def _ignore(directory, names):
 def stage_qa_coverage(out_dir):
     """#1446: stage the QA-coverage snapshot the Monday ops green report reads.
 
-    Derived from tests/qa_manifest.py (the ONE page registry, #1426) at bundle
+    Derived from qa/qa_manifest.py (the ONE page registry, #1426) at bundle
     time via its `--emit coverage` emitter — never a hand-maintained number.
     The payload is deterministic by contract (sort_keys, NO timestamp) so the
     CDK asset hash only changes when the manifest itself changes.
@@ -76,7 +76,7 @@ def stage_qa_coverage(out_dir):
     """
     try:
         proc = subprocess.run(
-            [sys.executable, os.path.join(REPO_ROOT, "tests", "qa_manifest.py"), "--emit", "coverage"],
+            [sys.executable, os.path.join(REPO_ROOT, "qa", "qa_manifest.py"), "--emit", "coverage"],
             capture_output=True,
             text=True,
             timeout=120,

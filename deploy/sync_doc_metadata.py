@@ -295,7 +295,7 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
 
         try:
             out = subprocess.run(
-                [sys.executable, str(ROOT / "tests" / "qa_manifest.py"), "--emit", "leak"],
+                [sys.executable, str(ROOT / "qa" / "qa_manifest.py"), "--emit", "leak"],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -311,7 +311,7 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
         # module (imported here, not a local literal anymore) so the daily
         # visual-qa sweep can reuse the same list — fall back to AST-reading
         # the literal there.
-        n = _ast_literal_str_list_len(ROOT / "tests" / "leak_token_sweep.py", "JSON_ENDPOINTS")
+        n = _ast_literal_str_list_len(ROOT / "qa" / "leak_token_sweep.py", "JSON_ENDPOINTS")
         if n is not None:
             counts["JSON_ENDPOINTS"] = n
     pages = counts.get("PAGES")

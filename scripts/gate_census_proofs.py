@@ -2923,6 +2923,22 @@ REGISTRY_PROOFS.update(
     }
 )
 
+REGISTRY_PROOFS["registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa"] = {
+    "gate_name": "ALLOWLIST[qa]",
+    "command": "python3 -m pytest tests/test_root_clutter_guard.py -q   # 4 tests",
+    "mutation": "the entry's own line deleted from ALLOWLIST, leaving the tracked `qa/` dir unlisted.",
+    "observed": (
+        "2026-10-10 on this branch: ARMED (entry removed) — 1 failed, 3 passed, "
+        "`test_no_unlisted_top_level_dir` naming `['qa']` exactly. REVERTED (entry restored): 4 passed."
+    ),
+    "scope": (
+        "Proves the entry is load-bearing for the D1 ratchet given the real tracked `qa/` dir "
+        "(qa/qa_manifest.py, qa/leak_token_sweep.py). It does not prove the reason text is accurate beyond matching "
+        "docs/REPO_STRUCTURE.md's own row for the same directory."
+    ),
+    "proved_on": "2026-10-10",
+}
+
 # #4419: the strava read-seam SET guard (and the pair-rule fixture beside it) turned
 # tests/test_shared_modules.py into a tree-sweeping structural test. Three REAL-tree
 # mutations, each restored by copying the pre-mutation file back.
