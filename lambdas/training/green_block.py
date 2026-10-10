@@ -27,6 +27,8 @@ GREEN_BONUS_SETS_PER_WEEK = 12
 BONUS_KIND = "bonus"
 GREEN_BLOCKED_BY = ("protein_floor_missed",)
 GREEN_TAIL_ON_LOCKED_TEMPLATES = False
+# The per-session lines `owner_redlines`' `volume_ceiling` tripwire reports — read from here so it cannot keep v0.4's 18.
+SESSION_SET_CEILINGS = {"sets_per_session": BASE_SESSION_SET_CEILING, "sets_per_session_with_green": GREEN_SESSION_SET_CEILING}
 
 PROVENANCE = {
     "provenance": "owner",

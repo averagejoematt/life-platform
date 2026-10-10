@@ -282,6 +282,7 @@ def backfill(monkeypatch):
 
     monkeypatch.setattr(mod, "_table", tbl)
     monkeypatch.setattr(mod, "_INGEST_HEALTH_AVAILABLE", False)
+    monkeypatch.setattr(mod, "_HAS_AUTH_BREAKER", False)  # #4643: pinned in test_hevy_breaker_quarantine_4643.py
     monkeypatch.setattr(mod, "load_since", lambda: "2026-07-01T00:00:00Z")
     monkeypatch.setattr(mod, "save_since", lambda ts: calls["save_since"].append(ts))
     monkeypatch.setattr(mod, "archive_raw", lambda wid, raw: f"s3://x/raw/hevy/{wid}.json")

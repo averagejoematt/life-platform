@@ -92,6 +92,7 @@ def test_a_miss_with_no_source_label_does_not_replace_a_stored_skip(monkeypatch)
 
 def test_a_vanished_habit_keeps_its_stored_skip(monkeypatch):
     _closed(monkeypatch)
+    monkeypatch.setattr(habitify_lambda, "_ALIAS_GROUPS_CACHE", [])  # #4655: no registry read in a unit test
     stored = _record(
         {
             "Cold Shower": {"status": "skipped", "group": "Recovery"},

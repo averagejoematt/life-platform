@@ -1055,7 +1055,26 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 247 -> 248 (2026-10-10, #4707): structural::test_key_rotator_grants_4707.py — the lambdas/ sweep holding
         # every Secrets Manager rotation Lambda's sm.<method> calls to its role's grants — arrives PROVEN via the re-runnable
         # harness (MutationSpec + proof, ARMED 1/1). Measured: 772 {247, 513, 7, 5} -> 773 {248, 513, 7, 5}.
-        <= 248
+        # Upper bound 248 -> 249 (2026-10-10, #4636): structural::test_retired_training_shapes_4636.py — the lambdas/ mcp/
+        # sweep holding every read of the retired per-day training shape to training/legacy_workouts.py — arrives PROVEN
+        # via the re-runnable harness (MutationSpec + proof, ARMED 1/1). Measured: 773 {248, 513, 7, 5} -> 774 {249, 513, 7, 5}.
+        # Upper bound 249 -> 250 (2026-10-09, #4638, stacked on #4636 at merge): structural::test_upstream_changes_4638.py —
+        # the sweep holding the stated apple_health upstream_changes facet to "no rebuild-a-day caller" (keyword OR
+        # positional monotonic_guard) — arrives PROVEN via the re-runnable harness (MutationSpec + proof, ARMED 1/1).
+        # Measured after merging origin/main: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
+        # Upper bound 250 -> 251 (2026-10-10, #4694, stacked on #4638): guard::lambdas/content/autopublish_audit.py — the deterministic audit
+        # an unapproved chronicle must pass before the stale-draft sweep publishes it — arrives PROVEN (GUARD_PROOFS: four
+        # mutations, 5/1/5/1 red, restored 14 passed). Measured on top of #4638: 775 {250, 513, 7, 5} -> 776 {251, 513, 7, 5}.
+        # Upper bound 251 -> 252 (2026-10-10, #4674, stacked on #4694): registry::ledgers/site_vocabulary_residue.py::BASELINE::
+        # pace flag arrives PROVEN (REGISTRY_PROOFS). Measured after merging origin/main (disposable export vs lane):
+        # 776 {251, 513, 7, 5} -> 777 {252, 513, 7, 5}; id-set diff: exactly that one row enters, none leaves.
+        # Upper bound 252 -> 253 (2026-10-10, #4643 box 5): guard::deploy/check_bucket_notification_drift.py — the
+        # read-only S3 ingestion-trigger drift check — arrives PROVEN (GUARD_PROOFS: two mutations, 2 and 1 red,
+        # restored 6 passed). Measured on the lane off origin/main df63a72ea: 777 {252, 513, 7, 5} -> 778 {253, 513, 7, 5}.
+        # Upper bound 253 -> 254 (2026-10-10, #4270): registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa (the qa/ dir)
+        # arrives PROVEN (REGISTRY_PROOFS). Id-set diff vs a `git archive origin/main` export at 057ec826b:
+        # 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}; STRUCTURAL_CLASSES::{static,utility} relocate tests/ -> qa/.
+        <= 254
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

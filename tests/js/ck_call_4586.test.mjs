@@ -126,7 +126,8 @@ test("what settles next is one sentence with its day in words", () => {
 
 test("the list is every settled call newest first, the older ones folded away", () => {
   const html = C.listHTML(BODY, BASE);
-  const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)"/g)].map((m) => m[1]);
+  // Each row returns to this list by name (#4675).
+  const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)&amp;from=calls"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
   assert.equal(hrefs.length, 39);
   assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 9: Lisa Park called his morning recovery score at about 89\.1\. <span>Right · within 21\.5 either way<\/span><\/a><\/li>/);
@@ -144,13 +145,8 @@ test("each page names itself from the call", () => {
   assert.equal(C.metaFor(null).title, "A coach’s call, checked — Average Joe Matt");
 });
 
-test("Back returns where the reader came from on this site, else the front page", () => {
-  const origin = "https://averagejoematt.com";
-  assert.deepEqual(C.backTarget(`${origin}/next/v8/coaches/?x=1`, origin, BASE), { href: "/next/v8/coaches/?x=1", text: "← Back" });
-  assert.deepEqual(C.backTarget("https://news.ycombinator.com/item?id=1", origin, BASE), { href: BASE, text: "← Average Joe Matt" });
-  assert.deepEqual(C.backTarget("", origin, BASE), { href: BASE, text: "← Average Joe Matt" });
-  assert.deepEqual(C.backTarget("javascript:alert(1)", origin, BASE), { href: BASE, text: "← Average Joe Matt" });
-});
+// Where Back goes (`from=`, by name, else the front page) is one rule for every deep page
+// since #4675: tests/js/ck_deep_links_4675.test.mjs.
 
 test("no coach on any call page carries an honorific, and no sentence a count of earlier starts", () => {
   const all = BODY.calls.map((c) => C.claimHTML(c) + C.outcomeHTML(c) + C.recordHTML(c, BODY)).join("") + C.listHTML(BODY, BASE);

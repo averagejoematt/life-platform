@@ -10,10 +10,14 @@ Three rules the 2026-10-01 continuity review earned:
   * **Plan figures come from the plan root** (``experiment.plan_facts``), never from
     ``PROFILE#v1`` — the profile's 1,800 kcal / 190 g turned every protein verdict upside
     down for four weeks (#4540).
-  * **An export lag is not an absence.** Each batch-exported source carries a watermark —
-    the last date it covers and when that batch landed — and window dates past it are
-    ``not_yet_exported``. MacroFactor lands 3–7 days late; four installments read that as
-    a man who stopped logging.
+  * **An export lag is not an absence.** Every source the dossier reads carries a watermark
+    (``export_watermarks``) — the last date it covers on or before the week's end and when
+    that row landed — and a daily source's window dates past it are ``not_yet_exported``.
+    MacroFactor lands 3–7 days late; four installments read that as a man who stopped logging.
+  * **The window is the window.** No row dated after the week's end is read — a rebuilt week
+    sees only what its own dates hold, never a later batch (the watermark used to look 21 days
+    ahead). ``week_dossier`` refuses to return a packet whose targets are not the plan root's
+    (``plan_facts_findings``).
   * **Programmed volume is the programme.** Every session carries whether it was a matched
     routine and how it scored against the prescription, so the volume is attributed to the
     team that wrote it.
@@ -300,15 +304,73 @@ def _recovery(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _watermark(table, source: str, end: str) -> Dict[str, Any]:
-    rows = _days(table, source, (_d(end) - _dt.timedelta(days=21)).isoformat(), (_d(end) + _dt.timedelta(days=21)).isoformat())
-    if not rows:
+# ── ingest watermarks (#4532) ────────────────────────────────────────────────
+# Every source the dossier reads, and how it arrives. A DAILY source owes one row per day, so
+# a window date past its watermark is "not yet exported" — export lag, never behaviour
+# (MacroFactor's 09-20→26 landed in one batch at 09-27 05:33Z). An EVENT source has a row only
+# when something happened (a session, a weigh-in, a walk), so a date past its watermark is
+# either a rest day or unlanded and is never told as either.
+WATERMARK_SOURCES: Dict[str, str] = {
+    "macrofactor": "daily",
+    "whoop": "daily",
+    "habitify": "daily",
+    "apple_health": "daily",
+    "withings": "event",
+    "hevy": "event",
+    "strava": "event",
+}
+# The landing-time field each writer stamps (the HAE webhook writes its own name).
+_INGEST_FIELD: Dict[str, str] = {"apple_health": "webhook_ingested_at"}
+WATERMARK_LOOKBACK_DAYS = 21
+
+
+def ingest_watermark(table, source: str, end: str) -> Dict[str, Any]:
+    """The last date ``source`` covers ON OR BEFORE ``end`` and when that row landed.
+
+    Window-bounded: no row dated after ``end`` is read, so the watermark of a past week is
+    what that week could know about its own dates — a rebuilt week never borrows a later
+    row. ``last_batch_landed`` is a landing timestamp (UTC, minute precision), not a fact
+    about the week, and may postdate ``end`` when a batch landed after the window closed."""
+    start = (_d(end) - _dt.timedelta(days=WATERMARK_LOOKBACK_DAYS)).isoformat()
+    field = _INGEST_FIELD.get(source, "ingested_at")
+    covered: Dict[str, str] = {}
+    for r in _rows(table, source, start, end):
+        d = str(r.get("date") or str(r.get("sk", ""))[5:15])
+        if not d or d > end:
+            continue
+        covered[d] = max(covered.get(d, ""), str(r.get(field) or ""))  # the latest landing of that date's rows
+    if not covered:
         return {"last_covered_date": None, "last_batch_landed": None}
-    last = max(rows)
-    return {"last_covered_date": last, "last_batch_landed": str(rows[last].get("ingested_at") or "")[:16] or None}
+    last = max(covered)
+    return {"last_covered_date": last, "last_batch_landed": covered[last][:16] or None}
 
 
-def _nutrition(table, wk: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
+def _watermark(table, source: str, end: str) -> Dict[str, Any]:
+    return ingest_watermark(table, source, end)
+
+
+def not_yet_exported(window_dates: List[str], watermark: Dict[str, Any]) -> List[str]:
+    """Window dates past the watermark — every one of them, when the source has no row at all."""
+    last = watermark.get("last_covered_date")
+    return [d for d in window_dates if last is None or d > last]
+
+
+def export_watermarks(table, wk: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Per-source watermark for the week: ``{source: {kind, last_covered_date, last_batch_landed, ...}}``.
+    A daily source also carries its ``not_yet_exported_dates``; an event source carries a note instead."""
+    window = _dates(wk["start"], wk["end"])
+    out: Dict[str, Dict[str, Any]] = {}
+    for source, kind in WATERMARK_SOURCES.items():
+        wm: Dict[str, Any] = {"kind": kind, **ingest_watermark(table, source, wk["end"])}
+        if kind == "daily":
+            wm["not_yet_exported_dates"] = not_yet_exported(window, wm)
+        else:
+            wm["note"] = "a row exists only when something happened; a date past the watermark is a rest day or unlanded — tell neither"
+        out[source] = wm
+    return out
+
+
+def _nutrition(table, wk: Dict[str, Any], plan: Dict[str, Any], wm: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     days = _days(table, "macrofactor", wk["start"], wk["end"])
     kcal_t, prot_t, fib_t = plan.get("daily_calories_target"), plan.get("daily_protein_min_g"), plan.get("daily_fiber_min_g")
     per: List[Dict[str, Any]] = []
@@ -324,9 +386,11 @@ def _nutrition(table, wk: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any
                 "fiber_g": _r(_f(r.get("total_fiber_g")), 0),
             }
         )
-    wm = _watermark(table, "macrofactor", wk["end"])
+    if wm is None:
+        wm = _watermark(table, "macrofactor", wk["end"])
+    wm = {"last_covered_date": wm.get("last_covered_date"), "last_batch_landed": wm.get("last_batch_landed")}
     missing = [d for d in _dates(wk["start"], wk["end"]) if d not in days]
-    nye = [d for d in missing if wm["last_covered_date"] is None or d > wm["last_covered_date"]]
+    nye = not_yet_exported(missing, wm)
     return {
         "targets_from_plan": {
             "calories_kcal": kcal_t,
@@ -672,10 +736,21 @@ def _goals() -> Dict[str, Any]:
         )
 
 
-def load_plan() -> Dict[str, Any]:
-    from experiment.plan_facts import load_plan_facts
+_PLAN_FACTS_CACHE: Dict[str, Any] = {}
 
-    facts = load_plan_facts() or {}
+
+def _plan_facts() -> Optional[Dict[str, Any]]:
+    """The plan root's figures, read once per container so the dossier's targets and the check
+    that holds them (`plan_facts_findings`) see the same read — never a second, divergent one."""
+    if _PLAN_FACTS_CACHE.get("facts") is None:  # a failed read is retried next call, never cached
+        from experiment.plan_facts import load_plan_facts
+
+        _PLAN_FACTS_CACHE["facts"] = load_plan_facts()
+    return _PLAN_FACTS_CACHE["facts"]
+
+
+def load_plan(facts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    facts = (facts if facts is not None else _plan_facts()) or {}
     goals = _goals()
     t = goals.get("targets") or {}
     return {
@@ -725,12 +800,50 @@ def roster() -> List[Dict[str, Any]]:
     return [r for r in out if r["coach_id"] in _operational()]
 
 
+# The dossier's target figures and the plan-root key each must equal (#4532). The dossier
+# carries them twice — the merged plan block and nutrition's targets_from_plan — and both
+# are held, because a writer may quote either.
+PLAN_TARGET_PATHS: Tuple[Tuple[Tuple[str, ...], str], ...] = (
+    (("plan", "daily_calories_target"), "daily_calories_target"),
+    (("plan", "daily_protein_min_g"), "daily_protein_min_g"),
+    (("plan", "daily_fiber_min_g"), "daily_fiber_min_g"),
+    (("nutrition", "targets_from_plan", "calories_kcal"), "daily_calories_target"),
+    (("nutrition", "targets_from_plan", "protein_floor_g"), "daily_protein_min_g"),
+    (("nutrition", "targets_from_plan", "fiber_min_g"), "daily_fiber_min_g"),
+)
+
+
+def plan_facts_findings(dossier: Dict[str, Any], facts: Optional[Dict[str, Any]]) -> List[str]:
+    """Every dossier target that is not the plan root's figure. ``facts`` is
+    ``experiment.plan_facts.load_plan_facts()``; ``None`` (plan root unreadable) returns ``[]``
+    — the check is disarmed rather than guessing a plan, the same contract as plan_facts_gate.
+    A dossier carrying the profile's 1,800 kcal / 190 g fails here (#4540)."""
+    if not facts:
+        return []
+    out: List[str] = []
+    for path, key in PLAN_TARGET_PATHS:
+        node: Any = dossier
+        for p in path:
+            node = node.get(p) if isinstance(node, dict) else None
+        want = facts.get(key)
+        if want is None:
+            continue
+        if _f(node) != float(want):
+            out.append(f"dossier {'.'.join(path)} is {node!r}; the plan root ({facts.get('source', 'config/user_goals.json')}) says {want}")
+    return out
+
+
 def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
-    """(dossier, not_yet_exported_sources) for one season week."""
-    plan = load_plan()
+    """(dossier, not_yet_exported_sources) for one season week.
+
+    Raises ``ValueError`` when the dossier's targets are not the plan root's: a packet with the
+    wrong targets never reaches a writer (the four installments that printed 1,800 / 190)."""
+    facts = _plan_facts()
+    plan = load_plan(facts or {})  # the SAME read the check below holds the dossier to
     team = roster()
     names = {c["coach_id"]: c["name"] for c in team}
-    nutrition = _nutrition(table, wk, plan)
+    watermarks = export_watermarks(table, wk)
+    nutrition = _nutrition(table, wk, plan, watermarks["macrofactor"])
     dossier = {
         "week": wk["week"],
         "window": {
@@ -757,8 +870,16 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         # his own words, when he answered the week's questions by email (#4546); empty is a normal week
         "owner_voice": _owner_voice(table, wk),
         "body_composition": _body_composition(table, wk),
+        # per-source: the last date each source covers and when it landed — export lag is not absence
+        "export_watermarks": watermarks,
     }
-    nye = ["macrofactor"] if nutrition["not_yet_exported_dates"] else []
+    findings = plan_facts_findings(dossier, facts)
+    if findings:
+        raise ValueError("week dossier targets are not the plan's: " + "; ".join(findings))
+    nye = sorted(
+        {s for s, w in watermarks.items() if w.get("not_yet_exported_dates")}
+        | ({"macrofactor"} if nutrition["not_yet_exported_dates"] else set())
+    )
     dossier["roster_note"] = {
         "weekly_team": [c["name"] for c in team],
         "weekly_team_count": len(team),
@@ -767,7 +888,16 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "same_seat_two_names": "the physical seat's two calls were filed as 'Victor Reyes'; that seat is Max Reyes on the weekly team",
     }
     dossier["data_caveats"] = [
-        *(["nutrition for " + ", ".join(nutrition["not_yet_exported_dates"]) + " is not yet exported"] if nye else []),
+        *(
+            ["nutrition for " + ", ".join(nutrition["not_yet_exported_dates"]) + " is not yet exported"]
+            if nutrition["not_yet_exported_dates"]
+            else []
+        ),
+        *[
+            f"{s} for " + ", ".join(w["not_yet_exported_dates"]) + " is not yet exported"
+            for s, w in sorted(watermarks.items())
+            if s != "macrofactor" and w.get("not_yet_exported_dates")
+        ],
         "steps undercount (phone only)",
         "journal ingestion has been degraded since mid-September: an absent entry may simply be unlanded. Journal presence is NOT a story this experiment — at most one passing line in a season, never a lead or a coach's theme",
     ]

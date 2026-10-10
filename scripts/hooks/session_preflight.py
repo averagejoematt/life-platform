@@ -28,6 +28,7 @@ HEARD (#4260, verified against the hook contract)
   session actually started in (payload `cwd`), not the checkout this script lives in.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -106,6 +107,24 @@ def _boot_brief() -> list[str]:
         return [f"  model       UNVERIFIED (boot brief failed: {type(exc).__name__}: {exc})"]
 
 
+def _red_alarms() -> list[str]:
+    """#4709: alarms in ALARM now (name + red duration) and those that fired+cleared in 24h.
+    Read-only CloudWatch; any failure prints UNVERIFIED, never a blank or a 'none'."""
+    if os.environ.get("CLAUDE_HOOK_INERT") == "1":
+        return ["  red alarms  UNVERIFIED (hook inert — no AWS read; this is not a clean board)"]
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("_boot_brief_alarms", ROOT / "scripts" / "boot_brief.py")
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod.red_alarm_lines()
+    except Exception as exc:  # noqa: BLE001
+        return [f"  red alarms  UNVERIFIED ({type(exc).__name__}: {exc})"]
+
+
 def main() -> int:
     read_payload()  # records the payload cwd for git(); an empty/garbage stdin is fine
     print("── session pre-flight " + "─" * 46)
@@ -113,6 +132,8 @@ def main() -> int:
     print(f"  deploy lease {_waiting_lease()}")
     print(f"  worktrees   {_worktrees()}")
     for line in _boot_brief():
+        print(line)
+    for line in _red_alarms():
         print(line)
     print("  gates       python3 scripts/wrap_gates.py           (headroom per lane)")
     print("              python3 scripts/skill_lint.py --offline  (skill corpus)")
