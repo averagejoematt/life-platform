@@ -209,7 +209,7 @@ def test_edition_every_block_carries_the_contract_on_the_wire():
     assert b["coach_lines"]["voice"] == "restated" and len(b["coach_lines"]["data"]["lines"]) <= 3
     assert all("Dr." not in ln["coach"] for ln in b["coach_lines"]["data"]["lines"])
     # #4595: the scorecard is served, one row per area, each decided by a written rule.
-    assert b["scorecard"]["state"] == "ok" and b["scorecard"]["data"]["order"] == list(_ed.SCORECARD_ORDER)
+    assert b["scorecard"]["state"] == "ok" and b["scorecard"]["data"]["order"] == ["body", "training", "sleep", "food", "mind", "ai"]
     assert b["next"]["data"]["bet"]["data"]["question"].startswith("Will the morning recovery score")
 
 
