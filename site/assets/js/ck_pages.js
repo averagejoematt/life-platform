@@ -387,7 +387,9 @@ async function mountFront(edition, b) {
   // This week: what is going well and not, the lead's read, the chapter and the podcast.
   const span = F.weekSpan(b.week);
   fill("ck-week-label", esc(span ? `This week · ${span}` : "This week"));
-  fill("ck-week", F.weekSortHTML(b.week, base));
+  // #4595: the served scorecard (one written rule per area, decided in code) when the edition
+  // serves it; until the API that serves it is deployed, the older seven-day sort stands in.
+  fill("ck-week", F.scorecardRows(b.scorecard).length ? F.scorecardHTML(b.scorecard, base) : F.weekSortHTML(b.week, base));
   fill("ck-follow-line", esc(F.followLine(b.next)));
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
