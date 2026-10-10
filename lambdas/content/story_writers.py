@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ai.model_defaults import NARRATIVE_MODEL as WRITER_MODEL  # noqa: E402 — the one narrative default (#4275)
 
-from content import story_craft, story_ledger
+from content import story_checks, story_craft, story_ledger
 
 CHRONICLE_MAX_TOKENS = 7000  # ~1,100-1,500 words lands near 2,500 tokens; the ceiling is headroom, never the target
 EPISODE_MAX_TOKENS = 8000
@@ -353,7 +353,12 @@ def fact_check(
     _noop = re.compile(
         r"(?i)\bno (?:change|error|issue|correction)s? (?:is )?(?:needed|found|here|required|necessary)\b|\bskipping\b|\bthis is accurate\b"
     )
-    # an N/A fix is the reader saying the fact does not apply ("not reportable") — a non-finding, not a claim to change (#4749)
-    _na = re.compile(r"(?i)^\s*n/?a\.?\s*$")
-    real = [f for f in found if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}") and not _na.match(str(f.get("fix", "")))]
+    # an N/A fix whose problem says the fact does not apply ("not reportable") is a non-finding — unless it touches the
+    # privacy rules, which keep blocking however the reader phrased the fix (#4749; the one predicate the audit shares)
+    real = [
+        f
+        for f in found
+        if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}")
+        and not story_checks.is_na_nonfinding(f.get("problem", ""), f.get("fix", ""), f.get("claim", ""))
+    ]
     return [f"fact: {f['claim']!r} — {f['problem']} → {f['fix']}" for f in real]

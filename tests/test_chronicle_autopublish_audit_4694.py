@@ -286,36 +286,72 @@ def test_the_held_token_is_one_literal_in_the_lambda_the_module_and_the_metric_f
     assert 'alarm_name="chronicle-autopublish-held"' in block
 
 
-def test_an_na_outcome_never_blocks_whatever_its_prefix_4749():
-    """Week 5's stored findings re-verdicted: 3 blocking episode findings, not 4. Mutation control: drop is_na_outcome -> 4."""
+def _fact_reply_4749(findings):
+    """A fact-reader reply in the wire shape ``story_writers.fact_check`` parses (abridged, synthetic findings)."""
+    return {"stop_reason": "end_turn", "content": [{"type": "text", "text": json.dumps({"findings": findings})}]}
+
+
+def _writer_findings_4749(findings):
+    from content import story_writers
+
+    return story_writers.fact_check("text", {}, invoke=lambda body, model: _fact_reply_4749(findings))
+
+
+# (a) Week 5's real shape, abridged: the reader saying a dossier field does not apply, answered N/A.
+WEEK5_NA_SHAPE = {"claim": "graded_this_week_count", "problem": "the dossier field is not reportable for this week.", "fix": "N/A"}
+
+# (b) Privacy findings the reader answered with "→ N/A" instead of "remove" (synthetic, abridged). Every one says
+# "not reportable"/"does not apply" so ONLY the privacy veto stands between it and being dropped.
+PRIVACY_NA_FINDINGS = [
+    {"claim": "his 17th start", "problem": "a cycle count is not reportable on a reader surface.", "fix": "N/A"},
+    {"claim": "the reset tally", "problem": "reset counts are not reportable.", "fix": "N/A"},
+    {"claim": "attempt history", "problem": "the attempt count does not apply to reader copy.", "fix": "N/A"},
+    {"claim": "biological_age", "problem": "an owner-only field; not reportable.", "fix": "N/A"},
+    {"claim": "what his wife said", "problem": "off the record, not reportable.", "fix": "N/A"},
+    {"claim": "the journal entry", "problem": "private; not applicable to the installment.", "fix": "N/A"},
+]
+
+
+def test_week5_na_shape_is_a_non_finding_at_writer_and_audit_4749():
+    """(a) Week 5's stored findings re-verdicted: 3 blocking episode findings, not 4. Mutation control: make
+    is_na_outcome return False -> 4, and the writer emits the N/A line."""
     blocking = autopublish_audit.desk_blocking(json.dumps(WEEK5_DESK_FINDINGS))
     assert not any("N/A" in b for b in blocking)
+    assert len([b for b in blocking if b.startswith("desk episode:")]) == 3
     for prefix in ("fact:", "dek: fact:", "newgate:", "turn 2 (elena): fact:"):
-        raw = json.dumps({"post": [f"{prefix} 'x' — not reportable. → N/A"], "episode": [f"{prefix} 'x' — nope. -> n/a."]})
+        raw = json.dumps({"post": [f"{prefix} 'x' — not reportable. → N/A"], "episode": [f"{prefix} 'x' — does not apply here. -> n/a."]})
         assert autopublish_audit.desk_blocking(raw) == [], prefix
+    out = _writer_findings_4749([WEEK5_NA_SHAPE, {"claim": "23 days", "problem": "dossier says 12", "fix": "say 12 days"}])
+    assert len(out) == 1 and "23 days" in out[0]
+
+
+def test_an_na_fix_alone_is_not_a_non_finding_4749():
+    """Narrow: N/A is a non-finding only when the problem SAYS the fact does not apply."""
+    for problem in ("nope.", "the dossier says 12, not 23.", "wrong figure."):
+        raw = json.dumps({"post": [f"fact: 'x' — {problem} → N/A"], "episode": []})
+        assert len(autopublish_audit.desk_blocking(raw)) == 1, problem
+        assert len(_writer_findings_4749([{"claim": "x", "problem": problem, "fix": "N/A"}])) == 1, problem
     # a real fix that merely mentions N/A still blocks
-    real = json.dumps({"post": ["fact: 'x' — wrong → write N/A days"], "episode": []})
+    real = json.dumps({"post": ["fact: 'x' — not reportable → write N/A days"], "episode": []})
     assert len(autopublish_audit.desk_blocking(real)) == 1
 
 
-def test_the_fact_reader_does_not_emit_an_na_fix_as_a_finding_4749():
-    from content import story_writers
-
-    reply = {
-        "stop_reason": "end_turn",
-        "content": [
-            {
-                "type": "text",
-                "text": json.dumps(
-                    {
-                        "findings": [
-                            {"claim": "graded_this_week_count", "problem": "not reportable.", "fix": "N/A"},
-                            {"claim": "23 days", "problem": "dossier says 12", "fix": "say 12 days"},
-                        ]
-                    }
-                ),
-            }
-        ],
-    }
-    out = story_writers.fact_check("text", {}, invoke=lambda body, model: reply)
-    assert len(out) == 1 and "23 days" in out[0]
+def test_a_privacy_finding_answered_na_still_blocks_at_writer_and_audit_4749():
+    """(b) A privacy finding the reader answered '→ N/A' keeps blocking at BOTH the desk writer and the autopublish
+    audit. Mutation control (run): drop the ``touches_privacy`` veto from ``story_checks.is_na_nonfinding`` and every
+    case below is dropped at both sites — this test goes red."""
+    offenders = []
+    out = _writer_findings_4749(PRIVACY_NA_FINDINGS)
+    if len(out) != len(PRIVACY_NA_FINDINGS):
+        offenders.append(f"writer dropped {len(PRIVACY_NA_FINDINGS) - len(out)} privacy finding(s)")
+    # the stored shape the writer emits, built independently so the audit is judged on its own
+    stored = [f"fact: {f['claim']!r} — {f['problem']} → {f['fix']}" for f in PRIVACY_NA_FINDINGS]
+    for prefix in ("", "dek: ", "turn 3 (elena): "):
+        raw = json.dumps({"post": [prefix + s for s in stored], "episode": [prefix + s for s in stored]})
+        blocking = autopublish_audit.desk_blocking(raw)
+        if len(blocking) != 2 * len(stored):
+            offenders.append(f"audit ({prefix or 'bare'}) blocked {len(blocking)} of {2 * len(stored)}")
+    assert not offenders, offenders
+    # and alongside the Week 5 non-finding, only the privacy line survives
+    mixed = _writer_findings_4749([WEEK5_NA_SHAPE, PRIVACY_NA_FINDINGS[0]])
+    assert len(mixed) == 1 and "17th start" in mixed[0]

@@ -55,14 +55,12 @@ _DATED_WEEKDAY = re.compile(
 )
 
 
-# An N/A outcome: the fact reader saying a fact does not apply ("... not reportable. → N/A"). It reports nothing wrong,
-# so it never blocks whatever prefix it was written under (#4749).
-_NA_OUTCOME = re.compile(r"(?:→|->)\s*n/?a\.?\s*$", re.IGNORECASE)
-
-
 def is_na_outcome(finding: str) -> bool:
-    """True for a finding whose corrected-wording slot is N/A — a non-finding, not a claim to fix."""
-    return bool(_NA_OUTCOME.search(str(finding or "").strip()))
+    """True for the fact reader's "does not apply" answer ("... not reportable. → N/A") — a non-finding, whatever
+    prefix it was written under (#4749). Narrow: the problem must SAY the fact does not apply, and a finding that
+    names a privacy concern (a cycle/reset/attempt count, an owner-only or off-record field) is never one — it keeps
+    blocking even when the reader answered it with N/A. One predicate, shared with the desk writer's filter."""
+    return story_checks.is_na_nonfinding_line(str(finding or "").strip())
 
 
 def is_style_finding(finding: str) -> bool:
