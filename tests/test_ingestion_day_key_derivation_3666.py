@@ -134,6 +134,16 @@ DAY_KEY_WRITERS = {
         "frame": "pacific",
         "reason": "Updates an EXISTING strava DATE# record in place; it never derives a day, it re-opens one.",
     },
+    "strava_lambda.py": {
+        "source": "strava",
+        "origin": "inherited",
+        "frame": "pacific",
+        "reason": (
+            "#4638: the reconciler's empty-day write replaces an EXISTING strava DATE# row, using the day read "
+            "back off that row's own sort key (_fetch_stored_days) — it never derives a day. The rows themselves "
+            "are framework writes keyed by the activity's start_date_local day."
+        ),
+    },
     "whoop_lambda.py": {
         "source": "whoop",
         "origin": "reading_timestamp",

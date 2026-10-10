@@ -55,6 +55,14 @@ _DATED_WEEKDAY = re.compile(
 )
 
 
+def is_na_outcome(finding: str) -> bool:
+    """True for the fact reader's "does not apply" answer ("... not reportable. → N/A") — a non-finding, whatever
+    prefix it was written under (#4749). Narrow: the problem must SAY the fact does not apply, and a finding that
+    names a privacy concern (a cycle/reset/attempt count, an owner-only or off-record field) is never one — it keeps
+    blocking even when the reader answered it with N/A. One predicate, shared with the desk writer's filter."""
+    return story_checks.is_na_nonfinding_line(str(finding or "").strip())
+
+
 def is_style_finding(finding: str) -> bool:
     """True for a finding that is a writer's note (``craft:``/``repeat:``), however the desk wrapped it."""
     return _WRAPPER.sub("", str(finding or "").strip()).lower().startswith(STYLE_PREFIXES)
@@ -72,7 +80,7 @@ def desk_blocking(raw: Any) -> List[str]:
         return ["the desk's audit record is not {post: [...], episode: [...]}"]
     out: List[str] = []
     for part in ("post", "episode"):
-        out += [f"desk {part}: {f}" for f in found[part] if not is_style_finding(f)]
+        out += [f"desk {part}: {f}" for f in found[part] if not is_style_finding(f) and not is_na_outcome(f)]
     return out
 
 

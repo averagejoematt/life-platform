@@ -269,7 +269,8 @@ DEGRADE_CODES = (
     "truncated",  # Bedrock stop_reason == max_tokens; the array was cut off
     "unparseable",  # no readable in-taxonomy JSON array came back
     "cap_exceeded",  # the monthly Haiku call cap; no spend, no attempt
-    "llm_error",  # anything else that raised (AccessDenied, throttle, timeout, budget tier 3)
+    "budget_paused",  # #4643: budget_guard pauses the `training_notes` feature; no spend, no attempt
+    "llm_error",  # anything else that raised (AccessDenied, throttle, timeout)
 )
 # Records written before #3699 carry `degraded: true` with NO reason field at all. That
 # absence is itself provenance — it is not "unknown for an unknown reason", it is "written

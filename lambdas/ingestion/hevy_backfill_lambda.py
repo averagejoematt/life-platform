@@ -417,6 +417,11 @@ def lambda_handler(event: dict, context: Any) -> dict:
     """Scheduled backfill entry point. Polls the events feed since the
     last-known timestamp, ingests new/updated workouts, persists new
     high-water-mark on success."""
+    # #4643: the daily boot probe (pipeline_health_check) now invokes this function. A
+    # boot check proves the bundle imports — it must never walk the feed or write a
+    # health record that would read as a real attempt.
+    if event and event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     # #3764: the template index has a producer now. Runs on its own daily EventBridge
     # rule with this constant input — the index was built by hand once on 2026-06-01 and
     # had drifted 789 vs 828 live by 2026-09-13, every missing title costing a live walk.

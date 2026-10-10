@@ -41,19 +41,21 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 lambda_client = boto3.client("lambda", region_name=REGION)
 
-PIPELINES = [
-    # (lambda_function_name, display_name, source_id)
-    ("whoop-data-ingestion", "Whoop", "whoop"),
-    ("withings-data-ingestion", "Withings", "withings"),
-    ("eightsleep-data-ingestion", "Eight Sleep", "eightsleep"),
-    ("garmin-data-ingestion", "Garmin", "garmin"),
-    ("strava-data-ingestion", "Strava", "strava"),
-    ("habitify-data-ingestion", "Habitify", "habitify"),
-    ("todoist-data-ingestion", "Todoist", "todoist"),
-    ("notion-journal-ingestion", "Notion", "notion"),
-    ("weather-data-ingestion", "Weather", "weather"),
-    ("dropbox-poll", "Dropbox Poll", "dropbox"),
-    ("health-auto-export-webhook", "Health Auto Export", "apple_health"),
+from ingestion.source_registry import active_api_source_ids, best_effort_source_ids, health_probe_targets
+
+# #4643: the INGESTION probe rows are DERIVED from the registry's `probe_functions`
+# facet — (lambda_function_name, display_name, source_id). This was a hand-written
+# literal that omitted the Hevy poller and all three enrichment functions and still
+# listed paused Garmin with nothing tying it to the facet. A paused source stays in
+# the list and is skipped at probe time by `is_paused` (the registry `paused` facet),
+# so it is reported `paused`, never invoked. tests/test_health_probe_registry_4643.py
+# holds this list equal to the registry and the registry equal to the scheduled
+# functions in cdk/stacks/ingestion_stack.py.
+INGESTION_PROBES = health_probe_targets()
+
+# The compute/serve cascade is not ingestion and has no registry row; these stay
+# named here. Each handles {"healthcheck": true} as a boot check.
+COMPUTE_PROBES = [
     ("character-sheet-compute", "Character Sheet", "character_sheet"),
     ("daily-metrics-compute", "Daily Metrics", "computed_metrics"),
     ("daily-insight-compute", "Daily Insights", "insights"),
@@ -61,6 +63,8 @@ PIPELINES = [
     ("daily-brief", "Daily Brief", "daily_brief"),
     ("anomaly-detector", "Anomaly Detector", "anomaly_detector"),
 ]
+
+PIPELINES = INGESTION_PROBES + COMPUTE_PROBES
 
 # ── ER-01 infra-liveness ──────────────────────────────────────────────────────
 # Active OAuth/API *pull* sources that should run at least once per day. These are
@@ -72,8 +76,6 @@ PIPELINES = [
 # #466/#467), otherwise it sits at 'unknown' forever and the listing fakes coverage.
 # #498 (X-10): derived from the registry's active_api facet — this was one of the
 # two hand-rolled copies of "which pulls must attempt daily".
-from ingestion.source_registry import active_api_source_ids, best_effort_source_ids
-
 ACTIVE_API_SOURCES = active_api_source_ids()
 
 # Best-effort sources: known-brittle by an accepted, unfixable upstream cause. They are

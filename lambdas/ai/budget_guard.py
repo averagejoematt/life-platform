@@ -208,6 +208,40 @@ _FEATURE_CUTOFF = {
     # verdict and the deterministic layer (redline vetoes, tripped tripwires) still runs at
     # $0 — the routine is never reported as red-teamed by a model that did not run.
     "plan_critics": 2,
+    # ── INGEST-PATH processing (#4643) — hard-stop only, BY DECLARATION ───────
+    #
+    # The four AI callers on the ingest path (every lambdas/ingestion/ module and
+    # the lambdas/ modules they import directly — tests/test_ingest_ai_budget_rows_4643.py
+    # derives the set and reds a new one with no row here). Until #4643 none of them
+    # was listed, so each INHERITED the unknown-feature default (cutoff 3) by accident
+    # — the shape that made coherence_semantic outlive every reader surface. Listing
+    # them at 3 changes NO live behaviour (that was already their effective cutoff, and
+    # bedrock_client stops everything at 3 anyway); what it changes is that the band is
+    # now a written decision a reviewer can move, with a budget-ledger row behind it.
+    #
+    # Why 3 and not band 1, although each is an analysis/derivation layer: band 1 is the
+    # platform's DEFAULT state at current burn (tier >= 1 most days of a month), so a
+    # band-1 cutoff here would switch journal and social enrichment, the training-note
+    # tail and the sensitivity classifier off on most days — a product change, and the
+    # owner's call, not a side effect of filing a ledger row. Live spend is cents a
+    # month (LifePlatform/AI::EstimatedCostUSD, read 2026-10-10: Aug journal-enrichment
+    # $0.011, Sep hevy-backfill $0.035, the two social dimensions $0.00).
+    #
+    # journal_enrichment: the Notion-journal Haiku extraction (enriched_* + the
+    # flourishing projection). A paused run skips the model, keeps every entry
+    # un-enriched for the next sweep (the Sunday 30-day pass self-heals), and reports
+    # `paused_by_budget` in its summary.
+    "journal_enrichment": 3,
+    # social_enrichment: the same extraction over inbound social posts (#1671).
+    "social_enrichment": 3,
+    # broadcast_sensitivity (#1673): the off-topic Haiku layer of the auto-publish
+    # sensitivity gate. FAIL-CLOSED when paused (the post is HELD, never published), so
+    # pausing it earlier would silently empty the public social feed — it stays at 3.
+    "broadcast_sensitivity": 3,
+    # training_notes (#187/#3699): the bounded Haiku tail of the training-note extractor
+    # (hevy-backfill on ingest + the bulk sweep). A paused call degrades the record to
+    # deterministic-only with degraded_reason `budget_paused` — the note is never dropped.
+    "training_notes": 3,
     # ── Band 3: the two IRREDUCIBLE reader promises + the two OPERATOR-TRUTH CI
     #    gates — pause LAST (ADR-100/125, the latter added by the ADR-125
     #    2026-08-03 amendment, #1927).

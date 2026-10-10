@@ -73,6 +73,13 @@ MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
+# #4643: the budget_guard feature this Lambda's own Haiku extraction is gated on — listed in
+# budget_guard._FEATURE_CUTOFF and scripts/ai_budget_ledger.py (tests/test_ingest_ai_budget_rows_4643.py).
+BUDGET_FEATURE = "journal_enrichment"
+# #4643: the ER-01 INGEST_HEALTH#<name> sentinel every run writes (record_ingest_health), so a
+# dead or erroring enrichment is visible to liveness, not only to a DLQ that never fills.
+HEALTH_SOURCE = "journal_enrichment"
+
 PK = f"USER#{USER_ID}#SOURCE#notion"
 # J-5 (#505): the floor is WORDS, aligned with journal_analyzer_lambda — the old
 # 20-CHAR floor let one-liners through that only produced junk extractions.
@@ -82,6 +89,33 @@ SCHEMA_VERSION = 2  # #505: bump when the extraction schema changes; v1 entries 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
+
+# #4643: the ER-01 liveness sentinel, the same writer notion/dropbox/hevy use.
+try:
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
+
+def _record_health(*, succeeded: bool, exc=None) -> None:
+    """Best-effort INGEST_HEALTH write for this run (the Lambda ran = attempted). Never raises."""
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    error_class = "none" if succeeded else (exc if isinstance(exc, str) else classify_error(exc))
+    record_ingest_health(table, HEALTH_SOURCE, logger, attempted=True, succeeded=succeeded, error_class=error_class)
+
+
+def _ai_allowed() -> bool:
+    """budget_guard gate for this run's Haiku extraction (#4643). Fails open if the
+    module is missing — bedrock_client's own tier-3 backstop still applies."""
+    try:
+        from ai import budget_guard
+    except ImportError:  # pragma: no cover — budget_guard always bundled in prod
+        return True
+    return budget_guard.allow(BUDGET_FEATURE)
 
 
 # ── Haiku Prompt ──────────────────────────────────────────────────────────────
@@ -491,6 +525,10 @@ def _refresh_horizons_calibration():
 
 
 def lambda_handler(event: dict, context) -> dict:
+    # #4643: the daily boot probe (pipeline_health_check) invokes this with
+    # {"healthcheck": true} — prove the bundle imports, never call the model.
+    if isinstance(event, dict) and event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Lambda entry point.
@@ -536,6 +574,7 @@ def lambda_handler(event: dict, context) -> dict:
         if event.get("conversations_only"):
             summary = _run_conversational(event, start_date, end_date, force)
             logger.info(f"Conversations-only complete: {summary}")
+            _record_health(succeeded=True)  # #4643
             return {"statusCode": 200, "body": json.dumps(summary)}
 
         entries = query_journal_entries(start_date, end_date, full_sync)
@@ -549,12 +588,18 @@ def lambda_handler(event: dict, context) -> dict:
             rows = _write_flourishing_rows(entries)
             summary = {"entries_found": len(entries), "flourishing_rows": rows, "date_range": f"{start_date} → {end_date}"}
             logger.info(f"Flourishing-only complete: {summary}")
+            _record_health(succeeded=True)  # #4643
             return {"statusCode": 200, "body": json.dumps(summary)}
 
         enriched = 0
         skipped = 0
         errors = 0
+        paused_by_budget = 0  # #4643: entries left for the next sweep because the tier paused the model
+        last_error = None  # #4643: the class the health record carries when a run errors
         diary_reactions = 0  # #1756
+        ai_allowed = _ai_allowed()  # #4643: one tier read per run, not per entry
+        if not ai_allowed:
+            logger.warning(f"budget tier pauses {BUDGET_FEATURE}: no Haiku extraction this run (entries stay queued)")
 
         for item in entries:
             sk = item.get("sk", "")
@@ -590,6 +635,10 @@ def lambda_handler(event: dict, context) -> dict:
             elif stale_schema and item.get("enriched_at"):
                 logger.info(f"Re-enriching {sk}: schema v{item.get('enriched_schema_version') or 1} < v{SCHEMA_VERSION}")
 
+            if not ai_allowed:
+                paused_by_budget += 1
+                continue
+
             template = item.get("template", "Unknown")
             date = item.get("date", "")
             structured_scores = build_structured_scores(item)
@@ -617,9 +666,11 @@ def lambda_handler(event: dict, context) -> dict:
                         skipped += 1
                 else:
                     errors += 1
+                    last_error = last_error or "parse"
                     logger.error(f"  ✗ No enrichment returned for {sk}")
             except Exception as e:
                 errors += 1
+                last_error = e
                 logger.error(f"  ✗ Error enriching {sk}: {e}")
 
         # #1403: after enrichment, project the window's SOURCE#flourishing rows.
@@ -658,6 +709,7 @@ def lambda_handler(event: dict, context) -> dict:
             "enriched": enriched,
             "skipped": skipped,
             "errors": errors,
+            "paused_by_budget": paused_by_budget,  # #4643
             "diary_reactions": diary_reactions,  # #1756
             "flourishing_rows": flourishing_rows,
             "conversational": conversational,
@@ -666,7 +718,12 @@ def lambda_handler(event: dict, context) -> dict:
         }
         logger.info(f"Complete: {summary}")
 
+        # #4643: a run in which any entry failed to enrich is a FAILED run for liveness (the
+        # streak arm then sees a model/parse failure that repeats), while a budget pause is a
+        # healthy run that sanctioned-skipped — the tier is not an outage.
+        _record_health(succeeded=errors == 0, exc=last_error)
         return {"statusCode": 200, "body": json.dumps(summary)}
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)
+        _record_health(succeeded=False, exc=e)  # #4643
         raise

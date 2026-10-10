@@ -272,10 +272,10 @@ def review_record(post: dict) -> dict:
 
 
 # ── Production off-topic classifier (Bedrock; lazy imports; fail-closed) ────────────
-# Budget feature name. Deliberately NOT registered in budget_guard._FEATURE_CUTOFF, so it
-# inherits the "unknown feature" cutoff (tier 3) — this cheap Haiku pass keeps the feed
-# low-touch until the hard stop, at which point bedrock_client's own tier-3 backstop
-# raises anyway and we hold. (Promotable into an ADR-125 band later if telemetry warrants.)
+# Budget feature name. Registered in budget_guard._FEATURE_CUTOFF at the hard stop (tier 3,
+# #4643 — it used to inherit that cutoff by being unlisted, and so had no budget-ledger row
+# either). This cheap Haiku pass keeps the feed low-touch until the hard stop, at which point
+# bedrock_client's own tier-3 backstop raises anyway and we hold.
 _BUDGET_FEATURE = "broadcast_sensitivity"
 
 _OFFTOPIC_SYSTEM = (

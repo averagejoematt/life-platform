@@ -257,6 +257,51 @@ def reader_surface(text: str, *, constructed: bool = False) -> List[str]:
     return findings
 
 
+# ── the fact reader's N/A non-finding (#4749) ────────────────────────────────
+# The fact reader sometimes answers "this fact does not apply" with a fix of N/A ("'graded_this_week_count' — not
+# reportable for this week. → N/A"). That reports nothing wrong, so neither the desk writer nor the autopublish audit
+# should hold a week on it. The carve-out is NARROW on purpose, because an N/A fix alone says nothing about the
+# problem: a finding is a non-finding only when (1) its fix is exactly N/A, (2) its problem text SAYS the fact does
+# not apply, and (3) nothing in its claim or problem touches the privacy rules — a cycle/reset/attempt count, an
+# owner-only or off-record field. A privacy finding the reader happened to answer with "→ N/A" instead of "remove"
+# still blocks (fail-closed): the privacy veto reuses ``reader_surface`` and the off-record vocabulary above.
+_NA_FIX = re.compile(r"^\s*n/?a\.?\s*$", re.IGNORECASE)
+_DOES_NOT_APPLY = re.compile(
+    r"\bnot\s+(?:reportable|applicable)\b|\b(?:does\s+not|doesn['’]t)\s+apply\b|\bis\s+inapplicable\b",
+    re.IGNORECASE,
+)
+_PRIVACY_CONCERN = re.compile(
+    r"\b(?:privacy|private|sensitive|confidential|owner[\s_-]*only|tier[\s_-]*2|off[\s_-]*(?:the[\s_-]*)?record|"
+    r"cycles?|resets?|restarts?|relaunch(?:es)?|attempts?|vices?|journal|family|partner|spouse|wife|girlfriend|employer)",
+    re.IGNORECASE,
+)
+_NA_TAIL = re.compile(r"\s*(?:→|->)\s*(?P<fix>n/?a\.?)\s*$", re.IGNORECASE)
+
+
+def touches_privacy(text: str) -> bool:
+    """True when ``text`` names a privacy concern: the privacy vocabulary, or anything ``reader_surface`` refuses."""
+    text = str(text or "")
+    return bool(_PRIVACY_CONCERN.search(text)) or bool(reader_surface(text))
+
+
+def is_na_nonfinding(problem: Any, fix: Any, claim: Any = "") -> bool:
+    """True only for the fact reader's "does not apply" answer — fix N/A, problem saying not reportable / not
+    applicable / does not apply, and no privacy concern in the claim or problem (#4749)."""
+    problem, claim = str(problem or ""), str(claim or "")
+    if not _NA_FIX.match(str(fix or "")) or not _DOES_NOT_APPLY.search(problem):
+        return False
+    return not touches_privacy(f"{claim} {problem}")
+
+
+def is_na_nonfinding_line(finding: Any) -> bool:
+    """The same predicate over a stored finding string (``... '<claim>' — <problem> → N/A``), whatever its prefix."""
+    m = _NA_TAIL.search(str(finding or ""))
+    if not m:
+        return False
+    head = str(finding)[: m.start()]
+    return is_na_nonfinding(head, m.group("fix"), "")
+
+
 def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
     """``reader_surface`` plus the desk writers' own findings: backstage words, or an export lag told as silence.
 
