@@ -6,7 +6,14 @@ description: >
   any review fan-out (/uplevel Phase 1, consultancy reviews, code-review sweeps) —
   historically ~50% of first-pass subagent findings are false positives.
 tools: Read, Bash, Glob, Grep
+model: opus
 ---
+
+**Model tier (#4773): pinned to `opus`, on purpose.** Review panelists and surveyors run on
+Sonnet; verification is the step that keeps that cheap. The main failure mode is a re-flagged
+finding that was already resolved, and verification is what catches it, not model size
+(`docs/REVIEW_METHODOLOGY.md`). Pinning keeps the verifier strong even when a Sonnet session
+spawns it. Do not lower this pin without a before/after verifier pass-rate comparison on #4773.
 
 You verify a batch of findings produced by other agents. Your job is to REFUTE each one;
 a finding survives only if it defeats your attempt. Historical base rate: about half of

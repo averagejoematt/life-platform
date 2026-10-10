@@ -67,8 +67,8 @@ _BEFORE_4770 = {
     "daily_debrief": _H45,
     "ensemble": _H45,
     "eyeball_estimate": _H45,
-    # #4769: these two invoked NO model before (each passed a bare tier word that raises);
-    # pinned to the model #4769 restores, which no caller names yet.
+    # #4769: these two invoked NO model before #4784 (each passed a bare tier word that raises);
+    # pinned to the model #4784 restored, which each caller now resolves through its route.
     "horizons_retrospective": _S46,
     "broadcast_sensitivity": _H45,
     "journal_enrichment": _H45,
@@ -220,16 +220,9 @@ _EXEMPT = {
         "CACHING_DECISIONS records the model each cache decision was MEASURED against (a fact about a past "
         "CountTokens run, read by no invoke path); re-made per model by #4778",
     ),
-    # _PENDING_4769: each passes a bare tier word the chokepoint rejects; #4769 (parallel lane) fixes the
-    # names, then a one-line follow-up moves each to its ROUTES row and deletes the exemption.
-    "lambdas/reading/horizons_retrospective.py": ("2026-10-10", "#4769: model_name='sonnet' raises; route 'horizons_retrospective' waits"),
-    "lambdas/privacy/broadcast_sensitivity_gate.py": (
-        "2026-10-10",
-        "#4769: model_name='haiku' raises; route 'broadcast_sensitivity' waits",
-    ),
 }
-# Routes no caller names yet — the same two, until #4769's follow-up.
-_UNCALLED_ROUTES = {"horizons_retrospective": "#4769", "broadcast_sensitivity": "#4769"}
+# Routes no caller names yet. Empty since the #4769 callers moved onto their rows (2026-10-10).
+_UNCALLED_ROUTES: dict[str, str] = {}
 
 
 def _is_env_read(node):
@@ -310,7 +303,7 @@ def test_every_exemption_is_dated_reasoned_and_still_needed():
     _, named = _scan(ROOT)
     for route in _UNCALLED_ROUTES:
         assert route not in named, f"{route} now has a caller — delete it from _UNCALLED_ROUTES and its _EXEMPT row"
-    assert len(_EXEMPT) <= 3, "the exemption list only shrinks"
+    assert len(_EXEMPT) <= 1, "the exemption list only shrinks"
 
 
 _PLANTED = [

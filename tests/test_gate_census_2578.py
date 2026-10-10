@@ -1074,10 +1074,15 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 253 -> 254 (2026-10-10, #4270): registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa (the qa/ dir)
         # arrives PROVEN (REGISTRY_PROOFS). Id-set diff vs a `git archive origin/main` export at 057ec826b:
         # 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}; STRUCTURAL_CLASSES::{static,utility} relocate tests/ -> qa/.
-        # Upper bound 254 -> 257 (2026-10-10, #4770): registry::tests/test_model_routing_4770.py::_EXEMPT::{prompt_cache,
-        # horizons_retrospective, broadcast_sensitivity_gate} arrive PROVEN (REGISTRY_PROOFS; each entry deleted -> 1 failed
-        # naming that file, restored 15 passed). Measured off origin/main 057ec826b: 779 {254, 513, 7, 5} -> 782 {257, 513, 7, 5}.
-        <= 257
+        # Upper bound 254 -> 257 (2026-10-10, #4252 box 4, on top of #4270): the Unit Tests suite split into a 3-leg `shard`
+        # matrix. Two CI steps enter PROVEN (ci-test.yml shard::3 install, shard::4 coverage pass) and the combine step that
+        # replaced the old coverage gate (test::6, same label) turns PROVEN, its residue line leaving — CI_PROOFS. Measured by
+        # id-set diff vs a `git archive origin/main` export: 779 {254, 513, 7, 5} -> 781 {257, 512, 7, 5}.
+        # Upper bound 257 -> 258 (2026-10-10, #4770): registry::tests/test_model_routing_4770.py::_EXEMPT::lambdas/ai/
+        # prompt_cache.py arrives PROVEN (REGISTRY_PROOFS; entry deleted -> 1 failed naming prompt_cache.py:143/:159, restored
+        # 15 passed). The two #4769 callers moved onto ROUTES rows, so their exemptions never enter. Id-set diff vs a
+        # `git archive origin/main` export at 16dcddf20: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}.
+        <= 258
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

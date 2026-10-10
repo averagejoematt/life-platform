@@ -136,10 +136,8 @@ ROUTES: dict[str, Route] = {
     "daily_debrief": Route(feature="daily_debrief", env="AI_MODEL_HAIKU"),
     "ensemble": Route(feature="ensemble", env="AI_MODEL_HAIKU"),
     "eyeball_estimate": Route(feature="eyeball_estimate"),
-    # The two #4769 callers: today each passes a bare tier word ("sonnet" / "haiku") the
-    # chokepoint rejects, so they invoke NO model. These rows are the model #4769 restores;
-    # no caller names them until that fix lands and the caller moves here (the guard's
-    # dated _PENDING_4769 exemption in tests/test_model_routing_4770.py).
+    # The two #4769 callers: each passed a bare tier word ("sonnet" / "haiku") the chokepoint
+    # rejected until #4769 (#4784) gave them mapped names; they resolve here since, unchanged.
     "horizons_retrospective": Route(feature="horizons_retrospective"),
     "broadcast_sensitivity": Route(feature="broadcast_sensitivity"),
     "journal_enrichment": Route(feature="journal_enrichment", env="MODEL"),
