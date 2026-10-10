@@ -33,7 +33,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 from test_plan_input_read_state_4072 import TODAY, _FakeTable, _stage1, _whoop_rows, _wire  # noqa: E402
 
 import mcp.config as mcp_config  # noqa: E402
-import mcp.plan_morning_note as pmn  # noqa: E402
+import mcp.plan_helpers as pmn  # noqa: E402
 import mcp.tools_coach_packet as pkt  # noqa: E402
 import mcp.tools_plan as tp  # noqa: E402
 
@@ -75,7 +75,7 @@ def _block(**overrides) -> dict:
 
 # ── 1. the pair contract: the block reads what the packet reads ────────────────────────────
 def test_the_constraint_block_carries_the_same_note_the_coach_packet_serves(monkeypatch):
-    """Mutation (run 2026-10-10): delete the `plan_morning_note.attach(...)` line in
+    """Mutation (run 2026-10-10): delete the `attach_morning_note(...)` line in
     `tool_plan_next_session` -> KeyError 'morning_note' here. Reshaping the words (e.g. a
     lower()/paraphrase) or a second query of the partition reds the equality."""
     _wire_both(monkeypatch, _whoop_rows() + [_note(TODAY)])
