@@ -121,7 +121,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-737 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+736 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -195,7 +195,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `life_events` | — | site_api_journey.py |
 | `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
 | `macrofactor_meals` | — | — |
-| `macrofactor_workouts` | — | tools_training.py |
+| `macrofactor_workouts` | — | — |
 | `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, site_api_physical.py |
 | `milestones` | — | — |
 | `morning_note` | site_api_social_note.py | morning_note.py |
@@ -509,7 +509,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1275 total · 916 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1276 total · 917 resolved · 359 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 83 resolved · 0 dynamic of 83 scheduled lambdas (107 lambdas total)
 - Alarms: 133 literal-named declarations across three idioms, 4 composite; routing digest 89 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only

@@ -25,7 +25,10 @@ exhausting the budget through fan-out must 429 without reaching Bedrock.
 import hashlib
 import json
 import os
+import socket
 import sys
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
@@ -48,6 +51,24 @@ def _post(body):
     }
 
 
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """#4560: these tests assert CHARGES, never answers. Before this, every one of them ran past the
+    charge into the real context fetch (S3/DDB) and the persona pass (Bedrock) with fake creds; in the
+    full CI suite that path stalled one test for 182 s (bar 90 s) while the same test took 2.6 s alone.
+    A socket connect here is a leak: fail it instantly instead of letting it retry for minutes."""
+
+    leaks = []
+
+    def _refuse(self, address, *a, **k):
+        leaks.append(address)  # recorded, because the tests below swallow exceptions on purpose
+        raise OSError(f"#4560: network refused in test ({address})")
+
+    monkeypatch.setattr(socket.socket, "connect", _refuse)
+    yield
+    assert not leaks, f"#4560: test_board_ask_fanout_cost_1221 reached the network {leaks} — stub the path, do not call out"
+
+
 def _spy(ai, monkeypatch, allowed=True):
     """Record every rate-limiter charge so the test can assert the TOTAL cost."""
     charges = []
@@ -60,6 +81,11 @@ def _spy(ai, monkeypatch, allowed=True):
     monkeypatch.setattr(ai, "_RATE_LIMITER_READY", True)
     monkeypatch.setattr(ai, "_ai_paused_response", lambda: None)
     monkeypatch.setattr(ai, "_get_anthropic_key", lambda: "fake-key")
+    # #4560: cut the paid/network path AFTER the charge — the context fetch (S3/DDB) and the
+    # persona pass (Bedrock). The charges are already recorded by the time either is reached.
+    monkeypatch.setattr(ai, "_ask_fetch_context", lambda *a, **k: {})
+    monkeypatch.setattr(ai._board_panel, "convene", lambda *a, **k: ([], []))
+    monkeypatch.setattr(ai, "_create_board_session", lambda *a, **k: None)
     return charges
 
 

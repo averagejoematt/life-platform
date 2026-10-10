@@ -1169,6 +1169,22 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard rglobs lambdas/ on disk, so an untracked module is in scope
     ),
+    "structural::test_retired_training_shapes_4636.py": MutationSpec(
+        gate_id="structural::test_retired_training_shapes_4636.py",
+        target="tests/test_retired_training_shapes_4636.py",
+        detects=(
+            "a NEW module that reads a stored row's nested per-day `workouts` list — the retired training shape "
+            "(#4636: the monthly digest counted 0 of 24 September sessions reading it, and two MCP views read the "
+            "writerless macrofactor_workouts partition) — outside the one bridge, training/legacy_workouts.py"
+        ),
+        plants=(
+            (
+                "lambdas/training/_census_probe_4636.py",
+                'def sessions(row):\n    return row.get("workouts") or []\n',
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ and mcp/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1974,6 +1990,20 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "or another module's handle (only names bound to boto3.client('secretsmanager') in the Lambda file are read); "
         "grants that live outside the policy function (the create_platform_lambda baseline) are not credited, so such a "
         "call would red rather than pass; a resource-policy or KMS denial is not modelled.",
+        proved_on="2026-10-10",
+    ),
+    "structural::test_retired_training_shapes_4636.py": _proof(
+        "structural::test_retired_training_shapes_4636.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 10 passed in 4.07s | mutated: 1 failed, 9 passed in 3.54s "
+        ":: tests/test_retired_training_shapes_4636.py::test_no_retired_shape_read_outside_the_bridge | reverted: 10 passed in 4.54s",
+        "Covers the SET: every .py under lambdas/ and mcp/ on disk (rglob, AST) is swept for a string naming the "
+        'macrofactor_workouts partition (literal or a SOURCE#macrofactor_workouts key), a `.get("workouts")` or '
+        '`["workouts"]` read, and an import of training.legacy_workouts; every hit is pinned per file with its exact count '
+        "and reason, so a new file, one more occurrence in a pinned file, or a stale pin each red. Hand mutations on "
+        "2026-10-10, each watched RED and restored: reverting the monthly digest's ex_hevy, the tools_training reads and "
+        "the tools_hevy day-supersede each red the guard plus that fix's behaviour pins (3 failed each). STILL INVISIBLE, "
+        "stated: a read of the key spelled through a variable or getattr, a partition name assembled at runtime from "
+        "parts, and readers outside lambdas/ and mcp/ (scripts/, deploy/).",
         proved_on="2026-10-10",
     ),
 }

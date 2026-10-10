@@ -1628,12 +1628,15 @@ function _scCallHTML(p, shareUrl) {
   // #3046: an open call shows WHEN its verdict is due (the API computes it from
   // the evaluator's own domain-clamped window), not just when it was made.
   const dueBit = st === "pending" && p.due_date ? `<span class="sc-call-d label">grades ${esc(p.due_date)}</span>` : "";
+  // #4701: a held call (`text: ""` + `unsourced`) prints the API's sentence, never a blank
+  // quote, and offers no share card — there are no words of his to share.
+  const held = p.unsourced && typeof p.unsourced.text === "string" ? p.unsourced.text.trim() : "";
   return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
     `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}${dueBit}</div>` +
-    `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>` +
+    (held ? `<p class="sc-call-claim sc-call-unsourced label" data-unsourced>${esc(held)}</p>` : `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>`) +
     `${callReasonText(st, p.outcome_notes) ? `<p class="sc-call-why label">${esc(callReasonText(st, p.outcome_notes))}</p>` : ""}` + // #4220: reader words, never the raw dict
-    `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
+    `${shareUrl && !held ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
 }
 // #404: a graded call's permalink, from the moments index (built by the daily
 // sweep). Key mirrors og_moments._prediction_key — plain composite, no hashing.
