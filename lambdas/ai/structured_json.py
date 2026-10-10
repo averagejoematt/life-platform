@@ -13,8 +13,8 @@ This module is the one door:
     against `us.anthropic.claude-haiku-4-5-20251001-v1:0` (see the #4276 PR): the enum
     was honoured, `temperature` and `cache_control` were accepted alongside it, and a
     schema with `additionalProperties: true` was refused with a ValidationException.
-  * If Bedrock refuses the SCHEMA (a ValidationException that names `output_config`),
-    the call is re-sent once without it. That is the old path, and `STRUCTURED_OUTPUT
+  * If Bedrock refuses the SCHEMA (a ValidationException that names `output_config`, or
+    the "compiled grammar is too large" refusal, which does not), the call is re-sent once without it. That is the old path, and `STRUCTURED_OUTPUT
     fallback=schema_rejected` is logged, so an unsupported site degrades to today's
     behaviour and says so. It never fails the caller.
   * `parse_json_text(text)` is the old fence-tolerant parse, kept as the fallback
@@ -197,8 +197,16 @@ def grammar_rejected(exc: Exception) -> bool:
 
 
 def _schema_rejected(exc: Exception) -> bool:
+    """A refusal of the SCHEMA, not of the call: the request is fine without `output_config`.
+
+    Two shapes: a ValidationException that names `output_config` (an unsupported feature), and
+    the compiled-grammar-too-large refusal, whose message does NOT name `output_config` (measured
+    2026-10-02 on the Story Desk). Before #4276's grammar follow-up only the first was absorbed, so
+    a `call_json` site whose schema crossed Bedrock's grammar limit raised instead of going schema-less.
+    """
     msg = str(exc)
-    return "output_config" in msg and ("ValidationException" in msg or "validation" in msg.lower() or "400" in msg)
+    named = "output_config" in msg and ("ValidationException" in msg or "validation" in msg.lower() or "400" in msg)
+    return named or grammar_rejected(exc)
 
 
 def _text_of(resp: Any) -> str:
