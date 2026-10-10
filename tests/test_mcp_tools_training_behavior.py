@@ -266,6 +266,18 @@ def hevy_lift(date: str, i: int = 0) -> dict:
     }
 
 
+def hevy_volume(date: str, lbs: float, i: int = 0, exercise: str = "Squat (Barbell)") -> dict:
+    """One per-workout Hevy row whose all-sets tonnage is `lbs` (one set, 1 rep). #4636: the
+    periodization volume and muscle recency read these rows, not `macrofactor_workouts`.
+    The kg value is `lbs / 2.20462` because the normalizer converts back with that factor."""
+    return {
+        "sk": f"DATE#{date}#WORKOUT#v{i}",
+        "date": date,
+        "source_workout_id": f"v{i}",
+        "exercises": [{"name": exercise, "sets": [{"type": "normal", "weight_kg": lbs / 2.20462, "reps": 1}]}],
+    }
+
+
 def _lifting_days(n: int) -> list[dict]:
     """A loaded-lifting streak of `n` days immediately before TODAY."""
     return [hevy_lift(_d(-i), i) for i in range(1, n + 1)]
@@ -687,8 +699,8 @@ def test_periodization_progressive_overload_needs_four_volume_weeks(sources):
     """Overload = first-half vs second-half mean weekly volume, gated at n>=4
     weeks with volume. Below the gate it is None (honest) rather than a two-point
     'trend' (ADR-105)."""
-    mf = [{"date": _d(-7 * i), "total_volume_lbs": 1000} for i in range(0, 3)]
-    sources(strava=[strava_day(TODAY, activities=[activity("Run", minutes=40, avg_hr=120)])], macrofactor_workouts=mf)
+    hevy = [hevy_volume(_d(-7 * i), 1000, i) for i in range(0, 3)]
+    sources(strava=[strava_day(TODAY, activities=[activity("Run", minutes=40, avg_hr=120)])], hevy=hevy)
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 8})
     assert out["progressive_overload"] is None
 
@@ -697,9 +709,9 @@ def test_periodization_progressive_overload_delta_is_hand_derivable(sources):
     """Six weekly volume points 1000,1000,1000,2000,2000,2000 (oldest→newest).
     mid = 6//2 = 3 ⇒ first half mean = 1000, second half mean = 2000 ⇒
     delta_pct = (2000-1000)/1000*100 = 100.0 ⇒ trend 'increasing'."""
-    mf = [{"date": _d(-7 * i), "total_volume_lbs": (2000 if i < 3 else 1000)} for i in range(0, 6)]
+    hevy = [hevy_volume(_d(-7 * i), (2000 if i < 3 else 1000), i) for i in range(0, 6)]
     strava = [strava_day(_d(-7 * i), activities=[activity("Run", minutes=40, avg_hr=120)]) for i in range(0, 6)]
-    sources(strava=strava, macrofactor_workouts=mf)
+    sources(strava=strava, hevy=hevy)
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 8})
     ov = out["progressive_overload"]
     assert ov["first_half_avg_volume_lbs"] == 1000.0
@@ -1003,7 +1015,7 @@ def test_an_unreadable_lifting_streak_never_demotes_4416(sources, monkeypatch):
     assert not any("rest day" in w for w in out["warnings"])
 
 
-def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):
+def test_recommendation_classifies_a_hevy_workout_into_muscle_recovery(sources):
     """FIXED (#2249) — `classify_exercise(ename)` at mcp/tools_training.py:621
     calls a name that was never imported in this module; the `# noqa: F821`
     beside it was added mechanically by deploy/archive/onetime/fix_ci_lint.py
@@ -1019,19 +1031,17 @@ def test_recommendation_survives_a_macrofactor_workout_with_exercises(sources):
     history reached it. Now `classify_exercise` is imported properly and the
     call both survives AND actually classifies the exercise into muscle_recovery
     (Bench Press -> Chest + Triceps since #4071: one primary muscle and the secondaries the
-    taxonomy names — the old keyword row also credited Shoulders), rather than merely not crashing."""
+    taxonomy names — the old keyword row also credited Shoulders), rather than merely not crashing.
+
+    #4636: muscle recency now reads the live Hevy per-workout rows — `macrofactor_workouts` has
+    had no writer since 2026-03-07, so the view was empty for every date after March."""
     sources(
         whoop=[_recovery_day(TODAY, recovery=80)],
         eightsleep=[],
         garmin=[],
         strava=[],
         computed_metrics=[],
-        macrofactor_workouts=[
-            {
-                "date": _d(-2),
-                "workouts": [{"exercises": [{"exercise_name": "Barbell Bench Press"}]}],
-            }
-        ],
+        hevy=[hevy_volume(_d(-2), 135, exercise="Barbell Bench Press")],
     )
     out = call("get_training", {"view": "recommendation", "date": TODAY})
     assert "muscle_recovery" in out
@@ -1359,7 +1369,7 @@ def test_periodization_ignores_records_without_a_date(sources):
     or crashed on inside _week_key's strptime."""
     sources(
         strava=[{"pk": "USER#matthew#SOURCE#strava", "activities": [activity("Run", minutes=60, avg_hr=120)]}],
-        macrofactor_workouts=[{"total_volume_lbs": 500}],
+        hevy=[{"total_volume_lbs": 500}],
     )
     out = call("get_training", {"view": "periodization", "end_date": TODAY, "weeks": 2})
     assert out["error"] == "No training data for range."
