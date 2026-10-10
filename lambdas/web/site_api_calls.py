@@ -522,7 +522,7 @@ def compose(
 
     ``rows_by_coach`` is ``{short_id: [PREDICTION# rows]}`` exactly as the shared fetch
     returns them; ``names`` is ``{short_id: plain name}``; ``dark`` is
-    ``claim_sourcing.dark_instruments(...)`` — the instruments with no reading now (#4673)."""
+    ``claim_sourcing.gap_instruments(...)`` — every instrument's gap intervals, open or closed (#4673, #4702)."""
     calls: list[dict] = []
     excluded: dict[str, int] = {}
     records: dict[str, dict] = {}
@@ -611,7 +611,8 @@ def handle_calls(event, *, _g):
         }
         rows_by_coach = {cid: [_decimal_to_float(r) for r in fetched.get(cid, [])] for cid in names}
         today = _g["datetime"].now(PT).strftime("%Y-%m-%d")  # the facade's clock hand-off
-        dark = claim_sourcing.dark_instruments(_absent(_g))
+        # #4702: the interval form — the open gap (now) AND every closed one (history).
+        dark = claim_sourcing.gap_instruments(_absent(_g), instrument_presence.gap_history(_g["table"]))
         doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"], dark)
         if "docket:resolved" in failures or "docket:open" in failures:
             doc["bets_state"] = "unavailable"

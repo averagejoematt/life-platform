@@ -544,6 +544,18 @@ def _absent_coaches(_g):
         return {}
 
 
+def _gap_instruments(_g, absent):
+    """#4702: the interval form `web.claim_sourcing` holds against — the open gap from
+    `absent` (the read above) plus every CLOSED gap `instrument_presence.gap_history` derives
+    from the stored DATE# rows, so words said during a gap stay held after the sensor reports
+    again. `gap_history` never raises; this adds the same fail-open for anything else."""
+    try:
+        return claim_sourcing.gap_instruments(absent, instrument_presence.gap_history(_g["table"]))
+    except Exception as _e:
+        logger.warning(f"[/api/coach*] instrument gap history failed (fail-open): {_e}")
+        return claim_sourcing.gap_instruments(absent)
+
+
 def _held_positions(dossier, dark):
     """#4673: the dossier's open docket positions, less any whose words cite a sensor that had
     sent no reading by the day the item opened. Those are DROPPED, never blanked — the dossier
@@ -569,7 +581,7 @@ def handle_coaches(event, *, _g):
         order = persona_registry.OPERATIONAL_COACH_IDS
         coaches = []
         absent = _absent_coaches(_g)
-        dark = claim_sourcing.dark_instruments(absent)  # #4673
+        dark = _gap_instruments(_g, absent)  # #4673/#4702
         for pid, p in ops.items():
             # #4220: the record is the PREDICTION# ledger's, counted by the ONE producer
             # (coach.coach_record) that /api/calibration, /api/predictions and /api/wrong
@@ -681,8 +693,8 @@ def handle_coach(event, *, _g):
         # #4673: the dated records #4217 left as history are history — but a record whose
         # words cite a sensor that had sent no reading by its own date is not quoted, from
         # this coach or any other (web.claim_sourcing). Liveness is per INSTRUMENT, so the
-        # lead's page is held to it too.
-        dark = claim_sourcing.dark_instruments(absent)
+        # lead's page is held to it too. #4702: against every gap, open or closed.
+        dark = _gap_instruments(_g, absent)
         if absent_state:
             stance = {"source": "absent", "headline_read": "", "stage": {}}
         elif is_lead:
