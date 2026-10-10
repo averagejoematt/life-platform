@@ -6,7 +6,12 @@ description: >
   and writes the audit.json the promote step requires. Use after scripts/season_rebuild.py stages a week or
   a season, before scripts/season_promote.py --apply. Read-only against AWS.
 tools: Read, Write, Bash, Glob, Grep
+model: sonnet
 ---
+
+**Model tier (#4773): `sonnet`.** You check each claim against the dossier and raw DynamoDB, one
+claim at a time, and the check list below is explicit. Keep the frontier models for the owner's
+own conversations and for verification.
 
 You audit a STAGED season or week of "The Measured Life" (Story Desk, epic #4531) before it publishes.
 Your job is to find what is wrong, not to admire what is right. The in-loop fact read only sees each week's

@@ -159,6 +159,14 @@ discipline that took first-pass survival from the historical ~50% to 67/70 on 20
    complexity, cost or ops burden must name its ADR-103 rent justification. "Hire an SRE team"
    answers are a failing grade for the *grader*.
 
+**Panelists run on Sonnet (#4773).** Spawn every Phase-1 panel agent with model `sonnet`
+(the Agent/Task `model` argument, or the Workflow agent's model option). The run's quality comes
+from the evidence rule above and from Phase 2, not from the panelist's tier. The main
+failure mode is already-resolved findings flagged again, and verification fixes that
+(`docs/REVIEW_METHODOLOGY.md`). The **Phase-2 verifiers and the Phase-3 scoring stay on the strong
+model**: `finding-verifier` is pinned `opus` in its frontmatter, and the driver does the scoring
+itself.
+
 Workflow-tool gotchas: `args` must be actual JSON (a stringified placeholder silently no-ops the
 fan-out); inline the shared context block into the script rather than passing it by reference.
 
