@@ -269,8 +269,11 @@ def test_the_coverage_FLOOR_is_measured_over_BOTH_passes_not_one():
     would; a missing leg and a red leg both red the verdict).
     """
     for ln in _coverage_gate_pytest_lines():
-        for flag in ("--cov-fail-under", "--cov-append", "xml:coverage.xml"):
+        for flag in ("--cov-append", "xml:coverage.xml"):
             assert flag not in ln, f"a single pass carries {flag} — it would grade or publish a SUBSET of the suite: {ln}"
+        # Each pass disarms pytest-cov's pyproject `fail_under` explicitly; any other value
+        # grades that pass's subset.
+        assert re.findall(r"--cov-fail-under=(\d+)", ln) == ["0"], f"a pass must carry exactly --cov-fail-under=0: {ln}"
     src = _read(CI_TEST)
     combine = src[src.index("      - name: Test coverage gate") :]
     combine = combine[: combine.index("      - name: Coverage regression gate")]

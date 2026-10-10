@@ -3148,29 +3148,33 @@ CI_PROOFS["ci::ci-test.yml::shard::4"] = {
         "in the leg's share. Removed after the run."
     ),
     "observed": (
-        "2026-10-09. MUTATED exit 1 in 218s — `FAILED tests/test_zz_planted_red_4252.py::test_planted_red_4252`, 3 failed, "
-        "16311 passed; the step stopped before `mv .coverage`, so the leg published NO data file (`test`'s combine step "
-        "then refuses on the red leg). The first baseline on the same body was also exit 1, on the two census tests this "
-        "very entry clears — the step reds on ANY failing test in the leg. BASELINE_PLACEHOLDER"
+        "2026-10-10, on the final body (legs carry --cov-fail-under=0). BASELINE exit 0 in 165s — 16349 passed, 0 failed. "
+        "MUTATED exit 1 in 199s — `FAILED tests/test_zz_planted_red_4252.py::test_planted_red_4252`, 1 failed, 16349 "
+        "passed; under pipefail the step stops before `mv .coverage`, and `test`'s combine step then refuses on the red "
+        "leg. Two earlier baselines were exit 1 and taught the body: once on the two census tests this very entry clears, "
+        "and once with every test passing — pytest-cov had graded the half leg against pyproject's fail_under, which is "
+        "why every leg now carries --cov-fail-under=0. END TO END the same day, all three legs' bodies then the combine "
+        "and ratchet bodies: legs exit 0 (15337 / 16349 / 113 passed), combine exit 0 over 3 data files, measured 86.59% "
+        "against the 86.30 high-water mark, OK."
     ),
     "scope": (
         "Any failing or erroring test in the leg's files, through the `| tail -60` pipe (pipefail). Which files a leg holds "
         "is tests/ci_shard.py's crc32 split, held exact by tests/test_ci_test_shards_4252.py; the serial leg runs the "
         "same body's other branch."
     ),
-    "proved_on": "2026-10-09",
+    "proved_on": "2026-10-10",
 }
 CI_PROOFS["ci::ci-test.yml::test::6"] = {
     "gate_name": "test / Test coverage gate (regression floor, ADR-080)",
     "command": "python3 -m pytest tests/test_ci_test_shards_4252.py -q -p no:cacheprovider   # baseline 13 passed (coverage installed)",
     "mutation": (
         "The test file EXECUTES the step's own `run:` body (bash -e, real `coverage combine/xml/report` over real per-leg "
-        "data files). Mutated one at a time in the real ci-test.yml, restored byte-identical (md5 14c28a9f before and "
+        "data files). Mutated one at a time in the real ci-test.yml, restored byte-identical (md5 c5684e17 before and "
         "after): M1 the `SHARD_RESULT != success` refusal deleted; M2 the EXPECTED_LEGS data-file count deleted; M3 "
         "`--fail-under=82` dropped from the report."
     ),
     "observed": (
-        "2026-10-09. M1: 1 failed — test_a_red_leg_reds_the_verdict_even_with_full_data. M2: 1 failed — "
+        "2026-10-09, re-run 2026-10-10 on the final file. M1: 1 failed — test_a_red_leg_reds_the_verdict_even_with_full_data. M2: 1 failed — "
         "test_a_missing_legs_data_reds_rather_than_grading_a_subset. M3: 2 failed — "
         "test_the_combine_step_expects_every_leg_and_carries_the_only_floor, test_combined_coverage_under_the_floor_reds. "
         "RESTORED: 13 passed."

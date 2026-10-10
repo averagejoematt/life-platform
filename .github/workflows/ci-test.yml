@@ -133,12 +133,15 @@ jobs:
           # `-m serial` pass over the whole tree. NO leg grades the floor or writes a
           # report — grading one leg would grade a subset and red a correct build. Each
           # leaves its raw data file for `test`, which combines every leg's first.
+          # `--cov-fail-under=0` is what says so: pytest-cov otherwise reads pyproject's
+          # `fail_under` and grades THIS leg's subset against it (a serial leg of ~110
+          # tests fails it by construction, and a half leg can).
           if [ "$LEG" = "serial" ]; then
             echo "::group::Coverage — serial pass (-m serial)"
             python3 -m pytest tests/ \
                 --ignore=tests/test_integration_aws.py \
                 --cov=lambdas --cov=mcp \
-                --cov-report= \
+                --cov-report= --cov-fail-under=0 \
                 --durations=25 \
                 -m serial \
                 --junitxml=shard-out/junit-serial.xml \
@@ -148,7 +151,7 @@ jobs:
             python3 -m pytest tests/ \
                 --ignore=tests/test_integration_aws.py \
                 --cov=lambdas --cov=mcp \
-                --cov-report= \
+                --cov-report= --cov-fail-under=0 \
                 --durations=25 \
                 -n auto --dist loadfile -m "not serial" \
                 --junitxml="shard-out/junit-$LEG.xml" \
@@ -422,7 +425,7 @@ jobs:
           python3 scripts/ci_test_sections.py shard-out/junit-parallel-1.xml shard-out/junit-parallel-2.xml shard-out/junit-serial.xml || true
           # #4252: the budget measures the test phase — from the EARLIEST leg's start.
           UNIT_TESTS_START_EPOCH=$(python3 -c 'import glob; v=[int(open(p).read()) for p in glob.glob("shard-out/start-*.epoch")]; print(min(v) if v else "")')
-          DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
+          DURATION_SECONDS=$(( $(date +%s) - ${UNIT_TESTS_START_EPOCH:-$(date +%s)} ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 82 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \
               --high-water 86.30 --fail-on-regression

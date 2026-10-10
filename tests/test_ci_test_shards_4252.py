@@ -138,8 +138,14 @@ def test_the_shard_step_feeds_the_leg_spec_and_writes_per_leg_outputs():
     run = step["run"]
     assert run.index("set -o pipefail") < run.index("python3 -m pytest")
     assert 'mv .coverage "shard-out/coverage-$LEG.dat"' in run
-    for bad in ("--cov-fail-under", "--fail-under", "xml:coverage.xml", "--cov-append"):
-        assert bad not in run, f"a leg grades or reports on a SUBSET of the suite ({bad}) — only `test` may"
+    for bad in ("xml:coverage.xml", "--cov-append"):
+        assert bad not in run, f"a leg reports on a SUBSET of the suite ({bad}) — only `test` may"
+    # pytest-cov reads pyproject's `fail_under` and would grade each leg's SUBSET against
+    # it (the serial leg fails it by construction). Every pass must say 0 explicitly.
+    pytest_cmds = re.findall(r"python3 -m pytest tests/ (?:[^\n]*\\\n)*[^\n]*", run)
+    assert len(pytest_cmds) == 2, pytest_cmds
+    for cmd in pytest_cmds:
+        assert re.findall(r"--(?:cov-)?fail-under=(\d+)", cmd) == ["0"], f"a leg must carry exactly --cov-fail-under=0: {cmd}"
     upload = _wf()["jobs"]["shard"]["steps"][-1]
     assert upload["uses"].startswith("actions/upload-artifact@") and upload["if"] == "always()"
     assert upload["with"]["name"] == "unit-tests-shard-${{ matrix.leg }}" and upload["with"]["path"] == "shard-out/"
@@ -164,7 +170,8 @@ def test_the_combine_step_expects_every_leg_and_carries_the_only_floor():
     run = step["run"]
     assert re.search(r"coverage report --fail-under=\d+", run)
     text = open(CI_TEST, encoding="utf-8").read()
-    assert len(re.findall(r"--(?:cov-)?fail-under=\d+", text)) == 1, "the floor is graded in exactly one place"
+    floors = [v for v in re.findall(r"--(?:cov-)?fail-under=(\d+)", text) if v != "0"]
+    assert len(floors) == 1, f"the floor is graded in exactly one place: {floors}"
 
 
 def test_the_sections_read_every_legs_junit():
