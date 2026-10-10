@@ -296,6 +296,23 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #4643: the same metric for Hevy — the daily {"reconcile": true} run of
+        # hevy-backfill compares the vendor's all-time workout count with the stored,
+        # non-tombstoned workout rows (net of feed events the hourly poll has not applied
+        # yet) and emits the shortfall. Catches a workout the events cursor walked past.
+        _alarm(
+            "IngestReconciliationHevy",
+            "ingest-reconciliation-hevy",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            dims={"Source": "hevy"},
+            to_digest=True,
+        )
+
         # DI-2b: interior-gap detection. Freshness/liveness see only the latest
         # date per source; this catches a DAILY source going dead mid-window then
         # resuming (a hole behind the high-water mark). Emitted by freshness_checker
@@ -411,6 +428,14 @@ class MonitoringStack(Stack):
             "LifePlatform/IngestReconciliation",
             "MissingActivityCount",
             dims={"Source": "whoop"},
+        )
+        # #4643: and the hevy reconciler's (a failed vendor/store read emits no datapoint).
+        _heartbeat_alarm(
+            "IngestReconciliationHevyHeartbeat",
+            "ingest-reconciliation-hevy-heartbeat",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            dims={"Source": "hevy"},
         )
         _heartbeat_alarm(
             "FreshnessInteriorGapHeartbeat",

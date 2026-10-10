@@ -263,8 +263,11 @@ export function weightFoldLine(j, today = todayPT()) {
 
 // The goal half (the /data/physical/ fold, not the hub): goal, what's left, the rate WITH
 // its interval and its provisional flag, and the projection only when the engine dates one.
-export function weightGoalLine(j) {
+// #4766: projected dates opt in to the year when they fall outside the current Pacific year —
+// a 2027 window printed year-less in 2026 reads as dates already past.
+export function weightGoalLine(j, now = new Date()) {
   if (!j || j.goal_weight_lbs == null) return "";
+  const pday = (iso) => dayInWords(iso, { yearIfNotCurrent: true, now });
   const bits = [`Goal ${fmt(j.goal_weight_lbs)}${j.remaining_lbs != null ? `; ${_one(j.remaining_lbs)} lb to go` : ""}.`];
   const r = j.weekly_rate_lbs;
   if (r != null && Number(r) !== 0) {
@@ -273,8 +276,8 @@ export function weightGoalLine(j) {
   }
   const lo = j.projected_goal_date_earliest, hi = j.projected_goal_date_latest;
   if (!j.projected_goal_date) bits.push("No dated projection yet.");
-  else if (lo && hi && lo !== hi) bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} between ${dayInWords(lo)} and ${dayInWords(hi)}.`);
-  else bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} around ${dayInWords(j.projected_goal_date)}.`);
+  else if (lo && hi && lo !== hi) bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} between ${pday(lo)} and ${pday(hi)}.`);
+  else bits.push(`Projected to reach ${fmt(j.goal_weight_lbs)} around ${pday(j.projected_goal_date)}.`);
   return bits.join(" ");
 }
 

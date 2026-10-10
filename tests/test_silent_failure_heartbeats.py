@@ -28,6 +28,7 @@ _DETECTORS = [
     ("ingest-liveness-unhealthy", "ingest-liveness-heartbeat", "UnhealthySourceCount"),
     ("ingest-reconciliation-strava", "ingest-reconciliation-strava-heartbeat", "MissingActivityCount"),
     ("ingest-reconciliation-whoop", "ingest-reconciliation-whoop-heartbeat", "MissingActivityCount"),
+    ("ingest-reconciliation-hevy", "ingest-reconciliation-hevy-heartbeat", "MissingActivityCount"),  # #4643
     ("freshness-interior-gap", "freshness-interior-gap-heartbeat", "InteriorGapCount"),
     ("coherence-overall", "coherence-heartbeat", "OverallAlarm"),
     ("compute-pipeline-stale", "compute-pipeline-stale-heartbeat", "ComputePipelineStaleness"),

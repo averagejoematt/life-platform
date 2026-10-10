@@ -31,7 +31,7 @@ def _run_reconcile(monkeypatch, api_activities, stored_by_local_date):
 
     def fake_stored(table, start_date, end_date):
         requested["range"] = (start_date, end_date)
-        return [a for d, acts in stored_by_local_date.items() if start_date <= d <= end_date for a in acts]
+        return {d: list(acts) for d, acts in stored_by_local_date.items() if start_date <= d <= end_date}
 
     fake_boto3 = types.SimpleNamespace(
         resource=lambda *a, **k: types.SimpleNamespace(Table=lambda name: None),
@@ -43,9 +43,10 @@ def _run_reconcile(monkeypatch, api_activities, stored_by_local_date):
     from common import secret_cache
 
     monkeypatch.setattr(secret_cache, "get_secret_json", lambda sid, client: {"access_token": "t"})
-    monkeypatch.setattr(strava, "_fetch_stored_activities", fake_stored)
+    monkeypatch.setattr(strava, "_fetch_stored_days", fake_stored)
     monkeypatch.setattr(strava, "_fetch_activities_in_range", lambda secret, after, before: (api_activities, secret))
     monkeypatch.setattr(strava, "_emit_reconciliation_metric", lambda n: None)
+    monkeypatch.setattr(strava, "_emit_store_vendor_metrics", lambda *a: None)
 
     out = strava._reconcile({}, None)
     return json.loads(out["body"]), requested["range"]

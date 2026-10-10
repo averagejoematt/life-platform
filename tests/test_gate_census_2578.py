@@ -1062,11 +1062,23 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # the sweep holding the stated apple_health upstream_changes facet to "no rebuild-a-day caller" (keyword OR
         # positional monotonic_guard) — arrives PROVEN via the re-runnable harness (MutationSpec + proof, ARMED 1/1).
         # Measured after merging origin/main: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
-        # Upper bound 250 -> 253 (2026-10-10, #4252 box 4, stacked on #4638): the Unit Tests suite split into a 3-leg `shard`
+        # Upper bound 250 -> 251 (2026-10-10, #4694, stacked on #4638): guard::lambdas/content/autopublish_audit.py — the deterministic audit
+        # an unapproved chronicle must pass before the stale-draft sweep publishes it — arrives PROVEN (GUARD_PROOFS: four
+        # mutations, 5/1/5/1 red, restored 14 passed). Measured on top of #4638: 775 {250, 513, 7, 5} -> 776 {251, 513, 7, 5}.
+        # Upper bound 251 -> 252 (2026-10-10, #4674, stacked on #4694): registry::ledgers/site_vocabulary_residue.py::BASELINE::
+        # pace flag arrives PROVEN (REGISTRY_PROOFS). Measured after merging origin/main (disposable export vs lane):
+        # 776 {251, 513, 7, 5} -> 777 {252, 513, 7, 5}; id-set diff: exactly that one row enters, none leaves.
+        # Upper bound 252 -> 253 (2026-10-10, #4643 box 5): guard::deploy/check_bucket_notification_drift.py — the
+        # read-only S3 ingestion-trigger drift check — arrives PROVEN (GUARD_PROOFS: two mutations, 2 and 1 red,
+        # restored 6 passed). Measured on the lane off origin/main df63a72ea: 777 {252, 513, 7, 5} -> 778 {253, 513, 7, 5}.
+        # Upper bound 253 -> 254 (2026-10-10, #4270): registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa (the qa/ dir)
+        # arrives PROVEN (REGISTRY_PROOFS). Id-set diff vs a `git archive origin/main` export at 057ec826b:
+        # 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}; STRUCTURAL_CLASSES::{static,utility} relocate tests/ -> qa/.
+        # Upper bound 254 -> 257 (2026-10-10, #4252 box 4, on top of #4270): the Unit Tests suite split into a 3-leg `shard`
         # matrix. Two CI steps enter PROVEN (ci-test.yml shard::3 install, shard::4 coverage pass) and the combine step that
-        # replaced the old coverage gate (test::6, same label) is PROVEN too, its residue line leaving — CI_PROOFS, each
-        # step's own run body executed and mutated. Measured: 775 {250, 513, 7, 5} -> 777 {253, 512, 7, 5}.
-        <= 253
+        # replaced the old coverage gate (test::6, same label) turns PROVEN, its residue line leaving — CI_PROOFS. Measured by
+        # id-set diff vs a `git archive origin/main` export: 779 {254, 513, 7, 5} -> 781 {257, 512, 7, 5}.
+        <= 257
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

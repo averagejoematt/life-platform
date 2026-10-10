@@ -60,6 +60,11 @@ _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 # per-day + open-ended. They pause at the hard stop, i.e. exactly when Bedrock
 # stops for everything.
 _OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa")
+# #4643: the ingest-path AI callers, listed at the hard stop BY DECLARATION — the cutoff each
+# already inherited by being unlisted, so naming them changed no live behaviour. Moving one into
+# band 1 would pause it on most days of a month (tier >= 1 is the default at current burn), which
+# is a product call, so it is a deliberate edit here and in budget_guard, never a drift.
+_INGEST_PATH = ("journal_enrichment", "social_enrichment", "broadcast_sensitivity", "training_notes")
 
 
 def _at_tier(monkeypatch, tier):
@@ -135,8 +140,16 @@ def test_all_gated_features_are_classified():
     """No feature may drift back into the default (cutoff 3) bucket unclassified —
     the coherence_semantic bug (internal QA silently outliving readers) recurs
     exactly that way."""
-    classified = set(_INTERNAL + _READER_NARRATIVE + _IRREDUCIBLE_READER + _OPERATOR_TRUTH)
+    classified = set(_INTERNAL + _READER_NARRATIVE + _IRREDUCIBLE_READER + _OPERATOR_TRUTH + _INGEST_PATH)
     assert set(budget_guard._FEATURE_CUTOFF) == classified
+
+
+def test_ingest_path_callers_sit_at_the_hard_stop_by_declaration():
+    """#4643: each is listed at exactly the cutoff it used to inherit unlisted — a re-band is
+    an owner call written here, never a side effect."""
+    cut = budget_guard._FEATURE_CUTOFF
+    for f in _INGEST_PATH:
+        assert cut[f] == budget_guard._HARD_STOP_TIER, f"{f}: re-banding an ingest-path caller is a deliberate edit (#4643)"
 
 
 def test_ask_endpoint_and_daily_brief_are_the_last_to_go():
