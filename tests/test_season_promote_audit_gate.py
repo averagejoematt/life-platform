@@ -177,7 +177,7 @@ def recorder(monkeypatch):
     monkeypatch.setattr(sp, "plan", lambda staging, weeks: {"staging_findings": [], "chronicle": []})
     for step in ("backup", "apply_chronicle", "apply_ledger", "apply_panel"):
         monkeypatch.setattr(sp, step, lambda *a, _s=step, **k: calls.append(_s))
-    for step in ("apply_pages", "apply_recap"):
+    for step in ("apply_pages", "apply_effects", "apply_recap"):
         monkeypatch.setattr(sp, step, lambda *a, _s=step, **k: calls.append(_s))
     return calls
 
@@ -200,7 +200,7 @@ def test_apply_with_a_clean_current_audit_runs_every_step(tmp_path, recorder):
     st = _stage(tmp_path)
     _write(st, _clean_audit(st))
     assert sp.main(["--staging", st, "--weeks", "0-1", "--apply"]) == 0
-    assert recorder == ["backup", "apply_chronicle", "apply_ledger", "apply_pages", "apply_panel", "apply_recap"]
+    assert recorder == ["backup", "apply_chronicle", "apply_ledger", "apply_pages", "apply_effects", "apply_panel", "apply_recap"]
 
 
 def test_MUTATION_CONTROL_with_the_gate_removed_a_blocking_audit_would_publish(tmp_path, recorder, monkeypatch):
