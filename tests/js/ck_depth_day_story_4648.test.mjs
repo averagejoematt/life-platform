@@ -47,7 +47,7 @@ test("a day with coach lines shows each coach's words as served, under one headi
   assert.match(html, /<h2>What the coaches said\.<\/h2>/);
   assert.equal((html.match(/<li>/g) || []).length, 3);
   for (const l of MOVES.lines) assert.ok(html.includes(`“${l.text}”`), `${l.coach}'s words are printed whole and unchanged`);
-  assert.match(html, /<a class="ck-link" href="\/next\/v8\/coach\/\?c=sleep_coach">Lisa Park<\/a> · On a result/);
+  assert.match(html, /<a class="ck-link" href="\/next\/v8\/coach\/\?c=sleep_coach&amp;from=2026-10-07">Lisa Park<\/a> · On a result/);
   assert.match(html, /Marcus Webb<\/a> · A reply to James Okafor/);
   assert.doesNotMatch(html, /A bet opened/, "no line opened a bet: no bet date");
   assert.doesNotMatch(text(html), /\b20\d\d-\d\d-\d\d\b|\bDr\.|undefined|null/);
@@ -64,7 +64,7 @@ test("a day with a settled call shows the call, its rule, the verdict and a link
   assert.ok(html.includes(call.called_short), "the served short sentence; the rule rides the shared tag (#4647)");
   assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 1\.2 hours either way<\/span>/);
   assert.match(html, /It came in at 8\.6 hours\./);
-  assert.ok(html.includes(`href="/next/v8/call/?id=${call.id}"`));
+  assert.ok(html.includes(`href="/next/v8/call/?id=${call.id}&amp;from=2026-10-02"`), "the call page returns to this day (#4675)");
   assert.doesNotMatch(html, /<details>/);
 });
 
@@ -72,7 +72,7 @@ test("a bet settled that day is tagged with the sentence naming both coaches", (
   const html = D.daySettledHTML("2026-09-30", CALLS, BASE);
   assert.match(html, /<h2>2 calls were checked this day\.<\/h2>/);
   assert.match(html, /<span class="ck-soft">Marcus Webb was right; Amara Patel was wrong\.<\/span>/);
-  assert.match(html, /href="\/next\/v8\/call\/\?id=bet-20260930-994b3d89f6"/);
+  assert.match(html, /href="\/next\/v8\/call\/\?id=bet-20260930-994b3d89f6&amp;from=2026-09-30"/);
 });
 
 test("a day with many settled calls shows two and folds the rest, every one still linked", () => {
@@ -81,7 +81,7 @@ test("a day with many settled calls shows two and folds the rest, every one stil
   assert.equal(day.length, 4);
   assert.match(html, /<h2>4 calls were checked this day\.<\/h2>/);
   assert.match(html, /<details><summary>2 more settled this day<\/summary>/);
-  for (const c of day) assert.ok(html.includes(`id=${c.id}"`), c.id);
+  for (const c of day) assert.ok(html.includes(`id=${c.id}&amp;from=2026-09-24"`), c.id);
   assert.match(html, /<span class="ck-verdicts__tag">Wrong · [^<]+<\/span>/);
   assert.doesNotMatch(html, /ck-verdicts__tag[^>]*>(Right|Wrong)</, "no verdict without its rule");
 });

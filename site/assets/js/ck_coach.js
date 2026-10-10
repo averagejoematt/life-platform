@@ -39,7 +39,8 @@ import { tryJSON, esc, fmtShort, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, countWord } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import { COACH_JOBS } from "/assets/js/ck_pages.js";
-import { verdictTag } from "/assets/js/ck_verdict.js";
+import { verdictTag, callVerdictTag, gradedOnText } from "/assets/js/ck_verdict.js";
+import { callsOf, callHref, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { docketQuestion, recentLines, ledgerLine, standingAsk, shortId } from "/assets/js/v7_coaches.js";
 
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -64,18 +65,8 @@ export const isCoachId = (id) => /^[a-z][a-z0-9_]{1,39}$/.test(String(id || ""))
 export function coachHref(personaId, base = "/next/v8/") {
   return isCoachId(personaId) ? `${base}coach/?c=${encodeURIComponent(personaId)}` : `${base}coaches/`;
 }
-/** Where "Back" goes: the page the reader came from when it is on this site (and is not
- *  this page), otherwise the preview's Coaches page. Only a path is ever returned. */
-export function backTarget(referrer, here, base = "/next/v8/") {
-  const fallback = { href: `${base}coaches/`, text: "← The AI coaches" };
-  try {
-    const [from, at] = [new URL(String(referrer)), new URL(String(here))];
-    if (from.origin !== at.origin || (from.pathname === at.pathname && from.search === at.search)) return fallback;
-    return { href: `${from.pathname}${from.search}`, text: "← Back" };
-  } catch {
-    return fallback;
-  }
-}
+// Where "Back" goes is the page named by `from=`, by name, else the front page: one rule for
+// every deep page, in ck_call.js `backFor` (#4675).
 
 // What each coach is for, in a reader's words, keyed on the served persona id. Static
 // page copy in the third person; a coach that is not here falls back to the Coaches
@@ -304,15 +295,35 @@ export function verdictPair(p) {
   if (last && !pair[last.verdict]) pair[last.verdict] = last;
   return pair;
 }
-export function verdictsHTML(p) {
+/** This coach's newest settled call of each verdict that has a page of its own, from
+ *  GET /api/calls (newest first as served). Bets are left out: a bet has a verdict per side
+ *  and the next section has it. */
+export function pagedPair(p, callsBody) {
+  const short = shortId(p && p.persona_id);
+  const own = callsOf(callsBody).filter((c) => c.kind !== "bet" && c.coach_id === short);
+  return { right: own.find((c) => c.verdict === "right") || null, wrong: own.find((c) => c.verdict === "wrong") || null };
+}
+/** The right and the wrong card. A call that has a page is shown from that page's served
+ *  sentences and opens it (#4675), and the call page returns here; a verdict with no paged
+ *  call falls back to the record's own line, which has no page to open. */
+export function verdictsHTML(p, callsBody = null, base = "/next/v8/") {
   if (!p) return "";
+  const paged = pagedPair(p, callsBody);
   const { right, wrong } = verdictPair(p);
-  if (!right && !wrong) return "";
-  const card = (line, tag) =>
-    line
-      ? `<div>${verdictTag(tag === "Right", line.rule)}<p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
-      : `<div>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-  return `<div class="ck-verdicts">${card(right, "Right")}${card(wrong, "Wrong")}</div>`;
+  if (!right && !wrong && !paged.right && !paged.wrong) return "";
+  const pageCard = (call) => {
+    const day = shortDay(call.settled_date);
+    const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
+    const href = withFrom(callHref(base, call.id), `coach:${p.persona_id}`);
+    return `<div>${callVerdictTag(call)}<p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(when ? `${when} ` : "")}<a class="ck-link" href="${esc(href)}">The whole call</a></p></div>`;
+  };
+  const card = (call, line, tag) =>
+    call
+      ? pageCard(call)
+      : line
+        ? `<div>${verdictTag(tag === "Right", line.rule)}<p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
+        : `<div>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+  return `<div class="ck-verdicts">${card(paged.right, right, "Right")}${card(paged.wrong, wrong, "Wrong")}</div>`;
 }
 
 // ── disagreements ──────────────────────────────────────────────────────────────
@@ -421,17 +432,15 @@ export async function mount() {
   const page = document.body && document.body.dataset.ckPage;
   if (page !== "coach") return;
   const base = document.body.dataset.ckBase || "/next/v8/";
-  const back = backTarget(document.referrer, location.href, base);
-  for (const id of ["ck-back", "ck-back-foot"]) {
-    const a = document.getElementById(id);
-    if (a) {
-      a.setAttribute("href", back.href);
-      a.textContent = id === "ck-back" ? back.text : back.text.replace(/^← /, "");
-    }
-  }
-  const asked = new URLSearchParams(location.search).get("c") || "";
+  const params = new URLSearchParams(location.search);
+  const from = params.get("from") || "";
+  setBack(backFor(from, base));
+  const asked = params.get("c") || "";
   const pid = isCoachId(asked) ? asked : "";
-  const [profile, roster, docket] = pid ? await Promise.all([tryJSON(`/api/coach/${encodeURIComponent(pid)}`), tryJSON("/api/coaches"), tryJSON("/api/coach_docket")]) : [null, null, null];
+  const [profile, roster, docket, calls] = pid
+    ? await Promise.all([tryJSON(`/api/coach/${encodeURIComponent(pid)}`), tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")])
+    : [null, null, null, null];
+  setBack(backFor(from, base, rosterNames(roster)));
   const p = pid ? coachView(pid, profile, roster) : null;
   if (!p) {
     // No coach named, or a name the roster does not have: one sentence and the way back.
@@ -453,7 +462,7 @@ export async function mount() {
     "ck-next": nextHTML(p, docket, p.tier === "lead" ? { predictions: [] } : predictions, names, today),
     "ck-longer": longerHTML(p),
     "ck-record": recordHTML(p),
-    "ck-verdicts": verdictsHTML(p) || soft(`No checked call by ${p.name} is on record yet.`),
+    "ck-verdicts": verdictsHTML(p, calls, base) || soft(`No checked call by ${p.name} is on record yet.`),
     "ck-disagreements": disagreementsHTML(p, docket, names),
     "ck-persona": personaHTML(p),
   };

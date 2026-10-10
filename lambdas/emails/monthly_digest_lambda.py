@@ -107,6 +107,7 @@ from emails.monthly_digest_render import (  # noqa: E402,F401
     _is_section_header,
     build_html,
 )
+from emails.weekly_digest_extractors import ex_hevy_workouts  # #4636: the ONE per-workout Hevy extractor
 
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
@@ -268,20 +269,24 @@ def ex_strava(recs, profile=None):
 def ex_hevy(recs):
     """Monthly strength summary: session count AND the volume behind it (#1658).
 
-    The per-workout list (titles + volume) was always built here and then thrown
-    away — the letter reported the number of sessions but not a pound of the work,
-    which is the figure a lifter actually reads a monthly review for.
+    #4636: built on the weekly digest's `ex_hevy_workouts` — one stored Hevy row IS one
+    workout (sk `DATE#<d>#WORKOUT#<uuid>`, set weights in kg). This used to iterate a
+    per-day nested `workouts` list with a `total_volume_lbs` field, the retired
+    daily-aggregate shape no current row carries, so September 2026's 24 sessions came
+    out as `{"workout_count": 0, "total_volume_lbs": 0}` — and that went into the prompt.
+
+    Only live per-workout rows are counted: a tombstoned per-day aggregate (superseded in
+    place on 2026-05-26) is the same sessions again, and `fetch_range` does not drop it.
     """
-    if not recs:
+    live = [r for r in (recs or []) if r.get("source_workout_id") and not r.get("tombstone")]
+    summary = ex_hevy_workouts(live)
+    if not summary:
         return None
-    wk = []
-    for r in recs:
-        for w in r.get("workouts", []):
-            wk.append({"title": w.get("title", ""), "volume_lbs": round(float(w.get("total_volume_lbs", 0)))})
+    count = summary["workout_count"]
     return {
-        "workout_count": len(wk),
-        "total_volume_lbs": sum(w["volume_lbs"] for w in wk),
-        "avg_volume_lbs": round(sum(w["volume_lbs"] for w in wk) / len(wk)) if wk else None,
+        "workout_count": count,
+        "total_volume_lbs": summary["total_volume_lbs"],
+        "avg_volume_lbs": round(summary["total_volume_lbs"] / count) if count else None,
     }
 
 
