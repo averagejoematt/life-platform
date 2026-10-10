@@ -566,7 +566,15 @@ class TestScorecardApi:
         monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_q, get_item_hook=_g_hook))
         body = json.loads(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}})["body"])
         assert body["commitments"]["lifetime"]["kept"] == 1
-        assert len(queries) == 1, f"one coach must mean one PREDICTION# query, got {len(queries)}"
+        # #4701: the instrument-presence read (the #4673 sourcing hold) is ONE more job in the
+        # same concurrent round and issues its own `USER#…#SOURCE#` reads; the bound here is on
+        # the COACH# partition fan-out, which the commitment tally must not grow.
+        partition = [
+            q
+            for q in queries
+            if str(q["KeyConditionExpression"].get_expression()["values"][0].get_expression()["values"][1]).startswith("COACH#")
+        ]
+        assert len(partition) == 1, f"one coach must mean one PREDICTION# query, got {len(partition)}"
         assert {"pk": cg.ROLLUP_PK, "sk": cg.ROLLUP_SK} in gets
 
     def test_no_rollup_yet_serves_null_never_a_zeroed_ledger(self, monkeypatch):
