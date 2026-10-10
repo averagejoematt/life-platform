@@ -528,7 +528,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 
 | Surface | Count | Registry |
 |---------|-------|----------|
-| ai_features | 20 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
+| ai_features | 24 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 134 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 32 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 92 | this model's schedules plane (CDK AST) |
