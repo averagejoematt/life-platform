@@ -1752,14 +1752,11 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
     except Exception:
         existing = []
-    _hook = _panel_desk().door_safe(  # #4538: a counted title is not published — the episode keeps its bare number
-        _short_title(
-            script.get("episode_title"),
-            beats.get("title"),
-            script.get("pull_quote"),
-            review.get("pull_quote"),
-        )
-    )
+    # #4674: the episode carries its chapter's title, through the SAME rule as the desk path — the writer's own
+    # episode_title is only the fallback for a week with no chapter. #4538: a title that fails the door is not
+    # published — the episode keeps its bare number.
+    _own = _short_title(script.get("episode_title"), script.get("pull_quote"), review.get("pull_quote"))
+    _hook = _panel_desk().door_safe(_panel_desk().episode_title(post, {"title": _own}))
     # Editorial cover art (Part II — atmospheric, free-license; fail-soft, kill-switch
     # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
     _cover: dict[str, str] = {}

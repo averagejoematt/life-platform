@@ -325,6 +325,43 @@ Fix the root cause FIRST — redriving into a still-broken Lambda just round-tri
 
 ---
 
+## S3 bucket notifications (ingestion triggers outside CDK)
+
+Four functions start from an S3 event notification on `matthew-life-platform`. The notifications are ONE bucket-level document that CDK does not own; `cdk/stacks/` only grants `s3.amazonaws.com` permission to invoke the functions. A dropped notification shows up nowhere except as eventual staleness of the source (#4643).
+
+| Notification Id | Function | Filter |
+|---|---|---|
+| `MacroFactorCSVIngest` | `macrofactor-data-ingestion` | prefix `uploads/macrofactor/`, suffix `.csv` |
+| `InboundEmailInsightParser` | `insight-email-parser` | prefix `raw/inbound_email/` |
+| `FoodDeliveryCSVIngest` | `food-delivery-ingestion` | prefix `imports/food_delivery/`, suffix `.csv` |
+| `MeasurementsCSVIngest` | `measurements-ingestion` | prefix `imports/measurements/` |
+
+All four fire on `s3:ObjectCreated:*`. The authoritative list is `EXPECTED_NOTIFICATIONS` in `deploy/check_bucket_notification_drift.py`; this table restates it.
+
+**Check (read-only, run any time):**
+
+```bash
+python3 deploy/check_bucket_notification_drift.py --strict   # exit 1 on drift or a read error
+```
+
+It makes one `s3:GetBucketNotification` call and reports `missing`, `unexpected`, `changed` and any non-Lambda configuration. It is on-demand today. Running it on a schedule from CI needs `s3:GetBucketNotification` on the CI role first; that grant is not in `infra/iam/` yet.
+
+**Repair (owner, attended — this is an AWS write):** `put-bucket-notification-configuration` REPLACES the whole document, so never put a single entry. Read the full live document, edit it, and put the whole thing back:
+
+```bash
+aws s3api get-bucket-notification-configuration --bucket matthew-life-platform > /tmp/notif.json
+# edit /tmp/notif.json so it matches EXPECTED_NOTIFICATIONS — keep the other entries
+aws s3api put-bucket-notification-configuration --bucket matthew-life-platform \
+  --notification-configuration file:///tmp/notif.json
+python3 deploy/check_bucket_notification_drift.py --strict   # must print `clean`
+```
+
+S3 validates each destination when the document is put: a function whose resource policy has no `s3.amazonaws.com` invoke grant fails the whole call. Three of the grants are CDK-owned (`S3InvokeMacrofactor`, `S3InvokeFoodDelivery`, `S3InvokeMeasurements` in `cdk/stacks/ingestion_stack.py`). The `insight-email-parser` grant (`AllowS3InvokeRefresh`, read 2026-10-10) is also outside CDK: its stack declares only the SES grant.
+
+To add or remove a trigger, change `EXPECTED_NOTIFICATIONS` and this table in the same PR, then apply the document change above after the merge.
+
+---
+
 ## How to Manually Trigger a Lambda
 
 ```bash

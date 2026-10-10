@@ -32,6 +32,9 @@ from common.numeric import decimals_to_float, floats_to_decimal
 logger = logging.getLogger(__name__)
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+# #4643: the budget_guard feature the Haiku tail is gated on — listed in
+# budget_guard._FEATURE_CUTOFF and scripts/ai_budget_ledger.py (tests/test_ingest_ai_budget_rows_4643.py).
+BUDGET_FEATURE = "training_notes"
 
 # MAX_TOKENS is DERIVED from a measurement, not chosen as a round number (#3699; the
 # #3678/#3403 class — a budget set from a stale observation and never re-derived). 256 was
@@ -162,6 +165,13 @@ class CapExceeded(ExtractionDegraded):
     """Monthly Haiku call cap reached — caller degrades to deterministic-only."""
 
     degrade_code = "cap_exceeded"
+
+
+class BudgetPaused(ExtractionDegraded):
+    """The budget tier pauses BUDGET_FEATURE (#4643) — no spend, no attempt, no cap charge;
+    caller degrades to deterministic-only and the note is kept (Invariant 4)."""
+
+    degrade_code = "budget_paused"
 
 
 class TruncatedResponse(ExtractionDegraded):
@@ -322,6 +332,16 @@ def _bump_calls(table, now=None, lane: str = "live"):
         pass
 
 
+def _ai_allowed() -> bool:
+    """budget_guard gate for the Haiku tail (#4643). Fails open if the module is missing —
+    bedrock_client's own tier-3 backstop still applies."""
+    try:
+        from ai import budget_guard
+    except ImportError:  # pragma: no cover — budget_guard always bundled in prod
+        return True
+    return budget_guard.allow(BUDGET_FEATURE)
+
+
 def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live"):
     """Build the llm_fn passed to training_notes.extract_signals: hash-cached + capped.
 
@@ -344,6 +364,9 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live
         cached = cache_get(table, h)
         if cached is not None:
             return cached
+        if not _ai_allowed():
+            # #4643: before the cap read and before any spend — a paused tier charges nothing.
+            raise BudgetPaused(f"budget tier pauses {BUDGET_FEATURE} ({lane} lane)")
         if monthly_calls(table, lane=lane) >= monthly_cap:
             raise CapExceeded(f"training-notes Haiku monthly cap {monthly_cap} reached ({lane} lane)")
         try:
