@@ -67,6 +67,20 @@ regexTarget = "match"
 regexes = ['''handle_zone2_breakdown''']
 paths = ['''tests/test_site_api_derived_phase_4088\.py''']
 
+[[allowlists]]
+# #4189 — found 2026-10-10 by the secret-scan gate on PR #4737
+# (https://github.com/averagejoematt/life-platform/actions/runs/38030571095): one
+# generic-api-key finding at commit ca3352536, tests/js/morning_note_box_4189.test.mjs line 12,
+# `const TOKEN = "<the sequential hex digits 0-f, twice>"`. Not a credential: the fake 32-hex
+# owner grant the morning-note box test parses — the digits 0..f in order, repeated, signing
+# nothing. The follow-up commit builds it with `.repeat(2)` so no literal can match; this entry
+# exists only because the gate scans the PR commit RANGE, which still carries ca3352536.
+description = "tests/js/morning_note_box_4189.test.mjs — the sequential-hex fake grant token 0123456789abcdef x2 in the #4189 box test. A test fixture, not a credential."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''0123456789abcdef0123456789abcdef''']
+paths = ['''tests/js/morning_note_box_4189\.test\.mjs''']
+
 # ── #3620 — the platform's OWN bearer shapes ─────────────────────────────────
 # GitHub's validity checks and non-provider patterns are not offered on a
 # user-owned repo (#3606 item 3), so gitleaks' default ruleset is the whole

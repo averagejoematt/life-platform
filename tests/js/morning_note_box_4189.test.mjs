@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 
 const mn = await import("../../site/assets/js/morning_note_box.js");
 
-const TOKEN = "0123456789abcdef0123456789abcdef";
+// A fake 32-hex grant, built (not written as one literal) so it never reads as a credential.
+const TOKEN = "0123456789abcdef".repeat(2);
 const DAY = "2026-10-10";
 const NOW = new Date("2026-10-10T12:30:00Z"); // 05:30 PT on DAY
 
