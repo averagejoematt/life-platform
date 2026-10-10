@@ -1072,7 +1072,8 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # read-only S3 ingestion-trigger drift check — arrives PROVEN (GUARD_PROOFS: two mutations, 2 and 1 red,
         # restored 6 passed). Measured on the lane off origin/main df63a72ea: 777 {252, 513, 7, 5} -> 778 {253, 513, 7, 5}.
         # Upper bound 253 -> 254 (2026-10-10, #4270): registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa (the qa/ dir)
-        # arrives PROVEN (REGISTRY_PROOFS). Measured on origin/main df63a72ea: 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}.
+        # arrives PROVEN (REGISTRY_PROOFS). Id-set diff vs a `git archive origin/main` export at 057ec826b:
+        # 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}; STRUCTURAL_CLASSES::{static,utility} relocate tests/ -> qa/.
         <= 254
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"

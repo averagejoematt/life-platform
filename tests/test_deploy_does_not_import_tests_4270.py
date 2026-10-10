@@ -3,7 +3,12 @@
 tests/ should hold tests and fixtures. Deploy and CI tooling that reaches INTO tests/ (a sys.path insert of
 tests/, or a subprocess/path reference to a tests/*.py module) couples the deploy path to the test tree, so
 a test-only refactor can break a deploy. The modules deploy/ needed (the page registry and the leak-token
-sweep core) now live in scripts/ with re-export shims left in tests/.
+sweep core) now live in qa/ (qa/qa_manifest.py, qa/leak_token_sweep.py) with re-export shims left in tests/.
+
+NOT DONE: deploy/ still reaches into tests/ — three deploy/ files sit in LEGACY below — so #4270's
+"deploy/ no longer imports tests/" box stays open. Scope is top-level deploy/*.py and scripts/*.py only;
+subdirectories are not swept (measured 2026-10-10: one hit, deploy/archive/patch_visual_qa_log_5xx.py, an
+archived one-shot patch script).
 
 This is a shrink-only ledger: LEGACY lists the files that still reach into tests/ (each moves in a later
 slice of #4270). A NEW offender fails; a ledger entry that no longer offends also fails (delete it).
@@ -72,6 +77,8 @@ def test_no_new_deploy_or_scripts_module_reaches_into_tests():
     new = sorted(found - LEGACY)
     stale = sorted(LEGACY - found)
     moved_back = sorted(set(MOVED_CLEAN) & found)
-    assert not new, f"deploy/ or scripts/ module now reaches into tests/ (move the module to scripts/ instead): {new}"
+    assert (
+        not new
+    ), f"deploy/ or scripts/ module now reaches into tests/ (move the module to qa/ instead, leaving a re-export shim in tests/): {new}"
     assert not moved_back, f"already-moved files regressed to importing tests/: {moved_back}"
     assert not stale, f"LEGACY entries no longer reach into tests/ — delete them from the ledger: {stale}"

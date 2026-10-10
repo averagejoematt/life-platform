@@ -18,6 +18,9 @@ on:
       - 'lambdas/web/**'
       - 'cdk/stacks/**'
       - 'tests/qa_manifest.py'
+      # #4270: the registry's real home — tests/qa_manifest.py above is now a re-export shim,
+      # so a page registered in qa/qa_manifest.py must re-run the PAGE leg too.
+      - 'qa/qa_manifest.py'
       # C1 (#1436): the schema-baseline directory the ROUTE leg enforces against —
       # its appearance flips that leg from advisory to blocking.
       - 'tests/api_schemas/**'
