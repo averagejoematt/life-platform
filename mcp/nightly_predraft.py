@@ -7,6 +7,10 @@ WHY THIS EXISTS
   chat REVIEWS a draft instead of building one.
 
 WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
+  0. `sweep_expired` (#4732): ARCHIVE — never delete — the pre-draft's own uncommitted drafts whose
+     day has passed, or whose day already has a committed routine of the same archetype. The owner
+     usually commits his own routine in chat, so without this every night left a pair behind.
+     Routines the pre-draft did not author are never touched. Fail-soft and reported as `sweep`.
   1. `scheduled_session(tomorrow)` — THE seam (below). No lifting session → the first-class
      `no_session` outcome, never a guessed one. Archetype-agnostic (full / upper / lower).
   2. Idempotency + ownership: a routine already on file for tomorrow decides the run —
@@ -108,6 +112,10 @@ SKIPPED_OWNER_ROUTINE = "skipped_owner_routine"
 BLOCKED_STALE_INPUTS = "blocked_stale_inputs"
 HONEST_OUTCOMES = (DRAFTED, EXISTS, NO_SESSION, SKIPPED_OWNER_ROUTINE, BLOCKED_STALE_INPUTS)
 FAILED = "failed"  # NOT honest-terminal: emits PredraftOutcome = 0, so the dead-man (Sum < 1) still fires
+SWEEP_LOOKBACK_DAYS = 120
+"""#4732: how far back the expired-draft sweep looks (the orphan census's own lookback), floored at the genesis."""
+SWEEP_LIMIT = 500
+"""#4732: the index Query page the sweep reads — the same bound `routine_repo.stale_draft_census` uses."""
 GENERATOR_VARIANTS = ("ideal", "floor", "re_entry")
 """The variants `routine_generator` persists for a lifting session — with the date and the archetype,
 each is one routine PARTITION (`_new_routine_id`, #3115)."""
@@ -315,6 +323,78 @@ def _critics_summary(rec: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ── #4732: the pre-draft archives what it left behind ───────────────────────────────────
+# Every night drafts a primary + a floor sibling for tomorrow. In chat the owner reviews it and
+# usually commits a DIFFERENT routine (his own draft) for the session, so the pre-draft's pair
+# stays `draft` forever — nothing commits it and nothing archived it. The routine repo on
+# 2026-10-09 held 19 live-cycle drafts older than 7 days; 14 of them were these marked pairs
+# (09-26 → 10-02), which is the ~+2/day the `data:orphan_routine_drafts` census counted.
+def _committed(ir: Any) -> bool:
+    return bool(getattr(ir, "hevy_routine_id", None)) or getattr(ir, "status", None) == "active"
+
+
+def _sweep_reason(ir: Any, today: str, on_date: list[Any]) -> str | None:
+    """Why the pre-draft's OWN uncommitted draft is dead, or None to leave it.
+
+    Only a routine the pre-draft stamped (`_is_ours`), still `draft`, never pushed to Hevy. Expired:
+    its target day is before `today`. Superseded: a committed routine of the same archetype is on its
+    date (the owner committed a session for that day — his own, or this primary, for a sibling)."""
+    if not _is_ours(ir) or getattr(ir, "status", None) != "draft" or getattr(ir, "hevy_routine_id", None):
+        return None
+    day = str(getattr(ir, "target_date", "") or "")
+    if not day or day > today:
+        return None
+    if day < today:
+        return "expired"
+    archetype = str(getattr(ir, "archetype", "") or "").lower()
+    for other in on_date:
+        if other.routine_id != ir.routine_id and _committed(other) and str(getattr(other, "archetype", "") or "").lower() == archetype:
+            return "superseded"
+    return None
+
+
+def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[str, Any]:
+    """Archive the pre-draft's own expired / superseded drafts — NEVER delete (#4732).
+
+    The archive is `manage_hevy_routine archive`'s local-only branch (`_action_archive` for a routine
+    never pushed to Hevy): status `archived` as the routine's next version, so every prior version stays
+    readable. A routine the pre-draft did not author is never touched here — that stays the owner's call.
+    Never targets a day after `today`, so tonight's draft (tomorrow) is never in reach."""
+    from common.pacific_time import shift_day_key
+    from training.routine_repo import list_by_date_range, put_versioned
+
+    if genesis is None:
+        from training.routine_repo import _live_genesis
+
+        genesis = _live_genesis()
+    start = shift_day_key(today, -SWEEP_LOOKBACK_DAYS)
+    if genesis and genesis > start:
+        start = genesis  # a pre-genesis draft is history, never this sweep's business
+    rows = list_by_date_range(start, today, limit=SWEEP_LIMIT)
+    by_date: dict[str, list[Any]] = {}
+    for ir in rows:
+        by_date.setdefault(str(ir.target_date), []).append(ir)
+    archived: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    for ir in rows:
+        reason = _sweep_reason(ir, today, by_date.get(str(ir.target_date), []))
+        if not reason:
+            continue
+        snap = dict(getattr(ir, "inputs_snapshot", None) or {})
+        snap[MARKER] = {**(snap.get(MARKER) or {}), "archived": {"at": run_at, "reason": reason, "by": "nightly_predraft.sweep_expired"}}
+        ir.inputs_snapshot = snap
+        ir.status = "archived"
+        ir.parent_version = int(ir.version)
+        ir.version = int(ir.version) + 1
+        try:
+            put_versioned(ir)
+        except Exception as e:  # noqa: BLE001 — one refused write never stops the rest; it is named
+            errors.append({"routine_id": ir.routine_id, "error": f"{type(e).__name__}: {e}"[:200]})
+            continue
+        archived.append({"routine_id": ir.routine_id, "target_date": ir.target_date, "reason": reason})
+    return {"window": {"start": start, "end": today}, "scanned": len(rows), "archived": archived, "errors": errors}
+
+
 def run(target_date: str | None = None) -> dict[str, Any]:
     """One pre-draft for `target_date` (default: tomorrow, Pacific). Never commits."""
     from common.pacific_time import pacific_today, shift_day_key
@@ -322,6 +402,16 @@ def run(target_date: str | None = None) -> dict[str, Any]:
     target = target_date or shift_day_key(pacific_today(), JOB["target_offset_days"])
     run_at = datetime.now(timezone.utc).isoformat()
     out: dict[str, Any] = {"job": JOB["name"], "target_date": target, "run_at": run_at, "engine": ENGINE_VERSION}
+    # #4732: archive last nights' leftovers first. The sweep's "today" is the run's own day (target −
+    # offset) CLAMPED to the real Pacific today: a back-dated run never reaches past its own target, and
+    # an on-demand run for a FUTURE date (e.g. D+3) never treats D+2 as today and archives a real D+1
+    # pre-draft as "expired" before its day. Fail-soft: a sweep error is named, never fatal.
+    try:
+        sweep_today = min(shift_day_key(target, -JOB["target_offset_days"]), pacific_today())
+        out["sweep"] = sweep_expired(sweep_today, run_at)
+    except Exception as e:  # noqa: BLE001 — the draft still runs; the sweep's failure is on the record
+        logger.warning(f"nightly predraft: the expired-draft sweep failed ({type(e).__name__}: {e})")
+        out["sweep"] = {"error": f"{type(e).__name__}: {e}"[:300]}
 
     session = scheduled_session(target) or {}
     # #4161: the week counter's basis (sessions AND days) and the deload ride with the pre-draft too

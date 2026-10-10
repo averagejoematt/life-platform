@@ -342,6 +342,89 @@ def build_day_items(rows):
     return day_items
 
 
+# ── #4638: the diary file's date range is authoritative ─────────────────────
+# The diary export is a rolling window (7 days in every archived upload checked
+# 2026-10-09) and carries a row for each logged food — nothing for a day with no
+# food. Before #4638 the parser wrote only the days present, so a day emptied or
+# deleted in the app kept its old totals forever. Now a STORED day that falls inside
+# the file's date range (its first..last dated row) but has no rows in the file is
+# replaced with an explicit empty record, tombstoned so every derived read (which
+# drops `tombstone=true`) reads it as absent rather than as a logged day.
+#
+# Deliberately narrow: (a) only a day already in the store is written — a never-
+# logged gap stays absent instead of gaining a row; (b) a day carrying ANY row with a
+# parseable date counts as present even when no row parses into an entry, so a parse
+# failure can never erase a day; (c) a daily-summary-format record (`_format`) belongs
+# to the other export channel and is left alone; (d) an already-empty record is not
+# rewritten, so a re-upload is idempotent.
+EMPTY_DAY_REASON = "macrofactor_day_absent_from_export"
+
+
+def file_date_range(rows):
+    """(first, last, present) — the ISO dates any row of the file carries, by
+    `normalize_date`. (None, None, set()) for a file with no dated row."""
+    present = {d for d in (normalize_date(r.get("Date")) for r in rows) if d}
+    if not present:
+        return None, None, present
+    return min(present), max(present), present
+
+
+def absent_day_items(rows, stored_items, ingested_at=None):
+    """The explicit empty records a diary import owes the store (#4638).
+
+    `stored_items` are the macrofactor rows already stored for (at least) the
+    file's date range. Returns {date: item} for each stored day inside that range
+    the file carries no row for — see the block comment above for what is skipped.
+    """
+    first, last, present = file_date_range(rows)
+    if first is None:
+        return {}
+    ingested_at = ingested_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    out = {}
+    for stored in stored_items or ():
+        date_str = str(stored.get("date") or str(stored.get("sk", "")).replace("DATE#", ""))[:10]
+        if not (first <= date_str <= last) or date_str in present:
+            continue
+        if stored.get("_format"):
+            continue  # a daily-summary record — the diary export does not own it
+        if stored.get("tombstone") and not stored.get("entries_count"):
+            continue  # already the empty record — idempotent re-upload
+        out[date_str] = {
+            "pk": PK,
+            "sk": f"DATE#{date_str}",
+            "date": date_str,
+            "source": "macrofactor",
+            "schema_version": 1,
+            "ingested_at": ingested_at,
+            "entries_count": 0,
+            "food_log": [],
+            "tombstone": True,
+            "tombstoned_at": ingested_at,
+            "tombstoned_reason": EMPTY_DAY_REASON,
+        }
+    return out
+
+
+def stored_days_in_range(first, last):
+    """The macrofactor rows stored between `first` and `last` (inclusive), paginated.
+    Narrow projection: only what `absent_day_items` reads."""
+    from boto3.dynamodb.conditions import Key
+
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(PK) & Key("sk").between(f"DATE#{first}", f"DATE#{last}~"),
+        "ProjectionExpression": "sk, #d, #f, tombstone, entries_count",
+        "ExpressionAttributeNames": {"#d": "date", "#f": "_format"},
+    }
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            return items
+        kwargs["ExclusiveStartKey"] = last_key
+
+
 def safe_int(val):
     # int() is safe here only because safe_float rejects non-finite values —
     # int(float('nan')) raises ValueError, so a 'nan' Reps/RIR cell used to
@@ -643,9 +726,24 @@ def lambda_handler(event, context):
     csv_type = detect_csv_type(rows[0].keys())
     print(f"Detected CSV type: {csv_type}")
 
+    days_emptied = 0
     if csv_type == "nutrition":
         archive_raw(bucket, source_key, content_bytes)
         day_items = build_day_items(rows)
+        # #4638: the file's date range is authoritative — a stored day inside it with no
+        # rows was emptied in the app. A failed read must not cost the import itself, so
+        # it is logged loudly and the import proceeds without the empty records.
+        first, last, _present = file_date_range(rows)
+        if first is not None:
+            try:
+                emptied = absent_day_items(rows, stored_days_in_range(first, last))
+            except Exception as exc:  # noqa: BLE001 — the import's writes outrank the clean-up
+                print(f"[#4638] ERROR: stored-range read failed ({type(exc).__name__}: {exc}); no empty days written")
+                emptied = {}
+            for date_str in emptied:
+                print(f"[#4638] {date_str}: stored but absent from the export's {first}..{last} range — writing an empty record")
+            days_emptied = len(emptied)
+            day_items.update(emptied)
     elif csv_type == "workout":
         archive_raw(bucket, source_key, content_bytes, subfolder="workouts")
         day_items = build_workout_day_items(rows)
@@ -720,6 +818,7 @@ def lambda_handler(event, context):
                 "csv_type": csv_type,
                 "rows_parsed": len(rows),
                 "days_written": written,
+                "days_emptied": days_emptied,
             }
         ),
     }

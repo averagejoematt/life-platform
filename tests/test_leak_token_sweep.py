@@ -131,6 +131,17 @@ def test_tokens_for_daily_run_drops_reset_window_once_mature():
     assert "999.0 sentinel" in labels
 
 
+def test_daily_run_drops_day_30_plus_counter_on_day_30_and_31_4689():
+    """Day N = days_since_genesis + 1; 'Day 31' (the 2026-10-06 /api/vitals red) is real content."""
+    from datetime import date, timedelta
+
+    g = date.fromisoformat(lts.EXPERIMENT_START_DATE)
+    for day_number, expect_kept in ((29, True), (30, False), (31, False)):
+        today = (g + timedelta(days=day_number - 1)).isoformat()
+        labels = {t[0] for t in lts.tokens_for_daily_run(today=today)}
+        assert ("Day-30+ counter" in labels) is expect_kept, day_number
+
+
 def test_tokens_for_daily_run_keeps_full_list_pre_start():
     from datetime import date, timedelta
 

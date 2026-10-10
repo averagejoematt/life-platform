@@ -74,6 +74,10 @@ def _quiet_pipeline(monkeypatch, hb):
     )
     monkeypatch.setattr(hb, "write_normalized", lambda rec: None)
     monkeypatch.setattr(hb, "_derive_training_notes", lambda rec: None)
+    # #4643: the breaker + quarantine paths have their own tests; keep these off the table.
+    monkeypatch.setattr(hb, "_HAS_AUTH_BREAKER", False)
+    monkeypatch.setattr(hb, "_load_event_failures", lambda: {})
+    monkeypatch.setattr(hb, "_note_event_failure", lambda *a, **k: False)
 
 
 def test_clean_run_records_success_sentinel(monkeypatch):
