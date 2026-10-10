@@ -236,6 +236,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
         "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted
+        "test_retired_training_shapes_4636.py",  # #4636: rglob sweep — no read of macrofactor_workouts / a nested 'workouts' list outside training/legacy_workouts.py
         "test_journal_row_cowriters_4677.py",  # #4677: rglob sweep — a module that names the journal partition and writes must be a declared co-writer, or its attributes are erased on re-ingest
         "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
         "test_predictions_sourcing_hold_4701.py",  # #4701: glob sweep — every lambdas/web claim_natural reader applies claim_sourcing or names its exemption
