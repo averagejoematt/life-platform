@@ -44,6 +44,7 @@ from typing import Any, Iterable
 
 from common.pacific_time import parse_day_key
 
+from training.legacy_workouts import day_workouts  # #4636: the ONE reader of the retired per-day shape
 from training.template_muscle_overrides import muscle_override_for
 
 #: The stated fraction a named secondary muscle is credited per working set. 0.5 is the
@@ -346,8 +347,7 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
             continue
         # Legacy per-day shape: workouts nested under data.workouts (or top-level workouts).
         date_str = item.get("date") or sk[5:15]
-        workouts = item.get("data", {}).get("workouts") or item.get("workouts") or []
-        for w in workouts:
+        for w in day_workouts(item):
             out.append(
                 {
                     "date": date_str,

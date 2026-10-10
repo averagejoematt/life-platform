@@ -38,6 +38,7 @@ from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
 from common.repo_config import config_dir
 
+from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION  # #4636: the retired partition, named once
 from training.routine_ir import RoutineSpec
 
 # Depth-independent default — see common.repo_config (#1653). The literal
@@ -95,7 +96,7 @@ EXACT_ARCHETYPE_SOURCES = ("sticker", "hevy_routine_id")
 # Performed-workout sources to union for the honest counters. workout_uid
 # ("hevy:<id>" / the MacroFactor formula) dedupes the same session arriving via
 # more than one pipe so it isn't counted twice in N or Y (work order §1.5).
-_PERFORMED_SOURCES = ("hevy", "macrofactor_workouts", "macrofactor_export")
+_PERFORMED_SOURCES = ("hevy", LEGACY_WORKOUTS_PARTITION, "macrofactor_export")
 # Variants that are paired with / substitute for a real session — excluded from
 # the routine index used to resolve a performed workout's type.
 _NON_COUNTING_VARIANTS = ("floor", "re_entry")

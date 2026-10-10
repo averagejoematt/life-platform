@@ -12,6 +12,8 @@ On approve:
   4. Updates DynamoDB status: draft → published
   5. Invokes chronicle-email-sender to deliver to subscribers
   6. Returns HTML confirmation page
+  Steps 2-5 (and recap, ledger, recall, Elena, Panel) are `publish_side_effects` — the ONE owner
+  every publish path calls, the season promote included (#4593).
 
 On request_changes:
   1. Validates token
@@ -298,7 +300,7 @@ def _commit_recap(item: dict) -> None:
         logger.warning("[recap] _commit_recap failed (non-fatal): %s", exc)
 
 
-def _index_for_recall(date_str: str) -> None:
+def _index_for_recall(date_str: str, sk: str = "") -> None:
     """#1384 write-side: add the freshly published week to the semantic-recall corpus.
 
     Must run AFTER `_mark_published` — the indexer only accepts a `published` record, and
@@ -313,7 +315,8 @@ def _index_for_recall(date_str: str) -> None:
     try:
         from ai import recall_indexer
 
-        status = recall_indexer.index_chronicle_installment(table, CHRONICLE_PK, date_str)
+        # #4593: `sk` only when the row's sk is not DATE#{date} (a re-dated lead-in the season promote republishes).
+        status = recall_indexer.index_chronicle_installment(table, CHRONICLE_PK, date_str, **({"sk": sk} if sk else {}))
         # #2705: a `failed` status is not news at INFO. 2026-08-11 logged
         # "[recall] index 2026-08-11: failed" at INFO and sat unindexed for four
         # days — the publish path's only trace of a real miss, at the level nobody
@@ -394,6 +397,102 @@ def _invoke_coach_panel_podcast() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PUBLISH-TIME SIDE EFFECTS — the ONE owner (#4593)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 2026-10-02 the season promote (scripts/season_promote.py) published the rebuilt week 4 by
+# writing the chronicle row directly. Every side effect below lived inline in this file's two
+# publish paths, so the third path ran none of them: no delivery email (chronicle-delivery-
+# heartbeat lit), no share kit (qa-smoke's hook-liveness leg lit, and its AccessDenied read
+# flapped swallowed-permission-denial). Every publish path now goes through
+# `publish_side_effects`, and a path that does not want an effect DECLINES it by name with a
+# reason — it cannot simply not know about it. tests/test_publish_side_effects_4593.py pins
+# that the approve click, the sweep and the promote all call this function.
+
+#: Every publish-time side effect, in the order they run. Adding one here is the whole wiring:
+#: every caller either runs it or declines it by name.
+SIDE_EFFECTS = (
+    "s3_artifacts",  # journal post page + posts.json + share kit (+ CloudFront invalidation)
+    "recap",  # RECAP#latest / RECAP#{date} from the draft's pre-built recap
+    "ledger",  # LEDGER#{date} season memory from the row's desk ledger (#4533)
+    "mark_published",  # status=published, approved_at, draft fields + token removed
+    "recall_index",  # the semantic-recall corpus (#1384) — after mark_published
+    "delivery",  # chronicle-email-sender (subscribers)
+    "elena_state",  # elena-state-updater (#537)
+    "panel_podcast",  # coach-panel-podcast (#734)
+)
+#: Effects a batch caller may fire ONCE for many rows instead of per row (the sweep).
+DEFERRABLE = ("delivery", "panel_podcast")
+NO_SEND = "no-send"
+
+
+def _record_no_send(item: dict, date_str: str, reason: str) -> str:
+    """#4593: a declined delivery is a DECISION on the row, not an absence. chronicle-email-sender reads
+    `delivery_decision` and no-ops on it (so a cron inside the 7-day window cannot send what was declined),
+    and an operator reading the row sees why it was never mailed. Never overwrites a real delivery."""
+    if item.get("delivered_at"):
+        return f"declined: {reason} (already delivered at {item.get('delivered_at')}; no decision stamped)"
+    sk = str(item.get("sk") or f"DATE#{date_str}")
+    table.update_item(
+        Key={"pk": CHRONICLE_PK, "sk": sk},
+        UpdateExpression="SET delivery_decision = :d, delivery_decision_reason = :r, delivery_decided_at = :n",
+        ConditionExpression="attribute_not_exists(delivered_at)",
+        ExpressionAttributeValues={":d": NO_SEND, ":r": reason, ":n": datetime.now(timezone.utc).isoformat()},
+    )
+    logger.info("[#4593] %s: delivery declined, no-send decision recorded (%s)", sk, reason)
+    return f"declined: {reason} (no-send decision recorded)"
+
+
+def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = None, defer: tuple = ()) -> dict:
+    """Run — or explicitly decline — every publish-time side effect for one installment.
+
+    decline: {effect: reason} for an effect this path owns elsewhere or does not want. A declined
+      delivery stamps a no-send decision on the row (``_record_no_send``).
+    defer:   effects from ``DEFERRABLE`` the caller fires once itself after a batch.
+
+    Returns {effect: "ran" | "declined: …" | "deferred"} covering EVERY name in ``SIDE_EFFECTS``.
+    ``_publish_to_s3`` still raises on an archived row (#3485), so nothing after it runs for one.
+    """
+    decline = dict(decline or {})
+    defer = tuple(defer or ())
+    unknown = (set(decline) | set(defer)) - set(SIDE_EFFECTS)
+    if unknown:
+        raise ValueError(f"#4593: unknown publish side effect(s) {sorted(unknown)} — known: {SIDE_EFFECTS}")
+    if set(defer) - set(DEFERRABLE):
+        raise ValueError(f"#4593: only {DEFERRABLE} can be deferred, not {sorted(set(defer) - set(DEFERRABLE))}")
+    if set(decline) & set(defer):
+        raise ValueError(f"#4593: {sorted(set(decline) & set(defer))} both declined and deferred")
+    blank = [k for k, v in decline.items() if not str(v or "").strip()]
+    if blank:
+        raise ValueError(f"#4593: a declined side effect needs a reason: {blank}")
+
+    sk = str(item.get("sk") or "")
+    runners = {
+        "s3_artifacts": lambda: _invalidate_cloudfront(_publish_to_s3(item)),
+        "recap": lambda: _commit_recap(item),  # Phase 3: commit the "previously on" recap with the week
+        "ledger": lambda: _commit_ledger(item),  # #4533: the season ledger the next week picks the story up from
+        "mark_published": lambda: _mark_published(date_str),
+        # #1384; the sk only for a re-dated row whose sk is not DATE#{date}
+        "recall_index": lambda: _index_for_recall(date_str, sk) if sk and sk != f"DATE#{date_str}" else _index_for_recall(date_str),
+        "delivery": _invoke_email_sender,
+        "elena_state": lambda: _invoke_elena_state_updater(date_str),  # #537: published → update her memory
+        "panel_podcast": _invoke_coach_panel_podcast,  # #734: a published week earns a Panel episode
+    }
+    out: dict = {}
+    for effect in SIDE_EFFECTS:
+        if effect in decline:
+            reason = str(decline[effect]).strip()
+            out[effect] = _record_no_send(item, date_str, reason) if effect == "delivery" else f"declined: {reason}"
+            logger.info("[#4593] %s %s: %s", date_str, effect, out[effect])
+        elif effect in defer:
+            out[effect] = "deferred"
+        else:
+            runners[effect]()
+            out[effect] = "ran"
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # AUTO-PUBLISH SWEEP (SS-01) — the self-sustaining fail-safe: a chronicle draft must
 # never stay dark just because the approve link wasn't clicked. A daily schedule
 # sweeps drafts older than the review window and publishes them via the SAME path the
@@ -447,13 +546,8 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
             published.append({"date": date_str, "week": wk, "dry_run": True})
             continue
         try:
-            paths = _publish_to_s3(item)
-            _invalidate_cloudfront(paths)
-            _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
-            _commit_ledger(item)  # #4533: the season ledger the next week picks the story up from
-            _mark_published(date_str)
-            _index_for_recall(date_str)  # #1384: published → it can be cited as a precedent
-            _invoke_elena_state_updater(date_str)  # #537: published → update her memory
+            # #4593: the ONE side-effect owner; delivery + the Panel fire once for the batch below.
+            publish_side_effects(item, date_str, defer=DEFERRABLE)
             published.append({"date": date_str, "week": wk})
             logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
         except Exception as exc:
@@ -563,15 +657,7 @@ def _handle(event: dict) -> dict:
     if action == "approve":
         logger.info("chronicle-approve: APPROVING Week %s (%s)", week_num, date_str)
 
-        invalidation_paths = _publish_to_s3(item)
-        _invalidate_cloudfront(invalidation_paths)
-        _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
-        _commit_ledger(item)  # #4533: the season ledger the next week picks the story up from
-        _mark_published(date_str)
-        _index_for_recall(date_str)  # #1384: published → it can be cited as a precedent
-        _invoke_email_sender()
-        _invoke_elena_state_updater(date_str)  # #537: published → update her memory
-        _invoke_coach_panel_podcast()  # #734: a published week earns a Panel episode
+        publish_side_effects(item, date_str)  # #4593: every side effect, none declined
 
         return _html_response(
             200,

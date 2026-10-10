@@ -6102,13 +6102,6 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_training.py",
-      "partition": "macrofactor_workouts",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_training.py",
       "partition": "strava",
       "via": "seam"
     },
@@ -7583,7 +7576,7 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 737,
+      "edges": 736,
       "lambdas": 107,
       "mcp_tool_modules": 35,
       "mcp_tools": 87,
@@ -7598,8 +7591,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 359,
-        "sites_resolved": 916,
-        "sites_total": 1275
+        "sites_resolved": 917,
+        "sites_total": 1276
       },
       "schedule_resolution": {
         "dynamic": 0,

@@ -1055,7 +1055,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 247 -> 248 (2026-10-10, #4707): structural::test_key_rotator_grants_4707.py — the lambdas/ sweep holding
         # every Secrets Manager rotation Lambda's sm.<method> calls to its role's grants — arrives PROVEN via the re-runnable
         # harness (MutationSpec + proof, ARMED 1/1). Measured: 772 {247, 513, 7, 5} -> 773 {248, 513, 7, 5}.
-        # Upper bound 248 -> 249 (2026-10-09, #4674): registry BASELINE::pace flag arrives PROVEN (REGISTRY_PROOFS): 773 -> 774.
+        # Upper bound 248 -> 249 (2026-10-10, #4636): structural::test_retired_training_shapes_4636.py — the lambdas/ mcp/
+        # sweep holding every read of the retired per-day training shape to training/legacy_workouts.py — arrives PROVEN
+        # via the re-runnable harness (MutationSpec + proof, ARMED 1/1). Measured: 773 {248, 513, 7, 5} -> 774 {249, 513, 7, 5}.
         <= 249
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
