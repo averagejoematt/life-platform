@@ -483,8 +483,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "note": (
                 "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
                 "stored record by id; older edits are never re-fetched. A workout deleted in the app keeps its "
-                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused and "
-                "_reconcile is API → store only."
+                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused. Since #4638 the "
+                "daily _reconcile REPORTS the store → vendor difference inside its 14-day window (stored workout ids "
+                "the vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
+                "ChangedActivityCount with Source=whoop) but stays read-only: nothing is removed."
             ),
         },
     },
@@ -592,14 +594,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=3 (full replace).
         "upstream_changes": {
             "edits": "inside_window",
-            "deletes": "not_propagated",
+            "deletes": "inside_window",
             "window_days": 3,
             "standing": "stated_default",
             "note": (
                 "An edit (rename, sport type, trim) inside the 3-day trailing re-fetch propagates, and so does a "
-                "PARTIAL delete there (the re-fetch is a full replace of the day). A day whose activities are all "
-                "deleted keeps its row (fetch_day returns nothing for an empty day), and an edit older than 3 "
-                "days is never re-fetched; _reconcile is API → store only."
+                "PARTIAL delete there (the re-fetch is a full replace of the day). A day whose activities are ALL "
+                "deleted is rewritten as an explicit empty, tombstoned day by the daily _reconcile (store → vendor, "
+                "#4638) anywhere inside its 14-day window except the first and last day, at most 3 days per run, and "
+                "never when the vendor list comes back wholly empty. An edit, or a partial delete, older than 3 days "
+                "is not written: _reconcile REPORTS it (StoreOnlyActivityCount / ChangedActivityCount, Source=strava) "
+                "and the store keeps what it first saw."
             ),
         },
     },
