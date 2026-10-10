@@ -374,6 +374,7 @@ def test_a_tombstoned_ledger_row_is_invisible():
         "ledger_json": json.dumps({**story_ledger.empty_ledger(), "week": 4}),
         "tombstone": True,
         "phase": "pilot",
+        "cycle": story_ledger.current_cycle(),  # #4533: a live row is also this cycle's
     }
     assert story_ledger.latest_visible(_T([row]), "p", "2026-09-29")["week"] is None
     live = {**row, "tombstone": False, "phase": "experiment"}
