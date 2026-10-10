@@ -1058,7 +1058,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 248 -> 249 (2026-10-10, #4636): structural::test_retired_training_shapes_4636.py — the lambdas/ mcp/
         # sweep holding every read of the retired per-day training shape to training/legacy_workouts.py — arrives PROVEN
         # via the re-runnable harness (MutationSpec + proof, ARMED 1/1). Measured: 773 {248, 513, 7, 5} -> 774 {249, 513, 7, 5}.
-        <= 249
+        # Upper bound 249 -> 250 (2026-10-09, #4638, stacked on #4636 at merge): structural::test_upstream_changes_4638.py —
+        # the sweep holding the stated apple_health upstream_changes facet to "no rebuild-a-day caller" (keyword OR
+        # positional monotonic_guard) — arrives PROVEN via the re-runnable harness (MutationSpec + proof, ARMED 1/1).
+        # Measured after merging origin/main: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
+        <= 250
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

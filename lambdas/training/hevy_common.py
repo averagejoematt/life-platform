@@ -148,7 +148,14 @@ def verify_webhook_signature(body_bytes: bytes, provided_secret_or_sig: str) -> 
 
 
 class HevyAPIError(Exception):
-    pass
+    """A Hevy API call failed. `status` is the HTTP code when there was one (None for a
+    network error) — #4643: the auth breaker keys on it, never on the message text, because
+    the message carries the request path and a `since=` timestamp whose microseconds can
+    contain "401" or "403" on a run that failed for an unrelated reason."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 def hevy_get(path: str, timeout: int = 30) -> dict:
@@ -177,7 +184,7 @@ def hevy_get(path: str, timeout: int = 30) -> dict:
             body = e.read().decode("utf-8", errors="replace")[:500]
         except Exception:
             pass
-        raise HevyAPIError(f"Hevy GET {path} → HTTP {e.code}: {body}") from e
+        raise HevyAPIError(f"Hevy GET {path} → HTTP {e.code}: {body}", status=e.code) from e
     except urllib.error.URLError as e:
         raise HevyAPIError(f"Hevy GET {path} network error: {e}") from e
 

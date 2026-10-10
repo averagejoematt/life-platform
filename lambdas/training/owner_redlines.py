@@ -89,6 +89,7 @@ PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # 
 PLAN_V0_3 = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3.md"  # superseded 2026-09-24, kept
 
 # The v1 -> v2 -> v3 history lives in the sibling `training.redline_changelog` (#4387, #1665 size ratchet).
+from training.green_block import SESSION_SET_CEILINGS  # noqa: E402  (#4503 OD4)
 from training.redline_changelog import CHANGELOG_V1_TO_V2, CHANGELOG_V2_TO_V3  # noqa: E402
 
 LAST_REVIEWED_BY_OWNER: str | None = "2026-09-23"
@@ -990,12 +991,14 @@ TRIPWIRES: list[dict[str, Any]] = [
         "signal": "hard sets per muscle per week, or working sets in one session",
         # #4147: moves with v0.4's band (owner, 2026-09-23: ~10 sets/muscle/wk, [8, 12]) — 12; it was 10, the top of v0.3's 6–10.
         # derived from the band, never re-typed: the ceiling IS the band's top
-        "threshold": {"sets_per_muscle_wk": REDLINES["lifting_sessions_per_wk"]["sets_per_muscle_wk"][1], "sets_per_session": 18},
+        # #4503 OD4 (A, owner 2026-09-30): the per-session line is the generator's v0.5 ceiling — 20 base / 24 with 🟢 — read from
+        # its one home (`training.green_block`), never re-typed: v0.4's literal 18 outlived the ruling here.
+        "threshold": {"sets_per_muscle_wk": REDLINES["lifting_sessions_per_wk"]["sets_per_muscle_wk"][1], **SESSION_SET_CEILINGS},
         "provenance": "population-derived",
         "derived_by": "S&C coach (red team 2026-09-22); the redline band is `lifting_sessions_per_wk.sets_per_muscle_wk` (v0.4: 8–12), this is its top",
         "action": "the plan does not grow next week — MRV is lower in a deficit and he can overshoot it without feeling it; above the band the next week's sets come down, never up",
         "evaluated_by_engine": False,
-        "note": "The 28-day per-muscle sets are already computed; the per-session count is the generator's own `session_set_ceiling` (18).",
+        "note": "The 28-day per-muscle sets are already computed; the per-session lines are the generator's own (v0.5 OD4, `training.green_block`).",
     },
     {
         "id": "post_goal_walking",
