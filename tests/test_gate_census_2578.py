@@ -1068,7 +1068,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 251 -> 252 (2026-10-10, #4674, stacked on #4694): registry::ledgers/site_vocabulary_residue.py::BASELINE::
         # pace flag arrives PROVEN (REGISTRY_PROOFS). Measured after merging origin/main (disposable export vs lane):
         # 776 {251, 513, 7, 5} -> 777 {252, 513, 7, 5}; id-set diff: exactly that one row enters, none leaves.
-        <= 252
+        # Upper bound 252 -> 253 (2026-10-10, #4643 box 5): guard::deploy/check_bucket_notification_drift.py — the
+        # read-only S3 ingestion-trigger drift check — arrives PROVEN (GUARD_PROOFS: two mutations, 2 and 1 red,
+        # restored 6 passed). Measured on the lane off origin/main df63a72ea: 777 {252, 513, 7, 5} -> 778 {253, 513, 7, 5}.
+        <= 253
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
