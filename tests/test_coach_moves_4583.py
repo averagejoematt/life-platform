@@ -596,10 +596,52 @@ SELF_NAMED = (
 def test_a_line_naming_its_own_speaker_is_refused_4705(sheet):
     reasons = S.check_line(SELF_NAMED, "reaction", sheet, today=TODAY, speaker_name=NAMES["sleep_coach"])
     assert "names_self:Lisa" in reasons, reasons
-    assert "names_self:Park" in S.check_line("Park would say it held.", "reaction", sheet, today=TODAY, speaker_name="Lisa Park")
-    assert "names_self:Lisa Park" in S.check_line("Lisa Park here: it held.", "reaction", sheet, today=TODAY, speaker_name="Lisa Park")
+    assert "names_self:Reyes" in S.check_line("Reyes would say it held.", "reaction", sheet, today=TODAY, speaker_name="Max Reyes")
+    assert "names_self:Lisa Park" in S.check_line("lisa park here: it held.", "reaction", sheet, today=TODAY, speaker_name="Lisa Park")
+    assert "names_self:Max Reyes" in S.check_line("Max Reyes thinks it held.", "reaction", sheet, today=TODAY, speaker_name="Max Reyes")
     # another coach's name is not the speaker's
     assert not [r for r in S.check_line(SELF_NAMED, "reaction", sheet, today=TODAY, speaker_name="Max Reyes") if r.startswith("names_self")]
+
+
+def _self_named(text, name):
+    return [r for r in S.self_name_findings(text, name) if r.startswith("names_self")]
+
+
+def test_a_name_part_that_is_an_ordinary_word_never_refuses_4705():
+    """Max Reyes (physical_coach) and Lisa Park (sleep_coach) carry name parts that are English words —
+    "max", "park". A line using the word is not the coach naming herself (#4705 review)."""
+    for text in (
+        "I think he should push to max effort on Saturday.",
+        "Max heart rate is not the point; I expect the steps to matter more.",
+        "I think his VO2 Max will climb through October.",
+        "I expect the max he lifts to hold, and a max-effort week to follow.",
+        "I think a long walk in the park would do more than another lifting day.",
+        "Park the scale for a week; I expect the trend to hold.",
+    ):
+        assert _self_named(text, "Max Reyes") == [], text
+        assert _self_named(text, "Lisa Park") == [], text
+    # the surname that is no word, and lowercase first names, behave as names only when capitalised
+    assert _self_named("I think reyes is a word nobody uses.", "Max Reyes") == []
+    assert _self_named("Reyes thinks it held.", "Max Reyes") == ["names_self:Reyes"]
+    # every live word-part is on the list, so no roster coach trips on it
+    for part in ("Max", "Park", "Marsh", "Vale", "Brooks"):
+        assert part.lower() in S.COMMON_WORD_NAME_PARTS
+
+
+def test_run_wires_the_speakers_name_into_the_gate_4705(monkeypatch):
+    """The production wiring: run() passes the speaker's display name to check_line. A line in which
+    physical_coach names himself twice is held; without the wiring it would ship."""
+    named = "Reyes thinks the long nights will keep the weight falling, and I expect that to hold through the weekend."
+    cast = {"speakers": [{"coach_id": "physical_coach", "move": "call"}], "bet": None}
+    out, table, inv, opened = _run(monkeypatch, cast, {"physical_coach": [named, named]})
+    row = table.puts[-1]
+    assert row["lines"] == [], row["lines"]
+    assert row["held"][0]["coach_id"] == "physical_coach"
+    assert row["held"][0]["reasons"] == ["names_self:Reyes"], row["held"]
+    # control: the same line from another coach is not self-naming and ships
+    cast = {"speakers": [{"coach_id": "sleep_coach", "move": "call"}], "bet": None}
+    out, table, inv, opened = _run(monkeypatch, cast, {"sleep_coach": [named, named]})
+    assert [ln["coach_id"] for ln in table.puts[-1]["lines"]] == ["sleep_coach"], table.puts[-1]["held"]
 
 
 def test_the_speakers_own_entries_read_you_4705(sheet):

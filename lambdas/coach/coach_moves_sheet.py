@@ -532,13 +532,35 @@ def binding_findings(text: str, sheet: dict) -> list:
     return out
 
 
+# Name parts that are also ordinary English words. A part on this list is never matched on its own — only
+# the full display name catches it — so "max effort", "a walk in the park" or "Max heart rate" never refuse
+# Max Reyes or Lisa Park (#4705 review). The live roster's word-parts are Max, Park, Marsh, Vale and Brooks;
+# the rest is the obvious set a future coach's name could draw from.
+COMMON_WORD_NAME_PARTS = frozenset(
+    "max park marsh vale brooks will mark bill rose grant hope faith joy frank ray dawn may june april art chase "
+    "hunter young long brown green white black gray grey rich bell page cook hill wood king lane field stone sharp "
+    "case drew sky river summer autumn star wade bush hall price love bond rock reed cliff dale glen hale nash "
+    "miles holly penny ruby jade iris heath bishop baker carter mason porter fisher".split()
+)
+
+
 def self_name_findings(text: str, speaker_name: str) -> list:
-    """A line in which the speaker names herself (display name, first name or surname) — a coach says
-    "I", never her own name (#4705, the wording of ai_calls.py's expert narrative rule)."""
+    """A line in which the speaker names herself — a coach says "I", never her own name (#4705, the wording
+    of ai_calls.py's expert narrative rule).
+
+    A multi-word display name matches in any case. A single first name or surname matches only as the
+    capitalised name itself (case-sensitive, word-bounded) and never when it is an ordinary English word
+    (COMMON_WORD_NAME_PARTS) — "max" or "Park" alone is a word, not a self-reference."""
+    name = " ".join((speaker_name or "").split())
+    t = text or ""
     out = []
-    for part in dict.fromkeys([speaker_name or ""] + (speaker_name or "").split()):
-        part = part.strip()
-        if len(part) >= 2 and re.search(rf"\b{re.escape(part)}\b", text or "", re.IGNORECASE):
+    multi = len(name.split()) >= 2
+    if multi and re.search(rf"\b{re.escape(name)}\b", t, re.IGNORECASE):
+        out.append(f"names_self:{name}")
+    for part in dict.fromkeys(name.split()):
+        if len(part) < 2 or part.lower() in COMMON_WORD_NAME_PARTS:
+            continue
+        if re.search(rf"(?<![\w-]){re.escape(part)}(?![\w-])", t):
             out.append(f"names_self:{part}")
     return out
 
