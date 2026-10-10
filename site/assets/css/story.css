@@ -760,11 +760,17 @@ body { overflow-x: hidden; }
 .pl-tag { font-family: var(--font-mono); font-size: var(--fs-label); padding: 1px 6px; border-radius: var(--radius-sm); margin-right: var(--sp-2); white-space: nowrap; }
 /* #1975 — outcome grammar (see cr-confirmed/cr-refuted above); .pl-open is the
    third, not-yet-decided state and stays at the lower ink-faint register (nothing
-   to flag yet), never the amber semaphore. */
-.pl-won .pl-tag { background: var(--ember-soft); color: var(--ember); }
-.pl-lost .pl-tag { background: color-mix(in oklch, var(--ink-muted) 18%, transparent); color: var(--ink-muted); }
-/* #4619 — text is --ink-muted on a faint wash: --ink-faint on its own 14% tint measured below 4.5:1 (axe color-contrast, live sweep). */
-.pl-open .pl-tag { background: color-mix(in oklch, var(--ink-faint) 8%, transparent); color: var(--ink-muted); }
+   to flag yet), never the amber semaphore.
+   #4619 — each tag paints its ink as a TINT of that same ink, and a tint eats the
+   contrast margin (#3726's class): ember on --ember-soft, muted on an 18% muted wash
+   and faint on a 14% faint wash all measured ~3.7-3.9:1 under axe, both themes. So
+   the text steps one register further from its own wash — the on-wash inks for the
+   two neutrals, ember pulled 30% toward --ink for won — while the washes, the
+   grammar (won ember / lost muted / open the quieter faint) and the layout stay.
+   tests/test_pl_tag_contrast_4619.py computes every variant over every ramp step. */
+.pl-won .pl-tag { background: var(--ember-soft); color: color-mix(in oklch, var(--ember) 70%, var(--ink)); }
+.pl-lost .pl-tag { background: color-mix(in oklch, var(--ink-muted) 18%, transparent); color: var(--ink-muted-on-wash); }
+.pl-open .pl-tag { background: color-mix(in oklch, var(--ink-faint) 14%, transparent); color: var(--ink-faint-on-wash); }
 
 /* Episode transcript reader — speaker-attributed turns + an in-page "chapters"
    contents (the host's questions). Reads like a script; calm, library-grade. */
