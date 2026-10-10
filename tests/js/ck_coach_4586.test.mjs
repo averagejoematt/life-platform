@@ -37,14 +37,8 @@ test("a coach's name links to its page, and anything that is not a persona id go
   }
 });
 
-test("Back returns to the on-site page the reader came from, otherwise to Coaches", () => {
-  const here = "https://averagejoematt.com/next/v8/coach/?c=sleep_coach";
-  assert.deepEqual(C.backTarget("https://averagejoematt.com/next/v8/?x=1", here, "/next/v8/"), { href: "/next/v8/?x=1", text: "← Back" });
-  const coaches = { href: "/next/v8/coaches/", text: "← The AI coaches" };
-  assert.deepEqual(C.backTarget("", here, "/next/v8/"), coaches, "no referrer");
-  assert.deepEqual(C.backTarget("https://evil.example/next/v8/", here, "/next/v8/"), coaches, "another site");
-  assert.deepEqual(C.backTarget(here, here, "/next/v8/"), coaches, "a reload of this page");
-});
+// Where Back goes (`from=`, by name, else the front page) is one rule for every deep page
+// since #4675: tests/js/ck_deep_links_4675.test.mjs.
 
 test("the top says what the coach is for, that it is software, and how it is written", () => {
   const html = C.whoHTML(SLEEP);
