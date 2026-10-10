@@ -146,18 +146,14 @@ def write_show_memory(table, user_id, logger, week, title, pull_quote, guest_id,
         cbs.append({"week": week, "title": title or "", "pull_quote": pull_quote or "", "open_bet": open_bet or ""})
         gh = [g for g in memory["guest_history"] if g.get("week") != week]
         gh.append({"week": week, "coach_id": guest_id, "name": guest_name or guest_id})
-        from experiment.phase_taxonomy import experiment_stamp_for
-
-        pk = f"USER#{user_id}#SOURCE#panelcast"
         table.put_item(
             Item={
-                "pk": pk,
+                "pk": f"USER#{user_id}#SOURCE#panelcast",
                 "sk": SHOW_MEMORY_SK,
                 "record_type": "show_memory",
                 "callbacks": cbs[-MAX_CALLBACKS:],
                 "guest_history": gh[-MAX_GUEST_HISTORY:],
                 "updated_at": datetime.now(timezone.utc).isoformat(),
-                **experiment_stamp_for(pk, SHOW_MEMORY_SK),  # #4536: the reset can tag and wipe it with the cycle
             }
         )
     except Exception as e:

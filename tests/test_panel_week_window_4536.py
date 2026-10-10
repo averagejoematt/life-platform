@@ -146,12 +146,6 @@ def test_show_memory_ignores_a_wiped_or_previous_cycle_row():
     assert live["callbacks"][0]["title"] == "a cycle-5 episode"  # mutation control
 
 
-def test_show_memory_write_carries_the_cycle_stamp():
-    t = _Table()
-    psv2.write_show_memory(t, "matthew", panel.logger, 3, "EP3", "q", "sleep_coach", "Lisa Park", "")
-    assert t.puts and t.puts[0].get("phase") == "experiment", "an unstamped SHOW#memory row is invisible to the reset's wipe"
-
-
 def test_elena_host_state_skips_a_tombstoned_stance_and_threads(monkeypatch):
     stance = {"pk": "PERSONA#elena", "sk": "STANCE#latest", "headline_stance": "the wiped cycle's read"}
     thread = {"pk": "PERSONA#elena", "sk": "THREAD#2026-07-01#old", "status": "open", "summary": "the wiped cycle's thread"}
