@@ -37,12 +37,24 @@ dossier; you verify against raw data, which is why you exist (#4549). On 2026-10
    real public figures; journal content or journal-silence probing; owner quotes not attributed as given.
 
 ## Output
+FIRST, before you read a single claim, record exactly what you are auditing:
+`python3 scripts/season_promote.py --staging <dir> --weeks <a-b> --audit-hashes` prints a JSON map of
+the sha256 of every file that publishes for those weeks. That map goes into `audit.json` verbatim as
+`staged_sha256`. If any staged file changes while you work, start over — the hashes must describe what you read.
+
 Write `audit.json` into the staging folder:
 ```json
 {"auditor": "story-auditor", "date": "<UTC ISO>", "items_checked": N, "raw_verified": M,
+ "staged_sha256": {"wk0_chronicle.md": "<sha256>", "...": "..."},
  "blocking": [{"week": N, "file": "...", "claim": "...", "problem": "...", "fix": "..."}],
  "advisory": [ ...same shape... ], "verdict": "publishable" | "fix-then-publish"}
 ```
 Blocking = factually wrong, an inexact quote, a privacy breach, or a misleading claim a reader would act on.
-`scripts/season_promote.py --apply` refuses unless `audit.json` exists, is newer than every staged
-chronicle/episode file, and has an empty `blocking` list. Reply with a short summary table and the counts.
+`blocking` is always written, as `[]` when nothing blocks — an absent list is refused, not read as zero.
+
+`scripts/season_promote.py --apply` refuses (exit 5, before any write) unless `audit.json` is a JSON
+object with an empty `blocking` list, `verdict` = `publishable`, `items_checked` ≥ 8 and `raw_verified`
+≥ 3 per promoted week, and a `staged_sha256` entry matching the current content of every
+`wk{N}_{chronicle.md,episode.json,ledger.json,dossier.json}` it would publish (#4549). A re-stage or a
+`--repair` after your audit changes a hash and the promote refuses until you re-audit.
+Reply with a short summary table and the counts.
