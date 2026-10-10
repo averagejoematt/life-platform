@@ -107,7 +107,25 @@ def main(vqa=None, argv=None):
             "deploy/restart_verify_rendered.py runs at reset time). Debug escape hatch only — every CI run keeps it on."
         ),
     )
+    ap.add_argument(
+        "--ai-qa-skipped",
+        metavar="REASON",
+        default=None,
+        help=(
+            "Record that the AI-vision judge was deliberately NOT run by the reader-surface gate (#4589/#4652), with "
+            "the gate's verdict line as REASON. The sweep then reports SKIPPED-BY-READER-SURFACE — not run, not a pass "
+            "— on stdout, in the job summary, as a ::warning annotation and in report.json. Refused with --ai-qa."
+        ),
+    )
+    ap.add_argument(
+        "--reader-truth-skipped",
+        metavar="REASON",
+        default=None,
+        help="The same record for the reader-truth judge. Refused with --reader-truth.",
+    )
     args = ap.parse_args(argv)
+    if (args.ai_qa and args.ai_qa_skipped is not None) or (args.reader_truth and args.reader_truth_skipped is not None):
+        ap.error("a judge cannot be both run and recorded as skipped (--ai-qa with --ai-qa-skipped, or the reader-truth pair)")
 
     pages = None
     if args.page:
@@ -136,6 +154,8 @@ def main(vqa=None, argv=None):
         update_truth_baseline=args.update_truth_baseline,
         leak_scan=not args.no_leak_scan,
         color_scheme=args.color_scheme,
+        ai_qa_skipped=args.ai_qa_skipped,
+        reader_truth_skipped=args.reader_truth_skipped,
     )
     return 0 if ok else 1
 

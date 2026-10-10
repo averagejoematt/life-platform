@@ -51,6 +51,9 @@ from __future__ import annotations
 import json
 import math
 import re
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -948,16 +951,102 @@ def body_of(response: Any) -> dict | None:
     return body
 
 
+#: #4607 — how long the upstream reads may take, counted from the moment they are handed to
+#: the pool. An upstream that has not answered when it passes is served ``unavailable`` (its
+#: own block and no other) and the document goes out without it. Far above the measured
+#: reads (the slowest is under half a second in the Lambda) and far below the function's
+#: 30 s timeout, which before this was the only bound — one hung read turned the whole front
+#: page into a 500.
+SOURCE_DEADLINE_SECONDS = 8.0
+
+#: #4607 — how many upstreams are read at once. FOUR, measured 2026-10-04 (laptop, live
+#: data, six rounds each): 1 → 4 workers took the read from 1,600 ms to 590 ms and CPU from
+#: 430 ms to 370 ms; past 6 the shared DynamoDB client's ten-connection pool overflows
+#: (urllib3 "pool is full" on 6–10 calls per request at 6 workers, 60 at one thread per
+#: upstream), every dropped connection is a fresh TLS handshake, and CPU climbs back to
+#: 420 ms. The Lambda is CPU-bound at its memory size, so the CPU figure is the one that counts.
+MAX_WORKERS = 4
+
+# ── the latency budget (#4607) ────────────────────────────────────────────────────
+#: The acceptance bar: uncached p95 of the deployed route, in milliseconds.
+LATENCY_TARGET_MS = 1500
+
+#: What each upstream costs the edition, in milliseconds INSIDE the Lambda. Every
+#: ``SOURCES`` key has an entry or tests/test_edition_latency_4607.py is red.
+#:
+#: Provenance (2026-10-04): the route's own p50 from the site API's ``route_metric`` log
+#: lines over four days, warm containers, status 200 —
+#:   filter _type="route_metric" and status=200 and ColdStart=0
+#:   | stats pct(DurationMs,50) by Route
+#: — except the four marked ``est.``, which this change reads a different way and which
+#: have no in-Lambda reading until it deploys: the two manifests (now one shared client),
+#: the dashboard without its unread dossiers (20% of the route's 685 ms, the share the
+#: profile gave the rest of the branch) and the record's one narrow sweep, split across its
+#: two keys (the old pair cost 1,193 + 1,771 ms). After a deploy, re-pin every entry from the
+#: ``[edition] upstream_ms`` log line ``read_bodies`` writes on each request.
+SOURCE_COST_MS = {
+    "journal": 40,  # est.
+    "panelcast": 40,  # est.
+    "cadence": 1,
+    "docket": 30,
+    "journey": 44,
+    "dashboard": 140,  # est.
+    "predictions": 170,  # est. — half of the narrow record sweep
+    "calibration": 170,  # est. — the other half
+    "decisions": 10,
+    "owner_words": 5,
+    "sleep": 41,
+    "session": 441,
+    "nutrition": 343,
+    "habits": 7,
+    "supplements": 81,
+    "experiments": 109,
+    "pulse": 63,
+    "training": 424,
+}
+
+#: The reviewed ceiling on the SUM of ``SOURCE_COST_MS``. The reads overlap, but the Lambda
+#: is CPU-bound, so the sum is the honest upper bound on the route and the number a new
+#: upstream moves. It is pinned at today's sum: adding an upstream that costs more than the
+#: few milliseconds of headroom is red until this line AND its pin in
+#: tests/test_edition_latency_4607.py are changed in the same pull request — the explicit,
+#: reviewed budget change. It stands ABOVE ``LATENCY_TARGET_MS`` today and says so rather
+#: than hiding it: session, training and nutrition are 1,208 ms of it and are still read
+#: whole. The ceiling only comes down; it reaches the target when those are narrowed or the
+#: function is given more CPU.
+SOURCE_COST_CEILING_MS = 2160
+
+
+#: #4607 — narrow readers: one read that serves several ``SOURCES`` keys, each as the subset
+#: of that route's body the edition reads, in the route's own shape. ``handle_edition`` hands
+#: them in; ``read_bodies`` without them reads every key through its route, as before.
+NARROW_JOBS = {"record": ("predictions", "calibration")}
+
+_S3_CLIENT = None
+_S3_CLIENT_LOCK = threading.Lock()
+
+
+def _s3_client():
+    """ONE S3 client for the two manifests, built once per container. A botocore client is
+    safe to share across threads; building one per read was most of what a manifest cost."""
+    global _S3_CLIENT
+    if _S3_CLIENT is None:
+        with _S3_CLIENT_LOCK:
+            if _S3_CLIENT is None:
+                import boto3
+
+                from web.site_api_common import S3_REGION
+
+                _S3_CLIENT = boto3.client("s3", region_name=S3_REGION)
+    return _S3_CLIENT
+
+
 def _read_s3_json(key: str) -> dict | None:
     """One public manifest from S3; None on any failure (never an empty dict)."""
     import os
 
-    import boto3
-
-    from web.site_api_common import S3_REGION
-
     try:
-        obj = boto3.client("s3", region_name=S3_REGION).get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=key)
+        obj = _s3_client().get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=key)
         data = json.loads(obj["Body"].read())
         return data if isinstance(data, dict) else None
     except Exception as e:  # noqa: BLE001 — a failed read is a block state, not a 500
@@ -967,17 +1056,73 @@ def _read_s3_json(key: str) -> dict | None:
         return None
 
 
-def read_bodies(read_route: Callable[[str, dict], Any], read_s3: Callable[[str], dict | None] = _read_s3_json) -> dict:
-    """Every upstream body, each read independently: one failure never blanks another."""
-    out: dict = {}
-    for key, path in SOURCES.items():
-        try:
-            out[key] = read_s3(_S3_KEYS[key]) if key in _S3_KEYS else body_of(read_route(path, dict(_ROUTE_QS.get(key, {}))))
-        except Exception as e:  # noqa: BLE001
-            from web.site_api_common import logger
+def read_bodies(
+    read_route: Callable[[str, dict], Any],
+    read_s3: Callable[[str], dict | None] = _read_s3_json,
+    narrow: dict | None = None,
+    deadline: float = SOURCE_DEADLINE_SECONDS,
+) -> dict:
+    """Every upstream body, each read independently AND at the same time (#4607).
 
-            logger.warning(f"[edition] {path} read failed ({type(e).__name__})")
-            out[key] = None
+    One failure never blanks another: a read that raises, answers non-200 or is still
+    running at ``deadline`` seconds leaves ``None`` for its own key(s) and nothing else.
+    ``narrow`` maps a ``NARROW_JOBS`` name to a zero-argument reader returning
+    ``{source_key: body}`` for that job's keys.
+
+    Threads, not processes: the handlers share the module-level DynamoDB ``Table`` and
+    call only ``query``/``get_item`` on it — stateless per-call transforms over the one
+    thread-safe botocore client, the pattern ``site_api_coach_ledger._query_partition``
+    has run in production since #1527. A read past the deadline cannot be killed; its
+    thread finishes in the background and its result is dropped.
+    """
+    from web.site_api_common import logger
+
+    jobs: dict = {}
+    covered: set = set()
+    for name, reader in (narrow or {}).items():
+        jobs[name] = (NARROW_JOBS[name], reader)
+        covered.update(NARROW_JOBS[name])
+    for key, path in SOURCES.items():
+        if key in covered:
+            continue
+        if key in _S3_KEYS:
+            jobs[key] = ((key,), lambda k=key: {k: read_s3(_S3_KEYS[k])})
+        else:
+            jobs[key] = ((key,), lambda k=key, p=path: {k: body_of(read_route(p, dict(_ROUTE_QS.get(k, {}))))})
+
+    out: dict = {key: None for key in SOURCES}
+    took: dict = {}
+
+    def run(name: str, fn: Callable[[], Any]) -> Any:
+        started = time.monotonic()
+        try:
+            return fn()
+        finally:
+            took[name] = round((time.monotonic() - started) * 1000)
+
+    pool = ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(jobs)), thread_name_prefix="edition")
+    try:
+        futures = {pool.submit(run, name, fn): (name, keys) for name, (keys, fn) in jobs.items()}
+        done, late = wait(futures, timeout=deadline)
+        for fut in done:
+            name, keys = futures[fut]
+            try:
+                got = fut.result()
+            except Exception as e:  # noqa: BLE001 — a failed read is a block state, not a 500
+                logger.warning(f"[edition] {name} read failed ({type(e).__name__})")
+                continue
+            for key in keys:
+                body = got.get(key) if isinstance(got, dict) else None
+                out[key] = body if isinstance(body, dict) else None
+        for fut in late:
+            name, _keys = futures[fut]
+            took[name] = None
+            logger.warning(f"[edition] {name} read passed the {deadline:g} s deadline — served unavailable")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    # The per-upstream table (#4607), one line per request: milliseconds each read took on
+    # its own thread (null = past the deadline). Query it with Logs Insights on `upstream_ms`.
+    logger.info("[edition] upstream_ms " + json.dumps(took, sort_keys=True))
     return out
 
 
@@ -986,13 +1131,14 @@ def handle_edition(read_route: Callable[[str, dict], Any]) -> dict:
     from coach import persona_registry
     from common.pacific_time import pacific_today
 
+    from web import site_api_coach
     from web.prediction_reason import metric_words
     from web.site_api_common import EXPERIMENT_START, _error, _ok, logger
 
     try:
         now = datetime.now(timezone.utc)
         doc = compose(
-            read_bodies(read_route),
+            read_bodies(read_route, narrow={"record": site_api_coach.edition_record}),
             today=pacific_today(),
             now=now,
             start_date=EXPERIMENT_START,

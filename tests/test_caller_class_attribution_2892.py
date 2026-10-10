@@ -118,10 +118,18 @@ def test_self_report_can_never_claim_the_projected_class(gov, env):
     cls = bc.caller_class(env)
     assert cls != "prod-cron"
     assert cls in bc.CALLER_CLASSES
-    # Belt and braces: remediation IS projected, so assert against the actual
-    # partition the governor uses, not just the string.
+    # Belt and braces, against the actual partition the governor uses, not just the string.
+    # #4652: `ci` is projected too now, so the property is stated as what it always was —
+    # INVOCATION_CONTEXT alone never buys a projected class. Only the runner's own
+    # environment (GITHUB_ACTIONS / CI) does, and remediation needs its workflow name on top.
     if cls in gov.PROJECTED_CALLER_CLASSES:
-        assert cls == "remediation" and "remediation" in (env.get("GITHUB_WORKFLOW") or "").lower()
+        assert env.get("GITHUB_ACTIONS") or env.get("CI"), f"{cls} claimed from INVOCATION_CONTEXT alone: {env}"
+        if cls == "remediation":
+            assert "remediation" in (env.get("GITHUB_WORKFLOW") or "").lower()
+        else:
+            assert cls == "ci"
+    else:
+        assert cls == "dev-session"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -199,7 +207,52 @@ def test_partition_covers_the_whole_registry_and_does_not_overlap(gov):
     episodic = set(gov.EPISODIC_CALLER_CLASSES)
     assert projected & episodic == set()
     assert projected | episodic == set(bc.CALLER_CLASSES)
-    assert projected == {"prod-cron", "remediation"}
+    # #4652 (2026-10-04): `ci` joined — the #3554 premise guard measured it billing 30 of 30 days.
+    assert projected == {"prod-cron", "remediation", "ci"}
+    assert episodic == {"dev-session"}
+
+
+def test_ci_is_projected_so_its_run_rate_reaches_the_month_end_number(gov):
+    """#4652: the class the premise guard named on every run is extrapolated, not excluded.
+
+    The arithmetic, on the live split of 2026-10-05T00:00Z (SSM /life-platform/budget-breakdown):
+    with `ci` excluded the share was 0.2612; with it projected the share is 0.3543, and only
+    dev-session is left out of the forward rate.
+    """
+    split = {"prod-cron": 10.0801, "ci": 4.4275, "dev-session": 30.6983, "remediation": 2.3365}
+    share = gov._projected_class_share(split)
+    assert share == pytest.approx((10.0801 + 4.4275 + 2.3365) / sum(split.values()))
+    assert share == pytest.approx(0.3543, abs=1e-4)
+    # mtd 64.01, 4.0 days elapsed of 31, non-AI 2.25/day and AI 13.75/day over a 4-day window.
+    projected = gov._project_month_end(64.01, 4.0, 31, 2.25 * 4, 13.75 * 4 * share, 4.0)
+    excluded = gov._project_month_end(64.01, 4.0, 31, 2.25 * 4, 13.75 * 4 * 0.2612, 4.0)
+    assert projected - excluded == pytest.approx(13.75 * (share - 0.2612) * 27, abs=0.01)
+    assert 34.0 < projected - excluded < 35.0, "the projection moves by ci's own run-rate x days remaining, nothing else"
+
+
+def test_a_ci_that_bills_every_day_is_no_longer_a_standing_violation(gov, monkeypatch):
+    """#4652's acceptance: the breakdown shows no `ci` under `episodic_premise_violations` —
+    because the class is projected, not because the bar moved or the measurement stopped."""
+    import json as _json
+
+    written = {}
+
+    class _SSM:
+        def put_parameter(self, **kw):
+            written.update(kw)
+
+    monkeypatch.setattr(gov, "_ssm", _SSM())
+    live = {"prod-cron": 30, "ci": 30, "dev-session": 10, "remediation": 15}  # 2026-10-05T00:00Z
+    gov._write_breakdown(0, 64.01, 256.4, 13.75, 2.25, datetime(2026, 10, 5, tzinfo=timezone.utc), 215.0, active_days_by_class=live)
+    payload = _json.loads(written["Value"])
+    assert payload["episodic_premise_violations"] == []
+    assert "ci" in payload["projected_classes"] and payload["episodic_classes"] == ["dev-session"]
+    assert payload["episodic_billing_days"]["ci"] == 30, "the count is still published — the measurement did not stop"
+    assert payload["episodic_premise_bar_days"] == gov._episodic.EPISODIC_PREMISE_BAR_DAYS == 25, "the bar did not move"
+    # ...and the guard still bites the class that IS excluded.
+    live["dev-session"] = 27
+    gov._write_breakdown(0, 64.01, 256.4, 13.75, 2.25, datetime(2026, 10, 5, tzinfo=timezone.utc), 215.0, active_days_by_class=live)
+    assert _json.loads(written["Value"])["episodic_premise_violations"] == ["dev-session"]
 
 
 def test_governor_reads_the_same_dimension_name_the_chokepoint_writes(gov):
@@ -216,8 +269,9 @@ def test_share_is_none_when_there_is_no_signal(gov):
 
 
 def test_share_splits_prod_from_dev_ci(gov):
+    # #4652: ci's 4.0 is on the projected side now — only dev-session's 14.0 is left out.
     split = {"prod-cron": 30.0, "remediation": 2.0, "ci": 4.0, "dev-session": 14.0}
-    assert gov._projected_class_share(split) == pytest.approx(32.0 / 50.0)
+    assert gov._projected_class_share(split) == pytest.approx(36.0 / 50.0)
 
 
 def test_share_is_clamped_to_at_most_one(gov):
@@ -485,11 +539,12 @@ def test_the_premise_measurement_reaches_the_persisted_breakdown(gov, monkeypatc
         1.0,
         datetime(2026, 9, 5, tzinfo=timezone.utc),
         215.0,
-        active_days_by_class={"prod-cron": 30, "ci": 28, "dev-session": 3, "remediation": 13},
+        active_days_by_class={"prod-cron": 30, "ci": 28, "dev-session": 26, "remediation": 13},
     )
     payload = _json.loads(written["Value"])
     assert payload["episodic_billing_days"]["ci"] == 28
-    assert payload["episodic_premise_violations"] == ["ci"]
+    # #4652: the excluded class is dev-session now; `ci` at 28 days is projected, so it is not a violation.
+    assert payload["episodic_premise_violations"] == ["dev-session"]
     assert payload["episodic_premise_bar_days"] == gov._episodic.EPISODIC_PREMISE_BAR_DAYS
     assert payload["episodic_premise_window_days"] == gov._episodic.EPISODIC_PREMISE_WINDOW_DAYS
 

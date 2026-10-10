@@ -65,6 +65,9 @@ export function areaLine(p) {
   const level = num(p.level);
   const score = num(p.raw_score);
   if (level === null || score === null) return "Not served right now.";
+  // An area held for thin coverage has a score built from a sliver of its inputs; printing
+  // it beside a fully measured area's score reads as a contradiction.
+  if (p.coverage_hold) return `Level ${whole(level)}. Too little of this area is measured to score it yet.`;
   const d = num(p.score_delta);
   const move = d === null || Math.abs(d) < 0.05 ? "level on the day" : d > 0 ? `up ${d.toFixed(1)} on the day` : `down ${(-d).toFixed(1)} on the day`;
   return `Level ${whole(level)}. Score ${whole(score)} of 100, ${move}.`;
@@ -99,8 +102,11 @@ export function levelHTML(body) {
 export function sheetLine(body) {
   const c = body && body.character;
   if (!c || num(c.level) === null) return "";
-  const of = num(c.composite_pillar_total);
-  return `Level ${whole(c.level)}${of !== null ? ` across ${of === 7 ? "seven" : of} areas of his life` : ""}`;
+  const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
+  const words = (v) => ({ 5: "five", 6: "six", 7: "seven" })[v] || String(v);
+  // The same count the sheet itself prints: an area nothing measures is not in the level.
+  const across = of === null ? "" : n !== null && n < of ? ` across ${words(n)} of ${words(of)} areas of his life` : ` across ${words(of)} areas of his life`;
+  return `Level ${whole(c.level)}${across}`;
 }
 export function badgesHTML(body) {
   const all = ((body && body.achievements) || []).filter((a) => a && a.label);

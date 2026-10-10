@@ -126,6 +126,8 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-rows--more li { display: block; padding-block: 0; }
 .ck-rows--more a { display: flex; justify-content: space-between; gap: 12px; padding-block: 15px; text-decoration: none; font-weight: 500; }
 .ck-rows--more a span { color: var(--ck-faint); font-weight: 400; }
+/* The call list: the verdict and its rule sit on their own line under the call (#4647). */
+.ck-rows--calls a { flex-direction: column; gap: 2px; }
 
 /* 7. Bet card */
 .ck-bet { background: var(--ck-panel); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 8px; }

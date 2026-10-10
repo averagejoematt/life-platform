@@ -134,9 +134,9 @@ export function todayBandHTML(edition, b, base = "/") {
   const row = (key, text, href) => `<li><span class="ck-rows__key">${esc(key)}</span><span>${esc(text)}${href ? ` <a class="ck-link" href="${esc(href)}">The full day</a>` : ""}</span></li>`;
   if (today) {
     const rest = factLine(today.facts, { skip: ["Weight"] });
-    rows.push(row("This morning", [morning || factLine(today.facts.filter((f) => f.label === "Weight")), rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
+    rows.push(row("Today so far", [morning || factLine(today.facts.filter((f) => f.label === "Weight")), rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
   } else {
-    rows.push(row("This morning", "Nothing recorded yet today."));
+    rows.push(row("Today so far", "Nothing recorded yet today."));
   }
   if (yesterday) {
     const days = week.data.days || [];
@@ -170,13 +170,15 @@ export function coachTodayHTML(block) {
 // left out of the sort: its only daily test is "trained", which every day passes, and an
 // unbroken run of training days is the thing the coaches are arguing about, not a win.
 export const WELL_SHARE = 5 / 7;
+export const MIN_DAYS_TO_SORT = 5; // fewer recorded days than this and the measure is not sorted
 const WEEK_NAMES = { weight: "Weight", sleep: "Sleep", food: "Protein" };
 const WEEK_UNSORTED = new Set(["training"]);
 const WEEK_TRENDS = { weight: "weight", training: "training", sleep: "sleep", food: "protein" };
 export function weekSort(week) {
   const well = [];
   const notWell = [];
-  if (!usable(week)) return { well, notWell };
+  const tooFew = [];
+  if (!usable(week)) return { well, notWell, tooFew };
   const measures = week.data.measures || {};
   for (const key of week.data.order || Object.keys(measures)) {
     const m = measures[key];
@@ -190,20 +192,26 @@ export function weekSort(week) {
     }
     const met = (m.data.met || []).filter((x) => x === true || x === false);
     if (!met.length) continue;
+    // Too few recorded days to sort: two days met of three is not a week that fell short.
+    if (met.length < MIN_DAYS_TO_SORT) {
+      tooFew.push(item);
+      continue;
+    }
     (met.filter(Boolean).length / met.length >= WELL_SHARE ? well : notWell).push(item);
   }
-  return { well, notWell };
+  return { well, notWell, tooFew };
 }
 export function weekSortHTML(week, base = "/") {
   if (!usable(week)) return soft((week && week.absent_text) || "The last seven days are not served right now.");
-  const { well, notWell } = weekSort(week);
+  const { well, notWell, tooFew } = weekSort(week);
   const list = (items) =>
     `<ul class="ck-rows">${items.map((i) => `<li><a class="ck-rows__key" href="${esc(base)}trend/?m=${esc(WEEK_TRENDS[i.key] || i.key)}">${esc(i.name)}</a><span>${esc(i.text)}</span></li>`).join("")}</ul>`;
   const part = (title, items, none) => `<p class="ck-label">${esc(title)}</p>${items.length ? list(items) : soft(none)}`;
   return [
     part("Going well", well, "Nothing met its target on five days in seven this week."),
     part("Not going well", notWell, "Nothing fell short this week."),
-    small("Going well means the target was met on at least five days in seven, or the scale ended the week lower than it began."),
+    tooFew.length ? part("Too few days recorded to say", tooFew, "") : "",
+    small("Going well means the target was met on at least five days in seven, or the scale ended the week lower than it began. A measure recorded on fewer than five days is not sorted."),
   ].join("");
 }
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.

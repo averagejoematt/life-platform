@@ -18,7 +18,13 @@ const ROSTER = load("coaches");
 const NAMES = C.rosterNames(ROSTER);
 const CALLS = { sleep: load("predictions_sleep"), physical: load("predictions_physical"), glucose: load("predictions_glucose") };
 const TODAY = "2026-10-04";
-const ALL = [SLEEP, PHYSICAL, GLUCOSE, LEAD, MIND];
+// #4649: the route withholds a watch item a general reader cannot read, and on the capture
+// day that was every item Lisa Park and Nathan Reeves had written (so `focused_on_now` is
+// [] in both captures). OWN is the same capture carrying a list of the kind the writer
+// stores under the new rule: short, plain, the coach's own. The items are this test's.
+const OWN_LIST = ["Whether more protein helps his deep sleep", "Whether easy cardio shows up in his training log", "Whether he notes how he slept each morning"];
+const OWN = { ...structuredClone(SLEEP), stance: { ...structuredClone(SLEEP.stance), focused_on_now: OWN_LIST } };
+const ALL = [SLEEP, PHYSICAL, GLUCOSE, LEAD, MIND, OWN];
 const text = (html) => html.replace(/<[^>]*>/g, " ");
 
 test("a coach's name links to its page, and anything that is not a persona id goes to Coaches", () => {
@@ -50,28 +56,51 @@ test("the top says what the coach is for, that it is software, and how it is wri
 });
 
 test("watching now shows ONE item in the coach's own words with its date; the rest is one tap away", () => {
-  const html = C.watchingHTML(SLEEP);
+  const html = C.watchingHTML(OWN);
   assert.match(html, /In Lisa Park’s own words, written October 4\./);
   const [onPage, behind] = [html.split("<details>")[0], html.slice(html.indexOf("<details>"))];
-  assert.ok(onPage.includes(`“${SLEEP.stance.focused_on_now[0]}.”`), "the first item, verbatim, in quotation marks");
-  for (const item of SLEEP.stance.focused_on_now.slice(1)) {
+  assert.ok(onPage.includes(`“${OWN_LIST[0]}.”`), "the first item, verbatim, in quotation marks");
+  for (const item of OWN_LIST.slice(1)) {
     assert.ok(!text(onPage).includes(item), `not on the page: ${item}`);
     assert.ok(text(behind).includes(item), `one tap away: ${item}`);
   }
-  assert.match(html, /<details><summary>Four more on the list<\/summary>/);
+  assert.match(html, /<details><summary>Two more on the list<\/summary>/);
   assert.match(html, /<summary>What Lisa Park has set aside for now<\/summary>/);
+  assert.ok(text(html).includes(SLEEP.stance.set_aside_for_now[0]), "with a list of its own, what is set aside is the coach's too");
   assert.match(html, /The latest thing Lisa Park asked of Matthew, October 3: “I've asked him to resume morning logging[^”]*”\s*Due October 10\./);
   assert.doesNotMatch(html, /read changed/, "an empty field prints nothing");
+  assert.doesNotMatch(html, /Set by the author/);
 });
 
 test("a watch item that uses a known term gets the plain line directly under it, not behind a tap", () => {
-  // The second item on the live list carries "slow-wave"; put first, it must be glossed in place.
-  const p = structuredClone(SLEEP);
-  p.stance.focused_on_now = [SLEEP.stance.focused_on_now[1], SLEEP.stance.focused_on_now[0]];
-  const onPage = C.watchingHTML(p).split("<details>")[0];
-  assert.match(onPage, /slow-wave architecture\.”<\/p><p class="ck-soft">Deep sleep: also called slow-wave sleep: the share of the night spent in the deepest stage\.<\/p>/);
+  const onPage = C.watchingHTML(OWN).split("<details>")[0];
+  assert.match(onPage, /helps his deep sleep\.”<\/p><p class="ck-soft">Deep sleep: also called slow-wave sleep: the share of the night spent in the deepest stage\.<\/p>/);
   assert.deepEqual(C.glossLines("Recovery and HRV"), ["Recovery: his wrist strap’s morning score out of 100.", "HRV: heart-rate variability: how much the gap between heartbeats changes overnight, as the wrist strap measures it."]);
-  assert.deepEqual(C.glossLines(SLEEP.stance.focused_on_now[0]), [], "no known term, no line");
+  assert.deepEqual(C.glossLines(OWN_LIST[2]), [], "no known term, no line");
+});
+
+test("a coach whose own items were all withheld shows the stage's list as the author's, never as the coach's (#4649)", () => {
+  // The capture: a stance dated October 4 with focused_on_now [] and the ladder beside it.
+  assert.deepEqual(SLEEP.stance.focused_on_now, []);
+  assert.equal(SLEEP.stance.source, "stance");
+  const html = C.watchingHTML(SLEEP);
+  assert.match(html, /Set by the author for the stage Matthew is in\. Not written this week\./);
+  assert.doesNotMatch(html, /own words/);
+  assert.match(html, /“Time in bed most nights\.”/);
+  assert.match(html, /<details><summary>One more on the list<\/summary>/);
+  // What is set aside comes from the same place as the list above it: the stage, not the stance.
+  const aside = html.slice(html.indexOf("has set aside for now"));
+  assert.ok(text(aside).includes("Perfect sleep scores"));
+  assert.ok(!text(html).includes(SLEEP.stance.set_aside_for_now[0]));
+  // No words of the coach's are composed: every watch line on the page is a served stage item.
+  for (const quoted of html.split("</details>")[0].match(/“[^”]*”/g) || []) {
+    assert.ok(SLEEP.stance.rung.cares_most.some((t) => quoted.toLowerCase().includes(t.toLowerCase())), quoted);
+  }
+  // No stance list and no stage list: the plain sentence, and nothing else.
+  const bare = structuredClone(SLEEP);
+  bare.stance.rung.cares_most = [];
+  bare.dossier = null;
+  assert.equal(C.watchingHTML(bare), '<p class="ck-soft">Lisa Park has no watch list on record right now.</p>');
 });
 
 test("a watch list that belongs to the stage says it is the author's and is not this week's", () => {
@@ -140,15 +169,33 @@ test("next says so when the calls or the bets are not served, and the lead has n
   assert.deepEqual(C.pendingCalls(CALLS.physical, "sleep_coach"), [], "another coach's calls are never this coach's");
 });
 
-test("the longer view is the served ladder of stages, the current one marked; without one, a plain sentence", () => {
+test("the stage Matthew is in, its plan and what opens the next one; then the stages after it — all from served fields", () => {
   const html = C.longerHTML(PHYSICAL);
   assert.match(html, /The stages this coach works through, set by the author\./);
-  assert.equal((html.match(/<li>/g) || []).length, PHYSICAL.stance.ladder.length);
-  assert.match(html, /<b>Move the scale and protect the engine\.<\/b> Now\./);
-  assert.equal((html.match(/ Now\./g) || []).length, 1);
-  assert.match(html, /What opens the next stage: A steady downward weight trend over a month/);
+  // medium: the current stage, its plan, and the test that opens the next
+  assert.match(html, /<b>This stage:<\/b> Move the scale and protect the engine\./);
   assert.match(html, /The plan for this stage: Prioritize sustainable weight loss/);
-  assert.equal(C.longerHTML(SLEEP), '<p class="ck-soft">Lisa Park has no longer view on record yet.</p>');
+  assert.match(html, /What opens the next stage: A steady downward weight trend over a month/);
+  // long: the stages after it, in the served order, and not the current one again
+  const after = PHYSICAL.stance.ladder.slice(1).map((s) => s.headline);
+  assert.ok(html.includes(`Further out, the stages after it, in order: ${after.join(" ")}</p>`), html);
+  assert.equal(html.split("Move the scale and protect the engine").length - 1, 1);
+  // #4649: a coach that has written a stance has the ladder beside it, so it has this view too
+  assert.equal(SLEEP.stance.source, "stance");
+  const sleep = C.longerHTML(SLEEP);
+  assert.match(sleep, /<b>This stage:<\/b> Get enough hours, regularly\./);
+  assert.match(sleep, /The plan for this stage: Anchor a bedtime window and protect duration\./);
+  assert.doesNotMatch(sleep, /What opens the next stage/, "an empty served field prints nothing");
+  assert.ok(sleep.includes("in order: Make the timing tight. Now we care about the stages. Protect what works.</p>"));
+  // a stage served with no headline is never drawn as a blank
+  assert.ok(C.longerHTML(MIND).includes("in order: Let the wins compound. Handle the hard weeks.</p>"));
+  // the last stage says so; no ladder at all is the plain sentence
+  const last = structuredClone(PHYSICAL);
+  last.stance.rung.stage_id = last.stance.ladder.at(-1).stage_id;
+  assert.match(C.longerHTML(last), /This is the last stage on the list\./);
+  const none = structuredClone(SLEEP);
+  delete none.stance.ladder;
+  assert.equal(C.longerHTML(none), '<p class="ck-soft">Lisa Park has no longer view on record yet.</p>');
   assert.match(C.longerHTML(LEAD), /Eli Marsh has no longer view on record yet\./);
 });
 
@@ -180,7 +227,8 @@ test("the newest right call and the newest wrong call are shown in reader words"
   assert.match(wrong.text, /Park said the share of deep sleep would go up over the checked window — it went down\./);
   assert.equal(wrong.checked, "Checked Sunday, October 4.");
   const html = C.verdictsHTML(SLEEP);
-  assert.match(html, /ck-verdicts__tag--right">Right</);
+  assert.match(html, /ck-verdicts__tag--right">Right · within 1\.2 either way</);
+  assert.match(html, /ck-verdicts__tag">Wrong · by which way the trend went over the checked window</);
   assert.doesNotMatch(text(html), /slope|trend=|_pct|\b20\d\d-\d\d-\d\d\b/, "the grader's working never reaches the page");
   assert.equal(C.verdictsHTML(LEAD), "", "no checked call: the mount prints the absence sentence");
 });

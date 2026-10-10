@@ -452,11 +452,11 @@ def read_breakdown(max_age_s: int = _BREAKDOWN_MAX_AGE_S):
 # ── #3554: the SCOPE of a projection is part of the projection ───────────────
 # Since #2892 the governor computes TWO month-end projections and persists both:
 #   `projected`             — extrapolates ONLY the caller classes that recur on a
-#                             schedule (`projected_classes`: prod-cron, remediation).
+#                             schedule (`projected_classes`: prod-cron, remediation, and ci since #4652).
 #                             This is the number the tier ladder is decided on, and
 #                             that is correct: one dev session is not a run-rate.
 #   `projected_all_classes` — extrapolates every class, episodic ones included
-#                             (`episodic_classes`: ci, dev-session).
+#                             (`episodic_classes`: dev-session; ci too before #4652).
 # What was wrong is that every CONSUMER read `projected` and printed it under a
 # scope-free label. Measured on the live surface 2026-09-05T06:57Z: /api/receipts
 # served `projected_month_end_usd 83.7 · 33.2% of ceiling` (green) while the SAME

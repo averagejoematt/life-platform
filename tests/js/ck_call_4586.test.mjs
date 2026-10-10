@@ -36,19 +36,19 @@ test("the call is shown in the coach's own words, with who, when and what it mea
 
 test("what happened carries the verdict as the kit's tag, beside the simple guess", () => {
   const right = C.outcomeHTML(C.findCall(BODY, NUMBER));
-  assert.match(right, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right<\/span><p><b>Morning recovery score came in at 67 against a call of 61/);
-  assert.match(right, /Lisa Park was right\. Checked September 21\./);
+  assert.match(right, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 17\.9 either way<\/span><p><b>Morning recovery score came in at 67 against a call of 61/);
+  assert.match(right, /Lisa Park was right\. Graded on the reading for September 8\. Checked September 21\./);
   assert.match(right, /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess, that nothing changes, has not been checked against this call yet\.<\/p>/);
   const wrong = C.outcomeHTML(C.callsOf(BODY).find((c) => c.verdict === "wrong"));
-  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong<\/span>/);
+  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within 18\.6 either way<\/span>/);
 });
 
 test("a call the simple guess was checked on says what it said and whether it was right", () => {
   const call = clone(C.findCall(BODY, NUMBER));
   call.simple_guess = { state: "scored", right: true, text: "The simple guess was that it would stay at 62, the last reading before the call. That guess was also right.", short: "also right" };
-  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag ck-verdicts__tag--right">The simple guess: right<\/span><p>The simple guess was that it would stay at 62/);
+  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag ck-verdicts__tag--right">The simple guess: right · within 17\.9 either way<\/span><p>The simple guess was that it would stay at 62/);
   call.simple_guess = { ...call.simple_guess, right: false, short: "wrong" };
-  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag">The simple guess: wrong<\/span>/);
+  assert.match(C.outcomeHTML(call), /<span class="ck-verdicts__tag">The simple guess: wrong · not within 17\.9 either way<\/span>/);
 });
 
 test("a bet shows both coaches' words and who was right", () => {
@@ -58,10 +58,9 @@ test("a bet shows both coaches' words and who was right", () => {
   assert.match(claim, /Marcus Webb said yes: “Any carb reduction/);
   assert.match(claim, /Amara Patel said no: “Evening carb reduction/);
   const out = C.outcomeHTML(bet);
-  assert.match(out, /ck-verdicts__tag--right">Right<\/span><p><b>Marcus Webb said yes\.<\/b>/);
-  assert.match(out, /<span class="ck-verdicts__tag">Wrong<\/span><p><b>Amara Patel said no\.<\/b>/);
-  assert.match(out, /It came in at 59\. Checked September 30\./);
-  assert.equal(C.verdictWord(bet), "");
+  assert.match(out, /ck-verdicts__tag--right">Right · on whether his morning recovery score would be below 70 on September 30<\/span><p><b>Marcus Webb said yes\.<\/b>/);
+  assert.match(out, /<span class="ck-verdicts__tag">Wrong · on whether his morning recovery score would be below 70 on September 30<\/span><p><b>Amara Patel said no\.<\/b>/);
+  assert.match(out, /It came in at 59\. Graded on the reading for September 30\. Checked September 30\./);
 });
 
 test("the running record is counts in a sentence, never a percentage", () => {
@@ -77,12 +76,13 @@ test("the running record is counts in a sentence, never a percentage", () => {
 });
 
 test("the front page's last settled call is one block that opens its page", () => {
+  // It leads with the clearest miss on record, not the newest call (red team, round 7).
   const html = C.lastCallHTML(BODY, BASE);
-  assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Saturday, October 3<\/p>/);
-  assert.match(html, /<b>Henning Brandt called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 83\.7 for September 20\. A call like this counts as right within 22\.5 either way, his usual day-to-day swing\.<\/b> It came in at 97\./, "the card says which day the call was for and what counts as right");
-  assert.match(html, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right<\/span>/);
-  assert.match(html, /The simple guess: not checked on this call yet\./);
-  assert.match(html, /href="\/next\/v8\/call\/\?id=explorer-20260919-aecd9fef2c">The whole call<\/a>/);
+  assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Thursday, September 24<\/p>/);
+  assert.match(html, /<b>Lisa Park called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 66\.2 for September 11\. A call like this counts as right within 17\.9 either way, his usual day-to-day swing\.<\/b> It came in at 24\./, "the card says which day the call was for and what counts as right");
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span>/);
+  assert.doesNotMatch(html, /The simple guess/, "the guess is said only once it has a result on this call");
+  assert.match(html, /href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|%/);
 });
 
@@ -103,7 +103,8 @@ test("a bet as the last settled call names who was right instead of one tag", ()
 test("what settles next is one sentence with its day in words", () => {
   assert.equal(
     C.nextCallHTML(BODY),
-    '<p class="ck-soft">Next: the bet between Max Reyes and Lisa Park on whether the 7-day average of his morning recovery score will be at or above 81.6 settles Monday, October 5.</p>',
+    // #4618: a next-day number call is due the day its sentence names, so it is what settles next.
+    '<p class="ck-soft">Next: Lisa Park’s call that his morning recovery score will be about 90.6 settles Sunday, October 4.</p>',
   );
   assert.equal(C.nextCallHTML(null), "");
   assert.equal(C.nextCallHTML({ next: { state: "absent", data: null, absent_text: "No call or bet has a settle date right now." } }), "");
@@ -115,7 +116,7 @@ test("the list is every settled call newest first, the older ones folded away", 
   const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
   assert.equal(hrefs.length, 33);
-  assert.match(html, /^<ul class="ck-rows ck-rows--more"><li><a href="[^"]+">October 3: Henning Brandt called his morning recovery score at about 83\.7\. <span>Right<\/span><\/a><\/li>/);
+  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 3: Henning Brandt called his morning recovery score at about 83\.7\. <span>Right · within 22\.5 either way<\/span><\/a><\/li>/);
   assert.match(html, /<details><summary>25 earlier calls<\/summary>/);
   assert.match(html, /<span>Marcus Webb was right; Amara Patel was wrong\.<\/span>/, "a bet row says who was right");
   assert.match(html, /72 more checked calls have no page here/);
@@ -125,7 +126,7 @@ test("the list is every settled call newest first, the older ones folded away", 
 test("each page names itself from the call", () => {
   const meta = C.metaFor(C.findCall(BODY, NUMBER));
   assert.equal(meta.title, "Lisa Park called his morning recovery score at about 61: right — Average Joe Matt");
-  assert.equal(meta.description, "Lisa Park called his morning recovery score at about 61. It came in at 67. Right.");
+  assert.equal(meta.description, "Lisa Park called his morning recovery score at about 61. It came in at 67. Right · within 17.9 either way.");
   assert.equal(C.metaFor(C.findCall(BODY, BET)).description, "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 on September 30. It came in at 59. Marcus Webb was right; Amara Patel was wrong.");
   assert.equal(C.metaFor(null).title, "A coach’s call, checked — Average Joe Matt");
 });
