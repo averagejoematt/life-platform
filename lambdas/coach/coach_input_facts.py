@@ -307,7 +307,12 @@ _INTAKE_FRAME = re.compile(
 # escalation to 190 grams per day is authorized", "the 190-gram target". The average cannot
 # refute a goal, so a protein figure is skipped when EVERY place it is written is framed so.
 _TARGET_BEFORE = re.compile(
-    r"(?:\b(?:target|floor|goal|ceiling|minimum)\s+(?:of\s+)?|\bescalat\w*\s+(?:\w+\s+){0,2}?to\s+|\btowards?\s+)"
+    r"(?:\b(?:target|floor|goal|ceiling|minimum)\s+(?:of\s+)?|\bescalat\w*\s+(?:\w+\s+){0,2}?to\s+|\btowards?\s+"
+    # #4690: an ASK to "reach"/"hit" a level is a goal, not intake ("I've asked him to log food
+    # consistently and reach 170 grams of protein daily"). The ask/aim word is required: a bare
+    # "(to) hit N" is also a past-tense report ("he managed to hit 190 grams"), which stays judged.
+    r"|\b(?:ask\w*|aim\w*|want\w*|needs?|should|must|try\w*|push\w*|plan\w*|urg\w*|encourag\w*|told|tell\w*)"
+    r"(?:\s+(?!managed\b|able\b|did\b|finally\b)[\w']+){0,6}?(?:\s+(?:to|and|or))?\s+(?:reach|hit)\s+)"
     r"(?:about\s+|around\s+|roughly\s+)?$",
     re.IGNORECASE,
 )
@@ -321,7 +326,9 @@ def _target_framed(sentence: str, value: float) -> bool:
     num = f"{value:g}"
     hits = list(re.finditer(r"(?<![\d.,])" + re.escape(num) + r"(?:\.0+)?(?![\d])", sentence))
     return bool(hits) and all(
-        _TARGET_BEFORE.search(sentence[max(0, m.start() - 40) : m.start()]) or _TARGET_AFTER.match(sentence[m.end() :]) for m in hits
+        # 80 chars: the #4690 ask word sits up to six words before "reach"; every alternative is $-anchored
+        _TARGET_BEFORE.search(sentence[max(0, m.start() - 80) : m.start()]) or _TARGET_AFTER.match(sentence[m.end() :])
+        for m in hits
     )
 
 
