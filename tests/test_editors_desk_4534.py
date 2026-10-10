@@ -188,6 +188,24 @@ def test_an_absence_leads_only_with_a_grounded_data_consequence():
     assert not story_desk.absence_lead_findings(with_consequence, GOOD_WEEK_WITH_JOURNAL_GAP)
 
 
+def test_evidence_that_restates_the_absence_is_not_its_consequence_even_with_a_grounded_figure():
+    # The PR #4755 verifier gap: an evidence item that restates the absence (or the journal) is skipped
+    # even when it carries a grounded figure above the small-count floor — 71 IS the dossier's recovery
+    # average, so only the restatement skip stops it counting as the consequence.
+    absence = {"thread_id": "rest_days_skipped", "angle": "he skipped both rest days", "why": ""}
+    accepted = []
+    for ev in (
+        "skipped rest days while recovery sat at 71",  # restates the absence (_ABSENCE)
+        "the journal stayed empty while recovery sat at 71",  # mentions the journal (_JOURNAL)
+    ):
+        if not story_desk.absence_lead_findings({"lead": {**absence, "evidence": [ev]}}, GOOD_WEEK_WITH_JOURNAL_GAP):
+            accepted.append(ev)
+    assert accepted == [], f"absence/journal restatements accepted as a data consequence: {accepted}"
+    # mutation control: the same grounded figure in an item that is not a restatement is a consequence
+    clean = {"lead": {**absence, "evidence": ["recovery sat at 71 for the week"]}}
+    assert not story_desk.absence_lead_findings(clean, GOOD_WEEK_WITH_JOURNAL_GAP)
+
+
 def test_an_absence_in_a_not_yet_exported_source_never_leads():
     lagging = copy.deepcopy(GOOD_WEEK_WITH_JOURNAL_GAP)
     lagging["nutrition"]["not_yet_exported_dates"] = ["2026-09-20", "2026-09-21"]
