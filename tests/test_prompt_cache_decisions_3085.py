@@ -75,9 +75,20 @@ def _extraction_prompt():
     return EXTRACTION_SYSTEM_PROMPT
 
 
+def _daily_brief_prompt():
+    """#4778: the daily brief's shared system prefix in its MINIMAL shape (no presence or
+    journal-signal block) — the shape the register's 530-tok wire measurement was taken on.
+    A real day only adds to it, so a 'declined, under the floor' verdict on this shape is
+    the optimistic bound, stated as such in the register's `why`."""
+    from ai.ai_calls import daily_brief_shared_system
+
+    return daily_brief_shared_system({"date": "2026-10-10"}, {"active_goals": ["lose weight", "build strength"]}, 72, "B")
+
+
 _PROMPTS = {
     "coach-quality-gate": _quality_gate_prompt,
     "coach-state-updater": _extraction_prompt,
+    "daily-brief": _daily_brief_prompt,
 }
 
 
@@ -89,7 +100,8 @@ def test_every_decision_carries_a_dated_rationale(fn):
     """'Record why not' is only an outcome if the why and the when are both there."""
     entry = prompt_cache.CACHING_DECISIONS[fn]
     assert isinstance(entry["engaged"], bool)
-    assert entry["model"], f"{fn}: a floor is meaningless without the model it belongs to"
+    assert entry["measured_on"], f"{fn}: a token count is meaningless without the model it was measured on"
+    assert entry["model_env"] and entry["model_default"], f"{fn}: the model must be DERIVED from the caller's resolution (#4778)"
     assert entry["prefix_tokens"] > 0, f"{fn}: prefix_tokens is a wire measurement, not a guess"
     assert len(entry["why"]) > 80, f"{fn}: the rationale must survive the next reader, not just satisfy a key"
     assert entry["decided"], f"{fn}: an undated decision cannot be re-litigated"
@@ -115,19 +127,19 @@ def test_engaged_flag_matches_what_the_floor_actually_permits(fn):
     """
     entry = prompt_cache.CACHING_DECISIONS[fn]
     prompt = _PROMPTS[fn]()
-    floor = prompt_cache.cache_floor(entry["model"])
+    # #4778: the floor of the model the caller RESOLVES to, not a recorded string.
+    model = prompt_cache.resolved_model(fn)
+    floor = prompt_cache.cache_floor(model)
     est = prompt_cache.estimate_tokens(prompt)
-    clears = prompt_cache.clears_floor(prompt, entry["model"])
-    assert clears is entry["engaged"], (
-        f"{fn}: recorded engaged={entry['engaged']} but its system prompt is ~{est} tok "
-        f"against a {floor} tok floor for {entry['model']}. "
-        + (
-            "A caller cannot claim caching below the floor — the marker is silently ignored and "
-            "`cache_read_input_tokens` stays 0 forever (#3085)."
-            if entry["engaged"]
-            else "The prompt has grown past the floor, so the recorded 'too small to cache' rationale "
-            f"({entry['decided']}, #{entry['issue']}) is no longer true — re-decide it rather than inherit it."
-        )
+    clears = prompt_cache.clears_floor(prompt, model)
+    assert (
+        clears is entry["engaged"]
+    ), f"{fn}: recorded engaged={entry['engaged']} but its system prompt is ~{est} tok " f"against a {floor} tok floor for {model}. " + (
+        "A caller cannot claim caching below the floor — the marker is silently ignored and "
+        "`cache_read_input_tokens` stays 0 forever (#3085)."
+        if entry["engaged"]
+        else "The prompt has grown past the floor, so the recorded 'too small to cache' rationale "
+        f"({entry['decided']}, #{entry['issue']}) is no longer true — re-decide it rather than inherit it."
     )
 
 

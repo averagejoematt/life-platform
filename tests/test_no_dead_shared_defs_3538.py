@@ -148,14 +148,15 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "(lambdas/compute/coach_memoir_lambda.py), so deleting its inverse would leave the "
         "live function's boundary math asserted only against hand-typed dates."
     ),
-    "lambdas/ai/prompt_cache.py:clears_floor": (
-        "the COMPUTATION of a live gate, not a leftover. "
-        "tests/test_prompt_cache_decisions_3085.py asserts "
-        "`clears_floor(the real prompt, the real model) == entry['engaged']` for every "
-        "recorded caller — deleting it deletes the only thing that checks the "
-        "CACHING_DECISIONS ledger against the models' actual minimum prefixes (#3085). It "
-        "is misplaced (it belongs on the test side, where it would not ride ~104 bundles), "
-        "not unused; moving it is a separate change with a real regression risk."
+    # `clears_floor` was allowlisted here as the #3085 gate's computation; #4778's
+    # `decision_drift` now calls it, so the scan no longer flags it and its entry is gone.
+    "lambdas/ai/prompt_cache.py:decision_drift": (
+        "the COMPUTATION of a live gate, not a leftover (#4778). "
+        "tests/test_prompt_cache_floor_derivation_4778.py runs it for every "
+        "CACHING_DECISIONS caller under the env the CDK stack sets, and under a hypothetical "
+        "5.5 move — deleting it deletes the only check that a caching decision still matches "
+        "the floor of the model its caller RESOLVES to. Kept beside the register it reads "
+        "(and beside clears_floor, its #3085 predecessor) rather than on the test side."
     ),
     "lambdas/common/subscriber_cadence.py:delivery_weekdays": (
         "the DERIVATION half of #3564's cadence contract, arriving with the merge of "
