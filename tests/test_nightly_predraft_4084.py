@@ -57,7 +57,7 @@ class _Repo:
         self.items[ir.routine_id] = serialize(ir)
         return ir
 
-    def list_by_date_range(self, start, end):
+    def list_by_date_range(self, start, end, limit=100):
         return [self.get_current(rid) for rid, it in self.items.items() if start <= it["target_date"] <= end]
 
 
