@@ -20,6 +20,13 @@ def door_safe(text: str) -> str:
     return "" if story_checks.reader_surface(text or "") else (text or "")
 
 
+def episode_title(post: dict, ep: dict) -> str:
+    """The episode carries its chapter's title (#4674): the desk writes the episode's own title separately, so the two
+    drifted ("Nine Days and No Rest" / "Nine Days and Counting"). The chapter is what the reader sees first and what
+    the journal index prints; the episode falls back to its own title only when the chapter has none."""
+    return post.get("title") or ep.get("title") or ""
+
+
 def desk_episode(post: dict, *, _g) -> dict | None:
     """The Story Desk's episode for this week's chronicle, or None (legacy path)."""
     try:
@@ -46,7 +53,7 @@ def publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False, *, _
     turns = [t for t in turns if t["line"]]
     unsafe = [r for t in turns for r in _g["_safety_gate"](t["line"])]
     # the title and the excerpt are reader copy too, and neither is a spoken turn (#4538)
-    unsafe += door_reasons(f"{ep.get('title') or post.get('title') or ''}\n{ep.get('excerpt') or ''}")
+    unsafe += door_reasons(f"{episode_title(post, ep)}\n{ep.get('excerpt') or ''}")
     if unsafe:
         if dry_run:
             return _g["_dry"](week, "HOLD", stage="desk-safety", reasons=sorted(set(unsafe)))
@@ -73,7 +80,7 @@ def publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False, *, _
         existing = []
     rec = {
         "week": week,
-        "title": f"EP{week} · {ep.get('title') or post.get('title')}",
+        "title": f"EP{week} · {episode_title(post, ep)}",
         "date": post.get("date"),
         **published,
         "byline": f"Elena + {guest_name}",

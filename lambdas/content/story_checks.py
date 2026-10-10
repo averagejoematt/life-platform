@@ -215,6 +215,13 @@ _OFF_RECORD = [
 # The machinery's own vocabulary is not reader copy: no reader knows the desk, the dossier or the ledger.
 _BACKSTAGE = re.compile(r"\b(?:the desk|desk (?:flagged|noted|says)|dossier|story budget|season ledger|the ledger)\b", re.IGNORECASE)
 
+# Terms the reader-vocabulary registry (site/data/glossary.json) rules "cut": a Lambda cannot read the site tree, so
+# this is a copy, and tests/test_story_door_pace_flag_4674.py holds it inside the registry's cut terms (#4674).
+_CUT_TERMS = ("pace flag",)
+_CUT_RES = tuple(
+    (t, re.compile(r"(?<![A-Za-z0-9])" + re.escape(t).replace(r"\ ", r"[\s_]") + r"(?![A-Za-z0-9])", re.I)) for t in _CUT_TERMS
+)
+
 # An export lag narrated as a behaviour (#4532). The dossier marks such days NOT_YET_EXPORTED;
 # these phrasings are what a writer reaches for when it reads that as silence.
 _ABSENCE_AS_BEHAVIOUR = [
@@ -250,6 +257,9 @@ def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
     findings = reader_surface(text)
     for m in _BACKSTAGE.finditer(text or ""):
         findings.append(f"backstage: {m.group(0)!r} is the machinery's word, not the reader's — say what the data shows")
+    for term, rx in _CUT_RES:
+        for m in rx.finditer(text or ""):
+            findings.append(f"vocabulary: {m.group(0)!r} is a term the site does not use with readers ({term!r} is cut in the registry)")
     if list(not_yet_exported):
         for pat in _ABSENCE_AS_BEHAVIOUR:
             for m in pat.finditer(text or ""):

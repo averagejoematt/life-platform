@@ -26,6 +26,7 @@
     {"term": "cycle", "ruling": "keep-with-gloss", "reader_form": "cycle", "gloss": "one attempt at this experiment, from a start date", "match": "word-ci"},
     {"term": "Third Wall", "ruling": "cut", "reader_form": "What the AI said, and how it felt", "gloss": "the AI's read, next to how the week actually felt"},
     {"term": "pillar", "ruling": "rename", "reader_form": "the seven areas", "gloss": "seven areas of his life, each scored 0–100 from his data — he calls them pillars"},
+    {"term": "pace flag", "ruling": "cut", "reader_form": "the weekly check that he is on pace for his goal", "gloss": "builder word for an internal on-pace marker; say what the data shows instead"},
     {"term": "protocol", "ruling": "keep-with-gloss", "reader_form": "protocol (the door) / what he's trying (cards)", "gloss": "a rule he follows on purpose, to see if a number moves", "match": "word-ci"},
     {"term": "gate", "ruling": "cut", "reader_form": "a check that has to pass before something ships", "gloss": "builder word; stays on /method/* and in essays"},
     {"term": "HRV", "ruling": "keep-with-gloss", "reader_form": "HRV", "gloss": "heart-rate variability — a nightly nervous-system reading; higher is usually better rested", "match": "exact"},
