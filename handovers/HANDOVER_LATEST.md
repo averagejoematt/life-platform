@@ -1,84 +1,81 @@
-# Handover — Session BJ: seven lanes built and combined in one integration PR, red-team round 7, and a merge the permission check refused (2026-10-05 02:40Z → ~04:40Z, Fable 5.1, owner on hand at the start, then autonomous)
+# Handover — Session BK: Session BJ's work landed, a five-day compute outage found and fixed, and the post-deploy steps done (2026-10-09 → 10-10 ~04:50Z, Opus 5.5, owner on hand)
 
-**Driving instruction:** `~/.claude/plans/next-session-prompt.md` — ask the owner nine questions first, check the laptop AI cap's deploy, then build #4647, #4650, #4618, #4648, #4649, #4607 and #4652 in that order, red-team before he sees anything, and wrap. Mid-session he asked for more parallel work (a second session took backlog items from a pasted prompt) and then said to keep going through the night autonomously.
+**Driving instruction:** continue Session BJ (`~/.claude/plans/next-session-prompt.md`). The owner said "anything that should be fable leave — but everything you can do with opus or below, continue", then "merge them" twice. Red-team rounds, the daily-mark ruling (#4646) and the front-page redesign were left for a Fable session. A backlog-paydown session ran beside Session BJ and has exited; its report is folded in below and in `project_session_bj_paydown_2026_10_04.md`.
 
-## Shipped: nothing merged, nothing deployed — this handover rides the PR that carries the work
-- **`gh pr merge 4656 --squash` was refused by the auto-mode permission check ("Merge Without Review")** with all ten checks green and `scripts/assert_pr_green.py` passing. It was not worked around. The owner was told at once with the two ways out (he merges, or he adds a permission rule).
-- **PR #4669 is the one integration PR.** It merges the seven lane branches, reconciles them, and carries the round-7 fixes and this wrap. When it merges, lane PRs #4656, #4657, #4658, #4659, #4660, #4661 and #4665 are redundant and close as landed-through.
+## Shipped — ten PRs merged, one at a time, each checked against the new main first
+- **#4669** (#4580): Session BJ's seven lanes as one squash, `461635c47`.
+  - The lanes: verdict rules (#4647), honest cost plus `/api/receipts` `typical_day`/`high_days` (#4650), next-day call targets (#4618), the day page's coach lines and settled calls plus the new `/api/coach_moves` (#4648), plain-word coach lists (#4649), narrow edition readers (#4607), and loud AI-check skips with `ci` in the governor projection (#4652).
+  - The seven lane PRs (#4656–#4661, #4665) were closed as landed-through.
+- **#4691** (#4672): a coach's forecast line names the day the forecast is for. Fixed with a sibling module, `ai/forecast_prompt.py`, because `ai_calls.py` is at its size ceiling. COACH_STANCE.md was re-verified.
+- **#4693** (#4549): the Story Desk promote gate fails closed on an audit that is missing or tied to a different hash.
+- **#4695** (#4541): a count claim is graded by counting, never by slope (`coach/prediction_count_grader.py`). The re-grade is still a dry run.
+- **#4696** (#4648): live schema baselines for `/api/coach_moves`, `/api/receipts` and `/api/coach/`.
+  - `/api/coach_moves` leaves both pending lists and is declared a `?date=` route, held from the public archive until the owner rules on #4615.
+  - `capture_api_schemas.py --only` now reaches a prefix route.
+- **#4697** (#4635, reader side): `/api/sleep_detail` and `/api/sleep_correlations` leave a night Eight Sleep flags `vendor_incomplete` out of every average. A missing flag reads as unknown and behaves as before.
+- **#4698** (#4673): a dated coach claim that cites an instrument that was dark on its date is not quoted. It is replaced by an `unsourced` note on the docket, calls, coach pages and coaches list (`web/claim_sourcing.py`).
+- **#4699** (#4607): narrow edition readers for nutrition and training, and a trimmed dashboard. Local measurement: upstream CPU −29%.
+- **#4700** (#4671): the kit page fixtures re-captured in one pass. They now agree at 56 of 131, and a cross-fixture test holds that.
+- **#4706** (#4704, P1): `daily-metrics-compute` no longer crashes on a string-typed habit-registry number. The character sheet counts and lists an undated earned badge. SCORING.md was re-verified.
 
-| Lane PR | Issue | What it does |
-|---|---|---|
-| #4656 | #4647 | every Right or Wrong prints the rule that decided it (`site/assets/js/ck_verdict.js`, the one place a verdict tag is written); the Coaches pair leads with a narrow hit and a clear miss |
-| #4657 | #4650 | "How it's built" states an ordinary day and the high days separately; `/api/receipts` serves `typical_day`, `high_days` and `ai_scheduled_share_pct` |
-| #4665 | #4618 | a number call's target day comes from its own sentence; a due date over a year out is refused; `scripts/regrade_tomorrow_calls_4618.py` (dry-run by default) |
-| #4660 | #4648 | the day page shows that day's coach lines and settled calls; new `GET /api/coach_moves?date=` inside the existing site API |
-| #4659 | #4649 | a deterministic plain-words check on a coach's watch list at write and at serve (`lambdas/coach/plain_words.py`); the ladder served beside the stance; `working_hypotheses` leaves the route's contract |
-| #4658 | #4607 | `/api/edition`: a narrow record reader, the dashboard without its unread dossiers, four reads at a time, an 8 s deadline, a latency budget guard |
-| #4661 | #4652 | a skipped AI check says so in four places and is never a pass; `ci` joins the cost governor's month-end projection |
-
-- **On top of the lanes (commits on the integration branch):** the day page's settled calls use the shared verdict tag; the two forecast sentences on "How it's built" follow the served `projected_classes`; the round-7 fixes below.
-- **Filed:** #4671 (the kit page captures disagree with each other), #4672 (the coach prompt drops the forecast's target date and coaches invent one), #4673 (a benched coach's settled-bet argument cites sensor data), #4674 (week 2's episode and chapter titles differ; "pace flag" in an excerpt), #4675 (deep pages do not link both ways), #4676 (gendered pronouns in two S3-held coach configs, owner-gated). Comments on #4649, #4617, #4646, #4607, #4650 and #4652 carry the round-7 findings and each lane's measured tables.
-- **Published for the owner:** four drawings of the daily mark at phone size with real weigh-ins, a private page at https://claude.ai/artifact/QwqPrzXP8SxDkSuEbL2whP (#4646).
+Deploys: CI/CD `161265885` deployed everything through #4698. The `0b4489498` run carries #4699, #4700 and #4706 from the last deployed base, and was in flight at wrap. The site deploy for `#4669` was re-run once `/api/coach_moves` answered 200, and passed smoke and visual QA. The site deploy for #4706 was in flight at wrap.
 
 ## Verified
-- **The laptop AI cap (#4623):** the CI/CD run for a4149347 finished with its Deploy job green. Budget tier read 0; `/life-platform/remediation-mode` read `off`.
-- **PR #4653 (another session's habits merge):** its main run failed at Plan; `habit-skip-review` showed `LastModified` 02:19Z, after the failure, so that session deployed it by hand. Not touched here.
-- **Tests on the integration branch:** `node --test tests/js/*.test.mjs` 748 pass, 0 fail. `pytest tests/ -n 8`: 31,575 passed, 1 failed, 59 skipped, 36 xfailed — the failure (`test_branch_never_carries_platform_counts_3984.py::test_must_fail_a_deleted_field_off_main_is_still_a_red`) ran while a commit landed on the branch mid-suite, and the file passes alone (14 passed). The suite was not re-run after the last two commits; CI's full pre-merge suite on #4669 is the reading to trust. `tests/kit_page_gate.py` clean.
-- **Not verified, because nothing deployed:** every live proof the seven issues ask for.
-
-## Red-team round 7 (seven fresh reviewers, a local render of the integration branch; full text in the private red-team file)
-- **Flat or down.** Design director: front page C+, daily mark D+, system B−, verdict tags C+, cost section D. Story editor: storytelling C, daily return C−, weekly return C+, the day page C, the cast C−. Product lead: 20-second read B, depth C, wayfinding C−, coherence C. Newcomer: first screen B, unique B−, back tomorrow D+, would send C−. Friend: ten-second read C, feel him D, coaches C−, open in a month D+. Skeptic: novelty B, honesty C+, more than a gimmick C, return C−. Senior leader: understand B, controls C+, honesty B+, meeting B−.
-- **What the changes did:** the rule beside the verdict works on a tight call and exposed a loose one — "Right · within 22.5 either way" on the front page's lead call read as rigged to six of seven. The day page worked on a day with coach lines (October 2 was called the best unit on the site) and reads as a ledger on a day without. The plain-word watch list is plain and nearly empty; the jargon moved to the pending calls on the same page. The cost split landed in its first sentence and was buried by four paragraphs of tier arithmetic.
-- **Fixed the same night:** the front page leads with the clearest miss and says the simple guess only when it has a result; the cost section is three plain figures and the laptop cap, with the high days, forecasts and tier sums behind one disclosure; step counts are off the day page; a measure recorded on fewer than five days is not filed under "Not going well"; a coach page accounts for every waiting call; an area held for thin coverage prints no score and the front page states the sheet's own count of areas; today's row reads "Today so far".
-- **Not real, per a second-pass verifier against the live site:** the 41-of-96 against 45-of-106 record mismatch (the kit captures were taken on different days; live routes agree); the audio player at 0:00 (the files load); "The fix" as a broken sentence (it is link text); "no manual approval step" (accurate — only the IAM deploy is gated; the stale sentence is this repo's CLAUDE.md, which still says "Deploy (manual approval…)").
-- **Still capped by owner-only items, all seven reviewers:** his dated note and question; the #4585 back-fill; the #4617 ruling.
+- `/api/coach_moves`, `/api/receipts`, `/api/coach/mind_coach` and `/api/edition` answer 200 live.
+- `/api/edition`, after #4669, measured over 20 cache-busted requests: p50 1.93 s, p95 1.98 s. The target is 1.5 s, so it misses. The per-upstream table is posted on #4607; nutrition, dashboard, session and training are the slowest. #4699 aims at that; re-measure after it deploys.
+- The compute outage was confirmed in CloudWatch: `TypeError` in `scoring_engine.score_habits_registry` from 2026-10-05T00:00:43Z.
+- A read-only `get_item` showed two `habit_registry` entries with `target_frequency` `{"S": "7"}` / `{"S": "5"}`.
+- The key-rotator failure was confirmed in its log: `AccessDenied` on `secretsmanager:UpdateSecretVersionStage`, 25 retries on one AWSPENDING token. `describe-secret` shows AWSCURRENT unchanged since 2026-07-06.
+- PR CI: every merged PR was asserted green with `scripts/assert_pr_green.py` immediately before its merge. #4700 was merged with main locally and re-tested twice (JS 751/751, kit gate clean, full Python suite 31,702 passed, with only the four live-IAM tests and two environment flakes failing) before it went in.
 
 ## Gotchas
-- **A merge can be refused outright in auto mode.** Try the first merge early in an unattended session, while the owner may still be there; if refused, the night's shape is lanes → one integration branch → red-team the local render → one PR.
-- **The kit captures in `tests/fixtures/kit_pages_4586/` contradict each other** (`edition.json` and `coaches.json` are from October 3; `predictions.json` and `coach_*.json` from October 4). Every reviewer marked the mismatch against the live site, which does not have it. Re-capture them in one pass before the next render (#4671).
-- **Printing a grading rule can lower a grade.** The tolerance on a recovery call is the metric's usual day-to-day swing (about 22 points of 100); shown beside "Right" it reads as soft grading. Lead with tight calls and clear misses.
-- **`/api/edition` is CPU-bound, not I/O-bound.** About 46% of one read was botocore parsing DynamoDB JSON; a thread pool alone would have moved 4.8 s to about 4.3 s. Narrow readers did the work.
-- **Only 37% of the two AI checks' cost scales with merges.** The daily prose pass and manual full-surface runs are the larger part, and the reader-surface skip had already shipped in #4598.
-- **Only one of the eleven "tomorrow" calls in #4618 says "tomorrow".** Ten pending calls were due in 2029, 2032 and 2065 because an ISO date in a time hint was read as a number of days.
-- **A PR-checks watch started before a push reports on the old head.** `assert_pr_green.py` said "not green" because the full suite had not attached to the new head yet; re-read the checks after every push.
-- **A shell command that `cd`s into the memory directory resets the working directory to the main checkout.** The next relative command then runs outside the lane.
+- **An alarm can be red for five days and nobody looks.** `compute-pipeline-stale`, both ingestion-DLQ alarms (they are `daily-metrics-compute`'s DeadLetterConfig) and the QA smoke's `score:day_grade` all carried the outage. The boot pre-flight names no red alarm, so it surfaced only at a wrap. The class tracker for that gap is #4709.
+- **A hand-edited DynamoDB config is untyped.** The habit registry was edited by hand on 10-04 and two numbers went in as strings. Read every profile number through a coercing reader, never `meta.get(...)` straight into a comparison.
+- **Two green PRs can still red main together.** #4700's sheet test pinned "the undated badge is not listed", and #4706 deliberately lists it. Neither PR's CI could see the other. Merging main into the second PR locally and re-running the JS tests caught it before merge.
+- **Dropping a schema exemption can trip a different gate.** The public-archive gate derives its route set from the same `_exemptions.json`, so removing `/api/coach_moves` there made the archive gate demand it. The route had to be declared in `PARAMETERISED_ROUTES` with a reason pointing at the owner's pending ruling.
+- **`capture_api_schemas.py --only /api/coach/` failed before #4696.** The `--only` normalizer stripped the trailing slash that marks a prefix route.
+- **A merge decided by `gh pr merge` is not a deploy.** A superseded CI/CD run is cancelled, but the next run deploys from the last deployed SHA (#4472), so nothing is stranded. Read the run, not the merge.
+- **`main` went red once on a flaky external lookup.** `test_experiment_library_citations_1983` got HTTP 429 from a citation host. It is not code; the next run was green.
 
 ## Residual / next picks
-- **#4580**: merge PR #4669 (the owner, or a session once `gh pr merge` is allowed); then close the seven lane PRs as landed-through, release their worktrees, confirm the CI/CD run deployed, and re-run `site-deploy.yml` once `/api/coach_moves` answers 200.
-- **#4650**: after the site API deploys, recapture `/api/receipts`'s schema baseline (three new keys were baselined from the branch's own output).
-- **#4648**: capture `/api/coach_moves`'s baseline live, drop its two exemptions, and rule on `ARCHIVE_ROUTES`; "a day with coach lines shows them" is held by a fixture only until a real day has lines.
-- **#4649**: `python3 deploy/capture_api_schemas.py --only /api/coach/ --check-drift` after deploy; the next stance run is Sunday 2026-10-11 17:00 UTC; run the plain-words check on a call's sentence at generation (comment on the issue).
-- **#4607**: post 20 cache-busted `/api/edition` timings and the `[edition] upstream_ms` table, re-pin `SOURCE_COST_MS`; the estimate is 1.4–1.8 s, so the 1.5 s bar may need narrow readers for training and nutrition or an owner-run memory bump.
-- **#4652**: read `/life-platform/budget-breakdown` after a governor run; the first real SKIP's log line; seven days of per-day cost. The owner should confirm the forecast moving from about $222 to about $256 once `ci` is counted.
-- **#4618**: `python3 scripts/regrade_tomorrow_calls_4618.py --apply` is the owner's write, after deploy (dry-run again first): 1 re-grade, 2 withdrawals, 11 re-specifications on October 4's data; the record moves 45 of 106 to 43 of 105.
-- **#4647**: on a coach's own page the tolerance prints with no unit, and a bet row in the call list has no separate rule; both need the routes to serve more.
-- **#4671**: re-capture the kit fixtures in one pass and add the cross-fixture test — before any further red-team render.
-- **#4675**: wire the deep pages both ways and return the reader to where they came from.
-- **#4672**: print the forecast's target date on the coach prompt line; confirm the summary row's item shape first.
-- **#4673**, **#4674**, **#4676**: as filed; #4676 needs the owner's yes for an S3 upload.
-- **#4646**: the owner's words on the four drawings; C (the year frame) needs a goal date from him.
-- **#4584**: one real note from the owner; then re-capture the `/api/owner_words` baseline (#4615 holds the first capture and its archive ruling).
-- **#4585**: the back-fill is still the owner's write; the skeptic's largest ask is the simple guess's score at the headline.
-- **#4617**: the ruling on conditional and commentary-derived calls; a direction call that stays needs its window's start and end readings served (comment on the issue).
-- **#4583**: read `MOVES#2026-10-05` after the 19:00 UTC run and judge the lines; round 7 says a day with coaches disagreeing is the site's best unit.
-- **#4604**: nine pages held out of the appendix; the owner rules per page.
-- **#4644**: the data-source sweep's rulings docket; **#4645** merges only on the owner's say-so and its locked worktree stays.
-- **#4651**: the repair agent reads `off`; the owner confirms whether that is the ruling.
-- **#4588**: the cut-over still waits on every screen's yes, five real readers and #4607.
-- **#4257**: the refill plan names it for the Fable lane; its PR #4544 is owner-held, so no promotion was made.
-- not-work — the front page does not yet lead with an open disagreement between coaches (the round-7 ask); it needs a day with real coach lines, which #4583 feeds.
-- not-work — the draft first-person lines on the preview are still draft wording, each marked so; the owner keeps, rewrites or strikes each.
-- not-work — a second session ran backlog paydown from a pasted prompt (#4259, #4191, #4411, #4635, #4637, #4631, #4538, #4250); its PRs #4664, #4666 and #4667 were open when last read and it was told to leave this handover alone.
-- not-work — the repo CLAUDE.md's CI/CD line still says "Deploy (manual approval, GitHub Environment `production`)"; since ADR-158 only the additive-IAM deploy is gated. It is a one-clause fix for a session that is already editing that file.
+- **#4704** (owner):
+  - Correct the two string-typed `target_frequency` values in the profile's `habit_registry` to numbers.
+  - Back-fill `daily-metrics-compute` for 2026-10-04 to today, respecting #4637's trailing windows.
+  - Live proof is a clean scheduled run, `day_grade_score` on the new rows, and `BADGE#lost_20` with an `earned_date`. The commands are on PR #4706.
+- **#4707**: merge PR #4708 (one IAM action plus a set test). Then the owner runs `bash deploy/cdk_deploy.sh LifePlatformOperational` (additive IAM is owner-required), then waits for the 2026-10-10 16:59 PT retry or runs `aws secretsmanager rotate-secret --secret-id life-platform/mcp-api-key`. Do not hand-remove AWSPENDING. Re-sync the local bridge's `.config.json` after the rotation.
+- **#4607**: re-measure `/api/edition` (20 cache-busted requests plus the `upstream_ms` table) once #4699 is deployed. If p95 is still over 1.5 s, the session reader is the next narrow reader, or the owner rules on a memory bump.
+- **#4618**: `python3 scripts/regrade_tomorrow_calls_4618.py --apply` is the owner's write (dry-run again first).
+- **#4541**: `python3 scripts/regrade_count_claims_4541.py --apply` is the owner's write (dry run: one mind_coach call goes from confirmed to refuted; the record moves 8/18 → 7/18).
+- **#4652**: the owner confirms the October forecast moving from about $222 to about $256 once `ci` is counted. Read `/life-platform/budget-breakdown` after a governor run.
+- **#4635**: the owner runs `deploy/repair_vendor_flags_4635.py --apply` and rules on re-fetching Eight Sleep nights. Until the repair runs, the reader from #4697 sees no flags on old rows.
+- **#4701**, **#4702**: the two gaps #4698 left (`/api/predictions` and two more `claim_natural` readers; and the hold decided by gap intervals instead of current liveness).
+- **#4709**: the boot pre-flight names every alarm in ALARM and its red duration; this is the procedure fix for tonight's incident class.
+- **#4703**: `/api/weekly_priority` serves null because the held synthesis left no record once the 8-day TTL ran out.
+- **#4705**: Lisa Park's `coach_moves` line refers to herself in the third person; carry #4564's self-name rule to that generator.
+- **#4671**: close on the merged head's CI run (PR #4700). Three live problems it found are now #4703, #4704 and #4705.
+- **#4648**: "a day with coach lines shows them" is now held by the live 2026-10-07 capture.
+- **#4615**: the owner rules on `/api/owner_words` and `/api/coach_moves` joining the public archive.
+- **#4189**: `deploy/api_deploy_sequencing.json` still lists `/api/morning_note` as pending deploy, but it answers 200 live. Its own lane removes the entry.
+- **#4675**, **#4674**, **#4676**: as filed. #4676 needs the owner's yes for an S3 upload.
+- **#4646**: the owner's words on the four daily-mark drawings (Fable lane).
+- **#4584**, **#4585**, **#4617**, **#4604**, **#4644**: the owner's note, the back-fill, the conditional-calls ruling, the nine appendix pages, and the sweep docket. **#4645** merges only on the owner's say-so.
+- **#4678**: PR #4679 (the Story Desk streak counts cardio days) waits on the owner choosing (a) merge as is, (b) relabel the count as active days, or (c) change it from next season. Its worktree stays.
+- **#4637**, **#4631**, **#4677**: the paydown session's owner writes. Recompute the 2026-09-27 row; re-enrich the one journal entry, then migrate the old keys; optional vocal back-fill. The commands are on each issue.
+- **#4538**: the owner rules on the unlisted post `/journal/posts/week-02/`. Recap cards are not on the shared story count check yet (reader side).
+- **#4540**: the owner rules on the 180 g protein floor.
+- **#4250**: the box-5 check is due on or after 2026-10-27.
+- **#4259**: proof is a boot worktree count under 20. The reaper took it from 31 to 18 at this wrap.
+- not-work — a Fable session takes the red-team round (render from the refreshed fixtures, #4671 done), the front page's open-disagreement lead (#4583's `MOVES#` rows feed it) and the daily mark; the next-session prompt at `~/.claude/plans/next-session-prompt.md` still holds.
+- not-work — MEMORY.md was trimmed from 22.3 KB to 14.8 KB. The tooling lines moved to `INDEX_working_tools.md`, sessions AZ→BH moved to the shipped archive, and a backup sits at `~/.claude/plans/MEMORY.md.bak-2026-10-09`.
 
-**Build beat:** none — nothing this session built is merged or deployed
-**Docs:** docs/OPERATING_KNOWLEDGE_LEDGER.md (two rows); docs/CONVENTIONS.md §9, docs/SCHEMA.md, docs/PROPORTIONALITY.md, docs/ONBOARDING.md, docs/engines/COACH_STANCE.md and docs/qa/SURFACE_DRIFT_EXEMPTIONS.md changed inside the lanes
-**Decisions:** none needed — no governance rule moved; counting `ci` in the governor's projection is what #4652 asked for and is parked for the owner's confirmation on PR #4669
-**Main:** green (6db5d7c5)
-**Incidents:** none — the refused merge is a permission outcome, not a platform event; no reader surface changed
+**Build beat:** none — the merged work is preview-page and pipeline plumbing behind `/next/v8/`, with no reader-facing launch to narrate yet
+**Docs:** docs/alarm_citations.json (five entries re-cited to live causes); docs/INCIDENT_LOG.md (one row, Patterns regenerated); docs/engines/COACH_STANCE.md and docs/engines/SCORING.md re-verified inside their lanes; docs/SCHEMA.md (the `vendor_incomplete` reader rule, #4697)
+**Decisions:** none needed — no governance rule moved; the archive hold on `/api/coach_moves` defers to the owner's pending #4615 ruling
+**Main:** green (16126588) — the run for HEAD `0b448949` (carrying #4699, #4700, #4706) was in flight at wrap; one earlier red was an external HTTP 429 in `test_experiment_library_citations_1983`, cleared by the next run
+**Incidents:** 1 row added — daily-metrics-compute crashed every run 2026-10-05 → 10-10 on a string-typed habit-registry number (P2, ~5 days to detect)
 **Stash/hooks:** clean
-**Closures:** none — no issues closed this session · DoD: scanned 0, hits 0
-**Backlog:** Now live; this session filed #4671 to #4676 (#4671, #4672, #4674 and #4676 to Now); no promotion made — the refill plan's pick, #4257, has an owner-held PR
-**Alarms:** every alarm red over 72 h is cited; no uncited flap in the window
-**CI warnings:** none on the latest green main run (6db5d7c5)
-**Ledger:** none — no standing machinery shipped (one test-held latency budget and one skip report ride existing gates; `docs/PROPORTIONALITY.md`'s reader-surface row was amended in the #4652 lane)
+**Closures:** none — no issues closed this session (every PR carried `Refs`) · DoD: scanned 0, hits 0
+**Backlog:** Now live at 20 for the opus lane (floor 3); no stale Later issues; filed #4701–#4705, #4707 and #4709 (the boot red-alarm tracker)
+**Alarms:** 5 entries re-cited to live causes — compute-pipeline-stale, qa-smoke-failures and both ingestion-DLQ alarms to #4704; key-rotator-errors to #4707
+**CI warnings:** unverified — the latest main run was still in flight at wrap
+**Ledger:** none — no standing machinery shipped (one set test on the key rotator's grants rides PR #4708, unmerged)
