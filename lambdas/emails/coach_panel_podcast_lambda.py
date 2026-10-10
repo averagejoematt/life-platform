@@ -96,12 +96,14 @@ def _chronicle_md(date_str: str) -> str | None:
     return None
 
 
-def _coach_latest(coach_id: str) -> dict | None:
+def _coach_latest(coach_id: str, until: str | None = None) -> dict | None:
+    # #4536: `until` (the reviewed week's last day) bounds the read — a retry never reviews a later week's reads.
     try:
         resp = table.query(
             **with_phase_filter(
                 {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"),
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}")
+                    & Key("sk").between("OUTPUT#", f"OUTPUT#{until or '9999'}~"),
                     "ScanIndexForward": False,
                     "Limit": 1,
                 }
@@ -162,7 +164,7 @@ def _elena_host_state() -> str:
     she may call back to on-air. Volatile → user turn. Fail-soft ""."""
     try:
         bits = []
-        st = table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {}
+        st = _panel_desk().visible(table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item"))  # #4536
         if st.get("headline_stance") and not st.get("grounding_flag"):
             bits.append(f"Elena's current editorial read (her own, persistent): {str(st['headline_stance'])[:300]}")
         resp = table.query(
@@ -170,7 +172,7 @@ def _elena_host_state() -> str:
             ScanIndexForward=False,
             Limit=20,
         )
-        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open"][:2]
+        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open" and _panel_desk().visible(t)][:2]
         if open_threads:
             bits.append(
                 "Story threads Elena is carrying (she may call back to one): "
@@ -381,6 +383,7 @@ def _enclosure_type(url: str) -> str:
 
 
 def _write_indexes(episodes: list) -> None:
+    episodes = _panel_desk().by_date(episodes)  # #4536: newest air date first, whatever order the writer passed
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
@@ -1005,7 +1008,7 @@ def _gemini_voice(persona_id: str) -> str:
 
 def _state_read() -> dict:
     try:
-        it = table.get_item(Key={"pk": PANEL_STATE_PK, "sk": PANEL_STATE_SK}).get("Item")
+        it = _panel_desk().visible(table.get_item(Key={"pk": PANEL_STATE_PK, "sk": PANEL_STATE_SK}).get("Item"))  # #4536
         return json.loads(it.get("state_json", "{}")) if it else {}
     except Exception as e:
         logger.warning("[panel] series_state read failed — %s", e)
@@ -1040,7 +1043,7 @@ def _gather_week(post: dict, state: dict) -> dict:
     chronicle = _strip_md(md) if md else ""
     coach_reads = []
     for cid in persona_registry.OPERATIONAL_COACH_IDS:
-        out = _coach_latest(cid)
+        out = _coach_latest(cid, post.get("date"))
         if out and out.get("summary"):
             coach_reads.append({"id": cid, "name": persona_registry.display_name(cid, s3, S3_BUCKET) or cid, **out})
     guest = coach_reads[post.get("week", 0) % len(coach_reads)] if coach_reads else None
@@ -1050,7 +1053,10 @@ def _gather_week(post: dict, state: dict) -> dict:
     try:
         from content.engagement_core import presence_prompt_block
 
-        sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        # #4536: presence AS OF the week's last day (the dated row), not today's — a retry reviews the same window.
+        sig = _panel_desk().visible(
+            table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": f"DATE#{post.get('date')}"}).get("Item")
+        )
         presence_note = presence_prompt_block(sig)
     except Exception as e:
         logger.warning("[panel] presence block skipped (non-fatal): %s", e)
@@ -1498,7 +1504,7 @@ def _dry(week, decision, **extra) -> dict:
     return {"statusCode": 200, "body": json.dumps({"dry_run": True, "week": week, "would": decision, **extra})}
 
 
-def _select_week_post() -> dict:
+def _select_week_post(week=None) -> dict:
     """Pick the week the Panel should produce now (shared by the weekly run + the
     SS-02 hold sweep so both target the SAME week).
 
@@ -1507,8 +1513,10 @@ def _select_week_post() -> dict:
     in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
     ISO dates compare lexically. If none exist yet (before the cycle's first
     Wednesday chronicle), derive the current week from genesis (the chronicle is
-    optional flavor — 2026-06-21 decoupling)."""
+    optional flavor — 2026-06-21 decoupling). #4536: `week` names the week instead (panelcast_desk.select_post)."""
     posts = _published_posts()
+    if week is not None:
+        return _panel_desk().select_post(posts, week, EXPERIMENT_START_DATE)
     weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if weekly:
         return max(weekly, key=lambda x: x["date"])
@@ -1534,7 +1542,7 @@ def _panel_desk():
     return panelcast_desk
 
 
-def _run_weekly(force: bool, dry_run: bool = False) -> dict:
+def _run_weekly(force: bool, dry_run: bool = False, week=None) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD.
 
     dry_run=True runs the full decision pipeline (gather → write → editor → gate)
@@ -1542,7 +1550,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     what the live run would do. The pre-flight tool for every Friday / post-reset."""
     from ai import gemini_tts
 
-    post = _select_week_post()
+    post = _select_week_post(week) if week is not None else _select_week_post()
     week = post["week"]
     published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
     if published_key:
@@ -1734,6 +1742,8 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             open_bet=script.get("open_bet"),
             date=post.get("date"),
             transcript_preview=preview,
+            advance_state=_panel_desk().advances(state, week),
+            notify=not post.get("backfill"),
         )
 
     # PASS → synthesize single-pass, then commit (series_state + RSS LAST).
@@ -1789,47 +1799,18 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         "image_url": _cover.get("image_url", ""),
         "image_credit": _cover.get("image_credit", ""),
     }
-    existing = [e for e in existing if e.get("week") != week] + [ep]
-    existing.sort(key=lambda e: e.get("week", 0), reverse=True)
-    # series_state + RSS committed LAST (atomic-ish: audio already durable).
-    recent = ([beats["title"]] + beats.get("recent_topics", []))[:5]
-    # Bet ledger (the Panel scoreboard): resolve the prior open bet with THIS week's
-    # reported outcome, then record the new open bet. Capped, reset-safe in DDB.
-    # Idempotent per-week (2026-07-02): a RE-published episode used to (a) "resolve"
-    # its own week's open bet with last week's outcome and (b) append a paraphrased
-    # duplicate — the live wk1 double-bet. The resolve loop now only touches a bet
-    # from an EARLIER week (the one the episode actually reports on), and the append
-    # supersedes this week's own open bet. Resolved bets are history — never touched.
-    ledger = list(state.get("bet_ledger", []))
-    outcome = ((script.get("last_bet_result") or {}).get("outcome") or "open").lower()
-    for entry in reversed(ledger):
-        if entry.get("outcome") == "open" and entry.get("week") != week:
-            entry["outcome"] = outcome if outcome in ("won", "lost", "open", "none") else "open"
-            break
-    if script.get("open_bet"):
-        ledger = [e for e in ledger if not (e.get("week") == week and e.get("outcome") == "open")]
-        ledger.append({"week": week, "bet": script["open_bet"], "outcome": "open", "date": beats["date"]})
-    _state_write(
-        {
-            "episode_count": state.get("episode_count", 1) + 1,
-            "last_episode": ep,
-            "open_bet": script.get("open_bet"),
-            "recent_topics": recent,
-            "bet_ledger": ledger[-20:],
-        }
-    )
+    # series_state + show memory + bet ledger, then RSS committed LAST (atomic-ish: audio already durable) — #4536 moved
+    # the commit to panelcast_desk.commit_legacy so it shares the desk path's in-week-order rule.
+    existing = _panel_desk().commit_legacy(week, ep, existing, state, script, beats, _hook, guest_id, _g=globals())
     _write_indexes(existing)
-    # #547: the show remembers itself — callbacks + guest history, real records only.
-    _write_show_memory(
-        week, ep.get("title") or _hook, script.get("pull_quote"), guest_id, (beats.get("guest") or {}).get("name"), script.get("open_bet")
-    )
     _emit_published_metric()  # safety-net: a CloudWatch alarm fires if this metric goes absent (no episode > 8d)
     _emit_outcome("published")  # reason code (#374) — the positive outcome in the same vocabulary as the holds
-    _notify_new_episode(ep)  # operator SNS ping (best-effort; never blocks publish)
+    if not post.get("backfill"):  # #4536: a named-week run notifies no one
+        _notify_new_episode(ep)  # operator SNS ping (best-effort; never blocks publish)
     # Confirmed-subscriber email blast — OFF by default (PANELCAST_NOTIFY_SUBSCRIBERS).
     # Flip on only after a {"notify_test": "<addr>"} dry-run looks right, so the very
     # first real episodes never blind-blast the list. Best-effort; never blocks publish.
-    if os.environ.get("PANELCAST_NOTIFY_SUBSCRIBERS", "false").lower() == "true":
+    if os.environ.get("PANELCAST_NOTIFY_SUBSCRIBERS", "false").lower() == "true" and not post.get("backfill"):
         try:
             _email_subscribers(ep)
         except Exception as e:
@@ -1896,7 +1877,7 @@ def lambda_handler(event, context):
 
     # Weekly autonomous run (the board-reviewed pipeline). Latest week, publish-or-HOLD.
     try:
-        return _run_weekly(force, dry_run=dry_run)
+        return _run_weekly(force, dry_run=dry_run, week=event.get("week"))  # #4536: {"week": N} names the week
     except Exception as e:
         logger.error("[panel] weekly run failed — %s", e)
         if not dry_run:

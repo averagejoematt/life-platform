@@ -324,7 +324,7 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
         # _gather_week carries the block in beats so _run_weekly's ER-03
         # allowed-number set includes the day/week numbers a host may voice.
         monkeypatch.setattr(panel, "_chronicle_md", lambda d: None)
-        monkeypatch.setattr(panel, "_coach_latest", lambda cid: None)
+        monkeypatch.setattr(panel, "_coach_latest", lambda cid, until=None: None)  # #4536: bounded to the week's last day
         monkeypatch.setattr(panel, "table", FakeDdbTable())
         beats = panel._gather_week({"week": 1, "date": _g(6), "title": "Week 1"}, {})
         assert MARKER in beats.get("phase_block", "")
