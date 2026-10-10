@@ -1,7 +1,7 @@
 // tests/js/ck_call_4586.test.mjs — #4586: a page for each settled coach call. Driven from
-// tests/fixtures/kit_pages_4586/calls.json, which is GET /api/calls' own output for the
-// captured rows (tests/test_site_api_calls_4586.py pins the two equal); no builder reads
-// the wall clock.
+// tests/fixtures/kit_pages_4586/calls.json, GET /api/calls as the live site served it (one
+// capture with the rest of the kit fixtures, #4671; tests/test_site_api_calls_4586.py holds
+// it to the route's shape); no builder reads the wall clock.
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -65,14 +65,14 @@ test("a bet shows both coaches' words and who was right", () => {
 
 test("the running record is counts in a sentence, never a percentage", () => {
   const html = C.recordHTML(C.findCall(BODY, NUMBER), BODY);
-  assert.match(html, /<p>Lisa Park: 10 of 24 checked calls right\.<\/p><p class="ck-soft" data-coach-comparison>Across 24 checked calls, so far they do not beat a simple guess\.<\/p>/);
+  assert.match(html, /<p>Lisa Park: 15 of 35 checked calls right\.<\/p><p class="ck-soft" data-coach-comparison>Across 35 checked calls, so far they do not beat a simple guess\.<\/p>/);
   const bare = clone(C.findCall(BODY, NUMBER));
   bare.records[0].comparison = null;
   assert.match(C.recordHTML(bare, BODY), /What a simple guess would have scored on these calls is not available right now\./, "a count never stands alone");
   assert.match(html, /The record counts every checked call, including the ones with no page of their own\./);
   assert.doesNotMatch(html, /%/);
   const both = C.recordHTML(C.findCall(BODY, BET), BODY);
-  assert.match(both, /Marcus Webb: 7 of 23 checked calls right\..*Amara Patel: 2 of 6 checked calls right\./);
+  assert.match(both, /Marcus Webb: 7 of 28 checked calls right\..*Amara Patel: 2 of 6 checked calls right\./);
 });
 
 test("the front page's last settled call is one block that opens its page", () => {
@@ -104,7 +104,7 @@ test("what settles next is one sentence with its day in words", () => {
   assert.equal(
     C.nextCallHTML(BODY),
     // #4618: a next-day number call is due the day its sentence names, so it is what settles next.
-    '<p class="ck-soft">Next: Lisa Park’s call that his morning recovery score will be about 90.6 settles Sunday, October 4.</p>',
+    '<p class="ck-soft">Next: Henning Brandt’s call that his weight will be about 307.2 lb settles Friday, October 9.</p>',
   );
   assert.equal(C.nextCallHTML(null), "");
   assert.equal(C.nextCallHTML({ next: { state: "absent", data: null, absent_text: "No call or bet has a settle date right now." } }), "");
@@ -115,11 +115,11 @@ test("the list is every settled call newest first, the older ones folded away", 
   const html = C.listHTML(BODY, BASE);
   const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
-  assert.equal(hrefs.length, 33);
-  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 3: Henning Brandt called his morning recovery score at about 83\.7\. <span>Right · within 22\.5 either way<\/span><\/a><\/li>/);
-  assert.match(html, /<details><summary>25 earlier calls<\/summary>/);
+  assert.equal(hrefs.length, 39);
+  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 9: Lisa Park called his morning recovery score at about 89\.1\. <span>Right · within 21\.5 either way<\/span><\/a><\/li>/);
+  assert.match(html, /<details><summary>31 earlier calls<\/summary>/);
   assert.match(html, /<span>Marcus Webb was right; Amara Patel was wrong\.<\/span>/, "a bet row says who was right");
-  assert.match(html, /72 more checked calls have no page here/);
+  assert.match(html, /89 more checked calls have no page here/);
   assert.equal(C.listHTML(null, BASE), "");
 });
 

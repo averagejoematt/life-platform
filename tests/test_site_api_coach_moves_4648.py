@@ -15,7 +15,8 @@ Pins:
   * a line the honest-number filter refuses on the front page is refused by date too;
   * the read is ONE GetItem on the one key, and a failed read is a 503, never an empty day;
   * a ``date`` that is not a calendar day is a 400 and reads nothing; no ``date`` is today;
-  * the route is registered and dispatched, and the kit page fixture is its own output.
+  * the route is registered and dispatched; its output for the wire's 2026-10-02 row is pinned
+    whole, and every kit page day capture (live, #4671) carries the same fields.
 """
 
 from __future__ import annotations
@@ -37,7 +38,8 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 from web import site_api_coach_moves as moves  # noqa: E402
 
 _WIRE = os.path.join(_REPO, "tests", "fixtures", "coach_moves_wire_4648", "rows.json")
-_KIT = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586", "coach_moves_2026-10-02.json")
+_OUT = os.path.join(_REPO, "tests", "fixtures", "coach_moves_wire_4648", "route_output_2026-10-02.json")
+_KIT_DIR = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586")  # coach_moves_<day>.json, live captures (#4671)
 ROWS = {r["sk"]: r for r in json.load(open(_WIRE, encoding="utf-8"))["rows"]}
 
 
@@ -132,9 +134,27 @@ def test_the_route_is_registered_and_dispatched():
     assert 'if path == "/api/coach_moves":\n        return handle_coach_moves(event)' in src
 
 
-def test_the_kit_page_fixture_is_this_routes_own_output():
+def test_the_routes_output_for_the_wire_day_is_pinned_whole():
     status, body = _get("2026-10-02")
     body.pop("_meta", None)
-    kit = json.load(open(_KIT, encoding="utf-8"))
-    kit.pop("_meta", None)
-    assert status == 200 and kit == body, "regenerate tests/fixtures/kit_pages_4586/coach_moves_2026-10-02.json from the route"
+    out = json.load(open(_OUT, encoding="utf-8"))
+    out.pop("_meta", None)
+    assert status == 200 and out == body, "regenerate tests/fixtures/coach_moves_wire_4648/route_output_2026-10-02.json from the route"
+
+
+def test_every_kit_page_day_capture_carries_the_fields_this_route_writes():
+    """The kit page day files are the DEPLOYED route's output (#4671); each must be this route's
+    shape: the same top-level fields, and every line the same fields as a line it writes."""
+    _, body = _get("2026-10-02")
+    line_fields = set(body["lines"][0])
+    names = sorted(n for n in os.listdir(_KIT_DIR) if n.startswith("coach_moves_") and n.endswith(".json"))
+    assert names, "no coach_moves_<day>.json capture in tests/fixtures/kit_pages_4586/"
+    with_lines = 0
+    for name in names:
+        kit = json.load(open(os.path.join(_KIT_DIR, name), encoding="utf-8"))
+        assert set(kit) == set(body), f"{name}: top-level fields differ: {sorted(set(kit) ^ set(body))}"
+        assert kit["date"] == name[len("coach_moves_") : -len(".json")], f"{name}: serves {kit['date']}"
+        for line in kit["lines"]:
+            assert set(line) == line_fields, f"{name}: line fields differ: {sorted(set(line) ^ line_fields)}"
+        with_lines += bool(kit["lines"])
+    assert with_lines, "no captured day carries a coach line — the day page's said section is never rendered"

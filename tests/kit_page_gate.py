@@ -5,7 +5,8 @@ kit_page_gate.py — the pre-merge gate for the kit pages of the living front pa
 
 What it holds, per page in KIT_PAGES, rendered at a phone (390x844) from a local static
 serve of site/ with the data routes mocked by committed fixtures
-(tests/fixtures/kit_pages_4586/ — live captures of 2026-10-03 and 2026-10-04, never fetched):
+(tests/fixtures/kit_pages_4586/ — one live capture, scripts/capture_kit_page_fixtures.py, its
+time in _capture.json; never fetched here):
 
   1. HEIGHT. A page taller than its phone-screen budget fails: six screens for the front
      page, four elsewhere (the appendix, a reference list, carries its own). The owner approved "about three and a half phone screens, one
@@ -57,10 +58,10 @@ KIT_PAGES = {
     "/next/v8/story/": 4,
     "/next/v8/coaches/": 4,
     "/next/v8/day/": 4,
-    # The longest a day page gets: seven lifts, three coach lines (the most a day holds) and a
-    # settled call (#4648). What was said and settled is a fifth part of the day, so this one
+    # The longest a day page gets: eight lifts, three coach lines (the most a day holds) and two
+    # settled calls (#4648). What was said and settled is a fifth part of the day, so this one
     # worst case has five screens; every other day keeps four.
-    "/next/v8/day/?d=2026-10-02": 5,
+    "/next/v8/day/?d=2026-10-07": 5,
     "/next/v8/day/?d=2026-10-01": 4,  # a day with no coach line and no settled call: nothing extra
     "/next/v8/day/?d=2026-09-24": 4,  # four calls settled: two shown, two folded
     "/next/v8/trend/": 4,  # the index of every trend
@@ -70,7 +71,7 @@ KIT_PAGES = {
     "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
     # One page per AI coach, one template: the record first, then what settles next, the
     # bets, the watch list, the longer view, the character and the terms — six screens at most.
-    "/next/v8/coach/?c=sleep_coach": 6,  # a watch list the coach wrote, three open bets
+    "/next/v8/coach/?c=sleep_coach": 6,  # the stage's watch list, a read that changed, one open bet and two settled
     "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the coach has a longer view
     "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
     "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
@@ -112,9 +113,18 @@ ROUTES = {
     "**/api/platform_stats": "platform_stats.json",
     "**/api/receipts": "receipts.json",
     "**/api/predictions": "predictions.json",
-    "**/api/coach_moves?date=2026-10-02": "coach_moves_2026-10-02.json",  # ck_depth.js — the route's own output (#4648)
-    "**/api/calls": "calls.json",  # ck_call.js — this route's own output for tests/fixtures/calls_wire_4586/
+    "**/api/calls": "calls.json",  # ck_call.js
 }
+#: ck_depth.js asks GET /api/coach_moves?date=<day> for the day it shows (#4648). One capture per
+#: day the gate opens, written by scripts/capture_kit_page_fixtures.py; a day with no file gets
+#: the catch-all {} (no lines).
+ROUTES.update(
+    {
+        f"**/api/coach_moves?date={name[len('coach_moves_'):-len('.json')]}": name
+        for name in sorted(os.listdir(FIXTURES_DIR))
+        if name.startswith("coach_moves_") and name.endswith(".json")
+    }
+)
 
 _FORBIDDEN = (
     (re.compile(r"\bDr\.\s"), "an honorific on a persona"),

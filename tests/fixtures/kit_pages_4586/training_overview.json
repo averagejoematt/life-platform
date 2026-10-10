@@ -1,1 +1,1131 @@
-{"daily_modality_minutes_30d": [{"date": "2026-09-06", "walking_min": 65, "total_min": 65}, {"date": "2026-09-07", "strength_min": 121, "total_min": 121}, {"date": "2026-09-08", "strength_min": 123, "total_min": 123}, {"date": "2026-09-09", "strength_min": 135, "total_min": 135}, {"date": "2026-09-10", "strength_min": 117, "total_min": 117}, {"date": "2026-09-11", "strength_min": 138, "walking_min": 61, "total_min": 199}, {"date": "2026-09-12", "strength_min": 155, "walking_min": 29, "total_min": 184}, {"date": "2026-09-13", "strength_min": 159, "walking_min": 57, "total_min": 216}, {"date": "2026-09-14", "strength_min": 146, "walking_min": 54, "total_min": 200}, {"date": "2026-09-15", "strength_min": 125, "walking_min": 61, "total_min": 186}, {"date": "2026-09-16", "strength_min": 144, "walking_min": 14, "total_min": 158}, {"date": "2026-09-17", "strength_min": 131, "walking_min": 58, "total_min": 189}, {"date": "2026-09-18", "strength_min": 65, "total_min": 65}, {"date": "2026-09-19", "strength_min": 210, "walking_min": 59, "total_min": 269}, {"date": "2026-09-20", "strength_min": 205, "walking_min": 63, "total_min": 268}, {"date": "2026-09-21", "strength_min": 130, "walking_min": 104, "total_min": 234}, {"date": "2026-09-22", "strength_min": 158, "total_min": 158}, {"date": "2026-09-23", "strength_min": 148, "walking_min": 63, "total_min": 211}, {"date": "2026-09-24", "strength_min": 151, "walking_min": 62, "total_min": 213}, {"date": "2026-09-25", "strength_min": 167, "walking_min": 72, "total_min": 239}, {"date": "2026-09-26", "strength_min": 66, "walking_min": 102, "total_min": 168}, {"date": "2026-09-27", "strength_min": 28, "walking_min": 165, "total_min": 193}, {"date": "2026-09-28", "strength_min": 116, "total_min": 116}, {"date": "2026-09-29", "strength_min": 137, "total_min": 137}, {"date": "2026-09-30", "walking_min": 109, "total_min": 109}, {"date": "2026-10-01", "strength_min": 137, "total_min": 137}, {"date": "2026-10-02", "strength_min": 155, "total_min": 155}, {"date": "2026-10-03", "walking_min": 241, "total_min": 241}]}
+{
+ "_meta": {
+  "generated_at": "2026-10-10T02:38:11.977886+00:00",
+  "served_at": "2026-10-10T02:38:11.977886+00:00",
+  "cache_seconds": 3600,
+  "request_id": "39bb6088d85e4cae"
+ },
+ "training": {
+  "workouts_30d": 46,
+  "window_days": 30,
+  "window_full": true,
+  "workouts_90d": 50,
+  "weekly_avg": 11.1,
+  "total_minutes_30d": 5115,
+  "total_distance_mi": 40.9,
+  "z2_weekly_avg_min": 912,
+  "z2_target_min": 150,
+  "z2_pct": 608,
+  "z2_trailing_7d_min": 565,
+  "avg_strain": 9.7,
+  "strength_sessions_30d": 26,
+  "top_activities": [
+   {
+    "type": "WeightTraining",
+    "count": 21
+   },
+   {
+    "type": "Walk",
+    "count": 20
+   },
+   {
+    "type": "Workout",
+    "count": 5
+   }
+  ],
+  "whoop_workout_count": 102,
+  "active_modalities": 3,
+  "avg_daily_steps": 3438
+ },
+ "modality_breakdown": [
+  {
+   "type": "WeightTraining",
+   "count_30d": 21,
+   "total_minutes_30d": 3115,
+   "avg_duration_min": 148,
+   "avg_hr": 114,
+   "total_distance_mi": 0.0,
+   "total_elevation_ft": 0,
+   "z2_minutes": 1217,
+   "trend_vs_prior_30d": null
+  },
+  {
+   "type": "Walk",
+   "count_30d": 20,
+   "total_minutes_30d": 1535,
+   "avg_duration_min": 77,
+   "avg_hr": 116,
+   "total_distance_mi": 40.9,
+   "total_elevation_ft": 2054,
+   "z2_minutes": 1198,
+   "trend_vs_prior_30d": null
+  },
+  {
+   "type": "Workout",
+   "count_30d": 5,
+   "total_minutes_30d": 465,
+   "avg_duration_min": 93,
+   "avg_hr": null,
+   "total_distance_mi": 0.0,
+   "total_elevation_ft": 0,
+   "z2_minutes": 0,
+   "trend_vs_prior_30d": null
+  }
+ ],
+ "muscle_volume": [
+  {
+   "muscle": "Back",
+   "sets_per_week": 18.8,
+   "total_sets": 80.5,
+   "MEV": 10,
+   "MAV_lo": 14,
+   "MAV_hi": 20,
+   "MRV": 25,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Quads",
+   "sets_per_week": 15.4,
+   "total_sets": 66.0,
+   "MEV": 8,
+   "MAV_lo": 12,
+   "MAV_hi": 16,
+   "MRV": 20,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Triceps",
+   "sets_per_week": 14.8,
+   "total_sets": 63.5,
+   "MEV": 6,
+   "MAV_lo": 10,
+   "MAV_hi": 14,
+   "MRV": 20,
+   "status": "high"
+  },
+  {
+   "muscle": "Biceps",
+   "sets_per_week": 14.0,
+   "total_sets": 60.0,
+   "MEV": 6,
+   "MAV_lo": 10,
+   "MAV_hi": 14,
+   "MRV": 20,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Shoulders",
+   "sets_per_week": 13.3,
+   "total_sets": 57.0,
+   "MEV": 8,
+   "MAV_lo": 12,
+   "MAV_hi": 20,
+   "MRV": 25,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Chest",
+   "sets_per_week": 12.6,
+   "total_sets": 54.0,
+   "MEV": 8,
+   "MAV_lo": 12,
+   "MAV_hi": 16,
+   "MRV": 20,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Glutes",
+   "sets_per_week": 11.3,
+   "total_sets": 48.5,
+   "MEV": 6,
+   "MAV_lo": 10,
+   "MAV_hi": 14,
+   "MRV": 18,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Hamstrings",
+   "sets_per_week": 11.3,
+   "total_sets": 48.5,
+   "MEV": 6,
+   "MAV_lo": 10,
+   "MAV_hi": 14,
+   "MRV": 18,
+   "status": "optimal"
+  },
+  {
+   "muscle": "Calves",
+   "sets_per_week": 6.8,
+   "total_sets": 29.0,
+   "MEV": 8,
+   "MAV_lo": 12,
+   "MAV_hi": 16,
+   "MRV": 20,
+   "status": "under"
+  },
+  {
+   "muscle": "Core",
+   "sets_per_week": 5.6,
+   "total_sets": 24.0,
+   "MEV": 4,
+   "MAV_lo": 6,
+   "MAV_hi": 16,
+   "MRV": 25,
+   "status": "optimal"
+  }
+ ],
+ "training_blueprint": null,
+ "daily_modality_minutes_30d": [
+  {
+   "date": "2026-09-10",
+   "strength_min": 117,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 117
+  },
+  {
+   "date": "2026-09-11",
+   "strength_min": 138,
+   "walking_min": 61,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 199
+  },
+  {
+   "date": "2026-09-12",
+   "strength_min": 155,
+   "walking_min": 29,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 184
+  },
+  {
+   "date": "2026-09-13",
+   "strength_min": 159,
+   "walking_min": 57,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 216
+  },
+  {
+   "date": "2026-09-14",
+   "strength_min": 146,
+   "walking_min": 54,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 200
+  },
+  {
+   "date": "2026-09-15",
+   "strength_min": 125,
+   "walking_min": 61,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 186
+  },
+  {
+   "date": "2026-09-16",
+   "strength_min": 144,
+   "walking_min": 14,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 158
+  },
+  {
+   "date": "2026-09-17",
+   "strength_min": 131,
+   "walking_min": 58,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 189
+  },
+  {
+   "date": "2026-09-18",
+   "strength_min": 65,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 65
+  },
+  {
+   "date": "2026-09-19",
+   "strength_min": 210,
+   "walking_min": 59,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 269
+  },
+  {
+   "date": "2026-09-20",
+   "strength_min": 205,
+   "walking_min": 63,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 268
+  },
+  {
+   "date": "2026-09-21",
+   "strength_min": 130,
+   "walking_min": 104,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 234
+  },
+  {
+   "date": "2026-09-22",
+   "strength_min": 158,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 158
+  },
+  {
+   "date": "2026-09-23",
+   "strength_min": 148,
+   "walking_min": 63,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 211
+  },
+  {
+   "date": "2026-09-24",
+   "strength_min": 151,
+   "walking_min": 62,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 213
+  },
+  {
+   "date": "2026-09-25",
+   "strength_min": 167,
+   "walking_min": 72,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 239
+  },
+  {
+   "date": "2026-09-26",
+   "strength_min": 66,
+   "walking_min": 102,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 168
+  },
+  {
+   "date": "2026-09-27",
+   "strength_min": 28,
+   "walking_min": 165,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 193
+  },
+  {
+   "date": "2026-09-28",
+   "strength_min": 116,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 116
+  },
+  {
+   "date": "2026-09-29",
+   "strength_min": 137,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 137
+  },
+  {
+   "date": "2026-09-30",
+   "strength_min": 0,
+   "walking_min": 109,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 109
+  },
+  {
+   "date": "2026-10-01",
+   "strength_min": 137,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 137
+  },
+  {
+   "date": "2026-10-02",
+   "strength_min": 155,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 155
+  },
+  {
+   "date": "2026-10-03",
+   "strength_min": 0,
+   "walking_min": 241,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 241
+  },
+  {
+   "date": "2026-10-04",
+   "strength_min": 146,
+   "walking_min": 35,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 181
+  },
+  {
+   "date": "2026-10-05",
+   "strength_min": 0,
+   "walking_min": 71,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 71
+  },
+  {
+   "date": "2026-10-06",
+   "strength_min": 141,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 141
+  },
+  {
+   "date": "2026-10-07",
+   "strength_min": 147,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 147
+  },
+  {
+   "date": "2026-10-08",
+   "strength_min": 0,
+   "walking_min": 54,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 54
+  },
+  {
+   "date": "2026-10-09",
+   "strength_min": 157,
+   "walking_min": 0,
+   "cycling_min": 0,
+   "stretching_min": 0,
+   "soccer_min": 0,
+   "hiking_min": 0,
+   "breathwork_min": 0,
+   "other_min": 0,
+   "total_min": 157
+  }
+ ],
+ "walking": {
+  "avg_daily_steps": 3438,
+  "avg_daily_steps_n": 29,
+  "avg_daily_steps_reason": null,
+  "total_walks_30d": 20,
+  "total_rucks_30d": 0,
+  "total_miles_30d": 40.9,
+  "avg_pace_min_per_mi": 19.9,
+  "z2_minutes_walking": 1198,
+  "daily_steps_trend": [
+   {
+    "date": "2026-09-10",
+    "steps": 1353,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-11",
+    "steps": 2415,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-12",
+    "steps": 974,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-09-13",
+    "steps": 1823,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-09-14",
+    "steps": 3578,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-15",
+    "steps": 2077,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-16",
+    "steps": 940,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-17",
+    "steps": 3030,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-18",
+    "steps": 1029,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-19",
+    "steps": 1280,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-09-20",
+    "steps": 1139,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-09-21",
+    "steps": 1405,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-22",
+    "steps": 2016,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-23",
+    "steps": 2520,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-24",
+    "steps": 2292,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-25",
+    "steps": 1565,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-26",
+    "steps": 14823,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-09-27",
+    "steps": 18419,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-09-28",
+    "steps": 1134,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-29",
+    "steps": 1561,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-09-30",
+    "steps": 4833,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-01",
+    "steps": 6382,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-02",
+    "steps": 1113,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-03",
+    "steps": 9913,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-10-04",
+    "steps": 1201,
+    "is_weekend": true
+   },
+   {
+    "date": "2026-10-05",
+    "steps": 683,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-06",
+    "steps": 8101,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-07",
+    "steps": 890,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-08",
+    "steps": 1209,
+    "is_weekend": false
+   },
+   {
+    "date": "2026-10-09",
+    "steps": 2731,
+    "is_weekend": false
+   }
+  ]
+ },
+ "breathwork": {
+  "sessions_30d": 0,
+  "total_minutes_30d": 0.0,
+  "avg_session_min": null,
+  "weekly_trend": [
+   {
+    "week": "2026-W37",
+    "sessions": 0,
+    "minutes": 0.0
+   },
+   {
+    "week": "2026-W38",
+    "sessions": 0,
+    "minutes": 0.0
+   },
+   {
+    "week": "2026-W39",
+    "sessions": 0,
+    "minutes": 0.0
+   },
+   {
+    "week": "2026-W40",
+    "sessions": 0,
+    "minutes": 0.0
+   },
+   {
+    "week": "2026-W41",
+    "sessions": 0,
+    "minutes": 0.0
+   }
+  ]
+ },
+ "weekly_trend": [
+  {
+   "week": "2026-W36",
+   "workouts": 1,
+   "minutes": 65,
+   "z2_min": 65
+  },
+  {
+   "week": "2026-W37",
+   "workouts": 10,
+   "minutes": 1095,
+   "z2_min": 500
+  },
+  {
+   "week": "2026-W38",
+   "workouts": 13,
+   "minutes": 1336,
+   "z2_min": 659
+  },
+  {
+   "week": "2026-W39",
+   "workouts": 13,
+   "minutes": 1415,
+   "z2_min": 734
+  },
+  {
+   "week": "2026-W40",
+   "workouts": 8,
+   "minutes": 1078,
+   "z2_min": 518
+  },
+  {
+   "week": "2026-W41",
+   "workouts": 5,
+   "minutes": 571,
+   "z2_min": 126
+  }
+ ],
+ "whoop_workouts": [
+  {
+   "date": "2026-09-10",
+   "sport_name": "Activity",
+   "strain": 6.31,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 117.0
+  },
+  {
+   "date": "2026-09-10",
+   "sport_name": "Sport_128",
+   "strain": null,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": null
+  },
+  {
+   "date": "2026-09-11",
+   "sport_name": "Activity",
+   "strain": 13.73,
+   "zone_2_minutes": null,
+   "zone_3_minutes": null,
+   "distance_meter": null,
+   "average_heart_rate": 79.0
+  },
+  {
+   "date": "2026-09-11",
+   "sport_name": "Hiking",
+   "strain": 8.93,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 128.0
+  },
+  {
+   "date": "2026-09-11",
+   "sport_name": "Cross Training",
+   "strain": 10.54,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 120.0
+  },
+  {
+   "date": "2026-09-12",
+   "sport_name": "Activity",
+   "strain": 13.07,
+   "zone_2_minutes": null,
+   "zone_3_minutes": null,
+   "distance_meter": null,
+   "average_heart_rate": 71.0
+  },
+  {
+   "date": "2026-09-12",
+   "sport_name": "Hiking",
+   "strain": 5.97,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 123.0
+  },
+  {
+   "date": "2026-09-12",
+   "sport_name": "Sport_128",
+   "strain": null,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": null
+  },
+  {
+   "date": "2026-09-12",
+   "sport_name": "Cross Training",
+   "strain": 10.3,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 111.0
+  },
+  {
+   "date": "2026-09-12",
+   "sport_name": "Hiking",
+   "strain": 8.93,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 128.0
+  },
+  {
+   "date": "2026-09-12",
+   "sport_name": "Sport_128",
+   "strain": null,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": null
+  },
+  {
+   "date": "2026-09-13",
+   "sport_name": "Activity",
+   "strain": 10.57,
+   "zone_2_minutes": null,
+   "zone_3_minutes": null,
+   "distance_meter": null,
+   "average_heart_rate": 74.0
+  },
+  {
+   "date": "2026-09-13",
+   "sport_name": "Sport_128",
+   "strain": null,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": null
+  },
+  {
+   "date": "2026-09-13",
+   "sport_name": "Hiking",
+   "strain": 6.66,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 115.0
+  },
+  {
+   "date": "2026-09-14",
+   "sport_name": "Activity",
+   "strain": 10.06,
+   "zone_2_minutes": null,
+   "zone_3_minutes": null,
+   "distance_meter": null,
+   "average_heart_rate": 75.0
+  },
+  {
+   "date": "2026-09-14",
+   "sport_name": "Hiking",
+   "strain": 6.44,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 113.0
+  },
+  {
+   "date": "2026-09-14",
+   "sport_name": "Hiking",
+   "strain": 6.75,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": 3945.3,
+   "average_heart_rate": 115.0
+  },
+  {
+   "date": "2026-09-14",
+   "sport_name": "Sport_128",
+   "strain": null,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": null
+  },
+  {
+   "date": "2026-09-15",
+   "sport_name": "Activity",
+   "strain": 10.36,
+   "zone_2_minutes": null,
+   "zone_3_minutes": null,
+   "distance_meter": null,
+   "average_heart_rate": 71.0
+  },
+  {
+   "date": "2026-09-15",
+   "sport_name": "Hiking",
+   "strain": 6.7,
+   "zone_2_minutes": 0.0,
+   "zone_3_minutes": 0.0,
+   "distance_meter": null,
+   "average_heart_rate": 113.0
+  }
+ ],
+ "cardio_sessions": [
+  {
+   "date": "2026-10-09",
+   "sport": "Cycling",
+   "distance_mi": 11.55,
+   "minutes": 50,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-09",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 20,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-08",
+   "sport": "Walk",
+   "distance_mi": 3.0,
+   "minutes": 54,
+   "avg_hr": 111.8,
+   "source": "strava"
+  },
+  {
+   "date": "2026-10-07",
+   "sport": "Treadmill",
+   "distance_mi": 3.0,
+   "minutes": 55,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-07",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 15,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-06",
+   "sport": "Cycling",
+   "distance_mi": 11.83,
+   "minutes": 50,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-06",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 15,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-05",
+   "sport": "Walk",
+   "distance_mi": 4.01,
+   "minutes": 71,
+   "avg_hr": 113.9,
+   "source": "strava"
+  },
+  {
+   "date": "2026-10-04",
+   "sport": "Walk",
+   "distance_mi": null,
+   "minutes": 35,
+   "avg_hr": 108.3,
+   "source": "strava"
+  },
+  {
+   "date": "2026-10-04",
+   "sport": "Treadmill",
+   "distance_mi": 2.06,
+   "minutes": 40,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-04",
+   "sport": "Cycling",
+   "distance_mi": 9.45,
+   "minutes": 40,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-04",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 10,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-03",
+   "sport": "Walk",
+   "distance_mi": 12.0,
+   "minutes": 241,
+   "avg_hr": 106.7,
+   "source": "strava"
+  },
+  {
+   "date": "2026-10-02",
+   "sport": "Cycling",
+   "distance_mi": 11.8,
+   "minutes": 50,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-02",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 15,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-01",
+   "sport": "Cycling",
+   "distance_mi": 11.7,
+   "minutes": 50,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-10-01",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 15,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-09-30",
+   "sport": "Walk",
+   "distance_mi": 5.37,
+   "minutes": 109,
+   "avg_hr": 116.4,
+   "source": "strava"
+  },
+  {
+   "date": "2026-09-29",
+   "sport": "Cycling",
+   "distance_mi": 9.05,
+   "minutes": 40,
+   "avg_hr": null,
+   "modality": "cardio",
+   "source": "hevy"
+  },
+  {
+   "date": "2026-09-29",
+   "sport": "Stretching",
+   "distance_mi": null,
+   "minutes": 15,
+   "avg_hr": null,
+   "modality": "mobility",
+   "source": "hevy"
+  }
+ ]
+}

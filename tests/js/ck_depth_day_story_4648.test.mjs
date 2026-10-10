@@ -1,8 +1,10 @@
 // tests/js/ck_depth_day_story_4648.test.mjs — #4648: a day page also shows what the coaches
 // said that day and any call that settled that day; a day with neither prints nothing extra.
-// Driven from the committed kit fixtures: calls.json is GET /api/calls as served, and
-// coach_moves_2026-10-02.json is GET /api/coach_moves's own output for the stored-row
-// fixture (tests/test_site_api_coach_moves_4648.py pins the two equal).
+// Driven from the committed kit fixtures (one live capture, #4671): calls.json is GET
+// /api/calls as served, and coach_moves_2026-10-07.json is GET /api/coach_moves?date=2026-10-07
+// as served — three lines, one a reply. No stored day carried a bet line at capture time, so the
+// bet's date is pinned on WIRE: the route's own output for the writer-shape row
+// (tests/fixtures/coach_moves_wire_4648/, pinned equal by tests/test_site_api_coach_moves_4648.py).
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +16,8 @@ const D = await import("../../site/assets/js/ck_depth.js");
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "kit_pages_4586");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const CALLS = load("calls");
-const MOVES = load("coach_moves_2026-10-02");
+const MOVES = load("coach_moves_2026-10-07");
+const WIRE = JSON.parse(readFileSync(join(FIX, "..", "coach_moves_wire_4648", "route_output_2026-10-02.json"), "utf8"));
 const ABSENT = { state: "absent", date: "2026-10-01", source: "/api/coach_moves", absent_text: "No coach line is recorded for Thursday, October 1.", lines: [] };
 const BASE = "/next/v8/";
 const text = (html) => html.replace(/<[^>]+>/g, " ");
@@ -34,19 +37,24 @@ test("a route that is not served, or a body that is not this day's, prints nothi
     assert.equal(D.dayStoryHTML("2026-10-02", body, null, BASE), "");
   }
   assert.equal(D.daySaidHTML("2026-10-01", MOVES, BASE), "", "another day's lines are never shown on this day");
+  assert.equal(D.daySaidHTML("2026-10-02", MOVES, BASE), "");
   assert.equal(D.daySettledHTML("2026-10-02", { state: "unavailable", calls: [] }, BASE), "");
 });
 
 test("a day with coach lines shows each coach's words as served, under one heading", () => {
-  const html = D.daySaidHTML("2026-10-02", MOVES, BASE);
+  const html = D.daySaidHTML("2026-10-07", MOVES, BASE);
   assert.equal((html.match(/<h2>/g) || []).length, 1);
   assert.match(html, /<h2>What the coaches said\.<\/h2>/);
   assert.equal((html.match(/<li>/g) || []).length, 3);
   for (const l of MOVES.lines) assert.ok(html.includes(`“${l.text}”`), `${l.coach}'s words are printed whole and unchanged`);
   assert.match(html, /<a class="ck-link" href="\/next\/v8\/coach\/\?c=sleep_coach">Lisa Park<\/a> · On a result/);
-  assert.match(html, /Marcus Webb<\/a> · A reply to Max Reyes/);
-  assert.equal((html.match(/A bet opened in these lines settles Friday, October 9\./g) || []).length, 1, "two lines share one bet: its date is said once");
+  assert.match(html, /Marcus Webb<\/a> · A reply to James Okafor/);
+  assert.doesNotMatch(html, /A bet opened/, "no line opened a bet: no bet date");
   assert.doesNotMatch(text(html), /\b20\d\d-\d\d-\d\d\b|\bDr\.|undefined|null/);
+  // Two lines that share one bet say its date once (the writer-shape row).
+  const bet = D.daySaidHTML("2026-10-02", WIRE, BASE);
+  assert.match(bet, /Marcus Webb<\/a> · A reply to Max Reyes/);
+  assert.equal((bet.match(/A bet opened in these lines settles Friday, October 9\./g) || []).length, 1, "two lines share one bet: its date is said once");
 });
 
 test("a day with a settled call shows the call, its rule, the verdict and a link to its page", () => {
@@ -79,10 +87,10 @@ test("a day with many settled calls shows two and folds the rest, every one stil
 });
 
 test("both on one day: the coaches first, then what settled", () => {
-  const html = D.dayStoryHTML("2026-10-02", MOVES, CALLS, BASE);
-  assert.ok(html.indexOf("What the coaches said.") > -1 && html.indexOf("What the coaches said.") < html.indexOf("A call was checked this day."));
+  const html = D.dayStoryHTML("2026-10-07", MOVES, CALLS, BASE);
+  assert.ok(html.indexOf("What the coaches said.") > -1 && html.indexOf("What the coaches said.") < html.indexOf("2 calls were checked this day."));
   assert.equal((html.match(/<section /g) || []).length, 1, "one section");
   assert.equal((html.match(/<h2>/g) || []).length, 1, "one heading: under the coaches, what settled takes a label");
-  assert.match(html, /<p class="ck-label">A call was checked this day\.<\/p>/);
+  assert.match(html, /<p class="ck-label">2 calls were checked this day\.<\/p>/);
   assert.match(D.dayStoryHTML("2026-10-02", null, CALLS, BASE), /^<section class="ck-section" id="ck-story"><p class="ck-label">Settled<\/p><h2>A call was checked this day\.<\/h2>/);
 });
