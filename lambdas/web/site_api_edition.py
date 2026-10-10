@@ -984,25 +984,31 @@ LATENCY_TARGET_MS = 1500
 #: profile gave the rest of the branch) and the record's one narrow sweep, split across its
 #: two keys (the old pair cost 1,193 + 1,771 ms). After a deploy, re-pin every entry from the
 #: ``[edition] upstream_ms`` log line ``read_bodies`` writes on each request.
+#:
+#: Round 2 (2026-10-09): the three entries marked ``est. r2`` are the round-1 standalone figure
+#: scaled by the CPU each new read path took against the old one on a laptop over live data,
+#: read-only, four rounds (nutrition 160 -> 2 ms CPU and 672 -> 3 KB of DynamoDB JSON;
+#: training 143 -> 11 ms and 791 -> 99 KB; the dashboard composed for the edition 47 -> 43 ms
+#: and 119 -> 92 KB). The deployed ``upstream_ms`` line is still owed for them.
 SOURCE_COST_MS = {
     "journal": 40,  # est.
     "panelcast": 40,  # est.
     "cadence": 1,
     "docket": 30,
     "journey": 44,
-    "dashboard": 140,  # est.
+    "dashboard": 128,  # est. r2 — without the weekly call, the lead's daily read and the pause flag
     "predictions": 170,  # est. — half of the narrow record sweep
     "calibration": 170,  # est. — the other half
     "decisions": 10,
     "owner_words": 5,
     "sleep": 41,
     "session": 441,
-    "nutrition": 343,
+    "nutrition": 15,  # est. r2 — one projected MacroFactor window
     "habits": 7,
     "supplements": 81,
     "experiments": 109,
     "pulse": 63,
-    "training": 424,
+    "training": 40,  # est. r2 — projected Strava + Apple Health windows
 }
 
 #: The reviewed ceiling on the SUM of ``SOURCE_COST_MS``. The reads overlap, but the Lambda
@@ -1010,17 +1016,26 @@ SOURCE_COST_MS = {
 #: upstream moves. It is pinned at today's sum: adding an upstream that costs more than the
 #: few milliseconds of headroom is red until this line AND its pin in
 #: tests/test_edition_latency_4607.py are changed in the same pull request — the explicit,
-#: reviewed budget change. It stands ABOVE ``LATENCY_TARGET_MS`` today and says so rather
-#: than hiding it: session, training and nutrition are 1,208 ms of it and are still read
-#: whole. The ceiling only comes down; it reaches the target when those are narrowed or the
-#: function is given more CPU.
-SOURCE_COST_CEILING_MS = 2160
+#: reviewed budget change. Round 1 pinned it at 2,160 ms, ABOVE ``LATENCY_TARGET_MS``, with
+#: session, training and nutrition 1,208 ms of it and still read whole. Round 2 (#4607)
+#: narrowed nutrition and training and trimmed the dashboard: 1,435 ms, under the target as
+#: a sum of standalone costs. Session (441 ms) is the largest entry still read whole. The
+#: ceiling only comes down.
+SOURCE_COST_CEILING_MS = 1435
 
 
 #: #4607 — narrow readers: one read that serves several ``SOURCES`` keys, each as the subset
 #: of that route's body the edition reads, in the route's own shape. ``handle_edition`` hands
 #: them in; ``read_bodies`` without them reads every key through its route, as before.
-NARROW_JOBS = {"record": ("predictions", "calibration")}
+NARROW_JOBS = {
+    "record": ("predictions", "calibration"),
+    # #4607 round 2 (measured after #4669 deployed: nutrition 1,021 ms and training 725 ms at
+    # the in-Lambda p50, the two slowest upstreams but one): each read as the one projected
+    # window its edition fields come from. A job named for its own key keeps the
+    # ``upstream_ms`` table's column names unchanged.
+    "nutrition": ("nutrition",),
+    "training": ("training",),
+}
 
 _S3_CLIENT = None
 _S3_CLIENT_LOCK = threading.Lock()
@@ -1131,14 +1146,21 @@ def handle_edition(read_route: Callable[[str, dict], Any]) -> dict:
     from coach import persona_registry
     from common.pacific_time import pacific_today
 
-    from web import site_api_coach
+    from web import site_api_coach, site_api_observatory
     from web.prediction_reason import metric_words
     from web.site_api_common import EXPERIMENT_START, _error, _ok, logger
 
     try:
         now = datetime.now(timezone.utc)
         doc = compose(
-            read_bodies(read_route, narrow={"record": site_api_coach.edition_record}),
+            read_bodies(
+                read_route,
+                narrow={
+                    "record": site_api_coach.edition_record,
+                    "nutrition": site_api_observatory.edition_nutrition,
+                    "training": site_api_observatory.edition_training,
+                },
+            ),
             today=pacific_today(),
             now=now,
             start_date=EXPERIMENT_START,

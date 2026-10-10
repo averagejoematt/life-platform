@@ -807,8 +807,13 @@ def _dispatch_route(event, path, method):
                 # door labels a weekly read as weekly instead of serving it as current.
                 "data_through": None,
             }
+            # #4607: the edition reads `moves` and `coaches` and nothing else. Composed for it
+            # (`composed_for`, an event key a Function-URL caller cannot set), the three
+            # blocks it never reads — this weekly call, the lead's daily read and the
+            # regeneration-pause flag — are NOT READ and served `null`, never an empty value.
+            _cd_for_edition = event.get("composed_for") == "edition"
             try:
-                _cd_int = _integrator_digest()  # #946: tombstone/phase-guarded
+                _cd_int = None if _cd_for_edition else _integrator_digest()  # #946: tombstone/phase-guarded
                 if _cd_int:
                     _cd_priority["text"] = _cd_int.get("analysis", "")
                     _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
@@ -833,7 +838,6 @@ def _dispatch_route(event, path, method):
             # `open_actions`, whose six dossier reads were ~80% of this branch's time
             # (measured 2026-10-04: 761 of 956 ms). Composed for the edition, the asks are
             # NOT READ and the key is served `null` — never `[]`, which would say "no asks".
-            _cd_for_edition = event.get("composed_for") == "edition"
             _cd_actions = []
             try:
                 for _cd_domain, _cd_info in ({} if _cd_for_edition else _cd_coach_display).items():
@@ -1047,7 +1051,7 @@ def _dispatch_route(event, path, method):
             # opens on when it is under 24 h old; absent (None) until the first row lands.
             from coach import lead_daily_read as _cd_lead_mod
 
-            _cd_lead_daily = _cd_lead_mod.latest_served(table)
+            _cd_lead_daily = None if _cd_for_edition else _cd_lead_mod.latest_served(table)
             if _cd_lead_daily:
                 _cd_lead_daily.update(coach_name=_cd_lead_name, coach_title=_cd_lead_title)
             # #4583: the board's daily moves (coach.coach_moves, COACH#eli_marsh / MOVES#) — at
@@ -1056,7 +1060,7 @@ def _dispatch_route(event, path, method):
 
             return _ok(
                 {
-                    "weekly_priority": _cd_priority,
+                    "weekly_priority": None if _cd_for_edition else _cd_priority,
                     "lead_daily": _cd_lead_daily,
                     "moves": _cd_moves_mod.latest_served(table),
                     "open_actions": None if _cd_for_edition else _cd_actions,
@@ -1070,7 +1074,7 @@ def _dispatch_route(event, path, method):
                     # every position_summary here is a HELD read, and the front-end
                     # must disclose that instead of presenting "as of <date>" as
                     # merely dated. Fail-open to False inside _regeneration_paused.
-                    "regeneration_paused": _regeneration_paused("coach_narrative"),
+                    "regeneration_paused": None if _cd_for_edition else _regeneration_paused("coach_narrative"),
                 },
                 cache_seconds=300,
                 content_as_of=_cd_content_as_of,

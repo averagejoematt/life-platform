@@ -389,8 +389,14 @@ def test_the_dashboard_composed_for_the_edition_reads_no_dossier_and_serves_the_
         dossier_reads.append(coach_id)
         return {"commitments": [{"status": "pending", "text": "Lights out by eleven.", "date": "2026-10-01", "due_date": "2026-10-05"}]}
 
+    integrator_reads = []
+
+    def integrator():
+        integrator_reads.append(1)
+        return {"analysis": "This week: protein first.", "generated_at": "2026-10-01T17:00:00+00:00", "data_through": "2026-09-30"}
+
     monkeypatch.setattr(L, "table", FakeDdbTable(query_hook=hook))
-    monkeypatch.setattr(L, "_integrator_digest", lambda: None)
+    monkeypatch.setattr(L, "_integrator_digest", integrator)
     monkeypatch.setattr(L, "_dossier_block", dossier)
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
 
@@ -402,15 +408,23 @@ def test_the_dashboard_composed_for_the_edition_reads_no_dossier_and_serves_the_
     assert whole is not None and dossier_reads, "the fixture does not exercise the dossier read at all"
     assert whole["open_actions"] and whole["open_actions"][0]["text"] == "Lights out by eleven."
 
+    assert integrator_reads and whole["weekly_priority"]["text"], "the fixture does not exercise the weekly call"
+
     del dossier_reads[:]
+    del integrator_reads[:]
     lean = read({"composed_for": "edition"})
     assert dossier_reads == [], f"composed for the edition, the dashboard still read {len(dossier_reads)} dossiers"
+    assert integrator_reads == [], "composed for the edition, the dashboard still read the weekly call"
     assert lean["open_actions"] is None, "asks that were not read must be null, never an empty list"
+    # #4607 round 2: the three other blocks the edition never reads are not read either — null, never empty.
+    assert (lean["weekly_priority"], lean["lead_daily"], lean["regeneration_paused"]) == (None, None, None)
     # A caller cannot ask for the lean body: the flag is an event key, not a query parameter.
     assert read({"queryStringParameters": {"composed_for": "edition"}})["open_actions"] == whole["open_actions"]
 
-    strip = lambda body: {k: v for k, v in body.items() if k not in ("open_actions", "_meta")}  # noqa: E731
+    unread = ("open_actions", "weekly_priority", "lead_daily", "regeneration_paused", "content_day_span", "_meta")
+    strip = lambda body: {k: v for k, v in body.items() if k not in unread}  # noqa: E731
     assert json.dumps(strip(lean)) == json.dumps(strip(whole))
+    assert json.dumps(lean["moves"]) == json.dumps(whole["moves"]) and json.dumps(lean["coaches"]) == json.dumps(whole["coaches"])
     assert any(c.get("position_summary") for c in lean["coaches"]), "the fixture serves no coach line to compare"
     assert ed._coach_lines(lean, _DAY, lambda sid: persona_registry.by_short_id(sid)[1], persona_registry.resolve) == ed._coach_lines(
         whole, _DAY, lambda sid: persona_registry.by_short_id(sid)[1], persona_registry.resolve
@@ -430,7 +444,7 @@ def test_the_edition_marks_every_read_it_makes(monkeypatch):
 
 # The second place the ceiling lives. Raising SOURCE_COST_CEILING_MS in the module without
 # changing this line is red; changing both is the explicit, reviewed budget change (#4607).
-REVIEWED_CEILING_MS = 2160
+REVIEWED_CEILING_MS = 1435
 
 
 def latency_budget_offences(sources=None, costs=None, ceiling=None):
