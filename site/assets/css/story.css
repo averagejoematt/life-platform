@@ -763,7 +763,8 @@ body { overflow-x: hidden; }
    to flag yet), never the amber semaphore. */
 .pl-won .pl-tag { background: var(--ember-soft); color: var(--ember); }
 .pl-lost .pl-tag { background: color-mix(in oklch, var(--ink-muted) 18%, transparent); color: var(--ink-muted); }
-.pl-open .pl-tag { background: color-mix(in oklch, var(--ink-faint) 14%, transparent); color: var(--ink-faint); }
+/* #4619 — text is --ink-muted on a faint wash: --ink-faint on its own 14% tint measured below 4.5:1 (axe color-contrast, live sweep). */
+.pl-open .pl-tag { background: color-mix(in oklch, var(--ink-faint) 8%, transparent); color: var(--ink-muted); }
 
 /* Episode transcript reader — speaker-attributed turns + an in-page "chapters"
    contents (the host's questions). Reads like a script; calm, library-grade. */
