@@ -624,6 +624,23 @@ final ones in 8 of 8 re-seen cases while `sleep_score` is the provisional one. T
 writer stores the night as sent and never drops, alters or promotes it; whether a
 flagged night belongs in an average, and with what label, is a read-side decision.
 
+**The site reader's decision (`lambdas/web/site_api_sleep.py`, #4635).** It follows the
+platform's partial-day rule (#1084: a day that is not final never enters a mean) and
+reads the flag as a tri-state — True, False, or absent = unknown:
+- `vendor_incomplete: true` — the night is **left out** of `/api/sleep_detail`'s
+  `avg_score_window` / `avg_efficiency_window` (and their gated `30d_` twins) and out of
+  every `/api/sleep_correlations` sleep-score series. It stays in `sleep_trend`, labelled:
+  each row's `eightsleep.vendor_incomplete` carries the flag; when the latest night is
+  flagged, `sleep_detail.vendor_incomplete` is true and `figure_scope.vendor_incomplete_note`
+  says the headline score is provisional. `sleep_detail.avg_window_nights` is the n behind
+  the averages and `sleep_detail.nights_vendor_incomplete` the count left out
+  (`days_tracked` still counts every stored night).
+- `false` or **absent** — included and unlabelled, exactly as before #4635. An absent flag
+  is never read as "complete" nor as "incomplete"; the payload passes it through as `null`.
+- Because the flag is not a short-night detector, this does not catch every short night
+  (an unflagged night can be far short of the wrist device), and a flagged night with
+  final durations is still excluded — the rule is "the vendor said not final", nothing more.
+
 **SoT ruling — sleep duration/staging (#2921):** Whoop (wrist HRV/motion) and Eight
 Sleep (mattress pressure sensor) each independently measure sleep duration, stage
 breakdown (deep/rem/light), and efficiency for the same physical night, using
