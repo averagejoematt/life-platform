@@ -109,6 +109,16 @@ def sign_morning_note_token(secret: str, date_str: str) -> str:
     return hmac.new(secret.encode(), payload.encode(), digestmod="sha256").hexdigest()[:32]
 
 
+def morning_note_link(site_url: str, secret: str, date_str: str) -> str:
+    """The owner's link to the cockpit's four-word box for `date_str`'s morning (#4189 box 3).
+
+    The grant rides in the URL FRAGMENT (`#note=<day>.<token>`) — a browser never sends a
+    fragment to the server, so the token never reaches a CloudFront log or a Referer, and
+    `site/assets/js/morning_note_box.js` (the only reader of it) strips it from the address
+    bar once read. That module's GRANT_RE is the other half of this format."""
+    return f"{site_url.rstrip('/')}/cockpit/#note={date_str}.{sign_morning_note_token(secret, date_str)}"
+
+
 def verify_morning_note_token(secret: str, date_str: str, token) -> bool:
     """Constant-time verification of the owner's per-day note token. False on any malformed input (never raises)."""
     if not token or not isinstance(token, str):

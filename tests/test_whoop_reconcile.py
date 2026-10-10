@@ -57,6 +57,9 @@ def _run_reconcile(monkeypatch, sleeps, workouts, stored_sks, stored_workout_sta
     monkeypatch.setattr(whoop, "_fetch_all_records", fake_fetch_all)
     monkeypatch.setattr(whoop, "_fetch_stored_records", fake_stored)
     monkeypatch.setattr(whoop, "_emit_reconciliation_metric", lambda n: emitted.setdefault("count", n))
+    # #4638's store → vendor pass reads the stored workout rows on its own; none here.
+    monkeypatch.setattr(whoop, "_fetch_stored_workouts", lambda table, start_date, end_date: [])
+    monkeypatch.setattr(whoop, "_emit_store_vendor_metrics", lambda *a: None)
 
     out = whoop._reconcile({"reconcile": True}, None)
     return json.loads(out["body"]), emitted.get("count")

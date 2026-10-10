@@ -415,6 +415,9 @@ _ONE_HOP_BLIND_SPOT = {
     # correct — `utc-exempt(#2811)` vendor API windows / `utc-exempt(#2798)` billing month
     "tests/test_whoop_reconcile.py",
     "tests/test_strava_reconcile_window.py",
+    # #4638: same two reconcilers, same `utc-exempt(#2811)` vendor window — the test's UTC
+    # "today" is the one `_reconcile` itself bounds the vendor list and the judged days by.
+    "tests/test_store_vendor_reconcile_4638.py",
     # tests/test_receipts_endpoint.py MOVED to `_PT_PAIRED_RESIDUE` above by #4219: it now
     # pairs on the DIRECT pass (site_api_lambda.py calls `pacific_today()` itself, for the
     # coaching-dashboard `days_overdue` field), not only the one-hop delegation this set

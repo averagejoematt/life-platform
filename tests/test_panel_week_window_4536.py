@@ -180,7 +180,14 @@ DESK_EP = {
 def _wire_week_run(monkeypatch, state):
     rows = [
         _state_row(state, phase="experiment", updated=WK[4]),
-        {"pk": "USER#matthew#SOURCE#chronicle", "sk": f"DATE#{WK[3]}", "desk_episode_json": json.dumps(DESK_EP), "phase": "experiment"},
+        {
+            "pk": "USER#matthew#SOURCE#chronicle",
+            "sk": f"DATE#{WK[3]}",
+            "desk_episode_json": json.dumps(DESK_EP),
+            # #4728: the desk path holds an episode with no audit on record — a clean audit, both sections empty.
+            "desk_findings_json": json.dumps({"post": [], "episode": []}),
+            "phase": "experiment",
+        },
     ]
     t = _Table(rows)
     monkeypatch.setattr(panel, "table", t)
@@ -299,6 +306,28 @@ def test_a_backfilled_earlier_week_publishes_its_row_but_leaves_state_and_notifi
     g = _desk_g(_Table(), {"last_episode": {"week": 2}, "bet_ledger": []}, calls)
     desk.publish_desk_episode(3, {"week": 3, "date": WK[3]}, DESK_EP, False, _g=g)
     assert [c[0] for c in calls if isinstance(c, tuple)][:2] == ["state", "memory"] and "notify" in calls
+
+
+def test_the_legacy_writer_announces_nothing_for_a_named_week(monkeypatch):
+    """The legacy (non-desk) path: a backfill run sends neither the operator ping nor the subscriber blast."""
+    calls: list = []
+    g = {
+        "_notify_new_episode": lambda ep: calls.append("notify"),
+        "_email_subscribers": lambda ep: calls.append("email"),
+        "logger": panel.logger,
+    }
+    monkeypatch.setenv("PANELCAST_NOTIFY_SUBSCRIBERS", "true")
+    desk.announce_legacy({"week": 3}, {"week": 3, "date": WK[3], "backfill": True}, _g=g)
+    assert calls == [], calls
+    # mutation control: the scheduled (non-backfill) run pings the operator and blasts the subscribers
+    desk.announce_legacy({"week": 3}, {"week": 3, "date": WK[3]}, _g=g)
+    assert calls == ["notify", "email"], calls
+    # the legacy publish routes every announcement through announce_legacy — no direct, unguarded call survives
+    src = open(panel.__file__).read()
+    assert src.count("announce_legacy(ep, post") == 1
+    assert not [
+        ln for ln in src.splitlines() if "_notify_new_episode(ep)" in ln or "_email_subscribers(ep)" in ln
+    ], "a direct notify bypasses the guard"
 
 
 def test_the_legacy_commit_leaves_state_alone_for_an_earlier_week():

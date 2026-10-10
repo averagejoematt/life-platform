@@ -11,7 +11,7 @@ clean constants + clean DDB + clean API can still produce a stale-looking
 site if any of (a) hardcoded client JS, (b) cached S3 JSON, (c) missed DDB
 partitions leaks through. This script catches that class of bug.
 
-The token list + fetch/check core live in tests/leak_token_sweep.py (#1448)
+The token list + fetch/check core live in qa/leak_token_sweep.py (#1448)
 so the SAME deterministic, AI-free sweep also runs inside the daily
 tests/visual_qa.py pass, not only here at reset time — this script's own
 behavior is unchanged (full FORBIDDEN_TOKENS list, same --old-genesis waiver
@@ -43,19 +43,18 @@ from lambdas.common.constants import EXPERIMENT_START_DATE
 BASE = "https://averagejoematt.com"
 
 # Pages to fetch and inspect — derived from THE page registry
-# (tests/qa_manifest.py, #1426): every real HTML page whose manifest entry has
+# (qa/qa_manifest.py, #1426): every real HTML page whose manifest entry has
 # leak_scan=True (pure redirect stubs excluded). The pre-#1426 hand list here
 # covered 35 pages; the manifest facet covers the full live surface, so the
 # token grep now sweeps every page the public can reach.
-sys.path.insert(0, str(REPO_ROOT / "tests"))
-from leak_token_sweep import (  # noqa: E402
+from qa.leak_token_sweep import (  # noqa: E402
     ALLOW_503_NOT_COMPUTED,
     FORBIDDEN_TOKENS,
     JSON_ENDPOINTS,
     old_genesis_tokens as _old_genesis_tokens,
     sweep as _leak_sweep,
 )
-from qa_manifest import leak_scan_paths  # noqa: E402
+from qa.qa_manifest import leak_scan_paths  # noqa: E402
 
 PAGES = leak_scan_paths()
 
@@ -92,7 +91,7 @@ def main():
     args = parser.parse_args()
     # A LOCAL list, not a mutation of the shared module's FORBIDDEN_TOKENS — keeps
     # this reset-time-only extension from leaking into any other importer of
-    # tests/leak_token_sweep.py within the same process (e.g. a pytest run that
+    # qa/leak_token_sweep.py within the same process (e.g. a pytest run that
     # imports both this module and visual_qa.py).
     tokens = FORBIDDEN_TOKENS + _old_genesis_tokens(args.old_genesis)
 

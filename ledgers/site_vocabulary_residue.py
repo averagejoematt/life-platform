@@ -28,6 +28,7 @@ BASELINE = {
     "cycle": 2,  # 6 → 2 on the 2026-09-26 cycle-count ruling (#4182): only unlisted /method/cycles/ + /method/registry/ remain
     "Third Wall": 0,
     "pillar": 1,
+    "pace flag": 0,  # #4674: cut 2026-10-09; no reader page carries it
     "protocol": 1,
     "gate": 5,
     "HRV": 3,
