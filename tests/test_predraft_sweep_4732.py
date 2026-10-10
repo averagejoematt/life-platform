@@ -132,6 +132,12 @@ def _seeded():
     return table
 
 
+def _frozen_pacific_today():
+    """The handler's clock, frozen to the fixture's TODAY (#2376): `run()` with no target derives
+    tomorrow from `pacific_today()`, so the production default path is driven, not a back-dated call."""
+    return patch("common.pacific_time.pacific_today", return_value=TODAY)
+
+
 def _census(table):
     with patch.object(routine_repo, "_table", table):
         return routine_repo.stale_draft_census(older_than_days=7, today="2026-10-10", genesis=GENESIS)
@@ -146,8 +152,9 @@ def test_the_nightly_run_archives_its_own_expired_and_superseded_drafts_and_noth
         patch.object(routine_repo, "_table", table),
         patch("training.routine_repo._live_genesis", return_value=GENESIS),
         patch.object(npd, "scheduled_session", return_value={"label": "walk", "archetype": "aerobic"}),
+        _frozen_pacific_today(),
     ):
-        out = npd.run("2026-10-10")
+        out = npd.run()  # the scheduled call: no target, tomorrow derived from the (frozen) Pacific day
         current = {ir.routine_id: routine_repo.get_current(ir.routine_id) for ir in ALL}
 
     offenders = []
@@ -180,6 +187,8 @@ def test_the_nightly_run_archives_its_own_expired_and_superseded_drafts_and_noth
     live = [ir.routine_id for ir in _census(table)["live"]]
     if live != [CHAT_DRAFT.routine_id]:
         offenders.append(("orphan census after the sweep", live))
+    if out.get("target_date") != TOMORROW_PRIMARY.target_date:
+        offenders.append(("the run did not target tomorrow off the frozen clock", out.get("target_date")))
     if out.get("outcome") != npd.NO_SESSION:
         offenders.append(("the sweep changed the run's outcome", out.get("outcome")))
     assert not offenders, offenders
@@ -196,6 +205,7 @@ def test_a_failing_sweep_never_stops_the_nights_draft():
     with (
         patch.object(npd, "sweep_expired", side_effect=RuntimeError("ddb down")),
         patch.object(npd, "scheduled_session", return_value={"label": "walk", "archetype": "aerobic"}),
+        _frozen_pacific_today(),
     ):
-        out = npd.run("2026-10-10")
+        out = npd.run()
     assert out["outcome"] == npd.NO_SESSION and "RuntimeError" in out["sweep"]["error"]
