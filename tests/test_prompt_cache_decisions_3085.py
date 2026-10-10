@@ -30,7 +30,7 @@ import ast
 from pathlib import Path
 
 import pytest
-from ai import prompt_cache
+from ai import model_routing, prompt_cache
 
 _LAMBDAS = Path(__file__).resolve().parents[1] / "lambdas"
 
@@ -101,7 +101,9 @@ def test_every_decision_carries_a_dated_rationale(fn):
     entry = prompt_cache.CACHING_DECISIONS[fn]
     assert isinstance(entry["engaged"], bool)
     assert entry["measured_on"], f"{fn}: a token count is meaningless without the model it was measured on"
-    assert entry["model_env"] and entry["model_default"], f"{fn}: the model must be DERIVED from the caller's resolution (#4778)"
+    assert (
+        entry["route"] in model_routing.ROUTES
+    ), f"{fn}: the model must be DERIVED through the #4770 registry route its caller names (#4778)"
     assert entry["prefix_tokens"] > 0, f"{fn}: prefix_tokens is a wire measurement, not a guess"
     assert len(entry["why"]) > 80, f"{fn}: the rationale must survive the next reader, not just satisfy a key"
     assert entry["decided"], f"{fn}: an undated decision cannot be re-litigated"

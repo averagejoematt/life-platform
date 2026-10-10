@@ -159,10 +159,12 @@ _CHARS_PER_TOKEN = 3.6
 # caller moved to a 512-floor 5.5 model through its env var, the register would have
 # kept checking it against the 4,096 Haiku 4.5 floor and stayed green on a decision
 # whose premise had just dissolved. Each entry now names HOW its caller resolves a
-# model (`model_env`, falling back to `model_default` — the same
-# `os.environ.get(env, default)` the caller module does) and which model the
-# measurement was taken ON (`measured_on`). `resolved_model()` is the model the
-# caller actually runs on; `decision_drift()` reports every way a decision has
+# model — the `route` it passes to `ai.model_routing.model_for` (#4770's ONE
+# feature->tier->model registry; the route carries the env override its caller
+# reads, so a tier swap there and an env move on the Lambda both reach this check)
+# and the module-level `caller_var` that binds it — and which model the measurement
+# was taken ON (`measured_on`). `resolved_model()` is the model the caller actually
+# runs on, resolved by the registry itself, never re-typed here; `decision_drift()` reports every way a decision has
 # stopped describing it:
 #   * the caller now resolves to a different model family than `measured_on` —
 #     re-measure on the new model (tokenizers differ: Haiku 5.5 is reported ~30%
@@ -171,20 +173,18 @@ _CHARS_PER_TOKEN = 3.6
 #     the reverse;
 #   * the entry says engaged but fewer than 2 calls land inside one cache TTL
 #     (`calls_within_ttl`), so every write is a premium nothing reads.
-# `tests/test_prompt_cache_floor_derivation_4778.py` holds `model_env` /
-# `model_default` to the caller module AND to the deployed env the CDK stack sets.
+# `tests/test_prompt_cache_floor_derivation_4778.py` holds `route` / `caller_var` to
+# the caller module AND feeds the guard the deployed env the CDK stack sets.
 #
 # The LIVE counterpart is `PromptCacheNoOp` (#2888): this register is the
 # intent, that metric is the outcome. `tests/test_prompt_cache_decisions_3085.py`
 # holds the two consistent.
-_HAIKU_4_5 = "claude-haiku-4-5-20251001"
-
 CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     "coach-quality-gate": {
         "engaged": False,
-        "model_env": "AI_MODEL_HAIKU",
-        "model_default": _HAIKU_4_5,
+        "route": "coach_narrative.quality_gate",
         "caller": "coach/coach_quality_gate.py",
+        "caller_var": "AI_MODEL_HAIKU",
         "cdk_stack": "compute_stack.py",
         "measured_on": "haiku-4-5",
         "prefix_tokens": 814,
@@ -204,9 +204,9 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     },
     "coach-state-updater": {
         "engaged": False,
-        "model_env": "AI_MODEL_HAIKU",
-        "model_default": _HAIKU_4_5,
+        "route": "coach_narrative.state_update",
         "caller": "coach/coach_state_updater.py",
+        "caller_var": "AI_MODEL_HAIKU",
         "cdk_stack": "compute_stack.py",
         "measured_on": "haiku-4-5",
         "prefix_tokens": 2039,
@@ -229,9 +229,9 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     # re-enable test (>=2 within the TTL) is already met. SIZE is the binding half.
     "daily-brief": {
         "engaged": False,
-        "model_env": "AI_MODEL",
-        "model_default": "NARRATIVE_MODEL",  # ai.model_defaults.NARRATIVE_MODEL, resolved below
+        "route": "shared.narrative",
         "caller": "ai/ai_transport.py",
+        "caller_var": "AI_MODEL",
         "cdk_stack": "email_stack.py",
         "measured_on": "sonnet-4-6",
         "prefix_tokens": 530,
@@ -252,27 +252,17 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
 }
 
 
-def _resolve_default(default: str) -> str:
-    """`model_default` is a literal model name, or the sentinel "NARRATIVE_MODEL" for a
-    caller whose fallback is `ai.model_defaults.NARRATIVE_MODEL` — kept symbolic so the
-    register cannot drift from that one constant (#4275)."""
-    if default == "NARRATIVE_MODEL":
-        from ai.model_defaults import NARRATIVE_MODEL
-
-        return NARRATIVE_MODEL
-    return default
-
-
 def resolved_model(fn: str, environ: Optional[dict[str, str]] = None) -> str:
     """The model `fn` actually runs on under `environ` (the Lambda's env vars).
 
-    Same resolution the caller module performs: `environ[model_env]` if set and
-    non-empty, else `model_default`. Pass the deployed environment; `None` means
-    "no override", i.e. the default.
+    The caller's own resolution, done by the same function it calls:
+    `model_routing.model_for(route, env)` — the route's env var when set, else the
+    registry's tier/pin default (#4770). Pass the deployed environment; `None` means
+    "no override", i.e. the registry's answer.
     """
-    entry = CACHING_DECISIONS[fn]
-    env = environ or {}
-    return env.get(entry["model_env"]) or _resolve_default(entry["model_default"])
+    from ai.model_routing import model_for  # leaf module; imported lazily to keep this one import-light
+
+    return model_for(CACHING_DECISIONS[fn]["route"], env=environ or {})
 
 
 def model_family(model_id: Optional[str]) -> Optional[str]:

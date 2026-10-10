@@ -214,13 +214,9 @@ _HOMES = {
     "lambdas/ai/bedrock_client.py": "the chokepoint's name → profile map, its PRICES rows and the no-name default profile",
 }
 # RATCHET — dated, reasoned, shrink-only (test_every_exemption_is_still_needed).
-_EXEMPT = {
-    "lambdas/ai/prompt_cache.py": (
-        "2026-10-10",
-        "CACHING_DECISIONS records the model each cache decision was MEASURED against (a fact about a past "
-        "CountTokens run, read by no invoke path); re-made per model by #4778",
-    ),
-}
+# Empty since #4778 (2026-10-10): prompt_cache.CACHING_DECISIONS names each caller's route
+# and resolves its model through this registry, so it spells no model of its own.
+_EXEMPT: dict[str, tuple[str, str]] = {}
 # Routes no caller names yet. Empty since the #4769 callers moved onto their rows (2026-10-10).
 _UNCALLED_ROUTES: dict[str, str] = {}
 
@@ -303,7 +299,7 @@ def test_every_exemption_is_dated_reasoned_and_still_needed():
     _, named = _scan(ROOT)
     for route in _UNCALLED_ROUTES:
         assert route not in named, f"{route} now has a caller — delete it from _UNCALLED_ROUTES and its _EXEMPT row"
-    assert len(_EXEMPT) <= 1, "the exemption list only shrinks"
+    assert len(_EXEMPT) <= 0, "the exemption list only shrinks"
 
 
 _PLANTED = [

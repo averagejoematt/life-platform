@@ -7,12 +7,14 @@ floor (Haiku 4.5: 4,096; Sonnet 4.6: 1,024), so the day a caller moved through i
 var the register would have kept judging it against the OLD floor — green, on a
 decision whose premise had just dissolved. These tests make the model a derivation:
 
-  1. the register's `model_env` / `model_default` is exactly the caller module's own
-     resolution — `os.environ.get(env, default)`, or `model_for(route)` once the #4770
-     routing registry lands — read from source, so a caller that changes its resolution
-     without the register reds here;
-  2. the environment the CDK stack sets on that Lambda is what `resolved_model` is fed,
-     so a stack-level model move (CONF-04's `AI_MODEL_HAIKU`) reds here too;
+  1. the register's `route` is exactly the #4770 registry route the caller module binds
+     its model from (`caller_var = model_for("route")`), read from source, so a caller
+     that changes route without the register reds here — and `resolved_model` asks the
+     registry itself, so a TIER swap in `model_routing.TIER_MODELS` (#4772 / #4775)
+     reaches the guard with no edit to the register;
+  2. the value the CDK stack sets for the route's env var on that Lambda is what
+     `resolved_model` is fed, so a stack-level model move (CONF-04's `AI_MODEL_HAIKU`)
+     reds here too;
   3. `decision_drift` is empty for every caller under that deployed environment — the
      resolved model is the family the prefix was measured on, the engaged flag matches
      its floor, and an engaged caller has >=2 calls inside a TTL;
@@ -24,7 +26,7 @@ Files are read by explicit path (named in the register), never swept.
 import ast
 from pathlib import Path
 
-from ai import prompt_cache
+from ai import model_routing, prompt_cache
 
 _ROOT = Path(__file__).resolve().parents[1]
 _LAMBDAS = _ROOT / "lambdas"
@@ -56,56 +58,41 @@ def _module_env_default(path: Path, env: str):
         if ast.unparse(call.func) in ("os.environ.get", "os.getenv") and call.args and getattr(call.args[0], "value", None) == env:
             assert len(call.args) == 2, f"{path.name}: {env} has no fallback — the register cannot derive its model"
             return call.args[1]
-    raise AssertionError(f"{path.name}: no module-level os.environ.get({env!r}, ...) — the register's model_env is stale")
+    raise AssertionError(f"{path.name}: no module-level os.environ.get({env!r}, ...) — cannot derive the deployed model")
 
 
 def _literal_default(path: Path, env: str) -> str:
     node = _module_env_default(path, env)
     if isinstance(node, ast.Constant):
         return node.value
-    if isinstance(node, ast.Name):
-        return node.id  # symbolic, e.g. NARRATIVE_MODEL
-    raise AssertionError(f"{path.name}: {env} fallback is {ast.unparse(node)!r}, neither a literal nor a constant name")
+    raise AssertionError(f"{path.name}: {env} fallback is {ast.unparse(node)!r}, not a literal")
 
 
-def _resolve_name(value: str) -> str:
-    """A symbolic default (NARRATIVE_MODEL) to the model name it holds; literals pass through."""
-    return prompt_cache._resolve_default(value)
+def _caller_route(path: Path, var: str) -> str:
+    """The route the caller's module-level `var = model_for("route")` names.
 
-
-def _caller_resolution(path: Path, var: str) -> tuple[str, str]:
-    """(env var, default model) for the caller's module-level `var = ...` binding.
-
-    Two shapes are understood, so this guard survives the #4770 routing registry landing
-    on either side of it: the historical `os.environ.get(ENV, default)`, and
-    `model_for("route")` from `ai.model_routing` (resolved through that module's own
-    ROUTES row, never re-typed here). Any other shape is a loud failure.
+    Since #4770 every runtime caller resolves its model through `ai.model_routing`
+    (`tests/test_model_routing_4770.py` reds any other choice), so that is the one shape
+    understood here; anything else is a loud failure rather than a guessed model.
     """
     for node in ast.parse(path.read_text()).body:
         if not (isinstance(node, ast.Assign) and any(getattr(t, "id", None) == var for t in node.targets)):
             continue
         call = node.value
-        assert isinstance(call, ast.Call), f"{path.name}: {var} = {ast.unparse(call)!r} is not a model resolution this guard reads"
-        fn = ast.unparse(call.func)
-        if fn in ("os.environ.get", "os.getenv"):
-            assert len(call.args) == 2, f"{path.name}: {var} has no fallback — the register cannot derive its model"
-            env, default = call.args
-            dflt = default.value if isinstance(default, ast.Constant) else getattr(default, "id", None)
-            assert isinstance(dflt, str), f"{path.name}: {var} fallback {ast.unparse(default)!r} is neither a literal nor a name"
-            return env.value, _resolve_name(dflt)
-        if fn in ("model_for", "model_routing.model_for"):
-            import importlib
-
-            routing = importlib.import_module("ai.model_routing")
-            route = call.args[0].value
-            return routing.ROUTES[route].env, routing.default_model_for(route)
-        raise AssertionError(f"{path.name}: {var} is resolved by {fn}(), which this guard does not read — extend it")
-    raise AssertionError(f"{path.name}: no module-level `{var} = ...` — the register's caller/model_env is stale")
+        fn = ast.unparse(call.func) if isinstance(call, ast.Call) else None
+        assert fn in (
+            "model_for",
+            "model_routing.model_for",
+        ), f"{path.name}: {var} = {ast.unparse(call)!r} does not resolve through ai.model_routing — extend this guard"
+        assert call.args and isinstance(call.args[0], ast.Constant), f"{path.name}: {var} names no literal route"
+        return call.args[0].value
+    raise AssertionError(f"{path.name}: no module-level `{var} = ...` — the register's caller/caller_var is stale")
 
 
-def _cdk_env_for(stack_file: str, function_name: str) -> dict[str, str]:
-    """The environment dict the stack passes to `function_name`, with each value resolved
-    to what synth produces under no shell override (stacks/constants.py's own defaults)."""
+def _cdk_env_for(stack_file: str, function_name: str, env_var) -> dict[str, str]:
+    """`{env_var: value}` from the environment dict the stack passes to `function_name`
+    (empty when unset), each value resolved to what synth produces under no shell override
+    (stacks/constants.py's own defaults). `env_var` is the route's override channel."""
     path = _CDK_STACKS / stack_file
     tree = ast.parse(path.read_text())
     dicts = {}
@@ -133,7 +120,7 @@ def _cdk_env_for(stack_file: str, function_name: str) -> dict[str, str]:
     out = {}
     for k, v in zip(env_node.keys, env_node.values):
         key = getattr(k, "value", None)
-        if not isinstance(key, str) or not key.startswith("AI_MODEL"):
+        if env_var is None or key != env_var:
             continue
         if isinstance(v, ast.Constant):
             out[key] = v.value
@@ -144,17 +131,41 @@ def _cdk_env_for(stack_file: str, function_name: str) -> dict[str, str]:
     return out
 
 
-def test_the_register_model_resolution_is_the_callers_own():
-    """`model_env`/`model_default` must be the caller module's real resolution — read from
-    source, every entry, every offender reported at once."""
+def test_the_register_route_is_the_callers_own():
+    """`route` must be the route the caller module really binds its model from — read
+    from source, every entry, every offender reported at once."""
     offenders = []
     for fn, entry in sorted(prompt_cache.CACHING_DECISIONS.items()):
-        env, default = _caller_resolution(_LAMBDAS / entry["caller"], entry["model_env"])
-        if env != entry["model_env"]:
-            offenders.append(f"{fn}: {entry['caller']} reads env {env!r}, register says {entry['model_env']!r}")
-        if default != _resolve_name(entry["model_default"]):
-            offenders.append(f"{fn}: {entry['caller']} falls back to {default!r}, register says {entry['model_default']!r}")
+        if entry["route"] not in model_routing.ROUTES:
+            offenders.append(f"{fn}: route {entry['route']!r} has no model_routing.ROUTES row")
+            continue
+        route = _caller_route(_LAMBDAS / entry["caller"], entry["caller_var"])
+        if route != entry["route"]:
+            offenders.append(f"{fn}: {entry['caller']} binds {entry['caller_var']} from route {route!r}, register says {entry['route']!r}")
     assert not offenders, "\n".join(offenders)
+
+
+def test_resolved_model_is_the_registry_answer():
+    """No env → the registry's default; the route's own env var → it wins, exactly as the
+    caller's `model_for` call does. The register never re-types a model."""
+    for fn, entry in prompt_cache.CACHING_DECISIONS.items():
+        route = entry["route"]
+        assert prompt_cache.resolved_model(fn) == model_routing.default_model_for(route), fn
+        var = model_routing.ROUTES[route].env
+        if var:
+            assert prompt_cache.resolved_model(fn, {var: "us.anthropic.claude-haiku-5-5"}) == "us.anthropic.claude-haiku-5-5", fn
+
+
+def test_a_registry_tier_swap_reds_every_declined_decision(monkeypatch):
+    """#4770 adds a second way to move a caller: one edit to TIER_MODELS (the #4772 /
+    #4775 swaps). The guard must see it with NO env set and no edit to the register."""
+    prompts = _prompts()  # import the callers BEFORE the swap: they bind their model at import
+    monkeypatch.setitem(model_routing.TIER_MODELS, model_routing.WORKHORSE, "claude-haiku-5-5")
+    monkeypatch.setitem(model_routing.TIER_MODELS, model_routing.NARRATIVE, "claude-sonnet-5-5")
+    for fn in prompt_cache.CACHING_DECISIONS:
+        problems = prompt_cache.decision_drift(fn, prompts[fn], {})
+        assert any("re-measure" in p for p in problems), f"{fn}: a tier swap did not demand a re-measure: {problems}"
+        assert any("now clears" in p for p in problems), f"{fn}: a tier swap to a 512 floor did not red the decline: {problems}"
 
 
 def test_the_call_sites_send_the_derived_model():
@@ -191,7 +202,7 @@ def test_no_decision_has_drifted_from_the_deployed_model():
     prompts = _prompts()
     problems = []
     for fn, entry in sorted(prompt_cache.CACHING_DECISIONS.items()):
-        env = _cdk_env_for(entry["cdk_stack"], fn)
+        env = _cdk_env_for(entry["cdk_stack"], fn, model_routing.ROUTES[entry["route"]].env)
         problems += prompt_cache.decision_drift(fn, prompts[fn], env)
     assert not problems, "\n".join(problems)
 
