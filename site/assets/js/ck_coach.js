@@ -288,7 +288,7 @@ export function recordHTML(p) {
   const sentence = t.comparison && String(t.comparison.sentence || "").trim();
   if (!sentence) return soft(comparisonText(null));
   const through = isDay(r.through) ? ` through ${shortDay(r.through)}` : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span>of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span> of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
 }
 /** The newest checked call of each kind, in reader words. */
 export function verdictPair(p) {
@@ -306,6 +306,16 @@ export function pagedPair(p, callsBody) {
   const short = shortId(p && p.persona_id);
   const own = callsOf(callsBody).filter((c) => c.kind !== "bet" && c.coach_id === short);
   return { right: own.find((c) => c.verdict === "right") || null, wrong: own.find((c) => c.verdict === "wrong") || null };
+}
+// Round 8: "7 of 29 right" beside "no call found right yet" read as a contradiction. The
+// record counts every checked call; a card needs one whose sentence named a number, so the
+// sentence says which of the two is missing.
+function noExample(p, tag) {
+  const r = trackOf(p).record || {};
+  const n = tag === "Right" ? num(r.confirmed) : num(r.n) !== null && num(r.confirmed) !== null ? r.n - r.confirmed : null;
+  if (n === null) return `No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`;
+  if (n === 0) return `None of ${p.name}’s checked calls has come out ${tag.toLowerCase()} yet.`;
+  return `${p.name}’s ${n} ${tag.toLowerCase()} ${n === 1 ? "call has" : "calls have"} no page yet: ${n === 1 ? "its sentence" : "their sentences"} did not name a number to check.`;
 }
 /** The right and the wrong card. A call that has a page is shown from that page's served
  *  sentences and opens it (#4675), and the call page returns here; a verdict with no paged
@@ -326,7 +336,7 @@ export function verdictsHTML(p, callsBody = null, base = "/next/v8/") {
       ? pageCard(call)
       : line
         ? `<div>${verdictTag(tag === "Right", line.rule)}<p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
-        : `<div>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+        : `<div>${soft(noExample(p, tag))}</div>`;
   return `<div class="ck-verdicts">${card(paged.right, right, "Right")}${card(paged.wrong, wrong, "Wrong")}</div>`;
 }
 

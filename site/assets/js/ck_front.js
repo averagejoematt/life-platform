@@ -85,13 +85,16 @@ export function markCaption(today, edition) {
   const t = today.data;
   const [now, start, goal] = [num(t.weight_lbs), num(t.start_weight_lbs), num(t.goal_weight_lbs)];
   if (now === null) return "";
-  const parts = [`<b>${esc(fmt1(now))} lb</b>${t.date && edition && t.date !== edition.as_of ? esc(` on ${shortDay(t.date)}`) : ""}`];
+  const head = `<b>${esc(fmt1(now))} lb</b>`;
+  const parts = [];
+  if (t.date && edition && t.date !== edition.as_of) parts.push(esc(`on ${shortDay(t.date)}`));
   if (edition && num(edition.day_n) !== null && edition.day_n >= 1) parts.push(`Day ${edition.day_n}`);
   if (start !== null && goal !== null && start > goal) {
     const lost = start - now;
     parts.push(esc(`${fmt1(Math.abs(lost))} ${lost >= 0 ? "down" : "up"}, ${fmt1(Math.max(0, now - goal))} to go to ${String(Number(goal.toFixed(1)))}`));
   }
-  return parts.join(" · ");
+  // Round 8: the weight is the page's one large number (the kit's `ck-num`), the rest soft beside it.
+  return parts.length ? `${head}<span class="ck-soft">${parts.join(" · ")}</span>` : head;
 }
 
 // ── the Today band ─────────────────────────────────────────────────────────────
@@ -137,10 +140,12 @@ export function todayBandHTML(edition, b, base = "/") {
   const yesterday = detail.find((d) => d.date === yIso);
   const rows = [];
   const morning = morningLine(week, todayIso);
-  const row = (key, text, href) => `<li><span class="ck-rows__key">${esc(key)}</span><span>${esc(text)}${href ? ` <a class="ck-link" href="${esc(href)}">The full day</a>` : ""}</span></li>`;
+  const stop = (text) => (/[.!?]$/.test(text) ? text : `${text}.`);
+  const row = (key, text, href) => `<li><span class="ck-rows__key">${esc(key)}</span><span>${esc(href ? stop(text) : text)}${href ? ` <a class="ck-link" href="${esc(href)}">The full day</a>` : ""}</span></li>`;
   if (today) {
     const rest = factLine(today.facts, { skip: ["Weight"] });
-    rows.push(row("Today so far", [morning || factLine(today.facts.filter((f) => f.label === "Weight")), rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
+    const first = morning || factLine(today.facts.filter((f) => f.label === "Weight"));
+    rows.push(row("Today so far", [rest && first ? first.replace(/\.$/, "") : first, rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
   } else {
     rows.push(row("Today so far", "Nothing recorded yet today."));
   }
@@ -237,32 +242,37 @@ export function scorecardRows(block) {
     .map((key) => ({ key, row: rows[key] }))
     .filter(({ row }) => row && row.state);
 }
-export function scorecardHTML(block, base = "/") {
+// A row that earned its mark: going well, or ahead of the plan. Both take the filled dot.
+const EARNED = new Set(["going_well", "faster_than_planned"]);
+const NOTHING = /^nothing this week\.?$/i;
+export function scorecardHTML(block, base = "/", { label = true } = {}) {
   const rows = scorecardRows(block);
   if (!rows.length) return soft((block && block.absent_text) || "The scorecard is not served right now.");
   const d = block.data;
+  // Round 8: the rule sits under the row it decided, so "Not yet" beside "7 of 7 days" is
+  // never read without the sentence that explains it.
   const items = rows
     .map(({ key, row }) => {
       const r = usable(row) ? row.data : null;
       const name = (r && r.name) || (d.names && d.names[key]) || key;
       const keyHTML = SCORE_LINKS[key] ? `<a class="ck-rows__key" href="${esc(base)}${SCORE_LINKS[key]}">${esc(name)}</a>` : `<span class="ck-rows__key">${esc(name)}</span>`;
       if (!r || !r.verdict_text) return `<li>${keyHTML}<span>${esc(row.absent_text || "Not served right now.")}</span></li>`;
-      const dot = r.verdict === "going_well" ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
-      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}</span></li>`;
+      const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
+      const rule = r.rule ? `<br><span class="ck-small">${esc(r.rule)}</span>` : "";
+      return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}${rule}</span></li>`;
     })
     .join("");
   const right = d.went_right || {};
-  const line = (who, part) => `<li><span class="ck-rows__key">${esc(who)}</span><span>${esc((part && part.text) || "Nothing this week.")}</span></li>`;
-  const rules = rows
-    .filter(({ row }) => usable(row) && row.data.rule)
-    .map(({ row }) => `<li><span class="ck-rows__key">${esc(row.data.name)}</span><span>${esc(row.data.rule)}</span></li>`)
-    .join("");
+  // "Nothing this week." is not a line worth a row: a party with nothing to show is left out,
+  // and with neither having anything the part is not printed at all.
+  const said = (part) => (part && part.text && !NOTHING.test(String(part.text).trim()) ? part.text : "");
+  const line = (who, part) => (said(part) ? `<li><span class="ck-rows__key">${esc(who)}</span><span>${esc(said(part))}</span></li>` : "");
+  const wentRight = `${line("Matthew", right.matthew)}${line("The engine", right.engine)}`;
   return [
-    `<p class="ck-label">How the whole thing is going</p>`,
+    label ? `<p class="ck-label">How the whole thing is going</p>` : "",
     `<ul class="ck-rows">${items}</ul>`,
-    `<p class="ck-label">What went right this week</p>`,
-    `<ul class="ck-rows">${line("Matthew", right.matthew)}${line("The engine", right.engine)}</ul>`,
-    rules ? `<details><summary>${esc(`The rules behind each row. ${d.rules_set_text || ""}`.trim())}</summary><ul class="ck-rows">${rules}</ul></details>` : small(d.rules_set_text),
+    wentRight ? `<p class="ck-label">What went right this week</p><ul class="ck-rows">${wentRight}</ul>` : "",
+    small(d.rules_set_text),
   ].join("");
 }
 // The first sentences of a text, up to `max` characters, never cut mid-sentence.
@@ -284,7 +294,7 @@ export function leadReadHTML(body, base = "/") {
   const at = text.search(/[^.!?]*\bpriority\b/i);
   const lead = firstSentences(at > 0 ? text.slice(at).trim() : text);
   const day = dayInWords(body && body.data_through);
-  if (!lead || !day || !body.coach_name) return soft("The lead coach’s read of the week is not served right now.");
+  if (!lead || !day || !body.coach_name) return "";
   const first = String(body.coach_name).split(" ")[0];
   const more = body.coach_id || /^Eli Marsh$/.test(body.coach_name) ? `<p><a class="ck-link" href="${esc(base)}coach/?c=${esc(body.coach_id || "eli_marsh")}">${esc(`${first}’s page`)}</a></p>` : "";
   return `<p class="ck-small">${esc(`${body.coach_name}, the AI lead coach, on ${day}`)}</p><p>“${esc(lead)}”</p>${more}`;
@@ -359,7 +369,14 @@ export function argumentLines(days) {
   ok.sort((a, b) => b.date.localeCompare(a.date));
   return ok.flatMap((d) => d.lines.filter((l) => l && l.coach && l.text).map((l) => ({ ...l, date: d.date })));
 }
+// Round 8a's seven reviewers, unanimously: a reply and its answer can agree (they did, on
+// October 7 and 8), so an exchange is never headed "disagree". The open bet IS a disagreement
+// by construction — two coaches on opposite sides of one dated question — so it leads when
+// there is one; an exchange stands in only when there is no bet, as "the latest exchange".
 export function pickArgument(days, nextBlock) {
+  const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  const sides = usable(bet) ? (bet.data.sides || []).map((s) => s && s.coach).filter(Boolean) : [];
+  if (sides.length >= 2) return { kind: "bet", bet };
   const lines = argumentLines(days).filter((l) => !namesSelf(l));
   for (const reply of lines) {
     if (reply.move !== "reply" || !reply.replies_to) continue;
@@ -367,24 +384,50 @@ export function pickArgument(days, nextBlock) {
     const first = lines.find((l) => l !== reply && l.coach === reply.replies_to && l.date <= reply.date) || null;
     return { kind: "reply", first, second: reply };
   }
-  const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
-  const sides = usable(bet) ? (bet.data.sides || []).map((s) => s && s.coach).filter(Boolean) : [];
-  if (sides.length >= 2) {
-    const said = sides.map((c) => lines.find((l) => l.coach === c) || null).filter(Boolean);
-    return { kind: "bet", lines: said };
-  }
   return null;
 }
-// "The open argument" / "The open bet" / "The coaches" — the section's label follows what
-// the page could find, so a page with only a bet never calls it an argument.
+// "The open bet" / "The latest exchange" / "The coaches" — the section's label follows what
+// the page could find, and only the bet is ever called a disagreement.
 export function argumentLabel(pick) {
   if (!pick) return "The coaches";
-  return pick.kind === "reply" ? "The open argument" : "The open bet";
+  return pick.kind === "bet" ? "The open bet" : "The latest exchange";
 }
 export function argumentHeading(pick) {
   if (!pick) return "Nothing is in dispute this week.";
-  if (pick.kind === "reply") return pick.first ? "Two coaches disagree." : "One coach answers another.";
-  return pick.lines.length ? "Two coaches have money on it." : "Two coaches have a bet on it.";
+  if (pick.kind === "bet") return "Two coaches disagree.";
+  return "One coach answers another.";
+}
+// The live number against the open bet: the newest recorded day of the measure the question
+// names, from the week block ("Friday: 158 g protein."). "" when the question names no
+// measure the week carries, or the week has no reading. Nothing is computed: the day's own
+// served value, named by its day.
+const BET_MEASURES = [
+  [/protein/i, "food", (v) => `${trim1(v)} g protein`],
+  [/weight|lb\b|pounds/i, "weight", (v) => `${fmt1(v)} lb`],
+  [/sleep|hours/i, "sleep", (v) => `${trim1(v)} hours of sleep`],
+  [/train|minutes/i, "training", (v) => `${trim1(v)} minutes of training`],
+];
+const trim1 = (v) => (num(v) === null ? "" : String(Number(v.toFixed(1))));
+export function betLiveLine(bet, week) {
+  if (!usable(bet) || !usable(week) || !bet.data.question) return "";
+  const hit = BET_MEASURES.find(([re]) => re.test(bet.data.question));
+  if (!hit) return "";
+  const m = week.data.measures && week.data.measures[hit[1]];
+  const days = week.data.days || [];
+  if (!usable(m) || !Array.isArray(m.data.values)) return "";
+  for (let i = m.data.values.length - 1; i >= 0; i -= 1) {
+    if (num(m.data.values[i]) !== null && days[i]) return `${weekdayOf(days[i])}: ${hit[2](m.data.values[i])}.`;
+  }
+  return "";
+}
+// The newest line the coaches said in the window, minus any the page already printed, as one
+// dated row — what the Today band shows when no coach spoke today. "" with nothing left.
+export function lastHeardHTML(days, skip = [], base = "/") {
+  const line = argumentLines(days).filter((l) => !namesSelf(l) && !skip.includes(l.text))[0];
+  if (!line) return "";
+  const name = line.coach_id ? `<a class="ck-link" href="${esc(base)}coach/?c=${esc(line.coach_id)}">${esc(line.coach)}</a>` : esc(line.coach);
+  const kind = line.move === "reply" && line.replies_to ? `answering ${line.replies_to}` : "";
+  return `<ul class="ck-coach"><li><span class="ck-coach__who">${name}${esc(` · ${[kind, dayInWords(line.date)].filter(Boolean).join(" · ")}`)}</span><span>“${esc(line.text)}”</span></li></ul>`;
 }
 // The lines as the kit's coach rows: who (a door to the coach's page) · what kind of line ·
 // the day, then the served words. "" with nothing to print.
@@ -395,12 +438,12 @@ export function argumentHTML(pick, base = "/") {
     return `<span class="ck-coach__who">${name}${esc(` · ${[kind, dayInWords(l.date)].filter(Boolean).join(" · ")}`)}</span>`;
   };
   const row = (l, kind) => `<li>${who(l, kind)}<span>“${esc(l.text)}”</span></li>`;
-  const rows = pick.kind === "reply" ? [pick.first ? row(pick.first, "") : "", row(pick.second, `answering ${pick.second.replies_to}`)] : pick.lines.map((l) => row(l, ""));
-  const html = rows.join("");
+  if (pick.kind !== "reply") return "";
+  const html = [pick.first ? row(pick.first, "") : "", row(pick.second, `answering ${pick.second.replies_to}`)].join("");
   return html ? `<ul class="ck-coach">${html}</ul>` : "";
 }
 // The served texts a pick prints, so the Today band can leave them out.
-export const argumentTexts = (pick) => (pick ? (pick.kind === "reply" ? [pick.first, pick.second] : pick.lines).filter(Boolean).map((l) => l.text) : []);
+export const argumentTexts = (pick) => (pick && pick.kind === "reply" ? [pick.first, pick.second].filter(Boolean).map((l) => l.text) : []);
 
 // ── go deeper: the chapter's row ───────────────────────────────────────────────
 // One row in the "Go deeper" list for the latest chapter: its week and title as the door, the
@@ -409,6 +452,8 @@ export function chapterRowHTML(chapter) {
   if (!usable(chapter) || !chapter.data.title || !chapter.data.url) return soft((chapter && chapter.absent_text) || "The latest chapter is not served right now.");
   const c = chapter.data;
   const lead = c.week_label ? `${c.week_label} · ` : "";
-  const note = [`The chapter`, num(c.read_minutes) !== null ? `${c.read_minutes} min` : "", shortDay(c.date)].filter(Boolean).join(" · ");
-  return `<a href="${esc(c.url)}">${esc(`${lead}“${c.title}”`)} <span>${esc(note)}</span></a>`;
+  // The note is the chapter's own first sentence (round 8: the one narrative hook on the
+  // site), or what the chapter is and how long it takes when the excerpt has none.
+  const note = firstSentences(c.dek, 150) || [`The chapter`, num(c.read_minutes) !== null ? `${c.read_minutes} min` : "", shortDay(c.date)].filter(Boolean).join(" · ");
+  return `<a class="ck-rows__key" href="${esc(c.url)}">${esc(`${lead}“${c.title}”`)}</a><span>${esc(note)}</span>`;
 }

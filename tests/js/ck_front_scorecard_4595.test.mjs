@@ -45,10 +45,27 @@ test("the rules and the day they were set are printed with the rows", () => {
   assert.doesNotMatch(F.scorecardHTML(SC), /\b20\d\d-\d\d-\d\d\b/, "an ISO date reached the page");
 });
 
-test("what went right prints one line for Matthew and one for the engine", () => {
+test("what went right prints a line for each party with something to show, and no 'nothing' row (round 8)", () => {
   const plain = text(F.scorecardHTML(SC));
   assert.ok(plain.includes(`What went right this week Matthew ${SC.data.went_right.matthew.text}`));
-  assert.ok(plain.includes("The engine Nothing this week."));
+  assert.doesNotMatch(plain, /The engine Nothing this week\./);
+  const both = clone(SC);
+  both.data.went_right.engine = { area: "ai", text: "The coaches beat the simple guess on three calls.", source: "/api/calibration" };
+  assert.match(text(F.scorecardHTML(both)), /The engine The coaches beat the simple guess on three calls\./);
+  const neither = clone(SC);
+  neither.data.went_right = { matthew: { text: "Nothing this week." }, engine: { text: "Nothing this week." } };
+  assert.doesNotMatch(text(F.scorecardHTML(neither)), /What went right this week/);
+});
+
+test("the mark is filled for a row that earned it — going well or faster than planned — and the page can drop the kicker (round 8)", () => {
+  const html = F.scorecardHTML(SC, "/next/v8/");
+  const row = (name) => html.split("<li>").find((li) => li.includes(`>${name}</a>`) || li.includes(`>${name}</span>`));
+  assert.match(row("Body"), /<i class="ck-dot" aria-hidden="true"><\/i><b>Faster than planned\.<\/b>/);
+  assert.match(row("Sleep"), /<i class="ck-dot" aria-hidden="true"><\/i><b>Going well\.<\/b>/);
+  assert.match(row("Training"), /<i class="ck-dot ck-dot--off" aria-hidden="true"><\/i><b>Not yet\.<\/b>/);
+  assert.match(row("Training"), /<span class="ck-small">Days trained in the last seven/, "the rule sits under the row it decided");
+  assert.doesNotMatch(F.scorecardHTML(SC, "/next/v8/", { label: false }), /How the whole thing is going/);
+  assert.match(F.scorecardHTML(SC, "/next/v8/"), /How the whole thing is going/);
 });
 
 test("a row whose source failed prints its not-served sentence, never a verdict", () => {

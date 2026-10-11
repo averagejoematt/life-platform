@@ -190,7 +190,7 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span>of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ export function weekSlots(edition, b, base = "/") {
     "ck-week-label": esc(span ? `This week · ${span}` : "This week"),
     // #4595: the served scorecard (one written rule per area, decided in code) when the edition
     // serves it; until the API that serves it is deployed, the older seven-day sort stands in.
-    "ck-week": F.scorecardRows(b.scorecard).length ? F.scorecardHTML(b.scorecard, base) : F.weekSortHTML(b.week, base),
+    "ck-week": F.scorecardRows(b.scorecard).length ? F.scorecardHTML(b.scorecard, base, { label: false }) : F.weekSortHTML(b.week, base),
     "ck-quotes": F.quotesHTML(b.chapter, null, base),
     ...words,
   };
@@ -440,23 +440,42 @@ async function mountFront(edition, b) {
   fillSlots(frontSlots(edition, b, base));
   const days = argumentDays(edition.as_of);
   const [calls, character, ...moves] = await Promise.all([tryJSON("/api/calls"), tryJSON("/api/character"), ...days.map((d) => tryJSON(`/api/coach_moves?date=${d}`))]);
-  // The argument: the newest reply and what it answers, from the served moves.
+  // The argument: the open bet (two coaches, opposite sides, a date) with the live number
+  // against it; failing a bet, the newest exchange, from the served moves.
   const pick = F.pickArgument(moves, b.next);
   fill("ck-argue-label", esc(F.argumentLabel(pick)));
   fill("ck-argue-heading", esc(F.argumentHeading(pick)));
-  const argued = F.argumentHTML(pick, base);
-  fill("ck-argument", argued || (pick ? "" : soft("No coach has answered another in the last seven days.")));
-  if (pick && pick.kind === "reply") document.getElementById("ck-bet")?.remove();
+  fill("ck-argument", F.argumentHTML(pick, base));
+  if (pick && pick.kind === "bet") {
+    const live = F.betLiveLine(pick.bet, b.week);
+    if (live) fill("ck-bet", `${betHTML(b.next)}${small(live)}`);
+  } else if (pick && pick.kind === "reply") {
+    document.getElementById("ck-bet")?.remove();
+  }
   // A line from the edition's day that the argument already printed is not printed twice.
-  const today = F.coachTodayHTML(b.coach_lines, { skip: F.argumentTexts(pick) });
-  if (today) fill("ck-coach-lines", today);
-  else document.getElementById("ck-coach-lines-label")?.remove(), document.getElementById("ck-coach-lines")?.remove();
-  // The clearest miss on record, or what the route can offer in its place.
-  const { kind } = lastCallPick(calls);
-  const last = lastCallHTML(calls, base);
+  // With nothing said today, the newest line the coaches said stands under its own label,
+  // and with nothing in the window at all the band has no coach part.
+  const shown = F.argumentTexts(pick);
+  const today = F.coachTodayHTML(b.coach_lines, { skip: shown });
+  const spokeToday = usable(b.coach_lines) && (b.coach_lines.data.lines || []).length > 0;
+  if (today && spokeToday) fill("ck-coach-lines", today);
+  else {
+    const heard = F.lastHeardHTML(moves, shown, base);
+    if (heard) {
+      fill("ck-coach-lines-label", "The coaches, last heard");
+      fill("ck-coach-lines", heard);
+    } else {
+      document.getElementById("ck-coach-lines-label")?.remove();
+      document.getElementById("ck-coach-lines")?.remove();
+    }
+  }
+  // The clearest miss this week, or on record, or what the route can offer in its place.
+  const { kind } = lastCallPick(calls, edition.as_of);
+  const last = lastCallHTML(calls, base, edition.as_of);
   if (last) {
-    fill("ck-miss-heading", esc(kind === "wrong" ? "The clearest miss so far." : kind === "right" ? "The tightest right call so far." : "The latest checked call."));
-    fill("ck-call", `${last}${nextCallHTML(calls)}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`);
+    const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
+    fill("ck-miss-heading", esc(heading));
+    fill("ck-call", `${last}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`);
   } else {
     fill("ck-call", soft((calls && calls.absent_text) || "The settled calls are not served right now."));
   }
@@ -470,7 +489,10 @@ async function mountWeek(edition, b) {
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
   const [read, transcript, character] = await Promise.all([tryJSON("/api/weekly_priority"), transcriptUrl ? tryJSON(transcriptUrl) : null, tryJSON("/api/character")]);
-  fill("ck-lead-read", F.leadReadHTML(read, base));
+  // Round 8: a section with nothing to show does not render its heading.
+  const lead = F.leadReadHTML(read, base);
+  if (lead) fill("ck-lead-read", lead);
+  else document.getElementById("ck-lead-section")?.remove();
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
   const sheet = sheetLine(character);
   if (sheet) fill("ck-sheet-line", `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>`);

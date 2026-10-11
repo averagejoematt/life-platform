@@ -194,15 +194,27 @@ export function recordHTML(call, body) {
 // The simple guess is said here only once it has a result on this call.
 // Which call leads, and why: {call, kind} with kind "wrong" (the clearest miss), "right" (the
 // tightest hit, when no miss is printable) or "latest". {call: null, kind: ""} with nothing served.
-export function lastCallPick(callsBody) {
+// With `asOf`, the clearest miss settled in the seven days up to it comes first ("recent"),
+// so the slot moves with the week; the all-time clearest miss stands in when the week has none.
+export const RECENT_DAYS = 7;
+const daysBefore = (iso, n) => {
+  const t = Date.parse(`${iso}T12:00:00Z`);
+  return Number.isFinite(t) ? new Date(t - n * 86400000).toISOString().slice(0, 10) : "";
+};
+export function lastCallPick(callsBody, asOf = "") {
   const all = callsOf(callsBody);
+  const since = asOf ? daysBefore(asOf, RECENT_DAYS) : "";
+  if (since) {
+    const recent = showcasePair(all.filter((c) => c.settled_date >= since && c.settled_date <= asOf));
+    if (recent.wrong) return { call: recent.wrong, kind: "recent" };
+  }
   const pair = showcasePair(all);
   if (pair.wrong) return { call: pair.wrong, kind: "wrong" };
   if (pair.right) return { call: pair.right, kind: "right" };
   return { call: all[0] || null, kind: all[0] ? "latest" : "" };
 }
-export function lastCallHTML(callsBody, base) {
-  const { call } = lastCallPick(callsBody);
+export function lastCallHTML(callsBody, base, asOf = "") {
+  const { call } = lastCallPick(callsBody, asOf);
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;

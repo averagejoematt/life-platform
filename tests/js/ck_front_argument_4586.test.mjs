@@ -1,12 +1,15 @@
 // tests/js/ck_front_argument_4586.test.mjs — round 8 of the preview front page (#4586):
-// the page leads with the coaches' open argument and the clearest miss, and the week band
-// is its own page.
+// the page leads with what the coaches are arguing about and the clearest miss, and the
+// week band is its own page.
 //
 // Driven from live captures of GET /api/coach_moves?date=<day> for 2026-10-05 → 10-09
-// (tests/fixtures/front_argument_4586/, the wire minus _meta). What is held: the argument is
-// the newest reply and the line it answers; a line in which a coach names herself is never
-// chosen; with no reply the open bet's sides stand; lines already in the argument leave the
-// Today band; the deeper rows and the week page print a sentence for a failed block.
+// (tests/fixtures/front_argument_4586/, the wire minus _meta). What is held, after round
+// 8a's seven reviewers: only the open bet is ever headed "disagree" (two coaches on opposite
+// sides of a dated question), with the live number against it; an exchange is "the latest
+// exchange" and stands in only when there is no bet; a line in which a coach names herself
+// is never chosen; the Today band never prints an empty room under a heading; the miss
+// rotates to the week's clearest; the deeper rows and the week page print a sentence for a
+// failed block.
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -25,6 +28,8 @@ const DAYS = readdirSync(FIX).filter((n) => n.startsWith("coach_moves_")).map((n
 const edition = load(KIT, "edition");
 const B = edition.blocks;
 const BASE = "/next/v8/";
+// The edition's `next` block with its bet absent: what the page sees between bets.
+const NO_BET = { ...B.next, data: { ...B.next.data, bet: { state: "absent", as_of: null, source: "/api/coach_docket", absent_text: "No coach bet is waiting to settle.", data: null } } };
 
 test("the fixtures are the wire: five days, one absent, eight lines, three of them self-naming", () => {
   assert.equal(DAYS.length, 5);
@@ -43,54 +48,66 @@ test("a coach naming herself is read as such; an ordinary word that is also a na
   assert.equal(F.namesSelf({ coach: "James Okafor", text: "Marcus Webb is right that dinner underperforms." }), false);
 });
 
-test("the argument is the newest reply and the line it answers, dated, in the served words", () => {
+test("with an open bet, the bet is the argument: two coaches on opposite sides, and only that is headed 'disagree'", () => {
   const pick = F.pickArgument(DAYS, B.next);
+  assert.equal(pick.kind, "bet");
+  assert.deepEqual(pick.bet.data.sides.map((s) => s.says).sort(), ["no", "yes"], "opposite sides by construction");
+  assert.equal(F.argumentLabel(pick), "The open bet");
+  assert.equal(F.argumentHeading(pick), "Two coaches disagree.");
+  assert.equal(F.argumentHTML(pick, BASE), "", "the bet card carries it; no exchange is printed above a bet");
+  assert.deepEqual(F.argumentTexts(pick), []);
+  // The live number against the bet: the newest recorded day of the measure the question names.
+  const line = F.betLiveLine(pick.bet, B.week);
+  assert.match(line, /^(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day: \d+(\.\d)? g protein\.$/, line);
+  const food = B.week.data.measures.food.data.values;
+  const lastIdx = food.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();
+  assert.match(line, new RegExp(`: ${String(Number(food[lastIdx].toFixed(1)))} g protein\\.$`));
+  assert.equal(F.betLiveLine({ ...pick.bet, data: { ...pick.bet.data, question: "Will the moon be full on Monday?" } }, B.week), "", "a question naming no measure the week carries");
+  assert.equal(F.betLiveLine(pick.bet, { state: "unavailable", absent_text: "x", data: null }), "");
+});
+
+test("with no bet, the newest reply and the line it answers are the latest exchange — never 'disagree'", () => {
+  const pick = F.pickArgument(DAYS, NO_BET);
   assert.equal(pick.kind, "reply");
   assert.equal(pick.second.coach, "James Okafor");
   assert.equal(pick.second.date, "2026-10-08");
   assert.equal(pick.second.replies_to, "Marcus Webb");
   assert.equal(pick.first.coach, "Marcus Webb");
   assert.equal(pick.first.date, "2026-10-07");
+  assert.equal(F.argumentLabel(pick), "The latest exchange");
+  assert.equal(F.argumentHeading(pick), "One coach answers another.");
   const html = F.argumentHTML(pick, BASE);
   assert.equal((html.match(/<li>/g) || []).length, 2);
   assert.match(html, /Marcus Webb<\/a> · Wednesday, October 7<\/span><span>“James Okafor's protein hold deserves scrutiny/);
   assert.match(html, /James Okafor<\/a> · answering Marcus Webb · Thursday, October 8<\/span>/);
   assert.match(html, /href="\/next\/v8\/coach\/\?c=labs_coach"/);
   assert.doesNotMatch(html, /\b20\d\d-\d\d-\d\d\b/);
-  assert.equal(F.argumentLabel(pick), "The open argument");
-  assert.equal(F.argumentHeading(pick), "Two coaches disagree.");
+  assert.doesNotMatch(F.argumentHeading(pick), /disagree/i);
   assert.deepEqual(F.argumentTexts(pick), [pick.first.text, pick.second.text]);
 });
 
-test("a self-naming line is never the argument, even when it is the newest reply's target", () => {
+test("a self-naming line is never the exchange, even when it is the newest reply's target", () => {
   const days = [
     { state: "ok", date: "2026-10-02", lines: [{ coach_id: "sleep_coach", coach: "Lisa Park", move: "call", text: "Lisa expects a rest day." }] },
     { state: "ok", date: "2026-10-03", lines: [{ coach_id: "physical_coach", coach: "Max Reyes", move: "reply", replies_to: "Lisa Park", text: "I disagree with Lisa Park: keep the streak." }] },
   ];
-  const pick = F.pickArgument(days, B.next);
+  const pick = F.pickArgument(days, NO_BET);
   assert.equal(pick.kind, "reply");
   assert.equal(pick.first, null, "the answered line names its own speaker and is left out");
-  assert.equal(F.argumentHeading(pick), "One coach answers another.");
   assert.match(F.argumentHTML(pick, BASE), /answering Lisa Park/);
-  // The reply itself naming its speaker: nothing qualifies, so the bet's sides stand.
   const self = [{ state: "ok", date: "2026-10-03", lines: [{ coach: "Max Reyes", move: "reply", replies_to: "Lisa Park", text: "Max Reyes disagrees." }] }];
-  assert.equal(F.pickArgument(self, B.next).kind, "bet");
+  assert.equal(F.pickArgument(self, NO_BET), null);
 });
 
-test("with no reply in the window, the open bet's two sides stand with their newest lines; with no bet either, nothing is called an argument", () => {
+test("with no bet and no reply, nothing is called an argument", () => {
   const noReplies = DAYS.map((d) => ({ ...d, lines: (d.lines || []).filter((l) => l.move !== "reply") }));
-  const pick = F.pickArgument(noReplies, B.next);
-  assert.equal(pick.kind, "bet");
-  assert.deepEqual(B.next.data.bet.data.sides.map((s) => s.coach), ["Nathan Reeves", "Marcus Webb"]);
-  assert.deepEqual(pick.lines.map((l) => `${l.coach} ${l.date}`), ["Nathan Reeves 2026-10-08"], "Marcus's only remaining lines name himself or are replies");
-  assert.equal(F.argumentLabel(pick), "The open bet");
-  assert.match(F.argumentHTML(pick, BASE), /Nathan Reeves<\/a> · Thursday, October 8/);
-  const none = F.pickArgument(noReplies, { state: "unavailable", absent_text: "What comes next is not served right now.", data: null });
+  const none = F.pickArgument(noReplies, NO_BET);
   assert.equal(none, null);
   assert.equal(F.argumentHTML(none, BASE), "");
   assert.equal(F.argumentLabel(none), "The coaches");
+  assert.equal(F.argumentHeading(none), "Nothing is in dispute this week.");
   assert.equal(F.pickArgument([], null), null);
-  assert.equal(F.pickArgument([null, {}, { state: "absent", date: "2026-10-10", lines: [] }], null), null);
+  assert.equal(F.pickArgument([null, {}, { state: "absent", date: "2026-10-10", lines: [] }], { state: "unavailable", absent_text: "x", data: null }), null);
 });
 
 test("the Today band leaves out a line the argument already printed, and says nothing when every line was", () => {
@@ -103,25 +120,44 @@ test("the Today band leaves out a line the argument already printed, and says no
   assert.match(F.coachTodayHTML({ state: "absent", absent_text: "No coach had anything to say on Saturday, October 10.", data: null }, { skip: ["x"] }), /No coach had anything to say on Saturday, October 10\./);
 });
 
+test("when no coach spoke today, the newest line heard stands with its day — never a self-naming one, never one already printed", () => {
+  const html = F.lastHeardHTML(DAYS, [], BASE);
+  assert.equal((html.match(/<li>/g) || []).length, 1);
+  assert.match(html, /James Okafor<\/a> · Friday, October 9<\/span><span>“I think Matthew will keep deferring the lab draw/, "October 9's other line names its own speaker and is skipped");
+  const skipped = F.lastHeardHTML(DAYS, [F.argumentLines(DAYS).find((l) => l.coach === "James Okafor" && l.date === "2026-10-09").text], BASE);
+  assert.match(skipped, /James Okafor<\/a> · answering Marcus Webb · Thursday, October 8/);
+  assert.equal(F.lastHeardHTML([], [], BASE), "");
+  assert.doesNotMatch(html, /\b20\d\d-\d\d-\d\d\b/);
+});
+
 test("the argument reads the edition's day and the six before it", () => {
   assert.deepEqual(P.argumentDays("2026-10-09"), ["2026-10-09", "2026-10-08", "2026-10-07", "2026-10-06", "2026-10-05", "2026-10-04", "2026-10-03"]);
   assert.deepEqual(P.argumentDays(""), []);
   assert.equal(P.argumentDays("2026-03-01")[1], "2026-02-28");
 });
 
-test("the front page's miss leads with the clearest wrong call, and says which kind it found", () => {
+test("the miss leads with the week's clearest wrong call when there is one, else the clearest on record, and says which", () => {
   const calls = load(KIT, "calls");
-  const pick = C.lastCallPick(calls);
-  assert.equal(pick.kind, "wrong");
-  assert.equal(pick.call.kind !== "bet" ? pick.call.status || "refuted" : "refuted", "refuted");
-  assert.match(C.lastCallHTML(calls, BASE), new RegExp(`call/\\?id=${pick.call.id}`));
+  const all = C.callsOf(calls);
+  const recentWrong = all.filter((c) => c.kind !== "bet" && c.verdict === "wrong" && c.settled_date >= "2026-10-02" && c.settled_date <= "2026-10-09");
+  const pick = C.lastCallPick(calls, "2026-10-09");
+  if (recentWrong.length) {
+    assert.equal(pick.kind, "recent");
+    assert.ok(pick.call.settled_date >= "2026-10-02" && pick.call.settled_date <= "2026-10-09");
+  } else {
+    assert.equal(pick.kind, "wrong");
+  }
+  assert.equal(C.lastCallPick(calls).kind, "wrong", "without a day, the all-time clearest miss");
+  assert.match(C.lastCallHTML(calls, BASE, "2026-10-09"), new RegExp(`call/\\?id=${pick.call.id}`));
+  assert.equal(C.lastCallPick(calls, "2020-01-01").kind, "wrong", "a window with nothing settled falls back to the record");
   assert.deepEqual(C.lastCallPick({ state: "ok", calls: [] }), { call: null, kind: "" });
   assert.deepEqual(C.lastCallPick(null), { call: null, kind: "" });
 });
 
-test("the deeper rows: the chapter is one door with its week and read time; a failed block is its sentence", () => {
+test("the deeper rows: the chapter is one door with its week and its own first sentence; a failed block is its sentence", () => {
   const row = F.chapterRowHTML(B.chapter);
-  assert.match(row, /^<a href="\/journal\/posts\/week-08\/">Week 5 · “Park's Blind Spot” <span>The chapter · 6 min · October 6<\/span><\/a>$/);
+  const note = F.firstSentences(B.chapter.data.dek, 150) || `The chapter · ${B.chapter.data.read_minutes} min · October 6`;
+  assert.equal(row, `<a class="ck-rows__key" href="/journal/posts/week-08/">Week 5 · “Park's Blind Spot”</a><span>${note.replace(/'/g, "&#39;")}</span>`);
   assert.equal(F.chapterRowHTML({ state: "unavailable", absent_text: "The latest chapter is not served right now.", data: null }), '<p class="ck-soft">The latest chapter is not served right now.</p>');
   const slots = P.frontSlots(edition, B, BASE);
   assert.equal(slots["ck-chapter-row"], row);
@@ -129,10 +165,11 @@ test("the deeper rows: the chapter is one door with its week and read time; a fa
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
 });
 
-test("the week page carries the band whole: the sorted week, the chapter lines and the silence sentence", () => {
+test("the week page carries the band whole: the sorted week without a second kicker, the chapter lines and the silence sentence", () => {
   const slots = P.weekSlots(edition, B, BASE);
   assert.equal(slots["ck-week-label"], "This week · October 3 to October 9");
-  assert.match(slots["ck-week"], /How the whole thing is going|Going well/);
+  assert.doesNotMatch(slots["ck-week"], /ck-label">How the whole thing is going/, "the page's own heading says it");
+  assert.match(slots["ck-week"], /Going well|Not yet/);
   assert.match(slots["ck-quotes"], /“Park's Blind Spot”, the chapter/);
   assert.equal(slots["ck-words"], null);
   assert.match(slots["ck-words-absent"], /Nothing new in his own words since/);
@@ -142,9 +179,8 @@ test("the week page carries the band whole: the sorted week, the chapter lines a
   assert.equal(failed["ck-quotes"], '<p class="ck-soft">Not served right now.</p>');
 });
 
-test("nothing the round-8 builders emit carries an honorific, an ISO date or a first-person line of the page's own", () => {
-  const pick = F.pickArgument(DAYS, B.next);
-  const out = [F.argumentHTML(pick, BASE), F.chapterRowHTML(B.chapter), ...Object.values(P.weekSlots(edition, B, BASE)).filter(Boolean)].join("\n");
+test("nothing the round-8 builders emit carries an honorific, an ISO date or a leaked non-value", () => {
+  const out = [F.argumentHTML(F.pickArgument(DAYS, NO_BET), BASE), F.lastHeardHTML(DAYS, [], BASE), F.chapterRowHTML(B.chapter), F.betLiveLine(B.next.data.bet, B.week), ...Object.values(P.weekSlots(edition, B, BASE)).filter(Boolean)].join("\n");
   assert.doesNotMatch(out, /\bDr\.\s/);
   assert.doesNotMatch(out, /\b20\d\d-\d\d-\d\d\b/);
   assert.doesNotMatch(out, /undefined|NaN|\[object Object\]/);
