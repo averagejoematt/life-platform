@@ -236,6 +236,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
         "test_model_routing_4770.py",  # #4770: glob sweep of lambdas/ + mcp/ — no model literal, model env read or model_defaults import outside ai/model_routing.py
         "test_invoke_model_names_resolve_4769.py",  # #4769: glob sweep — every statically-known model_name= under lambdas/ + mcp/ resolves at the Bedrock chokepoint
+        "test_coach_vision_isolation_3759.py",  # #3759: os.walk sweep of lambdas/ mcp/ site/ scripts/ deploy/ cdk/ — no public or narrative consumer names the owner-only coach-vision record
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
         "test_upstream_changes_4638.py",  # #4638: rglob sweep — a new Apple Health rebuild-a-day caller falsifies the stated upstream_changes facet
         "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted

@@ -13,6 +13,7 @@ Lambdas (8+):
   daily-insight-compute     cron(45 16 * * ? *)   — 9:45 AM PT daily (ADR-052)
   hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 12:00 PM PT
   state-of-matthew          cron(30 19 ? * SUN *) — Sunday 12:30 PM PT (#552)
+  coach-vision              cron(0 17 ? * MON *)  — Monday 10:00 AM PT (#3759)
   weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
   dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
   challenge-generator       cron(0 22 ? * SUN *)  — Sunday 3:00 PM PT
@@ -23,7 +24,10 @@ V2 P2.9 (2026-05-17): docstring corrected to match actual ADR-052 reordering
 """
 
 from aws_cdk import (
+    Duration,
     Stack,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
@@ -340,6 +344,49 @@ class ComputeStack(Stack):
             custom_policies=rp.compute_state_of_matthew(),
             **shared,
         )
+
+        # #3759 (epic #3743): the Monday coach-vision read over the progress photos. ONE
+        # Haiku vision call a week over this week's set + the prior one (≤ 6 camera JPEGs,
+        # read by key off the owner-only index — `coach.coach_vision`), writing ONE owner-only
+        # row to USER#matthew#SOURCE#coach_vision. Monday 17:00 UTC (10:00 PT): after the
+        # week-close capture day (#3761) and after ai-expert-analyzer's 14:00 UTC run, so a
+        # late Sunday set is in. Compute stack rather than serve: the role reads `raw/`, which
+        # no site-API role may name (#3757). 512 MB because six JPEGs are held in memory.
+        create_platform_lambda(
+            self,
+            "CoachVision",
+            function_name="coach-vision",
+            handler="coach.coach_vision_lambda.lambda_handler",
+            source_file="lambdas/coach/coach_vision_lambda.py",
+            schedule="cron(0 17 ? * MON *)",
+            timeout_seconds=180,
+            memory_mb=512,
+            custom_policies=rp.compute_coach_vision(),
+            **shared,
+        )
+        # Absence heartbeat (tests/test_heartbeat_completeness.py): a weekly function that
+        # stops being invoked emits NO Invocations datapoint, so missing data is BREACHING
+        # (#2754) and seven daily periods is the CloudWatch ceiling for an hourly-or-longer
+        # period (#3685: periods × period ≤ 604800). A run that honestly declines to write
+        # (no set this week, budget pause) still invokes, so a quiet week never false-fires.
+        coach_vision_absent = cloudwatch.Alarm(
+            self,
+            "CoachVisionNoInvocations",
+            alarm_name="coach-vision-no-invocations-7d",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": "coach-vision"},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=7,
+            datapoints_to_alarm=7,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        coach_vision_absent.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         create_platform_lambda(
             self,
