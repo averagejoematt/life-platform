@@ -23,6 +23,7 @@ import statistics
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from ai import model_routing  # #4774: the tier registry (#4770) — receipt rows carry their tier
 from common.pacific_time import parse_iso_utc  # #1964: the ONE ISO-8601 parser
 
 # #1997: import (never hand-copy) the governor's price table + safety buffer so the
@@ -356,6 +357,10 @@ def inference_receipt() -> dict:
             cr_month, cr_today = _split(series.get(qid_map[("model", mid, "cache_read")], []))
             cw_month, cw_today = _split(series.get(qid_map[("model", mid, "cache_write")], []))
             row = {"model": mid.split("/")[-1]}
+            # #4774: the registry tier this model runs (None = not in the registry). A model
+            # shared by several tiers (Haiku 4.5) lists them all in `tiers`.
+            row["tier"] = model_routing.tier_for_model(mid)
+            row["tiers"] = model_routing.tiers_for_model(mid)
             for label, tin, tout, tcr, tcw in (
                 ("today", in_today, out_today, cr_today, cw_today),
                 ("month", in_month, out_month, cr_month, cw_month),
@@ -402,6 +407,7 @@ def inference_receipt() -> dict:
                 features.append(
                     {
                         "lambda": fn,
+                        "tier": model_routing.tier_for_feature(fn),  # #4774; None = untiered
                         "month_input_tokens": int(tin),
                         "month_output_tokens": int(tout),
                         "month_est_cost_usd": cost_month,
@@ -463,6 +469,9 @@ def inference_receipt() -> dict:
             "reconciliation_ratio": round(month_total / features_total, 3) if features_total else None,
             "drift_bar": _DRIFT_RATIO_BAR,
             "unpriced_features": sum(1 for f in features if f["month_est_cost_usd"] is None),
+            # #4774: rows the routing registry cannot place carry tier null — counted, not hidden.
+            "untiered_models": sum(1 for r in models if r["tier"] is None),
+            "untiered_features": sum(1 for f in features if f["tier"] is None),
             # The one genuinely unattributable slice, named rather than hidden:
             # bedrock_client.feature_name() falls back to "unknown" when no Lambda name
             # resolves, the context label is not allowlisted and the caller is not a
