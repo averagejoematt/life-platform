@@ -222,9 +222,6 @@ def test_dropbox_empty_folder_run_emits_healthy(monkeypatch):
     table = MagicMock()
     table.get_item.return_value = {}  # no breaker marker
     monkeypatch.setattr(dp, "table", table)
-    monkeypatch.setattr(dp, "get_tracker_item", lambda: {})
-    monkeypatch.setattr(dp, "_is_recently_empty", lambda tracker: False)
-    monkeypatch.setattr(dp, "_mark_empty_poll", lambda: None)
     monkeypatch.setattr(dp, "_record_health", lambda **kw: None)
     monkeypatch.setattr(dp, "get_dropbox_secret", lambda: {"dropbox_app_key": "k", "dropbox_app_secret": "s", "dropbox_refresh_token": "r"})
     monkeypatch.setattr(dp, "refresh_access_token", lambda *a: "token")
@@ -237,22 +234,13 @@ def test_dropbox_empty_folder_run_emits_healthy(monkeypatch):
     assert _dims(healthy[-1]["MetricData"][1]) == {"Source": "dropbox"}
 
 
-def test_dropbox_recently_empty_skip_emits_nothing(monkeypatch):
-    """The COST-03 skip never touches Dropbox, so it proves nothing about the
-    credential — it must not emit (in either direction)."""
+def test_dropbox_has_no_recently_empty_skip_4641():
+    """#4641: the COST-03 skip had a 25-min window under a 30-min cron and never
+    fired; it is removed, so a run always reaches Dropbox (and so always proves auth)."""
     from ingestion import dropbox_poll_lambda as dp
 
-    cw = _patch_cw(monkeypatch)
-    table = MagicMock()
-    table.get_item.return_value = {}
-    monkeypatch.setattr(dp, "table", table)
-    monkeypatch.setattr(dp, "get_tracker_item", lambda: {"marker": "fresh"})
-    monkeypatch.setattr(dp, "_is_recently_empty", lambda tracker: True)
-    monkeypatch.setattr(dp, "_record_health", lambda **kw: None)
-
-    resp = dp.lambda_handler({}, None)
-    assert resp["statusCode"] == 200
-    assert cw.calls == [], "a skip that never reached Dropbox must not claim auth health either way"
+    assert not hasattr(dp, "_is_recently_empty")
+    assert not hasattr(dp, "_mark_empty_poll")
 
 
 def test_notion_no_new_entries_run_emits_healthy(monkeypatch):

@@ -22,7 +22,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | constant |
 | `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | constant |
 | `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | constant |
-| `bluesky-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `bluesky-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 | `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | constant |
 | `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | constant |
 | `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | constant |
@@ -39,8 +39,8 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | constant |
 | `daily-metrics-compute` | compute_stack | `cron(40 16 * * ? *)` | constant |
 | `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | constant, constant |
-| `dropbox-poll` | ingestion_stack | `rate(30 minutes)` | constant |
-| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `dropbox-poll` | ingestion_stack | `rate(2 hours)` | constant |
+| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | resolved |
 | `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | constant |
 | `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | constant |
 | `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | constant |
@@ -68,11 +68,11 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | constant |
 | `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | constant |
 | `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | constant |
-| `mastodon-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `mastodon-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 | `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | constant |
 | `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | constant |
 | `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | constant |
-| `notion-journal-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | resolved |
 | `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | constant |
 | `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | constant |
 | `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | constant |
@@ -96,8 +96,8 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | constant |
 | `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | constant |
 | `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | resolved, constructed, constant |
-| `withings-data-ingestion` | ingestion_stack | `cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
-| `youtube-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | resolved |
+| `youtube-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 
 **Unscheduled lambdas (24)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
 
@@ -240,7 +240,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**87 tools across 35 modules** (AST-counted from `mcp/registry.py`;
+**88 tools across 36 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -277,7 +277,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 136 alarms (4 composite)
+Routing: digest 93 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 137 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -384,6 +384,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `nightly-predraft-missing` | mcp_stack | metric | digest | declaration |  |
 | `paging-budget-tier-3` | monitoring_stack | metric | paging | declaration |  |
 | `paging-pipeline-dead` | monitoring_stack | metric | paging | declaration |  |
+| `panelcast-autopublish-held` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
 | `prediction-gradable-share-low` | monitoring_prediction_alarms | metric | digest | declaration |  |
@@ -512,9 +513,9 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1284 total · 923 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1283 total · 922 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 83 resolved · 0 dynamic of 83 scheduled lambdas (107 lambdas total)
-- Alarms: 136 literal-named declarations across three idioms, 4 composite; routing digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 137 literal-named declarations across three idioms, 4 composite; routing digest 93 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 93 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -531,7 +532,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 24 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 136 | this model's alarms plane (CDK AST) |
+| alarms | 137 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 93 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
