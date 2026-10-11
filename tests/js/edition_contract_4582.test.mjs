@@ -88,6 +88,46 @@ test("with one upstream failing, each front-page slot prints its block's own sen
   assert.deepEqual([...seenFailing].sort(), [...Object.keys(SLOT_BLOCK), "ck-words-absent", ...Object.keys(WEEK_SLOT_BLOCK).map((k) => `week:${k}`)].sort());
 });
 
+// #4582 box 1: what the front page used to read from its own routes is now in the edition, so
+// the slots it fills from those blocks are held to the same rule over the same documents.
+// `ck-argument` prints the moves' sentence only when no open bet stands in for the argument.
+const READ_SLOT_BLOCK = {
+  "ck-call": (b) => b.calls,
+  "ck-argument": (b) => (P.frontReadSlots({ as_of: green.as_of }, b, "/")["ck-argue-label"] === "The coaches" ? b.moves : null),
+};
+const unserved = (b) => !!b && b.state === "unavailable";
+
+test("the front page's other reads are the edition's blocks, and a failed one prints its own sentence", () => {
+  assert.ok(green.blocks.calls && green.blocks.moves && green.blocks.sheet && green.blocks.lead_read);
+  assert.equal(green.blocks.calls.state, "ok");
+  const greenRead = P.frontReadSlots(green, green.blocks, "/");
+  assert.match(greenRead["ck-call"], /The whole call/);
+  assert.match(greenRead["ck-sheet-span"], /^Level \d+/);
+  const offences = [];
+  const seen = new Set();
+  for (const name of Object.keys(cases)) {
+    const ed = editionFor(name);
+    const slots = P.frontReadSlots(ed, ed.blocks, "/");
+    for (const [slot, pick] of Object.entries(READ_SLOT_BLOCK)) {
+      const block = pick(ed.blocks);
+      if (!unserved(block)) continue;
+      seen.add(slot);
+      if (!prints(slots[slot], block.absent_text)) offences.push(`${name}: ${slot} printed ${JSON.stringify(slots[slot])}, not ${JSON.stringify(block.absent_text)}`);
+    }
+    // A failed week of lines is never "nothing in dispute".
+    if (unserved(ed.blocks.moves) && /Nothing is in dispute/.test(slots["ck-argue-heading"] || "")) offences.push(`${name}: a failed read claims nothing is in dispute`);
+    // A failed sheet leaves the shell's own words, never a level from nowhere.
+    if (unserved(ed.blocks.sheet) && "ck-sheet-span" in slots) offences.push(`${name}: ck-sheet-span filled from a failed sheet`);
+    // The day's coach lines failing never removes their sentence.
+    if (unserved(ed.blocks.coach_lines) && slots["ck-coach-lines"] === null) offences.push(`${name}: ck-coach-lines removed for a failed read`);
+    for (const [slot, html] of Object.entries(slots)) {
+      if (/undefined|NaN|>null</.test(String(html))) offences.push(`${name}: ${slot} leaks ${JSON.stringify(html)}`);
+    }
+  }
+  assert.deepEqual(offences, []);
+  assert.deepEqual([...seen].sort(), Object.keys(READ_SLOT_BLOCK).sort());
+});
+
 test("today's weight fails to its sentence and the green weight leaves the mark and its caption", () => {
   const ed = editionFor("journey");
   assert.equal(ed.blocks.today.state, "unavailable");
