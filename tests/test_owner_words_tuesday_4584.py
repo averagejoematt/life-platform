@@ -192,9 +192,9 @@ REPLY_CLEAN = "honestly?  the week went better than the numbers say,,\n\nslept b
 REPLY_HELD = "Skipped the fizzlewick all week and it was hard."
 
 
-def _top_posted(reply):
+def _top_posted(reply, signature="Sent from my iPhone\n\n"):
     return (
-        f"{reply}\n\nSent from my iPhone\n\n"
+        f"{reply}\n\n{signature}"
         "On Tue, Oct 13, 2026 at 6:00 PM The Measured Life <\nlifeplatform@example.invalid> wrote:\n\n"
         f"> One question for Wednesday, Week 6.\n>\n> Q1: {QUESTION}\n>\n> —\n> Your reply goes on the site word for word.\n"
     )
@@ -267,6 +267,12 @@ def test_a_one_question_top_post_pairs_with_q1_and_keeps_his_lines_exactly():
     a = sq.parse_reply(_top_posted(REPLY_CLEAN), keep_raw=True)
     assert [(x["q"], x["question"]) for x in a] == [(1, QUESTION)]
     assert a[0]["raw"] == REPLY_CLEAN, "his lines as typed — the signature and the wrapped attribution are not his"
+    # Without a signature line the client's WRAPPED attribution ("On Tue, … <" / "…> wrote:") is the only end
+    # marker, and it never matches the one-line header pattern whole.
+    bare = sq.parse_reply(_top_posted(REPLY_CLEAN, signature=""), keep_raw=True)
+    assert [x["raw"] for x in bare] == [REPLY_CLEAN]
+    for sig in ("--\nMatt\n\n", "Get Outlook for iOS\n\n", "________________________________\nFrom: Matthew <m@example.invalid>\n"):
+        assert [x["raw"] for x in sq.parse_reply(_top_posted(REPLY_CLEAN, signature=sig), keep_raw=True)] == [REPLY_CLEAN], sig
 
 
 def test_mutation_several_questions_keep_an_unlabelled_top_post_unpaired():
