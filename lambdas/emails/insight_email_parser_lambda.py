@@ -1,5 +1,5 @@
 """
-Insight Email Parser Lambda — v1.2.0
+Insight Email Parser Lambda — v1.3.0
 
 Triggered by SES inbound email → S3 → Lambda.
 
@@ -32,6 +32,30 @@ Changes v1.2.0 (#2821 — the watch-surface fix):
     alerts_topic=local_digest_topic so a genuine unhandled exception (crash
     class) now mints the shared helper's per-function Errors alarm AND
     preserves the original SES/S3 event in the ingestion DLQ.
+
+Changes v1.3.0 (#4633 — the sender-authentication verdict on EVERY route):
+  - The provider-level verdict now runs BEFORE this parser: the SES receipt rule's
+    first action is emails.inbound_auth_gate_lambda (RequestResponse), which
+    returns STOP_RULE_SET on a failing/missing DMARC verdict, a spam/virus FAIL or
+    an unlisted From — nothing is stored, nothing fires here.
+  - Defence in depth: `sender_verdict` requires SES's own aligned verdict
+    (`_ses_authenticated`, the topmost Authentication-Results header) for an
+    ALLOWED_SENDERS address too — #4546 had gated only the STORY_REPLY_SENDERS
+    route. An allowlisted From that SES did not vouch for is refused LOUDLY
+    (envelope `sender_unauthenticated`, never the body) before any route.
+  - An SES-direct record (`ses.receipt` present) is checked against the receipt
+    verdicts before its S3 object is even read.
+  - No fallback address in source: ALLOWED_SENDERS comes from the environment
+    only; with it unset the parser refuses every message (`allowlist_unset`).
+  - Every record this module can write sits behind that verdict — see the
+    inventory pinned by tests/test_inbound_auth_gate_4633.py:
+      INSIGHT#<ts> rows (save_insight) · corrections-ledger rows
+      (coach_corrections.write_correction) · Story Desk QA rows
+      (story_questions.qa_row) · owner-words entries (owner_words.record) ·
+      email_log# send-ledger rows (send_ledger.record_sent) · the two
+      confirmation sends. The dead-letter envelope + InsightParseFailure metric
+      are the refusal's TRACE (reason/sender/subject, never a body), not a record
+      derived from the message.
 
 Dry-run posture (#2291): this module is EVENT-driven (SES inbound receipt →
 S3 → Lambda), never scheduled, so it is exempt from #2222's DEFAULT dry-run
@@ -158,17 +182,11 @@ def _persist_failure_envelope(identifier: str, reason: str, payload: dict) -> st
 # Confirmation emails send FROM this address (root domain DKIM already verified)
 SENDER = "awsdev@mattsusername.com"
 
-# Allowed sender addresses (security: only process Matthew's emails)
-# Loaded from env var (comma-separated) with hardcoded fallback
+# Allowed sender addresses (security: only process Matthew's emails). Environment ONLY (comma-separated, set by the
+# CDK stack from the same constant the receipt gate reads) — #4633 removed the hardcoded fallback this public repo
+# used to carry. Empty means the parser refuses every message (sender_verdict -> "allowlist_unset"), never "anyone".
 _env_senders = os.environ.get("ALLOWED_SENDERS", "")
-ALLOWED_SENDERS = (
-    {s.strip().lower() for s in _env_senders.split(",") if s.strip()}
-    if _env_senders
-    else {
-        "awsdev@mattsusername.com",
-        # TODO: Add your personal email address(es) here or set ALLOWED_SENDERS env var
-    }
-)
+ALLOWED_SENDERS = frozenset(s.strip().lower() for s in _env_senders.split(",") if s.strip())
 
 # #4546: the reply desk's own sender list — OFF by default (empty). The Story Desk's Monday questions go TO the
 # chronicle's EMAIL_RECIPIENT; a reply typed from that inbox can arrive From an address that is not in
@@ -201,18 +219,38 @@ def _ses_authenticated(msg, sender):
     return False
 
 
-def story_reply_sender_verdict(sender, subject, msg):
-    """#4546: how the parser treats a sender — ``"allowed"`` (ALLOWED_SENDERS, every route), ``"story_only"`` (a
-    STORY_REPLY_SENDERS address on a [SQ-W<n>] reply that SES authenticated — the reply desk route only),
+def sender_verdict(sender, subject, msg):
+    """How the parser treats a sender — the ONE gate every route sits behind (#4546, widened by #4633):
+    ``"allowed"`` (ALLOWED_SENDERS AND SES's own aligned verdict vouches for it — every route),
+    ``"allowed_unauthenticated"`` (an ALLOWED_SENDERS From that SES did not authenticate — refused loudly, no route),
+    ``"story_only"`` (a STORY_REPLY_SENDERS address on a [SQ-W<n>] reply that SES authenticated — the desk route only),
     ``"story_unauthenticated"`` (that address, but SES did not vouch for it), ``"story_unknown_sender"`` (a [SQ-W<n>]
-    reply from anyone else) or ``"rejected"`` (anything else — the parser's existing silent ignore)."""
+    reply from anyone else), ``"allowlist_unset"`` (no sender list configured at all — fail closed, #4633) or
+    ``"rejected"`` (anything else — the parser's existing silent ignore)."""
+    if not ALLOWED_SENDERS and not STORY_REPLY_SENDERS:
+        return "allowlist_unset"
     if sender in ALLOWED_SENDERS:
-        return "allowed"
+        return "allowed" if _ses_authenticated(msg, sender) else "allowed_unauthenticated"
     if story_questions.week_from_subject(subject) is None:
         return "rejected"
     if sender in STORY_REPLY_SENDERS:
         return "story_only" if _ses_authenticated(msg, sender) else "story_unauthenticated"
     return "story_unknown_sender"
+
+
+story_reply_sender_verdict = sender_verdict  # #4546's name, kept for its callers and tests
+
+
+def _receipt_refusal(record):
+    """#4633: an SES-direct record carries the provider's receipt verdicts — refuse on them before the S3 read. Returns
+    the refusal reason, or "" when the record is not SES-direct or the receipt passes."""
+    ses_info = record.get("ses") if isinstance(record, dict) else None
+    if not isinstance(ses_info, dict) or "receipt" not in ses_info:
+        return ""
+    from emails.inbound_auth_gate_lambda import receipt_verdict
+
+    ok, reason, _statuses = receipt_verdict(ses_info.get("receipt") or {})
+    return "" if ok else reason
 
 
 def extract_reply_text(email_body):
@@ -515,7 +553,7 @@ def lambda_handler(event, context):
         1. S3 Event Notification (has 'Records' with s3 info)
         2. SES direct invocation (has 'Records' with ses info)
         """
-        print("[INFO] Insight Email Parser v1.1.0 triggered")
+        print("[INFO] Insight Email Parser v1.3.0 triggered")
 
         # #2291: this handler is exempt from DEFAULT dry-run suppression (it is
         # SES-receipt-triggered — see SES_EXEMPT_EVENT_DRIVEN), but an EXPLICIT
@@ -548,6 +586,13 @@ def lambda_handler(event, context):
                     # records. raw/* is delete-protected (ADR-032/033/046), so the entry
                     # in RETIRED_SOURCES is the tombstone.
                     key = f"raw/inbound_email/{message_id}"
+                    # #4633: an SES-direct record carries the provider's own receipt verdicts — a failing or missing
+                    # DMARC/spam/virus verdict is refused HERE, before the S3 read, before the header check below.
+                    refusal = _receipt_refusal(record)
+                    if refusal:
+                        print(f"[WARN] SES receipt verdict refused ({refusal}): messageId={message_id}")
+                        _persist_failure_envelope(key, f"receipt_{refusal}", {"key": key, "verdict": refusal})
+                        continue
                 else:
                     print("[WARN] No S3 key or SES messageId found, skipping")
                     # #2821: an S3-key-less/messageId-less record is itself a
@@ -594,9 +639,21 @@ def lambda_handler(event, context):
                 sender = sender_email.group(0).lower() if sender_email else ""
 
                 subject = msg.get("Subject", "")
-                verdict = story_reply_sender_verdict(sender, subject, msg)
+                # #4633: THE gate. Nothing below — no route, no body extraction, no write, no send — runs unless the
+                # verdict is "allowed" or "story_only"; the log lines never print the allowlist.
+                verdict = sender_verdict(sender, subject, msg)
+                if verdict == "allowlist_unset":
+                    print("[ERROR] ALLOWED_SENDERS unset — refusing every inbound message (fail closed, #4633)")
+                    _persist_failure_envelope(key, "allowlist_unset", {"key": key, "subject": subject[:200]})
+                    continue
                 if verdict == "rejected":
-                    print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
+                    print(f"[WARN] Unauthorized sender: {sender}. Ignoring.")
+                    continue
+                if verdict == "allowed_unauthenticated":
+                    # A listed From that SES's own verdict does not vouch for is either a forgery or a mail path that
+                    # lost its signature — both loud, neither stored (who/what only, never the body).
+                    print(f"[WARN] sender refused (allowed_unauthenticated): {sender} — SES verdict missing or failing")
+                    _persist_failure_envelope(key, "sender_unauthenticated", {"key": key, "sender": sender, "subject": subject[:200]})
                     continue
                 if verdict in ("story_unauthenticated", "story_unknown_sender"):
                     # #4546: a reply to the desk's questions that we refuse is HIS reply lost — never the silent

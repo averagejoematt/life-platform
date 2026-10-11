@@ -169,6 +169,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - elena-state-updater → `lambdas/emails/elena_state_updater.py`
 - evening-nudge → `lambdas/emails/evening_nudge_lambda.py`
 - habit-skip-review → `lambdas/emails/habit_skip_review_lambda.py`
+- inbound-auth-gate → `lambdas/emails/inbound_auth_gate_lambda.py`
 - insight-email-parser → `lambdas/emails/insight_email_parser_lambda.py`
 - life-platform-freshness-checker → `lambdas/emails/freshness_checker_lambda.py`
 - milestone-digest → `lambdas/emails/milestone_digest_lambda.py`

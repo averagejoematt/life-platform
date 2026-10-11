@@ -176,8 +176,22 @@ def _role_policies_module():
 RP, ROLE_POLICY_MODULES = _role_policies_module()
 
 
+#: #4633: a `create_platform_lambda(..., custom_policies=[])` site — a role that holds NO grants of its
+#: own (the helper's least-privilege path: AWSLambdaBasicExecutionRole + the fleet baseline, nothing
+#: else) — enrols under this name instead of a role_policies* function. The static IAM linter's R6
+#: (tests/test_role_policies.py) reads an EMPTY policy function as a half-written one, so a zero-grant
+#: role cannot have one; and a site this derivation cannot resolve is the #4439 failure mode (the
+#: Lambda leaves every guard built on the family). The literal `[]` is statically unambiguous, so it
+#: stays IN the family with zero statements: every write site in its source is then a gap, which is
+#: exactly the guard a Lambda that must write nothing should sit under. Only the empty literal
+#: qualifies — a non-empty literal list is still unresolvable and still reds by site.
+ZERO_GRANTS = "custom_policies=[]"
+
+
 def policy_statements(policy_fn: str):
     """The statements of one role, from whichever family member defines it."""
+    if policy_fn == ZERO_GRANTS:
+        return []
     for mod in ROLE_POLICY_MODULES:
         fn = getattr(mod, policy_fn, None)
         if callable(fn):
@@ -186,6 +200,8 @@ def policy_statements(policy_fn: str):
 
 
 def policy_is_defined(policy_fn: str) -> bool:
+    if policy_fn == ZERO_GRANTS:
+        return True
     return any(callable(getattr(mod, policy_fn, None)) for mod in ROLE_POLICY_MODULES)
 
 
@@ -257,7 +273,9 @@ def derive_role_family(stack_glob: str | None = None, dropped: list | None = Non
             kw = {k.arg: k.value for k in node.keywords if k.arg}
             policy = kw.get("custom_policies")
             policy_fn = None
-            if isinstance(policy, ast.Call):
+            if isinstance(policy, ast.List) and not policy.elts:
+                policy_fn = ZERO_GRANTS  # #4633: a zero-grant role, resolved — not dropped
+            elif isinstance(policy, ast.Call):
                 f = policy.func
                 policy_fn = f.attr if isinstance(f, ast.Attribute) else (f.id if isinstance(f, ast.Name) else None)
             fn, src = _kw_str(kw, "function_name", consts), _kw_str(kw, "source_file", consts)
@@ -468,6 +486,16 @@ def test_MUTATION_an_unresolvable_site_is_reported_not_dropped(tmp_path):
     const = tmp_path / "const_stack.py"
     const.write_text("NAME = 'fn-x'\ncreate_platform_lambda(self, 'X', function_name=NAME, source_file='a.py', custom_policies=rp.p())\n")
     assert [e.function_name for e in derive_role_family(str(const))] == ["fn-x"]
+    # #4633: the empty literal enrols as ZERO_GRANTS (zero statements, still in the family); a NON-empty
+    # literal list is not a policy function and is still reported, not dropped.
+    zero = tmp_path / "zero_stack.py"
+    zero.write_text("create_platform_lambda(self, 'X', function_name='fn-z', source_file='a.py', custom_policies=[])\n")
+    rows = derive_role_family(str(zero))
+    assert [(e.function_name, e.policy_fn) for e in rows] == [("fn-z", ZERO_GRANTS)] and policy_statements(ZERO_GRANTS) == []
+    full = tmp_path / "full_stack.py"
+    full.write_text("create_platform_lambda(self, 'X', function_name='fn-f', source_file='a.py', custom_policies=[stmt])\n")
+    dropped = []
+    assert derive_role_family(str(full), dropped=dropped) == [] and dropped == ["full_stack.py:1"], dropped
 
 
 def test_the_write_extractor_reads_the_two_incident_modules():
