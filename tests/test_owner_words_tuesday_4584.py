@@ -283,6 +283,64 @@ def test_mutation_several_questions_keep_an_unlabelled_top_post_unpaired():
     assert [x["q"] for x in sq.parse_reply(body.replace("> Q2: second?\n", ""))] == [1]
 
 
+# A list is a natural answer to "what will you do differently next week" — one answer, labels and all.
+REPLY_LIST = "1. I walked every day\n2. I ate well\n   mostly, anyway\n\n3. bed by 10"
+
+
+def test_a_numbered_list_answering_the_one_question_is_one_answer_kept_whole():
+    a = sq.parse_reply(_top_posted(REPLY_LIST), keep_raw=True)
+    assert [(x["q"], x["question"], x["raw"]) for x in a] == [(1, QUESTION, REPLY_LIST)], "never split into answers to questions not asked"
+    assert sq.parse_reply(_top_posted(REPLY_LIST), [QUESTION], keep_raw=True)[0]["raw"] == REPLY_LIST
+    # A lone "1." is still read as the Q1 label he typed (stripped), exactly as before.
+    assert [x["raw"] for x in sq.parse_reply(_top_posted("1. a fine week"), keep_raw=True)] == ["a fine week"]
+
+
+def test_mutation_with_several_questions_a_numbered_top_post_still_answers_each_question():
+    body = "1. fine\n2. tired\n\nOn Mon, Oct 12, 2026 at 9:00 AM wrote:\n> Q1: first?\n> Q2: second?\n"
+    assert [(x["q"], x["answer"]) for x in sq.parse_reply(body)] == [(1, "fine"), (2, "tired")]
+
+
+def test_a_numbered_list_reply_reaches_the_edition_whole(monkeypatch):
+    t = _deliver(monkeypatch, _wire_email(_top_posted(REPLY_LIST)))
+    words = [r for (pk, sk), r in t.items.items() if pk == ow.PK]
+    assert len(words) == 1 and words[0]["text"] == REPLY_LIST and words[0]["prompt"] == QUESTION
+    _route, his = _edition_his_words(t)
+    assert his["state"] == "ok" and his["data"]["text"] == REPLY_LIST
+
+
+def _flattened(reply):
+    """An HTML-only reply stripped to text: the original arrives with no ">" on any line."""
+    return (
+        f"{reply}\n\nOn Tue X wrote:\nOne question for Wednesday, Week 6. Just hit reply and type.\n\nQ1: {QUESTION}\n\n"
+        "—\nYour reply goes on the site word for word, as his own words on Wednesday's front page.\n"
+    )
+
+
+def test_the_sent_question_unquoted_by_the_client_is_never_stored_as_his_answer():
+    a = sq.parse_reply(_flattened("Fine week."), keep_raw=True)
+    assert [(x["q"], x["question"], x["raw"]) for x in a] == [(1, QUESTION, "Fine week.")]
+    # No attribution line either: the original's own first line ends his reply.
+    bare = "Fine week.\n\nOne question for Wednesday, Week 6. Just hit reply and type.\n\nQ1: " + QUESTION + "\n\n—\nYour reply goes.\n"
+    assert [x["raw"] for x in sq.parse_reply(bare, keep_raw=True)] == ["Fine week."]
+    # Nothing typed: the echoed question alone is no answer at all.
+    assert sq.parse_reply("Q1: " + QUESTION + "\n") == []
+    assert sq.parse_reply("Q1: " + QUESTION.upper() + "\n", [QUESTION]) == []
+
+
+def test_mutation_a_labelled_answer_of_his_own_is_still_his():
+    assert [x["answer"] for x in sq.parse_reply("Q1: it cost me sleep\n")] == ["it cost me sleep"]
+
+
+def test_a_reply_whose_client_dropped_the_quote_still_pairs_through_the_subject(monkeypatch):
+    assert sq.parse_reply(REPLY_CLEAN) == [], "the body alone cannot say how many questions were asked"
+    assert sq.questions_for_subject("Re: The Measured Life · Week 6 · one question for Wednesday [SQ-W6]") == [QUESTION]
+    assert sq.questions_for_subject("Re: The Measured Life · Week 6 · 3 quick questions [SQ-W6]") is None
+    assert sq.questions_for_subject("one question for Wednesday") is None
+    t = _deliver(monkeypatch, _wire_email(REPLY_CLEAN + "\n\nSent from my iPhone\n"))
+    words = [r for (pk, sk), r in t.items.items() if pk == ow.PK]
+    assert len(words) == 1 and words[0]["text"] == REPLY_CLEAN and words[0]["prompt"] == QUESTION
+
+
 def test_a_clean_tuesday_reply_leads_the_edition_byte_for_byte_with_its_question(monkeypatch):
     t = _deliver(monkeypatch, _wire_email(_top_posted(REPLY_CLEAN)))
     qa = [r for (pk, sk), r in t.items.items() if sk.startswith(sq.QA_SK_PREFIX)]

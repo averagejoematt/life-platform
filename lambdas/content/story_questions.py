@@ -188,13 +188,29 @@ def week_from_subject(subject: str) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
+def questions_for_subject(subject: str) -> Optional[List[str]]:
+    """#4584: the questions a reply answers, when the subject alone says so. A Tuesday reply ("one question for
+    Wednesday") answers exactly ``tuesday_question(week)`` — deterministic, so no marker read — which lets a reply
+    whose client stripped the quote still pair with Q1. Monday's generated questions are not recoverable from the
+    subject: None, and the parser reads them from the quote as before."""
+    week = week_from_subject(subject)
+    if week is None or "one question for wednesday" not in (subject or "").lower():
+        return None
+    return [tuesday_question(week)]
+
+
 _Q_LINE = re.compile(r"^\s*(?:>\s*)*Q(\d+)\s*[:.)-]\s*(.*)$", re.IGNORECASE)
 _NUM_LINE = re.compile(r"^\s*(\d+)\s*[:.)-]\s+(.*)$")
 _QUOTE_HEADER = re.compile(r"^\s*On .{3,120}wrote:\s*$|^-{2,}\s*Original Message", re.IGNORECASE)
 _OFF = re.compile(r"\b(?:off[ -]?(?:the[ -])?record|OTR)\b", re.IGNORECASE)
 # Where a top-posted reply ends: the quoted original, a mail client's signature line, or an Outlook-style header
 # block (#4584). Anything past it is not his reply, and the top-posted answer is published verbatim.
-_LEAD_END = re.compile(r"^\s*(?:--\s*|Sent from my\b.*|Get Outlook\b.*|_{5,}\s*|From:\s.*@.*)$", re.IGNORECASE)
+# The first line of each of the desk's own emails ends it too: an HTML-only reply flattened to text has no ">" and
+# may carry no "On … wrote:" line, so the original's opening line is the only edge left.
+_LEAD_END = re.compile(
+    r"^\s*(?:--\s*|Sent from my\b.*|Get Outlook\b.*|_{5,}\s*|From:\s.*@.*|One question for Wednesday\b.*|A few quick ones for Week\b.*)$",
+    re.IGNORECASE,
+)
 _WROTE = re.compile(r"wrote:\s*$", re.IGNORECASE)
 
 
@@ -218,27 +234,46 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
 
     One-question emails (#4584, the Tuesday question): a reply typed ABOVE the quote with no "Q1:"/"1." label is the
     answer to Q1 when exactly one question was asked (``questions`` has one entry, or the quote shows only Q1) and
-    nothing else was parsed. With several questions an unlabelled top-post stays unpaired, exactly as before."""
+    nothing else was parsed. With several questions an unlabelled top-post stays unpaired, exactly as before.
+
+    A numbered list typed above the quote of a one-question email is ONE answer to Q1, kept whole with the "1." /
+    "2." labels he typed — it is a list, not answers to questions that were never asked. A question line that
+    reached the body unquoted (an HTML-only reply flattened to text) is read as the quoted question, never as his
+    answer: an "answer" equal to a question that was sent is dropped."""
     lines = (body or "").replace("\r\n", "\n").split("\n")
     answers: Dict[int, List[str]] = {}
     raws: Dict[int, List[str]] = {}
     quoted_q: Dict[int, str] = {}
     current: Optional[int] = None
     seen_inline = False
+    labelled = False  # he typed a "Q2: …" label himself
+    sent = {_norm(q) for q in list(questions or []) + list(TUESDAY_QUESTIONS) if q}
     lead: List[str] = []  # the unlabelled lines typed above the quote (#4584)
     lead_open = True
+    lead_all: List[str] = []  # the whole top-post, numbered lines included (#4584: a list answering one question)
+    lead_all_open = True
+    lead_nums = 0
+    flattened = False  # the quote reached us without ">" (an HTML-only reply): past its first question, nothing is his
     for raw in lines:
         if _QUOTE_HEADER.match(raw):
             current = None
-            lead_open = False
+            lead_open = lead_all_open = False
             continue
-        is_quoted = raw.lstrip().startswith(">")
+        is_quoted = raw.lstrip().startswith(">") or flattened
         if lead_open:
             if is_quoted or _LEAD_END.match(raw) or _Q_LINE.match(raw) or _NUM_LINE.match(raw):
                 lead_open = False
             else:
                 lead.append(raw)
+        if lead_all_open:
+            if is_quoted or _LEAD_END.match(raw) or _Q_LINE.match(raw):
+                lead_all_open = False
+            else:
+                lead_all.append(raw)
+                lead_nums += int(bool(_NUM_LINE.match(raw)))
         m = _Q_LINE.match(raw)
+        if m and not is_quoted and _norm(m.group(2)) in sent:
+            is_quoted = flattened = True  # the sent question, unquoted by the client — never his answer
         if m and is_quoted:  # a quoted question: answers typed below it belong to it
             current = int(m.group(1))
             quoted_q[current] = m.group(2).strip()
@@ -248,6 +283,7 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
             continue
         if m and not is_quoted:  # "Q2: my answer" typed by him
             current = int(m.group(1))
+            labelled = True
             if m.group(2).strip():
                 answers.setdefault(current, []).append(m.group(2).strip())
                 raws.setdefault(current, []).append(m.group(2))
@@ -265,7 +301,16 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
             raws[current].append(raw)  # a blank line inside an answer; trailing ones are dropped below
     single = (questions is not None and len(questions) == 1) or (questions is None and set(quoted_q) == {1})
     lead = _trim_attribution(lead)
-    if single and not answers and "\n".join(lead).strip():
+    lead_all = _trim_attribution(lead_all)
+    if single and not labelled and lead_nums and "\n".join(lead_all).strip():
+        while lead_all and not lead_all[0].strip():
+            lead_all.pop(0)
+        first = _NUM_LINE.match(lead_all[0])
+        if lead_nums == 1 and first and first.group(1) == "1":
+            lead_all[0] = first.group(2)  # a lone "1." is the Q1 label he typed, not a list
+        answers = {1: [ln.strip() for ln in lead_all if ln.strip()]}
+        raws = {1: lead_all}
+    elif single and not answers and "\n".join(lead).strip():
         while lead and not lead[0].strip():
             lead.pop(0)
         answers[1] = [ln.strip() for ln in lead if ln.strip()]
@@ -273,7 +318,7 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
     out = []
     for q_no in sorted(answers):
         text = " ".join(answers[q_no]).strip()
-        if not text:
+        if not text or _norm(text) in sent:  # the question echoed back is not his answer
             continue
         q_text = questions[q_no - 1] if questions and 0 < q_no <= len(questions) else quoted_q.get(q_no)
         a = {"q": q_no, "question": q_text, "answer": _clean(text), "off_record": bool(_OFF.search(text))}
@@ -284,6 +329,10 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
             a["raw"] = "\n".join(kept)
         out.append(a)
     return out
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "")).strip().lower()
 
 
 def _clean(text: str) -> str:
