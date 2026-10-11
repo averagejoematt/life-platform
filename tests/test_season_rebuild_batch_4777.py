@@ -201,3 +201,54 @@ def test_fact_check_still_parses_through_fact_findings():
     assert story_writers.fact_check("t", {}, invoke=lambda b, m: {"stop_reason": "end_turn", "content": []}) == [
         "fact-read: unparseable — the installment is unverified"
     ]
+
+
+def test_a_read_that_raises_is_a_finding_and_the_paid_reads_are_still_written(tmp_path, capsys):
+    out = str(tmp_path)
+    _stage(out, [0, 1])
+    calls = []
+
+    def realtime(model_input):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("ThrottlingException after retries")
+        return _reply()
+
+    rc = sr.recheck(out, [0, 1], realtime_fn=realtime)
+    printed = capsys.readouterr().out
+    assert rc == 1, "a failed read is never a clean pass"
+    assert len(calls) == 6, "one failure does not stop the other reads"
+    summary = _load(out, "recheck.json")
+    assert summary["read_errors"] == 1 and summary["findings"] == 1
+    wk0 = _load(out, "wk0_recheck.json")
+    assert wk0["findings"]["dek"] == ["dek: read failed — RuntimeError: ThrottlingException after retries"]
+    assert os.path.exists(os.path.join(out, "wk1_recheck.json"))
+    assert "1 read(s) failed" in printed
+
+
+def test_a_budget_stop_skips_the_remaining_reads_and_says_so(tmp_path):
+    out = str(tmp_path)
+    _stage(out, [0, 1])
+    calls = []
+
+    class BudgetExceeded(RuntimeError):
+        pass
+
+    class DevSessionBudgetExceeded(BudgetExceeded):
+        pass
+
+    def realtime(model_input):
+        calls.append(1)
+        if len(calls) == 3:
+            raise DevSessionBudgetExceeded("dev cap $5 reached")
+        return _reply()
+
+    assert sr.recheck(out, [0, 1], realtime_fn=realtime) == 1
+    assert len(calls) == 3, "no read is attempted after a budget stop"
+    summary = _load(out, "recheck.json")
+    assert summary["read_errors"] == 4 and summary["records"] == 6
+    wk1 = _load(out, "wk1_recheck.json")
+    assert all(
+        v[0].startswith(f"{k}: read failed — not read — the sweep stopped after DevSessionBudgetExceeded")
+        for k, v in wk1["findings"].items()
+    )

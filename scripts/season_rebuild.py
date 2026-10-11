@@ -325,12 +325,29 @@ def recheck(
         def realtime_fn(model_input: Dict[str, Any]) -> Dict[str, Any]:
             return bedrock_client.invoke_with_retry(model_input, story_writers.FACT_MODEL)
 
+    # One failed read never loses the sweep: a raise (a ClientError after invoke_with_retry gives up, or the dev
+    # cap's BudgetExceeded) becomes that record's "read failed" finding, and the reads already paid for are still
+    # written. After a budget stop no further read is attempted — the rest are marked skipped, never silently clean.
+    plain_fn = realtime_fn
+    stopped: Dict[str, str] = {}
+
+    def guarded_fn(model_input: Dict[str, Any]) -> Dict[str, Any]:
+        if stopped:
+            return {"_read_error": f"not read — the sweep stopped after {stopped['why']}"}
+        try:
+            return plain_fn(model_input)
+        except Exception as e:  # noqa: BLE001 — every failure is reported per record, never swallowed
+            why = f"{type(e).__name__}: {e}"
+            if _is_budget_stop(e):
+                stopped["why"] = why
+            return {"_read_error": why}
+
     run = run or bedrock_batch.run_or_fallback
     deadline = time.time() + wait_hours * 3600 if wait_hours is not None else None
     res = run(
         records,
         story_writers.FACT_MODEL,
-        realtime_fn,
+        guarded_fn,
         force_realtime=force_realtime,
         deadline_epoch=deadline,
         job_name=f"season-recheck-{time.strftime('%Y%m%d-%H%M%S', time.gmtime())}",
@@ -339,10 +356,15 @@ def recheck(
     print(f"recheck: {len(records)} fact reads · mode={res['mode']} · {res['reason']}")
     by_week: Dict[int, Dict[str, Any]] = {}
     total = 0
+    read_errors = 0
     for rec, resp in zip(records, res["results"]):
         rid = rec["recordId"]
         n, kind = int(rid[2:].split("-", 1)[0]), rid.split("-", 1)[1]
-        found = [f"{kind}: {f}" for f in story_writers.fact_findings(resp or {})]
+        if isinstance(resp, dict) and resp.get("_read_error"):
+            read_errors += 1
+            found = [f"{kind}: read failed — {resp['_read_error']}"]
+        else:
+            found = [f"{kind}: {f}" for f in story_writers.fact_findings(resp or {})]
         total += len(found)
         wk = by_week.setdefault(n, {"week": n, "findings": {}, "batched": {}})
         wk["findings"][kind] = found
@@ -357,13 +379,27 @@ def recheck(
         "realtime_records": res.get("realtime_records", len(records)),
         "savings": res.get("savings"),
         "findings": total,
+        "read_errors": read_errors,
     }
     for n, wk in sorted(by_week.items()):
         wk.update({k: summary[k] for k in ("mode", "reason", "job_arn")})
         _save(out, f"wk{n}_recheck.json", wk)
         print(f"  wk{n}: " + " · ".join(f"{k} findings={len(v)}" for k, v in wk["findings"].items()))
     _save(out, "recheck.json", summary)
+    if read_errors:
+        print(f"recheck: {read_errors} read(s) failed — each is a finding in its week's file, re-run those weeks")
     return 0 if total == 0 else 1
+
+
+def _is_budget_stop(e: BaseException) -> bool:
+    """A budget refusal (tier 3, or the laptop dev cap) — every later read would be refused too."""
+    try:
+        from ai.budget_guard import BudgetExceeded
+    except Exception:  # noqa: BLE001 — the name check below still catches it
+        BudgetExceeded = None  # type: ignore[assignment]
+    if BudgetExceeded is not None and isinstance(e, BudgetExceeded):
+        return True
+    return any(c.__name__ == "BudgetExceeded" for c in type(e).__mro__)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
