@@ -344,7 +344,7 @@ All four fire on `s3:ObjectCreated:*`. The authoritative list is `EXPECTED_NOTIF
 python3 deploy/check_bucket_notification_drift.py --strict   # exit 1 on drift or a read error
 ```
 
-It makes one `s3:GetBucketNotification` call and reports `missing`, `unexpected`, `changed` and any non-Lambda configuration. It is on-demand today. Running it on a schedule from CI needs `s3:GetBucketNotification` on the CI role first; that grant is not in `infra/iam/` yet.
+It makes one `s3:GetBucketNotification` call and reports `missing`, `unexpected`, `changed` and any non-Lambda configuration. It also runs nightly, blocking, in `.github/workflows/config-drift.yml` (the ownership/bucket-policy drift step) under `github-actions-deploy-role`, whose `S3BucketNotificationRead` grant was applied 2026-10-11 (`infra/iam/README.md`).
 
 **Repair (owner, attended — this is an AWS write):** `put-bucket-notification-configuration` REPLACES the whole document, so never put a single entry. Read the full live document, edit it, and put the whole thing back:
 
