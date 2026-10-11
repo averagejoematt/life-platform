@@ -205,6 +205,7 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
   const calls = pendingCalls(predictions, pid);
   if (p.tier === "lead" && !bets.length && !calls.length) return soft(`${p.name} is the lead. The lead makes no dated calls and has no bet open, so nothing is waiting to settle.`);
   const out = [];
+  const tail = [];
   const ahead = calls.filter((c) => isUpcoming(c, today));
   const older = calls.length - ahead.length;
   const nextBet = bets.find((b) => b.resolution_date >= today);
@@ -227,11 +228,14 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
     if (rows) out.push(`<ul class="ck-rows">${rows}</ul>`);
     // Every waiting call is accounted for: the ones shown, the rest still ahead, the older.
     const later = Math.max(0, ahead.length - shown);
-    if (rows && later) out.push(soft(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`));
-    if (older) out.push(soft(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`));
+    if (rows && later) tail.push(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`);
+    if (older) tail.push(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`);
   }
-  if (!docket) out.push(soft("The bets between coaches are not available right now."));
-  else if (bets.length) out.push(soft(`${cap(countWord(bets.length))} open ${bets.length === 1 ? "bet" : "bets"} against another coach: the next section has ${bets.length === 1 ? "it" : "them"}.`));
+  if (!docket) tail.push("The bets between coaches are not available right now.");
+  else if (bets.length) tail.push(`${cap(countWord(bets.length))} open ${bets.length === 1 ? "bet" : "bets"} against another coach: the next section has ${bets.length === 1 ? "it" : "them"}.`);
+  // The accounting sentences after the list are one paragraph, not three (the six-screen
+  // budget's headroom, 2026-10-11): nothing dropped, two gaps and a line given back.
+  out.push(soft(tail.join(" ")));
   return out.join("");
 }
 

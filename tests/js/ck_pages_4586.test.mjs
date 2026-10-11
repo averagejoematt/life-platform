@@ -112,8 +112,9 @@ test("the bet card states the question, the date and both sides", () => {
   assert.doesNotMatch(html, /Settles Monday, October 12/);
   const undated = { ...B.next, data: { ...B.next.data, bet: { ...B.next.data.bet, data: { ...B.next.data.bet.data, question: "Will protein stay high?" } } } };
   assert.match(P.betHTML(undated), /<p class="ck-small">Settles Monday, October 12<\/p>/);
-  // #4809: each side on its own line, with the coach's reason as served
-  assert.match(html, /<p class="ck-soft">Nathan Reeves says no: “Fuel-cognition link [^”]+”\.<\/p><p class="ck-soft">Marcus Webb says yes: “Protein intake gap [^”]+”\.<\/p>/);
+  // ruling 2026-10-11: off the front card the sides stand alone on one line; the reasons are the front card's
+  assert.match(html, /<p class="ck-soft">Nathan Reeves says no\. Marcus Webb says yes\.<\/p>/);
+  assert.doesNotMatch(html, /Fuel-cognition link|Protein intake gap/);
   assert.equal(P.betLine(B.next), "A bet between Nathan Reeves and Marcus Webb settles Monday, October 12.");
   assert.equal(P.moreBetsLine(load("coach_docket"), "2026-10-12"), "One more bet settles on October 16.");
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-12" }, { resolution_date: "2026-10-14" }, { resolution_date: "2026-10-16" }] }, "2026-10-12"), "Two more bets settle on October 14 and 16.");
@@ -140,6 +141,9 @@ test("the showcase pair leads with the tightest right call and the clearest miss
   // both distances were computed the same way, so what they are is said once, under the pair
   assert.match(html, /<\/div><\/div><p class="ck-soft">Each allowed distance is one standard deviation of his readings over the 30 days before the call\.<\/p>$/);
   assert.equal((html.match(/standard deviation/g) || []).length, 1);
+  // the coaches page's scorecard door closes that same paragraph (one line given back, 2026-10-11)
+  const door = '<a class="ck-link" href="/coaching/scorecard/">Every prediction, right and wrong</a>';
+  assert.ok(P.callVerdictsHTML(calls, "/next/v8/", "coaches", { trailer: door }).endsWith(`before the call. ${door}</p>`));
   assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span><p>Lisa Park called his morning recovery score at about 66\. <b>It came in at 24\.<\/b><\/p>/);
   assert.match(html, /href="\/next\/v8\/call\/\?id=sleep-20260910-09aa1ff6cc"/);
   assert.doesNotMatch(html, /83\.7/);

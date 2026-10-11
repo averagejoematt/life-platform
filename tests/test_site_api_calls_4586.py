@@ -485,6 +485,7 @@ def test_a_score_out_of_100_is_a_whole_number_and_the_stored_call_keeps_its_deci
 
 
 def test_rounding_never_changes_the_verdict_a_reader_recomputes():
+    # Why the exception to "a score is a whole number" exists (ruling 2026-10-11): |result - call| on the printed numbers must agree with the tag.
     # 64.4 against 82 with 17.7 allowed is a hit (17.6); "64" against 82 would read as a miss (18)
     assert calls.said_pair(64.4, 82, 17.7, "recovery_score", True) == ("64.4", "82", "17.7")
     # the same numbers graded as a miss keep their whole numbers: 18 > 17.7 agrees with it

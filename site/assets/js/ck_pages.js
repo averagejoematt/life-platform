@@ -200,7 +200,7 @@ export function recordBigHTML(block) {
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
-export function betHTML(nextBlock, { sidesText = "", extra = "", href = "", hrefText = "What each one argued" } = {}) {
+export function betHTML(nextBlock, { sidesText = "", extra = "", href = "", hrefText = "What each one argued", oneLine = false } = {}) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
   // #4582: with the whole `next` block unserved there is no bet part at all. Its sentence is
   // the block's ("What comes next is not served right now."), never "No coach bet is waiting
@@ -208,15 +208,34 @@ export function betHTML(nextBlock, { sidesText = "", extra = "", href = "", href
   if (!bet) return absent(nextBlock, "What comes next is not served right now.");
   if (!usable(bet) || !bet.data.question) return absent(bet, "No coach bet is waiting to settle.");
   const b = bet.data;
-  // #4809: each side on its own line, with the coach's reason when the route serves one. A
-  // string `sidesText` is printed as one line (the caller's own wording).
-  const sides = Array.isArray(sidesText) ? sidesText : sidesText ? [sidesText] : F.betSidesLines(bet);
+  // #4809: an array `sidesText` is one line per side (the front card's, each with the coach's
+  // reason); a string is printed as one line (the caller's own wording). With neither, the
+  // sides alone on one line — the reasons are the front card's only (ruling 2026-10-11).
+  const sides = Array.isArray(sidesText) ? sidesText : [sidesText || F.betSidesLine(bet, {}, { reasons: false })].filter(Boolean);
   const door = href ? `<p><a class="ck-link" href="${esc(href)}">${esc(hrefText)}</a></p>` : "";
   // The question names its own day ("… on Monday, October 12?"), so the card's "Settles <day>"
   // line is printed only when it does not: room for the reasons (#4809), nothing said twice.
   const day = dayInWords(b.settle_date);
   const head = day && String(b.question).includes(day) ? "" : `<p class="ck-small">Settles ${esc(day)}</p>`;
+  // `oneLine`: the sides, the extra sentence and the door as ONE soft paragraph — the coaches
+  // page's card, which holds its four-screen budget with headroom (ruling 2026-10-11).
+  if (oneLine) {
+    // The door follows the sides it explains; the extra sentence closes the paragraph.
+    const parts = [esc(sides.filter(Boolean).join(" ")), href ? `<a class="ck-link" href="${esc(href)}">${esc(hrefText)}</a>` : "", esc(extra)];
+    const line = parts.some(Boolean) ? `<p class="ck-soft">${parts.filter(Boolean).join(" ")}</p>` : "";
+    return `<div class="ck-bet">${head}<p><b>${esc(b.question)}</b></p>${line}</div>`;
+  }
   return `<div class="ck-bet">${head}<p><b>${esc(b.question)}</b></p>${sides.map(soft).join("")}${soft(extra)}${door}</div>`;
+}
+// The bet's reasons are printed on the front card only (ruling 2026-10-11: the coaches page
+// keeps its four-screen budget); the coaches page's card carries a door to them — and only
+// when the front card prints them: it leads with this bet (two named sides) and at least one
+// side has a served reason. Otherwise no door, never one to a card without the reasons.
+export function reasonsDoor(nextBlock, base = "/") {
+  const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  const sides = usable(bet) ? (bet.data.sides || []).filter((s) => s && s.coach) : [];
+  const served = sides.some((s) => typeof s.reason === "string" && s.reason.trim());
+  return sides.length >= 2 && served ? { href: `${base}#ck-bet`, hrefText: "Why each says so." } : {};
 }
 // "Three more bets settle on October 7, 12 and 16." from the served docket, minus the
 // one on the card. "" when there are none.
@@ -357,7 +376,9 @@ export function verdictsHTML(coachesBody) {
 // whose allowed distance was tightest, and the wrong call that missed by the most. Each
 // carries its rule in the tag and the day its reading was taken. "" when the route has
 // nothing, so the caller can fall back.
-export function callVerdictsHTML(callsBody, base = "/", from = "") {
+// `trailer`: trusted HTML (the shell's own door) closing the paragraph under the pair, so the
+// note and the door share one line instead of two paragraphs (the four-screen budget, 2026-10-11).
+export function callVerdictsHTML(callsBody, base = "/", from = "", { trailer = "" } = {}) {
   const calls = ((callsBody && callsBody.calls) || []).filter((c) => c && c.id && c.called_short && c.kind !== "bet");
   const { right, wrong } = showcasePair(calls);
   if (!right && !wrong) return "";
@@ -370,7 +391,8 @@ export function callVerdictsHTML(callsBody, base = "/", from = "") {
     return callCardHTML(call, { when, note: !shared, href: withFrom(`${base}call/?id=${encodeURIComponent(call.id)}`, from) });
   };
   const after = [shared, ruleless(calls.filter((c) => !hasRule(c)).length)].filter(Boolean).join(" ");
-  return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>${soft(after)}`;
+  const close = after || trailer ? `<p class="ck-soft">${esc(after)}${after && trailer ? " " : ""}${trailer}</p>` : "";
+  return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>${close}`;
 }
 
 // ── the catch-up list on the front page ────────────────────────────────────────
@@ -489,7 +511,7 @@ export function frontReadSlots(edition, b, base = "/") {
   if (pick && pick.kind === "bet") {
     // The card in the bet's own terms: each coach with its job, the live number inside the
     // card, and the door to what each one argued (round 8b).
-    out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLines(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet` });
+    out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLines(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet`, hrefText: "Every open bet, on the coaches page" });
   } else if (pick && pick.kind === "reply") {
     out["ck-bet"] = null;
   }
@@ -577,10 +599,13 @@ async function mountCoaches(edition, b) {
   const [coaches, docket, calls] = await Promise.all([tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")]);
   fill("ck-record-big", recordBigHTML(b.record));
   fill("ck-team", teamHTML(coaches, base, "coaches") || soft("The team is not served right now."));
-  const pair = callVerdictsHTML(calls, base, "coaches");
+  // The shell's scorecard door joins the note under the pair; with no pair it stands as served.
+  const more = document.getElementById("ck-verdicts-more");
+  const pair = callVerdictsHTML(calls, base, "coaches", { trailer: more ? more.innerHTML.trim() : "" });
+  if (pair && more) more.remove();
   fill("ck-verdicts", pair || verdictsHTML(coaches) || soft("No checked call is served right now."));
   const bet = b.next && b.next.data && b.next.data.bet;
-  fill("ck-bet", betHTML(b.next, { extra: moreBetsLine(docket, usable(bet) ? bet.data.settle_date : "") }));
+  fill("ck-bet", betHTML(b.next, { extra: moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""), ...reasonsDoor(b.next, base), oneLine: true }));
 }
 
 const PAGES = { front: mountFront, week: mountWeek, start: mountStart, story: mountStory, coaches: mountCoaches };

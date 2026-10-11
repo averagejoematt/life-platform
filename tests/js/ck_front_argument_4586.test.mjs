@@ -75,15 +75,22 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   // a side with no served reason is the side alone; nothing is written in its place
   const bare = { ...pick.bet, data: { ...pick.bet.data, sides: pick.bet.data.sides.map((s) => ({ coach: s.coach, says: s.says })) } };
   assert.equal(F.betSidesLine(bare, jobs), "Nathan Reeves (mind) says no. Marcus Webb (food) says yes.");
-  // the front page's bet card and the coaches page's both print each reason under its side
+  // Ruling 2026-10-11 (the coaches page keeps four screens): the FRONT card prints each reason
+  // under its side; the coaches page's card prints the sides alone, on one line, and its door
+  // goes to the front card — the two doors never loop on a promise neither page keeps.
   const front = P.frontReadSlots(edition, B, BASE)["ck-bet"];
-  assert.match(front, /What each one argued/, "the front page's own card, not the coaches page's");
-  const coaches = P.betHTML(B.next);
+  assert.match(front, /<a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">Every open bet, on the coaches page<\/a>/, front);
+  assert.doesNotMatch(front, /What each one argued/, "the front card prints the argument itself");
+  const coaches = P.betHTML(B.next, { ...P.reasonsDoor(B.next, BASE), extra: "One more bet settles on October 16.", oneLine: true });
   for (const [who, reason] of Object.entries(why)) {
     const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     assert.match(front, new RegExp(`<p class="ck-soft">${esc(who)}(?: \\([a-z ]+\\))? says (yes|no): “${esc(reason)}”\\.</p>`), front);
-    assert.match(coaches, new RegExp(`<p class="ck-soft">${esc(who)} says (yes|no): “${esc(reason)}”\\.</p>`), coaches);
+    assert.ok(!coaches.includes(reason), `the coaches page does not print ${who}'s reason`);
   }
+  // one paragraph (the four-screen budget): the sides, the door to the reasons, the extra sentence
+  assert.match(coaches, /<p class="ck-soft">Nathan Reeves says no\. Marcus Webb says yes\. <a class="ck-link" href="\/next\/v8\/#ck-bet">Why each says so\.<\/a> One more bet settles on October 16\.<\/p><\/div>$/, coaches);
+  // no served reason: no door to a card that would not print one
+  assert.deepEqual(P.reasonsDoor({ ...B.next, data: { ...B.next.data, bet: bare } }, BASE), {});
   assert.match(P.betHTML(B.next, { sidesText: "x says no.", extra: "Friday: 1 g.", href: "/next/v8/coaches/#ck-bet" }), /<p class="ck-soft">x says no\.<\/p><p class="ck-soft">Friday: 1 g\.<\/p><p><a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">What each one argued<\/a><\/p><\/div>$/);
   const food = B.week.data.measures.food.data.values;
   const lastIdx = food.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();

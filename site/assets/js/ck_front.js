@@ -447,18 +447,20 @@ export function jobsByName(days) {
 // estimated”." — the job only when known, and the coach's reason (#4809: the opening position
 // from the docket row, one clause in its served words, `sides[].reason`) only when served. A
 // side with no reason is the side alone; nothing is written in a coach's voice here.
-export function betSidesLines(bet, jobs = {}) {
+// `reasons: false` prints the sides alone: the reasons are the FRONT card's (ruling
+// 2026-10-11 — the coaches page keeps its four-screen budget and links to the front card).
+export function betSidesLines(bet, jobs = {}, { reasons = true } = {}) {
   if (!usable(bet)) return [];
   return (bet.data.sides || [])
     .filter((s) => s && s.coach)
     .map((s) => {
       const who = `${s.coach}${jobs[s.coach] ? ` (${jobs[s.coach]})` : ""} says ${s.says}`;
-      const why = typeof s.reason === "string" ? s.reason.trim() : "";
+      const why = reasons && typeof s.reason === "string" ? s.reason.trim() : "";
       return why ? `${who}: “${why}”.` : `${who}.`;
     });
 }
 // The sides as one line: "Nathan Reeves (mind) says no. Marcus Webb (food) says yes."
-export const betSidesLine = (bet, jobs = {}) => betSidesLines(bet, jobs).join(" ");
+export const betSidesLine = (bet, jobs = {}, opts = {}) => betSidesLines(bet, jobs, opts).join(" ");
 // The newest line the coaches said in the window, minus any the page already printed, as one
 // dated row — what the Today band shows when no coach spoke today. "" with nothing left.
 // A short line is preferred (round 8b: the one coach voice on the front page was its hardest

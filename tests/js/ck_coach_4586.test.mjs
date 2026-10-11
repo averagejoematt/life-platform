@@ -130,7 +130,7 @@ test("next names the first date something settles, gives the whole count and lis
   assert.match(html, /Four more are due after these\./);
   assert.match(html, /Seven older calls are still waiting to be checked\./);
   assert.doesNotMatch(text(html), /\b20\d\d-\d\d-\d\d\b/);
-  assert.match(html, /One open bet against another coach: the next section has it\./);
+  assert.match(html, /<p class="ck-soft">Four more are due after these\. Seven older calls are still waiting to be checked\. One open bet against another coach: the next section has it\.<\/p>$/, "the accounting is one paragraph");
   // A bet that settles before the first call leads instead (the October 4 shape of the docket).
   const soon = structuredClone(DOCKET);
   soon.open.find((b) => [b.coach_a, b.coach_b].includes("sleep_coach")).resolution_date = "2026-10-12";
