@@ -458,8 +458,10 @@ def test_the_gate_and_the_parser_read_one_sender_constant_and_the_gate_holds_no_
     for fn in ("inbound-auth-gate", "insight-email-parser"):
         env = _kw(ctor[fn], "environment")
         assert isinstance(env, ast.Call) and getattr(env.args[0], "id", "") == "INBOUND_SENDER_ENV", fn
-    assert getattr(_kw(ctor["inbound-auth-gate"], "custom_policies").func, "attr", "") == "operational_inbound_auth_gate"
+    # Zero grants is a LITERAL `[]` at the call site, not a policy function: the static IAM linter's R6
+    # (tests/test_role_policies.py) reads an empty policy function as a half-written one, and this role
+    # has no policy to write. `[]` (not None) is what keeps the helper on its least-privilege path.
+    policies = _kw(ctor["inbound-auth-gate"], "custom_policies")
+    assert isinstance(policies, ast.List) and policies.elts == [], "the gate's role is zero grants"
     rp_src = open(os.path.join(ROOT, "cdk", "stacks", "role_policies_operational.py"), encoding="utf-8").read()
-    fn_node = next(n for n in ast.parse(rp_src).body if isinstance(n, ast.FunctionDef) and n.name == "operational_inbound_auth_gate")
-    returns = [n for n in ast.walk(fn_node) if isinstance(n, ast.Return)]
-    assert len(returns) == 1 and isinstance(returns[0].value, ast.List) and returns[0].value.elts == [], "the gate's role is zero grants"
+    assert "inbound_auth_gate" not in rp_src, "no policy function for a role with no policy (R6)"

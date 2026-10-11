@@ -3330,8 +3330,8 @@ GUARD_PROOFS.update(
                 "The DMARC refusal deleted from `receipt_verdict()` in the REAL tracked module — the two lines "
                 '`if statuses["dmarcVerdict"] != "PASS": return False, f"dmarc_{...}", statuses` — so a receipt whose '
                 "dmarcVerdict is FAIL, GRAY, PROCESSING_FAILED or absent reads as authenticated (the pre-#4633 world: the "
-                "parser trusted the From header). md5 884455f09400f9775dda4e796784638c -> fd83e3af50f644314319a227cbab3a14; "
-                "restored from a pre-mutation copy and cmp'd byte-identical (884455f0… again)."
+                "parser trusted the From header). md5 c465c7b3f6955ffed288ad3275de2c67 -> 72e5375265bb02c000d343fb5fae12ee; "
+                "restored from a pre-mutation copy and cmp'd byte-identical (c465c7b3… again). Run twice on 2026-10-11 — first on the file as pushed (884455f0… -> fd83e3af…), then again on the final file after a docstring edit — same 8 failed / 23 passed both times."
             ),
             "observed": (
                 "2026-10-11. BASELINE 31 passed. MUTATED: 8 failed, 23 passed — "

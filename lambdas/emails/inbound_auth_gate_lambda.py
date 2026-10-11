@@ -34,8 +34,9 @@ byte of the message body is stored or read; the parser's own `_ses_authenticated
 (Authentication-Results header, aligned DKIM-or-DMARC) is the defence-in-depth
 twin that still refuses a message that somehow reached S3 without this verdict.
 
-No grants of its own (role_policies_operational.operational_inbound_auth_gate is
-an empty list — the role carries only the helper's fleet-wide baseline: CloudWatch
+No grants of its own (the stack passes `custom_policies=[]` — there is deliberately
+no role_policies function for a role with no policy, the static IAM linter's R6 reads
+an empty one as half-written — so the role carries only the helper's fleet-wide baseline: CloudWatch
 Logs, X-Ray traces, ssm:GetParameter on the two budget parameters; nothing on the
 table, the bucket, SES or Secrets), and no boto3 client is constructed here, so a
 verdict bug cannot write anything — the "writes nothing" clause of the acceptance

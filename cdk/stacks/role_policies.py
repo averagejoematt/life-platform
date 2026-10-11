@@ -139,7 +139,6 @@ from stacks.role_policies_operational import (  # noqa: F401  (re-export)
     operational_dlq_consumer,
     operational_email_subscriber,
     operational_freshness_checker,
-    operational_inbound_auth_gate,
     operational_insight_email_parser,
     operational_key_rotator,
     operational_og_image_generator,

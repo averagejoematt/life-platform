@@ -117,6 +117,7 @@ WATCHED_LOG_GROUPS = (
     # ── LifePlatformOperational ──────────────────────────────────────────────
     "/aws/lambda/hevy-restamp",
     "/aws/lambda/hevy-routine-cron",
+    "/aws/lambda/inbound-auth-gate",
     "/aws/lambda/insight-email-parser",
     "/aws/lambda/life-platform-ai-quality-canary",
     "/aws/lambda/life-platform-alert-digest",

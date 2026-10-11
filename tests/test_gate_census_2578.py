@@ -1086,7 +1086,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # guard::lambdas/emails/inbound_auth_gate_lambda.py — a `# gate-entrypoint:` module (lambda_handler returns SES's
         # STOP_RULE_SET disposition; SES does the blocking, nothing raises) — arrives PROVEN via GUARD_PROOFS in
         # scripts/gate_census_proofs.py: the DMARC refusal deleted from receipt_verdict() in the REAL tracked file (md5
-        # 884455f0… -> fd83e3af…, restored byte-identical): baseline 31 passed, MUTATED 8 failed / 23 passed (the five
+        # c465c7b3… -> 72e53752…, restored byte-identical): baseline 31 passed, MUTATED 8 failed / 23 passed (the five
         # forged/GRAY/missing DMARC fixtures got CONTINUE, DKIM-alone passed, the batch refusal and the parser's SES-direct
         # route let the dmarc=FAIL record through), RESTORED 31 passed. Id-set diff vs a `git archive origin/main` export at
         # f68a5e8bc: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}; enters exactly that id, leaves {}, unproven does NOT

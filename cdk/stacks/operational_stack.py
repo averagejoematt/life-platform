@@ -749,10 +749,15 @@ class OperationalStack(Stack):
         # it and a second set would need an activation step; adding a rule to it needs
         # only `cdk deploy LifePlatformOperational`.
         #
-        # Role: no grants of its own (rp.operational_inbound_auth_gate is empty; only the
-        # helper's fleet baseline — logs, X-Ray, SSM GetParameter on the budget tier —
-        # remains) and the function builds no client, so "a refused message writes
-        # nothing" is structural. Its only outputs
+        # Role: no grants of its own — `custom_policies=[]` is the helper's least-privilege
+        # path (a CDK-owned role with AWSLambdaBasicExecutionRole only, plus the fleet
+        # baseline it adds to every role: X-Ray and ssm:GetParameter on the budget tier).
+        # There is deliberately NO role_policies function for it: the static IAM linter's
+        # R6 reads an empty policy function as a half-written one, and this role has no
+        # policy to write — the function reads the receipt SES hands it, returns a
+        # disposition, constructs no boto3 client and touches no table, bucket, secret or
+        # metric. Adding a grant here is a design change, not a fix. So "a refused
+        # message writes nothing" is structural. Its only outputs
         # are the disposition and a [REJECT]/[PASS] log line (messageId + the five
         # verdict statuses, never an address) — the line the issue's live proof pastes.
         inbound_auth_gate = create_platform_lambda(
@@ -764,7 +769,7 @@ class OperationalStack(Stack):
             timeout_seconds=10,  # SES's RequestResponse budget is 30s; a verdict is microseconds
             memory_mb=128,
             environment=dict(INBOUND_SENDER_ENV),
-            custom_policies=rp.operational_inbound_auth_gate(),
+            custom_policies=[],  # zero grants, on purpose — see the role note above
             table=local_table,
             bucket=local_bucket,
             dlq=None,  # RequestResponse: SES gets the error synchronously, there is no async retry to dead-letter
