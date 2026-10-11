@@ -5,8 +5,31 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
-    uses: ./.github/workflows/ci-test.yml
-    with:
-      build_sha: ${{ github.event.pull_request.head.sha }}
-      owner_run: ''
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'
+      - name: Install test dependencies
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-cov pytest-xdist boto3 botocore hypothesis pyyaml pillow)
+          pip install $PINS
+      - name: Parallel pass, durations=0
+        env:
+          COVERAGE_CORE: sysmon
+        run: |
+          set -o pipefail
+          python3 -m pytest tests/ \
+              --ignore=tests/test_integration_aws.py \
+              --cov=lambdas --cov=mcp --cov-report= \
+              --durations=0 \
+              -n auto --dist loadfile -m "not serial" \
+              -q > /tmp/out.txt 2>&1 || true
+          grep -E "board_ask_fanout" /tmp/out.txt || echo "NO board_ask_fanout line in durations"
+          grep -E "^[0-9]+\.[0-9]+s (call|setup|teardown)" /tmp/out.txt | head -30
+          tail -3 /tmp/out.txt
