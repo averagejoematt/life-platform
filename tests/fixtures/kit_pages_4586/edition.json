@@ -626,8 +626,7 @@
    "as_of": null,
    "source": null,
    "absent_text": "The scorecard is not built yet.",
-   "data": null,
-   "todo": "epic #4580 \u2014 the scorecard rows have no served rules yet"
+   "data": null
   },
   "record": {
    "state": "ok",
