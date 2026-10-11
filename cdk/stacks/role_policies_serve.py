@@ -521,6 +521,24 @@ def mcp_server() -> list[iam.PolicyStatement]:
         # #4439: invoke implies record (#3563) — without it every MCP Bedrock call's
         # EstimatedCostUSD is dropped AccessDenied and the cost governor never sees it.
         _bedrock_telemetry_statement(),
+        # #4774: the surface waiter (mcp/tools_surfaces._dispatch) runs the site-api
+        # handlers IN-PROCESS, so they execute under THIS role, not site_api()'s. With no
+        # CloudWatch read here, get_platform_cost's inference_receipt 503'd on
+        # ListMetrics AccessDenied (live 2026-10-10T05:38:49Z), and the receipts envelope
+        # silently lost its history + typical day on GetMetricStatistics. These are the
+        # CloudWatch reads lambdas/web/ makes (site_api_budget, site_api_status), derived
+        # by tests/test_mcp_role_cloudwatch_reads_4774.py. Read-only; CloudWatch read
+        # APIs have no resource-level scoping, same as site_api()'s InferenceReceiptMetrics.
+        iam.PolicyStatement(
+            sid="SurfaceWaiterCloudWatchRead",
+            actions=[
+                "cloudwatch:DescribeAlarms",
+                "cloudwatch:GetMetricData",
+                "cloudwatch:GetMetricStatistics",
+                "cloudwatch:ListMetrics",
+            ],
+            resources=["*"],
+        ),
     ]
 
 
