@@ -15,4 +15,11 @@ if _ROOT not in sys.path:
 _mod = importlib.import_module("qa.visual_ai_qa")
 # Path-loaded callers (spec_from_file_location, no sys.modules lookup) keep THIS module object: mirror the surface.
 globals().update({k: v for k, v in vars(_mod).items() if not k.startswith("__")})
-sys.modules[__name__] = _mod
+if __name__ == "__main__":
+    # qa/visual_ai_qa.py has a standalone block keyed on __main__; there is no main(), so run it as such.
+    import runpy
+
+    sys.modules.pop("qa.visual_ai_qa", None)
+    runpy.run_module("qa.visual_ai_qa", run_name="__main__")
+else:
+    sys.modules[__name__] = _mod

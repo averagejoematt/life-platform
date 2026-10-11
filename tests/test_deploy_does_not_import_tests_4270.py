@@ -29,10 +29,7 @@ MOVED_CLEAN = [
     "deploy/build_bundle.py",
     "deploy/sync_doc_metadata.py",
     "deploy/restart_integration_check.py",
-    "deploy/capture_api_schemas.py",
     "scripts/api_sweep_check.py",
-    "scripts/design_sync_capture.py",
-    "scripts/fresh_eyes_discovery.py",
     "scripts/mypy_disable_cost.py",
     "scripts/review_anchor_seal.py",
     "scripts/surface_drift_gate.py",
@@ -71,14 +68,34 @@ LEGACY = {
     "scripts/harvest_eval_fixtures.py",  # tests/golden_surface_eval.py (the golden-brief eval-harness slice -> qa/eval)
 }
 
+# qa/ modules that still put tests/ on sys.path (they import tests-owned site_review / a11y_audit / truth_baseline_audit).
+# Shrink-only. Anything that imports one of these loads tests/ one step removed, so it is NOT "moved clean".
+QA_TESTS_PATH_LEGACY = {
+    "qa/accuracy_audit.py",
+    "qa/comprehension_qa.py",
+    "qa/visual_ai_qa.py",
+    "qa/visual_qa.py",
+}
+
+# deploy/ or scripts/ modules with no tests/ path line of their own that reach tests/ transitively via a qa/ module above.
+TRANSITIVE = {
+    "deploy/capture_api_schemas.py": "from qa import accuracy_audit -> qa/accuracy_audit.py appends tests/ and imports site_review*",
+    "scripts/design_sync_capture.py": "lazy `from qa import visual_qa` -> qa/visual_qa.py appends tests/",
+    "scripts/fresh_eyes_discovery.py": "lazy `from qa import visual_qa / visual_ai_qa` -> both append tests/",
+}
+
 _PATTERNS = [
     re.compile(r"sys\.path\.(insert|append)\(.*[\"']tests[\"']"),
     re.compile(r"[\"']tests[\"']\s*,\s*[\"'](?!test_)[\w]+\.py[\"']"),
     re.compile(r"/\s*[\"']tests[\"']\s*/\s*[\"'](?!test_)[\w]+\.py[\"']"),
     re.compile(r"^QA_MANIFEST\s*=\s*[\"']tests/"),
     re.compile(r"sys\.path\.(insert|append)\(\s*\w*\s*,?\s*tests_dir"),
-    re.compile(r"^for _p in .*[\"']tests[\"']"),
 ]
+
+
+# Multi-line: a loop over a path list that names "tests" and sys.path-inserts its variable (any variable name; the
+# deploy/pii_surface_guard.py `for p in (...)` form slipped past a `_p`-only pattern).
+_LOOP_INSERT = re.compile(r"^\s*for \w+ in [^\n]*[\"']tests[\"'][^\n]*:\n(?:\s*if [^\n]*\n)?\s*sys\.path\.(?:insert|append)", re.M)
 
 
 def _offenders() -> set:
@@ -86,7 +103,11 @@ def _offenders() -> set:
     for sub in ("deploy", "scripts"):
         for p in (ROOT / sub).glob("*.py"):
             rel = p.relative_to(ROOT).as_posix()
-            for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            text = p.read_text(encoding="utf-8", errors="replace")
+            if _LOOP_INSERT.search(text):
+                out.add(rel)
+                continue
+            for line in text.splitlines():
                 s = line.strip()
                 if s.startswith("#"):
                     continue
@@ -149,3 +170,32 @@ def test_every_shim_is_a_thin_alias_for_its_real_module():
         text = (ROOT / rel).read_text(encoding="utf-8")
         assert "sys.modules[__name__] = _mod" in text, f"{rel} is not a pure alias shim"
         assert len(text.splitlines()) < 45, f"{rel} grew logic - a shim must stay a re-export"
+
+
+_QA_TESTS_PATH = re.compile(r"sys\.path\.(?:append|insert)\(\s*[^\n]*[\"']tests[\"']")
+
+
+def test_qa_modules_that_put_tests_on_sys_path_are_ledgered():
+    found = set()
+    for p in (ROOT / "qa").glob("*.py"):
+        if _QA_TESTS_PATH.search(p.read_text(encoding="utf-8", errors="replace")):
+            found.add(p.relative_to(ROOT).as_posix())
+    assert not (found - QA_TESTS_PATH_LEGACY), f"qa/ module newly puts tests/ on sys.path: {sorted(found - QA_TESTS_PATH_LEGACY)}"
+    assert not (QA_TESTS_PATH_LEGACY - found), f"stale QA_TESTS_PATH_LEGACY rows: {sorted(QA_TESTS_PATH_LEGACY - found)}"
+
+
+def test_moved_clean_files_do_not_import_a_qa_module_that_reaches_tests():
+    """MOVED_CLEAN means "loads nothing from tests/", including one step removed through qa/."""
+    bad_mods = {Path(r).stem for r in QA_TESTS_PATH_LEGACY}
+    imp = re.compile(r"^\s*(?:from qa import ([\w, ]+)|from qa\.(\w+) import|import qa\.(\w+))", re.M)
+    offenders = []
+    for rel in MOVED_CLEAN:
+        for m in imp.finditer((ROOT / rel).read_text(encoding="utf-8")):
+            names = {n.strip() for n in (m.group(1) or "").split(",")} | {m.group(2), m.group(3)}
+            if names & bad_mods:
+                offenders.append(rel)
+    assert not offenders, f"MOVED_CLEAN but transitively loads tests/ via qa/: {offenders}"
+    for rel in TRANSITIVE:
+        assert any(
+            imp.search(ln) and any(n in ln for n in bad_mods) for ln in (ROOT / rel).read_text().splitlines()
+        ), f"{rel} no longer transitive - drop it"

@@ -132,11 +132,11 @@ jobs:
 
       - name: Format gate (black — ENFORCED, config in pyproject.toml)
         if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
-        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
         if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
-        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
         if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252

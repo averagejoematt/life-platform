@@ -228,14 +228,14 @@ jobs:
 
       - name: Format gate (same pin as ci-cd lint)
         if: always()
-        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       # Same class as the mypy gate above: ENFORCED in ci-lint.yml, invisible on a PR.
       # The full six-directory set is load-bearing — running a subset locally is how a
       # ruff red reaches main.
       - name: Lint gate (ruff — same command + pin as ci-lint.yml)
         if: always()
-        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       # #2632. THE ONE CLASS EVERY GATE ABOVE IS STRUCTURALLY BLIND TO. tests/conftest.py
       # puts lambdas/ AND each subpackage on sys.path so flat-name imports keep resolving,

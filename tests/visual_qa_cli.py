@@ -15,4 +15,7 @@ if _ROOT not in sys.path:
 _mod = importlib.import_module("qa.visual_qa_cli")
 # Path-loaded callers (spec_from_file_location, no sys.modules lookup) keep THIS module object: mirror the surface.
 globals().update({k: v for k, v in vars(_mod).items() if not k.startswith("__")})
-sys.modules[__name__] = _mod
+if __name__ == "__main__":
+    _mod.main()
+else:
+    sys.modules[__name__] = _mod

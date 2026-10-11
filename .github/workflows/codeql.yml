@@ -78,6 +78,7 @@ on:
       - 'mcp/**'
       - 'cdk/**'
       - 'tests/**'
+      - 'qa/**'
       - 'site/**'
       - '.github/workflows/**'
   schedule:
