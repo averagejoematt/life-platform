@@ -289,6 +289,22 @@ class EmailStack(Stack):
             targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"story_questions": True}))
         )
 
+        # #4584 the Tuesday question: ONE fixed question on the same channel and routing token, so his reply lands
+        # verbatim in the owner-words store and leads Wednesday's edition. Same target function, same role: no new
+        # IAM (it already sends SES and writes the STORYQ# marker for Monday).
+        # Clock: cron(0 1 ? * WED *) = Wednesday 01:00 UTC = Tuesday 18:00 PDT (UTC-7, mid-March → early November) and
+        # Tuesday 17:00 PST (UTC-8) in winter. EventBridge crons here are fixed UTC, so the send drifts one hour
+        # earlier across the November DST change; both are Tuesday evening Pacific, and the sender reads the PT day.
+        tuesday_question_rule = events.Rule(
+            self,
+            "OwnerWordsQuestionTuesday",
+            schedule=events.Schedule.cron(minute="0", hour="1", week_day="WED"),
+            description="#4584: the Tuesday-evening-PT question whose verbatim reply leads Wednesday's edition (optional)",
+        )
+        tuesday_question_rule.add_target(
+            targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"tuesday_question": True}))
+        )
+
         create_platform_lambda(
             self,
             "WeeklyPlate",
