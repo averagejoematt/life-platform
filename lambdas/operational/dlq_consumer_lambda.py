@@ -108,6 +108,12 @@ ABSOLUTE_MESSAGE_CAP = 1000  # belt-and-suspenders guard against a runaway loop
 # Durable retry ledger (single-table, no GSI — composite key only, ADR-115).
 LEDGER_PK = "SYSTEM#dlq-ledger"
 LEDGER_TTL_SECONDS = 90 * 24 * 3600  # auto-purge ledger rows 90d after last touch
+# #4789: attempts only accumulate while failures keep recurring inside this window. A row whose
+# last_seen is older restarts at this occurrence's count, so a transient signature seen 3x in
+# weeks (healthy in between) is retried, not escalated. 3 days: the same crash on a 6-hourly
+# schedule recurs ~12x inside it (still escalates, #4731), while a weekly job's signature never
+# strings together; override with LEDGER_WINDOW_DAYS.
+LEDGER_WINDOW_DAYS = float(os.environ.get("LEDGER_WINDOW_DAYS", "3"))
 
 # ── AWS clients ────────────────────────────────────────────────────────────────
 sqs = boto3.client("sqs", region_name=REGION)
@@ -293,30 +299,59 @@ def record_failure(stable_id: str, fn_name: str, receive_count: int, body_str: s
     inc = max(1, int(receive_count))
     now = int(time.time())
     now_iso = datetime.now(timezone.utc).isoformat()
-    try:
-        resp = _table.update_item(
-            Key={"pk": LEDGER_PK, "sk": f"MSG#{stable_id}"},
-            UpdateExpression=(
-                "ADD attempts :inc "
-                "SET fn_name = :fn, last_seen = :now, last_receive_count = :rc, "
-                "body_preview = :bp, failure_signature = :sig, #t = :ttl, first_seen = if_not_exists(first_seen, :now)"
-            ),
+    cutoff_iso = datetime.fromtimestamp(now - LEDGER_WINDOW_DAYS * 86400, timezone.utc).isoformat()
+    key = {"pk": LEDGER_PK, "sk": f"MSG#{stable_id}"}
+    values = {
+        ":fn": fn_name or "unknown",
+        ":now": now_iso,
+        ":rc": Decimal(int(receive_count)),
+        ":bp": (body_str or "")[:500],
+        ":sig": signature or "",
+        ":ttl": Decimal(now + LEDGER_TTL_SECONDS),
+        ":cutoff": cutoff_iso,
+    }
+    common_set = "fn_name = :fn, last_seen = :now, last_receive_count = :rc, body_preview = :bp, failure_signature = :sig, #t = :ttl"
+    fresh = "attribute_not_exists(last_seen) OR last_seen >= :cutoff"
+
+    def _update(expr: str, cond: str, extra: dict):
+        return _table.update_item(
+            Key=key,
+            UpdateExpression=expr,
+            ConditionExpression=cond,
             ExpressionAttributeNames={"#t": "ttl"},
-            ExpressionAttributeValues={
-                ":inc": Decimal(inc),
-                ":fn": fn_name or "unknown",
-                ":now": now_iso,
-                ":rc": Decimal(int(receive_count)),
-                ":bp": (body_str or "")[:500],
-                ":sig": signature or "",
-                ":ttl": Decimal(now + LEDGER_TTL_SECONDS),
-            },
+            ExpressionAttributeValues={**values, **extra},
             ReturnValues="UPDATED_NEW",
         )
+
+    add_expr = f"ADD attempts :inc SET {common_set}, first_seen = if_not_exists(first_seen, :now)"
+    # Two-step, every step conditional on last_seen so concurrent writers cannot lose a count:
+    #   1. ADD while the row is fresh (or new) - the common path, one call.
+    #   2. row is stale: conditionally RESET attempts to this occurrence's count (and first_seen).
+    #   3. another writer reset it first (condition fails again): the row is fresh now, so ADD.
+    try:
+        try:
+            resp = _update(add_expr, fresh, {":inc": Decimal(inc)})
+        except Exception as e:  # noqa: BLE001
+            if not _is_cond_fail(e):
+                raise
+            try:
+                resp = _update(
+                    f"SET attempts = :inc, {common_set}, first_seen = :now",
+                    "last_seen < :cutoff",
+                    {":inc": Decimal(inc)},
+                )
+            except Exception as e2:  # noqa: BLE001
+                if not _is_cond_fail(e2):
+                    raise
+                resp = _update(add_expr, "last_seen >= :cutoff", {":inc": Decimal(inc)})
         return int(resp.get("Attributes", {}).get("attempts", inc))
     except Exception as e:  # noqa: BLE001 — fail-soft, never drop a message on a DDB blip
         logger.error(f"  ledger update failed for {stable_id}: {e}")
         return inc
+
+
+def _is_cond_fail(e: Exception) -> bool:
+    return getattr(e, "response", {}).get("Error", {}).get("Code") == "ConditionalCheckFailedException"
 
 
 def mark_escalated(stable_id: str) -> None:
