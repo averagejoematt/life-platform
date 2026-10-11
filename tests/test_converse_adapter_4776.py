@@ -14,7 +14,12 @@ What is pinned:
   * every guard and meter of `invoke()` stays in the path for a Converse call: the tier-3 budget
     stop fires BEFORE `converse`, the dev-session cap is checked and charged, usage metrics are
     emitted on the family's own price row (never the Fable default), truncation is metered;
-  * the four candidates are mapped, priced on their own rows, and IAM names EXACTLY those ARNs;
+  * a refusal is NEVER retried — counted through each of the three retry loops (`invoke_with_retry`,
+    both `common/retry_utils` wrappers, `ai_transport.call_anthropic`): one attempt, no sleep, no
+    send; the verifier's reproduction had the one loop retrying it 3x with ~20 s of backoff;
+  * the four candidates are mapped, priced on their own rows, IAM names EXACTLY those ARNs, and
+    `resolve_model_id` passes through ONLY those ids — an unmapped sibling or a bare profile-only
+    id is an UnknownModelError, never a quiet pass-through metered at the Fable default;
   * the swap-eval harness drives all three internal features through the adapter end to end
     with the stub transport — twelve feature x candidate runs — and its deterministic gate still
     bites through the adapter.
@@ -140,6 +145,14 @@ def test_converse_family_is_detected_for_names_profiles_and_arns_and_never_for_c
         assert bc.converse_family(anthropic) is None, anthropic
     with pytest.raises(bc.UnknownModelError):
         bc.resolve_model_id("gpt-oss-240b")
+    # #4275's refuse-to-guess rule holds for a bare Converse-family id too: ONLY the mapped ids pass
+    # through. The family prefix alone let `openai.gpt-oss-safeguard-20b` (unmapped, unpriced — it
+    # would meter at the Fable default) and a bare `amazon.nova-micro-v1:0` (profile-only) through.
+    for unmapped in ("openai.gpt-oss-safeguard-20b", "openai.gpt-oss-safeguard-120b-1:0", "amazon.nova-micro-v1:0", "qwen.qwen3-235b-v1:0"):
+        with pytest.raises(bc.UnknownModelError, match="refusing to guess"):
+            bc.resolve_model_id(unmapped)
+    assert bc.resolve_model_id("us.amazon.nova-micro-v1:0") == "us.amazon.nova-micro-v1:0", "the profile id is the mapped one"
+    assert bc._CONVERSE_MAPPED_IDS == {m for m, _f, _r in CANDIDATES.values()}
 
 
 def test_the_four_candidates_price_on_their_own_rows_with_no_cache_leg():
@@ -257,9 +270,56 @@ def test_the_untranslatable_refuses_before_any_send(monkeypatch):
         else:
             missed.append((needle, "no refusal"))
     assert missed == []
-    assert issubclass(bc.ConverseUnsupported, ValueError), "both retry wrappers treat it as a refusal, never retried"
     with pytest.raises(bc.ConverseUnsupported, match="not a Converse-family"):
         bc.to_converse_request({"messages": [user]}, "us.anthropic.claude-haiku-5-5")
+
+
+def test_a_refusal_is_never_retried_by_any_of_the_three_loops(wired, monkeypatch):
+    """Counted, not inferred from the class hierarchy. The first cut asserted only
+    `issubclass(ConverseUnsupported, ValueError)`; the one loop's `refusals` tuple did not name
+    the class, so a refused body fell into `except Exception` and was retried 3x with ~20 s of
+    jittered sleep (the verifier measured attempts=3, sleeps=[3.93, 11.41]). Mutation proof: drop
+    `ConverseUnsupported` from `invoke_with_retry`'s `refusals` and the first block reds."""
+    from ai import ai_transport as at
+    from common import retry_utils as ru
+
+    fake, _cw, _tier = wired
+    sleeps = []
+    monkeypatch.setattr(bc.time, "sleep", lambda s: sleeps.append(s))
+    attempts = {"n": 0}
+    real_invoke = bc.invoke
+
+    def counting_invoke(body, model_name=None):
+        attempts["n"] += 1
+        return real_invoke(body, model_name=model_name)
+
+    monkeypatch.setattr(bc, "invoke", counting_invoke)  # invoke_with_retry looks `invoke` up at call time
+    user = {"role": "user", "content": "x"}
+
+    # 1. the one loop
+    with pytest.raises(bc.ConverseUnsupported, match="tools"):
+        bc.invoke_with_retry({"messages": [user], "max_tokens": 5, "tools": [{"name": "f"}]}, model_name="gpt-oss-20b")
+    assert (attempts["n"], sleeps) == (1, []), "a refusal entered the backoff ladder"
+
+    # 2. both retry_utils wrappers re-raise it at once, metric fired
+    fired = []
+    monkeypatch.setattr(ru, "_emit_failure_metric", lambda: fired.append("ru"))
+    attempts["n"] = 0
+    with pytest.raises(bc.ConverseUnsupported, match="stream"):
+        ru.call_anthropic_raw({"model": "qwen3-32b", "max_tokens": 5, "messages": [user], "stream": True})
+    assert (attempts["n"], sleeps, fired) == (1, [], ["ru"])
+    attempts["n"] = 0
+    with pytest.raises(bc.ConverseUnsupported, match="image"):
+        ru.call_anthropic_api("hi", model="gpt-oss-120b", system=[{"type": "image", "source": {"type": "base64", "data": "AA=="}}])
+    assert (attempts["n"], sleeps, fired) == (1, [], ["ru", "ru"])
+
+    # 3. the brief's wrapper: the outage sentinel in one attempt, failure metric fired
+    monkeypatch.setattr(at, "_emit_failure_metric", lambda *a, **k: fired.append("at"))
+    attempts["n"] = 0
+    out = at.call_anthropic("hi", model="nova-micro", system=[{"type": "image", "source": {"type": "base64", "data": "AA=="}}])
+    assert out == at.AI_UNAVAILABLE_SENTINEL
+    assert (attempts["n"], sleeps, fired[-1]) == (1, [], "at")
+    assert fake.converse_calls == [] and fake.invoke_calls == [], "nothing was sent, nothing billed"
 
 
 def test_from_converse_response_is_the_messages_shape_every_caller_parses():

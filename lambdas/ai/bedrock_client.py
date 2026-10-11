@@ -102,6 +102,10 @@ CONVERSE_FAMILIES = {
     "amazon.nova": "nova",
 }
 _REGION_PREFIXES = ("us.", "global.", "eu.", "apac.")
+# The Converse-family ids `resolve_model_id` passes through unchanged: exactly the mapped
+# ones, so an unmapped sibling (`openai.gpt-oss-safeguard-20b`) or a profile-only model's
+# bare id (`amazon.nova-micro-v1:0`) is an UnknownModelError, never a quiet pass-through.
+_CONVERSE_MAPPED_IDS = frozenset(v for v in _MODEL_MAP.values() if v.removeprefix("us.").startswith(tuple(CONVERSE_FAMILIES)))
 
 # Fable 5 / Opus 4.7+ removed sampling params (temperature/top_p/top_k → 400), and so
 # did the whole Claude 5 line: Sonnet 5, Opus 5 and Opus 5.5 all reject them (#4275).
@@ -139,8 +143,8 @@ class UnknownModelError(ValueError):
         self.model_name = model_name
         known = ", ".join(sorted(_MODEL_MAP))
         super().__init__(
-            f"unknown AI model name {model_name!r}: not a Bedrock profile id (us./global./arn:), not a Converse-family "
-            f"foundation-model id ({'/'.join(CONVERSE_FAMILIES)}) "
+            f"unknown AI model name {model_name!r}: not a Bedrock profile id (us./global./arn:), not a mapped "
+            f"Converse-family foundation-model id [{', '.join(sorted(_CONVERSE_MAPPED_IDS))}] "
             f"and not one of the {len(_MODEL_MAP)} mapped names [{known}] — refusing to guess a model (#4275)"
         )
 
@@ -856,19 +860,25 @@ def _client():
 def resolve_model_id(model_name: str | None) -> str:
     """Map an Anthropic model name to a Bedrock inference-profile ID.
 
-    Pass-through if already a profile id (us.* / global.*) or a full ARN. No name at
-    all (None / "") is the one case that takes `_DEFAULT_PROFILE`. A NAME that maps to
-    nothing raises `UnknownModelError` (#4275) — it used to return `_DEFAULT_PROFILE`
-    too, which turned `AI_MODEL=claude-sonnet-5` into a silent Haiku 4.5 downgrade of
-    every narrative surface. Absent is not unknown; unknown fails loudly.
+    Pass-through if already a profile id (us.* / global.*), a full ARN, or one of the
+    Converse-family foundation-model ids `_MODEL_MAP` names (#4776 — the exact id, not
+    the family prefix). No name at all (None / "") is the one case that takes
+    `_DEFAULT_PROFILE`. A NAME that maps to nothing raises `UnknownModelError` (#4275)
+    — it used to return `_DEFAULT_PROFILE` too, which turned `AI_MODEL=claude-sonnet-5`
+    into a silent Haiku 4.5 downgrade of every narrative surface. Absent is not
+    unknown; unknown fails loudly.
     """
     if not model_name:
         return _DEFAULT_PROFILE
     if model_name.startswith(("us.", "global.", "arn:")):
         return model_name
-    if model_name.startswith(tuple(CONVERSE_FAMILIES)):
+    if model_name in _CONVERSE_MAPPED_IDS:
         # #4776: a bare in-region foundation-model id of a Converse family (`openai.gpt-oss-120b-1:0`)
-        # takes no inference profile, so like a `us.` id it is already the thing Bedrock wants.
+        # takes no inference profile, so like a `us.` id it is already the thing Bedrock wants — but
+        # ONLY the ids `_MODEL_MAP` names. A family prefix alone passed `openai.gpt-oss-safeguard-20b`
+        # (unmapped, unpriced: it would have metered at the Fable default) and a bare
+        # `amazon.nova-micro-v1:0` (reachable only through its `us.` profile). #4275's rule — refuse
+        # to guess — holds for the Converse families too: a mapped model prices on its own row.
         return model_name
     try:
         return _MODEL_MAP[model_name]
@@ -928,8 +938,14 @@ class ConverseUnsupported(ValueError):
 
     Raised by `to_converse_request` — before any send, so nothing is billed — for an image,
     document, tool_use or tool_result block, a `tools`/`tool_choice`/`stream` key, or an
-    output_config that is not a json_schema. Both retry wrappers treat a ValueError as a
-    refusal (it is never retried: attempt 2 would carry the same body).
+    output_config that is not a json_schema. A REFUSAL, not a transport failure: attempt 2
+    would carry the same body, so every retry loop excepts this class ahead of its generic
+    handler — `invoke_with_retry` (the one loop, in its `refusals` tuple), both
+    `common/retry_utils` wrappers (re-raise) and `ai/ai_transport.call_anthropic` (the
+    outage sentinel, failure metric fired). Being a ValueError is NOT what makes it a
+    refusal: the generic `except Exception` in each loop would retry a bare ValueError
+    three times with ~20 s of backoff — the verifier reproduced exactly that before the
+    class was named in each loop (#4776).
     """
 
 
@@ -1172,16 +1188,17 @@ def invoke_with_retry(body: dict, model_name: str | None = None) -> dict:
     """`invoke()` under the platform's single retry policy (#4279).
 
     Worst case: INVOKE_MAX_ATTEMPTS sends and sum(INVOKE_RETRY_BASE_DELAYS) = 20 s of
-    sleep. Never retried: the tier-3 budget stop (#3084) and UnknownModelError
-    (#4275) — both refusals raised before invoke_model, nothing billed, and attempt
-    2 would be identical — and a non-retryable ClientError (validation, access).
+    sleep. Never retried: the tier-3 budget stop (#3084), UnknownModelError (#4275)
+    and ConverseUnsupported (#4776) — all three refusals raised before any send,
+    nothing billed, and attempt 2 would be identical — and a non-retryable
+    ClientError (validation, access).
     A non-ClientError exception (connection reset, read timeout) is retried: the
     send did not return, so nothing was received to re-bill (#2893's rule).
     The final failure is re-raised unchanged; callers own the degrade path.
     """
     import botocore.exceptions as _bce
 
-    refusals = (budget_stop_cls(), UnknownModelError)
+    refusals = (budget_stop_cls(), UnknownModelError, ConverseUnsupported)
     for attempt in range(1, INVOKE_MAX_ATTEMPTS + 1):
         try:
             # Looked up at call time, so a monkeypatched `bedrock_client.invoke` is what runs.
