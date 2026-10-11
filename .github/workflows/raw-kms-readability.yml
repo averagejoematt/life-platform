@@ -1,0 +1,112 @@
+# Raw-archive readability check (#4634 box 3).
+#
+# Between 2026-05-16 21:31Z and 2026-05-17 21:44Z the bucket's default encryption
+# was a customer-managed KMS key that was later deleted; the 25 raw objects written
+# under it can never be decrypted again. They are RECORDED, object by object, in
+# docs/audits/RAW_KMS_UNREADABLE_INVENTORY_2026-10.md. Every "recoverable from raw"
+# claim on the platform silently depends on the rest of raw/ staying readable, and
+# until this workflow nothing checked that.
+#
+# What it does (scripts/raw_kms_readability_inventory.py --check-against-record):
+#   * lists every object under raw/ and HeadObjects each one (encryption + key);
+#   * fails when the set of undecryptable objects differs from the recorded set —
+#     a NEW one (a key lost again) or a recorded one that now reads (re-fetched or
+#     re-encrypted; the record must be updated in the same change);
+#   * fails on any HeadObject error (readability unknowable is not readable);
+#   * reads 1 byte from 20 random objects that should decrypt and fails if any
+#     does not — the "sampled read fails to decrypt" arm of the issue's box 3.
+#
+# Read-only against AWS: ListObjectsV2 + HeadObject + a 1-byte ranged GetObject,
+# plus a best-effort kms:DescribeKey. No new IAM grant: the remediation role's
+# S3List (s3:prefix raw/*) and S3Read (s3:GetObject on the bucket) statements in
+# infra/iam/github-actions-remediation-role.permissions.json already cover it.
+# That role has no kms:DescribeKey on the dead key, so the script reports its
+# state as Unknown(...) — which it counts as undecryptable. That is the right
+# call for raw/, whose policy is SSE-S3 only: ANY SSE-KMS object there is either
+# a recorded one or a new defect.
+#
+# Scope is raw/ — the archive the "recoverable from raw" claims depend on. The
+# one-off inventory in the audit doc covered every other top-level prefix (all
+# SSE-S3, zero undecryptable, 2026-10-11) and config/ is owner-run only.
+#
+# Cost: ~40k HEADs/week ≈ $0.016/week S3 request charges; ~1 minute on a free
+# public-repo runner.
+
+name: Raw archive readability
+
+on:
+  schedule:
+    - cron: '29 14 * * 1'   # Mondays 14:29 UTC (07:29 PDT; fixed UTC — no DST drift) — weekly; the dead set changes only on a key loss or a re-fetch
+  workflow_dispatch: {}
+#
+# No `pull_request` trigger on purpose — same reasoning as config-drift.yml /
+# hae-webhook-ingress-drift.yml: this reads LIVE bucket state, which a PR's repo
+# bytes cannot speak to.
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+
+permissions:
+  id-token: write   # OIDC token for AWS
+  contents: read
+  issues: write     # advisory-failure issue filing (#1447)
+
+concurrency:
+  group: raw-kms-readability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: raw/ objects decrypt, and the dead set is the recorded set
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # setup-python + configure-aws-credentials via the shared composite (#1655).
+      # remediation-role, not deploy-role — a readability census is diagnosis
+      # (#903 shed diagnosis reads out of the deploy role).
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-remediation-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install check dependencies (boto3, botocore)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
+
+      - name: Raw readability check (read-only, blocking)
+        # Unpiped: a pipe would hand the step the TAIL's exit status and the gate
+        # could not fail (the #3103 class, CONVENTIONS.md §4). The script's own
+        # exit code is captured directly; the step summary is built from a file.
+        run: |
+          set -u
+          OUT="$(mktemp)"
+          rc=0
+          python3 scripts/raw_kms_readability_inventory.py --prefix raw/ --check-against-record --sample-readable 20 --markdown > "$OUT" 2>&1 || rc=$?
+          cat "$OUT"
+          {
+            echo "## Raw archive readability (#4634)"
+            echo ""
+            echo "Run (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ) — exit $rc"
+            echo ""
+            cat "$OUT"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      # #1447 — a red here is silent otherwise (no reader surface depends on it).
+      # File/update ONE deduped issue on failure; auto-close on the next green run.
+      - name: File/resolve advisory failure issue (#1447)
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: raw-kms-readability
+          workflow-name: Raw archive readability
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            An object under raw/ is undecryptable and not in
+            docs/audits/RAW_KMS_UNREADABLE_INVENTORY_2026-10.md, a recorded one now
+            reads (update the record), a HeadObject failed, or a sampled read did not
+            decrypt. The run's step summary lists which.

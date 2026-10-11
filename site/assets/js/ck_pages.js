@@ -167,9 +167,12 @@ export function coachLinesHTML(block) {
 // ── the record, never alone ────────────────────────────────────────────────────
 // One sentence pair: the count and what a simple guess would have done. With either half
 // missing the block is `unavailable` upstream and this prints its sentence instead.
+// #4617: the count states what it counts — sealed, bets, commentary, conditional — when served.
+const countedText = (d) => String((d && d.counted_text) || "").trim();
 export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
-  return `${block.data.count_text} ${comparisonText({ sentence: block.data.comparison_text })}`;
+  const counted = countedText(block.data);
+  return `${block.data.count_text}${counted ? ` ${counted}` : ""} ${comparisonText({ sentence: block.data.comparison_text })}`;
 }
 export function betLine(nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
@@ -193,7 +196,7 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}${countedText(d) ? `<p class="ck-small">${esc(countedText(d))}</p>` : ""}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────

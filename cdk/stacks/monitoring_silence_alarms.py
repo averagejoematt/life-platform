@@ -25,6 +25,7 @@ swallowed failure, so they have no twin constant to pin.
     chronicle-status-write-failed            CHRONICLE-STATUS-WRITE-FAILED          (#3563)
     freshness-sentinel-write-failed          FRESHNESS-SENTINEL-WRITE-FAILED        (#3563)
     chronicle-autopublish-held               CHRONICLE-AUTOPUBLISH-HELD             (#4694)
+    panelcast-autopublish-held               PANELCAST-AUTOPUBLISH-HELD             (#4694)
 
 #2823's ONE DELIBERATE DEVIATION — THRESHOLD, NOT SHAPE. Every alarm above is
 threshold=1 over 5 minutes: those tokens mean "this should never happen." A held
@@ -390,3 +391,46 @@ def add_silence_alarms(scope, digest) -> None:
         treat_missing_data=NB,
     )
     ap_held_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
+    # ══════════════════════════════════════════════════════════════
+    # #4694 (owner ruling 2026-10-11): the Panel's LEGACY writer — the Mon/Wed
+    # cron and the SS-02 hold sweep — publishes only with the owner's approval or
+    # a passed audit. panelcast_desk.legacy_publish_gate logs this token once per
+    # held run, and the line names the week, its chronicle date and every
+    # blocking item. The hold's own SNS ping (_hold_and_alert, "[Panel] Episode
+    # wk<N> HELD for review") also names the week, but it is best-effort — a
+    # failed publish is only a warning — so this alarm is the backstop that
+    # keeps the refusal loud. It re-fires on every cron/sweep run that holds the
+    # week again. Token must equal autopublish_audit.PANEL_HELD_TOKEN — pinned by
+    # tests/test_panelcast_autopublish_audit_4694.py.
+    # Rent (ADR-103): $0.10/mo standing; the metric publishes nothing while
+    # healthy. Demote when: the legacy writer is retired (desk-only Panel path).
+    # ══════════════════════════════════════════════════════════════
+    pc_held_lg = logs.LogGroup.from_log_group_name(scope, "AutopublishHeldLgCoachPanelPodcast", "/aws/lambda/coach-panel-podcast")
+    pc_held_mf = logs.MetricFilter(
+        scope,
+        "AutopublishHeldFilterCoachPanelPodcast",
+        log_group=pc_held_lg,
+        filter_pattern=logs.FilterPattern.literal('"PANELCAST-AUTOPUBLISH-HELD"'),
+        metric_name="PanelcastAutopublishHeld",
+        metric_namespace="LifePlatform/Email",
+        metric_value="1",
+    )
+    pc_held_alarm = cloudwatch.Alarm(
+        scope,
+        "AutopublishHeldAlarmCoachPanelPodcast",
+        alarm_name="panelcast-autopublish-held",
+        alarm_description=(
+            "#4694: coach-panel-podcast's legacy writer (Mon/Wed cron or hold sweep) held a Panel episode with no owner "
+            "approval and no passed audit — the episode is NOT published. The PANELCAST-AUTOPUBLISH-HELD line in "
+            "/aws/lambda/coach-panel-podcast names the week (wk<N>), its chronicle date and the blocking items; the "
+            "'[Panel] Episode wk<N> HELD for review' email carries the same. Invoke coach-panel-podcast with "
+            '{"owner_approved": true} to publish it, or fix the chronicle and let the next run audit it.'
+        ),
+        metric=pc_held_mf.metric(period=Duration.seconds(300), statistic="Sum"),
+        evaluation_periods=1,
+        threshold=1,
+        comparison_operator=GTE,
+        treat_missing_data=NB,
+    )
+    pc_held_alarm.add_alarm_action(cw_actions.SnsAction(digest))

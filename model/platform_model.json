@@ -648,6 +648,12 @@
       "stack": "monitoring_stack",
       "via": "declaration"
     },
+    "panelcast-autopublish-held": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
     "permanence-errors": {
       "kind": "metric",
       "routing": "digest",
@@ -993,7 +999,7 @@
   ],
   "cost_surface": {
     "ai_features": 24,
-    "alarms": 136,
+    "alarms": 137,
     "emf_namespaces": 33,
     "schedules": 93,
     "secrets": 30
@@ -7591,9 +7597,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 136,
+      "alarms": 137,
       "alarms_by_routing": {
-        "digest": 92,
+        "digest": 93,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,

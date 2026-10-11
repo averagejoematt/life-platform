@@ -185,7 +185,17 @@ class TestEvaluateAllEndToEnd:
             "evaluation": {"type": "machine", "metric": "hrv", "condition": "gt", "threshold": None, "evaluation_window_days": 14},
         }
         writes = []
-        monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t, p=False: trend)
+        # #4617: a dated call is graded across its own window — feed the window a series that
+        # moves the way `trend` says (a 1.0-per-day step against a 0.2 day-to-day wobble).
+        step = {"up": 1.0, "down": -1.0}.get(trend[0], 0.0)
+        series = [
+            {
+                "date": (datetime.strptime(created, "%Y-%m-%d") + timedelta(days=i)).strftime("%Y-%m-%d"),
+                "hrv": 50 + step * i + 0.2 * (i % 2),
+            }
+            for i in range(days_ago + 1)
+        ]
+        monkeypatch.setattr(ev, "_get_source_data", lambda *a, **k: series)
         monkeypatch.setattr(
             ev, "_update_prediction_status", lambda p, e, b=None: writes.append(("status", e["status"]))
         )  # #4585: + the baseline stamp
