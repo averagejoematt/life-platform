@@ -306,12 +306,6 @@
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
     },
-    "ingest-auth-unhealthy-garmin": {
-      "kind": "metric",
-      "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
-    },
     "ingest-auth-unhealthy-habitify": {
       "kind": "metric",
       "routing": "urgent",
@@ -1017,7 +1011,7 @@
   ],
   "cost_surface": {
     "ai_features": 25,
-    "alarms": 140,
+    "alarms": 139,
     "emf_namespaces": 33,
     "schedules": 95,
     "secrets": 30
@@ -7661,9 +7655,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 140,
+      "alarms": 139,
       "alarms_by_routing": {
-        "digest": 96,
+        "digest": 95,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
