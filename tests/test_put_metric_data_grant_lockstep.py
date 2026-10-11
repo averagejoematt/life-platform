@@ -133,6 +133,13 @@ def _policy_aliases(tree) -> set:
 # to this set rather than to every wired handler.
 HAS_CUSTOM_POLICIES: set = set()
 
+# #4633: a site passing the empty literal `custom_policies=[]` is a role with NO grants of its own (the
+# helper's least-privilege path; the static IAM linter's R6 forbids an empty policy FUNCTION, so this
+# is the only shape a zero-grant role can take). It resolves to this sentinel — truthy, so the wired-set
+# guard below sees it as resolved, and deliberately NOT a role_policies name, so if such a Lambda ever
+# starts emitting put_metric_data the emitter leg reds on an unresolvable role rather than passing it.
+ZERO_GRANTS = "custom_policies=[]"
+
 
 def _build_source_to_rp_map() -> dict:
     """source_file → set(role_policies fn names) from every create_platform_lambda."""
@@ -152,6 +159,8 @@ def _build_source_to_rp_map() -> dict:
                     source_file = kw.value.value
                 if kw.arg == "custom_policies":
                     has_custom_policies = True
+                    if isinstance(kw.value, ast.List) and not kw.value.elts:
+                        rp_fns.add(ZERO_GRANTS)
                     for call in ast.walk(kw.value):
                         if (
                             isinstance(call, ast.Call)
@@ -226,6 +235,8 @@ def test_every_wired_lambda_resolves_its_policy_alias():
     """
     assert HAS_CUSTOM_POLICIES, "no create_platform_lambda passes custom_policies — the scan broke"
     unresolved = sorted(sf for sf in HAS_CUSTOM_POLICIES if not _SOURCE_TO_RP.get(sf))
+    # the zero-grant shape has a live subject (#4633) — if it ever grows a policy function, drop this line
+    assert _SOURCE_TO_RP.get("lambdas/emails/inbound_auth_gate_lambda.py") == {ZERO_GRANTS}
     assert not unresolved, (
         "These create_platform_lambda calls pass custom_policies that did not resolve to any "
         "`role_policies*` module alias — extend _policy_aliases:\n  " + "\n  ".join(unresolved)
