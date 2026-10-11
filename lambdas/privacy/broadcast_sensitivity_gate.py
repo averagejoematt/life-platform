@@ -315,9 +315,7 @@ def bedrock_offtopic_classifier(text: str) -> OfftopicResult:
     except ImportError:  # pragma: no cover — budget_guard always bundled in prod
         pass
 
-    import json
-
-    from ai import bedrock_client
+    from ai import bedrock_client, structured_json
 
     body = {
         "max_tokens": 60,
@@ -329,10 +327,12 @@ def bedrock_offtopic_classifier(text: str) -> OfftopicResult:
     for block in resp.get("content") or []:
         if block.get("type") == "text":
             raw += block.get("text", "")
-    m = re.search(r"\{.*\}", raw, re.DOTALL)
-    if m is None:  # no JSON object in the reply → unparseable verdict → uncertain → hold
-        return OfftopicResult(None, 0.0)
-    parsed = json.loads(m.group(0))
+    try:
+        parsed = structured_json.load_json_span(raw, "{")  # the one parse door (#4276 box 2)
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":  # no JSON object in the reply → unparseable verdict → uncertain → hold
+            return OfftopicResult(None, 0.0)
+        raise (e.cause or e)  # a decode error PROPAGATES, unchanged → classify_sensitivity's classifier_error hold
     on_topic = parsed.get("on_topic")
     if not isinstance(on_topic, bool):
         return OfftopicResult(None, 0.0)  # unparseable verdict → uncertain → hold

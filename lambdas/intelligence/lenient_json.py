@@ -14,9 +14,9 @@ what the fallback cannot recover). None = no usable response.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
+
+from ai import structured_json  # the one parse door (#4276 box 2)
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +27,12 @@ def lenient_json(text, key, partial):
         s = s.split("\n", 1)[1] if "\n" in s else s[3:]
     if s.endswith("```"):
         s = s[:-3]
-    a, b = s.find("{"), s.rfind("}")
-    core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
-    for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
-        try:
-            return json.loads(cand)
-        except Exception:  # noqa: BLE001
-            pass
-    m = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
-    if not m:
-        return None
     try:
-        value = json.loads(f'"{m.group(1)}"')  # unescape
-    except Exception:  # noqa: BLE001
-        value = m.group(1)
+        return structured_json.load_json_span(s, "{", repair_trailing_commas=True, whole_text_if_no_span=True)
+    except structured_json.JsonSpanError as e:
+        core = e.span  # the outermost object (or the whole text when there is none)
+    value = structured_json.salvage_string_field(core, key)
+    if value is None:
+        return None
     logger.warning("Full-JSON parse failed — used %s regex fallback", key)
     return {key: value, "_partial": True, **partial}
