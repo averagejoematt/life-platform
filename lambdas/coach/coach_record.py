@@ -219,7 +219,8 @@ def call_class(row: dict) -> str:
         return "sealed"
     if row.get("source") == "dispute_docket":
         return "bet"
-    spec = row.get("evaluation") if isinstance(row.get("evaluation"), dict) else {}
+    raw_spec = row.get("evaluation")
+    spec: dict = raw_spec if isinstance(raw_spec, dict) else {}
     if spec.get("type") == "conditional" or CONDITIONAL_RE.search(str(row.get("claim_natural") or "")):
         return "conditional"
     return "commentary"
