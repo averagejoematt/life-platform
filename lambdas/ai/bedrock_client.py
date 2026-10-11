@@ -20,6 +20,12 @@ Key facts:
     same cache_control blocks used on the direct API — no beta header.
   • A model NAME that maps to nothing raises UnknownModelError here (#4275);
     it is never silently rewritten to another model.
+  • #4776: a NON-Anthropic family (gpt-oss, Qwen3, Nova) is spoken to through the
+    Bedrock Converse API from the SAME `invoke()`. The Anthropic Messages body is
+    translated on the way out and the reply is translated back into the Messages
+    shape, so no caller changes; every guard and meter in `invoke()` stays in the
+    path (budget tier, dev-session cap, usage metrics, truncation, cache no-op).
+    `converse_family()` / `to_converse_request()` / `from_converse_response()`.
 
 This module is bundled into every function's deploy package (#781 retired the shared Lambda layer).
 """
@@ -69,7 +75,33 @@ _MODEL_MAP = {
     # probe that before any traffic moves.
     "claude-haiku-5-5": "us.anthropic.claude-haiku-5-5",
     "claude-sonnet-5-5": "us.anthropic.claude-sonnet-5-5",
+    # ── #4776 open-weight trial: the four Converse-family candidates. Ids read LIVE on
+    # 2026-10-11 from `aws bedrock list-foundation-models --region us-west-2` (gpt-oss-120b,
+    # gpt-oss-20b and qwen3-32b: ON_DEMAND, ACTIVE, in-region — no inference profile) and
+    # `list-inference-profiles` (Nova Micro is INFERENCE_PROFILE-only: `us.` profile, ACTIVE,
+    # SYSTEM_DEFINED, fanning out across us-east-1/us-east-2/us-west-2). Resolvable-and-priced is
+    # not routed: no `ai/model_routing.py` row points at any of them — adoption is the #4776 kill
+    # criterion (non-inferior with n and an interval, every gate, >=30% cheaper OR a named
+    # non-price benefit) against the Haiku 5.5 baseline, which waits on #4772's model access.
+    # gpt-oss-safeguard-20b/120b exist (ON_DEMAND) but carry no published price in the issue,
+    # so they are NOT mapped: a mapped model must price on its own row (#2883's rule).
+    "gpt-oss-120b": "openai.gpt-oss-120b-1:0",
+    "gpt-oss-20b": "openai.gpt-oss-20b-1:0",
+    "qwen3-32b": "qwen.qwen3-32b-v1:0",
+    "nova-micro": "us.amazon.nova-micro-v1:0",
 }
+
+# ── #4776: the non-Anthropic families, spoken to through the Bedrock Converse API ─────
+# Keyed by the model-id prefix AFTER any `us.`/`global.` region prefix. Anything not listed
+# here — every Claude profile, Titan — takes the Anthropic Messages / InvokeModel path exactly
+# as before. A family row is a TRANSPORT fact, not a route: `ai/model_routing.py` still decides
+# which feature runs on what.
+CONVERSE_FAMILIES = {
+    "openai.gpt-oss": "gpt-oss",
+    "qwen.": "qwen",
+    "amazon.nova": "nova",
+}
+_REGION_PREFIXES = ("us.", "global.", "eu.", "apac.")
 
 # Fable 5 / Opus 4.7+ removed sampling params (temperature/top_p/top_k → 400), and so
 # did the whole Claude 5 line: Sonnet 5, Opus 5 and Opus 5.5 all reject them (#4275).
@@ -107,7 +139,8 @@ class UnknownModelError(ValueError):
         self.model_name = model_name
         known = ", ".join(sorted(_MODEL_MAP))
         super().__init__(
-            f"unknown AI model name {model_name!r}: not a Bedrock profile id (us./global./arn:) "
+            f"unknown AI model name {model_name!r}: not a Bedrock profile id (us./global./arn:), not a Converse-family "
+            f"foundation-model id ({'/'.join(CONVERSE_FAMILIES)}) "
             f"and not one of the {len(_MODEL_MAP)} mapped names [{known}] — refusing to guess a model (#4275)"
         )
 
@@ -327,6 +360,16 @@ PRICES = {
     # attribution gap. Measured 2026-08-30: 576,561 Titan input tokens MTD metered as
     # $5.77 against $0.0115 of real cost.
     "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+    # #4776: the four Converse-family trial candidates. Keys are substrings of the live ids
+    # (`openai.gpt-oss-120b-1:0`, `openai.gpt-oss-20b-1:0`, `qwen.qwen3-32b-v1:0`,
+    # `us.amazon.nova-micro-v1:0`) and collide with no Claude row, so first-match and
+    # longest-match agree. Cache legs are 0 on purpose: the Converse adapter translates no
+    # `cachePoint`, so no cache token can be billed through it; re-read Nova's cache rates
+    # before translating one. Rates UNVERIFIED (see PRICE_PROVENANCE) — none is routed today.
+    "gpt-oss-120b": {"in": 0.15, "out": 0.60, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+    "gpt-oss-20b": {"in": 0.07, "out": 0.30, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+    "qwen3-32b": {"in": 0.15, "out": 0.60, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+    "nova-micro": {"in": 0.035, "out": 0.14, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
 }
 # Back-compat alias: ~8 modules/scripts/tests already read `_PRICES` from here.
 _PRICES = PRICES
@@ -376,6 +419,32 @@ PRICE_PROVENANCE = {
         "source": "https://aws.amazon.com/bedrock/pricing/ — Amazon Titan Text Embeddings V2",
         "verified_on": "2026-08-30",
         "note": "#1384/#2883: input-only $0.02/1M, measured against real cost 2026-08-30",
+    },
+    # #4776: every row below is UNVERIFIED (†) — the figures come from the issue's own table and
+    # docs/AI_MODEL_STRATEGY.md §2 (the AWS pricing page did not render for that research; AWS doc
+    # fragments + trackers). Nothing is routed to them, so no metered dollar depends on them yet;
+    # re-read against the AWS page before the first real eval call and again before any adoption.
+    "gpt-oss-120b": {
+        "source": "https://aws.amazon.com/bedrock/pricing/",
+        "verified_on": "2026-10-11",
+        "note": "UNVERIFIED (#4776): $0.15/$0.60 in-region, no cache tier translated. Against haiku-5-5 ($0.10/$0.50) this is "
+        "DEARER, so adoption needs a named non-price benefit (in-region, strict JSON, second provider)",
+    },
+    "gpt-oss-20b": {
+        "source": "https://aws.amazon.com/bedrock/pricing/",
+        "verified_on": "2026-10-11",
+        "note": "UNVERIFIED (#4776): $0.07/$0.30 in-region — 30% / 40% under haiku-5-5, on the price arm of the kill criterion",
+    },
+    "qwen3-32b": {
+        "source": "https://aws.amazon.com/bedrock/pricing/",
+        "verified_on": "2026-10-11",
+        "note": "UNVERIFIED (#4776): ~$0.15/$0.60 in-region (the issue's own '~'); dearer than haiku-5-5, non-price benefit required",
+    },
+    "nova-micro": {
+        "source": "https://aws.amazon.com/bedrock/pricing/",
+        "verified_on": "2026-10-11",
+        "note": "UNVERIFIED (#4776): $0.035/$0.14 via the us. profile — 65% / 72% under haiku-5-5. Nova caches natively; the "
+        "adapter translates no cachePoint, so its cache rates are deliberately not carried (0)",
     },
 }
 
@@ -797,6 +866,10 @@ def resolve_model_id(model_name: str | None) -> str:
         return _DEFAULT_PROFILE
     if model_name.startswith(("us.", "global.", "arn:")):
         return model_name
+    if model_name.startswith(tuple(CONVERSE_FAMILIES)):
+        # #4776: a bare in-region foundation-model id of a Converse family (`openai.gpt-oss-120b-1:0`)
+        # takes no inference profile, so like a `us.` id it is already the thing Bedrock wants.
+        return model_name
     try:
         return _MODEL_MAP[model_name]
     except KeyError:
@@ -817,8 +890,163 @@ def structured_output_config(schema: dict) -> dict:
     return {"format": {"type": "json_schema", "schema": schema}}
 
 
+# ── #4776: the Converse adapter ────────────────────────────────────────────────────────
+# Bedrock's Converse API is the one request shape every non-Anthropic family on Bedrock
+# speaks (the InvokeModel bodies differ per vendor). The translation is PURE in both
+# directions so it is unit-testable with no AWS, and it is deliberately narrow: what the
+# platform's ~40 callers actually send (text system + text messages, max_tokens,
+# temperature/top_p, stop_sequences, a JSON-schema output_config, cache_control markers) is
+# translated; anything else raises `ConverseUnsupported` BEFORE a send rather than being
+# dropped on the floor — a silently dropped tool list or image would return confident garbage.
+#
+# What is translated how, and why:
+#   • system / messages text blocks → Converse `{"text": …}` blocks. `cache_control` markers are
+#     DROPPED (not translated to `cachePoint`): none of the four trial families is known to honour
+#     one through Converse, and `_note_cache_noop` below then reports the no-op honestly.
+#   • output_config.format json_schema → the schema is rendered into a trailing system block as an
+#     instruction ("schema_via": "instruction"). Converse has no Anthropic `output_config`, and a
+#     wire-level constraint (a forced tool, or a vendor `response_format`) is per-family and
+#     unprobed; the reply is still parsed and checked against the schema by `structured_json`
+#     and the swap eval's schema gate, so a model that cannot hold the shape is MEASURED, not hidden.
+#   • max_tokens / temperature / top_p / stop_sequences → inferenceConfig. top_k, thinking,
+#     metadata and anthropic_version have no Converse equivalent and are dropped (recorded in
+#     the reply's `_converse.dropped`).
+#   • stopReason → stop_reason (same vocabulary for end_turn / max_tokens / stop_sequence /
+#     tool_use; anything else passes through verbatim so a new reason is visible, not masked).
+#   • usage.inputTokens/outputTokens(/cacheRead/cacheWrite) → the Messages `usage` keys, so
+#     `estimate_cost_usd`, the dev-session cap and every CloudWatch meter read it unchanged.
+_CONVERSE_TRANSLATED_KEYS = frozenset({"messages", "system", "max_tokens", "temperature", "top_p", "stop_sequences", "output_config"})
+_CONVERSE_DROPPED_KEYS = frozenset({"top_k", "thinking", "metadata", "anthropic_version"})
+_CONVERSE_STOP_REASONS = {"end_turn": "end_turn", "max_tokens": "max_tokens", "stop_sequence": "stop_sequence", "tool_use": "tool_use"}
+CONVERSE_SCHEMA_INSTRUCTION = (
+    "Respond with ONLY a single JSON object that conforms to this JSON Schema — no prose before or after it, " "no code fence:\n"
+)
+
+
+class ConverseUnsupported(ValueError):
+    """A Messages-body feature the Converse adapter does not translate (#4776).
+
+    Raised by `to_converse_request` — before any send, so nothing is billed — for an image,
+    document, tool_use or tool_result block, a `tools`/`tool_choice`/`stream` key, or an
+    output_config that is not a json_schema. Both retry wrappers treat a ValueError as a
+    refusal (it is never retried: attempt 2 would carry the same body).
+    """
+
+
+def converse_family(model_id: str | None) -> str | None:
+    """The CONVERSE_FAMILIES name for `model_id`, or None for the Anthropic / InvokeModel path.
+
+    Accepts a bare id, a `us.`/`global.` profile id or a full ARN (the resource's leaf is read).
+    """
+    m = (model_id or "").strip().lower().split("/")[-1]
+    for prefix in _REGION_PREFIXES:
+        if m.startswith(prefix):
+            m = m[len(prefix) :]
+            break
+    for prefix, family in CONVERSE_FAMILIES.items():
+        if m.startswith(prefix):
+            return family
+    return None
+
+
+def _converse_text_blocks(content, where: str, dropped: set) -> list:
+    if content is None:
+        return []
+    if isinstance(content, str):
+        return [{"text": content}]
+    blocks = []
+    for block in content:
+        if not isinstance(block, dict):
+            raise ConverseUnsupported(f"{where}: a non-dict content block is not translated by the Converse adapter (#4776)")
+        kind = block.get("type", "text")
+        if kind != "text":
+            raise ConverseUnsupported(f"{where}: a {kind!r} block is not translated by the Converse adapter (#4776)")
+        if block.get("cache_control"):
+            dropped.add("cache_control")
+        blocks.append({"text": str(block.get("text") or "")})
+    return blocks
+
+
+def to_converse_request(body: dict, model_id: str) -> tuple[dict, dict]:
+    """Translate an Anthropic Messages `body` (no "model" key) into `converse()` kwargs.
+
+    Returns `(request, note)`: the kwargs for `bedrock-runtime.converse`, and the adapter's
+    record of what it did (`family`, `schema_via`, `dropped`) which rides the reply as
+    `_converse`. Pure — no I/O. Raises `ConverseUnsupported` on anything it will not translate.
+    """
+    family = converse_family(model_id)
+    if family is None:
+        raise ConverseUnsupported(f"{model_id!r} is not a Converse-family model id (#4776)")
+    unknown = sorted(k for k in body if k not in _CONVERSE_TRANSLATED_KEYS and k not in _CONVERSE_DROPPED_KEYS)
+    if unknown:
+        raise ConverseUnsupported(f"Messages key(s) {unknown} are not translated by the Converse adapter (#4776)")
+    dropped: set = {k for k in _CONVERSE_DROPPED_KEYS if k in body}
+    system_blocks = _converse_text_blocks(body.get("system"), "system", dropped)
+    messages = []
+    for i, m in enumerate(body.get("messages") or []):
+        if not isinstance(m, dict) or m.get("role") not in ("user", "assistant"):
+            raise ConverseUnsupported(f"messages[{i}]: role must be user or assistant for the Converse adapter (#4776)")
+        messages.append({"role": m["role"], "content": _converse_text_blocks(m.get("content"), f"messages[{i}]", dropped)})
+    schema_via = None
+    if body.get("output_config") is not None:
+        fmt = (body.get("output_config") or {}).get("format") or {}
+        if fmt.get("type") != "json_schema" or fmt.get("schema") is None:
+            raise ConverseUnsupported("output_config: only a json_schema format is translated by the Converse adapter (#4776)")
+        system_blocks.append({"text": CONVERSE_SCHEMA_INSTRUCTION + json.dumps(fmt["schema"], sort_keys=True)})
+        schema_via = "instruction"
+    inference: dict = {}
+    if body.get("max_tokens") is not None:
+        inference["maxTokens"] = int(body["max_tokens"])
+    if body.get("temperature") is not None:
+        inference["temperature"] = float(body["temperature"])
+    if body.get("top_p") is not None:
+        inference["topP"] = float(body["top_p"])
+    if body.get("stop_sequences"):
+        inference["stopSequences"] = [str(s) for s in body["stop_sequences"]]
+    request: dict = {"modelId": model_id, "messages": messages}
+    if system_blocks:
+        request["system"] = system_blocks
+    if inference:
+        request["inferenceConfig"] = inference
+    return request, {"family": family, "schema_via": schema_via, "dropped": sorted(dropped)}
+
+
+def from_converse_response(resp: dict, model_id: str, note: dict | None = None) -> dict:
+    """Translate a `converse()` reply into the Anthropic Messages response shape.
+
+    Only `text` content blocks are carried (gpt-oss's `reasoningContent` is not text a caller
+    can use and is not billed as output here — it is counted in `outputTokens`, which IS carried).
+    Pure — no I/O.
+    """
+    message = ((resp or {}).get("output") or {}).get("message") or {}
+    content = [
+        {"type": "text", "text": block["text"]}
+        for block in message.get("content") or []
+        if isinstance(block, dict) and isinstance(block.get("text"), str)
+    ]
+    u = (resp or {}).get("usage") or {}
+    usage = {"input_tokens": int(u.get("inputTokens") or 0), "output_tokens": int(u.get("outputTokens") or 0)}
+    if u.get("cacheReadInputTokens"):
+        usage["cache_read_input_tokens"] = int(u["cacheReadInputTokens"])
+    if u.get("cacheWriteInputTokens"):
+        usage["cache_creation_input_tokens"] = int(u["cacheWriteInputTokens"])
+    stop = (resp or {}).get("stopReason")
+    return {
+        "id": ((resp or {}).get("ResponseMetadata") or {}).get("RequestId") or "converse",
+        "type": "message",
+        "role": message.get("role") or "assistant",
+        "content": content,
+        "model": model_id,
+        "stop_reason": _CONVERSE_STOP_REASONS.get(stop, stop),
+        "stop_sequence": None,
+        "usage": usage,
+        "_converse": dict(note or {"family": converse_family(model_id)}),
+    }
+
+
 def invoke(body: dict, model_name: str | None = None) -> dict:
-    """Invoke a Claude model on Bedrock.
+    """Invoke a Claude model on Bedrock — or, for a Converse family (#4776), the same call
+    translated through the Converse API; the caller sees one shape either way.
 
     Args:
         body: an Anthropic Messages dict — {messages, max_tokens, system?}.
@@ -876,16 +1104,21 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     if any(marker in lowered for marker in _THINKING_DISABLE_REJECTED_MARKERS):
         if (bedrock_body.get("thinking") or {}).get("type") == "disabled":
             bedrock_body.pop("thinking", None)
-    # Bedrock requires this exact version string for the Anthropic schema.
-    bedrock_body["anthropic_version"] = "bedrock-2023-05-31"
-
-    resp = _client().invoke_model(
-        modelId=model_id,
-        body=json.dumps(bedrock_body),
-        contentType="application/json",
-        accept="application/json",
-    )
-    parsed = json.loads(resp["body"].read())
+    if converse_family(model_id) is not None:
+        # #4776: a non-Anthropic family — translate out, send through Converse, translate back.
+        # Every guard above already ran; every meter below runs on the translated reply.
+        request, note = to_converse_request(bedrock_body, model_id)
+        parsed = from_converse_response(_client().converse(**request), model_id, note)
+    else:
+        # Bedrock requires this exact version string for the Anthropic schema.
+        bedrock_body["anthropic_version"] = "bedrock-2023-05-31"
+        resp = _client().invoke_model(
+            modelId=model_id,
+            body=json.dumps(bedrock_body),
+            contentType="application/json",
+            accept="application/json",
+        )
+        parsed = json.loads(resp["body"].read())
     # G1: meter token usage + estimated spend at the single chokepoint. Fail-open.
     _emit_usage_metrics(parsed.get("usage") or {}, model_id)
     _dev_cap_record(parsed.get("usage") or {}, model_id)

@@ -552,6 +552,34 @@ _SEMANTIC_SCHEMA = {  # #4276: the semantic pass's reply shape, closed and all-r
 }
 
 
+def semantic_body(facts, narratives):
+    """The semantic pass's Messages body for `facts` + `narratives` — the ONE prompt builder,
+    so a replay (tests/model_swap_eval.py, #4776) sends byte-identical bodies to the live pass.
+    Carries the route's model (#4770); a replay strips it."""
+    from ai.model_routing import model_for  # #4770: the one model registry (read at call time, as before)
+
+    facts_line = "; ".join(f"{k}={v}" for k, v in facts.items() if v is not None)
+    joined = "\n\n".join(n[:600] for n in narratives[:8])
+    prompt = (
+        "You are a QA auditor for an AI health platform. Below are the authoritative facts for the day, "
+        "then several coach narratives served to the user. Flag ONLY a HARD, unambiguous incoherence: "
+        "a narrative stating a number that clearly contradicts a fact (off by MORE than 25%), a direct "
+        "self-contradiction between narratives, or a unit error (HRV is milliseconds, not bpm). "
+        "Do NOT flag any of the following — these are NOT incoherence: a metric simply not being mentioned; "
+        "a number within ~25% of the fact (normal day-to-day variance); a cumulative total vs a weekly rate "
+        "(e.g. 'lost 13.8 lbs' alongside a -7.3 lb/week rate — different framings, both can be true); a "
+        "historical or trend value cited alongside the current one. When unsure, treat it as coherent. "
+        "Ignore tone/style. Respond with strict JSON: "
+        '{"coherent": true|false, "issues": ["..."]}.\n\n'
+        f"AUTHORITATIVE FACTS: {facts_line}\n\nNARRATIVES:\n{joined}"
+    )
+    return {
+        "model": model_for("coherence_semantic"),
+        "max_tokens": 400,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+
+
 def _semantic_pass(facts, narratives):
     """A Haiku read on whether the served narratives cohere with the facts —
     the content analogue of the visual AI-QA. Budget-gated; fail-soft."""
@@ -567,28 +595,7 @@ def _semantic_pass(facts, narratives):
     try:
         from ai import bedrock_client
 
-        facts_line = "; ".join(f"{k}={v}" for k, v in facts.items() if v is not None)
-        joined = "\n\n".join(n[:600] for n in narratives[:8])
-        prompt = (
-            "You are a QA auditor for an AI health platform. Below are the authoritative facts for the day, "
-            "then several coach narratives served to the user. Flag ONLY a HARD, unambiguous incoherence: "
-            "a narrative stating a number that clearly contradicts a fact (off by MORE than 25%), a direct "
-            "self-contradiction between narratives, or a unit error (HRV is milliseconds, not bpm). "
-            "Do NOT flag any of the following — these are NOT incoherence: a metric simply not being mentioned; "
-            "a number within ~25% of the fact (normal day-to-day variance); a cumulative total vs a weekly rate "
-            "(e.g. 'lost 13.8 lbs' alongside a -7.3 lb/week rate — different framings, both can be true); a "
-            "historical or trend value cited alongside the current one. When unsure, treat it as coherent. "
-            "Ignore tone/style. Respond with strict JSON: "
-            '{"coherent": true|false, "issues": ["..."]}.\n\n'
-            f"AUTHORITATIVE FACTS: {facts_line}\n\nNARRATIVES:\n{joined}"
-        )
-        from ai.model_routing import model_for  # #4770: the one model registry (read at call time, as before)
-
-        body = {
-            "model": model_for("coherence_semantic"),
-            "max_tokens": 400,
-            "messages": [{"role": "user", "content": prompt}],
-        }
+        body = semantic_body(facts, narratives)
         # #4276: constrained to _SEMANTIC_SCHEMA and parsed in the one door; a schema-less
         # fallback reply with prose around its JSON still gets the old {...} span salvage.
         from ai.structured_json import call_json, parse_json_span

@@ -143,6 +143,10 @@ except ImportError:  # pragma: no cover - packaging drift; the class split degra
         "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75, "cache_write_1h": 6.00},
         "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25, "cache_write_1h": 2.00},
         "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "gpt-oss-120b": {"in": 0.15, "out": 0.60, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "gpt-oss-20b": {"in": 0.07, "out": 0.30, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "qwen3-32b": {"in": 0.15, "out": 0.60, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "nova-micro": {"in": 0.035, "out": 0.14, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
     }
 
 # ── #2892: which caller classes the month-end projection extrapolates ────────
