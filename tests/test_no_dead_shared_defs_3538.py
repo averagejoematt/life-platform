@@ -88,19 +88,7 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # record_text.coach_output_text (deploy/backfill_recall_embeddings.py) and
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
-_BATCH_REASON = (
-    "ADR-132 / #409, amended for #4777: bedrock_batch is the batch-inference path for "
-    "bulk rebuilds/backfills of 100+ independent records per job. run_or_fallback is the "
-    "adopter API (it reaches submit/wait/retrieve itself) and build_jsonl_record builds its "
-    "records; no producer adopts them yet — each adoption is its own change (the season "
-    "rebuild is a sequential chain and must be restructured first; the training-notes "
-    "backfill is the flat candidate). Deleting them is an ADR-132 reversal, not a dead-code "
-    "cleanup. Revisit when the first producer adopts run_or_fallback."
-)
-
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/ai/bedrock_batch.py:build_jsonl_record": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:run_or_fallback": _BATCH_REASON,
     "lambdas/ai/ai_calls.py:call_training_coach_v2": (
         "one seat of a symmetric ADR-153 coach family (sleep / nutrition / training / mind, "
         "each a 3-line `_run_coach_v2_pipeline(<seat>, ...)` wrapper). The daily-brief tests "
