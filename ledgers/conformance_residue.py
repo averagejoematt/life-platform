@@ -57,7 +57,6 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/operational/ai_quality_canary_lambda.py::personas::sleep_coach,training_coach": "2026-08-17",
     "lambdas/operational/qa_check_subscriber_promise.py::lambdas::between-chronicle,chronicle-email-sender,weekly-signal": "2026-08-17",
     "lambdas/web/site_api_ai_lambda.py::personas::nutrition_coach,sleep_coach,training_coach": "2026-08-17",
-    "lambdas/web/site_api_nutrition.py::sources::habitify,strava,whoop": "2026-08-17",
     "lambdas/web/site_api_rollups.py::sources::macrofactor,notion,withings": "2026-08-17",
     "lambdas/web/site_api_status.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/web/site_stats_refresh_lambda.py::lambdas::habitify-data-ingestion,whoop-data-ingestion,withings-data-ingestion": "2026-08-17",

@@ -1090,9 +1090,16 @@ def deficit_sustainability(*, _g) -> dict:
     deficit_published = bool(trend_check.get("publish"))
 
     # #3754: Hevy joins the read — the training-output channel is scored on the daily
-    # training load over Strava + Hevy, never on the Strava day row's kilojoules.
-    src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava", "hevy")}
-    whoop, habit, strava, hevy = src["whoop"], src["habitify"], src["strava"], src["hevy"]
+    # training load over Strava + Hevy, never on the Strava day row's kilojoules. Each
+    # channel names the ONE source it reads (a reference per consumer, not a hand-typed
+    # list of registry vocabulary — the #2844 conformance guard's green path).
+    def _by_day(source_id):
+        return sorted(_query_source(source_id, start, today), key=lambda x: x.get("sk", ""))
+
+    whoop = _by_day("whoop")
+    habit = _by_day("habitify")
+    strava = _by_day("strava")
+    hevy = _by_day("hevy")
 
     def trend_dir(vals):
         v = [x for x in vals if x is not None]
