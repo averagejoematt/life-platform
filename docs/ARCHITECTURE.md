@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-10-11 (v8.6.0 — 88 tools, 69-module MCP package, 20 data sources, 109 Lambdas, 26 secrets, 136 alarms, 10 CDK stacks deployed).
+Last updated: 2026-10-11 (v8.6.0 — 88 tools, 69-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 136 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **159 ADRs** (ADR-001 → ADR-161 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -111,7 +111,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Source | Lambda | Schedule | Type |
 |---|---|---|---|
 | Whoop | `whoop-data-ingestion` | Hourly (active hours) | API pull |
-| Garmin | `garmin-data-ingestion` | Paused (ADR-074) — no live rule | API pull |
+| Garmin | (none) | Retired 2026-10-11 (#4640, ADR-074 amendment) — watch activities arrive through Strava | via Strava |
 | Eight Sleep | `eightsleep-data-ingestion` | 4x daily (mornings) | API pull |
 | Withings | `withings-data-ingestion` | 4x daily | API pull |
 | Habitify | `habitify-data-ingestion` | Hourly (active hours) | API pull |
@@ -395,7 +395,7 @@ The count and the table below must agree, and the count's `live-verified` stamp 
 | `life-platform/whoop` | Whoop Lambda — OAuth2 tokens |
 | `life-platform/withings` | Withings Lambda — OAuth2 tokens |
 | `life-platform/strava` | Strava Lambda — OAuth2 tokens |
-| `life-platform/garmin` | Garmin Lambda — garth OAuth tokens |
+| `life-platform/garmin` | RETIRED (#4640) — no consumer; owner-attended delete pending |
 | `life-platform/eightsleep` | Eight Sleep Lambda — username + password |
 | `life-platform/eightsleep-client` | Eight Sleep Lambda — client credential alongside user creds |
 | `life-platform/ai-keys` | Legacy direct-API fallback across the intelligence/email Lambdas — Anthropic API key (Bedrock/IAM is the primary path, ADR-062) |

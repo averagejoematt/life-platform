@@ -23,7 +23,6 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets,
     aws_iam as iam,
-    aws_lambda as _lambda,
     aws_logs as logs,
     aws_s3 as s3,
     aws_sns as sns,
@@ -32,7 +31,7 @@ from aws_cdk import (
 from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
+from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.lambda_helpers import create_platform_lambda
 
 # ── #2806/#2807/#2808: the social-enrichment channel set, derived at synth time ──
@@ -95,7 +94,6 @@ DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 class IngestionStack(Stack):
     def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
-        garth_layer = _lambda.LayerVersion.from_layer_version_arn(self, "GarthLayer", GARTH_LAYER_ARN)
         local_dlq = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
@@ -185,32 +183,11 @@ class IngestionStack(Stack):
             )
         )
 
-        # ── 2. Garmin — PAUSED, no schedule (#497/C-2, 2026-07-04). ADR-074
-        # declares the pause (vendor anti-automation 429-blocks server-side
-        # OAuth refresh), yet the cron kept firing 4×/day into the throttle —
-        # ~73 consecutive failures, and per the code's own note each hit only
-        # prolongs the lockout. Revive = manual re-auth (setup_garmin_browser_auth.py)
-        # + restore `schedule="cron(0 0,6,14,22 * * ? *)"` here. The function
-        # stays deployed for manual invokes; the INGEST_HEALTH sentinel keeps
-        # tracking whatever runs.
-        garmin = create_platform_lambda(
-            self,
-            "GarminIngestion",
-            function_name="garmin-data-ingestion",
-            source_file="lambdas/ingestion/garmin_lambda.py",
-            handler="ingestion.garmin_lambda.lambda_handler",
-            timeout_seconds=300,
-            memory_mb=512,
-            additional_layers=[garth_layer],
-            custom_policies=rp.ingestion_garmin(),
-            # No async retry: a failed run is almost always an OAuth-refresh 429.
-            # Retrying re-hammers Garmin's throttled endpoint and prolongs the
-            # lockout; the gap-fill loop recovers missed days on the next run.
-            retry_attempts=0,
-            alerts_topic=None,
-            **{k: v for k, v in shared.items() if k != "alerts_topic"},
-        )
-        garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        # ── 2. Garmin direct-API function — RETIRED (#4640, owner ruling 2026-10-11).
+        # `garmin-data-ingestion` (no schedule since #497, 74 consecutive throttle
+        # failures, last success 2026-06-16), its role, its reserved-concurrency slot
+        # and its alarm are removed. Garmin-watch activities arrive through Strava.
+        # The `life-platform/garmin` secret is an owner-attended delete.
 
         # ── 3. Notion — 3x daily (#4641; was 18/day for 0 pages in 252 runs)
         create_platform_lambda(

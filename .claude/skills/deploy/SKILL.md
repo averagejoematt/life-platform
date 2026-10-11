@@ -105,7 +105,6 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - dropbox-poll → `lambdas/ingestion/dropbox_poll_lambda.py`
 - eightsleep-data-ingestion → `lambdas/ingestion/eightsleep_lambda.py`
 - food-delivery-ingestion → `lambdas/ingestion/food_delivery_lambda.py`
-- garmin-data-ingestion → `lambdas/ingestion/garmin_lambda.py`
 - habitify-data-ingestion → `lambdas/ingestion/habitify_lambda.py`
 - health-auto-export-webhook → `lambdas/ingestion/health_auto_export_lambda.py` (cdk_only†)
 - hevy-backfill → `lambdas/ingestion/hevy_backfill_lambda.py` (cdk_only†)

@@ -112,7 +112,6 @@ from stacks.role_policies_ingestion import (  # noqa: F401  (re-export)
     ingestion_bluesky,
     ingestion_dropbox,
     ingestion_eightsleep,
-    ingestion_garmin,
     ingestion_habitify,
     ingestion_hae,
     ingestion_hevy_backfill,

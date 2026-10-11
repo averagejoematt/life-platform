@@ -230,7 +230,7 @@ def dark_fields(source_key: str, fields: list[str]) -> list[str]:
 
 def test_the_check_map_is_actually_derived():
     checks = field_completeness_checks()
-    assert len(checks) >= 9, f"only {len(checks)} entries parsed out of FIELD_COMPLETENESS_CHECKS — the derivation has gone blind"
+    assert len(checks) >= 8, f"only {len(checks)} entries parsed out of FIELD_COMPLETENESS_CHECKS — the derivation has gone blind"
     assert all(v for v in checks.values()), "an entry with an empty field list checks nothing"
     # The #2271 correction must not regress.
     assert checks["todoist"] == ["completed_count"]
@@ -280,14 +280,6 @@ def test_the_guard_rejects_a_bogus_field_on_every_monitored_source():
     not just the one that happened to be broken."""
     for source_key in field_completeness_checks():
         assert dark_fields(source_key, ["tasks_completed"]) == ["tasks_completed"], f"{source_key} accepted a field no writer emits"
-
-
-def test_the_guard_rejects_the_historical_garmin_defect_by_name():
-    """The specific name #2287 found. `body_battery_highest` has never been
-    written by any writer in this repo's history; the garmin writer emits
-    `body_battery_high`. Pinned so the correction cannot silently revert."""
-    assert dark_fields("garmin", ["body_battery_highest"]) == ["body_battery_highest"]
-    assert dark_fields("garmin", ["body_battery_high"]) == []
 
 
 _STUBBED_WRITER = '''

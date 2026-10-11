@@ -115,9 +115,7 @@ EVENT_WINDOWS: dict[str, dict] = {
 }
 
 # ── paused: derived from the source registry's `paused` facet (never hand-typed truth) ──
-PAUSED: dict[str, str] = {
-    "garmin-data-ingestion": "garmin",  # ADR-074 — the facet is asserted by the census test
-}
+PAUSED: dict[str, str] = {}
 
 # ── first scheduled fire still ahead (dated; the row reds itself once overdue) ──
 FIRST_DUE: dict[str, dict] = {

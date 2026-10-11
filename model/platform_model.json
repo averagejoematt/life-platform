@@ -3222,13 +3222,6 @@
       "via": "pk"
     },
     {
-      "direction": "unknown",
-      "lambda": "garmin-data-ingestion",
-      "module": "lambdas/ingestion/garmin_lambda.py",
-      "partition": "garmin",
-      "via": "pk"
-    },
-    {
       "direction": "read",
       "lambda": "habitify-data-ingestion",
       "module": "lambdas/ingestion/habitify_lambda.py",
@@ -6761,15 +6754,6 @@
       "stack": "compute_stack",
       "timeout_seconds": 120
     },
-    "garmin-data-ingestion": {
-      "declared_alarm": null,
-      "handler": "ingestion.garmin_lambda.lambda_handler",
-      "memory_mb": 512,
-      "module": "lambdas/ingestion/garmin_lambda.py",
-      "schedules": [],
-      "stack": "ingestion_stack",
-      "timeout_seconds": 300
-    },
     "habit-skip-review": {
       "declared_alarm": null,
       "handler": "emails.habit_skip_review_lambda.lambda_handler",
@@ -7691,8 +7675,8 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 742,
-      "lambdas": 109,
+      "edges": 741,
+      "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
       "partitions": 115,
@@ -7706,8 +7690,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 930,
-        "sites_total": 1291
+        "sites_resolved": 929,
+        "sites_total": 1290
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7978,7 +7962,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+      "method": "Delivered through Strava \u2014 direct-API function retired 2026-10-11 (#4640, ADR-074)",
       "privacy_tier": "public",
       "stale_hours": null
     },

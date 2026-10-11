@@ -100,7 +100,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | resolved |
 | `youtube-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 
-**Unscheduled lambdas (25)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
+**Unscheduled lambdas (24)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
@@ -122,7 +122,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-742 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+741 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -519,8 +519,8 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1291 total · 930 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
-- Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (109 lambdas total)
+- Edge sites: 1290 total · 929 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
+- Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (108 lambdas total)
 - Alarms: 140 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 18 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 95 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
