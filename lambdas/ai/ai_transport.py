@@ -159,6 +159,7 @@ def call_anthropic(
     # preserved via cache_control blocks in sys_block. Response shape is
     # identical to the direct API, so parsing/validation below is unchanged.
     from ai.bedrock_client import (
+        ConverseUnsupported as _ConverseUnsupported,
         UnknownModelError as _UnknownModel,
         budget_stop_cls as _budget_stop_cls,
         first_text as _first_text,
@@ -193,6 +194,14 @@ def call_anthropic(
         # contract a hard Bedrock error already has, only in seconds.
         _emit_failure_metric()
         print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
+        return AI_UNAVAILABLE_SENTINEL
+    except _ConverseUnsupported as e:
+        # #4776: the Converse adapter refused the body (an image, a tool list, a non-schema
+        # output_config …) BEFORE any send — nothing billed, and attempt 2 would carry the
+        # same body. Same contract as the unknown name: the sentinel in milliseconds, the
+        # failure metric so the caller-side defect is visible, never the backoff ladder.
+        _emit_failure_metric()
+        print(f"[ERROR] Converse adapter refused the request body — NOT retried, nothing billed: {e}")
         return AI_UNAVAILABLE_SENTINEL
     except Exception as e:
         _emit_failure_metric()
