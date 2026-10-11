@@ -40,11 +40,19 @@ _PROFILE_TARGET_KEYS = {"calorie_target", "protein_target_g"}
 # The two figures the row (and the literal defaults beside it) carried. Neither is a plan
 # figure, so neither may sit next to a nutrition-target name again.
 _STALE_TARGET_FIGURES = {1800, 190}
+# #4540 owner ruling 2026-10-11: the floor is the plan's 170 g. 180 g was the training redlines'
+# own figure; a 180 beside a PROTEIN name is the same defect (calories keep 1800: it is the
+# redlines' 7-day energy floor, a different quantity).
+_STALE_PROTEIN_FIGURES = {180}
+_PROTEIN_NAME_RE = re.compile(r"protein|prot_|_prot", re.IGNORECASE)
 # What makes a name a nutrition TARGET name: a calorie/protein stem and a target/goal/floor
 # word, either order (`cal_target`, `protein_g_target`, `CALORIE_TARGET`, `target_kcal`).
 _TARGET_NAME_RE = re.compile(
     r"(?:cal|kcal|protein|prot|pro)[a-z0-9_]*(?:target|goal|floor)|(?:target|goal|floor)[a-z0-9_]*(?:cal|kcal|protein)", re.IGNORECASE
 )
+
+
+_TARGET_NAME_RE_ANY = re.compile(r"target|goal|floor", re.IGNORECASE)
 
 
 def _names_in(node):
@@ -82,6 +90,33 @@ def _context(const, parents):
     return [const]
 
 
+def _enclosing_dict_keys(const, parents):
+    """The string keys of every dict the literal is (transitively) a value of — `{"protein_floor_g": {"value": 180}}`
+    names its figure by the OUTER key."""
+    out, child, node = [], const, parents.get(const)
+    while node is not None:
+        if isinstance(node, ast.Dict) and child in node.values:
+            key = node.keys[node.values.index(child)]
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                out.append(key.value)
+        child, node = node, parents.get(node)
+    return out
+
+
+def _enclosing_assign_names(const, parents):
+    """Names assigned to by the statement the literal sits in (`TARGETS = {...}` -> TARGETS)."""
+    node = parents.get(const)
+    while node is not None and not isinstance(node, ast.stmt):
+        node = parents.get(node)
+    out = []
+    if isinstance(node, ast.Assign):
+        for t in node.targets:
+            out += [n.id for n in ast.walk(t) if isinstance(n, ast.Name)]
+    elif isinstance(node, ast.AnnAssign):
+        out += [n.id for n in ast.walk(node.target) if isinstance(n, ast.Name)]
+    return out
+
+
 def target_literal_findings(src, path="<src>"):
     """Findings for one module's source. Two shapes:
 
@@ -116,6 +151,22 @@ def target_literal_findings(src, path="<src>"):
             hit = next((n for n in names if _TARGET_NAME_RE.search(n)), None)
             if hit:
                 found.append(f"{path}:{node.lineno}: literal {node.value!r} beside the nutrition-target name {hit!r}")
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, (int, float))
+            and not isinstance(node.value, bool)
+            and node.value in _STALE_PROTEIN_FIGURES
+        ):
+            names = [n for ctx in _context(node, parents) for n in _names_in(ctx)] + _enclosing_dict_keys(node, parents)
+            hit = next((n for n in names if _PROTEIN_NAME_RE.search(n) and _TARGET_NAME_RE.search(n)), None)
+            if not hit:
+                # `TARGETS = {"protein_g": 180}`: the protein key names the quantity, the assigned
+                # name says it is a target/goal/floor.
+                prot = next((n for n in names if _PROTEIN_NAME_RE.search(n)), None)
+                tgt = next((n for n in _enclosing_assign_names(node, parents) if _TARGET_NAME_RE_ANY.search(n)), None)
+                hit = f"{prot} in {tgt}" if prot and tgt else None
+            if hit:
+                found.append(f"{path}:{node.lineno}: literal {node.value!r} (the retired 180 g floor) beside {hit!r}")
     return found
 
 
@@ -159,6 +210,10 @@ def test_the_guard_sees_every_shape_it_exists_for():
         'row = {"calorie_target": 1800}': 1,
         "render(calorie_target=1800)": 1,
         "if cal_target == 1800:\n    pass": 1,
+        "protein_g_floor = 180": 1,  # #4540: the retired 180 g floor
+        'REDLINES = {"protein_floor_g": {"value": 180}}': 1,
+        'x = {"protein_g": 180}': 0,  # no target/floor word anywhere -> not a target (documented limit)
+        'TARGETS = {"protein_g": 180}': 1,  # mcp/tools_nutrition.py TARGETS: protein key in a target-named dict
     }
     for src, n in shapes.items():
         got = target_literal_findings(src)
