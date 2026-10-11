@@ -28,12 +28,17 @@ const prints = (html, sentence) => [esc(sentence), `<p class="ck-soft">${esc(sen
 
 // Each front-page slot -> the block whose sentence it must print when that block failed.
 // `next` prints its bet part's sentence, or the whole block's when the block is unserved.
+// Round 8 (#4586): the week band and the chapter quote moved to the week page (weekSlots);
+// the front page's chapter is one row in "Go deeper".
 const SLOT_BLOCK = {
   "ck-record": (b) => b.record,
   "ck-mark-caption": (b) => b.today,
   "ck-bet": (b) => (b.next && b.next.data && b.next.data.bet) || b.next,
   "ck-today": (b) => b.week,
   "ck-coach-lines": (b) => b.coach_lines,
+  "ck-chapter-row": (b) => b.chapter,
+};
+const WEEK_SLOT_BLOCK = {
   "ck-week": (b) => b.week,
   "ck-quotes": (b) => b.chapter,
 };
@@ -69,10 +74,18 @@ test("with one upstream failing, each front-page slot prints its block's own sen
     for (const [slot, html] of Object.entries(slots)) {
       if (/undefined|NaN|>null</.test(String(html))) offences.push(`${name}: ${slot} leaks ${JSON.stringify(html)}`);
     }
+    // The week page's slots, the same rule.
+    const week = P.weekSlots(ed, ed.blocks, "/");
+    for (const [slot, pick] of Object.entries(WEEK_SLOT_BLOCK)) {
+      const block = pick(ed.blocks);
+      if (!failed(block)) continue;
+      seenFailing.add(`week:${slot}`);
+      if (!prints(week[slot], block.absent_text)) offences.push(`${name}: week ${slot} printed ${JSON.stringify(week[slot])}, not ${JSON.stringify(block.absent_text)}`);
+    }
   }
   assert.deepEqual(offences, []);
   // Every slot was exercised failing by at least one case — the loop cannot go vacuous.
-  assert.deepEqual([...seenFailing].sort(), [...Object.keys(SLOT_BLOCK), "ck-words-absent"].sort());
+  assert.deepEqual([...seenFailing].sort(), [...Object.keys(SLOT_BLOCK), "ck-words-absent", ...Object.keys(WEEK_SLOT_BLOCK).map((k) => `week:${k}`)].sort());
 });
 
 test("today's weight fails to its sentence and the green weight leaves the mark and its caption", () => {

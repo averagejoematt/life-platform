@@ -1,14 +1,20 @@
 // ck_front.js — the reshaped preview front page (#4586, epic #4580).
 //
-// The page has two rhythms under one fixed top. The top never changes shape: who he is,
-// his own dated note, the daily mark, and the coaches' last settled call with the next
-// one due. Under it sit two bands:
+// Round 8 (2026-10-11): the page leads with the coaches' open argument and the clearest
+// miss on record, then the last 24 hours, and everything below that is a link. The top
+// never changes shape: who he is, the record, the daily mark and his own dated note.
 //
-//   TODAY      changes every day and is specific to the last 24 hours — this morning's
-//              weigh-in and sleep, what was recorded yesterday, what is planned, and what
-//              the coaches said today.
-//   THIS WEEK  changes weekly — what is going well and what is not, the lead coach's read,
-//              one line from the chapter and one from the podcast.
+//   THE ARGUMENT  what two coaches disagree about, from the last seven days of their
+//                 served lines (GET /api/coach_moves?date=<day>): a reply and the line it
+//                 answers, printed exactly as served; failing a pair, the open bet's sides.
+//   THE MISS      the clearest wrong call on record, with the rule that graded it.
+//   TODAY         the last 24 hours — this morning's weigh-in and sleep, yesterday, the plan,
+//                 and any coach line from today not already in the argument.
+//   GO DEEPER     one row each: this week (its own page now, /next/v8/week/), the seven
+//                 days, the character sheet, the chapter, the coaches.
+//
+// The week band (what is going well and what is not, the lead coach's read, the chapter
+// and podcast lines) moved whole to /next/v8/week/; its builders stay here.
 //
 // Every builder is pure and exported for tests/js/ck_front_4586.test.mjs. Each prints a
 // plain sentence when its data is absent: never a blank, a zero or another day's number.
@@ -150,10 +156,14 @@ export function todayBandHTML(edition, b, base = "/") {
   const html = `<ul class="ck-rows">${rows.join("")}</ul>`;
   return /recovery/i.test(html) ? `${html}${small(RECOVERY_GLOSS)}` : html;
 }
-// What the coaches said today: each line a move, or the block's own plain sentence.
-export function coachTodayHTML(block) {
-  const lines = usable(block) ? block.data.lines || [] : [];
-  if (!lines.length) return soft((block && block.absent_text) || "The coaches have written nothing today.");
+// What the coaches said today: each line a move, or the block's own plain sentence. A line
+// already printed in the argument above (`skip`: its served texts) is not printed twice;
+// when every line was, the band says nothing and the caller drops its label — "" here.
+export function coachTodayHTML(block, { skip = [] } = {}) {
+  const served = usable(block) ? block.data.lines || [] : [];
+  if (!served.length) return soft((block && block.absent_text) || "The coaches have written nothing today.");
+  const lines = served.filter((l) => !skip.includes(l && l.text));
+  if (!lines.length) return "";
   const rows = lines
     .map((l) => {
       const who = [l.coach, l.domain, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
@@ -319,4 +329,86 @@ export function followLine(nextBlock) {
   const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
   const day = usable(ch) ? dayInWords(ch.data.date) : "";
   return day ? `The next chapter and podcast are due ${day}. The week’s numbers go out every Sunday.` : "A new chapter and podcast most weeks, the numbers every Sunday.";
+}
+
+// ── the argument (round 8) ─────────────────────────────────────────────────────
+// What the coaches are arguing about, from the last ARGUMENT_DAYS days of served moves
+// (one GET /api/coach_moves?date=<day> each; `days` is their bodies in any order). The
+// newest reply and the line it answers make the argument. With no reply in the window,
+// the open bet's two sides stand, each with the newest line that coach said. With neither,
+// nothing is called an argument: the caller prints a plain sentence. Lines are the served
+// words, dated. A line in which a coach names herself as if she were someone else (the
+// generator defect #4705 fixed; three such lines were served 2026-10-05 → 10-09) is never
+// chosen, so the lead of the page is not a line the page would have to explain.
+export const ARGUMENT_DAYS = 7;
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Name parts that are ordinary words are never read as a self-reference on their own (the same
+// set the generator's gate excludes, coach_moves_sheet.COMMON_WORD_NAME_PARTS, for the live roster).
+const COMMON_WORD_NAMES = new Set(["Max", "Park", "Marsh", "Vale", "Brooks"]);
+export function namesSelf(line) {
+  const name = String((line && line.coach) || "").trim();
+  const text = String((line && line.text) || "");
+  if (!name || !text) return false;
+  const parts = name.split(/\s+/);
+  if (parts.length >= 2 && new RegExp(`\\b${escapeRe(name)}\\b`, "i").test(text)) return true;
+  return parts.some((p) => p.length >= 2 && !COMMON_WORD_NAMES.has(p) && new RegExp(`(?:^|[^\\w-])${escapeRe(p)}(?![\\w-])`).test(text));
+}
+// Every served line across the bodies, newest day first, each stamped with its day.
+export function argumentLines(days) {
+  const ok = (days || []).filter((d) => d && d.state === "ok" && typeof d.date === "string" && Array.isArray(d.lines) && d.lines.length);
+  ok.sort((a, b) => b.date.localeCompare(a.date));
+  return ok.flatMap((d) => d.lines.filter((l) => l && l.coach && l.text).map((l) => ({ ...l, date: d.date })));
+}
+export function pickArgument(days, nextBlock) {
+  const lines = argumentLines(days).filter((l) => !namesSelf(l));
+  for (const reply of lines) {
+    if (reply.move !== "reply" || !reply.replies_to) continue;
+    // The newest line by the coach answered, said no later than the reply.
+    const first = lines.find((l) => l !== reply && l.coach === reply.replies_to && l.date <= reply.date) || null;
+    return { kind: "reply", first, second: reply };
+  }
+  const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  const sides = usable(bet) ? (bet.data.sides || []).map((s) => s && s.coach).filter(Boolean) : [];
+  if (sides.length >= 2) {
+    const said = sides.map((c) => lines.find((l) => l.coach === c) || null).filter(Boolean);
+    return { kind: "bet", lines: said };
+  }
+  return null;
+}
+// "The open argument" / "The open bet" / "The coaches" — the section's label follows what
+// the page could find, so a page with only a bet never calls it an argument.
+export function argumentLabel(pick) {
+  if (!pick) return "The coaches";
+  return pick.kind === "reply" ? "The open argument" : "The open bet";
+}
+export function argumentHeading(pick) {
+  if (!pick) return "Nothing is in dispute this week.";
+  if (pick.kind === "reply") return pick.first ? "Two coaches disagree." : "One coach answers another.";
+  return pick.lines.length ? "Two coaches have money on it." : "Two coaches have a bet on it.";
+}
+// The lines as the kit's coach rows: who (a door to the coach's page) · what kind of line ·
+// the day, then the served words. "" with nothing to print.
+export function argumentHTML(pick, base = "/") {
+  if (!pick) return "";
+  const who = (l, kind) => {
+    const name = l.coach_id ? `<a class="ck-link" href="${esc(base)}coach/?c=${esc(l.coach_id)}">${esc(l.coach)}</a>` : esc(l.coach);
+    return `<span class="ck-coach__who">${name}${esc(` · ${[kind, dayInWords(l.date)].filter(Boolean).join(" · ")}`)}</span>`;
+  };
+  const row = (l, kind) => `<li>${who(l, kind)}<span>“${esc(l.text)}”</span></li>`;
+  const rows = pick.kind === "reply" ? [pick.first ? row(pick.first, "") : "", row(pick.second, `answering ${pick.second.replies_to}`)] : pick.lines.map((l) => row(l, ""));
+  const html = rows.join("");
+  return html ? `<ul class="ck-coach">${html}</ul>` : "";
+}
+// The served texts a pick prints, so the Today band can leave them out.
+export const argumentTexts = (pick) => (pick ? (pick.kind === "reply" ? [pick.first, pick.second] : pick.lines).filter(Boolean).map((l) => l.text) : []);
+
+// ── go deeper: the chapter's row ───────────────────────────────────────────────
+// One row in the "Go deeper" list for the latest chapter: its week and title as the door, the
+// read time as the grey note. A block that failed prints its own sentence — never a blank.
+export function chapterRowHTML(chapter) {
+  if (!usable(chapter) || !chapter.data.title || !chapter.data.url) return soft((chapter && chapter.absent_text) || "The latest chapter is not served right now.");
+  const c = chapter.data;
+  const lead = c.week_label ? `${c.week_label} · ` : "";
+  const note = [`The chapter`, num(c.read_minutes) !== null ? `${c.read_minutes} min` : "", shortDay(c.date)].filter(Boolean).join(" · ");
+  return `<a href="${esc(c.url)}">${esc(`${lead}“${c.title}”`)} <span>${esc(note)}</span></a>`;
 }

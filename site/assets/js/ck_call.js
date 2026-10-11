@@ -192,10 +192,17 @@ export function recordHTML(call, body) {
 // with neither the newest call. The label is the day it settled, whichever call it is.
 // "Settled <day>: <coach> called X. It came in at Y. Wrong · not within Z either way."
 // The simple guess is said here only once it has a result on this call.
-export function lastCallHTML(callsBody, base) {
+// Which call leads, and why: {call, kind} with kind "wrong" (the clearest miss), "right" (the
+// tightest hit, when no miss is printable) or "latest". {call: null, kind: ""} with nothing served.
+export function lastCallPick(callsBody) {
   const all = callsOf(callsBody);
   const pair = showcasePair(all);
-  const call = pair.wrong || pair.right || all[0];
+  if (pair.wrong) return { call: pair.wrong, kind: "wrong" };
+  if (pair.right) return { call: pair.right, kind: "right" };
+  return { call: all[0] || null, kind: all[0] ? "latest" : "" };
+}
+export function lastCallHTML(callsBody, base) {
+  const { call } = lastCallPick(callsBody);
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;
