@@ -1019,7 +1019,7 @@
     "ai_features": 25,
     "alarms": 140,
     "emf_namespaces": 33,
-    "schedules": 94,
+    "schedules": 95,
     "secrets": 30
   },
   "edges": [
@@ -7543,6 +7543,10 @@
       "module": "lambdas/emails/wednesday_chronicle_lambda.py",
       "schedules": [
         {
+          "expr": "cron(0 1 * * WED *)",
+          "resolution": "constructed"
+        },
+        {
           "expr": "cron(0 15 ? * WED *)",
           "resolution": "constant"
         },
@@ -7697,13 +7701,13 @@
       "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 84,
-      "schedules": 94
+      "schedules": 95
     },
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 927,
-        "sites_total": 1288
+        "sites_resolved": 930,
+        "sites_total": 1291
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8502,6 +8506,13 @@
       "lambda": "dashboard-refresh",
       "resolution": "constant",
       "stack": "compute_stack",
+      "utc": "01:00"
+    },
+    {
+      "expr": "cron(0 1 * * WED *)",
+      "lambda": "wednesday-chronicle",
+      "resolution": "constructed",
+      "stack": "email_stack",
       "utc": "01:00"
     },
     {
