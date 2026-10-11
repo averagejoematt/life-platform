@@ -4,6 +4,8 @@ Tool registry: maps tool names to their functions and JSON schemas.
 
 from typing import Any, cast
 
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G
+
 from mcp.config import RAW_DAY_LIMIT, SOURCES
 from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 from mcp.tool_output_schemas import attach_output_schemas  # #4286 box 2: outputSchema, the ten most-called tools
@@ -645,7 +647,10 @@ TOOLS = {
                         "type": "number",
                         "description": "[macros] Override daily calorie target (kcal). Defaults to TDEE estimate.",
                     },
-                    "protein_target": {"type": "number", "description": "[macros] Override daily protein target (g). Default: 180g."},
+                    "protein_target": {
+                        "type": "number",
+                        "description": f"[macros] Override daily protein target (g). Default: {PLAN_DAILY_PROTEIN_MIN_G}g (the plan's floor).",
+                    },
                 },
                 "required": [],
             },

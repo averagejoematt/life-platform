@@ -2840,6 +2840,15 @@ Garmin ingestion broke on a recurring cycle (re-auth → works briefly → 429 �
 
 Garmin metrics unique to it (body battery, stress, SpO2, respiration, floors, RHR, calorie split) stop updating; Whoop + Eight Sleep + Apple Health cover the rest. The freshness/QA noise stops (shown ⏸ paused, never failing). Revive = uncomment + re-auth from a residential IP, or onboard Terra/official API.
 
+
+### Amendment 2026-10-11 (#4640) — the direct-API function is retired, and two lines above were stale
+
+**Owner ruling 2026-10-11: retire it.** `garmin-data-ingestion`, its role, its reserved-concurrency slot (1) and the `life-platform/garmin` credential reference are removed from CDK (`LifePlatformIngestion`); `ci/lambda_map.json` and the daily boot probe no longer name it. The secret itself is an owner-attended delete (`aws secretsmanager delete-secret --secret-id life-platform/garmin`). The registry entry stays (historical `garmin` DDB rows and raw objects remain readable) and now says *delivered through Strava*.
+
+**Verified facts behind the decision.** The function had no schedule since #497, its health record was frozen at 74 consecutive failures (error class throttle, last success 2026-06-16), and the Garmin watch's activities already arrive through Strava: seven watch-recorded walks since 2026-09-06 (09-06, 09-14, 09-16, 09-26, 09-27, 09-30, 10-03), each with distance, cadence, polyline and heart-rate zones. The vendor's official programme is business-only by its own FAQ; the aggregator costs $399 a month billed annually by its own pricing page; the unofficial client has open throttling and edge-blocking issues. What the direct API alone would add (stress, body battery, training readiness) does not justify any of that, so the stress and body-battery truth entries that named Garmin (`mcp/config.py`) are removed.
+
+**Corrections to the original text.** (1) The Decision section says Strava is paused on a payment error (API 402): stale, Strava is live and is the Garmin delivery path. (2) It says a wearable aggregator has a free tier: stale, the verified price is $399/month. Three devices now push to Strava, not one (`lambdas/common/strava_read_seam.py` docstring corrected). The original text above is left as written.
+
 ---
 
 ## ADR-075: Budget guard early-month guard + AI cost trim (remediation agent)

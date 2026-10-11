@@ -836,11 +836,11 @@ def test_summary_averages_only_the_days_that_carry_each_field(monkeypatch):
 
 
 def test_summary_compares_each_average_to_its_target_with_a_signed_gap(monkeypatch):
-    """protein average 125.0 vs the 180 g target -> gap -55.0, 69.4% of target, over the
+    """protein average 125.0 vs the plan's 170 g floor -> gap -45.0, 73.5% of target, over the
     n=2 days that carried protein."""
     install(monkeypatch, SUMMARY_ROWS)
     tc = tn.tool_get_nutrition(SUMMARY_ARGS)["target_comparison"]["protein_g"]
-    assert tc == {"target": 180, "average": 125.0, "gap": -55.0, "pct_of_target": 69.4, "n": 2}
+    assert tc == {"target": 170, "average": 125.0, "gap": -45.0, "pct_of_target": 73.5, "n": 2}
 
 
 def test_summary_errors_and_echoes_the_window_when_macrofactor_is_silent(monkeypatch):
@@ -990,7 +990,7 @@ def test_macros_falls_back_to_the_flat_default_when_no_weigh_in_exists(monkeypat
     install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
-    assert out["targets"]["protein_g"] == 180
+    assert out["targets"]["protein_g"] == 170
 
 
 def test_macros_errors_when_macrofactor_is_silent(monkeypatch):
@@ -1003,7 +1003,7 @@ def test_macros_still_answers_when_the_weight_lookup_fails(monkeypatch):
     install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT, raise_sources={"withings"})
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
-    assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 180*0.95
+    assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 170*0.95
 
 
 def test_macros_ignores_a_withings_row_that_carries_no_weight(monkeypatch):
@@ -1063,7 +1063,7 @@ def test_macros_refuses_the_calorie_target_when_the_weight_trend_contradicts_it(
     # ...and it does NOT quietly fall back to the 2400 flat default under another label
     assert t["daily_breakdown"][0]["calories_pct"] is None
     assert t["adherence"]["calorie_target_hit_pct"] is None
-    # the 180 g protein floor is unaffected and stays the primary nutrition gate (#3931)
+    # the 170 g protein floor is unaffected and stays the primary nutrition gate (#3931)
     assert t["adherence"]["protein_target_hit_pct"] == 100.0
 
 

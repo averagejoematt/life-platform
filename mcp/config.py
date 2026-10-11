@@ -61,8 +61,6 @@ _DEFAULT_SOURCE_OF_TRUTH = {
     "steps": "apple_health",
     "tasks": "todoist",
     "habits": "habitify",
-    "stress": "garmin",
-    "body_battery": "garmin",
     "gait": "apple_health",
     "energy_expenditure": "apple_health",
     "cgm": "apple_health",

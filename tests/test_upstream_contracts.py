@@ -45,7 +45,6 @@ for _k, _v in {
 }.items():
     os.environ.setdefault(_k, _v)
 
-from ingestion.garmin_lambda import transform as garmin_transform  # noqa: E402
 from ingestion.health_auto_export_lambda import process_blood_glucose  # noqa: E402
 from ingestion.strava_lambda import _normalize as strava_normalize  # noqa: E402
 from ingestion.whoop_lambda import (  # noqa: E402
@@ -238,17 +237,6 @@ CONTRACTS = [
         ],
         strava_normalize,
         ["strava_id", "name", "distance_miles", "total_elevation_gain_feet", "average_heartrate", "summary_polyline"],
-    ),
-    Contract(
-        "garmin",
-        "daily",
-        [
-            ("steps", "number"),
-            ("resting_heart_rate", "number"),
-            ("body_battery_high", "number"),
-        ],
-        lambda fx: garmin_transform(fx, "2026-06-08")[0],
-        ["steps", "resting_heart_rate", "body_battery_high"],
     ),
 ]
 

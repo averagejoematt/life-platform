@@ -31,8 +31,11 @@ Three layers, read top to bottom:
 Leaf module: imports only `ai.model_defaults` (itself a leaf), so `common/`, `mcp/` and
 `ai/bedrock_client` can all depend on it without a cycle.
 
-Not here, deliberately: the open-weight rows (gpt-oss-*, qwen3-32b, nova-micro) wait for the
-adapter story (#4776) — a route to a model the chokepoint cannot speak to would be a lie.
+Not here, deliberately: the open-weight candidates (gpt-oss-120b/20b, qwen3-32b, nova-micro) are
+NAMED and PRICED at the chokepoint since #4776 (its Converse adapter can speak to them), but no
+route points at one — a route lands only on the #4776 kill criterion (non-inferior with n and an
+interval against Haiku 5.5, every gate, >=30% cheaper or a named non-price benefit), and the
+adopted model then also becomes the workhorse tier's outage fallback here, with a test.
 """
 
 from __future__ import annotations

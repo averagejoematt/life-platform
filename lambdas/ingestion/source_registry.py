@@ -1184,23 +1184,19 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     "garmin": {
         "label": "Garmin",
         "checker_label": "Garmin biometrics",
-        "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
-        "desc": "Biometrics — paused (vendor anti-automation, ADR-074)",
+        "desc": "Garmin watch — delivered through Strava (direct API retired, ADR-074 amendment 2026-10-11)",
         "category": "Wearables",
         "behavioral": False,
         "stale_hours": None,
         # PAUSED 2026-06-03 — Garmin's anti-automation crackdown 429-blocks
         # server-side OAuth refresh from datacenter IPs. See ADR-074.
         "paused": True,
-        "active_api": True,
-        "probe_functions": (("garmin-data-ingestion", "Garmin"),),  # #4643: the daily boot probe's targets
-        # Best-effort: still evaluated + logged, excluded from UnhealthySourceCount
-        # so the accepted 429 failure can't mask a real source death (2026-06-19).
-        "best_effort": True,
+        # No active_api / best_effort: the direct function is retired (#4640), so the
+        # pipeline-health probe has nothing to evaluate.
         "expected_days": 5,
         "qa_tier": None,  # paused sources render ⏸ from the paused flag
-        "method": "OAuth API pull, 4x daily — paused (ADR-074)",
-        "metrics": "Stress, body battery, steps",
+        "method": "Delivered through Strava — direct-API function retired 2026-10-11 (#4640, ADR-074)",
+        "metrics": "Activities (via Strava)",
         # #3252: steps, and PAUSED (ADR-074) — the canonical stale-is-not-absent
         # case. A paused source cannot report, so it can neither confirm nor deny a
         # step absence; absence_sourcing returns `stale`, never `absent`, while it

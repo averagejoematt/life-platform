@@ -140,7 +140,7 @@ def test_parser_finds_the_known_alarm_families():
     assertion below would pass vacuously."""
     families, _ = _covered_map()
     assert "whoop" in families["ingest-consecutive-failures-"], "consecutive-failures loop not parsed — parser broke"
-    assert "garmin" in families["ingest-auth-unhealthy-"], "per-source auth loop not parsed — parser broke"
+    assert "notion" in families["ingest-auth-unhealthy-"], "per-source auth loop not parsed — parser broke"
 
 
 def test_every_oauth_source_has_a_per_source_alarm():
@@ -200,7 +200,8 @@ def test_digest_only_sources_do_not_page():
     page that de-paged it — and notion is monitored:False, operator view only."""
     _, covered = _covered_map()
     digest_only = reg.oauth_digest_only_source_ids()
-    assert "garmin" in digest_only, "garmin lost its paused/best_effort facets — re-check the routing rule"
+    assert "garmin" not in digest_only, "garmin direct pull is retired (#4640) — it must not carry the oauth facet"
+    assert "notion" in digest_only
     wrong = sorted(s for s in digest_only if covered.get(s) == "urgent")
     assert not wrong, f"digest-only OAuth sources routed to the URGENT page: {wrong}"
 
@@ -223,7 +224,7 @@ def test_oauth_facet_excludes_keyless_and_manual_sources():
     oauth_ids = set(reg.oauth_source_ids())
     for keyless in ("weather", "youtube", "bluesky", "mastodon", "apple_health", "measurements", "food_delivery", "supplements"):
         assert keyless not in oauth_ids, f"{keyless} has no outbound credential — it must not carry the oauth facet"
-    for credentialed in ("whoop", "withings", "strava", "eightsleep", "todoist", "habitify", "hevy", "garmin", "notion", "dropbox"):
+    for credentialed in ("whoop", "withings", "strava", "eightsleep", "todoist", "habitify", "hevy", "notion", "dropbox"):
         assert credentialed in oauth_ids, f"{credentialed} is a credentialed pull — it must carry the oauth facet"
 
 
@@ -362,7 +363,7 @@ def test_daily_cadence_sources_keep_the_24h_window():
     1h window + treat_missing=NOT_BREACHING would clear a still-dead credential
     every evening. Their window stays matched to their cadence."""
     periods = _per_source_loop_periods()
-    for src in ("todoist", "habitify", "whoop", "garmin", "notion"):
+    for src in ("todoist", "habitify", "whoop", "notion"):
         assert periods.get(src) == 86400, f"ingest-auth-unhealthy-{src} must keep the 86400s cadence-matched window, got {periods.get(src)}"
 
 

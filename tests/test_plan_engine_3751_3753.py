@@ -305,7 +305,7 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
     e = R["energy_floor_kcal"]
     assert (e["floor_7d_mean"], e["floor_lifting_day"], e["floor_any_day"], e["opening_kcal"]) == (1800, 1900, 1600, 2100)
     assert e["titration"]["step_kcal"] == 150 and e["titration"]["never_on_a_week_with_fewer_complete_logs_than"] == 6
-    assert R["protein_floor_g"]["value"] == 180 and R["protein_floor_g"]["target_g"] == 200 and R["protein_floor_g"]["days_of_7"] == 6
+    assert R["protein_floor_g"]["value"] == 170 and R["protein_floor_g"]["target_g"] == 200 and R["protein_floor_g"]["days_of_7"] == 6
     assert R["protein_floor_g"]["g_per_kg_dxa_lean"]["floor"] == 2.3
     assert R["fat_floor_g"]["value"] == 65 and R["carb_floor_g"]["value"] == 120
     w = R["walking_floor_hr_wk"]

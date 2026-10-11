@@ -104,6 +104,29 @@ Once the workhorse tier is on Haiku 5.5, it costs about $5 a month. Open-weight 
 - Every gate passes.
 - It is **either** ≥30% cheaper **or** it delivers a named non-price benefit.
 
+### The trial table (#4776) — pre-filled, not run
+
+The adapter, the price rows, the IAM rows and the replay harness for the three features landed with #4776; the eval itself has **not run**, because its baseline is Haiku 5.5 and that model's access is not enabled in the account yet (#4772). Each cell below is filled in from `tests/model_swap_eval.py --feature <f> --incumbent claude-haiku-5-5 --candidate <c>` once it can run; until then every verdict reads *not run*. Thresholds are the harness's own (`MARGIN` 0.10: the Wilson 95% lower bound of the candidate's preference share must be ≥ 0.40; a candidate gate failure blocks whatever the judge says). The price arm is arithmetic on the chokepoint's rows (`bedrock_client.PRICES`, every open-weight row **unverified †**) against `haiku-5-5` ($0.10 / $0.50): a model that is not ≥30% cheaper on both legs must earn its place on a **named** non-price benefit.
+
+| Feature (n) | Candidate | $ in / out vs Haiku 5.5 † | Price arm (≥30% cheaper) | Non-price benefit it must show | Quality: p, Wilson 95% ≥ 0.40 | Every gate | Verdict |
+|---|---|---|---|---|---|---|---|
+| coach_quality_gate (45) | gpt-oss-120b | 0.15 / 0.60 = +50% / +20% | **no** — dearer | in-region, or strict JSON the baseline lacks, or second provider | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_quality_gate (45) | gpt-oss-20b | 0.07 / 0.30 = −30% / −40% | yes (on the bar) | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_quality_gate (45) | Qwen3-32B | ~0.15 / 0.60 = +50% / +20% | **no** — dearer | in-region, or a second family's result | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_quality_gate (45) | Nova Micro | 0.035 / 0.14 = −65% / −72% | yes | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | gpt-oss-120b | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | gpt-oss-20b | −30% / −40% | yes (on the bar) | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | Qwen3-32B | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | Nova Micro | −65% / −72% | yes | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | gpt-oss-120b | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | gpt-oss-20b | −30% / −40% | yes (on the bar) | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | Qwen3-32B | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | Nova Micro | −65% / −72% | yes | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+
+Two things the table already says before a single call: gpt-oss-120b and Qwen3-32B cannot be adopted on price at all, so their only route in is a measured non-price benefit (the in-region claim needs a stated reason it matters; "strict JSON" needs the baseline to fail the schema gate where the candidate passes it); and the sample sizes are small — at an even split the harness needs about n=93 to clear the bar, so an INCONCLUSIVE verdict is the likely first reading and is reported as such, never rounded up. Reading the n: `coherence_semantic` has 22 inputs because only the briefs carrying `authoritative_facts` can be served as a facts line.
+
+How the adapter sends a schema: Converse has no Anthropic `output_config`, so the JSON schema is rendered into a trailing system instruction and the reply is checked against the schema afterwards (`schema_conformance` is a gate). That is the honest shape of the "strict JSON" question — a model that cannot hold the shape fails the gate rather than being helped by the wire.
+
 ## 5. Architecture
 
 ```

@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-10-11 (v8.6.0 — 109 Lambdas, 26 active secrets, 88 MCP tools, ~136 alarms)
+> Last updated: 2026-10-11 (v8.6.0 — 108 Lambdas, 26 active secrets, 88 MCP tools, ~135 alarms)
 
 ---
 
@@ -113,7 +113,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | **~136 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
+| CloudWatch alarms | **~135 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
@@ -172,7 +172,7 @@ CDK-managed in us-west-2 (73) plus 4 standalone in us-east-1 (Lambda@Edge + OG +
 Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(Functions)'`.
 
 ### Ingestion (14)
-`whoop-data-ingestion` · `eightsleep-data-ingestion` · `garmin-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `apple-health-ingestion` · `dropbox-poll` · `food-delivery-ingestion` · `measurements-ingestion`
+`whoop-data-ingestion` · `eightsleep-data-ingestion` · `strava-data-ingestion` · `withings-data-ingestion` · `habitify-data-ingestion` · `macrofactor-data-ingestion` · `notion-journal-ingestion` · `todoist-data-ingestion` · `weather-data-ingestion` · `health-auto-export-webhook` · `apple-health-ingestion` · `dropbox-poll` · `food-delivery-ingestion` · `measurements-ingestion`
 
 > SIMP-2 cohort (8, ADR-056): whoop, garmin, strava, withings, eightsleep, habitify, todoist, weather. Pattern-exempt (6): notion, macrofactor, apple_health, dropbox_poll, food_delivery, measurements (HAE-fed).
 

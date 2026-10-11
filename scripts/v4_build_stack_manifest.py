@@ -85,6 +85,7 @@ INGEST_PATTERNS = (
     "webhook_push",  # provider pushes to a Function URL, near-real-time
     "file_transport",  # a file lands in cloud storage and a poller picks it up
     "habit_bridge",  # projected out of another source's habit records
+    "relayed_through_source",  # the device has no writer of its own; its records arrive inside another source's feed
     "manual_entry",  # a human types it in (MCP tool, form, lab PDF)
     "frozen_archive",  # historical import, no live writer
 )
@@ -104,6 +105,8 @@ def _ingest_pattern(source_id: str, method: str) -> str:
             return "file_transport"
         if "bridge" in m:
             return "habit_bridge"
+        if "delivered through" in m:
+            return "relayed_through_source"
         if "manual" in m or "log" in m:
             return "manual_entry"
     else:

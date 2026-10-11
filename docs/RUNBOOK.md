@@ -2,10 +2,10 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-10-11 (v8.6.0 — 88 MCP tools, 69-module package, 109 Lambdas, 20 data sources)
+Last updated: 2026-10-11 (v8.6.0 — 88 MCP tools, 69-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
-- Lambda functions defined (CDK): 109 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
+- Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
 - Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
 - Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
@@ -208,7 +208,7 @@ daily-brief-schedule                cron(0 17 * * ? *)
 | Source | Schedule | Lambda |
 |--------|----------|--------|
 | Whoop | 07:00 AM | whoop-data-ingestion |
-| Garmin | Paused (ADR-074) — no live rule | garmin-data-ingestion |
+| Garmin | Retired 2026-10-11 (#4640) — no function, no rule; data arrives through Strava | (none) |
 | Notion Journal | 07:00 AM | notion-journal-ingestion |
 | Withings | 07:15 AM | withings-data-ingestion |
 | Habitify | 07:15 AM | habitify-data-ingestion |
@@ -501,7 +501,7 @@ All secrets are stored in AWS Secrets Manager under `life-platform/` prefix. See
 | `life-platform/whoop` | whoop-data-ingestion | OAuth2; auto-refresh on each run |
 | `life-platform/withings` | withings-data-ingestion | OAuth2; auto-refresh on 401 |
 | `life-platform/strava` | strava-data-ingestion | OAuth2; auto-refresh on expires_at |
-| `life-platform/garmin` | garmin-data-ingestion | garth OAuth1+OAuth2; refreshed via Playwright browser flow |
+| `life-platform/garmin` | (none — retired #4640) | dormant; owner-attended delete |
 | `life-platform/eightsleep` + `/eightsleep-client` | eightsleep-data-ingestion | User creds + client ID |
 | `life-platform/ai-keys` | 24+ Lambdas (daily-brief, weekly digests, coaches, etc.) | Anthropic API key |
 | `life-platform/site-api-ai-key` | life-platform-site-api, life-platform-site-api-ai | Isolated Anthropic key for public site |
@@ -539,7 +539,7 @@ Each Lambda has its own dedicated IAM role scoped to exactly what it needs:
 | lambda-eightsleep-role | eightsleep-data-ingestion | life-platform/eightsleep only |
 | lambda-macrofactor-role | macrofactor-data-ingestion | None |
 | lambda-apple-health-role | apple-health-ingestion | None |
-| lambda-garmin-ingestion-role | garmin-data-ingestion | life-platform/garmin only |
+| lambda-garmin-ingestion-role | (retired #4640 — removed with the function) | — |
 | lambda-habitify-ingestion-role | habitify-data-ingestion | life-platform/habitify only |
 | lambda-mcp-server-role | life-platform-mcp | DynamoDB GetItem + Query + PutItem (cache writes) |
 | lambda-anomaly-detector-role | anomaly-detector | life-platform/anthropic (Haiku for hypothesis) |
@@ -772,7 +772,9 @@ therefore means some held source is emitting 0s *right now*.
 obsolete — the #2976 re-cut delivered a strictly better clear latency by fixing
 the emitters instead of the window arithmetic.)
 
-### Garmin: 429 Too Many Requests / OAuth1 expired (auth_breaker tripped)
+### Garmin: 429 Too Many Requests / OAuth1 expired (auth_breaker tripped) — RETIRED (#4640)
+
+> **Historical.** The `garmin-data-ingestion` function, its alarm and its role were removed on 2026-10-11 (ADR-074 amendment). Garmin-watch activities arrive through Strava. Reviving the direct API is a new ADR plus re-adding the function to `cdk/stacks/ingestion_stack.py`; the steps below are kept only as the revival reference.
 
 Garmin OAuth1 has a ~30-day lifetime; after the gap or rate-limit storm, the Lambda trips `auth_breaker` and stops attempting calls until cleared.
 

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-10-04T22:10:25.264831+00:00",
+  "captured_at": "2026-10-11T22:19:31.415062+00:00",
   "fetch_path": "/api/calls",
   "is_prefix_sample": false,
   "path": "/api/calls",
@@ -146,7 +146,7 @@
             "simple_guess": {
               "keys": {
                 "right": {
-                  "type": "null"
+                  "type": "boolean"
                 },
                 "short": {
                   "type": "string"
@@ -163,6 +163,26 @@
             "title": {
               "type": "string"
             },
+            "tolerance": {
+              "keys": {
+                "n": {
+                  "type": "integer"
+                },
+                "statistic": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "window_days": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
             "topic": {
               "type": "string"
             },
@@ -175,11 +195,12 @@
           },
           "optional": [
             "sides",
+            "tolerance",
             "topic"
           ],
           "type": "object"
         },
-        "length_sample": 33,
+        "length_sample": 55,
         "type": "array"
       },
       "count": {

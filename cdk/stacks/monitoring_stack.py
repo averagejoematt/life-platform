@@ -775,10 +775,9 @@ class MonitoringStack(Stack):
                 dims={"Source": _auth_src},
             )
         # DIGEST, not urgent — registry-derived (oauth_digest_only_source_ids):
-        # garmin is paused + best_effort (its 429 auth death is the accepted,
-        # unfixable state ADR-074 de-paged; coverage returns, the page does not) and
-        # notion is monitored:False (operator view only, never a paging surface).
-        for _auth_src in ("garmin", "notion"):
+        # garmin's direct function is retired (#4640) so ingest-auth-unhealthy-garmin
+        # is removed (nothing emits IngestAuthHealthy{Source=garmin}); notion is monitored:False (operator view only, never a paging surface).
+        for _auth_src in ("notion",):
             _alarm(
                 f"IngestAuthUnhealthy{_auth_src.title()}",
                 f"ingest-auth-unhealthy-{_auth_src}",

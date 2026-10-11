@@ -379,13 +379,10 @@ def test_apple_health_xml_lambda_deleted():
 # ==============================================================================
 
 
-def test_garmin_has_no_schedule():
-    """The ADR-074 pause and the deployed cron now agree: no schedule= in the
-    Garmin block (the 4×/day probe into a throttle is gone)."""
-    start = _INGESTION_STACK_SRC.index("GarminIngestion")
-    end = _INGESTION_STACK_SRC.index("Notion", start)
-    garmin_block = _INGESTION_STACK_SRC[start:end]
-    assert "schedule=" not in garmin_block, "garmin cron re-armed against ADR-074"
+def test_garmin_function_is_retired():
+    """#4640 (supersedes #497): the Garmin direct-API function is gone from the stack entirely."""
+    assert 'function_name="garmin-data-ingestion"' not in _INGESTION_STACK_SRC, "garmin function re-added"
+    assert "ingestion_garmin" not in _INGESTION_STACK_SRC
 
 
 # ==============================================================================

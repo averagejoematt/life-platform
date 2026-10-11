@@ -89,7 +89,6 @@ pytestmark = pytest.mark.integration
 # Expected handler mapping: function_name → expected_module_prefix
 EXPECTED_HANDLERS = {
     "whoop-data-ingestion": "whoop_lambda",
-    "garmin-data-ingestion": "garmin_lambda",
     "strava-data-ingestion": "strava_lambda",
     "withings-data-ingestion": "withings_lambda",
     "habitify-data-ingestion": "habitify_lambda",

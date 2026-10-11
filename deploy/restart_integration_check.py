@@ -105,7 +105,6 @@ SOURCE_FN = {
     "hevy": "hevy-backfill",
     "notion": "notion-journal-ingestion",
     "weather": "weather-data-ingestion",
-    "garmin": "garmin-data-ingestion",
     "dropbox": "dropbox-poll",
     "apple_health": "health-auto-export-webhook",
     "macrofactor": "macrofactor-data-ingestion",

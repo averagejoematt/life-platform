@@ -306,12 +306,6 @@
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
     },
-    "ingest-auth-unhealthy-garmin": {
-      "kind": "metric",
-      "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
-    },
     "ingest-auth-unhealthy-habitify": {
       "kind": "metric",
       "routing": "urgent",
@@ -1017,7 +1011,7 @@
   ],
   "cost_surface": {
     "ai_features": 25,
-    "alarms": 140,
+    "alarms": 139,
     "emf_namespaces": 33,
     "schedules": 95,
     "secrets": 30
@@ -3219,13 +3213,6 @@
       "lambda": "food-delivery-ingestion",
       "module": "lambdas/ingestion/food_delivery_lambda.py",
       "partition": "food_delivery",
-      "via": "pk"
-    },
-    {
-      "direction": "unknown",
-      "lambda": "garmin-data-ingestion",
-      "module": "lambdas/ingestion/garmin_lambda.py",
-      "partition": "garmin",
       "via": "pk"
     },
     {
@@ -6761,15 +6748,6 @@
       "stack": "compute_stack",
       "timeout_seconds": 120
     },
-    "garmin-data-ingestion": {
-      "declared_alarm": null,
-      "handler": "ingestion.garmin_lambda.lambda_handler",
-      "memory_mb": 512,
-      "module": "lambdas/ingestion/garmin_lambda.py",
-      "schedules": [],
-      "stack": "ingestion_stack",
-      "timeout_seconds": 300
-    },
     "habit-skip-review": {
       "declared_alarm": null,
       "handler": "emails.habit_skip_review_lambda.lambda_handler",
@@ -7677,9 +7655,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 140,
+      "alarms": 139,
       "alarms_by_routing": {
-        "digest": 96,
+        "digest": 95,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7691,8 +7669,8 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 742,
-      "lambdas": 109,
+      "edges": 741,
+      "lambdas": 108,
       "mcp_tool_modules": 36,
       "mcp_tools": 88,
       "partitions": 115,
@@ -7706,8 +7684,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 930,
-        "sites_total": 1291
+        "sites_resolved": 929,
+        "sites_total": 1290
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -7978,7 +7956,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+      "method": "Delivered through Strava \u2014 direct-API function retired 2026-10-11 (#4640, ADR-074)",
       "privacy_tier": "public",
       "stale_hours": null
     },
