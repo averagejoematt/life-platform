@@ -107,6 +107,88 @@ def test_apple_health_rebuild_path_has_no_operator_caller_so_nothing_propagates(
     )
 
 
+# ── every other stated facet, held to the code it describes ─────────────────────
+
+
+def _module(path):
+    return ast.parse((ROOT / path).read_text())
+
+
+def _config_kwargs(tree):
+    """The keyword arguments of the module's IngestionConfig(...) call, as Python literals."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "IngestionConfig":
+            return {k.arg: k.value.value for k in node.keywords if isinstance(k.value, ast.Constant)}
+    return None
+
+
+def _called_attrs(tree):
+    return {node.func.attr for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)}
+
+
+def _env_default(path, env_name):
+    m = re.search(r'os\.environ\.get\("' + env_name + r'",\s*"(\d+)"\)', (ROOT / path).read_text())
+    return int(m.group(1)) if m else None
+
+
+def test_every_stated_facet_note_matches_the_code_it_describes():
+    """#4638 box 1: the facet is a claim about the store, so each claim is checked against its code.
+
+    test_framework_refetch_windows_match_the_stated_windows holds strava/whoop's window_days;
+    this holds the rest — withings' today-only window and missing delete path, hevy's events
+    feed with tombstones, and the numbers the strava/whoop notes quote for the store → vendor
+    reconcile (#4759): its 14-day window and strava's 3-days-per-run empty-day cap. One test,
+    every offender reported.
+    """
+    offenders = []
+
+    # withings: edits inside a 1-day window (refresh_today, gap-fill otherwise), deletes never.
+    withings = _module("lambdas/ingestion/withings_lambda.py")
+    cfg = _config_kwargs(withings) or {}
+    facet = _facet("withings") or {}
+    if cfg.get("refresh_today") is not True or cfg.get("refresh_trailing_days"):
+        offenders.append(f"withings: config refresh_today={cfg.get('refresh_today')!r} trailing={cfg.get('refresh_trailing_days')!r}")
+    if (facet.get("edits"), facet.get("window_days")) != ("inside_window", 1):
+        offenders.append(
+            f"withings: stated edits={facet.get('edits')!r} window_days={facet.get('window_days')!r}, code re-fetches today only"
+        )
+    if {"delete_item", "batch_writer"} & _called_attrs(withings) and facet.get("deletes") == "not_propagated":
+        offenders.append("withings: a delete path now exists but deletes is still stated not_propagated")
+
+    # hevy: the events feed applies 'updated' and tombstones 'deleted' at any age.
+    hevy_text = (ROOT / "lambdas/ingestion/hevy_backfill_lambda.py").read_text()
+    hevy = ast.parse(hevy_text)
+    called_names = {getattr(n.func, "id", None) for n in ast.walk(hevy) if isinstance(n, ast.Call)}
+    facet = _facet("hevy") or {}
+    if not {"_tombstone_deleted", "resolve_tombstones"} <= called_names or "/v1/workouts/events" not in hevy_text:
+        offenders.append("hevy: the events-feed tombstone path is gone but the facet still says any_age")
+    if (facet.get("edits"), facet.get("deletes")) != ("any_age", "any_age"):
+        offenders.append(f"hevy: stated {facet.get('edits')!r}/{facet.get('deletes')!r}, code propagates both at any age")
+
+    # strava + whoop: the reconcile window and strava's per-run empty-day cap the notes quote.
+    for key, path, env_name in (
+        ("strava", "lambdas/ingestion/strava_lambda.py", "RECONCILE_WINDOW_DAYS"),
+        ("whoop", "lambdas/ingestion/whoop_lambda.py", "WHOOP_RECONCILE_WINDOW_DAYS"),
+    ):
+        window = _env_default(path, env_name)
+        note = str((_facet(key) or {}).get("note") or "")
+        if window is None or f"{window}-day window" not in note:
+            offenders.append(f"{key}: reconcile window {window} not the one the note quotes")
+    cap = _env_default("lambdas/ingestion/strava_lambda.py", "STRAVA_MAX_EMPTIED_DAYS_PER_RUN")
+    strava = _facet("strava") or {}
+    if cap is None or f"at most {cap} days per run" not in str(strava.get("note") or ""):
+        offenders.append(f"strava: empty-day cap {cap} not the one the note quotes")
+    if strava.get("deletes") != "inside_window":
+        offenders.append(f"strava: deletes={strava.get('deletes')!r}, but the reconcile writes the emptied day (#4759)")
+
+    # whoop: the reconcile reports store → vendor but never writes, so deletes stay not_propagated.
+    whoop = _module("lambdas/ingestion/whoop_lambda.py")
+    if {"delete_item"} & _called_attrs(whoop) and (_facet("whoop") or {}).get("deletes") == "not_propagated":
+        offenders.append("whoop: a delete path now exists but deletes is still stated not_propagated")
+
+    assert not offenders, "upstream_changes facet disagrees with its code:\n  " + "\n  ".join(offenders)
+
+
 # ── MacroFactor: the diary file's date range is authoritative ────────────────────
 
 # The header row of a real diary export (raw/matthew/macrofactor/2026/10/, 2026-10-05), verbatim.
