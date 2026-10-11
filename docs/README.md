@@ -83,7 +83,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–160)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–161)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/review craft` grades against |
 | [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |
@@ -107,6 +107,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [design/DESIGN_PARTNER_BRIEF.md](design/DESIGN_PARTNER_BRIEF.md) | The design-session contract + Slop Litmus v1 — synced into the v5 design project as BRIEF.md (#1464) |
 | [design/COACH_INNER_LIFE_BOUNDARY.md](design/COACH_INNER_LIFE_BOUNDARY.md) | What a coach may say about its own life — bible-derived texture vs. invented events, and the rulings on tense, the grounding gate, and where the stance lives (#2538) |
 | [COST_TRACKER.md](COST_TRACKER.md) | The $215 budget (surge $252 — ADR-133) + real run-rate |
+| [AI_MODEL_STRATEGY.md](AI_MODEL_STRATEGY.md) | Which model each AI job runs on — frontier, Claude workhorse, open-weight trial, caching, batch (ADR-161, epic #4768) |
 | [STACK_MANIFEST.md](STACK_MANIFEST.md) | `/data/stack.json` — the public "fork the architecture, not the data" instrument manifest: what it derives from, the privacy allowlists, the honest cost block (#1401) |
 | [RESERVED_CONCURRENCY.md](RESERVED_CONCURRENCY.md) | Concurrency strategy |
 | [A11Y_BASELINE.md](A11Y_BASELINE.md) | Accessibility baseline (pre-v4 audit) |
