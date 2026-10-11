@@ -3,7 +3,7 @@ tap-target floor on touch, and visual_qa's tap-target audit must GATE on it.
 
 Renders a faithful waveform (the SHIPPED tokens.css + story.css) in headless
 Chromium at a 390px viewport and runs the exact `_tap_target_audit` from
-tests/visual_qa.py:
+qa/visual_qa.py:
 
   * with the shipped CSS, the day-bars pass (the #1249 ::after lifts the effective
     touch height to 44px while the visible bar stays ~2px wide);

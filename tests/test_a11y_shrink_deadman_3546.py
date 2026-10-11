@@ -130,7 +130,7 @@ def _today():
 def test_committed_shrink_ledger_has_no_stale_entry():
     """No (page, rule) may sit unharvested for more than a week.
 
-    To clear a red here: run `python3 tests/visual_qa.py --update-baseline`
+    To clear a red here: run `python3 qa/visual_qa.py --update-baseline`
     against live, review the `tests/a11y_baseline.json` diff, and commit both
     it and the regenerated sidecar. Hand-deleting the row is not a fix — the
     next sweep re-adds it with today's date and the gate stays off.

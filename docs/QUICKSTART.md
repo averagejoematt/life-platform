@@ -39,7 +39,7 @@ python3 -m venv .venv                 # python3 must be 3.12.x — see table abo
 source .venv/bin/activate
 pip install -r requirements-dev.txt   # pytest, black, ruff, flake8, playwright, boto3 — pinned to match CI's gates
 pip install -r cdk/requirements.txt   # aws-cdk-lib + constructs (pinned)
-playwright install chromium           # browser for tests/visual_qa.py (local visual QA)
+playwright install chromium           # browser for qa/visual_qa.py (local visual QA)
 bash scripts/install_hooks.sh         # pre-commit hook: black/ruff format gate + doc-metadata sync (sync_doc_metadata.py --apply)
 ```
 

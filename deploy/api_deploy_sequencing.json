@@ -9,7 +9,7 @@
     "",
     "scripts/check_api_before_frontend.py (a PR-time check, .github/workflows/pr-checks.yml)",
     "requires an entry here for any newly-added route it finds referenced by a touched",
-    "site/ file. tests/visual_qa.py and deploy/smoke_test_site.sh both read",
+    "site/ file. qa/visual_qa.py and deploy/smoke_test_site.sh both read",
     "pending_deploy_routes to downgrade that route's 404 from a gating failure to a",
     "warning until it's re-armed (removed) post-deploy — the #2050 pattern, generalized",
     "to ONE registry instead of a hand-edited inline set per incident.",

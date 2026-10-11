@@ -1,0 +1,2302 @@
+#!/usr/bin/env python3
+"""
+visual_qa.py — Playwright visual QA sweep for averagejoematt.com (v4 "The Measured Life")
+
+Deep render verification of the three-door v4 site (ADR-071), over the unchanged
+read-only engine:
+  1. Drives Chromium over the v4 surfaces (Home/Cockpit/Story/Evidence + topics).
+  2. Scrolls each page top-to-bottom (triggers lazy data fetch + .reveal animations).
+  3. Verifies key containers rendered + inline-SVG charts have drawn geometry.
+  4. Exercises one interaction (cockpit pillar disclosure → Day-Grade Replay detail).
+  5. Mobile pass at 390px (+ chrome at 360px): horizontal overflow, plus the Epic-A
+     failure classes as regression tests (#1013) — app-bar row ≤ viewport (#1003),
+     no reveal stuck at opacity:0 after scroll (#1002), viewport meta present (#1004),
+     and the tap-target floor audit (#1010/#1249, gating: effective hit area ≥ 44px).
+     #3733: the SAME horizontal-overflow measurement also runs once at the DESKTOP
+     context's own viewport (1440x900 by default) — #1013's control only ever existed
+     at 390px, so a table pushed past its container at a full desktop width (a 1216px
+     .rd-tbl inside an overflow-x:visible .rd-sec on /method/, /method/cycles/) went
+     uncaught for as long as this sweep existed.
+  6. Captures full-page + per-chart element screenshots.
+  7. Optional --ai-qa: hands the screenshots to Claude (Bedrock) for semantic
+     "does this actually render correctly" judgement — robust to daily data changes
+     where pixel-diff would be brittle (see qa/visual_ai_qa.py).
+  8. Detects stuck loading text, JS errors, 5xx responses, empty sections.
+  9. axe-core accessibility audit per page (#1433, vendored bundle — no CDN):
+     GATES on NEW serious/critical violations vs the committed baseline
+     (tests/a11y_baseline.json); baselined + minor/moderate findings are
+     recorded honestly as warnings, never hidden, never gating. Baseline
+     shrinks/updates DELIBERATELY via --update-baseline (see tests/a11y_audit.py
+     for the full semantics + review discipline). Runs at BOTH viewports (#3277):
+     once post-reveal at the desktop context, once again at 390×844 after the
+     mobile reveal pass, each against its own ledger — a violation that only
+     exists at 390px (scrollable-region-focusable on the block-scroll tables)
+     used to be measured by no gate at all.
+  10. Leak-token sweep (#1448, deterministic, no AI, no browser): the SAME
+      token-grep deploy/restart_verify_rendered.py runs at reset time
+      (qa/leak_token_sweep.py) also runs here on every sweep, so a
+      template/leak-token regression (a stale literal, a cached S3 JSON blob,
+      a missed DDB partition) is caught within a day instead of only at the
+      next reset. --no-leak-scan is the debug escape hatch.
+
+The site is PUBLIC (no cf-auth gate) — no authentication needed.
+
+Usage:
+    python3 qa/visual_qa.py                      # full sweep, no AI
+    python3 qa/visual_qa.py --page /cockpit/         # single page
+    python3 qa/visual_qa.py --screenshot         # save full-page + chart crops
+    python3 qa/visual_qa.py --screenshot --ai-qa # + Claude semantic verdict per image (full surface)
+    python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+                                                    # + Claude semantic verdict, tier-1 pages only (#1428;
+                                                    #   what CI runs at deploy time)
+    python3 qa/visual_qa.py --screenshot --ai-qa --reader-truth
+                                                    # + phase-aware truth pass over each
+                                                    #   page's rendered prose (#1095; since
+                                                    #   #3251 this runs in the DAILY standalone
+                                                    #   only, never at deploy time)
+    python3 qa/visual_qa.py --update-baseline    # rewrite tests/a11y_baseline.json from
+                                                    #   this run's axe findings (#1433; deliberate,
+                                                    #   review the diff — the run still reds on NEW
+                                                    #   violations so nothing is silently absorbed)
+    python3 qa/visual_qa.py --no-a11y            # skip the axe pass (debug escape hatch;
+                                                    #   every CI run keeps it on)
+    python3 qa/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
+                                                    # the weekly ADVISORY iOS-Safari-engine run
+                                                    #   (#1434; .github/workflows/webkit-mobile-qa.yml):
+                                                    #   WebKit at an iPhone-class profile over the
+                                                    #   tier-1/2 manifest pages
+
+Cost: $0 for the browser sweep. Measured from the LifePlatform/AI per-gate rows
+(2026-08-27..30, #3249/#3251; every AI layer no-ops cleanly if AI is unavailable or
+budget-paused): --ai-qa --ai-qa-max-tier 1 is 6 Haiku vision calls, ~$0.046/run (n=16,
+stable to the cent); the untiered --ai-qa pass is 92 calls, ~$0.53; --reader-truth is
+~20 calls over the full prose surface, ~$0.19/run — the expensive half, which is why
+#3251 (option C1) moved it out of the per-deploy copies. Cadence by design (#1428 +
+#3251): CI's deploy-time gate runs --ai-qa-max-tier 1 only; the daily standalone
+(.github/workflows/visual-qa.yml) carries --reader-truth on every fire and the full
+untiered --ai-qa on Sundays/manual — see that workflow's header for the split.
+"""
+
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime, timezone
+
+# Default target is live prod. The PR-time render gate (qa/pr_render_gate.py)
+# overrides this to a local static server (http://127.0.0.1:PORT) via QA_SITE_URL
+# so the same capture_page() harness can shift-left onto site PRs without a deploy.
+SITE_URL = os.environ.get("QA_SITE_URL", "https://averagejoematt.com")
+
+# ── Performance budgets (#580) ─────────────────────────────────────────────────
+# Baselines measured 2026-07-05 against production (headless Chromium, single run,
+# 33 swept pages): LCP 72-1136ms (p90 984ms), CLS 0.059-0.614 (p90 0.570), total
+# JS 119-408KB/page. Budgets below carry headroom over that observed max so CI
+# network jitter doesn't flake the gate, while still catching a real regression.
+# See docs/DESIGN_SYSTEM_V5.md "Performance budget" for the full writeup — update
+# both places if the numbers move.
+LCP_BUDGET_MS = 2500  # ~2.2x the observed baseline max (1136ms)
+CLS_BUDGET = 0.75  # global ceiling ~1.2x the 2026-07-05 baseline max (0.614). Pages
+# that have paid down their shift set a TIGHTER per-page `cls_budget` in the manifest
+# (#1474): the archive readout pages (/data,/method,/protocols) reserve their async
+# space with designed skeleton states, dropping from the 0.46-0.67 baseline to ~0
+# (returning) / ~0.14 (first visit, the one-time intro card) — see qa_manifest
+# _readout_visual + docs/DESIGN_SYSTEM_V5.md §9. The global stays here for the pages
+# not yet reworked (e.g. the cockpit's bespoke motion reveal).
+JS_BYTES_SOFT_BUDGET = 550_000  # ~1.35x the observed baseline max (408KB); soft
+# (warning only) — the site's largest page type (data/method/protocols, which
+# share evidence.js) sets the ceiling other page types have plenty of room under.
+
+_PERF_INIT_SCRIPT = """
+window.__perf = {lcp: 0, cls: 0};
+try {
+    new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) { window.__perf.lcp = e.renderTime || e.loadTime || e.startTime; }
+    }).observe({type: 'largest-contentful-paint', buffered: true});
+} catch (e) {}
+try {
+    new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) { if (!e.hadRecentInput) window.__perf.cls += e.value; }
+    }).observe({type: 'layout-shift', buffered: true});
+} catch (e) {}
+"""
+
+# ── Page definitions — derived from THE page registry (qa/qa_manifest.py, #1426).
+# The sweep's coverage facet is every manifest entry carrying a `visual` def (or
+# `visual_variants` for deep-link sweeps). Adding a page to the sweep = setting
+# `visual=` on its manifest entry — there is NO page list in this file anymore.
+# Derivation verified identical to the pre-#1426 hand list (36 entries, same
+# paths + checks); tests/test_qa_manifest.py gates the derivation from drifting.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests")
+)  # a11y_audit / truth_baseline_audit / site_review (#4270)
+import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
+import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright import)
+from qa_manifest import leak_scan_paths, text_floor_paths, visual_pages  # noqa: E402
+
+_API_SEQUENCING_REGISTRY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy", "api_deploy_sequencing.json")
+
+# ── #2978: confirm-before-fail — the deploy-race class's ONE primitive ─────────
+# The shape-(a) record (5 closed per-symptom issues, rate 1 per 1.5 days and
+# worsening): smoke/visual-QA measuring the edge mid-invalidation, a cold
+# Lambda's first hit, an asset race, an empty first readout — each a transient
+# that reds a green deploy and auto-rolls it back. The reader-truth gate already
+# proved the answer (#2741 confirm-before-fail): a deterministic FAIL only gates
+# after it REPRODUCES on one re-probe. Crucially the confirm path COUNTS AND
+# PRINTS every confirmed transient (ADR-104) — the race rate stays measurable
+# for #2978's 30-day re-measure even though it no longer reds deploys.
+QA_CONFIRM_ATTEMPTS = int(os.environ.get("VISUAL_QA_CONFIRM_ATTEMPTS", "1"))
+QA_CONFIRM_DELAY_S = float(os.environ.get("VISUAL_QA_CONFIRM_DELAY_S", "15"))
+
+
+def confirm_before_fail(first, reprobe, sleeper=None, attempts=None, delay=None):
+    """#2978: return `first` unless it FAILed, in which case re-probe once after
+    a bounded delay. A clean re-probe records PASS + a visible confirmed-transient
+    warning (carrying the first probe's issues as evidence); a reproduced failure
+    returns the SECOND result stamped as reproduced — fresher evidence, and the
+    stamp says the race was ruled out."""
+    attempts = QA_CONFIRM_ATTEMPTS if attempts is None else attempts
+    if first.get("status") != "FAIL" or attempts < 1:
+        return first
+    delay = QA_CONFIRM_DELAY_S if delay is None else delay
+    print(f"  ⟳ {first.get('path')}: FAIL on first probe — confirming once after {delay:g}s before it can gate (#2978)")
+    (sleeper or time.sleep)(delay)
+    second = reprobe()
+    evidence = "; ".join(first.get("issues") or [])[:300]
+    if second.get("status") == "PASS":
+        second["warnings"] = list(second.get("warnings") or []) + [
+            f"confirmed-transient (#2978 deploy-race): first probe failed [{evidence}], clean on re-probe"
+        ]
+        second["confirmed_transient"] = True
+    else:
+        second["issues"] = list(second.get("issues") or []) + ["(reproduced on #2978 confirm re-probe — not a transient)"]
+    return second
+
+
+def await_convergence_or_die(base=None, expect_build=None, printer=print, exiter=sys.exit):
+    """#2978: refuse to sweep until the deploy has CONVERGED at the viewer path.
+
+    confirm_before_fail above is the second net — it re-probes a page that
+    already read the wrong world. This is the first: the sweep does not start
+    until the edge serves the build under test, the declared api-before-frontend
+    routes answer, and the site-api is warm. Opt-in on VISUAL_QA_EXPECT_BUILD
+    (site-deploy.yml passes github.sha), so every existing caller — the weekly
+    run, the WebKit run, local debugging — behaves exactly as it does today.
+
+    Non-convergence and an unreadable signal both exit non-zero and LOUD: a
+    sweep that cannot tell a race from a real defect must not report either.
+    """
+    expect_build = expect_build or os.environ.get("VISUAL_QA_EXPECT_BUILD", "")
+    if not expect_build:
+        printer("ℹ️  convergence: NOT ASSERTED — no VISUAL_QA_EXPECT_BUILD (#2978); ad-hoc run, verdicts are un-raced-checked")
+        return None
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy"))
+    import deploy_convergence  # noqa: PLC0415 — deliberately lazy: only the deploy-time path needs it
+
+    report = deploy_convergence.await_convergence(base or SITE_URL, expect_build)
+    for wid, w in report["windows"].items():
+        printer(f"  convergence · {wid}: {w['state']} — {w['detail']}")
+    if report["overall"] != deploy_convergence.CONVERGED:
+        stuck = [w for w, s in report["windows"].items() if s["state"] == report["overall"]]
+        deploy_convergence.emit(
+            deploy_convergence.UNVERIFIED if report["overall"] == deploy_convergence.UNAVAILABLE else deploy_convergence.RACED,
+            deploy_convergence.EDGE_CONTENT,
+            window_id=stuck[0] if stuck else None,
+            detail=f"visual sweep blocked: overall={report['overall']}; "
+            + "; ".join(f"{w}={report['windows'][w]['detail']}" for w in stuck),
+        )
+        printer(f"::error::visual QA did not start — convergence {report['overall'].upper()} (#2978). Re-run after the signal converges.")
+        exiter(1)
+    return report
+
+
+def _pending_deploy_routes() -> set:
+    """#2831: the routes deferred via deploy/api_deploy_sequencing.json's
+    `pending_deploy_routes` — the generalized, dated replacement for the old
+    hand-edited-during-an-incident bare-`set()` literal (#2050's manual
+    reflex). scripts/check_api_before_frontend.py (a PR-time
+    check, .github/workflows/pr-checks.yml) requires a PR that adds a route a
+    touched site/ page consumes to register an entry here (or in
+    sequenced_routes) before merge — this is the SAME file, read at sweep
+    time, so the deferral it declared actually takes effect. Fail-soft: a
+    missing/malformed registry reads as "nothing deferred", never a crash.
+    """
+    try:
+        with open(_API_SEQUENCING_REGISTRY, encoding="utf-8") as f:
+            data = json.load(f)
+        return {e["route"] for e in data.get("pending_deploy_routes", []) if isinstance(e, dict) and e.get("route")}
+    except Exception:
+        return set()
+
+
+PAGES = visual_pages()
+
+# Text that should never be visible (stuck/placeholder states).
+_EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
+
+
+def _payload_is_empty(data) -> bool:
+    """True only for an AFFIRMATIVELY empty collection payload.
+
+    A top-level empty list, a dict whose every list value is empty and whose
+    numeric counts are zero, or a dict DECLARING absence — the engine's own
+    `available: false` + non-empty `reason` contract (the exact shape
+    renderAutonomic/renderZone2 branch on). The declared-absence arm was
+    missing until 2026-08-22: on cycle Day 5, /api/autonomic_balance honestly
+    answered `{"available": false, "reason": "Need at least 7 days … 5 so
+    far"}` — no lists, no count keys — so the genesis discrimination refused
+    it and the deterministic FAIL auto-rolled-back a healthy site deploy
+    (run 32547631137, the #2841 instrument class). Anything unrecognized
+    still returns False — an API we can't read stays a gating failure,
+    never a silent pass.
+    """
+    if isinstance(data, list):
+        return len(data) == 0
+    if isinstance(data, dict):
+        if data.get("available") is False and isinstance(data.get("reason"), str) and data["reason"].strip():
+            return True
+        lists = [v for v in data.values() if isinstance(v, list)]
+        counts = [v for k, v in data.items() if isinstance(v, (int, float)) and ("count" in k or "total" in k)]
+        if not lists and not counts:
+            return False
+        return all(len(v) == 0 for v in lists) and all(v == 0 for v in counts)
+    return False
+
+
+def _api_deps_all_empty(page, api_deps) -> bool:
+    """Probe the page's own API deps: True iff EVERY dep answers 200 with an
+    affirmatively-empty payload (see _payload_is_empty). Used to tell a genesis
+    dark state (honest data absence rendered as placeholders) from a broken
+    data bind. Fail-closed: no deps, a non-200, or an unparseable body → False.
+    """
+    if not api_deps:
+        return False
+    for dep in api_deps:
+        try:
+            resp = page.request.get(f"{SITE_URL}{dep}", timeout=10000)
+            if resp.status != 200 or not _payload_is_empty(resp.json()):
+                return False
+        except Exception:
+            return False
+    return True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Page-level checks (run in the browser)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _scroll_and_reveal(page):
+    """Scroll the page top-to-bottom, then force all .reveal animations visible."""
+    page.evaluate(
+        """
+        () => new Promise(resolve => {
+            let y = 0; const step = 400;
+            const timer = setInterval(() => {
+                window.scrollBy(0, step); y += step;
+                document.querySelectorAll('.reveal').forEach(el => {
+                    el.classList.add('is-visible'); el.style.opacity = '1'; el.style.transform = 'none';
+                });
+                if (y >= document.body.scrollHeight) { clearInterval(timer); window.scrollTo(0, 0); resolve(); }
+            }, 80);
+            setTimeout(() => { clearInterval(timer); window.scrollTo(0, 0); resolve(); }, 10000);
+        })
+    """
+    )
+    page.evaluate(
+        """
+        () => document.querySelectorAll('.reveal').forEach(el => {
+            el.classList.add('is-visible'); el.style.opacity = '1'; el.style.transform = 'none';
+        })
+    """
+    )
+    page.wait_for_timeout(1500)
+
+
+def _check_svg_charts(page, selectors):
+    """For each chart selector, report whether the SVG has drawn geometry + is visible."""
+    return page.evaluate(
+        """(selectors) => {
+        const out = [];
+        for (const sel of selectors) {
+            document.querySelectorAll(sel).forEach((svg, i) => {
+                if (!svg) return;
+                const drawn = svg.querySelectorAll('path, polyline, line, circle, rect, a .node, .node').length;
+                const box = svg.getBoundingClientRect();
+                out.push({sel, index: i, drawn, visible: box.width > 4 && box.height > 4});
+            });
+        }
+        return out;
+    }""",
+        selectors,
+    )
+
+
+def _constellation_edge_cpts(page):
+    """#1215 regression guard. The home constellation's edge evidence (r, n, significance)
+    must ride the site's ONE shared data-cpts readout (hover + tap + keyboard), not a
+    hover-only native <title> that touch and keyboard can never reach.
+
+    Assert the constellation svg CARRIES a data-cpts attribute (present even at zero edges)
+    whose point count >= the number of served edge <line>s. Non-vacuous: the PRE-FIX svg has
+    no data-cpts attribute at all, so this fails regardless of how many edges the live
+    coupling data currently has (it fails even at 0 edges) — see test_constellation_edge_cpts.
+    """
+    return page.evaluate(
+        """() => {
+        const svg = document.querySelector('.constellation svg');
+        if (!svg) return { skip: 'no constellation svg on this page' };
+        const edges = svg.querySelectorAll('[data-edges] line').length;
+        const raw = svg.getAttribute('data-cpts');
+        if (raw === null)
+            return { ok: false, edges, reason: 'svg carries no data-cpts attribute — edge evidence is still hover-only <title>' };
+        let pts;
+        try { pts = JSON.parse(raw); } catch (e) { return { ok: false, edges, reason: 'data-cpts is not valid JSON' }; }
+        const n = Array.isArray(pts) ? pts.length : -1;
+        if (n < edges) return { ok: false, edges, n, reason: `data-cpts has ${n} point(s) < ${edges} served edge line(s)` };
+        return { ok: true, edges, n };
+    }"""
+    )
+
+
+def _check_sections_for_blank(page):
+    """Visible sections >100px tall with <5 chars of text and no chart (excludes closed <details>)."""
+    return page.evaluate(
+        """
+        () => {
+            const issues = [];
+            const insideClosedDetails = (el) => {
+                let p = el.parentElement;
+                while (p) { if (p.tagName === 'DETAILS' && !p.hasAttribute('open')) return true; p = p.parentElement; }
+                return false;
+            };
+            document.querySelectorAll('section, [class*=section]').forEach(s => {
+                const rect = s.getBoundingClientRect();
+                if (rect.height < 20 || insideClosedDetails(s)) return;
+                const text = s.innerText.trim();
+                if (rect.height > 100 && text.length < 5 && !s.querySelector('canvas, svg, img')) {
+                    issues.push({class: s.className.slice(0, 60), id: s.id, height: Math.round(rect.height)});
+                }
+            });
+            return issues;
+        }
+    """
+    )
+
+
+def _check_stale_text(page):
+    """Visible development/placeholder/stuck-loading copy that should never ship."""
+    return page.evaluate(
+        r"""
+        () => {
+            const body = document.body.innerText;
+            const issues = [];
+            const suspects = [
+                {pattern: /launching april|coming soon|ships after april/i, desc: 'Pre-launch copy still visible'},
+                {pattern: /(?<![a-z])TODO(?![a-z])|FIXME|lorem ipsum/i, desc: 'Development placeholder'},
+                {pattern: /Loading\.\.\.\./i, desc: 'Stuck loading indicator'},
+            ];
+            for (const s of suspects) {
+                if (s.pattern.test(body)) {
+                    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                    while (w.nextNode()) {
+                        const txt = w.currentNode.textContent;
+                        if (s.pattern.test(txt)) {
+                            // "coming soon" on /gear/ is sanctioned, permanent-until-launched
+                            // affiliate-program copy (v4_build_gear.py — the page's own
+                            // disclosure explains it), not stuck pre-launch placeholder text.
+                            // Both occurrences carry "affiliate" in the same text node, so
+                            // that's the discriminator — the genuine "site launching April"
+                            // class has no reason to mention affiliates (#1427).
+                            if (s.desc === 'Pre-launch copy still visible' && /affiliate/i.test(txt)) continue;
+                            const el = w.currentNode.parentElement;
+                            if (el && el.offsetParent !== null && el.offsetHeight > 0) {
+                                issues.push({text: txt.trim().slice(0, 60), desc: s.desc});
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            return issues;
+        }
+    """
+    )
+
+
+def _mobile_overflow(page):
+    """Horizontal overflow in px at the current (mobile) viewport — >4 means a layout break."""
+    return page.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
+
+
+# ── #3734: text that overflows its OWN container, invisibly ──────────────────
+# `_mobile_overflow` measures the DOCUMENT. That is the right question for a layout
+# break, and it is structurally blind to this one: on /data/vitals/ at 390w the
+# `.vs-stamp` sentence measured 372.4px inside a 353px band and its right edge sat at
+# 403.2 against the band's 372.3 — clipped mid-word, no ellipsis, no signal — while
+# `document.scrollWidth - clientWidth` read **0**, because the band does not scroll and
+# the overflow never reaches the viewport.
+#
+# Nine months of mobile sweeps ran over that page and none could see it. A page-level
+# measure cannot: the defect is entirely inside one box.
+#
+# So this measures CONTAINERS. The set is deliberately narrow — components that pair a
+# fixed-width stamp with flowing text, which is the shape that clips — rather than every
+# element on the page, because a general "nothing may exceed its parent" sweep would
+# drown in legitimate cases (sticky headers, negative margins, decorative overhangs)
+# and get muted within a week.
+TEXT_CONTAINER_SEL = (".vs-band", ".vf-wrap", ".rcp-tier", ".nut-lossrate")
+_CONTAINER_OVERFLOW_TOL = 1.0  # sub-pixel rounding only; a real clip is tens of px
+
+
+def _container_text_overflow(page, selectors=TEXT_CONTAINER_SEL):
+    """[(container, child, px)] for any child whose box escapes its container horizontally.
+
+    Reads getBoundingClientRect on both sides rather than scrollWidth: a child that
+    overflows a NON-scrolling parent does not move the parent's scrollWidth at all, which
+    is exactly how this class stayed invisible.
+    """
+    return page.evaluate(
+        """(args) => {
+        const [sels, tol] = args;
+        const out = [];
+        document.querySelectorAll(sels.join(',')).forEach(el => {
+          const pr = el.getBoundingClientRect();
+          if (pr.width === 0) return;
+          [...el.children].forEach(c => {
+            const cr = c.getBoundingClientRect();
+            if (cr.width === 0) return;
+            const over = Math.max(cr.right - pr.right, pr.left - cr.left);
+            if (over > tol) out.push([el.className, c.className || c.tagName.toLowerCase(), Math.round(over * 10) / 10]);
+          });
+        });
+        return out;
+      }""",
+        [list(selectors), _CONTAINER_OVERFLOW_TOL],
+    )
+
+
+# ── Mobile failure-class assertions (#1013) ───────────────────────────────────
+# These pin the EXACT classes the 2026-07-11 mobile review found live and Epic A
+# fixed (#1002 stuck reveals, #1003 app-bar overflow, #1004 missing viewport meta),
+# so they become regression tests, not lore. (a)-(d) all gate now — (d) the 44px
+# tap-target floor (Epic B #1010) was promoted advisory → gating by #1249.
+
+# Mirrors the reveal selector in site/assets/js/motion.js — an element matching this
+# that stays opacity:0 after a scroll-through is the #1002 tall-section reveal bug.
+MOBILE_REVEAL_SEL = (
+    ".hero, .page-hero, .ev-head, .dx-head, .beat, .loop, .rd-sec, .two-voice, "
+    ".coach-daily, .coach-progress, .coach-report, .coach-stance, .team-lead, "
+    ".team-focus, .team-tension, .team-huddle, .supp, .cap-card, .vr-row, .figs, .ml-ladder"
+)
+
+# GATING (#1010/#1249): the cockpit's headline controls + site-wide chrome the review
+# measured under the 44px floor, plus the home waveform day-bar anchors (.wave a.bar,
+# #1249). The audit gates on the EFFECTIVE hit area (own box unioned with any generated
+# ::after/::before overlay — the documented #1010 grammar) and only fails a target that
+# is below the floor in BOTH axes, so a wide inline text link or a control expanded to
+# 44px in one axis by the ::after grammar passes; a target tiny in both axes (the pre-fix
+# 2px×13px day-bar) fails. This finishes #1013 as designed (advisory → gating).
+TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs a, .ev-link, .cta-quiet, .wave a.bar"
+
+
+def _app_bar_overflow(page):
+    """px by which the fixed bottom app-bar (.doors) row exceeds the viewport at the
+    current width — >2 is the #1003 overflow (clipped toggle / truncated door)."""
+    return page.evaluate(
+        """() => {
+        const bar = document.querySelector('.doors');
+        if (!bar) return null;                       // page has no app-bar → n/a
+        const vw = document.documentElement.clientWidth;
+        // scrollWidth catches children pushed past the edge even when the bar itself
+        // is clipped to viewport width; also check the rightmost child's edge.
+        let far = 0;
+        bar.querySelectorAll(':scope > *').forEach(c => {
+            const style = getComputedStyle(c);
+            if (style.display === 'none') return;
+            far = Math.max(far, c.getBoundingClientRect().right);
+        });
+        return Math.round(Math.max(bar.scrollWidth - vw, far - vw));
+    }"""
+    )
+
+
+def _stuck_reveals(page, sel):
+    """Reveal-selector elements that are real-sized but stuck at opacity:0 after scroll
+    (the #1002 bug). Excludes zero-size / honest-empty elements to avoid false positives."""
+    return page.evaluate(
+        """(sel) => {
+        const out = [];
+        document.querySelectorAll(sel).forEach(el => {
+            const r = el.getBoundingClientRect();
+            // Only substantial, laid-out sections count — the #1002 bug strands whole
+            // content blocks (hero/rd-sec/backlog cards, all >100px). Requiring ≥24px
+            // excludes empty/collapsed elements and tiny transient labels so the live
+            // post-deploy sweep can't false-positive on an honest sparse-data element.
+            if (r.width < 24 || r.height < 24) return;
+            if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') return;
+            const op = parseFloat(getComputedStyle(el).opacity);
+            if (op < 0.05) out.push((el.className || el.tagName).toString().slice(0, 40));
+        });
+        return out;
+    }""",
+        sel,
+    )
+
+
+# ── Mobile FIRST-LOAD contract (#3542 / DES-1 + DES-3) ────────────────────────
+# Everything above measures the mobile viewport by RESIZING a page that has already
+# been loaded and scrolled at the desktop context. That is a structurally different
+# event from a phone visitor's first paint, and it is exactly why the DES-1 class was
+# invisible to every gate for months: evidence.js called `main.scrollIntoView()` on
+# its INITIAL render whenever `matchMedia("(max-width: 819px)")` matched, so every
+# archive shell (/data/*, /protocols/*, /method/*) scrolled itself past its own hero,
+# intro card and topic tabs with no user input at all — measured live at 390x844,
+# /data/physical/ scrollY = [0, 1297, 1297, 1297] at 200/800/1500/3000ms — while the
+# page's own orientation copy promised "no page jumps". Desktop was always 0.
+#
+# So this is a SEPARATE, FRESH navigation at 390x844: a new page in the same context,
+# viewport set BEFORE goto, and nothing touches it afterwards. Two invariants:
+#   (1) the page does not scroll itself (scrollY stays 0 at every sample), and the
+#       .page-hero — where the page has one — lies inside the FIRST viewport, so what
+#       a phone visitor sees first is what the page was designed to open on;
+#   (2) DES-3: wherever a sticky top bar's computed backdrop-filter is `none`, its
+#       computed background must be fully opaque. An 82%-alpha bar is legible only
+#       because the blur behind it destroys the text underneath; the @media (max-width:
+#       600px) block stripped the blur (it traps position:fixed children — #1007) and
+#       left the alpha, shipping the bar as tinted cellophane with page prose reading
+#       straight through it.
+MOBILE_FIRST_LOAD_VIEWPORT = {"width": 390, "height": 844}
+# Sample instants (ms after load). Mirrors the issue's own probe_scroll.py so the gate
+# measures the window the defect was measured in — the live jump landed between 200
+# and 800ms (it fires after the readout's async fetch resolves, and smooth-scrolls).
+MOBILE_FIRST_LOAD_SAMPLES_MS = (250, 800, 1600, 2600)
+# 1px of sub-pixel/anchor slop. The defect was three orders of magnitude larger.
+MOBILE_FIRST_LOAD_SCROLL_TOLERANCE_PX = 2
+# The three sticky top bars normalized onto one rule in tokens.css @layer chrome-base.
+TOP_BAR_SEL = ".story-top, .ev-top, .cockpit-top"
+
+_MOBILE_FIRST_LOAD_PROBE_JS = r"""(sel) => {
+    const hero = document.querySelector('.page-hero');
+    let heroTop = null, heroBottom = null;
+    if (hero) {
+        const r = hero.getBoundingClientRect();
+        // DOCUMENT coordinates — independent of wherever the page currently sits, so
+        // "the hero is in the first screenful" is a layout fact, not a scroll fact.
+        heroTop = r.top + window.scrollY;
+        heroBottom = r.bottom + window.scrollY;
+    }
+    const bars = [];
+    document.querySelectorAll(sel).forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;          // not laid out → not a bar a reader sees
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        bars.push({
+            sel: (el.className || el.tagName).toString().trim().split(/\s+/)[0],
+            position: cs.position,
+            backdrop_filter: (cs.backdropFilter || cs.webkitBackdropFilter || 'none'),
+            background_color: cs.backgroundColor,
+        });
+    });
+    return {
+        scroll_y: Math.round(window.scrollY),
+        hero_present: !!hero,
+        hero_doc_top: heroTop,
+        hero_doc_bottom: heroBottom,
+        viewport_h: window.innerHeight,
+        top_bars: bars,
+    };
+}"""
+
+
+def _css_alpha(color):
+    """Alpha channel of a COMPUTED CSS colour string, 0.0–1.0 (1.0 when opaque/unparsable).
+
+    Computed backgrounds reach us in several syntaxes and the modern ones matter here:
+    the live bar computed as `oklch(0.15 0.008 75 / 0.82)` in Chromium, not `rgba(...)`,
+    because the declaration is a `color-mix(in oklch, …)`. Handles legacy
+    `rgba(r, g, b, a)` / `rgb(r g b / a)` and the `<fn>(… / a)` family
+    (oklch/oklab/lab/lch/hsl/color). Unknown syntax reads as OPAQUE deliberately — this
+    feeds a gate, and an unparsable colour must never invent a violation.
+    """
+    c = (color or "").strip().lower()
+    if not c:
+        return 1.0
+    if c in ("transparent", "rgba(0, 0, 0, 0)"):
+        return 0.0
+    m = re.match(r"^rgba?\((.*)\)$", c)
+    if m:
+        parts = [x for x in re.split(r"[\s,/]+", m.group(1)) if x]
+        if len(parts) >= 4:
+            return _alpha_value(parts[3])
+        return 1.0
+    m = re.search(r"/\s*([0-9.]+%?)\s*\)\s*$", c)
+    if m:
+        return _alpha_value(m.group(1))
+    return 1.0
+
+
+def _alpha_value(token):
+    try:
+        return float(token[:-1]) / 100.0 if token.endswith("%") else float(token)
+    except ValueError:
+        return 1.0
+
+
+def mobile_first_load_findings(path, samples, probe, tolerance_px=MOBILE_FIRST_LOAD_SCROLL_TOLERANCE_PX):
+    """PURE verdict over one fresh-mobile-load observation (#3542). Returns finding strings.
+
+    `samples` is [(t_ms, scroll_y), …] taken during the load with NO interaction;
+    `probe` is the final _MOBILE_FIRST_LOAD_PROBE_JS dict. Kept free of Playwright so
+    tests/test_visual_qa_units.py can drive it with the pre-fix observation directly —
+    a gate whose verdict logic can only be exercised by a browser is a gate nobody
+    proves can fail.
+    """
+    findings = []
+    jumped = [(t, y) for t, y in samples if y > tolerance_px]
+    if jumped:
+        trace = ", ".join(f"{t}ms={y}" for t, y in samples)
+        findings.append(
+            f"Page scrolled itself on FIRST LOAD at {MOBILE_FIRST_LOAD_VIEWPORT['width']}px with no interaction "
+            f"(#3542/DES-1): scrollY {trace} — expected 0 throughout"
+        )
+    vh = probe.get("viewport_h") or MOBILE_FIRST_LOAD_VIEWPORT["height"]
+    if probe.get("hero_present"):
+        top, bottom = probe.get("hero_doc_top"), probe.get("hero_doc_bottom")
+        if top is not None and bottom is not None and not (top < vh and bottom > 0):
+            findings.append(
+                f".page-hero does not intersect the first viewport at {MOBILE_FIRST_LOAD_VIEWPORT['width']}px "
+                f"(#3542/DES-1): hero spans {round(top)}–{round(bottom)}px in the document, first screen is 0–{vh}px"
+            )
+    for bar in probe.get("top_bars", []):
+        backdrop = (bar.get("backdrop_filter") or "none").strip().lower()
+        if backdrop not in ("none", ""):
+            continue  # a real blur is doing the work the alpha assumes
+        alpha = _css_alpha(bar.get("background_color"))
+        if alpha < 0.999:
+            findings.append(
+                f"Sticky top bar .{bar.get('sel')} is {alpha:.2f}-alpha with backdrop-filter: none at "
+                f"{MOBILE_FIRST_LOAD_VIEWPORT['width']}px (#3542/DES-3) — page text reads straight through it; "
+                f"computed background {bar.get('background_color')!r}"
+            )
+    return findings
+
+
+def mobile_first_load_check(context, url, path):
+    """Drive the #3542 fresh-mobile-load probe for `url` and return finding strings.
+
+    A NEW page in the caller's context, sized to 390x844 BEFORE navigation, left
+    completely untouched afterwards — the only shape in which "does this page scroll
+    itself with no user input?" is an honest question.
+    """
+    page = context.new_page()
+    try:
+        page.set_viewport_size(MOBILE_FIRST_LOAD_VIEWPORT)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        except Exception as e:  # noqa: BLE001 — a nav failure is already gated upstream
+            return [f"Mobile first-load probe could not load the page (#3542): {str(e)[:120]}"]
+        samples, probe = [], {}
+        last = 0
+        for t in MOBILE_FIRST_LOAD_SAMPLES_MS:
+            page.wait_for_timeout(max(0, t - last))
+            last = t
+            try:
+                probe = page.evaluate(_MOBILE_FIRST_LOAD_PROBE_JS, TOP_BAR_SEL) or {}
+            except Exception:
+                continue
+            samples.append((t, probe.get("scroll_y", 0)))
+        if not samples:
+            return ["Mobile first-load probe returned no samples (#3542) — treated as a failure, never a pass"]
+        return mobile_first_load_findings(path, samples, probe)
+    finally:
+        try:
+            page.close()
+        except Exception:
+            pass
+
+
+def _viewport_meta_ok(page):
+    """True if a width=device-width viewport meta is present (the #1004 class)."""
+    return page.evaluate(
+        """() => {
+        const m = document.querySelector('meta[name="viewport"]');
+        return !!(m && /width\\s*=\\s*device-width/i.test(m.getAttribute('content') || ''));
+    }"""
+    )
+
+
+def _tap_target_audit(page, sel):
+    """#1010/#1249 tap-target floor (GATING): interactive controls whose EFFECTIVE hit
+    area is below the 44px floor in BOTH axes. The effective box is the element's own
+    rect unioned with any generated ::before/::after overlay — the documented #1010
+    grammar (a transparent, centered/anchored pseudo-element) enlarges the clickable
+    region without a visual change, and getBoundingClientRect alone can't see it. A
+    target below the floor in only ONE axis is an accepted affordance (a wide inline text
+    link; a control lifted to 44px in one axis by the ::after grammar, e.g. the app-bar
+    toggle or the #1249 waveform day-bars); a target tiny in BOTH axes is genuinely
+    un-tappable and fails the sweep."""
+    return page.evaluate(
+        """(sel) => {
+        const out = [];
+        document.querySelectorAll(sel).forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return;        // not rendered
+            let w = r.width, h = r.height;
+            // Fold in the #1010 hit-expander pseudo-elements: a generated ::after/::before
+            // (content !== 'none') carries the real touch area. Chromium resolves its
+            // width/height to used px, so max() over own+pseudo is the effective hit box.
+            for (const pe of ['::before', '::after']) {
+                const ps = getComputedStyle(el, pe);
+                if (!ps || ps.content === 'none' || ps.content === 'normal') continue;
+                const pw = parseFloat(ps.width), ph = parseFloat(ps.height);
+                if (!isNaN(pw)) w = Math.max(w, pw);
+                if (!isNaN(ph)) h = Math.max(h, ph);
+            }
+            if (w < 44 && h < 44) {
+                out.push(`${(el.className||el.tagName).toString().slice(0,28)} ${Math.round(w)}x${Math.round(h)} eff`);
+            }
+        });
+        return out;
+    }""",
+        sel,
+    )
+
+
+# ── SVG-text legibility floor (#1210) ─────────────────────────────────────────
+# Inline-SVG <text> is sized in viewBox units, so its ON-SCREEN size scales with
+# the svg's rendered width: a 10px radar label in a 320-unit viewBox drawn 280px
+# wide lands at ~8.8px, below the 11px smallest-shipping register (DESIGN_SYSTEM_V5
+# §10.5). #1017 fixed this for the home constellation; #1210 generalized it
+# (site/assets/js/svgtype.js floors the registered labels to max(base, 11/scale)).
+# This audit is the arbiter that retired the comment-level `fs-ok: SVG viewBox
+# units` sanction: it measures the RENDERED result — computed font-size × the live
+# getScreenCTM scale — for EVERY svg <text>, at both widths, so no future
+# viewBox-unit label can ship sub-floor behind a comment again.
+SVG_TEXT_FLOOR_PX = 11.0
+
+_SVG_TEXT_AUDIT_JS = """(floor) => {
+    const out = [];
+    document.querySelectorAll('svg text').forEach(t => {
+        const txt = (t.textContent || '').trim();
+        if (!txt) return;                                  // empty <text> — nothing to read
+        let box; try { box = t.getBoundingClientRect(); } catch (e) { return; }
+        if (!box || box.width < 1 || box.height < 1) return; // not laid out / off the tree
+        const cs = getComputedStyle(t);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const fs = parseFloat(cs.fontSize) || 0;           // user-unit font-size (px)
+        let scale = 1;
+        // hypot(a,b) is the uniform scale magnitude — correct even for a rotated
+        // axis label (a -90deg text has ctm.a≈0, which would falsely read as 1x).
+        try { const m = t.getScreenCTM(); if (m) { const s = Math.hypot(m.a, m.b); if (s > 0) scale = s; } } catch (e) {}
+        const eff = fs * scale;                            // effective ON-SCREEN px
+        if (eff < floor - 0.05) {
+            out.push({
+                cls: (t.getAttribute('class') || '(none)'),
+                txt: txt.slice(0, 24),
+                fs: Math.round(fs * 100) / 100,
+                scale: Math.round(scale * 1000) / 1000,
+                eff: Math.round(eff * 100) / 100,
+            });
+        }
+    });
+    return out;
+}"""
+
+
+def _svg_text_floor_findings(page, width):
+    """Set `width`, let svgtype.js re-floor (rAF-debounced on resize), then return
+    every svg <text> whose effective on-screen size is below the 11px floor."""
+    page.set_viewport_size({"width": width, "height": 900 if width >= 1000 else 844})
+    page.wait_for_timeout(300)  # let the resize handler's rAF re-floor + layout settle
+    try:
+        return page.evaluate(_SVG_TEXT_AUDIT_JS, SVG_TEXT_FLOOR_PX) or []
+    except Exception:
+        return []
+
+
+# ── HTML-text legibility floor (#2674) ────────────────────────────────────────
+# The #1210 audit sweeps `svg text` ONLY — the vitals-ring labels that shipped at
+# 8.8–9.3px were HTML <span>s (`.vr-l`/`.vr-sub`), invisible to it, and the static
+# CSS gate (check_css_tokens.py) had blessed them via free-text `fs-ok:` sanctions
+# (a sanction can bless ANY literal; nothing checked the rendered result). This is
+# the rendered-px arbiter for HTML text: every visible text node must compute
+# >= the §10.5 11px floor. Armed on the three highest-traffic pages (the #2674
+# scope, measured clean before arming — the 2026-07-17 lesson: never arm a widened
+# gate on surfaces still carrying live findings).
+#
+# (#3543) The set is now DERIVED from the page registry — every tier-1/2 page, 64 of
+# them — instead of the three it was armed on. Three pages was never the promise
+# DESIGN_SYSTEM_V5 §10.5 makes ("every rendered text node"), and the 61 unmeasured
+# pages carried 19 sub-floor tokens.css rules at 8.0–10.4px on 10 of them: the gate
+# reported green the whole time because those rules happened to render somewhere it
+# never looked. Widened under the same arming rule it was born with — the full
+# tier-1/2 surface was measured at 1280 and 390 first, and every sub-floor node that
+# sweep found was FIXED (lifted to var(--fs-label)), not exempted.
+TEXT_FLOOR_PAGES = text_floor_paths()
+
+_HTML_TEXT_AUDIT_JS = """(floor) => {
+    const out = [];
+    const seen = new Set();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walker.nextNode())) {
+        if (!(n.textContent || '').trim()) continue;        // whitespace-only node
+        const el = n.parentElement;
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+        if (el.closest('svg')) continue;                    // #1210's audit owns svg text
+        let box; try { box = el.getBoundingClientRect(); } catch (e) { continue; }
+        if (!box || box.width < 1 || box.height < 1) continue;   // not laid out / off the tree
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        const fs = parseFloat(cs.fontSize) || 0;
+        if (fs > 0 && fs < floor - 0.05) {
+            const cls = (typeof el.className === 'string' && el.className.trim())
+                ? '.' + el.className.trim().split(/\\s+/).join('.') : '';
+            out.push({
+                sel: el.tagName.toLowerCase() + cls,
+                txt: (n.textContent || '').trim().slice(0, 24),
+                eff: Math.round(fs * 100) / 100,
+            });
+        }
+    }
+    return out;
+}"""
+
+
+def _html_text_floor_findings(page, width):
+    """Set `width`, then return every visible HTML text node whose computed
+    font-size is below the 11px floor — deduped by (selector, size)."""
+    page.set_viewport_size({"width": width, "height": 900 if width >= 1000 else 844})
+    page.wait_for_timeout(300)
+    try:
+        raw = page.evaluate(_HTML_TEXT_AUDIT_JS, SVG_TEXT_FLOOR_PX) or []
+    except Exception:
+        return []
+    agg = {}
+    for f in raw:
+        key = (f.get("sel"), f.get("eff"))
+        if key not in agg:
+            agg[key] = {**f, "n": 0}
+        agg[key]["n"] += 1
+    return sorted(agg.values(), key=lambda x: (x.get("eff") or 0, x.get("sel") or ""))
+
+
+# ── visitor-facing GLYPH leak (#3543) ─────────────────────────────────────────
+# The provenance trigger shipped as `&#9432;` — a U+24D8 CIRCLED LATIN SMALL LETTER I
+# used as an icon. A text glyph standing in for an icon is a defect in two registers at
+# once: it is sized by the type scale (that one rendered at 10.12px, under the §10.5
+# floor, and no type fix could raise it without making the trigger larger than the label
+# it sits on), and it renders in whatever the reader's font stack has for that code
+# point — which is exactly the "no emoji, no glyph decoration" rule DESIGN_SYSTEM_V5 §8
+# states and nothing measured. Icons come from the sprite (icons.js/icons.svg); this is
+# the arbiter that no module quietly goes back to a code point.
+#
+# Narrow by construction — only the ranges the design system actually forbids:
+#   U+2460–U+24FF  enclosed alphanumerics (the ⓘ class)
+#   U+2600–U+27BF  misc symbols + dingbats
+#   U+1F300–U+1FAFF emoji / pictographs
+#   U+FE0F         the emoji variation selector (an otherwise-plain code point,
+#                  presented as emoji — invisible to a naive range check)
+# Typographic marks the site DOES use — —, ·, ▼, ✓-as-SVG, arrows — are deliberately
+# out of range; this sweep is about glyphs standing in for icons, not punctuation.
+_GLYPH_LEAK_AUDIT_JS = r"""() => {
+    const out = [];
+    const bad = /[\u2460-\u24FF\u2600-\u27BF\uFE0F]|[\uD83C-\uD83E][\uDC00-\uDFFF]/;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walker.nextNode())) {
+        const txt = (n.textContent || '');
+        if (!txt.trim()) continue;
+        const m = bad.exec(txt);
+        if (!m) continue;
+        const el = n.parentElement;
+        if (!el) continue;
+        let box; try { box = el.getBoundingClientRect(); } catch (e) { continue; }
+        if (!box || box.width < 1 || box.height < 1) continue;   // not laid out
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        const cls = (typeof el.className === 'string' && el.className.trim())
+            ? '.' + el.className.trim().split(/\s+/).join('.') : '';
+        // Is the glyph standing in for an ICON — i.e. inside interactive chrome the
+        // site draws (a button, a link, a tab)? That is the #3543 defect: a control
+        // whose mark is a code point is sized by the type scale and rendered by
+        // whatever font the reader has. A glyph inside a data label is typography.
+        const chrome = !!el.closest('button, a, [role="button"], [role="tab"], summary');
+        out.push({
+            sel: el.tagName.toLowerCase() + cls,
+            glyph: m[0],
+            code: 'U+' + m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0'),
+            txt: txt.trim().slice(0, 24),
+            chrome: chrome,
+        });
+    }
+    return out;
+}"""
+
+
+def _glyph_leak_findings(page):
+    """Every visible text node carrying a forbidden glyph code point (#3543),
+    deduped by (selector, code point). The viewport is whatever the caller set."""
+    try:
+        raw = page.evaluate(_GLYPH_LEAK_AUDIT_JS) or []
+    except Exception:
+        return []
+    agg = {}
+    for f in raw:
+        key = (f.get("sel"), f.get("code"))
+        if key not in agg:
+            agg[key] = {**f, "n": 0}
+        agg[key]["n"] += 1
+    return sorted(agg.values(), key=lambda x: (x.get("code") or "", x.get("sel") or ""))
+
+
+def gha_paused_gate_annotation(gate, status, env=None, stream=None):
+    """Emit a GitHub Actions `::warning::` when an AI gate was budget-paused (#1927).
+
+    The stdout line and the job summary both already say SKIPPED-BY-BUDGET, but
+    both live INSIDE the job log — a reviewer reading the checks list sees only a
+    green ✔ and has no way to know the gate never ran. An annotation is the one
+    surface that renders next to the check itself, so a paused gate can never
+    present as a clean gate. Same instrument ADR-147 chose for `content_truth`
+    findings, for the same reason.
+
+    Returns the emitted line (or "" when nothing was emitted) so the CI-output
+    contract is directly testable — no-op unless GITHUB_ACTIONS is set, so a
+    local run stays free of CI noise.
+    """
+    env = os.environ if env is None else env
+    state = (status or {}).get("status")
+    if state not in ("skipped_by_budget", SKIPPED_BY_READER_SURFACE):
+        return ""
+    if not env.get("GITHUB_ACTIONS"):
+        return ""
+    if state == SKIPPED_BY_READER_SURFACE:
+        # #4652: the cost gate's skip gets the SAME annotation the budget pause gets. A
+        # `::notice` in the workflow was the only trace before, under a job that still read
+        # "Visual + AI-vision QA ✔" — a skip recorded as a pass (ADR-116).
+        line = (
+            f"::warning title={gate} SKIPPED-BY-READER-SURFACE::"
+            f"{gate} did NOT run — skipped by the reader-surface gate (#4589/#4652): {status.get('reason')}. "
+            f"This check is not evidence about this deploy."
+        )
+    else:
+        tier = (status or {}).get("tier")
+        line = (
+            f"::warning title={gate} SKIPPED-BY-BUDGET::"
+            f"{gate} did NOT run — paused by budget guard at tier {tier} (ADR-125). "
+            f"This check is not evidence about this deploy."
+        )
+    print(line, file=stream or sys.stdout)
+    return line
+
+
+# #4652: the second sanctioned non-run of an AI gate — the reader-surface cost gate
+# (scripts/reader_surface.py, #4589) said no reader surface changed. The workflow hands the
+# gate's own verdict line to the sweep (--ai-qa-skipped / --reader-truth-skipped) so the
+# sweep, not a shell `echo`, owns saying so on every surface it reports on: stdout, the job
+# summary, a ::warning annotation and report.json. A status of None means "never asked for";
+# this status means "asked for, deliberately not run, and NOT a pass".
+SKIPPED_BY_READER_SURFACE = "skipped_by_reader_surface"
+
+
+def reader_surface_skip_status(reason):
+    """The status dict for a gate the reader-surface gate skipped, or None when `reason` is unset."""
+    if reason is None:
+        return None
+    return {"status": SKIPPED_BY_READER_SURFACE, "reason": str(reason).strip() or "no reason was passed"}
+
+
+def reader_surface_skip_line(gate, status, markdown=False):
+    """The one line a skipped gate prints — '' unless `status` is a reader-surface skip."""
+    if (status or {}).get("status") != SKIPPED_BY_READER_SURFACE:
+        return ""
+    if markdown:
+        return f"⏸ **{gate}: SKIPPED-BY-READER-SURFACE** — not run, not a pass. {status.get('reason')}\n"
+    return f"{gate}: SKIPPED-BY-READER-SURFACE — not run, not a pass ({status.get('reason')})"
+
+
+def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None, today_pt=None):
+    """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
+    # #2973: unevaluated pages get their own bucket in the headline (passed +
+    # failed + unevaluated == pages) AND a named callout — a page the AI oracle
+    # never saw must be unmissable in the one surface reviewers actually read.
+    unevaluated = [r for r in results if r.get("ai_unevaluated")]
+    # #4474: the headline counts reader-truth UNEVALUATED rows too, matching sweep_tally.
+    n_uneval = sum(1 for r in results if r.get("ai_unevaluated") or r.get("truth_unevaluated"))
+    uneval_part = f", {n_uneval} UNEVALUATED" if n_uneval else ""
+    lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed{uneval_part}, {warns} warnings\n"]
+    for r in unevaluated:
+        lines.append(
+            f"❌ **UNEVALUATED (#2973)** — the AI oracle never saw **{r['page']}** (`{r['path']}`): {str(r['ai_unevaluated'])[:160]}\n"
+        )
+    # #3540: the same treatment for the reader-truth judge. Its unevaluated rows
+    # are FAILs (counted as UNEVALUATED above since #4474, red exit code), and they get their own
+    # named callout for the same reason #2973's do — the one surface reviewers
+    # actually read must never let "we could not judge this" pass as a result.
+    for r in [x for x in results if x.get("truth_unevaluated")]:
+        lines.append(
+            f"❌ **UNEVALUATED (#3540)** — the reader-truth judge returned no readable verdict for "
+            f"**{r['page']}** (`{r['path']}`): {str(r['truth_unevaluated'])[:160]}\n"
+        )
+    # #1440/#1428: a budget-tier pause must render as its own line in the CI
+    # summary — never silently absent, never indistinguishable from a clean run.
+    if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
+        lines.append(f"⏸ **AI-vision QA: SKIPPED-BY-BUDGET** (tier {ai_vision_status['tier']}) — not run, not a pass.\n")
+    # #4652: the reader-surface gate's skips, in the same place and the same words.
+    for gate, st in (("AI-vision QA", ai_vision_status), ("Reader-truth QA", reader_truth_status)):
+        if reader_surface_skip_line(gate, st):
+            lines.append(reader_surface_skip_line(gate, st, markdown=True))
+    # #1990: the a11y ledger-shrink signal (gate_findings' "fixed" list) gets its
+    # own hard-to-miss section instead of scrolling by folded into per-page
+    # `warnings` — the "consumer" #1990's acceptance criteria asks for.
+    # #3546: the SAME phase filter the console tally and the sidecar use — a CI
+    # summary that lists a candidate the sweep will decline to harvest is a
+    # summary that trains reviewers to ignore the section.
+    summary_day_n = a11y_audit.experiment_day_n(today_pt) if today_pt else None
+    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")}, day_n=summary_day_n)
+    # #3277: the mobile ledger has its own shrink signal, keyed with the viewport
+    # so it can never be mistaken for (or silently merged into) the desktop one.
+    shrink_candidates.update(
+        a11y_audit.shrink_candidates(
+            {f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")}, day_n=summary_day_n
+        )
+    )
+    if shrink_candidates:
+        lines.append("\n### a11y ledger — shrink candidates (#1990)\n")
+        lines.append(
+            "Baselined violation(s) no longer observed live — safe to remove via "
+            "`python3 qa/visual_qa.py --update-baseline` (review the diff before committing):\n"
+        )
+        for page_path, rule_ids in sorted(shrink_candidates.items()):
+            lines.append(f"- `{page_path}`: {', '.join(rule_ids)}")
+        lines.append("")
+    if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
+        lines.append(f"⏸ **Reader-truth QA: SKIPPED-BY-BUDGET** (tier {reader_truth_status['tier']}) — not run, not a pass.\n")
+    for r in results:
+        v = r.get("ai_verdict") or {}
+        if r["status"] == "FAIL" or r.get("warnings") or v.get("severity") in ("med", "high"):
+            icon = "❌" if r["status"] == "FAIL" else "⚠️"
+            lines.append(f"- {icon} **{r['page']}** (`{r['path']}`)")
+            for i in r.get("issues", []):
+                lines.append(f"  - 🔴 {i}")
+            for w in r.get("warnings", []):
+                lines.append(f"  - ⚠️ {w}")
+            if v:
+                lines.append(f"  - 🤖 AI[{v.get('severity')}]: {v.get('summary', '')}")
+    try:
+        with open(path, "a") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception:
+        pass
+
+
+def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=20000):
+    """Navigate; try networkidle, fall back to domcontentloaded (pages poll/async-load)."""
+    try:
+        page.goto(url, wait_until="networkidle", timeout=primary_timeout)
+        return None
+    except Exception:
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=fallback_timeout)
+            return "networkidle timed out; fell back to domcontentloaded"
+        except Exception as e2:
+            return f"Page load failed: {e2}"
+
+
+_MAX_SCREENSHOT_DIM = 32767  # WebKit's hard cap (#3353) — Chromium's is far higher but
+# the tiled path below is engine-agnostic, so both browsers take the same code path
+# whenever a page exceeds this, keeping the mechanism consistent across engines.
+_MAX_SCREENSHOT_TILES = 60  # sanity bound (~60 x 844px mobile viewport ≈ 50,000px of
+# page — already generous for anything the site ships); guards a miscomputed/runaway
+# scrollHeight from turning into an unbounded capture loop.
+
+
+def _capture_full_page(page, out_path, warnings=None):
+    """Full-page screenshot that survives WebKit's 32767px cap (#3353).
+
+    Tries the normal `page.screenshot(full_page=True)` first — the fast path
+    every page under the cap takes on every engine, unchanged from before this
+    fix. On failure (WebKit's `Cannot take screenshot larger than 32767 pixels`,
+    or any other engine-level screenshot error) falls back to scrolling the
+    page in viewport-height increments, screenshotting each slice, and
+    stitching them top-to-bottom with Pillow (already a dev dependency —
+    qa/visual_ai_qa.py's downscale path, requirements-dev.txt pillow==12.3.0).
+
+    A capture failure — direct OR tiled — is recorded as a WARNING and this
+    returns False; it never raises. The caller (capture_page) must be able to
+    keep running its OTHER checks (mobile a11y, tap targets, etc.) regardless
+    of whether the screenshot itself succeeded — a screenshot is diagnostic
+    evidence, not a gating signal, and before this fix a raised screenshot
+    exception aborted the rest of that page's audit (#3353's actual defect:
+    six weeks of WebKit runs failing on their own capture mechanics rather
+    than reporting a real mobile-Safari verdict).
+
+    Returns True iff `out_path` was written.
+    """
+    try:
+        page.screenshot(path=out_path, full_page=True)
+        return True
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"Full-page screenshot failed ({e}) — falling back to tiled capture (#3353)")
+
+    try:
+        from PIL import Image
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"Tiled screenshot fallback unavailable — Pillow import failed ({e})")
+        return False
+
+    tile_paths = []
+    try:
+        try:
+            height = page.evaluate("() => document.documentElement.scrollHeight")
+        except Exception:
+            height = None
+        viewport = page.viewport_size or {"width": 390, "height": 844}
+        vw = viewport["width"]
+        vh = viewport["height"]
+        total_height = int(height) if height else vh
+
+        offset = 0
+        n = 0
+        while offset < total_height and n < _MAX_SCREENSHOT_TILES:
+            try:
+                page.evaluate(f"() => window.scrollTo(0, {offset})")
+            except Exception:
+                pass
+            page.wait_for_timeout(60)
+            tile_path = f"{out_path}.tile{n}.png"
+            page.screenshot(path=tile_path)
+            tile_paths.append(tile_path)
+            offset += vh
+            n += 1
+
+        if not tile_paths:
+            if warnings is not None:
+                warnings.append("Tiled screenshot fallback captured zero tiles")
+            return False
+
+        images = [Image.open(t) for t in tile_paths]
+        stitched = Image.new("RGB", (vw, sum(im.height for im in images)), "white")
+        y = 0
+        for im in images:
+            stitched.paste(im, (0, y))
+            y += im.height
+            im.close()
+        if total_height and stitched.height > total_height:
+            stitched = stitched.crop((0, 0, vw, total_height))
+        stitched.save(out_path)
+
+        try:
+            page.evaluate("() => window.scrollTo(0, 0)")
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"Tiled screenshot capture failed ({e}) — page not captured, sweep continues (#3353)")
+        return False
+    finally:
+        for t in tile_paths:
+            try:
+                os.remove(t)
+            except Exception:
+                pass
+
+
+def run_leak_token_sweep(base_url=None):
+    """Deterministic, AI-free leak-token sweep (#1448).
+
+    Reuses the SAME token-grep deploy/restart_verify_rendered.py runs at reset
+    time (qa/leak_token_sweep.py) so a template/leak-token regression — a
+    hardcoded stale literal, a cached S3 JSON blob, a missed DDB partition — is
+    caught within a day instead of only at the next reset. Plain urllib + regex
+    over leak_scan_paths() + the JSON endpoints; no Playwright, no Bedrock, no
+    cost. tokens_for_daily_run() drops the reset-window-only checks (Day-30+,
+    character level, ...) once the current cycle has legitimately matured past
+    them, so real progress never reds this.
+
+    Returns {"ok": bool, "checked": int, "not_checked": int,
+    "issues": [str, ...], "warnings": [str, ...]} — unreachable pages (#1931)
+    are warnings + not_checked, never issues: a page the sweep could not read
+    has an unknown leak status, and partial coverage must be visible as such.
+    """
+    base_url = base_url or SITE_URL
+    tokens = leak_token_sweep.tokens_for_daily_run()
+    pages = leak_scan_paths()
+    page_results = leak_token_sweep.sweep(
+        base_url,
+        pages,
+        leak_token_sweep.JSON_ENDPOINTS,
+        tokens=tokens,
+        allow_503_paths=leak_token_sweep.ALLOW_503_NOT_COMPUTED,
+    )
+    issues = []
+    warnings = []
+    not_checked = 0
+    for r in page_results:
+        if r.get("unreachable"):
+            # Transport failure after one retry (#1931): the page was never
+            # read, so its leak status is unknown — a WARNING, never a finding,
+            # and never counted as checked.
+            not_checked += 1
+            warnings.append(f"{r['path']} — UNREACHABLE after retry (leak status unknown, page NOT checked)")
+            continue
+        for label, samples in r["hits"]:
+            issues.append(f"{r['path']} — [{label}] {' | '.join(samples)}")
+    return {
+        "ok": not issues,
+        "checked": len(page_results) - not_checked,
+        "not_checked": not_checked,
+        "issues": issues,
+        "warnings": warnings,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Main sweep
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _a11y_gate(page, path, a11y_baseline, theme, viewport, issues, warnings):
+    """Run axe on the page AS CURRENTLY LAID OUT and fold the verdict into
+    issues/warnings (#1433, extended to a second viewport by #3277).
+
+    `viewport` ("desktop" | "mobile") is the ledger axis — it selects which
+    committed baseline the observed violations are compared against, and tags
+    every message so a 390px-only finding can never read as a desktop one. The
+    caller has already set the page's viewport size and run _scroll_and_reveal;
+    this helper never resizes. Returns gate_findings()' dict, or None if axe
+    failed to inject/run (recorded as a warning — explicitly not a pass).
+    """
+    tag = "" if viewport == "desktop" else f" @{a11y_audit.MOBILE_VIEWPORT['width']}px"
+    try:
+        observed = a11y_audit.run_axe(page)
+    except Exception as e:
+        warnings.append(f"a11y audit{tag} did not run (axe inject/run failed: {str(e)[:100]}) — not a pass (#1433)")
+        return None
+    result = a11y_audit.gate_findings(path, observed, a11y_baseline, theme=theme, viewport=viewport)
+    for v in result["new"]:
+        tgt = f" e.g. {v['targets'][0]}" if v.get("targets") else ""
+        issues.append(f"NEW {v['impact']} a11y violation{tag} (axe: {v['id']}): {v['help']} — {v['nodes']} node(s){tgt} (#1433)")
+    if result["baselined"]:
+        ids = ", ".join(sorted(v["id"] for v in result["baselined"]))
+        warnings.append(f"a11y baseline debt{tag}: {len(result['baselined'])} known violation(s) ({ids}) — recorded, not gating (#1433)")
+    if result["advisory"]:
+        ids = ", ".join(sorted(v["id"] for v in result["advisory"]))
+        warnings.append(f"a11y advisory{tag}: {len(result['advisory'])} new minor/moderate violation(s) ({ids}) — not gating (#1433)")
+    if result["fixed"]:
+        warnings.append(f"a11y fixed vs baseline{tag}: {', '.join(result['fixed'])} — shrink the ledger via --update-baseline (#1433)")
+    return result
+
+
+def capture_page(
+    context,
+    page_def,
+    screenshot_dir,
+    save_screenshots=False,
+    capture_prose=False,
+    a11y_baseline=None,
+    theme="dark",
+    context_mobile=False,
+    mobile_first_load=True,
+):
+    """Drive one page def in an open browser context and return its result dict.
+
+    Pure capture: navigate, scroll/reveal, run element/chart/interaction checks,
+    blank/stale-text scan, optional screenshots (full + chart crops + 390px mobile),
+    HTTP/JS failure collection. No printing, no AI-QA, no report writing — those
+    stay in run_sweep so its CI behaviour is byte-for-byte unchanged. Returns:
+        {"page", "path", "status", "issues", "warnings", "screenshots"}
+
+    a11y_baseline (#1433): pass a loaded tests/a11y_baseline.json dict to run the
+    axe-core audit on this page (run_sweep does; NEW serious/critical violations
+    vs the baseline become gating issues). The default None skips it, so the
+    direct capture_page callers (site_review, pr_render_gate) are byte-for-byte
+    unchanged — they render against mocked/partial data where axe findings
+    would not match the live-surface baseline.
+
+    theme (#1991): which baseline ledger ("pages" for "dark", "pages_light" for
+    "light") the axe gate compares against — must match the color_scheme the
+    caller opened `context` with, so the gate reads the ledger that was
+    actually captured under that theme. Defaults to "dark", matching every
+    pre-#1991 call site (context is still opened by the caller; capture_page
+    itself never sets color_scheme).
+
+    context_mobile (#3277): True when the CALLER opened `context` at the mobile
+    profile (run_sweep --mobile, the weekly WebKit lane) — then the pre-resize
+    pass is not a desktop pass at all, it is a second 390px render, so it is
+    skipped and only the mobile ledger is exercised. Without this the WebKit
+    lane compared a 390px DOM against the desktop ledger, which is precisely how
+    it reported `scrollable-region-focusable` as a desktop-ledger NEW serious
+    violation for six weeks. Defaults False (the 1440x900 contexts).
+
+    mobile_first_load (#3542): run the fresh-navigation mobile probe — a second,
+    untouched page at 390x844 that asserts the page does not scroll itself on first
+    paint (DES-1) and that a sticky top bar whose computed backdrop-filter is `none`
+    is fully opaque (DES-3). ON by default in every caller, including
+    qa/pr_render_gate.py, which drives this same function; False is the escape
+    hatch for a harness that cannot afford the extra navigation.
+
+    Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
+    can reuse identical capture without forking the gating visual-qa harness.
+    """
+    page = context.new_page()
+    page.add_init_script(_PERF_INIT_SCRIPT)
+    path, name = page_def["path"], page_def["name"]
+    a11y_result = None
+    a11y_mobile_result = None  # #3277: the 390px pass — None until it runs
+    issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
+    perf_result = {"lcp_ms": None, "cls": None, "js_bytes": 0}
+    _js_bytes = [0]  # mutable box (perf_js_bytes) — total JS response bytes for the page
+    # #3352: the page SHELL's own Content-Type. The ONE signal that separates "the
+    # deploy script stamped the wrong metadata" from "this page is broken" — on
+    # 2026-08-31 the whole /data/* door was served `application/json` (INCIDENT_LOG P1)
+    # and the auto-rollback re-ran the script that did it. Recorded per page, read by
+    # qa/visual_qa_verdict.py; nothing in this module gates on it.
+    _shell_ct = [None]
+
+    _noncrit = ["favicon", "sub_count", "subscriber_count"]
+    page.on("console", lambda m: js_errors.append(m.text) if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None)
+    page.on("pageerror", lambda err: js_errors.append(str(err)))
+
+    def _on_response(r):
+        if r.status >= 400 and not any(nc in r.url for nc in _noncrit):
+            failed_responses.append((r.status, r.url))
+        try:
+            ct = r.headers.get("content-type", "")
+            # #3352: last same-origin main-document response wins (a retried navigation
+            # must be judged on the attempt that actually rendered, not the first).
+            if r.url.startswith(SITE_URL) and r.request.resource_type == "document":
+                _shell_ct[0] = ct
+            if r.url.endswith(".js") or "javascript" in ct:
+                _js_bytes[0] += len(r.body())
+        except Exception:
+            pass  # opaque/redirected/aborted responses — skip, don't fail the sweep over it
+
+    page.on("response", _on_response)
+
+    try:
+        nav = _navigate_with_fallback(page, f"{SITE_URL}{path}")
+        if nav and nav.startswith("Page load failed"):
+            issues.append(nav)
+            raise RuntimeError("nav_failed")
+        if nav:
+            warnings.append(nav)
+
+        wait_for = page_def.get("wait_for")
+        if wait_for:
+            try:
+                page.wait_for_selector(wait_for, state="visible", timeout=8000)
+            except Exception:
+                issues.append(f"Container '{wait_for}' never became visible")
+
+        # ── performance budget: LCP + CLS (#580) ──
+        # Read before _scroll_and_reveal's synthetic scrolling runs, so this reflects
+        # what a real visitor's browser reports for natural page load — not our own
+        # forced scroll/reveal. A short settle wait lets async data-driven re-renders
+        # (the site's "·· -> real number" pattern) mostly finish, same as how a real
+        # LCP/CLS measurement window works.
+        page.wait_for_timeout(600)
+        try:
+            _perf = page.evaluate("() => window.__perf") or {}
+        except Exception:
+            _perf = {}
+        lcp_ms = _perf.get("lcp") or None
+        cls = _perf.get("cls")
+        perf_result["lcp_ms"] = round(lcp_ms, 1) if lcp_ms else None
+        perf_result["cls"] = round(cls, 4) if cls is not None else None
+        if lcp_ms and lcp_ms > LCP_BUDGET_MS:
+            issues.append(f"LCP {lcp_ms:.0f}ms exceeds budget {LCP_BUDGET_MS}ms")
+        # Per-page CLS budget override (#1474): a page that has PAID DOWN its shift
+        # (designed skeleton states reserving async space) locks the gain with a
+        # tighter budget than the global ceiling, so the improvement can't silently
+        # regress. Pages without an override keep CLS_BUDGET.
+        cls_budget = page_def.get("cls_budget", CLS_BUDGET)
+        if cls is not None and cls > cls_budget:
+            issues.append(f"CLS {cls:.3f} exceeds budget {cls_budget}")
+
+        _scroll_and_reveal(page)
+
+        # ── desktop overflow (#3733) — the same `_mobile_overflow` measurement, taken
+        # at the DESKTOP context's own viewport (1440x900 by default) instead of only
+        # at 390px below. Before #3733 nothing ever measured horizontal page overflow
+        # at desktop width: a 1216px .rd-tbl inside an overflow-x:visible .rd-sec on
+        # /method/ and /method/cycles/ pushed the page out 248px at 1440 and this sweep
+        # never noticed, because #1013's control only exists at the mobile viewport.
+        # Skipped when context_mobile — that pass already opened at 390x844, and the
+        # identical check runs below against the mobile ledger; running it twice at the
+        # same viewport would just double-count one finding.
+        if not context_mobile:
+            desktop_overflow = _mobile_overflow(page)
+            if desktop_overflow and desktop_overflow > 4:
+                issues.append(f"Horizontal overflow at desktop viewport — content exceeds viewport by {desktop_overflow}px")
+
+        # ── element/text checks ──
+        for check in page_def.get("checks", []):
+            els = page.query_selector_all(check["selector"])
+            if "min_count" in check and len(els) < check["min_count"]:
+                issues.append(f"Expected {check['min_count']}+ '{check['selector']}', found {len(els)} — {check['desc']}")
+            if check.get("not_empty"):
+                empties = 0
+                for el in els:
+                    # #4182 (2026-09-26): an element inside a CLOSED <details> is collapsed
+                    # by design, not empty — inner_text() is "" for anything hidden, which
+                    # red-gated the cockpit's demoted level (`[data-bind='level']` inside the
+                    # "engine's score" disclosure) on a page that rendered correctly, and
+                    # the declined rollback filed #4202. Read the rendered text_content()
+                    # there; the visible-placeholder rule is unchanged everywhere else.
+                    try:
+                        collapsed = bool(el.evaluate("e => !!e.closest('details:not([open])')"))
+                    except Exception:
+                        collapsed = False
+                    try:
+                        txt = ((el.text_content() if collapsed else el.inner_text()) or "").strip()
+                    except Exception:
+                        txt = (el.text_content() or "").strip()
+                    if txt in _EMPTY_SENTINELS:
+                        empties += 1
+                if els and empties == len(els):
+                    # Genesis dark-state discrimination (2026-08-10): on cycle Day 1
+                    # /protocols/discoveries/ rendered every readout as a placeholder
+                    # because the API held zero discoveries YET — an honest absence,
+                    # not a broken bind — and the deterministic FAIL rolled back a
+                    # privacy fix in a loop. If the page's own API deps are all
+                    # honestly empty, this is a data-driven dark state: WARN (so the
+                    # AI layer and a human still see it) instead of gating.
+                    if _api_deps_all_empty(page, page_def.get("api_deps")):
+                        warnings.append(f"All '{check['selector']}' empty — API honestly empty (genesis dark state) — {check['desc']}")
+                    else:
+                        issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
+                elif not els:
+                    issues.append(f"'{check['selector']}' not found — {check['desc']}")
+
+        # ── SVG chart geometry (soft: warn, the AI layer judges render quality) ──
+        if page_def.get("charts"):
+            svg = _check_svg_charts(page, page_def["charts"])
+            visible = [c for c in svg if c["visible"]]
+            if not svg:
+                warnings.append(f"No chart SVG matched {page_def['charts']} (may be an honest sparse-data state)")
+            elif visible and all(c["drawn"] == 0 for c in visible):
+                issues.append(f"Chart SVG present but no drawn geometry: {page_def['charts']}")
+
+        # ── #1215: the home constellation's edge evidence must ride the shared data-cpts
+        #    readout (hover + tap + keyboard), not a hover-only native <title>. GATING. ──
+        if path == "/":
+            ec = _constellation_edge_cpts(page)
+            if ec and not ec.get("ok") and not ec.get("skip"):
+                issues.append(f"Constellation edge readout gap (#1215): {ec.get('reason')}")
+
+        # ── interaction (cockpit pillar disclosure) ──
+        if page_def.get("interact"):
+            it = page_def["interact"]
+            # #4182: an interaction can sit inside a collapsed disclosure (the cockpit's
+            # pillar rows live in the closed "engine's score" <details>). `open` names the
+            # control a reader taps first; a missing opener is a real regression, not a skip.
+            if it.get("open"):
+                opener = page.query_selector(it["open"])
+                if not opener:
+                    issues.append(f"Interaction opener '{it['open']}' not present — {it['desc']}")
+                else:
+                    try:
+                        opener.click(timeout=3000)
+                        page.wait_for_timeout(200)
+                    except Exception:
+                        issues.append(f"Interaction opener '{it['open']}' could not be clicked — {it['desc']}")
+            target = page.query_selector(it["click"])
+            if not target:
+                warnings.append(f"Interaction skipped — '{it['click']}' not present")
+            else:
+                try:
+                    target.click(timeout=3000)
+                    page.wait_for_selector(it["expect"], state="visible", timeout=4000)
+                    # The cockpit disclosure animates via View Transitions — a
+                    # screenshot mid-crossfade captures both frames overlapped
+                    # ("garbled text" AI-vision false-FAIL, found 2026-06-12).
+                    # Let the transition settle before anything is captured.
+                    page.wait_for_timeout(800)
+                except Exception:
+                    issues.append(f"Interaction failed: clicking '{it['click']}' did not reveal '{it['expect']}' — {it['desc']}")
+
+        # ── blank sections + stale copy ──
+        for bs in _check_sections_for_blank(page)[:2]:
+            issues.append(f"Empty section: .{bs['class'][:40]} (h={bs['height']}px)")
+        for st in _check_stale_text(page):
+            issues.append(f"Stale text: \"{st['text'][:50]}\" — {st['desc']}")
+
+        # ── axe-core accessibility audit (#1433) — desktop viewport, post-reveal ──
+        # Runs after _scroll_and_reveal forced every section visible so axe sees the
+        # page a reader sees (color-contrast on revealed content, not opacity:0).
+        # Gate: NEW serious/critical vs the committed baseline red the page; every
+        # other finding (baselined debt, new minor/moderate, fixed-vs-baseline) is
+        # recorded honestly as a warning — visible, never gating, never hidden.
+        # The SAME pass runs again at 390px below (#3277) against the mobile ledger.
+        # context_mobile (#3277): in a --mobile sweep this render is already 390px —
+        # auditing it against the DESKTOP ledger is the axis error the WebKit lane
+        # shipped with. Skip it; the mobile pass below is the one that applies.
+        if a11y_baseline is not None and not context_mobile:
+            a11y_result = _a11y_gate(page, path, a11y_baseline, theme, "desktop", issues, warnings)
+
+        # ── screenshots (full page + chart crops) ──
+        slug = path.strip("/").replace("/", "-") or "home"
+        if save_screenshots:
+            full = os.path.join(screenshot_dir, f"{slug}.png")
+            if _capture_full_page(page, full, warnings):
+                shots.append({"kind": "page", "path": full})
+            for ci, sel in enumerate(page_def.get("charts", [])):
+                el = page.query_selector(sel)
+                if el:
+                    try:
+                        crop = os.path.join(screenshot_dir, f"{slug}-chart{ci}.png")
+                        el.screenshot(path=crop)
+                        shots.append({"kind": "chart", "path": crop, "selector": sel})
+                    except Exception:
+                        pass
+
+        # ── rendered prose dump (accuracy-audit / Axis B+C reads the visitor's text) ──
+        # Default off so the CI visual sweep is unchanged; site_review/accuracy_audit opt in.
+        if capture_prose and screenshot_dir:
+            try:
+                prose = page.evaluate("() => document.body.innerText") or ""
+                with open(os.path.join(screenshot_dir, f"{slug}.txt"), "w") as pf:
+                    pf.write(prose)
+                shots.append({"kind": "prose", "path": os.path.join(screenshot_dir, f"{slug}.txt")})
+            except Exception:
+                pass
+
+        # ── mobile @ 390px: overflow + the Epic-A failure classes (#1013) ──
+        page.set_viewport_size({"width": 390, "height": 844})
+        # Re-scroll at the mobile viewport so motion.js's IntersectionObserver fires
+        # at the 844px height — the #1002 stuck-reveal bug is viewport-height-dependent
+        # (a section too tall to reach the threshold never reveals), and some pages
+        # only overflow the threshold on desktop. This makes the mobile-only case real.
+        _scroll_and_reveal(page)
+        # ── axe-core audit, MOBILE viewport (#3277) — the second pass of the SAME gate ──
+        # Before #3277 axe ran once, at the desktop context above, so a violation that
+        # only exists at 390px — tables/code blocks that become horizontally-scrolling
+        # boxes below the tablet breakpoint and were keyboard-unreachable
+        # (scrollable-region-focusable, serious) — was measured by no gate: 15 reader
+        # pages carried it live (33 nodes, chromium 2026-08-31) and the rule was absent
+        # from the ledger, which read as clean. Same rule set, same NEW-serious/critical gating, compared against the
+        # mobile ledger ("pages_mobile" / "pages_light_mobile") captured at this exact
+        # viewport. Runs after the mobile _scroll_and_reveal so the DOM axe sees is the
+        # revealed 390px page, not the desktop layout re-flowed mid-transition.
+        if a11y_baseline is not None:
+            a11y_mobile_result = _a11y_gate(page, path, a11y_baseline, theme, "mobile", issues, warnings)
+        overflow = _mobile_overflow(page)
+        if overflow and overflow > 4:
+            issues.append(f"Horizontal overflow at 390px — content exceeds viewport by {overflow}px")
+        # (e) #3734 — text clipped inside its own container. Invisible to the measure
+        #     above: the band does not scroll, so the document never widens.
+        clipped = _container_text_overflow(page)
+        if clipped:
+            issues.append(
+                "Text overflows its own container @390px (#3734 class): "
+                + "; ".join(f"{child!r} escapes {parent!r} by {px}px" for parent, child, px in clipped[:4])
+            )
+        # (b) #1002 — reveal-selector elements stuck at opacity:0 after scroll-through.
+        stuck = _stuck_reveals(page, MOBILE_REVEAL_SEL)
+        if stuck:
+            issues.append(
+                f"Scroll-reveal stuck at opacity:0 on {len(stuck)} element(s) @390px (#1002 class): {', '.join(sorted(set(stuck))[:4])}"
+            )
+        # (a) #1003 — bottom app-bar row overflows the viewport at 390px.
+        bar390 = _app_bar_overflow(page)
+        if bar390 is not None and bar390 > 2:
+            issues.append(f"App-bar row exceeds viewport by {bar390}px @390px (#1003 class)")
+        # (c) #1004 — the page must carry a width=device-width viewport meta.
+        if not _viewport_meta_ok(page):
+            issues.append("Missing width=device-width viewport meta (#1004 class)")
+        # (d) #1010/#1249 — tap-target floor, GATING: any known-good control whose
+        #     effective hit area is below 44px in BOTH axes fails the sweep (advisory →
+        #     gating, finishing #1013; #1249 added .wave a.bar after the day-bars got the
+        #     vertical ::after expander).
+        small = _tap_target_audit(page, TAP_TARGET_SEL)
+        if small:
+            issues.append(f"Tap targets < 44px in both axes @390px (#1010/#1249): {', '.join(small[:5])}")
+        if save_screenshots:
+            mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
+            if _capture_full_page(page, mob, warnings):
+                shots.append({"kind": "mobile", "path": mob})
+        # ── mobile FIRST LOAD @ 390px (#3542) — a SEPARATE, FRESH navigation ──
+        # Everything above judges a page that was loaded at the desktop context and
+        # then resized + scrolled by us. This one is the phone visitor's actual first
+        # paint: new page, 390x844 set before goto, zero interaction afterwards. It is
+        # the only shape that can see a page that scrolls itself (DES-1) or a top bar
+        # whose alpha survived the loss of its blur (DES-3). Runs in BOTH harnesses,
+        # because pr_render_gate.py drives this same capture_page.
+        if mobile_first_load:
+            for f in mobile_first_load_check(context, f"{SITE_URL}{path}", path):
+                issues.append(f)
+
+        # ── chrome @ 360px: the app-bar is tightest here (#1003 verified at 360) ──
+        page.set_viewport_size({"width": 360, "height": 800})
+        page.wait_for_timeout(200)
+        bar360 = _app_bar_overflow(page)
+        if bar360 is not None and bar360 > 2:
+            issues.append(f"App-bar row exceeds viewport by {bar360}px @360px (#1003 class)")
+
+        # ── SVG-text legibility floor (#1210): every inline-SVG <text> must render
+        #    >=11px effective at BOTH 1280 and 390. viewBox-unit text scales with the
+        #    svg's rendered width, so a label legible on desktop can fall sub-floor at
+        #    another width (and vice-versa) — measure at both. svgtype.js floors the
+        #    registered labels; this is the guard that it held. ──
+        for _floor_w in (1280, 390):
+            for f in _svg_text_floor_findings(page, _floor_w):
+                issues.append(
+                    f"SVG text below 11px floor @{_floor_w}px (#1210): .{f['cls']} '{f['txt']}' = "
+                    f"{f['fs']}px x scale {f['scale']} = {f['eff']}px effective"
+                )
+            # ── HTML-text legibility floor (#2674): the vitals-ring labels that shipped
+            #    at ~9px were HTML spans, invisible to the svg-only #1210 audit and
+            #    fs-ok-sanctioned past the static CSS gate. Rendered-px is the arbiter;
+            #    gating on the three highest-traffic pages (measured clean before arming).
+            if path in TEXT_FLOOR_PAGES:
+                for f in _html_text_floor_findings(page, _floor_w):
+                    issues.append(
+                        f"HTML text below 11px floor @{_floor_w}px (#2674): {f['sel']} '{f['txt']}' = " f"{f['eff']}px computed x{f['n']}"
+                    )
+                # ── glyph leak (#3543): an icon spelled as a code point. Same page set
+                #    and the same two widths — a leak can be conditional on either.
+                #    REPORTED AS A WARNING, deliberately: measured across all 64 tier-1/2
+                #    pages it finds 10 live glyphs on 8 pages, and only one of them was
+                #    the defect this sweep was written for (the provenance ⓘ, fixed in
+                #    this change). The rest are content — ✓/✗ in a scorecard label, ⚑/⚠
+                #    in a readout note, and a ☀️ inside a Hevy workout TITLE, which is
+                #    ingested data no site change can clear. Arming a gate on a surface
+                #    carrying live findings is what red-walls a deploy for a week and
+                #    teaches readers to skip it; arming it as a warning makes the count
+                #    visible and falsifiable on every run. Promote to `issues` once the
+                #    content producers are clean — the sweep will say when.
+                for f in _glyph_leak_findings(page):
+                    warnings.append(
+                        f"Glyph leak in visitor-facing text @{_floor_w}px (#3543): {f['sel']} "
+                        f"'{f['txt']}' carries {f['code']} '{f['glyph']}' x{f['n']}"
+                        f"{' — INSIDE INTERACTIVE CHROME (an icon, not typography)' if f.get('chrome') else ''}"
+                        " — icons come from icons.js/icons.svg, never a text code point (DESIGN_SYSTEM_V5 §8)"
+                    )
+
+        # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
+        # A 429 is throttle noise, not a broken endpoint: the sweep's parallel
+        # page loads can exceed site-api's reserved concurrency (20) — observed
+        # flaking the gating CI job on a different endpoint each run (2026-07-04).
+        # Re-probe each API 429 once, sequentially, after the page settles: a
+        # <400 re-probe downgrades to a warning; a persistent 429 still fails.
+        _kept = []
+        for s, u in failed_responses:
+            if s == 429 and "/api/" in u:
+                try:
+                    if page.request.get(u, timeout=10000).status < 400:
+                        warnings.append(f"429 throttle recovered on re-probe: {u.replace(SITE_URL, '')[:90]}")
+                        continue
+                except Exception:
+                    pass
+            _kept.append((s, u))
+        failed_responses = _kept
+        # Routes merged on main but not yet deployed to site-api — a 404 there is the
+        # known merged-but-dark window, not a broken page (the callers are fail-soft).
+        # #2831: sourced from deploy/api_deploy_sequencing.json's pending_deploy_routes
+        # instead of a hand-edited-per-incident literal — REMOVE the registry entry once
+        # the route is confirmed live; a lingering entry hides a genuinely dead route.
+        pending_deploy_apis: set = _pending_deploy_routes()
+        _pending = [(s, u) for s, u in failed_responses if s == 404 and any(p in u for p in pending_deploy_apis)]
+        for s, u in _pending:
+            warnings.append(f"pending-deploy API 404 (known, #2831/#2050): {u.replace(SITE_URL, '')[:90]}")
+        failed_responses = [su for su in failed_responses if su not in _pending]
+        api_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" in u})
+        other_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" not in u})
+        if api_fails:
+            issues.append(f"{len(api_fails)} broken API call(s): {'; '.join(api_fails[:4])}")
+        if other_fails:
+            warnings.append(f"{len(other_fails)} non-API resource issue(s): {'; '.join(other_fails[:3])}")
+        code_errors = [e for e in js_errors if "Failed to load resource" not in e]
+        if code_errors:
+            issues.append(f"{len(code_errors)} JS error(s): {code_errors[0][:160]}")
+
+    except Exception as e:
+        if str(e) not in ("auth_failed", "nav_failed"):
+            issues.append(f"Page load failed: {e}")
+
+    perf_result["js_bytes"] = _js_bytes[0]
+    if _js_bytes[0] > JS_BYTES_SOFT_BUDGET:
+        warnings.append(f"Total JS {_js_bytes[0] // 1024}KB exceeds soft budget {JS_BYTES_SOFT_BUDGET // 1024}KB")
+
+    page.close()
+    return {
+        "page": name,
+        "path": path,
+        "tier": page_def.get("tier"),  # #1428: lets run_sweep restrict the AI-vision layer by tier
+        "status": "PASS" if not issues else "FAIL",
+        "issues": issues,
+        "warnings": warnings,
+        "screenshots": shots,
+        "perf": perf_result,
+        "a11y": a11y_result,  # #1433: new/baselined/advisory/fixed/observed, or None if the audit didn't run
+        "a11y_mobile": a11y_mobile_result,  # #3277: the same shape for the 390px pass, or None if it didn't run
+        "shell_content_type": _shell_ct[0],  # #3352: rollback scope check — None when no document response was seen
+    }
+
+
+def sweep_pages(pages, max_tier=None):
+    """Which page defs the DETERMINISTIC sweep drives (#1434).
+
+    Pure/testable (no Playwright dependency), mirroring ai_qa_targets semantics:
+    max_tier=None returns the list unchanged (every existing caller — the gating
+    deploy-time sweep and the daily standalone run — passes nothing, so their
+    coverage is byte-for-byte what it was). An int restricts to page defs whose
+    qa_manifest `tier` is <= max_tier: the weekly WebKit run passes 2 to sweep
+    exactly the flagship doors + live-data topic pages. A missing/None tier is
+    treated as tier 0 (always included) rather than silently dropped.
+    """
+    if max_tier is None:
+        return pages
+    return [p for p in pages if (p.get("tier") if p.get("tier") is not None else 0) <= max_tier]
+
+
+def ai_qa_targets(results, max_tier=None):
+    """Which captured-page results get handed to the AI-vision pass (#1428).
+
+    Pure/testable (no Playwright/Bedrock dependency): max_tier=None returns every
+    result unchanged (the weekly full-surface behavior); an int restricts to results
+    whose `tier` is <= max_tier (deploy-time passes 1 for exactly the flagship doors).
+    A missing/None tier on a result is treated as tier 0 (always included) rather than
+    silently dropped — an untiered page should never vanish from AI coverage by accident.
+    """
+    if max_tier is None:
+        return results
+    return [r for r in results if (r.get("tier") if r.get("tier") is not None else 0) <= max_tier]
+
+
+# The ONLY sanctioned non-run of a requested AI gate: a deliberate budget-tier pause
+# (ADR-125 tier 3), which already reports itself three separate ways (#1440/#1927).
+# Every other non-"ok" state means the gate was asked for and graded nothing.
+_SANCTIONED_AI_STATES = frozenset({"ok", "skipped_by_budget"})
+
+
+def sweep_tally(results):
+    """The three DISJOINT buckets the summary line reports (#2973): (passed,
+    failed, unevaluated), with passed + failed + unevaluated == len(results).
+
+    A page the AI oracle could not look at (`ai_unevaluated`, set by
+    visual_ai_qa.assess_results) counts ONLY in `unevaluated` — never in
+    `passed` (it has no coverage, regardless of recorded status) and not
+    double-counted in `failed`. Pure/testable: this arithmetic is what
+    guarantees a green sweep means every page was actually evaluated, so it
+    must not live inline where no test can reach it (the #2938 lesson).
+
+    #4474: a page the READER-TRUTH judge never answered for (`truth_unevaluated`,
+    #3540) is the same fact and lands in the same bucket. Before, it counted
+    in `failed`, so run 36626034291 printed "5 failed, 0 unevaluated" for five
+    pages nobody judged, and the exit code's explicit `unevaluated == 0` term
+    did not cover them — only their FAIL status did.
+    """
+
+    def _uneval(r):
+        return bool(r.get("ai_unevaluated") or r.get("truth_unevaluated"))
+
+    unevaluated = sum(1 for r in results if _uneval(r))
+    passed = sum(1 for r in results if r["status"] == "PASS" and not _uneval(r))
+    failed = sum(1 for r in results if r["status"] == "FAIL" and not _uneval(r))
+    return passed, failed, unevaluated
+
+
+def requested_ai_gate_failures(gates):
+    """Which REQUESTED AI gates failed to actually run (#2938).
+
+    `gates` is an iterable of (label, requested, status_dict). Returns a list of
+    human-readable failure strings — empty when every requested gate either ran or
+    was honestly paused by budget.
+
+    Extracted from run_sweep so the decision the exit code depends on is directly
+    testable. It was previously inline and unreachable by any test, which is part of
+    why `⚠ unavailable` + exit 0 survived on the deploy path for months.
+    """
+    failures = []
+    for label, requested, status in gates:
+        if not requested:
+            continue
+        state = (status or {}).get("status")
+        if state in _SANCTIONED_AI_STATES:
+            continue
+        detail = (status or {}).get("detail") or state or "no status returned"
+        failures.append(f"{label}: {detail}")
+    return failures
+
+
+def run_sweep(
+    pages=None,
+    save_screenshots=False,
+    screenshot_dir=None,
+    ai_qa=False,
+    reader_truth=False,
+    ai_qa_max_tier=None,
+    browser_name="chromium",
+    mobile=False,
+    max_tier=None,
+    a11y=True,
+    update_a11y_baseline=False,
+    update_truth_baseline=False,
+    leak_scan=True,
+    color_scheme="dark",
+    ai_qa_skipped=None,
+    reader_truth_skipped=None,
+):
+    """Run the v4 visual QA sweep. Returns True if no page FAILED.
+
+    leak_scan (#1448): runs the deterministic, AI-free leak-token sweep
+    (qa/leak_token_sweep.py — the same checks deploy/restart_verify_rendered.py
+    runs at reset time) against SITE_URL and folds any hit into the pass/fail
+    tally as a synthetic "page" result. True by default (every existing gating
+    run gets it automatically); the CLI's --no-leak-scan is the debug escape
+    hatch, mirroring --no-a11y.
+
+    a11y / update_a11y_baseline (#1433): the axe-core audit runs per page by
+    default (a11y=False is the debug escape hatch — CI never passes it); NEW
+    serious/critical violations vs tests/a11y_baseline.json gate like any other
+    page issue. update_a11y_baseline=True rewrites the baseline from this run's
+    observations for the pages actually swept (the deliberate, reviewed update
+    path — the run STILL reports new violations red so nothing is silently
+    absorbed; the committed baseline diff is the review surface). #3277: the
+    audit runs at both the desktop context and 390×844 on every page, so one
+    sweep is n = pages × 2 axe passes, and one --update-baseline run rewrites
+    both this theme's ledgers (desktop + "_mobile").
+
+    ai_qa_max_tier (#1428): when set, restricts the Claude-vision assessment to
+    pages whose qa_manifest tier is <= this value (deploy-time passes `1` to cover
+    exactly the 6 flagship doors). The deterministic Playwright sweep above is
+    NEVER affected by this — `pages` (or the full PAGES list) still drives it, so
+    coverage there stays exactly what it is today. None (the default, used by the
+    weekly full-surface run) assesses every captured page — unchanged behavior.
+
+    browser_name / mobile / max_tier (#1434): the weekly advisory WebKit run
+    (.github/workflows/webkit-mobile-qa.yml) passes browser_name="webkit",
+    mobile=True, max_tier=2 to drive the iOS-Safari engine at an iPhone-class
+    viewport over the tier-1/2 pages — the backdrop-filter/position:fixed bug
+    class Chromium emulation cannot see (memory: project_mobile_pwa). mobile=True
+    opens the context at 390x844, dpr 3, is_mobile + has_touch (explicit metrics
+    rather than a Playwright device descriptor so a descriptor rename between
+    Playwright versions can never silently change the run; the UA stays the
+    engine default — the site does no UA sniffing, the ENGINE is the coverage).
+    capture_page's own in-page viewport passes (390/844, 360/800, 1280) behave
+    exactly as before. Defaults reproduce today's gating runs byte-for-byte.
+
+    color_scheme (#1991): "dark" (default, unchanged behavior) or "light" —
+    both Playwright contexts (mobile and desktop) below open with this scheme,
+    and it's threaded into the axe gate (capture_page's `theme` param) and the
+    --update-baseline write path so a light run reads/writes the sibling
+    "pages_light" ledger in tests/a11y_baseline.json instead of "pages". Every
+    other check (element/text, chart geometry, tap-target, etc.) is theme-
+    agnostic and runs identically either way — only the axe-core pass and its
+    baseline differ by theme.
+    """
+    # #2978: before a single page is captured — a sweep of the pre-deploy world
+    # produces verdicts about the pre-deploy world. No-op unless the caller
+    # supplied the build under test (VISUAL_QA_EXPECT_BUILD).
+    await_convergence_or_die()
+
+    from playwright.sync_api import sync_playwright
+
+    if screenshot_dir is None:
+        screenshot_dir = os.path.join(os.path.dirname(__file__), "..", "qa-screenshots")
+    os.makedirs(screenshot_dir, exist_ok=True)
+
+    results = []
+    # #3030 — ONE CLOCK PER SWEEP: pin the PT calendar date now, before the first
+    # capture, and judge every phase-aware verdict against it. Assess-time "today"
+    # let a midnight-PT-straddling run flag screenshots whose chrome was correct
+    # when captured. Canonical frame only (#1964): common.pacific_time, never a
+    # locally-built ZoneInfo.
+    _lam = os.path.join(os.path.dirname(__file__), "..", "lambdas")
+    if _lam not in sys.path:
+        sys.path.insert(0, _lam)
+    from common.pacific_time import pacific_today
+
+    capture_today_pt = pacific_today()  # already an ISO YYYY-MM-DD string
+    # AI-QA needs the screenshots, so force-enable capture when --ai-qa is set.
+    if ai_qa:
+        save_screenshots = True
+
+    # #1433: load the committed a11y baseline once; None disables the audit.
+    a11y_baseline = a11y_audit.load_baseline() if (a11y or update_a11y_baseline) else None
+
+    with sync_playwright() as p:
+        browser = getattr(p, browser_name).launch(headless=True)
+        if mobile:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 844},
+                device_scale_factor=3,
+                is_mobile=True,
+                has_touch=True,
+                color_scheme=color_scheme,
+            )
+        else:
+            context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme=color_scheme)
+
+        for page_def in sweep_pages(pages or PAGES, max_tier):
+            # --reader-truth needs each page's rendered innerText (the prose dump).
+            def _probe(pd=page_def):
+                return capture_page(
+                    context,
+                    pd,
+                    screenshot_dir,
+                    save_screenshots,
+                    capture_prose=reader_truth,
+                    a11y_baseline=a11y_baseline,
+                    theme=color_scheme,
+                    context_mobile=mobile,  # #3277: a --mobile context has no desktop pass to audit
+                )
+
+            # #2978: a deterministic FAIL only gates after it reproduces once.
+            result = confirm_before_fail(_probe(), _probe)
+            results.append(result)
+            icon = "✅" if not result["issues"] else "❌"
+            n_warn = len(result["warnings"])
+            warn = f" ({n_warn} warning{'s' if n_warn != 1 else ''})" if result["warnings"] else ""
+            print(f"  {icon} {result['page']} ({result['path']}){warn}")
+            for x in result["issues"]:
+                print(f"      → {x}")
+            for w in result["warnings"]:
+                print(f"      ⚠ {w}")
+
+        browser.close()
+
+    # ── optional Claude-vision semantic QA over the captured screenshots ──
+    # #1428: restrict WHICH pages get assessed to ai_qa_max_tier (deploy-time
+    # passes 1 → exactly the tier-1 doors); the deterministic checks above already
+    # ran over every page in `pages`/PAGES regardless, so tiering the AI layer
+    # never reduces deterministic coverage. None (weekly full-surface run) skips
+    # the filter and assesses every captured page, same as before #1428.
+    # #4652: None unless the reader-surface gate skipped this judge (never when it was asked to run).
+    ai_vision_status = None if ai_qa else reader_surface_skip_status(ai_qa_skipped)
+    if ai_qa:
+        try:
+            from visual_ai_qa import assess_results
+        except ImportError:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from visual_ai_qa import assess_results
+        ai_targets = ai_qa_targets(results, ai_qa_max_tier)
+        if ai_qa_max_tier is not None:
+            print(f"\n── AI-vision QA (Claude / Bedrock) — tier <= {ai_qa_max_tier}: {len(ai_targets)}/{len(results)} pages ──")
+        else:
+            print("\n── AI-vision QA (Claude / Bedrock) — full surface ──")
+        ai_vision_status = assess_results(ai_targets)  # mutates ai_targets in place: adds ai_verdict + may add issues
+
+    # ── optional phase-aware reader-truth QA over the captured prose (#1095) ──
+    reader_truth_status = None if reader_truth else reader_surface_skip_status(reader_truth_skipped)
+    if reader_truth:
+        try:
+            from visual_ai_qa import assess_reader_truth
+        except ImportError:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from visual_ai_qa import assess_reader_truth
+        print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
+        reader_truth_status = assess_reader_truth(results, today_iso=capture_today_pt)  # mutates results; one clock (#3030)
+
+        # Deliberate ledger rewrite (#2956) — a11y --update-baseline's sibling.
+        # Only pages this sweep actually captured prose for are touched; fresh
+        # entries land UNTRIAGED and red the unit suite until an issue is named.
+        # #2981: every exit from this block SAYS what it did. The old form
+        # skipped silently on a non-ok status and on an empty sweep, and printed
+        # "rewritten" otherwise — so an operator could not tell a recorded
+        # baseline from a no-op, and the publish path stayed held by debt they
+        # had already tried to acknowledge.
+        if update_truth_baseline:
+            import truth_baseline_audit
+
+            truth_status = (reader_truth_status or {}).get("status")
+            if truth_status != "ok":
+                print(f"⚠ truth baseline NOT updated — reader-truth QA returned status={truth_status!r}; nothing was recorded (#2981)")
+            else:
+                observed_by_path = {
+                    r["path"]: r.get("truth_findings", [])
+                    for r in results
+                    if any(s.get("kind") == "prose" for s in r.get("screenshots", []))
+                }
+                report = truth_baseline_audit.update_baseline(observed_by_path)
+                for line in truth_baseline_audit.update_summary(report):
+                    print(line)
+                print("  → review + commit the diff deliberately (#2956)")
+
+    # ── deliberate a11y-baseline rewrite (#1433) — only the pages this run swept ──
+    if update_a11y_baseline:
+        # #3277: one sweep captures BOTH viewports, so one --update-baseline run
+        # rewrites both ledgers for this theme — desktop from "a11y", mobile from
+        # "a11y_mobile" — each from the pass that actually ran at that viewport.
+        # A --mobile sweep opened ONE 390px context, so it can only write the
+        # mobile ledger; it must never touch the desktop one from a 390px render.
+        viewport_keys = (("mobile", "a11y_mobile"),) if mobile else (("desktop", "a11y"), ("mobile", "a11y_mobile"))
+        for viewport, result_key in viewport_keys:
+            observed_by_path = {r["path"]: r[result_key]["observed"] for r in results if r.get(result_key) is not None}
+            skipped = [r["path"] for r in results if r.get(result_key) is None]
+            if observed_by_path:
+                new_baseline = a11y_audit.update_baseline(
+                    observed_by_path, theme=color_scheme, viewport=viewport, day_n=a11y_audit.experiment_day_n(capture_today_pt)
+                )
+                counts = a11y_audit.summarize(new_baseline, theme=color_scheme, viewport=viewport)
+                counts_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "clean — no violations"
+                print(
+                    f"\na11y baseline ({color_scheme}, {viewport}) rewritten ({len(observed_by_path)} page(s) captured) "
+                    f"→ tests/a11y_baseline.json"
+                )
+                print(f"  ledger now: {counts_str} — review + commit the diff deliberately (#1433)")
+            if skipped:
+                print(
+                    f"  ⚠ a11y baseline ({viewport}) NOT updated for {len(skipped)} page(s) where the audit failed to run: "
+                    f"{', '.join(skipped[:5])}"
+                )
+
+    # ── deterministic leak-token sweep (#1448) — no AI, no browser; reuses the
+    # SAME token-grep deploy/restart_verify_rendered.py runs at reset time, so a
+    # template/leak-token regression is caught within a day instead of only at
+    # the next reset. Appended AFTER the AI-vision/reader-truth/a11y passes
+    # above so it never becomes an accidental AI-vision or a11y target (it has
+    # no screenshot/a11y payload) — it only affects the pass/fail tally + the
+    # reports below.
+    if leak_scan:
+        leak_status = run_leak_token_sweep()
+        icon = "✅" if leak_status["ok"] else "❌"
+        print("\n── Leak-token sweep (deterministic, #1448) ──")
+        print(
+            f"  {icon} {leak_status['checked']} URL(s) checked"
+            f" ({leak_status['not_checked']} NOT checked), {len(leak_status['issues'])} finding(s)"
+        )
+        for x in leak_status["issues"]:
+            print(f"      → {x}")
+        for x in leak_status["warnings"]:
+            print(f"      ⚠ {x}")
+        results.append(
+            {
+                "page": "Leak-token sweep",
+                "path": "(cross-cutting — leak_scan_paths + JSON endpoints)",
+                "status": "PASS" if leak_status["ok"] else "FAIL",
+                "issues": leak_status["issues"],
+                "warnings": leak_status["warnings"],
+                "screenshots": {},
+            }
+        )
+
+    # ── #3352 live-proof injection — workflow_dispatch ONLY, never a push ──
+    #
+    # The #3200 lesson: a fail-closed path with green unit tests can be entirely
+    # non-functional, and the only proof is watching it fire. `rollback-site-on-failure`'s
+    # new scope check is exactly that shape, so this env hook lets an operator make a
+    # dispatched site-deploy run red on a CHOSEN surface (against the real site, with a
+    # harmless same-tree redeploy) and watch the rollback decline by name.
+    #
+    # site-deploy.yml passes VISUAL_QA_INJECT_SURFACE only under
+    # `github.event_name == 'workflow_dispatch'` — pinned by
+    # tests/test_site_deploy_workflow.py so a push can never inject. The synthetic result
+    # is classified through the SAME string rules as a real failure (no bypass), and it is
+    # labelled [INJECTED] everywhere it appears.
+    inject_surface = os.environ.get("VISUAL_QA_INJECT_SURFACE", "").strip().lower()
+    if inject_surface and inject_surface != "none":
+        try:
+            from visual_qa_verdict import injected_result
+        except ImportError:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from visual_qa_verdict import injected_result
+
+        synthetic = injected_result(inject_surface)
+        if synthetic is None:
+            print(f"\n⚠ VISUAL_QA_INJECT_SURFACE={inject_surface!r} is not a known surface — nothing injected (#3352)")
+        else:
+            print(f"\n── [INJECTED] #3352 live proof: one synthetic {inject_surface} failure — this run is DELIBERATELY red ──")
+            for x in synthetic["issues"]:
+                print(f"      → {x}")
+            results.append(synthetic)
+
+    # #2973: three disjoint buckets — passed + failed + unevaluated == total — so
+    # "passed" can never silently absorb a page the AI oracle errored on instead
+    # of looking at. Unevaluated pages are also status=FAIL (they gate), but the
+    # tally names them separately: a green sweep must MEAN every page was seen.
+    passed, failed, unevaluated = sweep_tally(results)
+    warns = sum(len(r.get("warnings", [])) for r in results)
+    print(f"\n{'=' * 56}")
+    print(f"Visual QA: {passed} passed, {failed} failed, {unevaluated} unevaluated, {warns} warning(s) across {len(results)} pages")
+    # #2978: confirmed transients are the deploy-race rate, kept measurable —
+    # one line per run so the 30-day re-measure can count them from CI logs.
+    transients = sum(1 for r in results if r.get("confirmed_transient"))
+    if transients:
+        print(
+            f"Confirmed-transient (#2978): {transients} page(s) failed the first probe and passed the confirm — the race fired, nothing gated"
+        )
+    for r in results:
+        if r.get("ai_unevaluated"):
+            print(f"  ❌ UNEVALUATED — the AI oracle never saw {r['page']} ({r['path']}): {str(r['ai_unevaluated'])[:120]}")
+        # #3540: the reader-truth judge's own unevaluated bucket. These rows are
+        # FAIL and, since #4474, counted in `unevaluated` (not `failed`), so both
+        # exit-code terms red on them; the line names the reason as "not judged",
+        # never "judged and found wrong" — two different facts about a deploy.
+        if r.get("truth_unevaluated"):
+            print(
+                f"  ❌ UNEVALUATED — the reader-truth judge never answered for {r['page']} ({r['path']}): {str(r['truth_unevaluated'])[:120]}"
+            )
+    # #1440/#1428: a budget-tier pause of an AI QA pass must read as its own
+    # explicit state, never blend into "passed" — this is the one line a human
+    # or a CI summary skim is guaranteed to see regardless of page-level warnings.
+    if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
+        print(f"AI-vision QA: SKIPPED-BY-BUDGET (tier {ai_vision_status['tier']}) — not run, not a pass")
+    if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
+        print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
+    # #4652: …and the reader-surface gate's skip reads the same way, from the same place.
+    for _gate, _st in (("AI-vision QA", ai_vision_status), ("Reader-truth QA", reader_truth_status)):
+        if reader_surface_skip_line(_gate, _st):
+            print(reader_surface_skip_line(_gate, _st))
+    # #1927: …and once more as a CI ANNOTATION, the only one of the three surfaces
+    # that is visible without opening the job log. Both gates now pause at tier 3
+    # only (ADR-125 amendment), so this fires when Bedrock is stopped fleet-wide.
+    gha_paused_gate_annotation("AI-vision QA", ai_vision_status)
+    gha_paused_gate_annotation("Reader-truth QA", reader_truth_status)
+    # #1990: a dedicated, hard-to-miss tally for baselined a11y debt that's no
+    # longer live — the consumer the shrink warnings previously lacked.
+    # #3546: …and a clock on it. The tally alone printed on every run for a year
+    # while the list grew 5 → 50, so the list is now persisted to a committed
+    # sidecar with a first_seen date per (page, rule) and a unit test reds once
+    # any row is a week old. `day_n` drops phase-dependent pages inside a
+    # cycle's thin window (see a11y_audit.phase_dependent_page).
+    cycle_day_n = a11y_audit.experiment_day_n(capture_today_pt)  # the sweep's ONE clock (#3030)
+    shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")}, day_n=cycle_day_n)
+    shrink_candidates.update(
+        a11y_audit.shrink_candidates({f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")}, day_n=cycle_day_n)
+    )  # #3277: mobile-ledger shrink, viewport-keyed
+    if shrink_candidates:
+        total_rules = sum(len(v) for v in shrink_candidates.values())
+        print(
+            f"a11y ledger: {total_rules} shrink candidate(s) across {len(shrink_candidates)} page(s) "
+            f"— run --update-baseline and review the diff (#1990)"
+        )
+    # The sidecar must record what is STILL unharvested. The tally above is
+    # computed against the baseline as it was when the pages were swept, so on
+    # an --update-baseline run it is the BEFORE number — correct to print, wrong
+    # to persist (every row it names was just written away). Re-derive against
+    # the file now on disk, from the SAME observations, and print the residue.
+    ledger_candidates = shrink_candidates
+    if update_a11y_baseline:
+        fresh = a11y_audit.load_baseline()
+        ledger_candidates = a11y_audit.shrink_candidates(
+            {
+                r["path"]: a11y_audit.gate_findings(r["path"], r["a11y"]["observed"], fresh, theme=color_scheme, viewport="desktop")
+                for r in results
+                if r.get("a11y")
+            },
+            day_n=cycle_day_n,
+        )
+        ledger_candidates.update(
+            a11y_audit.shrink_candidates(
+                {
+                    f"{r['path']} @390px": a11y_audit.gate_findings(
+                        r["path"], r["a11y_mobile"]["observed"], fresh, theme=color_scheme, viewport="mobile"
+                    )
+                    for r in results
+                    if r.get("a11y_mobile")
+                },
+                day_n=cycle_day_n,
+            )
+        )
+        residue = sum(len(v) for v in ledger_candidates.values())
+        print(
+            f"a11y ledger after harvest: {residue} shrink candidate(s) across {len(ledger_candidates)} page(s) "
+            f"remaining (phase-excepted or audit-skipped) (#3546)"
+        )
+    # Persist unconditionally — an EMPTY shrink list must clear the sidecar's
+    # swept rows, or a harvested entry would keep its stale first_seen forever
+    # and the dead-man would red on debt that is already paid.
+    try:
+        shrink_ledger = a11y_audit.write_shrink_ledger(ledger_candidates, capture_today_pt, swept_pages={r["path"] for r in results})
+        stale = a11y_audit.stale_shrink_entries(shrink_ledger, capture_today_pt)
+        print(
+            f"a11y shrink dead-man: {len(shrink_ledger['entries'])} tracked, {len(stale)} older than "
+            f"{a11y_audit.SHRINK_MAX_AGE_DAYS}d → tests/a11y_shrink_ledger.json (#3546)"
+        )
+        for page_key, rule, first_seen, age in stale[:10]:
+            print(f"  ⚠ STALE {age}d — {page_key}: {rule} (first seen {first_seen}) — harvest via --update-baseline")
+    except Exception as e:
+        # Fail-soft on the WRITE only: a sidecar that could not be written must
+        # not take down a sweep that already produced its verdict. The dead-man
+        # itself is a unit test over the committed file, so a silent write
+        # failure surfaces there as an ageing row, never as a pass.
+        print(f"⚠ a11y shrink dead-man ledger NOT written: {str(e)[:160]} (#3546)")
+    # ── #2938: a REQUESTED AI gate that graded nothing is a FAILURE, not a warning ──
+    #
+    # Until 2026-08-21 this was the shape of a green run:
+    #
+    #   ── AI-vision QA (Claude / Bedrock) — tier <= 1: 6/92 pages ──
+    #     ⚠ AI-QA unavailable — could not import bedrock_client: No module named 'boto3'
+    #   ── Reader-truth QA (phase-aware, Claude / Bedrock) ──
+    #     ⚠ AI-QA unavailable — could not import bedrock_client: No module named 'boto3'
+    #
+    # …and the job concluded SUCCESS, because the exit code read only page failures.
+    # `boto3` was never installed in ANY of the three visual-qa workflow copies, so both
+    # AI gates had been structurally dark on the deploy path while CLAUDE.md and ADR-076
+    # described them as gating since 2026-06-05. A green light wired to nothing.
+    #
+    # The missing dependency is the trigger; the DEFECT is `⚠ … unavailable` + exit 0.
+    # Installing boto3 without this would leave the same silent-pass one outage away.
+    #
+    # `skipped_by_budget` is deliberately NOT a failure — it is a designed, honest pause
+    # (ADR-125 tier 3, #1440/#1927) that already reports itself three ways. Everything
+    # else means "you asked for this gate and it graded nothing", which must not be a
+    # pass: `unavailable` (dependency/import gone) and `no_surfaces` (asked for
+    # reader-truth, captured no prose) are both blindness, not health.
+    ai_gate_failures = requested_ai_gate_failures(
+        [("AI-vision QA", ai_qa, ai_vision_status), ("Reader-truth QA", reader_truth, reader_truth_status)]
+    )
+
+    if ai_gate_failures:
+        print(f"\n{'=' * 56}")
+        for msg in ai_gate_failures:
+            print(f"❌ REQUESTED AI GATE DID NOT RUN — {msg}")
+        print("   This is a FAILURE, not a warning: the gate was asked for and graded nothing (#2938).")
+        print("   (A budget-tier pause is the ONLY sanctioned non-run, and reports separately.)")
+        if os.environ.get("GITHUB_ACTIONS"):
+            for msg in ai_gate_failures:
+                print(f"::error title=AI gate did not run::{msg}")
+
+    if save_screenshots:
+        print(f"Screenshots: {screenshot_dir}/")
+
+    with open(os.path.join(screenshot_dir, "report.json"), "w") as f:
+        json.dump(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "capture_today_pt": capture_today_pt,  # the sweep's ONE clock (#3030)
+                "browser": browser_name,
+                "mobile": mobile,
+                "max_tier": max_tier,
+                "color_scheme": color_scheme,
+                "passed": passed,
+                "failed": failed,
+                "unevaluated": unevaluated,  # #2973: passed + failed + unevaluated == len(results)
+                "warnings": warns,
+                "ai_vision_status": ai_vision_status,
+                "reader_truth_status": reader_truth_status,
+                "results": results,
+            },
+            f,
+            indent=2,
+        )
+
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status, ai_vision_status, capture_today_pt)
+
+    # #2973: an unevaluated page can never ride out on a green exit code — the
+    # explicit `unevaluated == 0` term holds even if a future refactor stops
+    # flipping unevaluated pages to FAIL.
+    return failed == 0 and unevaluated == 0 and not ai_gate_failures
+
+
+if __name__ == "__main__":
+    # CLI/argparse wiring lives in visual_qa_cli.py (#1991 — extracted to hold this
+    # module's line count inside the module-size headroom). Pass this already-executed
+    # module object (sys.modules["__main__"] when run as `python3 qa/visual_qa.py`)
+    # so visual_qa_cli never re-imports/re-executes this file under a second name.
+    from visual_qa_cli import main as _cli_main
+
+    sys.exit(_cli_main(vqa=sys.modules[__name__]))

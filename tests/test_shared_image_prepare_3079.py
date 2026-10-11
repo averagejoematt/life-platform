@@ -165,7 +165,7 @@ def test_unpreparable_capture_is_named_and_never_a_silent_clean_read(tmp_path):
 # #3079 defect was a SECOND copy of the screenshot->judge path, added without anyone
 # having to decide it was a good idea.
 SANCTIONED_IMAGE_BLOCK_SITES = {
-    ("tests/visual_ai_qa.py", "_png_block"): (
+    ("qa/visual_ai_qa.py", "_png_block"): (
         "THE screenshot -> vision-judge prepare path. Owns the #2973 Bedrock reject "
         "guard and the #3067 model-resize tiling; visual_ai_qa, visual_qa's --ai-qa "
         "sweep and scripts/fresh_eyes_discovery.py all route through it (#3079)."
@@ -187,7 +187,7 @@ SANCTIONED_IMAGE_BLOCK_SITES = {
     ),
 }
 
-_SCAN_DIRS = ("lambdas", "tests", "scripts", "mcp", "deploy", "cdk")
+_SCAN_DIRS = ("lambdas", "tests", "qa", "scripts", "mcp", "deploy", "cdk")
 _SKIP_PARTS = {"__pycache__", "node_modules", "cdk.out", ".venv", "site-packages"}
 
 
@@ -304,7 +304,7 @@ def test_the_census_sweep_actually_reaches_every_directory_it_claims(tmp_path):
     swept = {os.path.relpath(p, _ROOT) for p in _python_files()}
     for known in (
         "scripts/fresh_eyes_discovery.py",
-        "tests/visual_ai_qa.py",
+        "qa/visual_ai_qa.py",
         "lambdas/experiment/eyeball_calibration.py",
         "mcp/registry.py",
         "deploy/sync_doc_metadata.py",

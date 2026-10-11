@@ -30,7 +30,7 @@
 // FAIL CONDITION: only a SyntaxError fails this gate. A runtime error past that point
 // (e.g. a shim gap) is logged as a non-fatal warning — this gate's job is full-depth
 // SYNTAX verification, not full runtime behavior; real DOM execution is already
-// covered by tests/pr_render_gate.py / visual QA (an actual Playwright browser against
+// covered by qa/pr_render_gate.py / visual QA (an actual Playwright browser against
 // a mocked API). Conflating the two would make this gate flaky on shim gaps instead of
 // reliable on the one thing node --check can't do.
 import { register } from "node:module";

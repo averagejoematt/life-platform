@@ -4,7 +4,7 @@ Boxes 1/2/4 (PR #2728) made the coverage ledger honest: 69 routes read UNCOVERED
 because nothing swept them. This box gives them the sweep: a generic
 status+JSON-shape tier derived from the router itself (`qa_manifest.
 api_sweep_records()`, probed by `scripts/api_sweep_check.py` inside the smoke)
-plus the numeric impossible-value scan (tests/accuracy_audit.py widens its
+plus the numeric impossible-value scan (qa/accuracy_audit.py widens its
 denominator to the same rows). The `light_pct: 106.7` incident is the shape this
 closes: the RIGHT rule reading a too-narrow denominator.
 

@@ -181,7 +181,7 @@ LEDGER: dict[str, dict] = {
         "per-feature dollars not separable; Aug journal-enrichment $0.01",
     ),
     "comprehension_qa": _row(
-        owner="tests/comprehension_qa.py",
+        owner="qa/comprehension_qa.py",
         attribution=EXCLUSIVE,
         attribution_keys=("comprehension_qa",),
         founding_usd=0.00,
@@ -337,7 +337,7 @@ LEDGER: dict[str, dict] = {
         "nightly qa-smoke lambda, whose only AI is this gate",
     ),
     "visual_ai_qa": _row(
-        owner="tests/visual_ai_qa.py",
+        owner="qa/visual_ai_qa.py",
         attribution=EXCLUSIVE,
         attribution_keys=("visual-ai-qa",),
         founding_usd=3.11,

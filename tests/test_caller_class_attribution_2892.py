@@ -63,7 +63,7 @@ def test_lambda_container_wins_over_ci_markers():
 
 def test_github_actions_without_lambda_is_ci():
     # The 2026-08-18 drift audit traced the $18.52 'unknown' LambdaFunction bucket
-    # to tests/visual_ai_qa.py running in CI — no Lambda container, so it landed
+    # to qa/visual_ai_qa.py running in CI — no Lambda container, so it landed
     # nowhere. It now lands in `ci`.
     assert bc.caller_class({"GITHUB_ACTIONS": "true"}) == "ci"
     assert bc.caller_class({"CI": "true"}) == "ci"

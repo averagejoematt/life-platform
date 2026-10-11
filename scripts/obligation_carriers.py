@@ -382,7 +382,7 @@ RESIDUE_LEDGERS: Dict[str, Dict[str, str]] = {
         "expires": _REVIEW_BY,
         "consumer": "tests/test_pair_seam_conformance_2847.py",
     },
-    "tests/mypy_clean_set.py::DIRTY": {
+    "scripts/mypy_clean_set.py::DIRTY": {
         "carrier": _DRAIN_CARRIER,
         "condition": "stays EMPTY (#1656) — a re-added module is a regression out of the type gate",
         "declared": _SEEDED,

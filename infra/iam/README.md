@@ -258,7 +258,7 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > daily standalone visual-qa sweep can persist each run's per-page web-vitals
 > (LCP/CLS/JS-bytes) and rebuild the weekly regression trend line
 > (`generated/qa_archive/perf/trend.json`). The workflow step is
-> `continue-on-error` and `tests/perf_trend.py` is fail-soft, so until this lands
+> `continue-on-error` and `qa/perf_trend.py` is fail-soft, so until this lands
 > the perf trend simply does not accrue — it never reds the sweep. Applied by the
 > **same** one-line `put-role-policy` as the #1441 screenshot grant above (both
 > statements ship in the one file), so a single apply lands both. Until then,

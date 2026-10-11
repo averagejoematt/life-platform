@@ -247,7 +247,7 @@ def stage_build_info(out_dir, info=None):
 GENERATED_BUNDLE_EXEMPTIONS = {
     BUILD_INFO_NAME: "2026-08-20 #2920: per-build fingerprint (#2377), generated at stage time — no fixed source path to diff",
     "qa_coverage_stats.json": (
-        "2026-08-20 #2920: fail-soft derived snapshot of tests/qa_manifest.py (#1446) — "
+        "2026-08-20 #2920: fail-soft derived snapshot of qa/qa_manifest.py (#1446) — "
         "not a runtime-behavior file, not addressed by this issue"
     ),
 }

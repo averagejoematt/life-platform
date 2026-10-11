@@ -1,7 +1,7 @@
 # Surface-drift gate (#1454) — "did you also update the tests?", asked by a
 # machine on every PR. Diff-aware: blocks a PR that ADDS a site page / site-api
 # route / EventBridge schedule / site JS module without its QA registration
-# (tests/qa_manifest.py entry, tests/api_schemas/ baseline, monitoring change,
+# (qa/qa_manifest.py entry, tests/api_schemas/ baseline, monitoring change,
 # the #1432-scanned directory) — or a dated entry in
 # docs/qa/SURFACE_DRIFT_EXEMPTIONS.md. Never silent.
 #
@@ -17,9 +17,6 @@ on:
       - 'site/**'
       - 'lambdas/web/**'
       - 'cdk/stacks/**'
-      - 'tests/qa_manifest.py'
-      # #4270: the registry's real home — tests/qa_manifest.py above is now a re-export shim,
-      # so a page registered in qa/qa_manifest.py must re-run the PAGE leg too.
       - 'qa/qa_manifest.py'
       # C1 (#1436): the schema-baseline directory the ROUTE leg enforces against —
       # its appearance flips that leg from advisory to blocking.

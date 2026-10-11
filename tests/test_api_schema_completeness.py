@@ -467,15 +467,15 @@ class TestArrayUnionShape:
         assert not cas.is_valid_shape_node(bad)
 
 
-# ── shared sentinel scan reuse (tests/accuracy_audit.py::scan_json_value_leaks) ──
+# ── shared sentinel scan reuse (qa/accuracy_audit.py::scan_json_value_leaks) ──
 
 
 def test_capture_script_reuses_the_shared_sentinel_scan_not_a_copy():
     """#1436's sentinel-scan-extension AC: deploy/capture_api_schemas.py must call
-    the SAME leak-scan tests/accuracy_audit.py::sanity_scan() already uses for its
+    the SAME leak-scan qa/accuracy_audit.py::sanity_scan() already uses for its
     curated page-binding subset — not a parallel reimplementation that could drift
     out of sync with it."""
-    import accuracy_audit as aa
+    from qa import accuracy_audit as aa
 
     assert cas.accuracy_audit is aa
     assert cas.accuracy_audit.scan_json_value_leaks is aa.scan_json_value_leaks

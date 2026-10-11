@@ -382,7 +382,7 @@ class MonitoringStack(Stack):
         )
 
         # #1440: a budget-tier pause of the reader-truth AI QA pass (either hook —
-        # tests/visual_ai_qa.assess_reader_truth on CI/local, or the nightly
+        # qa/visual_ai_qa.assess_reader_truth on CI/local, or the nightly
         # qa_smoke_lambda.check_reader_truth — both call
         # reader_truth_qa.emit_budget_pause_metric(), dimension-less) must be
         # visible even on a day nothing else fails. qa_smoke's own email only

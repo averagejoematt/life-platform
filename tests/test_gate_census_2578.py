@@ -636,7 +636,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # scripts/ (1 failed each — the subscript form is what the first draft missed);
         # M3/M3b are negative controls, the same idiom as a leading and as a trailing comment
         # (32 passed, no cry-wolf); M4b stripped truncation handling from the covered site in
-        # tests/visual_ai_qa.py (3 failed). Three gaps are STATED in the record rather than
+        # qa/visual_ai_qa.py (3 failed). Three gaps are STATED in the record rather than
         # papered over — a two-line bind-then-compare form, a helper that returns the stop
         # reason, and a parse failure reached without reading it at all — which is why both
         # covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live
@@ -958,7 +958,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 213 -> 214 (2026-09-26, #4182 M4, the comprehension judge): `ci::visual-qa.yml::visual-qa::10`, the new
         # `continue-on-error` CI step this lane's workflow edit mints, arrives PROVEN — CI_PROOFS in
         # scripts/gate_census_proofs.py, wired into gate_census.PROVEN_CAN_FAIL. Mutation planted directly in the real tracked
-        # tests/comprehension_qa.py: main()'s body replaced with a bare `return 0`, deleting the
+        # qa/comprehension_qa.py: main()'s body replaced with a bare `return 0`, deleting the
         # `if not os.path.exists(_ARTIFACT_PATH): return 1` check. `python3 -m pytest tests/test_comprehension_qa.py -k
         # main_returns -v`: BASELINE 3 passed; MUTATED 2 failed / 1 passed (the two artifact-missing/crash cases both asserted
         # `main() == 1` and got 0); REVERTED 3 passed, byte-identical. Unproven stays 540; one entrant.

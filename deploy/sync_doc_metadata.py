@@ -289,7 +289,7 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
                         counts[target.id] = len(node.value.elts)
     if "PAGES" not in counts:
         # #1426: PAGES is no longer a literal — it derives from THE page registry
-        # (tests/qa_manifest.py leak_scan facet). Count via the emitter subprocess
+        # (qa/qa_manifest.py leak_scan facet). Count via the emitter subprocess
         # so discovery stays import-side-effect-free in this module.
         import subprocess
 
@@ -307,7 +307,7 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
         except Exception:
             pass
     if "JSON_ENDPOINTS" not in counts:
-        # #1448: JSON_ENDPOINTS moved to the shared tests/leak_token_sweep.py
+        # #1448: JSON_ENDPOINTS moved to the shared qa/leak_token_sweep.py
         # module (imported here, not a local literal anymore) so the daily
         # visual-qa sweep can reuse the same list — fall back to AST-reading
         # the literal there.

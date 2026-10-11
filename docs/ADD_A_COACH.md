@@ -313,7 +313,7 @@ If you want a commissioned portrait, it is a **hard gate — Matthew only** (ADR
    regenerates the bundled `portrait_data.js` (marked GENERATED — do not hand-edit).
 5. **The contact-sheet gate** — all personas side-by-side, light + dark, at 40/56/96 px. Matthew
    approves the *sheet*, recorded in `_meta.sign_off` (no sign-off ⇒ validation fails ⇒ the recipe
-   never renders). Then `tests/test_portrait_recipes.py` + `tests/visual_qa.py --screenshot --ai-qa`.
+   never renders). Then `tests/test_portrait_recipes.py` + `qa/visual_qa.py --screenshot --ai-qa`.
 
 The one-sentence rule: **AI may sketch, only code ships, only Matthew approves.**
 

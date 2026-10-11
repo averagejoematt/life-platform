@@ -2,14 +2,14 @@
 
 `v4_build_sitemap.py` used to enumerate `site/**/*.html` directly and filter
 with a hand-maintained SKIP_TOP set — a second, drifting vocabulary of "what's
-a page" alongside `tests/qa_manifest.py` (the ONE page registry, #1426).
+a page" alongside `qa/qa_manifest.py` (the ONE page registry, #1426).
 Two concrete defects fell out: `journal/essays/.../body.html` (an authoring
 FRAGMENT, never a page) qualified via the glob and, because `url_for()` strips
 `.html` from non-index files, shipped as a dead extensionless URL CloudFront
 301s to a 404; and `/subscribe.html` (no noindex) shipped as a second entry
 alongside its own target `/subscribe/`.
 
-This pins: (1) the sitemap is derived from `tests/qa_manifest.MANIFEST`, not a
+This pins: (1) the sitemap is derived from `qa/qa_manifest.MANIFEST`, not a
 filesystem glob — a file present on disk but ABSENT from the registry is
 structurally never a candidate, proven with a positive control; (2) neither
 dead URL from #3567's own reproduction is in the real, generated sitemap;

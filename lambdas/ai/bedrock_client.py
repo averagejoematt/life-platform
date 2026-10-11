@@ -144,7 +144,7 @@ _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
 # reason and worked #2 downward.
 #
 # Every byte of it is the two AI CI gates, both of which run inside ONE process
-# (`tests/visual_qa.py --ai-qa --reader-truth`), so `sys.argv[0]` cannot separate
+# (`qa/visual_qa.py --ai-qa --reader-truth`), so `sys.argv[0]` cannot separate
 # them either — the split has to come from the code that owns each pass.
 #
 # The rules, in the same discipline as `caller_class()` below:
@@ -170,7 +170,7 @@ _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
 #     CI keeps the `unknown` residual — its two gates are labelled by `attributed_to`.
 ATTRIBUTABLE_FEATURES: frozenset = frozenset(
     {
-        # tests/visual_ai_qa.py — the Claude-vision judge. Screenshot IMAGE input
+        # qa/visual_ai_qa.py — the Claude-vision judge. Screenshot IMAGE input
         # (up to 1,568 visual tokens per tile, #3067) dominates its bill and is
         # structurally uncacheable: every capture differs on every run.
         "visual-ai-qa",
@@ -179,7 +179,7 @@ ATTRIBUTABLE_FEATURES: frozenset = frozenset(
         # variable wins and the row stays `life-platform-qa-smoke`, so the CI copy
         # and the nightly Lambda copy of the SAME gate stop being summed together.
         "reader-truth-qa",
-        # tests/comprehension_qa.py (#4182, M4) — the newcomer-comprehension judge:
+        # qa/comprehension_qa.py (#4182, M4) — the newcomer-comprehension judge:
         # a blind reader + a text-only grader over the six flagship doors. Advisory
         # (never gates the deploy), so its spend is metered separately from the two
         # deploy-gating judges above rather than falling into the "unknown" residual.
@@ -199,7 +199,7 @@ def attributed_to(feature: str):
 
     A no-op inside a Lambda container (the runtime's own function name wins) and
     a no-op for any label outside `ATTRIBUTABLE_FEATURES`. Context-local, so two
-    passes in one process — which is exactly what `tests/visual_qa.py` runs — are
+    passes in one process — which is exactly what `qa/visual_qa.py` runs — are
     attributed separately without either of them touching the ~40 call sites.
     """
     token = _FEATURE.set(feature or "")

@@ -206,12 +206,12 @@ else
 fi
 
 # ── v4 pages (HTTP status) — derived from THE page registry (#1426) ───────────
-# tests/qa_manifest.py is the ONE page list; this block sweeps every registered
+# qa/qa_manifest.py is the ONE page list; this block sweeps every registered
 # page at its expected status. Adding a page = one manifest entry, never a new
 # check_status line here (the old hand list sampled 22 pages; this is all ~80).
 SMOKE_SURFACE="site"   # page shells are site/** bytes — a revert restores them
 echo "── v4 pages (HTTP status, from qa_manifest) ──────────────"
-QA_MANIFEST="$(dirname "$0")/../tests/qa_manifest.py"
+QA_MANIFEST="$(dirname "$0")/../qa/qa_manifest.py"
 if MANIFEST_ROWS=$(python3 "$QA_MANIFEST" --emit smoke); then
   while IFS='|' read -r page_path page_name page_status; do
     [[ -z "$page_path" ]] && continue
@@ -228,7 +228,7 @@ check_status "www redirect"         "https://www.averagejoematt.com/" "200"
 echo ""
 
 # ── Private routes (#3760) — anonymous must NEVER get 200 ─────────────────────
-# Derived from tests/qa_manifest.PRIVATE_ROUTES, the same registry the page sweep above
+# Derived from qa/qa_manifest.PRIVATE_ROUTES, the same registry the page sweep above
 # derives from, so a second private route joins this sweep by existing rather than by
 # somebody remembering this file.
 SMOKE_SURFACE="infra"  # the gate is the site-api + a CloudFront behaviour; no site/** revert repairs it
@@ -429,7 +429,7 @@ echo ""
 # before there was anything to check. It has run now, and /privacy/ publishes the
 # terms beside these numbers, so an absent archive is a real regression.
 # The two JSON documents are covered by the api_deps sweep below (they are
-# declared on the /privacy/ row in tests/qa_manifest.py); the tarball is not
+# declared on the /privacy/ row in qa/qa_manifest.py); the tarball is not
 # JSON, so it gets its own status check.
 # #3395: /archive/* is Lambda-written generated/ content (ADR-046) — data-plane,
 # not in site/, so a site/** revert cannot restore it.
@@ -499,7 +499,7 @@ SMOKE_SURFACE="api"
 echo "── Manifest api_deps (distinct union, JSON health, #1586) ────"
 # #2831: routes explicitly deferred in deploy/api_deploy_sequencing.json's
 # pending_deploy_routes (the #2050 pattern, generalized — the SAME registry
-# scripts/check_api_before_frontend.py's PR-time check and tests/visual_qa.py
+# scripts/check_api_before_frontend.py's PR-time check and qa/visual_qa.py
 # both read). A 404 on one of these is the known merged-but-not-deployed-yet
 # window, not a broken page — downgrade to a warning instead of failing the
 # whole smoke run (and triggering rollback_site.sh) out from under a PR that
@@ -579,7 +579,7 @@ echo ""
 # (2026-08-22: 71/71 pass — the 2026-07-17 rule). Transport flakes WARN inside
 # the checker (the #2841 posture); wrong statuses and malformed JSON FAIL.
 # The numeric impossible-value scan over these same rows runs in
-# tests/accuracy_audit.py --live, whose denominator includes them.
+# qa/accuracy_audit.py --live, whose denominator includes them.
 SMOKE_SURFACE="api"
 echo "── Live-route sweep (#2652 — router-derived long tail) ───────"
 if python3 "$(dirname "$0")/../scripts/api_sweep_check.py" --base "$BASE"; then
@@ -655,7 +655,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   # no API dep and no deploy-time visual gate — it can silently break or leak
   # placeholder content between reviews. Each page must contain its declared
   # structural marker (expected title/selector) and NO template-leak token. Page
-  # list + markers derive from tests/qa_manifest.py (content_class static/utility
+  # list + markers derive from qa/qa_manifest.py (content_class static/utility
   # — the ONE registry, #1426), never a hand list. The 404 row fetches a
   # nonexistent URL: CloudFront serves the 404 page's BODY with HTTP status 404,
   # so this asserts body structure, never a 200 (the status sweep above already
@@ -692,7 +692,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   # crawler / HN-Twitter-Slack link-unfurl view is real content, not the blank client-
   # rendered shell it was before #1395. This is a real regression guard: on the pre-fix
   # tree Home + /data/ + /protocols/ shipped NO static core, so this block FAILS there.
-  # Page list derives from tests/qa_manifest.py (the ONE registry, #1426) — never a
+  # Page list derives from qa/qa_manifest.py (the ONE registry, #1426) — never a
   # hand list here.
   echo "── Static core (crawler/no-JS view, from qa_manifest) ────"
   # #1526: THIS is the check that auto-rolled-back a healthy deploy on 2026-07-19 —

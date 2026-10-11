@@ -182,10 +182,10 @@ def test_a_requested_judge_is_never_overwritten_by_a_skip_record(swept, monkeypa
 
 def test_every_gate_skip_in_a_workflow_hands_its_reason_to_the_sweep():
     ci = _read(".github/workflows/ci-cd.yml")
-    assert 'python3 tests/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"' in ci
+    assert 'python3 qa/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"' in ci
     assert "SKIP_REASON: ${{ steps.reader_surface.outputs.reason }}" in ci
     # No deterministic-only invocation is left that says nothing about the judge it dropped.
-    assert not re.search(r"^\s*python3 tests/visual_qa\.py --screenshot\s*$", ci, re.M), "a bare SKIP invocation is back in ci-cd.yml"
+    assert not re.search(r"^\s*python3 qa/visual_qa\.py --screenshot\s*$", ci, re.M), "a bare SKIP invocation is back in ci-cd.yml"
 
     vq = _read(".github/workflows/visual-qa.yml")
     # Each SKIP arm clears the flag AND records why, in the same arm.
@@ -222,7 +222,7 @@ def test_a_skip_cannot_trigger_a_rollback_and_a_site_change_cannot_be_skipped():
     sd = _read(".github/workflows/site-deploy.yml")
     assert "needs.visual-qa.result" in sd
     assert "reader_surface" not in sd and "--ai-qa-skipped" not in sd
-    assert re.search(r"^\s*python3 tests/visual_qa\.py --screenshot --ai-qa --ai-qa-max-tier 1\s*$", sd, re.M)
+    assert re.search(r"^\s*python3 qa/visual_qa\.py --screenshot --ai-qa --ai-qa-max-tier 1\s*$", sd, re.M)
 
 
 # ── 3. the registry cannot drift ───────────────────────────────────────────────

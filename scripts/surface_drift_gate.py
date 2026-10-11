@@ -13,7 +13,7 @@ live elsewhere: tests/test_qa_manifest.py, deploy/sync_doc_metadata.py --check).
 FOUR LEGS (one per surface type):
 
   PAGE   a new site/**/*.html (non-legacy) must be registered in
-         tests/qa_manifest.py (or carry an EXEMPT reason there). Registration
+         qa/qa_manifest.py (or carry an EXEMPT reason there). Registration
          truth comes from qa_manifest.self_check() — reused, NOT reimplemented.
 
   ROUTE  a new route in lambdas/web/site_api_lambda.py's dispatcher (the
@@ -69,7 +69,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 
 SITE_API = "lambdas/web/site_api_lambda.py"
-QA_MANIFEST = "tests/qa_manifest.py"
+QA_MANIFEST = "qa/qa_manifest.py"
 SCHEMA_DIR = "tests/api_schemas"
 LEDGER = "docs/qa/SURFACE_DRIFT_EXEMPTIONS.md"
 JS_SCAN_DIR = "site/assets/js"
@@ -203,7 +203,7 @@ def page_leg(added_pages: set, unregistered: set, ghosts: set, exemptions: list)
     findings = []
     for p in sorted(added_pages):
         if p not in unregistered:
-            findings.append(Finding("PAGE", "ok", p, "registered in tests/qa_manifest.py (or EXEMPT there)"))
+            findings.append(Finding("PAGE", "ok", p, "registered in qa/qa_manifest.py (or EXEMPT there)"))
             continue
         ex = exemption_for(exemptions, "page", p)
         if ex:

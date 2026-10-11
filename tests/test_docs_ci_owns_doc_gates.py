@@ -152,8 +152,6 @@ def _trigger_paths():
 # genuinely reads — derived below rather than trusted from this list, which exists only to
 # make the intent legible next to the asymmetry it licenses.
 _TESTS_PR_PATHS = {
-    "tests/qa_manifest.py",
-    "tests/leak_token_sweep.py",
     "tests/test_platform_stats_truth.py",
     # #3374 R1 — generate_platform_model.py AST-reads KNOWN_SECRETS as the secrets
     # cost-surface count; push covers it via tests/**.

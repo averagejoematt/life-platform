@@ -17,7 +17,7 @@ Both are deliberate honest statistics prose, not a leak — yet the phrase-match
 scan raised two HIGH findings on them. This is the #2959/#3003/#3199/#3379
 suppressor-family rule (structural, never phrase-matched) inverted onto a
 DETECTOR, and it failed the same way: `_is_isolated_value` in
-tests/accuracy_audit.py replaces the substring check with a position check — a
+qa/accuracy_audit.py replaces the substring check with a position check — a
 hit only counts when the token sits adjacent to a label/colon/punctuation/
 boundary (a rendered VALUE), never mid-sentence flanked by two ordinary words.
 

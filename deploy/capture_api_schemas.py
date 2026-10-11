@@ -30,7 +30,7 @@ one of the two buckets — a new route with neither reds CI (#1436's structural 
 
 Sentinel scan (#1436 AC): every successfully-fetched LIVE response (before it is
 reduced to a shape-only snapshot) is scanned by
-tests/accuracy_audit.py::scan_json_value_leaks for a leaked NaN/undefined/
+qa/accuracy_audit.py::scan_json_value_leaks for a leaked NaN/undefined/
 [object Object]/None/null string — the same regex/walk tests/site_review.py's curated
 subset always used, now run across the FULL router surface. Findings are printed
 loudly; they do not abort the capture run (a leak is a finding to act on, not a
@@ -69,12 +69,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-for _p in (ROOT / "deploy", ROOT / "tests"):
+for _p in (ROOT / "deploy", ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-import accuracy_audit  # noqa: E402 — scan_json_value_leaks, the shared sentinel scan (#1436)
 import endpoint_registry  # noqa: E402
+
+from qa import accuracy_audit  # noqa: E402 — scan_json_value_leaks, the shared sentinel scan (#1436)
 
 SITE_URL = os.environ.get("QA_SITE_URL", "https://averagejoematt.com")
 SNAPSHOT_DIR = ROOT / "tests" / "api_schemas"

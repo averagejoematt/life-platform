@@ -3,7 +3,7 @@ budget is a DERIVED number with a pair-contract, not a bare literal.
 
 WHAT WENT WRONG
 ---------------
-`tests/visual_ai_qa.py::_assess_page` sent ``"max_tokens": 700`` — a literal with
+`qa/visual_ai_qa.py::_assess_page` sent ``"max_tokens": 700`` — a literal with
 nothing pinning it, unlike the coach-v2 cap that `test_ai_calls_coach_v2_max_tokens_3190.py`
 guards. The `/coaching/` page's verdict outgrew it, and the consequence was not a
 warning: #3540 (correctly) turns a reply cut off at ``max_tokens`` into an explicit
@@ -74,7 +74,7 @@ import os
 import re
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_VISUAL_AI_QA_PATH = os.path.join(_HERE, "visual_ai_qa.py")
+_VISUAL_AI_QA_PATH = os.path.join(os.path.dirname(_HERE), "qa", "visual_ai_qa.py")
 
 # ── the measured derivation, restated as numbers the inequality can use ──────
 #
@@ -103,7 +103,7 @@ def _read_source():
 def _assess_page_body(source):
     """Slice `_assess_page`'s real body — the shipped source, never a fixture copy."""
     m = _ASSESS_PAGE_RE.search(source)
-    assert m, "could not find `def _assess_page(` in tests/visual_ai_qa.py — has it moved or been renamed?"
+    assert m, "could not find `def _assess_page(` in qa/visual_ai_qa.py — has it moved or been renamed?"
     rest = source[m.start() :]
     end = _NEXT_TOPLEVEL_DEF_RE.search(rest[1:])
     assert end, "could not find the next top-level `def` after _assess_page — the slice would run to EOF"
@@ -113,7 +113,7 @@ def _assess_page_body(source):
 def _declared_budget(source):
     m = re.search(r"^_VERDICT_MAX_TOKENS = (\d+)$", source, re.MULTILINE)
     assert m, (
-        "tests/visual_ai_qa.py no longer declares `_VERDICT_MAX_TOKENS = <int>` at module level. "
+        "qa/visual_ai_qa.py no longer declares `_VERDICT_MAX_TOKENS = <int>` at module level. "
         "#3652 named this budget precisely so its derivation could live beside it and be re-checked; "
         "if it moved, move this guard with it deliberately."
     )
@@ -137,7 +137,7 @@ def test_the_verdict_budget_is_a_named_constant_not_an_inline_literal():
     everywhere = _MAX_TOKENS_LITERAL_RE.findall(source)
     assert (
         not everywhere
-    ), f"tests/visual_ai_qa.py carries bare max_tokens literal(s) {everywhere} — every budget must be a named, derived constant"
+    ), f"qa/visual_ai_qa.py carries bare max_tokens literal(s) {everywhere} — every budget must be a named, derived constant"
 
 
 def test_verdict_budget_covers_the_derived_page_rule_ceiling():

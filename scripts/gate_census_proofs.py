@@ -1079,7 +1079,7 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         "scope": (
             "A verdict on three of the six hand-maintained public stats — review_grade, "
             "site_pages, active_secrets — each against a real source (newest "
-            "docs/reviews/*_grades_*.json, tests/qa_manifest.MANIFEST, "
+            "docs/reviews/*_grades_*.json, qa/qa_manifest.MANIFEST, "
             "model/platform_model.json cost_surface.secrets). review_count, "
             "board_technical and board_product are deliberately NOT covered: nothing in "
             "the repo enumerates reviews and the board rosters' live source is an S3 "
@@ -1979,7 +1979,7 @@ _RECEDE_SCOPE = (
     "each rule's ink tokens over --page and --surface at the opacity parsed from the sheet; it does not know "
     "which background a given instance actually lands on, does not see a wash/image ground (the .ch-state "
     "class, guarded separately by test_ch_state_grounds_on_a_ramp_step_not_an_accent_wash), and does not see "
-    "inline styles or JS-set colours. The live arbiter stays tests/visual_qa.py's axe sweep. Also scoped: the "
+    "inline styles or JS-set colours. The live arbiter stays qa/visual_qa.py's axe sweep. Also scoped: the "
     "companion set-completeness check test_every_opacity_declaration_is_classified sweeps evidence.css ONLY — "
     "tokens.css's ~40 further opacity declarations are deliberately unclassified rather than asserted "
     "text-free on inspection this change did not do."
@@ -2272,7 +2272,7 @@ _DERIVED_DECOR_SCOPE = (
     "reach. Whether the exempt selector really carries no text node is a HUMAN judgement recorded as the row's "
     "written reason (aria-hidden in the emitting JS/HTML, an SVG-only child, a :disabled control); the guard "
     "proves the row is load-bearing and still points at a live rule, not that the reason is true. The live "
-    "arbiter stays tests/visual_qa.py's axe sweep."
+    "arbiter stays qa/visual_qa.py's axe sweep."
 )
 
 # selector: (alpha, n failures when un-exempted, worst ratio per palette block)
@@ -2632,7 +2632,7 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
         "command": "python3 -m pytest tests/test_comprehension_qa.py -k main_returns -v",
         "mutation": (
             "The step's whole failure contract collapses to `comprehension_qa.main()`'s own "
-            "logic (the step is a bare `python3 tests/comprehension_qa.py`, so the step's exit "
+            "logic (the step is a bare `python3 qa/comprehension_qa.py`, so the step's exit "
             "code IS this function's return value) — planted directly in the real tracked file: "
             "main()'s body replaced with a bare `return 0`, deleting the "
             "`if not os.path.exists(_ARTIFACT_PATH): ... return 1` check entirely. Bedrock/AWS "

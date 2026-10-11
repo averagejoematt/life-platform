@@ -42,7 +42,7 @@
 # the full AI-vision read. Non-Sunday daily fires skip --ai-qa entirely (deploy
 # time already covers tier-1 pages via ci-cd.yml/site-deploy.yml's --ai-qa-max-tier
 # 1) — this keeps AI-vision spend to exactly two buckets: tier-1 at every deploy,
-# full surface once a week. See tests/visual_qa.py's module docstring for the cost math.
+# full surface once a week. See qa/visual_qa.py's module docstring for the cost math.
 #
 # #3251 (owner decision, option C1, 2026-08-30) — this daily fire is now the prose
 # judge's ONLY CI home: --reader-truth was removed from the two per-deploy copies
@@ -225,13 +225,13 @@ jobs:
           SKIPPED=()
           if [ -n "${AI_QA_SKIP}" ]; then SKIPPED+=(--ai-qa-skipped "${AI_QA_SKIP}"); fi
           if [ -n "${READER_TRUTH_SKIP}" ]; then SKIPPED+=(--reader-truth-skipped "${READER_TRUTH_SKIP}"); fi
-          python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }} \
+          python3 qa/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }} \
             --color-scheme ${{ steps.cadence.outputs.color_scheme }} "${SKIPPED[@]}"
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         if: always() && steps.dial.outputs.level != 'off'
         run: |
-          python3 tests/accuracy_audit.py --live
+          python3 qa/accuracy_audit.py --live
 
       # #1441 — the screenshot leg of the generation-time AI archive: this daily
       # sweep already captures full-page screenshots of every AI-narrative page
@@ -249,7 +249,7 @@ jobs:
         run: |
           DATE=$(date -u +%F)
           UPLOADED=0
-          for slug in $(python3 tests/qa_manifest.py --emit ai-screens); do
+          for slug in $(python3 qa/qa_manifest.py --emit ai-screens); do
             f="qa-screenshots/${slug}.png"
             if [ -f "$f" ]; then
               aws s3 cp "$f" "s3://matthew-life-platform/generated/qa_archive/screenshots/${DATE}/${slug}.png" --no-progress \
@@ -276,7 +276,7 @@ jobs:
         continue-on-error: true
         run: |
           if [ -f qa-screenshots/report.json ]; then
-            python3 tests/perf_trend.py --from-report qa-screenshots/report.json --persist --rollup \
+            python3 qa/perf_trend.py --from-report qa-screenshots/report.json --persist --rollup \
               || echo "::warning::perf-trend persist/rollup failed (advisory — #1435 IAM staging or transient S3)"
           else
             echo "::warning::no qa-screenshots/report.json — perf-trend persist skipped (sweep produced no report)"
@@ -284,7 +284,7 @@ jobs:
 
       # #4182 M4 — the newcomer-comprehension judge (advisory): a blind Haiku reader +
       # a text-only grader over the six flagship doors, graded against each door's
-      # declared intent (tests/qa_manifest.py). Reuses tests/visual_ai_qa.py's Bedrock
+      # declared intent (qa/qa_manifest.py). Reuses qa/visual_ai_qa.py's Bedrock
       # plumbing (attribution, image prep, the shared unreadable-verdict retry) rather
       # than a second copy. `continue-on-error: true` — it never gates this run, and
       # is ADVISORY until the 2026-10-10 floor-ratchet date named in #4182's M4 (the
@@ -296,7 +296,7 @@ jobs:
       - name: Comprehension judge — six doors, blind reader + grader (#4182 M4, advisory)
         if: always() && steps.dial.outputs.level != 'off'
         continue-on-error: true
-        run: python3 tests/comprehension_qa.py
+        run: python3 qa/comprehension_qa.py
 
       - name: Upload screenshots + report
         if: always()

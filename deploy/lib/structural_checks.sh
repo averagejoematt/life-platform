@@ -8,7 +8,7 @@
 #
 #   struct_marker_ok <file>   — the page body must contain the fixed-string marker
 #                               in $STRUCT_MARKER (expected title/selector, declared
-#                               per page in tests/qa_manifest.py — THE registry, #1426).
+#                               per page in qa/qa_manifest.py — THE registry, #1426).
 #                               Fixed-string (grep -F), never a regex: markers are
 #                               literal HTML fragments like 'class="policy-title"'.
 #   leak_tokens_absent <file> — the body must carry NO template-leak token. The token

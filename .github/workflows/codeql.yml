@@ -123,7 +123,7 @@ jobs:
           config: |
             paths-ignore:
               # Vendored third-party minified JS (axe-core, for the accessibility QA
-              # harness at tests/visual_qa.py) — not our code, not our bugs to fix, and
+              # harness at qa/visual_qa.py) — not our code, not our bugs to fix, and
               # CodeQL can't produce an actionable finding on minified output anyway.
               - tests/vendor/**
 

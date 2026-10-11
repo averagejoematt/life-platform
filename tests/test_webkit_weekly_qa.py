@@ -14,7 +14,7 @@ Two guards:
    test_site_deploy_workflow.py):
      - weekly `schedule:` cron (fixed UTC, repo convention) + workflow_dispatch
      - installs the WEBKIT engine (`playwright install --with-deps webkit`)
-     - drives tests/visual_qa.py with --browser webkit --mobile --max-tier 2
+     - drives qa/visual_qa.py with --browser webkit --mobile --max-tier 2
      - ADVISORY: no rollback scripts, no deploy scripts, no cdk deploy —
        a red here must never be able to roll back or mutate anything
      - failure surfaces loudly: since #3277 a red run files a tracked issue
@@ -110,8 +110,8 @@ def test_workflow_installs_webkit_and_drives_the_mobile_tier2_sweep():
 
     text = expanded(_workflow_text())
     assert re.search(r"playwright install --with-deps webkit", text), "webkit engine not installed"
-    run = re.search(r"python3 tests/visual_qa\.py([^\n]*)", text)
-    assert run, "workflow never invokes python3 tests/visual_qa.py"
+    run = re.search(r"python3 qa/visual_qa\.py([^\n]*)", text)
+    assert run, "workflow never invokes python3 qa/visual_qa.py"
     args = run.group(1)
     for flag in ("--browser webkit", "--mobile", "--max-tier 2"):
         assert flag in args, f"visual_qa.py invocation missing {flag}: {args.strip()}"

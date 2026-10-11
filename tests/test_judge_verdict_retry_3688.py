@@ -9,7 +9,7 @@ not land, and the parenthetical "(or its budget raised)" is what let it not land
 
 A raised budget makes truncation less likely; it does not make a truncated verdict
 recoverable — the money is already spent AND no coverage was bought. And because
-`ai-unevaluated` is one of the three classes `tests/visual_qa_verdict.py` routes
+`ai-unevaluated` is one of the three classes `qa/visual_qa_verdict.py` routes
 to DECLINE, a truncated verdict does not revert the deploy: the gate goes red,
 the site stays up, and the reason is a judge that ran out of tokens rather than a
 page that is wrong. Silent by construction.
@@ -206,7 +206,7 @@ def test_reader_truth_transport_failure_is_not_this_loops_class():
     assert len(errors) == 1 and not rtq.is_unevaluated(errors[0])
 
 
-# ── member 2: tests/visual_ai_qa._assess_page (the issue's confirmed member) ──
+# ── member 2: qa/visual_ai_qa._assess_page (the issue's confirmed member) ──
 
 
 @pytest.mark.parametrize("bad,kind", _UNREADABLE)
@@ -271,7 +271,7 @@ def test_vision_readable_first_verdict_costs_exactly_one_call(monkeypatch, tmp_p
 
 _COVERED_SOURCES = {
     "lambdas/operational/reader_truth_qa.py": "the reader-truth BATCH judge (assess_prose) — CI gate + nightly + restart-verify",
-    "tests/visual_ai_qa.py": "the per-page AI-vision judge (_assess_page)",
+    "qa/visual_ai_qa.py": "the per-page AI-vision judge (_assess_page)",
 }
 
 
@@ -340,7 +340,7 @@ def test_the_chokepoint_does_not_mutate_the_callers_body():
 #
 # THE PATTERN WAS WIDENED BY ITS OWN MUTATION RUN, which is worth recording. The first
 # draft matched only `get("stop_reason") … == "max_tokens"`. Mutation M4 rewrote the
-# COVERED site in tests/visual_ai_qa.py to `resp.get("stop_reason") in ("max_tokens",)`
+# COVERED site in qa/visual_ai_qa.py to `resp.get("stop_reason") in ("max_tokens",)`
 # — semantically identical, and the draft pattern went blind to it. So the rule now
 # requires the two names on one line with a COMPARISON between them (`==`, `!=`, or
 # membership), which catches the subscript, membership and negated forms alike, and
@@ -357,7 +357,7 @@ _DECIDES_ON_TRUNCATION = re.compile(
 )
 _TRAILING_COMMENT = re.compile(r"\s#.*$")
 _SCAN_DIRS = ("lambdas", "mcp", "scripts", "deploy", "cdk")
-_SCAN_FILES = ("tests/visual_ai_qa.py", "tests/visual_qa.py", "tests/visual_qa_verdict.py")
+_SCAN_FILES = ("qa/visual_ai_qa.py", "qa/visual_qa.py", "qa/visual_qa_verdict.py")
 
 # Sites that decide on truncation but are NOT judges, with the issue each is
 # folded onto BY NAME. A residual may not be silent — that is the #3652 box-1
@@ -471,7 +471,7 @@ def test_the_judge_call_site_set_is_enumerated_from_source_and_every_member_is_c
     Covered:  operational/reader_truth_qa.py  (the batch prose judge — the live
               specimen; also the code behind the Set's row 3, `qa_smoke_lambda`'s
               check_reader_truth, which owns no judge of its own)
-              tests/visual_ai_qa.py           (the per-page vision judge — row 1)
+              qa/visual_ai_qa.py           (the per-page vision judge — row 1)
     Residual: lambdas/ai/bedrock_client.py    (the truncation meter → #2893, row 2)
     """
     hits = _enumerate_truncation_decision_sites()

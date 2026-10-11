@@ -115,7 +115,7 @@ because the directory is gitignored and exists only on that machine.
 - **Motion wiring.** New sections needing scroll-reveal/chart-draw-in/interactive
   tooltips get the standard wiring (`DESIGN_SYSTEM_V5.md` §7 "Wiring") — the head-guard
   script + `motion.js` `defer` tag — not a bespoke reimplementation.
-- **New page?** Add a `tests/qa_manifest.py` entry (path/name/tier/content_class/
+- **New page?** Add a `qa/qa_manifest.py` entry (path/name/tier/content_class/
   api_deps/js_modules/visual/leak_scan/smoke) — it's now THE single registry that
   `visual_qa.py`, `smoke_test_site.sh`, `restart_verify_rendered.py`, and
   `site_review_bindings.py` all derive from or are gated against (#1426); you no longer
@@ -140,7 +140,7 @@ because the directory is gitignored and exists only on that machine.
    masked second failure has shipped before), plus `pytest --collect-only` first if you
    touched any test-adjacent import. `scripts/check_doc_links.py` and
    `scripts/check_doc_tombstones.py` if you touched docs.
-4. Performance budget: if `tests/visual_qa.py` covers the touched page(s), confirm LCP/
+4. Performance budget: if `qa/visual_qa.py` covers the touched page(s), confirm LCP/
    CLS/JS-bytes stay under `DESIGN_SYSTEM_V5.md` §9's budgets — a new art/motion layer
    is the likeliest way to blow the CLS soft-fail.
 

@@ -213,9 +213,9 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "guard::scripts/verify_public_archive.py": "2026-09-05 seal (#3536)",
     "guard::scripts/wrap_gates.py": "2026-09-05 seal (#3536)",
     "guard::tests/a11y_audit.py": "2026-09-05 seal (#3536)",
-    "guard::tests/accuracy_audit.py": "2026-09-05 seal (#3536)",
+    "guard::qa/accuracy_audit.py": "2026-09-05 seal (#3536)",
     "guard::tests/pair_seam_guard_lib.py": "2026-09-05 seal (#3536)",
-    "guard::tests/pr_render_gate.py": "2026-09-05 seal (#3536)",
+    "guard::qa/pr_render_gate.py": "2026-09-05 seal (#3536)",
     "qa::lambdas/operational/qa_check_as_of.py::check_as_of_agreement": "2026-09-05 seal (#3536)",
     "qa::lambdas/operational/qa_check_coach_labs.py::check_coach_labs_truth": "2026-09-05 seal (#3536)",
     "qa::lambdas/operational/qa_check_content_cadence.py::check_content_cadence": "2026-09-05 seal (#3536)",
@@ -335,7 +335,7 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/grounding_wiring.py::GATE_CLASSES::night": "2026-09-05 seal (#3536)",
     "registry::tests/grounding_wiring.py::GATE_CLASSES::numbers": "2026-09-05 seal (#3536)",
     # RELOCATED, not added (#4270): the same STRUCTURAL_CLASSES set, byte-identical, moved from
-    # tests/qa_manifest.py (now a re-export shim) to qa/qa_manifest.py so deploy/ stops importing
+    # qa/qa_manifest.py (now a re-export shim) to qa/qa_manifest.py so deploy/ stops importing
     # the test tree. The seal date is the set's own; the residue's size is unchanged.
     "registry::qa/qa_manifest.py::STRUCTURAL_CLASSES::static": "2026-09-05 seal (#3536)",
     "registry::qa/qa_manifest.py::STRUCTURAL_CLASSES::utility": "2026-09-05 seal (#3536)",
@@ -489,7 +489,7 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/test_wiring_coverage.py::_CAUSAL_ALLOWLIST::likely_connection": "2026-09-05 seal (#3536)",
     "registry::tests/test_wiring_coverage.py::_CAUSAL_ALLOWLIST::non-causal": "2026-09-05 seal (#3536)",
     "registry::tests/test_wiring_coverage.py::_CAUSAL_ALLOWLIST::not proven causal": "2026-09-05 seal (#3536)",
-    "registry::tests/visual_ai_qa.py::_PAGE_RULES::/coaching/": "2026-09-05 seal (#3536)",
+    "registry::qa/visual_ai_qa.py::_PAGE_RULES::/coaching/": "2026-09-05 seal (#3536)",
     "structural::test_alarm_emission_dimension_3260.py": "2026-09-05 seal (#3536)",
     "structural::test_analyzer_gate_all_paths_2421.py": "2026-09-05 seal (#3536)",
     "structural::test_archive_handover.py": "2026-09-05 seal (#3536)",

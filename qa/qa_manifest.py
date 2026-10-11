@@ -3,7 +3,7 @@
 qa_manifest.py — THE page registry every QA sweep derives from (#1426).
 
 One entry per live page under site/ (legacy/ excluded by standing policy).
-The four previously hand-maintained page lists — tests/visual_qa.py PAGES,
+The four previously hand-maintained page lists — qa/visual_qa.py PAGES,
 deploy/smoke_test_site.sh v4-page block, deploy/restart_verify_rendered.py
 PAGES, and the site-review PAGE_BINDINGS keys — now all derive from or are
 gated against this module, killing the "new page = FOUR registries" trap
@@ -23,12 +23,12 @@ Entry fields
   api_deps       /api endpoints (or absolute JSON paths) the page renders from.
                  Under-claiming is safe; over-claiming is not (site-review rule).
   js_modules     main ES module(s) the page loads (informational facet, #1431)
-  visual         Playwright def for tests/visual_qa.py (wait_for/checks/charts/
+  visual         Playwright def for qa/visual_qa.py (wait_for/checks/charts/
                  interact) or None = not yet in the sweep (#1427 extends).
   leak_scan      include in the leak-token grep (default True for every real
                  HTML page; False only for pure redirects) — driven by
                  restart_verify_rendered.py at reset time AND by the daily
-                 tests/visual_qa.py sweep (#1448; both share tests/leak_token_sweep.py)
+                 qa/visual_qa.py sweep (#1448; both share qa/leak_token_sweep.py)
   smoke          expected HTTP status for the status sweep (default "200")
   ai_surface     #1441 (default False): True = the page renders AI-generated
                  narrative a reader sees (coach commentary, board answers,
@@ -52,15 +52,15 @@ they can never drift from the live build — same trick site_review_bindings
 uses for its primary endpoints.
 
 Emitters (for the bash smoke script and ad-hoc use):
-    python3 tests/qa_manifest.py --emit paths       # every page path
-    python3 tests/qa_manifest.py --emit smoke       # "path|name|expected_status"
-    python3 tests/qa_manifest.py --emit leak        # leak-scan page paths
-    python3 tests/qa_manifest.py --emit static_core # pages that must ship a static core
-    python3 tests/qa_manifest.py --emit structural  # "fetch_path|name|marker" (#1429)
-    python3 tests/qa_manifest.py --emit ai-screens  # screenshot slugs of ai_surface pages (#1441)
-    python3 tests/qa_manifest.py --emit api_deps    # distinct union of every declared api_dep (#1586)
-    python3 tests/qa_manifest.py --emit api_sweep   # router-derived long-tail rows 'route|fetch|status' (#2652)
-    python3 tests/qa_manifest.py --check            # internal consistency self-check
+    python3 qa/qa_manifest.py --emit paths       # every page path
+    python3 qa/qa_manifest.py --emit smoke       # "path|name|expected_status"
+    python3 qa/qa_manifest.py --emit leak        # leak-scan page paths
+    python3 qa/qa_manifest.py --emit static_core # pages that must ship a static core
+    python3 qa/qa_manifest.py --emit structural  # "fetch_path|name|marker" (#1429)
+    python3 qa/qa_manifest.py --emit ai-screens  # screenshot slugs of ai_surface pages (#1441)
+    python3 qa/qa_manifest.py --emit api_deps    # distinct union of every declared api_dep (#1586)
+    python3 qa/qa_manifest.py --emit api_sweep   # router-derived long-tail rows 'route|fetch|status' (#2652)
+    python3 qa/qa_manifest.py --check            # internal consistency self-check
 
 No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
 (insert REPO_ROOT/tests on sys.path).
@@ -200,7 +200,7 @@ def _essay_rows():
 
 
 # ── Curated entries — everything that is not an archive readout page ──────────
-# visual defs here are moved VERBATIM from the pre-#1426 tests/visual_qa.py
+# visual defs here are moved VERBATIM from the pre-#1426 qa/visual_qa.py
 # PAGES list (coverage identical; the sweep now reads them from this facet).
 _CURATED = [
     {
@@ -1008,7 +1008,7 @@ PAGES_BY_PATH = {p["path"]: p for p in MANIFEST}
 
 # ── Consumer facets ───────────────────────────────────────────────────────────
 def visual_pages():
-    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage.
+    """qa/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage.
 
     Each entry carries `tier` (from its parent manifest entry, #1428) so the
     sweep can restrict the AI-vision layer to a tier subset (deploy-time =
@@ -1037,7 +1037,7 @@ def visual_pages():
 
 
 def text_floor_paths():
-    """tests/visual_qa.py TEXT_FLOOR_PAGES (#2674/#3543) — every tier-1/2 page.
+    """qa/visual_qa.py TEXT_FLOOR_PAGES (#2674/#3543) — every tier-1/2 page.
 
     The 11px floor was measured on three pages while the doc promised the surface,
     and 19 sub-floor rules accumulated in tokens.css behind that gap: 10 pages were
@@ -1067,7 +1067,7 @@ def ai_screenshot_slugs():
     """#1441 — the visual_qa screenshot slugs of every ai_surface page. The
     standalone visual-qa workflow uploads qa-screenshots/{slug}.png for each to
     generated/qa_archive/screenshots/{date}/ (the screenshot leg of the AI
-    archive). Slug rule mirrors tests/visual_qa.py capture_page exactly."""
+    archive). Slug rule mirrors qa/visual_qa.py capture_page exactly."""
     return [(p["path"].strip("/").replace("/", "-") or "home") for p in MANIFEST if p.get("ai_surface")]
 
 
@@ -1118,7 +1118,7 @@ def api_dep_endpoints():
 # ── #2652 box 3: the live-route sweep facet ──────────────────────────────────
 # Every /api route the router registers that no page declares as an api_dep gets
 # a GENERIC probe: status + JSON shape (scripts/api_sweep_check.py, run by the
-# smoke) and the numeric impossible-value scan (tests/accuracy_audit.py widens
+# smoke) and the numeric impossible-value scan (qa/accuracy_audit.py widens
 # its denominator to these rows). The route LIST derives from
 # deploy/endpoint_registry — the same AST walk sync_doc_metadata publishes the
 # endpoint count from — so a new router route auto-enters the sweep the commit
@@ -1287,7 +1287,7 @@ def coverage_stats():
         k = f"tier{p['tier']}"
         by_tier[k] = by_tier.get(k, 0) + 1
     return {
-        "source": "tests/qa_manifest.py (#1426)",
+        "source": "qa/qa_manifest.py (#1426)",
         "pages_total": len(MANIFEST),
         "pages_by_tier": dict(sorted(by_tier.items())),
         "visual_defs": len(visual_pages()),

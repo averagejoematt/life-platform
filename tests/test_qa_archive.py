@@ -4,8 +4,8 @@ tests/test_qa_archive.py — the generation-time AI-surface archive (#1441).
 Covers:
   - lambdas/qa_archive.py     key/body builders (pure), fail-soft archive_text,
                               surface-registry parity with eval_retention
-  - tests/qa_manifest.py      ai_surface facet + the ai-screens emitter (slug
-                              rule must mirror tests/visual_qa.py capture_page)
+  - qa/qa_manifest.py      ai_surface facet + the ai-screens emitter (slug
+                              rule must mirror qa/visual_qa.py capture_page)
   - deploy/s3_lifecycle.json       the 90-day qa-archive rule is DECLARED (the
                               JSON is the bucket's full-config source of truth —
                               applied verbatim by deploy/apply_s3_lifecycle.sh;
@@ -190,9 +190,9 @@ def test_ai_surface_pages_declared():
 def test_ai_screenshot_slugs_mirror_visual_qa_slug_rule():
     """qa_manifest.ai_screenshot_slugs() must produce the exact slug visual_qa's
     capture_page uses to name the PNG (path.strip('/').replace('/', '-') or
-    'home') — asserted against the literal in tests/visual_qa.py so a slug-rule
+    'home') — asserted against the literal in qa/visual_qa.py so a slug-rule
     change there breaks THIS test, not silently the S3 upload step."""
-    with open(os.path.join(HERE, "visual_qa.py")) as f:
+    with open(os.path.join(os.path.dirname(HERE), "qa", "visual_qa.py")) as f:
         src = f.read()
     assert 'slug = path.strip("/").replace("/", "-") or "home"' in src
     for p in qa_manifest.MANIFEST:

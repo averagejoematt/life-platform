@@ -29,7 +29,7 @@ hypothesis==6.168.5
 # gate's pin (CQ-01, #1963) — read from ci-test.yml, not quoted here.
 pyyaml==6.0.3
 
-# Visual QA — Playwright browser automation (tests/visual_qa.py).
+# Visual QA — Playwright browser automation (qa/visual_qa.py).
 # After install: `playwright install --with-deps chromium`
 # CQ-01 (AUDIT 2026-06-30): pinned to MATCH the CI gate (ci-cd.yml) — CI is the
 # source of truth for the enforced gate versions; a mismatch let local formatting

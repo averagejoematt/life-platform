@@ -20,7 +20,7 @@ known tokens.
    font-size must EITHER drop the literal for the shared floor-scaler
    (`font-size: var(--fs-*)`, floored >=11px effective per-svg by svgtype.js) OR keep
    a literal that documents why its minimum rendered scale stays >=11px effective;
-   tests/visual_qa.py's getScreenCTM sweep is the arbiter.
+   qa/visual_qa.py's getScreenCTM sweep is the arbiter.
 
 2. UNDEFINED TOKENS — every `var(--x)` reference must resolve: defined in
    tokens.css, defined in the sheet itself, or set at runtime (JS setProperty /
@@ -248,7 +248,7 @@ def raw_hex_findings(text: str) -> list:
 # EITHER drop the literal for the shared floor-scaler (`font-size: var(--fs-*)`, set
 # per-svg to >=11px effective by site/assets/js/svgtype.js — no literal, so it never
 # reaches this check) OR keep a literal that DOCUMENTS why its minimum rendered scale
-# stays >=11px effective. tests/visual_qa.py's getScreenCTM sweep is the arbiter that
+# stays >=11px effective. qa/visual_qa.py's getScreenCTM sweep is the arbiter that
 # the floor actually holds; this static gate just closes the hand-wave loophole.
 _FLOOR_JUSTIFY = ("floor", "effective", "11px")
 

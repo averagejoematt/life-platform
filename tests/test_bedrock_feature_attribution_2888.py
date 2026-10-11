@@ -22,7 +22,7 @@ Three properties, each of which has a way to be wrong:
      metric is ~$0.30/metric/month against six metric names on this dimension, so
      an unbounded label would add recurring cost to a cost-reduction change.
   3. The two AI CI gates run in ONE process and are labelled SEPARATELY —
-     the whole point, since `sys.argv[0]` is `tests/visual_qa.py` for both.
+     the whole point, since `sys.argv[0]` is `qa/visual_qa.py` for both.
 """
 
 import os
@@ -102,7 +102,7 @@ def test_allowlisted_label_names_the_spend():
 
 
 def test_the_two_ci_gates_are_labelled_separately():
-    """Both run inside one `tests/visual_qa.py` process; argv cannot split them."""
+    """Both run inside one `qa/visual_qa.py` process; argv cannot split them."""
     seen = []
     for label in ("visual-ai-qa", "reader-truth-qa"):
         with bedrock_client.attributed_to(label):
@@ -168,7 +168,7 @@ def test_ci_gate_call_sites_are_actually_wired():
     A resolver that works and is never called is the failure mode this whole
     issue is about, so assert the two gates' call sites reference it.
     """
-    harness = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visual_ai_qa.py")
+    harness = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "qa", "visual_ai_qa.py")
     with open(harness, encoding="utf-8") as fh:
         src = fh.read()
     assert '_attributed(bedrock, "visual-ai-qa")' in src, "the vision judge no longer labels its spend"
@@ -183,7 +183,7 @@ def test_allowlist_matches_the_wired_labels():
 
 def test_comprehension_judge_call_site_is_actually_wired():
     """#4182 M4 — the same instrument-must-be-attached class as the two CI gates above."""
-    harness = os.path.join(os.path.dirname(os.path.abspath(__file__)), "comprehension_qa.py")
+    harness = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "qa", "comprehension_qa.py")
     with open(harness, encoding="utf-8") as fh:
         src = fh.read()
     assert (

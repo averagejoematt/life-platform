@@ -4,7 +4,7 @@ v4_build_sitemap.py — regenerate sitemap.xml for the v4 indexable surface.
 
 #3567: this used to enumerate `site/**/*.html` directly and filter with a
 hand-maintained SKIP_TOP set — a SECOND, drifting vocabulary of "what's a
-page" alongside `tests/qa_manifest.py` (the charter's ONE page registry,
+page" alongside `qa/qa_manifest.py` (the charter's ONE page registry,
 #1426). Two concrete defects fell out of that duplication: `body.html` (the
 essay permalink's verbatim prose FRAGMENT, `v4_build_journal.py`'s authoring
 include — never a page in its own right) qualified as a real URL, and because
@@ -13,7 +13,7 @@ extensionless URL CloudFront 301s straight to a 404; and `/subscribe.html`
 (the legacy meta-refresh stub) had no noindex, so both it and its target
 `/subscribe/` shipped as separate sitemap entries.
 
-Now: candidate URLs are exactly the paths in `tests/qa_manifest.MANIFEST` —
+Now: candidate URLs are exactly the paths in `qa/qa_manifest.MANIFEST` —
 the registry every other QA surface already derives from — resolved to their
 real file under site/, then filtered by the SAME live noindex check as
 before (a page is indexable unless its own HTML asserts
@@ -54,9 +54,9 @@ _NOSCRIPT_END = "<!-- noscript-posts:end -->"
 
 
 def _page_registry():
-    """tests/qa_manifest.MANIFEST — the ONE page registry (#1426/#3567)."""
-    sys.path.insert(0, str(REPO_ROOT / "tests"))
-    import qa_manifest  # noqa: E402 — local import, path just inserted
+    """qa/qa_manifest.MANIFEST — the ONE page registry (#1426/#3567)."""
+    sys.path.insert(0, str(REPO_ROOT))
+    from qa import qa_manifest  # noqa: E402 — local import, path just inserted
 
     return qa_manifest.MANIFEST
 
@@ -159,7 +159,7 @@ def main() -> int:
     (SITE / "sitemap.xml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(
         f"wrote site/sitemap.xml — {len(urls)} registry URL(s) + {len(post_urls)} post URL(s) "
-        f"(derived from tests/qa_manifest.MANIFEST, #3567; noindex pages excluded live)."
+        f"(derived from qa/qa_manifest.MANIFEST, #3567; noindex pages excluded live)."
     )
 
     _update_chronicle_noscript(posts)

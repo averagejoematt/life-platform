@@ -28,7 +28,7 @@ import comprehension_qa as cq  # noqa: E402
 from ai import budget_guard  # noqa: E402 — the REAL module; tests monkeypatch its functions directly
 
 
-# ── the six doors' declared intent (tests/qa_manifest.py) ────────────────────────
+# ── the six doors' declared intent (qa/qa_manifest.py) ────────────────────────
 def test_every_door_has_an_intent_at_or_under_thirty_words():
     for path in cq.DOORS:
         intent = cq._door_intent(path)
@@ -258,7 +258,7 @@ def test_low_scores_and_unevaluated_doors_each_emit_a_warning(tmp_path, monkeypa
 
 # ── main()'s "fails only when the artifact is missing" contract ──────────────────
 # This is also the CI-step census proof (docs/CONVENTIONS.md §9): the workflow step
-# is `python3 tests/comprehension_qa.py`, whose exit code IS main()'s return value.
+# is `python3 qa/comprehension_qa.py`, whose exit code IS main()'s return value.
 def test_main_returns_zero_when_the_artifact_was_written(tmp_path, monkeypatch):
     artifact = tmp_path / "comprehension.json"
     artifact.write_text("{}")

@@ -3,7 +3,7 @@
 a11y_audit.py — axe-core accessibility audit for the Playwright sweep (#1433).
 
 Runs the vendored axe-core bundle (tests/vendor/axe.min.js, pinned — see its
-header for version/provenance/license) against each page tests/visual_qa.py
+header for version/provenance/license) against each page qa/visual_qa.py
 drives, and gates on NEW serious/critical violations versus a committed
 baseline (tests/a11y_baseline.json):
 
@@ -57,7 +57,7 @@ mobile ledgers, and every pre-#3277 call site — which never passes `viewport` 
 reads/writes the desktop ledgers byte-for-byte as before.
 
 Baseline update path (DELIBERATE, REVIEWED — never auto-regenerated):
-    python3 tests/visual_qa.py --update-baseline
+    python3 qa/visual_qa.py --update-baseline
 rewrites tests/a11y_baseline.json from what the sweep just observed, for the
 pages it swept (a --page/--max-tier run touches only those pages' entries;
 the rest of the baseline is preserved). The run still reports NEW violations
@@ -95,7 +95,7 @@ GATING_IMPACTS = ("critical", "serious")
 UNTRIAGED = "UNTRIAGED"
 
 # The viewport the mobile pass runs at — the SAME 390×844 every existing mobile
-# check in tests/visual_qa.py (overflow, stuck reveals, app-bar, tap targets) and
+# check in qa/visual_qa.py (overflow, stuck reveals, app-bar, tap targets) and
 # the weekly WebKit context already use. Reused, not invented (#3277).
 MOBILE_VIEWPORT = {"width": 390, "height": 844}
 
@@ -105,19 +105,19 @@ _LEDGER_NOTES = {
     "pages": (
         "Committed a11y debt ledger (#1433) — honest capture of current axe violations per page. "
         "The visual-qa gate reds only on NEW serious/critical violations vs this file. "
-        "Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; "
+        "Update DELIBERATELY via `python3 qa/visual_qa.py --update-baseline` and review the diff in the PR; "
         "added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate."
     ),
     "pages_light": (
         "Light-theme sibling ledger (#1991) — same honest-capture contract as 'pages'/note above, scoped to "
         "axe findings observed under a Playwright color_scheme='light' context. Update DELIBERATELY via "
-        "`python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep "
+        "`python3 qa/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep "
         "alternates dark/light by ISO-week parity so both ledgers stay current without a dedicated job."
     ),
     "pages_mobile": (
         "Mobile-viewport sibling ledger (#3277) — same honest-capture contract as 'pages'/note above, scoped to "
         "axe findings observed at 390x844 after the mobile scroll/reveal pass (dark theme). Written by the SAME "
-        "`python3 tests/visual_qa.py --update-baseline` run that writes 'pages' (one sweep captures both viewports); "
+        "`python3 qa/visual_qa.py --update-baseline` run that writes 'pages' (one sweep captures both viewports); "
         "seeded 2026-08-31 from all 92 sweep paths against live production. Two things it states out loud: (1) "
         "`scrollable-region-focusable` is deliberately ABSENT — #3277 drove it from 15 pages / 33 nodes to zero "
         "(the motion.js scroll-region focus primitive), so a reappearance is a NEW serious violation and reds the "
@@ -128,7 +128,7 @@ _LEDGER_NOTES = {
     ),
     "pages_light_mobile": (
         "Light-theme mobile-viewport ledger (#3277) — the light sibling of 'pages_mobile', captured at 390x844 under "
-        "color_scheme='light'. Written by `python3 tests/visual_qa.py --color-scheme light --update-baseline`; the "
+        "color_scheme='light'. Written by `python3 qa/visual_qa.py --color-scheme light --update-baseline`; the "
         "weekly standalone alternates dark/light by ISO-week parity, so this is the ledger the light run gates "
         "against. Same two statements as 'pages_mobile': no `scrollable-region-focusable` anywhere, and its serious "
         "rows (19 pages of color-contrast + svg-img-alt) are the SAME set 'pages_light' already accepts on desktop — "
@@ -370,16 +370,16 @@ SHRINK_MAX_AGE_DAYS = 7
 PHASE_THIN_DAYS = 7
 
 SHRINK_LEDGER_NOTE = (
-    "a11y shrink dead-man (#3546) — one row per (page, rule) that tests/visual_qa.py observed as "
+    "a11y shrink dead-man (#3546) — one row per (page, rule) that qa/visual_qa.py observed as "
     "baselined-but-no-longer-live, with the date it was FIRST seen that way. Written by the sweep, "
     "read by tests/test_a11y_shrink_deadman_3546.py, which reds once any row is older than "
     "SHRINK_MAX_AGE_DAYS. A row leaves this file exactly one way: the ledger entry it names is "
-    "harvested via `python3 tests/visual_qa.py --update-baseline` (or the violation comes back). "
+    "harvested via `python3 qa/visual_qa.py --update-baseline` (or the violation comes back). "
     "Rows flagged phase_dependent are excluded from both the candidate list and the harvest while "
     "the cycle's day_n < PHASE_THIN_DAYS. Generated — do not hand-edit."
 )
 
-# The suffix tests/visual_qa.py appends to a page path for the 390px ledger.
+# The suffix qa/visual_qa.py appends to a page path for the 390px ledger.
 _MOBILE_KEY_SUFFIX = " @" + str(MOBILE_VIEWPORT["width"]) + "px"
 
 
@@ -561,7 +561,7 @@ def shrink_candidates(gate_results_by_path, day_n=None):
 
     `gate_findings` computes "fixed" on EVERY run, not just --update-baseline
     ones, but before #1990 that signal only ever surfaced folded into each
-    page's free-text `warnings` list in tests/visual_qa.py, where it scrolled
+    page's free-text `warnings` list in qa/visual_qa.py, where it scrolled
     by untriaged — the root cause the debt ledger went stale in the good
     direction (real gating quietly off on pages that were actually clean)
     with nobody the wiser. This gives it an explicit consumer: callers render
@@ -570,7 +570,7 @@ def shrink_candidates(gate_results_by_path, day_n=None):
 
     gate_results_by_path: {page_path: gate_findings() result dict}, e.g.
     {r["path"]: r["a11y"] for r in results if r.get("a11y")} from a
-    tests/visual_qa.py sweep. Pure — no I/O.
+    qa/visual_qa.py sweep. Pure — no I/O.
 
     `day_n` (#3546, default None = pre-#3546 behaviour exactly): the running
     cycle's 1-indexed day. Supplied, it drops candidates on phase-dependent
