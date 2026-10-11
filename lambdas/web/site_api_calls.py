@@ -52,8 +52,11 @@ THE READ
 The same concurrent, projected fetch ``/api/predictions`` makes (one Query per coach
 partition, through the facade's ``_parallel_fetch``), with the two docket prefixes riding
 in the same pool. No new index, no write, no Lambda. Measured 2026-10-04: the uncached
-``/api/predictions`` — the same eight partition reads — answers in about one second; this
-route is deliberately NOT an upstream of ``/api/edition`` (#4607).
+``/api/predictions`` — the same eight partition reads — answers in about one second, so this
+route is NOT read whole by ``/api/edition`` (#4607). The edition's ``calls`` block (#4582 box
+1, the front page's one request) comes from the SAME read: ``read(_g)`` + ``document()`` are
+this route's own fetch and composition, and ``site_api_coach_ledger.edition_record`` runs them
+once, deriving the coaches' record from the same partition rows — one sweep feeds both.
 
 Honest numbers (ADR-104): counts only — no percentage is served here at any n; absence is
 a sentence, never a zero; a call the simple guess has not been scored on says exactly that.
@@ -594,35 +597,47 @@ def _absent(_g) -> dict:
         return {}
 
 
-def handle_calls(event, *, _g):
-    """GET /api/calls — every settled, checkable call; ``?id=`` for one (see module docstring)."""
-    qs = (event or {}).get("queryStringParameters") or {}
-    wanted = str(qs.get("id") or "").strip()
-    if wanted and not ID_RE.fullmatch(wanted):
-        return _error(404, ABSENT_ID, state="absent", absent_text=ABSENT_ID)
+def read(_g) -> tuple:
+    """The route's one read -> ``(names, fetched, failures)``: every coach's PREDICTION#
+    partition (the predictions route's projection) and the two docket prefixes, in one pool.
+    ``fetched`` maps a short coach id to its raw rows (Decimals as stored), and the two
+    ``docket:*`` keys to theirs; ``failures`` names every job that raised."""
     names = {cid: plain_name(name) for cid, name in _g["_CALIB_COACH_NAMES"].items()}
     fetch, docket_rows = _g["_fetch_prediction_partition"], _g["_docket_rows"]
     jobs: dict = {cid: (lambda pk=f"COACH#{cid}_coach": fetch(pk)) for cid in names}
     jobs["docket:resolved"] = lambda: docket_rows("RESOLVED#", _g["DOCKET_RESOLVED_LIMIT"], newest_first=True)
     jobs["docket:open"] = lambda: docket_rows("OPEN#", _g["DOCKET_OPEN_LIMIT"], newest_first=False)
     failures: list = []
+    fetched = _g["_parallel_fetch"](jobs, failures=failures)
+    return names, fetched, failures
+
+
+def document(names: dict, fetched: dict, failures: list, _g) -> dict:
+    """The whole document from ``read``'s result. Raises when any coach partition failed: a
+    missing partition would silently drop that coach's calls and unsettle the "newest settled
+    call", so the caller prints a sentence instead of a partial list."""
+    if any(cid in failures for cid in names):
+        raise RuntimeError(f"coach partition reads failed: {sorted(f for f in failures if f in names)}")
+    dockets = {k: [_decimal_to_float(d) for d in fetched.get(k, []) if singleton_visible(d)] for k in ("docket:resolved", "docket:open")}
+    rows_by_coach = {cid: [_decimal_to_float(r) for r in fetched.get(cid, [])] for cid in names}
+    today = _g["datetime"].now(PT).strftime("%Y-%m-%d")  # the facade's clock hand-off
+    # #4702: the interval form — the open gap (now) AND every closed one (history).
+    dark = claim_sourcing.gap_instruments(_absent(_g), instrument_presence.gap_history(_g["table"]))
+    doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"], dark)
+    if "docket:resolved" in failures or "docket:open" in failures:
+        doc["bets_state"] = "unavailable"
+        logger.error(f"[/api/calls] degraded — docket reads failed: {sorted(f for f in failures if f.startswith('docket'))}")
+    return doc
+
+
+def handle_calls(event, *, _g):
+    """GET /api/calls — every settled, checkable call; ``?id=`` for one (see module docstring)."""
+    qs = (event or {}).get("queryStringParameters") or {}
+    wanted = str(qs.get("id") or "").strip()
+    if wanted and not ID_RE.fullmatch(wanted):
+        return _error(404, ABSENT_ID, state="absent", absent_text=ABSENT_ID)
     try:
-        fetched = _g["_parallel_fetch"](jobs, failures=failures)
-        if any(cid in failures for cid in names):
-            # A missing partition would silently drop that coach's calls and unsettle the
-            # "newest settled call"; the page prints a sentence instead of a partial list.
-            raise RuntimeError(f"coach partition reads failed: {sorted(f for f in failures if f in names)}")
-        dockets = {
-            k: [_decimal_to_float(d) for d in fetched.get(k, []) if singleton_visible(d)] for k in ("docket:resolved", "docket:open")
-        }
-        rows_by_coach = {cid: [_decimal_to_float(r) for r in fetched.get(cid, [])] for cid in names}
-        today = _g["datetime"].now(PT).strftime("%Y-%m-%d")  # the facade's clock hand-off
-        # #4702: the interval form — the open gap (now) AND every closed one (history).
-        dark = claim_sourcing.gap_instruments(_absent(_g), instrument_presence.gap_history(_g["table"]))
-        doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"], dark)
-        if "docket:resolved" in failures or "docket:open" in failures:
-            doc["bets_state"] = "unavailable"
-            logger.error(f"[/api/calls] degraded — docket reads failed: {sorted(f for f in failures if f.startswith('docket'))}")
+        doc = document(*read(_g), _g)
     except Exception as exc:  # noqa: BLE001 — the honest degradation is a sentence, logged
         logger.error(f"[/api/calls] {exc}")
         body = {

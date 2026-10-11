@@ -364,9 +364,10 @@ def test_the_edition_record_block_serves_what_it_counts():
     assert sum(c["n"] for c in block["data"]["counted"].values()) == block["data"]["decided"]
 
 
-def test_the_narrow_edition_read_projects_what_the_classes_read():
+def test_the_edition_read_projects_what_the_classes_read():
+    """The edition record is derived from ``/api/calls``' own sweep (#4582), which reads each
+    partition at the predictions projection — every field ``call_class`` reads must be in it."""
     from web import site_api_coach_ledger as ledger
 
     for field in ("pre_registered", "source", "evaluation", "claim_natural"):
-        assert field in ledger._RECORD_PROJECTION_FIELDS
-    assert set(ledger._RECORD_PROJECTION_FIELDS) < set(ledger._PREDICTION_PROJECTION_FIELDS)
+        assert field in ledger._PREDICTION_PROJECTION_FIELDS

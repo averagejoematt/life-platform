@@ -61,8 +61,28 @@ from coach.persona_registry import plain_name as _registry_plain_name
 from common import subscriber_cadence as sc
 from common.pacific_time import day_in_words, pacific_date_of, pacific_day_n, parse_day_key, parse_iso_utc
 
-#: The page order. The front page renders blocks in exactly this sequence.
-ORDER = ("premise", "chapter", "next", "today", "week", "life", "coach_lines", "scorecard", "record", "his_words", "catch_up", "follow")
+#: The block order. The last four (#4582 box 1, the front page makes one data request) are
+#: what the front page and the week page read from their own routes until then: the last
+#: seven days of coach lines, the settled calls, the character sheet's level and the lead
+#: coach's weekly read.
+ORDER = (
+    "premise",
+    "chapter",
+    "next",
+    "today",
+    "week",
+    "life",
+    "coach_lines",
+    "scorecard",
+    "record",
+    "his_words",
+    "catch_up",
+    "follow",
+    "moves",
+    "calls",
+    "sheet",
+    "lead_read",
+)
 
 #: Upstream key -> the route (or public file) it is read from. The key is the ``bodies``
 #: key ``compose()`` reads; the value is what every block's ``source`` names.
@@ -88,6 +108,11 @@ SOURCES = {
     # The last seven days (#4586): one value per day per measure.
     "pulse": "/api/pulse_history",
     "training": "/api/training_overview",
+    # #4582 box 1: the reads the front page and the week page still made beside the edition.
+    "moves": "/api/coach_moves",  # one body per day of the last seven (read_moves)
+    "calls": "/api/calls",  # read in the record's own partition sweep (NARROW_JOBS["record"])
+    "character": "/api/character",
+    "priority": "/api/weekly_priority",
 }
 
 #: The two public manifests are S3 objects under generated/ (CloudFront strips the prefix).
@@ -907,6 +932,7 @@ def compose(
     """
     # The scorecard's rules live in their own module (#4595), which reads this one's helpers:
     # imported here, once this module is whole, so neither import is circular.
+    from web.edition_page_reads import calls_block, lead_read_block, moves_block, sheet_block
     from web.edition_scorecard import scorecard as _scorecard
 
     b = {k: bodies.get(k) for k in SOURCES}
@@ -926,6 +952,10 @@ def compose(
         "his_words": his_words,
         "catch_up": _catch_up(b["journal"], today),
         "follow": _follow(b["cadence"], now, today),
+        "moves": moves_block(b["moves"], today),
+        "calls": calls_block(b["calls"], today),
+        "sheet": sheet_block(b["character"], today),
+        "lead_read": lead_read_block(b["priority"], today),
     }
     return {"as_of": today, "day_n": day_n, "order": list(ORDER), "blocks": {k: blocks[k] for k in ORDER}}
 
@@ -1007,6 +1037,17 @@ SOURCE_COST_MS = {
     "experiments": 109,
     "pulse": 63,
     "training": 40,  # est. r2 — projected Strava + Apple Health windows
+    # #4582 box 1 (2026-10-11): the route's own in-Lambda p50, warm, status 200, the four days
+    # to 2026-10-11 (the query above): /api/coach_moves 6.1 ms (n=107) x seven days;
+    # /api/character 46.5 ms (n=89); /api/weekly_priority 4.0 ms (n=65). /api/calls is 1,181 ms
+    # (n=58) — the whole eight-partition sweep plus its two docket prefixes and the instrument
+    # history — and the edition now runs exactly that sweep ONCE for the record and the calls
+    # together (NARROW_JOBS["record"]), so the calls cost what the sweep costs beyond the
+    # record's 340: 1,181 - 340 = 841 (est. until the deployed ``upstream_ms`` line re-pins it).
+    "moves": 42,
+    "calls": 841,
+    "character": 47,
+    "priority": 4,
 }
 
 #: The reviewed ceiling on the SUM of ``SOURCE_COST_MS``. The reads overlap, but the Lambda
@@ -1019,14 +1060,26 @@ SOURCE_COST_MS = {
 #: narrowed nutrition and training and trimmed the dashboard: 1,435 ms, under the target as
 #: a sum of standalone costs. Session (441 ms) is the largest entry still read whole. The
 #: ceiling only comes down.
-SOURCE_COST_CEILING_MS = 1435
+#:
+#: #4582 box 1 (2026-10-11) RAISES it, 1,435 -> 2,369 ms, and says why: the front page made
+#: ten more requests after the edition (/api/calls at 1,181 ms in the Lambda, /api/character
+#: and seven days of /api/coach_moves), so a cold reader waited for the edition AND then for
+#: the slowest of those. Folding them in moves that wait into the one request rather than
+#: adding to it — the reader's path loses a 1.2 s round trip and the Lambda runs one partition
+#: sweep where the two requests ran two. The route's own measured p50 before this change was
+#: 1,537 ms (n=118, the same four days): over the target already. The ceiling is the honest
+#: sum, not a target; the next narrowing is the calls sweep's projection.
+SOURCE_COST_CEILING_MS = 2369
 
 
 #: #4607 — narrow readers: one read that serves several ``SOURCES`` keys, each as the subset
 #: of that route's body the edition reads, in the route's own shape. ``handle_edition`` hands
 #: them in; ``read_bodies`` without them reads every key through its route, as before.
 NARROW_JOBS = {
-    "record": ("predictions", "calibration"),
+    # #4582 box 1: the calls ride the record's sweep — one read of the eight partitions.
+    "record": ("predictions", "calibration", "calls"),
+    # #4582 box 1: the seven days of coach lines, one in-process read per day (read_moves).
+    "moves": ("moves",),
     # #4607 round 2 (measured after #4669 deployed: nutrition 1,021 ms and training 725 ms at
     # the in-Lambda p50, the two slowest upstreams but one): each read as the one projected
     # window its edition fields come from. A job named for its own key keeps the
@@ -1145,11 +1198,13 @@ def handle_edition(read_route: Callable[[str, dict], Any]) -> dict:
     from common.pacific_time import pacific_today
 
     from web import site_api_coach, site_api_observatory
+    from web.edition_page_reads import read_moves
     from web.prediction_reason import metric_words
     from web.site_api_common import EXPERIMENT_START, _error, _ok, logger
 
     try:
         now = datetime.now(timezone.utc)
+        today = pacific_today()
         doc = compose(
             read_bodies(
                 read_route,
@@ -1157,9 +1212,10 @@ def handle_edition(read_route: Callable[[str, dict], Any]) -> dict:
                     "record": site_api_coach.edition_record,
                     "nutrition": site_api_observatory.edition_nutrition,
                     "training": site_api_observatory.edition_training,
+                    "moves": lambda: {"moves": read_moves(read_route, today)},
                 },
             ),
-            today=pacific_today(),
+            today=today,
             now=now,
             start_date=EXPERIMENT_START,
             persona_of=persona_registry.resolve,

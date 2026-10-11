@@ -15,7 +15,11 @@
    "record",
    "his_words",
    "catch_up",
-   "follow"
+   "follow",
+   "moves",
+   "calls",
+   "sheet",
+   "lead_read"
   ],
   "blocks": {
    "premise": {
@@ -853,6 +857,773 @@
      "next_chapter_date": "2026-10-07",
      "next_chapter_state": "ok"
     }
+   },
+   "moves": {
+    "state": "absent",
+    "as_of": null,
+    "source": "/api/coach_moves",
+    "absent_text": "No coach line is recorded in these seven days.",
+    "data": null
+   },
+   "calls": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/calls",
+    "absent_text": "No call has been checked against the data yet.",
+    "data": {
+     "calls": [
+      {
+       "id": "explorer-20260919-aecd9fef2c",
+       "kind": "number",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 83.7 for September 20. A call like this counts as right within 22.5 either way, his usual day-to-day swing.",
+       "called_short": "Henning Brandt called his morning recovery score at about 83.7.",
+       "happened_short": "It came in at 97.",
+       "settled_date": "2026-10-03",
+       "verdict": "right",
+       "verdict_text": "Henning Brandt was right.",
+       "actual": {
+        "value": 97.0,
+        "text": "97"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260925-6c64d91f26",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.8 hours for September 26. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.8 hours.",
+       "happened_short": "It came in at 8.6 hours.",
+       "settled_date": "2026-10-02",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 8.61,
+        "text": "8.6 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260923-90ca568b17",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.4 hours for September 24. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.4 hours.",
+       "happened_short": "It came in at 6.7 hours.",
+       "settled_date": "2026-09-30",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 6.69,
+        "text": "6.7 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "bet-20260930-994b3d89f6",
+       "kind": "bet",
+       "coach_id": "nutrition",
+       "coach_name": "Marcus Webb",
+       "called": "Marcus Webb and Amara Patel bet on one question, fixed the day the bet opened: whether his morning recovery score (his wrist strap’s morning score out of 100) would be below 70 on September 30. Marcus Webb said yes; Amara Patel said no.",
+       "called_short": "Marcus Webb and Amara Patel bet on whether his morning recovery score would be below 70 on September 30.",
+       "happened_short": "It came in at 59.",
+       "settled_date": "2026-09-30",
+       "verdict": "right",
+       "verdict_text": "Marcus Webb was right; Amara Patel was wrong.",
+       "actual": {
+        "value": 59.0,
+        "text": "59"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "mind-20260914-7fc4b43947",
+       "kind": "number",
+       "coach_id": "mind",
+       "coach_name": "Nathan Reeves",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 59.3 for September 15. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 59.3.",
+       "happened_short": "It came in at 82.",
+       "settled_date": "2026-09-28",
+       "verdict": "wrong",
+       "verdict_text": "Nathan Reeves was wrong.",
+       "actual": {
+        "value": 82.0,
+        "text": "82"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "glucose-20260914-6d451f1e07",
+       "kind": "number",
+       "coach_id": "glucose",
+       "coach_name": "Amara Patel",
+       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 59 for September 15. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called_short": "Amara Patel called his morning recovery score at about 59.",
+       "happened_short": "It came in at 82.",
+       "settled_date": "2026-09-28",
+       "verdict": "wrong",
+       "verdict_text": "Amara Patel was wrong.",
+       "actual": {
+        "value": 82.0,
+        "text": "82"
+       },
+       "simple_guess": {
+        "state": "scored",
+        "right": true,
+        "text": "The simple guess was that it would stay at 73, the last reading before the call. That guess was right.",
+        "short": "right"
+       }
+      },
+      {
+       "id": "physical-20260913-dabfd973c0",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 57.9 for September 14. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called_short": "Max Reyes called his morning recovery score at about 57.9.",
+       "happened_short": "It came in at 63.",
+       "settled_date": "2026-09-27",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right.",
+       "actual": {
+        "value": 63.0,
+        "text": "63"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "labs-20260906-d2deb9b27d",
+       "kind": "direction",
+       "coach_id": "labs",
+       "coach_name": "James Okafor",
+       "called": "James Okafor called his resting heart rate to go down, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.",
+       "called_short": "James Okafor called his resting heart rate to go down.",
+       "happened_short": "It went down.",
+       "settled_date": "2026-09-27",
+       "verdict": "right",
+       "verdict_text": "James Okafor was right.",
+       "actual": null,
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "explorer-20260906-9bd38c7af0",
+       "kind": "direction",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his daily steps to go up, in a prediction sealed before day one. It was checked on September 27 against the trend in his most recent readings.",
+       "called_short": "Henning Brandt called his daily steps to go up.",
+       "happened_short": "It went down.",
+       "settled_date": "2026-09-27",
+       "verdict": "wrong",
+       "verdict_text": "Henning Brandt was wrong.",
+       "actual": null,
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260912-80ba7a5cb1",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 13. A call like this counts as right within 18.3 either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his morning recovery score at about 52.9.",
+       "happened_short": "It came in at 73.",
+       "settled_date": "2026-09-26",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 73.0,
+        "text": "73"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260911-7db5ae079d",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his morning recovery score at about 52.9.",
+       "happened_short": "It came in at 59.",
+       "settled_date": "2026-09-25",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 59.0,
+        "text": "59"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "mind-20260911-7f4b0e1879",
+       "kind": "number",
+       "coach_id": "mind",
+       "coach_name": "Nathan Reeves",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 52.9.",
+       "happened_short": "It came in at 59.",
+       "settled_date": "2026-09-25",
+       "verdict": "right",
+       "verdict_text": "Nathan Reeves was right.",
+       "actual": {
+        "value": 59.0,
+        "text": "59"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "glucose-20260911-6ab6874e32",
+       "kind": "number",
+       "coach_id": "glucose",
+       "coach_name": "Amara Patel",
+       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called_short": "Amara Patel called his morning recovery score at about 52.9.",
+       "happened_short": "It came in at 59.",
+       "settled_date": "2026-09-25",
+       "verdict": "right",
+       "verdict_text": "Amara Patel was right.",
+       "actual": {
+        "value": 59.0,
+        "text": "59"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260917-a194cad85a",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.3 hours for September 18. A call like this counts as right within 1.3 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.3 hours.",
+       "happened_short": "It came in at 7.9 hours.",
+       "settled_date": "2026-09-24",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 7.91,
+        "text": "7.9 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260910-09aa1ff6cc",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 66.2 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his morning recovery score at about 66.2.",
+       "happened_short": "It came in at 24.",
+       "settled_date": "2026-09-24",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 24.0,
+        "text": "24"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "physical-20260910-eb03181022",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 59.5 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called_short": "Max Reyes called his morning recovery score at about 59.5.",
+       "happened_short": "It came in at 24.",
+       "settled_date": "2026-09-24",
+       "verdict": "wrong",
+       "verdict_text": "Max Reyes was wrong.",
+       "actual": {
+        "value": 24.0,
+        "text": "24"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "mind-20260910-89b649fbd5",
+       "kind": "number",
+       "coach_id": "mind",
+       "coach_name": "Nathan Reeves",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 59.5 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 59.5.",
+       "happened_short": "It came in at 24.",
+       "settled_date": "2026-09-24",
+       "verdict": "wrong",
+       "verdict_text": "Nathan Reeves was wrong.",
+       "actual": {
+        "value": 24.0,
+        "text": "24"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260909-ed1ad9588c",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 66.2 for September 10. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his morning recovery score at about 66.2.",
+       "happened_short": "It came in at 44.",
+       "settled_date": "2026-09-23",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 44.0,
+        "text": "44"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "glucose-20260909-75eb1ad7bf",
+       "kind": "number",
+       "coach_id": "glucose",
+       "coach_name": "Amara Patel",
+       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 66.2 for September 10. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called_short": "Amara Patel called his morning recovery score at about 66.2.",
+       "happened_short": "It came in at 44.",
+       "settled_date": "2026-09-23",
+       "verdict": "wrong",
+       "verdict_text": "Amara Patel was wrong.",
+       "actual": {
+        "value": 44.0,
+        "text": "44"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260908-4ea6ae44f3",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his morning recovery score at about 61.",
+       "happened_short": "It came in at 64.",
+       "settled_date": "2026-09-22",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 64.0,
+        "text": "64"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "physical-20260908-4fb6f94b5c",
+       "kind": "number",
+       "coach_id": "physical",
+       "coach_name": "Max Reyes",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+       "called_short": "Max Reyes called his morning recovery score at about 61.",
+       "happened_short": "It came in at 64.",
+       "settled_date": "2026-09-22",
+       "verdict": "right",
+       "verdict_text": "Max Reyes was right.",
+       "actual": {
+        "value": 64.0,
+        "text": "64"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "explorer-20260908-2d69f1be32",
+       "kind": "number",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+       "called_short": "Henning Brandt called his morning recovery score at about 61.",
+       "happened_short": "It came in at 64.",
+       "settled_date": "2026-09-22",
+       "verdict": "right",
+       "verdict_text": "Henning Brandt was right.",
+       "actual": {
+        "value": 64.0,
+        "text": "64"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260907-8436f03290",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 8. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his morning recovery score at about 61.",
+       "happened_short": "It came in at 67.",
+       "settled_date": "2026-09-21",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 67.0,
+        "text": "67"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260906-387666ee11",
+       "kind": "direction",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called_short": "Lisa Park called the 7-day average of his heart-rate variability to go up.",
+       "happened_short": "It went up.",
+       "settled_date": "2026-09-20",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": null,
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "mind-20260906-624cc93c4e",
+       "kind": "direction",
+       "coach_id": "mind",
+       "coach_name": "Nathan Reeves",
+       "called": "Nathan Reeves called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called_short": "Nathan Reeves called the 7-day average of his heart-rate variability to go up.",
+       "happened_short": "It went up.",
+       "settled_date": "2026-09-20",
+       "verdict": "right",
+       "verdict_text": "Nathan Reeves was right.",
+       "actual": null,
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "labs-20260906-0e4f1bd6d5",
+       "kind": "direction",
+       "coach_id": "labs",
+       "coach_name": "James Okafor",
+       "called": "James Okafor called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called_short": "James Okafor called the 7-day average of his heart-rate variability to go up.",
+       "happened_short": "It went up.",
+       "settled_date": "2026-09-20",
+       "verdict": "right",
+       "verdict_text": "James Okafor was right.",
+       "actual": null,
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "explorer-20260906-24683d8506",
+       "kind": "direction",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called the 7-day average of his heart-rate variability (the beat-to-beat variation in his pulse overnight, in milliseconds; higher is generally better) to go up, in a prediction sealed before day one. It was checked on September 20 against the trend in his most recent readings.",
+       "called_short": "Henning Brandt called the 7-day average of his heart-rate variability to go up.",
+       "happened_short": "It went up.",
+       "settled_date": "2026-09-20",
+       "verdict": "right",
+       "verdict_text": "Henning Brandt was right.",
+       "actual": null,
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260912-f8d23a1a70",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.2 hours for September 13. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
+       "happened_short": "It came in at 9 hours.",
+       "settled_date": "2026-09-19",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 8.98,
+        "text": "9 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260911-405624ba88",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.2 hours for September 12. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
+       "happened_short": "It came in at 8.8 hours.",
+       "settled_date": "2026-09-18",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 8.76,
+        "text": "8.8 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260910-20dd74ef58",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.1 hours for September 11. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
+       "happened_short": "It came in at 4.7 hours.",
+       "settled_date": "2026-09-17",
+       "verdict": "wrong",
+       "verdict_text": "Lisa Park was wrong.",
+       "actual": {
+        "value": 4.7,
+        "text": "4.7 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260909-38211bd881",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7 hours for September 10. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7 hours.",
+       "happened_short": "It came in at 7.5 hours.",
+       "settled_date": "2026-09-16",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 7.46,
+        "text": "7.5 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "sleep-20260908-803225a748",
+       "kind": "number",
+       "coach_id": "sleep",
+       "coach_name": "Lisa Park",
+       "called": "Lisa Park called his sleep time at about 7.1 hours for September 9. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
+       "happened_short": "It came in at 6.5 hours.",
+       "settled_date": "2026-09-15",
+       "verdict": "right",
+       "verdict_text": "Lisa Park was right.",
+       "actual": {
+        "value": 6.48,
+        "text": "6.5 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "explorer-20260908-8526eaea28",
+       "kind": "number",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his sleep time at about 7.1 hours for September 9. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Henning Brandt called his sleep time at about 7.1 hours.",
+       "happened_short": "It came in at 6.5 hours.",
+       "settled_date": "2026-09-15",
+       "verdict": "right",
+       "verdict_text": "Henning Brandt was right.",
+       "actual": {
+        "value": 6.48,
+        "text": "6.5 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      },
+      {
+       "id": "explorer-20260906-59ae9cdbee",
+       "kind": "number",
+       "coach_id": "explorer",
+       "coach_name": "Henning Brandt",
+       "called": "Henning Brandt called his sleep time at about 7 hours for September 7. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called_short": "Henning Brandt called his sleep time at about 7 hours.",
+       "happened_short": "It came in at 8.4 hours.",
+       "settled_date": "2026-09-13",
+       "verdict": "wrong",
+       "verdict_text": "Henning Brandt was wrong.",
+       "actual": {
+        "value": 8.37,
+        "text": "8.4 hours"
+       },
+       "simple_guess": {
+        "state": "not_yet_scored",
+        "right": null,
+        "text": "The simple guess, that nothing changes, has not been checked against this call yet.",
+        "short": "not checked on this call yet"
+       }
+      }
+     ]
+    }
+   },
+   "sheet": {
+    "state": "ok",
+    "as_of": "2026-10-03",
+    "source": "/api/character",
+    "absent_text": "The character sheet has no level yet.",
+    "data": {
+     "character": {
+      "level": 10.0,
+      "composite_pillar_count": 6,
+      "composite_pillar_total": 7
+     }
+    }
+   },
+   "lead_read": {
+    "state": "absent",
+    "as_of": null,
+    "source": "/api/weekly_priority",
+    "absent_text": "No weekly read from the lead coach yet.",
+    "data": null
    }
   }
  },
@@ -993,6 +1764,34 @@
       "next_chapter_date": null,
       "next_chapter_state": "unavailable"
      }
+    },
+    "moves": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/coach_moves",
+     "absent_text": "The last seven days of coach lines is not served right now.",
+     "data": null
+    },
+    "calls": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/calls",
+     "absent_text": "The list of settled calls is not served right now.",
+     "data": null
+    },
+    "sheet": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/character",
+     "absent_text": "The character sheet is not served right now.",
+     "data": null
+    },
+    "lead_read": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/weekly_priority",
+     "absent_text": "The lead coach's weekly read is not served right now.",
+     "data": null
     }
    }
   },
@@ -3892,6 +4691,50 @@
       "rules_set": "2026-10-09",
       "rules_set_text": "The rules were set on Friday, October 9."
      }
+    }
+   }
+  },
+  "moves": {
+   "blocks": {
+    "moves": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/coach_moves",
+     "absent_text": "The last seven days of coach lines is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "calls": {
+   "blocks": {
+    "calls": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/calls",
+     "absent_text": "The list of settled calls is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "character": {
+   "blocks": {
+    "sheet": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/character",
+     "absent_text": "The character sheet is not served right now.",
+     "data": null
+    }
+   }
+  },
+  "priority": {
+   "blocks": {
+    "lead_read": {
+     "state": "unavailable",
+     "as_of": null,
+     "source": "/api/weekly_priority",
+     "absent_text": "The lead coach's weekly read is not served right now.",
+     "data": null
     }
    }
   }

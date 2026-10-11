@@ -35,5 +35,8 @@
   "transcript_wk4.json": "/panelcast/wk4.transcript.json",
   "weekly_priority.json": "/api/weekly_priority",
   "workouts.json": "/api/workouts"
+ },
+ "composed": {
+  "edition.json": "blocks moves, calls, sheet and lead_read composed by lambdas/web/site_api_edition.py (#4582) from coach_moves_*.json, calls.json, character.json and weekly_priority.json of this same capture: the route that serves them was not deployed when it was taken. The next run of the script replaces the file whole."
  }
 }
