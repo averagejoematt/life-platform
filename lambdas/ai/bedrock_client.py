@@ -517,8 +517,12 @@ def estimate_cost_usd(usage: dict, model_id: str) -> float:
     ) / 1_000_000.0
 
 
-def _emit_usage_metrics(usage: dict, model_id: str) -> None:
+def _emit_usage_metrics(usage: dict, model_id: str, cost_scale: float = 1.0) -> None:
     """Meter token usage + estimated spend at the inference chokepoint (G1).
+
+    `cost_scale` prices the same tokens at a different rate — a Bedrock batch record
+    (#4777, ADR-132) bills the identical token counts at `bedrock_batch.BATCH_DISCOUNT`
+    off, so it is metered at 0.5x rather than at the on-demand price.
 
     Emits per-LambdaFunction token metrics (per-feature attribution) plus a
     dimensionless AnthropicOutputTokens (feeds the existing platform-total
@@ -534,7 +538,7 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
         cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
         if not (in_tok or out_tok or cache_read or cache_write):
             return
-        cost = estimate_cost_usd(usage, model_id)
+        cost = estimate_cost_usd(usage, model_id) * float(cost_scale)
         fn_dim = [{"Name": "LambdaFunction", "Value": feature_name()}]
         class_dim = [{"Name": CALLER_CLASS_DIMENSION, "Value": caller_class()}]
         md = [
