@@ -521,7 +521,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 5,
         "qa_tier": "optional",  # weigh-ins are sporadic — a missing day is behavior
         # cadence reason (internal, kept out of the published method text): was hourly; ~5% of runs changed a row (#4641)
-        "method": "OAuth API pull, 4x daily + 4 site-stats-refresh invokes",
+        "method": "OAuth API pull, about 8x daily",
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
         "raw_layout": {

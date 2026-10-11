@@ -697,15 +697,23 @@ class MonitoringStack(Stack):
             self,
             "IngestAuthUnhealthy",
             alarm_name="ingest-auth-unhealthy-24h",
-            # #2976 re-cut 86400s → 3600s (→ 10800s in #4641: Dropbox/Withings/Notion emit sparsely, so 1h flaps ALARM/OK per run), superseding #2004's "do not shorten": every
-            # authenticated-successful run now emits 1 (≥1 point/30 min, and a tripped
-            # breaker keeps landing 0s) — fires as fast as before, clears ~1h after
-            # real recovery instead of a 24h latch (2026-08-21→22). See RUNBOOK.md.
-            alarm_description="some source emitted IngestAuthHealthy=0 in the last 3h; clears ~3h after recovery (#2976, #4641: window > the 2h Dropbox emit cadence) — confirm via AUTH_FAILURE markers.",
+            # #2976 re-cut 86400s → 3600s, superseding #2004's "do not shorten"; #4641
+            # widened it to 54000s (15 h) because the sub-daily sources were cut to sparse
+            # crons and each emits 0 only on its own runs: dropbox every 2 h, notion
+            # 14,21,3 UTC (gaps 6/7/11 h), withings 14,17,21,0 UTC (gaps 3/4/3/14 h). The
+            # window must exceed the sparsest gap among them (14 h, withings) or a dead
+            # credential flaps ALARM/OK between runs and re-pages 2-3x a day instead of
+            # holding ALARM (pinned by test_aggregate_alarm_window_exceeds_sparsest_hourly_emitters,
+            # which derives the gap from ingestion_stack.py's cron strings). Consequence,
+            # stated plainly: after real recovery this clears up to ~15 h later (the last
+            # 0 must age out), not the ~1 h of #2976. Eight Sleep (one 4-run burst, 18 h gap)
+            # and the daily-cron sources are NOT held by this window; their
+            # per-source ingest-auth-unhealthy-{source} alarms are the durable truth.
+            alarm_description="some source emitted IngestAuthHealthy=0 in the last 15h; clears up to ~15h after recovery (#2976, #4641: window > the 14h Withings cron gap) — confirm via AUTH_FAILURE markers.",
             metric=cloudwatch.Metric(
                 namespace="LifePlatform/OAuth",
                 metric_name="IngestAuthHealthy",
-                period=Duration.seconds(10800),
+                period=Duration.seconds(54000),
                 statistic="Minimum",
             ),
             evaluation_periods=1,
