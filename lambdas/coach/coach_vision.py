@@ -39,6 +39,15 @@ WHAT IS DELIBERATELY NARROW
     the numbers the model was shown as its only numeric vocabulary and the two set dates
     as its only dates. Fail-CLOSED on the text alone — a flagged observation is withheld,
     the band and the anchors stand (the eyeball-probe precedent, #2430).
+  * LOUD when it cannot observe: `observe` returns `ok` or `paused` and otherwise raises
+    `CoachVisionFailure` — no readable photo in this week's set, an inference call that
+    fails (AccessDenied, a throttle, a model-access change), a reply off the schema or an
+    implausible band. A weekly function with one trigger that swallowed those would stay
+    "invoked" every Monday and dark for months: the absence alarm counts Invocations, and
+    `bedrock_client` publishes usage, not failure. Raising is what puts an Errors
+    datapoint on the function and, after the async retries, the event in the shared
+    ingestion DLQ (`life-platform-ingestion-dlq-messages`, the DLQ consumer's
+    escalation) — the paths that are already watched.
 
 Pure and injectable: no boto3 client is constructed here. The Lambda passes the table,
 the S3 reader and the invoke function in, which is what makes every branch reachable in
@@ -75,6 +84,18 @@ ESTIMATE_LABEL = "visual estimate, not a measurement"
 DATA_CLASS = "visual_estimate"
 
 POSES = ("front", "side", "back")
+
+
+class CoachVisionFailure(RuntimeError):
+    """The run could not observe this week's set — NOT one of the three honest no-ops.
+
+    Raised (never returned) by `observe` for an S3 read that leaves no readable photo in
+    the current set, an inference call that fails, or a reply that cannot become a record.
+    The Lambda lets it propagate so the failure is an Errors datapoint and a DLQ message,
+    not a warning line in a log nobody reads on a Monday.
+    """
+
+
 #: Two sets of three poses. A set with a missing pose sends fewer, never a placeholder.
 MAX_IMAGES = 6
 #: "This week's" set: the newest set captured within this many days of the run. Older
@@ -379,6 +400,16 @@ def _grounded_text(text: Optional[str], shown: dict, set_dates: dict, *, now: Op
 
 
 # ── the observation ───────────────────────────────────────────────────────────
+def _fail(reason: str, *, cause: Optional[BaseException] = None) -> CoachVisionFailure:
+    """Log at ERROR and raise `CoachVisionFailure` — the only exit for a failed observation.
+
+    Declared as returning the exception so a caller inside an `except` can write
+    `raise _fail(...)` and keep the cause chain; every other call site simply raises here.
+    """
+    logger.error("[coach_vision] FAILED — %s", reason)
+    raise CoachVisionFailure(reason) from cause
+
+
 def observe(
     current: dict,
     prior: Optional[dict],
@@ -394,9 +425,12 @@ def observe(
 
     Returns one of:
       {"status": "paused", "reason": ...}   — the budget guard stood it down (nothing billed)
-      {"status": "error", "reason": ...}    — inference/shape failure (nothing fabricated)
       {"status": "ok", "observation": {...}, "sent": {...}, "model": ...}
-    Writes nothing and constructs no client: storage is the caller's separate step.
+    and RAISES `CoachVisionFailure` for everything else — no readable photo in this week's
+    set, an inference failure, an off-schema reply, an implausible band. Nothing is
+    fabricated on any of those paths, and nothing is quietly skipped either: a Monday that
+    cannot observe is a failure the fleet's Errors/DLQ watch has to see (see the module
+    docstring). Writes nothing and constructs no client: storage is the caller's separate step.
     """
     if allow_fn is None:
         try:
@@ -417,23 +451,23 @@ def observe(
     anchors_text = anchors_block(anchors.get("dexa"), anchors.get("tape_trend"))
     content, sent = build_content(current, prior, loader, anchors_text)
     if not sent["current"]:
-        return {"status": "error", "reason": "no readable photo in this week's set"}
+        _fail(f"no readable photo in this week's set ({current['as_of']}): every S3 read failed or no key passed the prefix check")
 
     from ai.structured_json import call_json, decode_error, schema_findings
 
     body = build_body(content, model)
     try:
         parsed = call_json(lambda b: send(b, model_name=model), body, schema=OBSERVATION_SCHEMA, label="coach_vision")
-    except Exception as e:  # noqa: BLE001 — any inference failure degrades to a soft error
-        return {"status": "error", "reason": f"{type(e).__name__}: {e}"}
+    except Exception as e:  # noqa: BLE001 — re-raised as the one typed failure, never swallowed
+        raise _fail(f"inference failed: {type(e).__name__}: {e}", cause=e)
     if not isinstance(parsed, dict):
-        return {"status": "error", "reason": decode_error(parsed)}
+        _fail("reply was not a JSON object: " + decode_error(parsed))
     problems = schema_findings(parsed, OBSERVATION_SCHEMA)
     if problems:
-        return {"status": "error", "reason": "observation off-schema: " + "; ".join(problems[:3])}
+        _fail("observation off-schema: " + "; ".join(problems[:3]))
     low, high = _num(parsed.get("body_fat_low_pct")), _num(parsed.get("body_fat_high_pct"))
     if low is None or high is None or not (0 < low <= high < 70):
-        return {"status": "error", "reason": f"implausible band {low}-{high}"}
+        _fail(f"implausible band {low}-{high}")
 
     set_dates = {"current": current["as_of"], "prior": prior["as_of"] if prior else None}
     # The set dates ride in `shown` as well as in the date allow-list: the number gate reads

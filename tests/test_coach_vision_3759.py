@@ -258,15 +258,79 @@ def test_a_fabricated_number_withholds_the_text_and_keeps_the_band(world):
     assert item["body_fat_estimate"]["low_pct"] == Decimal("20.0")
 
 
-def test_an_implausible_or_off_schema_reply_writes_nothing(world):
+def test_an_implausible_or_off_schema_reply_raises_and_writes_nothing(world):
     table, s3 = world
     bad = dict(_good_reply(), body_fat_low_pct=30, body_fat_high_pct=25)
-    out = lam.run(table=table, s3=s3, bucket="b", today=TODAY, invoke_fn=_recording_invoke([], bad), allow_fn=lambda f: True, now=NOW)
-    assert out["status"] == "error" and "implausible" in out["reason"] and table.puts == []
+    with pytest.raises(cv.CoachVisionFailure, match="implausible band"):
+        lam.run(table=table, s3=s3, bucket="b", today=TODAY, invoke_fn=_recording_invoke([], bad), allow_fn=lambda f: True, now=NOW)
+    with pytest.raises(cv.CoachVisionFailure, match="off-schema"):
+        lam.run(
+            table=table,
+            s3=s3,
+            bucket="b",
+            today=TODAY,
+            invoke_fn=_recording_invoke([], {"qualitative": "x"}),
+            allow_fn=lambda f: True,
+            now=NOW,
+        )
+    assert table.puts == []
+
+
+# ── failures are loud: the Monday job must never go dark behind a green Invocations alarm ──
+def test_an_inference_failure_raises_out_of_the_handler_with_its_cause(world):
+    """AccessDenied / throttle / model-access: the run RAISES (Errors datapoint + DLQ), writes nothing.
+
+    The absence alarm counts Invocations and bedrock_client emits no failure metric, so a
+    swallowed exception here would be invisible for as long as it lasted.
+    """
+    table, s3 = world
+
+    class _Denied(Exception):
+        pass
+
+    def invoke(body, model_name=None):
+        raise _Denied("AccessDeniedException: not authorized to invoke the model")
+
+    with pytest.raises(cv.CoachVisionFailure, match="inference failed: _Denied: AccessDeniedException") as info:
+        lam.run(table=table, s3=s3, bucket="b", today=TODAY, invoke_fn=invoke, allow_fn=lambda f: True, now=NOW)
+    assert isinstance(info.value.__cause__, _Denied)
+    assert table.puts == []
+    assert "raises" in lam.__doc__ and "CoachVisionFailure" in lam.__doc__
+
+
+def test_every_photo_unreadable_raises_but_one_unreadable_photo_only_drops_that_image(world):
+    table, s3 = world
+
+    class _DeadS3(_S3):
+        def get_object(self, Bucket, Key):
+            raise PermissionError(f"AccessDenied: {Key}")
+
+    with pytest.raises(cv.CoachVisionFailure, match="no readable photo in this week's set"):
+        lam.run(table=table, s3=_DeadS3(), bucket="b", today=TODAY, invoke_fn=_recording_invoke([]), allow_fn=lambda f: True, now=NOW)
+    assert table.puts == []
+
+    class _OneBadS3(_S3):
+        def get_object(self, Bucket, Key):
+            if Key.endswith("2026-10-11-side.jpg"):
+                raise PermissionError(f"AccessDenied: {Key}")
+            return super().get_object(Bucket, Key)
+
+    calls = []
     out = lam.run(
-        table=table, s3=s3, bucket="b", today=TODAY, invoke_fn=_recording_invoke([], {"qualitative": "x"}), allow_fn=lambda f: True, now=NOW
+        table=table, s3=_OneBadS3(), bucket="b", today=TODAY, invoke_fn=_recording_invoke(calls), allow_fn=lambda f: True, now=NOW
     )
-    assert out["status"] == "error" and table.puts == []
+    assert out["status"] == "written"
+    (item,) = table.puts
+    assert set(item["photo_keys"]["current"]) == {"front", "back"} and set(item["photo_keys"]["prior"]) == set(cv.POSES)
+    assert sum(1 for c in calls[0]["body"]["messages"][0]["content"] if c["type"] == "image") == 5
+
+
+def test_a_budget_pause_is_the_one_soft_outcome_after_the_set_is_known(world):
+    """The negative control for the two tests above: paused returns, does not raise, writes nothing."""
+    table, s3 = world
+    calls = []
+    out = lam.run(table=table, s3=s3, bucket="b", today=TODAY, invoke_fn=_recording_invoke(calls), allow_fn=lambda f: False, now=NOW)
+    assert out["status"] == "paused" and out["as_of"] == "2026-10-11" and calls == [] and table.puts == []
 
 
 def test_the_run_is_idempotent_on_the_set_and_re_observes_a_retake(world):

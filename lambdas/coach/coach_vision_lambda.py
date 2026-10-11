@@ -16,7 +16,17 @@ this file owns is the I/O order and the three honest no-ops —
   * the budget guard paused   → nothing written, `status: paused`
 
 — each of which returns rather than raises, so a quiet week never lands in the DLQ as a
-failure. A read that fails (S3, DDB, Bedrock) raises after logging, which IS a failure.
+failure. Everything else that stops the record IS a failure and raises after logging: a
+DDB read error propagates from boto3 untouched, and `coach_vision.observe` raises
+`CoachVisionFailure` when no photo in this week's set is readable (S3), when the inference
+call fails (Bedrock — AccessDenied, a throttle, a model-access change), or when the reply
+cannot become a record (off-schema, implausible band). Nothing here catches those: this is
+a weekly function with ONE trigger, and its only alarm counts Invocations — a run that
+swallowed its failures would keep that alarm green while the job was dark for months. The
+raise is what makes an Errors datapoint and, after the async retries, a message on the
+shared ingestion DLQ (`life-platform-ingestion-dlq-messages` + the DLQ consumer's
+escalation, #4731), which are the watched paths (`tests/test_coach_vision_3759.py` pins
+both raises end to end).
 
 The S3 keys are the ones the index rows carry; each is checked against the registry's own
 prefix facet before it is read (`coach_vision.key_is_under_prefix`). This role holds
@@ -127,9 +137,9 @@ def run(*, table, s3, bucket: str, today: str, invoke_fn=None, allow_fn=None, no
     result = coach_vision.observe(
         current, prior, anchors, loader=_photo_loader(s3, bucket, prefix), invoke_fn=invoke_fn, allow_fn=allow_fn, now=now
     )
-    if result["status"] != "ok":
-        logger.warning("[coach_vision] %s: %s", result["status"], result.get("reason"))
-        return {"status": result["status"], "reason": result.get("reason"), "as_of": current["as_of"]}
+    if result["status"] == "paused":  # the one soft outcome after the set is known; a failure has already raised
+        logger.warning("[coach_vision] paused: %s", result.get("reason"))
+        return {"status": "paused", "reason": result.get("reason"), "as_of": current["as_of"]}
 
     created_at = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     record = coach_vision.build_record(current, prior, anchors, result, created_at=created_at)
