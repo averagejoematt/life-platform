@@ -211,9 +211,10 @@ def arm_floor_clause(min_days_per_arm: int) -> str:
 MODEL_PROPOSED_CITATION = (
     "Proposed by the weekly hypothesis generator's model (Bedrock, structured tier) alongside the "
     "hypothesis text and its confirmation criterion, then frozen unchanged at pre-registration: the "
-    "model chose this bar and no derivation from Matthew's own variance stands behind it. It is "
-    "deliberately NOT re-priced afterwards — the criterion sentence states the same number, and "
-    "replacing one of the two would put a contradiction on the public artifact."
+    "model chose this bar and no derivation from Matthew's own variance stands behind it. Since #3495 "
+    "a generated bar is replaced by a derivation from the outcome metric's own trailing series at the "
+    "write; it is kept as proposed only when that series is too short or too flat to estimate a "
+    "variance, so this label is the honest fallback — it does not meet ADR-105's bar."
 )
 
 # #1843's diary-intervention bar. habit_pct is a 0-1 completion ratio, so 0.05 is five
@@ -254,10 +255,18 @@ def stamp_spec_provenance(hyp: dict, min_days_per_arm: int, daily_rows=None, *, 
     `min_effect: 0.05` with no derivation, no arm floor, and a `confirmation_criteria`
     that named no n. This is the chokepoint that closes the set.
 
-    Additive and idempotent: an existing facet, an existing `min_days_per_arm` and a
-    criterion that already names the floor are all left exactly as they are, so the
-    seeder's derived specs pass through untouched. Returns a new dict; never mutates the
-    caller's.
+    #3495: a bar that arrives DECLARED (model-proposed, or a design convention) is now
+    re-priced HERE, at the pre-registration write and never after it, from the outcome
+    metric's own trailing variance (`derive_stored_bar`); the criterion sentence is
+    rewritten from the derived number and the proposed bar is kept in
+    `min_effect_basis.replaced`. Only when the series cannot support a variance estimate
+    does the declared bar survive — labelled as declared, which `experiment_gates` says
+    does not meet ADR-105's bar.
+
+    Idempotent: an existing facet, an existing `min_days_per_arm` and a criterion that
+    already names the floor are all left exactly as they are, so the seeder's derived
+    specs pass through with only the `min_effect_basis` view of their own derivation
+    added. Returns a new dict; never mutates the caller's.
     """
     spec = hyp.get("test_spec")
     if not isinstance(spec, dict):
@@ -270,14 +279,19 @@ def stamp_spec_provenance(hyp: dict, min_days_per_arm: int, daily_rows=None, *, 
 
     if "min_effect" in spec and "min_effect_provenance" not in spec:
         derivation = spec.get("min_effect_derivation")
+        kind = kind or experiment_gates.MODEL_PROPOSED
+        citation = citation or MODEL_PROPOSED_CITATION
         if isinstance(derivation, dict):
             # The seeder's already-derived block, expressed in the shared facet shape.
             spec["min_effect_provenance"] = effect_provenance({"min_effect": spec["min_effect"], "derived_from": derivation})
+            spec.setdefault("min_effect_basis", min_effect_basis({"derived_from": derivation}))
+        elif derive_stored_bar(out, spec, daily_rows, min_days_per_arm, kind=kind, citation=citation):
+            pass  # #3495: derived from the outcome's own trailing variance; the criterion now reads it.
         else:
             spec["min_effect_provenance"] = declared_effect_provenance(
                 spec["min_effect"],
-                kind=kind or experiment_gates.MODEL_PROPOSED,
-                citation=citation or MODEL_PROPOSED_CITATION,
+                kind=kind,
+                citation=citation,
                 values=outcome_series(spec, daily_rows),
                 metric=str(spec.get("outcome_metric") or ""),
                 window_days=len(daily_rows) if daily_rows else None,
@@ -288,3 +302,143 @@ def stamp_spec_provenance(hyp: dict, min_days_per_arm: int, daily_rows=None, *, 
     if isinstance(criteria, str) and criteria.strip() and ARM_FLOOR_PHRASE not in criteria:
         out["confirmation_criteria"] = criteria.rstrip() + arm_floor_clause(min_days_per_arm)
     return out
+
+
+# ── #3495 box 4 (QS-5): EVERY stored bar is derived at the write ──────────────
+#
+# #3552 derived the two GENESIS bars and LABELLED every other one. The weekly generator's
+# bar stayed the number the model typed (`hyp_protein_recovery_lag`, 2026-10-04: a 10-point
+# recovery bar labelled `model_proposed`), and `experiment_gates` says plainly that a
+# labelled-but-unpriced bar does not meet ADR-105 rule 4. The reason given for not
+# re-pricing it — "the criterion sentence states the same number" — is answered here by
+# writing the criterion sentence FROM the derived number, at the one moment a re-price is
+# legitimate: before the record is frozen (`store_hypothesis` IS the pre-registration
+# write; nothing has been observed against the bar yet). A record already frozen is never
+# touched — the pending 2026-10-04 one keeps its labelled model bar until it resolves.
+#
+# The rule is the genesis seeder's rule, not a second one: EFFECT_SD_FRACTION (k) x the
+# mean-successive-difference sigma of the outcome metric's own trailing readings, with
+# MIN_PAIRS as the n floor. The stored `min_effect_basis` names every input, so
+# `experiment_gates.min_effect_meets_rigor_bar` can RECOMPUTE the bar from the record and
+# refuse a hand-typed number dressed as a derivation.
+DERIVATION_STATISTIC = "sd_of_successive_differences_over_sqrt2"
+
+# Units the criterion sentence names for each outcome metric (build_data_narrative's own
+# scales). A metric missing here is stated unitless rather than with a guessed unit.
+OUTCOME_UNITS = {
+    "recovery": "points",
+    "hrv": "ms",
+    "rhr": "bpm",
+    "sleep_score": "points",
+    "sleep_efficiency": "points",
+    "deep_sleep_hrs": "hours",
+    "rem_hrs": "hours",
+    "total_sleep_hrs": "hours",
+    "stress": "points",
+    "body_battery": "points",
+    "steps_garmin": "steps",
+    "steps": "steps",
+    "calories": "kcal",
+    "active_cal": "kcal",
+    "protein_g": "g",
+    "carbs_g": "g",
+    "fat_g": "g",
+    "weight_lbs": "lbs",
+    "mindful_min": "minutes",
+    "zone2_min": "minutes",
+    "sleep_onset_min": "minutes",
+    "glucose_avg": "mg/dL",
+    "mood": "points",
+    "energy": "points",
+    "journal_stress": "points",
+    "habit_pct": "(0-1 completion ratio)",
+}
+
+_OP_WORDS = {">=": "at or above", "<=": "at or below"}
+
+
+def window_days_of(daily_rows) -> int | None:
+    """The calendar span the trailing rows cover, first date to last inclusive.
+
+    Falls back to the row count when the dates do not parse — a stated window is always
+    the one the series was actually read over, never the lookback constant it was meant
+    to be."""
+    if not daily_rows:
+        return None
+    dates = sorted(str(r.get("date")) for r in daily_rows if r.get("date"))
+    try:
+        from datetime import date
+
+        first, last = date.fromisoformat(dates[0][:10]), date.fromisoformat(dates[-1][:10])
+        return (last - first).days + 1
+    except (IndexError, ValueError):
+        return len(daily_rows)
+
+
+def min_effect_basis(derived: dict, *, replaced=None) -> dict:
+    """The `min_effect_basis` block: window, statistic, value, k and n — every input a reader
+    (or `experiment_gates`) needs to recompute the bar from the record alone."""
+    block = derived["derived_from"]
+    basis = {
+        "metric": block.get("metric"),
+        "unit": block.get("unit", ""),
+        "window_days": block.get("window_days"),
+        "statistic": DERIVATION_STATISTIC,
+        "value": block.get("sd"),
+        "k": EFFECT_SD_FRACTION,
+        "n": block.get("n"),
+        "n_floor": MIN_PAIRS,
+    }
+    if replaced is not None:
+        # The number the generator proposed, kept on the record so the re-price is visible.
+        basis["replaced"] = replaced
+    return basis
+
+
+def derived_criteria_sentence(spec: dict, basis: dict, monitoring_window_days, min_days_per_arm: int) -> str:
+    """The public criterion, written FROM the derived bar so the sentence and the number can
+    never disagree. Every number in it comes from the spec or the basis."""
+    unit = basis.get("unit") or ""
+    unit_str = f" {unit}" if unit else ""
+    lag = int(float(spec.get("lag_days") or 0))
+    when = {0: "same-day", 1: "next-day"}.get(lag, f"{lag}-day-lagged")
+    cond = spec.get("condition_metric")
+    if spec.get("condition_op") == "median_split":
+        cond_words = f"{cond} is above its median"
+    else:
+        cond_words = f"{cond} is {_OP_WORDS.get(spec.get('condition_op'), spec.get('condition_op'))} {spec.get('condition_threshold')}"
+    window = f" over a {monitoring_window_days}-day monitoring window" if monitoring_window_days else ""
+    bar = spec["min_effect"]
+    return (
+        f"Mean {when} {spec.get('outcome_metric')} at least {bar}{unit_str} {spec.get('direction')} on days when {cond_words} "
+        f"than on the other days{window}, 95% CI excluding 0, with at least {min_days_per_arm} {ARM_FLOOR_PHRASE}. "
+        f"The {bar}{unit_str} bar is derived, not chosen: {basis['k']} x the SD of successive differences / sqrt(2) of "
+        f"{basis['metric']}, {basis['value']}{unit_str} over n={basis['n']} successive readings in the trailing "
+        f"{basis['window_days']} days (floor: {basis['n_floor']} readings)."
+    )
+
+
+def derive_stored_bar(out: dict, spec: dict, daily_rows, min_days_per_arm: int, *, kind: str, citation: str) -> bool:
+    """Replace a not-yet-frozen DECLARED bar with one derived from the outcome metric's own
+    trailing variance, and rewrite the criterion to read it. Returns False — leaving the bar
+    for the caller to LABEL as declared — when the series cannot support the estimate.
+
+    Mutates `out`/`spec`, which `stamp_spec_provenance` has already copied."""
+    metric = str(spec.get("outcome_metric") or "")
+    window = window_days_of(daily_rows)
+    derived = derive_min_effect(
+        outcome_series(spec, daily_rows), metric=metric, window_days=window or 0, unit=OUTCOME_UNITS.get(metric, "")
+    )
+    if derived is None or not window:
+        return False
+    replaced = {"value": spec.get("min_effect"), "kind": kind, "source": citation}
+    spec["min_effect"] = derived["min_effect"]
+    spec["min_effect_derivation"] = derived["derived_from"]
+    spec["min_effect_basis"] = min_effect_basis(derived, replaced=replaced)
+    spec["min_effect_provenance"] = effect_provenance(derived)
+    if isinstance(out.get("confirmation_criteria"), str):
+        out["proposed_confirmation_criteria"] = out["confirmation_criteria"]
+    out["confirmation_criteria"] = derived_criteria_sentence(
+        spec, spec["min_effect_basis"], out.get("monitoring_window_days"), min_days_per_arm
+    )
+    return True
