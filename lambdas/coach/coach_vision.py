@@ -57,14 +57,13 @@ a test with no network and no AWS.
 from __future__ import annotations
 
 import base64
-import json
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
 from ai.model_routing import model_for  # #4770: the one model registry
-from common.pacific_time import parse_day_key
+from common.pacific_time import pacific_date_of, pacific_today, parse_day_key
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +178,7 @@ def group_sets(rows: list) -> list:
             week = int(week) if week is not None else None
         except (TypeError, ValueError):
             week = None
-        slot = by_col.setdefault(f"w{week}" if week else f"d{date}", {"week_n": week, "as_of": date, "poses": {}, "sha256": {}})
+        slot = by_col.setdefault(f"w{week}" if week else f"d{date}", {"capture_week": week, "as_of": date, "poses": {}, "sha256": {}})
         slot["as_of"] = max(slot["as_of"], date)
         prior = slot["poses"].get(pose)
         if not prior or date >= prior["date"]:
@@ -390,7 +389,8 @@ def _grounded_text(text: Optional[str], shown: dict, set_dates: dict, *, now: Op
         str(text),
         allowed=grounded_generation.allowed_numbers(shown),
         allowed_dates=grounded_generation.allowed_dates(set_dates),
-        generation_date_iso=(now or datetime.now(timezone.utc)).strftime("%Y-%m-%d"),
+        # #2811: the generation DAY is the Pacific day; `now` stays an instant.
+        generation_date_iso=(pacific_date_of(now.isoformat()) if now else None) or pacific_today(),
         start_date_iso=EXPERIMENT_START_DATE,
     )
     if findings:
@@ -580,8 +580,3 @@ def thread_block(table, today: Optional[str]) -> str:
         return ""
     lines = thread_lines(rec, today)
     return ("COACH VISION (owner-only; the band is an estimate, never a measurement):\n" + "\n".join(lines)) if lines else ""
-
-
-def as_json_safe(obj: Any) -> Any:
-    """Decimal → float for a record read back from DynamoDB."""
-    return json.loads(json.dumps(obj, default=lambda v: float(v) if isinstance(v, Decimal) else str(v)))
