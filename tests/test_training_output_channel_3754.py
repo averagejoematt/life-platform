@@ -171,6 +171,34 @@ def test_a_tombstoned_hevy_aggregate_is_not_a_session():
     assert toc.series([], [live, dead])["values"] == toc.series([], [live])["values"]
 
 
+def test_sessions_counts_what_the_load_model_scored_not_the_raw_strava_activities():
+    """ADR-104: `input.sessions` is the live-proof predicate, so it must be the number the
+    model scored, not the raw record count. One Strava day holding Hevy's own echo of a lift
+    (`WeightTraining`, skipped because Hevy carries the session) plus the SAME Zone-1 walk
+    twice (two devices, one start — `strava_read_seam.dedup_activities` keeps one), and one
+    Hevy workout row: four raw records, TWO sessions (the lift once, the walk once)."""
+    day = _SUST_DAYS[0]
+    walk = {**Z1_WALK, "start_date": f"{day}T15:00:00Z", "device_name": "WHOOP"}
+    walk_again = {**walk, "device_name": "Garmin"}  # the second device's copy of the same minutes
+    echo = {**HR_ACTIVITY, "sport_type": "WeightTraining", "average_heartrate": 120, "start_date": f"{day}T17:00:00Z"}
+    strava = [row("strava", day, activities=[echo, walk, walk_again])]
+    hevy = [hevy_workout(day)]
+    assert sum(len(r["activities"]) for r in strava) + len(hevy) == 4, "the raw count the old field reported"
+
+    out = toc.series(strava, hevy)
+    assert out["input"]["sessions"] == 2, out["input"]
+    # The model's own ledger of what it scored and what it set aside, carried on its basis.
+    _, basis = tl.daily_training_load(strava, hevy)
+    assert basis["sessions"] == {"total": 2, "strava": 1, "hevy": 1, "strava_echoes_skipped": 1, "strava_duplicates_dropped": 1}
+    assert out["input"]["sessions"] == basis["sessions"]["total"]
+    # And the load itself is the lift's worked-set points alone: the walk is Zone-1 rest at 0,
+    # the echo contributes nothing (Hevy carries it), the duplicate walk nothing twice.
+    assert out["values"] == [round(tl.hevy_session_load(hevy[0])["points"], 1)]
+    # Without a Hevy row that day the lift is NOT an echo — the Strava record is the session.
+    _, alone = tl.daily_training_load(strava, [])
+    assert alone["sessions"] == {"total": 2, "strava": 2, "hevy": 0, "strava_echoes_skipped": 0, "strava_duplicates_dropped": 1}
+
+
 # ── 2. the MCP tool, end to end ───────────────────────────────────────────────────────
 def _hr_series_rows(hrs: list[float]) -> list[dict]:
     """Seven MacroFactor days (the tool's floor), six Whoop days, one HR activity a day."""

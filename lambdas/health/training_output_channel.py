@@ -30,7 +30,10 @@ A Zone-1 walk is an observed day at 0 (measured rest, the #4075 reading), not a 
 with no record at all is absent, as it always was for this channel. The channel still
 compares first-third vs last-third of that series, so a drop in per-session output is what
 it sees; a drop in session COUNT (training less often at the same output) is not, and the
-`input` block says so (`series: observed_training_days`).
+`input` block says so (`series: observed_training_days`). `input.sessions` is the count the
+load model SCORED (`basis["sessions"]["total"]`: after its multi-device dedupe and its
+Hevy-echo skip), never the raw record count — a walk two devices both pushed, or Hevy's own
+echo of a lift Hevy already carries, is a record the model set aside, not a second session.
 
 PURE: no I/O, no clock. The callers hand in the rows they already read.
 """
@@ -69,7 +72,10 @@ def series(strava_rows: Optional[Iterable[Mapping[str, Any]]], hevy_rows: Option
     for d, v in load_by_day.items():  # a loaded day is observed by definition
         by_day.setdefault(d, float(v))
     values = [round(by_day[d], 1) for d in sorted(by_day)]
-    sessions = sum(len(r.get("activities") or []) for r in strava) + len(hevy)
+    # The sessions the model SCORED — after its multi-device dedupe and its Hevy-echo skip —
+    # never the raw record count, which overstates every duplicated walk and every echo
+    # (ADR-104; `sessions > 0` is the channel's live-proof predicate, so it must be honest).
+    sessions = int((basis.get("sessions") or {}).get("total") or 0)
     return {
         "values": values,
         "by_day": {d: round(v, 1) for d, v in sorted(by_day.items())},
