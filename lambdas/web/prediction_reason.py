@@ -36,6 +36,7 @@ import json
 import re
 from typing import Any
 
+from common.pacific_time import day_in_words
 from experiment.measurable_metrics import AGG_SUFFIXES, base_metric
 
 #: Reader words for every base key in ``experiment.measurable_metrics.METRIC_SOURCES``
@@ -117,6 +118,27 @@ def _cap(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
 
 
+def _window_words(window: Any, metric: Any) -> tuple[str | None, str | None]:
+    """#4617: ``("from 327.3 lb on September 6 to 312.1 lb on October 4", "1.1 lb")`` for a call
+    graded across its own window (``outcome_notes.window``), else ``(None, None)``."""
+    if not isinstance(window, dict):
+        return None, None
+    unit = _UNITS.get(base_metric(str(metric or "")), "")
+    first, last, band = _num(window.get("first_value")), _num(window.get("last_value")), _num(window.get("band"))
+    on_first, on_last = day_in_words(str(window.get("first_date") or ""), weekday=False), day_in_words(
+        str(window.get("last_date") or ""), weekday=False
+    )
+    if not (first and last and band and on_first and on_last) or on_first == window.get("first_date"):
+        return None, None
+    k = int(window.get("averaged_over") or 1)
+    if k > 1:
+        return (
+            f"from an average of {first}{unit} over its first {k} readings (from {on_first}) to {last}{unit} over its last {k} (to {on_last})",
+            f"{band}{unit}",
+        )
+    return f"from {first}{unit} on {on_first} to {last}{unit} on {on_last}", f"{band}{unit}"
+
+
 def graded_on_data(status: Any) -> bool | None:
     st = str(status or "").strip().lower()
     if st in ("confirmed", "refuted"):
@@ -173,16 +195,22 @@ def reason_words(record: dict) -> tuple[str | None, bool | None]:
                 m = _PREDICTED.search(grader)
                 called = m.group(1) if m else None
         if kind == "directional" and called:
+            span, swing = _window_words(notes.get("window"), ev.get("metric"))
             if status == "refuted" and "metric flat" in grader:
+                if span:
+                    return (
+                        f"{_cap(words)} held flat, {span}, inside its usual day-to-day swing of {swing} — the call was for it to go {called}",
+                        flag,
+                    )
                 return f"{_cap(words)} held flat — the call was for it to go {called}", flag
             try:
                 went = "up" if float(actual) > 0 else "down"
             except (TypeError, ValueError):
                 went = None
             if went and status == "confirmed" and went == called:
-                return f"{_cap(words)} went {went}, as called", flag
+                return f"{_cap(words)} went {went}{' ' + span if span else ''}, as called", flag
             if went and status == "refuted" and went != called:
-                return f"{_cap(words)} went {went} — the call was for it to go {called}", flag
+                return f"{_cap(words)} went {went}{' ' + span if span else ''} — the call was for it to go {called}", flag
         if kind == "point":
             seen, want = _num(actual), _num(ev.get("threshold"))
             if seen and want:
