@@ -15,6 +15,15 @@ rewritten — it is the commitment device, quoted to the writers as written.
 
     python3 scripts/season_rebuild.py --through-week 4 --out <dir>
     python3 scripts/season_rebuild.py --weeks 3 --out <dir>      # one week, ledger read from <dir>
+    python3 scripts/season_rebuild.py --recheck 0-4 --out <dir>  # the fact-read sweep over staged weeks (#4777)
+
+THE FACT-READ SWEEP (#4777, ADR-132 as amended). The write chain above is sequential — every call reads the one
+before it and the previous week's ledger — so it never holds 100 independent records and stays on-demand. The
+sweep is the rebuild's one fan-out: a fresh fact read of every staged post, dek and episode, all independent, sent
+through ``bedrock_batch.run_or_fallback``. At 100+ records it runs as one Bedrock batch job at the batch price;
+below that it runs on-demand and prints why. Either way every reply goes through the same
+``story_writers.fact_findings`` gate, and the findings land in ``wk<N>_recheck.json`` (+ ``recheck.json``) — the
+sweep rewrites nothing; ``--repair N`` is still how a finding is fixed.
 """
 
 from __future__ import annotations
@@ -23,6 +32,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
@@ -252,6 +262,110 @@ def repair_week(out: str, n: int, notes: Optional[List[str]] = None, episode_not
     return 0 if not (pf or ef) else 1
 
 
+RECHECK_KINDS = ("post", "dek", "episode")
+
+
+def _parse_weeks(spec: str) -> List[int]:
+    a, _, b = spec.partition("-")
+    return list(range(int(a), int(b or a) + 1))
+
+
+def recheck_records(out: str, weeks: List[int]) -> List[Dict[str, Any]]:
+    """Every staged installment's fact read as one batch-input record set, ``recordId`` = ``wk<N>-<kind>``.
+
+    Each read is built exactly as the live gate builds it (``_Gates`` for the week's context; the post without the
+    code-rendered dek, the dek on its own, the episode as spoken text), so a batched read and a real-time read ask
+    the same question."""
+    from ai import bedrock_batch
+
+    records: List[Dict[str, Any]] = []
+    for n in weeks:
+        dossier = _load(out, f"wk{n}_dossier.json")
+        budget = _load(out, f"wk{n}_budget.json")
+        md = _load(out, f"wk{n}_chronicle.md")
+        ep = _load(out, f"wk{n}_episode.json")
+        if dossier is None or budget is None or (md is None and ep is None):
+            print(f"  wk{n}: nothing staged in {out} — skipped")
+            continue
+        prev_ledger = _load(out, f"wk{n - 1}_ledger.json") if n > 0 else story_ledger.empty_ledger()
+        g = _Gates(n, dossier, budget, prev_ledger or {}, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
+        texts = {
+            "post": strip_dek(md) if md else "",
+            "dek": budget.get("top_line") or "",
+            "episode": story_writers.episode_text(ep) if ep else "",
+        }
+        for kind in RECHECK_KINDS:
+            if texts[kind]:
+                body = story_writers.fact_check_body(texts[kind], g.dossier, context=g.context)
+                records.append(bedrock_batch.build_jsonl_record(f"wk{n}-{kind}", body, story_writers.FACT_MODEL))
+    return records
+
+
+def recheck(
+    out: str,
+    weeks: List[int],
+    *,
+    force_realtime: bool = False,
+    wait_hours: Optional[float] = None,
+    realtime_fn=None,
+    run=None,
+) -> int:
+    """The fact-read sweep over staged weeks — batch at 100+ records, on-demand below, and it says which (#4777).
+
+    Returns 0 when no read found anything, 1 when any did (the same exit contract as ``--repair``)."""
+    from ai import bedrock_batch
+
+    records = recheck_records(out, weeks)
+    if not records:
+        print(f"recheck: no staged installments for weeks {weeks} in {out}")
+        return 2
+    if realtime_fn is None:
+        from ai import bedrock_client
+
+        def realtime_fn(model_input: Dict[str, Any]) -> Dict[str, Any]:
+            return bedrock_client.invoke_with_retry(model_input, story_writers.FACT_MODEL)
+
+    run = run or bedrock_batch.run_or_fallback
+    deadline = time.time() + wait_hours * 3600 if wait_hours is not None else None
+    res = run(
+        records,
+        story_writers.FACT_MODEL,
+        realtime_fn,
+        force_realtime=force_realtime,
+        deadline_epoch=deadline,
+        job_name=f"season-recheck-{time.strftime('%Y%m%d-%H%M%S', time.gmtime())}",
+    )
+    # the operator is told which path ran and why — the batch-or-on-demand line is part of the output contract
+    print(f"recheck: {len(records)} fact reads · mode={res['mode']} · {res['reason']}")
+    by_week: Dict[int, Dict[str, Any]] = {}
+    total = 0
+    for rec, resp in zip(records, res["results"]):
+        rid = rec["recordId"]
+        n, kind = int(rid[2:].split("-", 1)[0]), rid.split("-", 1)[1]
+        found = [f"{kind}: {f}" for f in story_writers.fact_findings(resp or {})]
+        total += len(found)
+        wk = by_week.setdefault(n, {"week": n, "findings": {}, "batched": {}})
+        wk["findings"][kind] = found
+        wk["batched"][kind] = rid not in set(res.get("realtime_record_ids") or [])
+    summary = {
+        "weeks": sorted(by_week),
+        "records": len(records),
+        "mode": res["mode"],
+        "reason": res["reason"],
+        "job_arn": res.get("job_arn"),
+        "batch_records": res.get("batch_records", 0),
+        "realtime_records": res.get("realtime_records", len(records)),
+        "savings": res.get("savings"),
+        "findings": total,
+    }
+    for n, wk in sorted(by_week.items()):
+        wk.update({k: summary[k] for k in ("mode", "reason", "job_arn")})
+        _save(out, f"wk{n}_recheck.json", wk)
+        print(f"  wk{n}: " + " · ".join(f"{k} findings={len(v)}" for k, v in wk["findings"].items()))
+    _save(out, "recheck.json", summary)
+    return 0 if total == 0 else 1
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--through-week", type=int, default=None)
@@ -260,7 +374,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--repair", type=int, default=None, help="re-gate and fix a staged week's post without re-running the desk")
     ap.add_argument("--note", action="append", default=[], help="with --repair: an editor's note on the POST (repeatable)")
     ap.add_argument("--episode-note", action="append", default=[], help="with --repair: an editor's note on the EPISODE (repeatable)")
+    ap.add_argument("--recheck", type=str, default=None, help="e.g. '0-4': the fact-read sweep over staged weeks (batch at 100+ reads)")
+    ap.add_argument("--realtime", action="store_true", help="with --recheck: never submit a batch job, run every read on-demand")
+    ap.add_argument("--batch-wait-hours", type=float, default=None, help="with --recheck: how long to wait on a batch job (default 24)")
     args = ap.parse_args(argv)
+    if args.recheck is not None:
+        return recheck(args.out, _parse_weeks(args.recheck), force_realtime=args.realtime, wait_hours=args.batch_wait_hours)
     if args.repair is not None:
         return repair_week(args.out, args.repair, args.note, args.episode_note)
     os.makedirs(args.out, exist_ok=True)
@@ -269,8 +388,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     cal = story_dossier.season_weeks()
     last = args.through_week if args.through_week is not None else 4
     if args.weeks:
-        a, _, b = args.weeks.partition("-")
-        todo = list(range(int(a), int(b or a) + 1))
+        todo = _parse_weeks(args.weeks)
     else:
         todo = list(range(0, last + 1))
     by_week = {0: {"week": 0, "date": "2026-08-31", "day_last": 0}, **{w["week"]: w for w in cal}}
