@@ -21,6 +21,7 @@ from health import (
     nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
     nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
     tdee as health_tdee,  # ADR-152 / #2310: THE one TDEE definition
+    training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
 
 from web.site_api_common import (
@@ -1088,8 +1089,10 @@ def deficit_sustainability(*, _g) -> dict:
     trend_check = health_tdee.implied_deficit_vs_trend(tdee, avg_cal, _trend_lb_wk, _trend_days)
     deficit_published = bool(trend_check.get("publish"))
 
-    src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava")}
-    whoop, habit, strava = src["whoop"], src["habitify"], src["strava"]
+    # #3754: Hevy joins the read — the training-output channel is scored on the daily
+    # training load over Strava + Hevy, never on the Strava day row's kilojoules.
+    src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava", "hevy")}
+    whoop, habit, strava, hevy = src["whoop"], src["habitify"], src["strava"], src["hevy"]
 
     def trend_dir(vals):
         v = [x for x in vals if x is not None]
@@ -1148,13 +1151,12 @@ def deficit_sustainability(*, _g) -> dict:
             t0.append(hv)
     t0_dir, t0_d = trend_dir(t0)
     t0_bad = t0_dir == "declining" and abs(t0_d) > 10
-    # Channel 5 — training output (Strava kJ/day)
-    daily_kj: dict[str, float] = {}
-    for s in strava:
-        d = s.get("sk", "").replace("DATE#", "")
-        daily_kj[d] = daily_kj.get(d, 0) + (_f(s.get("total_kilojoules")) or 0)
-    train = [daily_kj[d] for d in sorted(daily_kj)]
-    train_dir, train_d = trend_dir(train)
+    # Channel 5 — training output. #3754 (2026-10-04 sweep): this read the Strava day
+    # row's `total_kilojoules`, > 0 on 0 of 1,242 stored day rows all-time, so the public
+    # channel could never read "degraded". It is now the daily training load — the same
+    # model the TSB/ACWR surfaces read (#4075) — see health/training_output_channel.py.
+    training = training_output_channel.series(strava, hevy)
+    train_dir, train_d = trend_dir(training["values"])
     train_bad = train_dir == "declining" and abs(train_d) > 15
 
     channels = [
@@ -1162,7 +1164,13 @@ def deficit_sustainability(*, _g) -> dict:
         {"name": "Sleep quality", "status": "degraded" if sleep_bad else "stable", "direction": eff_dir, "delta_pct": eff_d},
         {"name": "Recovery", "status": "degraded" if rec_bad else "stable", "direction": rec_dir, "delta_pct": rec_d},
         {"name": "Habit completion", "status": "degraded" if t0_bad else "stable", "direction": t0_dir, "delta_pct": t0_d},
-        {"name": "Training output", "status": "degraded" if train_bad else "stable", "direction": train_dir, "delta_pct": train_d},
+        {
+            "name": "Training output",
+            "status": "degraded" if train_bad else "stable",
+            "direction": train_dir,
+            "delta_pct": train_d,
+            "input": training["input"],  # #3754: what was measured, never inferred from the verdict
+        },
     ]
     degraded = sum(1 for c in channels if c["status"] == "degraded")
     if not in_deficit:
