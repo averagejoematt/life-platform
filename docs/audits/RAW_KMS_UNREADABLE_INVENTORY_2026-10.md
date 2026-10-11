@@ -159,6 +159,27 @@ HeadObject fails, or when any of 20 random should-be-readable objects fails a 1-
 list above is therefore load-bearing: **a re-fetch that makes a recorded object readable must
 remove its bullet in the same change**, or the next Monday run goes red (by design).
 
+## Backup bucket and version check (2026-10-11)
+
+Read-only, 2026-10-11 ~19:30Z: the backup bucket `matthew-life-platform-raw-backup` was HeadObject'd for
+every one of the 25 recorded keys and their noncurrent versions listed, with
+`python3 scripts/raw_kms_readability_inventory.py --prefix raw/ --month 2026-05 --check-backup --versions --markdown`.
+It scanned 1215 objects under `raw/` in 2026-05, with 0 HeadObject errors, and found the same 25 undecryptable objects.
+
+| Source path | Undecryptable | Re-fetchable from vendor | Readable older version | Copies in backup bucket | Backup check errors | Unrecoverable |
+|---|---|---|---|---|---|---|
+| `raw/matthew/health_auto_export` | 14 | no — webhook push, no vendor re-fetch | 0 | 0 | 0 | yes |
+| `raw/matthew/strava` | 1 | yes — vendor API serves history | 0 | 0 | 0 | no |
+| `raw/matthew/whoop` | 3 | yes — vendor API serves history | 0 | 0 | 0 | no |
+| `raw/matthew/withings` | 5 | yes — vendor API serves history | 0 | 0 | 0 | no |
+| `raw/todoist` | 2 | partly — completions re-fetchable, point-in-time snapshots are not | 0 | 0 | 0 | no |
+
+**Conclusion.** No readable older version and no backup copy exists for any of the 25 objects, so the 14 Apple
+Health payloads have no second copy anywhere and are recorded as unrecoverable; the 11 others (Strava, Whoop,
+Withings, Todoist) await the owner's vendor re-fetch or waiver.
+
+The scheduled check `raw-kms-readability.yml` ran green on 2026-10-11T19:07Z (run 38166655589) against this record.
+
 ## Not done here (owner boxes on #4634)
 
 - `config/`: `python3 scripts/raw_kms_readability_inventory.py --prefix config/ --include-config --markdown` — owner-run, then add its row above.
