@@ -64,14 +64,20 @@ so the first post-deploy log line per label is each site's support proof.
       the intro and weekly scripts are array-rooted) → parse_json_text, then parse_json_span
     rewrite_note.parse_edits · eyeball_calibration · review_pack_ranker (span grabs) → parse_json_span
 
-  NOT yet through the door: the five span parsers in tests/test_bedrock_client.py's
-  JSON_HAND_PARSE_LEDGER, each with the contract that keeps it out.
+  parsed in the door through `load_json_span` (the raising form — each keeps its own failure
+  contract; JSON_HAND_PARSE_LEDGER in tests/test_bedrock_client.py is empty since #4276 box 2):
+    critics.parse_model_verdict (named no-object / json.loads error) ·
+    lenient_json (B4 trailing-comma repair, then `salvage_string_field`) ·
+    reader_truth_qa.parse_verdict (typed UNEVALUATED, the #4474 first-object retry) ·
+    broadcast_sensitivity_gate.bedrock_offtopic_classifier (a decode error still propagates
+      to classifier_error) · training_notes_llm._parse_signals (UnparseableResponse, lengths only)
 """
 
 from __future__ import annotations
 
 import copy
 import json
+import re
 from typing import Any, Callable, List, Optional
 
 LOG_TAG = "STRUCTURED_OUTPUT"
@@ -98,6 +104,80 @@ def parse_json_text(text: Any) -> Any:
 
 
 _CLOSERS = {"{": "}", "[": "]"}
+_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+
+
+class JsonSpanError(ValueError):
+    """A span parse that failed, typed (#4276 box 2) so a judge or classifier keeps its own contract.
+
+    `kind` is "no_span" (no opener, or no closer after it) or "decode" (the span did not parse).
+    `cause` is the first decoder error, `msg`/`pos` are its message and position, `text_len` and
+    `span_len` the lengths. `span` holds the span text for a caller's own salvage; it is never in
+    `str()` or `repr()`, because some callers' text is owner-private (training notes).
+    """
+
+    def __init__(self, kind: str, text_len: int, span: str = "", cause: Optional[json.JSONDecodeError] = None):
+        self.kind = kind
+        self.text_len = text_len
+        self.span = span
+        self.span_len = len(span)
+        self.cause = cause
+        self.msg = cause.msg if cause is not None else ""
+        self.pos = cause.pos if cause is not None else -1
+        if kind == "no_span":
+            detail = f"no JSON span in a {text_len}-char response"
+        else:
+            detail = f"{type(cause).__name__}: {cause} (a {self.span_len}-char span)"
+        super().__init__(detail)
+
+    def __repr__(self) -> str:
+        return f"JsonSpanError({self.kind!r}, text_len={self.text_len}, span_len={self.span_len})"
+
+
+def load_json_span(
+    text: Any,
+    openers: str = "{[",
+    *,
+    first_value_fallback: bool = False,
+    repair_trailing_commas: bool = False,
+    whole_text_if_no_span: bool = False,
+) -> Any:
+    """The span from the first of `openers` to the last matching closer, parsed — or a typed
+    `JsonSpanError`. The raising form of `parse_json_span`, for the judges and classifiers whose
+    failure path is part of their contract (#4276 box 2 emptied JSON_HAND_PARSE_LEDGER with it):
+
+      * `first_value_fallback` — when the greedy span fails, read exactly ONE value from its
+        first opener (`raw_decode`): a whole verdict followed by prose that holds a brace (#4474).
+      * `repair_trailing_commas` — a second attempt with `,}` / `,]` collapsed (B4).
+      * `whole_text_if_no_span` — no span: parse the whole (stripped) text instead of failing.
+
+    On failure the error carries the FIRST (greedy) decoder error, as the callers reported it.
+    """
+    text = str(text or "")
+    starts = [i for i in (text.find(o) for o in openers) if i != -1]
+    a = min(starts) if starts else -1
+    b = max(text.rfind(_CLOSERS[o]) for o in openers) if starts else -1
+    if a == -1 or b <= a:
+        if not whole_text_if_no_span:
+            raise JsonSpanError("no_span", len(text))
+        span = text.strip()
+    else:
+        span = text[a : b + 1]  # noqa: E203
+    try:
+        return json.loads(span)
+    except json.JSONDecodeError as first:
+        err = first
+    if first_value_fallback:
+        try:
+            return json.JSONDecoder().raw_decode(span)[0]
+        except json.JSONDecodeError:
+            pass
+    if repair_trailing_commas:
+        try:
+            return json.loads(_TRAILING_COMMA.sub(r"\1", span))
+        except json.JSONDecodeError:
+            pass
+    raise JsonSpanError("decode", len(text), span, err)
 
 
 def parse_json_span(text: Any, openers: str = "{[") -> Any:
@@ -106,20 +186,26 @@ def parse_json_span(text: Any, openers: str = "{[") -> Any:
 
     The same span the greedy, DOTALL `{...}`/`[...]` regex took in coach_panel_podcast's
     extractor (and the `find("{")`/`rfind("}")` slices elsewhere), moved here (#4276) so the
-    salvage is one copy in the one door.
+    salvage is one copy in the one door. `load_json_span` is the raising form.
     """
-    text = str(text or "")
-    starts = [i for i in (text.find(o) for o in openers) if i != -1]
-    if not starts:
+    try:
+        return load_json_span(text, openers)
+    except JsonSpanError:
         return None
-    a = min(starts)
-    b = max(text.rfind(_CLOSERS[o]) for o in openers)
-    if b <= a:
+
+
+def salvage_string_field(text: Any, key: str) -> Optional[Any]:
+    """The last-resort salvage of ONE string field from JSON that will not parse: the first
+    `"key": "..."` in `text`, unescaped (the raw capture when the escape itself is broken);
+    None when the key is not there. Moved from lenient_json (B4) so the unescape parse is in the door.
+    """
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*"((?:[^"\\]|\\.)*)"', str(text or ""), re.DOTALL)
+    if not m:
         return None
     try:
-        return json.loads(text[a : b + 1])  # noqa: E203
+        return json.loads(f'"{m.group(1)}"')  # unescape
     except json.JSONDecodeError:
-        return None
+        return m.group(1)
 
 
 def decode_error(value: Any) -> str:

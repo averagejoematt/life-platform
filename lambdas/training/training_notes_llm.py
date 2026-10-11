@@ -23,10 +23,10 @@ record, and the reason survives log retention.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 
+from ai import structured_json  # the one parse door (#4276 box 2)
 from common.numeric import decimals_to_float, floats_to_decimal
 
 logger = logging.getLogger(__name__)
@@ -235,15 +235,13 @@ def _parse_signals(text: str, taxonomy) -> list:
     """
     if not text:
         raise UnparseableResponse("empty response — no text content block")
-    # Tolerate a fenced block or leading prose: grab the first [...] span.
-    start, end = text.find("["), text.rfind("]")
-    if start == -1 or end == -1 or end < start:
-        raise UnparseableResponse(f"no JSON array span in a {len(text)}-char response")
-    span = text[start : end + 1]  # noqa: E203
+    # Tolerate a fenced block or leading prose: the first "[" to the last "]", parsed in the door (#4276 box 2).
     try:
-        arr = json.loads(span)
-    except (ValueError, TypeError) as e:
-        raise UnparseableResponse(f"json.loads failed on a {len(span)}-char span: {type(e).__name__}: {e}") from e
+        arr = structured_json.load_json_span(text, "[")
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":
+            raise UnparseableResponse(f"no JSON array span in a {len(text)}-char response") from None
+        raise UnparseableResponse(f"json.loads failed on a {e.span_len}-char span: {type(e.cause).__name__}: {e.cause}") from e.cause
     out = []
     for s in arr if isinstance(arr, list) else []:
         if not isinstance(s, dict):

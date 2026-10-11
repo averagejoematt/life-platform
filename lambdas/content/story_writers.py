@@ -326,26 +326,39 @@ correct — return ONLY claims that must change. If the installment is clean, re
 For each finding give the exact claim, the problem, and the corrected wording."""
 
 
-def fact_check(
-    text: str, dossier: Dict[str, Any], *, context: Optional[Dict[str, Any]] = None, invoke: Optional[Callable[..., Dict[str, Any]]] = None
-) -> List[str]:
-    """Findings (as gate strings) from the fact read. An unreadable reply is itself a finding — never a pass.
-    ``context`` carries the series' own record the dossier does not: last week's open bet, this week's new
-    bet and the previous titles — facts of the SERIES, which an installment may state."""
+def fact_check_body(text: str, dossier: Dict[str, Any], *, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The fact read's request body for one installment (or dek, or episode). Split from ``fact_check`` so a
+    rebuild can fan many reads out as one Bedrock batch job (#4777) and still parse every reply through the
+    same ``fact_findings`` gate a real-time read goes through."""
     ctx = f"SERIES RECORD (facts of the series itself — bets made on air, previous titles):\n{json.dumps(context or {}, indent=1, default=str)}\n\n"
-    body = {
+    return {
         "system": FACT_RUBRIC,
         "messages": [{"role": "user", "content": f"DOSSIER:\n{json.dumps(dossier, indent=1, default=str)}\n\n{ctx}INSTALLMENT:\n{text}"}],
         "max_tokens": 8000,
         "temperature": 0,
         "output_config": {"format": {"type": "json_schema", "schema": FACT_SCHEMA}},
     }
+
+
+def fact_check(
+    text: str, dossier: Dict[str, Any], *, context: Optional[Dict[str, Any]] = None, invoke: Optional[Callable[..., Dict[str, Any]]] = None
+) -> List[str]:
+    """Findings (as gate strings) from the fact read. An unreadable reply is itself a finding — never a pass.
+    ``context`` carries the series' own record the dossier does not: last week's open bet, this week's new
+    bet and the previous titles — facts of the SERIES, which an installment may state."""
+    body = fact_check_body(text, dossier, context=context)
     if invoke is None:
         from ai import bedrock_client
 
         resp = bedrock_client.invoke_with_retry(body, FACT_MODEL)
     else:
         resp = invoke(body, FACT_MODEL)
+    return fact_findings(resp)
+
+
+def fact_findings(resp: Dict[str, Any]) -> List[str]:
+    """One fact-read reply → gate strings. The same parse for a real-time reply and a batch record's modelOutput:
+    a cheaper path skips no gate (ADR-132 as amended for #4777)."""
     if resp.get("stop_reason") != "end_turn":
         return [f"fact-read: incomplete (stop_reason={resp.get('stop_reason')}) — the installment is unverified"]
     try:
