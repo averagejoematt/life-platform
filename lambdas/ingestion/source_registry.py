@@ -1196,7 +1196,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 5,
         "qa_tier": None,  # paused sources render ⏸ from the paused flag
         "method": "Delivered through Strava — direct-API function retired 2026-10-11 (#4640, ADR-074)",
-        "metrics": "Steps (via Strava)",
+        "metrics": "Activities (via Strava)",
         # #3252: steps, and PAUSED (ADR-074) — the canonical stale-is-not-absent
         # case. A paused source cannot report, so it can neither confirm nor deny a
         # step absence; absence_sourcing returns `stale`, never `absent`, while it

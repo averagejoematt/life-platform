@@ -72,6 +72,7 @@ meaning anything.
 | `webhook_push` | The provider pushes; near-real-time. |
 | `file_transport` | A file lands in cloud storage and a poller picks it up. |
 | `habit_bridge` | Projected out of another source's habit records. |
+| `relayed_through_source` | The device has no writer of its own; its records arrive inside another source's feed (Garmin through Strava since #4640). |
 | `manual_entry` | A human types it in. |
 | `frozen_archive` | Historical import, no live writer. |
 
