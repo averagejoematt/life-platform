@@ -4,8 +4,11 @@
 // The front page reads ONE document, /api/edition (#4582): one Pacific `as_of`, one
 // `day_n`, and blocks that each carry state / as_of / source / absent_text / data. A
 // block that is absent, stale or unavailable prints its own sentence — never a blank,
-// a zero or a number from another day. The three layer-2 pages read the edition for the
-// facts they share with the front page, plus the public routes that already exist.
+// a zero or a number from another day. The front page reads nothing else (#4582 box 1: the
+// coach lines of the last seven days, the settled calls and the sheet's level are blocks of
+// the edition too); the week page reads only the chapter's published transcript besides. The
+// other layer-2 pages read the edition for the facts they share with the front page, plus the
+// public routes that already exist.
 //
 // The look is the kit and nothing else (docs/design/v8/README.md): every class below is
 // a `ck-` class from clean.css. Standing rules held here: no count of earlier starts, no
@@ -419,7 +422,8 @@ export function weekSlots(edition, b, base = "/") {
   };
 }
 
-// The days the argument reads: the edition's day and the six before it.
+// The days the argument reads: the edition's day and the six before it — the window the
+// edition's `moves` block is read over (site_api_edition.moves_days, #4582).
 export function argumentDays(asOf, n = F.ARGUMENT_DAYS) {
   const out = [];
   let iso = asOf;
@@ -438,68 +442,99 @@ const fillSlots = (slots) => {
   }
 };
 
-async function mountFront(edition, b) {
-  const base = document.body.dataset.ckBase || "/";
-  fillSlots(frontSlots(edition, b, base));
-  const days = argumentDays(edition.as_of);
-  const [calls, character, ...moves] = await Promise.all([tryJSON("/api/calls"), tryJSON("/api/character"), ...days.map((d) => tryJSON(`/api/coach_moves?date=${d}`))]);
+// The edition's blocks for what the front page and the week page used to read from their own
+// routes (#4582 box 1), each in that route's own shape so the builders read them unchanged.
+// A block that failed gives the builder nothing — the caller prints the block's sentence.
+export const movesOf = (b) => (usable(b.moves) && Array.isArray(b.moves.data.days) ? b.moves.data.days : []);
+export const callsBodyOf = (b) => (usable(b.calls) && Array.isArray(b.calls.data.calls) ? { state: "ok", calls: b.calls.data.calls } : null);
+export const characterOf = (b) => (usable(b.sheet) ? b.sheet.data : null);
+export const leadReadOf = (b) => (usable(b.lead_read) ? b.lead_read.data : null);
+
+// Every front-page slot that needs more than one block (the argument reads the open bet and the
+// week of coach lines; the coach band leaves out what the argument printed), as { id: html } —
+// `null` removes the element, an id left out keeps what frontSlots put there. Pure, so
+// tests/js/edition_contract_4582.test.mjs renders it over the route's own documents: a block
+// that failed prints its own sentence, never a claim the failed read cannot support.
+export function frontReadSlots(edition, b, base = "/") {
+  const e = edition || {};
+  const out = {};
+  const moves = movesOf(b);
   // The argument: the open bet (two coaches, opposite sides, a date) with the live number
   // against it; failing a bet, the newest exchange, from the served moves.
   const pick = F.pickArgument(moves, b.next);
-  fill("ck-argue-label", esc(F.argumentLabel(pick)));
-  fill("ck-argue-heading", esc(F.argumentHeading(pick)));
-  fill("ck-argument", F.argumentHTML(pick, base));
+  out["ck-argue-label"] = esc(F.argumentLabel(pick));
+  if (!pick && b.moves.state === "unavailable") {
+    // A failed read is not "nothing in dispute": the section says the lines are not served.
+    out["ck-argue-heading"] = esc("What they are arguing about.");
+    out["ck-argument"] = soft(b.moves.absent_text);
+  } else {
+    out["ck-argue-heading"] = esc(F.argumentHeading(pick));
+    out["ck-argument"] = F.argumentHTML(pick, base);
+  }
   if (pick && pick.kind === "bet") {
     // The card in the bet's own terms: each coach with its job, the live number inside the
     // card, and the door to what each one argued (round 8b).
-    fill("ck-bet", betHTML(b.next, { sidesText: F.betSidesLine(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet` }));
+    out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLine(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet` });
   } else if (pick && pick.kind === "reply") {
-    document.getElementById("ck-bet")?.remove();
+    out["ck-bet"] = null;
   }
   // A line from the edition's day that the argument already printed is not printed twice.
   // With nothing said today, the newest line the coaches said stands under its own label,
-  // and with nothing in the window at all the band has no coach part.
+  // and with nothing in the window at all the band has no coach part — unless the day's lines
+  // failed to read, when frontSlots' sentence for them stands.
   const shown = F.argumentTexts(pick);
   const today = F.coachTodayHTML(b.coach_lines, { skip: shown });
   const spokeToday = usable(b.coach_lines) && (b.coach_lines.data.lines || []).length > 0;
-  if (today && spokeToday) fill("ck-coach-lines", today);
+  if (today && spokeToday) out["ck-coach-lines"] = today;
   else {
     const heard = F.lastHeardHTML(moves, shown, base);
     if (heard) {
-      fill("ck-coach-lines-label", "The coaches, last heard");
-      fill("ck-coach-lines", heard);
-    } else {
-      document.getElementById("ck-coach-lines-label")?.remove();
-      document.getElementById("ck-coach-lines")?.remove();
+      out["ck-coach-lines-label"] = "The coaches, last heard";
+      out["ck-coach-lines"] = heard;
+    } else if (b.coach_lines.state !== "unavailable") {
+      out["ck-coach-lines-label"] = null;
+      out["ck-coach-lines"] = null;
     }
   }
-  // The clearest miss this week, or on record, or what the route can offer in its place.
-  const { kind } = lastCallPick(calls, edition.as_of);
-  const last = lastCallHTML(calls, base, edition.as_of, F.SHORT_JOBS);
+  // The clearest miss this week, or on record, or the calls block's own sentence.
+  const calls = callsBodyOf(b);
+  const { kind } = lastCallPick(calls, e.as_of);
+  const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS);
   if (last) {
     const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
-    fill("ck-miss-heading", esc(heading));
-    fill("ck-call", `${last}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`);
+    out["ck-miss-heading"] = esc(heading);
+    out["ck-call"] = `${last}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`;
   } else {
-    fill("ck-call", soft((calls && calls.absent_text) || "The settled calls are not served right now."));
+    out["ck-call"] = soft(b.calls.absent_text || "The settled calls are not served right now.");
   }
-  const sheet = sheetLine(character);
-  if (sheet) fill("ck-sheet-span", esc(sheet));
+  const sheet = sheetLine(characterOf(b));
+  if (sheet) out["ck-sheet-span"] = esc(sheet);
+  return out;
 }
 
+// The front page reads nothing but the edition (#4582 box 1): every slot is the edition's.
+async function mountFront(edition, b) {
+  const base = document.body.dataset.ckBase || "/";
+  fillSlots(frontSlots(edition, b, base));
+  fillSlots(frontReadSlots(edition, b, base));
+}
+
+// The week page: the edition, and the chapter's published transcript for its quotes.
 async function mountWeek(edition, b) {
   const base = document.body.dataset.ckBase || "/";
   fillSlots(weekSlots(edition, b, base));
+  // Round 8: a section with nothing to show does not render its heading; a read that failed
+  // says so instead.
+  const lead = F.leadReadHTML(leadReadOf(b), base);
+  if (lead) fill("ck-lead-read", lead);
+  else if (b.lead_read.state === "unavailable") fill("ck-lead-read", soft(b.lead_read.absent_text));
+  else document.getElementById("ck-lead-section")?.remove();
+  const sheet = sheetLine(characterOf(b));
+  fill("ck-sheet-line", sheet ? `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>` : esc(b.sheet.absent_text || ""));
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
-  const [read, transcript, character] = await Promise.all([tryJSON("/api/weekly_priority"), transcriptUrl ? tryJSON(transcriptUrl) : null, tryJSON("/api/character")]);
-  // Round 8: a section with nothing to show does not render its heading.
-  const lead = F.leadReadHTML(read, base);
-  if (lead) fill("ck-lead-read", lead);
-  else document.getElementById("ck-lead-section")?.remove();
+  const transcript = transcriptUrl ? await tryJSON(transcriptUrl) : null;
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
-  const sheet = sheetLine(character);
-  if (sheet) fill("ck-sheet-line", `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>`);
 }
 
 async function mountStart(edition, b) {

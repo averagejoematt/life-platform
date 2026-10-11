@@ -39,7 +39,6 @@ importable by the CI-side harness (tests/ already puts lambdas/ on sys.path).
 Stdlib-only — safe to import anywhere.
 """
 
-import json
 import os
 import re
 from datetime import date, timedelta
@@ -741,40 +740,36 @@ def parse_verdict(text):
     `findings` is empty because nothing was read, not because nothing was found,
     and callers must route on `unevaluated` before they read `findings`.
     """
-    m = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not m:
-        return {
-            "findings": [],
-            "severity": "unknown",
-            "summary": "(no structured verdict)",
-            UNEVALUATED_FIELD: KIND_NO_VERDICT,
-            "raw": (text or "")[:200],
-        }
+    from ai import structured_json  # the one parse door (#4276 box 2)
+
+    # The span runs from the FIRST "{" to the LAST "}" (the greedy DOTALL regex this
+    # replaced). #4474: a complete verdict followed by prose that itself contains a brace
+    # (or by a second object) spans both and fails to parse, although the verdict is
+    # whole — `first_value_fallback` then reads exactly one object from the first "{".
+    # A reply whose first object is itself broken still fails, and the GREEDY decoder
+    # error is kept, so the next unparseable batch names the position and reason.
     try:
-        v = json.loads(m.group(0))
-    except json.JSONDecodeError as greedy_err:
-        # #4474: the greedy span runs from the FIRST "{" to the LAST "}". A complete
-        # verdict followed by prose that itself contains a brace (or by a second
-        # object) spans both and fails to parse, although the verdict is whole.
-        # raw_decode reads exactly one object from the first "{" and ignores what
-        # follows. A reply whose first object is itself broken still fails, and the
-        # decoder's own message is kept, so the next unparseable batch names the
-        # position and reason instead of only "unparseable".
-        try:
-            v, _end = json.JSONDecoder().raw_decode(m.group(0))
-        except json.JSONDecodeError:
+        v = structured_json.load_json_span(text, "{", first_value_fallback=True)
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":
             return {
                 "findings": [],
                 "severity": "unknown",
-                "summary": "(unparseable verdict)",
-                UNEVALUATED_FIELD: KIND_UNPARSEABLE,
+                "summary": "(no structured verdict)",
+                UNEVALUATED_FIELD: KIND_NO_VERDICT,
                 "raw": (text or "")[:200],
-                "detail": f"{greedy_err.msg} at char {greedy_err.pos} of {len(m.group(0))}",
             }
-    # No isinstance(v, dict) guard here on purpose: the regex above only ever
-    # yields a span that starts "{" and ends "}", so json.loads returns a dict or
-    # raises — a third case does not exist, and a guard that cannot fire is the
-    # thing this issue is about.
+        return {
+            "findings": [],
+            "severity": "unknown",
+            "summary": "(unparseable verdict)",
+            UNEVALUATED_FIELD: KIND_UNPARSEABLE,
+            "raw": (text or "")[:200],
+            "detail": f"{e.msg} at char {e.pos} of {e.span_len}",
+        }
+    # No isinstance(v, dict) guard here on purpose: the span always starts "{" and
+    # ends "}", so the parse returns a dict or raises — a third case does not exist,
+    # and a guard that cannot fire is the thing this issue is about.
     if not isinstance(v.get("findings"), list):
         v["findings"] = []
     return v

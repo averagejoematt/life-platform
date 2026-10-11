@@ -1,0 +1,95 @@
+{
+ "days": [
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.575483+00:00",
+    "served_at": "2026-10-11T17:08:16.575483+00:00",
+    "cache_seconds": 300,
+    "request_id": "4eb403c62a2c4e34"
+   },
+   "state": "absent",
+   "date": "2026-10-03",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Saturday, October 3.",
+   "lines": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.508535+00:00",
+    "served_at": "2026-10-11T17:08:16.508535+00:00",
+    "cache_seconds": 300,
+    "request_id": "ba3280d795c44706"
+   },
+   "state": "absent",
+   "date": "2026-10-02",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Friday, October 2.",
+   "lines": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.434835+00:00",
+    "served_at": "2026-10-11T17:08:16.434835+00:00",
+    "cache_seconds": 300,
+    "request_id": "455b2add667b42cc"
+   },
+   "state": "absent",
+   "date": "2026-10-01",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Thursday, October 1.",
+   "lines": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.370976+00:00",
+    "served_at": "2026-10-11T17:08:16.370976+00:00",
+    "cache_seconds": 300,
+    "request_id": "f0b6367627ff43de"
+   },
+   "state": "absent",
+   "date": "2026-09-30",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Wednesday, September 30.",
+   "lines": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.312011+00:00",
+    "served_at": "2026-10-11T17:08:16.312011+00:00",
+    "cache_seconds": 300,
+    "request_id": "1319cb761a51499c"
+   },
+   "state": "absent",
+   "date": "2026-09-29",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Tuesday, September 29.",
+   "lines": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.253587+00:00",
+    "served_at": "2026-10-11T17:08:16.253587+00:00",
+    "cache_seconds": 300,
+    "request_id": "e84092d87aec409c"
+   },
+   "state": "absent",
+   "date": "2026-09-28",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Monday, September 28.",
+   "lines": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-10-11T17:08:16.192716+00:00",
+    "served_at": "2026-10-11T17:08:16.192716+00:00",
+    "cache_seconds": 300,
+    "request_id": "2888e14f34a0494c"
+   },
+   "state": "absent",
+   "date": "2026-09-27",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Sunday, September 27.",
+   "lines": []
+  }
+ ]
+}
