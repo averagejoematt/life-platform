@@ -235,6 +235,19 @@ def gate(
             hits=[(k, t) for k, t in e.violations if k != "context"],
         )
 
+    # 3b. The story door (#4538): the SAME reader-surface check the chronicle, the recap and the Panel face, in its
+    # `constructed` mode (a card has no free prose to spare a frame word). Replaces the cards' own literal rule.
+    from content import story_checks
+
+    door = story_checks.reader_surface(blob, constructed=True)
+    if door:
+        return GateResult(
+            VERDICT_HELD,
+            reason="card copy did not pass the story door (cycle/reset/attempt count or off-record specifics) — nothing sent",
+            blocked_templates=blocked_templates,
+            hits=[("story-door", context)],
+        )
+
     # 4. The semantic screen, over prose only, last (ADR-105: deterministic first).
     sens_verdict, sens_hits = screen_free_text(free_text or [], offtopic_classifier=offtopic_classifier, context=context)
     if sens_verdict != VERDICT_CLEARED:
