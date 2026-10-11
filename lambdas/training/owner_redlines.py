@@ -81,9 +81,8 @@ training recommendations were approved: the deload moves from every 6th session-
 −30 % to ONE pre-planned deload at the later of program week 6 (hybrid weeks) or the v0.4 block
 lock, −40 % sets for 7 days, loads held (`lifting_sessions_per_wk.deload`). (b) Ruling "B": the
 loss-rate target is CONDITIONAL ON PROTEIN ADHERENCE (`rate_protein_gate`) — the protein floor stays
-(the plan's `PLAN_DAILY_PROTEIN_MIN_G`; owner ruling 2026-10-11, #4540: 170 g, the sealed plan's number, not the 180 g
-this module carried before); the risk is adherence, not
-the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step."""
+(`PLAN_DAILY_PROTEIN_MIN_G`; owner ruling 2026-10-11, #4540: 170 g, the sealed plan's number, not the 180 g
+carried before); the risk is adherence, not the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
 PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # #4147; written by the driver, owner-private
@@ -244,8 +243,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "provenance": "owner",
         "stated": "2026-09-07",
         "note": (
-            "'Protein is the #1 preservation lever — 180 g/day target, currently under-hitting.' (2026-09-07 quote; the floor was re-ruled to the plan's "
-            f"{_PLAN_PROTEIN_FLOOR_G} g on 2026-10-11, #4540.) {_PLAN_PROTEIN_FLOOR_G} g is the FLOOR, "
+            f"'Protein is the #1 preservation lever — 180 g/day target, currently under-hitting.' (2026-09-07; re-ruled to the plan's {_PLAN_PROTEIN_FLOOR_G} g on 2026-10-11, #4540.) {_PLAN_PROTEIN_FLOOR_G} g is the FLOOR, "
             "200 g the target, on ≥6 of 7 days, in 4 feedings (Helms 2014, 2.3–3.1 g/kg FFM; Longland 2016, 2.4 g/kg in a 40 % deficit "
             "gained lean; Pasiakos 2013, no benefit past 2× RDA). Measured now: 107–146 g mean, floor met on 2 of 20 logged days."
         ),
@@ -294,10 +292,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         "unmeasured_day": "UNKNOWN, not missed — only a MacroFactor-logged day can miss the floor",
         "provenance": "owner",
         "stated": "2026-09-24",
-        "evidence": (
-            "Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; "
-            f"{_PLAN_PROTEIN_FLOOR_G} g = {_PLAN_PROTEIN_FLOOR_G / 77.4:.2f} g/kg of 77.4 kg DXA lean)"
-        ),
+        "evidence": f"Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; {_PLAN_PROTEIN_FLOOR_G} g = {_PLAN_PROTEIN_FLOOR_G / 77.4:.2f} g/kg of 77.4 kg DXA lean)",
         "note": "missed >= 3 of the trailing 7 MEASURED days -> the lower band; < 3 -> the step target returns; < 4 measured days -> unknown, target unchanged",
     },
     "fat_floor_g": {
