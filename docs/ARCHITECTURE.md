@@ -120,7 +120,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Notion Journal | `notion-journal-ingestion` | Hourly (active hours) | API pull |
 | Weather | `weather-data-ingestion` | 2x daily | API pull |
 | MacroFactor | `macrofactor-data-ingestion` | S3 trigger (Dropbox CSV) | File upload |
-| Dropbox Poll | `dropbox-poll` | `rate(30 minutes)` | File poll |
+| Dropbox Poll | `dropbox-poll` | `rate(2 hours)` | File poll |
 | Journal Enrichment | `journal-enrichment` | Hourly | Compute |
 | Activity Enrichment | `activity-enrichment` | Hourly | Compute |
 | Apple Health (CGM, water, BP, SOM) | `health-auto-export-webhook` | Near real-time (webhook) | HAE push |

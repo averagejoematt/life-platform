@@ -237,7 +237,7 @@ daily-brief-schedule                cron(0 17 * * ? *)
 | Dashboard Refresh | 02:00 PM | dashboard-refresh (lightweight, no AI — updates weight/glucose/zone2/TSB/buddy) |
 | Dashboard Refresh | 06:00 PM | dashboard-refresh (same as above, second daily run) |
 | Weather | 2x daily | weather-data-ingestion |
-| Dropbox Poll | Every 30 min | dropbox-poll |
+| Dropbox Poll | Every 2 hours | dropbox-poll |
 
 **MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 30 min) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
 
