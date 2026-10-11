@@ -480,20 +480,34 @@ def test_a_score_out_of_100_is_a_whole_number_and_the_stored_call_keeps_its_deci
     ]
     assert any(t != int(t) for t in stored), "the stored predictions keep their decimals"
     # hours, pounds and grams are not scores: their decimal stays
-    assert calls.said_pair(7.8, 7.1, 1.2, "sleep_duration_hours", True) == ("7.8 hours", "7.1 hours")
-    assert calls.said_pair(64.5, 70, 17.9, "recovery_score", True) == ("65", "70"), "half rounds up, not to even"
+    assert calls.said_pair(7.8, 7.1, 1.2, "sleep_duration_hours", True) == ("7.8 hours", "7.1 hours", "1.2 hours")
+    assert calls.said_pair(64.5, 70, 17.9, "recovery_score", True) == ("65", "70", "17.9"), "half rounds up, not to even"
 
 
 def test_rounding_never_changes_the_verdict_a_reader_recomputes():
     # 64.4 against 82 with 17.7 allowed is a hit (17.6); "64" against 82 would read as a miss (18)
-    assert calls.said_pair(64.4, 82, 17.7, "recovery_score", True) == ("64.4", "82")
+    assert calls.said_pair(64.4, 82, 17.7, "recovery_score", True) == ("64.4", "82", "17.7")
     # the same numbers graded as a miss keep their whole numbers: 18 > 17.7 agrees with it
-    assert calls.said_pair(64.4, 82, 17.7, "recovery_score", False) == ("64", "82")
-    # every call the route serves: the printed numbers agree with the printed verdict
-    for c in _doc()["calls"]:
+    assert calls.said_pair(64.4, 82, 17.7, "recovery_score", False) == ("64", "82", "17.7")
+    # Max Reyes, physical-20260912-7c9a8852c3 (tests/fixtures/edition_wire_4582/calls.json): a
+    # miss by 18.3 against 18.2532 allowed. "55"/"73" (18) and "54.7"/"73" against "18.3" (18.3)
+    # both read as a hit, so the allowance is printed to the precision that settles it.
+    assert calls.said_pair(54.7, 73.0, 18.2532, "recovery_score", False) == ("54.7", "73", "18.25")
+    # a whole-number pair the one-decimal allowance would flip: 18 against 17.96 is a miss, "18.0" a hit
+    assert calls.said_pair(60, 78, 17.96, "recovery_score", False) == ("60", "78", "17.96")
+    # the same ladder holds off the 0-100 scores
+    assert calls.said_pair(7.06, 8.24, 1.15, "sleep_duration_hours", False) == ("7.06 hours", "8.24 hours", "1.15 hours")
+    assert calls.said_pair(64.5, 70, None, "recovery_score", True) == ("65", "70", None)
+    # every call a route capture serves: the printed numbers agree with the printed verdict
+    wire = os.path.join(_REPO, "tests", "fixtures", "edition_wire_4582", "calls.json")
+    served = _doc()["calls"] + json.load(open(_KIT, encoding="utf-8"))["calls"] + json.load(open(wire, encoding="utf-8"))["calls"]
+    checked = 0
+    for c in served:
         if c["kind"] != "number":
             continue
-        want = float(re.search(r"at about (-?[\d.]+)", c["called_short"]).group(1))
-        seen = float(re.search(r"came in at (-?[\d.]+)", c["happened_short"]).group(1))
+        want = float(re.search(r"at about (-?\d+(?:\.\d+)?)", c["called_short"]).group(1))
+        seen = float(re.search(r"came in at (-?\d+(?:\.\d+)?)", c["happened_short"]).group(1))
         tol = float(c["tolerance"]["text"].split()[0])
-        assert (abs(seen - want) <= tol) == (c["verdict"] == "right"), c["id"]
+        assert (round(abs(seen - want), 6) <= tol) == (c["verdict"] == "right"), (c["id"], want, seen, tol, c["verdict"])
+        checked += 1
+    assert checked > 26

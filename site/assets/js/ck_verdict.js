@@ -3,8 +3,8 @@
 // A verdict with no rule beside it reads as arbitrary grading: "called 83.7, came in at 97:
 // Right" next to "called 59.3, came in at 82: Wrong" only makes sense once the reader sees
 // that each call had its own allowed distance. So a verdict is never printed alone here.
-// `verdictTag` takes the rule as an argument and, when there is none, prints a sentence
-// saying the rule is not available instead of a tag. No other file builds the kit's
+// `verdictTag` takes the rule as an argument and, when there is none, returns "" — no tag
+// and no stand-in sentence (#4808: no verdict without its rule). No other file builds the kit's
 // `ck-verdicts__tag` (tests/js/ck_verdict_4647.test.mjs holds that).
 //
 // The rule is read from GET /api/calls and nowhere else. A number call's allowed distance is

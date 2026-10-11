@@ -178,7 +178,7 @@
    },
    "tolerance": {
     "value": 18.2532,
-    "text": "18.3",
+    "text": "18.25",
     "statistic": "one standard deviation of his readings over the 30 days before the call",
     "window_days": 30,
     "n": 31

@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from coach import coach_baseline, coach_dossier, coach_record, prediction_windows
@@ -223,33 +224,74 @@ def _said(value: Any, metric: Any) -> str | None:
     return _amount(value, metric)
 
 
-def said_pair(want: Any, seen: Any, tolerance: Any, metric: Any, coach_right: bool) -> tuple[str | None, str | None]:
-    """The called and the measured number as the page prints them (#4808).
-
-    Whole numbers on a score out of 100 — UNLESS the whole numbers would make a reader's own
-    check (the distance between the two, against the allowed distance as printed) disagree
-    with the verdict: a call of 64.4 against 82 with 17.7 allowed is a hit (17.6), but "64"
-    against 82 reads as a miss (18). Then both keep their one decimal — rounding is never
-    allowed to change what a reader recomputes."""
-    exact = (_amount(want, metric), _amount(seen, metric))
-    if base_metric(str(metric or "")) not in WHOLE_SCORES:
-        return exact
-    w, s = _whole(want), _whole(seen)
-    if w is None or s is None:
-        return exact
-    shown = prediction_reason._num(tolerance)
-    if shown is not None and (abs(s - w) <= float(shown)) != coach_right:
-        return exact
-    return str(w), str(s)
+def _places(value: Any, places: int) -> str | None:
+    """``value`` to ``places`` decimals, half-up, trailing zeros dropped ("18.30" -> "18.3")."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    if places == 0:
+        return str(_whole(f))
+    text = str(Decimal(repr(f)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
+    return text.rstrip("0").rstrip(".") if "." in text else text
 
 
-def tolerance_block(spec: dict) -> dict | None:
+#: (decimals on the two numbers, decimals on the allowed distance), tried in order until a
+#: reader's own check on the printed figures agrees with the verdict (#4808). A score out of
+#: 100 starts whole; everything else starts at the one decimal ``_amount`` prints.
+_SCORE_PRECISIONS = ((0, 1), (0, 2), (1, 1), (1, 2), (2, 2), (3, 3), (4, 4))
+_AMOUNT_PRECISIONS = ((1, 1), (1, 2), (2, 2), (3, 3), (4, 4))
+
+
+def said_pair(want: Any, seen: Any, tolerance: Any, metric: Any, coach_right: bool) -> tuple[str | None, str | None, str | None]:
+    """The called number, the measured number and the allowed distance as the page prints them
+    (#4808) — chosen TOGETHER, because a reader checks the verdict on the printed figures:
+    is the distance between the two numbers within the printed allowance?
+
+    Whole numbers on a score out of 100 with the allowance to one decimal, and one decimal on
+    anything else — UNLESS that rounding makes the reader's check disagree with the verdict.
+    Two specimens: 64.4 against 82 with 17.7 allowed is a hit (17.6), but "64" against "82"
+    reads 18, a miss; and 54.7 against 73 with 18.2532 allowed is a miss (18.3 > 18.2532),
+    but "55"/"73" reads 18 and "54.7"/"73" against "18.3" reads 18.3 — both hits. Then the
+    precision steps up (the allowance first, the numbers next) until the printed figures
+    settle the check the way the grader did: "54.7", "73" and "18.25". Rounding is never
+    allowed to change what a reader recomputes. ``tolerance`` absent: the pair alone, as before."""
+    base = base_metric(str(metric or ""))
+    unit = prediction_reason._UNITS.get(base, "")
+    if _places(want, 0) is None or _places(seen, 0) is None:
+        return None, None, None
+    try:
+        allowed = float(tolerance)
+    except (TypeError, ValueError):
+        allowed = None
+    ladder = _SCORE_PRECISIONS if base in WHOLE_SCORES else _AMOUNT_PRECISIONS
+    if allowed is None:
+        p = ladder[0][0]
+        return f"{_places(want, p)}{unit}", f"{_places(seen, p)}{unit}", None
+    chosen = ladder[-1]
+    for numbers, allowance in ladder:
+        w, sn = Decimal(str(_places(want, numbers))), Decimal(str(_places(seen, numbers)))
+        t = Decimal(str(_places(tolerance, allowance)))
+        if (abs(sn - w) <= t) == coach_right:
+            chosen = (numbers, allowance)
+            break
+    numbers, allowance = chosen
+    return (
+        f"{_places(want, numbers)}{unit}",
+        f"{_places(seen, numbers)}{unit}",
+        f"{_places(tolerance, allowance)}{unit}",
+    )
+
+
+def tolerance_block(spec: dict, text: str | None = None) -> dict | None:
     """The allowed distance of a number call, served ONCE per call (#4808): the number as the
     tag prints it, and in words the statistic and window it was computed from, read off the
     rule string frozen into the spec at emission. ``statistic`` is None when the rule string is
-    not the emitter's form — the number still stands; no wording is guessed."""
+    not the emitter's form — the number still stands; no wording is guessed. ``text`` is the
+    allowance as ``said_pair`` printed it beside the two numbers, when it needed more than the
+    one decimal to keep a reader's check honest."""
     metric = spec.get("metric")
-    text = _amount(spec.get("tolerance"), metric)
+    text = text or _amount(spec.get("tolerance"), metric)
     if not text:
         return None
     m = _TOLERANCE_RULE_RE.search(str(spec.get("tolerance_rule") or ""))
@@ -419,7 +461,7 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
     coach_right = status == "confirmed"
     happened = f"{reason}."
     if kind == "number":
-        want, seen = said_pair(spec.get("threshold"), notes.get("actual_value"), spec.get("tolerance"), metric, coach_right)
+        want, seen, allowed = said_pair(spec.get("threshold"), notes.get("actual_value"), spec.get("tolerance"), metric, coach_right)
         if not want or not seen:
             return None, NO_READER_WORDS
         target = _iso_day(spec.get("target_date"))
@@ -427,7 +469,7 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         # #4808: the allowed distance is NOT in this sentence any more. It is served once, in
         # ``tolerance`` (the number and, in words, what it was computed from), and the kit
         # prints it once — in the verdict's tag — so no page says it twice.
-        tolerance = tolerance_block(spec)
+        tolerance = tolerance_block(spec, allowed)
         called = f"{name} called {subject} at about {want}{on}."
         called_short = f"{name} called {plain} at about {want}."
         happened_short = f"It came in at {seen}."
