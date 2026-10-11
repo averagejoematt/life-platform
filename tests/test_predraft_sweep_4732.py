@@ -231,3 +231,182 @@ def test_a_failing_sweep_never_stops_the_nights_draft():
     ):
         out = npd.run()
     assert out["outcome"] == npd.NO_SESSION and "RuntimeError" in out["sweep"]["error"]
+
+
+# ── owner ruling 2026-10-11: a draft the pre-draft did NOT author, untouched 14 days, is archived ──
+# The live shapes (routine repo, read-only, 2026-10-10): chat `draft_custom` drafts carrying `authored`
+# and (when red-teamed) a `critics` record whose `ran_at` is their last touch, and unmarked
+# `cron_generated` / floor drafts from the generator. Ids are the live prefixes.
+STALE_TODAY = "2026-10-11"  # cutoff 09-27
+
+
+def _chat(rid, day, archetype, created, critics_ran_at=None, version=2, hevy=None, status="draft"):
+    snap = {
+        "authored": {"by": "chat", "rationale": "owner-built in the evening chat"},
+        "cardio_cues": [],
+        "created_exercises": [],
+        "exercise_count": 6,
+        "force_title": True,
+        "total_sets": 18,
+    }
+    if critics_ran_at:
+        snap["critics"] = {"ran_at": critics_ran_at, "verdicts": [{"critic": "load", "verdict": "pass"}], "binding": {"version": version}}
+    return RoutineSpec(
+        routine_id=rid,
+        target_date=day,
+        archetype=archetype,
+        variant="ideal",
+        status=status,
+        version=version,
+        parent_version=version - 1,
+        created_by="chat",
+        source_action="draft_custom",
+        created_at=created,
+        hevy_routine_id=hevy,
+        inputs_snapshot=snap,
+    )
+
+
+def _cron(rid, day, archetype, variant, created, version=3):
+    snap = (
+        {"calendar": {"session_role": f"{archetype}_heavy"}}
+        if variant == "ideal"
+        else {"session_role": f"{archetype}_heavy", "variant": variant}
+    )
+    return RoutineSpec(
+        routine_id=rid,
+        target_date=day,
+        archetype=archetype,
+        variant=variant,
+        status="draft",
+        version=version,
+        parent_version=version - 1,
+        created_by="cron",
+        source_action="cron_generated" if variant == "ideal" else variant,
+        created_at=created,
+        inputs_snapshot=snap,
+    )
+
+
+# untouched since 09-26 (≤ cutoff 09-27) → archived
+STALE_CHAT = _chat("2c101a6f-chat", "2026-09-26", "lower", "2026-09-26T04:03:45.264667+00:00", "2026-09-26T04:04:08.437664+00:00")
+STALE_UNREVIEWED = _chat("6b310125-chat", "2026-09-27", "lower", "2026-09-26T17:03:49.148957+00:00", version=1)
+STALE_CRON = _cron("8409f757-cron", "2026-09-20", "lower", "ideal", "2026-09-20T02:00:38.731040+00:00")
+# touched inside the window → kept
+RECENT_CHAT = _chat("34a34a5a-chat", "2026-09-28", "lower", "2026-09-28T02:03:47.944385+00:00", "2026-09-28T02:04:10.719319+00:00")
+OLD_BUT_RETOUCHED = _chat("38995601-chat", "2026-09-26", "flex", "2026-09-26T17:15:46.834097+00:00", "2026-10-05T17:16:08Z")
+# old, but its day has not come — a planned session is never read as abandoned
+OLD_FUTURE_DAY = _chat("f00dfeed-chat", "2026-10-14", "upper", "2026-09-20T17:00:00Z")
+# pushed to Hevy / committed / already archived — never the rule's business
+OLD_PUSHED = _chat("bead0001-pushed", "2026-09-20", "upper", "2026-09-19T17:00:00Z", hevy="hv-0920")
+OLD_ACTIVE = _chat("bead0002-active", "2026-09-21", "upper", "2026-09-20T17:00:00Z", status="active", hevy="hv-0921")
+OLD_ARCHIVED = _chat("bead0003-archived", "2026-09-22", "upper", "2026-09-21T17:00:00Z", status="archived")
+# no stamp at all: an unknown age is never read as old
+UNSTAMPED = _chat("bead0004-nostamp", "2026-09-23", "lower", "")
+
+STALE_ALL = [
+    STALE_CHAT,
+    STALE_UNREVIEWED,
+    STALE_CRON,
+    RECENT_CHAT,
+    OLD_BUT_RETOUCHED,
+    OLD_FUTURE_DAY,
+    OLD_PUSHED,
+    OLD_ACTIVE,
+    OLD_ARCHIVED,
+    UNSTAMPED,
+]
+STALE_WANT = {STALE_CHAT.routine_id, STALE_UNREVIEWED.routine_id, STALE_CRON.routine_id}
+
+
+def _stale_seeded():
+    table = _Table()
+    with patch.object(routine_repo, "_table", table):
+        for ir in STALE_ALL:
+            routine_repo.put_versioned(RoutineSpec(**{**ir.__dict__, "inputs_snapshot": dict(ir.inputs_snapshot)}))
+    return table
+
+
+def _sweep(table, today=STALE_TODAY):
+    with patch.object(routine_repo, "_table", table):
+        out = npd.sweep_expired(today, "2026-10-11T02:00:01Z", genesis=GENESIS)
+        current = {ir.routine_id: routine_repo.get_current(ir.routine_id) for ir in STALE_ALL}
+    return out, current
+
+
+def test_a_non_predraft_draft_untouched_14_days_is_archived_never_deleted_and_nothing_else_moves():
+    table = _stale_seeded()
+    before_keys = set(table.items)
+    out, current = _sweep(table)
+    offenders = []
+    archived = {a["routine_id"]: a["reason"] for a in out["archived"]}
+    if archived != {rid: npd.STALE_REASON for rid in STALE_WANT}:
+        offenders.append(("archived set", archived))
+    if out["window"].get("stale_cutoff") != "2026-09-27" or out["errors"]:
+        offenders.append(("window / errors", out["window"], out["errors"]))
+    seeded = {ir.routine_id: int(ir.version) for ir in STALE_ALL}
+    for rid in STALE_WANT:
+        ir = current[rid]
+        stamp = (ir.inputs_snapshot or {}).get(npd.AUTO_ARCHIVE_KEY) or {}
+        if ir.status != "archived" or stamp.get("reason") != npd.STALE_REASON or not stamp.get("last_touched"):
+            offenders.append(("not archived with its stamp", rid, ir.status, stamp))
+        if npd.MARKER in (ir.inputs_snapshot or {}):
+            offenders.append(("a chat draft now reads as a pre-draft", rid))
+        if int(ir.version) != seeded[rid] + 1:
+            offenders.append(("the archive is not the NEXT version", rid, ir.version))
+        for v in (seeded[rid], seeded[rid] + 1):
+            if (f"USER#matthew#ROUTINE#{rid}", f"VERSION#{v:06d}") not in table.items:
+                offenders.append(("version item missing", rid, v))
+    for ir in STALE_ALL:
+        if ir.routine_id in STALE_WANT:
+            continue
+        got = current[ir.routine_id]
+        if got.status != ir.status or int(got.version) != int(ir.version):
+            offenders.append(("touched a routine the rule must leave", ir.routine_id, got.status, got.version))
+    if not before_keys <= set(table.items) or table.deletes:
+        offenders.append(("an item disappeared", sorted(before_keys - set(table.items))))
+    # the qa-smoke census drops the archived ones; the recent / unstamped drafts stay counted
+    with patch.object(routine_repo, "_table", table):
+        live = {ir.routine_id for ir in routine_repo.stale_draft_census(older_than_days=7, today=STALE_TODAY, genesis=GENESIS)["live"]}
+    if live & STALE_WANT:
+        offenders.append(("census still counts an archived draft", sorted(live & STALE_WANT)))
+    assert not offenders, offenders
+
+
+def test_a_second_run_is_a_no_op():
+    table = _stale_seeded()
+    _sweep(table)
+    out, _ = _sweep(table)
+    assert out["archived"] == [] and out["errors"] == []
+
+
+def test_the_threshold_is_fourteen_days_to_the_day():
+    """Touched on the cutoff day (today − 14) → archived; one day later → kept."""
+    on_cutoff = _chat("edge0001", "2026-09-27", "lower", "2026-09-27T23:59:00Z")
+    day_after = _chat("edge0002", "2026-09-28", "lower", "2026-09-28T00:00:01Z")
+    assert npd._stale_reason(on_cutoff, STALE_TODAY, "2026-09-27") == npd.STALE_REASON
+    assert npd._stale_reason(day_after, STALE_TODAY, "2026-09-27") is None
+    assert npd.STALE_DRAFT_DAYS == 14
+
+
+def test_the_rule_alone_never_reaches_a_day_still_ahead():
+    """The sweep's window already ends at today; the rule holds on its own too (another caller may pass
+    a wider list): an old draft for a day still ahead, or for today, is a planned session."""
+    for day in (STALE_TODAY, OLD_FUTURE_DAY.target_date):
+        ir = _chat("ahead0001", day, "upper", "2026-09-01T17:00:00Z")
+        assert npd._stale_reason(ir, STALE_TODAY, "2026-09-27") is None, day
+
+
+def test_mutation_check_the_rule_is_what_archives_them():
+    """Mutation control: with `_stale_reason` disarmed the same fixture archives NOTHING (none of it is the
+    pre-draft's), and with the last-touch reduced to `created_at` alone the re-touched draft is wrongly
+    archived — so the fixture discriminates both the rule and its notion of "touched"."""
+    table = _stale_seeded()
+    with patch.object(npd, "_stale_reason", return_value=None):
+        out, _ = _sweep(table)
+    assert out["archived"] == []
+
+    table = _stale_seeded()
+    with patch.object(npd, "_last_touched_day", lambda ir: str(ir.created_at or "")[:10]):
+        out, _ = _sweep(table)
+    assert OLD_BUT_RETOUCHED.routine_id in {a["routine_id"] for a in out["archived"]}

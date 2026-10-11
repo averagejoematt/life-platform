@@ -1,0 +1,43 @@
+{
+  "captured_at": "2026-10-04T20:39:19.762950+00:00",
+  "fetch_path": "/api/owner_words",
+  "is_prefix_sample": false,
+  "path": "/api/owner_words",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "entries": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "sentence": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
