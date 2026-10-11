@@ -202,6 +202,44 @@ def test_run_or_fallback_deadline_miss_stops_job_and_runs_everything_on_demand(m
     assert "missed its deadline" in out["reason"]
 
 
+def _raising_wait(monkeypatch, fake, stop_raises=False):
+    from botocore.exceptions import ClientError
+
+    def _wait(arn, deadline, poll_interval=60.0):
+        raise ClientError({"Error": {"Code": "ThrottlingException", "Message": "slow down"}}, "GetModelInvocationJob")
+
+    monkeypatch.setattr(bb, "wait_for_batch", _wait)
+    cleaned = []
+    monkeypatch.setattr(bb, "_cleanup", lambda i, o, log: cleaned.append((i, o)))
+    if stop_raises:
+        ctrl = MagicMock()
+        ctrl.stop_model_invocation_job.side_effect = RuntimeError("stop denied")
+        monkeypatch.setattr(bb, "_ctrl", lambda: ctrl)
+    return cleaned
+
+
+def test_run_or_fallback_wait_exception_stops_job_runs_on_demand_and_cleans_up(monkeypatch):
+    _tier(monkeypatch)
+    fake = _FakeBatch(monkeypatch)
+    cleaned = _raising_wait(monkeypatch, fake)
+    out = bb.run_or_fallback(_records(100), "claude-sonnet-4-6", lambda mi: "RT", role_arn="arn:role", log=lambda m: None)
+    assert fake.stopped == ["arn:aws:bedrock:us-west-2:123:model-invocation-job/abc123"]
+    assert out["results"] == ["RT"] * 100 and out["batch_records"] == 0 and out["realtime_records"] == 100
+    assert cleaned == [(fake.submitted[0]["in"], fake.submitted[0]["out"])]
+    assert "wait failed" in out["reason"]
+
+
+def test_run_or_fallback_wait_exception_with_failing_stop_still_falls_back_and_cleans_up(monkeypatch):
+    _tier(monkeypatch)
+    fake = _FakeBatch(monkeypatch)
+    cleaned = _raising_wait(monkeypatch, fake, stop_raises=True)
+    logs = []
+    out = bb.run_or_fallback(_records(100), "claude-sonnet-4-6", lambda mi: "RT", role_arn="arn:role", log=logs.append)
+    assert out["results"] == ["RT"] * 100
+    assert cleaned == [(fake.submitted[0]["in"], fake.submitted[0]["out"])]
+    assert any("could not stop" in m for m in logs)
+
+
 def test_run_or_fallback_failed_job_runs_everything_on_demand(monkeypatch):
     _tier(monkeypatch)
     _FakeBatch(monkeypatch, status="Failed")
