@@ -54,6 +54,7 @@ _RUN_AXE_JS = """async () => {
 #: path -> phone-screen budget. Adding a kit page means adding it here.
 KIT_PAGES = {
     "/next/v8/": 6,
+    "/next/v8/week/": 4,  # round 8: the week band moved here whole from the front page
     "/next/v8/start/": 4,
     "/next/v8/story/": 4,
     "/next/v8/coaches/": 4,

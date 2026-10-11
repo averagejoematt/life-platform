@@ -219,7 +219,7 @@ test("the stage Matthew is in, its plan and what opens the next one; then the st
 
 test("the record is a count beside the comparison, never a percentage and never alone", () => {
   const html = C.recordHTML(SLEEP);
-  assert.match(html, /<p class="ck-big">15<span>of 35 checked calls<\/span><\/p>/);
+  assert.match(html, /<p class="ck-big">15<span> of 35 checked calls<\/span><\/p>/);
   // The route serves the comparison for this coach's calls alone, so the sentence says whose.
   assert.equal(SLEEP.report_card.track_record.comparison.sentence, "Across 35 checked calls, so far they do not beat a simple guess.");
   assert.match(html, /Across Lisa Park’s 35 checked calls, so far they do not beat a simple guess\. The simple guess is that nothing changes from the last reading\./);
@@ -312,7 +312,7 @@ test("when the coach's own route is not served, the roster still names it and ca
   assert.equal(view.name, "Lisa Park");
   assert.equal(view.partial, true);
   assert.match(C.watchingHTML(view), /not available right now/);
-  assert.match(C.recordHTML(view), /15<span>of 35 checked calls/, "the roster carries the record and its comparison");
+  assert.match(C.recordHTML(view), /15<span> of 35 checked calls/, "the roster carries the record and its comparison");
   const thin = structuredClone(ROSTER);
   thin.coaches.find((c) => c.persona_id === "sleep_coach").comparison = null;
   assert.match(C.recordHTML(C.coachView("sleep_coach", null, thin)), /What a simple guess would have scored/, "a roster entry with no comparison draws no count");

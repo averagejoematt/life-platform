@@ -77,7 +77,7 @@ test("the coaches' count never renders without its comparison", () => {
   const alone = { ...B.record, data: { ...B.record.data, comparison_text: "" } };
   assert.equal(P.recordLine(alone), "");
   assert.doesNotMatch(P.recordBigHTML(alone), /ck-big/);
-  assert.match(P.recordBigHTML(B.record), /56<span>of 131 checked calls<\/span>/);
+  assert.match(P.recordBigHTML(B.record), /56<span> of 131 checked calls<\/span>/);
   assert.match(P.recordBigHTML(B.record), /So far they do not beat a simple guess\./);
 });
 

@@ -192,16 +192,40 @@ export function recordHTML(call, body) {
 // with neither the newest call. The label is the day it settled, whichever call it is.
 // "Settled <day>: <coach> called X. It came in at Y. Wrong · not within Z either way."
 // The simple guess is said here only once it has a result on this call.
-export function lastCallHTML(callsBody, base) {
+// Which call leads, and why: {call, kind} with kind "wrong" (the clearest miss), "right" (the
+// tightest hit, when no miss is printable) or "latest". {call: null, kind: ""} with nothing served.
+// With `asOf`, the clearest miss settled in the seven days up to it comes first ("recent"),
+// so the slot moves with the week; the all-time clearest miss stands in when the week has none.
+export const RECENT_DAYS = 7;
+const daysBefore = (iso, n) => {
+  const t = Date.parse(`${iso}T12:00:00Z`);
+  return Number.isFinite(t) ? new Date(t - n * 86400000).toISOString().slice(0, 10) : "";
+};
+export function lastCallPick(callsBody, asOf = "") {
   const all = callsOf(callsBody);
+  const since = asOf ? daysBefore(asOf, RECENT_DAYS) : "";
+  if (since) {
+    const recent = showcasePair(all.filter((c) => c.settled_date >= since && c.settled_date <= asOf));
+    if (recent.wrong) return { call: recent.wrong, kind: "recent" };
+  }
   const pair = showcasePair(all);
-  const call = pair.wrong || pair.right || all[0];
+  if (pair.wrong) return { call: pair.wrong, kind: "wrong" };
+  if (pair.right) return { call: pair.right, kind: "right" };
+  return { call: all[0] || null, kind: all[0] ? "latest" : "" };
+}
+// `jobs` maps a persona id to the coach's job in a word or two: with it, the card's first line
+// names the coach and the job ("Settled Saturday, October 10 · Lisa Park, the sleep coach"),
+// and the result is the bold line — the punch, not the rule (round 8b).
+export function lastCallHTML(callsBody, base, asOf = "", jobs = null) {
+  const { call } = lastCallPick(callsBody, asOf);
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;
   const guess = g && g.state === "scored" && g.short ? `The simple guess: ${g.short}.` : "";
   const said = call.kind === "bet" ? esc(call.verdict_text) : callVerdictTag(call);
-  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
+  const job = jobs && call.kind !== "bet" && call.coach_name && jobs[personaOfCall(call.coach_id)] ? ` · ${call.coach_name}, the ${jobs[personaOfCall(call.coach_id)]} coach` : "";
+  const sentence = jobs ? `${esc(call.called || call.called_short)} <b>${esc(call.happened_short)}</b>` : `<b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}`;
+  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}${esc(job)}</p><p>${sentence}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
 }
 
 // "Next: <question> settles <day>." — the day is written here from the served date so the

@@ -1,0 +1,17 @@
+{
+  "state": "ok",
+  "date": "2026-10-05",
+  "source": "/api/coach_moves",
+  "absent_text": "No coach line is recorded for Monday, October 5.",
+  "lines": [
+    {
+      "coach_id": "nutrition_coach",
+      "coach": "Marcus Webb",
+      "move": "reaction",
+      "move_label": "On a result",
+      "text": "Marcus Webb called it — non-compensated carb cuts correlating with recovery decline — and that result is graded true, yet Matthew's recovery score today is 98, his strongest so far; I think the structure held better than the prediction implied.",
+      "replies_to": null,
+      "bet_settles": null
+    }
+  ]
+}
