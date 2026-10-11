@@ -758,6 +758,8 @@
      "right": 41,
      "decided": 96,
      "count_text": "41 of 96 checked calls right.",
+     "counted": null,
+     "counted_text": null,
      "beats_simple_guess": false,
      "comparison_text": "So far they do not beat a simple guess.",
      "brier_skill": -0.0158,

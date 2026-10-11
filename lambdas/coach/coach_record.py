@@ -50,6 +50,7 @@ decides which cycle the resolution belongs to).
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Iterable
 
 from boto3.dynamodb.conditions import Key
@@ -83,6 +84,7 @@ _PROJECTION_NAMES = {
     "#pr": "pre_registered",
     "#src": "source",
     "#conf": "confidence",
+    "#cn": "claim_natural",  # #4617: what the record counts (``call_class``) reads the sentence
 }
 
 
@@ -183,6 +185,70 @@ def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool =
         if outcome_date > through:
             through = outcome_date
     return {"confirmed": confirmed, "refuted": refuted, "n": confirmed + refuted, "through": through or None}
+
+
+# ── #4617: what the record counts ─────────────────────────────────────────────────────────
+# "N of M checked calls right" counted three different things as one: calls sealed before
+# day one, calls whose measure and direction a model read out of in-experiment commentary,
+# and conditional/hedged sentences graded on their outcome with the condition never checked.
+# Nothing is dropped from the count; every decided row is exactly ONE of these classes, and
+# the served sentence names each class's count so the reader knows what the number is.
+
+#: Every decided call is exactly one of these, in the order a sentence names them.
+CALL_KINDS = ("sealed", "bet", "commentary", "conditional")
+CALL_KIND_WORDS = {
+    "sealed": ("sealed before day one", "sealed before day one"),
+    "bet": ("side of a bet between two coaches", "sides of bets between two coaches"),
+    "commentary": ("read out of the coaches' running commentary", "read out of the coaches' running commentary"),
+    "conditional": ("conditional or hedged sentence", "conditional or hedged sentences"),
+}
+#: A conditional or hedged sentence is not falsifiable by the measure alone (the one
+#: definition — ``web.site_api_calls`` reads it from here).
+CONDITIONAL_RE = re.compile(r"\b(if|unless|once|when|whenever|assuming|provided|until|may|might|could)\b", re.IGNORECASE)
+
+
+def call_class(row: dict) -> str:
+    """Which of ``CALL_KINDS`` a graded PREDICTION# row is (never None — nothing is dropped).
+
+    sealed  — ``pre_registered`` (frozen before Day 1 as a measure, a direction and a window);
+    bet     — a dispute-docket position (its criterion was frozen when the bet opened);
+    conditional — a ``conditional`` spec, or a coach sentence that is conditional/hedged;
+    commentary  — everything else: a call a model read out of in-experiment commentary.
+    """
+    if row.get("pre_registered"):
+        return "sealed"
+    if row.get("source") == "dispute_docket":
+        return "bet"
+    spec = row.get("evaluation") if isinstance(row.get("evaluation"), dict) else {}
+    if spec.get("type") == "conditional" or CONDITIONAL_RE.search(str(row.get("claim_natural") or "")):
+        return "conditional"
+    return "commentary"
+
+
+def class_counts(decided: Iterable[Any]) -> dict:
+    """``{class: {"n", "right"}}`` over DECIDED rows, every class present (zeros included)."""
+    out = {k: {"n": 0, "right": 0} for k in CALL_KINDS}
+    for row in decided or []:
+        if not isinstance(row, dict) or graded_status(row) is None:
+            continue
+        c = out[call_class(row)]
+        c["n"] += 1
+        c["right"] += graded_status(row) == "confirmed"
+    return out
+
+
+def counted_text(counts: dict | None) -> str | None:
+    """ "Counted: 9 sealed before day one, 59 read out of the coaches' running commentary and 6
+    conditional or hedged sentences." — every non-empty class, in order; None when empty."""
+    parts = []
+    for key in CALL_KINDS:
+        n = int(((counts or {}).get(key) or {}).get("n") or 0)
+        if n:
+            parts.append(f"{n} {CALL_KIND_WORDS[key][0 if n == 1 else 1]}")
+    if not parts:
+        return None
+    listed = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    return f"Counted: {listed}."
 
 
 _MONTH_WORDS = (

@@ -971,16 +971,22 @@ class TestBayesianPosterior:
         published mean_confidence could only fall."""
         daily_series("hrv", [60.0], table=table)
         spec = {"type": "machine", "metric": "hrv", "condition": "gt", "threshold": 50}
-        evaluations, _ = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=days_before(30))], TODAY)
+        evaluations, _ = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=HRV_WINDOW_OPENED)], TODAY)
         assert evaluations[0]["status"] == "confirmed"
         assert evaluations[0]["bayesian_update"] == "success"
+
+
+# #4617: a dated direction call is graded across ITS OWN window, [created, created + 14 days] for
+# hrv — so a call that reads the 14-day series ending TODAY must have opened 14 days ago. (Opened
+# 30 days ago its window closed 16 days back, before any seeded reading: no verdict, not a guess.)
+HRV_WINDOW_OPENED = days_before(14)
 
 
 class TestVerdictRouting:
     def test_a_confirmed_directional_call_credits_the_coachs_posterior(self, table):
         daily_series("hrv", TestEwmaTrend.RISING, table=table)
         spec = {"type": "directional", "metric": "hrv", "condition": "up"}
-        evaluations, stats = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=days_before(30))], TODAY)
+        evaluations, stats = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=HRV_WINDOW_OPENED)], TODAY)
         assert (evaluations[0]["status"], evaluations[0]["bayesian_update"]) == ("confirmed", "success")
         assert float(confidence_rows(table)[-1]["alpha"]) == 2.0
         assert stats["confirmed"] == 1
@@ -988,15 +994,16 @@ class TestVerdictRouting:
     def test_a_refuted_directional_call_debits_the_coachs_posterior(self, table):
         daily_series("hrv", TestEwmaTrend.FALLING, table=table)
         spec = {"type": "directional", "metric": "hrv", "condition": "up"}
-        evaluations, stats = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=days_before(30))], TODAY)
+        evaluations, stats = ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=HRV_WINDOW_OPENED)], TODAY)
         assert (evaluations[0]["status"], evaluations[0]["bayesian_update"]) == ("refuted", "failure")
         assert float(confidence_rows(table)[-1]["beta_param"]) == 2.0
         assert stats["refuted"] == 1
 
     def test_a_verdict_with_no_subdomain_still_lands_in_the_public_learning_trail(self, table):
-        daily_series("hrv", TestEwmaTrend.FALLING, table=table)
+        # No subdomain → the 21-day default window (#4617: graded across it, so the series spans it).
+        daily_series("hrv", [60.0] * 8 + TestEwmaTrend.FALLING, table=table)
         spec = {"type": "directional", "metric": "hrv", "condition": "up"}
-        pred = prediction(evaluation=spec, subdomain="", created_date=days_before(30))
+        pred = prediction(evaluation=spec, subdomain="", created_date=days_before(21))
         ev._evaluate_all([pred], TODAY)
         assert confidence_rows(table) == []  # nowhere to file the posterior
         assert len(learning_rows(table)) == 1  # but the miss is still published
@@ -1041,7 +1048,7 @@ class TestCreditIsSymmetric:
         """The control: the half that already worked must keep working."""
         daily_series("hrv", [40.0], table=table)
         evaluations, stats = ev._evaluate_all(
-            [prediction(evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=days_before(30))], TODAY
+            [prediction(evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=HRV_WINDOW_OPENED)], TODAY
         )
         assert (evaluations[0]["status"], evaluations[0]["beats_null"]) == ("refuted", False)
         assert evaluations[0]["bayesian_update"] == "failure"
@@ -1056,7 +1063,7 @@ class TestCreditIsSymmetric:
         less trusted than they began it.
         """
         daily_series("hrv", [60.0], table=table)
-        hit = prediction(pred_id="hit", evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=days_before(30))
+        hit = prediction(pred_id="hit", evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=HRV_WINDOW_OPENED)
         miss = prediction(
             pred_id="miss",
             evaluation={"type": "machine", "metric": "hrv", "condition": "lt", "threshold": 50},
@@ -1096,7 +1103,7 @@ class TestCreditIsSymmetric:
             lambda *a, **k: {"status": "confirmed", "reason": "matched the null", "actual_value": 60.0, "beats_null": False},
         )
         evaluations, stats = ev._evaluate_all(
-            [prediction(evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=days_before(30))], TODAY
+            [prediction(evaluation=dict(self.THRESHOLD_SPEC), subdomain="hrv", created_date=HRV_WINDOW_OPENED)], TODAY
         )
         assert evaluations[0]["status"] == "confirmed"
         assert evaluations[0]["bayesian_update"] is None
@@ -1112,7 +1119,7 @@ class TestWrittenRecord:
     def test_a_graded_prediction_is_written_back_with_its_verdict_and_date(self, table):
         daily_series("hrv", TestEwmaTrend.FALLING, table=table)
         spec = {"type": "directional", "metric": "hrv", "condition": "up"}
-        ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=days_before(30))], TODAY)
+        ev._evaluate_all([prediction(evaluation=spec, subdomain="hrv", created_date=HRV_WINDOW_OPENED)], TODAY)
         stored = table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]
         assert (stored["status"], stored["outcome"], stored["outcome_date"]) == ("refuted", "refuted", TODAY)
 
@@ -1162,7 +1169,7 @@ class TestWrittenRecord:
     def test_a_subjects_diary_claim_is_graded_but_moves_no_coachs_posterior(self, table):
         daily_series("hrv", TestEwmaTrend.FALLING, table=table)
         spec = {"type": "directional", "metric": "hrv", "condition": "up"}
-        claim = prediction(coach_id="", pred_id="claim_1", evaluation=spec, subdomain="hrv", created_date=days_before(30))
+        claim = prediction(coach_id="", pred_id="claim_1", evaluation=spec, subdomain="hrv", created_date=HRV_WINDOW_OPENED)
         evaluations, _ = ev._evaluate_all([claim], TODAY)
         assert evaluations[0]["status"] == "refuted"
         assert (confidence_rows(table), learning_rows(table)) == ([], [])
@@ -1424,7 +1431,7 @@ class TestHandler:
             prediction(
                 pred_id="p1",
                 subdomain="hrv",
-                created_date=days_before(30),
+                created_date=HRV_WINDOW_OPENED,
                 evaluation={"type": "directional", "metric": "hrv", "condition": "up"},
             ),
         )

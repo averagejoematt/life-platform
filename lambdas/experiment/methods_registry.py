@@ -46,6 +46,7 @@ import types
 
 from ai import conversation_enrichment
 from coach.coach_prediction_evaluator import _get_ewma_trend  # #3448: the directional-band stamp's fingerprinted source
+from coach.prediction_direction_window import measure as _direction_window_measure  # #4617: the window grade's source
 from common import stats_core
 
 from experiment import bsts_lite, calibration_core
@@ -650,7 +651,35 @@ REGISTRY = {
         # multi-device duplicate activities and recomputes the day totals.
         "f5c734515863",
         min_n=9,
-        used_by="Coach prediction grading \u2014 the #813 directional rescue path for machine specs.",
+        used_by=(
+            "Coach prediction grading \u2014 since #4617 only a direction call with no filing date "
+            "(every dated call is graded by directional_window_verdict)."
+        ),
+    ),
+    "directional_window_verdict": _entry(
+        "directional_window_verdict",
+        "Direction call graded across its own window (up / down / flat)",
+        _direction_window_measure,
+        "Calibration",
+        "change = last reading \u2212 first reading of [filed day, filed day + stated window]; "
+        "band = median |day-to-day change| of the window's readings (\u00f7 \u221ak for an "
+        "N-day-average call, comparing the mean of the first k and last k readings, "
+        "k = min(N, readings \u00f7 2)); change > band \u2192 up, < \u2212band \u2192 down, else flat",
+        "The call's own stated window (the domain-clamped window when none is stated), from "
+        "the day it was filed \u2014 genesis for a call sealed before day one. Readings after "
+        "the window's last day never enter. At least 4 readings, the first and last within "
+        "2 days of their edges, else no verdict (never a flat one).",
+        "The band is derived from the subject's own day-to-day variance inside the window "
+        "(ADR-105), about one standard deviation of the first-minus-last difference a "
+        "no-change series would produce \u2014 so a single noisy edge reading (a partial "
+        "day of steps) can still decide a raw-reading call; the N-day-average calls smooth "
+        "it. The median step includes any real trend per day, which widens the band slightly "
+        "on a steadily moving series. Replaced the latest-readings EWMA check (#4617): two "
+        "sealed weight calls it graded flat sat on a window where the served weigh-ins fell "
+        "more than ten pounds.",
+        "e6fd28082ad4",
+        min_n=4,
+        used_by="Coach prediction grading \u2014 every dated direction call, and every machine spec the #813 rescue re-routes.",
     ),
     "calibration_verdict": _entry(
         "calibration_verdict",

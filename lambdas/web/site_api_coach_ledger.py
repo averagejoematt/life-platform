@@ -813,7 +813,26 @@ def handle_calibration(event, *, _g):
 #: ``coach_record`` reads; ``status``/``outcome``/``confidence`` are the grade and the Brier
 #: pair. The maps and prose the two full routes also carry (``evaluation``, ``baseline``,
 #: ``claim_natural``, ``outcome_notes`` …) are what made the same partitions cost megabytes.
-_RECORD_PROJECTION_FIELDS = ("status", "outcome", "confidence", "tombstone", "phase", "prediction_id", "outcome_date")
+_RECORD_PROJECTION_FIELDS = (
+    "status",
+    "outcome",
+    "confidence",
+    "tombstone",
+    "phase",
+    "prediction_id",
+    "outcome_date",
+    # #4617: what the record counts — coach_record.call_class reads these four.
+    "pre_registered",
+    "source",
+    "evaluation",
+    "claim_natural",
+)
+
+
+def _counted_block(decided) -> dict:
+    """#4617: what the headline count counts — every decided row in exactly one class, never dropped."""
+    counted = coach_record.class_counts(decided)
+    return {"counted": counted, "counted_text": coach_record.counted_text(counted)}
 
 
 def edition_record(*, _g):
@@ -860,9 +879,11 @@ def edition_record(*, _g):
         logger.error(f"[edition-record] degraded — {len(failures)} of {len(_CALIB_COACH_NAMES)} partitions failed: {sorted(failures)}")
     confirmed = refuted = 0
     coach_pairs: list = []
+    season_all: list = []  # #4617: the rows the class counts are taken over — the same season
     for cid in _CALIB_COACH_NAMES:
         records = coach_record.resolved_once(fetched.get(cid, []))
         season = [r for r in records if coach_record.counts_this_cycle(r, EXPERIMENT_START)]
+        season_all.extend(season)
         for rec in season:
             status = rec.get("status", "pending")  # the bucket key handle_predictions tallies
             if status == "confirmed":
@@ -873,7 +894,13 @@ def edition_record(*, _g):
     today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
     return {
         "predictions": {
-            "overall": {"confirmed": confirmed, "refuted": refuted, "decided": confirmed + refuted, "due": {"as_of": today_pt}}
+            "overall": {
+                "confirmed": confirmed,
+                "refuted": refuted,
+                "decided": confirmed + refuted,
+                "due": {"as_of": today_pt},
+                **_counted_block(season_all),
+            }
         },
         "calibration": {
             "platform": {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}},
@@ -1220,6 +1247,7 @@ def handle_predictions(event, *, _g):
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
                     "due": due,
+                    **_counted_block(season_decided),  # #4617: sealed / bets / commentary / conditional, as counts
                     "lifetime": {
                         "total": l_total,
                         "confirmed": l_confirmed,

@@ -96,8 +96,8 @@ WITHHELD = "withheld by the privacy filter"
 NO_IDENTITY = "the stored row has no stable identity"
 UNSOURCED = "the sentence rests on a sensor that had sent no reading by the day it was said"
 
-#: A conditional or hedged sentence is not falsifiable by the measure alone.
-_CONDITIONAL_RE = re.compile(r"\b(if|unless|once|when|whenever|assuming|provided|until|may|might|could)\b", re.IGNORECASE)
+#: A conditional or hedged sentence is not falsifiable by the measure alone (#4617: one definition, coach_record's).
+_CONDITIONAL_RE = coach_record.CONDITIONAL_RE
 _UP_RE = re.compile(r"\b(up|upward|upwards|increas\w+|ris\w+|climb\w*|higher)\b", re.IGNORECASE)
 _DOWN_RE = re.compile(r"\b(down|downward|downwards|decreas\w+|declin\w+|drop\w*|lower)\b", re.IGNORECASE)
 
@@ -341,11 +341,17 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         happened_short = _went(reason)
         if happened_short is None:
             return None, NO_READER_WORDS
-        if "flat" in happened_short:
-            return None, FLAT_READ
+        window = notes.get("window") if isinstance(notes.get("window"), dict) else None
+        if "flat" in happened_short and window is None:
+            return None, FLAT_READ  # the pre-#4617 trend check; a window-graded flat verdict is checkable and printed
         checked = _words(_iso_day(row.get("outcome_date")))
         called = f"{name} called {subject} to go {direction}, in a prediction sealed before day one."
-        if checked:
+        if window is not None and _words(_iso_day(window.get("start"))) and _words(_iso_day(window.get("end"))):
+            called += (
+                f" It was checked on the change from the first reading of its window, {_words(_iso_day(window.get('start')))}, "
+                f"to the last, {_words(_iso_day(window.get('end')))}, against his usual day-to-day swing."
+            )
+        elif checked:
             called += f" It was checked on {checked} against the trend in his most recent readings."
         called_short = f"{name} called {plain} to go {direction}."
     sealed = bool(row.get("pre_registered"))
