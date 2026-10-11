@@ -197,7 +197,7 @@
       "name": "Withings",
       "category": "Wearables",
       "measures": "Weight, body composition",
-      "method": "OAuth API pull, 4x daily + 4 site-stats-refresh invokes",
+      "method": "OAuth API pull, about 8x daily",
       "posture": "load-bearing",
       "ingest_pattern": "scheduled_credentialed_pull",
       "behavioral": true,
