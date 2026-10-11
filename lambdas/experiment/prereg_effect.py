@@ -219,6 +219,15 @@ MODEL_PROPOSED_CITATION = (
 
 # #1843's diary-intervention bar. habit_pct is a 0-1 completion ratio, so 0.05 is five
 # percentage points — the same number that hypothesis' criterion sentence states.
+# What `min_effect_basis.replaced.source` says about a model bar that WAS replaced — the
+# full MODEL_PROPOSED_CITATION describes the kept-as-proposed fallback, which would read as
+# a contradiction on a record whose bar was re-priced.
+MODEL_PROPOSED_REPLACED_SOURCE = (
+    "Proposed by the weekly hypothesis generator's model (Bedrock, structured tier) alongside the "
+    "hypothesis text and its confirmation criterion; replaced at the pre-registration write by the "
+    "derivation in this basis block (#3495), so this number is kept only as the record of what was proposed."
+)
+
 DIARY_DESIGN_CITATION = (
     "#1843's design choice, made when this structural hypothesis was written: habit_pct is a 0-1 "
     "completion ratio, so 0.05 is five percentage points of same-day habit adherence — the smallest "
@@ -276,6 +285,12 @@ def stamp_spec_provenance(hyp: dict, min_days_per_arm: int, daily_rows=None, *, 
     out["test_spec"] = spec
 
     spec.setdefault("min_days_per_arm", min_days_per_arm)
+
+    if "min_effect" not in spec and "min_effect_provenance" not in spec:
+        # An omitted bar is the bar the engine's checker applies: `validate_test_spec` and the
+        # deterministic check both read `spec.get("min_effect", 0)`. Store that 0 as a DECLARED
+        # bar so it is re-priced like any other — never frozen as an unlabelled implicit zero.
+        spec["min_effect"] = 0
 
     if "min_effect" in spec and "min_effect_provenance" not in spec:
         derivation = spec.get("min_effect_derivation")
@@ -352,6 +367,10 @@ OUTCOME_UNITS = {
     "energy": "points",
     "journal_stress": "points",
     "habit_pct": "(0-1 completion ratio)",
+    "walking_speed": "mph",
+    "training_load": "kJ",
+    "workout": "(0/1 indicator)",
+    "diary_day": "(0/1 indicator)",
 }
 
 _OP_WORDS = {">=": "at or above", "<=": "at or below"}
@@ -411,8 +430,8 @@ def derived_criteria_sentence(spec: dict, basis: dict, monitoring_window_days, m
         f"Mean {when} {spec.get('outcome_metric')} at least {bar}{unit_str} {spec.get('direction')} on days when {cond_words} "
         f"than on the other days{window}, 95% CI excluding 0, with at least {min_days_per_arm} {ARM_FLOOR_PHRASE}. "
         f"The {bar}{unit_str} bar is derived, not chosen: {basis['k']} x the SD of successive differences / sqrt(2) of "
-        f"{basis['metric']}, {basis['value']}{unit_str} over n={basis['n']} successive readings in the trailing "
-        f"{basis['window_days']} days (floor: {basis['n_floor']} readings)."
+        f"{basis['metric']}, {basis['value']}{unit_str} over n={basis['n']} successive differences in the trailing "
+        f"{basis['window_days']} days (floor: {basis['n_floor']} differences)."
     )
 
 
@@ -432,7 +451,8 @@ def derive_stored_bar(out: dict, spec: dict, daily_rows, min_days_per_arm: int, 
     candidate = dict(spec)
     candidate["min_effect"] = derived["min_effect"]
     candidate["min_effect_derivation"] = derived["derived_from"]
-    candidate["min_effect_basis"] = min_effect_basis(derived, replaced={"value": spec.get("min_effect"), "kind": kind, "source": citation})
+    source = MODEL_PROPOSED_REPLACED_SOURCE if citation == MODEL_PROPOSED_CITATION else citation
+    candidate["min_effect_basis"] = min_effect_basis(derived, replaced={"value": spec.get("min_effect"), "kind": kind, "source": source})
     candidate["min_effect_provenance"] = effect_provenance(derived)
     # The write only claims a derivation the ONE predicate can recompute from the record —
     # the same check a reader (or a later audit) applies to the stored row.

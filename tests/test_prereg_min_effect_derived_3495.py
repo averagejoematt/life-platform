@@ -241,3 +241,45 @@ def test_the_engine_stores_the_derived_bar_and_the_gate_still_recognises_it(monk
     # The DDB round trip hands Decimals back; the predicate must still recognise the bar.
     ok, reason = gates.min_effect_meets_rigor_bar(eng.d2f(spec))
     assert ok, reason
+
+
+# ── 4. the verifier's repairs: an omitted bar, the floor's unit, the replaced label ──
+
+
+def test_an_omitted_min_effect_is_derived_like_a_declared_zero():
+    """A generated spec with NO `min_effect` key used to be stored with no bar, no
+    provenance and no basis — an effective bar of 0 (the checker reads
+    `spec.get("min_effect", 0)`). It is now a declared 0, re-priced like any other bar."""
+    hyp = _model_hyp()
+    del hyp["test_spec"]["min_effect"]
+    spec = prereg_effect.stamp_spec_provenance(hyp, eng.MIN_DAYS_PER_ARM, _ROWS)["test_spec"]
+    assert spec["min_effect"] == _EXPECTED_BAR
+    assert spec["min_effect_provenance"]["kind"] == gates.PERSONAL_DERIVATION
+    assert spec["min_effect_basis"]["replaced"]["value"] == 0
+    ok, reason = gates.min_effect_meets_rigor_bar(spec)
+    assert ok, reason
+    # Too short to derive: still labelled (declared 0), never an unlabelled implicit bar.
+    short = prereg_effect.stamp_spec_provenance(hyp, eng.MIN_DAYS_PER_ARM, _ROWS[:3])["test_spec"]
+    assert short["min_effect"] == 0
+    assert short["min_effect_provenance"]["kind"] == gates.MODEL_PROPOSED
+
+
+def test_the_criterion_counts_differences_not_readings():
+    """MIN_PAIRS counts successive DIFFERENCES — 'floor: 5 readings' would understate it."""
+    crit = _stamped()["confirmation_criteria"]
+    assert "n=6 successive differences" in crit
+    assert f"floor: {prereg_effect.MIN_PAIRS} differences" in crit
+    assert "readings)" not in crit
+
+
+def test_a_replaced_model_bar_does_not_carry_the_kept_as_proposed_citation():
+    replaced = _stamped()["test_spec"]["min_effect_basis"]["replaced"]
+    assert replaced["source"] == prereg_effect.MODEL_PROPOSED_REPLACED_SOURCE
+    assert "kept as proposed only when" not in replaced["source"]
+
+
+def test_every_spec_metric_has_a_stated_unit():
+    """The derived criterion is written after `validate_hypothesis`'s units check, so it is
+    never re-validated — every outcome the generator can name gets its unit here."""
+    missing = sorted(m for m in eng.SPEC_METRICS if m not in prereg_effect.OUTCOME_UNITS)
+    assert not missing, f"SPEC_METRICS with no unit in OUTCOME_UNITS: {missing}"
