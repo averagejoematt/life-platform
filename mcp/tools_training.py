@@ -10,7 +10,7 @@ from training import training_load  # #4075: the ONE load model (computed_metric
 
 from mcp.core import get_profile, query_source
 from mcp.helpers import classify_hr_zone, compute_ewa, warm_start_seed
-from mcp.strength_helpers import classify_exercise
+from mcp.strength_helpers import classify_exercise, normalize_hevy_items
 from mcp.tools_correlation import tool_get_zone2_breakdown
 
 # Readiness tier severity, worst last. Comparing the tier strings directly (e.g.
@@ -260,9 +260,13 @@ def _get_training_periodization(args):
 
     # ── 1. Fetch training data ───────────────────────────────────────────────
     strava_items = query_source("strava", start_date, end_date)
-    mf_workout_items = query_source("macrofactor_workouts", start_date, end_date)
+    # #4636: strength volume reads the LIVE Hevy per-workout rows. It read
+    # `macrofactor_workouts`, a partition with no writer since 2026-03-07, so every week
+    # after March reported 0 lb. `query_source` derives the phase decision and drops the
+    # tombstoned per-day Hevy aggregates, so each session is read once.
+    hevy_items = query_source("hevy", start_date, end_date)
 
-    if not strava_items and not mf_workout_items:
+    if not strava_items and not hevy_items:
         return {"error": "No training data for range.", "start_date": start_date, "end_date": end_date}
 
     # ── 2. Build weekly training profile ─────────────────────────────────────
@@ -352,14 +356,14 @@ def _get_training_periodization(args):
                 }
             )
 
-    # Process MacroFactor workouts for volume tracking
-    for item in mf_workout_items:
-        date = item.get("date")
+    # Strength volume per week from Hevy (#4636): every logged set's load x reps, in lb —
+    # the same all-sets tonnage the weekly digest's `ex_hevy_workouts` reports.
+    for workout in normalize_hevy_items(hevy_items):
+        date = workout.get("date")
         if not date:
             continue
         wk = _week_key(date)
-        vol = _sf(item.get("total_volume_lbs")) or 0
-        weeks[wk]["total_volume_lbs"] += vol
+        weeks[wk]["total_volume_lbs"] += sum(s["weight_lbs"] * s["reps"] for ex in workout["exercises"] for s in ex["sets"])
 
     # How many calendar days of each ISO week the QUERY actually covers. #1917 window
     # honesty: `rest_days = 7 - len(dates)` charged the in-progress week (and the
@@ -599,7 +603,7 @@ def _get_training_periodization(args):
             "each ISO week the query actually covers (days_in_window), so an in-progress "
             "or truncated week does not count unelapsed days as rest."
         ),
-        "source": "strava + macrofactor_workouts",
+        "source": "strava + hevy",
     }
 
 
@@ -784,17 +788,18 @@ def _get_training_recommendation(args):
     days_since_hard = _days_since(last_hard_date)
 
     # ── 4. Muscle group recency from strength data ───────────────────────────
+    # #4636: read from the live Hevy rows. This read `macrofactor_workouts` (no writer
+    # since 2026-03-07), so muscle recency was empty for every date after March.
     muscle_last_trained = {}
-    mf_workout_items = query_source("macrofactor_workouts", d14_start, target_date)
-    for item in mf_workout_items:
-        d = item.get("date")
-        for workout in item.get("workouts") or []:
-            for exercise in workout.get("exercises") or []:
-                ename = exercise.get("exercise_name", "")
-                cls = classify_exercise(ename)
-                for mg in cls["muscle_groups"]:
-                    if mg not in muscle_last_trained or d > muscle_last_trained[mg]:
-                        muscle_last_trained[mg] = d
+    for workout in normalize_hevy_items(query_source("hevy", d14_start, target_date)):
+        d = workout.get("date")
+        if not d or d > target_date:
+            continue
+        for exercise in workout["exercises"]:
+            cls = classify_exercise(exercise["name"], exercise.get("template_id") or None)
+            for mg in cls["muscle_groups"]:
+                if mg not in muscle_last_trained or d > muscle_last_trained[mg]:
+                    muscle_last_trained[mg] = d
 
     muscle_recovery = {}
     for mg, last_date in muscle_last_trained.items():
@@ -1072,7 +1077,7 @@ def _get_training_recommendation(args):
         "muscle_recovery": muscle_recovery,
         "recent_activities_7d": recent_activities[:10],
         # #4075: hevy (the load model's set log) and computed_metrics (the one ACWR) are read.
-        "source": "whoop + eightsleep + garmin + strava + hevy + macrofactor_workouts + computed_metrics",
+        "source": "whoop + eightsleep + garmin + strava + hevy + computed_metrics",
     }
 
 

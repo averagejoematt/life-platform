@@ -37,7 +37,9 @@ import logging
 
 logger = logging.getLogger()
 
-MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("reading.enrich")
 
 # ── Closed vocabularies — the deterministic half of the #2425 gate ────────────
 # The prompt below is generated from these same constants, so prompt and

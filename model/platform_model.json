@@ -126,6 +126,12 @@
       "stack": "operational_stack",
       "via": "declaration"
     },
+    "chronicle-autopublish-held": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
     "chronicle-delivery-heartbeat": {
       "kind": "metric",
       "routing": "urgent",
@@ -365,6 +371,18 @@
       "routing": "digest",
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-hevy": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-hevy-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
     },
     "ingest-reconciliation-strava": {
       "kind": "metric",
@@ -974,10 +992,10 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 20,
-    "alarms": 133,
-    "emf_namespaces": 32,
-    "schedules": 92,
+    "ai_features": 24,
+    "alarms": 136,
+    "emf_namespaces": 33,
+    "schedules": 93,
     "secrets": 30
   },
   "edges": [
@@ -2782,6 +2800,13 @@
     },
     {
       "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/panelcast_desk.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
       "lambda": null,
       "module": "lambdas/emails/panelcast_desk.py",
       "partition": "chronicle",
@@ -6102,13 +6127,6 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_training.py",
-      "partition": "macrofactor_workouts",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_training.py",
       "partition": "strava",
       "via": "seam"
     },
@@ -6725,6 +6743,10 @@
         {
           "expr": "cron(0 * * * ? *)",
           "resolution": "constant"
+        },
+        {
+          "expr": "cron(30 18 * * ? *)",
+          "resolution": "constructed"
         },
         {
           "expr": "cron(40 13 * * ? *)",
@@ -7569,9 +7591,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 133,
+      "alarms": 136,
       "alarms_by_routing": {
-        "digest": 89,
+        "digest": 92,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7593,13 +7615,13 @@
       "privacy_sources_owner_only": 17,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 83,
-      "schedules": 92
+      "schedules": 93
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 359,
-        "sites_resolved": 916,
-        "sites_total": 1275
+        "sites_dynamic": 361,
+        "sites_resolved": 922,
+        "sites_total": 1283
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8827,6 +8849,13 @@
       "resolution": "constructed",
       "stack": "ingestion_stack",
       "utc": "18:20"
+    },
+    {
+      "expr": "cron(30 18 * * ? *)",
+      "lambda": "hevy-backfill",
+      "resolution": "constructed",
+      "stack": "ingestion_stack",
+      "utc": "18:30"
     },
     {
       "expr": "cron(30 18 ? * * *)",

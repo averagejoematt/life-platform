@@ -98,13 +98,27 @@ from typing import Any, Optional
 # platform-specific: they apply on Bedrock exactly as on the first-party API.
 # An unknown model gets the most conservative (largest) floor so a new model can
 # never be assumed cacheable without someone checking.
+#
+# #4778: the 5.5 generation (Haiku 5.5, Sonnet 5.5, Opus 5.5) sits on the 512 tier.
+# Before these rows, `…-haiku-5-5` matched the generic "haiku" row (4,096) and
+# `…-sonnet-5-5` matched "sonnet-5" (1,024) — both conservative, so nothing over-
+# claimed caching, but a DECLINED decision made against those floors could never be
+# flagged as stale once a caller moved: the floor the guard compared against was the
+# old one. Haiku/Sonnet 5.5 at 512 are from the Bedrock model card (#4772/#4778), and
+# Bedrock CountTokens REJECTS both 5.5 base ids ("The provided model doesn't support
+# counting tokens", probed 2026-10-10) — so on these models the floor is wire-proven
+# only by `usage.cache_creation_input_tokens` after a real move, i.e. by the
+# `AnthropicCacheReadTokens` / `PromptCacheNoOp` series, never by CountTokens.
 MIN_CACHEABLE_PREFIX_TOKENS: dict[str, int] = {
+    "haiku-5-5": 512,
     "haiku-4-5": 4096,
     "haiku": 4096,
+    "sonnet-5-5": 512,
     "sonnet-4-6": 1024,
     "sonnet-5": 1024,
     "sonnet": 1024,
     "opus-4-6": 4096,
+    "opus-5-5": 512,
     "opus-5": 512,
     "opus": 512,
     "fable": 512,
@@ -129,10 +143,38 @@ _CHARS_PER_TOKEN = 3.6
 # deliberately left un-caching" without re-running the numbers.
 #
 # `prefix_tokens` is a WIRE measurement, not `estimate_tokens`: Bedrock
-# `CountTokens` against `anthropic.claude-haiku-4-5-20251001-v1:0` (the base id
-# of the `us.` inference profile the platform actually invokes — CountTokens
-# rejects the profile id itself), counting a request with the system block minus
-# the same request without it. Re-measure with that method if you change a prompt.
+# `CountTokens` against the BASE id of the measured model (`anthropic.claude-…`;
+# CountTokens rejects the `us.` inference-profile id itself), counting a request
+# with the system block minus the same request without it. Re-measure with that
+# method if you change a prompt. `measured_on` is the floor-registry FAMILY key the
+# measurement holds for ("haiku-4-5", "sonnet-4-6") — a family shares a tokenizer,
+# and a family key keeps model-name literals in bedrock_client / model_defaults
+# only (#4275). CountTokens does NOT support the 5.5 models (probed 2026-10-10); a
+# caller that moves to one is measured from the `usage` block of its first real
+# call instead (`input_tokens` + `cache_creation_input_tokens` with and without the
+# system block), and `measured_on` becomes the 5.5 family key.
+#
+# #4778 — THE MODEL IS DERIVED, NOT RECORDED. Until #4778 each entry carried a
+# hand-written `model` string, and the floor check ran against THAT — so the day a
+# caller moved to a 512-floor 5.5 model through its env var, the register would have
+# kept checking it against the 4,096 Haiku 4.5 floor and stayed green on a decision
+# whose premise had just dissolved. Each entry now names HOW its caller resolves a
+# model — the `route` it passes to `ai.model_routing.model_for` (#4770's ONE
+# feature->tier->model registry; the route carries the env override its caller
+# reads, so a tier swap there and an env move on the Lambda both reach this check)
+# and the module-level `caller_var` that binds it — and which model the measurement
+# was taken ON (`measured_on`). `resolved_model()` is the model the caller actually
+# runs on, resolved by the registry itself, never re-typed here; `decision_drift()` reports every way a decision has
+# stopped describing it:
+#   * the caller now resolves to a different model family than `measured_on` —
+#     re-measure on the new model (tokenizers differ: Haiku 5.5 is reported ~30%
+#     heavier for the same text) and re-decide against its floor;
+#   * the prompt clears the resolved model's floor but the entry says declined, or
+#     the reverse;
+#   * the entry says engaged but fewer than 2 calls land inside one cache TTL
+#     (`calls_within_ttl`), so every write is a premium nothing reads.
+# `tests/test_prompt_cache_floor_derivation_4778.py` holds `route` / `caller_var` to
+# the caller module AND feeds the guard the deployed env the CDK stack sets.
 #
 # The LIVE counterpart is `PromptCacheNoOp` (#2888): this register is the
 # intent, that metric is the outcome. `tests/test_prompt_cache_decisions_3085.py`
@@ -140,8 +182,13 @@ _CHARS_PER_TOKEN = 3.6
 CACHING_DECISIONS: dict[str, dict[str, Any]] = {
     "coach-quality-gate": {
         "engaged": False,
-        "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "route": "coach_narrative.quality_gate",
+        "caller": "coach/coach_quality_gate.py",
+        "caller_var": "AI_MODEL_HAIKU",
+        "cdk_stack": "compute_stack.py",
+        "measured_on": "haiku-4-5",
         "prefix_tokens": 814,
+        "calls_within_ttl": None,
         "decided": "2026-08-27",
         "issue": 3085,
         "why": (
@@ -151,23 +198,125 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
             "it needs ~1,858 tok of PURE PADDING inside a quality-JUDGE prompt. Measured prize "
             "for padding both callers to the floor: $0.29/mo; the ceiling if the floor did not "
             "exist at all is $0.69/mo (0.32% of the $215 ADR-133 ceiling). Not worth degrading "
-            "the judge for. Revisit if the model's floor drops or the prompt grows on its merits."
+            "the judge for. Re-confirmed 2026-10-10 (#4778): 814 tok on the wire again. On a "
+            "512-floor 5.5 model it CLEARS — `decision_drift` reds the day this caller moves."
         ),
     },
     "coach-state-updater": {
         "engaged": False,
-        "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "prefix_tokens": 1783,
-        "decided": "2026-08-27",
-        "issue": 3085,
+        "route": "coach_narrative.state_update",
+        "caller": "coach/coach_state_updater.py",
+        "caller_var": "AI_MODEL_HAIKU",
+        "cdk_stack": "compute_stack.py",
+        "measured_on": "haiku-4-5",
+        "prefix_tokens": 2039,
+        "calls_within_ttl": None,
+        "decided": "2026-10-10",
+        "issue": 4778,
         "why": (
-            "1,783 tok against Haiku 4.5's 4,096 floor — needs 2.30x growth. Its user turn is the "
-            "per-coach narrative (volatile by construction) and the metric allow-list is already "
-            "inside the system prompt, so there is no run-invariant block left to hoist: the "
-            "remaining 2,313 tok would be padding. Same $0.29/mo joint prize as the gate above."
+            "2,039 tok on the wire (re-measured 2026-10-10, #4778; 1,783 at #3085 on 2026-08-27 — "
+            "the extraction prompt grew on its merits) against Haiku 4.5's 4,096 floor — needs "
+            "2.01x growth. Its user turn is the per-coach narrative (volatile by construction) and "
+            "the metric allow-list is already inside the system prompt, so there is no run-"
+            "invariant block left to hoist: the remaining ~2,057 tok would be padding. Same "
+            "$0.29/mo joint prize as the gate above. On a 512-floor 5.5 model it clears 4x over."
+        ),
+    },
+    # #4778 acceptance 2: the daily brief's shared system prefix, recorded either way.
+    # Built once per brief by `ai_calls.daily_brief_shared_system` and passed with
+    # `cache_system=False` to the four coach calls (BoD, training+nutrition, journal,
+    # TL;DR) — all in ONE invocation, inside one 5m TTL, so the call-count half of the
+    # re-enable test (>=2 within the TTL) is already met. SIZE is the binding half.
+    "daily-brief": {
+        "engaged": False,
+        "route": "shared.narrative",
+        "caller": "ai/ai_transport.py",
+        "caller_var": "AI_MODEL",
+        "cdk_stack": "email_stack.py",
+        "measured_on": "sonnet-4-6",
+        "prefix_tokens": 530,
+        "calls_within_ttl": 4,
+        "decided": "2026-10-10",
+        "issue": 4778,
+        "why": (
+            "530 tok on the wire for the minimal shape (phase block + profile snapshot + rules; "
+            "Bedrock CountTokens, Sonnet 4.6, 2026-10-10), ~784 est. with the presence and "
+            "journal-signal blocks a real day adds — under Sonnet 4.6's 1,024 floor either way, "
+            "so the marker would be silently ignored. 4 calls inside one TTL satisfies the "
+            "call-count criterion; size does not. NOTE the prefix carries day-varying bytes "
+            "(date, day-grade, journal signals), so only in-invocation reuse is ever available — "
+            "#2888 priced that prize at ~$0.8-1.1/mo. On a 512-floor 5.5 model even the minimal "
+            "shape clears: re-enable then, after re-measuring on that model."
         ),
     },
 }
+
+
+def resolved_model(fn: str, environ: Optional[dict[str, str]] = None) -> str:
+    """The model `fn` actually runs on under `environ` (the Lambda's env vars).
+
+    The caller's own resolution, done by the same function it calls:
+    `model_routing.model_for(route, env)` — the route's env var when set, else the
+    registry's tier/pin default (#4770). Pass the deployed environment; `None` means
+    "no override", i.e. the registry's answer.
+    """
+    from ai.model_routing import model_for  # leaf module; imported lazily to keep this one import-light
+
+    return model_for(CACHING_DECISIONS[fn]["route"], env=environ or {})
+
+
+def model_family(model_id: Optional[str]) -> Optional[str]:
+    """The floor-registry key `model_id` resolves to (longest substring match), or None.
+
+    Two ids in the same family share a floor AND a tokenizer, so a measurement taken on
+    one holds for the other (`us.anthropic.claude-haiku-4-5-20251001-v1:0` and
+    `claude-haiku-4-5-20251001` are both "haiku-4-5"). Different families need a fresh
+    measurement even when the floors happen to match.
+    """
+    mid = (model_id or "").lower()
+    for key in sorted(MIN_CACHEABLE_PREFIX_TOKENS, key=len, reverse=True):
+        if key in mid:
+            return key
+    return None
+
+
+def decision_drift(fn: str, prompt: str, environ: Optional[dict[str, str]] = None) -> list[str]:
+    """Every way `CACHING_DECISIONS[fn]` has stopped describing the caller (#4778).
+
+    Empty list == the decision still holds for the model the caller resolves to under
+    `environ`. Pure: no I/O, so the same check runs in CI against the CDK-derived
+    environment and against a hypothetical one ("what if this caller moved to 5.5?").
+    """
+    entry = CACHING_DECISIONS[fn]
+    model = resolved_model(fn, environ)
+    floor = cache_floor(model)
+    problems: list[str] = []
+    measured_family, live_family = model_family(entry["measured_on"]), model_family(model)
+    if measured_family != live_family:
+        problems.append(
+            f"{fn}: resolves to {model} ({live_family}, {floor} tok floor) but prefix_tokens was measured on "
+            f"{entry['measured_on']} ({measured_family}) — re-measure the prefix on the wire against the new model "
+            "and re-decide `engaged` against its floor (#4778)"
+        )
+    clears = clears_floor(prompt, model)
+    if clears is not entry["engaged"]:
+        est = estimate_tokens(prompt)
+        problems.append(
+            f"{fn}: recorded engaged={entry['engaged']} but the prefix is ~{est} tok against the {floor} tok floor of "
+            f"{model} — "
+            + (
+                "a marker below the floor is silently ignored and cache reads stay 0 forever (#3085)"
+                if entry["engaged"]
+                else "it now clears, so the 'too small to cache' rationale no longer holds — re-decide it (#4778)"
+            )
+        )
+    calls = entry.get("calls_within_ttl")
+    if entry["engaged"] and (calls is None or calls < 2):
+        problems.append(
+            f"{fn}: engaged with calls_within_ttl={calls!r} — a cache write needs >=2 calls inside one TTL to be read "
+            "at all; record the measured count (#4778)"
+        )
+    return problems
 
 
 def cache_floor(model_id: Optional[str]) -> int:
@@ -177,11 +326,8 @@ def cache_floor(model_id: Optional[str]) -> int:
     generic `haiku` fallback. An unrecognised model returns the conservative
     4,096 rather than an optimistic default — see the module docstring.
     """
-    mid = (model_id or "").lower()
-    for key in sorted(MIN_CACHEABLE_PREFIX_TOKENS, key=len, reverse=True):
-        if key in mid:
-            return MIN_CACHEABLE_PREFIX_TOKENS[key]
-    return _CONSERVATIVE_FLOOR
+    family = model_family(model_id)
+    return MIN_CACHEABLE_PREFIX_TOKENS[family] if family else _CONSERVATIVE_FLOOR
 
 
 def estimate_tokens(text: str) -> int:

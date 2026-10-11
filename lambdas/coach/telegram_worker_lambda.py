@@ -44,7 +44,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import boto3
-from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+from ai.model_routing import model_for  # #4770: the one model registry
 
 try:
     from common.platform_logger import get_logger
@@ -70,7 +70,7 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 # Narrative register on a personal chat surface — Sonnet, same tier as the coach
 # cards (structured tasks take Haiku; a coach texting in their own voice is not a
 # structured task).
-MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)
+MODEL = model_for("coach_telegram")
 
 _dynamodb = None
 _secrets = None

@@ -182,6 +182,8 @@ def _parts(doc):
         yield f"life.{k}", row
     for k, part in ((blocks.get("week") or {}).get("data") or {}).get("measures", {}).items():
         yield f"week.{k}", part
+    for k, row in ((blocks.get("scorecard") or {}).get("data") or {}).get("rows", {}).items():
+        yield f"scorecard.{k}", row
 
 
 def test_edition_every_block_carries_the_contract_on_the_wire():
@@ -206,7 +208,8 @@ def test_edition_every_block_carries_the_contract_on_the_wire():
     }
     assert b["coach_lines"]["voice"] == "restated" and len(b["coach_lines"]["data"]["lines"]) <= 3
     assert all("Dr." not in ln["coach"] for ln in b["coach_lines"]["data"]["lines"])
-    assert b["scorecard"]["state"] == "absent"
+    # #4595: the scorecard is served, one row per area, each decided by a written rule.
+    assert b["scorecard"]["state"] == "ok" and b["scorecard"]["data"]["order"] == ["body", "training", "sleep", "food", "mind", "ai"]
     assert b["next"]["data"]["bet"]["data"]["question"].startswith("Will the morning recovery score")
 
 
@@ -236,17 +239,18 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "journey": {"today", "life.body"},
         "sleep": {"life.sleep"},
         "session": {"life.training"},
-        "nutrition": {"life.food", "week.food"},
-        "pulse": {"week.weight", "week.sleep"},
-        "training": {"week.training"},
+        "nutrition": {"life.food", "week.food", "scorecard.food"},
+        "pulse": {"week.weight", "week.sleep", "scorecard.body", "scorecard.sleep"},
+        "training": {"week.training", "scorecard.training"},
         "habits": {"life.habits"},
         "supplements": {"life.supplements"},
         "experiments": {"life.experiments"},
         "dashboard": {"coach_lines"},
-        "predictions": {"record"},
-        "calibration": {"record"},
-        "decisions": {"his_words", "life.mind"},
-        "owner_words": {"his_words", "life.mind"},  # #4584: either source failing is a failed read of his words
+        "predictions": {"record", "scorecard.ai"},
+        "calibration": {"record", "scorecard.ai"},
+        "decisions": {"his_words", "life.mind", "scorecard.mind"},
+        # #4584: either source failing is a failed read of his words
+        "owner_words": {"his_words", "life.mind", "scorecard.mind"},
     }
     offenders = []
     for key, fed in feeds.items():

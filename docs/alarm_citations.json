@@ -44,7 +44,8 @@
     "added": "2026-10-10",
     "cause": "daily-metrics-compute TypeError (habit_registry string target_frequency)",
     "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4704 — daily-metrics-compute has raised TypeError in scoring_engine.score_habits_registry on every invocation since 2026-10-05T00:00:43Z: two hand-edited habit_registry entries (added 2026-10-04) store target_frequency as a DynamoDB string. No computed_metrics day grade has been written since DATE#2026-10-03, which is what this alarm measures. Fix PR 4706 merged 2026-10-10 ~04:15Z and is deploying; clears on the first clean scheduled run (live proof on #4704). The earlier false-positive explanation (an off-schedule dry-run read, 2026-08-30) does not apply to this episode."
+    "citation": "self-clearing on a dated window — the issue 4704 outage is fixed (PR 4706 deployed 2026-10-10 ~04:30Z; the registry values corrected and 10-04..10-08 back-filled at ~05:20Z). Only the 17:00Z daily-brief emits this metric, and the 86400s window still holds the 10-09 17:00Z datapoint of 1.0; the 16:40Z compute writes 10-09 with the fixed code and the 17:00Z brief emits 0. Expiry of this citation: 2026-10-10T17:30Z — if still ALARM then, file an issue instead of extending this line",
+    "updated": "2026-10-10"
   },
   "cost-metric-drift-sustained": {
     "added": "2026-08-21",
@@ -63,18 +64,6 @@
     "citation": "#2801",
     "note": "FLAP, not a standing red (#2912 detector). Entered and cleared ALARM twice in the 72h to 2026-08-27: first at 2026-08-26T17:00 PT when cost_governor moved the SSM budget-tier 1 -> 2 (ADR-125 band 2 pauses reader narratives incl. coach_narrative), then cleared and re-fired as the projection oscillated across the ~87% band boundary. The guard computed CORRECTLY both times - Session E measured MTD $146.07/26d projecting ~$174 against August's temporary $200 ceiling = 87.1%, driven by the 08-23 diligence spike. Not overridden: Session F's 04:00-13:00Z window fell entirely outside the only effective override window (16:00-17:00Z, after cost_governor's last cron(0 0/8 * * ? *) run and before the 17:00Z brief). Consequence carried in the handover: #3202's last acceptance box - both coaches publishing - stays unproven while tier >= 2. Epic #2801 owns the September base derivation; the temporary $200/$235 window auto-reverts to $150/$176 on 2026-09-01 with no deploy."
   },
-  "life-platform-dlq-depth-warning": {
-    "added": "2026-10-10",
-    "cause": "daily-metrics-compute async failures (#4704)",
-    "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4704 — daily-metrics-compute's async DeadLetterConfig is life-platform-ingestion-dlq; each crashed scheduled run (00:00Z and 16:40Z) lands one message after its retries, and the alarm has entered ALARM at ~00:06Z and ~16:46Z every day since 2026-10-07, clearing ~3-4 h later. Read 2026-10-10 ~04:40Z: depth 1, oldest message ~2.9 h. Fix PR 4706 merged; stops recurring with #4704's live proof. The earlier coach-ensemble-digest episode (2026-09-15) is resolved and not this one."
-  },
-  "life-platform-ingestion-dlq-messages": {
-    "added": "2026-10-10",
-    "cause": "daily-metrics-compute async failures (#4704)",
-    "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4704 — daily-metrics-compute's async DeadLetterConfig is life-platform-ingestion-dlq; each crashed scheduled run (00:00Z and 16:40Z) lands one message after its retries, and the alarm has entered ALARM at ~00:06Z and ~16:46Z every day since 2026-10-07, clearing ~3-4 h later. Read 2026-10-10 ~04:40Z: depth 1, oldest message ~2.9 h. Fix PR 4706 merged; stops recurring with #4704's live proof. The earlier coach-ensemble-digest episode (2026-09-15) is resolved and not this one."
-  },
   "life-platform-s3-bucket-size-high": {
     "citation": "self-clearing on a dated window — the deploys/ noncurrent-version lifecycle was tightened 7d to 1d and applied to the LIVE bucket 2026-08-31 (fin-diligence remediation, verified via get-bucket-lifecycle-configuration); S3 lifecycle expiry runs daily, so the ~72GB noncurrent tail drains over the next runs. Expiry of this citation: 2026-09-03 — if still ALARM then, file a follow-up issue instead of extending this line",
     "note": "prior citation pointed at a closed issue; the shipped cure is the fin-diligence 2026-08-31 lifecycle change (PR 3381)"
@@ -88,13 +77,15 @@
     "added": "2026-10-10",
     "cause": "score:day_grade",
     "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4704 — daily-metrics-compute has raised TypeError in scoring_engine.score_habits_registry on every invocation since 2026-10-05T00:00:43Z: two hand-edited habit_registry entries (added 2026-10-04) store target_frequency as a DynamoDB string. The QA smoke's score:day_grade check fails because the day grade stops at 2026-10-03. Fix PR 4706 merged; clears with #4704's live proof. The prior citation (the week-07 share kit and two coach cross-surface checks) is no longer the live cause."
+    "citation": "self-clearing on a dated window — the only FAIL in the 10-09 18:31Z run was score:day_grade (day grade missing), caused by the issue 4704 outage, now fixed and back-filled 2026-10-10 ~05:20Z. The next nightly smoke (2026-10-10 ~18:31Z) reads the 10-09 grade written at 16:40Z. Expiry of this citation: 2026-10-10T19:30Z — if still ALARM then, file an issue for the live FAIL",
+    "updated": "2026-10-10"
   },
   "qa-smoke-warnings": {
     "added": "2026-10-04",
     "cause": "data:orphan_routine_drafts,weeks:fact_agreement",
     "cause_observed": "2026-10-03T18:31Z",
-    "citation": "#4593 — weeks:fact_agreement reads the week-4 share kit as UNREACHABLE (HTTP 404), the same missing artifact. The run's second cause, data:orphan_routine_drafts, is 5 routine drafts dated 2026-09-26/27 never committed or archived — owner-archivable with manage_hevy_routine; it rides this citation until the kit is built."
+    "citation": "#4732 — data:orphan_routine_drafts: live-cycle drafts older than 7 days grew ~2/day (19 on 10-09); the pre-draft's own expired drafts are now archived by PR 4739 (merged 2026-10-10), and the owner's chat-authored drafts need his archive call (on #4732). The run's other warning, weeks:fact_agreement (api_edition read timed out), is #4607.",
+    "updated": "2026-10-10"
   },
   "site-api-invocation-spike": {
     "citation": "2026-08-24 session note — self-inflicted QA traffic",
@@ -167,5 +158,21 @@
     "cause": "AccessDenied secretsmanager:UpdateSecretVersionStage in finishSecret",
     "cause_observed": "2026-10-10T04:45Z",
     "citation": "#4707 — the mcp-api-key rotation fails at finishSecret since 2026-10-07 (25 retries on one AWSPENDING token): the KeyRotator role lacks secretsmanager:UpdateSecretVersionStage (lost in a 2026-03-10 rewrite). AWSCURRENT is unchanged, so the key still serves. PR 4708 adds the grant; it needs the owner's `bash deploy/cdk_deploy.sh LifePlatformOperational` after merge."
+  },
+  "ingest-reconciliation-hevy-heartbeat": {
+    "added": "2026-10-10",
+    "citation": "#4643 — new tonight (PR 4764, LifePlatformMonitoring deployed ~11:10Z): the heartbeat is BREACHING until the daily Hevy reconcile writes its first datapoint at 18:30Z 2026-10-10. Expiry: 2026-10-10T19:30Z — if still ALARM then, the reconcile did not run; comment on #4643."
+  },
+  "life-platform-dlq-depth-warning": {
+    "added": "2026-10-10",
+    "cause": "daily-metrics-compute async failures (outage now fixed)",
+    "cause_observed": "2026-10-10T04:45Z",
+    "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
+  },
+  "life-platform-ingestion-dlq-messages": {
+    "added": "2026-10-10",
+    "cause": "daily-metrics-compute async failures (outage now fixed)",
+    "cause_observed": "2026-10-10T04:45Z",
+    "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
   }
 }

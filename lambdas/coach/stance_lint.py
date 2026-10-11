@@ -75,25 +75,42 @@ def _focus(stance):
     return stance.get("focused_on_now") if isinstance(stance, dict) else None
 
 
+def _aside(stance):
+    return stance.get("set_aside_for_now") if isinstance(stance, dict) else None
+
+
+def _watch(stance):
+    """Both printed lists, one after the other: 'watching now' and 'set aside' (#4714)."""
+    return [*(_focus(stance) or []), *(_aside(stance) or [])]
+
+
 def self_correction(stance):
     """The strict instruction for the ONE self-correcting retry, or "" when the draft needs none:
     a leaked raw number, a watch item that is not plain (#4649), or both in one message."""
     vitals = VITALS_CORRECTION if vital_hits(stance) > 0 else ""
-    return vitals + plain_words.correction(plain_words.failing(_focus(stance)))
+    return vitals + plain_words.correction(plain_words.failing(_watch(stance)))
 
 
 def retry_is_better(retry, first):
-    """Keep the retry when it leaks fewer numbers; on a tie, when more of its watch items are plain."""
+    """Keep the retry when it leaks fewer numbers; on a tie, when fewer of its printed items fail, then when more are plain."""
     if not isinstance(retry, dict):
         return False
     before, after = vital_hits(first), vital_hits(retry)
-    return after < before or (after == before and len(plain_words.plain_items(_focus(retry))) > len(plain_words.plain_items(_focus(first))))
+    if after != before:
+        return after < before
+    bad_r, bad_f = len(plain_words.failing(_watch(retry))), len(plain_words.failing(_watch(first)))
+    return bad_r < bad_f or (bad_r == bad_f and len(plain_words.plain_items(_watch(retry))) > len(plain_words.plain_items(_watch(first))))
 
 
 def keep_plain(stance, coach_id=None, logger=None):
     """The stance's watch list with every item that is not plain dropped (#4649). Nothing
     replaces a dropped item; the count and the reasons are logged, never the reader's problem."""
-    dropped = plain_words.failing(_focus(stance))
+    dropped = plain_words.failing(_watch(stance))
     if dropped and logger is not None:
         logger.warning("[stance] %s: withheld %d watch item(s) that are not plain: %s", coach_id, len(dropped), dropped)
     return plain_words.plain_items(_focus(stance))
+
+
+def keep_plain_aside(stance):
+    """The stance's 'set aside' list with every item that is not plain dropped (#4714)."""
+    return plain_words.plain_items(_aside(stance))

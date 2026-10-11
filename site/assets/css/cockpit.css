@@ -779,3 +779,21 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 /* #4182: the mark sits beside the rings on screen two (it was absolutely placed in the
    hero's top-right corner while the hero was the first screen). */
 .cockpit-instruments .cockpit-fingerprint { margin-top: 0; }
+
+/* #4189: the owner's four-word morning note — injected by morning_note_box.js ONLY from his
+   signed link, above the hero; a reader's cockpit never has this element. tokens.css vars only. */
+.morning-note { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius);
+  background: var(--surface); display: grid; gap: var(--sp-3); max-width: var(--container-read); }
+.mn-kicker { margin: 0; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--ink-faint); }
+.mn-words { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--sp-3); }
+.mn-field { display: grid; gap: var(--sp-1); font-size: var(--fs-small); color: var(--ink-muted); }
+.mn-field input { font: inherit; font-size: var(--fs-body); color: var(--ink); background: var(--surface-sunken);
+  border: var(--border-strong); border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3); }
+.mn-felt { border: 0; padding: 0; margin: 0; display: flex; gap: var(--sp-4); align-items: center; color: var(--ink-muted);
+  font-size: var(--fs-small); }
+.mn-felt legend { float: left; margin-right: var(--sp-3); }
+.mn-send { justify-self: start; font: inherit; color: var(--ink); background: var(--ember-soft); border: 1px solid var(--ember-line);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-4); cursor: pointer; }
+.mn-send:disabled { cursor: default; opacity: 0.6; }
+.mn-status { margin: 0; font-size: var(--fs-small); color: var(--ink-muted); }

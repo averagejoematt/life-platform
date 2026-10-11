@@ -78,6 +78,11 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         # hardcode just wrote onto the SAME item a few lines earlier (a get-with-
         # fallback-default idiom for a log/validation label), not an external column.
         "source": "Lambda-identity constant; MacroFactor's CSV export has no `source` column at all, and the read is self-referential (reads back this item's own just-written value) (verified 2026-09-14, #3662)",
+        # #4638: `_format` is a format-marker this Lambda stamps on a daily-summary record;
+        # no MacroFactor export has a `_format` column. The read (`absent_day_items`) is of
+        # a PREVIOUSLY-STORED DDB row, to leave the summary channel's records alone — it can
+        # never supply the value this write uses.
+        "_format": "Lambda-stamped format marker (no `_format` column in any MacroFactor export); the read inspects an already-stored DDB row to skip summary-format records, never this write's payload (verified 2026-10-09, #4638)",
     },
     "whoop_lambda.py": {
         # VERIFIED DIFFERENT CLASS, and weaker than a near-miss: the flagged dict

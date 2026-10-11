@@ -22,7 +22,7 @@
 // only thing that touches the DOM.
 import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
-import { callHref, callsOf } from "/assets/js/ck_call.js";
+import { callHref, callsOf, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { callVerdictTag } from "/assets/js/ck_verdict.js";
 
 const LB_PER_KG = 2.20462;
@@ -307,7 +307,8 @@ export function daySaidHTML(iso, movesBody, base) {
   if (!lines.length) return "";
   const rows = lines
     .map((l) => {
-      const name = l.coach_id ? `<a class="ck-link" href="${esc(coachHref(base, l.coach_id))}">${esc(l.coach)}</a>` : esc(l.coach);
+      // The coach's page returns to this day by name (#4675).
+      const name = l.coach_id ? `<a class="ck-link" href="${esc(withFrom(coachHref(base, l.coach_id), iso))}">${esc(l.coach)}</a>` : esc(l.coach);
       const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [l.move_label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
       return `<li><span class="ck-coach__who">${name}${kind ? esc(` · ${kind}`) : ""}</span><span>“${esc(l.text)}”</span></li>`;
     })
@@ -318,18 +319,18 @@ export function daySaidHTML(iso, movesBody, base) {
 }
 // One settled call on a day: the served `called` sentence (it carries the rule the call
 // was checked by), what happened, the verdict, and the door to the call's own page.
-function settledRow(call, base) {
+function settledRow(call, base, iso = "") {
   // A bet has a verdict per side, so the route's own sentence stands; any other call takes
   // the shared tag, which never prints a verdict without the rule that decided it (#4647).
   const verdict = call.kind === "bet" ? `<span class="ck-soft">${esc(call.verdict_text || "Settled")}</span>` : callVerdictTag(call);
-  return `<li>${verdict}<span>${esc(call.called_short || call.called)}</span><span class="ck-soft">${esc(call.happened_short)}</span><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></li>`;
+  return `<li>${verdict}<span>${esc(call.called_short || call.called)}</span><span class="ck-soft">${esc(call.happened_short)}</span><a class="ck-link" href="${esc(withFrom(callHref(base, call.id), iso))}">The whole call</a></li>`;
 }
 // Every call settled on the day, from GET /api/calls. "" when none settled that day. Under
 // the coaches' lines it takes a label, not a second heading: the two are one part of the day.
 export function daySettledHTML(iso, callsBody, base, { under = false } = {}) {
   const calls = callsOf(callsBody).filter((c) => c.settled_date === iso);
   if (!calls.length) return "";
-  const list = (items) => `<ul class="ck-coach">${items.map((c) => settledRow(c, base)).join("")}</ul>`;
+  const list = (items) => `<ul class="ck-coach">${items.map((c) => settledRow(c, base, iso)).join("")}</ul>`;
   const rest = calls.slice(SETTLED_FIRST);
   const more = rest.length ? `<details><summary>${rest.length} more settled this day</summary>${list(rest)}</details>` : "";
   const title = calls.length === 1 ? "A call was checked this day." : `${calls.length} calls were checked this day.`;
@@ -392,9 +393,14 @@ async function load(routes) {
 const todayPT = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 
 const movesPath = (iso) => `/api/coach_moves?date=${iso}`;
+// persona id -> coach name, from the day's served lines, for a back link to a coach page.
+const movesNames = (body) => Object.fromEntries(((body && body.lines) || []).filter((l) => l && l.coach_id && l.coach).map((l) => [l.coach_id, l.coach]));
 
 async function mountDay(base) {
   const asked = isDay(param("d")) ? param("d") : "";
+  // Back goes to the page named by `from=`, by name; without it, the front page (#4675).
+  const from = param("from");
+  setBack(backFor(from, base));
   // The day's lines are asked for alongside everything else when the address names the day.
   const early = asked ? tryJSON(movesPath(asked)) : null;
   const src = await load({ pulse: "/api/pulse_history", workouts: "/api/workouts", training: "/api/training_overview", nutrition: "/api/nutrition_overview", calls: "/api/calls" });
@@ -410,7 +416,9 @@ async function mountDay(base) {
   document.title = `${dayInWords(iso)} — Average Joe Matt`;
   fill("ck-nav", dayNavHTML(iso, src, base));
   // Said and settled: whole sections, added only when the day has them (#4648).
-  const story = dayStoryHTML(iso, await (early || tryJSON(movesPath(iso))), src.calls, base);
+  const moves = await (early || tryJSON(movesPath(iso)));
+  setBack(backFor(from, base, movesNames(moves)));
+  const story = dayStoryHTML(iso, moves, src.calls, base);
   if (story) document.getElementById("ck-head")?.insertAdjacentHTML("afterend", story);
   fill("ck-facts", dayFactsHTML(iso, src, base, todayPT()));
   fill("ck-lifts", dayLiftsHTML(iso, src, base));

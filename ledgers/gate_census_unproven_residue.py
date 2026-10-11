@@ -82,7 +82,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "ci::.github/workflows/ci-lint.yml::lint / Syntax check (py_compile)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-test.yml::test / Deprecated secrets scan": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-test.yml::test / Install test dependencies": "2026-09-05 seal (#3536)",
-    "ci::.github/workflows/ci-test.yml::test / Test coverage gate (regression floor, ADR-080)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/codeql.yml::analyze / Initialize CodeQL": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/codeql.yml::analyze / Perform CodeQL analysis": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/config-drift.yml::drift / Report the derived twin set": "2026-09-05 seal (#3536)",
@@ -335,8 +334,11 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "registry::tests/grounding_wiring.py::GATE_CLASSES::freshness": "2026-09-05 seal (#3536)",
     "registry::tests/grounding_wiring.py::GATE_CLASSES::night": "2026-09-05 seal (#3536)",
     "registry::tests/grounding_wiring.py::GATE_CLASSES::numbers": "2026-09-05 seal (#3536)",
-    "registry::tests/qa_manifest.py::STRUCTURAL_CLASSES::static": "2026-09-05 seal (#3536)",
-    "registry::tests/qa_manifest.py::STRUCTURAL_CLASSES::utility": "2026-09-05 seal (#3536)",
+    # RELOCATED, not added (#4270): the same STRUCTURAL_CLASSES set, byte-identical, moved from
+    # tests/qa_manifest.py (now a re-export shim) to qa/qa_manifest.py so deploy/ stops importing
+    # the test tree. The seal date is the set's own; the residue's size is unchanged.
+    "registry::qa/qa_manifest.py::STRUCTURAL_CLASSES::static": "2026-09-05 seal (#3536)",
+    "registry::qa/qa_manifest.py::STRUCTURAL_CLASSES::utility": "2026-09-05 seal (#3536)",
     "registry::tests/safety_eval_matrix.py::FAMILY_CHECKS::grounding": "2026-09-05 seal (#3536)",
     "registry::tests/safety_eval_matrix.py::FAMILY_CHECKS::injection": "2026-09-05 seal (#3536)",
     "registry::tests/safety_eval_matrix.py::FAMILY_CHECKS::privacy": "2026-09-05 seal (#3536)",

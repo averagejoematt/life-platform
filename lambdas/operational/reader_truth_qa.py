@@ -46,7 +46,9 @@ from datetime import date, timedelta
 from html.parser import HTMLParser
 
 # Haiku by default — structured verdict task (ADR-049 tiering, ADR-063 budget).
-DEFAULT_MODEL = os.environ.get("READER_TRUTH_MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+DEFAULT_MODEL = model_for("reader_truth_qa")
 
 # budget_guard._FEATURE_CUTOFF key — operator-truth band, pauses at tier 3 (ADR-125/#1927).
 BUDGET_FEATURE = "reader_truth_qa"

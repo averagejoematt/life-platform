@@ -39,6 +39,7 @@ from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
 from common.repo_config import config_dir
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
 
 logger = logging.getLogger("vacation_fund")
 
@@ -57,7 +58,7 @@ _VALID_EXTRA_SOURCES = ("hevy", "macrofactor_export")
 # macrofactor_export is the public label; the DDB partition is macrofactor_workouts.
 _SOURCE_PARTITION = {
     "hevy": "hevy",
-    "macrofactor_export": "macrofactor_workouts",
+    "macrofactor_export": LEGACY_WORKOUTS_PARTITION,
 }
 
 _DEFAULT_CONFIG = {
@@ -187,7 +188,7 @@ def _hevy_miles(start_date: str, end_date: str) -> float:
 def _macrofactor_miles(start_date: str, end_date: str) -> float:
     miles = 0.0
     for day in _query_range(_SOURCE_PARTITION["macrofactor_export"], start_date, end_date):
-        for w in day.get("workouts") or []:
+        for w in day_workouts(day):
             for ex in w.get("exercises") or []:
                 for s in ex.get("sets") or []:
                     if s.get("distance_miles") is not None:

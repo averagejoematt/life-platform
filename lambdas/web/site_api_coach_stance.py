@@ -234,7 +234,7 @@ def _stance_from_latest(latest):
         "source": "stance",
         "headline_read": audience_guard.public_or_empty(latest.get("headline_read")),
         "focused_on_now": plain_words.plain_items(audience_guard.public_items(latest.get("focused_on_now", []))),
-        "set_aside_for_now": audience_guard.public_items(latest.get("set_aside_for_now", [])),
+        "set_aside_for_now": plain_words.plain_items(audience_guard.public_items(latest.get("set_aside_for_now", []))),  # #4714
         "stage": _public_stage(latest.get("stage")),
         "how_my_read_changed": audience_guard.public_or_empty(latest.get("how_my_read_changed")),
         "confidence_note": audience_guard.public_or_empty(latest.get("confidence_note")),

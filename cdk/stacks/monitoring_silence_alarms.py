@@ -24,6 +24,7 @@ swallowed failure, so they have no twin constant to pin.
     telegram-coach-hold                      TELEGRAM-COACH-HOLD                    (#2823)
     chronicle-status-write-failed            CHRONICLE-STATUS-WRITE-FAILED          (#3563)
     freshness-sentinel-write-failed          FRESHNESS-SENTINEL-WRITE-FAILED        (#3563)
+    chronicle-autopublish-held               CHRONICLE-AUTOPUBLISH-HELD             (#4694)
 
 #2823's ONE DELIBERATE DEVIATION — THRESHOLD, NOT SHAPE. Every alarm above is
 threshold=1 over 5 minutes: those tokens mean "this should never happen." A held
@@ -348,3 +349,44 @@ def add_silence_alarms(scope, digest) -> None:
         treat_missing_data=NB,
     )
     fc_write_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
+    # ══════════════════════════════════════════════════════════════
+    # #4694: the stale-draft sweep REFUSED to auto-publish a chronicle. A draft
+    # nobody approved now publishes itself only when the deterministic audit
+    # (content/autopublish_audit.py) passes; otherwise it stays a draft — and a
+    # held week is the weekly story going dark unless Matthew approves it, so
+    # the refusal must not be a log line nobody reads. The sweep logs this
+    # token once per held week per daily run (the line names the week and every
+    # blocking item), so the alarm re-fires each day the week waits inside the
+    # auto-publish window. Token must equal
+    # chronicle_approve_lambda.HELD_TOKEN == autopublish_audit.HELD_TOKEN —
+    # pinned by tests/test_chronicle_autopublish_audit_4694.py.
+    # Rent (ADR-103): $0.10/mo standing; the metric publishes nothing while
+    # healthy. Demote when: the sweep is retired (an approval-only weekly path).
+    # ══════════════════════════════════════════════════════════════
+    ap_held_lg = logs.LogGroup.from_log_group_name(scope, "AutopublishHeldLgChronicleApprove", "/aws/lambda/chronicle-approve")
+    ap_held_mf = logs.MetricFilter(
+        scope,
+        "AutopublishHeldFilterChronicleApprove",
+        log_group=ap_held_lg,
+        filter_pattern=logs.FilterPattern.literal('"CHRONICLE-AUTOPUBLISH-HELD"'),
+        metric_name="ChronicleAutopublishHeld",
+        metric_namespace="LifePlatform/Email",
+        metric_value="1",
+    )
+    ap_held_alarm = cloudwatch.Alarm(
+        scope,
+        "AutopublishHeldAlarmChronicleApprove",
+        alarm_name="chronicle-autopublish-held",
+        alarm_description=(
+            "#4694: chronicle-approve's stale-draft sweep held an unapproved chronicle whose deterministic audit did "
+            "not pass — the week is NOT published. The CHRONICLE-AUTOPUBLISH-HELD line in /aws/lambda/chronicle-approve "
+            "names the week and the blocking items; approve it from the preview email, or regenerate it."
+        ),
+        metric=ap_held_mf.metric(period=Duration.seconds(300), statistic="Sum"),
+        evaluation_periods=1,
+        threshold=1,
+        comparison_operator=GTE,
+        treat_missing_data=NB,
+    )
+    ap_held_alarm.add_alarm_action(cw_actions.SnsAction(digest))

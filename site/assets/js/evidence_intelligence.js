@@ -11,7 +11,10 @@ import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, 
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 import { coachComparison } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 
-export async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
+// #4780 — the "projected goal (80% range)" figure opts in to fmtShort's { yearIfNotCurrent }
+// spelling, so a next-year window reads "Jul 2, 2027–Sep 18, 2027", never as past dates. The
+// router calls renderResults(data, topic); `now` is a third, test-only argument.
+export async function renderResults(d, _topic, { now = new Date() } = {}) { const _pd = (iso) => fmtShort(iso, { yearIfNotCurrent: true, now }); const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${_pd(j.projected_goal_date_earliest)}–${_pd(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
 
 // Post-mortems — what each closed cycle taught, derived live from the record.
 export async function renderPostmortems(d) {
@@ -628,6 +631,13 @@ export function renderPredictions(d) {
   // the provenance column below would say "in-cycle" for the whole cycle. Sealed rows
   // displace the OLDEST in-cycle rows, the row count stays 40, and the date order the
   // table renders is unchanged.
+  // #4701: a call whose words rest on a sensor that had sent no reading by the day it was
+  // made is served with `text: ""` and an `unsourced` note. Print the note's own sentence
+  // in the call column, never a blank quote — the row keeps its verdict and its date.
+  const callCell = (p) => {
+    const held = p && p.unsourced && typeof p.unsourced.text === "string" ? p.unsourced.text.trim() : "";
+    return held ? `<span class="rd-unit" data-unsourced>${esc(held)}</span>` : esc(p.text);
+  };
   const _ROW_CAP = 40;
   const _sealedRows = list.filter((p) => p.pre_registered);
   const _shown = (list.length > _ROW_CAP && _sealedRows.length)
@@ -636,7 +646,7 @@ export function renderPredictions(d) {
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
         .slice(0, _ROW_CAP)
     : list.slice(0, _ROW_CAP);
-  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
+  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${callCell(p)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>provenance</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest. <strong>sealed</strong> = pre-registered before Day 1 and covered by the published seal above; <strong>in-cycle</strong> = logged by the coach during the cycle.");
 }
