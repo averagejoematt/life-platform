@@ -25,7 +25,17 @@ _ENGAGEMENT_SOURCES = ("withings", "macrofactor", "notion")
 _COLLAPSE_GAP = 4
 
 
-_SURVIVAL_HORIZON = 30
+# #3495 (carried from #3621 qs ROW7): 30 is the TARGET the page asks about, not the
+# horizon it reports. The served horizon is DERIVED from the prior cycles by
+# survival_horizon() — the longest day at least _SURVIVAL_MIN_REACHED prior cycles
+# were observed engaged through, capped at this target — so the page speaks at a
+# day the record can answer instead of leading with a day no cycle has reached.
+_SURVIVAL_TARGET = 30
+
+# The n floor the odds already use (#3549): odds are served only once at least this
+# many prior cycles have been observed at the horizon. survival_horizon() derives the
+# horizon against the SAME floor, so a derived horizon always carries served odds.
+_SURVIVAL_MIN_REACHED = 1
 
 
 def _alive_days(collapse_day, window):
@@ -38,7 +48,23 @@ def _alive_days(collapse_day, window):
     return window or 0
 
 
-def survival_odds(priors, horizon=_SURVIVAL_HORIZON):
+def survival_horizon(priors, target=_SURVIVAL_TARGET, floor=_SURVIVAL_MIN_REACHED):
+    """The reported horizon for /api/survival (#3495, carried from #3621) — pure.
+
+    The largest day H in [1, target] such that at least `floor` prior cycles are
+    KNOWN engaged through day H (alive days >= H, the same `_alive_days` rule the
+    odds count with). Equivalently: min(target, the floor-th longest alive run).
+    When no prior cycle clears the floor even at day 1 (no priors, or every prior
+    collapsed on its first day) there is no answerable day, and the target is
+    returned so the odds block says so (reached=0 -> no odds, a named ceiling).
+    """
+    runs = sorted((_alive_days(cd, w) for cd, w in priors), reverse=True)
+    if floor < 1 or len(runs) < floor or runs[floor - 1] < 1:
+        return target
+    return min(target, runs[floor - 1])
+
+
+def survival_odds(priors, horizon=None):
     """The odds-of-reaching-the-horizon block for /api/survival (#3549) — pure.
 
     `priors` is a list of (collapse_day | None, window_days) for every CLOSED cycle.
@@ -62,6 +88,9 @@ def survival_odds(priors, horizon=_SURVIVAL_HORIZON):
 
     Returns a dict of numeric fields plus the derived `method` / `confidence` strings.
     """
+    derived = horizon is None
+    if derived:
+        horizon = survival_horizon(priors)
     n = len(priors)
     reached = sum(1 for cd, w in priors if _alive_days(cd, w) >= horizon)
     collapsed_before = sum(1 for cd, w in priors if cd is not None and _alive_days(cd, w) < horizon)
@@ -73,12 +102,19 @@ def survival_odds(priors, horizon=_SURVIVAL_HORIZON):
         f"a cycle re-anchored before day {horizon} while still engaged (censored) stays in n and never counts "
         "as a survivor, so the estimate can only understate the odds, never inflate them."
     )
+    if derived and horizon < _SURVIVAL_TARGET:
+        # #3495: say why the page speaks at this day and not the target.
+        treatment += (
+            f" The horizon is day {horizon}, not day {_SURVIVAL_TARGET}: no prior cycle has been observed at day "
+            f"{_SURVIVAL_TARGET}, and day {horizon} is the longest run any prior cycle stayed engaged through "
+            f"({reached} of {n} did), so it is the latest day the record can answer."
+        )
     p_pct = None
     ci95 = None
     ceiling_pct = None
     if n == 0:
         method = f"No prior cycles yet — there is nothing to handicap. {treatment}"
-    elif reached == 0:
+    elif reached < _SURVIVAL_MIN_REACHED:
         ceiling_pct = round(100 / (n + 2))
         method = (
             f"No odds served: 0 of {n} prior cycles has been observed at day {horizon} "
@@ -98,6 +134,7 @@ def survival_odds(priors, horizon=_SURVIVAL_HORIZON):
         )
     confidence = f"n={n} prior cycles · {reached} reached day {horizon} · a mirror, not a forecast"
     return {
+        "horizon_days": horizon,
         "p_reach_pct": p_pct,
         "p_reach_ci95_pct": ci95,
         "p_reach_ceiling_pct": ceiling_pct,
@@ -755,7 +792,7 @@ def cycle_compare(*, _g) -> dict:
 
 def survival(*, _g) -> dict:
     """GET /api/survival — per-cycle engagement strips + a loudly-caveated
-    probability that the current cycle reaches day 30."""
+    probability that the current cycle reaches the derived horizon (at most day 30)."""
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     CYCLE_GENESES = _g["CYCLE_GENESES"]
     try:
@@ -796,7 +833,9 @@ def survival(*, _g) -> dict:
         # #3549: the odds block is pure and horizon-checked — see survival_odds.
         # (The old line here counted a cycle re-anchored on day 1 as a day-30
         # survivor and served "47%" over a record no cycle had reached.)
-        odds = survival_odds(priors, _SURVIVAL_HORIZON)
+        # #3495: the horizon is derived from the priors (survival_horizon), never the
+        # fixed target — the payload speaks at a day the record can answer.
+        odds = survival_odds(priors)
 
         cur = next((c for c in cycles if c["is_current"]), None)
         cur_strip = str(cur["strip"]) if cur else ""
@@ -817,7 +856,7 @@ def survival(*, _g) -> dict:
 
         return _ok(
             {
-                "horizon_days": _SURVIVAL_HORIZON,
+                "horizon_days": odds["horizon_days"],
                 # #3549: None until a prior cycle has actually been observed at the
                 # horizon — a percentage here is never manufactured from censored cycles.
                 "p_reach_30_pct": odds["p_reach_pct"],

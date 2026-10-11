@@ -42,7 +42,9 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 import pytest  # noqa: E402
 from web import site_api_common as common, site_api_rollups as rollups  # noqa: E402
 
-H = rollups._SURVIVAL_HORIZON
+# #3495: the fixed 30 is now the TARGET; the pure-helper tests below pass it explicitly,
+# the endpoint serves the horizon survival_horizon() derives from the priors.
+H = rollups._SURVIVAL_TARGET
 
 # The live payload's prior-cycle tuples on 2026-09-05 (collapse_day, window_days):
 # 8 collapsed at days [13,2,14,2,2,2,3,1]; 7 censored with windows [6,1,1,1,2,7,4].
@@ -191,12 +193,16 @@ class TestSurvivalEndpoint:
         body = _survival_with_engagement(geneses, engaged, monkeypatch)
         priors = [c for c in body["cycles"] if not c["is_current"]]
         assert len(priors) == 7 and all(c["censored"] for c in priors)
-        assert body["p_reach_30_pct"] is None
-        assert body["reached_horizon_n"] == 0
-        assert body["censored_before_horizon_n"] == 7
+        # #3495: the horizon is derived — the longest observed run is 7 days, so the
+        # payload speaks at day 7, where exactly one cycle was observed; the six
+        # censored cycles SHORTER than day 7 stay in n and never count (#3549's rule).
+        assert body["horizon_days"] == 7
+        assert body["reached_horizon_n"] == 1
+        assert body["censored_before_horizon_n"] == 6
         assert body["n_prior_cycles"] == 7
-        assert body["p_reach_30_ceiling_pct"] == round(100 / 9)
-        assert body["horizon_days"] == H
+        assert body["p_reach_30_pct"] == round((1 + 1) / (7 + 2) * 100) == 22
+        assert body["p_reach_30_ceiling_pct"] is None
+        assert "The horizon is day 7, not day 30" in body["method"]
 
     def test_every_n_literal_in_a_served_string_is_a_numeric_field_of_the_payload(self, monkeypatch):
         """AC2/#2003-for-prose: any 'n=<int>' inside a served string must equal a
@@ -234,14 +240,18 @@ class TestSurvivalEndpoint:
 
     def test_the_old_optimistic_rule_would_have_served_a_number_here(self, monkeypatch):
         """The prove-red half: on the all-censored record, the removed rule
-        (`cd is None or cd > 30` => survivor) yields (7+1)/(7+2) = 89% — the
-        payload must not carry that or any percentage."""
+        (`cd is None or cd > 30` => survivor) yields (7+1)/(7+2) = 89%. The payload
+        must not carry it: at the derived horizon (#3495) only the one cycle
+        observed through day 7 counts, so the served odds sit at the Laplace bound
+        (1+1)/(7+2) = 22% — censored cycles shorter than the horizon never lift it."""
         geneses, engaged = _all_censored_short_record()
         body = _survival_with_engagement(geneses, engaged, monkeypatch)
         priors = [c for c in body["cycles"] if not c["is_current"]]
         old_rule = round((sum(1 for c in priors if c["collapse_day"] is None or c["collapse_day"] > H) + 1) / (len(priors) + 2) * 100)
         assert old_rule == 89
-        assert body["p_reach_30_pct"] != old_rule and body["p_reach_30_pct"] is None
+        assert body["p_reach_30_pct"] != old_rule
+        bound = round((body["reached_horizon_n"] + 1) / (len(priors) + 2) * 100)
+        assert body["p_reach_30_pct"] == bound == 22
 
 
 # ── 3. the source: no hand-typed n survives in the served strings ─────────────
