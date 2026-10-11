@@ -99,7 +99,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `withings-data-ingestion` | ingestion_stack | `cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
 | `youtube-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
 
-**Unscheduled lambdas (24)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
+**Unscheduled lambdas (25)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
@@ -277,7 +277,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 136 alarms (4 composite)
+Routing: digest 94 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 138 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -344,6 +344,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `ingest-reconciliation-strava-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `ingest-reconciliation-whoop` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `ingest-reconciliation-whoop-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
+| `ingestion-error-inbound-auth-gate` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-insight-email-parser` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-og-image-generator` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-pipeline-health-check` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
@@ -371,6 +372,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `life-platform-dlq-consumer-errors` | monitoring_stack | metric | urgent | factory:_alarm |  |
 | `life-platform-dlq-depth-warning` | operational_stack | metric | digest | declaration |  |
 | `life-platform-freshness-checker-not-emitting` | operational_stack | metric | digest | declaration |  |
+| `life-platform-inbound-auth-gate-bypassed` | operational_stack | metric | digest | declaration |  |
 | `life-platform-ingestion-dlq-messages` | monitoring_stack | metric | urgent | factory:_alarm |  |
 | `life-platform-insight-email-parser-parse-failure` | operational_stack | metric | digest | declaration |  |
 | `life-platform-og-image-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
@@ -513,8 +515,8 @@ Field-level rulings (only non-default fields are declared):
 ## 6. Coverage (honest numbers, ADR-104)
 
 - Edge sites: 1284 total · 923 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
-- Schedules: 83 resolved · 0 dynamic of 83 scheduled lambdas (107 lambdas total)
-- Alarms: 136 literal-named declarations across three idioms, 4 composite; routing digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Schedules: 83 resolved · 0 dynamic of 83 scheduled lambdas (108 lambdas total)
+- Alarms: 138 literal-named declarations across three idioms, 4 composite; routing digest 94 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 93 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -531,7 +533,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 24 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 136 | this model's alarms plane (CDK AST) |
+| alarms | 138 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 93 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |

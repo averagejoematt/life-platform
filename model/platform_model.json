@@ -408,6 +408,12 @@
       "stack": "monitoring_stack",
       "via": "factory:_heartbeat_alarm"
     },
+    "ingestion-error-inbound-auth-gate": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
     "ingestion-error-insight-email-parser": {
       "kind": "metric",
       "routing": "digest",
@@ -565,6 +571,12 @@
       "via": "declaration"
     },
     "life-platform-freshness-checker-not-emitting": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "declaration"
+    },
+    "life-platform-inbound-auth-gate-bypassed": {
       "kind": "metric",
       "routing": "digest",
       "stack": "operational_stack",
@@ -993,7 +1005,7 @@
   ],
   "cost_surface": {
     "ai_features": 24,
-    "alarms": 136,
+    "alarms": 138,
     "emf_namespaces": 33,
     "schedules": 93,
     "secrets": 30
@@ -6798,6 +6810,15 @@
       "stack": "compute_stack",
       "timeout_seconds": 120
     },
+    "inbound-auth-gate": {
+      "declared_alarm": null,
+      "handler": "emails.inbound_auth_gate_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/emails/inbound_auth_gate_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 10
+    },
     "insight-email-parser": {
       "declared_alarm": null,
       "handler": "emails.insight_email_parser_lambda.lambda_handler",
@@ -7591,9 +7612,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 136,
+      "alarms": 138,
       "alarms_by_routing": {
-        "digest": 92,
+        "digest": 94,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7606,7 +7627,7 @@
       "contracts_known": 12,
       "contracts_ratchet": 12,
       "edges": 737,
-      "lambdas": 107,
+      "lambdas": 108,
       "mcp_tool_modules": 35,
       "mcp_tools": 87,
       "partitions": 114,

@@ -1223,6 +1223,12 @@ COVERAGE = {
         "(LifePlatform/Email::InsightParseFailure) for a caught-and-continued per-record failure that never raises. Both fire "
         "on invocation, which is exactly the case an absence alarm cannot cover.",
     ),
+    # #4633: the receipt rule's FIRST action (RequestResponse) for the inbound-email door. Event-driven like the parser
+    # above, so 'no mail' and 'the trigger died' are indistinguishable by count — but unlike the parser it HAS an absence
+    # signal: every parser invocation must be preceded by a gate invocation, and the metric-math alarm fires on a day
+    # with more parser runs than gate runs (the rule set edited by hand to drop or re-order the gate). Errors: the
+    # shared helper's per-function alarm. Not an exemption — EXEMPT_CEILING stays where it is.
+    "inbound-auth-gate": (ALARM, "life-platform-inbound-auth-gate-bypassed"),
 }
 
 

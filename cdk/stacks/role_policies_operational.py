@@ -1054,6 +1054,21 @@ def _experiment_cycle_read() -> iam.PolicyStatement:
     )
 
 
+def operational_inbound_auth_gate() -> list[iam.PolicyStatement]:
+    """Inbound auth gate (#4633): the SES receipt rule's first action — no grants of its own, on purpose.
+
+    The function reads the receipt verdicts SES hands it and returns a disposition; it
+    constructs no boto3 client, touches no table, bucket, secret or metric. An empty
+    statement list (not ``None`` — the helper would fall back to its legacy broad
+    DDB+S3 role) leaves it with only the helper's fleet-wide baseline (BasicExecution
+    logs, X-Ray traces, ssm:GetParameter on the two budget parameters — read 2026-10-11
+    off a synth), so the acceptance clause "a refused message writes nothing" holds
+    structurally even if the verdict code were wrong. Adding a grant here is a design
+    change, not a fix.
+    """
+    return []
+
+
 def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     """Insight email parser: reads from SES S3 drop, writes insight records to DDB.
 

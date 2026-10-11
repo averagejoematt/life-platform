@@ -33,6 +33,8 @@ from aws_cdk import (
     aws_iam as iam,
     aws_lambda as _lambda,
     aws_s3 as s3,
+    aws_ses as ses,
+    aws_ses_actions as ses_actions,
     aws_sns as sns,
     aws_sns_subscriptions as sns_subs,
     aws_sqs as sqs,
@@ -57,6 +59,15 @@ from stacks.lambda_helpers import create_platform_lambda
 REGION = "us-west-2"
 ACCT = "205930651321"
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
+
+# #4633: the inbound-email door. ONE sender list, read by both the receipt gate (inbound-auth-gate, the SES rule's
+# first action) and the parser (insight-email-parser) — two functions, one constant, so the lists cannot drift. The
+# parser also honours STORY_REPLY_SENDERS (#4546, OFF by default); set it HERE so the gate sees the same value.
+INBOUND_SENDER_ENV = {
+    "ALLOWED_SENDERS": "awsdev@mattsusername.com,mattsthrowaway@protonmail.com",
+}
+INBOUND_RECIPIENT = "insight@aws.mattsusername.com"  # the address the hand-made capture rule already matches
+INBOUND_RULE_SET_NAME = "life-platform-inbound"  # the ACTIVE receipt rule set (hand-made; imported, never replaced)
 LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
@@ -709,9 +720,7 @@ class OperationalStack(Stack):
             handler="emails.insight_email_parser_lambda.lambda_handler",
             timeout_seconds=30,
             memory_mb=128,
-            environment={
-                "ALLOWED_SENDERS": "awsdev@mattsusername.com,mattsthrowaway@protonmail.com",
-            },
+            environment=dict(INBOUND_SENDER_ENV),  # #4633: the ONE sender list, shared with the receipt gate below
             custom_policies=rp.operational_insight_email_parser(),
             table=local_table,
             bucket=local_bucket,
@@ -725,6 +734,88 @@ class OperationalStack(Stack):
             principal=iam.ServicePrincipal("ses.amazonaws.com"),
             source_arn=f"arn:aws:ses:{REGION}:{ACCT}:receipt-rule-set/*",
         )
+
+        # ── 9a. Inbound auth gate — the provider-level verdict BEFORE the parser (#4633)
+        # The sweep of 2026-10-04 found the inbound-email door authenticated only by the
+        # parser's header allowlist: the hand-made receipt rule stored every message and
+        # the S3 notification fired the parser regardless of SES's own SPF/DKIM/DMARC
+        # verdicts. This rule is the fix, in IaC: a REQUEST_RESPONSE Lambda action that
+        # returns STOP_RULE_SET on a non-PASS DMARC verdict, a spam/virus FAIL or an
+        # unlisted From — and because it is the first rule of the ACTIVE set (an
+        # AWS::SES::ReceiptRule with no `After` is inserted at the head of the list), a
+        # STOP_RULE_SET means the existing capture rule's S3 action never runs: no object
+        # under raw/inbound_email/, no notification, no parser, no record. The rule set
+        # itself stays the hand-made one, imported by name — CloudFormation cannot adopt
+        # it and a second set would need an activation step; adding a rule to it needs
+        # only `cdk deploy LifePlatformOperational`.
+        #
+        # Role: no grants of its own (rp.operational_inbound_auth_gate is empty; only the
+        # helper's fleet baseline — logs, X-Ray, SSM GetParameter on the budget tier —
+        # remains) and the function builds no client, so "a refused message writes
+        # nothing" is structural. Its only outputs
+        # are the disposition and a [REJECT]/[PASS] log line (messageId + the five
+        # verdict statuses, never an address) — the line the issue's live proof pastes.
+        inbound_auth_gate = create_platform_lambda(
+            self,
+            "InboundAuthGate",
+            function_name="inbound-auth-gate",
+            source_file="lambdas/emails/inbound_auth_gate_lambda.py",
+            handler="emails.inbound_auth_gate_lambda.lambda_handler",
+            timeout_seconds=10,  # SES's RequestResponse budget is 30s; a verdict is microseconds
+            memory_mb=128,
+            environment=dict(INBOUND_SENDER_ENV),
+            custom_policies=rp.operational_inbound_auth_gate(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,  # RequestResponse: SES gets the error synchronously, there is no async retry to dead-letter
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+        )
+        inbound_auth_gate.add_permission(
+            "SESInvokeInboundAuthGate",
+            principal=iam.ServicePrincipal("ses.amazonaws.com"),
+            source_arn=f"arn:aws:ses:{REGION}:{ACCT}:receipt-rule-set/*",
+        )
+        inbound_rule_set = ses.ReceiptRuleSet.from_receipt_rule_set_name(self, "InboundRuleSet", INBOUND_RULE_SET_NAME)
+        inbound_rule_set.add_rule(
+            "InsightAuthGate",
+            receipt_rule_name="insight-auth-gate",
+            recipients=[INBOUND_RECIPIENT],
+            enabled=True,
+            scan_enabled=True,  # the spam/virus verdicts the gate reads come from this flag
+            actions=[
+                # ORDER IS THE CONTRACT: the verdict is the first and only action of the first rule. The store (the
+                # hand-made capture rule's S3 action) is a later rule and is reached only on CONTINUE.
+                ses_actions.Lambda(function=inbound_auth_gate, invocation_type=ses_actions.LambdaInvocationType.REQUEST_RESPONSE),
+            ],
+        )
+        # The gate's ABSENCE signal (tests/test_heartbeat_completeness.py's ALARM row for it). An event-driven function
+        # has no cadence to grade, but it has a downstream that must never run without it: every parser invocation is
+        # preceded by a gate invocation while the rule above holds. The one way the gate goes silently absent is the
+        # hand-made rule set being edited by hand (the gate rule dropped, disabled or re-ordered behind the store) —
+        # and that reads here as parser runs with no gate run in the same day. 24h period: a message straddling a
+        # bucket boundary would need its two invocations seconds apart to land on different days (negligible), and
+        # one genuine bypass is one message, so a single datapoint must be enough. Digest-routed like its siblings.
+        gate_bypass_alarm = cloudwatch.Alarm(
+            self,
+            "InboundAuthGateBypassedAlarm",
+            alarm_name="life-platform-inbound-auth-gate-bypassed",
+            metric=cloudwatch.MathExpression(
+                expression="parser - gate",
+                label="insight-email-parser invocations not preceded by an inbound-auth-gate invocation",
+                using_metrics={
+                    "parser": insight_parser.metric_invocations(period=Duration.days(1), statistic="Sum"),
+                    "gate": inbound_auth_gate.metric_invocations(period=Duration.days(1), statistic="Sum"),
+                },
+                period=Duration.days(1),
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        gate_bypass_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
         # #2821 (b) above: the custom-metric twin of the Errors alarm — fires on a
         # caught-and-continued parse failure the Lambda Errors metric never sees.
         # 1h window matches the helper's own per-function Errors alarm period.
