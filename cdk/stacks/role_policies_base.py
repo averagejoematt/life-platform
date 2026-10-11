@@ -86,6 +86,18 @@ def _bedrock_statement() -> iam.PolicyStatement:
     routes across us-east-1/us-east-2/us-west-2.
 
     #3563: THIS GRANT HAS A COMPANION — see `_bedrock_telemetry_statement()`.
+
+    #4776 (open-weight trial, a SPIKE): the five ARNs under the marker below are EXACTLY the
+    four Converse-family candidates `bedrock_client._MODEL_MAP` names — gpt-oss-120b, gpt-oss-20b
+    and Qwen3-32B are in-region foundation models (no inference profile; region pinned to
+    REGION), Nova Micro is INFERENCE_PROFILE-only (the `us.` profile plus the foundation model
+    it fans out to, region wildcard like the Claude pair). The Converse API authorizes against
+    the same `bedrock:InvokeModel` action. No feature is routed to any of them; the grant exists
+    so the swap eval (#4771) and an adopted model can run under the Lambda roles. If the spike
+    closes not-realized, DELETE the block — `tests/test_converse_adapter_4776.py` holds this list
+    equal to the chokepoint's map in both directions, so a stale row reds. Additive IAM: CI's
+    Plan gate (#2834) reads every bedrock ARN as out-of-namespace → OWNER-REQUIRED, so the
+    deploy of this change is an attended `bash deploy/cdk_deploy.sh <Stack>` by the owner.
     """
     return iam.PolicyStatement(
         sid="BedrockInvoke",
@@ -95,6 +107,12 @@ def _bedrock_statement() -> iam.PolicyStatement:
             "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
             # #1384: Titan-v2 embeddings for semantic recall (bedrock_client.embed_text).
             "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0",
+            # ── #4776 open-weight trial (see the docstring; delete the block if the spike closes not-realized)
+            f"arn:aws:bedrock:{REGION}::foundation-model/openai.gpt-oss-120b-1:0",
+            f"arn:aws:bedrock:{REGION}::foundation-model/openai.gpt-oss-20b-1:0",
+            f"arn:aws:bedrock:{REGION}::foundation-model/qwen.qwen3-32b-v1:0",
+            f"arn:aws:bedrock:*:{ACCT}:inference-profile/us.amazon.nova-micro-v1:0",
+            "arn:aws:bedrock:*::foundation-model/amazon.nova-micro-v1:0",
         ],
     )
 

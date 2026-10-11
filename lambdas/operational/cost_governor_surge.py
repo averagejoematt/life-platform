@@ -207,6 +207,24 @@ def decide(recent_uniques, threshold: int | None, prev_surge_active: bool, prev_
     return SurgeDecision(True, bar, engaged_at, "bar" if above_bar else "hysteresis", rebar_from)
 
 
+def flapping_alert_text(flips_30d: int, threshold: int, rule: str, recent_uniques) -> tuple[str, str]:
+    """(subject, body) of the #3510 surge-flapping alert — PURE, so it lives on this side of
+    the split; `cost_governor_lambda._alert_surge_flapping` sends it (extracted 2026-10-11,
+    #4776: the governor crossed the 1,000-line ceiling by the four Converse price rows and the
+    standing rule is extraction, never a baseline raise)."""
+    subj = f"Surge mode flapping — {flips_30d} flips in 30d"
+    body = (
+        f"Surge mode has flipped {flips_30d} time(s) in the last 30 days, at or above the "
+        f"{SURGE_FLIPS_30D_ALARM}-flip bar (#3510).\n\n"
+        f"Effective threshold: {threshold} trailing-7d uniques — {rule}.\n"
+        f"Latest reading:      {recent_uniques}\n\n"
+        f"A threshold inside the baseline's own noise band flips on the noise: each edge moves "
+        f"the effective ceiling and all three tier bands. Re-read the derivation above against "
+        f"the last 8 weekly readings before treating any single flip as a traffic event."
+    )
+    return subj, body
+
+
 def held_by_note(decision: SurgeDecision, recent_uniques) -> str:
     """The operator-facing attribution string for the log line and `/api/receipts`.
 

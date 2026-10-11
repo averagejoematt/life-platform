@@ -143,6 +143,10 @@ except ImportError:  # pragma: no cover - packaging drift; the class split degra
         "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75, "cache_write_1h": 6.00},
         "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25, "cache_write_1h": 2.00},
         "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "gpt-oss-120b": {"in": 0.15, "out": 0.60, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "gpt-oss-20b": {"in": 0.07, "out": 0.30, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "qwen3-32b": {"in": 0.15, "out": 0.60, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+        "nova-micro": {"in": 0.035, "out": 0.14, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
     }
 
 # ── #2892: which caller classes the month-end projection extrapolates ────────
@@ -684,16 +688,9 @@ def _alert_surge_flapping(flips_30d: int, threshold: int, rule: str, recent_uniq
     """#3510: two flips in 30 days is itself a finding — the threshold is inside the
     baseline's noise, not above it. Sent on an EDGE only (a flip is what increments the
     count), so it is rate-limited by construction rather than by a suppression window."""
-    subj = f"Surge mode flapping — {flips_30d} flips in 30d"
-    body = (
-        f"Surge mode has flipped {flips_30d} time(s) in the last 30 days, at or above the "
-        f"{SURGE_FLIPS_30D_ALARM}-flip bar (#3510).\n\n"
-        f"Effective threshold: {threshold} trailing-7d uniques — {rule}.\n"
-        f"Latest reading:      {recent_uniques}\n\n"
-        f"A threshold inside the baseline's own noise band flips on the noise: each edge moves "
-        f"the effective ceiling and all three tier bands. Re-read the derivation above against "
-        f"the last 8 weekly readings before treating any single flip as a traffic event."
-    )
+    # The text is the PURE half (cost_governor_surge, #4776 extraction under the #1665 ceiling);
+    # the SNS send stays here where the tests monkeypatch `_sns`.
+    subj, body = cost_governor_surge.flapping_alert_text(flips_30d, threshold, rule, recent_uniques)
     try:
         _sns.publish(TopicArn=ALERTS_TOPIC, Subject=subj[:99], Message=body)
         logger.warning(f"Surge-flapping alert sent: flips_30d={flips_30d}")
