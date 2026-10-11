@@ -23,7 +23,6 @@ jobs:
         env:
           COVERAGE_CORE: sysmon
         run: |
-          set -o pipefail
           python3 -m pytest tests/ \
               --ignore=tests/test_integration_aws.py \
               --cov=lambdas --cov=mcp --cov-report= \
@@ -32,4 +31,4 @@ jobs:
               -q > /tmp/out.txt 2>&1 || true
           grep -E "board_ask_fanout" /tmp/out.txt || echo "NO board_ask_fanout line in durations"
           grep -E "^[0-9]+\.[0-9]+s (call|setup|teardown)" /tmp/out.txt | head -30
-          tail -3 /tmp/out.txt
+          tail -3 /tmp/out.txt; grep -cE 'FAILED' /tmp/out.txt || true
