@@ -235,11 +235,16 @@ def gate(
             hits=[(k, t) for k, t in e.violations if k != "context"],
         )
 
-    # 3b. The story door (#4538): the SAME reader-surface check the chronicle, the recap and the Panel face, in its
-    # `constructed` mode (a card has no free prose to spare a frame word). Replaces the cards' own literal rule.
+    # 3b. The story door (#4538): the SAME reader-surface check the chronicle, the recap and the Panel face. The
+    # template strings and captions are constructed copy, so they get `constructed=True` (the bare frame word is
+    # refused); the free prose (the coach line, drawn verbatim) gets prose mode, which spares "his second attempt at
+    # 225" exactly as the shared check does elsewhere. Replaces the cards' own literal rule.
     from content import story_checks
 
-    door = story_checks.reader_surface(blob, constructed=True)
+    prose = [str(t) for t in (free_text or []) if t]
+    prose_set = set(prose)
+    constructed_blob = "\n".join(s for s in strings if s and s not in prose_set)
+    door = story_checks.reader_surface(constructed_blob, constructed=True) + story_checks.reader_surface("\n".join(prose))
     if door:
         return GateResult(
             VERDICT_HELD,

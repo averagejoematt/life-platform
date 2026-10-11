@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
+from collections import namedtuple
 
 import pytest
 
@@ -23,6 +24,9 @@ _VOCAB = {"blocked_vices": ["Placeholder Habit"], "blocked_vice_keywords": ["pla
 CLEAN = ["DAY 8  ·  THE EXPERIMENT", "proof, not promises", "Day 9 tomorrow  ·  week 2 closes in 6 days", "most moved so far"]
 COUNTED = ["Day 7 · attempt #17", "16 lost · 0 kept", "the Fifteenth Reset", "most moved this attempt"]
 OFF_RECORD = ["a hard night after his wife left", "his boss moved the meeting"]
+
+_Res = namedtuple("_Res", ["on_topic", "confidence"])
+_ON_TOPIC = lambda t: _Res(True, 0.99)  # noqa: E731
 
 
 @pytest.fixture(autouse=True)
@@ -56,3 +60,15 @@ def test_mutation_control_without_the_shared_check_the_same_fixtures_publish(mon
     """Proves the fixtures bite: neuter the shared check and the counted caption goes out."""
     monkeypatch.setattr(story_checks, "reader_surface", lambda text, constructed=False: [])
     assert recap_gate.gate([*CLEAN, COUNTED[0]]).may_send is True
+
+
+def test_coach_prose_with_the_word_attempt_is_not_held():
+    """The coach line is free prose: 'his second attempt at 225' passes in prose mode, as in the shared check."""
+    coach = ["His second attempt at 225 went up clean.", "Worth another attempt tomorrow: a 20-minute walk."]
+    leaked = [c for c in coach if not recap_gate.gate([*CLEAN, c], free_text=[c], offtopic_classifier=_ON_TOPIC).may_send]
+    assert leaked == []
+
+
+def test_a_count_in_the_coach_line_is_still_held():
+    c = "This is attempt #17 for him."
+    assert recap_gate.gate([*CLEAN, c], free_text=[c], offtopic_classifier=_ON_TOPIC).may_send is False
