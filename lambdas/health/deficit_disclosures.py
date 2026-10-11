@@ -84,7 +84,12 @@ CHANNEL_CUTOFFS: dict[str, dict[str, Any]] = {
         "label": "Training Output",
         "decline_pct": 15,
         "provenance": "population-derived",
-        "note": "15% Strava kilojoule-output decline — a generic cutoff, not his own baseline noise band.",
+        "note": "15% daily-training-load decline — a generic cutoff, not his own baseline noise band.",
+        # #3754 (2026-10-04 sweep): the input was the Strava day row's `total_kilojoules`,
+        # > 0 on 0 of 1,242 stored day rows all-time — the channel could never fire. It is
+        # now the per-day training load (`training.training_load`, TSS-proxy points over
+        # Strava + Hevy), resolved by `health.training_output_channel` for both readers.
+        "input": "training.training_load.daily_training_load (TSS-proxy points, Strava + Hevy) — replaces strava.total_kilojoules, which is 0 on every stored day row",
     },
 }
 

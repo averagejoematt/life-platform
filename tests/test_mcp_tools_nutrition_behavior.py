@@ -1131,16 +1131,25 @@ def sust_rows(hrv=None, eff=None, rec=None, cal=1800, t0=None, kj=None) -> list[
         # exactly the shape ingestion/habitify_lambda.py writes
         rows += [habitify(day, completion_pct=t0[i], total_completed=8, total_possible=10) for i, day in enumerate(_SUST_DAYS)]
     if kj:
-        # DERIVED from the real writer: ingestion/strava_lambda.transform() rolls the
-        # per-activity `kilojoules` up into a day-level `total_kilojoules`, so the fixture
-        # cannot drift from what the strava partition actually holds.
+        # DERIVED from the real writer: ingestion/strava_lambda.transform() stores the
+        # per-activity `kilojoules` on the activity (and rolls a day-level
+        # `total_kilojoules` up beside it), so the fixture cannot drift from what the
+        # strava partition actually holds. #3754: the channel scores each activity's
+        # LOAD (`training.training_load`, kJ / 7.2 — a kJ series keeps its percentages),
+        # never the day-level rollup, which is 0 on every stored day row. A 0-kJ entry is
+        # the owner's real zero-output day: a Zone-1 walk with HR, observed rest at 0 load.
         from ingestion import strava_lambda
 
         for i, day in enumerate(_SUST_DAYS):
-            raw = {"activities": [{"kilojoules": kj[i], "moving_time_seconds": 3600}]}
-            produced = {k: v for k, v in strava_lambda.transform(raw, day)[0].items() if k not in ("source", "date")}
+            act = {"kilojoules": kj[i], "moving_time_seconds": 3600} if kj[i] else dict(Z1_WALK)
+            produced = {k: v for k, v in strava_lambda.transform({"activities": [act]}, day)[0].items() if k not in ("source", "date")}
             rows.append(strava(day, **produced))
     return rows
+
+
+#: A Zone-1 walk as Strava stores one for the owner: no power meter (`kilojoules` 0) and an
+#: average HR under the Zone-1 ceiling (109.8 bpm) — scores 0 load, an OBSERVED rest day.
+Z1_WALK = {"kilojoules": 0, "moving_time_seconds": 3600, "average_heartrate": 100, "sport_type": "Walk"}
 
 
 def channel(out: dict, name: str) -> dict:
@@ -1248,9 +1257,9 @@ def test_deficit_raises_a_watch_not_an_alarm_when_two_channels_degrade(monkeypat
 
 
 def test_deficit_reads_a_channel_that_starts_from_zero_as_stable(monkeypatch):
-    """Two rest days open the window, so the training series starts at 0 kJ. There
-    is no percentage change to state from a zero baseline — the channel must say
-    stable rather than divide by zero."""
+    """Two Zone-1 walks open the window — observed rest at 0 load (#4075) — so the
+    training series starts at 0. There is no percentage change to state from a zero
+    baseline — the channel must say stable rather than divide by zero."""
     install(monkeypatch, sust_rows(hrv=FLAT, kj=[0, 0, 50, 50, 80, 80]))
     train = channel(tn.tool_get_deficit_sustainability(SUST_ARGS), "Training Output")
     assert train["direction"] == "stable" and train["delta_pct"] == 0
