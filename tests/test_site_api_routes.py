@@ -125,7 +125,10 @@ def test_dispatch_call_exists_in_handler():
 _sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 from coach import persona_registry as _personas  # noqa: E402
-from web import site_api_edition as _ed  # noqa: E402
+from web import (
+    edition_page_reads as _reads,  # noqa: E402
+    site_api_edition as _ed,  # noqa: E402
+)
 from web.prediction_reason import metric_words as _metric_words  # noqa: E402
 
 _WIRE = os.path.join(ROOT, "tests", "fixtures", "edition_wire_4582")
@@ -296,7 +299,7 @@ def test_edition_serves_what_the_front_page_read_beside_it():
     assert later, "the capture has no call settled after the edition's day — the one-as_of filter is untested"
     assert [c["id"] for c in calls["data"]["calls"]] == [c["id"] for c in sorted(served, key=lambda c: c["settled_date"], reverse=True)]
     assert calls["as_of"] == max(c["settled_date"] for c in served) <= _CAPTURE_DAY
-    assert all(set(c) <= set(_ed.FRONT_CALL_FIELDS) for c in calls["data"]["calls"])
+    assert all(set(c) <= set(_reads.FRONT_CALL_FIELDS) for c in calls["data"]["calls"])
     # The sheet: the level and how many areas it is across, dated the edition's day.
     assert b["sheet"]["state"] == "ok" and b["sheet"]["as_of"] == _CAPTURE_DAY
     assert set(b["sheet"]["data"]["character"]) == {"level", "composite_pillar_count", "composite_pillar_total"}
@@ -344,7 +347,7 @@ def test_edition_reads_seven_days_of_moves_and_a_failed_day_is_never_an_empty_on
             return {"statusCode": 503, "body": _json.dumps({"error": "x"})}
         return {"statusCode": 200, "body": _json.dumps({"state": "absent", "date": qs["date"], "lines": []})}
 
-    got = _ed.read_moves(read, _CAPTURE_DAY)
+    got = _reads.read_moves(read, _CAPTURE_DAY)
     days = [d["date"] for d in got["days"]]
     assert asked == [("/api/coach_moves", {"date": d}) for d in days]
     assert days == ["2026-10-03", "2026-10-02", "2026-10-01", "2026-09-30", "2026-09-29", "2026-09-28", "2026-09-27"]
