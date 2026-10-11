@@ -365,14 +365,12 @@ def window_days_of(daily_rows) -> int | None:
     to be."""
     if not daily_rows:
         return None
-    dates = sorted(str(r.get("date")) for r in daily_rows if r.get("date"))
-    try:
-        from datetime import date
+    from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741)
 
-        first, last = date.fromisoformat(dates[0][:10]), date.fromisoformat(dates[-1][:10])
-        return (last - first).days + 1
-    except (IndexError, ValueError):
+    days = sorted(d for d in (parse_day_key(str(r.get("date") or "")[:10]) for r in daily_rows) if d is not None)
+    if not days:
         return len(daily_rows)
+    return (days[-1] - days[0]).days + 1
 
 
 def min_effect_basis(derived: dict, *, replaced=None) -> dict:
@@ -431,11 +429,16 @@ def derive_stored_bar(out: dict, spec: dict, daily_rows, min_days_per_arm: int, 
     )
     if derived is None or not window:
         return False
-    replaced = {"value": spec.get("min_effect"), "kind": kind, "source": citation}
-    spec["min_effect"] = derived["min_effect"]
-    spec["min_effect_derivation"] = derived["derived_from"]
-    spec["min_effect_basis"] = min_effect_basis(derived, replaced=replaced)
-    spec["min_effect_provenance"] = effect_provenance(derived)
+    candidate = dict(spec)
+    candidate["min_effect"] = derived["min_effect"]
+    candidate["min_effect_derivation"] = derived["derived_from"]
+    candidate["min_effect_basis"] = min_effect_basis(derived, replaced={"value": spec.get("min_effect"), "kind": kind, "source": citation})
+    candidate["min_effect_provenance"] = effect_provenance(derived)
+    # The write only claims a derivation the ONE predicate can recompute from the record —
+    # the same check a reader (or a later audit) applies to the stored row.
+    if not experiment_gates.min_effect_meets_rigor_bar(candidate)[0]:
+        return False
+    spec.update(candidate)
     if isinstance(out.get("confirmation_criteria"), str):
         out["proposed_confirmation_criteria"] = out["confirmation_criteria"]
     out["confirmation_criteria"] = derived_criteria_sentence(
