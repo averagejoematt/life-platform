@@ -37,7 +37,7 @@ def test_pipeline_health_check_derives():
     assert phc.ACTIVE_API_SOURCES == reg.active_api_source_ids()
     assert phc.BEST_EFFORT_SOURCES == reg.best_effort_source_ids()
     # the facet still names the load-bearing pulls
-    for k in ("whoop", "withings", "strava", "eightsleep", "habitify", "todoist", "notion", "weather", "dropbox", "hevy", "garmin"):
+    for k in ("whoop", "withings", "strava", "eightsleep", "habitify", "todoist", "notion", "weather", "dropbox", "hevy"):
         assert k in phc.ACTIVE_API_SOURCES, k
 
 

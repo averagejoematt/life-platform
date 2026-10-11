@@ -190,7 +190,6 @@ def status(*, _g) -> dict:
     _LAMBDA_TO_SOURCE = {
         "whoop-data-ingestion": "whoop",
         "withings-data-ingestion": "withings",
-        "garmin-data-ingestion": "garmin",
         "strava-data-ingestion": "strava",
         "habitify-data-ingestion": "habitify",
         "eightsleep-data-ingestion": "eightsleep",

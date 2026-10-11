@@ -19,7 +19,7 @@ This guard makes that disagreement a red test instead of an unread log line:
 Guard-the-SET discipline: the config list is AST-derived from the whole
 lambdas/ingestion/ tree (a new framework source is covered the day it lands),
 and the scan itself is proven live by asserting it found both a plain-literal
-prefix (weather) and an f-string prefix (garmin).
+prefix (weather) and an f-string prefix (eightsleep).
 """
 
 import ast
@@ -138,11 +138,11 @@ def _put_object_resources(fn_name):
 
 def test_scan_found_the_known_shapes():
     """Prove the AST scan is alive: a plain-literal prefix (weather) and an
-    f-string prefix (garmin) must both be in the derived set."""
+    f-string prefix (eightsleep) must both be in the derived set."""
     assert "weather" in CONFIGS, f"scan lost the literal-prefix case; found: {sorted(CONFIGS)}"
     assert CONFIGS["weather"] == "raw/weather"
-    assert "garmin" in CONFIGS, f"scan lost the f-string-prefix case; found: {sorted(CONFIGS)}"
-    assert CONFIGS["garmin"] == "raw/matthew/garmin"
+    assert "eightsleep" in CONFIGS, f"scan lost the f-string-prefix case; found: {sorted(CONFIGS)}"
+    assert CONFIGS["eightsleep"] == "raw/matthew/eightsleep"
     assert len(CONFIGS) >= 8, f"framework config set shrank unexpectedly: {sorted(CONFIGS)}"
 
 

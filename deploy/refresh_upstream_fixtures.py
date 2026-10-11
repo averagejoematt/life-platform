@@ -26,7 +26,7 @@ Usage (run in your terminal, with AWS creds — Matthew runs all live calls):
     python3 deploy/refresh_upstream_fixtures.py --source hae --endpoint blood_glucose \
         --from-file ~/captured_hae_payload.json --apply
 
-Live-refreshable (SIMP-2 fetch_day returns the raw vendor shape):  whoop, withings, garmin.
+Live-refreshable (SIMP-2 fetch_day returns the raw vendor shape):  whoop, withings.
 --from-file only (push/normalized sources):                        strava, hae.
 
 NB: the live path calls each ingestion Lambda's real authenticate(), which for
@@ -153,10 +153,6 @@ LIVE_SOURCES = {
     "withings": {
         "module": "withings_lambda",
         "derive": lambda raw: {"measures": raw},
-    },
-    "garmin": {
-        "module": "garmin_lambda",
-        "derive": lambda raw: {"daily": raw},
     },
 }
 

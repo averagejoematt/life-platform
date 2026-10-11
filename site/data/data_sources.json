@@ -129,8 +129,8 @@
       "id": "garmin",
       "name": "Garmin",
       "category": "Wearables",
-      "metrics": "Stress, body battery, steps",
-      "method": "OAuth API pull, 4x daily — paused (ADR-074)",
+      "metrics": "Activities (via Strava)",
+      "method": "Delivered through Strava — direct-API function retired 2026-10-11 (#4640, ADR-074)",
       "posture": "paused"
     },
     {

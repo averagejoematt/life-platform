@@ -70,7 +70,6 @@ check_handler "insight-email-parser"              "insight_email_parser_lambda"
 # Spot-check a few more ingestion Lambdas
 check_handler "todoist-data-ingestion"            "todoist_lambda"
 check_handler "whoop-data-ingestion"              "whoop_lambda"
-check_handler "garmin-data-ingestion"             "garmin_lambda"
 check_handler "health-auto-export-webhook"        "health_auto_export_lambda"
 
 # ── 2. Todoist IAM S3 path verification ───────────────────────────────────────

@@ -37,7 +37,6 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "cdk/stacks/monitoring_stack.py::lambdas::between-chronicle,chronicle-email-sender,weekly-signal": "2026-08-17",
     "cdk/stacks/monitoring_stack.py::sources::dropbox,habitify,todoist,whoop": "2026-08-17",
     "cdk/stacks/monitoring_stack.py::sources::eightsleep,hevy,strava,whoop,withings": "2026-08-17",
-    "cdk/stacks/monitoring_stack.py::sources::garmin,notion": "2026-08-17",
     "lambdas/content/engagement_core.py::sources::apple_health,eightsleep,whoop": "2026-08-17",
     "lambdas/content/html_builder.py::sources::habitify,macrofactor,strava,whoop": "2026-08-17",
     "lambdas/content/insight_writer.py::sources::garmin,strava,whoop": "2026-08-17",

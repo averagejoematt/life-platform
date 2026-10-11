@@ -211,10 +211,6 @@
     "lambdas/ingestion/food_delivery_lambda.py": {
       "function": "food-delivery-ingestion"
     },
-    "lambdas/ingestion/garmin_lambda.py": {
-      "function": "garmin-data-ingestion",
-      "native_deps": true
-    },
     "lambdas/ingestion/habitify_lambda.py": {
       "function": "habitify-data-ingestion"
     },

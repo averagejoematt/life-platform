@@ -244,6 +244,7 @@
         "webhook_push",
         "file_transport",
         "habit_bridge",
+        "relayed_through_source",
         "manual_entry",
         "frozen_archive"
       ]
