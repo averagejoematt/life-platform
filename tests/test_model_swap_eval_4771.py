@@ -292,3 +292,39 @@ def test_incumbents_agree_with_the_model_registry_once_it_lands():
         if mse.resolved(model_routing.model_for(f.route)) != mse.resolved(held):
             drift.append((f.name, f.route, model_routing.model_for(f.route), held))
     assert not drift, f"registry route disagrees with the main-path attribute: {drift}"
+
+
+def test_credential_stub_never_shadows_a_file_chain_4796(tmp_path):
+    """Real mode with a credentials-file-only chain must leave AWS_ACCESS_KEY_ID unset; offline modes still stub."""
+    import os
+    import site
+    import subprocess
+    import sys
+
+    creds = tmp_path / "credentials"
+    creds.write_text("[default]\naws_access_key_id = AKIAFILEONLY\naws_secret_access_key = filesecret\n")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    env.update(
+        PYTHONUSERBASE=site.getuserbase(),
+        AWS_SHARED_CREDENTIALS_FILE=str(creds),
+        AWS_CONFIG_FILE=str(tmp_path / "nocfg"),
+        HOME=str(tmp_path),
+    )
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    code = (
+        "import sys; sys.argv=['x'] + sys.argv[1:]; sys.path.insert(0, %r); import golden_surface_eval, safety_eval_matrix, model_swap_eval, os; print(os.environ.get('AWS_ACCESS_KEY_ID'))"
+        % tests_dir
+    )
+
+    def run(*extra, e=env):
+        r = subprocess.run([sys.executable, "-c", code, *extra], env=e, capture_output=True, text=True, timeout=120)
+        assert r.stdout.strip(), r.stderr[-800:]
+        return r.stdout.strip().splitlines()[-1]
+
+    assert run() == "None"  # real mode, file chain: not shadowed
+    assert run("--dry-run") == "testing"  # offline path stays hermetic
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    bare = {k: v for k, v in env.items() if not k.startswith("AWS_")}
+    bare.update(HOME=str(empty), AWS_EC2_METADATA_DISABLED="true")
+    assert run(e=bare) == "testing"  # no chain at all: hermetic
