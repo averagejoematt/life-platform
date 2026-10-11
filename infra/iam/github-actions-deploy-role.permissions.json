@@ -59,6 +59,14 @@
       "Resource": "arn:aws:s3:::matthew-life-platform/deploys/*"
     },
     {
+      "Sid": "S3BucketNotificationRead",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketNotification"
+      ],
+      "Resource": "arn:aws:s3:::matthew-life-platform"
+    },
+    {
       "Sid": "DynamoDB",
       "Effect": "Allow",
       "Action": [
