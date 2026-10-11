@@ -199,7 +199,8 @@ def test_the_verdict_never_extends_a_desk_sender_beyond_a_desk_subject(monkeypat
 
 
 def test_an_allowed_sender_still_lands_a_desk_reply_without_the_flag(run):
-    table, s3, cw, ses, words = run(_email(OWNER_ADDR, SQ_SUBJECT, INLINE))
+    # #4633: an ALLOWED_SENDERS address needs SES's own verdict too now — the header is part of the wire shape.
+    table, s3, cw, ses, words = run(_email(OWNER_ADDR, SQ_SUBJECT, INLINE, [SES_PASS]))
     assert len(_qa_rows(table)) == 1 and cw.calls == []
 
 

@@ -169,6 +169,9 @@
     "lambdas/emails/habit_skip_review_lambda.py": {
       "function": "habit-skip-review"
     },
+    "lambdas/emails/inbound_auth_gate_lambda.py": {
+      "function": "inbound-auth-gate"
+    },
     "lambdas/emails/insight_email_parser_lambda.py": {
       "function": "insight-email-parser"
     },
