@@ -24,6 +24,8 @@ import { esc } from "/assets/js/evidence_shared.js";
 const MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
 const RE_WITHIN = /counts as right within (.+?) either way/;
 const RE_TREND = /against (the trend in [^.]+)\./;
+// #4617: a direction call graded across its own window says so in its sentence.
+const RE_WINDOW = /checked on the change from the first reading of its window, ([^,]+), to the last, ([^,.]+)/;
 const RE_BET = /\b(whether .+?)\. [^.]*\bsaid\b/;
 const RE_FOR_DAY = new RegExp(`\\bfor ((?:${MONTHS}) \\d{1,2})\\.`);
 const RE_ON_DAY = new RegExp(`\\bon ((?:${MONTHS}) \\d{1,2})$`);
@@ -46,8 +48,13 @@ export function toleranceText(call) {
  *  deviation of his readings over the 30 days before the call." "" when not served —
  *  the number in the tag still stands, and no wording is guessed. */
 export function toleranceNote(call) {
-  const st = call && call.kind === "number" && call.tolerance && typeof call.tolerance.statistic === "string" ? call.tolerance.statistic.trim() : "";
-  return st ? `The allowed distance is ${st.replace(/[.\s]+$/, "")}.` : "";
+  const t = call && call.tolerance;
+  const st = t && typeof t.statistic === "string" ? t.statistic.trim().replace(/[.\s]+$/, "") : "";
+  if (!st) return "";
+  if (call.kind === "number") return `The allowed distance is ${st}.`;
+  // A window-graded direction call (#4617): its band is said here, once, with what it is.
+  const n = typeof t.text === "string" ? t.text.trim() : "";
+  return call.kind === "direction" && n ? `It counted as a move only beyond ${n} either way, ${st}.` : "";
 }
 
 /** The rule that decided a verdict on this call, in the route's own words. `right` is the
@@ -60,6 +67,8 @@ export function ruleFor(call, right) {
     return tol ? `${right ? "within" : "not within"} ${tol} either way` : "";
   }
   if (call.kind === "direction") {
+    const w = RE_WINDOW.exec(String(call.called || ""));
+    if (w) return `by the change from ${w[1]} to ${w[2]}`;
     const m = RE_TREND.exec(String(call.called || ""));
     return m ? `by ${m[1]}` : "";
   }
@@ -166,6 +175,8 @@ export function gradedOnText(call) {
   const day = measuredDay(call);
   if (day) return `Graded on the reading for ${day}.`;
   if (call && call.kind === "direction") {
+    const w = RE_WINDOW.exec(String(call.called || ""));
+    if (w) return `Graded on the readings from ${w[1]} to ${w[2]}.`;
     const m = RE_TREND.exec(String(call.called || ""));
     return m ? `Graded on ${m[1]}.` : "";
   }

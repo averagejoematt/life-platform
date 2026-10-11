@@ -233,6 +233,11 @@ def test_a_window_graded_flat_call_gets_a_page_with_its_rule(monkeypatch):
     assert why is None and built["verdict"] == "wrong"
     assert "held flat, from 319.5 lb on September 6 to 319.5 lb on September 20" in built["happened"]
     assert "first reading of its window, September 6, to the last, September 20" in built["called"]
+    # #4808: the band is served once, with what it is, and never as an unnamed "usual swing"
+    assert built["tolerance"]["text"] == "1 lb" and built["tolerance"]["n"] == 15
+    assert built["tolerance"]["statistic"] == "the median day-to-day change of his readings inside the window"
+    for field in ("called", "happened"):
+        assert "swing" not in built[field] and "1 lb" not in built[field], (field, built[field])
 
 
 def test_the_old_flat_read_still_gets_no_page():

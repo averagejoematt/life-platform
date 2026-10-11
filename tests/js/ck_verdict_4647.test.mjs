@@ -216,3 +216,23 @@ test("Marcus Webb's page: a checked call whose rule the record line cannot read 
   assert.ok(skipped >= 1, "the fixture holds a line with no readable rule");
   assert.match(html, /settled calls? (has|have) no rule the page can print/);
 });
+
+test("a direction call graded across its own window (#4617) has a rule, and its band is said once with what it is", () => {
+  const base = clone(byId("labs-20260906-d2deb9b27d"));
+  const call = {
+    ...base,
+    verdict: "wrong",
+    called: "Max Reyes called his weight to go down, in a prediction sealed before day one. It was checked on the change from the first reading of its window, September 6, to the last, September 20.",
+    happened: "Weight held flat, from 319.5 lb on September 6 to 319.5 lb on September 20 — the call was for it to go down.",
+    happened_short: "It held flat.",
+    tolerance: { value: 1.0, text: "1 lb", statistic: "the median day-to-day change of his readings inside the window", window_days: null, n: 15 },
+  };
+  assert.equal(V.ruleFor(call, false), "by the change from September 6 to September 20");
+  assert.equal(V.gradedOnText(call), "Graded on the readings from September 6 to September 20.");
+  assert.equal(V.toleranceNote(call), "It counted as a move only beyond 1 lb either way, the median day-to-day change of his readings inside the window.");
+  const card = V.callCardHTML(call);
+  assert.match(card, /^<div><span class="ck-verdicts__tag">Wrong · by the change from September 6 to September 20<\/span><p>[^<]+ <b>It held flat\.<\/b><\/p>/);
+  assert.equal(card.split("1 lb").length - 1, 1, "the band is printed once");
+  // the legacy trend sentence still reads as before
+  assert.equal(V.ruleFor(base, true), "by the trend in his most recent readings");
+});

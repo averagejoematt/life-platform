@@ -263,6 +263,27 @@ def tolerance_block(spec: dict) -> dict | None:
     }
 
 
+#: prediction_reason's flat-window sentence names the band as "its usual day-to-day swing of X";
+#: on a call page the band is the tag's, said once with its statistic, so the clause is dropped.
+_SWING_CLAUSE = re.compile(r", inside its usual day-to-day swing of [^—]+(?= —)")
+
+
+def window_band_block(window: dict, metric: Any) -> dict | None:
+    """A window-graded direction call's band (#4617) in the same shape as ``tolerance_block``
+    (#4808): the number, and in words what it is — the grader's own ``band_rule``."""
+    text = _amount(window.get("band"), metric)
+    rule = str(window.get("band_rule") or "").strip()
+    if not text:
+        return None
+    return {
+        "value": float(window["band"]),
+        "text": text,
+        "statistic": rule.replace("of the readings", "of his readings", 1) if rule else None,
+        "window_days": None,
+        "n": window.get("readings"),
+    }
+
+
 def _names_measure(text: str, metric: Any) -> bool:
     low = text.lower()
     return any(name in low for name in _NAMED_AS.get(base_metric(str(metric or "")), ()))
@@ -423,10 +444,15 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         checked = _words(_iso_day(row.get("outcome_date")))
         called = f"{name} called {subject} to go {direction}, in a prediction sealed before day one."
         if window is not None and _words(_iso_day(window.get("start"))) and _words(_iso_day(window.get("end"))):
+            # #4808: the band is served once, in ``tolerance``, with what it is in words — never
+            # as an unnamed "usual day-to-day swing" in this sentence or in what happened.
             called += (
                 f" It was checked on the change from the first reading of its window, {_words(_iso_day(window.get('start')))}, "
-                f"to the last, {_words(_iso_day(window.get('end')))}, against his usual day-to-day swing."
+                f"to the last, {_words(_iso_day(window.get('end')))}."
             )
+            tolerance = window_band_block(window, metric)
+            if tolerance:
+                happened = _SWING_CLAUSE.sub("", happened)
         elif checked:
             called += f" It was checked on {checked} against the trend in his most recent readings."
         called_short = f"{name} called {plain} to go {direction}."
