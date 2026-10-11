@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from health import (
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
+    training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
 
 from mcp.core import (
@@ -844,14 +845,17 @@ def tool_get_deficit_sustainability(args):
     habits_degraded = t0_dir == "declining" and abs(t0_delta) > _habit_cutoff
 
     # ── Channel 5: Training output ──
+    # #3754 (2026-10-04 sweep): this channel read the Strava day row's `total_kilojoules`,
+    # which is > 0 on 0 of 1,242 stored day rows all-time (only power-equipped activities
+    # report kilojoules), so its series was always all-zero and it could never read
+    # "degraded". The input is now the SAME per-day training load the ACWR/TSB surfaces
+    # use (`training.training_load`, #4075) over Strava + Hevy — see
+    # health/training_output_channel.py for the series contract.
     _training_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["training_output"]["decline_pct"]
-    daily_kj = {}
-    for s in strava_items:
-        d = s.get("date", "")
-        kj = float(s.get("total_kilojoules", 0) or 0)
-        daily_kj[d] = daily_kj.get(d, 0) + kj
-    training_vals = [daily_kj[d] for d in sorted(daily_kj)] if daily_kj else []
+    _training = training_output_channel.series(strava_items, sources.get("hevy", []))
+    training_vals = _training["values"]
     train_dir, train_delta = trend_direction(training_vals)
+    train_avg = safe_avg(training_vals)
     training_degraded = train_dir == "declining" and abs(train_delta) > _training_cutoff
 
     # ── Composite assessment ──
@@ -899,8 +903,12 @@ def tool_get_deficit_sustainability(args):
             "status": "degraded" if training_degraded else "stable",
             "direction": train_dir,
             "delta_pct": train_delta,
+            "avg": train_avg,
             "cutoff_pct": _training_cutoff,
             "provenance": deficit_disclosures.CHANNEL_CUTOFFS["training_output"]["provenance"],
+            # #3754: what this channel measured, so a reader can tell a measured rest
+            # window from the all-zero input the channel used to carry.
+            "input": _training["input"],
         },
     ]
     degraded_count = sum(1 for c in channels if c["status"] == "degraded")
