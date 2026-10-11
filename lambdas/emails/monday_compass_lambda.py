@@ -557,7 +557,7 @@ def _build_board_context_for_compass(week_state, todoist_data):
 def _fallback_board_context(week_state):
     weakest = week_state.get("weakest_pillar", "consistency")
     return (
-        "Dr. Nathan Reeves (Mind & Behaviour Coach) — domains: decision fatigue, willpower, behavioral change\n"
+        "Nathan Reeves (Mind & Behaviour Coach) — domains: decision fatigue, willpower, behavioral change\n"
         "  Principle: 'You cannot out-willpower a bad environment. Design the week before it designs you.'\n\n"
         f"Relevant expert for {weakest} pillar improvement\n"
         "The Chair (Platform Intelligence) — domains: cross-pillar optimization, compounding leverage\n"

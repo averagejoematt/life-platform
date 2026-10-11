@@ -35,9 +35,10 @@ from operational.qa_check import CONTENT_TRUTH, Check
 REPO = Path(__file__).resolve().parent.parent
 
 # Measured at landing (2026-09-21): 9 surfaces / 19 graded (surface, fact) pairs, read
-# live in 10 HTTP fetches shared with the hook-liveness leg.
-SURFACE_COUNT_FLOOR = 9
-OBSERVATION_COUNT_FLOOR = 19
+# live in 10 HTTP fetches shared with the hook-liveness leg. 2026-10-04: /api/edition
+# joins (#4582) — 10 surfaces / 24 pairs.
+SURFACE_COUNT_FLOOR = 10
+OBSERVATION_COUNT_FLOOR = 24
 # SHRINK-ONLY: 12 producers restate a week fact with no nightly-fetchable artifact.
 UNREGISTERED_PRODUCER_CEILING = 12
 
@@ -134,6 +135,18 @@ def _payloads(**overrides):
                 "weekly_rate_lbs": -5.63,
                 "weighin_count": 7,
                 "rate_provisional": True,
+            },
+        },
+        "/api/edition": {
+            "as_of": "2026-09-20",
+            "day_n": 15,
+            "blocks": {
+                "today": {
+                    "state": "ok",
+                    "as_of": "2026-09-20",
+                    "data": {"weight_lbs": 316.9, "date": "2026-09-20", "start_weight_lbs": 327.3, "start_date": "2026-09-06"},
+                },
+                "chapter": {"state": "ok", "as_of": "2026-09-15", "data": {"week_label": "Week 2", "date": "2026-09-15"}},
             },
         },
         "/api/timeline": {

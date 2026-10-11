@@ -21,11 +21,11 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 // The live shapes (/api/coaching-dashboard.coaches[], 2026-09-26T04:40Z capture), trimmed.
 const COACHES = [
-  { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery, HRV at 48.2 ms…", analysis_generated_at: "2026-09-25T17:01:48.880845+00:00" },
-  { coach_id: "physical", name: "Dr. Max Reyes", position_summary: "On the night of 2026-09-23, his Whoop registered 86% recovery…", analysis_generated_at: "2026-09-25T17:05:56.896879+00:00" },
-  { coach_id: "explorer", name: "Dr. Henning Brandt", position_summary: "Matthew is at a critical fork.", analysis_generated_at: "2026-09-25T17:10:57.817264+00:00" },
-  { coach_id: "labs", name: "Dr. James Okafor", position_summary: "", analysis_generated_at: "2026-09-25T17:20:00+00:00" },
-  { coach_id: "mind", name: "Dr. Nathan Reeves", position_summary: "A read with no timestamp.", analysis_generated_at: "" },
+  { coach_id: "sleep", name: "Lisa Park", position_summary: "On the night of 2026-09-23, Whoop logged 86% recovery, HRV at 48.2 ms…", analysis_generated_at: "2026-09-25T17:01:48.880845+00:00" },
+  { coach_id: "physical", name: "Max Reyes", position_summary: "On the night of 2026-09-23, his Whoop registered 86% recovery…", analysis_generated_at: "2026-09-25T17:05:56.896879+00:00" },
+  { coach_id: "explorer", name: "Henning Brandt", position_summary: "Matthew is at a critical fork.", analysis_generated_at: "2026-09-25T17:10:57.817264+00:00" },
+  { coach_id: "labs", name: "James Okafor", position_summary: "", analysis_generated_at: "2026-09-25T17:20:00+00:00" },
+  { coach_id: "mind", name: "Nathan Reeves", position_summary: "A read with no timestamp.", analysis_generated_at: "" },
 ];
 const MONDAY_CALL = "2026-09-21T14:02:56.543529+00:00"; // the integrator's cron: Mondays 14:00Z
 const FRIDAY_NIGHT_PT = new Date("2026-09-26T04:40:00Z"); // Friday Sep 25, 9:40 PM PT
@@ -111,8 +111,8 @@ test("the record line counts, never a percentage — and says nothing when nothi
 
 test("the ask: the chosen coach's own open action first, else the soonest-due; [] -> none (never invented)", () => {
   const acts = [
-    { coach_id: "sleep", coach_name: "Dr. Lisa Park", text: "Lights out by 10:30.", due: "2026-09-28" },
-    { coach_id: "physical", coach_name: "Dr. Max Reyes", text: "170 g protein every day for seven days.", due: "2026-10-02" },
+    { coach_id: "sleep", coach_name: "Lisa Park", text: "Lights out by 10:30.", due: "2026-09-28" },
+    { coach_id: "physical", coach_name: "Max Reyes", text: "170 g protein every day for seven days.", due: "2026-10-02" },
   ];
   assert.equal(T.pickAsk(acts, "physical").coach_id, "physical");
   assert.equal(T.pickAsk(acts, "explorer").coach_id, "sleep");
@@ -153,9 +153,9 @@ test("SOURCE: on the first screen today's read renders BEFORE the week's call, a
 // "Freshest" alone resolved to whichever coach the daily batch ran last. The chain: the
 // open ask → the best checked record at n >= 10 within today's batch → the freshest.
 const BATCH = [
-  { coach_id: "sleep", name: "Dr. Lisa Park", position_summary: "Sleep read.", analysis_generated_at: "2026-09-25T17:01:48Z" },
-  { coach_id: "labs", name: "Dr. James Okafor", position_summary: "Labs read.", analysis_generated_at: "2026-09-25T17:09:01Z" },
-  { coach_id: "explorer", name: "Dr. Henning Brandt", position_summary: "Explorer read.", analysis_generated_at: "2026-09-25T17:10:57Z" },
+  { coach_id: "sleep", name: "Lisa Park", position_summary: "Sleep read.", analysis_generated_at: "2026-09-25T17:01:48Z" },
+  { coach_id: "labs", name: "James Okafor", position_summary: "Labs read.", analysis_generated_at: "2026-09-25T17:09:01Z" },
+  { coach_id: "explorer", name: "Henning Brandt", position_summary: "Explorer read.", analysis_generated_at: "2026-09-25T17:10:57Z" },
 ];
 const CALIB = {
   coaches: [
@@ -205,7 +205,7 @@ const LEAD = {
   generated_at: "2026-09-25T17:12:00+00:00", // Friday 10:12 AM PT
   data_through: "2026-09-24",
   coach_id: "eli_marsh",
-  coach_name: "Dr. Eli Marsh",
+  coach_name: "Eli Marsh",
   coach_title: "Head Coach",
   cited: [
     { metric: "latest weigh-in (lb)", value: "313.1", as_of: "2026-09-25", source_field: "withings.weight_lbs" },
@@ -220,7 +220,7 @@ test("chain (0): a lead read under 24 h old leads, ahead of the ask and the reco
   assert.equal(p.reason, "chosen: today's lead read");
   assert.equal(p.coach.coach_id, "eli_marsh");
   assert.equal(p.coach.persona_id, "eli_marsh"); // the by-coach anchor, not "eli_marsh_coach"
-  assert.equal(p.coach.name, "Dr. Eli Marsh");
+  assert.equal(p.coach.name, "Eli Marsh");
   assert.equal(p.coach.position_summary, LEAD.text); // the served text, untouched
   assert.equal(p.coach.analysis_generated_at, LEAD.generated_at);
   assert.deepEqual(p.coach.cited, LEAD.cited);

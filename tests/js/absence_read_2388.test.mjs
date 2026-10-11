@@ -108,7 +108,7 @@ test("a reporting pillar keeps its correlative trend read", () => {
 // The exact /api/coach_analysis shape the site API serves: `analysis` is a STRING.
 const LIVE_COACH_PAYLOAD = {
   coach_id: "nutrition_coach",
-  coach_name: "Dr. Marcus Webb",
+  coach_name: "Marcus Webb",
   domain: "nutrition",
   analysis: "Protein intake has no logged days this cycle, so nothing can be graded yet.",
   key_recommendation: "Log one full day before we read anything into the macros.",

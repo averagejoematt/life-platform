@@ -1,0 +1,74 @@
+{
+  "_about": "MOVES# rows in the shape coach.coach_moves.build_row writes them (pk COACH#eli_marsh). MOVES#2026-10-04 is the one row stored on 2026-10-04, captured read-only from DynamoDB with its fact_sheet, cost and model fields left out: the cast ran and no line was admitted. No stored day carries a line yet, so MOVES#2026-10-02 is written for this fixture in the writer's shape: three lines (the most a day can hold), one a reply, two carrying the bet they opened, plus a held line and the stored honorific on a name. The route must serve the three lines and nothing else from it.",
+  "rows": [
+    {
+      "pk": "COACH#eli_marsh",
+      "sk": "MOVES#2026-10-04",
+      "record_type": "coach_moves",
+      "date": "2026-10-04",
+      "generated_at": "2026-10-04T19:00:22.131113+00:00",
+      "phase": "experiment",
+      "cycle": 17,
+      "lines": [],
+      "absent": [{"coach_id": "glucose_coach", "name": "Amara Patel", "reason": "no sensor since 2026-08-27"}],
+      "silent": ["sleep_coach", "nutrition_coach", "mind_coach", "physical_coach", "labs_coach", "explorer_coach"],
+      "held": [],
+      "dropped": [{"coach_id": "Nathan Reeves", "move": "reaction", "reason": "not eligible (sidelined or not on the roster)"}],
+      "bet": null
+    },
+    {
+      "pk": "COACH#eli_marsh",
+      "sk": "MOVES#2026-10-02",
+      "record_type": "coach_moves",
+      "date": "2026-10-02",
+      "generated_at": "2026-10-02T19:00:20.000000+00:00",
+      "phase": "experiment",
+      "cycle": 17,
+      "lines": [
+        {
+          "coach_id": "sleep_coach",
+          "name": "Dr. Lisa Park",
+          "move": "reaction",
+          "text": "I called 7.8 hours and he slept 8.6. I was inside my range but low, and I think his sleep is running longer than I have been giving it credit for.",
+          "date": "2026-10-02",
+          "replies_to": null,
+          "replies_to_name": null,
+          "result_id": "sleep-20260925"
+        },
+        {
+          "coach_id": "physical_coach",
+          "name": "Max Reyes",
+          "move": "call",
+          "text": "I expect his morning recovery to drop under 70 within the week. Two long sessions close together usually cost him something, early as this data is.",
+          "date": "2026-10-02",
+          "replies_to": null,
+          "replies_to_name": null,
+          "result_id": null,
+          "bet": {"docket_sk": "OPEN#2026-10-09#fixture", "resolution_date": "2026-10-09", "description": "whether his morning recovery score will be below 70 on 2026-10-09"}
+        },
+        {
+          "coach_id": "nutrition_coach",
+          "name": "Marcus Webb",
+          "move": "reply",
+          "text": "I disagree with Max. He logged 172 g of protein, and I think that carries his recovery through the week.",
+          "date": "2026-10-02",
+          "replies_to": "physical_coach",
+          "replies_to_name": "Max Reyes",
+          "result_id": null,
+          "bet": {"docket_sk": "OPEN#2026-10-09#fixture", "resolution_date": "2026-10-09", "description": "whether his morning recovery score will be below 70 on 2026-10-09"}
+        }
+      ],
+      "absent": [{"coach_id": "glucose_coach", "name": "Amara Patel", "reason": "no sensor since 2026-08-27"}],
+      "silent": ["mind_coach", "labs_coach", "explorer_coach"],
+      "held": [{"coach_id": "mind_coach", "move": "call", "text": "A held line that never shipped.", "findings": ["restates numbers"]}],
+      "dropped": [],
+      "bet": {"docket_sk": "OPEN#2026-10-09#fixture", "resolution_date": "2026-10-09", "description": "whether his morning recovery score will be below 70 on 2026-10-09", "coaches": ["physical_coach", "nutrition_coach"], "sides": {"physical_coach": true, "nutrition_coach": false}},
+      "fact_sheet": {"values": {"sleep_hours": 8.6}},
+      "models": {"cast": "fixture", "line": "fixture"},
+      "calls": 4,
+      "input_tokens": 1000,
+      "output_tokens": 200,
+      "cost_usd": 0.01
+    }
+  ]
+}

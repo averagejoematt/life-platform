@@ -32,6 +32,7 @@
     Experiment  → the cross-week arc (/api/experiment_synthesis), unchanged.
 */
 import { pageData } from "/assets/js/page_data.js"; // #3048 — per-page start section, JSON island
+import { coachComparison, comparisonText } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis, preStart, genesisCount } from "/assets/js/coach_popover.js"; // + #949 pre-start gate; #4182 the kicker's Day N
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
@@ -76,7 +77,7 @@ const OBS_DOMAINS = new Set(["sleep", "training", "nutrition", "mind", "physical
 // API from config/personas.json's single `lead: true` persona; this constant is only
 // the render-time fallback for a payload that predates the byline field, and
 // tests/test_board_lead_single_character.py pins it equal to the registry's lead.
-const LEAD_BYLINE_FALLBACK = "Dr. Eli Marsh";
+const LEAD_BYLINE_FALLBACK = "Eli Marsh";
 const READ_SCOPES = [
   { id: "today", title: "Today", date: "every coach's latest read" },
   { id: "week", title: "This week", date: "the week in each domain" },
@@ -216,6 +217,7 @@ function coachReportHTML(rc) {
   // through September 28" — counts, not a percentage, below n = 10).
   if (tr.headline && tr.decided) h += `<p class="cr-rate">${esc(tr.headline)}</p>`;
   else h += `<p class="cr-rate">${tr.hit_rate_pct == null ? `Score unlocks as predictions resolve <span class="label">— first calls land in the coming weeks</span>` : esc(tr.hit_rate_pct) + "% hit-rate" + ` <span class="label">${esc(tr.n_note || "")}</span>`}</p>`;
+  if (tr.decided || tr.hit_rate_pct != null) h += coachComparison(tr.comparison, { cls: "cr-cmp label" }); // #4585: never the count alone
   if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
   else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
   if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
@@ -234,12 +236,6 @@ function coachCharacterHTML(c) {
   if (c.voice && c.voice.catchphrase) h += `<p class="cc-catch">“${esc(c.voice.catchphrase)}”</p>`;
   if (c.arc) h += `<p class="cc-arc label">their arc: ${esc(c.arc)}</p>`;
   return h + `</section>`;
-}
-function coachHypothesesHTML(hyps) {
-  if (!(hyps && hyps.length)) return "";
-  return `<section class="coach-hyp"><p class="dx-kicker label">working hypotheses · live bets</p><ul class="ch-list">` +
-    hyps.map((x) => `<li class="ch-${esc(x.kind || "thread")}"><span class="label">${esc(x.kind || "thread")}</span> ${esc(x.claim)}</li>`).join("") +
-    `</ul></section>`;
 }
 function disclose(summary, innerHTML) {
   if (!innerHTML) return "";
@@ -400,9 +396,8 @@ function coachLiveRecordHTML(d) {
     h += `<p class="cl-empty dx-prose">No evidence-derived stance yet — the opinion engine writes its first weekly read once the data accrues.` +
       (st.stage && st.stage.label ? ` Until then the authored starting scaffold has them at <strong>${esc(String(st.stage.label).replace(/[.\s]+$/, ""))}</strong>.` : "") + `</p>`;
   }
-  const hyps = (d.working_hypotheses || []).filter((x) => x && x.claim);
-  if (hyps.length) h += coachHypothesesHTML(hyps);
-  else if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
+  // #4649: /api/coach/<id> no longer carries `working_hypotheses` (it was [] for every coach).
+  if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
   else h += `<p class="cl-empty dx-prose">No open calls on the board yet — when this coach makes a falsifiable prediction it shows here, then gets graded on the <a href="/coaching/scorecard/">scorecard</a>, hit or miss.</p>`;
   const trail = (d.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
   const outs = (d.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
@@ -574,7 +569,10 @@ async function renderToday(mount) {
     const clipped = /…$|\.\.\.$/.test(text.trim());
     h += `<section class="ct-read" aria-labelledby="ct-read-h" style="--coach:${esc(chosen.color || "")}">`;
     if (banner) h += `<p class="ct-banner">${esc(banner)}</p>`;
-    h += `<h2 class="ct-kicker label" id="ct-read-h">today's read</h2>` +
+    // #4589: the long coach reads are written twice a week (Mon/Thu), so a 3-4 day old read is the
+    // normal state; past the 48 h banner it is "the latest read", never "today's".
+    const kicker = readTier === "stale" ? "the latest read" : "today's read";
+    h += `<h2 class="ct-kicker label" id="ct-read-h">${kicker}</h2>` +
       `<p class="ct-who"><span class="ct-name">${esc(chosen.name || "")}</span>${_roleOf(chosen) ? ` <span class="ct-role label">· ${esc(_roleOf(chosen))}</span>` : ""}</p>` +
       `<p class="provenance"><span class="pv-src${readTier === "stale" ? " pv-stale" : ""}">${esc(writtenStamp(chosen.analysis_generated_at, now))}</span>` +
       `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
@@ -588,7 +586,7 @@ async function renderToday(mount) {
         `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}${lateWords(daysOverdue(ask, now)) ? ` · ${esc(lateWords(daysOverdue(ask, now)))}` : ""}</span></p>`;
     }
     const rec = recordLine(preds && preds.overall);
-    if (rec) h += `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>`;
+    if (rec) h += `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>` + coachComparison(preds && preds.comparison, { cls: "ct-record label" }); // #4585
     h += `</section>`;
   } else if (chosen) {
     // > 7 days: no read on the first screen. Say why, then the standing stances.
@@ -983,12 +981,11 @@ async function renderByCoach(read, id) {
   }
 
   // 3) LIVE BETS + a thin track strip (the accountability, not a whole section).
-  h += coachHypothesesHTML(coach.working_hypotheses);
   const tr = (coach.report_card && coach.report_card.track_record) || {};
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     // #4220: the ONE record's headline when served; the legacy rate line only for an older response.
     const trLine = tr.headline && tr.decided ? tr.headline : tr.hit_rate_pct != null ? tr.hit_rate_pct + "% hit-rate " + (tr.n_note || "") : "accruing";
-    h += `<p class="bc-track label">track record: ${esc(trLine)}</p>`;
+    h += `<p class="bc-track label">track record: ${esc(trLine)}</p>` + coachComparison(tr.comparison, { cls: "bc-track label" }); // #4585
   }
   // 3.2) CONVERSATIONS WITH MATTHEW (#1483, ADR-142 theme-referenceable tier) — the
   // coach ALLUDES to private check-in conversations. The payload carries ONLY the
@@ -1217,16 +1214,16 @@ function groundingFooterHTML(grounding) {
 // sigils and names on the convene cards match the roster (the phantom second
 // cast answered ungrounded and is retired; the API maps old cached ids).
 // Coaching-team v2 (2026-08-10): the training seat retired — the merged Performance
-// seat (Dr. Max Reyes) carries training. Keep this map equal to /api/coaches'
+// seat (Max Reyes) carries training. Keep this map equal to /api/coaches'
 // operational roster (tests/test_board_ask_roster.py + cast-consistency guard).
 const BOARD_PERSONAS = {
-  nutrition_coach: { name: "Dr. Marcus Webb", title: "Evidence-Based Nutrition" },
-  sleep_coach: { name: "Dr. Lisa Park", title: "Sleep & Recovery" },
-  physical_coach: { name: "Dr. Max Reyes", title: "Performance & Training" },
-  glucose_coach: { name: "Dr. Amara Patel", title: "Glucose & Metabolic Response" },
-  mind_coach: { name: "Dr. Nathan Reeves", title: "Mind & Behaviour" },
-  labs_coach: { name: "Dr. James Okafor", title: "Labs & Biomarkers" },
-  explorer_coach: { name: "Dr. Henning Brandt", title: "Cross-Domain Patterns" },
+  nutrition_coach: { name: "Marcus Webb", title: "Evidence-Based Nutrition" },
+  sleep_coach: { name: "Lisa Park", title: "Sleep & Recovery" },
+  physical_coach: { name: "Max Reyes", title: "Performance & Training" },
+  glucose_coach: { name: "Amara Patel", title: "Glucose & Metabolic Response" },
+  mind_coach: { name: "Nathan Reeves", title: "Mind & Behaviour" },
+  labs_coach: { name: "James Okafor", title: "Labs & Biomarkers" },
+  explorer_coach: { name: "Henning Brandt", title: "Cross-Domain Patterns" },
 };
 const BOARD_TRIO = ["physical_coach", "nutrition_coach", "sleep_coach"];
 
@@ -1241,7 +1238,7 @@ function attachFollowup(card, pid, sessionToken, getLeft, setLeft) {
   wrap.className = "cv-followup";
   wrap.setAttribute("novalidate", "");
   wrap.innerHTML =
-    `<input class="cv-fu-in" name="fq" maxlength="500" placeholder="Ask ${esc(BOARD_PERSONAS[pid].name.replace(/^Dr\.\s*/, "Dr. "))} a follow-up…" aria-label="Follow-up question for ${esc(BOARD_PERSONAS[pid].name)}">` +
+    `<input class="cv-fu-in" name="fq" maxlength="500" placeholder="Ask ${esc(BOARD_PERSONAS[pid].name)} a follow-up…" aria-label="Follow-up question for ${esc(BOARD_PERSONAS[pid].name)}">` +
     `<button class="cv-fu-btn" type="submit">Ask</button>` +
     `<span class="cv-fu-note label" role="status" aria-live="polite">${getLeft()} follow-up${getLeft() === 1 ? "" : "s"} left</span>`;
   card.appendChild(wrap);
@@ -1437,6 +1434,7 @@ async function renderScorecard(read, id) {
       `<div class="sc-tile"><span class="sc-n">${o.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.pending || 0}</span><span class="sc-l label">still open</span></div>` +
       `</div>`;
+    if (decided) h += coachComparison(data.comparison, { cls: "dx-prose sc-note" }); // #4585: the tiles never appear alone
     if (!decided) {
       // #3046 (was #1371): due-vs-pending context comes from the API's `due`
       // block, computed server-side from the evaluator's OWN domain-clamped
@@ -1554,6 +1552,7 @@ async function renderScorecard(read, id) {
     `<div class="sc-tile"><span class="sc-n">${c.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.pending || 0}</span><span class="sc-l label">still open</span></div>` +
     `</div>`;
+  if (decidedC) h += coachComparison(c.comparison, { cls: "dx-prose sc-note" }); // #4585: the tiles never appear alone
   if (!decidedC) {
     const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${rateText(cl.confirmed, cl.decided, cl.hit_rate_pct, data.percent_floor)} ${rateWord(cl.decided, data.percent_floor)}) across the whole record so far.` : "";
     // #3046: count only falsifiable calls; observational claims are labeled in the list below.
@@ -1629,12 +1628,15 @@ function _scCallHTML(p, shareUrl) {
   // #3046: an open call shows WHEN its verdict is due (the API computes it from
   // the evaluator's own domain-clamped window), not just when it was made.
   const dueBit = st === "pending" && p.due_date ? `<span class="sc-call-d label">grades ${esc(p.due_date)}</span>` : "";
+  // #4701: a held call (`text: ""` + `unsourced`) prints the API's sentence, never a blank
+  // quote, and offers no share card — there are no words of his to share.
+  const held = p.unsourced && typeof p.unsourced.text === "string" ? p.unsourced.text.trim() : "";
   return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
     `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}${dueBit}</div>` +
-    `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>` +
+    (held ? `<p class="sc-call-claim sc-call-unsourced label" data-unsourced>${esc(held)}</p>` : `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>`) +
     `${callReasonText(st, p.outcome_notes) ? `<p class="sc-call-why label">${esc(callReasonText(st, p.outcome_notes))}</p>` : ""}` + // #4220: reader words, never the raw dict
-    `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
+    `${shareUrl && !held ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
 }
 // #404: a graded call's permalink, from the moments index (built by the daily
 // sweep). Key mirrors og_moments._prediction_key — plain composite, no hashing.
@@ -1755,7 +1757,8 @@ async function wireMachineryRibbon(tabsEl) {
         (o.due && !o.due.due_now && o.due.earliest_due
           ? `none checked yet — the first comes due ${o.due.earliest_due}`
           : "none checked yet — each is checked once its window closes");
-      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(tally)} →</button>`);
+      const cmp = recordLine(o) ? ` — ${esc(comparisonText(preds && preds.comparison))}` : ""; // #4585: a count never rides alone
+      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(tally)}${cmp} →</button>`);
     }
     if (!bits.length) return;
     const rib = document.createElement("div");

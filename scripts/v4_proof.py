@@ -44,6 +44,7 @@ from pathlib import Path
 # #1955: the day/as-of frame is PACIFIC (the site convention) — the shared helper
 # lives in lambdas/common/pacific_time.py (stdlib-only, safe for a build script).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
+from coach.persona_registry import plain_name  # noqa: E402 — #4564: a baked byline carries no honorific
 from common.pacific_time import pacific_date_of, pacific_day_n, pacific_today  # noqa: E402
 
 # #3285: the direction of the weight delta is RULED in one place, shared with the OG
@@ -546,7 +547,7 @@ def coaching_read_block_html(read: dict) -> str:
         f'<p class="label">The board\'s read on the data — as of {_esc(as_of)}</p>',
     ]
     if priority:
-        coach_name = str(wp.get("coach_name") or "").strip()
+        coach_name = plain_name(wp.get("coach_name"))  # the live API may still serve a pre-#4564 name at build time
         who = f" · {_esc(coach_name)}" if coach_name else ""
         # #1115: labeled at its true altitude — this is the integrator's WEEKLY
         # call (the Week lens's read), never presented as today's line.
@@ -556,7 +557,7 @@ def coaching_read_block_html(read: dict) -> str:
         lines.append('<p class="label">Each coach\'s read</p>')
         rows = []
         for c in coaches:
-            name = _esc(c.get("name", "") or c.get("coach_id", ""))
+            name = _esc(plain_name(c.get("name")) or c.get("coach_id", ""))
             title = c.get("title", "")
             who = f"{name}" + (f" · {_esc(title)}" if title else "")
             rows.append(f"<li><strong>{who}</strong> — {_esc(c['position_summary'])}</li>")

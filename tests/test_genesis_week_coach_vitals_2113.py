@@ -2,12 +2,12 @@
 score is not this cycle's recovery, at any age.
 
 THE LIVE FAILURE (cycle 12, genesis 2026-08-03). `/api/coaching-dashboard` served,
-from Dr. Sarah Chen (training):
+from Sarah Chen (training):
 
     "Day one of this experiment gives me exactly one data point for each recovery
      metric ... Your Whoop recovery came in at 59%, HRV at 42 ms, resting HR at 59"
 
-and from Dr. Lisa Park (sleep):
+and from Lisa Park (sleep):
 
     "I have one night of data — a recovery score of 59%, REM at 26.8%, deep sleep at
      23.9%, sleep efficiency at 96.58%, and HRV of 42 ms"
@@ -99,14 +99,14 @@ _COCKPIT = {"recovery_pct": 44.0, "hrv_ms": 35.0, "rhr_bpm": 60.0, "sleep_hours"
 
 # The two cards, verbatim enough to be the real test subject.
 _SARAH_CHEN = {
-    "name": "Dr. Sarah Chen",
+    "name": "Sarah Chen",
     "position_summary": (
         "Day one of this experiment gives me exactly one data point for each recovery metric — and that's "
         "precisely what it should give me. Your Whoop recovery came in at 59%, HRV at 42 ms, resting HR at 59."
     ),
 }
 _LISA_PARK = {
-    "name": "Dr. Lisa Park",
+    "name": "Lisa Park",
     "position_summary": (
         "I have one night of data — a recovery score of 59%, REM at 26.8%, deep sleep at 23.9%, sleep "
         "efficiency at 96.58%, and HRV of 42 ms — but one night is a reference point, not yet a baseline."
@@ -395,7 +395,7 @@ def test_the_published_training_card_fails_the_vitals_check():
     ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [_SARAH_CHEN])
     assert ok is False
     assert "recovery 59" in msg and "hrv 42" in msg
-    assert "Dr. Sarah Chen" in msg
+    assert "Sarah Chen" in msg
 
 
 def test_the_published_sleep_card_fails_the_vitals_check():
@@ -418,7 +418,7 @@ def test_the_honest_absence_prose_clears_the_check():
         _COCKPIT,
         [
             {
-                "name": "Dr. Sarah Chen",
+                "name": "Sarah Chen",
                 "position_summary": "No recovery reading has landed in this cycle yet, so I have no baseline to read from.",
             }
         ],
@@ -431,7 +431,7 @@ def test_a_dated_prior_cycle_citation_clears_the_check():
     `_HISTORICAL_ANCHOR`, shared verbatim with the weight assessor."""
     ok, msg = wq.assess_cross_surface_vitals(
         _COCKPIT,
-        [{"name": "Dr. Sarah Chen", "position_summary": "Recovery was 59% as of 2026-08-02, before this cycle began."}],
+        [{"name": "Sarah Chen", "position_summary": "Recovery was 59% as of 2026-08-02, before this cycle began."}],
     )
     assert ok, msg
 
@@ -439,7 +439,7 @@ def test_a_dated_prior_cycle_citation_clears_the_check():
 def test_an_in_cycle_citation_clears_the_check():
     ok, msg = wq.assess_cross_surface_vitals(
         _COCKPIT,
-        [{"name": "Dr. Sarah Chen", "position_summary": "Your Whoop recovery came in at 44%, HRV at 35 ms, resting HR at 60 bpm."}],
+        [{"name": "Sarah Chen", "position_summary": "Your Whoop recovery came in at 44%, HRV at 35 ms, resting HR at 60 bpm."}],
     )
     assert ok, msg
 
@@ -452,7 +452,7 @@ def test_target_prose_is_not_a_current_claim():
         _COCKPIT,
         [
             {
-                "name": "Dr. James Okafor",
+                "name": "James Okafor",
                 "position_summary": (
                     "**Why These Two Biomarkers Matter** The two targets embedded in your plan — RHR 55 bpm and "
                     "HRV 50 ms — aren't arbitrary numbers. They're dashboard indicators for the same system."
@@ -473,7 +473,7 @@ def test_sleep_architecture_percentages_are_not_recovery_claims():
 def test_a_sleep_duration_disagreement_is_caught():
     ok, msg = wq.assess_cross_surface_vitals(
         _COCKPIT,
-        [{"name": "Dr. Lisa Park", "position_summary": "You slept 6.1 hours last night."}],
+        [{"name": "Lisa Park", "position_summary": "You slept 6.1 hours last night."}],
     )
     assert ok is False
     assert "sleep 6.1" in msg
@@ -488,7 +488,7 @@ def test_a_null_cockpit_field_is_a_clean_pass_not_a_failure():
 
 
 def test_a_silent_coach_is_not_a_failure():
-    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Dr. Nathan Reeves", "position_summary": "What is being avoided here?"}])
+    ok, msg = wq.assess_cross_surface_vitals(_COCKPIT, [{"name": "Nathan Reeves", "position_summary": "What is being avoided here?"}])
     assert ok, msg
 
 

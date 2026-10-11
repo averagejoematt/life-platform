@@ -172,7 +172,7 @@ def test_open_actions_serves_the_pending_commitment_with_every_field(monkeypatch
     action = physical[0]
     assert action == {
         "coach_id": "physical",
-        "coach_name": "Dr. Max Reyes",
+        "coach_name": "Max Reyes",
         "text": "I've asked him to reach 170 g of protein a day for seven days in a row.",
         "asked_on": "2026-09-25",
         "due": "2026-10-02",

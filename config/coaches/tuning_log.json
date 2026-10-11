@@ -311,6 +311,15 @@
       "summary": "Prompt-pass v3 (#2492, roadmap ideas 32+43): grounded pushback + conversational repair. One shared rule lands in coach_chat._system_parts — when the facts block contradicts a stated plan the coach disagrees citing the specific reading, and may NOT disagree from a hunch (the facts block is already grounding-gated, so the gate is structurally unrelaxed). The #2534 never-thank-him rule now HOLDS deterministically: coach_style_gate strips the ceremonial-acknowledgment class (thanks-for-the-correction / I-appreciate-the-correction / you're-absolutely-right.) at clause openings, precision-first per the #2555 discipline. One new texting_few_shot per texting-configured coach (sleep/nutrition/mind/physical/explorer — glucose/labs carry no texting_style and are out of this surface's scope): pushback in-voice for Lisa/Max/Henning, flat repair for Marcus/Nathan; persona_core renders [:3] to make room without displacing the register shots. Pins: tests/test_coach_pushback_repair_2492.py.",
       "rationale": "Transcript QA (2026-08-09/10) measured the two remaining robotic tells this pass targets: coaches agreeing with plans their own stored evidence contradicts (idea 32), and ceremonial gratitude on being corrected (idea 43) — the blind panel's sycophancy/attunement tell class. Rules are requests, so the repair half also gets the deterministic style-gate strip; the pushback half is licensed against the already-grounding-gated facts block ONLY, so honesty-is-the-personality survives the added disagreement.",
       "observed_effect": null
+    },
+    {
+      "date": "2026-10-03",
+      "coach": "all",
+      "change_type": "persona",
+      "summary": "Honorific dropped (#4564): every voice spec's display_name is the plain name (Lisa Park, Marcus Webb, Nathan Reeves, Max Reyes, Amara Patel, James Okafor, Henning Brandt, Nora Vale, Eli Marsh; Sarah Chen on the retired spec), and pattern_coach's two few-shot cross-references name a colleague without a title. No rule, register, few-shot content or decision style changed.",
+      "rationale": "Owner ruling 2026-10-02 after two red-team reads (an AI-skeptic reader, a growth strategist): the coaches are AI personas with domains and track records, and a doctor's title on an AI persona is a credential claim a cold reader takes literally. The registry (config/personas.json) carries the plain name and every surface derives from it; a voice spec that kept the title would put it back in every first-person prompt.",
+      "ref": "#4564 (epic #4531)",
+      "observed_effect": null
     }
   ]
 }

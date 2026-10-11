@@ -1,7 +1,7 @@
 """tests/test_weight_recency_1894.py — #1894: a stale weigh-in must not be narrated
 as today's.
 
-The live failure (Day 1 of cycle 11): Dr. Victor Reyes' card on the coaching door
+The live failure (Day 1 of cycle 11): Victor Reyes' card on the coaching door
 opened **"Day 1 weight is 317.61 lbs"** — the pre-genesis 2026-07-22 weigh-in —
 while home and /api/vitals served 321.09. A cold reader crossing home → coaching
 hit a 3.5 lb contradiction on the experiment's single most important number.
@@ -240,21 +240,21 @@ def _assess():
 def test_cross_surface_catches_the_live_1894_contradiction():
     ok, msg = _assess()(
         {"weight_lbs": 321.09},
-        [{"name": "Dr. Victor Reyes", "position_summary": "Day 1 weight is 317.61 lbs, and the deficit is holding."}],
+        [{"name": "Victor Reyes", "position_summary": "Day 1 weight is 317.61 lbs, and the deficit is holding."}],
     )
     assert ok is False
     assert "317.61" in msg and "321.09" in msg, f"the message must name both figures: {msg}"
 
 
 def test_cross_surface_passes_when_surfaces_agree():
-    ok, msg = _assess()({"weight_lbs": 316.0}, [{"name": "Dr. Victor Reyes", "position_summary": "He is at 316.3 lbs this week."}])
+    ok, msg = _assess()({"weight_lbs": 316.0}, [{"name": "Victor Reyes", "position_summary": "He is at 316.3 lbs this week."}])
     assert ok is True, msg
 
 
 def test_cross_surface_ignores_non_bodyweight_figures():
     """A '10 lbs' dumbbell reference is not a claim about his bodyweight."""
     ok, msg = _assess()(
-        {"weight_lbs": 316.0}, [{"name": "Dr. Sarah Chen", "position_summary": "Add 10 lbs to the bar and hold 45 lbs dumbbells."}]
+        {"weight_lbs": 316.0}, [{"name": "Sarah Chen", "position_summary": "Add 10 lbs to the bar and hold 45 lbs dumbbells."}]
     )
     assert ok is True, msg
 

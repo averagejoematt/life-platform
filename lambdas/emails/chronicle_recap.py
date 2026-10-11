@@ -2,7 +2,6 @@
 grounded only in published installments + the narrative arc, split out of
 wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 
-import json
 from datetime import datetime, timezone
 
 from common.constants import EXPERIMENT_START_DATE
@@ -61,7 +60,8 @@ def _published_installments(data):
     A draft that hasn't cleared the approve gate is NOT yet part of the public story."""
     out = []
     for inst in data.get("prev_installments", []) or []:
-        if (inst.get("status") or "published") == "published":
+        # #4537: an unlisted installment (a superseded earlier-launch lead-in) is off the reading list and off the recap
+        if (inst.get("status") or "published") == "published" and not inst.get("unlisted"):
             out.append(inst)
     out.sort(key=lambda i: i.get("date", ""), reverse=True)
     return out
@@ -179,6 +179,17 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
             logger.error("[recap] privacy violation — dropping recap: %s", e)
             return None
 
+        # Guard 4b — the story door (#4538): the same reader-surface check the chronicle and the Panel face. A recap
+        # that counts cycles/resets/attempts, or carries off-record specifics, is dropped — every reader-visible field.
+        from content import story_checks
+
+        door = story_checks.reader_surface(
+            "\n".join([story, out["where_we_are_now"], *(b["beat"] for b in beats), *out["threads_to_watch"]])
+        )
+        if door:
+            logger.error("[recap] story-door findings — dropping recap: %s", door)
+            return None
+
         # Guard 5 — thin history: with <2 published installments, keep only the
         # one-line story_so_far (the prompt is told this, but enforce it too).
         if len(allowed) < 2:
@@ -199,25 +210,19 @@ def _as_int(v):
 
 
 def _parse_recap_json(raw):
-    """Parse the recap LLM output: bare JSON, or fenced ```json … ```."""
+    """Parse the recap LLM output in the one door (#4276): a dict, else None.
+
+    Schema-less on purpose: `call_anthropic` here is the chronicle's text seam (prompt in,
+    text out), which carries no `output_config`; the fence-tolerant parse is
+    `ai.structured_json.parse_json_text`."""
     if isinstance(raw, dict):
         return raw
     if not isinstance(raw, str):
         return None
-    txt = raw.strip()
-    try:
-        return json.loads(txt)
-    except json.JSONDecodeError:
-        pass
-    if "```json" in txt:
-        start = txt.find("```json") + 7
-        end = txt.find("```", start)
-        if end > start:
-            try:
-                return json.loads(txt[start:end].strip())
-            except json.JSONDecodeError:
-                return None
-    return None
+    from ai.structured_json import parse_json_text
+
+    parsed = parse_json_text(raw)
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _write_recap(recap, date_str, *, _g):

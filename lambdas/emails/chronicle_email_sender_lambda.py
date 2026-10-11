@@ -44,6 +44,7 @@ from decimal import Decimal
 from typing import Any
 
 import boto3
+from coach.persona_registry import plain_name  # #4564 — bylines carry no honorific; match on the plain name either way
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -236,6 +237,15 @@ def _get_this_weeks_installment() -> dict | None:
                 installment.get("delivered_at"),
             )
             return None
+        # #4593: a publish path that declined delivery stamped the decision on the row
+        # (chronicle_approve_lambda.publish_side_effects) — the cron must not send it anyway.
+        if installment.get("delivery_decision") == "no-send":
+            logger.info(
+                "Most recent Chronicle installment (week %s) carries a no-send decision (%s) — no-op",
+                _fmt_week(installment.get("week_number", "?")),
+                installment.get("delivery_decision_reason", ""),
+            )
+            return None
         return installment
     except Exception as exc:
         logger.error("Failed to query Chronicle DDB: %s", exc)
@@ -332,8 +342,8 @@ def _get_confirmed_subscribers() -> list[dict]:
 
 # #2384: the byline map is DERIVED from the persona registry, never hand-typed.
 # The previous literal map had forked three ways from the registry: a retired
-# key rendered "Dr. Kai Nakamura" to subscribers, "vivek_murthy" rendered a
-# phantom "Dr. Daniel Murthy", and "peter_attia" rendered the wrong live coach.
+# key rendered "Kai Nakamura" to subscribers, "vivek_murthy" rendered a
+# phantom "Daniel Murthy", and "peter_attia" rendered the wrong live coach.
 # Rule: a key earns a byline card only if its registry persona is on the cast
 # the public site bills \u2014 operational coaches, the lead, and the narrator/meta
 # show personas. A retired board twin staged by an old draft falls back to The
@@ -389,7 +399,7 @@ def _load_portrait_manifest() -> dict:
         body = _s3.get_object(Bucket=S3_BUCKET, Key="site/assets/portraits/manifest.json")["Body"].read()
         portraits = json.loads(body).get("portraits", {})
         for pid, rec in portraits.items():
-            name = (rec.get("name") or "").strip().lower()
+            name = plain_name(rec.get("name")).lower()
             if name:
                 index[name] = pid
     except Exception as exc:
@@ -401,7 +411,7 @@ def _load_portrait_manifest() -> dict:
 def _coach_portrait_img(member: dict, theme: str = "ondark", px: int = 30) -> str:
     """Return an <img> tag for the coach's engraved portrait, or "" if none exists.
     Matches by display name; alt text carries the emoji for image-blocked clients."""
-    pid = _load_portrait_manifest().get((member.get("name") or "").strip().lower())
+    pid = _load_portrait_manifest().get(plain_name(member.get("name")).lower())
     if not pid:
         return ""
     emoji = member.get("emoji", "")

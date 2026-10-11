@@ -131,6 +131,17 @@ def test_tokens_for_daily_run_drops_reset_window_once_mature():
     assert "999.0 sentinel" in labels
 
 
+def test_daily_run_drops_day_30_plus_counter_on_day_30_and_31_4689():
+    """Day N = days_since_genesis + 1; 'Day 31' (the 2026-10-06 /api/vitals red) is real content."""
+    from datetime import date, timedelta
+
+    g = date.fromisoformat(lts.EXPERIMENT_START_DATE)
+    for day_number, expect_kept in ((29, True), (30, False), (31, False)):
+        today = (g + timedelta(days=day_number - 1)).isoformat()
+        labels = {t[0] for t in lts.tokens_for_daily_run(today=today)}
+        assert ("Day-30+ counter" in labels) is expect_kept, day_number
+
+
 def test_tokens_for_daily_run_keeps_full_list_pre_start():
     from datetime import date, timedelta
 
@@ -412,14 +423,16 @@ def test_every_sweep_caller_handles_unreachable():
         os.path.join("deploy", "restart_verify_rendered.py"),
     }
     callers = set()
-    for base in ("tests", "deploy", "scripts", "lambdas", "mcp"):
+    for base in ("tests", "deploy", "scripts", "lambdas", "mcp", "qa"):
         for dirpath, _dirnames, filenames in os.walk(os.path.join(_REPO, base)):
             for fn in filenames:
                 if not fn.endswith(".py"):
                     continue
                 full = os.path.join(dirpath, fn)
                 rel = os.path.relpath(full, _REPO)
-                if rel == os.path.join("tests", "leak_token_sweep.py") or rel.startswith(os.path.join("tests", "test_")):
+                if rel in (os.path.join("tests", "leak_token_sweep.py"), os.path.join("qa", "leak_token_sweep.py")) or rel.startswith(
+                    os.path.join("tests", "test_")
+                ):
                     continue
                 try:
                     tree = ast.parse(open(full, encoding="utf-8").read())
@@ -428,9 +441,9 @@ def test_every_sweep_caller_handles_unreachable():
                 src_imports_sweep = False
                 calls_sweep = False
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.ImportFrom) and node.module == "leak_token_sweep":
+                    if isinstance(node, ast.ImportFrom) and node.module in ("leak_token_sweep", "qa.leak_token_sweep"):
                         src_imports_sweep = True
-                    if isinstance(node, ast.Import) and any(a.name == "leak_token_sweep" for a in node.names):
+                    if isinstance(node, ast.Import) and any(a.name in ("leak_token_sweep", "qa.leak_token_sweep") for a in node.names):
                         src_imports_sweep = True
                     if isinstance(node, ast.Call):
                         f = node.func
@@ -455,14 +468,24 @@ _LIVE_4191_EXCERPT = (
 )
 
 
-def test_4191_stat_line_bracket_flags_a_page_but_not_the_manifests_stored_excerpt():
-    """The live 2026-09-26 excerpt on a PAGE is a finding; on /journal/posts.json it is the
-    stored artifact the fix cannot change at deploy, exempt until the manifest is re-rendered."""
+def test_4191_stat_line_bracket_flags_a_page_and_the_manifest_alike():
+    """The live 2026-09-26 excerpt is a finding on a PAGE and — the manifest having been
+    re-rendered — on /journal/posts.json too: the exemption for stored excerpts is lifted."""
     page = f"<p class='dx-prose'>{_LIVE_4191_EXCERPT}</p>"
     assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", page))
     assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/", page))
     manifest = '{"posts": [{"excerpt": "' + _LIVE_4191_EXCERPT.replace("\n", "\\n") + '"}]}'
-    assert not any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/journal/posts.json", manifest))
+    assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/journal/posts.json", manifest))
+
+
+def test_4191_the_story_desk_header_is_the_same_finding():
+    """The Story Desk's header carries no "Weight:" — a token keyed on that word alone is
+    blind to it. The un-bracketed dek (the stat row a reader is meant to see) is clean."""
+    desk = "[Day 4 to Day 10 · 318.9 lbs (-8.4 this week) · 7 training sessions]"
+    page = f"<p class='dx-prose'>{desk} Sunday morning in Seattle.</p>"
+    assert any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", page))
+    dek = "<p class='dx-meta'>Day 4 to Day 10 · 318.9 lbs (-8.4 this week) · 7 training sessions</p>"
+    assert not any(label == "Chronicle stat-line bracket as prose" for label, _ in lts.check_body("/story/", dek))
 
 
 def test_4191_t0_streak_segment_flags_a_page_but_the_manifests_field_is_legitimate():

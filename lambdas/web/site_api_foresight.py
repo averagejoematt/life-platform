@@ -23,7 +23,10 @@ import re
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
-from coach import coach_record  # #4220 — the ONE per-coach record producer (K of N through <day>)
+from coach import (
+    coach_baseline,  # #4585 — what a simple guess scored on the same calls
+    coach_record,  # #4220 — the ONE per-coach record producer (K of N through <day>)
+)
 from coach.prediction_grading import EWMA_PRIOR_LAG  # #4218 — the directional slope's lag, in words
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1197
 
@@ -206,6 +209,8 @@ _RE_POINT_RULE = re.compile(r"±1 SD of the trailing (?P<days>\d+)-day personal 
 _RE_TREND = re.compile(r"\btrend=(?P<dir>up|down|flat)\b")
 _RE_FLAT = re.compile(r"metric flat .*?within ±(?P<band>[\d.]+) noise band")
 _RE_DOCKET = re.compile(r"^dispute docket resolved\b.*?\bon (?P<on>\d{4}-\d{2}-\d{2})\s*$")
+# #4541: a count call's reason (coach/prediction_count_grader.py) — "... on 3 of 7 days 2026-09-06..2026-09-12 (claim: at least 5)"
+_RE_COUNT = re.compile(r"\bon (?P<q>\d+) of (?P<n>\d+) days \S+\.\.\S+ \(claim: (?P<bound>at least|at most) (?P<k>\d+)\)")
 
 
 def _wrong_num(v, *, keep_decimal: bool = False) -> str:
@@ -310,6 +315,18 @@ def _wrong_obituary_text(rec: dict) -> tuple:
             what_changed = f"The trend ran {seen}, the opposite of the call, so it was graded refuted."
         else:
             what_changed = "The trend did not go the way the call said, so it was graded refuted."
+        return believed, number, what_changed
+
+    # ── Count (#4541): 'X at or above T on at least K of N days' — actual_value is a DAY COUNT, never a reading ──
+    if etype == "count":
+        cm = _RE_COUNT.search(reason)
+        phrase = _WRONG_COND_PHRASE.get(cond, "")
+        if not (cm and label and phrase and thr is not None):
+            return fallback, "", "Too few days cleared the call's bar, so it was graded refuted."
+        bar = f"{phrase} {_with_unit(_wrong_num(thr), unit)}"
+        believed = f"{label} would come in {bar} on {cm.group('bound')} {cm.group('k')} of {cm.group('n')} days"
+        number = f"{cm.group('q')} of {cm.group('n')} days came in {bar} — the call needed {cm.group('bound')} {cm.group('k')}"
+        what_changed = f"The days were counted: {cm.group('q')} of {cm.group('n')}, so the call was graded refuted."
         return believed, number, what_changed
 
     # ── Point: 'X on <date> would land at <centre> ± 1 SD' ──
@@ -476,8 +493,10 @@ def wrong(*, _g) -> dict:
         # row carrying the grader's reason text — joined on prediction_id; a counted
         # refutation with no learning is templated from the ledger row itself.
         ledger, recent_misses, obituaries = [], [], []
+        all_decided = []  # #4585: the comparison's row-set — every coach's counted resolutions
         for c in _WRONG_COACHES:
             record, decided = coach_record.for_coach_with_rows(table, f"{c}_coach", genesis=EXPERIMENT_START)
+            all_decided.extend(decided)
             if record and record["n"]:
                 ledger.append({"coach": c, **record})
             refuted = [row for row in decided if coach_record.graded_status(row) == "refuted"]
@@ -549,7 +568,12 @@ def wrong(*, _g) -> dict:
                     "caught_undetailed": numeric_caught,
                     "recent": catches[:25],
                 },
-                "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                "predictions": {
+                    "by_coach": ledger,
+                    "refuted_recent": recent_misses[:25],
+                    # #4585 / epic #4580 rule 3: the ledger's counts never appear alone.
+                    "comparison": coach_baseline.comparison_block(all_decided),
+                },
                 # #1377 (The Wrong Feed): one obituary card per graded failure. The
                 # headline "graded failures" count DERIVES from this list (obituary_count
                 # == len(obituaries) by construction) — the front-end renders one card per

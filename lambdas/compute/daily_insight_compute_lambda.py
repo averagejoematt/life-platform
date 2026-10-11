@@ -44,13 +44,12 @@ import logging
 import math
 import os
 import statistics
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
+from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.pacific_time import pacific_clock_label, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
@@ -71,14 +70,15 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 PROFILE_PK = f"USER#{USER_ID}"
 
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 _api_key_cache = None
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 
 # AI model constant — read from env so model can be updated without redeployment
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("daily_insight")
 
 # BS-MP3: Decision Fatigue Detector — proactive alert threshold.
 #
@@ -464,8 +464,8 @@ def _fetch_execution_metrics(date_str, profile):
     Returns a compact dict with enough context for Haiku evaluation.
     """
     metrics = {}
-    cal_target = profile.get("calorie_target", 1800)
-    prot_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    prot_target = PLAN_DAILY_PROTEIN_MIN_G
 
     # Nutrition (MacroFactor)
     mf = fetch_date("macrofactor", date_str)
@@ -561,33 +561,23 @@ Rules:
 - If a log looks incomplete (nutrition_note present), treat food-logging as false.
 - Be conservative -- if evidence is unclear, lean toward executed=false with confidence=low.
 
-Return ONLY a JSON array, no preamble:
-[{{"type": "sleep_timing", "text": "get to bed by 10", "executed": false, "evidence": "sleep start 23:30 -- 90 min late", "confidence": "high"}}]"""
+Return ONLY a JSON object, no preamble:
+{{"evaluations": [{{"type": "sleep_timing", "text": "get to bed by 10", "executed": false, "evidence": "sleep start 23:30 -- 90 min late", "confidence": "high"}}]}}"""
 
-    payload = json.dumps(
-        {
-            "model": AI_MODEL_HAIKU,
-            "max_tokens": 600,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    ).encode()
-    req = urllib.request.Request(
-        ANTHROPIC_API,
-        data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
-        method="POST",
-    )
+    body = {"model": AI_MODEL_HAIKU, "max_tokens": 600, "messages": [{"role": "user", "content": prompt}]}
     try:
         # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
+        # #4276: constrained to _INTENTION_EVAL_SCHEMA at the model and parsed in the one door. The
+        # array is wrapped in an object (a schema's root is an object); a bare array from the
+        # schema-less fallback is still accepted.
+        from ai.structured_json import call_json
         from common.retry_utils import call_anthropic_raw
 
-        resp = call_anthropic_raw(req, timeout=25)
-        raw = resp["content"][0]["text"].strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        return json.loads(raw.strip())
+        from compute.compute_json_schemas import INTENTION_EVAL_SCHEMA
+
+        parsed = call_json(lambda b: call_anthropic_raw(b, timeout=25), body, schema=INTENTION_EVAL_SCHEMA, label="intention_eval")
+        evals = parsed.get("evaluations") if isinstance(parsed, dict) else parsed
+        return evals if isinstance(evals, list) else []
     except Exception as e:
         logger.warning(f"IC-8 Haiku evaluation failed: {e}")
         return []
@@ -1126,7 +1116,7 @@ def _compute_slow_drift(yesterday_str, profile):
 
         if len(wt_vals) >= 8:  # Attia: need >=8 measurements for regression
             # Check complete nutrition log days (Henning: >=11 of last 14 days)
-            cal_target = profile.get("calorie_target", 1800)
+            cal_target = PLAN_DAILY_CALORIES_TARGET
             mf_recs = fetch_range("macrofactor", (yest - timedelta(days=14)).isoformat(), yesterday_str)
             complete_days = sum(1 for r in mf_recs if safe_float(r, "total_calories_kcal", 0) >= cal_target * 0.65)
 
@@ -1742,9 +1732,9 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
             return None, ""
 
         # ── Build prescription ────────────────────────────────────────────────
-        cal_target = profile.get("calorie_target", 1800)
+        cal_target = PLAN_DAILY_CALORIES_TARGET
         new_ceiling = cal_target + DEFICIT_KCAL_INCREASE
-        prot_target = profile.get("protein_target_g", 190)
+        prot_target = PLAN_DAILY_PROTEIN_MIN_G
 
         rate_str = f"{rate_lbs_week:.1f} lbs/wk" if rate_lbs_week else "unknown"
 

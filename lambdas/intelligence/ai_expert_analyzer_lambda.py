@@ -96,7 +96,9 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 CACHE_PK = f"{USER_PREFIX}ai_analysis"
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
-AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL = model_for("expert_analyzer")
 
 # #2334: derived from the persona registry; EXPERT_PERSONAS coverage asserted in the set guard.
 # #3018: the integrator's public-audience register, guarded like #2972's public_summary.
@@ -157,7 +159,10 @@ def _latest_item(source):
     return strava_read_seam(source, items[0] if items else None)
 
 
-from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from common.constants import (
+    EXPERIMENT_START_DATE as EXPERIMENT_START,  # ADR-058
+    PLAN_DAILY_PROTEIN_MIN_G,  # #4540: the plan's targets
+)
 from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
 _CANON_FACTS_CACHE: dict[str, Any] = {}
@@ -230,7 +235,10 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
 
-from intelligence import weight_recency
+from intelligence import (
+    held_record_ttl as _held,  # #4703: a HOLD renews the prior record's ttl
+    weight_recency,
+)
 
 # #2056 (ADR-080 §2): the DATE#-recency helpers moved to intelligence/item_recency.py so
 # this handler stays under its 2,000-line cap while the grounding wiring lands. Private
@@ -325,10 +333,9 @@ def gather_data_for_expert(expert_key):
         avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
         avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else None
         avg_fiber = round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None
-        # Phase-3: target from the canonical facts (computed_metrics), not a hardcoded 190
-        # that drifts from scoring_engine/profile. avg_pro is the real intake (~140).
-        _facts = _load_canonical_facts()
-        protein_target = int(_facts.get("protein_g_target") or 190)
+        # #4540: the plan's floor (generated from the plan root), the same figure scoring_engine
+        # and canonical_facts carry — not the profile row, not a stored copy of it.
+        protein_target = PLAN_DAILY_PROTEIN_MIN_G
         adherence = round(sum(1 for v in pro_vals if v >= protein_target) / len(pro_vals) * 100) if pro_vals else None
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         # #914 anti-dilution: recency alongside the whole-window averages.
@@ -1171,7 +1178,7 @@ def generate_and_cache(expert_key, shared_system=None):
             return ""
 
     now = datetime.now(timezone.utc)
-    ttl = int((now + timedelta(days=8)).timestamp())
+    ttl = _held.ttl_from(now, _held.WEEKLY_TTL_DAYS)
 
     item = {
         "pk": CACHE_PK,
@@ -1372,7 +1379,7 @@ def generate_synthesis(all_coach_outputs):
     _f = _load_canonical_facts()
     _fact_bits = []
     if _f.get("protein_g_avg") is not None:
-        _fact_bits.append(f"protein intake avg {_f['protein_g_avg']:g} g (target {int(_f.get('protein_g_target') or 190)} g)")
+        _fact_bits.append(f"protein intake avg {_f['protein_g_avg']:g} g (plan floor {PLAN_DAILY_PROTEIN_MIN_G} g)")
     if _f.get("recovery_pct") is not None:
         _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
     if _f.get("hrv_ms") is not None:
@@ -1457,13 +1464,13 @@ def generate_synthesis(all_coach_outputs):
     # #2421/#3018: the Chair's weekly priority AND public_summary — same call, graded together.
     _synth_partial = {"cross_domain_notes": {}, "disagreements": []}
     synthesis = _gate_json_record("weekly_priority", synthesis, ("weekly_priority", "public_summary"), _synth_partial, prompt, api_key)
-    if synthesis is None:
-        return None
+    if synthesis is None:  # #4703: the hold renews the prior record it promises keeps serving
+        return _held.renew_held(table, CACHE_PK, "EXPERT#integrator", _held.WEEKLY_TTL_DAYS)
 
     try:
         # Cache synthesis to DDB
         now = datetime.now(timezone.utc)
-        ttl = int((now + timedelta(days=8)).timestamp())
+        ttl = _held.ttl_from(now, _held.WEEKLY_TTL_DAYS)
         item = {
             "pk": CACHE_PK,
             "sk": "EXPERT#integrator",
@@ -1636,8 +1643,8 @@ def generate_experiment_arc():
 
     # #2421: EXPERT#experiment_arc is read straight onto the story surface — gate it.
     parsed = _gate_json_record("experiment_arc", parsed, "arc", {"throughline": "", "chapters": []}, prompt, api_key)
-    if parsed is None:
-        return None
+    if parsed is None:  # #4703
+        return _held.renew_held(table, CACHE_PK, "EXPERT#experiment_arc", _held.ROLLUP_TTL_DAYS)
 
     try:
         now = datetime.now(timezone.utc)
@@ -1651,7 +1658,7 @@ def generate_experiment_arc():
             "week_count": len(weeks),
             "generated_at": now.isoformat(),
             "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
-            "ttl": int((now + timedelta(days=10)).timestamp()),
+            "ttl": _held.ttl_from(now, _held.ROLLUP_TTL_DAYS),
         }
         table.put_item(Item=item)
         logger.info("Experiment-arc cached: %d weeks, %d chars, %d chapters", len(weeks), len(item["arc"]), len(item["chapters"]))
@@ -1758,8 +1765,8 @@ def generate_month_rollup():
 
     # #2421: EXPERT#integrator_month feeds the site's Month lens — gate it.
     parsed = _gate_json_record("integrator_month", parsed, "narrative", {"headline": ""}, prompt, api_key)
-    if parsed is None:
-        return None
+    if parsed is None:  # #4703
+        return _held.renew_held(table, CACHE_PK, "EXPERT#integrator_month", _held.ROLLUP_TTL_DAYS)
 
     try:
         now = datetime.now(timezone.utc)
@@ -1776,7 +1783,7 @@ def generate_month_rollup():
             "days_in_experiment": day_n,
             "generated_at": now.isoformat(),
             "data_through": pacific_today(),  # #4185 box 3: the run's window end (PT) — an upper bound on the newest week note
-            "ttl": int((now + timedelta(days=10)).timestamp()),
+            "ttl": _held.ttl_from(now, _held.ROLLUP_TTL_DAYS),
         }
         table.put_item(Item=item)
         logger.info("Month-rollup cached: %d weeks, %d chars", len(weeks), len(item["narrative"]))
@@ -1849,10 +1856,15 @@ def lambda_handler(event, context):
                 else:
                     # #2218: empty generation — never "ok" (chars: 0 reads as success); excluded from synthesis.
                     results[expert_key] = {"status": "skipped_empty", "chars": 0}
+                    _held.renew_held(table, CACHE_PK, f"EXPERT#{expert_key}", _held.WEEKLY_TTL_DAYS)  # #4703: held/empty keeps the prior
             except Exception as e:
                 logger.error(f"Failed to generate {expert_key}: {e}")
                 results[expert_key] = {"status": "error", "error": str(e)}
 
+        # #4703: too many held reads to synthesize — the board-level records are held with them, so renew them.
+        if target == "all" and len(all_outputs) < 3 and any(r.get("status") == "skipped_empty" for r in results.values()):
+            for _sk, _d in _held.BOARD_RECORDS:
+                _held.renew_held(table, CACHE_PK, _sk, _d)
         # Synthesis pass — only when running all experts
         if target == "all" and len(all_outputs) >= 3:
             try:

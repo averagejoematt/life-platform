@@ -10,7 +10,7 @@ sentence (#4180):
     days" vs `/api/nutrition_overview` `avg_protein_g` 153.3
   * a logging gap: Webb "The food log went dark after September 19th … Six days
     without logs" vs `/api/nutrition_overview` `days_logged` 20 / `lag_days` 0
-  * loss rate: Eli "3.7 pounds per week" vs Dr. Okafor "−4.4 lb/week" vs
+  * loss rate: Eli "3.7 pounds per week" vs Okafor "−4.4 lb/week" vs
     `/api/journey` `weekly_rate_lbs` −4.58, CI [−4.86, −2.66]
 
 `cross_surface:*` stayed green through all of it — nothing compared a coach to
@@ -40,7 +40,10 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from operational import weight_truth_qa as wq  # noqa: E402
+from operational import (
+    protein_window_claims as pw,  # noqa: E402
+    weight_truth_qa as wq,  # noqa: E402
+)
 
 # ── The 2026-09-25 corpus, as measured (paste verbatim per the issue) ─────────
 
@@ -51,7 +54,7 @@ WEBB_GAP = {
     "position_summary": "The food log went dark after September 19th … Six days without logs",
 }
 ELI_RATE = {"name": "Eli Marsh", "position_summary": "3.7 pounds per week"}
-OKAFOR_RATE = {"name": "Dr. Okafor", "position_summary": "−4.4 lb/week"}
+OKAFOR_RATE = {"name": "Okafor", "position_summary": "−4.4 lb/week"}
 
 NUTRITION_09_25 = {"avg_protein_g": 153.3, "days_logged": 20, "lag_days": 0}
 JOURNEY_09_25 = {"weekly_rate_lbs": -4.58, "weekly_rate_ci_low": -4.86, "weekly_rate_ci_high": -2.66}
@@ -266,7 +269,7 @@ def test_mutation_disabling_number_words_reds_fixture_ii(monkeypatch):
 
 # ── the WIRE shape: the lead coach is page-level, not in `coaches[]` ─────────
 #
-# Measured live 2026-09-27 16:12Z on `/api/coaching-dashboard`: Dr. Eli Marsh's
+# Measured live 2026-09-27 16:12Z on `/api/coaching-dashboard`: Eli Marsh's
 # 106.9g sentence is served in `weekly_priority.text` (the head coach's weekly read),
 # NOT in `coaches[]` — the fixtures above put him in `coaches[]`, which the wire never
 # does. Reading `coaches[]` alone, both legs extracted 0 claims and passed green
@@ -281,7 +284,7 @@ WIRE_DASHBOARD_09_27 = {
             "average intake has dropped to 106.9 grams across 14 logged days, well short of the 170-gram floor that "
             "preserves lean mass during a deficit."
         ),
-        "coach_name": "Dr. Eli Marsh",
+        "coach_name": "Eli Marsh",
         "coach_title": "Principal Investigator — Program Lead",
         "generated_at": "2026-09-21T14:02:56.543529+00:00",
         "as_of_day_n": 16,
@@ -289,9 +292,9 @@ WIRE_DASHBOARD_09_27 = {
     },
     "lead_daily": None,
     "coaches": [
-        {"name": "Dr. Lisa Park", "position_summary": ""},
+        {"name": "Lisa Park", "position_summary": ""},
         {
-            "name": "Dr. Marcus Webb",
+            "name": "Marcus Webb",
             "position_summary": (
                 "The six-day logging gap since September 19th is blocking my directional read, but today's log tells "
                 "a clear story: 182g protein, 1,761 kcal, with the steak dinner anchoring 106g in a single sitting."
@@ -306,12 +309,12 @@ JOURNEY_09_27 = {"weekly_rate_lbs": -4.04, "weekly_rate_ci_low": -4.55, "weekly_
 def test_served_coach_texts_reads_the_page_level_lead_slots():
     texts = wq.served_coach_texts(WIRE_DASHBOARD_09_27)
     names = [t["name"] for t in texts]
-    assert "Dr. Eli Marsh (weekly_priority)" in names
+    assert "Eli Marsh (weekly_priority)" in names
     # an empty/None slot adds nothing; coaches[] rides through as served
     assert not any("lead_daily" in n for n in names)
-    assert "Dr. Marcus Webb" in names and len(texts) == 3
-    daily = dict(WIRE_DASHBOARD_09_27, lead_daily={"text": "protein averaged 120g this week", "coach_name": "Dr. Eli Marsh"})
-    assert "Dr. Eli Marsh (lead_daily)" in [t["name"] for t in wq.served_coach_texts(daily)]
+    assert "Marcus Webb" in names and len(texts) == 3
+    daily = dict(WIRE_DASHBOARD_09_27, lead_daily={"text": "protein averaged 120g this week", "coach_name": "Eli Marsh"})
+    assert "Eli Marsh (lead_daily)" in [t["name"] for t in wq.served_coach_texts(daily)]
     assert wq.served_coach_texts(None) == [] and wq.served_coach_texts({"coaches": None}) == []
 
 
@@ -327,7 +330,7 @@ def test_checks_fails_the_wire_shaped_09_27_page_naming_both_values_and_the_slot
     by_name = {c.name: c for c in wq.checks(_FakeCheck, "http://example.test", "content_truth")}
     vs_engine = by_name["cross_surface:coach_vs_engine"]
     assert vs_engine.passed is False, vs_engine.message
-    assert "Dr. Eli Marsh (weekly_priority) cites 106.9g vs engine 153.5g" in vs_engine.message
+    assert "Eli Marsh (weekly_priority) cites 106.9g vs engine 153.5g" in vs_engine.message
     assert "1 compared" in vs_engine.message
     # the dead-man: both legs' counts reach the log on every run, not only on a failure
     out = capsys.readouterr().out
@@ -343,3 +346,209 @@ def test_mutation_reading_coaches_only_turns_the_wire_fail_green(monkeypatch):
         wq.served_coach_texts(WIRE_DASHBOARD_09_27), nutrition=NUTRITION_09_27, journey=JOURNEY_09_27
     )
     assert ok and "0 compared" in msg, msg
+
+
+# ── #4569: a figure for a window the engine serves under ANOTHER field ────────
+#
+# Measured live 2026-10-03 (`/api/coaching-dashboard` + `/api/nutrition_overview`,
+# the page behind the 10-02 and 10-03 18:31Z `qa-smoke-failures` reds). Text verbatim;
+# coaches with no quantity-bearing sentence dropped, `nutrition_trend` trimmed to its
+# last four rows, every other key as served. 166 g is the MacroFactor row for
+# 2026-10-01 — `latest_protein_g`, and the last `nutrition_trend` row — and the coach
+# names that day one sentence earlier. Pre-fix both legs judged it against the 26-day
+# mean (146.5 g): a single day compared with an average.
+
+WIRE_DASHBOARD_10_03 = {
+    "weekly_priority": {
+        "text": (
+            "The one priority I've asked him to address next is his protein intake, currently averaging 153.5 grams "
+            "across logged days against a 170-gram floor."
+        ),
+        "coach_name": "Dr. Eli Marsh",
+    },
+    "lead_daily": None,
+    "coaches": [
+        {
+            "coach_id": "nutrition",
+            "name": "Dr. Marcus Webb",
+            "position_summary": (
+                "Logging resumed on October 1st. He logged 1,560 kcal and 166g protein, anchored by a pound of flank "
+                "steak at dinner — his best single-day protein number in a while."
+            ),
+            "analysis_generated_at": "2026-10-02T17:03:04.443679+00:00",
+            "analysis_data_through": "2026-10-01",
+        },
+        {
+            "coach_id": "labs",
+            "name": "Dr. James Okafor",
+            "position_summary": (
+                "His protein average reached 146.5 g over 26 days, exceeding the hold we agreed to while pending kidney "
+                "function verification."
+            ),
+            "analysis_data_through": "2026-10-02",
+        },
+        {
+            "coach_id": "explorer",
+            "name": "Dr. Henning Brandt",
+            "position_summary": (
+                "The coach is testing whether his protein gap—averaging 146.5g against a 190g target across 26 logged "
+                "days—is the primary driver of his recent recovery decline."
+            ),
+            "analysis_data_through": "2026-10-02",
+        },
+    ],
+}
+NUTRITION_OVERVIEW_10_03 = {
+    "nutrition": {
+        "avg_calories": 1537,
+        "avg_protein_g": 146.5,
+        "protein_target_g": 190.0,
+        "protein_floor_g": 170.0,
+        "days_logged": 26,
+        "cal_7d_avg": 1349,
+        "pro_7d_avg": 117.4,
+        "pro_avg_recent_g": 117.4,
+        "pro_avg_recent_g_window_days": 7,
+        "latest_date": "2026-10-01",
+        "as_of": "2026-10-01",
+        "today_pending": True,
+        "lag_days": 2,
+        "stalled": False,
+        "latest_calories": 1560,
+        "latest_protein_g": 166.0,
+    },
+    "nutrition_trend": [
+        {"date": "2026-09-25", "calories": 1761, "protein_g": 182.0, "carbs_g": 77.0, "fat_g": 77.0},
+        {"date": "2026-09-29", "calories": 1140, "protein_g": 54.0, "carbs_g": 150.0, "fat_g": 36.0},
+        {"date": "2026-09-30", "calories": 1736, "protein_g": 141.0, "carbs_g": 170.0, "fat_g": 59.0},
+        {"date": "2026-10-01", "calories": 1560, "protein_g": 166.0, "carbs_g": 44.0, "fat_g": 82.0},
+    ],
+}
+JOURNEY_10_03 = {"weekly_rate_lbs": -3.54, "weekly_rate_ci_low": -3.81, "weekly_rate_ci_high": -2.49}
+_SERVED_10_03 = pw.served_protein_windows(NUTRITION_OVERVIEW_10_03)
+
+
+def _legs_10_03(dashboard=WIRE_DASHBOARD_10_03, served=_SERVED_10_03):
+    texts = wq.served_coach_texts(dashboard)
+    return (
+        wq.assess_cross_surface_coach_consistency(texts, served_protein=served),
+        wq.assess_cross_surface_coach_vs_engine(
+            texts, nutrition=NUTRITION_OVERVIEW_10_03["nutrition"], journey=JOURNEY_10_03, served_protein=served
+        ),
+    )
+
+
+def _webb(text):
+    coaches = [dict(c, position_summary=text) if c["coach_id"] == "nutrition" else c for c in WIRE_DASHBOARD_10_03["coaches"]]
+    return dict(WIRE_DASHBOARD_10_03, coaches=coaches)
+
+
+def test_4569_checks_passes_the_wire_page_where_a_coach_cites_one_named_day(monkeypatch, capsys):
+    payloads = {
+        "/api/vitals": {"vitals": {}},
+        "/api/coaching-dashboard": WIRE_DASHBOARD_10_03,
+        "/api/sleep_detail": {"sleep_detail": {}},
+        "/api/nutrition_overview": NUTRITION_OVERVIEW_10_03,
+        "/api/journey": {"journey": JOURNEY_10_03},
+    }
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen_factory(payloads))
+    by_name = {c.name: c for c in wq.checks(_FakeCheck, "http://example.test", "content_truth")}
+    vs_engine, consistency = by_name["cross_surface:coach_vs_engine"], by_name["cross_surface:coach_consistency"]
+    assert vs_engine.passed is True, vs_engine.message
+    assert consistency.passed is True, consistency.message
+    # the dead-man names the figure's fate: it was read, and matched the day the coach named
+    assert "1 matched the engine's value for a day the coach named" in vs_engine.message
+    assert "1 left to the engine leg" in consistency.message
+    assert "1 matched the engine's value for a day the coach named" in capsys.readouterr().out
+
+
+def test_4569_without_the_served_windows_the_same_page_is_the_live_red():
+    """The control for the fixture itself: read the pre-fix way (no served windows), this
+    page reproduces both live FAIL lines — so the green above is the fix, not the fixture."""
+    (c_ok, c_msg), (e_ok, e_msg) = _legs_10_03(served=None)
+    assert not e_ok and "Dr. Marcus Webb cites 166g vs engine 146.5g" in e_msg, e_msg
+    assert not c_ok and "Dr. Marcus Webb cites 166g vs Dr. James Okafor cites 146.5g" in c_msg, c_msg
+
+
+def test_4569_a_single_day_figure_whose_day_is_not_named_still_fails():
+    """The day must be named in words. Drop the dated sentence and 166 g is an unlabelled
+    figure beside a 146.5 g mean again — matching SOME served day is not enough."""
+    undated = _webb("He logged 1,560 kcal and 166g protein, anchored by a pound of flank steak at dinner.")
+    (c_ok, _c), (e_ok, e_msg) = _legs_10_03(undated)
+    assert not e_ok and "cites 166g vs engine 146.5g" in e_msg, e_msg
+    assert not c_ok
+    # naming a DIFFERENT served day does not cover it either (09-30 served 141 g)
+    wrong_day = _webb("Logging resumed on September 30th. He logged 1,560 kcal and 166g protein.")
+    assert not _legs_10_03(wrong_day)[1][0]
+
+
+def test_4569_a_named_day_does_not_excuse_a_figure_the_engine_does_not_serve_for_it():
+    """The date alone exempts nothing: 176 g on a named October 1st is wrong (served: 166)."""
+    wrong = _webb("Logging resumed on October 1st. He logged 1,560 kcal and 176g protein.")
+    (_c_ok, _c), (e_ok, e_msg) = _legs_10_03(wrong)
+    assert not e_ok and "cites 176g vs engine 146.5g" in e_msg, e_msg
+
+
+def test_4569_every_way_a_coach_writes_the_day_is_read():
+    for text in ("on October 1st", "Oct. 1", "on Oct 1, 2026", "the 1st of October", "1 October", "2026-10-01"):
+        assert pw._names_day(f"Logging resumed {text}.", "2026-10-01"), text
+    for text in ("on October 12th", "on October 10", "in October", "on September 1st", "21 October"):
+        assert not pw._names_day(f"Logging resumed {text}.", "2026-10-01"), text
+
+
+def test_4569_an_average_is_never_read_as_a_single_day():
+    """An aggregate sentence is not a day's intake, whatever dates sit nearby: 54 g is
+    2026-09-29's served value, but 'averaging 54g' is an average and stays held to the
+    window mean. The same figure as a day's own intake, with the day named, is tagged."""
+    avg = "The 29th of September was a thin day. His protein is averaging 54g."
+    assert pw.protein_window_tags(avg, _SERVED_10_03) == {}
+    e_ok, e_msg = _legs_10_03(_webb(avg))[1]
+    assert not e_ok and "cites 54g vs engine 146.5g" in e_msg, e_msg
+    day = "The 29th of September was a thin day. He ate 54g protein and little else."
+    assert pw.protein_window_tags(day, _SERVED_10_03) == {54.0: "served_day"}
+
+
+def test_4569_a_named_recent_window_is_judged_against_the_recent_field():
+    """`pro_avg_recent_g` 117.4 over 7 days is a served fact; a coach who names that window
+    agrees with the engine, and one who names it with a wrong figure still fails — against
+    the 7-day field, named as such."""
+    right = _webb("Over the last seven days his protein has averaged 117g.")
+    (c_ok, c_msg), (e_ok, e_msg) = _legs_10_03(right)
+    assert e_ok and c_ok, (e_msg, c_msg)
+    for phrasing in ("His 7-day protein average is 117g.", "This week his protein intake averaged 117 grams."):
+        assert _legs_10_03(_webb(phrasing))[1][0], phrasing
+    wrong = _webb("Over the last seven days his protein has averaged 90g.")
+    e_ok, e_msg = _legs_10_03(wrong)[1]
+    assert not e_ok and "cites 90g vs engine 117.4g (7-day average)" in e_msg, e_msg
+    # an unnamed window is still judged against the window mean, as before
+    unnamed = _webb("His protein has averaged 117g.")
+    e_ok, e_msg = _legs_10_03(unnamed)[1]
+    assert not e_ok and "cites 117g vs engine 146.5g" in e_msg, e_msg
+
+
+def test_4569_the_106_9_specimen_still_fails_with_the_served_windows_supplied():
+    """#4186's specimen names '14 logged days' — not the served 7-day window, not a day —
+    so nothing here excuses it."""
+    served = pw.served_protein_windows({"nutrition": dict(NUTRITION_09_27, pro_avg_recent_g=110.0, pro_avg_recent_g_window_days=7)})
+    texts = wq.served_coach_texts(WIRE_DASHBOARD_09_27)
+    ok, msg = wq.assess_cross_surface_coach_vs_engine(texts, nutrition=NUTRITION_09_27, journey=JOURNEY_09_27, served_protein=served)
+    assert not ok and "cites 106.9g vs engine 153.5g" in msg, msg
+
+
+def test_4569_served_protein_windows_reads_the_wire_and_survives_its_absence():
+    assert _SERVED_10_03["days"]["2026-10-01"] == 166.0 and len(_SERVED_10_03["days"]) == 4
+    assert (_SERVED_10_03["recent_g"], _SERVED_10_03["recent_days"]) == (117.4, 7)
+    # `latest_*` alone (no trend rows) still yields the latest day
+    assert pw.served_protein_windows({"nutrition": {"latest_date": "2026-10-01", "latest_protein_g": 166.0}})["days"] == {
+        "2026-10-01": 166.0
+    }
+    for absent in (None, {}, {"nutrition": None, "nutrition_trend": None}, {"nutrition_trend": [{"date": None, "protein_g": "x"}, 7]}):
+        assert pw.served_protein_windows(absent) == {"days": {}, "recent_g": None, "recent_days": 0}, absent
+
+
+def test_4569_mutation_dropping_the_named_day_rule_reds_the_wire_page(monkeypatch):
+    """Mutation control: with the day never recognised as named, the fixed page is the
+    10-02 red again — the green is the named-day rule and nothing else."""
+    monkeypatch.setattr(pw, "_names_day", lambda prose, iso_day: False)
+    (c_ok, _c), (e_ok, e_msg) = _legs_10_03()
+    assert not e_ok and "cites 166g vs engine 146.5g" in e_msg and not c_ok, e_msg

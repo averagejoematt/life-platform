@@ -72,6 +72,10 @@ the CDK deploy / file-publishing / cfn-exec roles — 17 negative controls, all 
 59 required (action, resource) pairs across the seven jobs, all `allowed`. It also GAINS
 `s3:GetBucketPolicy`, which the deploy role never held: `config-drift`'s bucket-policy leg
 read AccessDenied on every nightly run until now.
+It also carries `s3:GetBucketNotification` (refresh 2026-10-11): #4643 granted it to the
+deploy role for `config-drift`'s nightly `check_bucket_notification_drift.py --strict` leg,
+and `config-drift` runs on THIS role after the merge — the deploy role keeps its grant too,
+unchanged.
 
 **Apply — the OWNER, in this order.** Steps 1–3 go BEFORE the merge: the merged workflows
 assume the readonly role and present `environment:ungated-deploy`, so both must be live
@@ -124,6 +128,21 @@ Role.AssumeRolePolicyDocument` lists exactly the two `environment:` subjects;
 `config-drift` for the first time since its bucket-policy leg was added;
 (d) CloudTrail `AssumeRoleWithWebIdentity` for `github-actions-deploy-role` shows only
 `environment:` subjects after step 5.
+
+### APPLIED 2026-10-11 — the deploy role's bucket-notification read (#4643)
+
+> Applied by the owner ~03:30Z with
+> `aws iam put-role-policy --role-name github-actions-deploy-role --policy-name life-platform-cicd-permissions --policy-document file://infra/iam/github-actions-deploy-role.permissions.json`.
+> Post-apply `python3 deploy/verify_oidc_iam.py --strict` → **CLEAN — every checked-in identity
+> matches live exactly (15 targets)**. The `github-actions-deploy-role` entry was deleted from
+> `_PENDING_PERMISSIONS_APPLY` (`tests/test_grant_enumeration_drift.py`) per the #2824 rule that
+> the queue stays a queue.
+
+`github-actions-deploy-role.permissions.json` carries one read-only statement,
+`S3BucketNotificationRead` (`s3:GetBucketNotification` on `arn:aws:s3:::matthew-life-platform`,
+owner ruling 2026-10-11 ~02:40Z). Its consumer is `deploy/check_bucket_notification_drift.py`
+(#4757), which `config-drift.yml` runs nightly (`--strict`, blocking) in its
+ownership/bucket-policy drift step. The role is hand-managed, not CDK, so no stack deploy applies it.
 
 ### PENDING APPLY — the remediation role's narrowed grants (#3562, 2026-09-05)
 

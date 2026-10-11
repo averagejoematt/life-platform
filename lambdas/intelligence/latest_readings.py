@@ -1,7 +1,7 @@
 """intelligence/latest_readings.py — the live latest readings, in canonical-facts vocabulary (#2575).
 
 WHY THIS EXISTS, MEASURED. On 2026-08-11 the nightly `cross_surface:vitals` check
-read "Dr. Lisa Park cites recovery 53% vs cockpit 46%". Neither number was invented
+read "Lisa Park cites recovery 53% vs cockpit 46%". Neither number was invented
 and neither was stale by any age rule — they came from two DIFFERENT producers of
 "the current reading":
 
@@ -22,7 +22,7 @@ Three of four columns past their cross-surface tolerance (recovery 8 pts vs 2.0,
 3.07 ms vs 1.5, weight 3.1 lb vs 1.5).
 
 The lag reproduces on other days, which is how we know it is structural and not one
-bad row: an earlier nightly published "Dr. Marcus Webb cites hrv 42 ms vs cockpit 32
+bad row: an earlier nightly published "Marcus Webb cites hrv 42 ms vs cockpit 32
 ms; recovery 55% vs 31%", and whoop held exactly 55/42.03 on 2026-08-07 and 31/32 on
 2026-08-08 — again two consecutive mornings, again rollup-behind-reading.
 

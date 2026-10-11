@@ -17,7 +17,7 @@ WHAT IT DOES PER BOT
      otherwise invisible until the whole thing is wired: a token that was mistyped,
      and a token pasted against the WRONG coach — it prints the bot's real @username
      back, so ``ajm_sleep_bot`` appearing under "nutrition" is caught here rather
-     than by Dr. Webb answering in Dr. Park's voice a week from now.
+     than by Webb answering in Park's voice a week from now.
   3. Calls ``getUpdates`` to discover your numeric chat id, if you have already sent
      the bot a message. The chat id is not a secret — it is the allow-list entry that
      stops a stranger who finds the bot from interrogating your health data. It is
@@ -28,12 +28,12 @@ WHAT IT DOES PER BOT
      integration uses, needs a single IAM grant and a single cached read, and costs
      ~$2.40/month less against a ceiling where that is real money.
 
-GLUCOSE IS DELIBERATELY NOT CREATED. Dr. Patel keeps running on the platform —
+GLUCOSE IS DELIBERATELY NOT CREATED. Patel keeps running on the platform —
 daily cards, narratives, the board — but Matthew does not want her as a texting
 contact, and an uncreated bot is one fewer public webhook endpoint to defend. She
 can be added later by naming her explicitly: `setup_telegram_bots.py glucose`.
 
-LABS WAS PROMOTED 2026-08-12 (ADR-153 amendment). Dr. Okafor was in that same
+LABS WAS PROMOTED 2026-08-12 (ADR-153 amendment). Okafor was in that same
 "no bot" class until the owner asked whether the roster needed a longevity coach.
 It turned out one already existed with no way to reach him — his own bio reads
 "Longevity & preventive medicine" and his lens is long-run risk factors — so
@@ -110,14 +110,14 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 #
 # The board's display name is the ROOM, not its chair. "Grand Rounds" is the real
 # clinical institution this group is: the whole specialist team convening on one
-# case. Dr. Eli Marsh still moderates inside it (he is the lead: true persona in
+# case. Eli Marsh still moderates inside it (he is the lead: true persona in
 # config/personas.json) — but the contact you open is the room, which is what you
 # actually want to reach when the question spans domains.
 BOTS = [
-    ("headcoach", "ajm_headcoach_bot", "Dr. Eli Marsh"),
-    ("nutrition", "ajm_nutrition_bot", "Dr. Marcus Webb"),
-    ("sleep", "ajm_sleep_bot", "Dr. Lisa Park"),
-    ("mind", "ajm_mind_bot", "Dr. Nathan Reeves"),
+    ("headcoach", "ajm_headcoach_bot", "Eli Marsh"),
+    ("nutrition", "ajm_nutrition_bot", "Marcus Webb"),
+    ("sleep", "ajm_sleep_bot", "Lisa Park"),
+    ("mind", "ajm_mind_bot", "Nathan Reeves"),
     # Coaching-team v2 (2026-08-10), re-pointed 2026-08-12 (ADR-153 amendment).
     # The merged Performance seat now answers on @ajm_training_bot — the thread
     # Matthew already had open with the training lane Max absorbed — instead of
@@ -125,9 +125,9 @@ BOTS = [
     # taken, and "longevity" described the retired Victor framing, not Max's
     # performance/movement mandate. So the handle moves to the coach it actually
     # fits (below) and Max keeps the conversation, not the misnomer.
-    ("physical", "ajm_training_bot", "Dr. Max Reyes"),
-    ("explorer", "ajm_research_bot", "Dr. Henning Brandt"),
-    ("pattern", "ajm_pattern_bot", "Dr. Nora Vale"),
+    ("physical", "ajm_training_bot", "Max Reyes"),
+    ("explorer", "ajm_research_bot", "Henning Brandt"),
+    ("pattern", "ajm_pattern_bot", "Nora Vale"),
     ("career", "ajm_career_bot", "Steve Brooks"),
     ("board", "ajm_board_bot", "Grand Rounds"),
     # Owner-called 2026-08-12: "should we not just have a longevity coach?" The
@@ -135,12 +135,12 @@ BOTS = [
     # "Longevity & preventive medicine" and his lens is long-run risk factors. So
     # rather than mint a seat that would overlap him, he gets the bot, and he
     # inherits @ajm_longevity_bot because that handle finally describes its owner.
-    ("labs", "ajm_longevity_bot", "Dr. James Okafor"),
+    ("labs", "ajm_longevity_bot", "James Okafor"),
 ]
 
 # Succession routes: the SEAT retired, the CHAT did not.
 #
-# RETIRED 2026-08-12 (ADR-153 amendment). Dr. Sarah Chen retired at the cycle-13
+# RETIRED 2026-08-12 (ADR-153 amendment). Sarah Chen retired at the cycle-13
 # genesis and `training` was aliased onto the Performance seat so her bot thread
 # would not dead-end. That alias is now unnecessary: @ajm_training_bot IS the
 # Performance seat's primary bot (key `physical` above), so the thread continues
@@ -162,7 +162,7 @@ ALIAS_BOTS: list[tuple[str, str, str]] = []
 # like an oversight, and either can be added later with an explicit argument:
 #     python3 setup/setup_telegram_bots.py glucose
 OPTIONAL_BOTS = [
-    ("glucose", "ajm_glucose_bot", "Dr. Amara Patel"),
+    ("glucose", "ajm_glucose_bot", "Amara Patel"),
 ]
 
 ALL_BOTS = BOTS + OPTIONAL_BOTS + ALIAS_BOTS

@@ -36,7 +36,6 @@ v1.0.0 — 2026-07-24 (#1390)
 
 from __future__ import annotations
 
-import json
 import statistics
 import uuid
 from datetime import datetime
@@ -69,7 +68,9 @@ _TRUTH_FIELD = {
 MIN_N_FOR_STATS = 5
 
 _ID_LEN = 8
-_HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+_HAIKU_MODEL = model_for("eyeball_estimate")
 
 # Vision prompt — asks ONLY for a macro estimate as strict JSON. It is explicitly told
 # this is a calibration estimate, not a food log, so the model is never in a posture of
@@ -263,14 +264,9 @@ def _parse_macro_json(text: str) -> Optional[dict]:
     """Extract the first JSON object from the model text. Returns None if none parses."""
     if not text:
         return None
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        return None
-    try:
-        obj = json.loads(text[start : end + 1])
-    except (json.JSONDecodeError, ValueError):
-        return None
+    from ai.structured_json import parse_json_span  # #4276: the span salvage lives in the one door
+
+    obj = parse_json_span(text, "{")
     return obj if isinstance(obj, dict) else None
 
 

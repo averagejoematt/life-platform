@@ -460,11 +460,21 @@ jobs:
   # ("Deploy-critical test lane") and are enforced by the `deploy_critical`
   # pytest marker (pytest.ini). `not integration` keeps the one live-AWS
   # test in a marked file (test_lv6) out of this creds-free lane.
+  #
+  # #4252: runs BESIDE lint, not after it. `plan` needs BOTH lint and this job, so a red
+  # lint still blocks plan → deploy exactly as before; the chain just stops paying lint's
+  # ~2.5 min and this job's ~3.5 min back to back (plan used to start at ~+7 min).
+  # NOT skipped on a PR squash merge, deliberately (unlike black/ruff/mypy in ci-lint.yml):
+  # the required fast lane ran this selection on the PR's merge ref, but that ref equals
+  # the pushed tree only when the PR head already contained main. Measured over the 20
+  # squash merges ad9d77fff..3772618e8: 5 of 20 landed a tree equal to the PR head's. In the
+  # other 15 the base had moved, and the moved-base union is the one case this deploy
+  # gate exists to catch (#4304 + #4317). Same rejection as find_test_verdict_owner.py's.
   test-critical:
     name: Deploy-critical tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [reconcile, lint]   # #1173: reconcile listed to read build_sha
+    needs: [reconcile]   # #1173: reconcile listed to read build_sha. #4252: not lint (see above)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -568,7 +578,11 @@ jobs:
     # `test / Unit Tests = skipped` — present, never absent. test-owner never exits
     # non-zero; if its runner dies, this job is skipped and the run is red on
     # test-owner's failure (visible, not silent).
-    needs: [reconcile, lint, test-owner]   # #1173: reconcile listed to read build_sha
+    # #4252: no longer `needs: lint`. This job gates nothing but notify-failure (ADR-117),
+    # so waiting on lint bought only one thing — not spending runner time when lint is red
+    # — and cost every push lint's ~2.5 min at the head of the 20-min long pole. A red lint
+    # still reds the run and still blocks plan → deploy through `plan`'s own needs.
+    needs: [reconcile, test-owner]   # #1173: reconcile listed to read build_sha
     # #4252 box 5: a burst of pushes runs ONE in-flight full suite, not one per push. A run
     # that will actually test (a push with no owner, above) joins the shared group and
     # CANCELS the older in-flight suite: the newer run tests a tree that contains the older
@@ -615,6 +629,9 @@ jobs:
       # only then — an additive-IAM diff carried over from an earlier merge does not re-park
       # every later code deploy behind the owner.
       cdk_changed: ${{ steps.plan.outputs.cdk_changed }}
+      # #4589: the resolved deploy base (#4472), read by visual-qa's reader-surface gate.
+      # Empty = unresolved, which that gate reads as RUN, never as a skip.
+      deploy_base: ${{ steps.base.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -851,6 +868,11 @@ jobs:
       # job's concurrency group keeps one pending job and cancels the older one, so a `~1` base
       # dropped a superseded run's merge forever (#4452's weekly-digest fix, 2026-09-29).
       # Read-only (Actions API). Empty output = unresolved → the next step deploys everything.
+      # #4250 box 3: one exception, decided inside the script. When THIS push is the reconcile
+      # bot's commit (it moves no deployable path of its own) and the run at its parent sha is
+      # alive or deployed, the base is that parent: the run that pushed the commit built this
+      # very tree and ships it, so this run plans nothing instead of a second fleet deploy.
+      # A red, dropped or unreadable parent run falls through to the ordinary base.
       - name: Resolve deploy base — the last successful Deploy on main (#4472)
         id: base
         if: github.event.inputs.deploy_all != 'true'
@@ -1350,15 +1372,29 @@ jobs:
     name: Visual + AI-vision QA
     runs-on: ubuntu-latest
     timeout-minutes: 50
-    needs: [reconcile, deploy]   # #1173: reconcile listed to read build_sha
+    needs: [reconcile, plan, deploy]   # #1173: reconcile listed to read build_sha; #4589: plan for deploy_base
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.reconcile.outputs.build_sha }}   # #1173: the reconciled tree
+          fetch-depth: 0   # #4589: the reader-surface gate diffs deploy_base..HEAD
 
       - uses: ./.github/actions/setup-ci
         with:
           python-cache: 'pip'
+
+      - name: Reader-surface gate (#4589 — the AI judge runs only when a reader surface changed)
+        id: reader_surface
+        env:
+          DEPLOY_BASE: ${{ needs.plan.outputs.deploy_base }}
+        run: |
+          # The owner's ruling (platform plan 2026-10-03, decision 4): the AI checks run only
+          # when reader pages change. scripts/reader_surface.py derives the surface (site/, the
+          # site-API request-time import closure, the judges + this wiring, bundled config) and
+          # diffs the deploy base (#4472) against the reconciled tree. An unresolved base, a
+          # non-ancestor or any error is RUN. The deterministic sweep below runs either way;
+          # only --ai-qa is dropped on a SKIP, and the verdict line says why.
+          python3 scripts/reader_surface.py --base "${DEPLOY_BASE}" --github-output
 
       - name: Install Playwright + Chromium
         # The one install step list for every visual-QA job (#4254): pinned playwright +
@@ -1375,6 +1411,9 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run visual + AI-vision QA sweep
+        env:
+          RUN_AI: ${{ steps.reader_surface.outputs.run_ai }}
+          SKIP_REASON: ${{ steps.reader_surface.outputs.reason }}
         run: |
           # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
           # time; the deterministic sweep runs the full surface.
@@ -1385,7 +1424,18 @@ jobs:
           # its own elapsed days; a threshold meter carrying its own explanation) were
           # rolling back healthy deploys. It still runs FULL-SURFACE in the daily
           # standalone (visual-qa.yml), where it reports without holding a rollback.
-          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+          # #4589: --ai-qa only when the reader-surface gate said RUN (its verdict line is above).
+          # The tier-3 budget pause is unchanged — it lives inside the judge and applies on RUN.
+          # #4652 (ADR-116): a SKIP is handed to the sweep, which reports it itself — a
+          # SKIPPED-BY-READER-SURFACE line, a job-summary line, a ::warning annotation and
+          # report.json's ai_vision_status — so a green job here can never read as "the AI
+          # judge passed this deploy". This job is in no rollback's `needs`, so a skip
+          # cannot revert anything either.
+          if [ "${RUN_AI}" = "false" ]; then
+            python3 tests/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"
+          else
+            python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+          fi
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |

@@ -10,10 +10,15 @@ PRESERVED legacy pages; new assertions pin the three v4 doors. System pages
 (subscribe) stayed at root and are still checked there.
 """
 
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
+
+sys.path.insert(0, str(ROOT / "scripts"))
+import check_css_tokens  # noqa: E402
+
 LEGACY = SITE / "legacy"
 
 
@@ -95,11 +100,26 @@ def test_v4_tokens_define_reduced_motion_and_both_modes():
     assert "--ember:" in tokens
 
 
+def _door_sheet_finding(name: str, html: str) -> str | None:
+    """A door draws its look from ONE system: tokens.css (DESIGN_SYSTEM_V5), or — once it
+    is rebuilt from the kit (#4581, docs/design/v8) — clean.css alone. Neither is a miss."""
+    if check_css_tokens.is_kit_page(html):
+        return None
+    if "/assets/css/tokens.css" in html:
+        return None
+    return f"{name} door loads neither tokens.css nor the kit (clean.css)"
+
+
 def test_v4_doors_link_tokens_first():
-    """tokens.css is the single source of colour/type/spacing — every door loads it."""
-    for name, rel in V4_DOORS.items():
-        html = _read(rel)
-        assert "/assets/css/tokens.css" in html, f"{name} door does not load tokens.css"
+    """tokens.css is the single source of colour/type/spacing — every door loads it,
+    unless the door is a kit page (#4581), which loads clean.css instead."""
+    misses = [f for name, rel in V4_DOORS.items() if (f := _door_sheet_finding(name, _read(rel)))]
+    assert not misses, misses
+    # Still fails an old page that drops its sheet; passes the same page on the kit.
+    bare = "<html><head><link rel='stylesheet' href='/assets/css/story.css'></head></html>"
+    assert _door_sheet_finding("Planted", bare)
+    assert _door_sheet_finding("Planted", '<link rel="stylesheet" href="/assets/css/clean.css">') is None
+    assert _door_sheet_finding("Planted", _read("kit/index.html")) is None
 
 
 # ── #1992: the cockpit hero must live inside a landmark ─────────────────────

@@ -324,7 +324,7 @@ def test_revise_weekly_passes_judge_feedback_verbatim():
     out = repair.revise_weekly(
         [{"speaker": "elena_voss", "line": "hi"}],
         ["JUDGE-ITEM-GAMMA: no humour beat"],
-        "Dr. Sarah Chen",
+        "Sarah Chen",
         "The Measured Life",
         _invoke_capturing(payload, calls),
         "test-model",
@@ -333,7 +333,7 @@ def test_revise_weekly_passes_judge_feedback_verbatim():
     )
     assert out == payload
     assert "JUDGE-ITEM-GAMMA: no humour beat" in calls[0]["messages"][0]["content"]
-    assert "Dr. Sarah Chen" in calls[0]["system"]
+    assert "Sarah Chen" in calls[0]["system"]
 
 
 def test_revise_intro_fails_soft_to_empty_on_error():
@@ -472,8 +472,8 @@ def _weekly_harness(monkeypatch, judge):
         "date": "2026-08-01",
         "title": "Week 3",
         "chronicle": "A solid, ordinary training week with good sleep.",
-        "coach_reads": [{"id": "sleep_coach", "name": "Dr. Sarah Chen", "summary": "Sleep held steady all week.", "themes": []}],
-        "guest": {"id": "sleep_coach", "name": "Dr. Sarah Chen", "summary": "Sleep held steady all week.", "themes": []},
+        "coach_reads": [{"id": "sleep_coach", "name": "Sarah Chen", "summary": "Sleep held steady all week.", "themes": []}],
+        "guest": {"id": "sleep_coach", "name": "Sarah Chen", "summary": "Sleep held steady all week.", "themes": []},
         "presence_note": "",
         "phase_block": "",
         "last_open_bet": None,
@@ -546,7 +546,7 @@ def test_weekly_passing_attempt_inside_budget_publishes_normally(monkeypatch):
     monkeypatch.setattr(panel._repair, "send_exhaustion_email", lambda *a, **k: emails.append(1) or {"sent": 1})
     monkeypatch.setattr(panel, "_hold_and_alert", lambda *a, **k: (_ for _ in ()).throw(AssertionError("held despite a clean gate pass")))
 
-    out = panel._run_weekly(force=False, dry_run=True)  # dry_run: the full decision path, no TTS/writes
+    out = panel._run_weekly(force=False, dry_run=True, approved=True)  # dry_run: the full decision path; #4694: owner-approved
     body = json.loads(out["body"])
     assert body["would"] == "PUBLISH" and body["clean_turns"] == 8 and body["week"] == 3
     assert emails == []  # no escalation on a pass
@@ -616,7 +616,7 @@ def test_4501_weekly_loop_treats_unevaluated_as_no_editor_verdict(monkeypatch):
     gates (here the judge passes, so it reaches publish) and puts no 'editor:' reason in the ledger."""
     _weekly_harness(monkeypatch, judge=lambda turns, rubric, gt="": (True, []))
     monkeypatch.setattr(panel, "_editor_review", lambda turns, bible: {"verdict": editor.UNEVALUATED, "issues": [], "pull_quote": ""})
-    out = panel._run_weekly(force=False, dry_run=True)
+    out = panel._run_weekly(force=False, dry_run=True, approved=True)  # #4694: past the audit gate
     body = json.loads(out["body"])
     assert body["would"] == "PUBLISH", body
 

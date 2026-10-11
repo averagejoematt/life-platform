@@ -1313,7 +1313,7 @@ def test_assess_prose_demotes_a_sparsity_objection_high_to_low(capsys):
 
 # ── #3199: a claim scoped to ACTIVE logging is not disproved by day arithmetic ─
 # The redeploy that CARRIED #3198's fix was itself auto-rolled-back by this flake:
-# Dr. Eli Marsh's /method/board/ copy — "active logging went silent across food,
+# Eli Marsh's /method/board/ copy — "active logging went silent across food,
 # training, habits, and journal since August 17th" — ground-truthed TRUE against
 # DDB the same night (zero macrofactor/hevy/journal rows, zero habitify check-ins
 # since genesis). The note below is the WIRE — verbatim from
@@ -1322,7 +1322,7 @@ def test_assess_prose_demotes_a_sparsity_objection_high_to_low(capsys):
 # stores it (fixture must be the wire).
 
 _NOTE_3199_BOARD = (
-    "Dr. Eli Marsh states 'active logging went silent across food, training, habits, and journal since August 17th' "
+    "Eli Marsh states 'active logging went silent across food, training, habits, and journal since August 17th' "
     "— but August 17 is Day 1 of the current cycle, and today is Day 9 (2026-08-25). The phras"
 )
 
@@ -1369,7 +1369,7 @@ def test_assess_prose_demotes_an_active_vs_passive_objection_high_to_low(capsys)
         "severity": "high",
         "summary": "x",
     }
-    pages = [{"name": "Board", "path": "/method/board/", "prose": "Dr. Eli Marsh: active logging went silent."}]
+    pages = [{"name": "Board", "path": "/method/board/", "prose": "Eli Marsh: active logging went silent."}]
     findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_9)
     assert errors == []
     assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"

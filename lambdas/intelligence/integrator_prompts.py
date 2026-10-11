@@ -2,8 +2,8 @@
 integrator_prompts.py — the board lead's narrative prompt builders, extracted
 from ai_expert_analyzer_lambda (#1115, ADR-080 size gate).
 
-WHO SIGNS THESE (#1986). The integrator voice used to be hardcoded as "Dr. Kai
-Nakamura, Integrative Health Director" while the public roster billed Dr. Eli
+WHO SIGNS THESE (#1986). The integrator voice used to be hardcoded as "Kai
+Nakamura, Integrative Health Director" while the public roster billed Eli
 Marsh as the lead — two characters in one role, and a reader could not tell who
 ran the board. The name is now DERIVED from the persona registry's single
 ``lead: true`` persona (config/personas.json → coach.persona_registry), so the
@@ -50,7 +50,7 @@ def _lead():
         name, title = persona_registry.lead_byline()
     except Exception as e:  # noqa: BLE001 — a byline lookup must never block generation
         logger.warning("lead byline unavailable, using pinned fallback (non-blocking): %s", e)
-        name, title = "Dr. Eli Marsh", "Principal Investigator — Program Lead"
+        name, title = "Eli Marsh", "Principal Investigator — Program Lead"
     return name, name.split()[-1], title
 
 

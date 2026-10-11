@@ -1,0 +1,276 @@
+{
+  "captured_at": "2026-10-04T22:10:25.264831+00:00",
+  "fetch_path": "/api/calls",
+  "is_prefix_sample": false,
+  "path": "/api/calls",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "absent_text": {
+        "type": "string"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "calls": {
+        "items": {
+          "keys": {
+            "actual": {
+              "keys": {
+                "text": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "called": {
+              "type": "string"
+            },
+            "called_short": {
+              "type": "string"
+            },
+            "claim": {
+              "type": "string"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "coach_name": {
+              "type": "string"
+            },
+            "happened": {
+              "type": "string"
+            },
+            "happened_short": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "logged_date": {
+              "type": "string"
+            },
+            "records": {
+              "items": {
+                "keys": {
+                  "comparison": {
+                    "keys": {
+                      "rule": {
+                        "type": "string"
+                      },
+                      "rule_words": {
+                        "type": "string"
+                      },
+                      "scored_complete": {
+                        "type": "boolean"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "right": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 2,
+              "type": "array"
+            },
+            "sealed": {
+              "type": "boolean"
+            },
+            "settled_date": {
+              "type": "string"
+            },
+            "sides": {
+              "items": {
+                "keys": {
+                  "claim": {
+                    "type": "string"
+                  },
+                  "coach_id": {
+                    "type": "string"
+                  },
+                  "coach_name": {
+                    "type": "string"
+                  },
+                  "right": {
+                    "type": "boolean"
+                  },
+                  "said": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 2,
+              "type": "array"
+            },
+            "simple_guess": {
+              "keys": {
+                "right": {
+                  "type": "null"
+                },
+                "short": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "title": {
+              "type": "string"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "verdict": {
+              "type": "string"
+            },
+            "verdict_text": {
+              "type": "string"
+            }
+          },
+          "optional": [
+            "sides",
+            "topic"
+          ],
+          "type": "object"
+        },
+        "length_sample": 33,
+        "type": "array"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "excluded": {
+        "keys": {
+          "count": {
+            "type": "integer"
+          },
+          "reasons": {
+            "keys": {
+              "a direction read out of commentary, not a call sealed before day one": {
+                "type": "integer"
+              },
+              "graded as no movement by a trend check that reads only the most recent readings": {
+                "type": "integer"
+              },
+              "graded on a day the sentence does not name": {
+                "type": "integer"
+              },
+              "the sentence does not state the number or direction that was graded": {
+                "type": "integer"
+              },
+              "the sentence was conditional or hedged": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "next": {
+        "keys": {
+          "absent_text": {
+            "type": "string"
+          },
+          "as_of": {
+            "type": "string"
+          },
+          "data": {
+            "keys": {
+              "coach_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "due_date": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "question": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "source": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "simple_guess_words": {
+        "type": "string"
+      },
+      "source": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      },
+      "today": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

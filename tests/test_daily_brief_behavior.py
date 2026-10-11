@@ -136,6 +136,16 @@ def frozen_clock(monkeypatch):
     return FROZEN_NOW
 
 
+@pytest.fixture(autouse=True)
+def _every_day_is_a_narrative_day(monkeypatch):
+    """#4589: the long per-coach narratives run on Monday/Thursday only (coach/narrative_cadence.py),
+    and FROZEN_NOW is a Friday. These tests pin the handler's behaviour, not the cadence, so they
+    run on a narrative day; the cadence itself is pinned in tests/test_narrative_cadence_4589.py."""
+    from coach import narrative_cadence
+
+    monkeypatch.setattr(narrative_cadence, "NARRATIVE_WEEKDAYS", tuple(range(7)))
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Test doubles — hand-rolled and bounded (never a MagicMock inside a read loop)
 # ══════════════════════════════════════════════════════════════════════════════

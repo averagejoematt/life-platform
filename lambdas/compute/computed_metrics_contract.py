@@ -25,6 +25,10 @@ than ACWR_MAX_AGE_HOURS on the newest records is a red — this incident would
 have paged on day 2 instead of running dark for 9.
 """
 
+from datetime import timedelta
+
+from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741)
+
 # Every field acwr-compute merges onto the computed_metrics record. The three
 # value fields (acwr / acute_load_7d / chronic_load_28d) are written only when
 # non-None, the rest unconditionally — preservation must cover all of them.
@@ -57,3 +61,27 @@ def carry_coowned_fields(table, item):
         if field in existing and field not in item:
             item[field] = existing[field]
     return item
+
+
+def window_anchor(target_date_str):
+    """#4637: the day every trailing window in `assemble_data` is anchored on — the
+    Pacific day AFTER the row's own date, i.e. the "today" of the morning the row is
+    normally computed. Derived from the TARGET, never from the wall clock: a late or
+    back-filled recompute (`event["date"]`) must describe the same period the on-time
+    run described. Raises on an unparseable date rather than writing a row keyed on it.
+    """
+    target = parse_day_key(target_date_str)
+    if target is None:
+        raise ValueError(f"daily-metrics-compute: target date {target_date_str!r} is not a YYYY-MM-DD day key")
+    return target + timedelta(days=1)
+
+
+def computed_lag_days(target_date_str, written_on):
+    """#4637: Pacific days between the row's own date and `written_on`, the Pacific day
+    it is being written. 1 is the scheduled morning-after run; 2 or more marks a late /
+    back-filled recompute, so a reader can tell one from an on-time row. None when the
+    date does not parse (the caller then writes no mark rather than a wrong one)."""
+    target = parse_day_key(target_date_str)
+    if target is None:
+        return None
+    return (written_on - target).days

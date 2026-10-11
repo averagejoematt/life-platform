@@ -47,10 +47,18 @@ export function splitPosts(posts) {
   };
 }
 
-/** The opening lines of a post, as served: the quoted title and the bracketed stat line dropped. */
+/** Markdown emphasis marks, dropped (R7 fix 4): the dek is served as `*…*` and the page printed
+ *  the asterisks. Only a mark that OPENS at a word start and CLOSES at a word end is removed —
+ *  the words between are untouched, and a lone asterisk or an underscore inside a word stays. */
+export function stripEmphasis(text) {
+  return String(text || "").replace(/(^|[\s(\[“"‘'—–-])(\*{1,3}|_{1,3})(?=\S)([^*_\n]*?\S)\2(?=$|[\s)\].,;:!?…”"’'—–-])/g, "$1$3");
+}
+
+/** The opening lines of a post, as served: the quoted title and the bracketed stat line dropped,
+ *  the emphasis marks with them. */
 export function openingLines(post) {
   if (!post) return "";
-  return cleanExcerpt(post.excerpt, post.title).split(/\n\s*\n/)[0].trim();
+  return stripEmphasis(cleanExcerpt(post.excerpt, post.title).split(/\n\s*\n/)[0].trim());
 }
 
 /** ISO-8601 week key ("2026-W39") of a YYYY-MM-DD, pinned to UTC noon. "" when unusable. */
@@ -115,9 +123,11 @@ export function journalLine(pulse) {
   return "";
 }
 
-/** His testimony from /api/field_notes: the weeks he answered, or the honest empty. */
+/** His testimony from /api/field_notes: the weeks he answered, or the honest empty. A null
+ *  payload is a fetch that failed — "not served right now", never a fact about him (R7 fix 9). */
 export function testimonyLine(fieldNotes) {
-  const entries = (fieldNotes && fieldNotes.entries) || [];
+  if (!fieldNotes) return { answered: [], text: "The notes put to him are not served right now." };
+  const entries = fieldNotes.entries || [];
   const answered = entries.filter((e) => e && e.has_matthew_response);
   if (!entries.length) return { answered: [], text: "No notes have been put to him yet." };
   if (!answered.length) {
@@ -250,7 +260,7 @@ function renderPreviously(posts, prologue, all, served) {
   if (prior[0]) setMargin(sec, prior[0].date);
 }
 
-function renderSoFar({ latest, weights, training, sleep, pulse, today }) {
+function renderSoFar({ latest, weights, training, sleep, pulse, today, served = true }) {
   const sec = document.getElementById("wk-sofar");
   const bits = [];
   const since = latest ? sinceWriteUp(weights, latest.date) : null;
@@ -268,7 +278,8 @@ function renderSoFar({ latest, weights, training, sleep, pulse, today }) {
   if (mornings.length) bits.push(`recovery ran <span data-src="api_sleep_detail.sleep_trend[].recovery_score">${esc(joinNumbers(mornings.map((m) => m.recovery_score)))}</span> on the last ${mornings.length === 1 ? "morning" : `${["", "", "two", "three"][mornings.length] || mornings.length} mornings`}`);
   const jl = journalLine(pulse);
   if (jl) bits.push(`<span data-src="api_pulse.pulse.glyphs.journal">${esc(jl)}</span>`);
-  if (!bits.length) return fill(sec, '<p class="wk-note">Nothing served for this week yet.</p>');
+  // R7 fix 9: an empty entry is "nothing on the record" only when its feeds answered.
+  if (!bits.length) return fill(sec, `<p class="wk-note">${served ? "Nothing is on the record for this week yet." : "This week’s figures are not served right now."}</p>`);
   fill(sec, `<p class="wk-small">${bits.join(" · ")}.</p>`);
   const last = since && since.to ? since.to.date : today;
   setMargin(sec, last);
@@ -280,7 +291,7 @@ function renderTestimony(fieldNotes) {
   fill(sec, `<p class="wk-note" data-src="api_field_notes.entries[].has_matthew_response">${esc(t.text)}</p>`);
 }
 
-function renderNext({ cad, pending, episodes, docket, journey, names, today, clock }) {
+function renderNext({ cad, pending, episodes, docket, journey, names, today, clock, served = true }) {
   const sec = document.getElementById("wk-next");
   const lines = [];
   const wu = nextWriteUpLine(cad, pending);
@@ -294,7 +305,7 @@ function renderNext({ cad, pending, episodes, docket, journey, names, today, clo
   const nw = w.day;
   if (w.text) before.push(w.text.replace(dayInWords(w.day), `<time datetime="${esc(w.day)}" data-src="api_journey.journey.last_weighin_date">${esc(dayInWords(w.day))}</time>`));
   if (before.length) lines.push(`<p class="wk-small">Before then: ${before.join(", and ")}.</p>`);
-  if (!lines.length) return fill(sec, '<p class="wk-note">Nothing is scheduled.</p>');
+  if (!lines.length) return fill(sec, `<p class="wk-note">${served ? "Nothing is scheduled." : "What comes next is not served right now."}</p>`);
   fill(sec, lines.join(""));
   const c = cad && cad.chronicle;
   const nd = (pending && pending.expected_date) || (c && !c.paused && c.next_date) || nw;
@@ -338,9 +349,9 @@ async function main() {
   const clock = (pulse && pulse.pulse && pulse.pulse.date) || through || "";
   renderLatest(instalments, all, served);
   renderPreviously(instalments, prologue, all, served);
-  renderSoFar({ latest: instalments[0], weights: weightsJson && weightsJson.weight_progress, training, sleep, pulse, today });
+  renderSoFar({ latest: instalments[0], weights: weightsJson && weightsJson.weight_progress, training, sleep, pulse, today, served: Boolean(weightsJson && training && sleep && pulse) });
   renderTestimony(fieldNotes);
-  renderNext({ cad, pending: postsJson && postsJson.pending, episodes, docket, journey, names: coachNames(coaches), today, clock });
+  renderNext({ cad, pending: postsJson && postsJson.pending, episodes, docket, journey, names: coachNames(coaches), today, clock, served: Boolean(cad && docket && journey) });
 }
 
 if (typeof document !== "undefined" && document.getElementById("wk-latest")) {

@@ -3,7 +3,7 @@
 //
 // The fixtures are the WIRE: reduced copies of /api/predictions (by_coach + the
 // coach_id/coach_name/retired/pre_registered fields of its rows) and /api/coaches as
-// served 2026-09-26 16:46Z. The two Dr. Sarah Chen rows are the cycle-17 pre-registration
+// served 2026-09-26 16:46Z. The two Sarah Chen rows are the cycle-17 pre-registration
 // sealed at 2026-09-06T02:13:38Z, before #3520's cast guard — they stay on the record.
 import "./support/loader.mjs";
 import test from "node:test";
@@ -17,18 +17,18 @@ const BY_COACH = {
   physical: bc(51, 7, 452, 31), glucose: bc(47, 4, 398, 22), labs: bc(53, 3, 324, 18), explorer: bc(39, 3, 354, 19),
 };
 const NAMES = {
-  sleep: "Dr. Lisa Park", physical: "Dr. Max Reyes", glucose: "Dr. Amara Patel", explorer: "Dr. Henning Brandt",
-  nutrition: "Dr. Marcus Webb", mind: "Dr. Nathan Reeves", labs: "Dr. James Okafor", training: "Dr. Sarah Chen",
+  sleep: "Lisa Park", physical: "Max Reyes", glucose: "Amara Patel", explorer: "Henning Brandt",
+  nutrition: "Marcus Webb", mind: "Nathan Reeves", labs: "James Okafor", training: "Sarah Chen",
 };
 const PREDICTIONS = Object.keys(NAMES)
   .filter((c) => c !== "training")
   .map((c) => ({ coach_id: c, coach_name: NAMES[c], retired: false, pre_registered: true }))
   .concat([
-    { coach_id: "training", coach_name: "Dr. Sarah Chen", retired: true, pre_registered: true, pre_registered_at: "2026-09-06T02:13:38.690141+00:00", metric: "steps" },
-    { coach_id: "training", coach_name: "Dr. Sarah Chen", retired: true, pre_registered: true, pre_registered_at: "2026-09-06T02:13:38.690141+00:00", metric: "resting_heart_rate" },
+    { coach_id: "training", coach_name: "Sarah Chen", retired: true, pre_registered: true, pre_registered_at: "2026-09-06T02:13:38.690141+00:00", metric: "steps" },
+    { coach_id: "training", coach_name: "Sarah Chen", retired: true, pre_registered: true, pre_registered_at: "2026-09-06T02:13:38.690141+00:00", metric: "resting_heart_rate" },
   ]);
 const DATA = { by_coach: BY_COACH, predictions: PREDICTIONS };
-const API_COACHES = ["Dr. Eli Marsh", "Dr. Lisa Park", "Dr. Marcus Webb", "Dr. Nathan Reeves", "Dr. Max Reyes", "Dr. Amara Patel", "Dr. James Okafor", "Dr. Henning Brandt"];
+const API_COACHES = ["Eli Marsh", "Lisa Park", "Marcus Webb", "Nathan Reeves", "Max Reyes", "Amara Patel", "James Okafor", "Henning Brandt"];
 
 test("the retired flag on the served rows puts the training seat in its own group", () => {
   assert.deepEqual([...retiredSeats(DATA)], ["training"]);
@@ -55,7 +55,7 @@ test("guard: the untagged scorecard names are /api/coaches' names (minus the lea
   const roster = new Set(API_COACHES);
   for (const n of untagged) assert.ok(roster.has(n), `${n} is on the scorecard untagged but not on /api/coaches`);
   const missing = API_COACHES.filter((n) => !untagged.has(n));
-  assert.deepEqual(missing, ["Dr. Eli Marsh"]);
+  assert.deepEqual(missing, ["Eli Marsh"]);
   for (const c of scorecardSeats(DATA).retired) assert.ok(!roster.has(NAMES[c]));
 });
 

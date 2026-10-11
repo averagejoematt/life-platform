@@ -41,17 +41,17 @@ WORKER_FUNCTION = os.environ.get("TELEGRAM_WORKER_FUNCTION", "telegram-coach-wor
 # routing would let phrasing redirect a question to a persona whose fact block was
 # never built for it — the #2343 shape. Keys match setup_telegram_bots.py's roster.
 ROUTING = {
-    "headcoach": "headcoach",  # Dr. Eli Marsh — the lead's own line (v2 roster)
+    "headcoach": "headcoach",  # Eli Marsh — the lead's own line (v2 roster)
     "nutrition": "nutrition",
     "sleep": "sleep",
     "mind": "mind",
     "physical": "physical",
     "explorer": "explorer",
-    "pattern": "pattern",  # Dr. Nora Vale (chat tier, v2 roster)
+    "pattern": "pattern",  # Nora Vale (chat tier, v2 roster)
     "career": "career",  # Steve Brooks (chat tier, v2 roster)
     "board": "board",
     "glucose": "glucose",  # deliberately uncreated bot, addable later — see ROUTE_GAPS
-    "labs": "labs",  # Dr. Okafor — granted a bot by ADR-153's 2026-08-12 amendment
+    "labs": "labs",  # Okafor — granted a bot by ADR-153's 2026-08-12 amendment
 }
 
 # #2677: "training" WAS a key here and is deliberately gone.

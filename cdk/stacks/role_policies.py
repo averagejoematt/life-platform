@@ -95,6 +95,7 @@ from stacks.role_policies_email import (  # noqa: F401  (re-export)
     email_daily_debrief,
     email_elena_state_updater,
     email_evening_nudge,
+    email_habit_skip_review,
     email_milestone_digest,
     email_monday_compass,
     email_monthly_digest,

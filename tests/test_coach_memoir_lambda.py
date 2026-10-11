@@ -258,7 +258,7 @@ def test_generate_prompt_carries_only_real_facts_no_invented_numbers(monkeypatch
     )
     stub_bundled_module(monkeypatch, "ai.bedrock_client", fake_bedrock)
 
-    persona = {"name": "Dr. Lisa Park", "board_role": "Sleep Science"}
+    persona = {"name": "Lisa Park", "board_role": "Sleep Science"}
     text, reasons = writer._generate_memoir(persona, "{}", "", facts, "2026-Q3")
 
     assert reasons == []
@@ -285,7 +285,7 @@ def test_generate_retries_once_then_drops_on_persistent_gate_failure(monkeypatch
     )
     stub_bundled_module(monkeypatch, "ai.bedrock_client", fake_bedrock)
 
-    persona = {"name": "Dr. Lisa Park", "board_role": "Sleep Science"}
+    persona = {"name": "Lisa Park", "board_role": "Sleep Science"}
     text, reasons = writer._generate_memoir(persona, "{}", "", facts, "2026-Q3")
 
     assert text is None  # fail-closed: never publish a memoir that dodges its own record

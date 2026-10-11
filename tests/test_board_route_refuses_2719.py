@@ -208,7 +208,7 @@ def test_a_registry_outage_still_falls_through_to_the_old_behaviour(monkeypatch)
 def test_a_retired_seat_still_refuses_with_its_own_reason(monkeypatch):
     """The ADR-153 guard is untouched — retired and absent stay distinguishable."""
     reg = dict(PERSONAS)
-    reg["training_coach"] = {"retired": True, "name": "Dr. Sarah Chen"}
+    reg["training_coach"] = {"retired": True, "name": "Sarah Chen"}
     monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: reg)
     assert worker.lambda_handler(_order("training"), None) == {"ok": True, "reason": "route_retired"}
 

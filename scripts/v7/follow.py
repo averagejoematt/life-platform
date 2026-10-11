@@ -58,6 +58,13 @@ def _entry(anchor: str, heading: str, inner: str, margin: str = "") -> str:
     )
 
 
+# The JS-off sentence (R7 fix 9): the form and the dated lines need scripts; the address does not.
+_NOSCRIPT = (
+    '    <noscript><p class="fo-note">The dated lines on this page are drawn from the site’s served data when scripts run, '
+    "and the form needs them too. With scripts off, the address below still works.</p></noscript>\n"
+)
+
+
 def _static_margin(d: str, mo: str, w: str) -> str:
     return f'<span class="d">{d}</span><span class="mo">{mo}</span><span class="w">{w}</span>'
 
@@ -111,9 +118,12 @@ def body(base: str) -> str:
         (
             "    <h1>Follow the experiment.</h1>\n"
             f'    <p class="fo-promise" data-src="subscriber_cadence.{{signal_weekday,chronicle_weekday}}">{lead}</p>\n'
+            # R7 fix 10: one dated served fact in the fold — the next write-up's day, under the promise
+            # (below the form it sat behind the bottom bar at 390×844).
+            '    <p class="fo-count fo-fold-next fo-pending" id="fo-fold-next" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>\n'
             f'    <p class="fo-small fo-terms" data-src="subscriber_cadence.{{chronicle_autopublish_weekday,weekly_count_word}}">{rest}</p>\n'
             '    <details class="fo-fold"><summary>The exact terms</summary>'
-            f'<p class="fo-note" data-src="subscriber_cadence.promise_sentence">{exact}</p></details>\n'
+            f'<p class="fo-note" data-src="subscriber_cadence.promise_sentence">{exact}</p></details>\n' + _NOSCRIPT
         )
         + _entry("fo-form", "By email", _form(base), _static_margin("§", "by", "email"))
         + _entry(

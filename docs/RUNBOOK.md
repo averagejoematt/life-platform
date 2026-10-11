@@ -2,10 +2,10 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-10-01 (v8.6.0 — 86 MCP tools, 67-module package, 106 Lambdas, 20 data sources)
+Last updated: 2026-10-11 (v8.6.0 — 87 MCP tools, 68-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
-- Lambda functions defined (CDK): 106 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
+- Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
 - Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
 - Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
@@ -322,6 +322,43 @@ aws sqs start-message-move-task \
   --source-arn arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq --region us-west-2
 ```
 Fix the root cause FIRST — redriving into a still-broken Lambda just round-trips the messages.
+
+---
+
+## S3 bucket notifications (ingestion triggers outside CDK)
+
+Four functions start from an S3 event notification on `matthew-life-platform`. The notifications are ONE bucket-level document that CDK does not own; `cdk/stacks/` only grants `s3.amazonaws.com` permission to invoke the functions. A dropped notification shows up nowhere except as eventual staleness of the source (#4643).
+
+| Notification Id | Function | Filter |
+|---|---|---|
+| `MacroFactorCSVIngest` | `macrofactor-data-ingestion` | prefix `uploads/macrofactor/`, suffix `.csv` |
+| `InboundEmailInsightParser` | `insight-email-parser` | prefix `raw/inbound_email/` |
+| `FoodDeliveryCSVIngest` | `food-delivery-ingestion` | prefix `imports/food_delivery/`, suffix `.csv` |
+| `MeasurementsCSVIngest` | `measurements-ingestion` | prefix `imports/measurements/` |
+
+All four fire on `s3:ObjectCreated:*`. The authoritative list is `EXPECTED_NOTIFICATIONS` in `deploy/check_bucket_notification_drift.py`; this table restates it.
+
+**Check (read-only, run any time):**
+
+```bash
+python3 deploy/check_bucket_notification_drift.py --strict   # exit 1 on drift or a read error
+```
+
+It makes one `s3:GetBucketNotification` call and reports `missing`, `unexpected`, `changed` and any non-Lambda configuration. It also runs nightly, blocking, in `.github/workflows/config-drift.yml` (the ownership/bucket-policy drift step) under `github-actions-deploy-role`, whose `S3BucketNotificationRead` grant was applied 2026-10-11 (`infra/iam/README.md`).
+
+**Repair (owner, attended — this is an AWS write):** `put-bucket-notification-configuration` REPLACES the whole document, so never put a single entry. Read the full live document, edit it, and put the whole thing back:
+
+```bash
+aws s3api get-bucket-notification-configuration --bucket matthew-life-platform > /tmp/notif.json
+# edit /tmp/notif.json so it matches EXPECTED_NOTIFICATIONS — keep the other entries
+aws s3api put-bucket-notification-configuration --bucket matthew-life-platform \
+  --notification-configuration file:///tmp/notif.json
+python3 deploy/check_bucket_notification_drift.py --strict   # must print `clean`
+```
+
+S3 validates each destination when the document is put: a function whose resource policy has no `s3.amazonaws.com` invoke grant fails the whole call. Three of the grants are CDK-owned (`S3InvokeMacrofactor`, `S3InvokeFoodDelivery`, `S3InvokeMeasurements` in `cdk/stacks/ingestion_stack.py`). The `insight-email-parser` grant (`AllowS3InvokeRefresh`, read 2026-10-10) is also outside CDK: its stack declares only the SES grant.
+
+To add or remove a trigger, change `EXPECTED_NOTIFICATIONS` and this table in the same PR, then apply the document change above after the merge.
 
 ---
 
@@ -776,6 +813,18 @@ Then watch the alarm `life-platform-garmin-data-ingestion-errors` return to OK w
 
 ### Eight Sleep: JWT auth failure
 Eight Sleep uses username/password → JWT (no OAuth). If the JWT refresh fails, the function will write to the DLQ. Check logs for the specific error. Resolution may require re-entering credentials in Secrets Manager if the account password changed.
+
+### Notion journal: no full re-sync yet, and how the reconcile decides (#4631)
+
+**No full re-sync of the journal (`{"full_sync": true}`, or a wide `start`/`end` backfill) until the #4631 fixes are merged, deployed and proven** — proven means the first production run that re-fetches an old-dated page has logged its reconcile decision with the row count unchanged. The legacy-key migration runs only after that, with the journal row count and the enriched-row count recorded before and after (counts only). Before the fix, a re-sync would have stripped the enrichment from every entry it re-keyed and could have deleted same-day entries outright; DynamoDB holds the only processed copy of most of them.
+
+How `notion-journal-ingestion` treats the multi-per-day templates (`MULTI_PER_DAY` in `lambdas/ingestion/notion_lambda.py`):
+
+- A run that reaches a date with one page in hand (an old page edited today, a page created today and dated back) writes that page and **leaves the date's other rows alone**. Holding one page of a date is not a view of the whole date.
+- A stored row is removed in two cases only: the same Notion page was just written under its stable key and its `enriched_*`/`defense_*` fields were read and carried across first; or a whole-date re-query of Notion no longer returns the row's page. A failed or inconsistent re-query, an unreadable row, or a row with no `notion_page_id` removes nothing.
+- Each `(date, template)` the run touches logs one line, counts only — no key, page id or text:
+  `[E-6] reconcile decision date=… template=… outcome=done rows_before=N written=W rekeyed_removed=R vendor_absent_removed=A kept_unwritten=K requery=… rows_after=M`.
+  `rows_after = rows_before + (new pages) − A`; a re-key leaves the count unchanged. Find them with `filter @message like /reconcile decision/` on `/aws/lambda/notion-journal-ingestion`.
 
 ### MacroFactor: Function not triggered
 Ensure your export CSV is dropped into the correct S3 path: `s3://matthew-life-platform/uploads/macrofactor/`. The filename does not matter but the prefix does. The primary path is Dropbox poll → S3 → `macrofactor-data-ingestion` (S3 trigger).

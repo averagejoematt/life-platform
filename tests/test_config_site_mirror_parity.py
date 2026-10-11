@@ -7,7 +7,7 @@ guard — nothing at all tying the two repo files together.
 
 That is not a hypothetical. Measured live 2026-08-03: the bucket-root
 `config/challenges_catalog.json` was a pre-#1904 remap onto *retired* personas
-(`Dr. Lena Johansson` ×24, `Coach Maya Rodriguez` ×10, `Dr. Kai Nakamura` ×8 …),
+(`Dr. Lena Johansson` ×24, `Coach Maya Rodriguez` ×10, `Kai Nakamura` ×8 …),
 while `site/config/challenges_catalog.json` carried the roster-clean 2026-08-01
 fix. `/api/challenges` and `/api/challenge_catalog` served the same 82
 challenges attributed to two different casts, and every gate was green:

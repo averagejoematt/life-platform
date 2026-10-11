@@ -186,7 +186,9 @@ class TestEvaluateAllEndToEnd:
         }
         writes = []
         monkeypatch.setattr(ev, "_get_ewma_trend", lambda m, d, t, p=False: trend)
-        monkeypatch.setattr(ev, "_update_prediction_status", lambda p, e: writes.append(("status", e["status"])))
+        monkeypatch.setattr(
+            ev, "_update_prediction_status", lambda p, e, b=None: writes.append(("status", e["status"]))
+        )  # #4585: + the baseline stamp
         monkeypatch.setattr(ev, "_update_bayesian_confidence", lambda c, s, u: writes.append(("bayes", u)))
         monkeypatch.setattr(ev, "_write_learning_record", lambda c, t, e: writes.append(("learning", e["status"])))
         evaluations, stats = ev._evaluate_all([pred], "2026-07-08")

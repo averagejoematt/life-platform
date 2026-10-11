@@ -591,11 +591,12 @@ def test_sanitize_for_demo_masks_weight_values_in_both_rendered_precisions():
 
 
 def test_sanitize_for_demo_masks_calories_and_protein():
-    html = "<p>2100 kcal / 190g protein (target 2200)</p>"
+    # #4540: the calorie target a brief renders is the plan's, so that is the figure masked.
+    html = f"<p>2100 kcal / 190g protein (target {ow.PLAN_DAILY_CALORIES_TARGET})</p>"
     data = {"macrofactor": {"total_calories_kcal": 2100, "total_protein_g": 190}}
     profile = {"demo_mode_rules": {"replace_values": {"calories": "[cal]", "protein": "[pro]"}}, "calorie_target": 2200}
     out = ow.sanitize_for_demo(html, data, profile)
-    assert "2100" not in out and "2200" not in out and "190" not in out
+    assert "2100" not in out and str(ow.PLAN_DAILY_CALORIES_TARGET) not in out and "190" not in out
     assert "[cal]" in out and "[pro]" in out
 
 

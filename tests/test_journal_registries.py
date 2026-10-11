@@ -199,7 +199,7 @@ class TestStringShapeTolerance:
     not the v2 dict sketch — both vintages must aggregate."""
 
     def test_string_entities(self):
-        dated = [("2026-07-01", _entry("2026-07-01", enriched_entities=["Britt", "britt", "Dr. Chen"]))]
+        dated = [("2026-07-01", _entry("2026-07-01", enriched_entities=["Britt", "britt", "Chen"]))]
         reg = jal.build_entity_registry(dated)
         assert len(reg) == 2
         assert reg[0]["name"] == "Britt" and reg[0]["mentions"] == 2

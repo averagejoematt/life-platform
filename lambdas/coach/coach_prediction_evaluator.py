@@ -110,7 +110,7 @@ EWMA_DECAY = 0.87
 # + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
-from coach import commitment_grading  # noqa: E402  (#3553 — the follow-through ledger's semantics + its dead-man)
+from coach import coach_baseline, commitment_grading, prediction_count_grader  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts)
 from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observation floor + the provisional-grade rules, reasoned out there
     EWMA_MIN_OBSERVATIONS,
     EWMA_MIN_PRIOR_POINTS,
@@ -798,7 +798,7 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
 # =============================================================================
 
 
-def _update_prediction_status(prediction, evaluation):
+def _update_prediction_status(prediction, evaluation, baseline=None):
     """Update a prediction record with its evaluation outcome."""
     try:
         pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
@@ -817,6 +817,7 @@ def _update_prediction_status(prediction, evaluation):
                 ":notes": outcome_notes,
             },
         )
+        coach_baseline.write_stamp(table, pk, sk, baseline)
         logger.info("Updated prediction %s -> %s", evaluation.get("prediction_id", "?"), evaluation["status"])
     except Exception as e:
         logger.error("Failed to update prediction %s: %s", evaluation.get("prediction_id", "?"), e)
@@ -961,6 +962,9 @@ def _write_learning_record(coach_id, today_str, evaluation):
 # =============================================================================
 
 
+_BASELINE_IO = (_get_source_data, _extract_metric_series, DIRECTIONAL_NOISE_THRESHOLD)  # #4585: the rule reads the grader's own data path
+
+
 def _evaluate_all(predictions, today_str):
     """
     Evaluate all pending predictions.
@@ -1017,15 +1021,16 @@ def _evaluate_all(predictions, today_str):
             continue  # Window hasn't elapsed yet
 
         # Route to appropriate evaluator
-        result = None
         try:
-            if eval_type == "machine":
+            # #4541: a count claim ("at least K of N days >= X") is COUNTED, or held ungraded — never routed to slope below.
+            result = prediction_count_grader.grade(pred, eval_spec, data_cache, today_str, _get_source_data, _extract_metric_series)
+            if result is None and eval_type == "machine":
                 result = _evaluate_machine(pred, eval_spec, data_cache, today_str)
-            elif eval_type in ("directional", "point"):  # #3551: point rides the same branch
+            elif result is None and eval_type in ("directional", "point"):  # #3551: point rides the same branch
                 result = (_evaluate_point if eval_type == "point" else _evaluate_directional)(pred, eval_spec, data_cache, today_str)
-            elif eval_type == "conditional":
+            elif result is None and eval_type == "conditional":
                 result = _evaluate_conditional(pred, eval_spec, data_cache, today_str)
-            else:
+            elif result is None:
                 logger.info("Skipping unsupported evaluation type: %s", eval_type)
                 stats["skipped_error"] += 1
                 continue
@@ -1071,10 +1076,10 @@ def _evaluate_all(predictions, today_str):
             "prediction_id": prediction_id,
             "coach_id": coach_id,
             "subdomain": subdomain,
-            "evaluation_type": eval_type,
-            "metric": eval_spec.get("metric", ""),
-            "threshold": eval_spec.get("threshold"),
-            "condition": eval_spec.get("condition", ""),
+            "evaluation_type": result.get("evaluation_type", eval_type),  # #4541: "count" when the count rule graded it
+            "metric": result.get("metric", eval_spec.get("metric", "")),
+            "threshold": result.get("threshold", eval_spec.get("threshold")),
+            "condition": result.get("condition", eval_spec.get("condition", "")),
             "actual_value": result.get("actual_value"),
             "status": status,
             "beats_null": result.get("beats_null", False),
@@ -1089,7 +1094,8 @@ def _evaluate_all(predictions, today_str):
         evaluations.append(evaluation)
 
         # Write status update to prediction record
-        _update_prediction_status(pred, evaluation)
+        _bl = coach_baseline.stamp_at_grading(pred, result.get("rule_spec", eval_spec), result, status, data_cache, *_BASELINE_IO)  # #4585
+        _update_prediction_status(pred, evaluation, _bl)
 
         # Update Bayesian confidence if applicable
         if bayesian_update and coach_id and subdomain:

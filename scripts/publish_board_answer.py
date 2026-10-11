@@ -22,7 +22,7 @@ Usage:
 
   # publish a multi-voice board answer (the personas, like /api/board_ask)
   python3 scripts/publish_board_answer.py --answer <id> \
-      --responses '[{"name":"Dr. Elena Vasquez","text":"..."},{"name":"Dr. James Okafor","text":"..."}]'
+      --responses '[{"name":"Elena Vasquez","text":"..."},{"name":"James Okafor","text":"..."}]'
 
 After publishing, sync the site (the feed is static) is NOT required — the feed is
 read live from S3 via CloudFront — but run an invalidation if you want it instant:

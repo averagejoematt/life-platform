@@ -31,7 +31,7 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -498,8 +498,8 @@ def build_user_message(data):
         "food_frequency": patterns,
         "weight_trend": weight,
         "profile_targets": {
-            "calorie_target": data["profile"].get("calorie_target", 1800),
-            "protein_target_g": data["profile"].get("protein_target_g", 190),
+            "calorie_target": PLAN_DAILY_CALORIES_TARGET,
+            "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
             "eating_window": "11am-7pm (16:8 IF)",
         },
@@ -510,8 +510,8 @@ def build_user_message(data):
 def build_system_prompt(profile, withings_data):
     """Render the system prompt with dynamic weight context."""
     weight_ctx = build_weight_context(withings_data, profile)
-    cal = profile.get("calorie_target", 1800)
-    pro = profile.get("protein_target_g", 190)
+    cal = PLAN_DAILY_CALORIES_TARGET
+    pro = PLAN_DAILY_PROTEIN_MIN_G
     return SYSTEM_PROMPT.format(
         weight_context=weight_ctx,
         calorie_target=cal,

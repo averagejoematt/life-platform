@@ -135,7 +135,7 @@ GET_INTELLIGENCE_QUALITY_DESCRIPTION = (
     "'intelligence validation results', 'which flags get overridden most', 'false positive rate by signal'."
 )
 
-GET_COACH_THREAD_DESCRIPTION = "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'"
+GET_COACH_THREAD_DESCRIPTION = "Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?'"
 
 GET_PREDICTIONS_DESCRIPTION = "Cross-coach prediction ledger — all predictions from all coaches with statuses. Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. #726: reads the canonical COACH#/PREDICTION# store (evaluator-graded, code-stamped IDs per #725 — the SAME store the public site serves); the legacy SOURCE#coach_thread# embedded predictions were tombstoned. #3712: also folds in the weekly TRAINING PRESCRIPTION's graded forecasts (claimant='prescription', coach_id=null, so a coach filter excludes them and no coach hit-rate can absorb them) — each carries its 80% interval and the n of weeks it was fitted on, status pending/confirmed/refuted/inconclusive, or 'declined' when there was too little history to forecast at all (a result, never a bet). For hit-rate + calibration analysis, use get_coach_track_record; for the prescription's own coverage verdict use get_benchmark(view='forecast')."
 

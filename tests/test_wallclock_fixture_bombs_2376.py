@@ -84,6 +84,12 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
         "The two datetime.now() reads are DELIBERATE dated-row expiries (FIRST_DUE past its window, an ON_DEMAND "
         "row past 365 days) — the #3506 re-attest pattern, designed to red on the day the row goes stale"
     ),
+    "test_coach_moves_4583.py": (
+        "TODAY is INJECTED everywhere it matters: build_sheet(inputs, TODAY), check_line(today=TODAY) and "
+        "coach_moves.run(today=TODAY, inputs=..., allow=...) — run reads no clock when today and inputs are passed "
+        "(read_inputs, the only datetime.now(), is never called). The dashboard test serves the stored row through "
+        "latest_served, which compares no date to the clock; budget_guard is patched to tier 0"
+    ),
     "test_quiet_behavioral_notice_2326.py": (
         "every scan_quiet_behavioral_sources call receives _TODAY explicitly as an "
         "argument — the module under test takes today as a parameter and consults no "

@@ -4,6 +4,7 @@ wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 
 import json
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
@@ -78,6 +79,14 @@ def store_installment(
     USER_ID = _g["USER_ID"]
     logger = _g["logger"]
     try:
+        # #4191: the envelope's bracketed machine header is the model's wire format, never
+        # stored prose — the numbers travel as `stats_line` and the structured `stats` map.
+        from content import chronicle_schema
+
+        content_markdown = chronicle_schema.strip_stat_header(raw_markdown)
+        stats = {
+            k: (v if isinstance(v, int) else Decimal(v)) for k, v in chronicle_schema.stats_fields(stats_line).items()
+        }  # Decimal from the digits as written: boto3 rejects float
         item = {
             "pk": f"USER#{USER_ID}#SOURCE#chronicle",
             "sk": f"DATE#{date_str}",
@@ -87,7 +96,7 @@ def store_installment(
             "title": title,
             "subtitle": f"Week {week_num} of The Measured Life",
             "stats_line": stats_line,
-            "content_markdown": raw_markdown,
+            "content_markdown": content_markdown,
             "content_html": body_html,
             "word_count": len(raw_markdown.split()),
             "has_board_interview": has_board,
@@ -98,6 +107,8 @@ def store_installment(
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": status,
         }
+        if stats:
+            item["stats"] = stats
         if approval_token:
             item["approval_token"] = approval_token
         if draft_journal_post_html:
@@ -150,7 +161,7 @@ def store_installment(
 
             qa_archive.archive_text(
                 "chronicle",
-                raw_markdown,
+                content_markdown,  # #4191: the archive holds what was stored, header dropped
                 meta={"week_number": week_num, "title": title, "status": status, "date": date_str},
             )
         except Exception as qa_e:  # noqa: BLE001 — the archive is never load-bearing

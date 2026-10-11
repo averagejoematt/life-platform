@@ -54,7 +54,9 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("coach_narrative.state_update")
 
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -319,7 +321,8 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1, schema=N
     }
     if system:
         # #3085: this `cache_control` is a NO-OP and that is the measured decision, not an
-        # oversight — EXTRACTION_SYSTEM_PROMPT is 1,783 tok against Haiku 4.5's 4,096 floor.
+        # oversight — EXTRACTION_SYSTEM_PROMPT measures well under Haiku 4.5's 4,096 floor (the
+        # measured count lives in the register, CACHING_DECISIONS["coach-state-updater"], #4778).
         # It is left on deliberately (an ignored marker costs nothing, and it engages for free
         # if the prompt ever grows on its merits). See ai.prompt_cache.CACHING_DECISIONS.
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]

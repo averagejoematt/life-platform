@@ -15,7 +15,7 @@
   },
   "personas": {
     "sleep_coach": {
-      "name": "Dr. Lisa Park",
+      "name": "Lisa Park",
       "type": "both",
       "operational": true,
       "domain": "sleep_science",
@@ -40,7 +40,7 @@
       "reader_register": "hours and bedtimes in words; no stage percentage without its night"
     },
     "training_coach": {
-      "name": "Dr. Sarah Chen",
+      "name": "Sarah Chen",
       "type": "retired",
       "operational": false,
       "domain": "exercise_physiology",
@@ -56,11 +56,11 @@
       "tts_voice": "en-US-Chirp3-HD-Leda",
       "retired": true,
       "retired_date": "2026-08-10",
-      "retirement_note": "Retired at the cycle-13 genesis; the Performance seat (Dr. Max Reyes) absorbs training, cardio, and mobility. Published history under her byline stays attributed to her.",
+      "retirement_note": "Retired at the cycle-13 genesis; the Performance seat (Max Reyes) absorbs training, cardio, and mobility. Published history under her byline stays attributed to her.",
       "pronouns": "she/her"
     },
     "nutrition_coach": {
-      "name": "Dr. Marcus Webb",
+      "name": "Marcus Webb",
       "type": "both",
       "operational": true,
       "domain": "nutrition_science",
@@ -85,7 +85,7 @@
       "reader_register": "kitchen words — meals, grams, calories, days logged; verdict first, then the number with its day"
     },
     "mind_coach": {
-      "name": "Dr. Nathan Reeves",
+      "name": "Nathan Reeves",
       "type": "both",
       "operational": true,
       "domain": "behavioral_psychology",
@@ -110,7 +110,7 @@
       "reader_register": "one observation, one question he can answer tonight; no scores, no mechanism"
     },
     "physical_coach": {
-      "name": "Dr. Max Reyes",
+      "name": "Max Reyes",
       "type": "both",
       "operational": true,
       "domain": "performance_science",
@@ -135,7 +135,7 @@
       "reader_register": "sessions, steps, pounds; never a ratio"
     },
     "glucose_coach": {
-      "name": "Dr. Amara Patel",
+      "name": "Amara Patel",
       "type": "both",
       "operational": true,
       "domain": "metabolic_health",
@@ -156,7 +156,7 @@
       "reader_register": "blood sugar, meals, times of day"
     },
     "labs_coach": {
-      "name": "Dr. James Okafor",
+      "name": "James Okafor",
       "type": "both",
       "operational": true,
       "domain": "clinical_pathology",
@@ -178,7 +178,7 @@
       "reader_register": "last test date in words; the next only if booked"
     },
     "explorer_coach": {
-      "name": "Dr. Henning Brandt",
+      "name": "Henning Brandt",
       "type": "both",
       "operational": true,
       "domain": "biostatistics_n1_research",
@@ -203,7 +203,7 @@
       "reader_register": "what would confirm or refute, one sentence each; the n in words"
     },
     "pattern_coach": {
-      "name": "Dr. Nora Vale",
+      "name": "Nora Vale",
       "type": "chat",
       "operational": false,
       "chat": true,
@@ -296,7 +296,7 @@
       "board_role": "Behavioural Performance Coach"
     },
     "andrew_huberman": {
-      "name": "Dr. Kai Nakamura",
+      "name": "Kai Nakamura",
       "type": "board",
       "operational": false,
       "domain": "neuroscience",
@@ -307,7 +307,7 @@
       "board_role": "Neuroscience & Protocols"
     },
     "layne_norton": {
-      "name": "Dr. Marcus Webb",
+      "name": "Marcus Webb",
       "type": "board",
       "operational": false,
       "domain": "nutrition_science",
@@ -318,7 +318,7 @@
       "board_role": "Macros, Protein & Adherence"
     },
     "rhonda_patrick": {
-      "name": "Dr. Amara Patel",
+      "name": "Amara Patel",
       "type": "board",
       "operational": false,
       "domain": "micronutrients_genome",
@@ -329,7 +329,7 @@
       "board_role": "Micronutrients, Genome & Longevity"
     },
     "peter_attia": {
-      "name": "Dr. Victor Reyes",
+      "name": "Victor Reyes",
       "type": "board",
       "operational": false,
       "domain": "metabolic_health",
@@ -340,7 +340,7 @@
       "board_role": "Metabolic Health & Longevity"
     },
     "paul_conti": {
-      "name": "Dr. Nathan Reeves",
+      "name": "Nathan Reeves",
       "type": "board",
       "operational": false,
       "domain": "psychiatry",
@@ -351,7 +351,7 @@
       "board_role": "Psychiatrist — Self-Structure & Inner Work"
     },
     "vivek_murthy": {
-      "name": "Dr. Vivek Murthy",
+      "name": "Vivek Murthy",
       "type": "board",
       "operational": false,
       "domain": "social_connection",
@@ -362,7 +362,7 @@
       "board_role": "Former U.S. Surgeon General — Social Connection & Loneliness"
     },
     "iris_tanaka_interim": {
-      "name": "Dr. Iris Tanaka",
+      "name": "Iris Tanaka",
       "type": "board",
       "operational": false,
       "domain": "sports_medicine",
@@ -373,7 +373,7 @@
       "board_role": "Sports Medicine (interim)"
     },
     "eli_marsh": {
-      "name": "Dr. Eli Marsh",
+      "name": "Eli Marsh",
       "type": "meta",
       "operational": false,
       "lead": true,
@@ -409,11 +409,11 @@
       }
     },
     "cora_vance": {
-      "name": "Dr. Cora Vance",
+      "name": "Cora Vance",
       "type": "board",
       "operational": false,
       "domain": "reading",
-      "short_bio": "Reading Coach for the Mind pillar — periodizes reading the way Dr. Sarah Chen periodizes training. Builds a living curriculum from his data, journal and taste; logs a prediction and a hope per book; carries an auditable hit rate and recalibrates when she misses. The standing advocate that reading stays pleasure, not a KPI.",
+      "short_bio": "Reading Coach for the Mind pillar — periodizes reading the way Sarah Chen periodizes training. Builds a living curriculum from his data, journal and taste; logs a prediction and a hope per book; carries an auditable hit rate and recalibrates when she misses. The standing advocate that reading stays pleasure, not a KPI.",
       "emoji": "📖",
       "color": "#c2855b",
       "board_persona_key": "cora_vance",

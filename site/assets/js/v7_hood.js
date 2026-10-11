@@ -26,7 +26,7 @@
 // entry_age.js — the one spelling every v7 page uses. Every rendered figure carries a
 // data-src naming the served field it came from.
 import { countWord, dataThrough, dayInWords, dayLabel, loopReturnText } from "/assets/js/entry_age.js";
-import { lintPublic } from "/assets/js/v7_coaches.js";
+import { lintPublic, metricWords } from "/assets/js/v7_coaches.js";
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const num = (v) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -122,6 +122,27 @@ export function spellSymbols(s) {
     .replace(/\s*±\s*/g, " give or take ");
 }
 
+/** The engine's short metric labels, spelled through the coaches page's metricWords (R7 fix 8):
+ *  "deep would trend up" → "the share of deep sleep would trend up". Typography, like the two
+ *  symbols — the served string stays verbatim in the folded record. */
+const METRIC_LABELS = { deep: "deep_pct", rem: "rem_pct" };
+export function spellMetrics(s) {
+  return String(s || "").replace(/\b(deep|rem)\b(?! sleep)/gi, (m) => metricWords(METRIC_LABELS[m.toLowerCase()]));
+}
+
+/** A point call whose band is wider than the call itself ("46.0 g give or take 73.1") reads as a
+ *  broken number unless the page says what the band means (R7 fix 8). The gloss is arithmetic on
+ *  the two served figures and nothing else: the call plus the band is the most that would have
+ *  counted. "" when the band is narrower than the call, or the sentence is not a point call. */
+export function bandGloss(spelled) {
+  const m = /would come in at ([\d,]+(?:\.\d+)?)( [a-zA-Z]+)? give or take ([\d,]+(?:\.\d+)?)/.exec(String(spelled || ""));
+  if (!m) return "";
+  const call = Number(m[1].replace(/,/g, ""));
+  const band = Number(m[3].replace(/,/g, ""));
+  if (!Number.isFinite(call) || !Number.isFinite(band) || band <= call) return "";
+  return ` — a band wider than the call itself: anything up to ${(call + band).toFixed(1)}${m[2] || ""} would have counted`;
+}
+
 /** A served sentence is fit for the main screen when it carries no evaluator record and passes the
  *  coaches page's public lint (an ISO date, a percent sign, a device brand) once its symbols are spelled. */
 export function fitForScreen(s) {
@@ -137,12 +158,13 @@ export function correctionSentences(ob, names) {
   const number = String((ob && ob.number) || "").trim();
   const changed = String((ob && ob.what_changed) || "").trim();
   const verdict = String((ob && ob.verdict) || "refuted").trim();
-  const said = fitForScreen(believed) ? `${name}’s call, as the engine recorded it: ${spellSymbols(believed).replace(/\.$/, "")}.` : `${name} made a dated call; its wording is in the record below.`;
+  const spell = (t) => spellMetrics(spellSymbols(t));
+  const said = fitForScreen(believed) ? `${name}’s call, as the engine recorded it: ${spell(believed).replace(/\.$/, "")}${bandGloss(spell(believed))}.` : `${name} made a dated call; its wording is in the record below.`;
   let happened;
-  if (fitForScreen(number)) happened = `${cap(spellSymbols(number)).replace(/\.$/, "")}.`;
+  if (fitForScreen(number)) happened = `${cap(spell(number)).replace(/\.$/, "")}.`;
   else if (number) happened = "The measured value is in the record below.";
   else happened = "No measured value is on the card; the record below says how it was settled.";
-  const changedBody = fitForScreen(changed) ? `${spellSymbols(changed).replace(/\.$/, "")}.` : "The engine’s reason is in the record below.";
+  const changedBody = fitForScreen(changed) ? `${spell(changed).replace(/\.$/, "")}.` : "The engine’s reason is in the record below.";
   // The grading tail names the verdict once: when the reason already says "graded refuted", only the day is added.
   const graded = new RegExp(`graded ${verdict}`, "i").test(changedBody) ? "Graded" : `Graded ${verdict}`;
   const what = `${changedBody} ${graded} by code${when ? ` on ${when}` : ""}.`;
@@ -234,7 +256,7 @@ function cardHtml(ob, i, names) {
     `<article class="hd-card" data-src="api_wrong.obituaries[${i}]">` +
     `<p class="hd-said"><b>What we said.</b> ${esc(s.said)}</p>` +
     `<p class="hd-happened"><b>What happened.</b> ${esc(s.happened)}</p>` +
-    `<p class="hd-changed"><b>What we changed.</b> ${esc(s.changedBody)} ${tail}</p>` +
+    `<p class="hd-changed"><b>How it was graded.</b> ${esc(s.changedBody)} ${tail}</p>` +
     `<details class="hd-fold"><summary>The record, as served</summary>${recordTable(ob, names)}</details>` +
     `</article>`
   );

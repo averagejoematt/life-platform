@@ -34,7 +34,7 @@ from ai import ai_calls  # noqa: E402
 from common import pacific_time  # noqa: E402
 
 VOICE_SPEC = {
-    "display_name": "Dr. Sarah Chen",
+    "display_name": "Sarah Chen",
     "domain": "sleep",
     "few_shot_examples": [],
     "structural_voice_rules": {},

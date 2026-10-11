@@ -919,7 +919,7 @@ def is_sparsity_objection(finding):
 # ── #3199 (2026-08-26): a claim scoped to ACTIVE logging is not disproved by day arithmetic ─
 #
 # THE OBSERVED FAILURE. The very redeploy that carried #3198's fix was itself
-# auto-rolled-back by a second flake on /method/board/: coach Dr. Eli Marsh's copy
+# auto-rolled-back by a second flake on /method/board/: coach Eli Marsh's copy
 # states "active logging went silent across food, training, habits, and journal
 # since August 17th" — a claim scoped explicitly to the deliberately-logged,
 # opt-in categories (food/nutrition, training, habits, journal), as distinct from

@@ -237,7 +237,10 @@ BASELINE = {
     # headroom IS the defect this issue names, and recreating it would only move the same
     # wall one tool to the right. The addition after that pays the same way — `inputSchema`
     # is 1,335 physical lines of this file and no guard reads it either.
-    "mcp/registry.py": 2130,
+    # 2026-10-04 (#4584): 2130 -> 2124. log_owner_note's entry (+6) was paid by moving the two surface tools'
+    # input schemas beside their tools in mcp/tools_surfaces.py (18 logical lines out, 5 import lines in, so 13
+    # extracted); 2 of those (a fifth, #2610) are banked and the rest handed back. Measured 2122.
+    "mcp/registry.py": 2124,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict

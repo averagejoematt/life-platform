@@ -253,7 +253,7 @@ def markdown_to_html(md: str) -> str:
             i += 1
             continue
         # #2221: the blockquote marker is ">"; the space after it is optional in
-        # markdown. Requiring "> " rendered a Board interview written as ">Dr. Park
+        # markdown. Requiring "> " rendered a Board interview written as ">Park
         # said..." as a paragraph with a stray ">" on the public journal page.
         if stripped.startswith(">"):
             buf = []

@@ -1229,6 +1229,13 @@ class TestGeneration:
         result = eng.generate_hypotheses([{"date": DAY}], [])
         assert result["hypotheses"][0]["hypothesis_id"] == "a"
 
+    def test_the_request_carries_the_hypotheses_schema(self, monkeypatch):
+        """#4276: the generation call is constrained to HYPOTHESES_SCHEMA (structured outputs)."""
+        fake = _anthropic('{"hypotheses": []}')
+        monkeypatch.setattr(retry_utils, "call_anthropic_raw", fake)
+        eng.generate_hypotheses([{"date": DAY}], [])
+        assert fake.calls[0]["output_config"]["format"]["schema"] == eng.HYPOTHESES_SCHEMA
+
     def test_unparseable_output_yields_nothing_rather_than_a_fabricated_hypothesis(self, monkeypatch):
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", _anthropic("I could not find any patterns."))
         assert eng.generate_hypotheses([{"date": DAY}], []) is None
@@ -1272,7 +1279,7 @@ class TestGeneration:
         eng.generate_hypotheses([{"date": DAY}], [], profile=None)
         assert f"started {EXPERIMENT_BASELINE_WEIGHT_LBS} lbs" in _prompt_of(fake.calls[0])
 
-    def test_a_real_profile_overrides_every_default_in_the_prompt(self, monkeypatch):
+    def test_a_real_profile_overrides_every_default_in_the_prompt_except_the_plan_targets(self, monkeypatch):
         fake = _anthropic('{"hypotheses": []}')
         monkeypatch.setattr(retry_utils, "call_anthropic_raw", fake)
         eng.generate_hypotheses(
@@ -1283,7 +1290,9 @@ class TestGeneration:
         prompt = _prompt_of(fake.calls[0])
         assert "started 340 lbs, goal 200 lbs" in prompt
         assert "140 lb weight loss" in prompt
-        assert "2000 cal/day, protein target: 210g/day" in prompt
+        # #4540: the nutrition targets are the plan's; the profile row's copies are not read.
+        assert f"{eng.PLAN_DAILY_CALORIES_TARGET} cal/day, protein target: {eng.PLAN_DAILY_PROTEIN_MIN_G}g/day" in prompt
+        assert "2000 cal/day" not in prompt and "210g/day" not in prompt
 
     def test_the_system_prompt_demands_a_pre_registered_machine_checkable_spec(self):
         assert "test_spec is MANDATORY" in eng.HYPOTHESIS_SYSTEM_PROMPT

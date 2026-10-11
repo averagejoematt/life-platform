@@ -200,11 +200,11 @@ def test_charter_points_the_boot_at_the_model():
 # concurrent edits like BASELINE_TOTAL_GATES and re-measure at merge, never by arithmetic.
 # Demote when: CLAUDE.md sits at or below the 3,500-token target for 30 days — the
 # ratchet becomes a flat cap and test 2 is deleted.
-CLAUDE_MD_TOKEN_CEILING = 7081  # 7081 (2026-10-01, fd20ad99f, 28,326 B). Target 3500 (#4271). Down-only.
+# 7081 (2026-10-01, fd20ad99f, 28,326 B) -> 3497 (2026-10-01, boxes 1-3 on 1b3177f8b, 13,990 B).
+CLAUDE_MD_TOKEN_CEILING = 3497  # Target 3500 (#4271) — met. Down-only.
 CLAUDE_MD_TOKEN_SLACK = 100  # ~400 B a PR may shrink by before it must lower the ceiling
-# Box 3 (the one-line status pointer) has not landed. Until it does, the status block
-# (`## Session status` to EOF) may not grow past its byte count at the BB wrap.
-STATUS_BLOCK_BYTE_CEILING = 2029  # 2029 (2026-10-01, fd20ad99f). Retired by box 3's one-line shape.
+# Box 3 landed: the status block is the convention paragraph plus ONE pointer line, which
+# `/wrap` step (b) rewrites in place (date only). Its pre-box-3 byte cap is retired.
 _STATUS_HEADING = "## Session status"
 _STATUS_POINTER = re.compile(r"^\*\*Status:\*\* see handovers/HANDOVER_LATEST\.md \(Verified \d{4}-\d{2}-\d{2}\)$")
 
@@ -250,19 +250,19 @@ def test_claude_md_token_ceiling_is_banked_after_a_shrink():
 
 
 def test_claude_md_status_block_holds_its_shape():
+    """The status block is the convention paragraph plus exactly one pointer line, last in
+    the file — the session narrative lives in handovers/HANDOVER_LATEST.md (#4271 box 3)."""
     block = _status_block(_claude_md_bytes())
     pointers = [ln for ln in block.splitlines() if ln.startswith("**Status:**")]
-    if pointers:
-        # Box 3 landed: the convention paragraph plus exactly one pointer line, nothing after.
-        last = block.rstrip("\n").splitlines()[-1]
-        assert len(pointers) == 1 and _STATUS_POINTER.match(
-            last
-        ), f"the status block must end in exactly one line matching {_STATUS_POINTER.pattern}; found {pointers!r}"
-        return
-    size = len(block.encode("utf-8"))
-    assert size <= STATUS_BLOCK_BYTE_CEILING, (
-        f"the CLAUDE.md status block is {size} B, over its {STATUS_BLOCK_BYTE_CEILING} B ceiling — "
-        "the wrap replaces it with a SHORTER paragraph (or box 3's one-line pointer), never a longer one (#4271)."
+    last = block.rstrip("\n").splitlines()[-1]
+    assert len(pointers) == 1 and _STATUS_POINTER.match(last), (
+        f"the CLAUDE.md status block must end in exactly one line matching {_STATUS_POINTER.pattern} — "
+        f"found {pointers!r}, last line {last[:120]!r}; `/wrap` (b) rewrites that line's date, never a paragraph (#4271)."
+    )
+    paragraphs = [p for p in block.split("\n\n") if p.strip()]
+    assert len(paragraphs) <= 3, (
+        f"the status block has {len(paragraphs)} paragraphs (heading + convention + pointer is the shape) — "
+        "a session paragraph crept back in; it belongs in handovers/HANDOVER_LATEST.md (#4271)."
     )
 
 

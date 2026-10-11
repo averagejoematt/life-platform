@@ -28,7 +28,15 @@
 #                                 UNVERIFIED and exits 0, so a creds-less leg would red every
 #                                 night and file a permanent tracker. Parked on #4262.
 #
-# Nothing is removed from wrap_gates.py by this file — that follow-up waits on PR #4390.
+# Since the #4262 follow-up, backlog-hygiene, unlinked-closures and merge-text-closures run
+# ONLY here: they left `scripts/wrap_gates.py`'s interactive battery for its NIGHTLY list,
+# which `tests/test_advisory_failure_issue.py` holds equal to this matrix in both directions.
+# handover-lines and residual-queue are legs here AND stay in the wrap's verify phase (at wrap
+# time they judge the handover the session just wrote).
+#
+# One tracker per check, never a pile: the action keys each tracker on its leg's slug, so a
+# leg that reds again while its tracker is still open COMMENTS on it rather than filing a
+# twin, and the leg's next green run closes it.
 #
 # THE DEGRADE RULE. Two of these checks can decline to look and still exit 0: a script that
 # prints UNVERIFIED, and check_backlog_hygiene.py's gh fail-open ("skipping (advisory)"). At

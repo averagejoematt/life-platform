@@ -547,16 +547,32 @@ def test_no_strength_records_reports_absence():
     assert m.ex_hevy([]) is None
 
 
+def _hevy_workout(date_str, wid, volume_lbs, title="Push"):
+    """One stored Hevy row = one workout (#4636): sk DATE#<d>#WORKOUT#<id>, set weights in kg.
+    One set of `volume_lbs` lb x 1 rep makes the session's tonnage exactly `volume_lbs`."""
+    return {
+        "pk": f"USER#{m.USER_ID}#SOURCE#hevy",
+        "sk": f"DATE#{date_str}#WORKOUT#{wid}",
+        "date": date_str,
+        "source_workout_id": wid,
+        "title": title,
+        "exercises": [{"name": "Bench Press (Barbell)", "sets": [{"type": "normal", "weight_kg": volume_lbs * 0.45359237, "reps": 1}]}],
+    }
+
+
 def test_strength_workouts_are_counted_across_every_day_in_the_window():
     recs = [
-        {"workouts": [{"title": "Push", "total_volume_lbs": 12000}, {"title": "Pull", "total_volume_lbs": 9000}]},
-        {"workouts": [{"title": "Legs", "total_volume_lbs": 15000}]},
+        _hevy_workout("2026-07-10", "a", 12000, "Push"),
+        _hevy_workout("2026-07-10", "b", 9000, "Pull"),
+        _hevy_workout("2026-07-11", "c", 15000, "Legs"),
     ]
     assert m.ex_hevy(recs)["workout_count"] == 3
 
 
-def test_a_day_record_with_no_workouts_contributes_nothing():
-    assert m.ex_hevy([{"workouts": []}, {}])["workout_count"] == 0
+def test_a_retired_per_day_row_contributes_nothing():
+    """#4636: a per-day `workouts` list is the retired shape (a tombstoned Hevy aggregate is the
+    same sessions again). With no per-workout row the month is ABSENT (None), not a 0-session month."""
+    assert m.ex_hevy([{"workouts": [{"title": "Push", "total_volume_lbs": 12000}]}, {}]) is None
 
 
 # FIXED #1658 (found as a tranche-3 xfail, P3): monthly_digest_lambda.ex_hevy (lines 217-224) builds a full per-workout list
@@ -564,8 +580,10 @@ def test_a_day_record_with_no_workouts_contributes_nothing():
 # that reports the number of sessions but not a pound of the volume behind them is the one number a lifter cares least about;
 # the work is already done and discarded.
 def test_the_monthly_strength_summary_reports_the_volume_it_computed():
-    recs = [{"workouts": [{"title": "Push", "total_volume_lbs": 12000}, {"title": "Pull", "total_volume_lbs": 9000}]}]
-    assert m.ex_hevy(recs)["total_volume_lbs"] == 21000  # 12000 + 9000
+    recs = [_hevy_workout("2026-07-10", "a", 12000, "Push"), _hevy_workout("2026-07-10", "b", 9000, "Pull")]
+    out = m.ex_hevy(recs)
+    assert out["total_volume_lbs"] == 21000  # 12000 + 9000
+    assert out["avg_volume_lbs"] == 10500
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -594,8 +612,10 @@ def test_nutrition_averages_are_the_mean_of_the_logged_days():
     assert s["days_logged"] == 3
 
 
-def test_hit_rates_are_the_share_of_days_that_met_the_target():
-    # module defaults: CALORIE_TARGET 1800, PROTEIN_TARGET_G 180.
+def test_hit_rates_are_the_share_of_days_that_met_the_target(monkeypatch):
+    # Pinned for the arithmetic below: CALORIE_TARGET 1800, PROTEIN_TARGET_G 180.
+    monkeypatch.setattr(m, "CALORIE_TARGET", 1800)
+    monkeypatch.setattr(m, "PROTEIN_TARGET_G", 180)
     # calories <= 1800 on 2 of 3 (1700, 1800); protein >= 180 on 2 of 3 (180, 200).
     recs = [_mf(1700, 180), _mf(1900, 200), _mf(1800, 170)]
     s = m.ex_macrofactor(recs)
@@ -603,12 +623,16 @@ def test_hit_rates_are_the_share_of_days_that_met_the_target():
     assert s["protein_hit_rate"] == 67  # round(2 / 3 * 100)
 
 
-def test_the_targets_come_from_the_profile_when_it_has_them():
-    recs = [_mf(1700, 180)]
-    s = m.ex_macrofactor(recs, {"calorie_target": 1600, "protein_target_g": 175})
-    assert (s["calorie_target"], s["protein_target"]) == (1600, 175)
-    assert s["calorie_hit_rate"] == 0  # 1700 > 1600
-    assert s["protein_hit_rate"] == 100  # 180 >= 175
+def test_the_targets_are_the_plans_whatever_the_profile_row_says():
+    """#4540: the profile row held 1,800 / 190 against a plan of 1,500 / 170."""
+    from common import constants
+
+    assert (m.CALORIE_TARGET, m.PROTEIN_TARGET_G) == (constants.PLAN_DAILY_CALORIES_TARGET, constants.PLAN_DAILY_PROTEIN_MIN_G)
+    recs = [_mf(m.CALORIE_TARGET + 100, m.PROTEIN_TARGET_G)]
+    s = m.ex_macrofactor(recs, {"calorie_target": 9999, "protein_target_g": 1})
+    assert (s["calorie_target"], s["protein_target"]) == (m.CALORIE_TARGET, m.PROTEIN_TARGET_G)
+    assert s["calorie_hit_rate"] == 0  # 100 over the plan's target
+    assert s["protein_hit_rate"] == 100  # at the plan's floor
 
 
 def test_missing_profile_targets_fall_back_to_the_module_defaults():
@@ -883,22 +907,18 @@ def test_the_year_elapsed_percentage_uses_the_real_length_of_the_year(monkeypatc
 BOARD = {
     "members": {
         "chen": {
-            "name": "Dr. Sarah Chen",
+            "name": "Sarah Chen",
             "active": True,
             "emoji": "🏋️",
             "voice": {"tone": "Precise, periodisation-first", "catchphrase": "Build the base."},
-            "features": {
-                "monthly_digest": {"section_header": "🏋️ DR. SARAH CHEN — MONTHLY TRAINING REVIEW", "prompt_focus": "Training arc."}
-            },
+            "features": {"monthly_digest": {"section_header": "🏋️ SARAH CHEN — MONTHLY TRAINING REVIEW", "prompt_focus": "Training arc."}},
         },
         "webb": {
-            "name": "Dr. Marcus Webb",
+            "name": "Marcus Webb",
             "active": True,
             "emoji": "🥗",
             "voice": {"tone": "Blunt and practical"},
-            "features": {
-                "monthly_digest": {"section_header": "🥗 DR. MARCUS WEBB — MONTHLY NUTRITION REVIEW", "prompt_focus": "Adherence."}
-            },
+            "features": {"monthly_digest": {"section_header": "🥗 MARCUS WEBB — MONTHLY NUTRITION REVIEW", "prompt_focus": "Adherence."}},
         },
     }
 }
@@ -913,7 +933,7 @@ def _with_board(monkeypatch, config):
 def test_the_board_prompt_names_every_configured_advisor(monkeypatch):
     _with_board(monkeypatch, BOARD)
     prompt = m._build_monthly_prompt_from_config()
-    assert "DR. SARAH CHEN" in prompt and "DR. MARCUS WEBB" in prompt
+    assert "SARAH CHEN" in prompt and "MARCUS WEBB" in prompt
 
 
 def test_the_board_prompt_carries_each_advisors_brief_and_voice(monkeypatch):
@@ -941,11 +961,11 @@ def test_an_inactive_advisor_is_left_off_the_monthly_board(monkeypatch):
     config["members"]["webb"]["active"] = False
     _with_board(monkeypatch, config)
     prompt = m._build_monthly_prompt_from_config()
-    assert "DR. SARAH CHEN" in prompt and "DR. MARCUS WEBB" not in prompt
+    assert "SARAH CHEN" in prompt and "MARCUS WEBB" not in prompt
 
 
 def test_a_board_with_nobody_assigned_to_this_email_falls_back(monkeypatch):
-    _with_board(monkeypatch, {"members": {"chen": {"name": "Dr. Sarah Chen", "active": True, "features": {"weekly_digest": {}}}}})
+    _with_board(monkeypatch, {"members": {"chen": {"name": "Sarah Chen", "active": True, "features": {"weekly_digest": {}}}}})
     assert m._build_monthly_prompt_from_config() is None
 
 
@@ -965,7 +985,7 @@ def test_an_advisor_with_no_configured_header_gets_one_derived_from_their_name(m
     config = {
         "members": {
             "okafor": {
-                "name": "Dr. James Okafor",
+                "name": "James Okafor",
                 "active": True,
                 "emoji": "🩺",
                 "features": {"monthly_digest": {"prompt_focus": "Trajectory."}},
@@ -974,13 +994,13 @@ def test_an_advisor_with_no_configured_header_gets_one_derived_from_their_name(m
     }
     _with_board(monkeypatch, config)
     prompt = m._build_monthly_prompt_from_config()
-    assert "🩺 DR. JAMES OKAFOR" in prompt
+    assert "🩺 JAMES OKAFOR" in prompt
     assert "Trajectory." in prompt
 
 
 def test_an_advisor_with_no_configured_brief_is_still_given_a_default_instruction(monkeypatch):
     config = {
-        "members": {"okafor": {"name": "Dr. James Okafor", "active": True, "features": {"monthly_digest": {"section_header": "🩺 OKAFOR"}}}}
+        "members": {"okafor": {"name": "James Okafor", "active": True, "features": {"monthly_digest": {"section_header": "🩺 OKAFOR"}}}}
     }
     _with_board(monkeypatch, config)
     assert "Provide your monthly analysis." in m._build_monthly_prompt_from_config()
@@ -1190,7 +1210,7 @@ def _seeded_table():
         _row_for("chronicling", "2026-07-10", total_score=72, group_scores={"sleep": 80, "food": 60}),
         _row_for("todoist", "2026-07-10", completed_count=6),
         _row_for("todoist", MON_CUR_END, completed_count=4),
-        _row_for("hevy", "2026-07-10", workouts=[{"title": "Push", "total_volume_lbs": 12000}]),
+        _hevy_workout("2026-07-10", "w1", 12000),
         _row_for("character_sheet", MON_CUR_END, character_level=14, character_xp=5000, character_tier="Momentum"),
         _strava_day([_act()], miles=2.0, secs=1800, elev=100, date_str="2026-07-10"),
         # prior arm
@@ -1210,6 +1230,7 @@ def test_gather_reads_both_arms_of_every_source(monkeypatch, frozen_monday):
     assert data["prior"]["whoop"]["days"] == 1
     assert data["cur"]["withings"]["weight_latest"] == 305.0
     assert data["prior"]["withings"]["weight_latest"] == 312.0
+    assert data["cur"]["hevy"]["workout_count"] == 1  # #4636: the per-workout row is counted
 
 
 def test_gather_carries_the_windows_it_read(monkeypatch, frozen_monday):
@@ -1343,9 +1364,9 @@ def test_each_extractor_runs_once_per_arm(monkeypatch, frozen_monday):
 # ══════════════════════════════════════════════════════════════════════════════
 
 COMMENTARY = (
-    "🏋️ DR. SARAH CHEN — MONTHLY TRAINING REVIEW\n"
+    "🏋️ SARAH CHEN — MONTHLY TRAINING REVIEW\n"
     "Volume climbed steadily through the month.\n"
-    "🥗 DR. MARCUS WEBB — MONTHLY NUTRITION REVIEW\n"
+    "🥗 MARCUS WEBB — MONTHLY NUTRITION REVIEW\n"
     "Protein adherence held.\n"
     "💡 INSIGHT OF THE MONTH\n"
     "Add one Zone 2 session per week."
@@ -1442,7 +1463,7 @@ def test_the_letter_is_headlined_with_the_month_and_the_comparison_month():
 
 def test_the_letter_carries_every_advisor_section_from_the_commentary():
     body = _text(_html())
-    assert "DR. SARAH CHEN" in body and "DR. MARCUS WEBB" in body
+    assert "SARAH CHEN" in body and "MARCUS WEBB" in body
     assert "Volume climbed steadily through the month." in body
 
 
@@ -1623,7 +1644,7 @@ def test_the_letter_renders_even_when_the_board_commentary_is_empty():
 # lacks the exact VS16 variation selector) has their header rendered as ordinary body prose — the section silently loses its
 # heading. The renderer must derive the header set from the same board config the prompt was built from.
 def test_an_advisor_added_to_the_board_still_gets_a_rendered_section_header():
-    commentary = "🧬 DR. HENNING BRANDT — MONTHLY RIGOR REVIEW\nThe n behind each claim held up.\n"
+    commentary = "🧬 HENNING BRANDT — MONTHLY RIGOR REVIEW\nThe n behind each claim held up.\n"
     d = _data()
     html = m.build_html(d, GOALS, commentary, d["windows"])
     # NB the original assertion could never pass for ANY advisor, built-in ones

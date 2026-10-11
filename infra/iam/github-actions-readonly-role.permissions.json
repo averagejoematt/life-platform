@@ -34,7 +34,8 @@
       "Action": [
         "s3:ListBucket",
         "s3:GetBucketLocation",
-        "s3:GetBucketPolicy"
+        "s3:GetBucketPolicy",
+        "s3:GetBucketNotification"
       ],
       "Resource": "arn:aws:s3:::matthew-life-platform"
     },

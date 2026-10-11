@@ -72,7 +72,6 @@ _TAIL_EDITS = (
     '"replace": "<the corrected sentence, or an empty string to delete it>"}]}. One edit per sentence you change. '
     "No other text."
 )
-_JSON_RE = re.compile(r"\{.*\}", re.S)
 
 
 def _banned_patterns() -> tuple:
@@ -176,15 +175,9 @@ def correction_note(report: Any, draft: Optional[str] = None, edits: bool = Fals
 
 def parse_edits(response: Any) -> Optional[list]:
     """The `{"edits": [...]}` list in a reply, or None when the reply is not an edit list."""
-    import json
+    from ai.structured_json import parse_json_span  # #4276: the span salvage lives in the one door
 
-    m = _JSON_RE.search(str(response or ""))
-    if not m:
-        return None
-    try:
-        obj = json.loads(m.group(0))
-    except (ValueError, TypeError):
-        return None
+    obj = parse_json_span(response, "{")
     raw = obj.get("edits") if isinstance(obj, dict) else None
     if not isinstance(raw, list):
         return None

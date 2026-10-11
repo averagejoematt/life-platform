@@ -115,7 +115,7 @@ def test_absence_clauses_never_license_deferring_the_admission(coach_id):
 
 
 def _rules() -> str:
-    return build_system_prompt("persona", "memory", "facts", "Dr. Lisa Park").lower()
+    return build_system_prompt("persona", "memory", "facts", "Lisa Park").lower()
 
 
 def test_shared_rules_ban_the_demonstrative_acknowledgement():
@@ -152,7 +152,7 @@ def test_template_rules_ride_in_the_volatile_tail_not_the_cached_prefix():
     re-bills the persona substrate."""
     from coach.coach_chat import build_system_blocks
 
-    blocks = build_system_blocks("persona", "memory", "facts", "Dr. Lisa Park")
+    blocks = build_system_blocks("persona", "memory", "facts", "Lisa Park")
     cached = [b for b in blocks if b.get("cache_control")]
     assert cached, "the stable prefix lost its cache_control"
     assert "never offer him a menu" not in cached[0]["text"].lower()

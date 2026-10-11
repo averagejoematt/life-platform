@@ -330,7 +330,7 @@ def test_self_refuted_spares_a_payload_dating_finding_that_ends_in_a_withdrawal_
 # "active logging/tracking … went silent".
 ACTIVE_VS_PASSIVE_PARAPHRASES = [
     # WIRE (#3199, /method/board/, 2026-08-25)
-    "Dr. Eli Marsh states 'active logging went silent across food, training, habits, and journal since "
+    "Eli Marsh states 'active logging went silent across food, training, habits, and journal since "
     "August 17th' — but August 17 is Day 1 of the current cycle, and today is Day 9 (2026-08-25). The phras",
     # PARAPHRASE 1 — no "active", no silence verb
     "The board copy reads 'no entries in food, training, habits or journal since August 17th'. August 17 "

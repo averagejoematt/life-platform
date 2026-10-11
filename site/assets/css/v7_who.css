@@ -60,15 +60,14 @@
   margin: 0 0 var(--sp-3);
 }
 
-/* ── the fold: the honest photo frame beside his paragraph ── */
+/* ── the fold: his paragraph ── */
 .who-fold-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--sp-4);
   align-items: start;
 }
-.who-photo { width: 116px; margin: 0; }
-.who-photo img, .who-shot img {
+.who-shot img {
   display: block;
   width: 100%;
   height: auto;
@@ -84,12 +83,12 @@
   color: var(--ink-muted);
   margin-top: var(--sp-1);
 }
-/* ── the photographs: three, dated, in order ── */
+/* ── the photographs: two, dated, in order ── */
 .who-shots {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
-  max-width: 600px;
+  max-width: 400px;
 }
 .who-shot { margin: 0; }
 .who-small:empty { display: none; }
@@ -175,5 +174,4 @@
 @media (min-width: 601px) {
   .v7 { --who-margin-w: 96px; }
   .who-m .w { display: block; }
-  .who-fold-grid { grid-template-columns: 116px 1fr; }
 }

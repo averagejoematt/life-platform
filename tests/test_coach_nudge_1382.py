@@ -255,7 +255,7 @@ def test_sdt_lint_passes_informational_skippable_copy():
 
 def test_phrasing_prompt_carries_sdt_rules_and_only_payload_facts():
     firing = eng.evaluate_nutrition_log_gap(_ctx())
-    system, user = eng.build_phrasing_prompt("Dr. Marcus Webb", firing)
+    system, user = eng.build_phrasing_prompt("Marcus Webb", firing)
     # The model is told it does NOT decide — phrasing only (ADR-105).
     assert "your ONLY job is to phrase it" in system
     assert "INFORMATION, never command" in system
@@ -391,7 +391,7 @@ def _wire(monkeypatch, fake, *, now_utc, tier=0, copy_text=None, gate_result="pa
     ses = _FakeSes()
     monkeypatch.setattr(shell, "_ses_ref", ses)
     monkeypatch.setattr(shell, "_lambda_ref", object())
-    monkeypatch.setattr(shell, "_coach_name", lambda cid: "Dr. Marcus Webb")
+    monkeypatch.setattr(shell, "_coach_name", lambda cid: "Marcus Webb")
     monkeypatch.setattr(budget_guard, "current_tier", lambda: tier)
     monkeypatch.setattr(coach_checkin, "_cycle_cache", {"value": 10, "read": True})
     # #3877: provenance no longer rides an injected `cycle` — the write site asks the

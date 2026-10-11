@@ -2,7 +2,7 @@
   "_comment": "Per-muscle weekly volume landmarks (MV/MEV/MAV/MRV) + per-session set bounds. Personal Board defaults — conservative, longevity-tilt, MEV-default. Edit by hand; consumed by routine_generator.py.",
   "_units": "sets per week (hard sets, RIR 0-3)",
   "_version": 1,
-  "_authors": "Personal Board (Dr. Sarah Chen, Dr. Henning Brandt, Dr. Iris Tanaka interim)",
+  "_authors": "Personal Board (Sarah Chen, Henning Brandt, Iris Tanaka interim)",
   "muscles": {
     "chest":       {"MV": 6,  "MEV": 8,  "MAV": 16, "MRV": 22, "MIN_PER_SESSION": 2, "MAX_PER_SESSION": 8},
     "back":        {"MV": 8,  "MEV": 10, "MAV": 20, "MRV": 26, "MIN_PER_SESSION": 3, "MAX_PER_SESSION": 10},

@@ -9,7 +9,7 @@ The single source of project instructions loaded into every session: architectur
 
 **2. The knowledge base — [`/docs/`](../docs/)**
 Designed so an agent can answer "why" without guessing:
-- **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…160). Reversible, dated, with context + consequences.
+- **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…161). Reversible, dated, with context + consequences.
 - **Reference** — `ARCHITECTURE.md`, `SCHEMA.md` (authoritative data model), `RUNBOOK.md`, `INFRASTRUCTURE.md`, `MONITORING.md`, `SECURITY.md`, `COST_TRACKER.md`.
 - **[`docs/TAG_CODES.md`](../docs/TAG_CODES.md)** — decodes the internal tag alphabet (ADR/PG/SIMP/IC/SEC/…) so commits and comments are traceable to the decision that motivated them.
 - **`handovers/`** — the live end-of-session hand-off (`HANDOVER_LATEST.md`) so the next session resumes with full context. Prior sessions live on the **`session-archive`** branch (#1650) — `git show origin/session-archive:handovers/<name>.md`.
@@ -27,7 +27,7 @@ paragraph itself used to name two of them. A sample rather than an inventory:
 `python3 scripts/skill_registry.py` lists the live set; nothing here is hand-maintained.
 
 **3b. Subagent library — [`.claude/agents/`](agents/)**
-**4 subagent definitions** for the standing multi-agent fan-out pattern, each declaring its own least-privilege `tools:` list:
+**5 subagent definitions** for the standing multi-agent fan-out pattern, each declaring its own least-privilege `tools:` list:
 [`worktree-implementer`](agents/worktree-implementer.md) (one issue → one worktree → one
 open PR, with the worktree-discipline incident classes baked in),
 [`finding-verifier`](agents/finding-verifier.md) (adversarial second pass on review
@@ -53,7 +53,7 @@ stop re-improvising briefs from memory prose (#796).
   Every one fails open on a bad payload, because a hook that can crash can halt a session.
 - **Doc-sync pre-commit hook** (`scripts/install_hooks.sh` → `deploy/sync_doc_metadata.py`) — auto-updates doc headers (tool/Lambda/secret/alarm counts, version) on every commit, so docs can't silently drift from code.
 - **Self-healing remediation agent** (`.github/workflows/remediation-agent.yml`, ADR-064/065) — Claude on a schedule via GitHub Actions + Bedrock: triages alarms/CI/DLQ, auto-fixes the provably-safe class behind a deterministic merge gate, opens PRs for the rest. Read-only AWS role; the gate (not the model) holds merge authority.
-- **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 86 tools that let Claude query the live platform data directly during a session.
+- **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 87 tools that let Claude query the live platform data directly during a session.
 
 **5. Verification — Claude checks its own work**
 - `tests/visual_qa.py` — a Playwright browser sweep after deploys.

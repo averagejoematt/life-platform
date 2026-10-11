@@ -11,7 +11,7 @@ Lambdas (11):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
   wednesday-chronicle, weekly-plate, monday-compass, partner-weekly-email,
   evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12),
-  weekly-signal (PB-06)
+  weekly-signal (PB-06), habit-skip-review (#4622)
 
 """
 
@@ -267,11 +267,26 @@ class EmailStack(Stack):
             # completed. 300s = the measured pipeline + the persist/render tail
             # with real headroom; the generation cache (chronicle_store, #2669)
             # is the other half — a timeout retry reuses the text it already paid for.
-            timeout_seconds=300,
+            # #4535: 300 → 900. The Story Desk writes the post AND the episode in one run (desk budget, two writers, a
+            # fact read per piece, at most one corrective rewrite each live) — measured 5-12 min per week on the cycle-17
+            # rebuild. 900s is the Lambda ceiling; the generation cache keeps a timeout retry free of re-generation.
+            timeout_seconds=900,
             memory_mb=256,
-            environment=_email_env,
+            environment={**_email_env, "STORY_DESK": "on", "STORY_DESK_MAX_REWRITES": "1"},
             custom_policies=rp.email_wednesday_chronicle(),
             **shared,
+        )
+
+        # #4546 the reply desk: Monday 16:00 UTC (09:00 PT), the week's 3-5 gap questions go to Matthew with Reply-To the
+        # SES inbound address; his reply lands as owner voice for Wednesday's chronicle and episode. Never blocks a week.
+        story_questions_rule = events.Rule(
+            self,
+            "StoryQuestionsMonday",
+            schedule=events.Schedule.cron(minute="0", hour="16", week_day="MON"),
+            description="#4546: the Story Desk's weekly reply-by-email questions (optional; no reply is a normal week)",
+        )
+        story_questions_rule.add_target(
+            targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"story_questions": True}))
         )
 
         create_platform_lambda(
@@ -299,6 +314,24 @@ class EmailStack(Stack):
             memory_mb=512,
             environment=_email_env,
             custom_policies=rp.email_monday_compass(),
+            **shared,
+        )
+
+        # #4622: the Saturday skipped-habits queue. Saturday 16:00 UTC (fixed, no DST drift —
+        # 09:00 PDT). Reads the previous seven Pacific days of stored habitify records and mails
+        # the owner ONE list of daily habits still `skipped` (sends nothing on an empty week;
+        # every run emits an EMF run record). No AI, no secret: its role is a LeadingKeys-scoped
+        # Query on the habitify partition + SES, nothing else.
+        create_platform_lambda(
+            self,
+            "HabitSkipReview",
+            function_name="habit-skip-review",
+            handler="emails.habit_skip_review_lambda.lambda_handler",
+            source_file="lambdas/emails/habit_skip_review_lambda.py",
+            schedule="cron(0 16 ? * SAT *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            custom_policies=rp.email_habit_skip_review(),
             **shared,
         )
 

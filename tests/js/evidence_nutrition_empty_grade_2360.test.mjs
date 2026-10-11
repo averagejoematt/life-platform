@@ -21,7 +21,7 @@ import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { nutritionVerdict, nutritionProteinLead, nutritionHero } = await import("../../site/assets/js/evidence_nutrition.js");
+const { nutritionVerdict, nutritionProteinLead, nutritionHero, nutritionProteinAnnotation } = await import("../../site/assets/js/evidence_nutrition.js");
 
 // The exact shape the live API served on 2026-08-09, before the fix.
 const LIVE_EMPTY_PAYLOAD = {
@@ -224,4 +224,37 @@ test("#4245 a scheduled supplement miss reads as a named zero, not an absent rec
   const t = _text(nutritionMicronutrients(SCHEDULED_MISS_MICROS));
   assert.ok(/Scheduled but not taken on Thursday, September 24: Vitamin D, Omega 3 — counted as zero\./.test(t), t);
   assert.ok(!/No supplement record/.test(t), "a scheduled miss is not an absent record");
+});
+
+// #4540: the plan states ONE protein line (a 170 g floor). The API serves that figure on
+// both `protein_target_g` and `protein_floor_g`, so the page must not say it twice.
+const ONE_LINE_PAYLOAD = {
+  avg_protein_g: 150,
+  protein_target_g: 170,
+  protein_hit_pct: 0,
+  protein_hit_days: 0,
+  protein_floor_g: 170,
+  protein_floor_hit_pct: 0,
+  protein_floor_hit_days: 0,
+  days_logged: 12,
+};
+
+test("#4540: a target equal to the floor is named once in the protein lead", () => {
+  const html = nutritionProteinLead(ONE_LINE_PAYLOAD);
+  assert.match(html, /floor 170 g/);
+  assert.doesNotMatch(html, /target 170 g/);
+});
+
+test("#4540: a target that differs from the floor is still named beside it", () => {
+  const html = nutritionProteinLead({ ...ONE_LINE_PAYLOAD, protein_target_g: 190 });
+  assert.match(html, /floor 170 g/);
+  assert.match(html, /target 190 g/);
+});
+
+test("#4540: the chart annotation does not restate one line as two", () => {
+  const html = nutritionProteinAnnotation(ONE_LINE_PAYLOAD);
+  assert.match(html, /170 g target/);
+  assert.doesNotMatch(html, /170 g floor too/);
+  const two = nutritionProteinAnnotation({ ...ONE_LINE_PAYLOAD, protein_target_g: 190 });
+  assert.match(two, /under the 170 g floor too/);
 });

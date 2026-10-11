@@ -34,6 +34,12 @@ def render(cfg: dict) -> str:
     start_kg = timeline.get("start_weight_kg")
     goal_lbs = cfg.get("targets", {}).get("weight", {}).get("goal_lbs", 185)
     dow = derive_dow(start_date)
+    # #4540: the plan's nutrition targets ride in the bundle too, so no consumer needs a
+    # profile-row read (or an S3 read) to state them. A missing key is a KeyError here, at
+    # generation time — never a guessed default at runtime.
+    nutrition = cfg["targets"]["nutrition"]
+    plan_kcal = int(nutrition["daily_calories_target"])
+    plan_protein_min_g = int(nutrition["daily_protein_min_g"])
 
     if start_kg is None:
         start_kg = round(float(start_lbs) / 2.20462, 3)
@@ -61,6 +67,13 @@ EXPERIMENT_BASELINE_WEIGHT_LBS = {start_lbs}
 EXPERIMENT_BASELINE_WEIGHT_KG = {start_kg}
 
 EXPERIMENT_GOAL_WEIGHT_LBS = {goal_lbs}
+
+# The plan's nutrition targets (targets.nutrition in the plan root; the same two figures
+# experiment.plan_facts derives). The plan states ONE protein line — a floor. Every surface
+# that names a calorie target or a protein target/floor reads these, never PROFILE#v1 and
+# never a literal (#4540; guard: tests/test_protein_contract.py).
+PLAN_DAILY_CALORIES_TARGET = {plan_kcal}
+PLAN_DAILY_PROTEIN_MIN_G = {plan_protein_min_g}
 
 
 def day_n(today_iso: str) -> int:

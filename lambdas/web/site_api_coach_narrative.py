@@ -314,7 +314,7 @@ def handle_coach_analysis(event, *, _g):
         "sleep": "sleep_coach",
         "nutrition": "nutrition_coach",
         # Coaching-team v2 (2026-08-10): the merged Performance seat serves the
-        # training domain — Dr. Sarah Chen retired, Dr. Max Reyes absorbs it.
+        # training domain — Sarah Chen retired, Max Reyes absorbs it.
         "training": "physical_coach",
         "mind": "mind_coach",
         "physical": "physical_coach",

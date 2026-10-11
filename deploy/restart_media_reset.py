@@ -276,7 +276,7 @@ def build_prequel_episode(entry: dict, wav_bytes: int = None, mp3_bytes: int = N
         "url": url,
         "bytes": nbytes,
         "duration_sec": duration,
-        "byline": entry.get("byline", "Elena + Dr. Eli Marsh"),
+        "byline": entry.get("byline", "Elena + Eli Marsh"),
         "excerpt": entry.get(
             "excerpt",
             "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: "

@@ -108,6 +108,15 @@ def _actual_value(outcome_notes: Any) -> Any:
     return round(value, 4) if isinstance(value, float) else value
 
 
+def _graded_as(outcome_notes: Any) -> str | None:
+    """The notes' ``graded_as`` marker (#4541 — "count"), or None."""
+    try:
+        notes = outcome_notes if isinstance(outcome_notes, dict) else json.loads(outcome_notes or "{}")
+    except (TypeError, ValueError):
+        return None
+    return notes.get("graded_as") if isinstance(notes, dict) else None
+
+
 def _is_graded(row: dict) -> bool:
     return (row.get("status") or "").lower() in GRADED_STATUSES and bool(row.get("outcome_date")) and singleton_visible(row)
 
@@ -132,6 +141,7 @@ def to_block(row: dict | None) -> dict | None:
     evaluation: dict = raw_eval if isinstance(raw_eval, dict) else {}
     claim = audience_guard.public_blurb({"public_summary": row.get("claim_natural")}, limit=CLAIM_CHAR_LIMIT) or None
     prediction_id = row.get("prediction_id") or str(row.get("sk") or "").replace("PREDICTION#", "", 1) or None
+    counted = _graded_as(row.get("outcome_notes")) == "count"
     return {
         "prediction_id": prediction_id,
         "claim": claim,
@@ -141,10 +151,13 @@ def to_block(row: dict | None) -> dict | None:
         "metric": evaluation.get("metric"),
         # "directional" → condition is up/down, threshold None and actual_value is the
         # EWMA slope, not a level; the site must know which it is quoting.
-        "eval_type": evaluation.get("type"),
-        "condition": evaluation.get("condition"),
-        "threshold": _plain(evaluation.get("threshold")),
-        "actual_value": _actual_value(row.get("outcome_notes")),
+        # #4541: a call graded by COUNTING days is "count" whatever its stored spec says; its
+        # actual_value is a day count and its spec's condition/threshold are not the call's,
+        # so none of the three is served as if it were — the claim text carries the call.
+        "eval_type": "count" if counted else evaluation.get("type"),
+        "condition": None if counted else evaluation.get("condition"),
+        "threshold": None if counted else _plain(evaluation.get("threshold")),
+        "actual_value": None if counted else _actual_value(row.get("outcome_notes")),
         "status": (row.get("status") or "").lower(),
     }
 

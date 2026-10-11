@@ -249,16 +249,29 @@ jobs:
               print(f"::notice::ratchet lists {sorted(retired)} which are no longer public — shrink is allowed, tidy the file when convenient")
           sys.exit(1 if failed else 0)
           PYEOF
+
+          # #4643 box 5 — the S3 ingestion-trigger leg. The four bucket notifications
+          # (MacroFactor, inbound email, food delivery, measurements) are ONE bucket-level
+          # document CDK does not own, and a put-bucket-notification-configuration REPLACES
+          # it whole — a dropped entry otherwise shows up only as source staleness. Same
+          # question as the policy leg above ("does live still match the repo?"), so it is a
+          # command in this step, `rc`-accumulated. Read-only: one s3:GetBucketNotification,
+          # granted to github-actions-deploy-role 2026-10-11 (infra/iam/README.md). A clean
+          # run prints "expected 4, live 4"; repair is docs/RUNBOOK.md "S3 bucket notifications".
+          python3 deploy/check_bucket_notification_drift.py --strict || rc=1
           exit $rc
 
       # #4472 box 2 — the fourth "merged but not serving" question, for CODE rather than
-      # config: is any live Lambda older than the newest main commit that should have
-      # redeployed it (its handler, a shared module, a bundled config path)? The deploy
-      # dead-man (deploy-wedge-watch.yml) reads GitHub's side; this reads AWS's. ADVISORY
+      # config: does any live Lambda's bundle predate the newest main commit that should have
+      # redeployed it (its handler, a shared module, a bundled config path)? The verdict is
+      # ANCESTRY: the live bundle's build_info.json git_sha (#2377) must contain that commit
+      # (deploy/bundle_ancestry.classify); a bundle with no fingerprint falls back to
+      # LastModified, and the log prints which basis judged how many. The deploy dead-man
+      # (deploy-wedge-watch.yml) reads GitHub's side; this reads AWS's. ADVISORY
       # (continue-on-error): a stale function prints the deploy_all recovery and marks the
-      # step, but does not red the nightly — an out-of-band laptop deploy before a merge is
-      # a legitimate stale-looking shape. Read-only: lambda:ListFunctions, already granted
-      # to this role (ci-cd.yml's plan uses it).
+      # step, but does not red the nightly. Read-only: lambda:ListFunctions + GetFunction and
+      # a ranged GET of the presigned code URL (~260 KB per function, not the whole zip);
+      # both actions already granted to this role (iam simulate-principal-policy, 2026-10-02).
       - name: Live Lambda older than its source on main (#4472, read-only, advisory)
         if: always()
         continue-on-error: true

@@ -150,7 +150,7 @@ class TestOutputFrameWriteDate:
 class TestTurnPrompt:
     def test_reply_contains_the_specific_claim(self):
         sysb, user = icd.build_turn_prompt(
-            {"name": "Dr. Lisa Park", "board_role": "sleep"},
+            {"name": "Lisa Park", "board_role": "sleep"},
             {"name": "Coach Dan"},
             "protein timing vs sleep",
             "late protein wrecks deep sleep by 40 minutes",

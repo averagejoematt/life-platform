@@ -126,6 +126,12 @@
       "stack": "operational_stack",
       "via": "declaration"
     },
+    "chronicle-autopublish-held": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
     "chronicle-delivery-heartbeat": {
       "kind": "metric",
       "routing": "urgent",
@@ -365,6 +371,18 @@
       "routing": "digest",
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-hevy": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-hevy-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
     },
     "ingest-reconciliation-strava": {
       "kind": "metric",
@@ -974,10 +992,10 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 20,
-    "alarms": 133,
-    "emf_namespaces": 32,
-    "schedules": 90,
+    "ai_features": 24,
+    "alarms": 136,
+    "emf_namespaces": 33,
+    "schedules": 93,
     "secrets": 30
   },
   "edges": [
@@ -1978,6 +1996,20 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/content/owner_words.py",
+      "partition": "owner_words",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/owner_words.py",
+      "partition": "owner_words",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/content/recap_data.py",
       "partition": "computed_metrics",
       "via": "local-seam"
@@ -2028,6 +2060,27 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/content/site_writer.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/story_dossier.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/story_dossier.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/story_pipeline.py",
       "partition": "chronicle",
       "via": "pk"
     },
@@ -2747,6 +2800,20 @@
     },
     {
       "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/panelcast_desk.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/emails/panelcast_desk.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
       "lambda": "partner-weekly-email",
       "module": "lambdas/emails/partner_email_lambda.py",
       "partition": "email_log",
@@ -2781,7 +2848,21 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "wednesday-chronicle",
+      "module": "lambdas/emails/wednesday_chronicle_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
+      "lambda": "wednesday-chronicle",
+      "module": "lambdas/emails/wednesday_chronicle_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
       "lambda": "wednesday-chronicle",
       "module": "lambdas/emails/wednesday_chronicle_lambda.py",
       "partition": "chronicle",
@@ -6046,13 +6127,6 @@
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_training.py",
-      "partition": "macrofactor_workouts",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "life-platform-mcp",
-      "module": "mcp/tools_training.py",
       "partition": "strava",
       "via": "seam"
     },
@@ -6298,7 +6372,7 @@
         }
       ],
       "stack": "compute_stack",
-      "timeout_seconds": 180
+      "timeout_seconds": 300
     },
     "coach-ensemble-digest": {
       "declared_alarm": null,
@@ -6623,6 +6697,20 @@
       "stack": "ingestion_stack",
       "timeout_seconds": 300
     },
+    "habit-skip-review": {
+      "declared_alarm": null,
+      "handler": "emails.habit_skip_review_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/habit_skip_review_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 ? * SAT *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 60
+    },
     "habitify-data-ingestion": {
       "declared_alarm": null,
       "handler": "ingestion.habitify_lambda.lambda_handler",
@@ -6655,6 +6743,10 @@
         {
           "expr": "cron(0 * * * ? *)",
           "resolution": "constant"
+        },
+        {
+          "expr": "cron(30 18 * * ? *)",
+          "resolution": "constructed"
         },
         {
           "expr": "cron(40 13 * * ? *)",
@@ -7371,10 +7463,14 @@
         {
           "expr": "cron(0 15 ? * WED *)",
           "resolution": "constant"
+        },
+        {
+          "expr": "cron(0 16 * * MON *)",
+          "resolution": "constructed"
         }
       ],
       "stack": "email_stack",
-      "timeout_seconds": 300
+      "timeout_seconds": 900
     },
     "weekly-correlation-compute": {
       "declared_alarm": null,
@@ -7495,9 +7591,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 133,
+      "alarms": 136,
       "alarms_by_routing": {
-        "digest": 89,
+        "digest": 92,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7509,27 +7605,27 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 729,
-      "lambdas": 106,
-      "mcp_tool_modules": 34,
-      "mcp_tools": 86,
-      "partitions": 113,
+      "edges": 737,
+      "lambdas": 107,
+      "mcp_tool_modules": 35,
+      "mcp_tools": 87,
+      "partitions": 114,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 17,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 82,
-      "schedules": 90
+      "scheduled_lambdas": 83,
+      "schedules": 93
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 359,
-        "sites_resolved": 900,
-        "sites_total": 1259
+        "sites_dynamic": 361,
+        "sites_resolved": 923,
+        "sites_total": 1284
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 82
+        "resolved": 83
       }
     },
     "non_census_families": [
@@ -7961,6 +8057,11 @@
     },
     "nutrition_review": {
       "class": "experiment_scoped",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "owner_words": {
+      "class": "raw_timeseries",
       "ingestion": false,
       "privacy_tier": "public"
     },
@@ -8491,6 +8592,13 @@
       "utc": "16:00"
     },
     {
+      "expr": "cron(0 16 ? * SAT *)",
+      "lambda": "habit-skip-review",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "16:00"
+    },
+    {
       "expr": "cron(0 16 ? * MON *)",
       "lambda": "life-platform-traffic-digest",
       "resolution": "constant",
@@ -8516,6 +8624,13 @@
       "lambda": "telegram-coach-worker",
       "resolution": "constant",
       "stack": "serve_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 * * MON *)",
+      "lambda": "wednesday-chronicle",
+      "resolution": "constructed",
+      "stack": "email_stack",
       "utc": "16:00"
     },
     {
@@ -8734,6 +8849,13 @@
       "resolution": "constructed",
       "stack": "ingestion_stack",
       "utc": "18:20"
+    },
+    {
+      "expr": "cron(30 18 * * ? *)",
+      "lambda": "hevy-backfill",
+      "resolution": "constructed",
+      "stack": "ingestion_stack",
+      "utc": "18:30"
     },
     {
       "expr": "cron(30 18 ? * * *)",

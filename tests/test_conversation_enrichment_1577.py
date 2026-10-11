@@ -453,10 +453,14 @@ class TestSweep:
         summary = ce.run(table=FakeTable(), start_date="2026-07-14", end_date="2026-07-27", caller=_haiku_caller({}))
         assert summary["skipped"] == 1 and summary["enriched"] == 0
 
-    def test_parse_extraction_tolerates_fences(self):
+    def test_extract_tolerates_fences_and_sends_the_schema(self):
+        # #4276: the extraction goes through ai.structured_json.call_json — the schema is on
+        # the request, and the fence-tolerant parse is the door's fallback, not a local copy.
+        sent = []
         raw = {"content": [{"type": "text", "text": '```json\n{"sentiment": "mixed"}\n```'}]}
-        assert ce.parse_extraction(raw) == {"sentiment": "mixed"}
-        assert ce.parse_extraction({"content": [{"type": "text", "text": "not json"}]}) is None
+        assert ce.extract(lambda b: sent.append(b) or raw, {"messages": []}) == {"sentiment": "mixed"}
+        assert sent[0]["output_config"]["format"]["schema"] == ce.EXTRACTION_SCHEMA
+        assert ce.extract(lambda b: {"content": [{"type": "text", "text": "not json"}]}, {"messages": []}) is None
 
     def test_unparseable_extraction_counts_as_error(self, monkeypatch):
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)

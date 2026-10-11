@@ -17,6 +17,10 @@ WALL CLOCK (#4262 — replaces the old '~10s', which was a 12-gate battery on 20
   23-43 s, postflight 22-36 s, closure-dod 3-45 s), which ran in parallel with the doc leg.
   The dedup saves 11 gate runs of CPU and noise, not wall clock. Each gate now prints its
   own elapsed seconds and the run ends with a `WRAP-GATES-TIMING` line naming the slowest.
+  Then 29 -> 25 gate runs (gather 11 -> 7): backlog-hygiene, unlinked-closures and
+  merge-text-closures moved to the nightly workflow (NIGHTLY, below), and the a11y dead-man
+  pytest left for the CI suite that already runs it on every push. backlog-hygiene was the
+  slowest gather gate in two of the three runs above.
 
 THE SHAPE (gather → write → verify → commit)
   --gather (default)  Run every gate that does NOT read the finished handover, in
@@ -41,7 +45,7 @@ THE SHAPE (gather → write → verify → commit)
 USAGE
   python3 scripts/wrap_gates.py            # gather phase (before writing the handover)
   python3 scripts/wrap_gates.py --verify   # verify phase (after writing it, before (f))
-  python3 scripts/wrap_gates.py --list     # print the battery and exit
+  python3 scripts/wrap_gates.py --list     # print the battery (and the NIGHTLY legs) and exit
 Exit 0 iff every gate in the requested phase passed (by its own exit code).
 """
 
@@ -158,14 +162,11 @@ GATHER = [
             "240",
         ],
     ),
-    Gate("backlog-hygiene", "e7", ["python3", "scripts/check_backlog_hygiene.py"]),
     Gate("alarm-citations", "e10", ["python3", "scripts/check_alarm_citations.py"], marker="Alarms"),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),
-    # #3546: the a11y shrink-ledger dead-man — a shrink candidate older than 7 days is a
-    # (page, rule) pair that has silently stopped gating serious a11y violations. The ledger
-    # is a committed sidecar the standalone sweep writes; this is the consumer that makes a
-    # stale entry a wrap-time red rather than a log line nobody reads (#1990's recurrence).
-    Gate("a11y-shrink-deadman", "e11", [sys.executable, "-m", "pytest", "tests/test_a11y_shrink_deadman_3546.py", "-q"]),
+    # #4262: backlog-hygiene (e7), unlinked-closures and merge-text-closures are NOT here any
+    # more — they run nightly in `.github/workflows/wrap-nightly.yml` (see NIGHTLY, below),
+    # and a11y-shrink-deadman left for the CI suite it was already part of (see NIGHTLY's note).
     # #4262: the derived Docs-CI leg (#3531) is NOT here any more — it runs ONCE, in VERIFY.
     # A pre-write run judged docs the wrap was about to rewrite (the #3682 defect), so its
     # verdict was superseded by the verify run every time; the cost was ~11 duplicate gates.
@@ -174,26 +175,6 @@ GATHER = [
     # today still lacks its (e8) verdict, so `no-outcome-verdict` here IS the (e8) to-do list;
     # the session re-runs `--session` after commenting and pastes the summary line.
     Gate("closure-dod", "e8", ["python3", "scripts/closure_sweep.py", "--session"], marker="Closures"),
-    # #3812: detector C — the OTHER direction. A merged commit naming an open issue in its
-    # subject with no closing keyword is a fix that shipped and an issue nobody closed
-    # (Session AF: 11 of 40 swept, ten of them this exact shape). Advisory by design: its
-    # output is a re-read list for (e7), never a closure, so a finding never fails the wrap.
-    Gate("unlinked-closures", "e7", ["python3", "scripts/check_unlinked_closures.py"], marker="Backlog", ok_when=lambda rc, out: True),
-    # #3863: detector D — the FOURTH text. Detectors B and C both read pre-merge material; a
-    # squash message supplied at merge time (`--body-file`/`--subject`, or the web UI box) is
-    # seen by neither, and one retired an owner-gated issue on 2026-09-17. Wired HERE rather
-    # than left as a script, because a check that runs only when someone remembers to run it
-    # is the exact defect #3860 documents one layer down: its census was correct and invisible
-    # for ten days because nothing scheduled it. 7 days, not 30 — the wrap's question is "what
-    # did THIS session's merges close", and each audited commit costs a GitHub round trip.
-    # Advisory: a finding is a re-read for (e7), never a failed wrap.
-    Gate(
-        "merge-text-closures",
-        "e7",
-        ["python3", "scripts/check_merge_commit_closures.py", "--days", "7"],
-        marker="Backlog",
-        ok_when=lambda rc, out: True,
-    ),
 ]
 
 # ── the verify battery: gates that read the finished handover (run after writing it) ──
@@ -234,6 +215,35 @@ VERIFY = [
     *derived_doc_gates(),  # #3531/#3682/#4262: the Docs-CI leg, derived, run ONCE — after Phase 2 writes
 ]
 
+
+# ── the nightly battery: wrap-only checks that LEFT the interactive wrap (#4262) ──────
+#
+# Not run by this script. `.github/workflows/wrap-nightly.yml` runs each as one matrix leg
+# every night and files/updates/auto-closes ONE `auto-filed` tracker per leg through the
+# #1447 advisory-failure-issue action (a still-open tracker gets a comment, never a twin).
+# They mean the same thing with no session in the room, so a session that forgot `/wrap`
+# no longer means they did not run — and the wrap no longer pays their network wall
+# (backlog-hygiene alone measured 15-51 s). `tests/test_advisory_failure_issue.py` holds the
+# workflow's legs and this list to the same commands, in BOTH directions.
+#
+# Removed outright, not moved: `a11y-shrink-deadman` (#3546). It is a pytest file, so the
+# full suite already runs it on every PR and every push to main; a stale ledger row reds the
+# next push, which (e2)'s blocking main-green gate then reads. The wrap ran it a second time.
+#
+# handover-lines and residual-queue are legs too, but STAY in VERIFY: at wrap time they
+# judge the handover this session just wrote (the residual section is the one blocker), at
+# night they judge the committed one.
+NIGHTLY = [
+    # (e7), blocking by default since #1872 — the nightly leg keeps the bare invocation.
+    Gate("backlog-hygiene", "e7", ["python3", "scripts/check_backlog_hygiene.py"]),
+    # #3812: detector C — a merged commit naming an open issue in its subject with no closing
+    # keyword. Advisory by its closure_contract posture (`shipped-unlinked` = warn).
+    Gate("unlinked-closures", "e7", ["python3", "scripts/check_unlinked_closures.py"]),
+    # #3863: detector D — the squash text supplied at merge time, which detectors B and C never
+    # see. Always exits 0 (posture `validated-merge-text` = warn); the leg is its nightly log.
+    Gate("merge-text-closures", "e7", ["python3", "scripts/check_merge_commit_closures.py", "--days", "7"]),
+    *[g for g in VERIFY if g.name in ("handover-lines", "residual-queue")],  # the same Gate objects, not a restatement
+]
 
 _ELAPSED: dict = {}  # gate name -> seconds, for the per-gate timing line (#4262 box 4)
 
@@ -369,6 +379,8 @@ def main(argv=None) -> int:
             print(f"gather  ({g.step})  {g.name}: {' '.join(g.cmd)}")
         for g in VERIFY:
             print(f"verify  ({g.step})  {g.name}: {' '.join(g.cmd)}")
+        for g in NIGHTLY:
+            print(f"nightly ({g.step})  {g.name}: {' '.join(g.cmd)}  [a .github/workflows/wrap-nightly.yml leg]")
         return 0
 
     t0 = time.monotonic()

@@ -3,7 +3,7 @@
 The live failure, from the 2026-08-11 nightly qa-smoke:
 
     FAIL [content_truth] Reader Truth / cross_surface:vitals:
-    coach-cited vitals disagree with the cockpit — Dr. Lisa Park cites recovery 53% vs cockpit 46%
+    coach-cited vitals disagree with the cockpit — Lisa Park cites recovery 53% vs cockpit 46%
 
 Measured cause. The two surfaces have two DIFFERENT producers of "the current reading":
 
@@ -69,7 +69,7 @@ COCKPIT_VITALS = {"recovery_pct": 54.0, "hrv_ms": 41.1, "rhr_bpm": 56.0, "sleep_
 def _coach(facts):
     """A coach card that cites the facts it was grounded on, the way the live sleep card does."""
     return {
-        "name": "Dr. Lisa Park",
+        "name": "Lisa Park",
         "position_summary": (
             f"Your recovery came in at {facts['recovery_pct']:g}% this morning, with HRV at "
             f"{facts['hrv_ms']:g} ms and a resting heart rate of {facts['rhr_bpm']:g} bpm."
@@ -92,7 +92,7 @@ def test_the_live_divergence_reappears_without_the_overlay():
 
     ok, msg = wq.assess_cross_surface_vitals(COCKPIT_VITALS, [_coach(facts)])
     assert not ok
-    assert "Dr. Lisa Park cites recovery 46% vs cockpit 54%" in msg
+    assert "Lisa Park cites recovery 46% vs cockpit 54%" in msg
     assert "hrv 38 ms vs cockpit 41.1 ms" in msg
 
 
@@ -166,13 +166,13 @@ def test_the_weight_leg_closes_the_same_lag_on_the_weight_check():
     """
     rollup = {"sk": "DATE#2026-08-10", "latest_weight": 320.38}
     live = {"latest_weight": 317.24, "weight_as_of": "2026-08-11"}  # withings DATE#2026-08-11
-    coach_before = {"name": "Dr. Marcus Webb", "position_summary": "You weighed in at 320.4 lb this morning."}
+    coach_before = {"name": "Marcus Webb", "position_summary": "You weighed in at 320.4 lb this morning."}
     ok, msg = wq.assess_cross_surface_weight({"weight_lbs": 317}, [coach_before])
     assert not ok and "320.4 lb vs cockpit 317" in msg
 
     facts = cf.overlay_latest_readings(cf.build_canonical_facts(rollup, genesis=GENESIS), live, genesis=GENESIS)
     assert facts["latest_weight"] == 317.2
-    coach_after = {"name": "Dr. Marcus Webb", "position_summary": f"You weighed in at {facts['latest_weight']:g} lb this morning."}
+    coach_after = {"name": "Marcus Webb", "position_summary": f"You weighed in at {facts['latest_weight']:g} lb this morning."}
     ok, msg = wq.assess_cross_surface_weight({"weight_lbs": 317}, [coach_after])
     assert ok, msg
 

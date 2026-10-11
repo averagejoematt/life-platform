@@ -391,3 +391,105 @@ def test_check_includes_the_js_hex_and_tokens_css_halves(tmp_path, monkeypatch):
     monkeypatch.setattr(check_css_tokens, "TOKENS", planted_css)
     findings = check_css_tokens.check()
     assert any("tokens.css" in f and "0.6rem" in f for f in findings), findings
+
+
+# ---------------------------------------------------------------------------
+# #4581 — the kit. A page that loads clean.css answers to docs/design/v8 (the one look
+# the owner approved), not to DESIGN_SYSTEM_V5: the generated-<style> sweep skips it and
+# holds it to the kit's own rules instead. The exemption is keyed on the stylesheet the
+# page LOADS, so every v5 page is swept exactly as before — proved below with the same
+# planted violation on both sides of the line.
+# ---------------------------------------------------------------------------
+
+KIT_COMPONENTS = {
+    "edition-header": "ck-header",
+    "premise": "ck-premise",
+    "chapter-lead": "ck-lead",
+    "today-block": "ck-today",
+    "coach-row": "ck-coach",
+    "row-list": "ck-rows",
+    "bet-card": "ck-bet",
+    "verdict-pair": "ck-verdicts",
+    "quote": "ck-quote",
+    "chart": "ck-chart",
+    "follow-box": "ck-follow",
+    "footer": "ck-footer",
+}
+_KIT_PAGE = '<html><head><link rel="stylesheet" href="/assets/css/clean.css"></head><body>%s</body></html>'
+_V5_PAGE = '<html><head><link rel="stylesheet" href="/assets/css/tokens.css"></head><body>%s</body></html>'
+_PLANTED_STYLE = "<style>.x { font-size: 13px; } @media (max-width: 520px) { .x { color: red; } }</style>"
+
+
+def test_kit_specimen_shows_the_twelve_components_and_stays_unlisted():
+    """The specimen carries each of the twelve components exactly once (data-ck), the
+    sheet styles every one of them, and the page is noindex, self-hosted and in no
+    sitemap. One test, every offender reported."""
+    import re
+
+    repo = check_css_tokens.REPO
+    sheet = (check_css_tokens.CSS_DIR / check_css_tokens.KIT_SHEET).read_text()
+    page = (repo / "site" / "kit" / "index.html").read_text()
+    problems = []
+    shown = re.findall(r'data-ck="([\w-]+)"', page)
+    if sorted(shown) != sorted(KIT_COMPONENTS):
+        problems.append(f"specimen shows {sorted(shown)}, expected each of {sorted(KIT_COMPONENTS)} once")
+    for name, cls in KIT_COMPONENTS.items():
+        if not re.search(r"\." + cls + r"\b[^{}]*\{", sheet):
+            problems.append(f"clean.css has no rule for .{cls} ({name})")
+        if not re.search(r'data-ck="' + name + r'"', page) or not re.search(
+            r'class="[^"]*\b' + cls + r'\b[^"]*"[^>]*data-ck="' + name + '"', page
+        ):
+            problems.append(f"the specimen's {name} is not a .{cls}")
+    used = {cls for attr in re.findall(r'class="([^"]*)"', page) for cls in attr.split()}
+    stray = sorted(cls for cls in used if not cls.startswith("ck-") or not re.search(r"\." + re.escape(cls) + r"(?![\w-])", sheet))
+    if stray:
+        problems.append(f"specimen uses classes the kit does not define: {stray}")
+    if not check_css_tokens.is_kit_page(page):
+        problems.append("the specimen does not load clean.css")
+    if 'name="robots" content="noindex' not in page:
+        problems.append("the specimen is not noindex")
+    if "/kit/" in (repo / "site" / "sitemap.xml").read_text():
+        problems.append("/kit/ is in the sitemap")
+    font = re.search(r"url\((/assets/fonts/[^)]+)\)", sheet)
+    if not font or not (repo / "site" / font.group(1).lstrip("/")).is_file():
+        problems.append("clean.css's typeface is not a file under site/assets/fonts/")
+    assert not problems, "\n".join(problems)
+
+
+def test_kit_exemption_is_scoped_and_the_kit_rules_are_non_vacuous():
+    """The same planted <style> fails a v5 page (raw font-size AND rogue breakpoint, the
+    v5 vocabulary) and fails a kit page for the kit's reason (no page-scoped style at
+    all) — never silently passes either. And each kit-sheet rule fires on a mutation of
+    the real sheet."""
+    c = check_css_tokens
+    # An old page: swept by the v5 rules exactly as before.
+    v5 = "\n".join(c.inline_style_findings("site/x/index.html", _V5_PAGE % _PLANTED_STYLE))
+    assert "raw font-size `13px`" in v5 and "rogue breakpoint `520px`" in v5, v5
+    assert not c.is_kit_page(_V5_PAGE % "")
+    # A page that merely NAMES the kit in prose, or links it from the body copy, is not a kit page.
+    assert not c.is_kit_page('<p>see /assets/css/clean.css</p><link rel="stylesheet" href="/assets/css/tokens.css">')
+    # A kit page: exempt from the v5 vocabulary, held to its own rules.
+    assert c.is_kit_page(_KIT_PAGE % "")
+    assert c.kit_page_findings("k", _KIT_PAGE % "") == []
+    assert c.kit_page_findings("k", _KIT_PAGE % '<i style="width:43%"></i>') == []
+    assert "page-scoped <style>" in "\n".join(c.kit_page_findings("k", _KIT_PAGE % _PLANTED_STYLE))
+    assert c.kit_page_findings("k", _KIT_PAGE % '<p style="color:red">x</p>')
+    assert c.kit_page_findings("k", _KIT_PAGE % '<link rel="stylesheet" href="/assets/css/tokens.css">')
+    assert c.kit_page_findings("k", _KIT_PAGE % '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist">')
+    # The real sheet is clean; each mutation of it is caught.
+    sheet = (c.CSS_DIR / c.KIT_SHEET).read_text()
+    assert c.kit_sheet_findings("clean.css", sheet) == []
+    mutations = {
+        "the prototype's faint grey": (sheet.replace("--ck-faint: #6A7176", "--ck-faint: #8A9399"), "`--ck-faint` on `--ck-bg` is 3.13:1"),
+        "an accent section label": (
+            sheet.replace(".ck-label { font-size: var(--ck-fs-small); color: var(--ck-soft)", ".ck-label { color: var(--ck-accent)"),
+            "`.ck-label` paints with the accent",
+        ),
+        "a second typeface": (sheet + "\n.ck-quote { font-family: Georgia, serif; }\n", "sets font-family `Georgia, serif`"),
+        "a colour outside the tokens": (sheet + "\n.ck-bet { background: #FFF4E0; }\n", "raw hex colour `#FFF4E0`"),
+        "an undefined token": (sheet + "\n.ck-bet { color: var(--ember); }\n", "undefined token `--ember`"),
+        "bloat": (sheet + "/* " + "x" * c.KIT_MAX_BYTES + " */\n", "the kit stays under"),
+    }
+    for label, (mutated, expected) in mutations.items():
+        assert mutated != sheet, f"mutation `{label}` did not change the sheet — the proof is vacuous"
+        assert expected in "\n".join(c.kit_sheet_findings("clean.css", mutated)), label

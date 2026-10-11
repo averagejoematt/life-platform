@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-30
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-30 | **Total tools:** 86
+**Version:** v8.6.0 | **Last updated:** 2026-09-30 | **Total tools:** 87
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 86 Tools — by module
+## All 87 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -54,6 +54,7 @@
 | `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
+| `mcp/tools_owner_words.py` | 1 |
 | `mcp/tools_pending_writes.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
 | `mcp/tools_platform.py` | 3 |
@@ -80,7 +81,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_coach_thread` | coach_id, limit= | Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?' |
+| `get_coach_thread` | coach_id, limit= | Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?' |
 | `get_predictions` | status=, coach_id=, limit= | Cross-coach prediction ledger — all predictions from all coaches with statuses. Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. #726: reads the canonical COACH#/PREDICTION# store (evaluator-graded, code-stamped IDs per #725 — the SAME store the public site serves); the legacy SOURCE#coach_thread# embedded predictions were tombstoned. #3712: also folds in the weekly TRAINING PRESCRIPTION's graded forecasts (claimant='prescription', coach_id=null, so a coach filter excludes them and no coach hit-rate can absorb them) — each carries its 80% interval and the n of weeks it was fitted on, status pending/confirmed/refuted/inconclusive, or 'declined' when there was too little history to forecast at all (a result, never a bet). For hit-rate + calibration analysis, use get_coach_track_record; for the prescription's own coverage verdict use get_benchmark(view='forecast'). |
 | `get_coach_track_record` | coach_id, days=, subdomain= | Hit-rate track record for a single coach. The headline (record = {confirmed, refuted, n, through}, headline 'K of N checked calls right through <day>', decided_count, hit_rate_pct) is the SAME single producer the public /api/coaches, /api/calibration, /api/predictions and /api/wrong serve (#4220): the PREDICTION# ledger, this cycle, one resolution per prediction — the days window does not narrow it. The breakdowns read the COACH#{coach_id}/LEARNING# audit trail over the days window, one result per prediction, rows with no prediction_id excluded (counted in excluded_learnings): by_outcome counts (confirmed/refuted/inconclusive/expired), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. A subdomain filter scores hit_rate_pct from those breakdowns (hit_rate_source says which). Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'. |
 | `audit_coach_dossier` | coach_id, action=, record_sk=, note= | #1387: Matthew's PRIVATE audit + correction affordance over a coach's public dossier ('what this coach knows' on /coaching/by-coach/, rendered verbatim from COACH# memory). action='view' (default) returns the FULL UNFILTERED memory — commitments, learnings (including the ADR-141 conversation-channel rows the public dossier must never show, flagged), quality trail, relationship state — plus any dossier corrections already logged. action='retract' removes a record from the public dossier; action='correct' renders a dated correction note under it. Both write a dated row to the #1689 corrections ledger (item_ref.surface='coach_dossier') and NEVER edit the memory record in place — the memory stays auditable, corrections are themselves on the record. Args: coach_id (required), action (view\|retract\|correct), record_sk + note (required for retract/correct; get the record_sk from action=view). |
@@ -282,6 +283,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_coach_correction` | item_number=, signal=, coach=, surface=, correction, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. |
+
+### mcp.tools_owner_words (`mcp/tools_owner_words.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `log_owner_note` | text, prompt=, off_record=, date= | #4584: store Matthew's OWN words for the site's 'in his own words' block, exactly as he said them. Call it only when he asks for something he said to go on the site or 'on the record' (e.g. 'put this on the site: …', 'log this as my note: …', 'my answer to this week's question is …'). text = his words VERBATIM — copy them character for character: never summarise, paraphrase, correct, tidy, translate or add to them, and never write words for him. If he has not given the exact words, ask him for them instead of calling. prompt = the question his words answer, if there is one. off_record = true when he says it is off the record (stored, never published). date = the day the words are about, YYYY-MM-DD, default today (Pacific). A clean note is PUBLIC on averagejoematt.com word for word; anything the privacy filter matches is held (stored, never published). The result's `verdict` says which, in plain words — tell him that sentence as it is. |
 
 ### mcp.tools_pending_writes (`mcp/tools_pending_writes.py`)
 

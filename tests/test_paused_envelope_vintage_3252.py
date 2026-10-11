@@ -4,7 +4,7 @@ freshness than its stalest member (measured live 2026-08-27/28).
 THE DEFECT, as it actually happened. The gating visual/AI-QA judge failed `main`
 on /method/board/ with a reproduced high:
 
-    [temporal_contradiction] Dr. Eli Marsh states "he's been eleven days into the
+    [temporal_contradiction] Eli Marsh states "he's been eleven days into the
     cycle with no active logging (food, training, or journal entries since August
     17th)"
 

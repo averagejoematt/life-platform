@@ -61,6 +61,30 @@ except Exception:  # noqa: BLE001 — a missing declaration must not open the ga
 
 _PRIVACY_UNAVAILABLE = not _OWNER_ONLY_FIELDS
 
+# The two tools' input schemas (moved here from mcp/registry.py by #4584 — a schema lives beside its tool, and the
+# registry is at its #1665 size ceiling). Byte-identical to what the registry carried.
+DESCRIBE_PLATFORM_SURFACES_INPUT = {
+    "type": "object",
+    "properties": {
+        "keyword": {"type": "string", "description": "Substring filter over surface name / question / example phrasing."},
+        "include_excluded": {"type": "boolean", "description": "Also list reader-only surfaces + their exclusion reasons."},
+        "detail": {"type": "boolean", "description": "Include the derivation chain and phase-read counts behind each rule."},
+        "limit": {"type": "integer", "description": "Max surfaces to return (default 200, cap 300)."},
+    },
+    "required": [],
+}
+
+GET_PLATFORM_SURFACE_INPUT = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Surface name from describe_platform_surfaces ('/api/...' also accepted)."},
+        "params": {"type": "object", "description": "Query parameters for the surface (see its `params` in the index)."},
+        "question": {"type": "string", "description": "The question you are answering — recorded verbatim if this is a miss."},
+        "explain_against": {"type": "string", "description": "A second surface name; reconciles the two surfaces' rules."},
+    },
+    "required": ["name"],
+}
+
 
 def _strip_owner_only(node: Any, removed: set) -> Any:
     """Recursively drop Tier-2 owner-only field names from a served payload.

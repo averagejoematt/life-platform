@@ -1037,7 +1037,52 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # `git archive origin/main` export at d37bd02ae: main 770 {236, 522, 7, 5} -> this lane 772 {239, 521, 7, 5}.
         # Upper bound 239 -> 241 (2026-09-30, #4472): ci::ci-cd.yml::plan::7 + ci::config-drift.yml::drift::7, PROVEN
         # (CI_PROOFS). Id-set diff vs origin/main 0055fe546: 772 {239, 521, 7, 5} -> 774 {241, 521, 7, 5}.
-        <= 241
+        # Upper bound 241 -> 242 (2026-10-03, #4540): structural::test_protein_contract.py — the lambdas/ + mcp/ AST sweep
+        # holding nutrition targets to the plan constants — arrives PROVEN via the re-runnable harness (MutationSpec +
+        # proof, ARMED 1/1). Id-set diff vs a `git archive origin/main` export at 83f3bd53e (git-init'd, fully added):
+        # 767 {241, 514, 7, 5} -> 768 {242, 514, 7, 5}; one entrant, nothing leaves, unproven does not move.
+        # Upper bound 242 -> 243 (2026-10-03, #4585): structural::test_coach_count_comparison_guard_4585.py — the site/ sweep
+        # holding every coach count beside its comparison — arrives PROVEN via the re-runnable harness (MutationSpec + proof,
+        # ARMED 1/1). Measured on `scripts/gate_census.py --json`: 768 {242, 514, 7, 5} -> 769 {243, 514, 7, 5}.
+        # Upper bound 243 -> 245 (2026-10-04, #4586): the kit page gate arrives PROVEN as its guard script and as its CI
+        # step (GUARD_PROOFS / CI_PROOFS). Measured: 769 {243, 514, 7, 5} -> 771 {245, 514, 7, 5}.
+        # Upper bound 245 -> 246 (2026-10-05, #4677): structural::test_journal_row_cowriters_4677.py — the sweep holding
+        # every writer beside the journal partition to the co-owned declaration — arrives PROVEN via the re-runnable
+        # harness (MutationSpec + proof, ARMED 1/1). Measured: 771 {245, 514, 7, 5} -> 772 {246, 514, 7, 5}.
+        # Upper bound 246 -> 247 (2026-10-09 merge, #4652): registry PROJECTED_CALLER_CLASSES::ci arrives PROVEN (REGISTRY_PROOFS)
+        # as the sealed-unproven EPISODIC_CALLER_CLASSES::ci leaves the residue ledger — one in, one out, total unchanged.
+        # Measured on top of #4677: 772 {246, 514, 7, 5} -> 772 {247, 513, 7, 5}.
+        # Upper bound 247 -> 248 (2026-10-10, #4707): structural::test_key_rotator_grants_4707.py — the lambdas/ sweep holding
+        # every Secrets Manager rotation Lambda's sm.<method> calls to its role's grants — arrives PROVEN via the re-runnable
+        # harness (MutationSpec + proof, ARMED 1/1). Measured: 772 {247, 513, 7, 5} -> 773 {248, 513, 7, 5}.
+        # Upper bound 248 -> 249 (2026-10-10, #4636): structural::test_retired_training_shapes_4636.py — the lambdas/ mcp/
+        # sweep holding every read of the retired per-day training shape to training/legacy_workouts.py — arrives PROVEN
+        # via the re-runnable harness (MutationSpec + proof, ARMED 1/1). Measured: 773 {248, 513, 7, 5} -> 774 {249, 513, 7, 5}.
+        # Upper bound 249 -> 250 (2026-10-09, #4638, stacked on #4636 at merge): structural::test_upstream_changes_4638.py —
+        # the sweep holding the stated apple_health upstream_changes facet to "no rebuild-a-day caller" (keyword OR
+        # positional monotonic_guard) — arrives PROVEN via the re-runnable harness (MutationSpec + proof, ARMED 1/1).
+        # Measured after merging origin/main: 774 {249, 513, 7, 5} -> 775 {250, 513, 7, 5}.
+        # Upper bound 250 -> 251 (2026-10-10, #4694, stacked on #4638): guard::lambdas/content/autopublish_audit.py — the deterministic audit
+        # an unapproved chronicle must pass before the stale-draft sweep publishes it — arrives PROVEN (GUARD_PROOFS: four
+        # mutations, 5/1/5/1 red, restored 14 passed). Measured on top of #4638: 775 {250, 513, 7, 5} -> 776 {251, 513, 7, 5}.
+        # Upper bound 251 -> 252 (2026-10-10, #4674, stacked on #4694): registry::ledgers/site_vocabulary_residue.py::BASELINE::
+        # pace flag arrives PROVEN (REGISTRY_PROOFS). Measured after merging origin/main (disposable export vs lane):
+        # 776 {251, 513, 7, 5} -> 777 {252, 513, 7, 5}; id-set diff: exactly that one row enters, none leaves.
+        # Upper bound 252 -> 253 (2026-10-10, #4643 box 5): guard::deploy/check_bucket_notification_drift.py — the
+        # read-only S3 ingestion-trigger drift check — arrives PROVEN (GUARD_PROOFS: two mutations, 2 and 1 red,
+        # restored 6 passed). Measured on the lane off origin/main df63a72ea: 777 {252, 513, 7, 5} -> 778 {253, 513, 7, 5}.
+        # Upper bound 253 -> 254 (2026-10-10, #4270): registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa (the qa/ dir)
+        # arrives PROVEN (REGISTRY_PROOFS). Id-set diff vs a `git archive origin/main` export at 057ec826b:
+        # 778 {253, 513, 7, 5} -> 779 {254, 513, 7, 5}; STRUCTURAL_CLASSES::{static,utility} relocate tests/ -> qa/.
+        # Upper bound 254 -> 257 (2026-10-10, #4252 box 4, on top of #4270): the Unit Tests suite split into a 3-leg `shard`
+        # matrix. Two CI steps enter PROVEN (ci-test.yml shard::3 install, shard::4 coverage pass) and the combine step that
+        # replaced the old coverage gate (test::6, same label) turns PROVEN, its residue line leaving — CI_PROOFS. Measured by
+        # id-set diff vs a `git archive origin/main` export: 779 {254, 513, 7, 5} -> 781 {257, 512, 7, 5}.
+        # Upper bound 257 -> 258 (2026-10-10, #4770): registry::tests/test_model_routing_4770.py::_EXEMPT::lambdas/ai/
+        # prompt_cache.py arrives PROVEN (REGISTRY_PROOFS; entry deleted -> 1 failed naming prompt_cache.py:143/:159, restored
+        # 15 passed). The two #4769 callers moved onto ROUTES rows, so their exemptions never enter. Id-set diff vs a
+        # `git archive origin/main` export at 16dcddf20: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}.
+        <= 258
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

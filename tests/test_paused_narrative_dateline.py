@@ -4,7 +4,7 @@ in the frame its own prose uses (measured live 2026-08-27).
 THE DEFECT, as it actually happened. At 07:12 PT on 2026-08-27 the gating
 visual-QA judge failed /coaching/by-coach/#physical_coach:
 
-    Dr. Max Reyes states "I'm ten days into this restart with you — Day 10 as of
+    Max Reyes states "I'm ten days into this restart with you — Day 10 as of
     today" but the experiment is on Day 11.
 
 Ground truth from production /api/coach_analysis at the time:

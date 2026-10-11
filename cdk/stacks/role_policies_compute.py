@@ -179,12 +179,26 @@ def compute_episode_detect() -> list[iam.PolicyStatement]:
 def compute_coach_daily_reflection() -> list[iam.PolicyStatement]:
     """CC-08 daily reflection batch: reads COACH#/OUTPUT# + S3 voice specs, uses
     Bedrock (Haiku) for ≤120-word reflections, writes generated/coach_daily.json.
-    Budget-tier SSM read is granted to every CDK role by create_platform_lambda."""
+    Budget-tier SSM read is granted to every CDK role by create_platform_lambda.
+
+    #4583: + ssm:GetParameter on experiment-cycle. The daily moves row (COACH#eli_marsh /
+    MOVES#) and the Dispute Docket bet it may open (ENSEMBLE#docket) are both stamped by
+    phase_taxonomy.experiment_stamp_for -> coach_checkin.read_cycle() — the grant
+    compute_coach_memoir carries for the same reason. Without it the stamp fail-softs to an
+    unstamped row. The docket's reads/writes (GetItem, Query, PutItem) are already in the
+    base DynamoDB statement."""
     return _compute_base(
         needs_kms=True,
         needs_ai_keys=True,
         needs_s3_config=True,
         needs_s3_write=["generated/coach_daily.json"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
     )
 
 

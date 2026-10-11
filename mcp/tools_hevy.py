@@ -21,6 +21,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
 
 from mcp.core import query_source_range
 
@@ -40,7 +41,7 @@ _LEGACY_UID_PREFIX = "mf"
 # spec goal ("a workout is a workout") work today.
 _LEGACY_AGGREGATE_SOURCES = {
     # legacy DDB partition         → returned `source` label
-    "macrofactor_workouts": "macrofactor_export",
+    LEGACY_WORKOUTS_PARTITION: "macrofactor_export",
 }
 
 
@@ -79,11 +80,8 @@ def _expand_legacy_aggregate(item: dict, source_label: str) -> list[dict]:
         }
     """
     date_str = item.get("date") or ""
-    workouts = item.get("workouts") or []
     expanded: list[dict] = []
-    for w in workouts:
-        if not isinstance(w, dict):
-            continue
+    for w in day_workouts(item):
         title = w.get("title") or ""
         start_time = w.get("start_time") or ""
         end_time = w.get("end_time") or ""
@@ -196,6 +194,16 @@ def tool_get_workouts(args: dict) -> dict:
 
     # Legacy bridge: expand any daily-aggregate partitions whose `source`
     # label maps to a requested filter. macrofactor_workouts → macrofactor_export.
+    #
+    # #4636: a day the live per-workout source already holds is NOT expanded again. The
+    # archive is a mirror of the same Hevy log (its rows carry `original_source: hevy`),
+    # and the two uids can never match across it (`hevy:<id>` vs `mf:<hash>`), so the
+    # uid dedup below let 421 days (2021-04-12 → 2025-11-08) return every session twice —
+    # with identical set totals on 421 of 421, measured 2026-10-09. The live row wins its
+    # day; the archive only fills days the live source does not cover (the 10 MacroFactor-
+    # only days of 2026-02-24 → 2026-03-07).
+    live_dates = {r.get("date") for r in rows if r.get("date")}
+    legacy_days_superseded: set[str] = set()
     for legacy_src, label in _LEGACY_AGGREGATE_SOURCES.items():
         if source_filter and source_filter != label:
             continue
@@ -204,6 +212,9 @@ def tool_get_workouts(args: dict) -> dict:
         except Exception:
             items = []
         for it in items:
+            if it.get("date") in live_dates:
+                legacy_days_superseded.add(it["date"])
+                continue
             for w in _expand_legacy_aggregate(it, label):
                 if w.get("workout_uid") not in seen_uids:
                     rows.append(w)
@@ -216,6 +227,8 @@ def tool_get_workouts(args: dict) -> dict:
         "start_date": start_date,
         "end_date": end_date,
         "source_filter": source_filter,
+        # #4636: archive days skipped because the live per-workout source holds them.
+        "legacy_days_superseded": len(legacy_days_superseded),
         "workouts": rows[:limit],
     }
 

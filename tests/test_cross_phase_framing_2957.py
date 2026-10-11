@@ -230,7 +230,7 @@ def _reaction_rows(dates):
             "channel": "video_diary",
             "kind": "diary",
             "coach_id": "mind_coach",
-            "coach_name": "Dr. Nathan Reeves",
+            "coach_name": "Nathan Reeves",
             "theme": "consistency",
             "reaction": "A steady week is the point.",
             "phase": "experiment",

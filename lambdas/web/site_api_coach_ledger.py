@@ -24,15 +24,20 @@ from concurrent.futures import ThreadPoolExecutor
 
 from boto3.dynamodb.conditions import Key
 from coach import (
+    coach_baseline,  # #4585: the "nothing changes" rule served beside every coach count
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
+    plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
-from web import prediction_reason  # #4220: a graded call's reason in reader words
+from web import (
+    claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
+    prediction_reason,  # #4220: a graded call's reason in reader words
+)
 from web.site_api_common import (
     PT,
     USER_PREFIX,
@@ -149,13 +154,21 @@ def handle_coach_docket(event, *, _g):
     # is not served — a stake "based on CGM data" from a coach with no CGM is not a
     # position a reader can weigh. The entry names why under `absent`. Resolved history
     # is untouched. Fail-open with a logged warning; the renderer keeps its own guard.
-    try:
-        from health import instrument_presence as _presence
+    from health import instrument_presence as _presence
 
+    try:
         absent = _presence.absent_coaches(_g["table"])
     except Exception as _pe:
         logger.warning(f"[coach_docket] instrument presence check failed (fail-open): {_pe}")
         absent = {}
+    # #4673: the resolved history was left verbatim, and that is where the defect lived — a
+    # settled bet printed "…based on CGM data" from a side argued on 2026-09-23, four weeks
+    # after the sensor's last reading. Every claim (open OR resolved, either coach) that
+    # cites a dark instrument and is dated after its last reading is held; the entry names
+    # why under `unsourced` (web.claim_sourcing). The concession quotes the loser's claim
+    # verbatim, so it is held by the same rule. #4702: "dark" is the interval form — a gap
+    # that has since CLOSED still holds what was said inside it (gap_history never raises).
+    dark = claim_sourcing.gap_instruments(absent, _presence.gap_history(_g["table"]))
     try:
         items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
             "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
@@ -183,10 +196,14 @@ def handle_coach_docket(event, *, _g):
                 "opened_date": it.get("opened_date"),
                 "stakes": it.get("stakes") or {},
             }
+            if dark:
+                kept, held = claim_sourcing.split_claims(claims, it.get("opened_date"), dark)
+                if held:
+                    entry["claims"], entry["unsourced"] = kept, held
             if sk.startswith("OPEN#"):
                 _dark = {c: absent[c] for c in (entry["coach_a"], entry["coach_b"]) if c in absent}
                 if _dark:
-                    entry["claims"] = {c: t for c, t in dict(claims).items() if c not in _dark}
+                    entry["claims"] = {c: t for c, t in dict(entry["claims"]).items() if c not in _dark}
                     entry["absent"] = {
                         c: {"reason": st.get("reason"), "instrument": {"source": st.get("source"), "datatype": st.get("datatype")}}
                         for c, st in _dark.items()
@@ -204,6 +221,9 @@ def handle_coach_docket(event, *, _g):
                         "concession": concession,
                     }
                 )
+                held_concession = claim_sourcing.unsourced([concession], it.get("opened_date"), dark) if concession else None
+                if held_concession:
+                    entry["concession"], entry["concession_unsourced"] = None, held_concession
                 resolved.append(entry)
     except Exception as _e:
         logger.warning(f"[coach_docket] {_e}")
@@ -243,7 +263,7 @@ def _current_cycle():
 # Shared coach id/name maps for the calibration + predictions surfaces —
 # REGISTRY-DERIVED (coaching-team v2): these are career-backed history surfaces,
 # so retired coaches stay in the walk and their records keep their real byline
-# (Dr. Sarah Chen's predictions remain hers after the 2026-08-10 retirement).
+# (Sarah Chen's predictions remain hers after the 2026-08-10 retirement).
 from coach.persona_registry import (
     personas as _personas,  # noqa: E402
     short_id_names as _short_id_names,  # noqa: E402
@@ -254,7 +274,7 @@ _CALIB_COACH_NAMES = _short_id_names(include_retired=True)
 # #3520: which of those short ids belong to a RETIRED seat. The walk deliberately
 # includes retired coaches — their career records are real and stay under their real
 # byline — but the surface said nothing about it, so /coaching/scorecard/ listed
-# "Dr. Sarah Chen  0 DECIDED" beside seven operational coaches with no way for a reader
+# "Sarah Chen  0 DECIDED" beside seven operational coaches with no way for a reader
 # to tell that one of them left at the cycle-13 genesis. Derived from the registry's own
 # `retired` flag, never a name list.
 _RETIRED_SHORT_IDS = frozenset(
@@ -331,6 +351,11 @@ _PREDICTION_PROJECTION_FIELDS = (
     # resolution date that decides which cycle a graded call belongs to.
     "prediction_id",
     "outcome_date",
+    # #4585: the "nothing changes" rule's frozen verdict (coach.coach_baseline) and the
+    # docket marker that makes a docket position a yes/no bet — both read by the
+    # `comparison` block served beside every count on this module's two endpoints.
+    "baseline",
+    "source",
 )
 
 
@@ -440,6 +465,31 @@ def _fetch_prediction_partition(coach_pk, *, _g):
     that to [] so a single bad partition degrades exactly as it did before."""
     _query_partition = _g["_query_partition"]
     return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
+
+
+#: #4701: the `_parallel_fetch` job key /api/predictions reads instrument presence under.
+#: Not a short coach id, so it can never collide with a partition key.
+PRESENCE_JOB = "__instrument_presence__"
+
+
+def _instrument_presence_safe(*, _g):
+    """The interval form every other claim-sourcing route reads (#4702) —
+    `claim_sourcing.gap_instruments(absent_coaches, gap_history)` — fail-open (#4217): a
+    sentinel or history read failing must not take the ledger down, it only means less is
+    held. Never raises, so as a `_parallel_fetch` job it can never be counted as a failed
+    coach partition. Both reads ride this ONE job, so the pool still runs one wave."""
+    from health import instrument_presence as _presence
+
+    try:
+        absent = _presence.absent_coaches(_g["table"])
+    except Exception as _pe:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument presence check failed (fail-open): {_pe}")
+        absent = {}
+    try:
+        return claim_sourcing.gap_instruments(absent, _presence.gap_history(_g["table"]))
+    except Exception as _ge:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument gap history failed (fail-open): {_ge}")
+        return claim_sourcing.gap_instruments(absent)
 
 
 def _parallel_fetch(jobs, *, failures=None):
@@ -630,10 +680,13 @@ def handle_calibration(event, *, _g):
         hyp_rows = fetched.pop("hypothesis-ledger")
 
         per_coach = []
+        season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
         platform_pairs = []  # season
         platform_career_pairs = []  # career (all cycles, #1376)
         for cid, name in _CALIB_COACH_NAMES.items():
             summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
+            coach_decided = coach_record.decided_rows(fetched[cid], genesis=EXPERIMENT_START)
+            season_decided.extend(coach_decided)
             platform_pairs.extend(pairs)
             platform_career_pairs.extend(career_pairs)
             per_coach.append(
@@ -645,6 +698,8 @@ def handle_calibration(event, *, _g):
                     # #4220: K of N through <day> — the ONE record producer's block, over the
                     # same rows the Brier numbers beside it were scored on.
                     "record": coach_record.record_from_rows(fetched[cid], genesis=EXPERIMENT_START),
+                    # #4585: the record never appears alone — the same rows, scored by a guess.
+                    "comparison": coach_baseline.comparison_block(coach_decided),
                     "lifetime": career_summary,
                 }
             )
@@ -706,6 +761,9 @@ def handle_calibration(event, *, _g):
             {
                 "platform": platform,
                 "coaches": per_coach,
+                # #4585 / epic #4580 rule 3: no coach count without what a simple guess would
+                # have scored — four separate records, never added together.
+                "comparison": coach_baseline.comparison_block(season_decided),
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
@@ -746,6 +804,82 @@ def handle_calibration(event, *, _g):
         return _ok(
             {"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}, "prereg_seal": seal}, cache_seconds=60, degraded=e
         )
+
+
+#: #4607 — the fields the front page's record line is computed from, and nothing else: a
+#: strict SUBSET of ``_PREDICTION_PROJECTION_FIELDS`` (pinned by
+#: tests/test_edition_latency_4607.py), all scalars. The identity and cycle keys
+#: (``prediction_id``, ``outcome_date``, ``phase``, ``tombstone``) are the ones
+#: ``coach_record`` reads; ``status``/``outcome``/``confidence`` are the grade and the Brier
+#: pair. The maps and prose the two full routes also carry (``evaluation``, ``baseline``,
+#: ``claim_natural``, ``outcome_notes`` …) are what made the same partitions cost megabytes.
+_RECORD_PROJECTION_FIELDS = ("status", "outcome", "confidence", "tombstone", "phase", "prediction_id", "outcome_date")
+
+
+def edition_record(*, _g):
+    """The five facts /api/edition's record line prints, from ONE narrow partition sweep (#4607).
+
+    The front page read ``/api/predictions`` and ``/api/calibration`` whole for
+    ``overall.confirmed``, ``overall.decided`` and the coaches' stratum (``brier_skill``,
+    ``n``). Measured 2026-10-04: those two reads were 7.8 MB of the 10.0 MB of DynamoDB
+    JSON one edition request parsed, and ~3.0 s of its ~4.8 s in the Lambda — each walks all
+    coach PREDICTION# partitions with the full projection, and the calibration route adds
+    the paginated CALIB# ledger, none of which the record line reads.
+
+    NOT a second derivation of the record. The rows are the same unfiltered career
+    partitions (``_query_partition`` — same key condition, order and Limit, so the same
+    page), run through the same functions in the same order the two routes use:
+    ``coach_record.resolved_once`` → ``coach_record.counts_this_cycle`` → the
+    ``status`` tally ``handle_predictions`` keeps, and
+    ``calibration_core.pairs_from_prediction_records`` → ``score_strata`` for the stratum
+    ``handle_calibration`` serves. Only the projection is narrower, and every field those
+    functions read is in it. A stratum's own numbers depend on its own pairs only, so
+    scoring the coaches' stratum without the hypothesis and forecast strata returns the
+    same ``strata.coaches``. tests/test_edition_latency_4607.py runs the two routes and
+    this reader over one fake table and asserts the record block is identical.
+
+    Returns ``{"predictions": {...}, "calibration": {...}}`` — each the subset of that
+    route's body the record line reads, in the route's own shape. Raises when every
+    partition read failed (the same "a total outage is a failure, not a zero" rule as
+    ``handle_predictions``, #2658); the caller serves the block unavailable.
+    """
+    _query_partition = _g["_query_partition"]
+    _parallel_fetch = _g["_parallel_fetch"]
+    EXPERIMENT_START = _g["EXPERIMENT_START"]
+    failures: list = []
+    fetched = _parallel_fetch(
+        {
+            cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _query_partition(pk, "PREDICTION#", _RECORD_PROJECTION_FIELDS))
+            for cid in _CALIB_COACH_NAMES
+        },
+        failures=failures,
+    )
+    if failures and len(failures) == len(_CALIB_COACH_NAMES):
+        raise RuntimeError(f"all {len(failures)} coach partition reads failed: {sorted(failures)}")
+    if failures:
+        logger.error(f"[edition-record] degraded — {len(failures)} of {len(_CALIB_COACH_NAMES)} partitions failed: {sorted(failures)}")
+    confirmed = refuted = 0
+    coach_pairs: list = []
+    for cid in _CALIB_COACH_NAMES:
+        records = coach_record.resolved_once(fetched.get(cid, []))
+        season = [r for r in records if coach_record.counts_this_cycle(r, EXPERIMENT_START)]
+        for rec in season:
+            status = rec.get("status", "pending")  # the bucket key handle_predictions tallies
+            if status == "confirmed":
+                confirmed += 1
+            elif status == "refuted":
+                refuted += 1
+        coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
+    today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
+    return {
+        "predictions": {
+            "overall": {"confirmed": confirmed, "refuted": refuted, "decided": confirmed + refuted, "due": {"as_of": today_pt}}
+        },
+        "calibration": {
+            "platform": {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}},
+            "as_of": today_pt,
+        },
+    }
 
 
 def handle_voice_fidelity(event, *, _g):
@@ -820,6 +954,9 @@ def handle_predictions(event, *, _g):
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
         coach_filter = qs.get("coach_id", "")
+        # #4714: the coach page's "Next" list is the one request of this shape (ck_coach.js asks
+        # `?coach_id=<id>&status=pending`); only it is held to the plain-words rule below.
+        coach_page_pending = status_filter == "pending" and bool(coach_filter)
         # #2658: `int()` on an unvalidated param raised straight into the handler-wide
         # `except` below, which answered 200 with an empty ledger — a swallowed error
         # rendered as "the coaches have made no predictions" (ADR-104). Reject the bad
@@ -843,10 +980,19 @@ def handle_predictions(event, *, _g):
         # #1527: fetch every scanned coach's partition concurrently up front —
         # the loop below stays purely computational.
         _fetch_failures: list = []
-        fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches},
-            failures=_fetch_failures,
-        )
+        _jobs = {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+        # #4701: the instrument-presence read rides the SAME concurrent round as the
+        # partitions (8 coaches + 1 = the pool's 9 workers, one wave), so the #4673 hold
+        # costs this #1527-guarded path no serial round trip. It never raises.
+        _jobs[PRESENCE_JOB] = lambda: _instrument_presence_safe(_g=_g)
+        fetched = _parallel_fetch(_jobs, failures=_fetch_failures)
+        # #4701: the sourcing hold every other route that quotes a dated coach claim
+        # applies (web.claim_sourcing, #4673). A row whose words cite an instrument that
+        # had sent no reading by the day they were said keeps its date and its place in
+        # the record; its `text` is "" and `unsourced` says why. Before this the call
+        # page withheld a claim this ledger still quoted.
+        _dark = fetched.pop(PRESENCE_JOB, None) or []  # #4702: already the interval form
+        _fetch_failures[:] = [f for f in _fetch_failures if f != PRESENCE_JOB]
         # #2658: `_parallel_fetch` catches each partition error individually, so a total
         # outage never reached the handler-wide guard below — it produced a fully zeroed
         # scorecard at HTTP 200, which is the exact "absence rendered as zero" this issue
@@ -861,6 +1007,7 @@ def handle_predictions(event, *, _g):
             )
         all_predictions = []
         by_coach = {}
+        season_decided = []  # #4585: the comparison's row-set — the decided rows `record` counts
         # The real graded calls live in PREDICTION# records (status set by the daily
         # coach-prediction-evaluator), NOT in OUTPUT#.predictions (which was a list of
         # natural-language strings with no status — the old read returned all-zero).
@@ -910,6 +1057,9 @@ def handle_predictions(event, *, _g):
                 # career and in season alike — the same row-set `record` is counted from.
                 records = coach_record.resolved_once(fetched.get(cid, []))
                 by_coach[cid]["record"] = coach_record.record_from_rows(records, genesis=EXPERIMENT_START)
+                coach_decided = coach_record.decided_rows(records, genesis=EXPERIMENT_START)
+                season_decided.extend(coach_decided)
+                by_coach[cid]["comparison"] = coach_baseline.comparison_block(coach_decided)  # #4585
                 for rec in records:
                     ev = rec.get("evaluation") or {}
                     ungradeable = not prediction_windows.is_gradeable(ev)
@@ -941,13 +1091,29 @@ def handle_predictions(event, *, _g):
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
+                    # #4714: the plain-words rule applies to ONE list only — the coach page's "Next" (the only
+                    # caller asking for one coach's pending calls), never the full ledger (status=all, the
+                    # method/prediction pages). There, an in-cycle pending call a friend could not read is not
+                    # listed (it is still counted above, so the scorecard keeps the row). A SEALED pre-registered
+                    # bet is never hidden: it was frozen before the experiment began, so it is served whatever its
+                    # length, and only the jargon half of the rule labels it (`reader_plain: False`) for the page.
+                    _plain_label = None
+                    if coach_page_pending and p_status == "pending":
+                        _claim = rec.get("claim_natural")
+                        if rec.get("pre_registered"):
+                            _plain_label = not plain_words.specialist_terms(_claim)
+                        elif not plain_words.is_plain(_claim, plain_words.CALL_MAX_CHARS):
+                            continue
+
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
+                    _said = rec.get("claim_natural", "")
+                    _held = claim_sourcing.unsourced([_said], claim_sourcing.claim_day(rec), _dark) if _dark else None
                     all_predictions.append(
                         {
                             "coach_id": cid,
                             "coach_name": _pred_coach_names[cid],
                             "retired": cid in _RETIRED_SHORT_IDS,
-                            "text": rec.get("claim_natural", ""),
+                            "text": "" if _held else _said,  # #4701: held words are removed, never edited
                             "confidence": rec.get("confidence", "medium"),
                             "status": p_status,
                             "date": rec.get("created_date", ""),
@@ -973,6 +1139,11 @@ def handle_predictions(event, *, _g):
                             "reason": _reason,
                             "graded_on_data": _graded_on_data,
                             "subdomain": rec.get("subdomain", ""),
+                            # #4701: present only on a held row — the same note shape the docket,
+                            # call and coach routes serve (reason, instrument, gap, said_on, text; #4702).
+                            **({"unsourced": _held} if _held else {}),
+                            # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
+                            **({"reader_plain": False} if _plain_label is False else {}),
                         }
                     )
             except Exception as _qe:
@@ -1062,6 +1233,11 @@ def handle_predictions(event, *, _g):
                     },
                 },
                 "by_coach": by_coach,
+                # #4585 / epic #4580 rule 3: the record never appears alone. The "nothing
+                # changes" rule's right / scored / unscorable counts per record (number calls,
+                # direction calls, yes/no bets, sealed day-one predictions — never summed), and
+                # the ONE sentence a page prints beside the count.
+                "comparison": coach_baseline.comparison_block(season_decided),
                 # #4220: below this many decided calls a rendered record prints counts, not a %.
                 "percent_floor": coach_record.PERCENT_FLOOR,
                 "predictions": all_predictions,

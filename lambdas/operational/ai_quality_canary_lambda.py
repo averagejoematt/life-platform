@@ -436,7 +436,7 @@ def _persona_names():
     """The sanctioned, named coach/board personas — DERIVED from the canonical
     persona registry (`config/personas.json` via `persona_registry`, the same
     source site_api_coach.py reads), never hardcoded here (a local list would
-    drift from the registry — AC #1634). Naming one of these (e.g. "Dr. Sarah
+    drift from the registry — AC #1634). Naming one of these (e.g. "Sarah
     Chen") is EXPECTED and correct board behavior, not a fourth-wall break.
     Empty list on any failure → the judge prompt still states the vendor/model
     contract, just without the explicit roster to anchor on. Fail-soft."""
@@ -483,13 +483,21 @@ def _emit_judge_failure() -> None:
         logger.warning("canary: judge-failure metric emit failed: %s", e)
 
 
+_JUDGE_SCHEMA = {  # #4276: the advisory judge's reply shape, closed and all-required
+    "type": "object",
+    "properties": {"coherent": {"type": "boolean"}, "notes": {"type": "array", "items": {"type": "string"}}},
+    "required": ["coherent", "notes"],
+    "additionalProperties": False,
+}
+
+
 def _judge(transcript, persona_names=None):
     """Budget-gated Haiku read: is each answer on-character and grounded? ADVISORY
     only — kept in the record/digest for a human, never tied to the metric gauge
     (a permanently-red AI-judged alarm gets ignored). None on any failure.
 
     The character contract is stated EXPLICITLY (#1634): the board speaks through
-    NAMED, sanctioned coach personas (e.g. "Dr. Sarah Chen") — naming one is
+    NAMED, sanctioned coach personas (e.g. "Sarah Chen") — naming one is
     EXPECTED and correct, never a violation. The fourth-wall break is naming the
     underlying AI VENDOR or MODEL (Claude, Anthropic, GPT, Haiku, Sonnet,
     Bedrock, …) or otherwise stepping out of the persona. Leaving the judge to
@@ -517,16 +525,20 @@ def _judge(transcript, persona_names=None):
             "  - coherent: it actually answers the question.\n"
             'Respond ONLY as JSON: {"coherent": bool, "notes": ["short issue", ...]}.\n\n' + json.dumps(transcript, default=str)[:6000]
         )
+        from ai.model_routing import model_for  # #4770: the one model registry (read at call time, as before)
+
         body = {
-            "model": os.environ.get("AI_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+            "model": model_for("website_ai.quality_canary"),
             "max_tokens": 400,
             "system": "Terse QA judge. JSON only.",
             "messages": [{"role": "user", "content": prompt}],
         }
-        out = bedrock_client.invoke(body)
-        text = "".join(b.get("text", "") for b in out.get("content", [])) if isinstance(out, dict) else str(out)
-        m = re.search(r"\{.*\}", text, re.S)
-        return json.loads(m.group(0)) if m else None
+        # #4276: constrained to _JUDGE_SCHEMA and parsed in the one door; a schema-less fallback
+        # reply with prose around its JSON still gets the old {...} span salvage.
+        from ai.structured_json import call_json, parse_json_span
+
+        parsed = call_json(lambda b: bedrock_client.invoke(b), body, schema=_JUDGE_SCHEMA, label="ai_quality_canary_judge")
+        return parse_json_span(parsed, "{") if isinstance(parsed, str) else parsed
     except Exception as e:  # noqa: BLE001
         logger.warning("canary: advisory judge failed (non-fatal): %s", e)
         _emit_judge_failure()

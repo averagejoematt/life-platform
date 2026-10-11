@@ -53,12 +53,18 @@ export function entryAgeSuffix(dateStr, now = new Date()) {
 // (`{ weekday: false }` → "September 22"). Pinned to UTC noon so no viewer's offset can move
 // it a day — the same trick ptDaysAgo uses. "" when the date is unusable: an ISO string
 // never falls through to the reader.
-export function dayInWords(dateStr, { weekday = true } = {}) {
+// #4766 — OPT-IN `{ yearIfNotCurrent: true }`: a date outside the CURRENT Pacific year prints
+// its year ("Friday, July 2, 2027"), so a goal projection's next-year window never reads as
+// past dates. Opt-in, never the default: the default spelling must not depend on the clock
+// (a clock-dependent default turned ~100 year-less fixture assertions into a New-Year time
+// bomb). `now` is injectable so the rule is testable.
+export function dayInWords(dateStr, { weekday = true, yearIfNotCurrent = false, now = new Date() } = {}) {
   const iso = String(dateStr || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
   const d = new Date(_utcNoon(iso));
   if (isNaN(d.getTime())) return "";
-  const md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
+  let md = d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric" });
+  if (yearIfNotCurrent && d.getUTCFullYear() !== Number(PT_DAY.format(now).slice(0, 4))) md += `, ${d.getUTCFullYear()}`;
   return weekday ? `${d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long" })}, ${md}` : md;
 }
 
@@ -148,6 +154,32 @@ export function nextWeighInText(lastWeighinDate, throughDate, { capital = false 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(through) || due >= through) return { text: cap(`the next weigh-in is due ${dayInWords(due)}`), day: due };
   const n = Math.round((_utcNoon(through) - _utcNoon(last)) / 86400000);
   return { text: cap(`no weigh-in since ${dayInWords(last)} — ${n} day${n === 1 ? "" : "s"}`), day: last };
+}
+
+// #4329 (R7 fix 5) — the ONE spelling of the engine's date to goal on the v7 pages (Home, His
+// numbers). "Wednesday, June 9" with no year reads, in October, as a day that has passed; and
+// a single day is more precision than a projection has. The reader gets the month, the year
+// and the engine's own range: "At this rate the goal lands around June 2027 — between May and
+// September 2027." From /api/journey `projected_goal_date` (+ `_earliest` / `_latest`); the
+// range is dropped when either bound is unserved or both fall in the projected month. ""
+// when no date is served — the caller prints its own absence line.
+const _monthYear = (iso) => {
+  const d = new Date(_utcNoon(String(iso || "").slice(0, 10)));
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(iso || "")) || isNaN(d.getTime())) return null;
+  return { month: d.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" }), year: d.getUTCFullYear() };
+};
+export function goalWindowText(journey) {
+  const j = journey || {};
+  const mid = _monthYear(j.projected_goal_date);
+  if (!mid) return "";
+  const lo = _monthYear(j.projected_goal_date_earliest);
+  const hi = _monthYear(j.projected_goal_date_latest);
+  const same = (a, b) => a.month === b.month && a.year === b.year;
+  let range = "";
+  if (lo && hi && !(same(lo, mid) && same(hi, mid))) {
+    range = lo.year === hi.year ? ` — between ${lo.month} and ${hi.month} ${hi.year}` : ` — between ${lo.month} ${lo.year} and ${hi.month} ${hi.year}`;
+  }
+  return `At this rate the goal lands around ${mid.month} ${mid.year}${range}.`;
 }
 
 // #4219 — how many Pacific calendar days an open coach ask is past its `due` date. The

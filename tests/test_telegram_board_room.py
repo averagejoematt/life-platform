@@ -142,12 +142,12 @@ def test_chair_route_is_the_leads_telegram_route():
 def test_room_thread_prefixes_coach_turns_with_the_speaker():
     rows = [
         {"role": "matthew", "text": "how did I sleep"},
-        {"role": "coach", "coach_name": "Dr. Sana Okafor", "text": "well.", "status": "sent"},
+        {"role": "coach", "coach_name": "Sana Okafor", "text": "well.", "status": "sent"},
         {"role": "coach", "text": "nameless row survives un-prefixed"},
     ]
     thread = room.room_thread(rows)
     assert thread[0]["text"] == "how did I sleep"
-    assert thread[1]["text"] == "[Dr. Sana Okafor] well."
+    assert thread[1]["text"] == "[Sana Okafor] well."
     assert thread[2]["text"] == "nameless row survives un-prefixed"
 
 
@@ -226,7 +226,7 @@ def test_speaker_runs_the_turn_and_stamps_the_room(monkeypatch, _room_wire):
         worker,
         "_assemble",
         lambda pid, cid, allow_referral=True: {
-            "coach_name": "Dr. Marcus Webb",
+            "coach_name": "Marcus Webb",
             "persona": "P",
             "memory": "M",
             "facts_block": "F",

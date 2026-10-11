@@ -385,7 +385,8 @@ def resolve_referral_target(payload: Optional[str], personas: dict, self_persona
     """Marker payload → a real persona_id, or None (which means: no handoff).
 
     Accepts the persona_id (what the prompt asks for) and, fail-soft, the display
-    name — a model that writes ``[[refer: Dr. Nora Vale]]`` has expressed exactly
+    name — a model that writes ``[[refer: Nora Vale]]`` (or, echoing a pre-#4564 thread,
+    the same name behind its old honorific) has expressed exactly
     the same intent and there is no reason to punish it with silence. A
     self-referral resolves to None: a coach cannot hand a conversation to itself.
     """
@@ -394,9 +395,11 @@ def resolve_referral_target(payload: Optional[str], personas: dict, self_persona
         return None
     if raw in personas:
         return None if raw == self_persona_id else raw
-    low = raw.lower()
+    from coach.persona_registry import plain_name  # a model echoing an old thread may still write the honorific (#4564)
+
+    low = plain_name(raw).lower()
     for pid, p in personas.items():
-        if str((p or {}).get("name") or "").lower() == low:
+        if plain_name((p or {}).get("name")).lower() == low:
             return None if pid == self_persona_id else pid
     return None
 
@@ -408,7 +411,7 @@ def render_tail(turns: list, matthew_label: str, coach_label: str, limit: int = 
     """The last few turns of the referring conversation, attributed by NAME.
 
     Attributed rather than role-tagged because the referred coach is reading a
-    colleague's conversation, not resuming its own — 'Dr. Lisa Park:' is the
+    colleague's conversation, not resuming its own — 'Lisa Park:' is the
     frame that keeps it from answering as though Matthew wrote those lines.
     """
     lines = []

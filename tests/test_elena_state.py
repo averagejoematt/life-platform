@@ -207,12 +207,14 @@ def test_updater_requires_a_date():
 
 
 def test_both_publish_paths_invoke_the_updater():
-    # approve click
+    # #4593: approve click + stale-draft sweep both go through the ONE side-effect owner, which invokes her updater
+    owner_block = APPROVE_SRC[APPROVE_SRC.index("def publish_side_effects") : APPROVE_SRC.index("# AUTO-PUBLISH SWEEP")]
+    assert "_invoke_elena_state_updater(date_str)" in owner_block
     approve_block = APPROVE_SRC[APPROVE_SRC.index('if action == "approve"') :]
-    assert "_invoke_elena_state_updater(date_str)" in approve_block
-    # stale-draft sweep
+    assert "publish_side_effects(item, date_str)" in approve_block
     sweep_block = APPROVE_SRC[APPROVE_SRC.index("def _sweep_stale_drafts") : APPROVE_SRC.index("def lambda_handler")]
-    assert "_invoke_elena_state_updater(date_str)" in sweep_block
+    assert "publish_side_effects(item, date_str, defer=DEFERRABLE)" in sweep_block
+    assert "elena_state" not in sweep_block, "the sweep must not defer or decline her update"
     # wednesday direct-publish (non-preview branch only)
     assert "_invoke_elena_state_updater(date_str)" in CHRONICLE_SRC
     preview_branch = CHRONICLE_SRC[CHRONICLE_SRC.index("if PREVIEW_MODE:") : CHRONICLE_SRC.index("    else:\n        # ── Standard flow")]
@@ -268,3 +270,18 @@ def test_updater_writes_only_the_persona_partition():
 
     for m in re.finditer(r'\.(?:put_item|update_item)\(\s*(?:Item=\{|Key=\{)\s*"pk": ([^,]+),', UPDATER_SRC):
         assert m.group(1).strip() == "PERSONA_PK", f"write outside PERSONA_PK: {m.group(0)}"
+
+
+def test_the_extraction_is_asked_under_its_schema_and_parsed_in_the_one_door(monkeypatch):
+    """#4276: `_call_haiku` sends EXTRACTION_SCHEMA as output_config.format through
+    ai.structured_json.call_json; a fenced reply still parses (the door's fallback)."""
+    import common.retry_utils as retry_utils
+
+    esu = _updater()
+    sent = []
+    reply = '```json\n{"motifs": ["the long walk"]}\n```'
+    monkeypatch.setattr(
+        retry_utils, "call_anthropic_raw", lambda body, **k: sent.append(body) or {"content": [{"type": "text", "text": reply}]}
+    )
+    assert esu._call_haiku("sys", "user") == {"motifs": ["the long walk"]}
+    assert sent[0]["output_config"]["format"]["schema"] == esu.EXTRACTION_SCHEMA

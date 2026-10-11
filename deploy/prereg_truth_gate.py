@@ -374,6 +374,8 @@ def audit_prereg_truth(
     is absent from the operational set, never because it appears on a retirement list,
     so a coach retired WITHOUT being recorded is caught just the same.
     """
+    from coach.persona_registry import plain_name
+
     findings: list[Finding] = []
 
     for coach_id, block in (artifact.get("coaches") or {}).items():
@@ -390,7 +392,10 @@ def audit_prereg_truth(
             )
             continue
         expected = coach_bylines[coach_id]
-        if expected and name != expected:
+        # #4564: the honorific is not part of a seat's identity. The registry dropped it (owner ruling
+        # 2026-10-02) and a sealed artifact keeps the names it was sealed with, so the two are compared
+        # on the plain name — a different PERSON on the seat is still a mismatch, a dropped title is not.
+        if expected and plain_name(name) != plain_name(expected):
             findings.append(
                 Finding(
                     COACH_NAME_MISMATCH,

@@ -188,22 +188,24 @@ class TestParseVote:
 
 class TestBuildUserMessage:
     def test_roster_and_passage_present(self):
-        candidates = [{"coach_id": "sleep_coach", "name": "Dr. Lisa Park", "domain": "sleep_science"}]
+        candidates = [{"coach_id": "sleep_coach", "name": "Lisa Park", "domain": "sleep_science"}]
         msg = vfh._build_user_message(candidates, "some passage text")
-        assert "sleep_coach" in msg and "Dr. Lisa Park" in msg and "sleep_science" in msg
+        assert "sleep_coach" in msg and "Lisa Park" in msg and "sleep_science" in msg
         assert "some passage text" in msg
 
 
 class TestRunPanel:
     CANDIDATES = [
-        {"coach_id": "sleep_coach", "name": "Dr. Lisa Park", "domain": "sleep_science"},
-        {"coach_id": "training_coach", "name": "Dr. Sarah Chen", "domain": "exercise_physiology"},
+        {"coach_id": "sleep_coach", "name": "Lisa Park", "domain": "sleep_science"},
+        {"coach_id": "training_coach", "name": "Sarah Chen", "domain": "exercise_physiology"},
     ]
 
     def test_three_calls_collected(self, monkeypatch):
         calls = []
 
         class _BR:
+            structured_output_config = staticmethod(lambda schema: {"format": {"type": "json_schema", "schema": schema}})
+
             @staticmethod
             def invoke(body, model_name=None):
                 calls.append(body)
@@ -215,11 +217,15 @@ class TestRunPanel:
         assert len(votes) == 3
         # panel temperature diversity — not 3 copies of one call
         assert len({c["temperature"] for c in calls}) == 3
+        # #4276: each panelist is asked under a schema whose guess enum IS the roster
+        assert calls[0]["output_config"]["format"]["schema"]["properties"]["guess"]["enum"] == ["sleep_coach", "training_coach"]
 
     def test_one_panelist_failure_shrinks_panel_not_crashes(self, monkeypatch):
         state = {"n": 0}
 
         class _BR:
+            structured_output_config = staticmethod(lambda schema: {"format": {"type": "json_schema", "schema": schema}})
+
             @staticmethod
             def invoke(body, model_name=None):
                 state["n"] += 1
@@ -233,6 +239,8 @@ class TestRunPanel:
 
     def test_all_malformed_returns_no_votes(self, monkeypatch):
         class _BR:
+            structured_output_config = staticmethod(lambda schema: {"format": {"type": "json_schema", "schema": schema}})
+
             @staticmethod
             def invoke(body, model_name=None):
                 return {"content": [{"type": "text", "text": "garbage"}]}
@@ -305,8 +313,8 @@ class TestLambdaHandler:
         monkeypatch.setattr(vfh.table, "get_item", lambda **kw: {"Item": None})
 
         candidates = [
-            {"coach_id": "sleep_coach", "name": "Dr. Lisa Park", "domain": "sleep_science"},
-            {"coach_id": "training_coach", "name": "Dr. Sarah Chen", "domain": "exercise_physiology"},
+            {"coach_id": "sleep_coach", "name": "Lisa Park", "domain": "sleep_science"},
+            {"coach_id": "training_coach", "name": "Sarah Chen", "domain": "exercise_physiology"},
         ]
         monkeypatch.setattr(vfh, "_load_candidates", lambda: candidates)
 

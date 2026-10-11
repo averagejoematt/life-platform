@@ -150,6 +150,8 @@
   color: var(--ink);
   margin: var(--sp-3) 0 0;
 }
+/* the fold's one dated line, under the promise (R7 fix 10) */
+.fo-fold-next { margin: 0 0 var(--sp-3); }
 
 .fo-success {
   display: none;

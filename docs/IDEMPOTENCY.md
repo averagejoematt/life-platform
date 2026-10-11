@@ -56,18 +56,18 @@ in-flight lease, and a durable ledger.
 
 ---
 
-## 2. Email senders — the SES set (28 handlers)
+## 2. Email senders — the SES set (27 handlers)
 
-**The finding said 7. The derived set is 28.** `tests/test_ses_send_guard_set_2222.py::derive_ses_sending_handlers`
+**The finding said 7. The derived set is 27** (28 at filing; #2835 retired two SES sends and #4622 added one — the two retired rows stay in §2b, so the tables hold 29 rows for 27 senders). `tests/test_ses_send_guard_set_2222.py::derive_ses_sending_handlers`
 walks `lambdas/` for modules that define a `lambda_handler` *and* put mail on the
 wire; the census below is built from that same derivation, so the two can never
 disagree about who is in the set.
 
-All 28 honour a send suppressor (#2222/#2291) — that is a solved problem and is
+All 27 honour a send suppressor (#2222/#2291) — that is a solved problem and is
 not restated per row. The column that matters here is **replay-safe**.
 
 **#3113 closed the gap DIL-025 opened.** 6 senders were replay-safe when this
-file was written; 19 are now, and the remaining **9** carry a written verdict
+file was written; 19 are now, and the remaining **10** rows carry a written verdict
 rather than silence. The honest `N` rows in §2b are as much the deliverable as
 the `Y` rows — three of them are `N` because the Lambda's IAM role is read-only
 by design and the duplicate it would prevent is an ops digest nobody records.
@@ -99,7 +99,7 @@ send a second letter. `N` = it will.
 | `compute/weekly_signal_lambda.py` | `cron(30 16 ? * SUN *)` | **#3113.** `period_key = week:{ISO week}`, recorded after the **first** subscriber send. The #2820 delivery datapoint is a CloudWatch METRIC, not a durable record, and cannot answer "did this week's letter already go to the list?". Needed new `dynamodb:PutItem` + `kms:GenerateDataKey` grants. | `weekly_signal_lambda.py` guard |
 | `web/subscriber_onboarding_lambda.py` | `cron(5 17 * * ? *)` | The guard is **per-recipient**, which a per-lambda `period_key` cannot express: there is no one letter, there are N, each on its own clock relative to that subscriber's `confirmed_at`. The `onboarding_sent` flag IS a durable per-letter record, read before the send by the query's `FilterExpression` and written **one line** after it. Re-classified from "partial" on re-reading (#3113): the residual window (send OK, `update_item` raises) is the same fail-open window `send_ledger.record_sent` has. | `subscriber_onboarding_lambda.py:174`, `:225-232` |
 
-### 2b. Residual — no ledger, by verdict (9)
+### 2b. Residual — no ledger, by verdict (10)
 
 Each of these was assessed under #3113 and **deliberately not** given the shared
 primitive. The reasons are specific, not a shrug — and two of them are the same
@@ -118,6 +118,7 @@ the disproportion ADR-103/144 exists to refuse.
 | `operational/traffic_digest_lambda.py` | `cron(0 16 ? * MON *)` | **N — accepted** | `dynamodb:Query` only — "Query only, never write — the digest is read-only by contract" (`role_policies_operational.py`; #2835 added read-only `s3:GetObject` on the two folded-report artifact keys). Since #2835 this is THE Monday ops-pack email — the one remaining ops send. |
 | `operational/permanence_lambda.py` | `cron(0 6 * * ? *)` | **N — accepted** | `dynamodb:Query` only, and #1400 says why out loud: "the contract's own state lives in the published continuity document rather than in a private partition." |
 | `operational/data_reconciliation_lambda.py` | `cron(30 7 ? * MON *)` | **Y — idempotent by construction** | **#2835 retired its SES send** — delivery is now the `reconciliation/latest.json` S3 artifact (plus the dated archive key) the Monday ops pack embeds; a replay overwrites the same keys with the same freshly-computed report. |
+| `emails/habit_skip_review_lambda.py` | `cron(0 16 ? * SAT *)` | **N — accepted** | **#4622.** The role is `dynamodb:Query` on the habitify partition only (LeadingKeys-scoped) — read-only by design, like the ops digests above. A replay re-reads the same seven stored days and mails the same owner-only queue again; a duplicate is a repeated reading of an unchanged list (or of a shorter one, if he settled some in between), never a falsified record, and an empty week sends nothing either time. Adopting the ledger would mean a `dynamodb:PutItem` grant to close a one-email-to-the-owner gap. |
 | `web/email_subscriber_lambda.py` | **reader HTTP** (FunctionURL) | **Partial — accepted** | The remaining exposure is a *reader resubmitting the form*, which is not a replay: re-sending the confirmation is the intended behaviour when someone lost the first mail. The `confirm` leg is already replay-safe — the token is `REMOVE`d on use, so a replayed confirm cannot re-send the welcome (see §4). |
 
 > The ops `N` rows are the honest `N` this census was built to make sayable.

@@ -123,9 +123,9 @@ class TestCoachPreamble:
         goals = {"targets": {}, "coach_briefing": "Test briefing", "known_constraints": []}
         inventory = {}
         maturity = {"sleep": {"phase": "orientation", "days": 3, "threshold": 7, "unit": "nights", "target_date": "April 15"}}
-        result = build_coach_preamble("Dr. Lisa Park", "sleep", goals, inventory, maturity)
+        result = build_coach_preamble("Lisa Park", "sleep", goals, inventory, maturity)
         assert "FIRST PERSON" in result
-        assert "Dr. Lisa Park" in result
+        assert "Lisa Park" in result
 
     def test_null_targets_shown_correctly(self):
         from intelligence.intelligence_common import build_coach_preamble
@@ -133,7 +133,7 @@ class TestCoachPreamble:
         goals = {"targets": {"weight": {"goal_lbs": None}}, "coach_briefing": "", "known_constraints": []}
         inventory = {}
         maturity = {"sleep": {"phase": "emerging", "days": 10, "threshold": 7, "unit": "nights"}}
-        result = build_coach_preamble("Dr. Lisa Park", "sleep", goals, inventory, maturity)
+        result = build_coach_preamble("Lisa Park", "sleep", goals, inventory, maturity)
         assert "not yet set" in result
 
 

@@ -33,10 +33,11 @@ v1.0.0 — 2026-07-22 (#1688)
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Callable, Optional
+
+from ai.model_routing import model_for  # #4770: the one model registry
 
 # Error-class vocabulary — the ONE source of truth (#1689). Imported, never re-listed.
 from coach.coach_corrections import ERROR_CLASSES
@@ -382,12 +383,15 @@ _CRITIC_SYSTEM = (
 )
 
 
+_CRITIC_MODEL = model_for("review_pack.critic")
+
+
 def _build_critic_body(items: list) -> dict:
     """Compact Haiku request. `items` = [(n, checkable_claim), ...]. System block is a
     cached content block (COST-OPT-2 / ADR-049 prompt caching)."""
     lines = [f"#{n}: {claim}" for n, claim in items]
     return {
-        "model": "claude-haiku-4-5-20251001",
+        "model": _CRITIC_MODEL,
         "max_tokens": 700,
         "system": [{"type": "text", "text": _CRITIC_SYSTEM, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": "Items:\n" + "\n".join(lines) + "\n\nReturn the JSON array."}],
@@ -398,12 +402,10 @@ def _parse_critic(resp: dict) -> dict:
     """Parse the critic's JSON array → {n: wrongness float in 0..1}. Defensive: tolerate
     fences/prose, drop malformed rows. Returns {} on any parse failure."""
     text = "".join(p.get("text", "") for p in (resp or {}).get("content", []) if p.get("type") == "text").strip()
-    start, end = text.find("["), text.rfind("]")
-    if start == -1 or end == -1 or end < start:
-        return {}
-    try:
-        arr = json.loads(text[start : end + 1])  # noqa: E203
-    except (ValueError, TypeError):
+    from ai.structured_json import parse_json_span  # #4276: the span salvage lives in the one door
+
+    arr = parse_json_span(text, "[")
+    if arr is None:
         return {}
     out = {}
     for row in arr if isinstance(arr, list) else []:
@@ -426,7 +428,7 @@ def run_critic(numbered_analyses: list, invoke_fn: Callable) -> dict:
     if not items:
         return {}
     try:
-        resp = invoke_fn(_build_critic_body(items), model_name="claude-haiku-4-5-20251001")
+        resp = invoke_fn(_build_critic_body(items), model_name=_CRITIC_MODEL)
     except Exception as e:  # pragma: no cover — advisory; deterministic floor stands
         logger.warning(f"[review_pack_ranker] Haiku critic failed (non-fatal): {e}")
         return {}

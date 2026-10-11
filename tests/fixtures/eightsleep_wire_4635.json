@@ -1,0 +1,1284 @@
+{
+ "_provenance": "Built for #4635 from two archived Eight Sleep raw payloads (the framework's archived fetch_day envelope: trends + bed_side + tz), fetched on consecutive evenings. Key structure is the vendor's, complete. Values the transform reads, and the vendor's incomplete/processing/lagMinutes flags, are as sent; every other value is blanked (numbers 0, strings 'redacted', lists cut to one element) because the repo is public.",
+ "flagged_fetch": {
+  "wake_date": "2026-09-09",
+  "raw": {
+   "trends": {
+    "avgScore": 0,
+    "avgPresenceDuration": 0,
+    "avgSleepDuration": 0,
+    "avgDeepPercent": 0,
+    "avgTnt": 0,
+    "modelVersion": "v2",
+    "sfsCalculator": "v3.2",
+    "days": [
+     {
+      "day": "2026-09-08",
+      "presenceDuration": 47670,
+      "sleepDuration": 22560,
+      "remDuration": 4800,
+      "remPercent": 0.21,
+      "lightDuration": 12180,
+      "deepDuration": 5580,
+      "deepPercent": 0.25,
+      "snoreDuration": 0,
+      "heavySnoreDuration": 0,
+      "snorePercent": 0,
+      "heavySnorePercent": 0,
+      "mitigationEvents": 0,
+      "stoppedSnoringEvents": 0,
+      "reducedSnoringEvents": 0,
+      "ineffectiveExtendedEvents": 0,
+      "cancelledEvents": 0,
+      "elevationDuration": 0,
+      "theoreticalSnorePercent": 0,
+      "snoringReductionPercent": 0,
+      "elevationAutopilotAdjustmentCount": 0,
+      "presenceStart": "2026-09-08T04:41:00.000Z",
+      "presenceEnd": "2026-09-08T15:57:30.000Z",
+      "sleepStart": "2026-09-08T04:48:30.000Z",
+      "sleepEnd": "2026-09-08T15:56:30.000Z",
+      "tnt": 20,
+      "mainSessionId": "redacted",
+      "sessionIds": [
+       "redacted"
+      ],
+      "incomplete": false,
+      "tags": [
+       {
+        "id": "redacted",
+        "name": "redacted",
+        "value": true,
+        "source": "redacted",
+        "context": {
+         "externalId": "redacted",
+         "iconUrl": "redacted"
+        }
+       }
+      ],
+      "hotFlash": {
+       "summary": {
+        "sessionCount": 0
+       },
+       "sessions": []
+      },
+      "performanceWindows": {
+       "isAvailable": true,
+       "configuration": {
+        "chronotypeBaselineDays": 0,
+        "chronotypeMinimumCalibrationDays": 0,
+        "chronotypeFullyCalibratedDays": 0,
+        "socialJetlagMinSessions": 0,
+        "performanceWindowsBaselineDays": 0,
+        "performanceWindowsMinimumCalibrationDays": 0
+       },
+       "performanceWindowStats": {
+        "currentSleepStart": "redacted",
+        "currentSleepMidpoint": "redacted",
+        "currentSleepEnd": "redacted",
+        "currentTotalSleepTimeSeconds": 0,
+        "bedtimeBaseline": "redacted",
+        "sleepStartBaseline": "redacted",
+        "sleepEndBaseline": "redacted",
+        "sleepMidpointBaseline": "redacted",
+        "wasoBaseline": 0,
+        "totalSleepTimeSecondsBaseline": 0,
+        "deepSleepSecondsBaseline": 0
+       },
+       "chronotype": {
+        "source": "redacted",
+        "chronoClass": "redacted",
+        "isCalibrating": false,
+        "calibrationDays": 0,
+        "internalChronotypeDate": "1970-01-01T00:00:00.000Z"
+       },
+       "socialJetlag": {
+        "socialJetlagSeconds": 0,
+        "avgWeekdaySleepMidpoint": "redacted",
+        "avgWeekendSleepMidpoint": "redacted"
+       },
+       "exerciseWindow": {
+        "activeRuleName": "redacted",
+        "exerciseWindowStart": "redacted",
+        "exerciseWindowMidpoint": "redacted",
+        "exerciseWindowEnd": "redacted"
+       },
+       "cognitiveWindow": {
+        "activeRuleName": "redacted",
+        "cognitiveWindowStart": "redacted",
+        "cognitiveWindowMidpoint": "redacted",
+        "cognitiveWindowEnd": "redacted"
+       }
+      },
+      "score": 64,
+      "sleepQualityScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "sleepDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "hrv": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 44.5,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "respiratoryRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 12.7,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heartRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 55.9,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "deep": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "rem": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "waso": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "snoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heavySnoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "sleepDebt": {
+        "firstSleepDate": "redacted",
+        "dailySleepDebtSeconds": 0,
+        "baselineSleepDurationSeconds": 0,
+        "isCalibrating": false
+       }
+      },
+      "sleepRoutineScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "wakeupConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "sleepStartConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "bedtimeConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "latencyAsleepSeconds": {
+        "current": 450,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "latencyOutSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       }
+      }
+     },
+     {
+      "day": "2026-09-09",
+      "presenceDuration": 31950,
+      "sleepDuration": 24240,
+      "remDuration": 6780,
+      "remPercent": 0.28,
+      "lightDuration": 14310,
+      "deepDuration": 7710,
+      "deepPercent": 0.22,
+      "snoreDuration": 0,
+      "heavySnoreDuration": 0,
+      "snorePercent": 0,
+      "heavySnorePercent": 0,
+      "mitigationEvents": 0,
+      "stoppedSnoringEvents": 0,
+      "reducedSnoringEvents": 0,
+      "ineffectiveExtendedEvents": 0,
+      "cancelledEvents": 0,
+      "elevationDuration": 0,
+      "theoreticalSnorePercent": 0,
+      "snoringReductionPercent": 0,
+      "elevationAutopilotAdjustmentCount": 0,
+      "presenceStart": "2026-09-09T03:30:00.000Z",
+      "presenceEnd": "2026-09-09T11:43:00.000Z",
+      "sleepStart": "2026-09-09T04:49:30.000Z",
+      "sleepEnd": "2026-09-09T11:42:30.000Z",
+      "tnt": 24,
+      "mainSessionId": "redacted",
+      "sessionIds": [
+       "redacted"
+      ],
+      "incomplete": true,
+      "processing": true,
+      "lagMinutes": 2.50325,
+      "tags": [
+       {
+        "id": "redacted",
+        "name": "redacted",
+        "value": true,
+        "source": "redacted",
+        "context": {
+         "externalId": "redacted",
+         "iconUrl": "redacted"
+        }
+       }
+      ],
+      "hotFlash": {
+       "summary": {
+        "sessionCount": 0,
+        "averageDurationSeconds": 0,
+        "peakStage": "redacted"
+       },
+       "sessions": [
+        {
+         "startTime": "1970-01-01T00:00:00.000Z",
+         "durationSeconds": 0,
+         "level": 0,
+         "phase": "redacted",
+         "stage": "redacted"
+        }
+       ]
+      },
+      "performanceWindows": {
+       "isAvailable": true,
+       "configuration": {
+        "chronotypeBaselineDays": 0,
+        "chronotypeMinimumCalibrationDays": 0,
+        "chronotypeFullyCalibratedDays": 0,
+        "socialJetlagMinSessions": 0,
+        "performanceWindowsBaselineDays": 0,
+        "performanceWindowsMinimumCalibrationDays": 0
+       },
+       "performanceWindowStats": {
+        "currentSleepStart": "redacted",
+        "currentSleepMidpoint": "redacted",
+        "currentSleepEnd": "redacted",
+        "currentTotalSleepTimeSeconds": 0,
+        "bedtimeBaseline": "redacted",
+        "sleepStartBaseline": "redacted",
+        "sleepEndBaseline": "redacted",
+        "sleepMidpointBaseline": "redacted",
+        "wasoBaseline": 0,
+        "totalSleepTimeSecondsBaseline": 0,
+        "deepSleepSecondsBaseline": 0
+       },
+       "chronotype": {
+        "source": "redacted",
+        "chronoClass": "redacted",
+        "isCalibrating": false,
+        "calibrationDays": 0,
+        "internalChronotypeDate": "1970-01-01T00:00:00.000Z"
+       },
+       "socialJetlag": {
+        "socialJetlagSeconds": 0,
+        "avgWeekdaySleepMidpoint": "redacted",
+        "avgWeekendSleepMidpoint": "redacted"
+       },
+       "exerciseWindow": {
+        "activeRuleName": "redacted",
+        "exerciseWindowStart": "redacted",
+        "exerciseWindowMidpoint": "redacted",
+        "exerciseWindowEnd": "redacted"
+       },
+       "cognitiveWindow": {
+        "activeRuleName": "redacted",
+        "cognitiveWindowStart": "redacted",
+        "cognitiveWindowMidpoint": "redacted",
+        "cognitiveWindowEnd": "redacted"
+       }
+      },
+      "score": 85,
+      "sleepQualityScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "sleepDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "hrv": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 44.1,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "respiratoryRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 13,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heartRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 58,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "deep": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "rem": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "waso": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "snoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heavySnoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "sleepDebt": {
+        "firstSleepDate": "redacted",
+        "dailySleepDebtSeconds": 0,
+        "baselineSleepDurationSeconds": 0,
+        "isCalibrating": false
+       }
+      },
+      "sleepRoutineScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "wakeupConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "sleepStartConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "bedtimeConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "latencyAsleepSeconds": {
+        "current": 4770,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "latencyOutSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       }
+      }
+     }
+    ]
+   },
+   "bed_side": "left",
+   "tz": "America/Los_Angeles"
+  }
+ },
+ "next_day_fetch": {
+  "wake_date": "2026-09-10",
+  "raw": {
+   "trends": {
+    "avgScore": 0,
+    "avgPresenceDuration": 0,
+    "avgSleepDuration": 0,
+    "avgDeepPercent": 0,
+    "avgTnt": 0,
+    "modelVersion": "v2",
+    "sfsCalculator": "v3.2",
+    "days": [
+     {
+      "day": "2026-09-09",
+      "presenceDuration": 31950,
+      "sleepDuration": 24240,
+      "remDuration": 6750,
+      "remPercent": 0.28,
+      "lightDuration": 12210,
+      "deepDuration": 5280,
+      "deepPercent": 0.22,
+      "snoreDuration": 0,
+      "heavySnoreDuration": 0,
+      "snorePercent": 0,
+      "heavySnorePercent": 0,
+      "mitigationEvents": 0,
+      "stoppedSnoringEvents": 0,
+      "reducedSnoringEvents": 0,
+      "ineffectiveExtendedEvents": 0,
+      "cancelledEvents": 0,
+      "elevationDuration": 0,
+      "theoreticalSnorePercent": 0,
+      "snoringReductionPercent": 0,
+      "elevationAutopilotAdjustmentCount": 0,
+      "presenceStart": "2026-09-09T03:30:00.000Z",
+      "presenceEnd": "2026-09-09T11:43:00.000Z",
+      "sleepStart": "2026-09-09T04:49:30.000Z",
+      "sleepEnd": "2026-09-09T11:42:30.000Z",
+      "tnt": 24,
+      "mainSessionId": "redacted",
+      "sessionIds": [
+       "redacted"
+      ],
+      "incomplete": false,
+      "tags": [
+       {
+        "id": "redacted",
+        "name": "redacted",
+        "value": true,
+        "source": "redacted",
+        "context": {
+         "externalId": "redacted",
+         "iconUrl": "redacted"
+        }
+       }
+      ],
+      "hotFlash": {
+       "summary": {
+        "sessionCount": 0,
+        "averageDurationSeconds": 0,
+        "peakStage": "redacted"
+       },
+       "sessions": [
+        {
+         "startTime": "1970-01-01T00:00:00.000Z",
+         "durationSeconds": 0,
+         "level": 0,
+         "phase": "redacted",
+         "stage": "redacted"
+        }
+       ]
+      },
+      "performanceWindows": {
+       "isAvailable": true,
+       "configuration": {
+        "chronotypeBaselineDays": 0,
+        "chronotypeMinimumCalibrationDays": 0,
+        "chronotypeFullyCalibratedDays": 0,
+        "socialJetlagMinSessions": 0,
+        "performanceWindowsBaselineDays": 0,
+        "performanceWindowsMinimumCalibrationDays": 0
+       },
+       "performanceWindowStats": {
+        "currentSleepStart": "redacted",
+        "currentSleepMidpoint": "redacted",
+        "currentSleepEnd": "redacted",
+        "currentTotalSleepTimeSeconds": 0,
+        "bedtimeBaseline": "redacted",
+        "sleepStartBaseline": "redacted",
+        "sleepEndBaseline": "redacted",
+        "sleepMidpointBaseline": "redacted",
+        "wasoBaseline": 0,
+        "totalSleepTimeSecondsBaseline": 0,
+        "deepSleepSecondsBaseline": 0
+       },
+       "chronotype": {
+        "source": "redacted",
+        "chronoClass": "redacted",
+        "isCalibrating": false,
+        "calibrationDays": 0,
+        "internalChronotypeDate": "1970-01-01T00:00:00.000Z"
+       },
+       "socialJetlag": {
+        "socialJetlagSeconds": 0,
+        "avgWeekdaySleepMidpoint": "redacted",
+        "avgWeekendSleepMidpoint": "redacted"
+       },
+       "exerciseWindow": {
+        "activeRuleName": "redacted",
+        "exerciseWindowStart": "redacted",
+        "exerciseWindowMidpoint": "redacted",
+        "exerciseWindowEnd": "redacted"
+       },
+       "cognitiveWindow": {
+        "activeRuleName": "redacted",
+        "cognitiveWindowStart": "redacted",
+        "cognitiveWindowMidpoint": "redacted",
+        "cognitiveWindowEnd": "redacted"
+       }
+      },
+      "score": 78,
+      "sleepQualityScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "sleepDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "hrv": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 44.1,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "respiratoryRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 13,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heartRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 58,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "deep": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "rem": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "waso": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "snoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heavySnoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "sleepDebt": {
+        "firstSleepDate": "redacted",
+        "dailySleepDebtSeconds": 0,
+        "baselineSleepDurationSeconds": 0,
+        "isCalibrating": false
+       }
+      },
+      "sleepRoutineScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "wakeupConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "sleepStartConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "bedtimeConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "latencyAsleepSeconds": {
+        "current": 4770,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "latencyOutSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       }
+      }
+     },
+     {
+      "day": "2026-09-10",
+      "presenceDuration": 39030,
+      "sleepDuration": 27090,
+      "remDuration": 9480,
+      "remPercent": 0.35,
+      "lightDuration": 10800,
+      "deepDuration": 6810,
+      "deepPercent": 0.25,
+      "snoreDuration": 0,
+      "heavySnoreDuration": 0,
+      "snorePercent": 0,
+      "heavySnorePercent": 0,
+      "mitigationEvents": 0,
+      "stoppedSnoringEvents": 0,
+      "reducedSnoringEvents": 0,
+      "ineffectiveExtendedEvents": 0,
+      "cancelledEvents": 0,
+      "elevationDuration": 0,
+      "theoreticalSnorePercent": 0,
+      "snoringReductionPercent": 0,
+      "elevationAutopilotAdjustmentCount": 0,
+      "presenceStart": "2026-09-10T03:03:00.000Z",
+      "presenceEnd": "2026-09-10T11:39:00.000Z",
+      "sleepStart": "2026-09-10T03:57:30.000Z",
+      "sleepEnd": "2026-09-10T11:31:30.000Z",
+      "tnt": 26,
+      "mainSessionId": "redacted",
+      "sessionIds": [
+       "redacted"
+      ],
+      "incomplete": false,
+      "tags": [],
+      "hotFlash": {
+       "summary": {
+        "sessionCount": 0,
+        "averageDurationSeconds": 0,
+        "peakStage": "redacted"
+       },
+       "sessions": [
+        {
+         "startTime": "1970-01-01T00:00:00.000Z",
+         "durationSeconds": 0,
+         "level": 0,
+         "phase": "redacted",
+         "stage": "redacted"
+        }
+       ]
+      },
+      "performanceWindows": {
+       "isAvailable": true,
+       "configuration": {
+        "chronotypeBaselineDays": 0,
+        "chronotypeMinimumCalibrationDays": 0,
+        "chronotypeFullyCalibratedDays": 0,
+        "socialJetlagMinSessions": 0,
+        "performanceWindowsBaselineDays": 0,
+        "performanceWindowsMinimumCalibrationDays": 0
+       },
+       "performanceWindowStats": {
+        "currentSleepStart": "redacted",
+        "currentSleepMidpoint": "redacted",
+        "currentSleepEnd": "redacted",
+        "currentTotalSleepTimeSeconds": 0,
+        "bedtimeBaseline": "redacted",
+        "sleepStartBaseline": "redacted",
+        "sleepEndBaseline": "redacted",
+        "sleepMidpointBaseline": "redacted",
+        "wasoBaseline": 0,
+        "totalSleepTimeSecondsBaseline": 0,
+        "deepSleepSecondsBaseline": 0
+       },
+       "chronotype": {
+        "source": "redacted",
+        "chronoClass": "redacted",
+        "isCalibrating": false,
+        "calibrationDays": 0,
+        "internalChronotypeDate": "1970-01-01T00:00:00.000Z"
+       },
+       "socialJetlag": {
+        "socialJetlagSeconds": 0,
+        "avgWeekdaySleepMidpoint": "redacted",
+        "avgWeekendSleepMidpoint": "redacted"
+       },
+       "exerciseWindow": {
+        "activeRuleName": "redacted",
+        "exerciseWindowStart": "redacted",
+        "exerciseWindowMidpoint": "redacted",
+        "exerciseWindowEnd": "redacted"
+       },
+       "cognitiveWindow": {
+        "activeRuleName": "redacted",
+        "cognitiveWindowStart": "redacted",
+        "cognitiveWindowMidpoint": "redacted",
+        "cognitiveWindowEnd": "redacted"
+       }
+      },
+      "score": 82,
+      "sleepQualityScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "sleepDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "hrv": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 34.3,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "respiratoryRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 13,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heartRate": {
+        "upperRange": 0,
+        "lowerRange": 0,
+        "upperBound": 0,
+        "lowerBound": 0,
+        "current": 59,
+        "average": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "deep": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "rem": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "waso": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "snoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "heavySnoringDurationSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "sleepDebt": {
+        "firstSleepDate": "redacted",
+        "dailySleepDebtSeconds": 0,
+        "baselineSleepDurationSeconds": 0,
+        "isCalibrating": false
+       }
+      },
+      "sleepRoutineScore": {
+       "total": 0,
+       "weight": 0,
+       "weighted": 0,
+       "wakeupConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "sleepStartConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "bedtimeConsistency": {
+        "current": "redacted",
+        "lowerRange": "redacted",
+        "upperRange": "redacted",
+        "lowerBound": "redacted",
+        "upperBound": "redacted",
+        "average": "redacted",
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": "redacted"
+       },
+       "latencyAsleepSeconds": {
+        "current": 3270,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       },
+       "latencyOutSeconds": {
+        "current": 0,
+        "lowerRange": 0,
+        "upperRange": 0,
+        "lowerBound": 0,
+        "upperBound": 0,
+        "average": 0,
+        "stdDev": 0,
+        "score": 0,
+        "weight": 0,
+        "weighted": 0,
+        "available": true,
+        "inclusive7DayAverage": 0
+       }
+      }
+     }
+    ]
+   },
+   "bed_side": "left",
+   "tz": "America/Los_Angeles"
+  }
+ }
+}

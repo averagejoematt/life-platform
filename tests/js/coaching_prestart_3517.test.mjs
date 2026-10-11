@@ -28,8 +28,8 @@ const { rosterEntries } = await import("../../site/assets/js/coach_roster.js");
 const SITE_JS = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "assets", "js");
 
 const ROSTER = [
-  { persona_id: "physical_coach", name: "Dr. Nathan Reeves", domain: "physical_health", tier: "member", _live: "No weight reading has arrived since the September 6th reset." },
-  { persona_id: "nutrition_coach", name: "Dr. Amara Chen", domain: "nutrition", tier: "member", _live: "MacroFactor isn't syncing yet." },
+  { persona_id: "physical_coach", name: "Nathan Reeves", domain: "physical_health", tier: "member", _live: "No weight reading has arrived since the September 6th reset." },
+  { persona_id: "nutrition_coach", name: "Amara Chen", domain: "nutrition", tier: "member", _live: "MacroFactor isn't syncing yet." },
   { persona_id: "head_coach", name: "Elena Voss", domain: "integrator", tier: "lead" },
 ];
 

@@ -170,12 +170,14 @@ def test_resolution_is_registry_backed_not_string_trust():
     reg = personas()
     assert coach_outbound.resolve_referral_target("pattern_coach", reg, "sleep_coach") == "pattern_coach"
     # The display name expresses the same intent — accepted, fail-soft.
+    assert coach_outbound.resolve_referral_target("Nora Vale", reg, "sleep_coach") == "pattern_coach"
+    # #4564: a model echoing a pre-ruling thread may still write the honorific — same intent, same target.
     assert coach_outbound.resolve_referral_target("Dr. Nora Vale", reg, "sleep_coach") == "pattern_coach"
     # An id the model invented resolves to nothing at all.
     assert coach_outbound.resolve_referral_target("dream_coach", reg, "sleep_coach") is None
     # A coach cannot hand a conversation to itself.
     assert coach_outbound.resolve_referral_target("sleep_coach", reg, "sleep_coach") is None
-    assert coach_outbound.resolve_referral_target("Dr. Lisa Park", reg, "sleep_coach") is None
+    assert coach_outbound.resolve_referral_target("Lisa Park", reg, "sleep_coach") is None
 
 
 # ── O5 (pure half): quiet hours + the shared ledger ───────────────────────────
@@ -450,8 +452,8 @@ def test_the_referred_coach_gets_the_tail_and_its_own_seat(wired):
     _inbound(worker)
 
     referral_turn = h.turns[1]
-    assert referral_turn["coach_name"] == "Dr. Nora Vale"
-    assert "Dr. Lisa Park" in referral_turn["inbound"]  # the referring colleague, by name
+    assert referral_turn["coach_name"] == "Nora Vale"
+    assert "Lisa Park" in referral_turn["inbound"]  # the referring colleague, by name
     assert "can't switch off at night" in referral_turn["inbound"]  # the tail
     assert "Matthew has NOT texted you" in referral_turn["inbound"]
     # A referral cannot itself refer: no chain.
@@ -693,7 +695,7 @@ def test_the_training_route_refuses_rather_than_resurrecting_a_retired_seat(wire
 
     The load-bearing assertion is what happens to the now-unmapped key. The
     worker's offline fallback derives f"{route}_coach", and `training_coach` is
-    Dr. Sarah Chen — RETIRED at the cycle-13 genesis. Deriving her would put a
+    Sarah Chen — RETIRED at the cycle-13 genesis. Deriving her would put a
     retired persona back on the phone in her own voice, which is undetectable
     from the reply and strictly worse than an honest failure. It must refuse.
     """
@@ -719,7 +721,7 @@ def test_the_performance_seat_answers_on_its_primary_route(wired):
     with mock.patch.object(worker, "_secret_entry", side_effect=lambda key: dict(store.get(key) or {})):
         worker.lambda_handler({"coach_id": "physical", "chat_id": 4242, "text": "squats felt heavy"}, None)
 
-    assert h.turns[0]["coach_name"] == "Dr. Max Reyes"
+    assert h.turns[0]["coach_name"] == "Max Reyes"
     assert any(p.get("pk") == coach_chat.chat_pk("physical_coach") for p in h.table.puts)
 
 

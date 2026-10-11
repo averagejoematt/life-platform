@@ -51,6 +51,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -67,10 +68,19 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("journal_enrichment")
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
+
+# #4643: the budget_guard feature this Lambda's own Haiku extraction is gated on — listed in
+# budget_guard._FEATURE_CUTOFF and scripts/ai_budget_ledger.py (tests/test_ingest_ai_budget_rows_4643.py).
+BUDGET_FEATURE = "journal_enrichment"
+# #4643: the ER-01 INGEST_HEALTH#<name> sentinel every run writes (record_ingest_health), so a
+# dead or erroring enrichment is visible to liveness, not only to a DLQ that never fills.
+HEALTH_SOURCE = "journal_enrichment"
 
 PK = f"USER#{USER_ID}#SOURCE#notion"
 # J-5 (#505): the floor is WORDS, aligned with journal_analyzer_lambda — the old
@@ -81,6 +91,33 @@ SCHEMA_VERSION = 2  # #505: bump when the extraction schema changes; v1 entries 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
+
+# #4643: the ER-01 liveness sentinel, the same writer notion/dropbox/hevy use.
+try:
+    from ingestion.ingest_health import classify_error
+    from ingestion.ingestion_framework import record_ingest_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
+
+def _record_health(*, succeeded: bool, exc=None) -> None:
+    """Best-effort INGEST_HEALTH write for this run (the Lambda ran = attempted). Never raises."""
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    error_class = "none" if succeeded else (exc if isinstance(exc, str) else classify_error(exc))
+    record_ingest_health(table, HEALTH_SOURCE, logger, attempted=True, succeeded=succeeded, error_class=error_class)
+
+
+def _ai_allowed() -> bool:
+    """budget_guard gate for this run's Haiku extraction (#4643). Fails open if the
+    module is missing — bedrock_client's own tier-3 backstop still applies."""
+    try:
+        from ai import budget_guard
+    except ImportError:  # pragma: no cover — budget_guard always bundled in prod
+        return True
+    return budget_guard.allow(BUDGET_FEATURE)
 
 
 # ── Haiku Prompt ──────────────────────────────────────────────────────────────
@@ -135,6 +172,51 @@ Extract as JSON:
   "behaviors": [<concrete actions the author DID, e.g. "skipped the evening walk", "meal-prepped for the week", "stayed up late scrolling". Max 6. Empty list if none>],
   "causal_hints": [<cause→effect links the author EXPLICITLY asserts, each as {{"cause": "...", "effect": "...", "quote": "<the verbatim sentence from the entry that asserts the link>"}}. Max 4. Empty list if none — most entries have none>]
 }}"""
+
+# USER_PROMPT_TEMPLATE's shape, constrained at the model (#4276): Bedrock structured outputs via
+# ai.structured_json.call_json. Every key required; "null if …" fields are anyOf [T, null].
+_J_STRS = {"type": "array", "items": {"type": "string"}}
+_J_NUM = {"anyOf": [{"type": "number"}, {"type": "null"}]}
+_J_STR = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+EXTRACTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "mood_score": _J_NUM,
+        "energy_score": _J_NUM,
+        "stress_score": _J_NUM,
+        "sentiment": {"type": "string", "enum": ["positive", "neutral", "negative", "mixed"]},
+        "emotions": _J_STRS,
+        "themes": _J_STRS,
+        "cognitive_patterns": _J_STRS,
+        "growth_signals": _J_STRS,
+        "avoidance_flags": _J_STRS,
+        "ownership_score": _J_NUM,
+        "social_quality": {"anyOf": [{"type": "string", "enum": ["alone", "surface", "meaningful", "deep"]}, {"type": "null"}]},
+        "flow_indicators": {"type": "boolean"},
+        "values_lived": _J_STRS,
+        "gratitude_items": _J_STRS,
+        "alcohol_mention": {"type": "boolean"},
+        "sleep_disruption_context": _J_STR,
+        "pain_mentions": _J_STRS,
+        "exercise_context": _J_STR,
+        "notable_quote": _J_STR,
+        "defense_patterns": _J_STRS,
+        "primary_defense": _J_STR,
+        "entities": _J_STRS,
+        "behaviors": _J_STRS,
+        "causal_hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"cause": {"type": "string"}, "effect": {"type": "string"}, "quote": {"type": "string"}},
+                "required": ["cause", "effect", "quote"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "additionalProperties": False,
+}
+EXTRACTION_SCHEMA["required"] = list(EXTRACTION_SCHEMA["properties"])
 
 
 def _ground_causal_hints(hints, raw_text):
@@ -200,29 +282,15 @@ def call_haiku(raw_text, date, template, structured_scores):
     }
 
     # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
+    # #4276: the reply is constrained to EXTRACTION_SCHEMA at the model and parsed in the one door.
+    from ai.structured_json import call_json
     from common.retry_utils import call_anthropic_raw
 
-    result = call_anthropic_raw(body, timeout=30)
-
-    # Extract text content
-    text = ""
-    for block in result.get("content", []):
-        if block.get("type") == "text":
-            text += block["text"]
-
-    # Clean and parse JSON
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse Haiku response: {e}\nRaw: {text[:500]}")
+    parsed = call_json(lambda b: call_anthropic_raw(b, timeout=30), body, schema=EXTRACTION_SCHEMA, label="journal_enrichment")
+    if not isinstance(parsed, dict):
+        logger.error(f"Failed to parse Haiku response as a JSON object: {str(parsed)[:500]}")
         return None
+    return parsed
 
 
 FIELD_MAPPING = {
@@ -459,6 +527,10 @@ def _refresh_horizons_calibration():
 
 
 def lambda_handler(event: dict, context) -> dict:
+    # #4643: the daily boot probe (pipeline_health_check) invokes this with
+    # {"healthcheck": true} — prove the bundle imports, never call the model.
+    if isinstance(event, dict) and event.get("healthcheck"):
+        return {"statusCode": 200, "body": "ok"}
     try:
         """
         Lambda entry point.
@@ -504,6 +576,7 @@ def lambda_handler(event: dict, context) -> dict:
         if event.get("conversations_only"):
             summary = _run_conversational(event, start_date, end_date, force)
             logger.info(f"Conversations-only complete: {summary}")
+            _record_health(succeeded=True)  # #4643
             return {"statusCode": 200, "body": json.dumps(summary)}
 
         entries = query_journal_entries(start_date, end_date, full_sync)
@@ -517,12 +590,18 @@ def lambda_handler(event: dict, context) -> dict:
             rows = _write_flourishing_rows(entries)
             summary = {"entries_found": len(entries), "flourishing_rows": rows, "date_range": f"{start_date} → {end_date}"}
             logger.info(f"Flourishing-only complete: {summary}")
+            _record_health(succeeded=True)  # #4643
             return {"statusCode": 200, "body": json.dumps(summary)}
 
         enriched = 0
         skipped = 0
         errors = 0
+        paused_by_budget = 0  # #4643: entries left for the next sweep because the tier paused the model
+        last_error = None  # #4643: the class the health record carries when a run errors
         diary_reactions = 0  # #1756
+        ai_allowed = _ai_allowed()  # #4643: one tier read per run, not per entry
+        if not ai_allowed:
+            logger.warning(f"budget tier pauses {BUDGET_FEATURE}: no Haiku extraction this run (entries stay queued)")
 
         for item in entries:
             sk = item.get("sk", "")
@@ -558,6 +637,10 @@ def lambda_handler(event: dict, context) -> dict:
             elif stale_schema and item.get("enriched_at"):
                 logger.info(f"Re-enriching {sk}: schema v{item.get('enriched_schema_version') or 1} < v{SCHEMA_VERSION}")
 
+            if not ai_allowed:
+                paused_by_budget += 1
+                continue
+
             template = item.get("template", "Unknown")
             date = item.get("date", "")
             structured_scores = build_structured_scores(item)
@@ -585,9 +668,11 @@ def lambda_handler(event: dict, context) -> dict:
                         skipped += 1
                 else:
                     errors += 1
+                    last_error = last_error or "parse"
                     logger.error(f"  ✗ No enrichment returned for {sk}")
             except Exception as e:
                 errors += 1
+                last_error = e
                 logger.error(f"  ✗ Error enriching {sk}: {e}")
 
         # #1403: after enrichment, project the window's SOURCE#flourishing rows.
@@ -626,6 +711,7 @@ def lambda_handler(event: dict, context) -> dict:
             "enriched": enriched,
             "skipped": skipped,
             "errors": errors,
+            "paused_by_budget": paused_by_budget,  # #4643
             "diary_reactions": diary_reactions,  # #1756
             "flourishing_rows": flourishing_rows,
             "conversational": conversational,
@@ -634,7 +720,12 @@ def lambda_handler(event: dict, context) -> dict:
         }
         logger.info(f"Complete: {summary}")
 
+        # #4643: a run in which any entry failed to enrich is a FAILED run for liveness (the
+        # streak arm then sees a model/parse failure that repeats), while a budget pause is a
+        # healthy run that sanctioned-skipped — the tier is not an outage.
+        _record_health(succeeded=errors == 0, exc=last_error)
         return {"statusCode": 200, "body": json.dumps(summary)}
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)
+        _record_health(succeeded=False, exc=e)  # #4643
         raise

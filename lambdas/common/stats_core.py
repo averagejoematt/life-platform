@@ -286,6 +286,34 @@ def wilson_interval(k, n, confidence=0.95):
     return (lo, hi)
 
 
+def exact_sign_test_p(b, c):
+    """Two-sided exact sign test on discordant pairs (McNemar's exact test), #4585.
+
+    Two forecasters graded on the SAME calls: ``b`` = calls only the first got right,
+    ``c`` = calls only the second got right (calls both got right, or both missed, carry
+    no evidence about which is better and are not arguments). Under "neither is better"
+    each discordant call is a fair coin, so the p-value is
+    ``min(1, 2 · P(X <= min(b, c)))`` for ``X ~ Binomial(b + c, 1/2)``.
+
+    Returns 1.0 when there is no discordant call (nothing to tell them apart), None on a
+    negative or non-integer count. Exact (integer binomial coefficients), stdlib only.
+    Assumes the calls are independent — a caller whose calls share a window or a metric
+    must say the p-value is optimistic.
+    """
+    try:
+        b_i, c_i = int(b), int(c)
+    except (TypeError, ValueError):
+        return None
+    if b_i != b or c_i != c or b_i < 0 or c_i < 0:
+        return None
+    n = b_i + c_i
+    if n == 0:
+        return 1.0
+    k = min(b_i, c_i)
+    tail = sum(math.comb(n, i) for i in range(k + 1))
+    return min(1.0, 2.0 * tail / (2**n))
+
+
 def _block_resample(n, block_len, rng):
     """Indices for one moving-block bootstrap replicate of length n."""
     idx = []

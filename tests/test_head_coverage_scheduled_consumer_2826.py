@@ -596,6 +596,143 @@ def test_superseded_run_a_rolls_into_run_b_plan(tmp_path):
     assert "mcp/tools_health.py" in changed
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# #4250 box 3 — a reconcile-commit push defers to the live run that pushed it.
+# The bot's PAT push mints its own run ~40 s after the merge's; both read the
+# same last-deployed base, so both fleet-deployed the same tree (four pairs on
+# 2026-10-04). Replay: base deployed → M merges a shared module → the bot
+# commits a docs line + the counter file on top.
+# ─────────────────────────────────────────────────────────────────────────
+
+_PLAN_RED = [_j("Plan deployments", "failure")]
+_NOTHING_OWED = [_j("Plan deployments", "success"), _j("Deploy", "skipped")]
+_BOT_SUBJECT = "chore(reconcile): regenerate derived artifacts after merge [skip-reconcile]"
+
+
+def _reconcile_repo(tmp_path, bot_files, bot_subject=_BOT_SUBJECT):
+    """base → M (a shared module) → bot commit touching `bot_files`. Returns (repo, shas)."""
+    repo = str(tmp_path)
+
+    def git(*a):
+        return subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    shas = {}
+    for name, subject, paths in (
+        ("base", "base", ["lambdas/emails/daily_brief_lambda.py"]),
+        ("M", "feat: a shared module", ["lambdas/web/site_api_edition.py", "tests/test_x.py"]),
+        ("bot", bot_subject, bot_files),
+    ):
+        for path in paths:
+            os.makedirs(os.path.join(repo, os.path.dirname(path)), exist_ok=True)
+            with open(os.path.join(repo, path), "w") as f:
+                f.write(name)
+        git("add", "-A")
+        git("commit", "-qm", subject)
+        shas[name] = git("rev-parse", "HEAD")
+    return repo, shas
+
+
+def test_reconcile_push_base_defers_only_to_a_live_or_deployed_parent_run():
+    """The parent sha is the base only while the run at that sha can still ship (or has
+    shipped) this tree. Every other parent state returns None — the ordinary #4472 base —
+    so the bot's run still deploys a merge whose own run went red or was dropped."""
+    wrong = {}
+    for label, jobs, expected in (
+        ("in-flight", _IN_FLIGHT, "p" * 5),
+        ("deploy-running", [_j("Plan deployments", "success"), _j("Deploy", None, None, status="in_progress")], "p" * 5),
+        ("deployed", _FLEET_DEPLOYED, "p" * 5),
+        ("plan-red", _PLAN_RED, None),
+        ("deploy-cancelled", _CANCELLED, None),
+        ("deploy-failed", _REJECTED_LEASE, None),
+        ("nothing-owed", _NOTHING_OWED, None),
+    ):
+        runs = [(_run(2, "b", "2026-09-29T18:00:40Z"), _IN_FLIGHT), (_run(1, "p", "2026-09-29T18:00:00Z"), jobs)]
+        table = {r["id"]: j for r, j in runs}
+        got = dm.reconcile_push_base([r for r, _ in runs], lambda r: table[r["id"]], _NOW, "p" * 5)
+        if got != expected:
+            wrong[label] = got
+    assert not wrong, f"parent-run states that resolved the wrong base: {wrong}"
+
+    only_this = [_run(2, "b", "2026-09-29T18:00:40Z")]
+    assert dm.reconcile_push_base(only_this, lambda r: _IN_FLIGHT, _NOW, "p" * 5) is None, "no run at the parent sha → ordinary base"
+    dispatch = [_run(1, "p", "2026-09-29T18:00:00Z", "workflow_dispatch")]
+    assert (
+        dm.reconcile_push_base(dispatch, lambda r: _IN_FLIGHT, _NOW, "p" * 5) is None
+    ), "a dispatch at the parent sha did not push this commit"
+    assert dm.reconcile_push_base(only_this, lambda r: _IN_FLIGHT, _NOW, None) is None
+
+
+def test_reconcile_push_parent_is_judged_on_the_commit_not_its_label(tmp_path):
+    """One throwaway history per case; every wrong answer is reported at once. A commit
+    that carries the marker AND a deployable path is not a reconcile-only push."""
+    cases = (
+        ("docs-and-counter", ["docs/PROPORTIONALITY.md", "lambdas/web/platform_counts.py"], _BOT_SUBJECT, True),
+        ("docs-only", ["docs/PROPORTIONALITY.md", "model/platform_model.json"], _BOT_SUBJECT, True),
+        ("marker-with-a-shared-module", ["lambdas/common/constants.py"], _BOT_SUBJECT, False),
+        ("marker-with-a-bundled-config", ["config/personas.json"], _BOT_SUBJECT, False),
+        ("marker-with-mcp", ["mcp/tools_health.py"], _BOT_SUBJECT, False),
+        ("no-marker", ["docs/PROPORTIONALITY.md"], "docs: a hand edit", False),
+        ("marker-without-the-prefix", ["docs/PROPORTIONALITY.md"], "docs: a hand edit [skip-reconcile]", False),
+    )
+    wrong = {}
+    for label, files, subject, is_reconcile in cases:
+        case_dir = tmp_path / label
+        case_dir.mkdir()
+        repo, shas = _reconcile_repo(case_dir, files, subject)
+        expected = shas["M"] if is_reconcile else None
+        got = dm.reconcile_push_parent(shas["bot"], cwd=repo)
+        if got != expected:
+            wrong[label] = got
+    assert not wrong, f"cases that resolved the wrong parent: {wrong}"
+
+    assert dm.reconcile_push_parent(shas["M"], cwd=repo) is None, "the pushed sha is not the checked-out commit → never a guessed parent"
+    assert dm.reconcile_push_parent(None, cwd=repo) is None
+    assert dm.reconcile_push_parent(shas["bot"], cwd=str(tmp_path / "not-a-repo")) is None, "an unreadable git side falls through"
+
+
+def test_reconcile_commit_push_plans_no_second_deploy_of_the_merge(tmp_path, monkeypatch, capsys):
+    """The 2026-10-04 pairs, replayed through `--deploy-base` and the workflow's own
+    CHANGED command: with the merge's run alive, the bot push's plan sees only the counter
+    file (which the fleet loop ignores — test_bundle_deploy_trigger_registry). Control:
+    the merge's run red → the ordinary base, and the bot push plans the merge's module."""
+    repo, shas = _reconcile_repo(tmp_path, ["docs/PROPORTIONALITY.md", "lambdas/web/platform_counts.py"])
+    runs = [
+        (_run(3, "x", "2026-10-04T09:22:10Z"), _IN_FLIGHT),  # the bot push's own run, planning now
+        (_run(2, "y", "2026-10-04T09:21:28Z"), _IN_FLIGHT),  # the merge's run — it pushed the bot commit
+        (_run(1, "z", "2026-10-04T08:40:46Z"), _FLEET_DEPLOYED),
+    ]
+    runs[0][0]["head_sha"], runs[1][0]["head_sha"], runs[2][0]["head_sha"] = shas["bot"], shas["M"], shas["base"]
+    jobs = {r["id"]: j for r, j in runs}
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("GITHUB_SHA", shas["bot"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setattr(dm, "collect", lambda: ([r for r, _ in runs], lambda r: jobs[r["id"]]))
+
+    def planned():
+        assert dm.main(["--deploy-base"]) == dm.EXIT_OK
+        base = capsys.readouterr().out
+        assert base.endswith("\n") and base.count("\n") == 1, f"stdout must carry the sha and nothing else: {base!r}"
+        env = {**os.environ, "DEPLOY_BASE": base.strip(), "GITHUB_SHA": shas["bot"]}
+        out = subprocess.run(["bash", "-c", _plan_changed_command()], cwd=repo, env=env, check=True, capture_output=True, text=True).stdout
+        return base.strip(), set(out.split())
+
+    base, changed = planned()
+    assert base == shas["M"], "the live merge run owns the deploy of this tree"
+    assert changed == {"lambdas/web/platform_counts.py"}, f"the bot push re-planned the merge's files: {changed}"
+
+    jobs[2] = _PLAN_RED
+    base, changed = planned()
+    assert base == shas["base"], "a red merge run does not own the deploy — the ordinary #4472 base applies"
+    assert "lambdas/web/site_api_edition.py" in changed, "the bot push must still ship a merge whose own run failed"
+
+    jobs[2] = _IN_FLIGHT
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    assert planned()[0] == shas["base"], "a manual dispatch at the bot sha is a deliberate re-run, never deferred"
+
+
 # #4472 box 2 — live Lambda older than its source on main (the nightly advisory).
 _T = lambda s: datetime.fromisoformat(s).replace(tzinfo=timezone.utc)  # noqa: E731
 
@@ -639,3 +776,183 @@ def test_stale_lambdas_is_wired_as_an_advisory_step_of_the_nightly_drift_workflo
     step = [s for s in wf.split("\n      - ") if "check_deploy_deadman.py --stale-lambdas" in s]
     assert len(step) == 1, "the stale-Lambda check must be one step of config-drift.yml"
     assert "if: always()" in step[0] and "continue-on-error: true" in step[0]
+
+
+# #4472 box 2 (sha basis) — does the LIVE bundle's build_info.git_sha CONTAIN the commit the
+# function owes? LastModified cannot tell which tree shipped: a superseded run deploying
+# late stamps a fresh LastModified over old code (#2377's 2026-08-08 race).
+import io as _io  # noqa: E402
+import json as _json  # noqa: E402
+import zipfile as _zipfile  # noqa: E402
+
+
+def _bundle_zip(git_sha, members=400):
+    """A bundle shaped like deploy/build_bundle.py's output: the tree at the zip root plus
+    build_info.json carrying git_fingerprint()'s keys (live 2026-10-02: 104 of 104 mapped
+    functions carried one)."""
+    buf = _io.BytesIO()
+    with _zipfile.ZipFile(buf, "w", _zipfile.ZIP_DEFLATED) as zf:
+        for i in range(members):  # ~2.5 MB stored, the live bundle's order of size (CodeSize 2-5 MB)
+            zf.writestr(f"common/mod_{i:04d}.py", "".join(f"X_{i}_{j} = {j * 7919 % 104729}\n" for j in range(400)), _zipfile.ZIP_STORED)
+        if git_sha is not None:
+            info = {
+                "built_at": "2026-10-01T23:52:10Z",
+                "built_at_source": "commit",
+                "builder": "CI/CD Pipeline",
+                "dirty": None,
+                "dirty_scope": None,
+                "git_sha": git_sha,
+                "git_short_sha": git_sha[:8],
+                "schema": 1,
+            }
+            zf.writestr("build_info.json", _json.dumps(info, sort_keys=True, indent=2) + "\n")
+        zf.writestr("emails/weekly_digest_lambda.py", "def lambda_handler(e, c):\n    return 1\n")
+    return buf.getvalue()
+
+
+class _S3Ranged:
+    """An in-memory presigned-URL server with S3's Range semantics (206 + Content-Range);
+    `honour_range=False` answers 200 with the whole body and no Content-Range."""
+
+    def __init__(self, body, honour_range=True):
+        self.body, self.honour, self.served = body, honour_range, 0
+
+    def __call__(self, req, timeout=None):
+        rng = req.headers.get("Range") or req.get_header("Range")
+        body, headers = self.body, {}
+        if self.honour and rng:
+            spec = rng.split("=", 1)[1]
+            lo, hi = spec.split("-")
+            n = len(self.body)
+            start, end = (n - int(hi), n - 1) if lo == "" else (int(lo), min(int(hi), n - 1))
+            start = max(0, start)
+            body, headers = self.body[start : end + 1], {"Content-Range": f"bytes {start}-{end}/{n}"}
+        self.served += len(body)
+
+        class _Resp:
+            def __init__(self):
+                self.headers = headers
+
+            def read(self):
+                return body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        return _Resp()
+
+
+def test_build_sha_is_read_from_the_live_bundle_over_ranged_gets():
+    sha = "612fe47d9" + "0" * 31
+    blob = _bundle_zip(sha)
+    server = _S3Ranged(blob)
+    url = "https://awslambda-us-west-2-tasks.s3.us-west-2.amazonaws.com/snapshots/205930651321/weekly-digest-x?X-Amz-Signature=s"
+    assert dm.read_build_sha(url, opener=server) == sha
+    assert server.served < len(blob) / 2, "a ranged read, never the whole bundle"
+    assert dm.read_build_sha(url, opener=_S3Ranged(blob, honour_range=False)) == sha, "a server ignoring Range still reads"
+    assert dm.read_build_sha(url, opener=_S3Ranged(_bundle_zip(None))) is None, "no build_info.json → no fingerprint"
+
+
+def _linear_repo(tmp_path, names):
+    repo = str(tmp_path)
+
+    def git(*a):
+        return subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    shas = {}
+    for name in names:
+        with open(os.path.join(repo, name), "w") as f:
+            f.write(name)
+        git("add", "-A")
+        git("commit", "-qm", name)
+        shas[name] = git("rev-parse", "HEAD")
+    git("checkout", "-q", "-b", "side", shas[names[0]])
+    with open(os.path.join(repo, "side"), "w") as f:
+        f.write("side")
+    git("add", "-A")
+    git("commit", "-qm", "side")
+    shas["side"] = git("rev-parse", "HEAD")
+    return repo, shas
+
+
+def test_stale_by_build_sha_replays_a_superseded_runs_undeployed_merge(tmp_path):
+    """base → A (weekly-digest fix; its run CANCELLED) → B (mcp change; its run deployed
+    only B's diff). weekly-digest's live bundle is base's build — and its LastModified is
+    NEWER than A, so the LastModified check reads it fresh; the sha basis does not."""
+    dm._ensure_deploy_path()
+    import bundle_ancestry
+
+    repo, s = _linear_repo(tmp_path, ["base", "A", "B"])
+
+    def oracle(a, b):
+        return bundle_ancestry.git_is_ancestor(a, b, repo_root=repo)
+
+    now = _T("2026-09-30T08:00:00")
+    owed = {
+        "weekly-digest": (s["A"], _T("2026-09-29T17:42:00"), "lambdas/emails/weekly_digest_lambda.py changed"),
+        "life-platform-mcp": (s["B"], _T("2026-09-29T18:00:00"), "mcp/tools_health.py changed"),
+        "daily-brief": (s["A"], _T("2026-09-29T17:42:00"), "a shared module / bundled config changed"),
+        "laptop-lane": (s["A"], _T("2026-09-29T17:42:00"), "lambdas/x.py changed"),
+        "pre-2377": (s["A"], _T("2026-09-29T17:42:00"), "lambdas/y.py changed"),
+        "unfetched": (s["A"], _T("2026-09-29T17:42:00"), "lambdas/z.py changed"),
+        "in-grace": (s["B"], _T("2026-09-30T07:30:00"), "lambdas/w.py changed"),
+    }
+    deployed = {
+        "weekly-digest": s["base"],  # the superseded run's file never shipped
+        "life-platform-mcp": s["B"],
+        "daily-brief": s["B"],  # B contains A → fresh
+        "laptop-lane": s["side"],  # diverged: a lane-branch deploy without A
+        "pre-2377": None,  # no build_info.json → LastModified basis
+        "unfetched": "f" * 40,  # a sha this checkout cannot resolve → LastModified basis
+        "in-grace": s["base"],
+    }
+    lm = _T("2026-09-29T18:00:59")  # every function touched AFTER A merged — the race shape
+    last_modified = {fn: lm for fn in owed}
+    last_modified["unfetched"] = _T("2026-09-29T10:00:00")
+
+    rows = dm.stale_by_build_sha(deployed, last_modified, owed, now, oracle)
+    got = {r["function"]: r["why"] for r in rows}
+    assert sorted(got) == ["laptop-lane", "unfetched", "weekly-digest"], got
+    assert f"live build {s['base'][:8]} does not contain {s['A'][:8]} (behind)" in got["weekly-digest"]
+    assert "(diverged)" in got["laptop-lane"]
+    assert "LastModified basis: live build ffffffff not resolvable here" in got["unfetched"]
+    lm_only = [r["function"] for r in dm.stale_functions(last_modified, {k: v[1:] for k, v in owed.items()}, now)]
+    assert lm_only == ["unfetched"], "control: LastModified alone reads weekly-digest and laptop-lane fresh — the sha basis catches them"
+    code, text = dm.render_stale(rows)
+    assert code == dm.EXIT_ALARM and dm.RECOVERY in text and "weekly-digest" in text
+
+
+def test_stale_lambdas_mode_reads_the_sha_basis_and_prints_its_coverage(monkeypatch, capsys):
+    monkeypatch.setattr(
+        dm, "collect_last_modified", lambda: {"weekly-digest": _T("2026-09-29T18:00:59"), "daily-brief": _T("2026-09-29T18:00:59")}
+    )
+    monkeypatch.setattr(
+        dm,
+        "collect_owed_commits",
+        lambda: {
+            "weekly-digest": ("a" * 40, _T("2026-09-29T17:42:00"), "w changed"),
+            "daily-brief": ("a" * 40, _T("2026-09-29T17:42:00"), "d changed"),
+        },
+    )
+    monkeypatch.setattr(dm, "mapped_regions", lambda: {"weekly-digest": "us-west-2", "daily-brief": "us-west-2"})
+    monkeypatch.setattr(dm, "collect_deployed_shas", lambda fns: {"weekly-digest": "b" * 40, "daily-brief": None})
+    seen = []
+
+    def oracle(a, b):
+        seen.append((a, b))
+        return a == "b" * 40 and b == "a" * 40  # live b is an ANCESTOR of owed a → stale
+
+    import bundle_ancestry
+
+    monkeypatch.setattr(bundle_ancestry, "git_is_ancestor", oracle)
+    assert dm.main(["--stale-lambdas"]) == dm.EXIT_ALARM
+    out = capsys.readouterr().out
+    assert "weekly-digest" in out and "bbbbbbbb does not contain aaaaaaaa" in out
+    assert "basis: build_info.git_sha for 1 of 2 mapped functions; LastModified for 1: daily-brief" in out
+    assert "judged: 2 of 2; 0 owe a commit inside the 2 h grace window" in out, "a pass must say how much it judged"

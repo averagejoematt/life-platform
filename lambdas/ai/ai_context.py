@@ -10,7 +10,7 @@ no module state). ai_calls.py re-exports them for backward compatibility.
 import re
 from datetime import date as _date_cls
 
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ, PLAN_DAILY_CALORIES_TARGET  # noqa: F401
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.scoring_engine import habitify_reading  # #4362: rename-aware habit lookup
 from intelligence import (
@@ -323,7 +323,7 @@ def _build_tdee_context(data, profile):
     # MacroFactor may store estimated TDEE as tdee_kcal or estimated_tdee_kcal
     tdee = _safe_float(mf, "tdee_kcal") or _safe_float(mf, "estimated_tdee_kcal")
 
-    cal_target = profile.get("calorie_target", 1800)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
 
     # Derive from current phase if MacroFactor doesn't expose TDEE
     if tdee is None:
@@ -456,7 +456,7 @@ def _compute_data_quality(data, profile):
     cal = _safe_float(mf, "total_calories_kcal")
     _safe_float(mf, "total_protein_g")
     food_log = mf.get("food_log", [])
-    cal_target = profile.get("calorie_target", 1800)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
 
     if cal is None or cal == 0:
         signals.append("\u274c Nutrition (MacroFactor): NO DATA logged")
@@ -616,7 +616,7 @@ def _compute_surprise_scores(data):
     # --- Nutrition (calories) ---
     mf = data.get("macrofactor") or {}
     cal = _safe_float(mf, "total_calories_kcal")
-    cal_target = 1800  # Will be overridden by profile in caller if needed
+    cal_target = PLAN_DAILY_CALORIES_TARGET
     if cal is not None and cal > 0:
         dev_from_target = abs(cal - cal_target) / cal_target
         direction = "up" if cal > cal_target else "down"
@@ -834,7 +834,7 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
     sleep_debt = data.get("sleep_debt_7d_hrs")
     stress = _safe_float(journal, "stress_avg")
     recovery = _safe_float(whoop, "recovery_score")
-    cal_target = profile.get("calorie_target", 1800)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
 
     tradeoffs = []
 

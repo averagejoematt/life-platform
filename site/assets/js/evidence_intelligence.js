@@ -9,8 +9,12 @@ import { lineChart, dualWeight, nDots } from "/assets/js/charts.js";
 import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note, warmup } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
+import { coachComparison } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 
-export async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
+// #4780 — the "projected goal (80% range)" figure opts in to fmtShort's { yearIfNotCurrent }
+// spelling, so a next-year window reads "Jul 2, 2027–Sep 18, 2027", never as past dates. The
+// router calls renderResults(data, topic); `now` is a third, test-only argument.
+export async function renderResults(d, _topic, { now = new Date() } = {}) { const _pd = (iso) => fmtShort(iso, { yearIfNotCurrent: true, now }); const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${_pd(j.projected_goal_date_earliest)}–${_pd(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
 
 // Post-mortems — what each closed cycle taught, derived live from the record.
 export async function renderPostmortems(d) {
@@ -232,7 +236,11 @@ export function renderWrong(d) {
     return `<tr><td class="rd-name">${esc(c.coach)}</td><td class="num">${fmt(c.confirmed)} of ${fmt(n)}</td><td class="num">${fmt(c.refuted)}</td><td>${c.through ? esc(fmtShort(c.through)) : "—"}</td></tr>`;
   }).join("");
   const ledger = lr
-    ? sec("The prediction ledger — every checked call, one record per coach", `<table class="rd-tbl"><thead><tr><th>coach</th><th>checked calls right</th><th>refuted</th><th>through</th></tr></thead><tbody>${lr}</tbody></table>`)
+    ? sec(
+        "The prediction ledger — every checked call, one record per coach",
+        `<table class="rd-tbl"><thead><tr><th>coach</th><th>checked calls right</th><th>refuted</th><th>through</th></tr></thead><tbody>${lr}</tbody></table>` +
+          coachComparison(pr.comparison, { cls: "correlative" }), // #4585: the ledger never appears alone
+      )
     : "";
   const mr = (pr.refuted_recent || []).map((m) =>
     `<tr class="rd-flag"><td class="rd-name">${esc(String(m.date || "").slice(0, 10))}</td><td>${esc(m.coach)}</td><td>${esc(m.what)}</td></tr>`).join("");
@@ -461,7 +469,7 @@ const _OPEN_ARTIFACT_LINE =
 // pattern. A reset wipes the SEASON view honestly to zero; it must never wipe
 // the platform's actual track record out of sight along with it.
 // #3520: the scorecard walks retired seats too — their career records are real and keep
-// their real byline — but it said nothing about it, so a stranger met "Dr. Sarah Chen"
+// their real byline — but it said nothing about it, so a stranger met "Sarah Chen"
 // alongside seven current coaches with no way to tell she left at the cycle-13 genesis.
 // The flag is served by /api/calibration and /api/predictions, derived from the persona
 // registry's own `retired` field; the page never decides who is retired.
@@ -535,7 +543,8 @@ export function renderCalibration(d) {
     .join("");
   const board = sec(
     "The scoreboard — by coach",
-    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
+    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>` +
+      coachComparison(d && d.comparison, { cls: "correlative" }), // #4585: the scoreboard never appears alone
   );
   const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
   return _sealBlock(d && d.prereg_seal) + pair + relTbl + board + hypLine + _judgeBlock() + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
@@ -594,7 +603,9 @@ export function renderPredictions(d) {
   // The seal renders even at zero — a skeptic can verify the pre-registration
   // exists and is unedited before the first call has come due.
   if (!(o.total > 0) && !list.length) return _sealBlock(d && d.prereg_seal) + empty("No scored predictions yet — the prediction ledger restarts with each genesis rather than carrying old scores forward. Coaches log forward calls that get auto-graded against measured outcomes as target dates pass, so the track record rebuilds honestly from day one. It fills in as the first calls come due.");
-  const head = figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]);
+  const head =
+    figs([fig(o.total ?? 0, "predictions"), o.confirmed != null && fig(o.confirmed, "confirmed"), o.refuted != null && fig(o.refuted, "refuted"), o.pending != null && fig(o.pending, "pending"), resolved > 0 && fig(fmt(o.accuracy_pct) + "%", "accuracy")]) +
+    (resolved > 0 ? coachComparison(d && d.comparison, { cls: "correlative" }) : ""); // #4585: the count never appears alone
   const badge = (s) => s === "confirmed" ? "rd-badge-live" : "";
   // #3480: a pre-registered claim carries two dates — the instant it was FROZEN
   // (pre_registered_at) and the day it grades FROM (date = genesis). Before the
@@ -620,6 +631,13 @@ export function renderPredictions(d) {
   // the provenance column below would say "in-cycle" for the whole cycle. Sealed rows
   // displace the OLDEST in-cycle rows, the row count stays 40, and the date order the
   // table renders is unchanged.
+  // #4701: a call whose words rest on a sensor that had sent no reading by the day it was
+  // made is served with `text: ""` and an `unsourced` note. Print the note's own sentence
+  // in the call column, never a blank quote — the row keeps its verdict and its date.
+  const callCell = (p) => {
+    const held = p && p.unsourced && typeof p.unsourced.text === "string" ? p.unsourced.text.trim() : "";
+    return held ? `<span class="rd-unit" data-unsourced>${esc(held)}</span>` : esc(p.text);
+  };
   const _ROW_CAP = 40;
   const _sealedRows = list.filter((p) => p.pre_registered);
   const _shown = (list.length > _ROW_CAP && _sealedRows.length)
@@ -628,7 +646,7 @@ export function renderPredictions(d) {
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
         .slice(0, _ROW_CAP)
     : list.slice(0, _ROW_CAP);
-  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${esc(p.text)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
+  const rows = _shown.map((p) => `<tr><td class="rd-name">${esc(p.coach_name || p.coach_id)}${_retiredTag(p)}</td><td>${callCell(p)}</td><td><span class="rd-badge ${badge(p.status)}">${esc(p.status)}</span></td><td>${provenance(p)}</td><td class="num rd-range">${made(p)}</td></tr>`).join("");
   const tbl = list.length ? sec("The prediction ledger", `<table class="rd-tbl"><thead><tr><th>coach</th><th>call</th><th>verdict</th><th>provenance</th><th>made</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   return _sealBlock(d && d.prereg_seal) + head + tbl + note("Forward calls logged, then scored against reality — the coaches' track record, kept honest. <strong>sealed</strong> = pre-registered before Day 1 and covered by the published seal above; <strong>in-cycle</strong> = logged by the coach during the cycle.");
 }

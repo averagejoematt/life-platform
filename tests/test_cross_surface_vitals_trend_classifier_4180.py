@@ -2,7 +2,7 @@
 honest recovery/HRV TREND sentence is not a claim about the current reading.
 
 THE LIVE FAILURE, 2026-09-25 18:30Z qa-smoke (`qa-smoke-failures` ALARM since):
-`cross_surface:vitals` failed on "Dr. Nathan Reeves cites recovery 71.7% vs
+`cross_surface:vitals` failed on "Nathan Reeves cites recovery 71.7% vs
 cockpit 99%". The served coach text (`/api/coaching-dashboard`) reads:
 
     "His recovery EWMA has climbed from 71.7% to 82.2% over seven days."
@@ -39,7 +39,7 @@ COCKPIT_09_25 = {
 }
 
 _NATHAN_REEVES_TREND = {
-    "name": "Dr. Nathan Reeves",
+    "name": "Nathan Reeves",
     "position_summary": "His recovery EWMA has climbed from 71.7% to 82.2% over seven days.",
 }
 
@@ -65,7 +65,7 @@ def test_mutation_control_the_same_figure_stated_as_current_still_fails():
     """The #4180 regression control: strip the trend language, keep the number,
     and the pre-#4180 FAIL must still fire — the fix narrows what counts as a
     trend, it never widens what counts as agreement."""
-    coach = {"name": "Dr. Nathan Reeves", "position_summary": "last night's recovery was 71.7%"}
+    coach = {"name": "Nathan Reeves", "position_summary": "last night's recovery was 71.7%"}
     ok, msg = wq.assess_cross_surface_vitals(COCKPIT_09_25, [coach])
     assert not ok
     assert "recovery 71.7" in msg and "vs cockpit 99" in msg, msg
@@ -74,7 +74,7 @@ def test_mutation_control_the_same_figure_stated_as_current_still_fails():
 def test_a_bare_aggregate_without_a_from_to_range_is_also_treated_as_trend_end():
     """'7-day average recovery' with no explicit from/to range still isn't a
     claim about tonight."""
-    coach = {"name": "Dr. Sarah Chen", "position_summary": "Your 7-day average recovery has been running at 84%."}
+    coach = {"name": "Sarah Chen", "position_summary": "Your 7-day average recovery has been running at 84%."}
     ok, msg = wq.assess_cross_surface_vitals(COCKPIT_09_25, [coach])
     assert ok, msg
     assert "84" in msg, msg

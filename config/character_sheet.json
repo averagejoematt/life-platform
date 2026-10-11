@@ -18,7 +18,7 @@
     "sleep": {
       "weight": 0.2,
       "ema_lambda": 0.85,
-      "owner": "Dr. Lisa Park",
+      "owner": "Lisa Park",
       "components": {
         "duration_vs_target": {
           "weight": 0.25,
@@ -44,7 +44,7 @@
     "movement": {
       "weight": 0.18,
       "ema_lambda": 0.9,
-      "owner": "Dr. Max Reyes",
+      "owner": "Max Reyes",
       "components": {
         "training_frequency": {
           "weight": 0.15,
@@ -81,7 +81,7 @@
     "nutrition": {
       "weight": 0.18,
       "ema_lambda": 0.88,
-      "owner": "Dr. Marcus Webb",
+      "owner": "Marcus Webb",
       "components": {
         "calorie_adherence": {
           "weight": 0.2,
@@ -111,7 +111,7 @@
     "metabolic": {
       "weight": 0.12,
       "ema_lambda": 0.95,
-      "owner": "Dr. Amara Patel",
+      "owner": "Amara Patel",
       "components": {
         "cgm_glucose_control": {
           "weight": 0.3
@@ -134,7 +134,7 @@
     "mind": {
       "weight": 0.15,
       "ema_lambda": 0.85,
-      "owner": "Dr. Nathan Reeves",
+      "owner": "Nathan Reeves",
       "components": {
         "t0_habit_compliance": {
           "weight": 0.3,

@@ -48,6 +48,11 @@ from ai import prompt_cache
         ("us.anthropic.claude-opus-5", 512),
         ("us.anthropic.claude-opus-5-5", 512),
         ("us.anthropic.claude-fable-5-1", 512),
+        # #4778: Haiku 5.5 and Sonnet 5.5 join the 512 tier. Before these rows they fell
+        # to "haiku" (4,096) and "sonnet-5" (1,024) — conservative, but blind to a stale
+        # decline once a caller moved.
+        ("us.anthropic.claude-haiku-5-5", 512),
+        ("us.anthropic.claude-sonnet-5-5", 512),
     ],
 )
 def test_cache_floor_matches_anthropic_documented_minimums(model_id, expected):

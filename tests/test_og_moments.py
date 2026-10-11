@@ -81,7 +81,7 @@ def test_board_answer_moment_bakes_published_content_only():
                         "question": "Is the glucose spike the supplement, or a bad night's sleep?",
                         "asked_at": "2026-07-01",
                         "answered_at": "2026-07-04",
-                        "responses": [{"name": "Dr. Lisa Park", "text": "The short night explains most of it."}],
+                        "responses": [{"name": "Lisa Park", "text": "The short night explains most of it."}],
                     },
                     {"id": "unanswered1", "question": "Pending question?", "responses": []},
                 ]
@@ -91,7 +91,7 @@ def test_board_answer_moment_bakes_published_content_only():
     out = om._sweep_board_answers(s3)
     assert out == {"abc123def456": "/moments/qa/abc123def456/"}
     html = s3.puts["generated/moments/qa/abc123def456/index.html"]["body"].decode()
-    assert "Is the glucose spike" in html and "Dr. Lisa Park" in html
+    assert "Is the glucose spike" in html and "Lisa Park" in html
     assert "/coaching/qa/#abc123def456" in html  # links back to the live surface
     assert "unanswered1" not in json.dumps(list(s3.puts))  # no answer → no moment
 
@@ -116,7 +116,7 @@ def test_prediction_sweep_only_mints_decided_calls(monkeypatch):
                 "status": "confirmed",
                 "outcome_notes": "held at 64",
             },
-            {"coach_id": "sleep", "coach_name": "Dr. Lisa Park", "date": "2026-06-25", "text": "Sleep debt clears", "status": "pending"},
+            {"coach_id": "sleep", "coach_name": "Lisa Park", "date": "2026-06-25", "text": "Sleep debt clears", "status": "pending"},
         ]
     }
 

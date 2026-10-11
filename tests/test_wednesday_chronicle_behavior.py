@@ -902,8 +902,8 @@ def test_an_untitled_draft_is_labelled_untitled_rather_than_crashing():
 
 
 def test_a_board_interview_is_rendered_as_a_blockquote():
-    html = m.markdown_to_html("He asked about the plateau.\n\n> Dr. Park was unimpressed.\n\nThe answer stayed with him.")
-    assert "<blockquote>Dr. Park was unimpressed.</blockquote>" in html
+    html = m.markdown_to_html("He asked about the plateau.\n\n> Park was unimpressed.\n\nThe answer stayed with him.")
+    assert "<blockquote>Park was unimpressed.</blockquote>" in html
 
 
 def test_the_closing_signature_is_rendered_as_a_signature_line():
@@ -914,15 +914,15 @@ def test_a_board_interview_at_the_very_end_of_an_installment_is_not_dropped():
     """The buffer is flushed after the loop, so an interview as the closing beat
     survives. Pinned because losing it would be invisible: has_board_interview
     would still be stored True while the quote vanished from email and journal."""
-    html = m.markdown_to_html("He asked about the plateau.\n\n> Dr. Park had the last word.")
-    assert "<blockquote>Dr. Park had the last word.</blockquote>" in html
+    html = m.markdown_to_html("He asked about the plateau.\n\n> Park had the last word.")
+    assert "<blockquote>Park had the last word.</blockquote>" in html
 
 
 def test_a_blockquote_without_a_space_is_still_recognised_as_an_interview():
     """#2221 (was a tranche-3 xfail): the markdown blockquote marker is ">"; the space
     after it is optional. All THREE matchers were strict — the handler's has_board
     detector, markdown_to_html, and scripts/v4_build_journal.py (the public page)."""
-    body = "He asked about the plateau.\n\n>Dr. Park was unimpressed.\n\nHe let it sit."
+    body = "He asked about the plateau.\n\n>Park was unimpressed.\n\nHe let it sit."
     assert any(line.strip().startswith(">") for line in body.split("\n"))
     assert "<blockquote>" in m.markdown_to_html(body)
 
@@ -1038,6 +1038,38 @@ def test_an_installment_that_fails_the_privacy_gate_is_never_stored_or_mailed(en
     assert json.loads(resp["body"])["status"] == "privacy_hold"
     assert env["ses"].sent == []
     assert _stored_installment(env) is None
+
+
+def test_a_title_that_counts_attempts_holds_the_week_at_the_story_door(env):
+    """#4538 (owner ruling 2026-09-26): the handler's own chokepoint runs the shared reader-surface check on the
+    title, the stat line and the body — whichever writer produced them. The fixture's clean title publishes in every
+    other test of this file; the same installment under a counted title is held, unstored and unmailed."""
+    env["state"]["ai"] = RAW_INSTALLMENT.replace(TITLE, "The Fifteenth Reset, or: What the Body Remembers")
+    resp = m.lambda_handler({}, None)
+    body = json.loads(resp["body"])
+    assert body["status"] == "story_door_hold" and "Fifteenth Reset" in body["findings"][0]
+    assert env["ses"].sent == [] and _stored_installment(env) is None
+    assert _pending_marker(env)["reason"] == "story_door_hold"
+
+
+def test_a_title_in_the_noun_then_number_shape_is_held_too(env):
+    """#4538: the rule is the structure, not the founding phrase — "Attempt 17" (the owner's own words, 2026-09-19)
+    holds the week exactly as "The Fifteenth Reset" does, and a title that only numbers the day publishes."""
+    env["state"]["ai"] = RAW_INSTALLMENT.replace(TITLE, "Attempt 17: What the Body Remembers")
+    body = json.loads(m.lambda_handler({}, None)["body"])
+    assert body["status"] == "story_door_hold" and "Attempt 17" in body["findings"][0]
+    assert env["ses"].sent == [] and _stored_installment(env) is None
+
+
+def test_a_registry_cut_term_in_the_body_holds_the_week_at_the_story_door(env):
+    """#4674: week 4 published "pace flag" in its excerpt because only the desk writers' door knew the term. The
+    handler's final check now refuses it in the body whichever writer produced it — in the hyphenated spelling too
+    (one handler run per test: a second run would reuse the first's cached generation)."""
+    env["state"]["ai"] = RAW_INSTALLMENT.replace("the week did not fall apart", "the pace-flag stayed on")
+    body = json.loads(m.lambda_handler({}, None)["body"])
+    assert body["status"] == "story_door_hold" and "pace-flag" in body["findings"][0]
+    assert env["ses"].sent == [] and _stored_installment(env) is None
+    assert _pending_marker(env)["reason"] == "story_door_hold"
 
 
 def test_a_privacy_held_week_leaves_a_marker_explaining_the_gap(env):
@@ -1389,7 +1421,7 @@ def test_a_published_week_is_logged_for_the_status_page(publish_env):
 
 
 def test_a_board_interview_is_flagged_on_the_stored_installment(publish_env):
-    publish_env["state"]["ai"] = RAW_INSTALLMENT.replace("What happens next", "> Dr. Park was blunt about it.\n\nWhat happens next")
+    publish_env["state"]["ai"] = RAW_INSTALLMENT.replace("What happens next", "> Park was blunt about it.\n\nWhat happens next")
     m.lambda_handler({}, None)
     assert _stored_installment(publish_env)["has_board_interview"] is True
 

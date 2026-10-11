@@ -509,7 +509,63 @@ from gate_census_unproven_residue import UNPROVEN_RESIDUE  # noqa: E402
 # the rebased lane {can-fail (proven) 109, unproven 537, not-applicable 6, attempted-unproven
 # 3}. No registry-name phantom: FINDING_KINDS is deliberately not spelled `*_CLASSES`/`*_RULES`
 # (#3315), and the id-set diff is what proves it rather than the intention.
-BASELINE_TOTAL_GATES = 767  # 768 -> 767 (2026-10-01, #4255 one Lambda deploy path, re-synced onto #4497's 768): ONE leaves,
+BASELINE_TOTAL_GATES = 781  # 782 -> 781 (2026-10-10, #4778 restacked onto #4770): ONE leaves, registry::tests/test_model_routing_4770.py::_EXEMPT::lambdas/ai/prompt_cache.py — prompt_cache.py now resolves each caching decision's model through model_routing.ROUTES and spells no model, so the exemption (a proven gate, not an unproven one) retired with its REGISTRY_PROOFS row. Nothing enters. MEASURED by id-set diff (scripts/gate_census.py --json) vs an origin/main worktree at 0f4bcc1c8: main 782 -> lane 781, the one id above the only difference; unproven unchanged.
+# PRIOR: 782  # 781 -> 782 (2026-10-10, #4770 the model-routing registry): ONE entrant, registry::tests/test_model_routing_4770.py::_EXEMPT::lambdas/ai/prompt_cache.py, PROVEN on arrival (REGISTRY_PROOFS; entry deleted -> 1 failed naming prompt_cache.py, restored 15 passed). Nothing leaves; the two #4769 callers resolve through ROUTES rows, so no exemption of theirs enters. MEASURED by id-set diff (scripts/gate_census.py --json) vs a `git archive origin/main` export at 16dcddf20: main 781 {257, 512, 7, 5} -> lane 782 {258, 512, 7, 5}; unproven stays 512.
+# PRIOR: 781  # 779 -> 781 (2026-10-10, #4252 box 4 the Unit Tests shard legs, on top of #4270): TWO entrants,
+# both PROVEN on arrival (CI_PROOFS in scripts/gate_census_proofs.py, each step's own run body executed + mutated):
+# `ci::ci-test.yml::shard::3` (shard / Install test dependencies) and `ci::ci-test.yml::shard::4` (shard / Coverage
+# pass — this leg's share of tests/). The suite moved from the `test` job into a 3-leg `shard` matrix; `test` keeps its
+# name and now combines the legs' coverage data, so test::3/test::5 renumber to test::2/test::4 (same steps, shifted).
+# `test / Test coverage gate (regression floor, ADR-080)` (test::6, same label, now the combine step) turns PROVEN, so
+# its line leaves ledgers/gate_census_unproven_residue.py. MEASURED by id-set diff vs a `git archive origin/main`
+# export at 2f1d8f843: main 779 {proven 254, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 781
+# {257, 512, 7, 5}.
+# PRIOR: 779  # 778 -> 779 (2026-10-10, #4270 the qa/ top-level dir): ONE real entrant, registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa, PROVEN on arrival (REGISTRY_PROOFS; ALLOWLIST entry removed -> 1 failed naming qa, restored 4 passed). Two ids RELOCATE, not enter/leave: registry::tests/qa_manifest.py::STRUCTURAL_CLASSES::{static,utility} -> registry::qa/qa_manifest.py::STRUCTURAL_CLASSES::{static,utility} (qa/ joined gate_census._REGISTRY_ROOTS; the residue-ledger keys renamed in place, size unchanged). MEASURED by id-set diff vs a `git archive origin/main` export at 057ec826b: main 778 {253, 513, 7, 5} -> lane 779 {254, 513, 7, 5}; unproven stays 513.
+# PRIOR: 778  # 777 -> 778 (2026-10-10, #4643 box 5): ONE entrant, guard::deploy/
+# check_bucket_notification_drift.py, PROVEN on arrival (GUARD_PROOFS). Nothing leaves; unproven stays 513.
+# 776 -> 777 (2026-10-10, #4674 the "pace flag" vocabulary ratchet, stacked on #4694 at
+# merge): ONE entrant, `registry::ledgers/site_vocabulary_residue.py::BASELINE::pace flag`, PROVEN on arrival
+# (REGISTRY_PROOFS in scripts/gate_census_proofs.py). Nothing leaves. MEASURED after merging origin/main (disposable
+# origin/main export vs this lane, id-set diff): main 776 {proven 251, unproven 513, not-applicable 7,
+# attempted-unproven 5} -> lane 777 {252, 513, 7, 5}.
+# PRIOR: 776  # 775 -> 776 (2026-10-10, #4694 the chronicle auto-publish audit, stacked on #4638): ONE
+# entrant, `guard::lambdas/content/autopublish_audit.py` (new module; classified a guard), PROVEN on arrival (GUARD_PROOFS
+# in scripts/gate_census_proofs.py: four mutations, 5/1/5/1 red, restored 14 passed). Nothing leaves. MEASURED: main 775
+# {proven 250, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 776 {251, 513, 7, 5}.
+# PRIOR: 775  # 774 -> 775 (2026-10-09, #4638 the upstream-changes facet guard, stacked on #4636 at
+# merge): ONE entrant, `structural::test_upstream_changes_4638.py` (new: rglobs lambdas/ scripts/ deploy/ mcp/ for an
+# Apple Health rebuild-a-day caller, keyword or positional), PROVEN on arrival (MutationSpec + proof in
+# scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED after merging origin/main: main 774
+# {proven 249, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 775 {250, 513, 7, 5}.
+# PRIOR: 774  # 773 -> 774 (2026-10-10, #4636 the retired-training-shape guard): ONE entrant,
+# `structural::test_retired_training_shapes_4636.py` (new: rglobs lambdas/ mcp/), PROVEN on arrival (MutationSpec +
+# proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED: main 773 {proven 248, unproven 513,
+# not-applicable 7, attempted-unproven 5} -> lane 774 {249, 513, 7, 5}.
+# PRIOR: 773  # 772 -> 773 (2026-10-10, #4707 the key-rotator grant guard): ONE entrant,
+# `structural::test_key_rotator_grants_4707.py` (new: rglobs lambdas/ for rotation Lambdas), PROVEN on arrival
+# (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED on main 772
+# {proven 247, unproven 513, not-applicable 7, attempted-unproven 5} -> lane 773 {248, 513, 7, 5}.
+# 771 -> 772 (2026-10-05, #4677 the journal-row co-writer guard): ONE entrant,
+# `structural::test_journal_row_cowriters_4677.py` (new: rglobs lambdas/ mcp/ scripts/ deploy/), PROVEN on arrival
+# (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED on
+# `scripts/gate_census.py`'s build_census(): main 771 {proven 245, unproven 514, not-applicable 7, attempted-unproven 5}
+# -> this lane 772 {246, 514, 7, 5}.
+# PRIOR: 771  # 769 -> 771 (2026-10-04, #4586 the kit page gate): TWO entrants, one gate seen twice —
+# `guard::tests/kit_page_gate.py` (the script) and `ci::v4-gate.yml::render-accuracy-gate::4` (its step in the PR render
+# job). Both PROVEN on arrival (GUARD_PROOFS / CI_PROOFS in scripts/gate_census_proofs.py: front-page budget 6 -> 3, exit 1;
+# reverted, exit 0). Nothing leaves. MEASURED on `scripts/gate_census.py`'s build_census(): main 769 {proven 243,
+# unproven 514, not-applicable 7, attempted-unproven 5} -> this lane 771 {245, 514, 7, 5}.
+# PRIOR: 769  # 768 -> 769 (2026-10-03, #4585 no coach count without its comparison): ONE entrant,
+# `structural::test_coach_count_comparison_guard_4585.py` (new: globs site/assets/js + rglobs site/**/*.html|json), PROVEN on
+# arrival (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED on
+# `scripts/gate_census.py --json`: main 768 {proven 242, unproven 514, not-applicable 7, attempted-unproven 5} -> this lane
+# 769 {243, 514, 7, 5}.
+# PRIOR: 768  # 767 -> 768 (2026-10-03, #4540 nutrition targets derive from the plan): ONE entrant,
+# `structural::test_protein_contract.py` (the file existed; it becomes a census gate because it now os.walks lambdas/ + mcp/),
+# PROVEN on arrival (MutationSpec + proof in scripts/gate_census_mutations.py, ARMED 1/1). Nothing leaves. MEASURED by id-set
+# diff on `scripts/gate_census.py --json`, this tree vs a `git archive origin/main` export at 83f3bd53e (git-init'd, fully
+# added): main 767 {proven 241, unproven 514, not-applicable 7, attempted-unproven 5} -> this lane 768 {242, 514, 7, 5}.
+# PRIOR: 767  # 768 -> 767 (2026-10-01, #4255 one Lambda deploy path, re-synced onto #4497's 768): ONE leaves,
 # one RELOCATES, nothing enters as new. Leaves: `ci::ci-cd.yml::deploy::6` (`deploy / Deploy Lambdas`, the per-function matrix
 # loop — deleted; unproven, its residue line goes). Relocates, verdict unchanged (unproven): `guard::deploy/deploy_and_verify.sh`
 # -> `guard::deploy/archive/onetime/deploy_and_verify.sh` (archived; residue line re-keyed, not absorbed). MEASURED by id-set

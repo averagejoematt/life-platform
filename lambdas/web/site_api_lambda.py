@@ -70,9 +70,11 @@ from web.site_api_coach import (
     _regeneration_paused,
     handle_ai_analysis,
     handle_calibration,
+    handle_calls,
     handle_coach,
     handle_coach_analysis,
     handle_coach_docket,
+    handle_coach_moves,
     handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
@@ -82,6 +84,7 @@ from web.site_api_coach import (
     handle_field_notes,
     handle_journal_quotes,
     handle_month_rollup,
+    handle_owner_words,
     handle_panel_ledger,
     handle_predictions,
     handle_recap,
@@ -142,6 +145,7 @@ from web.site_api_data import (
     handle_what_changed,
 )
 from web.site_api_diary import handle_diary_shelf  # #1846 — the consent-gated diary shelf (/story/diary/)
+from web.site_api_edition import handle_edition  # #4582 — the front page's one composed document
 from web.site_api_fingerprint import handle_fingerprint, handle_wall  # #1379 — the Daily Fingerprint + the Wall
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
@@ -370,6 +374,8 @@ ROUTES = {
     "/api/journey": handle_journey,
     "/api/vacation_fund": handle_vacation_fund,
     "/api/content_cadence": handle_content_cadence,  # #1972 — chronicle/podcast next-installment line
+    "/api/edition": None,  # #4582: the front page's one document — composed in _dispatch_route below
+    "/api/owner_words": handle_owner_words,  # #4584: his own words (chat + email), verbatim; what /api/edition's his_words reads first
     "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
     # #1379: the Daily Fingerprint (dateless = today; ?date=YYYY-MM-DD handled inline below) + the Wall (all-attempts field)
@@ -519,6 +525,8 @@ ROUTES = {
     # Coaching Dashboard
     "/api/coaching-dashboard": None,  # GET — assembled coaching dashboard data
     # Prediction Ledger + Coach Timeline
+    "/api/calls": None,  # #4586: every settled, checkable coach call (GET, optional ?id=) — a page per call
+    "/api/coach_moves": None,  # #4648: one day's coach lines (GET, ?date=YYYY-MM-DD) — what the day page reads
     "/api/predictions": None,  # GET with ?status=&coach_id=&limit= query params
     "/api/coach_timeline": None,  # GET with ?coach_id= query param
 }
@@ -700,10 +708,23 @@ def _dispatch_route(event, path, method):
     # stakes; open positions + resolved history (losses never buried).
     if path == "/api/coach_docket":
         return handle_coach_docket(event)
+    if path == "/api/calls":
+        return handle_calls(event)
+    if path == "/api/coach_moves":
+        return handle_coach_moves(event)
     if path == "/api/panel_ledger":
         return handle_panel_ledger(event)
     if path.startswith("/api/coach/"):
         return handle_coach(event)
+    # #4582: the front page's ONE document, composed in-process from the routes this
+    # function dispatches (never an HTTP call to itself) under one Pacific as_of.
+    #
+    # #4607: every read the edition makes carries `composed_for` — a top-level event key a
+    # Function-URL request cannot set (only headers, query string and body are the caller's),
+    # so a route may leave out work the front page never reads without growing a public knob.
+    if path == "/api/edition" and method == "GET":
+        _ed_event = {"headers": {}, "composed_for": "edition"}
+        return handle_edition(lambda p, qs: _dispatch_route({**_ed_event, "rawPath": p, "queryStringParameters": qs}, p, "GET"))
     if path == "/api/coaching-dashboard":
         try:
             # Registry-derived (coaching-team v2). The retired training seat stays
@@ -786,8 +807,13 @@ def _dispatch_route(event, path, method):
                 # door labels a weekly read as weekly instead of serving it as current.
                 "data_through": None,
             }
+            # #4607: the edition reads `moves` and `coaches` and nothing else. Composed for it
+            # (`composed_for`, an event key a Function-URL caller cannot set), the three
+            # blocks it never reads — this weekly call, the lead's daily read and the
+            # regeneration-pause flag — are NOT READ and served `null`, never an empty value.
+            _cd_for_edition = event.get("composed_for") == "edition"
             try:
-                _cd_int = _integrator_digest()  # #946: tombstone/phase-guarded
+                _cd_int = None if _cd_for_edition else _integrator_digest()  # #946: tombstone/phase-guarded
                 if _cd_int:
                     _cd_priority["text"] = _cd_int.get("analysis", "")
                     _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
@@ -807,9 +833,14 @@ def _dispatch_route(event, path, method):
             # — the EXACT function /api/coach/{id} calls (web.site_api_coach) — so
             # this is not a second reader of the COMMITMENT# rows; the privacy pass,
             # corrections/retractions and phase filtering all apply identically.
+            #
+            # #4607: the edition reads `moves` and `coaches` from this body and never
+            # `open_actions`, whose six dossier reads were ~80% of this branch's time
+            # (measured 2026-10-04: 761 of 956 ms). Composed for the edition, the asks are
+            # NOT READ and the key is served `null` — never `[]`, which would say "no asks".
             _cd_actions = []
             try:
-                for _cd_domain, _cd_info in _cd_coach_display.items():
+                for _cd_domain, _cd_info in ({} if _cd_for_edition else _cd_coach_display).items():
                     _cd_full_id = _cd_coach_id_map[_cd_domain]
                     if _cd_full_id in _cd_absent:
                         continue  # #4217: an absent coach has no standing ask on the door
@@ -1020,15 +1051,19 @@ def _dispatch_route(event, path, method):
             # opens on when it is under 24 h old; absent (None) until the first row lands.
             from coach import lead_daily_read as _cd_lead_mod
 
-            _cd_lead_daily = _cd_lead_mod.latest_served(table)
+            _cd_lead_daily = None if _cd_for_edition else _cd_lead_mod.latest_served(table)
             if _cd_lead_daily:
                 _cd_lead_daily.update(coach_name=_cd_lead_name, coach_title=_cd_lead_title)
+            # #4583: the board's daily moves (coach.coach_moves, COACH#eli_marsh / MOVES#) — at
+            # most three move-tagged lines + the absent coaches' reasons; None until a row lands.
+            from coach import coach_moves as _cd_moves_mod
 
             return _ok(
                 {
-                    "weekly_priority": _cd_priority,
+                    "weekly_priority": None if _cd_for_edition else _cd_priority,
                     "lead_daily": _cd_lead_daily,
-                    "open_actions": _cd_actions,
+                    "moves": _cd_moves_mod.latest_served(table),
+                    "open_actions": None if _cd_for_edition else _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,
                     "content_day_span": _cd_day_span,
@@ -1039,7 +1074,7 @@ def _dispatch_route(event, path, method):
                     # every position_summary here is a HELD read, and the front-end
                     # must disclose that instead of presenting "as of <date>" as
                     # merely dated. Fail-open to False inside _regeneration_paused.
-                    "regeneration_paused": _regeneration_paused("coach_narrative"),
+                    "regeneration_paused": None if _cd_for_edition else _regeneration_paused("coach_narrative"),
                 },
                 cache_seconds=300,
                 content_as_of=_cd_content_as_of,

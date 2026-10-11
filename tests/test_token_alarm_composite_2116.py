@@ -97,7 +97,7 @@ def test_raw_alarm_carries_no_sns_action_of_its_own():
 def test_raw_alarm_threshold_and_metric_unchanged():
     assert 'alarm_name="ai-tokens-platform-daily-total"' in _BLOCK
     assert 'metric_name="AnthropicOutputTokens"' in _BLOCK
-    assert "threshold=250000" in _BLOCK
+    assert "threshold=AI_TOKENS_PLATFORM_DAILY_THRESHOLD" in _BLOCK  # #4517: derived, never a hand-typed literal
 
 
 def test_window_gauge_alarm_matches_cost_governor_cadence():
@@ -145,7 +145,7 @@ def test_the_spend_alarm_carries_no_sns_action_of_its_own():
     human, so an unshielded direct action here is the expensive regression."""
     assert 'alarm_name="ai-daily-spend-high"' in _SPEND_BLOCK
     assert "ai_daily_spend_alarm.add_alarm_action" not in _SPEND_BLOCK
-    assert "threshold=6.0" in _SPEND_BLOCK
+    assert "threshold=AI_DAILY_SPEND_THRESHOLD_USD" in _SPEND_BLOCK  # #4517: derived, never a hand-typed literal
 
 
 def test_spend_urgent_composite_requires_breach_and_not_in_window():
@@ -431,6 +431,82 @@ def test_the_docstring_states_the_real_count():
         f"docstring says {match.group(1)} raw + {match.group(2)} composite; "
         f"{os.path.basename(_FAMILY_PATH)} declares {raw} raw + {composite} composite"
     )
+
+
+# ── #4517: both daily-Sum thresholds are DERIVED from his own variance (ADR-105 rule 4) ──
+
+
+def _derivation_namespace() -> dict:
+    """Execute ONLY the module-level derivation (the samples, the pure function, the two
+    thresholds) out of the family module's own AST. Nothing CDK-shaped runs, so this needs no
+    aws_cdk install, and it reads the code that ships rather than a copy of it."""
+    wanted = {
+        "AI_ALARM_DERIVATION_WINDOW",
+        "AI_ALARM_DERIVATION_K_SD",
+        "AI_SPEND_DAILY_MAX_ROLLING_24H_USD",
+        "AI_TOKENS_DAILY_MAX_ROLLING_24H",
+        "lognormal_upper_bound",
+        "AI_DAILY_SPEND_THRESHOLD_USD",
+        "AI_TOKENS_PLATFORM_DAILY_THRESHOLD",
+    }
+    tree = ast.parse(_SRC)
+    body = []
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name in wanted:
+            body.append(node)
+        elif isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id in wanted for t in node.targets):
+            body.append(node)
+    ns: dict = {}
+    exec(compile(ast.Module(body=body, type_ignores=[]), _FAMILY_PATH, "exec"), ns)  # noqa: S102 — our own module's pure lines
+    missing = wanted - set(ns)
+    assert not missing, f"the #4517 derivation is incomplete in {os.path.basename(_FAMILY_PATH)}: missing {sorted(missing)}"
+    return ns
+
+
+def _threshold_kw(alarm_name: str) -> ast.AST:
+    for node in ast.walk(ast.parse(_SRC)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "Alarm":
+            kws = {k.arg: k.value for k in node.keywords}
+            if isinstance(kws.get("alarm_name"), ast.Constant) and kws["alarm_name"].value == alarm_name:
+                return kws["threshold"]
+    raise AssertionError(f"no cloudwatch.Alarm named {alarm_name!r} in {os.path.basename(_FAMILY_PATH)}")
+
+
+def test_the_daily_sum_thresholds_are_derived_from_personal_variance_4517():
+    """Each threshold is exp(mean(ln x) + 3·SD(ln x)) over the recorded 30-day sample of the
+    statistic the alarm evaluates (each day's max of the rolling-24h Sum), and both alarms read
+    the derived NAME, never a hand-typed number. The expected values are recomputed here
+    independently of the module's function."""
+    import math
+    import statistics
+
+    ns = _derivation_namespace()
+    for alarm, const, sample_name, rounding in (
+        ("ai-daily-spend-high", "AI_DAILY_SPEND_THRESHOLD_USD", "AI_SPEND_DAILY_MAX_ROLLING_24H_USD", 2),
+        ("ai-tokens-platform-daily-total", "AI_TOKENS_PLATFORM_DAILY_THRESHOLD", "AI_TOKENS_DAILY_MAX_ROLLING_24H", -3),
+    ):
+        kw = _threshold_kw(alarm)
+        assert isinstance(kw, ast.Name) and kw.id == const, f"{alarm}: threshold must be the derived {const}, found {ast.unparse(kw)}"
+        sample = ns[sample_name]
+        assert len(sample) >= 28, f"{sample_name}: n={len(sample)} — the derivation needs ~30 complete days"
+        logs = [math.log(v) for _, v in sample]
+        expected = round(math.exp(statistics.mean(logs) + 3 * statistics.stdev(logs)), rounding)
+        assert ns["AI_ALARM_DERIVATION_K_SD"] == 3
+        assert ns[const] == expected, f"{const}={ns[const]} does not match its derivation ({expected})"
+
+
+def test_the_derived_thresholds_sit_above_every_day_in_their_own_window_4517():
+    """The backtest, expressed on the recorded sample. Each value IS that day's highest
+    rolling-24h Sum, so a threshold above the max means 0 crossings over the derivation window.
+    Fails if a re-derivation (or a hand edit) puts the bar back inside the ordinary range, which
+    is what $6 / 250,000 were: 09-30 sat above both."""
+    ns = _derivation_namespace()
+    spend_max = max(v for _, v in ns["AI_SPEND_DAILY_MAX_ROLLING_24H_USD"])
+    tok_max = max(v for _, v in ns["AI_TOKENS_DAILY_MAX_ROLLING_24H"])
+    assert ns["AI_DAILY_SPEND_THRESHOLD_USD"] > spend_max, (ns["AI_DAILY_SPEND_THRESHOLD_USD"], spend_max)
+    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] > tok_max, (ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"], tok_max)
+    # Positive control: the retired bars DO sit inside the window, so this check can fail.
+    assert 6.0 < spend_max and 250000 < tok_max
 
 
 if __name__ == "__main__":

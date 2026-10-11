@@ -18,7 +18,7 @@ Three rules these helpers exist to enforce, all of them ADR-104/105:
     `lambdas/ingestion/weather_lambda.py` actually writes.
   * `coach_header_title` / `v2_coach_header_titles` — a V2 coach section
     header names its coach from `persona_registry`, never a hand-typed
-    literal (#4360: `DR. VICTOR REYES` survived a 2026-08-10 rename to Dr. Max
+    literal (#4360: `VICTOR REYES` survived a 2026-08-10 rename to Max
     Reyes for six weeks because nothing pointed at the coach's own config).
     `v2_coach_header_titles()` precomputes the whole `{engine_id: title}` map
     so each `html_builder.py` call site is a short dict lookup — that is what
@@ -55,7 +55,7 @@ def coach_header_title(engine_id: str, emoji: str, label: str) -> str:
     """``"{emoji} {NAME} — {LABEL}"`` for a V2 coach section header.
 
     #4360: every one of these headers used to be a hand-typed literal, and a
-    rename (Dr. Victor Reyes -> Dr. Max Reyes, 2026-08-10) left the
+    rename (Victor Reyes -> Max Reyes, 2026-08-10) left the
     physical-coach header stale for six weeks because nothing pointed at
     ``config/coaches/physical_coach.json``. The name comes from
     ``persona_registry`` (the CC-00 registry reconciling coach config keys,

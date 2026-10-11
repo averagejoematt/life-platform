@@ -8,6 +8,7 @@ present so the front-end can never render the cast sheet as measured behavior.
 """
 
 import os
+import re
 import sys
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -54,3 +55,13 @@ def test_traits_for_shape_and_order():
 def test_traits_for_unknown_coach_is_none():
     assert coach_traits.traits_for("the_chair") is None
     assert coach_traits.traits_for("") is None
+
+
+def test_no_trait_note_uses_a_gendered_pronoun_for_an_ai_persona():
+    # #4649: a coach is software. /api/coach/<id> served "quick to say she was wrong" under
+    # trait_scores.note; the note says what the character does, with no she/he/his/her.
+    pronoun = re.compile(r"\b(she|he|her|hers|herself|him|his|himself)\b", re.I)
+    offenders = {cid: pronoun.findall(entry["note"]) for cid, entry in coach_traits.COACH_TRAITS.items() if pronoun.search(entry["note"])}
+    assert not offenders, f"trait note(s) with a gendered pronoun: {offenders}"
+    for cid in coach_traits.COACH_TRAITS:
+        assert not pronoun.search(coach_traits.traits_for(cid)["note"]), cid

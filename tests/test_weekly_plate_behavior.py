@@ -815,15 +815,19 @@ class TestUserMessage:
         that isn't there if it is handed null."""
         assert _payload(withings={})["weight_trend"] is None
 
-    def test_the_prompt_carries_the_profile_targets(self):
+    def test_the_prompt_carries_the_plan_targets_not_the_profile_rows(self):
         targets = _payload(profile={"calorie_target": 2000, "protein_target_g": 210, "goal_weight_lbs": 190})["profile_targets"]
-        assert targets["calorie_target"] == 2000
-        assert targets["protein_target_g"] == 210
+        assert targets["calorie_target"] == wp.PLAN_DAILY_CALORIES_TARGET
+        assert targets["protein_target_g"] == wp.PLAN_DAILY_PROTEIN_MIN_G
         assert targets["goal_weight_lbs"] == 190
 
-    def test_absent_targets_fall_back_to_the_documented_defaults(self):
+    def test_absent_profile_targets_change_nothing_about_the_plan_targets(self):
         targets = _payload(profile={})["profile_targets"]
-        assert (targets["calorie_target"], targets["protein_target_g"], targets["goal_weight_lbs"]) == (1800, 190, 185)
+        assert (targets["calorie_target"], targets["protein_target_g"], targets["goal_weight_lbs"]) == (
+            wp.PLAN_DAILY_CALORIES_TARGET,
+            wp.PLAN_DAILY_PROTEIN_MIN_G,
+            185,
+        )
 
     def test_the_eating_window_is_stated_so_the_ai_can_time_its_suggestions(self):
         assert "16:8" in _payload()["profile_targets"]["eating_window"]
@@ -846,12 +850,13 @@ class TestSystemPrompt:
 
     def test_the_system_prompt_carries_the_calorie_and_protein_targets(self):
         rendered = wp.build_system_prompt({"calorie_target": 2000, "protein_target_g": 210}, WITHINGS)
-        assert "2000 cal/day" in rendered
-        assert "210g protein" in rendered
+        assert f"{wp.PLAN_DAILY_CALORIES_TARGET} cal/day" in rendered
+        assert f"{wp.PLAN_DAILY_PROTEIN_MIN_G}g protein" in rendered
+        assert "2000 cal/day" not in rendered and "210g protein" not in rendered  # #4540: the row is not read
 
-    def test_absent_targets_render_the_documented_defaults(self):
+    def test_absent_profile_targets_render_the_plan_targets(self):
         rendered = wp.build_system_prompt({}, WITHINGS)
-        assert "1800 cal/day" in rendered and "190g protein" in rendered
+        assert f"{wp.PLAN_DAILY_CALORIES_TARGET} cal/day" in rendered and f"{wp.PLAN_DAILY_PROTEIN_MIN_G}g protein" in rendered
 
     def test_the_system_prompt_states_the_grounding_rules_that_keep_meals_honest(self):
         """The 'no invented pairings' instruction is the module's own

@@ -102,6 +102,7 @@ WATCHED_LOG_GROUPS = (
     "/aws/lambda/daily-brief",
     "/aws/lambda/daily-debrief",
     "/aws/lambda/elena-state-updater",
+    "/aws/lambda/habit-skip-review",
     "/aws/lambda/milestone-digest",
     "/aws/lambda/monday-compass",
     "/aws/lambda/monthly-digest",

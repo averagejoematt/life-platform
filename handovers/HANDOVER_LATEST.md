@@ -1,85 +1,78 @@
-# Handover — Session BC: the overnight paydown toward 30 (2026-10-01 03:00Z → ~18:00Z, Opus only, owner asleep)
+# Handover — Session BN: owner rulings delivered — 16 rulings taken, 8 PRs merged, 4 CDK stacks and garth-layer:4 live (2026-10-11 ~02:30Z → ~04:50Z, Opus 5.5, owner at the keyboard)
 
-**Driver plan:** `~/.claude/plans/zazzy-foraging-treasure.md`, owner-approved ~03:00Z. The owner had rejected a first plan that landed at ~60 open: "i want the plan to get us closer to 30 open issues, we can synthetic tests to prove things." The plan used three levers:
-- synthetic proofs (dry runs, re-verdicts, future-date drafts, dispatches);
-- section-A owner-ruling closes;
-- folding the four child epics into #4287.
+**Driving instruction:** Session BM's parked owner list, delivered with the owner present. In four AskUserQuestion rounds (ELI5 with recommendations) the owner picked the recommended option on all 16 items. The rulings are posted on each issue at ~02:40Z. The driver then ran every attended step it could. Steps the auto-mode classifier denied were handed to the owner as `!` commands, and he ran them.
 
-**Result: 68 → 48 open (REST, 2026-10-01 ~17:55Z).** 22 closed (20 by the driver, 2 auto-closed trackers) and 2 filed (#4514, #4517). **The ~30 target was not met.** Three reasons:
-- Four planned synthetic proofs were refused, correctly, by the tools' consent contracts or by the classifier (see Gotchas).
-- The brief's coach holds turned out to be real rule violations (a reader check overriding the judge), not a pure bug.
-- The driver sat idle ~11 h (04:12Z → 15:33Z) before its next step fired.
+## Shipped — 8 PRs merged, all deployed
+- **#4785** (#4774): MCP role CloudWatch reads. The PR's own test hand-typed `215.0`, which `test_budget_ceiling_registry_2898` forbids; the fixture now derives from `site_api_budget._ADR133_BASE_CEILING_USD`. `cdk_deploy.sh LifePlatformMcp` was run by the owner.
+- **#4715** (#4641): secret writeback only on a token change. CodeQL #190 was dismissed as a false positive on the owner's ruling.
+- **#4779**: ADR-161, the AI model strategy.
+- **#4738** (#4582): edition contract test and schema baseline. `/api/edition` was moved to `PARAMETERISED_ROUTES`, so `his_words` never enters the public archive (owner ruling).
+- **#4794** (#4694): the Panel's legacy Mon/Wed path and the hold sweep publish only with `{"owner_approved": true}` or a passed audit. Otherwise `PANELCAST-AUTOPUBLISH-HELD wk<N>`.
+- **#4791** (#4473/#4502): garth-layer:4, published by the driver on the owner's approval. It carries oauthlib 4.0.0 and urllib3 2.8.0. Dependabot PRs #4473 and #4502 were closed as superseded. `cdk_deploy.sh LifePlatformIngestion` was run by the driver from fresh main.
+- **#4792 + #4798** (#4643 box 5): the deploy role gained `s3:GetBucketNotification`; the driver ran `put-role-policy` and the owner ran `verify_oidc_iam.py --strict` (CLEAN, 15 targets). config-drift now runs the bucket-notification check.
+- **#4795** (#4777): ADR-132's trip-wire now also counts records per job, and `bedrock_batch.run_or_fallback` is complete. The owner merged it and ran `cdk_deploy.sh LifePlatformCore`, which created the `life-platform-bedrock-batch` role.
+- **Deploys:**
+  - The driver ran `cdk_deploy.sh LifePlatformMonitoring` (#4741's dashboard) and `cdk_deploy.sh LifePlatformIngestion` (layer v4).
+  - The owner ran the Mcp and Core deploys.
+  - Main's CI was green end to end at a594eea2a after a `--failed` re-run once Core was live.
+- **Attended writes (owner-approved):**
+  - Habitify re-ingest of 09-24 (#4655, closed).
+  - Week-4 chronicle dry run (#4535, partial).
+  - #4618 re-grade applied: 14 corrections, record 59/143 → 56/141, re-run idempotent.
+  - Week-07 share kit written, with no email: the owner ran `season_promote.py --effects-only --weeks 4 --apply`, and the row now reads `delivery_decision=no-send`.
+- **Closed with proof:** #4655 (61/35 plus the `renamed:dropped-old-name x1` log line).
+- **Closed on owner rulings:** #4675 (no-link fallback accepted) and #4714 (serve-side hold is enough).
+- **Filed:** #4796 (swap-eval credential stub, P2) and #4797 (`run_or_fallback` polling exception, P3).
 
-## Shipped — 12 PRs merged, main green after every merge (now 6a474f62d)
-- **Brief / coach:** #4512 (a held coach names its client rule and the judge verdict; the revision note quotes the sentence to edit). The 17:00Z brief ran on it.
-- **Training (v0.5 rulings, #4503):** #4509 (OD1 re-entry tiers, 28 d held), #4510 (OD4/OD5: ceiling 20/24, bonus role, rep-triggered gains), #4511 (OD6: Body Scan 2 between-DXA read with own-variance noise).
-- **Training (HR):** #4508 (the cardio-HR join reads WHOOP workout rows; WHOOP's gym session is no longer dropped as a Hevy echo; a `rejoin_workout` path).
-- **Podcast:** #4506 (the editor under a JSON schema).
-- **CI/harness:**
-  - #4497: janitor and wedge classifier retired into the one dead-man.
-  - #4505: coverage high-water 83.20 → 86.30, floor 80 → 82.
-  - #4507: CLAUDE.md token and status-block ratchet.
-- **Session BB's wrap:** #4504.
-
-## Verified live (the driver read each)
-**Closed with `**Live proof:**` (real or labelled synthetic):**
-- #4245: `/api/nutrition_overview` serves supplements; the deployed dead-man check returns `ok 3/3`.
-- #4111: the deployed weekly-digest render has 'Added Beyond Plan: 21 set(s) added (+21 net)'.
-- #4387: a `plan_next_session` re-verdict of `4300a686…` reads 4.44 h weight-bearing in 48 h and picks cycling.
-- #4185: dry-run nutrition 'went quiet on September 26'; the probe found 0 protein findings.
-- #4360 / #4361: the deployed header and inventory renders.
-- #4256: the janitor is deleted on main; the dead-man was proven by #4484.
-- #4164: 15 consecutive green PII sweeps (5 scheduled + 10 dispatched).
-- #4480: 0 duration warnings on 3 main runs.
-- #4501: podcast dry run `[STRUCTURED_OUTPUT] label=panelcast_editor … parsed=dict`, `editor verdict=pass`.
-- #4412: the 09-28 and 09-29 rejoins joined (coverage 0.985 and 0.551, WHOOP), and the planner's `recent_aerobic` reads 109/139.
-
-**Ruling closes (section A of the approved plan):** #4267 #4266 #4254 #4263 #4277 #4278.
-**Epics folded into #4287:** #4246 #4247 #4248 #4249.
-**Auto-closed trackers:** #4485 (wrap-nightly green), #4491 (the served-coach-facts probe green at 17:48Z).
-
-**Partial, with the proof due named on each issue:**
-- #4343 / #4358: the 17:00Z brief (54651dc7-…) has 4 holds, each a named real rule (unlabeled window ×2, banned term ×2, one judge fail). Two owner rulings are parked on #4512.
-- #4503: boxes 1–3 live (synthetic 10-02 draft: `caps.total_sets` 20, `tier hold` / `threshold_days 28`; `between_dxa_lean` measured). Box 4 is blocked: the docs live in private S3 `config/`.
-- #4472: deploy-base proven; box 3 (a burst) not run, deliberately.
-- #4286: the server advertises resources, but this client's capabilities predate the deploy.
-- #4474: its truncation cause is fixed (0 TRUNCATED, 0 unevaluated); a new red on `/data/zone2/`.
-- #4183: the orphan leg is clear; the alarm is lit by six other legs.
-- #4252: 18.2 / 24.2 / 19.3 min (not three in a row).
-- #4262: one measured wrap (BB) plus this one.
+## Verified
+- **#4774:** live receipt at 04:26:21Z. It has 5 model rows and 43 Lambda rows, reconciles at 1.005, and history and typical_day are back. Reopened at the wrap: it had closed at 02:54Z with no proof, and box 3 (tier on rows) is still open.
+- **#4643 box 5:** the config-drift run printed `expected 4, live 4`.
+- **garth-layer:4:**
+  - `garmin-data-ingestion` is on layer v4, and its healthcheck returns 200 `ok`.
+  - Caveat: that check returns before the lazy `import garth`.
+  - OAuth1 signing from the published zip matches oauthlib 3.3.1.
+- **#4593:** kit.json written at 03:26:24Z (1373 bytes).
 
 ## Gotchas
-- **Tools refused synthetic proofs by design, and that's correct:**
-  - `mark_journal_quote` publishes a line and needs the owner's per-line yes (#4377);
-  - `get_exercise_notes dismiss` records his verbatim words and lifts a pain veto (#4401);
-  - a Telegram turn needs the bot secret (#4170);
-  - the classifier denied even a commit built to be refused (#4172, 'Unrequested Commit in a Connected App').
+- **Classifier denials, all parked and never routed around.** These were denied:
+  - `cdk_deploy.sh … -- --require-approval never` ("Blind Apply")
+  - `season_promote --apply` ("Production Deploy")
+  - `verify_oidc_iam.py --strict` and merging the IAM-role PR #4795 ("Permission Grant")
+  - the issue-filer's epic edit
 
-  Plan synthetic proofs around consent contracts, not just side effects.
-- **The `aws lambda invoke` CLI auto-retries a long synchronous call.** The retry then hits the first run's own in-flight lock ('already in flight — skipped'). Use `AWS_MAX_ATTEMPTS=1` and read the logs.
-- **A chained train read its predecessor as STOPPED although that log said DONE**, so trains 11 and 12 never ran. Separately, `merge_pr.sh` reported a merge as done over a GitHub GraphQL error. Chain fewer trains (one `train2.sh` with several PRs), and confirm `gh pr view --json state` after each merge.
-- **The driver idled ~11 h** between a background notification (04:12Z) and its handling (15:33Z). Overnight, prefer one long-lived waiter over many short chained ones, and check the clock at every wake.
+  These went through: `cdk_deploy.sh LifePlatformMonitoring` and `LifePlatformIngestion` with no IAM diff, Lambda invokes, the DynamoDB re-grade, and `iam put-role-policy`.
+- **A CDK IAM diff needs a TTY to confirm.** `!` commands have none, so the owner passes `-- --require-approval never` himself.
+- **The AWS CLI retries a Lambda invoke after its 60 s read timeout.** The week-4 chronicle dry run ran twice. Use `AWS_MAX_ATTEMPTS=1 --cli-read-timeout 900`.
+- **CI's Plan diffs only `GITHUB_SHA~1`.** #4791's layer-constant bump was never planned once later merges landed. Run `cdk_deploy.sh <Stack>` by hand when a CDK constant rides an earlier merge.
+- **`tests/golden_surface_eval.py` sets `AWS_ACCESS_KEY_ID=testing`** whenever credentials live in `~/.aws/credentials`, so every real swap-eval call fails (#4796).
+- **The local `mcp_bridge.py` hung for 1800 s on `get_platform_cost`** and no request reached the Lambda. The claude.ai connector answered at once.
 
-## Residual / next picks
-- #4500: re-synced (`bf65591e3`), green, held for the owner (one deploy path; the rollback dry run is in its body).
-- #4343: rule on #4512's two parked questions (does a stated date range count as a window? drop an edit that introduces a banned term?), then put the banned list and the window rule into the coach prompts.
-- #4503: box 4, the OD2/OD3/OD7 doc redlines in S3 `config/coaching/` (the drafted text is in Lane C's scratchpad), plus OD7's named human.
-- #4517: re-derive or retire the urgent AI-spend thresholds.
-- #4514: the podcast's Elena pass-1 truncation.
-- #4474: the `/data/zone2/` temporal-contradiction finding.
-- #4286: the first fresh client's resources/list.
-- Owner acts: #4377 #4401 #4170 #4172 #4191 #4189 #4261 #3761 #4076 #4259.
-- #4329 / #4330: Fable-only.
-- not-work — the owner's lower-heavy pre-draft carries a joints VETO on the RDL (09-13 hinge pain flag); his `get_exercise_notes dismiss` would both clear it and prove #4401.
+## Residual / next picks — waiting on the owner
+- **#4771:** enable Claude Haiku 5.5 in Bedrock → Model access (us-west-2). `agreementAvailability: NOT_AVAILABLE` blocks the swap-eval rehearsal and #4772.
+- **#4732:** merge PR #4793? Its 14-day auto-archive also catches unmarked cron drafts. 2 of "his 7" are cron drafts (verifier PASS, scope flagged).
+- **#4643:** config-drift has been red daily since at least 10-06 because the deploy role has no `s3:GetBucketPolicy`. Rule on a one-line read-only grant PR (owner apply after).
+- **#4768:** add #4796 and #4797 to the epic's story list (the classifier blocked the filer's edit).
+- **#4595 / #4694 / #4777:** carried rulings are applied. #4777 still needs the first live batch job, and a ruling on which producer adopts it first.
+- **#4646, #4635, #4617, #4584, #4585, #4619-class:** unchanged owner items from Session BM's list.
 
-**Build beat:** 2026-10-01-the-held-coach-says-why
-**Docs:** `docs/alarm_citations.json` (two urgent AI composites cited to #4517; qa-smoke-warnings re-cited to its live cause); engine docs updated inside their PRs (COACH_STANCE.md by #4512, CI registry by #4496/#4497, PROPORTIONALITY by #4497)
-**Decisions:** none needed — the v0.5 rulings are recorded on #4503 and in memory; the section-A rulings are recorded in each closing comment
-**Main:** green (6a474f62)
-**Incidents:** none — the second urgent AI-spend flap (09-30 20:17Z) is the same class as Session BB's row and is now tracked as #4517
+## Residual / next picks — agent work
+- **#4774 box 3:** receipt rows carry the registry tier (now unblocked by #4770).
+- **#4796:** the swap-eval credential stub (sonnet, Now).
+- **#4797:** the `run_or_fallback` polling exception (sonnet).
+- **#4535 box 2:** check whether the legacy `Gathering data: 10-03 → 10-09` packet reaches the week-4 writer.
+- **#4772:** the Haiku 5.5 workhorse swap, after the owner enables model access.
+- **#4789:** the DLQ signature-ledger window.
+- **#4257:** promoted to Now for the fable lane at this wrap.
+- not-work — proofs due from natural runs: #4593 qa-smoke share_kit cell, #4732 nightly sweep, #4694 first Mon/Wed hold, #4731 next recurring DLQ failure.
+
+**Build beat:** none — infrastructure delivery and owner rulings; nothing new for a reader to see
+**Docs:** none needed beyond the lanes — #4795 amended ADR-132 in DECISIONS.md and #4798 updated RUNBOOK/infra README in-lane
+**Decisions:** none needed — ADR-161 merged (#4779) and the ADR-132 amendment landed in #4795; no new governance call
+**Main:** green (a594eea2)
+**Incidents:** none
 **Stash/hooks:** clean
-**Closures:** #4267, #4266, #4254, #4263, #4277, #4278, #4246, #4247, #4248, #4249, #4245, #4111, #4387, #4185, #4360, #4361, #4256, #4164, #4480, #4501, #4412 commented (#4485, #4491 auto-closed) · DoD: scanned 26, hits 0
-**Backlog:** Now live at 5 opus-startable stories (floor 3, 0 short); 0 hygiene violations; #4514 and #4517 added to their epics' Stories
-**Alarms:** 0 uncited — 2 flaps (`ai-daily-spend-high-urgent`, `ai-tokens-platform-daily-total-urgent`) cited to #4517; `qa-smoke-warnings` re-cited to its live cause on #4183
-**CI warnings:** 5 — playwright SKIPPED in CI (#3640): known, by design; the coverage high-water warning is resolved by #4505
-**Ledger:** none — no new standing subsystem; #4497 retired machinery and updated its PROPORTIONALITY row inside the PR
+**Closures:** #4655, #4675, #4714 commented (Shipped/Outcome) · DoD: scanned 5, hits 1 — #4774 closed without proof at 02:54Z, reopened with a partial Outcome verdict
+**Backlog:** Now 22 actionable for opus; fable lane 2 → 3 (promoted #4257); no stale Later issues (106 open satisfy the filing contract)
+**Alarms:** every alarm red >72h cited; no uncited flaps (gate PASS)
+**CI warnings:** 2 — both are "Pending owner cdk deploy (LifePlatformIngestion) GarminIngestion.Layers" on a594eea2; resolved, `cdk_deploy.sh LifePlatformIngestion` ran at ~04:35Z after that run and garmin-data-ingestion reads garth-layer:4
+**Ledger:** none — no new standing subsystem; #4798 adds a leg to the existing config-drift workflow, #4794 a gate inside an existing Lambda

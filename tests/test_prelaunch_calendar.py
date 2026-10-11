@@ -135,7 +135,7 @@ def test_repair_produces_wellformed_vetted_content():
     assert "*Prologue — The Measured Life*" in md  # signature preserved as emphasis
     assert wc > 50
     # the fictional Board roster replaced the real public figures
-    assert "Dr. Reyes" in md and "Attia" not in md
+    assert "Reyes" in md and "Attia" not in md
     # the leadin-pages renderer must strip the header it renders its own chrome for
     stripped = leadin.body_html_from_record({"content_html": html})
     assert not stripped.startswith("<h1>") and "byline" not in stripped[:100]

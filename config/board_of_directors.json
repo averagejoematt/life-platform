@@ -9,7 +9,7 @@
   },
   "members": {
     "sarah_chen": {
-      "name": "Dr. Sarah Chen",
+      "name": "Sarah Chen",
       "title": "Sports Scientist (retired at the cycle-13 genesis)",
       "type": "fictional_advisor",
       "emoji": "🏋️",
@@ -57,12 +57,12 @@
       "features": {
         "weekly_digest": {
           "role": "individual_section",
-          "section_header": "🏋️ DR. SARAH CHEN — SPORTS SCIENTIST",
+          "section_header": "🏋️ SARAH CHEN — SPORTS SCIENTIST",
           "prompt_focus": "Training quality, Zone 2 adequacy, TSB/CTL/ATL, periodisation, recovery. Is Matthew building fitness or just accumulating fatigue? What does the Banister model + day grades say about his readiness?"
         },
         "monthly_digest": {
           "role": "individual_section",
-          "section_header": "🏋️ DR. SARAH CHEN — MONTHLY TRAINING REVIEW",
+          "section_header": "🏋️ SARAH CHEN — MONTHLY TRAINING REVIEW",
           "prompt_focus": "Training volume arc, Zone 2 base-building, CTL trajectory, periodisation, fatigue accumulation across the month. Did Matthew build fitness this month, or just accumulate fatigue?"
         },
         "daily_brief": {
@@ -79,7 +79,7 @@
       "retired_date": "2026-08-10"
     },
     "marcus_webb": {
-      "name": "Dr. Marcus Webb",
+      "name": "Marcus Webb",
       "title": "Nutritionist",
       "type": "fictional_advisor",
       "emoji": "🥗",
@@ -124,12 +124,12 @@
       "features": {
         "weekly_digest": {
           "role": "individual_section",
-          "section_header": "🥗 DR. MARCUS WEBB — NUTRITIONIST",
+          "section_header": "🥗 MARCUS WEBB — NUTRITIONIST",
           "prompt_focus": "Calorie/protein adherence, macro balance, meal timing patterns. Is nutrition supporting or undermining training and recovery? Reference hit rates and specific shortfalls."
         },
         "monthly_digest": {
           "role": "individual_section",
-          "section_header": "🥗 DR. MARCUS WEBB — MONTHLY NUTRITION REVIEW",
+          "section_header": "🥗 MARCUS WEBB — MONTHLY NUTRITION REVIEW",
           "prompt_focus": "30-day calorie and protein adherence, consistency vs spikes, nutrition-training interaction."
         },
         "daily_brief": {
@@ -144,7 +144,7 @@
       "active": true
     },
     "lisa_park": {
-      "name": "Dr. Lisa Park",
+      "name": "Lisa Park",
       "title": "Sleep Scientist & Circadian Specialist",
       "type": "fictional_advisor",
       "emoji": "😴",
@@ -193,12 +193,12 @@
       "features": {
         "weekly_digest": {
           "role": "individual_section",
-          "section_header": "😴 DR. LISA PARK — SLEEP & CIRCADIAN SPECIALIST",
+          "section_header": "😴 LISA PARK — SLEEP & CIRCADIAN SPECIALIST",
           "prompt_focus": "Sleep architecture (REM%, deep%), efficiency, sleep debt, upstream causes. What's driving sleep quality — duration, architecture, or efficiency? Connect to training load and day grades."
         },
         "monthly_digest": {
           "role": "individual_section",
-          "section_header": "😴 DR. LISA PARK — MONTHLY SLEEP REVIEW",
+          "section_header": "😴 LISA PARK — MONTHLY SLEEP REVIEW",
           "prompt_focus": "Sleep architecture monthly averages, efficiency trend, social jetlag, cumulative sleep debt. What does 30 days reveal that a single week cannot?"
         },
         "daily_brief": {
@@ -217,7 +217,7 @@
       "active": true
     },
     "james_okafor": {
-      "name": "Dr. James Okafor",
+      "name": "James Okafor",
       "title": "Longevity & Preventive Medicine",
       "type": "fictional_advisor",
       "emoji": "🩺",
@@ -265,12 +265,12 @@
       "features": {
         "weekly_digest": {
           "role": "individual_section",
-          "section_header": "🩺 DR. JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE",
+          "section_header": "🩺 JAMES OKAFOR — LONGEVITY & PREVENTIVE MEDICINE",
           "prompt_focus": "Long-term trajectory. What does the 4-week trend say? What leading indicator is most encouraging or concerning? What data gaps matter most?"
         },
         "monthly_digest": {
           "role": "individual_section",
-          "section_header": "🩺 DR. JAMES OKAFOR — MONTHLY TRAJECTORY REVIEW",
+          "section_header": "🩺 JAMES OKAFOR — MONTHLY TRAJECTORY REVIEW",
           "prompt_focus": "Body composition arc, long-term indicators, month-over-month directional change. At current trajectory, are 12-month goals achievable?"
         },
         "daily_brief": {
@@ -399,7 +399,7 @@
       "active": true
     },
     "layne_norton": {
-      "name": "Dr. Marcus Webb",
+      "name": "Marcus Webb",
       "title": "Macros, Protein & Adherence",
       "type": "real_expert",
       "emoji": "💪",
@@ -447,7 +447,7 @@
       "active": true
     },
     "rhonda_patrick": {
-      "name": "Dr. Amara Patel",
+      "name": "Amara Patel",
       "title": "Micronutrients, Genome & Longevity",
       "type": "real_expert",
       "emoji": "🧬",
@@ -500,7 +500,7 @@
       "active": true
     },
     "peter_attia": {
-      "name": "Dr. Victor Reyes",
+      "name": "Victor Reyes",
       "title": "Metabolic Health & Longevity",
       "type": "fictional_advisor",
       "emoji": "📊",
@@ -543,7 +543,7 @@
       "features": {
         "nutrition_review": {
           "role": "individual_section",
-          "section_header": "### Dr. Victor Reyes - Metabolic Health & Composition",
+          "section_header": "### Victor Reyes - Metabolic Health & Composition",
           "prompt_focus": "Weight trend and rate. CGM data if available. Meal glucose impact. Meal timing vs training. Deficit sustainability. DEXA benchmark context. Carb quality/timing."
         },
         "chronicle": {
@@ -555,7 +555,7 @@
       "active": true
     },
     "andrew_huberman": {
-      "name": "Dr. Kai Nakamura",
+      "name": "Kai Nakamura",
       "title": "Neuroscience & Protocols",
       "type": "fictional_advisor",
       "emoji": "🔬",
@@ -649,7 +649,7 @@
       "active": true
     },
     "paul_conti": {
-      "name": "Dr. Nathan Reeves",
+      "name": "Nathan Reeves",
       "title": "Psychiatrist — Self-Structure & Inner Work",
       "type": "real_expert",
       "emoji": "🧠",
@@ -753,7 +753,7 @@
       "active": true
     },
     "vivek_murthy": {
-      "name": "Dr. Vivek Murthy",
+      "name": "Vivek Murthy",
       "title": "Former U.S. Surgeon General — Social Connection & Loneliness",
       "type": "real_expert",
       "emoji": "🤝",
@@ -805,7 +805,7 @@
       "active": true
     },
     "amara_patel": {
-      "name": "Dr. Amara Patel",
+      "name": "Amara Patel",
       "title": "Metabolic Health Researcher",
       "type": "fictional_advisor",
       "emoji": "🔬",
@@ -857,7 +857,7 @@
       "active": true
     },
     "victor_reyes": {
-      "name": "Dr. Max Reyes",
+      "name": "Max Reyes",
       "title": "Performance Coach — Training, Cardio & Mobility",
       "type": "fictional_advisor",
       "emoji": "📊",
@@ -914,7 +914,7 @@
       "active": true
     },
     "nathan_reeves": {
-      "name": "Dr. Nathan Reeves",
+      "name": "Nathan Reeves",
       "title": "Psychiatrist — Behavioral Patterns",
       "type": "fictional_advisor",
       "emoji": "🧠",
@@ -960,7 +960,7 @@
       "active": true
     },
     "henning_brandt": {
-      "name": "Dr. Henning Brandt",
+      "name": "Henning Brandt",
       "title": "Biostatistician — N=1 Research",
       "type": "fictional_advisor",
       "emoji": "🔍",
@@ -1010,7 +1010,7 @@
       "active": true
     },
     "iris_tanaka_interim": {
-      "name": "Dr. Iris Tanaka",
+      "name": "Iris Tanaka",
       "title": "Sports Medicine (interim)",
       "type": "fictional_advisor",
       "emoji": "🦴",
@@ -1064,7 +1064,7 @@
       "_sunset_trigger": "Remove this entry (and the BOARDS.md placeholder note) when the real Sports Medicine seat is filled."
     },
     "eli_marsh": {
-      "name": "Dr. Eli Marsh",
+      "name": "Eli Marsh",
       "title": "Principal Investigator — Program Lead",
       "type": "meta_role",
       "emoji": "🔬",
@@ -1117,7 +1117,7 @@
       "active": true
     },
     "cora_vance": {
-      "name": "Dr. Cora Vance",
+      "name": "Cora Vance",
       "title": "Reading Coach — The Mind Pillar",
       "type": "fictional_advisor",
       "emoji": "📖",
@@ -1160,7 +1160,7 @@
       "active": false
     },
     "nora_vale": {
-      "name": "Dr. Nora Vale",
+      "name": "Nora Vale",
       "title": "Pattern Detective — Director of Longitudinal Intelligence",
       "type": "fictional_advisor",
       "emoji": "🧩",

@@ -216,8 +216,19 @@ _CONTENT_FILTER_WATCH: dict[str, str] = {
     # held`), so a hold is queryable after the fact rather than merely absent, and the
     # separate recap-card-no-invocations-24h alarm covers the "stopped running at all" case
     # this exemption does not.
+    # #4583, 2026-10-03. coach_moves_sheet.check_line reads the vocabulary through
+    # privacy_guard.find_violations; an unavailable channel raises, which check_line turns
+    # into the refusal `privacy_unchecked` — every line that day is HELD and the coach is
+    # silent. The failure direction is "publish nothing", the bluesky/recap shape, never a
+    # silent no-op scrub; each held line and its reason is stored on the day's MOVES# row.
+    "lambdas/compute/coach_daily_reflection_lambda.py": "exempt 2026-10-03 (#4583): the daily moves fail CLOSED — an "
+    "unavailable vocabulary holds every line (reason `privacy_unchecked` on the MOVES# row's `held`), publishing nothing",
     "lambdas/web/recap_card_lambda.py": "exempt 2026-09-13 (#3741): fails CLOSED to a held card on an owner-only, "
     "hand-posted surface — the failure publishes nothing; every run records its verdict in SOURCE#recap_cards",
+    # #4584, 2026-10-04. The parser screens each Story Desk answer it copies into the owner-words store
+    # (content.owner_words.screen). An unavailable vocabulary HOLDS the entry (stored, never served) — the "publish
+    # nothing" direction — and the parser emits InsightParseFailure for it, which this alarm already watches.
+    "lambdas/emails/insight_email_parser_lambda.py": "alarm:life-platform-insight-email-parser-parse-failure",
 }
 
 
@@ -691,6 +702,11 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # and removed here in the same lane: post-apply `deploy/verify_oidc_iam.py --strict` reported
     # CLEAN across all 15 targets, and live now carries 3 DynamoDB actions on 14 statements.
     # Same #2824 rule as the #3562 entry above — this queue stays a queue.
+    # 2026-10-11: the #4643 deploy-role entry (S3BucketNotificationRead, `s3:GetBucketNotification`
+    # on arn:aws:s3:::matthew-life-platform for deploy/check_bucket_notification_drift.py in
+    # config-drift.yml) was applied by the owner ~03:30Z with the same put-role-policy command;
+    # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 15 targets.
+    # Removed here per the same #2824 rule.
 }
 
 

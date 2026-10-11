@@ -16,6 +16,7 @@ from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from health import (
     nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
     nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
@@ -49,12 +50,6 @@ _RDO_IMPACT_R = 0.15
 _TARGET_RATE_LB_WK = 3
 _KCAL_PER_LB = 3500
 _REQUIRED_DEFICIT_KCAL = round(_TARGET_RATE_LB_WK * _KCAL_PER_LB / 7)  # 1500
-
-# Last-resort protein lines, used ONLY when canonical_facts carries a value that will not
-# coerce. The authoritative default lives in the `_prof.get(<key>, <default>)` call itself,
-# whose literal shape tests/test_protein_contract.py pins against the producer.
-_PROTEIN_TARGET_FALLBACK_G = 190.0
-_PROTEIN_FLOOR_FALLBACK_G = 170.0
 
 
 def _num(v):
@@ -272,6 +267,18 @@ def _mf(item, field, alt_field=None):
     return None
 
 
+def _trend_row(i: dict) -> dict:
+    """One `nutrition_trend` row — the chart's day. Shared with `edition_nutrition` (#4607)."""
+    d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+    return {
+        "date": d,
+        "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
+        "protein_g": (round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None),
+        "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
+        "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
+    }
+
+
 def nutrition_overview(*, _g) -> dict:
     """
     GET /api/nutrition_overview
@@ -285,32 +292,16 @@ def nutrition_overview(*, _g) -> dict:
     d30 = _experiment_date(30)
     d7 = _experiment_date(7)
 
-    # One protein story on every door: target (stretch) and floor (graded) are the
-    # SAME profile values daily_metrics_compute writes into canonical_facts
-    # (protein_g_target/protein_g_floor). This page used to hardcode 190 and call it
-    # the "floor" while the coaches graded against the real 170 floor — a reader
-    # crossing doors saw two truths.
-    # #2221: coerced through `_num` like every other read — a non-numeric
-    # protein_target_g in canonical_facts used to 500 the whole nutrition door rather
-    # than fall back to the documented default. Found by the derived AST guard in
-    # tests/test_site_api_nutrition_behavior.py, not by any marker.
+    # One protein story on every door (#4540): the plan root states ONE protein line — a
+    # floor — and this door, daily_metrics_compute (canonical_facts' protein_g_target /
+    # protein_g_floor) and every email read the SAME generated constant. The profile row's
+    # separate stretch "target" was never the plan and is no longer read anywhere; both
+    # served fields stay (the front-end reads both) and carry the plan's figure.
     #
-    # #2337: read ABOVE the empty-branch return, so the genesis/no-data branch serves
-    # the same configured numbers the populated branch does. It used to hardcode 190
-    # and 170 in three further places below; with MacroFactor quiet (#2326) the empty
-    # branch is the LIVE branch, so those copies were the ones a reader actually saw.
-    #
-    # The `.get("<key>", <default>)` LITERAL shape is load-bearing:
-    # tests/test_protein_contract.py regex-matches key+default here against
-    # daily_metrics_compute's producer so the doors cannot tell two protein truths
-    # again. Keep the literal; add the guard around it, never instead of it.
-    _prof = _get_profile()
-    protein_target = _num(_prof.get("protein_target_g", 190))
-    if protein_target is None:
-        protein_target = _PROTEIN_TARGET_FALLBACK_G
-    protein_floor = _num(_prof.get("protein_floor_g", 170))
-    if protein_floor is None:
-        protein_floor = _PROTEIN_FLOOR_FALLBACK_G
+    # #2337: set ABOVE the empty-branch return, so the genesis/no-data branch serves the
+    # same numbers the populated branch does. tests/test_protein_contract.py holds the SET
+    # of readers to the constant, not this one site.
+    protein_target = protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
 
     items = _query_source("macrofactor", d30, today)
     if not items:
@@ -546,20 +537,7 @@ def nutrition_overview(*, _g) -> dict:
     deficit_published = bool(trend_check.get("publish"))
 
     # Daily trend for chart
-    trend = []
-    for i in items:
-        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
-        trend.append(
-            {
-                "date": d,
-                "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
-                "protein_g": (
-                    round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None
-                ),
-                "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
-                "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
-            }
-        )
+    trend = [_trend_row(i) for i in items]
 
     # ── Weekday vs Weekend comparison ──
     weekday_items = []
@@ -711,8 +689,7 @@ def nutrition_overview(*, _g) -> dict:
         "deficit_published": deficit_published,
         "trend_check": trend_check,
         "protein_hit_pct": protein_hit_pct,
-        # The floor (170) is what "the protein floor holds" language grades against —
-        # the target (190) is the stretch line, not the floor.
+        # The plan's floor is what "the protein floor holds" language grades against.
         "protein_floor_hit_pct": floor_hit_pct,
         "protein_floor_g": protein_floor,
     }
@@ -1240,3 +1217,49 @@ def deficit_sustainability(*, _g) -> dict:
         },
         cache_seconds=3600,
     )
+
+
+# ── /api/edition's narrow read (#4607) ─────────────────────────────────────────────
+#: Every MacroFactor field the edition's food rows depend on: the two names `_mf` resolves for
+#: calories and for protein, and the day (`sk` and `tombstone` are always projected by
+#: `_query_source`). Measured 2026-10-09: the whole route parsed ~670 KB of DynamoDB JSON
+#: over eleven reads (the food log, supplements, habits, three Withings, two Strava, Hevy,
+#: Whoop and the profile) for the five facts the front page prints.
+_EDITION_MF_FIELDS = ("date", "calories", "total_calories", "total_calories_kcal", "protein_g", "total_protein_g")
+
+#: The `nutrition_trend` row keys the edition reads (``site_api_edition._week`` / ``_day_detail``).
+_EDITION_TREND_KEYS = ("date", "calories", "protein_g")
+
+
+def edition_nutrition(*, _g) -> dict:
+    """The subset of `/api/nutrition_overview` the front page reads, from ONE projected read (#4607).
+
+    `site_api_edition` reads `nutrition.{protein_floor_g, protein_floor_hit_days,
+    days_logged, latest_date}` and `nutrition_trend[].{date, calories, protein_g}` — nothing
+    else. Those come from the 30-day MacroFactor window alone, so this reads that window
+    (same `_query_source`, same dates, same phase decision) with a projection, and derives
+    each fact with the route's own code: `_mf`, `_trend_row`, `nutrition_logging.logging_record`
+    and the plan's floor. Returns `{"nutrition": <body subset>}` in the route's own shape;
+    a failed read raises, and the edition serves the food rows unavailable.
+    tests/test_edition_narrow_readers_4607.py runs the route and this reader over one fake
+    table and asserts the edition's blocks are identical.
+    """
+    _query_source = _g["_query_source"]
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d30 = _g["_experiment_date"](30)
+    protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
+    items = _query_source("macrofactor", d30, today, projection=_EDITION_MF_FIELDS)
+    items.sort(key=lambda x: x.get("sk", ""))
+    pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
+    log_rec = nutrition_logging.logging_record(items, today)
+    return {
+        "nutrition": {
+            "nutrition": {
+                "protein_floor_g": protein_floor,
+                "protein_floor_hit_days": sum(1 for v in pro_vals if v >= protein_floor),
+                "days_logged": log_rec["days_logged"],
+                "latest_date": log_rec["latest_date"],
+            },
+            "nutrition_trend": [{k: row[k] for k in _EDITION_TREND_KEYS} for row in (_trend_row(i) for i in items)],
+        }
+    }

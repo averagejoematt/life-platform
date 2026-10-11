@@ -52,7 +52,7 @@ def grounder_on(*bad_substrings):
 def turn(caller, grounder, **kw):
     params = dict(
         coach_id="nutrition",
-        coach_name="Dr. Marcus Webb",
+        coach_name="Marcus Webb",
         persona_block="VOICE: blunt, evidence first.",
         memory_block="You remember: he committed to 170g protein.",
         facts_block="FACTS: protein yesterday 148 g.",
@@ -261,7 +261,7 @@ def test_the_system_prompt_forbids_attaching_today_to_another_days_reading():
     """#2343's class stated in the prompt as well as enforced by the gate. The prompt
     is not the guarantee — prompt rules cannot guarantee structure — but a prompt
     that omits the rule makes the gate do work it shouldn't have to."""
-    s = cc.build_system_prompt("VOICE", "MEM", "FACTS", "Dr. Marcus Webb")
+    s = cc.build_system_prompt("VOICE", "MEM", "FACTS", "Marcus Webb")
     assert "do not attach today to a reading from another day" in s
     assert "say you don't have it" in s
 
@@ -274,7 +274,7 @@ def test_the_system_prompt_puts_the_stable_persona_before_the_daily_facts():
 
 
 def test_the_coach_is_told_to_text_like_a_person_not_file_a_report():
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Marcus Webb")
+    s = cc.build_system_prompt("V", "M", "F", "Marcus Webb")
     assert "text message" in s and "no salutation or sign-off" in s
 
 
@@ -306,7 +306,7 @@ def test_an_overlong_inbound_message_is_clipped_before_it_is_stored_or_prompted(
     turn(caller, grounder_clean, inbound=long)
     sent = caller.requests[0]["messages"][-1]["content"]
     assert len(sent) == cc.MAX_INBOUND_CHARS
-    recs = cc.turn_records("nutrition", "Dr. Marcus Webb", long, cc.TurnResult("ok", "sent"))
+    recs = cc.turn_records("nutrition", "Marcus Webb", long, cc.TurnResult("ok", "sent"))
     assert len(recs[0]["text"]) == cc.MAX_INBOUND_CHARS, "storage and prompt must agree on what was said"
 
 
@@ -316,13 +316,13 @@ def test_an_overlong_inbound_message_is_clipped_before_it_is_stored_or_prompted(
 def test_a_turn_writes_to_the_same_partition_family_the_dossier_reads():
     """Texting a coach must make that coach know Matthew better. A side channel would
     give him the FEELING of being known while the memory stayed empty."""
-    recs = cc.turn_records("nutrition", "Dr. Marcus Webb", "hi", cc.TurnResult("hey", "sent"))
+    recs = cc.turn_records("nutrition", "Marcus Webb", "hi", cc.TurnResult("hey", "sent"))
     assert all(r["pk"] == "COACH#nutrition_coach" for r in recs)
     assert all(r["sk"].startswith(cc.CHAT_SK_PREFIX) for r in recs)
 
 
 def test_both_sides_of_the_exchange_are_stored_in_order():
-    recs = cc.turn_records("nutrition", "Dr. Marcus Webb", "hi", cc.TurnResult("hey", "sent"))
+    recs = cc.turn_records("nutrition", "Marcus Webb", "hi", cc.TurnResult("hey", "sent"))
     assert [r["role"] for r in recs] == [cc.ROLE_MATTHEW, cc.ROLE_COACH]
     assert recs[0]["text"] == "hi" and recs[1]["text"] == "hey"
 
@@ -330,13 +330,13 @@ def test_both_sides_of_the_exchange_are_stored_in_order():
 def test_a_held_turn_is_stored_WITH_its_findings_so_the_gap_is_inspectable():
     """A later reader must see that the coach declined and why — not find a hole."""
     held = cc.TurnResult(cc._HELD_REPLY, "held", [{"type": "night_scope"}], 2)
-    recs = cc.turn_records("nutrition", "Dr. Marcus Webb", "hrv?", held)
+    recs = cc.turn_records("nutrition", "Marcus Webb", "hrv?", held)
     assert recs[1]["status"] == "held"
     assert recs[1]["findings"] == ["night_scope"]
 
 
 def test_a_grounded_turn_records_no_findings_key():
-    recs = cc.turn_records("nutrition", "Dr. Marcus Webb", "hi", cc.TurnResult("hey", "sent"))
+    recs = cc.turn_records("nutrition", "Marcus Webb", "hi", cc.TurnResult("hey", "sent"))
     assert "findings" not in recs[1]
 
 
@@ -406,7 +406,7 @@ def test_build_request_sends_system_as_blocks_with_a_cached_stable_prefix():
         persona_block="PERSONA_MARKER",
         memory_block="MEM_MARKER",
         facts_block="FACTS_MARKER",
-        coach_name="Dr. Lisa Park",
+        coach_name="Lisa Park",
         thread=[],
         inbound="hey",
         model="m",
@@ -435,13 +435,13 @@ def test_the_blocks_and_the_flat_string_cannot_fork():
 
 
 def test_the_rules_teach_register_matching_not_briefing():
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", "M", "F", "Lisa Park")
     assert "a bare 'hey' gets a bare hey back" in s
     assert "end on a statement" in s
 
 
 def test_the_rules_ban_filler_questions_and_assistant_isms():
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", "M", "F", "Lisa Park")
     assert "What's on your mind?" in s  # named as the banned example
     assert "Honest answer:" in s  # named as the banned example
     assert "use his name sparingly" in s
@@ -451,14 +451,14 @@ def test_the_persona_outranks_a_poisoned_memory_about_identity():
     """The go-live corpus contains a summary row memorializing 'I'm not Lisa'
     from the pre-fix identity bug. The prompt must tell the coach its persona
     outranks remembered notes, or the poisoned row re-teaches the error."""
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", "M", "F", "Lisa Park")
     assert "authoritative over remembered notes" in s
     assert "never tell him he has your name wrong" in s
 
 
 def test_the_rules_welcome_off_lane_conversation():
     """He should be able to text a coach about anything — a person first."""
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", "M", "F", "Lisa Park")
     assert "engage with it as yourself first" in s
 
 
@@ -466,7 +466,7 @@ def test_the_rules_carry_the_site_reader_vocabulary_in_the_second_person():
     """#4182: the reader-vocabulary rulings (site/data/glossary.json) reach the Telegram
     coach. Third person is the SITE's rule; a text to him stays "you". Each builder word is
     named with its plain form, and dates go in words with no "as of"."""
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", "M", "F", "Lisa Park")
     for plain in ("'a fresh start'", "'the seven areas'", "'the engine's score'", "'the weekly write-up'", "'data through Friday'"):
         assert plain in s, plain
     assert "never 'as of'" in s
@@ -479,7 +479,7 @@ def test_the_rules_forbid_acknowledging_a_write_the_chat_cannot_make():
     on 2026-09-25 while 0 memory rows were written — the persona has no tools. The prompt
     names the false acknowledgements and routes the write to his Claude chat. (This is the
     instruction half; #4170's reply GATE on the outbound turn is still open.)"""
-    s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", "M", "F", "Lisa Park")
     assert "you have no tools in this chat" in s
     for banned in ("'got it'", "'noted'", "'saved'", "'I'll remember that'", "'approved'"):
         assert banned in s, banned
@@ -504,6 +504,6 @@ def test_a_time_gap_line_in_memory_block_reaches_the_system_prompt_verbatim():
         "the way a person notices time passed with someone they know ('hey, been a minute'), then move on to what "
         "he actually said. Never mention this, or any gap, when the thread has been active."
     )
-    s = cc.build_system_prompt("V", gap_line, "F", "Dr. Lisa Park")
+    s = cc.build_system_prompt("V", gap_line, "F", "Lisa Park")
     assert gap_line in s
     assert ccs.QUIET_GAP_DAYS == 7  # the threshold this line's wording assumes

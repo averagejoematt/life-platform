@@ -110,6 +110,10 @@ async function main() {
   const ret = document.getElementById("fo-return-line");
   if (ret && rd) ret.setAttribute("data-day", rd);
   setLine("fo-return-line", rl || NO_WRITEUP_DAY, wuSrc);
+  // R7 fix 10: one dated served fact in the fold, under the promise.
+  const fold = document.getElementById("fo-fold-next");
+  if (fold && rd) fold.setAttribute("data-day", rd);
+  setLine("fo-fold-next", rl || NO_WRITEUP_DAY, wuSrc);
   if (rd) setMargin(document.getElementById("fo-return"), rd);
 }
 

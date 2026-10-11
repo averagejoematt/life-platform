@@ -66,9 +66,12 @@ EXPECTED_ROUTE_MAP = {
     "/api/coach_docket": "handle_coach_docket",  # #1386 — the Dispute Docket (open positions + resolved history)
     "/api/coach_team": "handle_coach_team",
     "/api/coach_timeline": "handle_coach_timeline",
+    "/api/calls": "handle_calls",  # #4586 — a page per settled coach call (inline in _dispatch_route)
+    "/api/coach_moves": "handle_coach_moves",  # #4648 — one day's coach lines by date (inline in _dispatch_route)
     "/api/coaches": "handle_coaches",
     "/api/constellation": "handle_constellation",
     "/api/content_cadence": "handle_content_cadence",  # #1972 — chronicle/podcast next-installment line
+    "/api/edition": "handle_edition",  # #4582 — the front page's one composed document (inline in _dispatch_route)
     "/api/correlations": "handle_correlations",
     "/api/current_challenge": "handle_current_challenge",
     "/api/cycle_compare": "handle_cycle_compare",
@@ -84,6 +87,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/experiment_vote": "_handle_experiment_vote",
     "/api/experiments": "handle_experiments",
     "/api/decisions": "handle_decisions",
+    "/api/owner_words": "handle_owner_words",  # #4584 — his own words (chat + email), verbatim, newest first
     "/api/diary_reactions": "handle_diary_reactions",  # #1574 — coach reactions to diary entries (GET, consent-gated)
     "/api/diary_shelf": "handle_diary_shelf",  # #1846 — consent-gated diary shelf on /story (GET, fail-closed, withheld counted)
     "/api/field_notes": "handle_field_notes",

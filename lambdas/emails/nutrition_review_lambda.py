@@ -36,7 +36,12 @@ from decimal import Decimal
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import (
+    EXPERIMENT_BASELINE_WEIGHT_LBS,
+    EXPERIMENT_START_DATE,
+    PLAN_DAILY_CALORIES_TARGET,
+    PLAN_DAILY_PROTEIN_MIN_G,
+)  # ADR-058
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 from health import nutrient_intake  # #4244: THE food + supplements micronutrient join (shared with the public door)
 
@@ -622,17 +627,17 @@ _FALLBACK_SYSTEM_PROMPT = (
 
 Write as three distinct expert voices analyzing the week's nutrition data, followed by a unified tactical section.
 
-### Dr. Marcus Webb - Macros, Protein & Adherence
+### Marcus Webb - Macros, Protein & Adherence
 Analyze: Weekly calorie avg vs target ({calorie_target} kcal) and deficit consistency. Protein total AND distribution (flag meals <30g, praise >40g). Target: {protein_target_g}g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.
 Tone: Direct, evidence-based. Reference HIS actual food log entries by deduced meal name.
 Principle: "Build from what's working. Don't overhaul - optimize."
 
-### Dr. Amara Patel - Micronutrients, Genome & Longevity
+### Amara Patel - Micronutrients, Genome & Longevity
 Analyze: Cross-reference dietary intake against genome SNPs provided. Vitamin D gap + genetics. FADS2 ALA conversion issue. FADS1 omega-6/inflammation. MTHFR methylfolate. Choline (MTHFD1+MTRR+PEMT triple risk, target 550mg+). Vitamin K (VKORC1). Potassium. Any micro whose food + supplements TOTAL is <50% for 3+ days (read from_supplements before calling anything a gap — see MICRONUTRIENT NUMBERS below).
 Tone: Scientific but accessible. Connect genes to nutrients to foods.
 Principle: "Genomics tells us WHERE to focus. Food logs tell us what's missing."
 
-### Dr. James Okafor - Metabolic Health & Composition
+### James Okafor - Metabolic Health & Composition
 Analyze: Weight trend and rate. CGM data if available. Meal glucose impact. Meal timing vs training. Deficit sustainability. DEXA benchmark context. Carb quality/timing.
 Tone: Strategic, longevity-focused.
 Principle: "Rate of loss matters less than body composition trajectory."
@@ -698,8 +703,8 @@ def build_user_message(data):
         "genome_nutrient_snps": extract_genome_context(data["genome_snps"]),
         "dexa": extract_dexa_context(data["latest_dexa"]),
         "profile_targets": {
-            "calorie_target": data["profile"].get("calorie_target", 1800),
-            "protein_target_g": data["profile"].get("protein_target_g", 190),
+            "calorie_target": PLAN_DAILY_CALORIES_TARGET,
+            "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
         },
     }
@@ -775,8 +780,8 @@ def _micro_column_scope(days):
 def build_summary_table(days, profile):
     if not days:
         return ""
-    cal_target = profile.get("calorie_target", 1800)
-    protein_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    protein_target = PLAN_DAILY_PROTEIN_MIN_G
 
     def _cal_color(v):
         return "#10b981" if v <= cal_target * 1.05 else "#f59e0b" if v <= cal_target * 1.2 else "#ef4444"
@@ -1032,8 +1037,8 @@ def lambda_handler(event, context):
     user_message = build_user_message(data)
     logger.info(f"Prompt size: {len(user_message)} chars")
 
-    cal_target = profile.get("calorie_target", 1800)
-    pro_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    pro_target = PLAN_DAILY_PROTEIN_MIN_G
 
     # Try config-driven prompt first, fall back to hardcoded
     system = _build_nutrition_prompt_from_config(cal_target, pro_target)

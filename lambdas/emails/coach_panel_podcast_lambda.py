@@ -24,8 +24,9 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import boto3
-from ai import google_tts, model_defaults  # #4275: model_defaults.NARRATIVE_MODEL is the one Sonnet default
+from ai import google_tts
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from ai.model_routing import model_for  # #4770: the one model registry
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common import media_tombstone  # #4365: a restart tombstone is not a published episode
@@ -49,7 +50,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+MODEL = model_for("chronicle.panel_podcast")
 SITE = "https://averagejoematt.com"
 PREFIX = "generated/panelcast"
 SKIP_TIER = 2  # PG-10
@@ -96,12 +97,14 @@ def _chronicle_md(date_str: str) -> str | None:
     return None
 
 
-def _coach_latest(coach_id: str) -> dict | None:
+def _coach_latest(coach_id: str, until: str | None = None) -> dict | None:
+    # #4536: `until` (the reviewed week's last day) bounds the read — a retry never reviews a later week's reads.
     try:
         resp = table.query(
             **with_phase_filter(
                 {
-                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"),
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}")
+                    & Key("sk").between("OUTPUT#", f"OUTPUT#{until or '9999'}~"),
                     "ScanIndexForward": False,
                     "Limit": 1,
                 }
@@ -162,7 +165,7 @@ def _elena_host_state() -> str:
     she may call back to on-air. Volatile → user turn. Fail-soft ""."""
     try:
         bits = []
-        st = table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {}
+        st = _panel_desk().visible(table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item"))  # #4536
         if st.get("headline_stance") and not st.get("grounding_flag"):
             bits.append(f"Elena's current editorial read (her own, persistent): {str(st['headline_stance'])[:300]}")
         resp = table.query(
@@ -170,7 +173,7 @@ def _elena_host_state() -> str:
             ScanIndexForward=False,
             Limit=20,
         )
-        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open"][:2]
+        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open" and _panel_desk().visible(t)][:2]
         if open_threads:
             bits.append(
                 "Story threads Elena is carrying (she may call back to one): "
@@ -209,11 +212,9 @@ def _build_script(week, title, chronicle_text, coach_id, coach_out, coach_name) 
     body = {"model": MODEL, "max_tokens": 1600, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=MODEL)
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-    try:
-        turns = json.loads(text)
-    except Exception as e:
-        logger.warning("wk%s: script JSON parse failed — %s", week, e)
+    turns = _extract_json(text)  # #4276: parsed in the one door (ai.structured_json)
+    if turns is None:
+        logger.warning("wk%s: script JSON parse failed", week)
         return []
     return turns if isinstance(turns, list) else []
 
@@ -293,7 +294,7 @@ def _safety_gate(text: str) -> list:
         reasons.append("report-card-tone")
     if _CAUSAL_RE.search(t):
         reasons.append("causal-claim")
-    return reasons
+    return reasons + _panel_desk().door_reasons(t)  # #4538: the shared story door — no cycle/attempt counts, off-record stays off
 
 
 # ── synthesis + publish ──────────────────────────────────────────────────────
@@ -383,6 +384,7 @@ def _enclosure_type(url: str) -> str:
 
 
 def _write_indexes(episodes: list) -> None:
+    episodes = _panel_desk().by_date(episodes)  # #4536: newest air date first, whatever order the writer passed
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
@@ -530,14 +532,14 @@ def _load_bible() -> dict:
         return {}
 
 
-INTRO_GUEST_ID = "eli_marsh"  # Dr. Eli Marsh — Principal Investigator (the lead)
+INTRO_GUEST_ID = "eli_marsh"  # Eli Marsh — Principal Investigator (the lead)
 # Per-voice loudness trim (dB) — only used by the legacy Chirp stitch path.
 _INTRO_VOLUME_GAIN = {ELENA: 0.0, INTRO_GUEST_ID: 0.0}
 # Episode 0 is synthesized single-pass via Gemini (genuine conversation). Map the
 # two speakers to Gemini prebuilt voices; Elena = host (breezy), Eli = guest (informative).
 # Episode 0 is the flagship trailer — use Sonnet (follows the multi-step arc + hard
 # requirements far better than Haiku, which kept dropping Elena's self-intro).
-INTRO_MODEL = os.environ.get("AI_MODEL_SONNET", model_defaults.NARRATIVE_MODEL)
+INTRO_MODEL = model_for("chronicle.panel_podcast_intro")
 INTRO_GEMINI_VOICES = {"Elena": "Aoede", "Eli": "Charon"}
 INTRO_STYLE = (
     "Perform this as a real, warm two-person podcast — NOT a formal reading. Two people who like each other, "
@@ -571,7 +573,7 @@ INTRO_COLD_OPEN = (
 def _intro_guest() -> dict:
     p = persona_registry.resolve(INTRO_GUEST_ID, s3, S3_BUCKET) or {}
     return {
-        "name": p.get("name", "Dr. Eli Marsh"),
+        "name": p.get("name", "Eli Marsh"),
         "role": p.get("board_role", "Principal Investigator"),
         "bio": p.get("short_bio", ""),
         "philosophy": p.get("philosophy", ""),
@@ -589,12 +591,12 @@ def _build_intro_script(bible: dict, zeitgeist: list | None = None) -> list:
 def _gate_intro(turns: list, allowed_numbers) -> list:
     """Resolve the two speakers + ER-03 + the Day-Zero hallucination guard (drop any
     line fabricating elapsed time, results, a back-catalogue, or a starting weight)."""
-    eli_aliases = {"eli", "eli_marsh", "dr. eli marsh", "eli marsh", "marsh", "guest", "principal investigator", "pi"}
+    eli_aliases = {"eli", "eli_marsh", "eli marsh", "marsh", "guest", "principal investigator", "pi"}
     clean, dropped = [], 0
     for t in turns:
         if not isinstance(t, dict):
             continue
-        raw = (t.get("speaker") or "").strip().lower()
+        raw = persona_registry.plain_name(t.get("speaker")).lower()  # a model may still label him with the old honorific (#4564)
         if raw in ("elena", "host", "elena_voss"):
             spk = ELENA
         elif raw in eli_aliases:
@@ -624,7 +626,7 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
             "week": 0,
             "title": ep.get("title"),
             "summary": (
-                "Episode 0 introduced the show — who Elena and Matt are, the eight-coach AI team Dr. Eli Marsh runs, "
+                "Episode 0 introduced the show — who Elena and Matt are, the eight-coach AI team Eli Marsh runs, "
                 "and the central bet: can technology and a person's own data genuinely improve a whole life, or is it just "
                 "over-optimization theater?"
             ),
@@ -778,7 +780,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
         + _chars.get("matthew", "")
         + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
-        "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
+        "Elena Voss (host, embedded journalist); Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
         "team — Matt himself designed and built the experiment and the platform)."
     )
 
@@ -926,7 +928,7 @@ def _run_intro(dry_run: bool = False) -> dict:
     # Structured transcript for the on-page reader (speaker-attributed turns + the
     # host's questions as in-page chapter anchors). No audio timestamps exist
     # (single-pass Gemini), so chapters jump within the transcript, not the audio.
-    _name_of = {ELENA: "Elena", INTRO_GUEST_ID: "Dr. Eli Marsh"}
+    _name_of = {ELENA: "Elena", INTRO_GUEST_ID: "Eli Marsh"}
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/wk0.transcript.json",
@@ -934,7 +936,7 @@ def _run_intro(dry_run: bool = False) -> dict:
             {
                 "week": 0,
                 "title": "EP0 · Welcome to The Measured Life",
-                "byline": "Elena + Dr. Eli Marsh",
+                "byline": "Elena + Eli Marsh",
                 "turns": [{"speaker": t["speaker"], "name": _name_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns],
             },
             ensure_ascii=False,
@@ -951,7 +953,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         "title": "Episode 0 — Welcome to The Measured Life",
         "date": pacific_today(),
         **published,  # url/bytes/duration_sec from the compressed publish (#1018)
-        "byline": "Elena + Dr. Eli Marsh",
+        "byline": "Elena + Eli Marsh",
         "excerpt": "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
         "transcript_url": "/panelcast/wk0.transcript.json",
     }
@@ -997,7 +999,7 @@ _SENSITIVE_WEEK_RE = re.compile(
 def _gemini_voice(persona_id: str) -> str:
     """Gender-correct Gemini voice, sourced from the persona registry (config/personas.json
     tts_voice) — the single source of truth. The old hardcoded GEMINI_VOICE table had drifted
-    out of sync with persona genders (Dr. Marcus Webb → a female voice, Dr. Sarah Chen → a male
+    out of sync with persona genders (Marcus Webb → a female voice, Sarah Chen → a male
     one). The registry's tts_voice ("en-US-Chirp3-HD-Charon") shares the voice name with Gemini,
     so the suffix IS the Gemini voice. Falls back to the legacy table only if the registry lacks one."""
     tts = persona_registry.tts_voice(persona_id, s3, S3_BUCKET) or ""
@@ -1007,7 +1009,7 @@ def _gemini_voice(persona_id: str) -> str:
 
 def _state_read() -> dict:
     try:
-        it = table.get_item(Key={"pk": PANEL_STATE_PK, "sk": PANEL_STATE_SK}).get("Item")
+        it = _panel_desk().visible(table.get_item(Key={"pk": PANEL_STATE_PK, "sk": PANEL_STATE_SK}).get("Item"))  # #4536
         return json.loads(it.get("state_json", "{}")) if it else {}
     except Exception as e:
         logger.warning("[panel] series_state read failed — %s", e)
@@ -1026,20 +1028,14 @@ def _today() -> str:
 
 
 def _extract_json(text: str):
-    """Tolerant parse: strip fences, then grab the first balanced JSON object/array
-    (LLMs sometimes append prose after the JSON). Returns None on failure."""
-    t = re.sub(r"^```(?:json)?|```$", "", (text or "").strip(), flags=re.M).strip()
-    try:
-        return json.loads(t)
-    except Exception:
-        pass
-    m = re.search(r"[\{\[].*[\}\]]", t, re.S)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except Exception:
-            return None
-    return None
+    """Tolerant parse in the one door (#4276): fences first (`parse_json_text`), then the first
+    JSON object/array span (`parse_json_span` — LLMs sometimes append prose after the JSON).
+    Returns None on failure. Schema-less on purpose: it is the `extract_json` dep every
+    panelcast text seam (repair, craft, the script builders) parses through."""
+    from ai.structured_json import parse_json_span, parse_json_text
+
+    parsed = parse_json_text(text)
+    return parse_json_span(parsed) if isinstance(parsed, str) else parsed
 
 
 def _gather_week(post: dict, state: dict) -> dict:
@@ -1048,7 +1044,7 @@ def _gather_week(post: dict, state: dict) -> dict:
     chronicle = _strip_md(md) if md else ""
     coach_reads = []
     for cid in persona_registry.OPERATIONAL_COACH_IDS:
-        out = _coach_latest(cid)
+        out = _coach_latest(cid, post.get("date"))
         if out and out.get("summary"):
             coach_reads.append({"id": cid, "name": persona_registry.display_name(cid, s3, S3_BUCKET) or cid, **out})
     guest = coach_reads[post.get("week", 0) % len(coach_reads)] if coach_reads else None
@@ -1058,7 +1054,10 @@ def _gather_week(post: dict, state: dict) -> dict:
     try:
         from content.engagement_core import presence_prompt_block
 
-        sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        # #4536: presence AS OF the week's last day (the dated row), not today's — a retry reviews the same window.
+        sig = _panel_desk().visible(
+            table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": f"DATE#{post.get('date')}"}).get("Item")
+        )
         presence_note = presence_prompt_block(sig)
     except Exception as e:
         logger.warning("[panel] presence block skipped (non-fatal): %s", e)
@@ -1506,7 +1505,7 @@ def _dry(week, decision, **extra) -> dict:
     return {"statusCode": 200, "body": json.dumps({"dry_run": True, "week": week, "would": decision, **extra})}
 
 
-def _select_week_post() -> dict:
+def _select_week_post(week=None) -> dict:
     """Pick the week the Panel should produce now (shared by the weekly run + the
     SS-02 hold sweep so both target the SAME week).
 
@@ -1515,8 +1514,10 @@ def _select_week_post() -> dict:
     in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
     ISO dates compare lexically. If none exist yet (before the cycle's first
     Wednesday chronicle), derive the current week from genesis (the chronicle is
-    optional flavor — 2026-06-21 decoupling)."""
+    optional flavor — 2026-06-21 decoupling). #4536: `week` names the week instead (panelcast_desk.select_post)."""
     posts = _published_posts()
+    if week is not None:
+        return _panel_desk().select_post(posts, week, EXPERIMENT_START_DATE)
     weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if weekly:
         return max(weekly, key=lambda x: x["date"])
@@ -1525,7 +1526,24 @@ def _select_week_post() -> dict:
     return {"week": wk, "date": pacific_now().date().isoformat(), "title": f"Week {wk}"}
 
 
-def _run_weekly(force: bool, dry_run: bool = False) -> dict:
+def _desk_episode(post: dict) -> dict | None:
+    return _panel_desk().desk_episode(post, _g=globals())
+
+
+def _publish_desk_episode(week, post: dict, ep: dict, dry_run: bool = False) -> dict:
+    return _panel_desk().publish_desk_episode(week, post, ep, dry_run, _g=globals())
+
+
+def _panel_desk():
+    try:
+        from emails import panelcast_desk
+    except ImportError:
+        if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
+            import panelcast_desk
+    return panelcast_desk
+
+
+def _run_weekly(force: bool, dry_run: bool = False, week=None, approved: bool = False) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD.
 
     dry_run=True runs the full decision pipeline (gather → write → editor → gate)
@@ -1533,7 +1551,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     what the live run would do. The pre-flight tool for every Friday / post-reset."""
     from ai import gemini_tts
 
-    post = _select_week_post()
+    post = _select_week_post(week) if week is not None else _select_week_post()
     week = post["week"]
     published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
     if published_key:
@@ -1542,6 +1560,13 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             return _dry(week, "SKIP", stage="already-published", matched_key=published_key)
         _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
+
+    # #4536: when the week's chronicle was written by the Story Desk, the episode script was written WITH it — from the
+    # same story budget, dossier and season ledger, through the same gates — and rides on the chronicle row. The Panel
+    # renders that script (after its own per-line safety gate) instead of writing a second, unrelated one.
+    desk_ep = _desk_episode(post)
+    if desk_ep:
+        return _publish_desk_episode(week, post, desk_ep, dry_run=dry_run)
 
     bible = _load_bible()
     state = _state_read()
@@ -1706,6 +1731,13 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             hold_class="quality",
         )
     script, clean, review = ready
+    # #4694: editor + QA alone is not enough — owner approval or a passed audit, else HOLD (human review only).
+    _said = "\n".join([str(script.get("episode_title") or ""), str(script.get("pull_quote") or "")] + [t["line"] for t in clean])
+    audit_hold = _panel_desk().legacy_publish_gate(week, post, _said, approved, _g=globals())
+    if audit_hold:
+        if dry_run:
+            return _dry(week, "HOLD", stage="autopublish-audit", reasons=audit_hold)
+        return _hold_and_alert(week, ["autopublish-audit: " + r for r in audit_hold], {"turns": clean, "qa_ledger": ledger})
 
     if dry_run:
         preview = "\n".join(f"{('Elena' if t['speaker'] == ELENA else guest_name)}: {t['line']}" for t in clean[:6])
@@ -1718,6 +1750,8 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             open_bet=script.get("open_bet"),
             date=post.get("date"),
             transcript_preview=preview,
+            advance_state=_panel_desk().advances(state, week),
+            notify=not post.get("backfill"),
         )
 
     # PASS → synthesize single-pass, then commit (series_state + RSS LAST).
@@ -1736,12 +1770,11 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
     except Exception:
         existing = []
-    _hook = _short_title(
-        script.get("episode_title"),
-        beats.get("title"),
-        script.get("pull_quote"),
-        review.get("pull_quote"),
-    )
+    # #4674: the episode carries its chapter's title, through the SAME rule as the desk path — the writer's own
+    # episode_title is only the fallback for a week with no chapter. #4538: a title that fails the door is not
+    # published — the episode keeps its bare number.
+    _own = _short_title(script.get("episode_title"), script.get("pull_quote"), review.get("pull_quote"))
+    _hook = _panel_desk().door_safe(_panel_desk().episode_title(post, {"title": _own}))
     # Editorial cover art (Part II — atmospheric, free-license; fail-soft, kill-switch
     # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
     _cover: dict[str, str] = {}
@@ -1767,55 +1800,17 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         "byline": f"Elena + {label_of[guest_id]}",
         "guest_id": guest_id,  # throughline: front-end links the byline → /story/coaches/<guest_id>
         "guest_name": label_of[guest_id],
-        "excerpt": (script.get("pull_quote") or post.get("excerpt") or "")[:240],
+        "excerpt": _panel_desk().door_safe((script.get("pull_quote") or post.get("excerpt") or "")[:240]),
         "image_url": _cover.get("image_url", ""),
         "image_credit": _cover.get("image_credit", ""),
     }
-    existing = [e for e in existing if e.get("week") != week] + [ep]
-    existing.sort(key=lambda e: e.get("week", 0), reverse=True)
-    # series_state + RSS committed LAST (atomic-ish: audio already durable).
-    recent = ([beats["title"]] + beats.get("recent_topics", []))[:5]
-    # Bet ledger (the Panel scoreboard): resolve the prior open bet with THIS week's
-    # reported outcome, then record the new open bet. Capped, reset-safe in DDB.
-    # Idempotent per-week (2026-07-02): a RE-published episode used to (a) "resolve"
-    # its own week's open bet with last week's outcome and (b) append a paraphrased
-    # duplicate — the live wk1 double-bet. The resolve loop now only touches a bet
-    # from an EARLIER week (the one the episode actually reports on), and the append
-    # supersedes this week's own open bet. Resolved bets are history — never touched.
-    ledger = list(state.get("bet_ledger", []))
-    outcome = ((script.get("last_bet_result") or {}).get("outcome") or "open").lower()
-    for entry in reversed(ledger):
-        if entry.get("outcome") == "open" and entry.get("week") != week:
-            entry["outcome"] = outcome if outcome in ("won", "lost", "open", "none") else "open"
-            break
-    if script.get("open_bet"):
-        ledger = [e for e in ledger if not (e.get("week") == week and e.get("outcome") == "open")]
-        ledger.append({"week": week, "bet": script["open_bet"], "outcome": "open", "date": beats["date"]})
-    _state_write(
-        {
-            "episode_count": state.get("episode_count", 1) + 1,
-            "last_episode": ep,
-            "open_bet": script.get("open_bet"),
-            "recent_topics": recent,
-            "bet_ledger": ledger[-20:],
-        }
-    )
+    # series_state + show memory + bet ledger, then RSS committed LAST (atomic-ish: audio already durable) — #4536 moved
+    # the commit to panelcast_desk.commit_legacy so it shares the desk path's in-week-order rule.
+    existing = _panel_desk().commit_legacy(week, ep, existing, state, script, beats, _hook, guest_id, _g=globals())
     _write_indexes(existing)
-    # #547: the show remembers itself — callbacks + guest history, real records only.
-    _write_show_memory(
-        week, ep.get("title") or _hook, script.get("pull_quote"), guest_id, (beats.get("guest") or {}).get("name"), script.get("open_bet")
-    )
     _emit_published_metric()  # safety-net: a CloudWatch alarm fires if this metric goes absent (no episode > 8d)
     _emit_outcome("published")  # reason code (#374) — the positive outcome in the same vocabulary as the holds
-    _notify_new_episode(ep)  # operator SNS ping (best-effort; never blocks publish)
-    # Confirmed-subscriber email blast — OFF by default (PANELCAST_NOTIFY_SUBSCRIBERS).
-    # Flip on only after a {"notify_test": "<addr>"} dry-run looks right, so the very
-    # first real episodes never blind-blast the list. Best-effort; never blocks publish.
-    if os.environ.get("PANELCAST_NOTIFY_SUBSCRIBERS", "false").lower() == "true":
-        try:
-            _email_subscribers(ep)
-        except Exception as e:
-            logger.warning("[panel] subscriber blast failed — %s", e)
+    _panel_desk().announce_legacy(ep, post, _g=globals())  # #4536: a named-week run notifies no one
     logger.info(
         "[panel] wk%s PUBLISHED — %d turns, %d bytes at %s, guest %s", week, len(clean), published["bytes"], published["url"], guest_id
     )
@@ -1878,7 +1873,8 @@ def lambda_handler(event, context):
 
     # Weekly autonomous run (the board-reviewed pipeline). Latest week, publish-or-HOLD.
     try:
-        return _run_weekly(force, dry_run=dry_run)
+        # #4536: {"week": N} names the week; #4694: only the owner's own invoke carries {"owner_approved": true}
+        return _run_weekly(force, dry_run=dry_run, week=event.get("week"), approved=event.get("owner_approved") is True)
     except Exception as e:
         logger.error("[panel] weekly run failed — %s", e)
         if not dry_run:

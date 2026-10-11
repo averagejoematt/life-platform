@@ -744,7 +744,14 @@ def operational_reading_recall_sweep() -> list[iam.PolicyStatement]:
 
 
 def operational_key_rotator() -> list[iam.PolicyStatement]:
-    """Key rotator: rotates MCP API key in Secrets Manager."""
+    """Key rotator: rotates MCP API key in Secrets Manager.
+
+    UpdateSecretVersionStage is what `finish_secret` calls to move AWSCURRENT onto the
+    pending version. It was dropped on 2026-03-10 (d2f996914 re-added this function after
+    385894fbb truncated the file), so every rotation failed at finishSecret (#4707).
+    tests/test_key_rotator_grants_4707.py derives the action set from the Lambda's own
+    `sm.<method>` calls and reds on any call this statement does not grant.
+    """
     return [
         iam.PolicyStatement(
             sid="Secrets",
@@ -752,6 +759,7 @@ def operational_key_rotator() -> list[iam.PolicyStatement]:
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:PutSecretValue",
                 "secretsmanager:UpdateSecret",
+                "secretsmanager:UpdateSecretVersionStage",
                 "secretsmanager:DescribeSecret",
             ],
             resources=[_secret_arn("life-platform/mcp-api-key")],
@@ -1071,7 +1079,13 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     """
     return _operational_base(
         ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
-        needs_s3_read=["inbound-email/*", "generated/qa_archive/text/*"],
+        # #4546: the SES receipt rule (insight-capture) writes raw/inbound_email/ — the old "inbound-email/*" grant matched
+        # nothing, so every reply since 2026-02-27 died on GetObject. Both kept until the old prefix is proven empty.
+        # #4584: + config/content_filter.json — each Story Desk answer also lands in the owner-words store, screened by
+        # the fail-closed content filter (content.owner_words.screen -> content_filter_channel). Without this read the
+        # vocabulary is unloadable and every email entry is HELD (stored, never published) and counted on
+        # InsightParseFailure — fail closed, never a silent pass. One object, read-only.
+        needs_s3_read=["raw/inbound_email/*", "inbound-email/*", "generated/qa_archive/text/*", "config/content_filter.json"],
         needs_s3_write=["dead-letter-archive/insight-email-parser/*"],
         needs_dlq=True,
         extra_statements=[

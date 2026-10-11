@@ -48,6 +48,7 @@ from datetime import datetime, timezone
 import boto3
 from ai import google_tts
 from coach import persona_registry
+from content import chronicle_schema
 
 try:
     from common.platform_logger import get_logger
@@ -78,7 +79,9 @@ def _elena_voice() -> str:
 
 def _markdown_to_narration(md: str) -> str:
     """Strip chronicle markdown down to clean spoken prose."""
-    t = md
+    # #4191: the envelope header of a row stored before the writer stopped keeping it — any
+    # bracketed header (the Story Desk's has no "Weight:"), never read aloud.
+    t = chronicle_schema.strip_stat_header(md)
     t = re.sub(r"^\[Weight:.*?\]\s*$", "", t, flags=re.M)  # stats header line
     t = re.sub(r"^---\s*$", "", t, flags=re.M)
     t = re.sub(r"^\*Week \d+ of The Measured Life\*\s*$", "", t, flags=re.M)

@@ -234,8 +234,18 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_rate_limit_identity_1221.py",  # #1221: AST sweep — no handler may derive its own client identity
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
-        "test_bedrock_client.py",  # #4276: rglob sweep — raw model text is json.loads-ed only in ai/structured_json.py (down-only ledger)
+        "test_model_routing_4770.py",  # #4770: glob sweep of lambdas/ + mcp/ — no model literal, model env read or model_defaults import outside ai/model_routing.py
+        "test_invoke_model_names_resolve_4769.py",  # #4769: glob sweep — every statically-known model_name= under lambdas/ + mcp/ resolves at the Bedrock chokepoint
+        "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
+        "test_upstream_changes_4638.py",  # #4638: rglob sweep — a new Apple Health rebuild-a-day caller falsifies the stated upstream_changes facet
+        "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted
+        "test_retired_training_shapes_4636.py",  # #4636: rglob sweep — no read of macrofactor_workouts / a nested 'workouts' list outside training/legacy_workouts.py
+        "test_journal_row_cowriters_4677.py",  # #4677: rglob sweep — a module that names the journal partition and writes must be a declared co-writer, or its attributes are erased on re-ingest
         "test_coaches_api.py",  # #4220: rglob sweep — no lambdas/web/** reader tallies a coach record from LEARNING#
+        "test_predictions_sourcing_hold_4701.py",  # #4701: glob sweep — every lambdas/web claim_natural reader applies claim_sourcing or names its exemption
+        "test_coach_count_comparison_guard_4585.py",  # #4585: glob/rglob sweep — every site/ module + inline script that shows a coach count renders its comparison
+        "test_built_page_facts_4586.py",  # #4586: every static fact on the "How it's built" page against its source (model, governor, workflows, incident log) — repo tree only
+        "test_coach_baseline_4585.py",  # #4585: glob sweep — every lambdas/web record producer serves `comparison` beside the record
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
         "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_branch_never_carries_platform_counts_3984.py",  # #3984: the literal gate + the hook keep the bot-owned counter off every branch
@@ -462,6 +472,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps the skill registry + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
+        "test_ci_test_shards_4252.py",  # #4252: lists tests/ — every test file in exactly one shard leg; ci-test.yml's matrix + combine step held to it
         # #2848: the operating-knowledge ledger. Verdict is pure repo shape — the committed
         # snapshot vs its rows, and whether every cited home is a tracked path. A PR that
         # renames a homed page or drops a ledger row must red BEFORE the merge; post-merge
@@ -517,6 +528,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_iam_twin_free_3336.py",  # #3336: deploy/ tree sweep — no apply script may embed an IAM policy document for a role with a checked-in infra/iam/*.json; the JSON pair is the only apply source
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
+        "test_ingest_ai_budget_rows_4643.py",  # #4643: globs lambdas/ingestion/ + direct imports — a new ingest-path AI caller with no cutoff/ledger row must red pre-merge (~1s)
         # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔
         # lambdas/operational/qa_check_outputs.py). Its verdict is pure repo shape —
         # a producer cron moving without its QA-window mirror must red BEFORE the
@@ -786,6 +798,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # in ONE module and retiring the MCP second load model. Pure repo shape — a second
         # load derivation is exactly a PR's own diff.
         "test_training_load_worked_set_4075.py",
+        # #4540: an os.walk AST sweep of lambdas/ + mcp/ for a read of the profile row's
+        # calorie/protein target or a stale 1800/190 literal beside a nutrition-target name.
+        # Pure repo shape — a reintroduced profile-target read is exactly a PR's own diff.
+        "test_protein_contract.py",
         # #3620: an os.walk sweep of lambdas/ + mcp/ for every `sha256(...)` call site
         # whose argument mentions an IP, triaged against an explicit allowlist. Pure
         # repo shape — a NEW unsalted `sha256(ip)` call site is exactly a PR's own
@@ -931,6 +947,17 @@ _PREMERGE_TREE_SWEEP_EXCLUDED = {
         "not a population that changes with the repo"
     ),
 }
+
+
+def pytest_ignore_collect(collection_path, config):
+    """#4252: a ci-test.yml shard leg (CI_TEST_SHARD=K/N) collects only its own test
+    files. Unset everywhere else, so every other run collects exactly what it did.
+    The partition contract lives in tests/ci_shard.py."""
+    import ci_shard
+
+    if ci_shard.excluded(str(collection_path), os.environ.get(ci_shard.SHARD_ENV, "")):
+        return True
+    return None
 
 
 def pytest_collection_modifyitems(config, items):

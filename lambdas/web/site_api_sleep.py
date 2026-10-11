@@ -105,6 +105,30 @@ def _stage_consistency_findings(
     return findings
 
 
+# ── #4635: the vendor's "not final yet" flag, read as a tri-state ────────────
+#
+# Eight Sleep's day entry carries `incomplete`; since PR #4666 the writer stores
+# it as `vendor_incomplete` (True OR False, as sent). Rows written before that
+# carry NO key, and absent means "never read" — not "complete" (docs/SCHEMA.md).
+# Measured on the 2026-09/10 archive: a flagged row is the vendor's provisional
+# record — 8 of 9 re-appeared next evening unflagged with the same durations and
+# a revised score, 1 was a genuinely short night — and a stored date is never
+# re-fetched. So a flagged night is not a full night's settled measurement.
+#
+# The read side follows the site's existing partial-data rule: a partial day is
+# EXCLUDED from an average (#1084 — today's accruing Whoop strain / step count
+# never enters a 30d mean) while the single-night row stays and SAYS what it is
+# (the circadian `measured` flag: a per-row label, absent = old behaviour). The
+# averages publish their own n beside them (#3451) so the exclusion is visible.
+# Unknown (None) behaves exactly as before #4635: included, unlabelled.
+def _vendor_incomplete(r):
+    """#4635 — True / False as the vendor sent it, None when the row never read the
+    flag (pre-#4635 rows, or a payload without the key). Never coerces absence to
+    False: an old row is "unknown", not "complete"."""
+    v = (r or {}).get("vendor_incomplete")
+    return v if isinstance(v, bool) else None
+
+
 def _eightsleep_block(date, r, sleep_score):
     """#2921 — Eight Sleep's own self-consistent stage block for one night. `r` is
     that night's raw Eight Sleep DDB row. `sleep_score` is passed in (rather than
@@ -127,6 +151,11 @@ def _eightsleep_block(date, r, sleep_score):
         "deep_pct": round(float(r["deep_pct"]), 1) if r.get("deep_pct") else None,
         "rem_pct": round(float(r["rem_pct"]), 1) if r.get("rem_pct") else None,
         "light_pct": round(float(r["light_pct"]), 1) if r.get("light_pct") else None,
+        # #4635 — Eight Sleep's own "this record is not final" flag for this night
+        # (True / False as sent; None = the row predates the flag). True means the
+        # score above is the vendor's provisional one and the night is left out of
+        # every average on this endpoint.
+        "vendor_incomplete": _vendor_incomplete(r),
     }
 
 
@@ -331,6 +360,11 @@ def sleep_correlations(*, _g) -> dict:
     eight = {}
     for e in _query_source("eightsleep", d30, today):
         dt = e.get("sk", "").replace("DATE#", "")[:10]
+        # #4635: a night the vendor flagged as not final carries a provisional score —
+        # it is left out of every correlation series, the same rule as the averages
+        # in sleep_detail. A row with no flag (pre-#4635) is kept, as before.
+        if _vendor_incomplete(e) is True:
+            continue
         if dt:
             eight[dt] = {"score": _f(e.get("sleep_score"))}
     sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
@@ -521,8 +555,13 @@ def sleep_detail(*, _g) -> dict:
                 break
 
     # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
-    score_vals = [float(r["sleep_score"]) for r in eight_with_data if r.get("sleep_score")]
-    eff_vals = [float(r["sleep_efficiency_pct"]) for r in eight_with_data if r.get("sleep_efficiency_pct")]
+    # #4635: a night the vendor flagged as not final is excluded from the Eight Sleep
+    # averages (the #1084 partial-day rule); it still appears in the trend, labelled.
+    # A row with no flag (pre-#4635) is unknown and counts, exactly as before.
+    _avg_nights = [r for r in eight_with_data if _vendor_incomplete(r) is not True]
+    _nights_vendor_incomplete = len(eight_with_data) - len(_avg_nights)
+    score_vals = [float(r["sleep_score"]) for r in _avg_nights if r.get("sleep_score")]
+    eff_vals = [float(r["sleep_efficiency_pct"]) for r in _avg_nights if r.get("sleep_efficiency_pct")]
     # Bed-temperature surfaces retired (ADR-118, #489) — the Eight Sleep temp
     # pipeline is dead (dead /v2/intervals endpoint, no bed_temp_f for 4+ months).
 
@@ -666,6 +705,16 @@ def sleep_detail(*, _g) -> dict:
         ),
         # #2344: the sibling `sleep_trend` array's date convention, named once here
         # rather than per-row.
+        # #4635: the latest night's Eight Sleep record was flagged by the vendor as not
+        # final when it was fetched — the headline score is provisional. Null otherwise.
+        "vendor_incomplete_note": (
+            (
+                f"Eight Sleep marked the night of {_night_of} as not final when it was fetched, so its "
+                f"sleep_score is the vendor's provisional one; flagged nights are left out of the averages."
+            )
+            if _vendor_incomplete(latest) is True
+            else None
+        ),
         "trend_date_field": "date",
         "trend_date_convention": "wake_date",
         "trend_note": (
@@ -754,6 +803,14 @@ def sleep_detail(*, _g) -> dict:
                 "30d_avg_score": avg(score_vals) if _w30["full"] else None,
                 "30d_avg_efficiency": avg(eff_vals) if _w30["full"] else None,
                 "days_tracked": len(eight_with_data),
+                # #4635: the n behind avg_score_window / avg_efficiency_window (#3451's
+                # n-beside-the-average rule), and how many stored nights were left out
+                # because the vendor flagged them as not final. days_tracked still
+                # counts every stored night.
+                "avg_window_nights": len(_avg_nights),
+                "nights_vendor_incomplete": _nights_vendor_incomplete,
+                # The latest night's own flag (True / False; None = unknown, pre-#4635).
+                "vendor_incomplete": _vendor_incomplete(latest),
                 "as_of_date": latest_date,
                 # #1968: the night every sleep figure above describes, plus which device
                 # each duration came from. Flat keys (front-ends read them directly) and

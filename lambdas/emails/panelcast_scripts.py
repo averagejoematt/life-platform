@@ -22,7 +22,6 @@ the weekly path (which DOES pass real headlines) shares this code unchanged.
 """
 
 import json
-import re
 from typing import TYPE_CHECKING
 
 try:  # bundle stages lambdas/ at the zip root; tests add lambdas/emails/ to sys.path
@@ -156,11 +155,9 @@ def build_intro_script(bible: dict, zeitgeist: list | None, deps: dict) -> list:
     }
     resp = invoke(body, model_name=deps["intro_model"])
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-    try:
-        turns = json.loads(text)
-    except Exception as e:
-        logger.warning("[panel] intro JSON parse failed — %s", e)
+    turns = deps["extract_json"](text)  # #4276: the lambda's extractor, which parses in ai.structured_json
+    if turns is None:
+        logger.warning("[panel] intro JSON parse failed")
         return []
     return turns if isinstance(turns, list) else []
 

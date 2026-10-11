@@ -25,7 +25,7 @@ import json
 import logging
 import os
 import secrets as _secrets
-from datetime import datetime, timezone  # noqa: F401 — timezone is resolved via the _g seam (chronicle_personas:204)
+from datetime import datetime, timedelta, timezone  # noqa: F401 — timezone is resolved via the _g seam (chronicle_personas:204)
 
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
@@ -49,7 +49,9 @@ RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 # #548: Margaret Calloway's red pen — the Haiku model for her critique + revision
 # calls (kept cheap and separate from Elena's Sonnet narrative voice, ADR-063 budget).
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("chronicle")
 
 # FEAT-12: Preview-before-publish workflow.
 # When PREVIEW_MODE=true (default), the Chronicle is stored as a draft in DynamoDB
@@ -197,7 +199,7 @@ JOURNAL ACCESS:
 You have full access to Matthew's journal entries. This is deep background — you NEVER quote the journal directly or use his exact words. But you see the emotional weather: the anxieties he names, the patterns in his thinking, what he avoids, what he celebrates, how his inner voice shifts over time. You use this to write with emotional accuracy about his inner state without exposing the private words. The journal is often where the REAL story lives — the gap between what the numbers say and what he feels.
 
 BOARD OF DIRECTORS:
-About 2-3 times per month (NOT every week), you include a brief interaction with one of the Board members when noteworthy events warrant expert commentary. These feel like real interviews — Dr. Okafor is precise and slightly intimidating (longevity), Dr. Reyes is steady and demanding about fundamentals (performance), Dr. Webb is blunt and practical (nutrition), Dr. Park (sleep) is gentle but firm. They have opinions and personality. Only include a Board interview if this week's data has a notable event, milestone, or inflection point that warrants it. If the week is quiet, skip the interview entirely.
+About 2-3 times per month (NOT every week), you include a brief interaction with one of the Board members when noteworthy events warrant expert commentary. These feel like real interviews — Okafor is precise and slightly intimidating (longevity), Reyes is steady and demanding about fundamentals (performance), Webb is blunt and practical (nutrition), Park (sleep) is gentle but firm. They have opinions and personality. Only include a Board interview if this week's data has a notable event, milestone, or inflection point that warrants it. If the week is quiet, skip the interview entirely.
 
 CHARACTER SHEET (GAMIFICATION LAYER):
 Matthew has a persistent RPG-style Character Level (1-100) built from 7 weighted pillars: Sleep, Movement, Nutrition, Metabolic Health, Mind, Relationships, and Consistency. Each pillar has its own level and tier (Foundation, Momentum, Discipline, Mastery, Elite). Level changes require 5+ days of sustained improvement (up) or 7+ days of decline (down), making them RARE and meaningful — roughly 2-4 events per month total. Tier transitions are even rarer.
@@ -241,7 +243,7 @@ WHAT NOT TO DO:
 - NO INVENTED CAREER (#4363): you are a fictional narrator. NEVER claim, invent or imply a byline, piece, assignment, job, employer, editor, credential or affiliation with any real publication, outlet, institution or person — not in a self-introduction, not in a callback, not in passing. You have no career outside this chronicle. If a sentence about yourself needs a past, give it the work you do HERE (the data, the journal, the weeks you have followed him), never a real masthead.
 - Don't use emoji or markdown headers. Write clean prose.
 - GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
-- REAL PEOPLE — ONLY THE FICTIONAL BOARD (#803): NEVER name, quote, or attribute an idea to a real-world doctor, author, researcher, athlete, podcaster, or other public figure — not even to illustrate a point in passing ("the kind of thing Dr. So-and-So talks about"). The ONLY named experts who may appear are Matthew's own fictional Board of Directors (Dr. Max Reyes, Dr. Lisa Park, Dr. Marcus Webb, Dr. Nathan Reeves, Margaret Calloway, Dr. Henning Brandt, plus whoever this week's config lists). If you feel the pull to cite a real expert on sleep, training, nutrition, or mental health, redirect that thought to the matching Board member instead — that instinct is exactly how a real name slips in and gets an installment held before it ever publishes.
+- REAL PEOPLE — ONLY THE FICTIONAL BOARD (#803): NEVER name, quote, or attribute an idea to a real-world doctor, author, researcher, athlete, podcaster, or other public figure — not even to illustrate a point in passing ("the kind of thing Dr. So-and-So talks about"). The ONLY named experts who may appear are Matthew's own fictional Board of Directors (Max Reyes, Lisa Park, Marcus Webb, Nathan Reeves, Margaret Calloway, Henning Brandt, plus whoever this week's config lists). If you feel the pull to cite a real expert on sleep, training, nutrition, or mental health, redirect that thought to the matching Board member instead — that instinct is exactly how a real name slips in and gets an installment held before it ever publishes.
 - SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — __VICE_TERMS__, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
 
 FORMAT:
@@ -417,8 +419,40 @@ def _margaret_haiku_call(system, user):
     return _personas._margaret_haiku_call(system, user, _g=globals())
 
 
+def _elena_revision_call(system, user, max_tokens):
+    return _personas._elena_revision_call(system, user, max_tokens, _g=globals())
+
+
 def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers):
     return _personas._run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers, _g=globals())
+
+
+def _rehearsal_week_end(event):
+    """#4535 past-week mode: the week-end date a REHEARSAL names, or None.
+
+    ``{"dry_run": true, "week": N}`` resolves to the season's week N from the one
+    calendar (``story_dossier.season_weeks`` — Week 1 runs genesis → the first Tuesday,
+    then Wednesday → Tuesday), so the desk builds that window regardless of the run date.
+    ``desk_week_end`` (an explicit date) wins when both are given. Dry runs only: a
+    publishing run stores under today's window, so a past week can never be published
+    over the current one by naming it."""
+    if not event.get("dry_run"):
+        return None
+    if event.get("desk_week_end"):
+        return event["desk_week_end"]
+    week = event.get("week")
+    if week is None or isinstance(week, bool):
+        return None
+    try:
+        n = int(week)
+    except (TypeError, ValueError):
+        return None
+    if n < 1:
+        return None
+    from content import story_dossier
+
+    weeks = story_dossier.season_weeks()
+    return weeks[n - 1]["end"] if n <= len(weeks) else None
 
 
 def _handler_core(event: dict, context) -> dict:
@@ -690,6 +724,29 @@ def _handler_core(event: dict, context) -> dict:
     if _cached is not None:  # the explicit narrow — mypy can't see through the bool
         raw_installment = _cached
 
+    # #4535: the Story Desk writes the week (dossier → desk budget → post + episode → gates → dek). Its own gates
+    # replace the legacy passes below — including the #914 presence gate, which forced a logging stall into the story
+    # and so narrated MacroFactor export lag as silence. STORY_DESK=off restores the legacy writer.
+    _desk = None
+    if _cached is None and os.environ.get("STORY_DESK", "on").lower() != "off" and _target_date:
+        try:
+            from content import story_pipeline
+
+            # a rehearsal may name the week (#4535 proof): {"dry_run": true, "desk_week_end": "YYYY-MM-DD"}
+            # or {"dry_run": true, "week": N} — the window is the season's week N, never today's.
+            _desk_end = _rehearsal_week_end(event) or _target_date
+            _desk = story_pipeline.live_week(table, _desk_end, log=logger.info)
+            if _desk is None:
+                logger.info(f"[#4535] story desk declined {_desk_end}: not a season week end — legacy writer")
+        except Exception as _desk_e:  # noqa: BLE001 — the legacy writer is the fallback, never a dark week
+            logger.error(f"[#4535] story desk failed — falling back to the legacy writer: {_desk_e}")
+            _desk = None
+        if _desk:
+            raw_installment = _desk["raw_installment"]
+            _skip_model_passes = True
+            week_num = _desk["week"]
+            logger.info(f"[#4535] story desk wrote week {week_num}: {_desk['title']!r} · findings {_desk['findings']}")
+
     # Call Sonnet
     try:
         if not _skip_model_passes:
@@ -861,7 +918,7 @@ def _handler_core(event: dict, context) -> dict:
 
     # #2221: ">" is the blockquote marker; the following space is optional in markdown
     # (markdown_to_html and scripts/v4_build_journal.py match the same way). Requiring
-    # "> " left an interview written as ">Dr. Park said..." un-flagged, so the site's
+    # "> " left an interview written as ">Park said..." un-flagged, so the site's
     # interview filter silently missed the week.
     #
     # Detect Board interview — a blockquote counts UNLESS it's Margaret's editor's note
@@ -959,6 +1016,26 @@ def _handler_core(event: dict, context) -> dict:
             "body": json.dumps({"status": "privacy_hold", "week": week_num, "violations": [t for _, t in e.violations]}),
         }
 
+    # ── Story door (#4538, fail-closed) — the ONE shared reader-surface check, at the one point every writer passes
+    # (the desk, the legacy writer, a reused cache): no cycle/reset/attempt count in the title, the stat line or the
+    # body, and no off-record specifics. The desk's writers already rewrite against it; this is what holds the week
+    # when a rewrite did not clear it, or when the writer was not the desk.
+    from content import story_checks
+
+    _door = story_checks.reader_surface(f"{title}\n{stats_line}\n{raw_installment}")
+    if _door:
+        logger.error(f"[story-door] BLOCKED chronicle week {week_num} — {_door}")
+        return _held_week(
+            week_num,
+            "story_door_hold",
+            f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear "
+            "the platform's automatic check on what the series puts on the record. No content was published "
+            "or stored for this week.",
+            json.dumps({"status": "story_door_hold", "week": week_num, "findings": _door}),
+            status_code=200,
+            dry_run=_dry,
+        )
+
     # ── #405: the per-chronicle share kit — machine-made from ALREADY-PUBLISHED fields
     # only (title, honest stats line, an excerpt of the prose, the canonical post URL).
     # Text/JSON only (the honest-stats OG card is drawn by the daily og sweep via the
@@ -1052,6 +1129,9 @@ def _handler_core(event: dict, context) -> dict:
             draft_share_kit_json=share_kit_json,
             allow_overwrite=bool(event.get("force")),
         )
+
+        if _stored and _desk:
+            _attach_desk_artifacts(date_str, _desk)
 
         # #2254: the conditional put refused (a protected row raced in between the
         # idempotency read and this write). The approval_token was never persisted, so
@@ -1179,6 +1259,62 @@ def _handler_core(event: dict, context) -> dict:
     }
 
 
+def _attach_desk_artifacts(date_str, desk):
+    """#4535/#4536: the desk's budget, episode script and the ledger this week leaves ride on the chronicle row — the
+    Panel renders the episode from it, and the approve path commits the ledger on publish."""
+    try:
+        table.update_item(
+            Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"},
+            UpdateExpression="SET desk_budget_json = :b, desk_episode_json = :e, desk_ledger_json = :l, desk_findings_json = :f, #p = if_not_exists(#p, :ph)",
+            ExpressionAttributeNames={"#p": "phase"},
+            ExpressionAttributeValues={
+                ":b": json.dumps(desk["budget"], default=str),
+                ":e": json.dumps(desk["episode"], default=str),
+                ":l": json.dumps(desk["ledger"], default=str),
+                ":f": json.dumps(desk["findings"], default=str),
+                ":ph": "experiment",
+            },
+        )
+    except Exception as e:  # noqa: BLE001 — the post still publishes; the Panel falls back to its own writer
+        logger.error(f"[#4535] could not attach desk artifacts to {date_str}: {e}")
+
+
+def _send_story_questions(event):
+    """#4546: Monday — the week's gap questions by email, Reply-To the SES inbound address. Never blocks anything."""
+    import datetime as _dtm
+
+    from common.pacific_time import pacific_today
+    from content import story_dossier, story_ledger, story_questions
+
+    today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()  # pacific_today() is a YYYY-MM-DD string
+    upcoming = story_dossier.week_containing(today.isoformat())  # #4539: the one definition the dead-man shares
+    if upcoming is None:
+        return {"statusCode": 200, "body": json.dumps({"status": "no_week"})}
+    n = upcoming["week"]
+    marker = {"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"STORYQ#W{n:03d}"}
+    if not event.get("force") and table.get_item(Key=marker).get("Item"):
+        return {"statusCode": 200, "body": json.dumps({"status": "already_sent", "week": n})}
+    so_far = {**upcoming, "end": min(upcoming["end"], (today - timedelta(days=1)).isoformat())}
+    dossier, _ = story_dossier.week_dossier(table, so_far)
+    ledger = story_ledger.latest_visible(table, f"USER#{USER_ID}#SOURCE#chronicle", upcoming["end"])
+    questions = story_questions.generate(dossier, story_ledger.ledger_for_prompt(ledger, n))
+    if event.get("dry_run"):
+        return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "questions": questions})}
+    resp = story_questions.send(ses, week=n, questions=questions, to=RECIPIENT, sender=SENDER)
+    from experiment.phase_taxonomy import experiment_stamp_for
+
+    table.put_item(
+        Item={
+            **marker,
+            "questions_json": json.dumps(questions),
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "message_id": resp.get("MessageId", ""),
+            **experiment_stamp_for(marker["pk"], marker["sk"]),  # #3599: the class-gated write-time stamp
+        }
+    )
+    return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": len(questions)})}
+
+
 def lambda_handler(event: dict, context) -> dict:
     """#2669: timeout-watchdog wrapper (common.timeout_watchdog) — _handler_core is the real flow."""
     from common.timeout_watchdog import arm, disarm
@@ -1189,6 +1325,8 @@ def lambda_handler(event: dict, context) -> dict:
         detail="the run dies mid-tail; if a '[#2669] generation cached' line appears above, the retry is free",
     )
     try:
+        if isinstance(event, dict) and event.get("story_questions"):
+            return _send_story_questions(event)  # #4546: Monday's optional questions — never touches the week's chronicle
         return _handler_core(event, context)
     finally:
         disarm(timer)

@@ -21,6 +21,7 @@ numbers, so the guards here are mostly honesty guards:
 import importlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -315,6 +316,137 @@ def test_cloudwatch_failure_costs_the_curve_not_the_receipt(monkeypatch):
     d = _payload(sai.handle_receipts())
     assert d["history"] == []
     assert d["month_to_date_usd"] == 26.11  # the rest of the receipt survives
+
+
+# ── 5b. the ordinary day and the days that were not (#4650) ───────────────────
+class _SeriesCW:
+    """The governor's running month-to-date total, as CloudWatch returns it per UTC day:
+    Minimum = the 00:00 run (the total as the day opened), Maximum = the 16:00 run.
+
+    `spends` are whole-day dollars for the days ending YESTERDAY — yesterday on the
+    HANDLER's clock (the request's own EndTime), so this fake never reads a clock itself.
+    """
+
+    def __init__(self, spends):
+        self._spends = list(spends)
+        self.calls = []
+
+    def get_metric_statistics(self, **kw):
+        self.calls.append(kw)
+        end = kw["EndTime"]
+        n = len(self._spends)
+        points, total, month = [], 0.0, None
+        for i, usd in enumerate(self._spends):
+            d = (end - timedelta(days=n - i)).date()
+            if month != d.month:
+                total, month = 0.0, d.month
+            points.append(
+                {"Timestamp": datetime(d.year, d.month, d.day, tzinfo=timezone.utc), "Minimum": total, "Maximum": total + usd * 2 / 3}
+            )
+            total += usd
+        opened = total if month == end.month else 0.0  # today has opened, and no more
+        points.append({"Timestamp": datetime(end.year, end.month, end.day, tzinfo=timezone.utc), "Minimum": opened, "Maximum": opened})
+        return {"Datapoints": list(reversed(points))}  # CloudWatch does not promise an order
+
+
+def test_the_ordinary_day_is_the_median_and_one_spike_does_not_move_it():
+    from web import site_api_budget as budget
+
+    now = datetime(2026, 10, 5, 2, 43, tzinfo=timezone.utc)
+    spends = [4.0] * 13 + [5.0] * 13 + [23.67, 24.68, 11.35, 4.32]  # Sep 5 … Oct 4
+    typical, high = budget._typical_day(_SeriesCW(spends), now)
+    # Sep 30 closes on its own Maximum (two-thirds of the day in this fake) — the counter
+    # resets at the month boundary — so 30 days are counted and the median is untouched.
+    assert typical["days_counted"] == 30
+    assert (typical["window_start"], typical["window_end"]) == ("2026-09-05", "2026-10-04")
+    assert typical["usd"] == 4.66  # median of 30: the 15th and 16th values, 4.32 and 5.0
+    assert typical["month_days"] == 31
+    assert typical["month_usd"] == round(typical["usd"] * 31, 2), "a reader who multiplies the two printed numbers gets the third"
+    assert [d["date"] for d in high["days"]] == ["2026-10-01", "2026-10-02", "2026-10-03"]
+    assert high["total_usd"] == 59.7
+    assert high["above_typical_usd"] == round(59.7 - 3 * typical["usd"], 2)
+    assert high["multiple"] == budget._HIGH_DAY_MULTIPLE
+    # The mean of the same days is what the old all-in forecast multiplied out.
+    assert sum(spends) / len(spends) > typical["usd"] + 1
+
+
+def test_high_days_are_this_months_only_and_today_is_never_counted():
+    from web import site_api_budget as budget
+
+    now = datetime(2026, 10, 3, 9, 0, tzinfo=timezone.utc)
+    spends = [4.0] * 20 + [30.0] + [4.0] * 7 + [4.0, 22.0]  # the 30.0 is in September; Oct 2 is 22.0
+    cw = _SeriesCW(spends)
+    typical, high = budget._typical_day(cw, now)
+    assert typical["usd"] == 4.0
+    assert typical["window_end"] == "2026-10-02", "today is incomplete and is left out"
+    assert [d["date"] for d in high["days"]] == ["2026-10-02"], "a high day in last month is not this month's spend"
+    assert cw.calls[0]["Statistics"] == ["Minimum", "Maximum"] and cw.calls[0]["MetricName"] == "EstimatedMonthToDateSpend"
+
+
+def test_too_few_days_or_no_series_withholds_the_ordinary_day(monkeypatch):
+    from web import site_api_budget as budget
+
+    now = datetime(2026, 10, 5, 2, 43, tzinfo=timezone.utc)
+    few = _SeriesCW([4.0] * (budget._TYPICAL_MIN_DAYS - 1))
+    assert budget._typical_day(few, now) == (None, None), "a handful of days is not an ordinary day"
+    assert budget._typical_day(_FakeCW(raises=True), now) == (None, None)
+    # Datapoints without a Minimum (the shape `history` asks for) are not guessed at.
+    assert budget._typical_day(_FakeCW(datapoints=[{"Timestamp": now, "Maximum": 3.2}]), now) == (None, None)
+    # … and the receipt itself survives, with the keys present and null.
+    _install(monkeypatch, _ssm_with(_breakdown()), _FakeCW(raises=True))
+    d = _payload(sai.handle_receipts())
+    assert d["typical_day"] is None and d["high_days"] is None
+    assert d["month_to_date_usd"] == 26.11
+
+
+def test_the_scheduled_share_is_the_governors_or_nothing(monkeypatch):
+    _install(monkeypatch, _ssm_with(_breakdown(prod_class_share=0.2612)))
+    assert _payload(sai.handle_receipts())["ai_scheduled_share_pct"] == 26.1
+    _install(monkeypatch, _ssm_with(_breakdown()))
+    assert _payload(sai.handle_receipts())["ai_scheduled_share_pct"] is None, "no measured split is null, never 100 or 0"
+    _install(monkeypatch, _ssm_with(_breakdown(prod_class_share="garbled")))
+    assert _payload(sai.handle_receipts())["ai_scheduled_share_pct"] is None
+
+
+def _cost_fields():
+    """The dotted /api/receipts paths ck_built.js declares it prints from (COST_FIELDS)."""
+    js = (_REPO / "site" / "assets" / "js" / "ck_built.js").read_text(encoding="utf-8")
+    block = re.search(r"export const COST_FIELDS = \{(.*?)\n\};", js, re.S)
+    assert block, "ck_built.js no longer declares COST_FIELDS"
+    return re.findall(r'"([a-z_]+(?:\.[a-z_]+)*)"', block.group(1))
+
+
+def test_every_field_the_built_page_prints_is_served_and_in_the_schema_baseline(monkeypatch):
+    """#4650: the page's cost sentences are pinned to served fields from BOTH ends. The JS
+    test proves a missing field removes its sentence; this proves the route still serves
+    each one under that name (and the contract baseline still pins it), so a rename here
+    reds the build instead of quietly emptying the page. One test, every offender."""
+    fields = _cost_fields()
+    assert len(fields) >= 15, fields
+    cw = _SeriesCW([4.0] * 26 + [23.67, 24.68, 11.35, 4.32])
+    _install(monkeypatch, _ssm_with(_breakdown(**_SCOPED)), cw)
+    served = _payload(sai.handle_receipts())
+    baseline = {"type": "object", "keys": _snapshot("api_receipts")}
+
+    def _served(path):
+        node = served
+        for key in path.split("."):
+            if not isinstance(node, dict) or node.get(key) is None:
+                return False
+            node = node[key]
+        return True
+
+    def _pinned(path):
+        node = baseline
+        for key in path.split("."):
+            node = (node.get("keys") or {}).get(key) if isinstance(node, dict) else None
+            if node is None:
+                return False
+        return True
+
+    offenders = [f"{f}: the route does not serve it" for f in fields if not _served(f)]
+    offenders += [f"{f}: tests/api_schemas/api_receipts.json does not pin it" for f in fields if not _pinned(f)]
+    assert not offenders, offenders
 
 
 def test_total_ssm_failure_returns_503_not_a_fabricated_receipt(monkeypatch):

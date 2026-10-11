@@ -1298,18 +1298,27 @@ def _run_ai_coach_pipeline(
     # domain this cycle — the legacy fallback narrative is skipped for it, so
     # "hold, don't publish" actually holds. Error-caused None (infra failure)
     # keeps the legacy fallback: no gate made a judgment there.
-    _held_domains = set()
+    # #4589: the long per-coach narratives are written twice a week (coach/narrative_cadence.py).
+    # Off a narrative day the roster is empty — no orchestrator/Sonnet/gate call — and nothing
+    # is held (no gate judged anything), so the short legacy training/nutrition note still runs.
+    from coach import narrative_cadence as _cadence
 
     # v2 roster: training seat retired — its _v2_text stays "" so renderers never show it.
-    for _cid, _call_fn, _label in [
-        ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
-        ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
-        ("mind", ai_calls.call_mind_coach_v2, "Mind"),
-        ("physical", ai_calls.call_physical_coach_v2, "Physical"),
-        ("glucose", ai_calls.call_glucose_coach_v2, "Glucose"),
-        ("labs", ai_calls.call_labs_coach_v2, "Labs"),
-        ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
-    ]:
+    _roster, _held_domains = _cadence.plan(
+        pacific_today(),
+        [
+            ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
+            ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
+            ("mind", ai_calls.call_mind_coach_v2, "Mind"),
+            ("physical", ai_calls.call_physical_coach_v2, "Physical"),
+            ("glucose", ai_calls.call_glucose_coach_v2, "Glucose"),
+            ("labs", ai_calls.call_labs_coach_v2, "Labs"),
+            ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
+        ],
+    )
+    if not _roster:
+        logger.info(_cadence.skip_line(pacific_today()))
+    for _cid, _call_fn, _label in _roster:
         try:
             _raw = _call_fn(data, profile)
             if isinstance(_raw, ai_calls.CoachHold):
@@ -1336,19 +1345,8 @@ def _run_ai_coach_pipeline(
     # Invoke ensemble digest (async) after all v2 coaches complete.
     # #2255: fanning this out is a write — coach-ensemble-digest persists its own
     # record and spends Bedrock budget — so a dry run must not trigger it.
-    if not persist:
-        logger.info("[DRY_RUN] skipping the async coach-ensemble-digest invoke")
-    else:
-        try:
-            _lc = boto3.client("lambda", region_name="us-west-2")
-            _lc.invoke(
-                FunctionName="coach-ensemble-digest",
-                InvocationType="Event",
-                Payload=json.dumps({"cycle_date": pacific_today()}).encode(),
-            )
-            logger.info("Ensemble digest invoked (async)")
-        except Exception as e:
-            logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
+    # #4589: nor an off-cadence day — it summarises the narratives, and none were written.
+    _cadence.fan_out_ensemble(boto3.client, persist, pacific_today(), bool(_roster), logger)
 
     # Build the shared system block ONCE; pass to all 4 AI calls so they
     # share one preamble object (smaller request build, single construction).

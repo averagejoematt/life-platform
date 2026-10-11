@@ -44,7 +44,7 @@ from coach import coach_brief_input_gate as gate  # noqa: E402
 from common import generation_cache as gc  # noqa: E402
 
 VOICE_SPEC = {
-    "display_name": "Dr. Sarah Chen",
+    "display_name": "Sarah Chen",
     "domain": "sleep",
     "few_shot_examples": [],
     "structural_voice_rules": {},

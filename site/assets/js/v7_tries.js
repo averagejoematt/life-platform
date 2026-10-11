@@ -92,7 +92,7 @@ export function withdrawnCount(supp) {
 
 /** The standing-rules line from /api/protocols. Null payload → the honest "not loaded". */
 export function rulesLine(protocols) {
-  if (!protocols) return "Standing rules: not loaded.";
+  if (!protocols) return "The standing rules are not served right now.";
   const n = Array.isArray(protocols.protocols) ? protocols.protocols.length : Number(protocols.count) || 0;
   if (!n) return "No standing rule is on the record beyond the stack.";
   return `${countWord(n, { capital: true })} standing rule${n === 1 ? "" : "s"} ${n === 1 ? "is" : "are"} on the record.`;
@@ -155,9 +155,19 @@ export function hisCalls(dec) {
   return out;
 }
 
-/** The day line under a note: the decision's date in words, else the note's own write day. */
+/** The Pacific calendar day (YYYY-MM-DD) a note was written — from `note_at`, the instant he
+ *  typed it; the decision's `date` only when no instant is served. Home dates the same record
+ *  the same way (R7 fix 7: one note read "September 8" here and "September 6, 9:02 pm" there —
+ *  `date` is the day the decision was FILED, which can trail the note by days). */
+export function callIso(call) {
+  const t = Date.parse(String((call && call.noteAt) || ""));
+  if (Number.isFinite(t)) return new Date(t).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  return (call && call.date) || "";
+}
+
+/** The day line under a note: the day he wrote it, in words (Pacific), else the decision's date. */
 export function callDay(call) {
-  return call.date ? dayInWords(call.date) : instantDayInWords(call.noteAt);
+  return instantDayInWords(call.noteAt) || (call.date ? dayInWords(call.date) : "");
 }
 
 /** "He went the other way." / "He went with it." / "" when the record does not say. */
@@ -222,7 +232,7 @@ function correctionHtml(supp) {
 function renderTakes(supp, protocols) {
   const sec = document.getElementById("tr-takes");
   const items = stackItems(supp);
-  if (!items.length) return fill(sec, '<p class="tr-note">The stack is not served.</p>');
+  if (!items.length) return fill(sec, '<p class="tr-note">The stack is not served right now.</p>');
   const c = stackCounts(supp);
   let html = `<p class="tr-lead"><span class="num" data-src="api_supplements.groups[].items[]">${esc(num(c.taking))}</span> in the current stack${c.paused ? `, <span class="num" data-src="api_supplements.groups[].items[].paused">${esc(num(c.paused))}</span> paused` : ""}.</p>`;
   html += `<p class="tr-small">Each one below: what he takes, what it should move, and how we’d know. The expectations are the stack’s own claims, not results.</p>`;
@@ -242,7 +252,7 @@ function renderTakes(supp, protocols) {
 
 function renderTesting(exp) {
   const sec = document.getElementById("tr-testing");
-  if (!exp || !Array.isArray(exp.experiments)) return fill(sec, '<p class="tr-note">The list of tests is not served.</p>');
+  if (!exp || !Array.isArray(exp.experiments)) return fill(sec, '<p class="tr-note">The list of tests is not served right now.</p>');
   const split = splitExperiments(exp);
   let html = `<p class="tr-lead" data-src="api_experiments.experiments[].origin">${esc(runningLine(split))}</p>`;
   const opts = { moveLabel: "should move", knowLabel: "how we’d know", tail: "Not named beyond the claim above." };
@@ -263,7 +273,7 @@ function renderTesting(exp) {
 
 function renderCalls(dec) {
   const sec = document.getElementById("tr-calls");
-  if (!dec) return fill(sec, '<p class="tr-note">His calls are not served.</p>');
+  if (!dec) return fill(sec, '<p class="tr-note">His calls are not served right now.</p>');
   const calls = hisCalls(dec);
   if (!calls.length) return fill(sec, '<p class="tr-note" data-src="api_decisions.count">He has published no calls yet.</p>');
   let html = `<p class="tr-small">Only the calls he chose to publish, in his own words as he typed them. The site’s side of each one is folded under it.</p>`;
@@ -272,19 +282,20 @@ function renderCalls(dec) {
     const fw = followedWords(c);
     html +=
       `<blockquote class="tr-quote"><p data-src="${esc(c.src)}.note">${esc(c.note)}</p>` +
-      (day ? `<span class="tr-dated"><time datetime="${esc(c.date || iso(c.noteAt))}" data-src="${esc(c.src)}.date">${esc(day)}</time></span>` : "") +
+      (day ? `<span class="tr-dated"><time datetime="${esc(callIso(c))}" data-src="${esc(c.src)}.${c.noteAt ? "note_at" : "date"}">${esc(day)}</time></span>` : "") +
       (c.recommended ? `<details class="tr-fold"><summary>what the site had recommended</summary><p data-src="${esc(c.src)}.decision">${esc(c.recommended)}</p>${fw ? `<p data-src="${esc(c.src)}.followed">${esc(fw)}</p>` : ""}</details>` : "") +
       `</blockquote>`;
   }
   fill(sec, html);
-  const first = calls.find((c) => c.date);
-  if (first) setMargin(sec, first.date);
+  const first = calls.find((c) => callIso(c));
+  if (first) setMargin(sec, callIso(first));
 }
 
 function renderNext(cad) {
   const sec = document.getElementById("tr-next");
   const line = returnLine(cad);
-  if (!line) return fill(sec, '<p class="tr-note">Nothing is scheduled.</p>');
+  // R7 fix 9: a failed fetch is "not served right now"; "nothing is scheduled" needs a served cadence.
+  if (!line) return fill(sec, `<p class="tr-note">${cad ? "Nothing is scheduled." : "The next write-up’s day is not served right now."}</p>`);
   fill(sec, `<p class="tr-small" data-src="api_content_cadence.chronicle.next_date">${esc(line)}</p>`);
   const c = cad && cad.chronicle;
   if (c && !c.paused && c.next_date) setMargin(sec, c.next_date);

@@ -152,6 +152,15 @@ _NUTRITION_PROFILE = {
 
 
 class TestScoreNutrition:
+    @pytest.fixture(autouse=True)
+    def _plan_targets(self, monkeypatch):
+        # #4540: the calorie target and the protein floor are the plan's generated constants,
+        # not the profile row. Pinned to the figures this class's arithmetic was written
+        # against; `_NUTRITION_PROFILE`'s own target fields are deliberately still present
+        # (and deliberately ignored — see the last test).
+        monkeypatch.setattr(se, "PLAN_DAILY_CALORIES_TARGET", 2000)
+        monkeypatch.setattr(se, "PLAN_DAILY_PROTEIN_MIN_G", 170)
+
     def test_no_nutrition_record_drops_the_component(self):
         assert se.score_nutrition({}, _NUTRITION_PROFILE) == (None, {})
 
@@ -180,13 +189,22 @@ class TestScoreNutrition:
             data = {"macrofactor": {"total_protein_g": grams}}
             assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["protein_score"] == 100
 
-    def test_protein_at_the_floor_scores_eighty(self):
+    def test_protein_at_the_floor_scores_full_marks(self):
+        """#4540: the plan states ONE protein line. A day at the floor has met the plan — the
+        old 80-at-170, 100-at-190 ramp graded against a profile-row target the plan never set."""
         data = {"macrofactor": {"total_protein_g": 170}}
-        assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["protein_score"] == 80
+        assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["protein_score"] == 100
 
-    def test_protein_between_floor_and_target_ramps_from_eighty_to_one_hundred(self):
-        data = {"macrofactor": {"total_protein_g": 180}}  # halfway
-        assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["protein_score"] == 90
+    def test_just_under_the_floor_keeps_the_old_sub_floor_curve(self):
+        data = {"macrofactor": {"total_protein_g": 169}}
+        assert se.score_nutrition(data, _NUTRITION_PROFILE)[1]["protein_score"] == round(80 * 169 / 170)
+
+    def test_the_profile_rows_target_fields_are_not_read(self):
+        row = dict(_NUTRITION_PROFILE, calorie_target=9999, protein_target_g=9999, protein_floor_g=9999)
+        data = {"macrofactor": {"total_calories_kcal": 2000, "total_protein_g": 170}}
+        details = se.score_nutrition(data, row)[1]
+        assert (details["cal_target"], details["protein_target"]) == (2000, 170)
+        assert (details["cal_score"], details["protein_score"]) == (100, 100)
 
     def test_protein_below_the_floor_ramps_down_to_zero(self):
         data = {"macrofactor": {"total_protein_g": 85}}  # half the floor

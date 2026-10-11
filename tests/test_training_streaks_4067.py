@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -183,12 +184,13 @@ def test_the_evidence_gatherer_reads_load_from_the_sanctioned_hevy_path():
 
 
 # ── #4411: the routine note's streak line is the LOADED-lifting streak ─────────────────────
-def test_fifteen_active_days_with_four_lifting_days_write_no_streak_line_into_the_note():
+def test_fifteen_active_days_with_four_lifting_days_write_no_streak_warning_into_the_note():
     """The owner's v0.5 red-team defect 6: the draft's session block said "day 16 of a streak" off a
     count of every day with ANY Hevy row. 15 active days (a Hevy row on each — 4 loaded lifts, then
-    Engine days — and a walk on each) carry a loaded streak of 4: no streak line, GREEN uncapped.
-    Mutation control: read `active_day_streak` in `tools_hevy_routine._gather_training_context` — 15 ≥ 5
-    and the note says "day 16"."""
+    Engine days — and a walk on each) carry a loaded streak of 4: no streak WARNING, GREEN uncapped,
+    and the one count the note states is the loaded 4 — never the active 15 or a "day 16".
+    Mutation control (run 2026-10-04): read `active_day_streak` in
+    `tools_hevy_routine._gather_training_context` — 15 ≥ 5, the note says "day 16" and counts 15."""
     from mcp import recovery_authoring as ra, tools_hevy_routine as thr
 
     hevy = [_lift(_d(n)) for n in range(1, 5)] + [_engine(_d(n)) for n in range(5, 16)]
@@ -203,7 +205,9 @@ def test_fifteen_active_days_with_four_lifting_days_write_no_streak_line_into_th
         ctx = thr._gather_training_context(TARGET)
     assert ctx["loaded_lifting_streak"] == 4 and ctx["late_week"] is False and ctx["green_ceiling_quality"] is False
     block = ra.render_session_block(ctx)
-    assert "streak" not in block and "in a row" not in block
+    assert "Today:" not in block and "GREEN is quality" not in block and "of a streak" not in block  # no warning
+    assert "Loaded lifting: 4 days in a row before this session" in block  # the count the note carries
+    assert not re.search(r"\b1[56]\b", block), block  # neither the active-day 15 nor "day 16"
     # an unreadable Hevy record is unknown — no streak line either, never a 0-day claim
     with (
         patch("mcp.tools_strength._read_hevy_all_phases", side_effect=RuntimeError("ddb down")),
@@ -211,12 +215,47 @@ def test_fifteen_active_days_with_four_lifting_days_write_no_streak_line_into_th
     ):
         unread = thr._gather_training_context(TARGET)
     assert unread["loaded_lifting_streak"] is None and unread["reasons"] == []
+    unread_block = ra.render_session_block(unread)
+    assert "Loaded lifting" not in unread_block and "in a row" not in unread_block
+
+
+def test_every_note_with_a_readable_streak_carries_the_loaded_count_and_only_five_warns():
+    """#4411's live-proof box: "the next nightly pre-draft note carries the loaded-lifting count".
+    After the streak source was switched, the note only named the count at `LATE_WEEK_STREAK` (5) —
+    and the pre-drafts of 09-30 → 10-05 held 0–2, so six notes in a row said nothing and none could
+    show which streak the platform reads. The count is now a context line on every note where it was
+    read; the WARNING (GREEN capped to quality) still starts at 5 and nowhere below.
+    Mutation control (run 2026-10-04): gate the count line on `late_week` — 0, 1, 2 and 4 red."""
+    from mcp import recovery_authoring as ra
+
+    for n in (0, 1, 2, 4, 5, 6):
+        ctx = ra.derive_training_context(n, "moderate", TARGET)
+        block = ra.render_session_block(ctx, "2026-09-22")
+        unit = "day" if n == 1 else "days"
+        assert f"Loaded lifting: {n} {unit} in a row before this session" in block, (n, block)
+        assert "walk and cardio days are not counted" in block
+        warned = "GREEN is quality" in block
+        assert warned is (n >= ra.LATE_WEEK_STREAK), (n, block)
+        assert ra.find_conditional_up(block) == []  # emitted prose is held to the subtract-only bar
+    assert ra.render_loaded_streak_line(None) is None and ra.render_loaded_streak_line({"reasons": []}) is None
+    # the draft path writes it onto the routine: exercises[0].notes is where Hevy shows the block
+    from types import SimpleNamespace
+
+    from mcp import tools_hevy_routine as thr
+
+    ir = SimpleNamespace(exercises=[SimpleNamespace(notes="why line", skill_tier=1, movement_key="squat")], inputs_snapshot={})
+    thr._apply_recovery_adaptation(ir, ra.derive_training_context(2, "deep", TARGET), "2026-09-22")
+    assert "Loaded lifting: 2 days in a row before this session" in ir.exercises[0].notes
+    assert ir.inputs_snapshot["recovery_branches"]["session"]["loaded_lifting_streak"] == 2
 
 
 def test_no_critic_packet_and_no_note_carries_the_active_day_streak():
     """#4411's set: `active_day_streak` is produced by `training_streaks.streaks` and read by (1) the
     joints packet — removed, (2) plan_draft_evidence's top-level key — removed, (3) the coach session
-    packet's `streaks` record — kept, labelled `active_streak_role` (activity context, never fatigue).
+    packet's `streaks` record — kept, labelled `active_streak_role` (activity context, never fatigue),
+    (4) `tools_training`'s readiness context — kept as a labelled number; its tier floor and rest
+    warning key on the loaded streak (#4416, `test_an_active_day_streak_is_not_a_fatigue_signal_4416`).
+    The routine note reads neither: `render_loaded_streak_line` states the loaded count only.
     Mutation control: pass `active_day_streak` back into `build_joints_packet` — this reds."""
     import inspect
 

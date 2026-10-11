@@ -83,7 +83,7 @@ def test_coach_page_shape_and_stance_rung():
     resp = api.handle_coach({"rawPath": "/api/coach/sleep_coach"})
     data = _body(resp)
     assert data["persona_id"] == "sleep_coach"
-    assert data["name"] == "Dr. Lisa Park"
+    assert data["name"] == "Lisa Park"
     assert "AI character" in data["disclosure"]
     # stance resolves to the entry rung from the baseline weight (~306 -> foundation)
     assert data["stance"]["band_metric"] == "weight_lbs"
@@ -156,7 +156,7 @@ def test_lead_coach_detail_route_shape():
     data = _body(api.handle_coach({"rawPath": "/api/coach/eli_marsh"}))
     assert data["persona_id"] == api.persona_registry.LEAD_PERSONA_ID
     assert data["tier"] == "lead"
-    assert data["name"] == "Dr. Eli Marsh"
+    assert data["name"] == "Eli Marsh"
     assert "AI character" in data["disclosure"]
     # lead extras are config-authored persona fields
     assert data["philosophy"] and "One experiment at a time" in data["philosophy"]
@@ -167,7 +167,7 @@ def test_lead_coach_detail_route_shape():
     # the standard dynamic sections are present and honest-empty pre-data:
     # no ladder scaffold is fabricated for him (source "none", never "ladder")
     assert data["stance"]["source"] == "none"
-    assert data["working_hypotheses"] == []
+    assert "working_hypotheses" not in data  # #4649: dropped from the contract (it was [] for every coach)
     assert data["stance_history"] == []
     assert data["recent_outputs"] == []
     # no generation voice spec exists for the lead — null, never a fabricated spec
@@ -782,6 +782,13 @@ def _assert_one_record(short_id, coaches, calibration, predictions, wrong):
         assert wrong_by[short_id] == {"coach": short_id, **record}, f"{short_id}: /api/wrong.by_coach disagrees"
     else:
         assert short_id not in wrong_by
+    # #4585: the comparison rides beside the record on every endpoint, counted over the SAME
+    # decided rows — so its records agree everywhere the count does.
+    served_cmp = roster[f"{short_id}_coach"]["comparison"]
+    assert served_cmp is not None, f"{short_id}: /api/coaches served a record without its comparison"
+    for label, other in (("calibration", cal["comparison"]), ("predictions", pred["comparison"])):
+        assert other["records"] == served_cmp["records"], f"{short_id}: /api/{label}.comparison disagrees with /api/coaches"
+    assert sum(r["graded"] for r in served_cmp["records"].values()) + served_cmp["unclassified"] == record["n"], short_id
     _assert_obituaries_are_the_record(short_id, record, wrong)
     return record
 

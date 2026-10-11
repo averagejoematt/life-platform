@@ -547,43 +547,60 @@ def test_mutation_control_a_planted_default_literal_is_found(tmp_path):
 
 
 # ── #4276 box 2: raw model text is parsed in ONE place ─────────────────────────────────
-# `ai/structured_json.py` (schema-constrained, with the fence-tolerant fallback) and
-# `ai/bedrock_client.py` are the only modules that may `json.loads` text taken from a
-# response's `["content"][…]["text"]`. Each hand parse elsewhere is a separate fence-stripper
+# `ai/structured_json.py` (schema-constrained `call_json`, the fence-tolerant `parse_json_text`,
+# the prose-tolerant `parse_json_span`) and `ai/bedrock_client.py` are the only modules that may
+# `json.loads` model text. Each hand parse elsewhere is a separate fence-stripper or span-grabber
 # that turns a truncated or malformed reply into a silent `None`/crash instead of a typed error.
 #
-# KNOWN GAP (stated, not hidden): the detector follows the text only WITHIN one function, from
-# the `["content"]…["text"]` subscript through local assignments. Model text that arrives as a
-# helper's RETURN VALUE (ai_calls' IC-3 pass, the enrichment and reading modules,
-# remediation/agent.py) is not seen.
+# The detector reads each function under lambdas/ and counts a `json.loads` as a hand parse of
+# model text when ANY of these holds (each one is a separate mutation control below):
+#   (a) its argument derives, through the function's own assignments, from a
+#       `["content"]…["text"]` subscript (the response's text block);
+#   (b) its argument derives from the return of a TEXT transport (`call_anthropic`,
+#       `call_anthropic_api`) — model text that arrives as a helper's return value;
+#   (c) the function handles a code fence (a non-docstring string constant containing ```)
+#       — a fence-stripping parse helper, whatever its argument is called;
+#   (d) the function looks for a JSON span (a "{" / "[" / "}" / "]" constant, a "\\{" regex, or a
+#       module-level compiled regex matching "{") and parses a slice or `.group()` of text.
+# KNOWN GAP (stated, not hidden): a bare `json.loads(text)` of a PARAMETER, with no fence and no
+# span handling, is indistinguishable from parsing an S3 body or a Lambda payload, so it is not
+# counted. remediation/agent.py lives outside lambdas/ and is outside this sweep.
 _JSON_PARSE_HOMES = {"lambdas/ai/structured_json.py", "lambdas/ai/bedrock_client.py"}
+_TEXT_TRANSPORTS = {"call_anthropic", "call_anthropic_api"}
 # path::function -> (hand parses in it, why it has not migrated yet). The ledger may only shrink.
+# Every member is a judge or classifier whose span parse carries a contract of its own that the
+# door's `parse_json_span` (None on any failure) would flatten.
 JSON_HAND_PARSE_LEDGER = {
-    "lambdas/compute/daily_insight_compute_lambda.py::_evaluate_intentions_haiku": (
+    "lambdas/coach/critics.py::parse_model_verdict": (
         1,
-        "2026-09-29 (#4276): fence-strip + json.loads on the intention-evaluation verdict; migrate to structured_json.call_json with a schema",
+        "2026-10-02 (#4276): names WHICH failure it was (no object vs json.loads) in the error the critics record; migrate with a door error-kind helper",
     ),
-    "lambdas/compute/hypothesis_engine_lambda.py::generate_hypotheses": (
-        1,
-        "2026-09-29 (#4276): parses after the AI-3 validator; migrate with a hypotheses schema beside the prompt",
-    ),
-    "lambdas/emails/elena_state_updater.py::_call_haiku": (
+    "lambdas/intelligence/lenient_json.py::lenient_json": (
         2,
-        "2026-09-29 (#4276): json.loads then a fence-strip retry on the Elena state reply; migrate to structured_json.parse_json_text / call_json",
+        "2026-10-02 (#4276): B4 trailing-comma repair + the key-regex partial salvage; move the repair into the door, then call_json the three analyzer generators",
     ),
-    "lambdas/intelligence/challenge_generator_lambda.py::generate_challenges": (
+    "lambdas/operational/reader_truth_qa.py::parse_verdict": (
         1,
-        "2026-09-29 (#4276): parses after the AI-3 validator; migrate with a challenges schema",
+        "2026-10-02 (#4276): typed UNEVALUATED verdicts (#3540) + the #4474 greedy-span second attempt; a CI gate's verdict typing, migrate on its own",
+    ),
+    "lambdas/privacy/broadcast_sensitivity_gate.py::bedrock_offtopic_classifier": (
+        1,
+        "2026-10-02 (#4276): a parse error PROPAGATES to the caller's classifier_error hold; a None-returning span would change the privacy gate's failure path",
+    ),
+    "lambdas/training/training_notes_llm.py::_parse_signals": (
+        1,
+        "2026-10-02 (#4276): raises UnparseableResponse naming lengths and parser positions (never the private text); migrate with decode_error",
     ),
 }
 
 
 def _model_text_json_loads(root):
-    """{path::function: n} for every json.loads whose argument derives from ["content"]…["text"]."""
+    """{path::function: n} for every json.loads of model text outside the one door (rules a-d above)."""
     import ast
     from collections import Counter
+    from pathlib import Path as _P
 
-    def _is_source(node):
+    def _is_content_text(node):
         for n in ast.walk(node):
             if isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Constant) and n.slice.value == "text":
                 for m in ast.walk(n.value):
@@ -591,36 +608,87 @@ def _model_text_json_loads(root):
                         return True
         return False
 
+    def _is_transport_call(node):
+        for n in ast.walk(node):
+            if isinstance(n, ast.Call):
+                f = n.func
+                if (f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")) in _TEXT_TRANSPORTS:
+                    return True
+        return False
+
+    def _is_span(node):
+        for n in ast.walk(node):
+            if isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Slice):
+                return True
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "group":
+                return True
+        return False
+
     def _names(node):
         return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
 
-    hits: Counter = Counter()
-    from pathlib import Path as _P
+    def _is_loads(n):
+        f = n.func
+        return (isinstance(f, ast.Attribute) and f.attr == "loads" and getattr(f.value, "id", "") == "json") or getattr(
+            f, "id", ""
+        ) == "loads"
 
+    def _tainted(fn, seed):
+        out: set = set()
+        for _ in range(4):  # a fixed point over the function's own assignments
+            for n in ast.walk(fn):
+                if isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and n.value is not None:
+                    if seed(n.value) or _names(n.value) & out:
+                        for t in n.targets if isinstance(n, ast.Assign) else [n.target]:
+                            out |= _names(t)
+        return out
+
+    hits: Counter = Counter()
     for path in sorted(str(x) for x in _P(root, "lambdas").rglob("*.py")):
         rel = os.path.relpath(path, root).replace(os.sep, "/")
         if rel in _JSON_PARSE_HOMES:
             continue
         with open(path, encoding="utf-8") as fh:
             tree = ast.parse(fh.read())
+        docstrings = {
+            id(n.body[0].value)
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and n.body
+            and isinstance(n.body[0], ast.Expr)
+            and isinstance(n.body[0].value, ast.Constant)
+        }
+        brace_regexes = {
+            t.id
+            for n in tree.body
+            if isinstance(n, ast.Assign)
+            and isinstance(n.value, ast.Call)
+            and getattr(n.value.func, "attr", "") == "compile"
+            and n.value.args
+            and isinstance(n.value.args[0], ast.Constant)
+            and "{" in str(n.value.args[0].value)
+            for t in n.targets
+            if isinstance(t, ast.Name)
+        }
         for fn in ast.walk(tree):
             if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            tainted: set = set()
-            for _ in range(4):  # a fixed point over the function's own assignments
-                for n in ast.walk(fn):
-                    if isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and n.value is not None:
-                        if _is_source(n.value) or _names(n.value) & tainted:
-                            for t in n.targets if isinstance(n, ast.Assign) else [n.target]:
-                                tainted |= _names(t)
+            consts = [n.value for n in ast.walk(fn) if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docstrings]
+            fence = any("```" in c for c in consts)
+            span_seek = any(c in ("{", "}", "[", "]") or "\\{" in c for c in consts) or bool(_names(fn) & brace_regexes)
+            model = _tainted(fn, lambda v: _is_content_text(v) or _is_transport_call(v))
+            spans = _tainted(fn, _is_span)
             for n in ast.walk(fn):
-                if not (isinstance(n, ast.Call) and n.args):
+                if not (isinstance(n, ast.Call) and n.args and _is_loads(n)):
                     continue
-                f = n.func
-                is_loads = (isinstance(f, ast.Attribute) and f.attr == "loads" and getattr(f.value, "id", "") == "json") or getattr(
-                    f, "id", ""
-                ) == "loads"
-                if is_loads and (_is_source(n.args[0]) or _names(n.args[0]) & tainted):
+                arg = n.args[0]
+                if (
+                    fence
+                    or _is_content_text(arg)
+                    or _is_transport_call(arg)
+                    or _names(arg) & model
+                    or (span_seek and (_is_span(arg) or _names(arg) & spans))
+                ):
                     hits[f"{rel}::{fn.name}"] += 1
     return dict(hits)
 
@@ -632,7 +700,7 @@ def test_no_module_hand_parses_raw_model_text_outside_structured_json():
     grew = sorted(k for k, n in live.items() if n > JSON_HAND_PARSE_LEDGER.get(k, (0, ""))[0])
     assert not grew, (
         "json.loads on raw model text outside ai/structured_json.py — route it through structured_json.call_json "
-        "(schema) or parse_json_text (#4276):\n  " + "\n  ".join(f"{k} ({live[k]} site(s))" for k in grew)
+        "(schema), parse_json_text or parse_json_span (#4276):\n  " + "\n  ".join(f"{k} ({live[k]} site(s))" for k in grew)
     )
     stale = sorted(k for k, (n, _why) in JSON_HAND_PARSE_LEDGER.items() if live.get(k, 0) < n)
     assert not stale, f"these ledger lines count hand parses that are gone — lower or delete them: {stale}"
@@ -640,23 +708,91 @@ def test_no_module_hand_parses_raw_model_text_outside_structured_json():
         assert _re.match(r"^\d{4}-\d{2}-\d{2} \(#\d+\): .{20,}$", why), key
 
 
-def test_MUTATION_a_planted_fence_parse_in_a_scratch_module_reds(tmp_path):
+def _plant_4276(tmp_path, body):
     scratch = tmp_path / "lambdas" / "scratch"
-    scratch.mkdir(parents=True)
-    (scratch / "planted.py").write_text(
+    scratch.mkdir(parents=True, exist_ok=True)
+    (scratch / "planted.py").write_text(body, encoding="utf-8")
+    return _model_text_json_loads(str(tmp_path))
+
+
+def test_MUTATION_a_planted_fence_parse_in_a_scratch_module_reds(tmp_path):
+    # (a) the response's text block, fence-stripped, then parsed
+    assert _plant_4276(
+        tmp_path,
         "import json\n\n\ndef _call(resp):\n"
         "    raw = resp['content'][0]['text'].strip()\n"
         "    if raw.startswith('```'):\n        raw = raw.split('\\n', 1)[1]\n"
         "    return json.loads(raw)\n",
-        encoding="utf-8",
-    )
-    assert _model_text_json_loads(str(tmp_path)) == {"lambdas/scratch/planted.py::_call": 1}
+    ) == {"lambdas/scratch/planted.py::_call": 1}
     # A parse through the one home is not a finding.
-    (scratch / "planted.py").write_text(
-        "from ai import structured_json\n\n\ndef _call(resp):\n    return structured_json.parse_json_text(resp['content'][0]['text'])\n",
-        encoding="utf-8",
+    assert (
+        _plant_4276(
+            tmp_path,
+            "from ai import structured_json\n\n\ndef _call(resp):\n    return structured_json.parse_json_text(resp['content'][0]['text'])\n",
+        )
+        == {}
     )
-    assert _model_text_json_loads(str(tmp_path)) == {}
+
+
+def test_MUTATION_each_helper_shaped_hand_parse_reds_and_a_non_model_parse_does_not(tmp_path):
+    """The three shapes the original detector could not see (its stated KNOWN GAP): each
+    planted alone must be found, and the control parses must not be."""
+    # (b) model text arriving as a TEXT transport's return value, no subscript in sight
+    assert _plant_4276(
+        tmp_path,
+        "import json\nfrom ai.ai_calls import call_anthropic\n\n\ndef _ic3(prompt):\n"
+        "    raw = call_anthropic(prompt, '', max_tokens=900).strip()\n    return json.loads(raw)\n",
+    ) == {"lambdas/scratch/planted.py::_ic3": 1}
+    # (c) a fence-stripping parse helper whose argument is just a parameter
+    assert _plant_4276(
+        tmp_path,
+        "import json\n\n\ndef _parse(text):\n    text = (text or '').strip()\n"
+        "    if text.startswith('```'):\n        text = text[3:]\n    return json.loads(text)\n",
+    ) == {"lambdas/scratch/planted.py::_parse": 1}
+    # (d) a span grab: first "{" to last "}", and a module-level {…} regex's .group()
+    assert _plant_4276(
+        tmp_path,
+        "import json\n\n\ndef _verdict(text):\n    a, b = text.find('{'), text.rfind('}')\n    return json.loads(text[a : b + 1])\n",
+    ) == {"lambdas/scratch/planted.py::_verdict": 1}
+    assert _plant_4276(
+        tmp_path,
+        "import json\nimport re\n\n_RX = re.compile(r'\\{.*\\}', re.S)\n\n\ndef _verdict(text):\n"
+        "    m = _RX.search(text)\n    return json.loads(m.group(0)) if m else None\n",
+    ) == {"lambdas/scratch/planted.py::_verdict": 1}
+    # Controls: an S3 body, a Lambda payload, a slice with no span-seeking, and a docstring that
+    # merely MENTIONS a fence are not model-text parses.
+    assert (
+        _plant_4276(
+            tmp_path,
+            "import json\n\n\ndef _load(obj, resp, raw):\n"
+            '    """Reads the ```json config."""\n'
+            "    a = json.loads(obj['Body'].read())\n    b = json.loads(resp['Payload'].read())\n"
+            "    c = json.loads(raw[4:])\n    return a, b, c\n",
+        )
+        == {}
+    )
+    # The door's own helpers are not findings.
+    assert (
+        _plant_4276(
+            tmp_path,
+            "from ai.structured_json import call_json, parse_json_span\n\n\ndef _call(send, body, text):\n"
+            "    return call_json(send, body, schema={'type': 'object'}), parse_json_span(text, '{')\n",
+        )
+        == {}
+    )
+
+
+def test_parse_json_span_takes_first_opener_to_last_closer_and_never_raises():
+    from ai.structured_json import parse_json_span
+
+    assert parse_json_span('Sure! {"a": 1} hope that helps') == {"a": 1}
+    assert parse_json_span('prose [{"n": 1}] more', "[") == [{"n": 1}]
+    assert parse_json_span('x {"a": [1, 2]} y') == {"a": [1, 2]}
+    assert parse_json_span("no json here") is None
+    assert parse_json_span('{"a": 1') is None  # a cut reply: no closer
+    assert parse_json_span("} then {") is None  # closer before the opener
+    assert parse_json_span('{"a": 1,}') is None  # unparseable span → None, never an exception
+    assert parse_json_span(None) is None
 
 
 _REPO_ROOT_4276 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

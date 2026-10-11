@@ -35,7 +35,7 @@ def test_coach_card_is_1200x630():
 def test_identity_resolves_from_board():
     recipes = _recipes()
     ident = cc.coach_identity("marcus_webb", recipes["marcus_webb"], _members())
-    assert ident["name"] == "Dr. Marcus Webb"
+    assert ident["name"] == "Marcus Webb"
     assert ident["title"]
     assert ident["color"].startswith("#")
 

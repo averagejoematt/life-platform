@@ -42,7 +42,7 @@ def test_roster_is_the_real_cast():
     assert set(ai.COACH_ROSTER) == REAL_ROSTER
     # every entry carries a display name + title (the FE contract)
     for pid, c in ai.COACH_ROSTER.items():
-        assert c["name"].startswith("Dr. ") and c["title"] and c["lens"]
+        assert c["name"] and not c["name"].startswith("Dr") and c["title"] and c["lens"]  # #4564: plain names
 
 
 def test_legacy_ids_map_to_real_coaches_never_500():
@@ -80,7 +80,7 @@ def test_grounding_in_every_persona_turn():
 def test_system_prompt_has_the_guardrails():
     ai = _roster()
     sysp = ai._coach_system("sleep_coach")
-    for needle in ("Dr. Lisa Park", "correlative", "N=1", "never medical advice", "AI coach persona"):
+    for needle in ("Lisa Park", "correlative", "N=1", "never medical advice", "AI coach persona"):
         assert needle in sysp, needle
     # stable per coach — the ephemeral prompt-cache contract
     assert sysp == ai._coach_system("sleep_coach")

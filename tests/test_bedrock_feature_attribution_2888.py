@@ -37,13 +37,61 @@ from ai import bedrock_client  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _no_lambda_env(monkeypatch):
-    """Default every case to the NON-Lambda context (CI/laptop)."""
+    """Default every case to the NON-Lambda CI context. #4589 split the old non-Lambda
+    residual by caller class: a CI call keeps `unknown`, a workstation call is named
+    `dev-session` — so the context is pinned here rather than inherited from whichever
+    machine runs the suite (a laptop run and a CI run must assert the same thing)."""
     monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    monkeypatch.delenv("INVOCATION_CONTEXT", raising=False)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_WORKFLOW", "CI/CD")
+    monkeypatch.delenv("GITHUB_WORKFLOW_REF", raising=False)
+
+
+def _workstation(monkeypatch):
+    for var in ("GITHUB_ACTIONS", "CI", "GITHUB_WORKFLOW", "GITHUB_WORKFLOW_REF"):
+        monkeypatch.delenv(var, raising=False)
 
 
 def test_unlabelled_non_lambda_call_stays_in_the_unknown_residual():
     """The residual bucket keeps its historic name so the series stays continuous."""
     assert bedrock_client.feature_name() == "unknown"
+
+
+def test_an_unlabelled_workstation_call_is_named_dev_session(monkeypatch):
+    """#4589: Oct 1-3 2026 put 30.65 USD (68% of self-metered AI spend) in `unknown`, every
+    dollar of it a workstation season rebuild. A workstation call now carries a label.
+
+    NEGATIVE CONTROL — verified by mutation: reverting `feature_name()`'s last line to
+    `return "unknown"` turns this assertion red."""
+    _workstation(monkeypatch)
+    assert bedrock_client.caller_class() == bedrock_client.CALLER_CLASS_DEV_SESSION
+    assert bedrock_client.feature_name() == bedrock_client.DEV_SESSION_FEATURE == "dev-session"
+
+
+def test_an_allowlisted_label_still_outranks_the_dev_session_label(monkeypatch):
+    """A judge run by hand on a laptop is still that judge's spend, not 'a dev session'."""
+    _workstation(monkeypatch)
+    with bedrock_client.attributed_to("visual-ai-qa"):
+        assert bedrock_client.feature_name() == "visual-ai-qa"
+    assert bedrock_client.feature_name() == "dev-session"
+
+
+def test_a_lambda_that_declares_itself_dev_keeps_its_function_name(monkeypatch):
+    """The MCP Lambda sets INVOCATION_CONTEXT=dev: its CLASS is dev-session, but its
+    FEATURE stays the function name — the runtime name always wins (property 1)."""
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "life-platform-mcp")
+    monkeypatch.setenv("INVOCATION_CONTEXT", "dev")
+    assert bedrock_client.caller_class() == bedrock_client.CALLER_CLASS_DEV_SESSION
+    assert bedrock_client.feature_name() == "life-platform-mcp"
+
+
+def test_the_dev_session_dimension_is_claimed_by_the_budget_ledger():
+    """A new LambdaFunction value nobody claims reds the monthly close (#3447 leg a)."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    import ai_budget_ledger
+
+    assert bedrock_client.DEV_SESSION_FEATURE in ai_budget_ledger.claimed_attribution_keys()
 
 
 def test_allowlisted_label_names_the_spend():

@@ -85,9 +85,28 @@ _MIN_PROSE_LEN = 12
 DERIVED = "DERIVED"
 
 DECISIONS = {
+    "lambdas/content/story_desk.py": (
+        "EDITORIAL RUBRIC, not a phase claim. The matching prose names the series' shape (a season, a week, a "
+        "thread) so the desk can rank stories; it states no day number, start date or cycle. Every phase fact the "
+        "model sees — the week's window, `Day N to Day M`, the calendar — is computed in code by "
+        "content.story_dossier.season_weeks from EXPERIMENT_START_DATE and handed over in the dossier (#4531)."
+    ),
+    "lambdas/content/story_writers.py": (
+        "EDITORIAL RULES + the fact-read rubric, not a phase claim. The prose tells the writers how to serve a "
+        "returning and a cold reader ('do not know the future: nothing after this week's last date exists'); the "
+        "day numbers, window and weekday calendar they may state come only from the dossier, derived in code from "
+        "EXPERIMENT_START_DATE (content.story_dossier.season_weeks), and the number gate holds them to it (#4531)."
+    ),
     "lambdas/emails/coach_panel_podcast_lambda.py": DERIVED,
     # #4188: the lead read's day number and genesis come from build_experiment_phase_context.
     "lambdas/coach/lead_daily_read.py": DERIVED,
+    "lambdas/coach/coach_moves.py": (
+        "SETTING, not a phase claim (#4583). The matching prose is 'a public health-experiment site' in the cast and line "
+        "prompts; it states no day number, start date or cycle. The only phase facts the model sees are the fact sheet's "
+        "'day of the experiment' and 'experiment start date' rows, copied from the lead read's cited block, which "
+        "coach.lead_daily_read builds from ai_context.build_experiment_phase_context. coach_moves_sheet.check_line holds "
+        "every line to them with the freshness class (stale Day N, experiment span) and the exact figure rule."
+    ),
     "lambdas/content/review_pack_ranker.py": (
         "NOT A PROMPT. The matching string is a FINDING detail — genesis_mismatch's "
         '"generated {gen_date}, BEFORE the current genesis {start_date_iso}" — emitted by the '

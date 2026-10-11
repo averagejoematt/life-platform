@@ -73,13 +73,15 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 )
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
+
+from compute.compute_json_schemas import hypotheses_schema  # #4276: the generation output schema (module at its size ceiling)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -107,10 +109,10 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry (each route keeps its env override)
 
-# AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+AI_MODEL = model_for("hypothesis_engine")
+AI_MODEL_HAIKU = model_for("hypothesis_engine.check")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 CALIBRATION_PK = f"USER#{USER_ID}#SOURCE#calibration"  # #530: resolution ledger (cross_phase)
@@ -987,14 +989,18 @@ def format_journal_candidates(candidates):
     )
 
 
+# #4276: the generation prompt's JSON shape, constrained at the model (compute/compute_json_schemas.py).
+HYPOTHESES_SCHEMA = hypotheses_schema(SPEC_METRICS)
+
+
 def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_candidates=None):
     """Run Claude to generate new cross-domain hypotheses from 14 days of data."""
     p = profile or {}
     start_w = p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
     goal_w = p.get("goal_weight_lbs", 185)
     total_loss = round(start_w - goal_w)
-    cal_target = p.get("calorie_target", 1800)
-    pro_target = p.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    pro_target = PLAN_DAILY_PROTEIN_MIN_G
 
     existing_texts = [h.get("hypothesis", "")[:100] for h in existing_hypotheses]
     existing_block = ""
@@ -1055,48 +1061,34 @@ test_spec field notes:
 - min_effect is in outcome_metric's own units (use 0 if any direction-consistent effect counts)
 - lag_days 0-3: outcome measured this many days AFTER the condition day"""
 
-    payload = json.dumps(
-        {
-            "model": AI_MODEL,
-            # 2026-05-03: bumped 2000 → 4000 — hypothesis JSON with multiple
-            # patterns + confidence reasons was hitting truncation, then 400 on
-            # retry. Sonnet 4.x supports 8192 in standard mode; 4000 is safe.
-            "max_tokens": 4000,
-            "system": [{"type": "text", "text": HYPOTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            "messages": [{"role": "user", "content": user_message}],
-        }
-    ).encode()
-
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-        method="POST",
-    )
+    body = {
+        "model": AI_MODEL,
+        # 2026-05-03: bumped 2000 → 4000 — hypothesis JSON with multiple
+        # patterns + confidence reasons was hitting truncation, then 400 on
+        # retry. Sonnet 4.x supports 8192 in standard mode; 4000 is safe.
+        "max_tokens": 4000,
+        "system": [{"type": "text", "text": HYPOTHESIS_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        "messages": [{"role": "user", "content": user_message}],
+    }
 
     # ADR-062 (2026-05-27): route through retry_utils.call_anthropic_raw (Bedrock).
+    # #4276: constrained to HYPOTHESES_SCHEMA at the model and parsed in the one door.
     try:
+        from ai.structured_json import call_json, decode_error
         from common.retry_utils import call_anthropic_raw
 
-        resp = call_anthropic_raw(req)
-        raw = resp["content"][0]["text"].strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        # AI-3: Validate raw JSON text before parsing
+        parsed = call_json(call_anthropic_raw, body, schema=HYPOTHESES_SCHEMA, label="hypothesis_engine")
+        if not isinstance(parsed, dict):
+            logger.error(f"Hypothesis parse error: {decode_error(parsed)}")
+            return None
+        # AI-3: validate the parsed reply's text before anything is kept
         if _HAS_AI_VALIDATOR:
-            val_result = validate_ai_output(raw, AIOutputType.GENERIC)
+            val_result = validate_ai_output(json.dumps(parsed, ensure_ascii=False), AIOutputType.GENERIC)
             if val_result.blocked:
                 logger.error("[AI-3] generate_hypotheses blocked: %s", val_result.block_reason)
                 return None
             if val_result.warnings:
                 logger.warning("[AI-3] generate_hypotheses warnings: %s", val_result.warnings)
-        parsed = json.loads(raw.strip())
         # #2420: ADR-104 grounding chokepoint BEFORE persistence. The reader-bound
         # prose fields may only cite numbers/dates present in what the model was
         # given (this exact user_message, which embeds daily_rows + the profile
@@ -1127,7 +1119,7 @@ test_spec field notes:
             parsed["hypotheses"] = kept
         return parsed
     # #2221: IndexError (empty `content`) / TypeError (null payload) escaped this handler and killed the weekly run.
-    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
+    except (KeyError, IndexError, TypeError) as e:
         logger.error(f"Hypothesis parse error: {e}")
         return None
 

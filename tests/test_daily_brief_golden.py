@@ -94,7 +94,7 @@ KWARGS = dict(
     readiness_score=72,
     readiness_colour="#059669",
     tldr_guidance={"tldr": "Solid recovery day — keep the deficit honest and walk after dinner."},
-    bod_insight="Dr. Kai Nakamura: protect the 9 PM wind-down; the streak follows the bedtime.",
+    bod_insight="Kai Nakamura: protect the 9 PM wind-down; the streak follows the bedtime.",
     training_nutrition={
         "training": "Zone-2 walk planned — keep it conversational pace.",
         "nutrition": "Protein on target; hold the line after 8 PM.",

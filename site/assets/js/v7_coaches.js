@@ -25,6 +25,7 @@
 
 import { chooseTodaysRead, ptDate } from "/assets/js/coach_today.js";
 import { dayInWords, dataThrough, countWord } from "/assets/js/entry_age.js";
+import { coachComparison } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
 
 const PT = "America/Los_Angeles";
 const esc = (s) =>
@@ -75,31 +76,60 @@ export function timeInWords(iso) {
   return `${day}, at ${mins}, Pacific time`;
 }
 
-// The engine's metric names in the reader's words. Unknown → the name with its underscores
-// opened, never hidden.
-const METRIC_WORDS = {
-  recovery_score: "the night’s recovery",
-  recovery_score_7day_avg: "the seven-night average recovery",
-  sleep_duration_hours: "the night’s sleep, in hours",
-  sleep_hours: "the night’s sleep, in hours",
-  total_sleep_hours: "the night’s sleep, in hours",
-  hrv: "heart-rate variability",
-  hrv_ms: "heart-rate variability",
-  rhr: "resting heart rate",
-  resting_heart_rate: "resting heart rate",
-  weight_lbs: "his weight",
-  weight: "his weight",
-  total_calories_kcal_7day_avg: "the seven-day average calories",
-  total_calories_kcal: "the day’s calories",
-  total_protein_g: "the day’s protein, in grams",
-  protein_g: "the day’s protein, in grams",
-  steps: "the day’s steps",
-  deep_pct: "the share of deep sleep",
-  rem_pct: "the share of dreaming sleep",
+// The engine’s metric names in the reader’s words. Unknown → the name with its underscores
+// opened, never hidden. Each BASE metric carries its words and what one reading spans (a
+// night or a day); a windowed form — `<base>_7day_avg`, `_14day_avg`, … — is DERIVED from its
+// base by rule ("the night’s recovery" → "the seven-night average recovery"), never typed as
+// another row (R7 fix 2: `total_protein_g_7day_avg` and `deep_pct_7day_avg` printed raw
+// because only two of the windowed forms had a row). tests/js/v7_coaches.test.mjs holds
+// every metric of a served docket to words.
+const METRIC_BASE = {
+  recovery_score: ["the night’s recovery", "night"],
+  sleep_duration_hours: ["the night’s hours of sleep", "night"],
+  sleep_hours: ["the night’s hours of sleep", "night"],
+  total_sleep_hours: ["the night’s hours of sleep", "night"],
+  sleep_score: ["the night’s sleep score", "night"],
+  hrv: ["heart-rate variability", "night"],
+  hrv_ms: ["heart-rate variability", "night"],
+  rhr: ["resting heart rate", "night"],
+  resting_heart_rate: ["resting heart rate", "night"],
+  weight_lbs: ["his weight", "day"],
+  weight: ["his weight", "day"],
+  total_calories_kcal: ["the day’s calories", "day"],
+  calories: ["the day’s calories", "day"],
+  total_protein_g: ["the day’s protein, in grams", "day"],
+  protein_g: ["the day’s protein, in grams", "day"],
+  steps: ["the day’s steps", "day"],
+  deep_pct: ["the share of deep sleep", "night"],
+  rem_pct: ["the share of dreaming sleep", "night"],
 };
+const RE_WINDOWED = /^(.+)_(\d+)day_avg$/;
+// "" when the metric has no words (neither a base row nor a windowed form of one).
+function resolveMetric(metric) {
+  const m = String(metric || "");
+  if (METRIC_BASE[m]) return METRIC_BASE[m][0];
+  const w = RE_WINDOWED.exec(m);
+  const base = w && METRIC_BASE[w[1]];
+  const n = w ? Number(w[2]) : 0;
+  if (!base || !(n > 1)) return "";
+  const span = `${numberWords(n)}-${base[1]} average`;
+  const words = base[0];
+  if (words.startsWith("his ")) return `his ${span} ${words.slice(4)}`;
+  return `the ${span} ${words.replace(/^the (night|day)’s /, "").replace(/^the /, "")}`;
+}
+/** True when the metric resolves to reader words — false is a field name about to print. */
+export function metricKnown(metric) {
+  return Boolean(resolveMetric(metric));
+}
 export function metricWords(metric) {
   const m = String(metric || "");
-  return METRIC_WORDS[m] || m.replace(/_/g, " ");
+  return resolveMetric(m) || m.replace(/_/g, " ");
+}
+/** The words split from their unit: "the day’s protein, in grams" → { what: "the day’s protein",
+ *  unit: "grams" } — so a sentence can put the unit after the number ("190 grams or better"). */
+export function metricParts(metric) {
+  const m = /^(.*), in ([a-z]+)$/.exec(metricWords(metric));
+  return m ? { what: m[1], unit: m[2] } : { what: metricWords(metric), unit: "" };
 }
 const COND_WORDS = { lt: "under", lte: "at most", le: "at most", gt: "over", gte: "at or above", ge: "at or above", eq: "at", up: "up", down: "down" };
 export function conditionWords(cond) {
@@ -140,9 +170,9 @@ const Q_COND = { gte: "or better", ge: "or better", gt: "or more", lte: "or lowe
 export function docketQuestion(criterion, resolutionDate) {
   const c = criterion || {};
   if (!c.metric || c.threshold == null) return "";
-  const what = metricWords(c.metric);
+  const { what, unit } = metricParts(c.metric);
   const cond = String(c.condition || "").toLowerCase();
-  const thr = fmtNum(c.threshold);
+  const thr = `${fmtNum(c.threshold)}${unit ? ` ${unit}` : ""}`;
   const when = dayInWords(resolutionDate);
   const on = when ? ` on ${when}` : "";
   if (cond === "lt" || cond === "gt") return `Will ${what} be ${cond === "lt" ? "under" : "over"} ${thr}${on}?`;
@@ -160,9 +190,13 @@ export function ledgerLine(lc, who) {
   const on = made ? `On ${made}, ` : "";
   const what = metricWords(lc.metric);
   let text;
+  // `rule` is what decided the verdict, for a page that prints the verdict as a tag
+  // (#4647); "" when the served row carries none.
+  let rule = "";
   if (String(lc.eval_type || "").toLowerCase() === "directional") {
     // actual_value is a slope: say the direction, never the number as a level.
     const dir = conditionWords(lc.condition) || "move";
+    rule = RULE_TREND;
     text = `${on}${name} said ${what} would go ${dir} over the checked window — the direction ${right ? "came true" : "did not come true"}.`;
   } else {
     // a point call ("within" a tolerance of the threshold — the grader's own condition word,
@@ -175,17 +209,20 @@ export function ledgerLine(lc, who) {
     // the live latest_checked serves no tolerance (the recent[] reason strings carry ±SD);
     // "give or take" prints only if a `tolerance` field is ever served, never from elsewhere
     const give = near && fmtNum(lc.tolerance) ? `, give or take ${fmtNum(lc.tolerance)}` : "";
+    if (give) rule = ruleWithin(right, fmtNum(lc.tolerance));
     const call = !thr ? "made a call on it" : near ? `would land near ${thr}${give}` : `would be ${cond} ${thr}`;
     const came = actual ? ` — it came in at ${actual}.` : right ? " — it held." : " — it did not.";
     text = `${on}${name} said ${what} ${call}${came}`;
   }
   const checked = dayInWords(lc.outcome_date);
-  return { verdict: right ? "right" : "wrong", text, checked: checked ? `Checked ${checked}.` : "", claim: lc.claim ? String(lc.claim) : "" };
+  return { verdict: right ? "right" : "wrong", text, rule, checked: checked ? `Checked ${checked}.` : "", claim: lc.claim ? String(lc.claim) : "" };
 }
 
 // ── the recent list: report_card.track_record.recent[] as right/wrong lines ───────
 // Each row is {date, status, metric, reason}; `reason` is the grader's own string. Three
 // shapes are read; anything else prints the verdict, the metric and the checked day only.
+const RULE_TREND = "by which way the trend went over the checked window";
+const ruleWithin = (right, tol) => `${right ? "within" : "not within"} ${tol} either way`;
 const RE_VALUE = /^(\w+)=([-\d.]+) on (\d{4}-\d{2}-\d{2}) vs predicted ([-\d.]+)(?: ±([\d.]+))?/;
 const RE_TREND = /^(\w+) trend=(\w+) \(slope=([-\d.]+)\), predicted=(\w+)/;
 const RE_DOCKET = /^dispute docket resolved: (.+)$/;
@@ -210,20 +247,24 @@ export function recentLine(row, who) {
   const reason = String(row.reason || "");
   const checked = dayInWords(row.date);
   let text;
+  let rule = "";
   let m;
   if ((m = RE_VALUE.exec(reason))) {
     const what = metricWords(m[1]);
     const give = m[5] ? `, give or take ${fmtNum(m[5])}` : "";
+    if (m[5]) rule = ruleWithin(right, fmtNum(m[5]));
     text = `For ${dayInWords(m[3])}, ${name} said ${what} would land near ${fmtNum(m[4])}${give} — it came in at ${fmtNum(m[2])}.`;
   } else if ((m = RE_TREND.exec(reason))) {
+    rule = RULE_TREND;
     text = `${name} said ${metricWords(m[1])} would go ${m[4]} over the checked window — it went ${m[2]}.`;
   } else if ((m = RE_DOCKET.exec(reason))) {
     const crit = criterionWords(m[1]);
+    rule = "by the question the bet fixed when it opened";
     text = crit ? `A disagreement settled by code: ${crit}.` : `A disagreement settled by code, on ${metricWords(row.metric)}.`;
   } else {
     text = `${name}’s call on ${metricWords(row.metric)}.`;
   }
-  return { verdict: right ? "right" : "wrong", text, checked: checked ? `Checked ${checked}.` : "" };
+  return { verdict: right ? "right" : "wrong", text, rule, checked: checked ? `Checked ${checked}.` : "" };
 }
 export function recentLines(recent, who) {
   return (Array.isArray(recent) ? recent : []).map((r) => recentLine(r, who)).filter(Boolean);
@@ -478,6 +519,8 @@ export function readHTML(pick, profile, now, calibration) {
     const t = tally(recent);
     parts.push(`<p class="v7c-dated">The last ${numberWords(t.n)} checked call${t.n === 1 ? "" : "s"}, newest first — ${numberWords(t.right)} right, ${numberWords(t.wrong)} wrong:</p>`);
     parts.push(`<ul class="v7c-ledger" data-src="api_coach_${esc(pid)}.report_card.track_record.recent">${recent.map(lineHTML).join("")}</ul>`);
+    const tr = profile && profile.report_card && profile.report_card.track_record;
+    parts.push(coachComparison(tr && tr.comparison, { cls: "v7c-note", src: `api_coach_${pid}.report_card.track_record.comparison.sentence` })); // #4585
   }
   // the read itself: the guarded slot, linted; a hit folds under <details>, never rewritten
   const text = String(c.position_summary || "").trim();
@@ -488,6 +531,12 @@ export function readHTML(pick, profile, now, calibration) {
   else parts.push(`<p class="v7c-absent">No public read is served for today.</p>`);
   const reason = reasonSentence(pick, calibration);
   if (reason) parts.push(`<p class="v7c-note" data-src="${esc(reason.src)}">${esc(reason.text)}</p>`);
+  // #4585: a "K of N held up" reason is a coach count — it never appears alone.
+  if (reason && pick.rule === "record") {
+    const sid = shortId(c.coach_id);
+    const r = (calibration && Array.isArray(calibration.coaches) ? calibration.coaches : []).find((x) => x && x.coach_id === sid);
+    parts.push(coachComparison(r && r.comparison, { cls: "v7c-note", src: `api_calibration.coaches[${sid}].comparison.sentence` }));
+  }
   // the standing ask, counted
   const ask = standingAsk(profile && profile.dossier && profile.dossier.commitments);
   const n = askCount(profile && profile.recent_outputs);
@@ -533,11 +582,12 @@ export function docketHTML(rows) {
     .join("\n");
 }
 
-export function recordHTML(rec) {
+export function recordHTML(rec, comparison) {
   if (!rec.soFar) return "";
   let s = `<p>All coaches together, by the site’s scorekeeper: <b class="v7c-num" data-src="api_calibration.platform.strata.coaches">${rec.soFar.k} of ${rec.soFar.n}</b> checked calls right so far`;
   if (rec.allTime) s += `; <span class="v7c-num" data-src="api_calibration.platform.lifetime.strata.coaches">${rec.allTime.k} of ${rec.allTime.n}</span> all time`;
-  return `${s}.</p>`;
+  // #4585 / epic #4580 rule 3: the count never appears alone.
+  return `${s}.</p>` + coachComparison(comparison, { cls: "v7c-note", src: "api_calibration.comparison.sentence" });
 }
 export function rosterHTML(rows) {
   if (!rows.length) return "";
@@ -615,7 +665,7 @@ export async function run(doc) {
   if (!cal) setHTML("v7c-record-body", NOT_SERVED("The record is"));
   else if (!rec.soFar) setHTML("v7c-record-body", `<p class="v7c-absent">No checked call yet.</p>`);
   else {
-    setHTML("v7c-record-body", recordHTML(rec));
+    setHTML("v7c-record-body", recordHTML(rec, cal.comparison));
     setHTML("v7c-record-m", marginHTML(rec.through));
   }
   const roster = rosterRows(coachesApi, cal, topPid);

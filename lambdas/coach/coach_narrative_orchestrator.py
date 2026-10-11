@@ -5,7 +5,7 @@ The "showrunner" — an LLM planning step (Haiku) that runs before a coach gener
 content. Reads all coach state, ensemble context, computation results, and narrative
 arc, then produces a structured generation brief for the target coach.
 
-Phase 2 target: sleep_coach (Dr. Lisa Park) — highest cross-domain influence.
+Phase 2 target: sleep_coach (Lisa Park) — highest cross-domain influence.
 
 Inputs (all DynamoDB + S3):
   - Target coach compressed state (COACH#sleep_coach / COMPRESSED#latest)
@@ -65,7 +65,9 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("coach_narrative")
 
 # Phase 2 target coach — will be parameterized in Phase 3
 TARGET_COACH = os.environ.get("TARGET_COACH", "sleep_coach")

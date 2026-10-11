@@ -68,6 +68,8 @@ import datetime as _dt
 import json
 import re
 
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row's stale target
+
 # The tight canonical-contradiction detector (SS-10). Dual path: package-style
 # (bundled lambdas/), flat (layer / flattened bundle). Fail-soft to None — the
 # number gate still runs; only the vitals-contradiction check is skipped.
@@ -508,7 +510,7 @@ def authoritative_facts_block(facts: dict) -> str:
         _pwin = f" over the last {int(_pd)} logged days" if _pd else ""
         lines.append(
             f"  - Protein INTAKE averages {facts['protein_g_avg']:g} g a day{_pwin} "
-            f"(target {int(facts.get('protein_g_target') or 190)} g, floor {int(facts.get('protein_g_floor') or 170)} g). "
+            f"(the plan's protein floor is {PLAN_DAILY_PROTEIN_MIN_G} g a day; the plan names no separate protein target). "
             f"His actual intake is ~{facts['protein_g_avg']:g} g — never state intake as the target or floor"
             + (f"; when you cite this average, name its window ({int(_pd)} logged days)." if _pd else ".")
         )
@@ -670,7 +672,7 @@ except ImportError:  # pragma: no cover — flat/layer bundle layout
 # ── #1896: a coach's own track-record claims ────────────────────────────────
 # The gates above check claims about MATTHEW (his numbers, his dates, his logged
 # behavior). None of them check a claim the coach makes about ITSELF — and on
-# 2026-07-27 Dr. Webb published "I called lunch wrong… That's a prediction miss,
+# 2026-07-27 Webb published "I called lunch wrong… That's a prediction miss,
 # and I'm logging it as one" while every stored PREDICTION# was status=pending
 # and the same paragraph admitted "I have zero food logs. Nothing." The verdict
 # was then persisted as a THREAD# row and baked into the committed noscript, so

@@ -5,7 +5,7 @@ Privacy on this platform is enforced by prompt instructions AND — because a pr
 is a hope, not a guarantee — by this fail-closed code gate at every publish/serve
 chokepoint. Two leak classes the truth audit (2026-06-27) caught:
   • real public figures named as if they were the platform's coaches/sources
-    (every coach here is fictional — Layne Norton → Dr. Marcus Webb, etc.);
+    (every coach here is fictional — Layne Norton → Marcus Webb, etc.);
   • vices/substances the subject is working to moderate (never public).
 
 Usage:

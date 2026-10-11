@@ -314,7 +314,7 @@ _DISPUTE_WIPED = {
     "week": "2026-W27",
     "coach_a": "nutrition_coach",
     "coach_b": "physical_coach",
-    "turns": [{"speaker": "nutrition_coach", "name": "Dr. Marcus Webb", "line": "thin margins", "kind": "position"}],
+    "turns": [{"speaker": "nutrition_coach", "name": "Marcus Webb", "line": "thin margins", "kind": "position"}],
 }
 
 
@@ -336,7 +336,7 @@ def test_latest_dispute_serves_current_cycle_thread(monkeypatch):
         "week": "2026-W29",
         "coach_a": "nutrition_coach",
         "coach_b": "training_coach",
-        "turns": [{"speaker": "nutrition_coach", "name": "Dr. Marcus Webb", "line": "front-load it", "kind": "position"}],
+        "turns": [{"speaker": "nutrition_coach", "name": "Marcus Webb", "line": "front-load it", "kind": "position"}],
         "created_at": "2026-07-20T00:00:00+00:00",
     }
     monkeypatch.setattr(capi, "table", _FakeTable(query_items=[fresh]))

@@ -309,7 +309,7 @@ def test_v7_numbers_shell_is_the_logbook_and_carries_no_number_or_ruled_word():
 
 def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
     """#4182 — the v7 Home (scripts/v7/home.py) is Prototype C's screen I: the eight dated
-    entries in the design order, the day-1 photograph (#3761), the page's own sheet and module,
+    entries in the design order, the clothed gym photograph (#3761), the page's own sheet and module,
     the cut-over proof anchor — and NO number in the static HTML (every figure is poured
     from a served field at runtime, so the shell can never go stale) and none of the
     owner-ruled words (no earlier starts, attempts, cycles or resets)."""
@@ -326,11 +326,26 @@ def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
     assert order == sorted(order), "the entries are out of the design order"
     assert 'href="/assets/css/v7_home.css"' in html and 'src="/assets/js/v7_home.js"' in html
     assert "<!-- home-proof:start -->" in html and "<!-- home-proof:end -->" in html
-    # #3761: the frame holds the owner-approved day-1 photograph (two widths, alt text), no longer the empty state
-    assert 'src="/assets/images/photo-2026-09-06-day1-sm.jpg"' in html and "/assets/images/photo-2026-09-06-day1.jpg 900w" in html
-    assert 'alt="Matthew on day 1, Sunday September 6, front view"' in html
+    # #3761: the frame holds the clothed gym photograph (two widths, alt text), no longer the empty state
+    assert 'src="/assets/images/photo-2026-09-24-gym-sm.jpg"' in html and "/assets/images/photo-2026-09-24-gym.jpg 900w" in html
+    assert 'alt="Matthew in the gym on Thursday September 24, a mirror photo"' in html
     assert "No photo yet." not in html
     text = site_text.main_text("site/next/index.html")
     assert not re.search(r"\d", text), f"a number in the static Home shell: {text[:200]!r}"
     assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
     assert (SITE / "assets" / "css" / "v7_home.css").exists() and (SITE / "assets" / "js" / "v7_home.js").exists()
+
+
+def test_the_shirtless_day_one_photograph_is_on_no_reader_surface():
+    """OWNER RULING 2026-10-03 (#3761): no shirtless photograph on any reader surface. The
+    day-1 photograph is the one that was published; it is deleted from `site/` and nothing
+    under `site/` — a shell, a module, a sheet, a manifest, the sitemap — may name it again,
+    and neither v7 generator may pour it. One sweep, every offender reported."""
+    stem = "photo-2026-09-06-day1"
+    offenders = [f"file exists: {p.relative_to(ROOT)}" for p in sorted(SITE.rglob(f"{stem}*"))]
+    for p in sorted([*SITE.rglob("*"), *(ROOT / "scripts" / "v7").glob("*.py")]):
+        if not p.is_file() or p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".ico", ".woff", ".woff2", ".mp4", ".pdf"}:
+            continue
+        if stem.encode() in p.read_bytes():
+            offenders.append(f"reference in: {p.relative_to(ROOT)}")
+    assert not offenders, "the shirtless day-1 photograph is back on a reader surface:\n  " + "\n  ".join(offenders)

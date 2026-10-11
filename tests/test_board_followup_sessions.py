@@ -172,7 +172,7 @@ def test_followup_routes_to_same_coach_with_prior_context(monkeypatch):
     # the model saw the SAME coach's system prompt and the prior turn as context
     req = cap["reqs"][-1]
     sys_txt = req["system"][0]["text"]
-    assert "Dr. Lisa Park" in sys_txt  # the sleep coach persona
+    assert "Lisa Park" in sys_txt  # the sleep coach persona
     convo = json.dumps(req["messages"])
     assert "Is my sleep debt catching up?" in convo  # prior question replayed
     assert "keep the window consistent" in convo  # prior answer replayed

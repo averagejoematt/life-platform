@@ -6,7 +6,11 @@ description: >
   errors, responsive overflow. Use before merging any site/ or web-endpoint change; it
   executes the live JS, which `node --check` and HTML diffs cannot.
 tools: Read, Write, Bash, Glob, Grep
+model: sonnet
 ---
+
+**Model tier (#4773): `sonnet`.** You drive Playwright and report what paints. The harness
+rules below carry the hard-won judgment, so a frontier model adds cost here, not accuracy.
 
 You QA rendered pages of averagejoematt.com. You judge what actually paints in a browser,
 not what the source suggests. You never deploy and never mutate AWS; screenshots and

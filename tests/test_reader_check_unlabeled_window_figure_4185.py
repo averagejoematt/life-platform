@@ -107,3 +107,14 @@ def test_mutation_control_the_pre_ruling_window_forms_hold_the_live_finals(monke
     monkeypatch.setattr(reader_checks, "_WINDOW_RE", pre)
     for text in (PHYSICAL_1001_RANGE, LABS_1001_COUNT, RULING_8[2]):
         assert len(reader_checks.unlabeled_window_figure(text)) == 1, text
+
+
+def test_ruling_8_extension_one_sessions_average_with_its_date_is_labelled():
+    # Owner, 2026-10-02 (answer a): the 10-01 dry run held physical (judge 87) on this sentence.
+    live = "The heart rate on those walks — 116.4 bpm average on September 30 and 116.1 bpm on October 1 — sat inside the cap."
+    assert reader_checks.unlabeled_window_figure(live) == []
+    assert reader_checks.unlabeled_window_figure("He averaged 116 bpm on Wednesday, September 30.") == []
+    # Controls: a RUNNING average or an EWMA on a date still hides its span.
+    assert len(reader_checks.unlabeled_window_figure("The running average on September 30 was 310.2 lb.")) == 1
+    assert len(reader_checks.unlabeled_window_figure("1,596 kcal EWMA on the night of September 24.")) == 1
+    assert "116 bpm average on September 30" in reader_checks.prompt_reader_rules()

@@ -192,12 +192,16 @@ class TestConcurrentPartitionFetch:
         round, which doubled the fan-out to 16 queries against a 9-worker pool and made
         THIS file's sibling assertion fail at 0.76s against the 0.70s budget. The fix was
         not a bigger budget: the follow-through tally is now a daily rollup the grader
-        writes and this handler reads with one GetItem, so the Query count is unchanged."""
-        fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": [_full_pred()]})
+        writes and this handler reads with one GetItem, so the Query count is unchanged.
+
+        #4701: the instrument-presence read (the #4673 sourcing hold) runs as ONE more job
+        in the same concurrent round and issues its own `USER#…#SOURCE#` reads, so the count
+        here is of COACH# partition queries — the fan-out this test exists to bound."""
+        fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": [_full_pred()] if _pk_of(kw).startswith("COACH#") else []})
         monkeypatch.setattr(api, "table", fake)
         body = _body(api.handle_predictions({"queryStringParameters": {"coach_id": "sleep"}}))
         assert list(body["by_coach"].keys()) == ["sleep"]
-        assert len(fake.query_calls) == 1
+        assert len([c for c in fake.query_calls if _pk_of(c).startswith("COACH#")]) == 1
 
 
 class TestProjectionCarriesEveryEmittedField:
@@ -212,7 +216,7 @@ class TestProjectionCarriesEveryEmittedField:
         (item,) = body["predictions"]
         assert item == {
             "coach_id": "sleep",
-            "coach_name": "Dr. Lisa Park",
+            "coach_name": "Lisa Park",
             "text": "Sleep debt clears by Thursday",
             "confidence": 0.8,
             "status": "confirmed",
@@ -253,7 +257,7 @@ class TestProjectionCarriesEveryEmittedField:
         fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": []})
         monkeypatch.setattr(api, "table", fake)
         body = _body(api.handle_predictions({}))
-        # Dr. Sarah Chen, the retired training seat (2 sealed pre-registered calls
+        # Sarah Chen, the retired training seat (2 sealed pre-registered calls
         # per the issue's live proof) — the live registry, not a fake.
         assert body["by_coach"]["training"]["retired"] is True
         assert body["by_coach"]["sleep"]["retired"] is False

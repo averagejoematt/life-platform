@@ -11,16 +11,18 @@ def _reset_manifest(monkeypatch, index):
 
 
 def test_portrait_img_when_manifest_has_coach(monkeypatch):
-    _reset_manifest(monkeypatch, {"dr. marcus webb": "marcus_webb"})
-    member = {"name": "Dr. Marcus Webb", "emoji": "\U0001f957"}
+    _reset_manifest(monkeypatch, {"marcus webb": "marcus_webb"})
+    member = {"name": "Marcus Webb", "emoji": "\U0001f957"}
     html = cel._coach_portrait_img(member)
     assert "<img" in html
     assert "/assets/portraits/marcus_webb-96-ondark.png" in html
     assert 'alt="\U0001f957"' in html  # emoji preserved as alt for image-blocked clients
+    # #4564: a board config still carrying the old honorific resolves to the same portrait
+    assert cel._coach_portrait_img({"name": "Dr. Marcus Webb", "emoji": "\U0001f957"}) == html
 
 
 def test_no_portrait_returns_empty_for_unknown_coach(monkeypatch):
-    _reset_manifest(monkeypatch, {"dr. marcus webb": "marcus_webb"})
+    _reset_manifest(monkeypatch, {"marcus webb": "marcus_webb"})
     member = {"name": "The Chair", "emoji": "\U0001f3af"}
     assert cel._coach_portrait_img(member) == ""
 

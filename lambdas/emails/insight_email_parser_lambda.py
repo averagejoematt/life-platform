@@ -57,6 +57,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run
+from content import story_questions  # #4546: the Story Desk's reply route
 from experiment.phase_taxonomy import experiment_stamp_for  # #3513: class-gated, date-derived write-time stamp
 
 # #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
@@ -168,6 +169,50 @@ ALLOWED_SENDERS = (
         # TODO: Add your personal email address(es) here or set ALLOWED_SENDERS env var
     }
 )
+
+# #4546: the reply desk's own sender list — OFF by default (empty). The Story Desk's Monday questions go TO the
+# chronicle's EMAIL_RECIPIENT; a reply typed from that inbox can arrive From an address that is not in
+# ALLOWED_SENDERS, and the parser drops it before the [SQ-W<n>] route ever sees it. An address listed here is
+# accepted for that ONE route only (a [SQ-W<n>] subject — never an insight, never a review-pack correction), and only
+# when SES's own verdict authenticates it (_ses_authenticated below), so a forged From cannot put words in his mouth.
+# Setting it is a CDK environment change on the parser — an owner-approved deploy, never a lane's.
+_env_story_senders = os.environ.get("STORY_REPLY_SENDERS", "")
+STORY_REPLY_SENDERS = frozenset(s.strip().lower() for s in _env_story_senders.split(",") if s.strip())
+
+
+def _ses_authenticated(msg, sender):
+    """True when SES's own Authentication-Results header — the TOPMOST one, which SES prepends on receipt; any
+    header below it came with the message and is the sender's claim, not SES's — says dmarc or dkim passed for the
+    sender's domain. A missing, foreign or failing verdict is False (fail closed)."""
+    domain = sender.rsplit("@", 1)[-1].lower() if "@" in sender else ""
+    headers = msg.get_all("Authentication-Results") or []
+    if not domain or not headers:
+        return False
+    first = re.sub(r"\s+", " ", str(headers[0])).lower()
+    if first.split(";", 1)[0].strip() != "amazonses.com":
+        return False
+    exact = rf"{re.escape(domain)}(?=\s|$)"  # the whole domain: example.com must not match example.com.evil
+    for clause in first.split(";")[1:]:
+        c = clause.strip()
+        if c.startswith("dmarc=pass") and re.search(rf"header\.from={exact}", c):
+            return True
+        if c.startswith("dkim=pass") and re.search(rf"header\.(?:i=@|d=){exact}", c):
+            return True
+    return False
+
+
+def story_reply_sender_verdict(sender, subject, msg):
+    """#4546: how the parser treats a sender — ``"allowed"`` (ALLOWED_SENDERS, every route), ``"story_only"`` (a
+    STORY_REPLY_SENDERS address on a [SQ-W<n>] reply that SES authenticated — the reply desk route only),
+    ``"story_unauthenticated"`` (that address, but SES did not vouch for it), ``"story_unknown_sender"`` (a [SQ-W<n>]
+    reply from anyone else) or ``"rejected"`` (anything else — the parser's existing silent ignore)."""
+    if sender in ALLOWED_SENDERS:
+        return "allowed"
+    if story_questions.week_from_subject(subject) is None:
+        return "rejected"
+    if sender in STORY_REPLY_SENDERS:
+        return "story_only" if _ses_authenticated(msg, sender) else "story_unauthenticated"
+    return "story_unknown_sender"
 
 
 def extract_reply_text(email_body):
@@ -435,6 +480,32 @@ def handle_review_pack_reply(reply_text, subject, sender, dry_run=False):
     return {"applied": applied, "unresolved": unresolved}
 
 
+def _store_owner_words(body_text, week, received_at, source_key):
+    """#4584: one owner-words entry per answered question of a Story Desk reply (channel ``email``, the question as
+    the prompt, the answer exactly as typed, off record when he marked it). Unanswered questions write nothing.
+
+    Fails closed and loud: an entry the filter could not screen is stored HELD (never served) and counted on
+    ``InsightParseFailure``, the parser's existing alarmed metric; any write failure is persisted to the parser's
+    dead-letter prefix and counted the same way. Returns the number of entries newly written."""
+    from content import owner_words
+
+    try:
+        answers = story_questions.parse_reply(body_text, keep_raw=True)
+        entries = owner_words.entries_from_story_reply(answers, week=week, received_at=received_at, source_key=source_key)
+        written = 0
+        for entry in entries:
+            _stored, created = owner_words.record(table, entry, stamp=experiment_stamp_for)
+            written += int(created)
+            if owner_words.HOLD_FILTER_UNAVAILABLE in (entry.get("hold_kinds") or []):
+                _emit_parse_failure_metric("owner_words_filter_unavailable")
+        print(f"[INFO] owner-words: {len(entries)} answer(s), {written} new entr{'y' if written == 1 else 'ies'}")
+        return written
+    except Exception as e:  # noqa: BLE001 — the chronicle's row is already written; this must not undo it
+        print(f"[ERROR] owner-words store failed: {type(e).__name__}")
+        _persist_failure_envelope(source_key, "owner_words_write_failed", {"key": source_key, "week": week, "error": str(e)})
+        return 0
+
+
 def lambda_handler(event, context):
     try:
         """
@@ -522,11 +593,18 @@ def lambda_handler(event, context):
                 sender_email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", from_addr)
                 sender = sender_email.group(0).lower() if sender_email else ""
 
-                if sender not in ALLOWED_SENDERS:
+                subject = msg.get("Subject", "")
+                verdict = story_reply_sender_verdict(sender, subject, msg)
+                if verdict == "rejected":
                     print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
                     continue
-
-                subject = msg.get("Subject", "")
+                if verdict in ("story_unauthenticated", "story_unknown_sender"):
+                    # #4546: a reply to the desk's questions that we refuse is HIS reply lost — never the silent
+                    # ignore above, or "he did not answer" and "we dropped his answer" read the same. The envelope
+                    # carries who/what only, never the body (his words are not stored from an unvouched message).
+                    print(f"[WARN] story-questions reply refused ({verdict}): {sender}")
+                    _persist_failure_envelope(key, f"story_reply_{verdict}", {"key": key, "sender": sender, "subject": subject[:200]})
+                    continue
                 print(f"[INFO] From: {sender}, Subject: {subject}")
 
                 # Extract text body
@@ -552,6 +630,33 @@ def lambda_handler(event, context):
             except Exception as e:
                 print(f"[ERROR] Failed to parse email: {e}")
                 _persist_failure_envelope(key, "parse_exception", {"bucket": bucket, "key": key, "error": str(e), "raw_email": raw_email})
+                continue
+
+            # #4546: a reply to the Story Desk's weekly questions ("[SQ-W<n>]" in the subject) carries answers typed
+            # INLINE under quoted questions — parsed from the full body (extract_reply_text stops at the first quoted
+            # line and would drop them) and stored as that week's owner voice. Never generates a confirmation mail.
+            sq_week = story_questions.week_from_subject(subject)
+            if sq_week is not None:
+                sq_answers = story_questions.parse_reply(body_text)
+                print(f"[INFO] story-questions reply for week {sq_week}: {len(sq_answers)} answer(s)")
+                if sq_answers and not dry_run:
+                    sq_received_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    sq_row = story_questions.qa_row(
+                        f"USER#{USER_ID}#SOURCE#insights",
+                        sq_week,
+                        sq_answers,
+                        received_at=sq_received_at,
+                        source_key=key,
+                    )
+                    sq_row.update(experiment_stamp_for(sq_row["pk"], sq_row["sk"]))  # #3599
+                    table.put_item(Item=sq_row)
+                    # #4584: each answer ALSO lands in the owner-words store, word for word, with its question as the
+                    # prompt. After the chronicle's row, and never able to undo it: a failure here is persisted and
+                    # counted, and the chronicle still has his voice.
+                    _store_owner_words(body_text, sq_week, sq_received_at, key)
+                    send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
+                continue
+            if verdict != "allowed":  # #4546: a STORY_REPLY_SENDERS address reaches the desk's route and nothing else
                 continue
 
             # #1690 (epic #1687): a reply to the weekly AI review-pack email carrying

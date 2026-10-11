@@ -1,10 +1,12 @@
 """scripts/v7/who.py — the "Who he is" page body (#4182, plan §2a row 7; Prototype C screen V).
 
-The page is the subject, in the first person: the day-1 photograph beside his own
+The page is the subject, in the first person: his own
 paragraph (VERBATIM from the live about page's `ABOUT_FIRST` in site/assets/js/dispatches.js
 — the site's one first-person page, by name; nothing here is rewritten), then the receipts
-strip in one line, then the photographs — three, dated, in order (#3761: the owner chose
-these three and said yes to publishing them on 2026-09-26; each re-saved with no EXIF) — then
+strip in one line, then the photographs — two, dated, in order (#3761; each re-saved with
+no EXIF. OWNER RULING 2026-10-03: no shirtless photograph on any reader surface — the day-1
+photograph is gone from the lead and from this list, and tests/test_site_chrome.py keeps
+it gone) — then
 the weigh-in line since the day it began, then how to check
 (the repo, the same four plain sentences Home's "How it works" carries, the email address as
 selectable text), then the dated return line. Every number is poured by
@@ -33,7 +35,6 @@ PHOTOS = (
         "Matthew in April 2025, before the weight came back, sitting on a couch",
         "April 2025 — before the weight came back",
     ),
-    ("/assets/images/photo-2026-09-06-day1", "2026-09-06", "Matthew on day 1, Sunday September 6, front view", "Day one, front view."),
     ("/assets/images/photo-2026-09-24-gym", "2026-09-24", "Matthew in the gym on Thursday September 24, a mirror photo", "In the gym."),
 )
 
@@ -94,8 +95,6 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
     """The inner HTML of `<main>` for /story/about/."""
     fold = (
         '<div class="who-fold-grid">'
-        f'<figure class="who-photo" id="who-photo">{photo_img(PHOTOS[1][0], PHOTOS[1][2], "116px")}'
-        '<figcaption class="who-cap" id="who-photo-cap" data-photo-date="2026-09-06">Day one, front view.</figcaption></figure>'
         '<div class="who-words">'
         f'<p class="who-first">{FIRST_PERSON}</p>'
         '<p class="who-sig">Matthew, in his own words.</p>'
@@ -110,6 +109,9 @@ def body(base: str) -> str:  # noqa: ARG001 — every page body takes the base; 
     return (
         "    <h1>Who he is</h1>\n"
         '    <p class="v7-job">In his own words, with the photo and the day count.</p>\n'
+        # R7 fix 9: the JS-off sentence. His paragraph and the photographs are static; the counts are not.
+        '    <noscript><p class="who-small">His paragraph and the photographs are on this page as written. The day count and the numbers are drawn '
+        "from the site’s served data when scripts run; with scripts off they are not shown.</p></noscript>\n"
         + _entry("who-fold", "In his own words", fold, "who-fold")
         + _entry("who-photos", "The photographs", _photo_strip())
         + _entry("who-since", 'Since <span id="who-since-day" data-src="api_journey.journey.started_date">the day it began</span>')

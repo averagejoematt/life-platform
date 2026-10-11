@@ -31,9 +31,11 @@ from typing import Any, Optional
 import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
-from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G
 from common.pacific_time import pacific_today
 from health.scoring_engine import habitify_reading  # #4362
+
+from ai import structured_json as _structured_json  # #4276: the one door for model JSON
 
 # God-module split slices 2+3: pure context/scoring + domain-data builders moved
 # to ai_context.py. Re-exported so callers + the coach functions keep working.
@@ -100,6 +102,7 @@ from ai.ai_transport import (  # noqa: F401
     _validate_ai_output,
     call_anthropic,
 )
+from ai.forecast_prompt import forecast_prompt_lines  # #4672 — the forecast line names its day
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -128,6 +131,28 @@ def init(s3_client: Any, bucket: str, has_board_loader: bool, board_loader_modul
 # ==============================================================================
 
 
+_S = {"type": "string"}
+# The IC-3 shape below, constrained at the model (#4276) — every object closed, every key required.
+_IC3_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "key_patterns": {"type": "array", "items": _S},
+        "likely_connection": _S,
+        "challenge": _S,
+        "priority": _S,
+        "tone": {"type": "string", "enum": ["celebrate", "challenge", "support"]},
+    },
+    "required": ["key_patterns", "likely_connection", "challenge", "priority", "tone"],
+    "additionalProperties": False,
+}
+
+
+def _ic3_send(body):
+    from common.retry_utils import call_anthropic_raw  # the one retry policy (#4279)
+
+    return call_anthropic_raw(body)
+
+
 def _run_analysis_pass(component_scores, habit_miss_context, insights_ctx, api_key):
     """IC-3 Pass 1: Identify patterns and causal chains BEFORE writing coaching.
 
@@ -153,13 +178,13 @@ Output this exact JSON structure:
         # "Unterminated string", cut between chars 1754 and 2277 (the measurements
         # are in tests/test_ic3_truncation_2668.py). Sized against that observed
         # ceiling, not the next round number: 1500 tok ≈ 6000 chars ≈ 2.6× it.
-        raw = call_anthropic(prompt, api_key, max_tokens=1500, model=AI_MODEL_HAIKU)
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        print("[INFO] IC-3 analysis parsed clean (%d keys)" % len(parsed := json.loads(raw.strip())))  # #2668: positive evidence
+        # #4276: constrained to _IC3_SCHEMA at the model and parsed in the one door; a
+        # non-object reply (a max_tokens cut) raises here, into the #2668 ERROR + metric.
+        body = _structured_json.user_turn_body(prompt, model=AI_MODEL_HAIKU, max_tokens=1500)
+        parsed = _structured_json.call_json(_ic3_send, body, schema=_IC3_SCHEMA, label="ic3_analysis")
+        if not isinstance(parsed, dict):
+            raise ValueError(_structured_json.decode_error(parsed))
+        print("[INFO] IC-3 analysis parsed clean (%d keys)" % len(parsed))  # #2668: positive evidence
         return parsed
     except Exception as e:
         # #2668: ERROR + a keyable metric. This ran dead 10 of 12 days with Errors
@@ -168,6 +193,17 @@ Output this exact JSON structure:
         print("[ERROR] IC-3 analysis pass failed: " + str(e))
         _emit_failure_metric("IC3AnalysisFailure")
         return None
+
+
+def _grounded_json(raw):
+    """#4276: parse a GROUNDED reply in the one door. These two callers stay schema-less
+    on purpose: `_ground_legacy_output` gates and re-asks on the raw text through
+    `call_anthropic` (text in, text out), which carries no `output_config`. Raises on a
+    non-object so the caller's existing `{}` degrade runs, exactly as json.loads did."""
+    parsed = _structured_json.parse_json_text(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError(_structured_json.decode_error(parsed))
+    return parsed
 
 
 # ==============================================================================
@@ -217,8 +253,8 @@ def daily_brief_shared_system(
         phase_block,
         "",
         "## Profile snapshot (stable across this brief)",
-        f"- Calorie target: {profile.get('calorie_target', '?')} kcal",
-        f"- Protein target: {profile.get('protein_target_g', '?')} g",
+        f"- Calorie target: {PLAN_DAILY_CALORIES_TARGET} kcal",
+        f"- Protein floor: {PLAN_DAILY_PROTEIN_MIN_G} g",
         f"- Goals: {', '.join(profile.get('active_goals', [])) or 'unspecified'}",
     ]
     if day_grade is not None and grade is not None:
@@ -374,8 +410,8 @@ def call_training_nutrition_coach(
     # IC-24: Data quality (critical for nutrition coaching)
     data_quality_block, _quality_scores = _compute_data_quality(data, profile)
 
-    cal_target = profile.get("calorie_target", 1800)
-    protein_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    protein_target = PLAN_DAILY_PROTEIN_MIN_G
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
 
@@ -434,13 +470,7 @@ Respond in EXACTLY this JSON format, no other text:
             # #2056: the #1699 behavioral class, armed on the same render coach-v2 uses.
             available_logs=_available_logs_for_today(data, None, None),
         )
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        return json.loads(cleaned)
+        return _grounded_json(raw)
     except Exception as e:
         print("[WARN] Training/nutrition coach failed: " + str(e))
         return {}
@@ -571,9 +601,9 @@ def _bod_phase_targets(data, profile):
         deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
         if deficit:
             targets.append(f"{int(float(deficit))} kcal deficit")
-        cal_target = profile.get("calorie_target")
-        if cal_target:
-            targets.append(f"{int(float(cal_target))} cal daily")
+        # #4540: the plan's calorie target (generated into common/constants.py from the plan root),
+        # not the profile row's `calorie_target` — the row said 1,800 against a plan of 1,500.
+        targets.append(f"{PLAN_DAILY_CALORIES_TARGET} cal daily")
 
         return f"{label}: {', '.join(targets)}." if targets else f"{label}."
     except Exception as e:
@@ -1019,7 +1049,7 @@ YESTERDAY'S SIGNALS:
 - TSB (training stress balance): {data_summary.get("tsb")}{data_summary.get("tsb_basis_note") or ""}
 - Sleep: {data_summary.get("sleep_duration_hrs")}hrs, score {data_summary.get("sleep_score")}, efficiency {data_summary.get("sleep_efficiency_pct")}%. {sleep_arch}
 - 7-day sleep debt: {data.get("sleep_debt_7d_hrs")}hrs
-- Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{profile.get("protein_target_g", 190)}g
+- Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{PLAN_DAILY_PROTEIN_MIN_G}g
 - Glucose: avg {data_summary.get("glucose_avg")} mg/dL, TIR {data_summary.get("glucose_tir")}%, overnight low {data_summary.get("glucose_min")} mg/dL
 - Gait: walking speed {data_summary.get("walking_speed_mph")} mph, step length {data_summary.get("walking_step_length_in")} in, asymmetry {data_summary.get("walking_asymmetry_pct")}%
 - Steps: {data_summary.get("steps")}
@@ -1091,13 +1121,7 @@ Respond in EXACTLY this JSON format, no other text:
             # "could ONLY apply to TODAY", which is the same-day framing the gate reads.
             available_logs=_available_logs_for_today(data, None, None),
         )
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        return json.loads(cleaned)
+        return _grounded_json(raw)
     except Exception as e:
         print("[WARN] TL;DR+Guidance failed: " + str(e))
         return {}
@@ -1728,14 +1752,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
                 def _fnum(v):
                     return float(v) if isinstance(v, (_Dec, int, float)) else None
 
-                for _f in _fx[0].get("forecasts", []):
-                    _p, _lo, _hi = _fnum(_f.get("point")), _fnum(_f.get("lo")), _fnum(_f.get("hi"))
-                    if _p is None or _lo is None or _hi is None:
-                        continue
-                    _fx_lines.append(
-                        f"  - {_f.get('metric', '?')} {_f.get('frame', '')}: the model expects {_p:g}{_f.get('unit', '')} "
-                        f"(80% interval {_lo:g}-{_hi:g})"
-                    )
+                _fx_lines.extend(forecast_prompt_lines(_fx[0].get("forecasts", [])))
                 _cov = _fx[0].get("coverage") or {}
                 if _cov.get("n_resolved") and _fnum(_cov.get("coverage_pct")) is not None:
                     _fx_lines.append(
@@ -1801,7 +1818,7 @@ AVOID OPENINGS: {json.dumps(voice_guidance.get('avoid_openings', []))}
 DECISION CLASS CEILING: {brief.get('decision_class_ceiling', 'observational')}
 EVIDENCE NOTE: {brief.get('evidence_note', 'Early data — use preliminary framing.')}
 
-VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I" not "Dr. [Name]". This narrative goes to Matthew alone — address him as "you" here. A reader-facing version is condensed from it and can add nothing, so obey the READER RULES now. Never refer to yourself in third person.
+VOICE: Write in FIRST PERSON. You ARE {voice_spec['display_name']}. Say "I", never your own name. This narrative goes to Matthew alone — address him as "you" here. A reader-facing version is condensed from it and can add nothing, so obey the READER RULES now. Never refer to yourself in third person.
 
 MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Target weight: 185 lbs (starting {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))})
@@ -2127,7 +2144,7 @@ Write your {domain_label} coaching section now."""
         # Step 6.4 (#1896): self-graded-verdict gate — BLOCKING (regenerate once,
         # then hold), the same ADR-108 shape as presence-ack above. The other
         # deterministic gates check claims about MATTHEW; none checked a claim the
-        # coach makes about ITSELF. On 2026-07-27 Dr. Webb published "I called lunch
+        # coach makes about ITSELF. On 2026-07-27 Webb published "I called lunch
         # wrong… that's a prediction miss, and I'm logging it as one" with every
         # stored PREDICTION# still pending and the same paragraph admitting "I have
         # zero food logs" — then persisted the fabricated verdict to THREAD# so it

@@ -40,6 +40,17 @@ os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 
 from ai import budget_guard  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _every_day_is_a_narrative_day(monkeypatch):
+    """#4589: the long per-coach narratives run on Monday/Thursday only (coach/narrative_cadence.py).
+    These tests pin the budget gate, not the cadence, so they run on a narrative day whatever the wall
+    clock says. The cadence itself is pinned in tests/test_narrative_cadence_4589.py."""
+    from coach import narrative_cadence
+
+    monkeypatch.setattr(narrative_cadence, "NARRATIVE_WEEKDAYS", tuple(range(7)))
+
+
 _PIPELINE_KWARGS = dict(
     data={"date": "2026-07-06", "journal_entries": [{"text": "quiet day"}]},
     profile={"goal_weight_lbs": 185},

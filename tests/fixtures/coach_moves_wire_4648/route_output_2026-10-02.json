@@ -1,0 +1,40 @@
+{
+ "_meta": {
+  "generated_at": "2026-10-04T19:00:00+00:00",
+  "served_at": "2026-10-04T19:00:00+00:00",
+  "cache_seconds": 300
+ },
+ "state": "ok",
+ "date": "2026-10-02",
+ "source": "/api/coach_moves",
+ "absent_text": "No coach line is recorded for Friday, October 2.",
+ "lines": [
+  {
+   "coach_id": "sleep_coach",
+   "coach": "Lisa Park",
+   "move": "reaction",
+   "move_label": "On a result",
+   "text": "I called 7.8 hours and he slept 8.6. I was inside my range but low, and I think his sleep is running longer than I have been giving it credit for.",
+   "replies_to": null,
+   "bet_settles": null
+  },
+  {
+   "coach_id": "physical_coach",
+   "coach": "Max Reyes",
+   "move": "call",
+   "move_label": "A call",
+   "text": "I expect his morning recovery to drop under 70 within the week. Two long sessions close together usually cost him something, early as this data is.",
+   "replies_to": null,
+   "bet_settles": "2026-10-09"
+  },
+  {
+   "coach_id": "nutrition_coach",
+   "coach": "Marcus Webb",
+   "move": "reply",
+   "move_label": "A reply",
+   "text": "I disagree with Max. He logged 172 g of protein, and I think that carries his recovery through the week.",
+   "replies_to": "Max Reyes",
+   "bet_settles": "2026-10-09"
+  }
+ ]
+}

@@ -22,6 +22,13 @@ EXPERIMENT_BASELINE_WEIGHT_KG = 148.478
 
 EXPERIMENT_GOAL_WEIGHT_LBS = 185
 
+# The plan's nutrition targets (targets.nutrition in the plan root; the same two figures
+# experiment.plan_facts derives). The plan states ONE protein line — a floor. Every surface
+# that names a calorie target or a protein target/floor reads these, never PROFILE#v1 and
+# never a literal (#4540; guard: tests/test_protein_contract.py).
+PLAN_DAILY_CALORIES_TARGET = 1500
+PLAN_DAILY_PROTEIN_MIN_G = 170
+
 
 def day_n(today_iso: str) -> int:
     """1-indexed Day-N relative to EXPERIMENT_START_DATE. Returns 0 for pre-genesis dates."""

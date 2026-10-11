@@ -22,6 +22,7 @@ the split, and it is why nothing here imports the facade — no import cycle.
 from boto3.dynamodb.conditions import Key
 from coach import (
     audience_guard,  # #4213: the by-coach slots serve the public twin or nothing
+    coach_baseline,  # #4585: the record and what a simple guess scored, from one read
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_record,  # #4220: the ONE record producer — K of N through <day>, from the PREDICTION# ledger
@@ -33,6 +34,7 @@ from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-
 from health import instrument_presence  # #4217: the absent coach — the same liveness /api/source_freshness serves
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 
+from web import claim_sourcing  # #4673: dated words citing a sensor with no reading that day are not quoted
 from web.site_api_common import (
     USER_PREFIX,
     _decimal_to_float,
@@ -56,7 +58,7 @@ def _registry(*, _g):
 
 # Last-resort byline if the registry module itself failed to import. Pinned equal
 # to config/personas.json's lead by tests/test_board_lead_single_character.py.
-_LEAD_FALLBACK = ("Dr. Eli Marsh", "Principal Investigator — Program Lead")
+_LEAD_FALLBACK = ("Eli Marsh", "Principal Investigator — Program Lead")
 
 
 def _lead_byline(*, _g):
@@ -138,7 +140,7 @@ def _track_record(coach_id, *, _g):
     result per prediction, and never a row that names no prediction."""
     _reader_reason = _g["_reader_reason"]
     table = _g["table"]
-    record = coach_record.for_coach(table, coach_id, genesis=_g["EXPERIMENT_START"])
+    record, comparison = coach_baseline.for_coach(table, coach_id, genesis=_g["EXPERIMENT_START"])  # #4585: one read, both
     recent = []
     seen = set()
     try:
@@ -184,6 +186,9 @@ def _track_record(coach_id, *, _g):
         "hit_rate_pct": round(confirmed / decided * 100, 1) if decided else None,
         "record": record,  # #4220: {confirmed, refuted, n, through} — None when the ledger read failed
         "headline": coach_record.headline(record),
+        # #4585 / epic #4580 rule 3: the record never appears alone — what a simple guess
+        # scored on the same calls (None only when the ledger read failed, like `record`).
+        "comparison": comparison,
         "preliminary": (decided or 0) < 12,
         "n_note": "preliminary — fewer than 12 decided predictions" if (decided or 0) < 12 else f"n={decided} decided",
         "recent": recent,
@@ -323,38 +328,6 @@ def _character(p, *, _g):
         "relationship_to_matthew": m.get("relationship_to_matthew"),
         "focus_areas": (m.get("focus_areas") or [])[:6],
     }
-
-
-def _working_hypotheses(coach_id, limit=6, *, _g):
-    """Live working hypotheses: open THREAD# (observation/prediction/concern) + pending
-    PREDICTION# claims. Already-computed by the coach engine; read-only here."""
-    table = _g["table"]
-    out = []
-    try:
-        tr = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("THREAD#"), "Limit": 25}
-            )
-        )
-        for it in tr.get("Items", []):
-            d = _decimal_to_float(it)
-            if (d.get("status") or "").lower() in ("open", "active") and d.get("summary"):
-                out.append({"claim": d["summary"], "kind": d.get("type") or "thread", "since": d.get("created_date")})
-    except Exception as _e:
-        logger.warning(f"[coach] threads: {_e}")
-    try:
-        pr = table.query(
-            **with_phase_filter(
-                {"KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"), "Limit": 25}
-            )
-        )
-        for it in pr.get("Items", []):
-            d = _decimal_to_float(it)
-            if (d.get("status") or "").lower() in ("pending", "confirming") and d.get("claim_natural"):
-                out.append({"claim": d["claim_natural"], "kind": "prediction", "status": d.get("status"), "since": d.get("created_date")})
-    except Exception as _e:
-        logger.warning(f"[coach] predictions: {_e}")
-    return out[:limit]
 
 
 def _coach_daily(coach_id, *, _g):
@@ -571,6 +544,30 @@ def _absent_coaches(_g):
         return {}
 
 
+def _gap_instruments(_g, absent):
+    """#4702: the interval form `web.claim_sourcing` holds against — the open gap from
+    `absent` (the read above) plus every CLOSED gap `instrument_presence.gap_history` derives
+    from the stored DATE# rows, so words said during a gap stay held after the sensor reports
+    again. `gap_history` never raises; this adds the same fail-open for anything else."""
+    try:
+        return claim_sourcing.gap_instruments(absent, instrument_presence.gap_history(_g["table"]))
+    except Exception as _e:
+        logger.warning(f"[/api/coach*] instrument gap history failed (fail-open): {_e}")
+        return claim_sourcing.gap_instruments(absent)
+
+
+def _held_positions(dossier, dark):
+    """#4673: the dossier's open docket positions, less any whose words cite a sensor that had
+    sent no reading by the day the item opened. Those are DROPPED, never blanked — the dossier
+    renderer quotes `my_claim` between quotation marks — and counted under `unsourced`; the
+    docket itself (/api/coach_docket) names the held side and why."""
+    if not dark or not isinstance(dossier, dict) or not isinstance(dossier.get("docket_positions"), list):
+        return dossier
+    kept = [p for p in dossier["docket_positions"] if not claim_sourcing.unsourced([p.get("my_claim")], p.get("date"), dark)]
+    held = len(dossier["docket_positions"]) - len(kept)
+    return {**dossier, "docket_positions": kept, "unsourced": held} if held else dossier
+
+
 def handle_coaches(event, *, _g):
     """GET /api/coaches — the roster (CC-01). Shaped-empty 200 by design."""
     _COACH_MODULES = _g["_COACH_MODULES"]
@@ -584,6 +581,7 @@ def handle_coaches(event, *, _g):
         order = persona_registry.OPERATIONAL_COACH_IDS
         coaches = []
         absent = _absent_coaches(_g)
+        dark = _gap_instruments(_g, absent)  # #4673/#4702
         for pid, p in ops.items():
             # #4220: the record is the PREDICTION# ledger's, counted by the ONE producer
             # (coach.coach_record) that /api/calibration, /api/predictions and /api/wrong
@@ -591,7 +589,7 @@ def handle_coaches(event, *, _g):
             # trail carries a docket re-recorded daily, #4216, and printed Webb "80% · n=25"
             # beside the scorecard's 0 of 5). `_track_record` still feeds the coach page's
             # self-assessed report card; it no longer feeds a headline.
-            record = coach_record.for_coach(_g["table"], pid, genesis=_g["EXPERIMENT_START"])
+            record, comparison = coach_baseline.for_coach(_g["table"], pid, genesis=_g["EXPERIMENT_START"])  # #4585: one read, both
             coaches.append(
                 {
                     "persona_id": pid,
@@ -603,8 +601,13 @@ def handle_coaches(event, *, _g):
                     "board_role": p.get("board_role"),
                     "headline_stat": coach_record.headline(record),
                     "record": record,  # {confirmed, refuted, n, through} — K of N through <day>
+                    "comparison": comparison,  # #4585: what a simple guess scored on the same calls
                     "tier": "staff",
-                    "latest_checked": latest_checked.for_coach(_g["table"], pid),
+                    # #4673: a graded call whose words cite a sensor with no reading on the
+                    # day it was made keeps its line but not its words (`claim` "" + `unsourced`).
+                    "latest_checked": claim_sourcing.scrub_one(
+                        latest_checked.for_coach(_g["table"], pid), dark, day_key="created_date", text_keys=("claim",)
+                    ),
                     # #4217: the coach's domain instrument ({source, datatype} or null) —
                     # registry-derived, served so the renderer reads it rather than keeping
                     # its own table — and whether it is dark right now.
@@ -631,6 +634,7 @@ def handle_coaches(event, *, _g):
                     "board_role": lead.get("board_role"),
                     "headline_stat": "runs the program",
                     "record": None,  # #4220: no graded calls — null, never a zero record
+                    "comparison": None,  # #4585: no count, so nothing to compare
                     "tier": "lead",
                     "latest_checked": None,  # E1: the lead makes no graded calls — null, never a placeholder
                     "instrument": None,  # #4217: the lead reads the whole board; no single sensor is his
@@ -665,7 +669,6 @@ def handle_coach(event, *, _g):
     _track_record = _g["_track_record"]
     _tuning_log_for = _g["_tuning_log_for"]
     _voice_subset = _g["_voice_subset"]
-    _working_hypotheses = _g["_working_hypotheses"]
     if not _COACH_MODULES:
         return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
     try:
@@ -685,7 +688,13 @@ def handle_coach(event, *, _g):
         # engine's own words ("no sensor since <YYYY-MM-DD>"; the page puts the date in
         # words). History (stance_history, recent_outputs, the dossier) stays: those are
         # dated records, not today's argument.
-        absent_state = None if is_lead else _absent_coaches(_g).get(pid)
+        absent = _absent_coaches(_g)
+        absent_state = None if is_lead else absent.get(pid)
+        # #4673: the dated records #4217 left as history are history — but a record whose
+        # words cite a sensor that had sent no reading by its own date is not quoted, from
+        # this coach or any other (web.claim_sourcing). Liveness is per INSTRUMENT, so the
+        # lead's page is held to it too. #4702: against every gap, open or closed.
+        dark = _gap_instruments(_g, absent)
         if absent_state:
             stance = {"source": "absent", "headline_read": "", "stage": {}}
         elif is_lead:
@@ -696,7 +705,9 @@ def handle_coach(event, *, _g):
             latest = _stance_latest(pid)
             stance = _stance_from_latest(latest) if latest else {"source": "none", "headline_read": "", "stage": {}}
         else:
-            stance = _stance_block(pid, weight)
+            # #4649: a coach that has written a stance still serves the author's stage
+            # ladder beside it (it used to be one or the other).
+            stance = _g["_stance_with_ladder"](_stance_block(pid, weight), pid, weight)
         return _ok(
             {
                 "persona_id": pid,
@@ -717,15 +728,18 @@ def handle_coach(event, *, _g):
                 # #1113: authored (deterministic, human-written) trait scores — the
                 # cast sheet, labelled as authored fiction-design by its own disclosure.
                 "trait_scores": coach_traits.traits_for(pid),
-                "working_hypotheses": _working_hypotheses(pid),
                 # E1 / #4182: "On <date> I said <claim> — it came in at <value>" (null when none graded).
-                "latest_checked": latest_checked.for_coach(_g["table"], pid),
+                "latest_checked": claim_sourcing.scrub_one(
+                    latest_checked.for_coach(_g["table"], pid), dark, day_key="created_date", text_keys=("claim",)
+                ),
                 # #4217: the instrument on the wire + the absence verdict (see above).
                 "instrument": None if is_lead else instrument_presence.served_instrument(pid),
                 "absent": bool(absent_state),
                 "reason": absent_state.get("reason") if absent_state else None,
                 "stance": stance,
-                "stance_history": _stance_history(pid),
+                "stance_history": claim_sourcing.scrub_rows(
+                    _stance_history(pid), dark, day_key="as_of", text_keys=("headline_read", "how_my_read_changed")
+                ),
                 # The lead has no generation voice spec (config/coaches/{id}.json) —
                 # null is the honest value, and the front-end omits the section.
                 "voice": _voice_subset(p["coach_config_key"]) if p.get("coach_config_key") else None,
@@ -735,13 +749,15 @@ def handle_coach(event, *, _g):
                     "quality_trend": _quality_trend(pid),
                     "tuning_log": _tuning_log_for(pid),
                 },
-                "recent_outputs": _recent_outputs(pid),
+                "recent_outputs": claim_sourcing.scrub_rows(
+                    _recent_outputs(pid), dark, day_key="date", text_keys=("summary",), list_keys=("themes",)
+                ),
                 # #1483 (ADR-142 tier 2): semi-private conversation references —
                 # sanctioned fields only; the words exchanged never cross the wire.
                 "conversations": _conversation_references(pid),
                 # #1387: the dossier — what this coach knows, verbatim from COACH#
                 # memory (privacy-filtered, correction-aware, no LLM in the path).
-                "dossier": _dossier_block(pid),
+                "dossier": _held_positions(_dossier_block(pid), dark),
                 # #4188: the lead's daily read lives in its own LEAD_DAILY# row (the CC-08
                 # reflection batch covers staff only). `daily` keeps its string type for
                 # every consumer; `lead_daily` carries the text WITH its cited block.

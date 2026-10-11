@@ -87,11 +87,11 @@ class TestMemoryBlock:
         block = psv2.memory_block(
             {
                 "callbacks": [{"week": 3, "title": "The Plateau", "pull_quote": "the scale lies weekly", "open_bet": "sleep 7h+"}],
-                "guest_history": [{"week": 3, "name": "Dr. Park"}],
+                "guest_history": [{"week": 3, "name": "Park"}],
             }
         )
         assert "LAND AT LEAST ONE CALLBACK" in block
-        assert "The Plateau" in block and "wk3 Dr. Park" in block
+        assert "The Plateau" in block and "wk3 Park" in block
 
 
 class TestV2Fallback:
@@ -100,7 +100,7 @@ class TestV2Fallback:
             "week": 5,
             "title": "Week five",
             "chronicle": "",
-            "guest": {"id": "sleep_coach", "name": "Dr. Park", "summary": "sleep steady", "themes": ["sleep"]},
+            "guest": {"id": "sleep_coach", "name": "Park", "summary": "sleep steady", "themes": ["sleep"]},
             "coach_reads": [{"id": "x", "name": "X", "summary": "REAL DISPUTE MATERIAL"}],
             "recent_topics": [],
             "last_open_bet": None,

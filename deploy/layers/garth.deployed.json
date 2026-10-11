@@ -1,27 +1,27 @@
 {
   "architecture": "x86_64",
   "layer_name": "garth-layer",
-  "layer_version": 3,
-  "measured": "2026-08-08",
+  "layer_version": 4,
+  "measured": "2026-10-11",
   "packages": {
     "annotated-types": "0.8.0",
     "certifi": "2026.7.22",
     "cffi": "2.1.1",
-    "charset-normalizer": "3.4.9",
-    "curl-cffi": "0.16.0",
+    "charset-normalizer": "3.5.2",
+    "curl-cffi": "0.16.3",
     "garminconnect": "0.3.8",
     "garth": "0.6.3",
-    "idna": "3.18",
-    "oauthlib": "3.3.1",
-    "pycparser": "3.0",
-    "pydantic": "2.13.4",
-    "pydantic-core": "2.46.4",
+    "idna": "3.20",
+    "oauthlib": "4.0.0",
+    "pycparser": "3.11",
+    "pydantic": "2.14.0",
+    "pydantic-core": "2.50.0",
     "requests": "2.34.2",
     "requests-oauthlib": "2.0.0",
     "typing-extensions": "4.16.0",
-    "typing-inspection": "0.4.2",
-    "ua-generator": "2.1.3",
-    "urllib3": "2.7.0"
+    "typing-inspection": "0.4.4",
+    "ua-generator": "2.1.6",
+    "urllib3": "2.8.0"
   },
   "platforms": [
     "manylinux2014_x86_64",
@@ -32,5 +32,5 @@
     "garminconnect==0.3.8",
     "garth==0.6.3"
   ],
-  "zip_sha256": "c51496d6876e0f0279cfa27c305054835bdf2cb16f89658fd9bb87454a815d22"
+  "zip_sha256": "51018a09b35e0c666e73a32c462ec7d9fafd0f16d5e8042065ac89e4157c14e9"
 }

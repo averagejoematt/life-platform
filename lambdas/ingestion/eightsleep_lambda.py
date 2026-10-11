@@ -28,6 +28,23 @@ Fields stored (raw):
   toss_turn_count          – Restlessness proxy
   bed_side                 – "left" or "right" (from secret)
 
+Vendor state flags (stored exactly as the day entry carried them, #4635):
+  vendor_incomplete        – the day's `incomplete` flag. Stored when the vendor sent a
+                             boolean, True OR False; absent on rows written before
+                             #4635 (absent = never read, NOT "complete").
+  vendor_processing        – the day's `processing` flag, only when the vendor sent it
+  vendor_lag_minutes       – the day's `lagMinutes`, only when the vendor sent it
+                             What the flags mean in practice, measured on the
+                             2026-09/10 archive: `incomplete: true` is the vendor
+                             saying "this night's record is not final yet" at fetch
+                             time — it is NOT a short-night detector. Of 9 flagged
+                             nights, 8 reappear in the next evening's payload unflagged
+                             with identical durations and a revised score (by up to 7
+                             points); 1 is a genuinely short record. An UNFLAGGED night
+                             can also be far short of the wrist device. So the writer
+                             stores the night as sent and labels it; whether a flagged
+                             night belongs in an average is a read-side decision.
+
 Derived clinical fields (computed at ingestion, queryable by all MCP tools):
   time_in_bed_hours        – sleep + awake (total TIB)
   sleep_efficiency_pct     – sleep / TIB × 100  (clinical target ≥85%)
@@ -312,6 +329,21 @@ def _safe_float(val, divisor=1):
         return None
 
 
+def _vendor_bool(val):
+    """A vendor boolean exactly as sent: True/False pass through, anything else
+    (missing key, null, a non-boolean) is None so it is stripped rather than
+    coerced — a missing `incomplete` must never be stored as False ("complete")."""
+    return val if isinstance(val, bool) else None
+
+
+def _vendor_number(val):
+    """A vendor number exactly as sent (no rounding); None when it is not a number.
+    `bool` is excluded on purpose — it is an `int` to Python and is not a number here."""
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        return None
+    return val
+
+
 def _hour_of_day(iso_ts: str, tz_offset: int = _DEFAULT_TZ_OFFSET) -> float | None:
     """
     Extract local fractional hour (0.0–24.0) from an ISO UTC timestamp.
@@ -578,6 +610,13 @@ def parse_trends_for_date(
         "respiratory_rate": resp_rate,
         "toss_turn_count": _safe_float(target.get("tnt")),
         "bed_side": bed_side,
+        # #4635: the vendor's own state flags for this day entry, stored as sent and
+        # under a `vendor_` name so no reader mistakes them for a platform verdict.
+        # The night's numbers above are NOT altered, dropped or promoted on the
+        # strength of the flag — the writer labels, the read side interprets.
+        "vendor_incomplete": _vendor_bool(target.get("incomplete")),
+        "vendor_processing": _vendor_bool(target.get("processing")),
+        "vendor_lag_minutes": _vendor_number(target.get("lagMinutes")),
     }
     # Strip None values before computing derived fields
     record = {k: v for k, v in record.items() if v is not None}

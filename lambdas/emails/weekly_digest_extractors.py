@@ -17,6 +17,7 @@ import statistics
 from collections import defaultdict
 from datetime import datetime
 
+from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.digest_utils import (
     _normalize_whoop_sleep,
     avg,
@@ -255,8 +256,8 @@ def ex_macrofactor(recs_dict, profile):
     recs = list(recs_dict.values()) if recs_dict else []
     if not recs:
         return None
-    cal_target = profile.get("calorie_target", 1800)
-    prot_target = profile.get("protein_target_g", 190)
+    cal_target = PLAN_DAILY_CALORIES_TARGET
+    prot_target = PLAN_DAILY_PROTEIN_MIN_G
     cals = [float(r["total_calories_kcal"]) for r in recs if "total_calories_kcal" in r]
     prots = [float(r["total_protein_g"]) for r in recs if "total_protein_g" in r]
     fats = [float(r["total_fat_g"]) for r in recs if "total_fat_g" in r]

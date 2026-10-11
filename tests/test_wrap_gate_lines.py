@@ -154,7 +154,6 @@ def test_gather_battery_runs_every_non_handover_gate():
     cmds = [" ".join(g.cmd) for g in wg.GATHER]
     for script in (
         "scripts/check_main_green.py",
-        "scripts/check_backlog_hygiene.py",
         "scripts/check_alarm_citations.py",
         "scripts/check_ci_warnings.py",
         "deploy/session_postflight.py",
@@ -166,9 +165,12 @@ def test_gather_battery_runs_every_non_handover_gate():
     assert any(g.cmd[:3] == ["git", "stash", "list"] for g in wg.GATHER), "#3007: the (e5) stash check must be in the batch"
 
 
-def test_gather_battery_preserves_e7_blocking_default():
-    (e7,) = [g for g in wg.GATHER if "check_backlog_hygiene.py" in " ".join(g.cmd)]
-    assert "--advisory" not in e7.cmd, "#1872: the batch must not weaken (e7) back to advisory"
+def test_e7_moved_to_nightly_and_kept_its_blocking_default():
+    """#4262 follow-up: (e7) left the interactive battery for wrap-nightly.yml (wg.NIGHTLY);
+    the move must not weaken it back to advisory (#1872), and it must not run in both."""
+    (e7,) = [g for g in wg.NIGHTLY if "check_backlog_hygiene.py" in " ".join(g.cmd)]
+    assert "--advisory" not in e7.cmd, "#1872: the nightly leg must not weaken (e7) back to advisory"
+    assert not any("check_backlog_hygiene.py" in " ".join(g.cmd) for g in wg.GATHER + wg.VERIFY), "#4262: (e7) runs nightly, not in /wrap"
 
 
 def test_verify_battery_asserts_the_handover_lines():
