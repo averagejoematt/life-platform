@@ -52,6 +52,9 @@ _TARGET_NAME_RE = re.compile(
 )
 
 
+_TARGET_NAME_RE_ANY = re.compile(r"target|goal|floor", re.IGNORECASE)
+
+
 def _names_in(node):
     """Every identifier-like token under `node`: names, attributes, keyword args and short
     identifier-shaped strings (dict keys, `.get("…")` keys). Prose strings are not names."""
@@ -100,6 +103,20 @@ def _enclosing_dict_keys(const, parents):
     return out
 
 
+def _enclosing_assign_names(const, parents):
+    """Names assigned to by the statement the literal sits in (`TARGETS = {...}` -> TARGETS)."""
+    node = parents.get(const)
+    while node is not None and not isinstance(node, ast.stmt):
+        node = parents.get(node)
+    out = []
+    if isinstance(node, ast.Assign):
+        for t in node.targets:
+            out += [n.id for n in ast.walk(t) if isinstance(n, ast.Name)]
+    elif isinstance(node, ast.AnnAssign):
+        out += [n.id for n in ast.walk(node.target) if isinstance(n, ast.Name)]
+    return out
+
+
 def target_literal_findings(src, path="<src>"):
     """Findings for one module's source. Two shapes:
 
@@ -142,6 +159,12 @@ def target_literal_findings(src, path="<src>"):
         ):
             names = [n for ctx in _context(node, parents) for n in _names_in(ctx)] + _enclosing_dict_keys(node, parents)
             hit = next((n for n in names if _PROTEIN_NAME_RE.search(n) and _TARGET_NAME_RE.search(n)), None)
+            if not hit:
+                # `TARGETS = {"protein_g": 180}`: the protein key names the quantity, the assigned
+                # name says it is a target/goal/floor.
+                prot = next((n for n in names if _PROTEIN_NAME_RE.search(n)), None)
+                tgt = next((n for n in _enclosing_assign_names(node, parents) if _TARGET_NAME_RE_ANY.search(n)), None)
+                hit = f"{prot} in {tgt}" if prot and tgt else None
             if hit:
                 found.append(f"{path}:{node.lineno}: literal {node.value!r} (the retired 180 g floor) beside {hit!r}")
     return found
@@ -189,7 +212,8 @@ def test_the_guard_sees_every_shape_it_exists_for():
         "if cal_target == 1800:\n    pass": 1,
         "protein_g_floor = 180": 1,  # #4540: the retired 180 g floor
         'REDLINES = {"protein_floor_g": {"value": 180}}': 1,
-        'x = {"protein_g": 180}': 0,  # no target/floor word -> not a target name (documented limit)
+        'x = {"protein_g": 180}': 0,  # no target/floor word anywhere -> not a target (documented limit)
+        'TARGETS = {"protein_g": 180}': 1,  # mcp/tools_nutrition.py TARGETS: protein key in a target-named dict
     }
     for src, n in shapes.items():
         got = target_literal_findings(src)
