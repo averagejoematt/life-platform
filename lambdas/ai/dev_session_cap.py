@@ -159,6 +159,31 @@ def check(caller_class: str, cloudwatch_factory: Callable[[], Any]) -> None:
     raise DevSessionBudgetExceeded(message)
 
 
+def check_projected(caller_class: str, projected_usd: float, cloudwatch_factory: Callable[[], Any]) -> None:
+    """Refuse a send whose PROJECTED cost would carry this run past its cap (#4777).
+
+    A Bedrock batch job is one submission that bills 100+ records at once, so the
+    per-call `check` (which only asks whether the run is ALREADY over) would let a
+    single job overshoot the cap by its whole size. This asks the same question with
+    the job's upper-bound estimate added to the run's spend. Raises
+    `DevSessionBudgetExceeded`, or returns; the same applies/override rules as `check`.
+    """
+    check(caller_class, cloudwatch_factory)  # already over → refuse; also takes the one day read
+    if not applies(caller_class):
+        return
+    override = run_override()
+    with _lock:
+        reason = decide(_run_spent + max(0.0, float(projected_usd)), _day_before_run or 0.0, override)
+    if reason is None:
+        return
+    message = (
+        f"batch job refused — its projected cost (about ${projected_usd:.2f}) would cross the cap: {reason} "
+        f"To spend more on purpose, re-run with {OVERRIDE_ENV}=<dollars>. Nothing was sent or billed."
+    )
+    print(f"[dev-session cap] {message}", file=sys.stderr)
+    raise DevSessionBudgetExceeded(message)
+
+
 def record(caller_class: str, cost_usd: float) -> None:
     """Called by the chokepoint after a billed send. Never raises."""
     global _run_spent
