@@ -19,8 +19,10 @@ THE ORDER (cost first, then honesty)
      (opposite sides of a gradable metric, a frozen date inside the docket's horizon);
   4. the lines — ONE Sonnet call per chosen coach (plus at most one regeneration), each
      refused by `coach_moves_sheet.check_line` / `cross_line_findings` unless it makes its
-     move, carries an opinion, cites at most two figures and only sheet values. A refused
-     line is HELD and that coach is silent today — never shipped;
+     move, carries an opinion, cites at most two figures and only sheet values, uses plain
+     words (`jargon_findings`), does not say again what was said yesterday (`repeat_findings`)
+     and does not reuse a hedge another line used today (`tic_findings`). A refused line is
+     HELD and that coach is silent today — never shipped;
   5. the bet — when both bettors' lines stand, the existing Dispute Docket opens it
      (`dispute_docket.open_from_disagreements`, ENSEMBLE#docket — no new store), which
      grades it on its date in code;
@@ -35,12 +37,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
-from ai.model_defaults import NARRATIVE_MODEL
+from ai.model_routing import model_for  # #4770: the one model registry
 
 from coach import coach_moves_sheet as sheet_mod
 
@@ -50,8 +51,8 @@ LEAD_ID = "eli_marsh"  # persona_registry.LEAD_PERSONA_ID — the board's day li
 PK = f"COACH#{LEAD_ID}"
 SK_PREFIX = "MOVES#"
 BUDGET_FEATURE = "coach_narrative"
-CAST_MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")  # structured choice
-LINE_MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)  # the line itself (narrative tier)
+CAST_MODEL = model_for("coach_narrative.moves_cast")  # structured choice
+LINE_MODEL = model_for("coach_narrative.moves_line")  # the line itself (narrative tier)
 MAX_SPEAKERS = 3
 CAST_MAX_TOKENS = 500
 LINE_MAX_TOKENS = 160
@@ -75,7 +76,8 @@ CAST_PROMPT = (
     "Restating today's numbers is not a move — a coach with nothing to add stays silent. Never pick a sidelined coach. "
     "Refer to every coach by its id exactly as given (for example sleep_coach), never by name, in coach_id, replies_to and bet sides. "
     "A reply names the coach it answers in replies_to. A reaction names the graded result in result (its prediction_id). "
-    "A change of mind is only for a coach whose earlier position appears below.\n"
+    "A change of mind is only for a coach whose earlier position appears below. "
+    "A coach who made the same point yesterday is not cast again for it unless the fact changed or Matthew answered.\n"
     "If two of your speakers would genuinely disagree about something a number will settle within 3 to 30 days, "
     "propose ONE bet: metric (one of {metrics}), condition (gt, gte, lt, lte), threshold, resolution_days, and sides "
     "(each coach's id mapped to true if they say the condition will hold, false if not — opposite sides). Otherwise bet is null.\n"
@@ -88,12 +90,15 @@ LINE_PROMPT = (
     "You are an AI coach on a public health-experiment site, writing ONE short line for today's front page. "
     "Rules you must obey:\n"
     f"- {sheet_mod.MAX_WORDS - 10} words at most. One or two sentences. No preamble, no sign-off, no lists.\n"
-    "- Speak as yourself in the first person ('I think', 'I expect', 'I was wrong'). Say what you THINK, not what the data says: "
+    "- Speak as yourself in the first person ('I expect', 'I was wrong', 'my read is'); vary your opening; do not start with 'I think'. "
+    'Say "I", never your own name. '
+    "Never refer to yourself in the third person; a result or position marked 'you' is your own. Say what you THINK, not what the data says: "
     "a line that only reports numbers will be refused.\n"
     "- Refer to Matthew in the third person (Matthew / he / his). Never 'you'. Never quote him or write words in his voice.\n"
     "- At most two figures, each exactly as it appears on the fact sheet. No other number, no arithmetic, no rounding. "
     "Spell no counts that are not on the sheet.\n"
-    "- Correlative only — never say one thing caused another. Hedge early data ('so far', 'early').\n"
+    "- Correlative only — never say one thing caused another. Hedge early data, and vary the hedge: 'early days', 'on a few days of data', 'for now', 'so far'.\n"
+    "- Plain words a friend could read: no specialist terms (not 'architecture', 'dynamics', 'baseline', 'primacy').\n"
     "- Never mention calories or a deficit, a reset, a restart, an attempt or a numbered cycle. No titles such as 'Dr.'.\n"
     "- No medical advice, no diagnosis, no supplement or drug suggestions."
 )
@@ -251,7 +256,9 @@ def bet_words(n: dict) -> str:
 
 
 def line_user(sp: dict, sheet: dict, names: dict, spoken: dict, bet: Optional[dict], extra: str) -> str:
-    parts = [sheet_mod.sheet_text(sheet, extra), sheet_mod.context_text(sheet, names)]
+    me = sp["coach_id"]
+    parts = [sheet_mod.sheet_text(sheet, extra), sheet_mod.context_text(sheet, names, speaker=me)]
+    parts.append(f'YOU ARE {names.get(me, me)}. Never write that name; say "I".')
     parts.append(f"YOUR MOVE TODAY: {sheet_mod.MOVE_WORDS[sp['move']]}.")
     if sp.get("about"):
         parts.append(f"What the meeting asked you to say: {sp['about']}")
@@ -262,7 +269,8 @@ def line_user(sp: dict, sheet: dict, names: dict, spoken: dict, bet: Optional[di
     if sp["move"] == "reaction":
         g = next((g for g in sheet.get("graded") or [] if g["prediction_id"] == sp.get("result")), None)
         if g:
-            parts.append(f"The result you are reacting to: {g['coach_id']} predicted '{g['claim']}' — it {g['verdict']}.")
+            owner = "your own call" if g["coach_id"] == me else g["coach_id"]
+            parts.append(f"The result you are reacting to: {owner} predicted '{g['claim']}' — it {g['verdict']}.")
     if bet and sp["coach_id"] in bet["coaches"]:
         side = bet["normalized"]["sides"][sp["coach_id"]]
         other = next(c for c in bet["coaches"] if c != sp["coach_id"])
@@ -356,15 +364,19 @@ def run(
             user = line_user(sp, sheet, names, spoken, bet, extra)
             text, reasons = "", ["not_generated"]
             for attempt in range(2):
-                msg = user if attempt == 0 else user + "\n\nYour previous line was refused: " + "; ".join(reasons) + ". Fix exactly that."
+                msg = user if attempt == 0 else user + sheet_mod.retry_note(reasons)
                 resp = invoke(
                     {"model": LINE_MODEL, "max_tokens": LINE_MAX_TOKENS, "system": system, "messages": [{"role": "user", "content": msg}]},
                     model_name=LINE_MODEL,
                 )
                 usages.append((LINE_MODEL, dict((resp or {}).get("usage") or {})))
                 text = _text_of(resp)
-                reasons = sheet_mod.check_line(text, sp["move"], sheet, today=today, target_name=target_name, extra=extra)
+                reasons = sheet_mod.check_line(
+                    text, sp["move"], sheet, today=today, target_name=target_name, extra=extra, speaker_name=names.get(cid, "")
+                )
                 reasons += sheet_mod.cross_line_findings(text, accepted_texts, sheet)
+                reasons += sheet_mod.repeat_findings(text, sp["move"], cid, sheet.get("yesterday"))
+                reasons += sheet_mod.tic_findings(text, accepted_texts)
                 if not reasons:
                     break
             if reasons:

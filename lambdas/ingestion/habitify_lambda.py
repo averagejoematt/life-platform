@@ -184,6 +184,62 @@ _dynamodb = boto3.resource("dynamodb", region_name=REGION)
 _table = _dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
 _SUPPLEMENTS_PK = f"USER#{USER_ID}#SOURCE#supplements"
 
+# #4655: the registry's rename aliases, read once per invocation (reset in the handler,
+# beside the logs memo). None = not loaded yet this run.
+_ALIAS_GROUPS_CACHE: list | None = None
+
+
+def reset_alias_cache() -> None:
+    global _ALIAS_GROUPS_CACHE
+    _ALIAS_GROUPS_CACHE = None
+
+
+def alias_groups_from_registry(registry) -> list[frozenset]:
+    """Every registry habit as the SET of names it has carried in Habitify (#4655).
+
+    The same resolution `scoring_engine.habitify_reading` and `habit_streaks` use (#4362):
+    a registry entry answers to its own key AND every name in its `habitify_names` list.
+    Only sets with more than one name can identify a rename, so singletons are dropped.
+    """
+    groups: list[frozenset] = []
+    if not isinstance(registry, dict):
+        return groups
+    for key, meta in registry.items():
+        names = {key} if isinstance(key, str) else set()
+        aliases = (meta or {}).get("habitify_names") if isinstance(meta, dict) else None
+        if isinstance(aliases, (list, tuple, set)):
+            names.update(n for n in aliases if isinstance(n, str) and n)
+        if len(names) > 1:
+            groups.append(frozenset(names))
+    return groups
+
+
+def _habit_alias_groups() -> list[frozenset]:
+    """The live registry's alias sets, from the canonical profile row (PROFILE#v1).
+
+    Fail-soft: an unreadable profile yields no aliases, which is exactly the pre-#4655
+    behaviour (a vanished terminal habit is restored) — never a dropped day.
+    """
+    global _ALIAS_GROUPS_CACHE
+    if _ALIAS_GROUPS_CACHE is None:
+        try:
+            item = (_table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"}) or {}).get("Item") or {}
+            _ALIAS_GROUPS_CACHE = alias_groups_from_registry(item.get("habit_registry"))
+        except Exception as e:
+            logger.warning("[UPGRADE-ONLY] habit_registry read failed, rename aliases unavailable: %s", type(e).__name__)
+            _ALIAS_GROUPS_CACHE = []
+    return _ALIAS_GROUPS_CACHE
+
+
+def _live_alias(name: str, next_statuses: dict, alias_groups) -> str | None:
+    """A DIFFERENT name of the same registry habit that the new journal carries, or None."""
+    for group in alias_groups or ():
+        if name in group:
+            for other in sorted(group):
+                if other != name and isinstance(next_statuses.get(other), dict):
+                    return other
+    return None
+
 
 # ── Supplement bridge mapping (unchanged) ─────────────────────────────────────
 
@@ -741,7 +797,22 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
 
     date_str = str(new.get("date") or existing.get("date") or "")
     day_open = bool(date_str) and date_str >= pacific_today()
-    upgrades = []
+    # (name, transition) pairs. The transition alone — never the name — reaches the log
+    # line (#4655: vice habit names must never be logged).
+    upgrades: list[tuple[str, str]] = []
+
+    def _hold_terminal(prev: dict, prev_status, cur: dict) -> str | None:
+        """Carry a stored terminal decision onto `cur` when `cur` is weaker; the transition or None."""
+        cur_status = cur.get("status")
+        if prev_status in TERMINAL_STATUSES and cur_status not in TERMINAL_STATUSES and not _settles_a_skip(prev_status, cur):
+            cur["status"] = prev_status
+            if prev.get("completed_at"):
+                cur["completed_at"] = prev["completed_at"]
+            if _decimal(prev.get("current_value")) > _decimal(cur.get("current_value")):
+                cur["current_value"] = _decimal(prev.get("current_value"))
+            cur.pop("miss_source", None)  # it is no longer a miss
+            return f"{cur_status}->{prev_status}"
+        return None
 
     for name, prev in prev_statuses.items():
         if not isinstance(prev, dict):
@@ -752,26 +823,30 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
             # The habit vanished from the journal (archived/renamed upstream). Keep the
             # stored row when it recorded a decision; drop it otherwise.
             if prev_status in TERMINAL_STATUSES:
+                # #4655: a RENAME is not a vanishing. When the registry knows another name
+                # of this habit and the new journal carries it, the habit is still here —
+                # restoring the old-name row beside it double-counts the habit. Drop the
+                # old row; its terminal decision still holds over a weaker new-name row.
+                alias = _live_alias(name, next_statuses, _habit_alias_groups())
+                if alias is not None:
+                    held = _hold_terminal(prev, prev_status, next_statuses[alias])
+                    upgrades.append((alias, f"renamed:{held}" if held else "renamed:dropped-old-name"))
+                    continue
                 next_statuses[name] = prev
-                upgrades.append(f"{name}:restored-{prev_status}")
+                upgrades.append((name, f"restored-{prev_status}"))
             continue
         if not isinstance(cur, dict):
             continue
         cur_status = cur.get("status")
-        if prev_status in TERMINAL_STATUSES and cur_status not in TERMINAL_STATUSES and not _settles_a_skip(prev_status, cur):
-            cur["status"] = prev_status
-            if prev.get("completed_at"):
-                cur["completed_at"] = prev["completed_at"]
-            if _decimal(prev.get("current_value")) > _decimal(cur.get("current_value")):
-                cur["current_value"] = _decimal(prev.get("current_value"))
-            cur.pop("miss_source", None)  # it is no longer a miss
-            upgrades.append(f"{name}:{cur_status}->{prev_status}")
+        held = _hold_terminal(prev, prev_status, cur)
+        if held:
+            upgrades.append((name, held))
         elif prev_status == "pending" and cur_status == "failed" and day_open and cur.get("miss_source") != "vendor":
             # An UNRESOLVED failure on an open day is a premature finalisation; an
             # owner-authored one is the owner telling us he missed it, and clamping that
             # back to `pending` would destroy the very distinction #3666 restored.
             cur["status"] = "pending"
-            upgrades.append(f"{name}:failed->pending(day-open)")
+            upgrades.append((name, "failed->pending(day-open)"))
         if prev.get("notes") and not cur.get("notes"):
             cur["notes"] = prev["notes"]
             cur["notes_at"] = prev.get("notes_at", [])
@@ -789,8 +864,17 @@ def upgrade_only_merge(existing: dict, new: dict) -> dict:
     groups = {hs.get("group") for hs in next_statuses.values() if isinstance(hs, dict)}
     groups = {g for g in groups if g and g != "Other"} or set(P40_GROUPS)
     new.update(_aggregate(next_statuses, groups))
-    new["upgrade_only_merges"] = upgrades[:50]
-    logger.info("[UPGRADE-ONLY] %s: kept %d stored status(es): %s", date_str, len(upgrades), ", ".join(upgrades[:10]))
+    new["upgrade_only_merges"] = [f"{n}:{t}" for n, t in upgrades[:50]]
+    # #4655: counts and transitions by status only — a habit name never reaches a log line.
+    by_kind: dict[str, int] = {}
+    for _, transition in upgrades:
+        by_kind[transition] = by_kind.get(transition, 0) + 1
+    logger.info(
+        "[UPGRADE-ONLY] %s: kept %d stored status(es): %s",
+        date_str,
+        len(upgrades),
+        ", ".join(f"{t} x{c}" for t, c in sorted(by_kind.items())),
+    )
     return new
 
 
@@ -907,6 +991,7 @@ def lambda_handler(event: dict, context) -> dict:
         # #3666: the logs memo is module-level and a warm container outlives the run —
         # a stale hit would freeze a day's completions at whatever the last run saw.
         reset_logs_cache()
+        reset_alias_cache()  # #4655: a registry alias added between runs must be seen
         return run_ingestion(_config, authenticate, fetch_day, transform, event, context, post_store_fn=supplement_bridge)
     except Exception as e:
         logger.error("habitify ingestion failed: %s", e, exc_info=True)

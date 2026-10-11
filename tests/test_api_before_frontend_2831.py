@@ -326,3 +326,20 @@ def test_registry_json_is_valid():
         data = json.load(f)
     assert "sequenced_routes" in data
     assert "pending_deploy_routes" in data
+
+
+# Routes confirmed live (GET != 404 against https://averagejoematt.com) whose
+# pending_deploy_routes entry has been re-armed (removed). A stale entry turns a
+# genuinely dead route's 404 into a smoke/visual WARN, so a route that is known
+# to be live must never be re-declared pending.
+_CONFIRMED_LIVE_ROUTES = {
+    # #4189 — answered 200 {"state": "absent", ...} live on 2026-10-10 05:23Z.
+    "/api/morning_note",
+}
+
+
+def test_confirmed_live_routes_are_not_declared_pending():
+    registry = cabf.load_registry()
+    pending = {e.get("route") for e in registry.get("pending_deploy_routes") or [] if isinstance(e, dict)}
+    stale = sorted(pending & _CONFIRMED_LIVE_ROUTES)
+    assert not stale, f"route(s) confirmed live but still in pending_deploy_routes (hides a real 404): {stale}"

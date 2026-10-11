@@ -35,6 +35,8 @@ import time
 import boto3
 from botocore.config import Config
 
+from ai import model_routing  # #4770: a leaf (imports only model_defaults), so no cycle
+
 # ── Model-name → Bedrock inference-profile ID ──────────────────────────────
 # The platform's AI_MODEL / AI_MODEL_HAIKU env vars hold Anthropic-style names
 # (e.g. "claude-sonnet-4-6"). Map them to the us-region cross-region inference
@@ -57,6 +59,16 @@ _MODEL_MAP = {
     "claude-opus-5": "us.anthropic.claude-opus-5",
     "claude-opus-5-5": "us.anthropic.claude-opus-5-5",
     "claude-sonnet-5": "us.anthropic.claude-sonnet-5",
+    # ── Claude 5.5 Haiku / Sonnet (#4770). Profile ids read LIVE from
+    # `aws bedrock list-inference-profiles --region us-west-2` on 2026-10-10: both ACTIVE, in
+    # `us.` and `global.`. Resolvable-and-priced is not selected: no route in
+    # `ai/model_routing.py` points at either — the workhorse move is #4772 and the narrative
+    # move #4775, each behind the #4771 swap eval. Whether either rejects sampling params or
+    # an explicit thinking-disable (the two marker tuples below) is unprobed: "sonnet-5"
+    # already scrubs sampling for Sonnet 5.5; Haiku 5.5 matches neither tuple. #4772/#4775
+    # probe that before any traffic moves.
+    "claude-haiku-5-5": "us.anthropic.claude-haiku-5-5",
+    "claude-sonnet-5-5": "us.anthropic.claude-sonnet-5-5",
 }
 
 # Fable 5 / Opus 4.7+ removed sampling params (temperature/top_p/top_k → 400), and so
@@ -295,6 +307,11 @@ PRICES = {
     "fable-5-1": {"in": 10.00, "out": 50.00, "cache_read": 0.25, "cache_write": 12.50, "cache_write_1h": 20.00},
     "opus-5-5": {"in": 4.00, "out": 20.00, "cache_read": 0.20, "cache_write": 5.00, "cache_write_1h": 8.00},
     "opus-5": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
+    # #4770: Claude 5.5 Haiku / Sonnet, ahead of "sonnet-5" and the family rows they would
+    # otherwise fall into ("haiku" would meter Haiku 5.5 at 10x). Rates UNVERIFIED — see
+    # PRICE_PROVENANCE; cache legs at the standard 0.1x / 1.25x / 2x of input.
+    "haiku-5-5": {"in": 0.10, "out": 0.50, "cache_read": 0.01, "cache_write": 0.125, "cache_write_1h": 0.20},
+    "sonnet-5-5": {"in": 2.00, "out": 10.00, "cache_read": 0.20, "cache_write": 2.50, "cache_write_1h": 4.00},
     "sonnet-5": {"in": 2.00, "out": 10.00, "cache_read": 0.20, "cache_write": 2.50, "cache_write_1h": 4.00},
     # ── Family rows: Fable 5 · Opus 4.5–4.8 · Sonnet 4.5/4.6 · Haiku 4.5.
     "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50, "cache_write_1h": 20.00},
@@ -325,6 +342,19 @@ PRICE_PROVENANCE = {
     "fable-5-1": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "cache read 0.025x base (page footnote 1)"},
     "opus-5-5": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "cache read 0.05x base (page footnote 2)"},
     "opus-5": {"source": _ANTHROPIC_PRICING_DOC, "verified_on": "2026-09-26", "note": "same rates as the Opus 4.5-4.8 family row"},
+    "haiku-5-5": {
+        "source": "https://aws.amazon.com/bedrock/pricing/",
+        "verified_on": "2026-10-10",
+        "note": "UNVERIFIED (#4770): $0.10/$0.50 from the #4768 research (docs/AI_MODEL_STRATEGY.md, marked †: the AWS "
+        "page did not render, figures from AWS doc fragments + trackers); cache legs assumed at 0.1x/1.25x/2x. Re-read "
+        "before #4772 routes spend here. No route uses it today, so no metered dollar depends on it yet",
+    },
+    "sonnet-5-5": {
+        "source": "https://aws.amazon.com/bedrock/pricing/",
+        "verified_on": "2026-10-10",
+        "note": "UNVERIFIED (#4770): $2/$10 from the #4768 research (†, as haiku-5-5); cache legs assumed at "
+        "0.1x/1.25x/2x. Re-read before #4775. No route uses it today",
+    },
     "sonnet-5": {
         "source": _ANTHROPIC_PRICING_DOC,
         "verified_on": "2026-09-26",
@@ -356,7 +386,7 @@ PRICE_PROVENANCE = {
 # cosine reduces to a dot product. Titan does no sampling, so the embedding is
 # DETERMINISTIC — the same text always yields the same vector, the property #1384's
 # reproducible retrieval relies on.
-TITAN_EMBED_MODEL_ID = os.environ.get("TITAN_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
+TITAN_EMBED_MODEL_ID = model_routing.model_for("semantic_recall.embed")  # #4770: embed tier, env TITAN_EMBED_MODEL_ID
 TITAN_EMBED_DIMENSIONS = int(os.environ.get("TITAN_EMBED_DIMENSIONS", "256"))
 _CW = None
 
@@ -487,8 +517,12 @@ def estimate_cost_usd(usage: dict, model_id: str) -> float:
     ) / 1_000_000.0
 
 
-def _emit_usage_metrics(usage: dict, model_id: str) -> None:
+def _emit_usage_metrics(usage: dict, model_id: str, cost_scale: float = 1.0) -> None:
     """Meter token usage + estimated spend at the inference chokepoint (G1).
+
+    `cost_scale` prices the same tokens at a different rate — a Bedrock batch record
+    (#4777, ADR-132) bills the identical token counts at `bedrock_batch.BATCH_DISCOUNT`
+    off, so it is metered at 0.5x rather than at the on-demand price.
 
     Emits per-LambdaFunction token metrics (per-feature attribution) plus a
     dimensionless AnthropicOutputTokens (feeds the existing platform-total
@@ -504,7 +538,7 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
         cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
         if not (in_tok or out_tok or cache_read or cache_write):
             return
-        cost = estimate_cost_usd(usage, model_id)
+        cost = estimate_cost_usd(usage, model_id) * float(cost_scale)
         fn_dim = [{"Name": "LambdaFunction", "Value": feature_name()}]
         class_dim = [{"Name": CALLER_CLASS_DIMENSION, "Value": caller_class()}]
         md = [

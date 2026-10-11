@@ -1,24 +1,318 @@
 {
+ "_meta": {
+  "generated_at": "2026-10-10T02:38:10.707187+00:00",
+  "served_at": "2026-10-10T02:38:10.707187+00:00",
+  "cache_seconds": 300,
+  "request_id": "fefebe4d44864475"
+ },
+ "overall": {
+  "total": 50,
+  "confirmed": 2,
+  "refuted": 4,
+  "pending": 2,
+  "inconclusive": 4,
+  "expired": 2,
+  "observational": 36,
+  "decided": 6,
+  "accuracy_pct": 33.3,
+  "due": {
+   "as_of": "2026-10-09",
+   "due_now": 0,
+   "earliest_due": "2026-10-16"
+  },
+  "lifetime": {
+   "total": 401,
+   "confirmed": 2,
+   "refuted": 6,
+   "pending": 128,
+   "inconclusive": 77,
+   "expired": 3,
+   "observational": 185,
+   "decided": 8,
+   "accuracy_pct": 25.0
+  }
+ },
+ "by_coach": {
+  "glucose": {
+   "total": 50,
+   "confirmed": 2,
+   "refuted": 4,
+   "pending": 2,
+   "inconclusive": 4,
+   "expired": 2,
+   "observational": 36,
+   "decided": 6,
+   "lifetime": {
+    "total": 401,
+    "confirmed": 2,
+    "refuted": 6,
+    "pending": 128,
+    "inconclusive": 77,
+    "expired": 3,
+    "observational": 185,
+    "decided": 8,
+    "hit_rate_pct": 25.0
+   },
+   "retired": false,
+   "record": {
+    "confirmed": 2,
+    "refuted": 4,
+    "n": 6,
+    "through": "2026-09-30"
+   },
+   "comparison": {
+    "rule": "nothing_changes",
+    "rule_words": "a guess that nothing changes",
+    "rule_version": 1,
+    "records": {
+     "number": {
+      "graded": 3,
+      "coach_right": 2,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 3,
+      "verdict": "not_yet_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "direction": {
+      "graded": 2,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 2,
+      "verdict": "not_yet_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "yes_no": {
+      "graded": 1,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 1,
+      "verdict": "not_yet_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     },
+     "sealed": {
+      "graded": 0,
+      "coach_right": 0,
+      "scored": 0,
+      "coach_right_on_scored": 0,
+      "rule_right": 0,
+      "coach_only": 0,
+      "rule_only": 0,
+      "unscorable": 0,
+      "unscorable_reasons": {},
+      "not_yet_scored": 0,
+      "verdict": "none_scored",
+      "sign_test_p": null,
+      "coach_right_pct": null,
+      "rule_right_pct": null
+     }
+    },
+    "unclassified": 0,
+    "scored_complete": false,
+    "skill": {
+     "n": 6,
+     "brier_skill": -0.0207,
+     "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+    },
+    "rule_sentence": null,
+    "sentence": "Too few checked calls yet (6) to compare them with a simple guess.",
+    "min_n_for_rate": 20,
+    "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+   },
+   "hit_rate_pct": 33.3
+  }
+ },
+ "comparison": {
+  "rule": "nothing_changes",
+  "rule_words": "a guess that nothing changes",
+  "rule_version": 1,
+  "records": {
+   "number": {
+    "graded": 3,
+    "coach_right": 2,
+    "scored": 0,
+    "coach_right_on_scored": 0,
+    "rule_right": 0,
+    "coach_only": 0,
+    "rule_only": 0,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 3,
+    "verdict": "not_yet_scored",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   },
+   "direction": {
+    "graded": 2,
+    "coach_right": 0,
+    "scored": 0,
+    "coach_right_on_scored": 0,
+    "rule_right": 0,
+    "coach_only": 0,
+    "rule_only": 0,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 2,
+    "verdict": "not_yet_scored",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   },
+   "yes_no": {
+    "graded": 1,
+    "coach_right": 0,
+    "scored": 0,
+    "coach_right_on_scored": 0,
+    "rule_right": 0,
+    "coach_only": 0,
+    "rule_only": 0,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 1,
+    "verdict": "not_yet_scored",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   },
+   "sealed": {
+    "graded": 0,
+    "coach_right": 0,
+    "scored": 0,
+    "coach_right_on_scored": 0,
+    "rule_right": 0,
+    "coach_only": 0,
+    "rule_only": 0,
+    "unscorable": 0,
+    "unscorable_reasons": {},
+    "not_yet_scored": 0,
+    "verdict": "none_scored",
+    "sign_test_p": null,
+    "coach_right_pct": null,
+    "rule_right_pct": null
+   }
+  },
+  "unclassified": 0,
+  "scored_complete": false,
+  "skill": {
+   "n": 6,
+   "brier_skill": -0.0207,
+   "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+  },
+  "rule_sentence": null,
+  "sentence": "Too few checked calls yet (6) to compare them with a simple guess.",
+  "min_n_for_rate": 20,
+  "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
+ },
+ "percent_floor": 10,
  "predictions": [
   {
    "coach_id": "glucose",
    "coach_name": "Amara Patel",
+   "retired": false,
    "text": "Nocturnal glucose dips are contributing to deep sleep decline through counter-regulatory cortisol fragmentation of slow-wave sleep.",
+   "confidence": 0.5,
    "status": "pending",
    "date": "2026-09-25",
+   "pre_registered_at": null,
+   "pre_registered": false,
    "due_date": "2026-10-16",
+   "gradeable": true,
    "metric": "deep_pct",
-   "eval_type": "directional"
+   "eval_type": "directional",
+   "outcome_notes": "",
+   "reason": null,
+   "graded_on_data": null,
+   "subdomain": "general"
   },
   {
    "coach_id": "glucose",
    "coach_name": "Amara Patel",
+   "retired": false,
    "text": "Nocturnal glucose dips will trigger cortisol counter-regulation, fragmenting slow-wave sleep and contributing to the recovery ceiling observed in Whoop data.",
+   "confidence": 0.5,
    "status": "pending",
    "date": "2026-09-15",
+   "pre_registered_at": null,
+   "pre_registered": false,
    "due_date": "2026-11-03",
+   "gradeable": true,
    "metric": "recovery_score",
-   "eval_type": "directional"
+   "eval_type": "directional",
+   "outcome_notes": "",
+   "reason": null,
+   "graded_on_data": null,
+   "subdomain": "recovery"
   }
- ]
+ ],
+ "commitments": {
+  "as_of": "2026-10-09",
+  "lifetime": {
+   "follow_through_ci95": [
+    54.1,
+    75.1
+   ],
+   "ungradeable": 38.0,
+   "kept": 49.0,
+   "total": 800.0,
+   "checkable": 118.0,
+   "graded": 75.0,
+   "follow_through_pct": 65.3,
+   "unresolved": 604.0,
+   "pending": 83.0,
+   "ungradeable_by_metric": {
+    "total_protein_g": 36.0,
+    "total_calories_kcal": 2.0
+   },
+   "broken": 26.0
+  },
+  "season": {
+   "graded": 57.0,
+   "kept": 39.0,
+   "ungradeable": 0.0,
+   "follow_through_pct": 68.4,
+   "checkable": 60.0,
+   "pending": 76.0,
+   "broken": 18.0,
+   "unresolved": 176.0,
+   "total": 309.0,
+   "follow_through_ci95": [
+    55.5,
+    79.0
+   ],
+   "ungradeable_by_metric": {}
+  }
+ },
+ "cycle": 17,
+ "prereg_seal": {
+  "genesis": "2026-09-06",
+  "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d",
+  "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
+  "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256",
+  "stamped_at": "2026-09-06T02:13:38.690967+00:00"
+ }
 }

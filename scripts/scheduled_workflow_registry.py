@@ -238,6 +238,17 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "the only scheduled discovery pass; its absence produces no output to miss, "
         "which is precisely why nobody would notice.",
     },
+    "raw-kms-readability.yml": {
+        "watched": True,
+        "grace_hours": 24.0,
+        "basis": "newly added (#4634 box 3) — no fire history of its own yet. Weekly (Mon 14:29 UTC) -> "
+        "derived 168h cadence; the same one-day grace as the other weekly rows (fresh-eyes, "
+        "golden-brief-eval) until check_cron_freshness's live derivation can re-derive its own.",
+        "reason": "The only check that raw/ still decrypts. Every 'recoverable from raw' replay or "
+        "back-fill depends on it, and the May-2026 key loss sat unseen for five months because "
+        "nothing looked. A cron that stops puts the archive straight back into that state, with "
+        "a closed #1447 tracker that reads as clean.",
+    },
     # ── deliberately NOT watched (each with its argument) ─────────────────────
     "codeql.yml": {
         "watched": False,

@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-09-30
 
-**Version:** v8.6.0 | **Last updated:** 2026-09-30 | **Total tools:** 87
+**Version:** v8.6.0 | **Last updated:** 2026-09-30 | **Total tools:** 88
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,13 +21,14 @@
 
 ---
 
-## All 87 Tools — by module
+## All 88 Tools — by module
 
 | Module | Tools |
 |---|---|
 | `mcp/tools_training_notes.py` | 1 |
 | `mcp/tools_data.py` | 6 |
 | `mcp/tools_coach_intelligence.py` | 5 |
+| `mcp/tools_coach_vision.py` | 1 |
 | `mcp/tools_training.py` | 2 |
 | `mcp/tools_health.py` | 3 |
 | `mcp/tools_benchmark.py` | 1 |
@@ -86,6 +87,12 @@
 | `get_coach_track_record` | coach_id, days=, subdomain= | Hit-rate track record for a single coach. The headline (record = {confirmed, refuted, n, through}, headline 'K of N checked calls right through <day>', decided_count, hit_rate_pct) is the SAME single producer the public /api/coaches, /api/calibration, /api/predictions and /api/wrong serve (#4220): the PREDICTION# ledger, this cycle, one resolution per prediction — the days window does not narrow it. The breakdowns read the COACH#{coach_id}/LEARNING# audit trail over the days window, one result per prediction, rows with no prediction_id excluded (counted in excluded_learnings): by_outcome counts (confirmed/refuted/inconclusive/expired), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. A subdomain filter scores hit_rate_pct from those breakdowns (hit_rate_source says which). Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'. |
 | `audit_coach_dossier` | coach_id, action=, record_sk=, note= | #1387: Matthew's PRIVATE audit + correction affordance over a coach's public dossier ('what this coach knows' on /coaching/by-coach/, rendered verbatim from COACH# memory). action='view' (default) returns the FULL UNFILTERED memory — commitments, learnings (including the ADR-141 conversation-channel rows the public dossier must never show, flagged), quality trail, relationship state — plus any dossier corrections already logged. action='retract' removes a record from the public dossier; action='correct' renders a dated correction note under it. Both write a dated row to the #1689 corrections ledger (item_ref.surface='coach_dossier') and NEVER edit the memory record in place — the memory stays auditable, corrections are themselves on the record. Args: coach_id (required), action (view\|retract\|correct), record_sk + note (required for retract/correct; get the record_sk from action=view). |
 | `evaluate_prediction` | prediction_id, status, outcome_note= | Manually resolve a coach prediction — mark as confirmed or refuted with an outcome note. |
+
+### mcp.tools_coach_vision (`mcp/tools_coach_vision.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_coach_vision` | limit=, fields=[] | OWNER-ONLY. The weekly coach-vision observation over the progress photos (#3759): what changed visually between this week's set and the prior one, and a body-fat band that is a VISUAL ESTIMATE, NOT A MEASUREMENT, stored beside the nearest DEXA value and the tape trend it was anchored to, with the model id. One record per photo set, newest first. Pass `fields` to select keys; the band always carries its label. Never a reader surface: nothing here is published, quoted on the site, or read by a coach narrative. |
 
 ### Training Intelligence (`mcp/tools_training.py`)
 

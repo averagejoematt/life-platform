@@ -105,6 +105,7 @@ except Exception:  # pragma: no cover - defensive guard, not expected in practic
 from web import (
     site_api_calls as _calls,
     site_api_coach_ledger as _ledger,
+    site_api_coach_moves as _moves,
     site_api_coach_narrative as _narrative,
     site_api_coach_profile as _profile,
     site_api_coach_stance as _stance,
@@ -237,11 +238,6 @@ def _character(p):
     return _profile._character(p, _g=globals())
 
 
-def _working_hypotheses(coach_id, limit=6):
-    """Delegated to web.site_api_coach_profile._working_hypotheses."""
-    return _profile._working_hypotheses(coach_id, limit, _g=globals())
-
-
 def _coach_daily(coach_id):
     """Delegated to web.site_api_coach_profile._coach_daily."""
     return _profile._coach_daily(coach_id, _g=globals())
@@ -280,6 +276,11 @@ def _stance_held_since(coach_id, current_stage_label):
 def _stance_block(coach_id, weight_lbs):
     """Delegated to web.site_api_coach_stance._stance_block."""
     return _stance._stance_block(coach_id, weight_lbs, _g=globals())
+
+
+def _stance_with_ladder(stance, coach_id, weight_lbs):
+    """Delegated to web.site_api_coach_stance.stance_with_ladder (#4649)."""
+    return _stance.stance_with_ladder(stance, coach_id, weight_lbs, _g=globals())
 
 
 def _integrator_digest():
@@ -322,6 +323,11 @@ def _fetch_prediction_partition(coach_pk):
     return _ledger._fetch_prediction_partition(coach_pk, _g=globals())
 
 
+def edition_record():
+    """The record line's five facts from one narrow sweep (#4607) — delegated to web.site_api_coach_ledger."""
+    return _ledger.edition_record(_g=globals())
+
+
 def _commitment_block():
     """Delegated to web.site_api_coach_ledger._commitment_block (#3553)."""
     return _ledger._commitment_block(_g=globals())
@@ -359,6 +365,11 @@ def handle_calibration(event):
 def handle_calls(event):
     """GET /api/calls — delegated to web.site_api_calls (#4586: one page per settled call)."""
     return _calls.handle_calls(event, _g=globals())
+
+
+def handle_coach_moves(event):
+    """GET /api/coach_moves?date= — delegated to web.site_api_coach_moves (#4648: one day's coach lines)."""
+    return _moves.handle_coach_moves(event, table=table)
 
 
 def handle_coach(event):

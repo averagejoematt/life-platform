@@ -1013,6 +1013,115 @@ def _emit_reconciliation_metric(missing_count: int) -> None:
         logger.warning("reconcile metric emit failed (non-fatal): %s", e)
 
 
+# ── Store → vendor (#4638) ────────────────────────────────────────────────────
+# The pass above only looks API → store. A workout deleted or re-typed in the Whoop app
+# produces the opposite difference — a stored DATE#…#WORKOUT#id row the vendor no longer
+# lists, or lists differently — and nothing looked there. The same trailing workout list
+# answers it at no extra Whoop request. REPORTED ONLY, as two metrics with Source=whoop:
+#   StoreOnlyActivityCount — stored workout ids absent from the vendor's trailing list
+#   ChangedActivityCount   — stored ids whose sport or start/end (duration) differ
+# This path stays read-only on the store (test_reconcile_is_read_only): removing or
+# rewriting a whoop workout row on the strength of a list diff is a separate decision,
+# left on #4638. The 2-day trailing re-fetch still overwrites edits inside its window.
+
+# Seconds of start/end disagreement below which a stored workout is not "changed".
+_STORE_VENDOR_TIME_TOLERANCE_SECONDS = 1
+
+
+def _fetch_stored_workouts(table, start_date: str, end_date: str) -> list:
+    """The stored whoop workout sub-records across [start_date, end_date] (inclusive),
+    with the fields the store → vendor pass compares."""
+    pk = f"USER#{USER_ID}#SOURCE#whoop"
+    out: list = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
+        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time",
+    }
+    while True:
+        resp = table.query(**kwargs)
+        out.extend(item for item in resp.get("Items", []) if "#WORKOUT#" in str(item.get("sk", "")))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return out
+
+
+def _workouts_store_vendor_diff(vendor_workouts: list, stored_workouts: list, covered_from: datetime, covered_to: datetime) -> tuple:
+    """(absent, changed) — stored workouts the vendor's list lacks or describes differently.
+
+    Only a stored workout whose start lies in [covered_from, covered_to) is judged; one
+    outside the window the vendor was asked about is not evidence of anything.
+    """
+    by_id = {str(w.get("id")): w for w in vendor_workouts if w.get("id") is not None}
+    absent: list = []
+    changed: list = []
+    for s in stored_workouts:
+        sk = str(s.get("sk", ""))
+        wid = str(s.get("workout_id") or sk.split("#WORKOUT#", 1)[-1])
+        day = sk[len("DATE#") :][:10]
+        t = parse_iso_utc(s.get("start_time"))
+        if not wid or t is None or not (covered_from <= t < covered_to):
+            continue
+        vendor = by_id.get(wid)
+        if vendor is None:
+            absent.append({"id": wid, "date": day})
+            continue
+        fields = []
+        if s.get("sport_id") is not None and vendor.get("sport_id") is not None and int(s["sport_id"]) != int(vendor["sport_id"]):
+            fields.append("sport_id")
+        for stored_key, vendor_key in (("start_time", "start"), ("end_time", "end")):
+            st, vt = parse_iso_utc(s.get(stored_key)), parse_iso_utc(vendor.get(vendor_key))
+            if st is not None and vt is not None and abs((st - vt).total_seconds()) > _STORE_VENDOR_TIME_TOLERANCE_SECONDS:
+                fields.append(stored_key)
+        if fields:
+            changed.append({"id": wid, "date": day, "fields": fields})
+    return absent, changed
+
+
+def _emit_store_vendor_metrics(absent_count: int, changed_count: int) -> None:
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/IngestReconciliation",
+            MetricData=[
+                {
+                    "MetricName": name,
+                    "Dimensions": [{"Name": "Source", "Value": "whoop"}],
+                    "Value": float(value),
+                    "Unit": "Count",
+                }
+                for name, value in (("StoreOnlyActivityCount", absent_count), ("ChangedActivityCount", changed_count))
+            ],
+        )
+    except Exception as e:  # metric emission must never fail the run
+        logger.warning("store→vendor metric emit failed (non-fatal): %s", e)
+
+
+def _store_vendor_report(vendor_workouts: list, start, today) -> dict:
+    """Run the store → vendor pass; a failure is reported in the body, never raised, so it
+    can never cost the API → store result it rides beside."""
+    try:
+        stored = _fetch_stored_workouts(_table, (start - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
+        # The leading day of the window is not judged (the vendor's own boundary
+        # semantics there are not ours to lean on); the trailing edge is tomorrow 00:00Z.
+        covered_from = datetime(start.year, start.month, start.day, tzinfo=timezone.utc) + timedelta(days=1)
+        covered_to = datetime(today.year, today.month, today.day, tzinfo=timezone.utc) + timedelta(days=1)
+        absent, changed = _workouts_store_vendor_diff(vendor_workouts, stored, covered_from, covered_to)
+    except Exception as e:
+        logger.warning("[RECONCILE] #4638 store→vendor pass failed (non-fatal): %s", e)
+        return {"error": str(e)}
+    _emit_store_vendor_metrics(len(absent), len(changed))
+    if absent or changed:
+        logger.warning(
+            "[RECONCILE] #4638 store→vendor: %d stored workouts gone from Whoop %s, %d changed %s",
+            len(absent),
+            absent,
+            len(changed),
+            changed,
+        )
+    return {"absent_count": len(absent), "absent": absent, "changed_count": len(changed), "changed": changed}
+
+
 def _reconcile(event: dict, context) -> dict:
     """Diff the trailing-window Whoop API record set against the store (read-only).
 
@@ -1085,6 +1194,7 @@ def _reconcile(event: dict, context) -> dict:
         missing = _records_missing_from_store(sleeps, workouts, stored_sks, stored_workout_starts)
 
         _emit_reconciliation_metric(len(missing))
+        store_vendor = _store_vendor_report(workouts, start, today)
         if missing:
             logger.warning(
                 "[RECONCILE] %d Whoop records missing from store: %s",
@@ -1109,6 +1219,7 @@ def _reconcile(event: dict, context) -> dict:
                     "workout_count": len(workouts),
                     "missing_count": len(missing),
                     "missing": missing,
+                    "store_vendor": store_vendor,
                 }
             ),
         }

@@ -23,7 +23,7 @@ The desk is the pipeline that makes that hold without hand correction.
 
 | Piece | Module | What it guarantees |
 |---|---|---|
-| **Dossier** | `lambdas/content/story_dossier.py` | Every figure a writer may use, computed in code for exactly the week's dates. Plan targets come from the plan root (`experiment.plan_facts`), never `PROFILE#v1` (#4540). Each batch-exported source has a watermark, so a date past it reads as *not yet exported*, never as a behaviour. Every training session says whether it was a programmed routine and how it scored against the prescription. Vice names never enter; journal entries are counted, never read. |
+| **Dossier** | `lambdas/content/story_dossier.py` | Every figure a writer may use, computed in code for exactly the week's dates. Plan targets come from the plan root (`experiment.plan_facts`), never `PROFILE#v1` (#4540), and `week_dossier` refuses a packet whose targets are not the plan root's (`plan_facts_findings`, #4532). Every source it reads has a watermark (`export_watermarks`: the last date it covers on or before the week's end, and when that row landed), so a date past a daily source's watermark reads as *not yet exported*, never as a behaviour. No row dated after the week's end is read. Every training session says whether it was a programmed routine and how it scored against the prescription. Vice names never enter; journal entries are counted, never read. |
 | **Ledger** | `lambdas/content/story_ledger.py` | One `LEDGER#{date}` row per published installment: threads (open / advanced / resolved / retired), the Panel's bets and their results, who was featured, the leads and beats used, and an arc note per character. Read through `singleton_visible`, so a reset's tombstones can never become last week's memory. |
 | **Desk** | `lambdas/content/story_desk.py` | One structured call returns the week's **story budget**: lead, secondary stories, omissions with reasons, a tone calibrated to the data, the coach to feature, last week's bet scored and the next one set, and an action for every open thread. The rubric is written in the module. Code then validates what a schema can't express. |
 | **Writers** | `lambdas/content/story_writers.py` | Elena's long-form post and the Panel script, both written from the same budget, dossier and ledger, plus the previous installment. |
@@ -51,6 +51,25 @@ python3 scripts/season_rebuild.py --weeks 5 --out <dir>
 
 Publishing is a separate, owner-approved promote step. Staging never publishes.
 
+## The audit gate (#4549)
+
+No staged installment publishes without an adversarial raw-data audit. After staging, run the
+`story-auditor` agent (`.claude/agents/story-auditor.md`) on the staging folder. It checks claims
+against raw DynamoDB, not just the dossier, and writes `audit.json`. Then:
+
+```bash
+python3 scripts/season_promote.py --staging <dir>            # the plan + any AUDIT GATE refusals, nothing written
+python3 scripts/season_promote.py --staging <dir> --apply    # exit 5 before any write unless the audit passes
+```
+
+`--apply` refuses when `audit.json` is missing, unreadable, not a JSON object, has a `blocking` list
+that is absent, not a list or not empty, has a verdict other than `publishable`, falls under the
+agent's floors (8 claims and 3 raw-verified per week), or is stale. Stale means the audit's
+`staged_sha256` hash for any file that would publish (`wk{N}_chronicle.md`, `_episode.json`,
+`_ledger.json`, `_dossier.json`) does not match the folder now. That ties the audit to the exact
+content, so an audit of an earlier draft cannot pass a re-staged or repaired one. A timestamp
+can't do that. `--audit-hashes` prints the map the auditor records.
+
 ## His answers also reach the front page (#4584)
 
 Each answered question in a reply to the Monday email is written twice. The `STORYQA#W` row the
@@ -67,6 +86,20 @@ vocabulary that could not be loaded holds the entry. A held entry is stored and 
 The reply only lands if the address he replies from is in the parser's `ALLOWED_SENDERS`
 (`cdk/stacks/operational_stack.py`). The questions are mailed to `EMAIL_RECIPIENT`, and a
 reply from an address outside that list is dropped with a log line (#4546).
+
+### The Tuesday question (#4584)
+
+A second rule, `OwnerWordsQuestionTuesday` (`cdk/stacks/email_stack.py`), sends one more
+question each Tuesday evening Pacific: `cron(0 1 ? * WED *)`, which is 18:00 PDT and 17:00 PST
+(the platform's crons are fixed UTC). It goes to the same `wednesday-chronicle` function with
+`{"tuesday_question": true}`. The question is fixed, chosen from
+`story_questions.TUESDAY_QUESTIONS` by week number, so there is no model call. The email carries
+the same `[SQ-W<n>]` token, which sends his reply down the route above, behind the same sender
+check: a `STORYQA#W` row for the chronicle and a verbatim owner-words entry that leads
+Wednesday's edition. A one-question email is usually answered above the quote with no `Q1:`
+label. `parse_reply` pairs such a reply with Q1 only when exactly one question was asked. The send
+is once a week, recorded by the marker `STORYQ#W{n}#TUE` (the Monday check matches its own marker
+exactly, so this one never stands in for it). There is no dead-man for the Tuesday send yet.
 
 ## The dead-men
 
@@ -86,5 +119,10 @@ A read that fails or comes back empty is a warn with no verdict, never a pass.
 - The weekly `wednesday-chronicle` and `coach-panel-podcast` lambdas still run their own
   prompts. Moving them onto the desk is #4535 / #4536. The Panel half waits on #4514
   (PR #4522) so two lanes don't edit one file.
+- **The audit gate covers `season_promote.py` only.** The live weekly path publishes with no
+  raw-data audit. `wednesday-chronicle` stores a draft, and `chronicle-approve` publishes it on
+  the approve click or through its daily stale-draft sweep. A published week then async-invokes
+  `coach-panel-podcast`, which publishes the episode. Running the same audit before the approval
+  email and attaching its verdict is the live-path follow-up #4549 names.
 - Count-claim predictions are still graded by slope upstream (#4541). The dossier carries that
   caveat to the writers.

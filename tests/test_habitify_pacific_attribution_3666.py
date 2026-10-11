@@ -445,6 +445,7 @@ def test_a_late_tick_is_never_lost_by_an_earlier_runs_write(monkeypatch):
 
 def test_a_habit_that_vanishes_upstream_keeps_its_recorded_decision(monkeypatch):
     monkeypatch.setattr(habitify_lambda, "pacific_today", lambda: "2026-09-07")
+    monkeypatch.setattr(habitify_lambda, "_ALIAS_GROUPS_CACHE", [])  # #4655: no registry read in a unit test
     stored = {"date": "2026-09-06", "habit_statuses": {"Retired Habit": {"status": "completed", "group": "Core"}}}
     later = {"date": "2026-09-06", "habit_statuses": {"Breathwork": {"status": "failed", "group": "Core"}}}
     merged = upgrade_only_merge(stored, later)

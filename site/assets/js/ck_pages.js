@@ -1,11 +1,14 @@
-// ck_pages.js — the four kit pages of the living front page (#4586, epic #4580):
-// the front page, Start here, Story and Coaches. Candidates on the preview path.
+// ck_pages.js — the kit pages of the living front page (#4586, epic #4580): the front
+// page, This week (round 8), Start here, Story and Coaches. Candidates on the preview path.
 //
 // The front page reads ONE document, /api/edition (#4582): one Pacific `as_of`, one
 // `day_n`, and blocks that each carry state / as_of / source / absent_text / data. A
 // block that is absent, stale or unavailable prints its own sentence — never a blank,
-// a zero or a number from another day. The three layer-2 pages read the edition for the
-// facts they share with the front page, plus the public routes that already exist.
+// a zero or a number from another day. The front page reads nothing else (#4582 box 1: the
+// coach lines of the last seven days, the settled calls and the sheet's level are blocks of
+// the edition too); the week page reads only the chapter's published transcript besides. The
+// other layer-2 pages read the edition for the facts they share with the front page, plus the
+// public routes that already exist.
 //
 // The look is the kit and nothing else (docs/design/v8/README.md): every class below is
 // a `ck-` class from clean.css. Standing rules held here: no count of earlier starts, no
@@ -19,7 +22,8 @@ import { dayInWords } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import * as F from "/assets/js/ck_front.js";
 import { sheetLine } from "/assets/js/ck_sheet.js";
-import { lastCallHTML, nextCallHTML } from "/assets/js/ck_call.js";
+import { lastCallHTML, lastCallPick, nextCallHTML, withFrom } from "/assets/js/ck_call.js";
+import { verdictTag, callCardHTML, gradedOnText, showcasePair, hasRule, ruleless, sharedToleranceNote } from "/assets/js/ck_verdict.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -163,9 +167,12 @@ export function coachLinesHTML(block) {
 // ── the record, never alone ────────────────────────────────────────────────────
 // One sentence pair: the count and what a simple guess would have done. With either half
 // missing the block is `unavailable` upstream and this prints its sentence instead.
+// #4617: the count states what it counts — sealed, bets, commentary, conditional — when served.
+const countedText = (d) => String((d && d.counted_text) || "").trim();
 export function recordLine(block) {
   if (!usable(block) || !block.data.count_text || !String(block.data.comparison_text || "").trim()) return "";
-  return `${block.data.count_text} ${comparisonText({ sentence: block.data.comparison_text })}`;
+  const counted = countedText(block.data);
+  return `${block.data.count_text}${counted ? ` ${counted}` : ""} ${comparisonText({ sentence: block.data.comparison_text })}`;
 }
 export function betLine(nextBlock) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
@@ -189,16 +196,46 @@ export function recordBigHTML(block) {
     d.decided >= MIN_PERCENT_N
       ? `<div class="ck-track" role="img" aria-label="${d.right} of ${d.decided} checked calls right"><i style="width:${Math.round((100 * d.right) / d.decided)}%"></i></div>`
       : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span>of ${d.decided} checked calls</span></p>${track}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${d.right}<span> of ${d.decided} checked calls</span></p>${track}${countedText(d) ? `<p class="ck-small">${esc(countedText(d))}</p>` : ""}<p>${esc(comparisonText({ sentence: d.comparison_text }))}</p></div>`;
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
-export function betHTML(nextBlock) {
+export function betHTML(nextBlock, { sidesText = "", extra = "", href = "", hrefText = "What each one argued", oneLine = false } = {}) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  // #4582: with the whole `next` block unserved there is no bet part at all. Its sentence is
+  // the block's ("What comes next is not served right now."), never "No coach bet is waiting
+  // to settle." — that would state a fact the page could not read.
+  if (!bet) return absent(nextBlock, "What comes next is not served right now.");
   if (!usable(bet) || !bet.data.question) return absent(bet, "No coach bet is waiting to settle.");
   const b = bet.data;
-  const sides = (b.sides || []).filter((s) => s.coach).map((s) => `${s.coach} says ${s.says}.`).join(" ");
-  return `<div class="ck-bet"><p class="ck-small">Settles ${esc(dayInWords(b.settle_date))}</p><p><b>${esc(b.question)}</b></p>${soft(sides)}</div>`;
+  // #4809: an array `sidesText` is one line per side (the front card's, each with the coach's
+  // reason); a string is printed as one line (the caller's own wording). With neither, the
+  // sides alone on one line — the reasons are the front card's only (ruling 2026-10-11).
+  const sides = Array.isArray(sidesText) ? sidesText : [sidesText || F.betSidesLine(bet, {}, { reasons: false })].filter(Boolean);
+  const door = href ? `<p><a class="ck-link" href="${esc(href)}">${esc(hrefText)}</a></p>` : "";
+  // The question names its own day ("… on Monday, October 12?"), so the card's "Settles <day>"
+  // line is printed only when it does not: room for the reasons (#4809), nothing said twice.
+  const day = dayInWords(b.settle_date);
+  const head = day && String(b.question).includes(day) ? "" : `<p class="ck-small">Settles ${esc(day)}</p>`;
+  // `oneLine`: the sides, the extra sentence and the door as ONE soft paragraph — the coaches
+  // page's card, which holds its four-screen budget with headroom (ruling 2026-10-11).
+  if (oneLine) {
+    // The door follows the sides it explains; the extra sentence closes the paragraph.
+    const parts = [esc(sides.filter(Boolean).join(" ")), href ? `<a class="ck-link" href="${esc(href)}">${esc(hrefText)}</a>` : "", esc(extra)];
+    const line = parts.some(Boolean) ? `<p class="ck-soft">${parts.filter(Boolean).join(" ")}</p>` : "";
+    return `<div class="ck-bet">${head}<p><b>${esc(b.question)}</b></p>${line}</div>`;
+  }
+  return `<div class="ck-bet">${head}<p><b>${esc(b.question)}</b></p>${sides.map(soft).join("")}${soft(extra)}${door}</div>`;
+}
+// The bet's reasons are printed on the front card only (ruling 2026-10-11: the coaches page
+// keeps its four-screen budget); the coaches page's card carries a door to them — and only
+// when the front card prints them: it leads with this bet (two named sides) and at least one
+// side has a served reason. Otherwise no door, never one to a card without the reasons.
+export function reasonsDoor(nextBlock, base = "/") {
+  const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
+  const sides = usable(bet) ? (bet.data.sides || []).filter((s) => s && s.coach) : [];
+  const served = sides.some((s) => typeof s.reason === "string" && s.reason.trim());
+  return sides.length >= 2 && served ? { href: `${base}#ck-bet`, hrefText: "Why each says so." } : {};
 }
 // "Three more bets settle on October 7, 12 and 16." from the served docket, minus the
 // one on the card. "" when there are none.
@@ -274,7 +311,8 @@ export function chartHTML(weights, { sentence: withSentence = true } = {}) {
 }
 
 // ── the team ───────────────────────────────────────────────────────────────────
-export function teamHTML(coachesBody, base = "") {
+// `from` is the page this list is on, so the coach page returns to it by name (#4675).
+export function teamHTML(coachesBody, base = "", from = "") {
   const coaches = ((coachesBody && coachesBody.coaches) || []).filter((c) => c && c.name);
   if (!coaches.length) return "";
   const n = (c) => (c.record && num(c.record.n)) || 0;
@@ -291,7 +329,7 @@ export function teamHTML(coachesBody, base = "") {
         record = `${r.confirmed} of ${r.n}${meter}`;
       }
       const jobLine = `${job}${job && sitting && !/[.!?]$/.test(job) ? "." : ""}${sitting}`.trim();
-      const name = base && c.persona_id ? `<a class="ck-link" href="${esc(base)}coach/?c=${esc(c.persona_id)}">${esc(c.name)}</a>` : esc(c.name);
+      const name = base && c.persona_id ? `<a class="ck-link" href="${esc(withFrom(`${base}coach/?c=${encodeURIComponent(c.persona_id)}`, from))}">${esc(c.name)}</a>` : esc(c.name);
       return `<li><span class="ck-coach__name">${name}</span><span class="ck-coach__job">${esc(jobLine)}</span><span class="ck-coach__record">${record}</span></li>`;
     })
     .join("")}</ul>`;
@@ -301,7 +339,7 @@ export function teamHTML(coachesBody, base = "") {
 // The newest checked call of each kind, in the coach's own words. Only a call with a plain
 // measured result ("point") shows its number; a direction call's stored result is a slope,
 // which is not a reader's number, so it shows the date alone.
-export function verdictPick(coachesBody) {
+export function verdictPick(coachesBody, ruleOf = null) {
   // A conditional ("If dinner is disrupted…") is graded on its outcome with the condition
   // never checked, so it is no example of a right or a wrong call. A claim that quotes a
   // raw date is machine wording and is passed over too.
@@ -309,38 +347,52 @@ export function verdictPick(coachesBody) {
   const calls = ((coachesBody && coachesBody.coaches) || [])
     .filter((c) => c && c.latest_checked && c.latest_checked.claim && !conditional.test(c.latest_checked.claim) && !/\b20\d\d-\d\d-\d\d\b/.test(c.latest_checked.claim))
     .map((c) => ({ coach: c.name, ...c.latest_checked }));
+  // With `ruleOf`, a call it gives no rule is skipped and counted (#4808).
+  const ruled = ruleOf ? calls.filter((c) => ruleOf(c)) : calls;
+  const skipped = calls.filter((c) => c.status === "confirmed" || c.status === "refuted").length - ruled.filter((c) => c.status === "confirmed" || c.status === "refuted").length;
   const newest = (status) => {
-    const of = calls.filter((c) => c.status === status).sort((a, b) => String(b.outcome_date).localeCompare(String(a.outcome_date)));
+    const of = ruled.filter((c) => c.status === status).sort((a, b) => String(b.outcome_date).localeCompare(String(a.outcome_date)));
     return of.find((c) => c.eval_type === "point" && num(c.actual_value) !== null) || of[0] || null;
   };
-  return { right: newest("confirmed"), wrong: newest("refuted") };
+  return { right: newest("confirmed"), wrong: newest("refuted"), skipped };
 }
+// /api/coaches serves no allowed distance for a number call, so only a direction call has a
+// rule this fallback can print. A call with no printable rule is never shown as right or wrong
+// (#4808): the pick passes over it, and the page says how many it passed over.
+const coachesRule = (call) => (call && call.eval_type === "directional" ? "by the trend in his most recent readings" : "");
 export function verdictsHTML(coachesBody) {
-  const { right, wrong } = verdictPick(coachesBody);
-  if (!right && !wrong) return "";
-  const card = (call, tag, cls) => {
-    if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-    const inRange = call.status === "confirmed" && /interval|range|between/i.test(call.claim) ? ", inside the range given" : "";
-    const result = call.eval_type === "point" && num(call.actual_value) !== null ? `The result was ${Number(call.actual_value.toFixed(1))}${inRange}. ` : "";
-    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.coach)}: “${esc(call.claim)}”</b></p>${soft(`${result}Checked ${shortDay(call.outcome_date)}.`)}</div>`;
+  const { right, wrong, skipped } = verdictPick(coachesBody, coachesRule);
+  if (!right && !wrong) return skipped ? soft(ruleless(skipped)) : "";
+  const card = (call, tag) => {
+    if (!call) return `<div>${soft(`No call with a printable rule has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+    // Only a direction call reaches here (its rule is the trend), so there is no number result.
+    return `<div>${verdictTag(tag === "Right", coachesRule(call))}<p>${esc(call.coach)}: “${esc(call.claim)}”</p>${soft(`Checked ${shortDay(call.outcome_date)}.`)}</div>`;
   };
-  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+  return `<div class="ck-verdicts">${card(right, "Right")}${card(wrong, "Wrong")}</div>${soft(ruleless(skipped))}`;
 }
 
-// The same pair from the settled calls that have a page (GET /api/calls): the newest right
-// and the newest wrong, each a call that named its number, its day and its result, and each
-// a door to its own page. "" when the route has nothing, so the caller can fall back.
-export function callVerdictsHTML(callsBody, base = "/") {
+// The same pair from the settled calls that have a page (GET /api/calls), each a door to
+// its own page. The pair is chosen to be checkable at a glance (#4647): the right call
+// whose allowed distance was tightest, and the wrong call that missed by the most. Each
+// carries its rule in the tag and the day its reading was taken. "" when the route has
+// nothing, so the caller can fall back.
+// `trailer`: trusted HTML (the shell's own door) closing the paragraph under the pair, so the
+// note and the door share one line instead of two paragraphs (the four-screen budget, 2026-10-11).
+export function callVerdictsHTML(callsBody, base = "/", from = "", { trailer = "" } = {}) {
   const calls = ((callsBody && callsBody.calls) || []).filter((c) => c && c.id && c.called_short && c.kind !== "bet");
-  const pick = (verdict) => calls.find((c) => c.verdict === verdict) || null;
-  const [right, wrong] = [pick("right"), pick("wrong")];
+  const { right, wrong } = showcasePair(calls);
   if (!right && !wrong) return "";
-  const card = (call, tag, cls) => {
-    if (!call) return `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call with a page has been found ${tag.toLowerCase()} yet.`)}</div>`;
+  // What the allowed distance is: once under the pair when both were computed the same way.
+  const shared = sharedToleranceNote([right, wrong]);
+  const card = (call, word) => {
+    if (!call) return `<div>${soft(`No call with a page has been found ${word} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
-    return `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(day ? `Checked ${day}. ` : "")}<a class="ck-link" href="${esc(base)}call/?id=${encodeURIComponent(call.id)}">What counted as right</a></p></div>`;
+    const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
+    return callCardHTML(call, { when, note: !shared, href: withFrom(`${base}call/?id=${encodeURIComponent(call.id)}`, from) });
   };
-  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+  const after = [shared, ruleless(calls.filter((c) => !hasRule(c)).length)].filter(Boolean).join(" ");
+  const close = after || trailer ? `<p class="ck-soft">${esc(after)}${after && trailer ? " " : ""}${trailer}</p>` : "";
+  return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>${close}`;
 }
 
 // ── the catch-up list on the front page ────────────────────────────────────────
@@ -358,52 +410,168 @@ const fill = (id, html) => {
   return el;
 };
 
+// Every front-page slot the edition alone fills, as { element id: html } — `null` removes
+// the element. Pure, so tests/js/edition_contract_4582.test.mjs drives the page's real
+// block-to-slot wiring with the documents the route composes (#4582): one upstream failing
+// must leave its slot printing the block's own sentence, never a blank or another figure.
+export function frontSlots(edition, b, base = "/") {
+  const e = edition || {};
+  const t = usable(b.today) ? b.today.data : {};
+  // His words lead when they are fresh. Silence is not a headline: the plain sentence that
+  // there is nothing new sits at the foot of the page instead.
+  const words = hisWordsFresh(b.his_words)
+    ? { "ck-words": hisWordsHTML(b.his_words) }
+    : { "ck-words": null, "ck-words-absent": esc((b.his_words && b.his_words.absent_text) || "") };
+  const span = F.weekSpan(b.week);
+  return {
+    // The fixed top: the record beside the premise, the daily mark, his own dated note when
+    // there is a fresh one.
+    // Round 8b: every number on the first screen is a door — the record to the coaches, the
+    // weight to its trend. A failed block prints its own sentence, with no door.
+    "ck-record": recordLine(b.record) ? `<a href="${esc(base)}coaches/">${esc(recordLine(b.record))}</a>` : esc((b.record && b.record.absent_text) || ""),
+    "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs),
+    "ck-mark-caption": F.markCaption(b.today, e) ? `<a href="${esc(base)}trend/?m=weight">${F.markCaption(b.today, e)}</a>` : esc((b.today && b.today.absent_text) || ""),
+    ...words,
+    // The argument: the open bet is the edition's; the lines come in mountFront from the
+    // last seven days of served moves.
+    "ck-bet": betHTML(b.next),
+    // Today: the last 24 hours.
+    "ck-today-label": esc(`Today · ${dayInWords(e.as_of)}`),
+    "ck-today": F.todayBandHTML(e, b, base),
+    "ck-coach-lines": F.coachTodayHTML(b.coach_lines),
+    // Go deeper: the week is one row (its own page, /week/), the chapter one row.
+    "ck-week-span": esc(span ? `How the whole thing is going · ${span}` : "How the whole thing is going"),
+    "ck-chapter-row": F.chapterRowHTML(b.chapter),
+    "ck-follow-line": esc(F.followLine(b.next)),
+  };
+}
+// The week page (round 8): the band that used to sit under Today on the front page, whole.
+export function weekSlots(edition, b, base = "/") {
+  const span = F.weekSpan(b.week);
+  const words = hisWordsFresh(b.his_words) ? { "ck-words": hisWordsHTML(b.his_words), "ck-words-absent": null } : { "ck-words": null, "ck-words-absent": esc((b.his_words && b.his_words.absent_text) || "") };
+  return {
+    "ck-week-label": esc(span ? `This week · ${span}` : "This week"),
+    // #4595: the served scorecard (one written rule per area, decided in code) when the edition
+    // serves it; until the API that serves it is deployed, the older seven-day sort stands in.
+    "ck-week": F.scorecardRows(b.scorecard).length ? F.scorecardHTML(b.scorecard, base, { label: false }) : F.weekSortHTML(b.week, base),
+    "ck-quotes": F.quotesHTML(b.chapter, null, base),
+    ...words,
+  };
+}
+
+// The days the argument reads: the edition's day and the six before it — the window the
+// edition's `moves` block is read over (site_api_edition.moves_days, #4582).
+export function argumentDays(asOf, n = F.ARGUMENT_DAYS) {
+  const out = [];
+  let iso = asOf;
+  for (let i = 0; i < n && iso; i += 1) {
+    out.push(iso);
+    const t = Date.parse(`${iso}T12:00:00Z`);
+    iso = Number.isFinite(t) ? new Date(t - 86400000).toISOString().slice(0, 10) : "";
+  }
+  return out;
+}
+
+const fillSlots = (slots) => {
+  for (const [id, html] of Object.entries(slots)) {
+    if (html === null) document.getElementById(id)?.remove();
+    else fill(id, html);
+  }
+};
+
+// The edition's blocks for what the front page and the week page used to read from their own
+// routes (#4582 box 1), each in that route's own shape so the builders read them unchanged.
+// A block that failed gives the builder nothing — the caller prints the block's sentence.
+export const movesOf = (b) => (usable(b.moves) && Array.isArray(b.moves.data.days) ? b.moves.data.days : []);
+export const callsBodyOf = (b) => (usable(b.calls) && Array.isArray(b.calls.data.calls) ? { state: "ok", calls: b.calls.data.calls } : null);
+export const characterOf = (b) => (usable(b.sheet) ? b.sheet.data : null);
+export const leadReadOf = (b) => (usable(b.lead_read) ? b.lead_read.data : null);
+
+// Every front-page slot that needs more than one block (the argument reads the open bet and the
+// week of coach lines; the coach band leaves out what the argument printed), as { id: html } —
+// `null` removes the element, an id left out keeps what frontSlots put there. Pure, so
+// tests/js/edition_contract_4582.test.mjs renders it over the route's own documents: a block
+// that failed prints its own sentence, never a claim the failed read cannot support.
+export function frontReadSlots(edition, b, base = "/") {
+  const e = edition || {};
+  const out = {};
+  const moves = movesOf(b);
+  // The argument: the open bet (two coaches, opposite sides, a date) with the live number
+  // against it; failing a bet, the newest exchange, from the served moves.
+  const pick = F.pickArgument(moves, b.next);
+  out["ck-argue-label"] = esc(F.argumentLabel(pick));
+  if (!pick && b.moves.state === "unavailable") {
+    // A failed read is not "nothing in dispute": the section says the lines are not served.
+    out["ck-argue-heading"] = esc("What they are arguing about.");
+    out["ck-argument"] = soft(b.moves.absent_text);
+  } else {
+    out["ck-argue-heading"] = esc(F.argumentHeading(pick));
+    out["ck-argument"] = F.argumentHTML(pick, base);
+  }
+  if (pick && pick.kind === "bet") {
+    // The card in the bet's own terms: each coach with its job, the live number inside the
+    // card, and the door to what each one argued (round 8b).
+    out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLines(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet`, hrefText: "Every open bet, on the coaches page" });
+  } else if (pick && pick.kind === "reply") {
+    out["ck-bet"] = null;
+  }
+  // A line from the edition's day that the argument already printed is not printed twice.
+  // With nothing said today, the newest line the coaches said stands under its own label,
+  // and with nothing in the window at all the band has no coach part — unless the day's lines
+  // failed to read, when frontSlots' sentence for them stands.
+  const shown = F.argumentTexts(pick);
+  const today = F.coachTodayHTML(b.coach_lines, { skip: shown });
+  const spokeToday = usable(b.coach_lines) && (b.coach_lines.data.lines || []).length > 0;
+  if (today && spokeToday) out["ck-coach-lines"] = today;
+  else {
+    const heard = F.lastHeardHTML(moves, shown, base);
+    if (heard) {
+      out["ck-coach-lines-label"] = "The coaches, last heard";
+      out["ck-coach-lines"] = heard;
+    } else if (b.coach_lines.state !== "unavailable") {
+      out["ck-coach-lines-label"] = null;
+      out["ck-coach-lines"] = null;
+    }
+  }
+  // The clearest miss this week, or on record, or the calls block's own sentence.
+  const calls = callsBodyOf(b);
+  const { kind } = lastCallPick(calls, e.as_of);
+  const last = lastCallHTML(calls, base, e.as_of, F.SHORT_JOBS);
+  if (last) {
+    const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
+    out["ck-miss-heading"] = esc(heading);
+    out["ck-call"] = `${last}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`;
+  } else {
+    out["ck-call"] = soft(b.calls.absent_text || "The settled calls are not served right now.");
+  }
+  const sheet = sheetLine(characterOf(b));
+  if (sheet) out["ck-sheet-span"] = esc(sheet);
+  return out;
+}
+
+// The front page reads nothing but the edition (#4582 box 1): every slot is the edition's.
 async function mountFront(edition, b) {
   const base = document.body.dataset.ckBase || "/";
-  // The fixed top: the record beside the premise, the daily mark, his own dated note when
-  // there is a fresh one, and the coaches' last settled call with the next one due.
-  fill("ck-record", esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""));
-  const t = usable(b.today) ? b.today.data : {};
-  fill("ck-mark", F.markHTML(usable(b.week) ? b.week.data.weight_series : null, edition.as_of, t.start_weight_lbs, t.goal_weight_lbs));
-  fill("ck-mark-caption", F.markCaption(b.today, edition) || esc((b.today && b.today.absent_text) || ""));
-  // His words lead when they are fresh. Silence is not a headline: the plain sentence that
-  // there is nothing new sits at the foot of the week instead.
-  if (hisWordsFresh(b.his_words)) fill("ck-words", hisWordsHTML(b.his_words));
-  else {
-    document.getElementById("ck-words")?.remove();
-    fill("ck-words-absent", esc((b.his_words && b.his_words.absent_text) || ""));
-  }
-  fill("ck-bet", betHTML(b.next));
-  // Today: the last 24 hours.
-  fill("ck-today-label", esc(`Today · ${dayInWords(edition.as_of)}`));
-  fill("ck-today", F.todayBandHTML(edition, b, base));
-  fill("ck-coach-lines", F.coachTodayHTML(b.coach_lines));
-  // This week: what is going well and not, the lead's read, the chapter and the podcast.
-  const span = F.weekSpan(b.week);
-  fill("ck-week-label", esc(span ? `This week · ${span}` : "This week"));
-  fill("ck-week", F.weekSortHTML(b.week, base));
-  fill("ck-follow-line", esc(F.followLine(b.next)));
+  fillSlots(frontSlots(edition, b, base));
+  fillSlots(frontReadSlots(edition, b, base));
+}
+
+// The week page: the edition, and the chapter's published transcript for its quotes.
+async function mountWeek(edition, b) {
+  const base = document.body.dataset.ckBase || "/";
+  fillSlots(weekSlots(edition, b, base));
+  // Round 8: a section with nothing to show does not render its heading; a read that failed
+  // says so instead.
+  const lead = F.leadReadHTML(leadReadOf(b), base);
+  if (lead) fill("ck-lead-read", lead);
+  else if (b.lead_read.state === "unavailable") fill("ck-lead-read", soft(b.lead_read.absent_text));
+  else document.getElementById("ck-lead-section")?.remove();
+  const sheet = sheetLine(characterOf(b));
+  fill("ck-sheet-line", sheet ? `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>` : esc(b.sheet.absent_text || ""));
   const pod = usable(b.chapter) && usable(b.chapter.data.podcast) ? b.chapter.data.podcast.data : null;
   const transcriptUrl = pod && /\.mp3$/.test(pod.mp3_url || "") ? pod.mp3_url.replace(/\.mp3$/, ".transcript.json") : "";
-  fill("ck-quotes", F.quotesHTML(b.chapter, null, base));
-  const [calls, read, transcript, character] = await Promise.all([
-    tryJSON("/api/calls"),
-    tryJSON("/api/weekly_priority"),
-    transcriptUrl ? tryJSON(transcriptUrl) : null,
-    tryJSON("/api/character"),
-  ]);
-  // The last settled call, and the next one with its date. Until the route answers, the
-  // bet card above stands in for "next".
-  const last = lastCallHTML(calls, base);
-  if (last) {
-    const next = nextCallHTML(calls);
-    fill("ck-call", `${last}${next}<p><a class="ck-link" href="${esc(base)}call/">Every settled call</a></p>`);
-    if (next) document.getElementById("ck-bet")?.remove();
-  }
-  fill("ck-lead-read", F.leadReadHTML(read, base));
+  const transcript = transcriptUrl ? await tryJSON(transcriptUrl) : null;
   if (transcript) fill("ck-quotes", F.quotesHTML(b.chapter, transcript, base));
-  const sheet = sheetLine(character);
-  if (sheet) fill("ck-sheet-line", `<a class="ck-link" href="${esc(base)}sheet/">${esc(`${sheet}: the character sheet`)}</a>`);
 }
 
 async function mountStart(edition, b) {
@@ -430,14 +598,17 @@ async function mountCoaches(edition, b) {
   const base = document.body.dataset.ckBase || "/";
   const [coaches, docket, calls] = await Promise.all([tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")]);
   fill("ck-record-big", recordBigHTML(b.record));
-  fill("ck-team", teamHTML(coaches, base) || soft("The team is not served right now."));
-  const pair = callVerdictsHTML(calls, base);
+  fill("ck-team", teamHTML(coaches, base, "coaches") || soft("The team is not served right now."));
+  // The shell's scorecard door joins the note under the pair; with no pair it stands as served.
+  const more = document.getElementById("ck-verdicts-more");
+  const pair = callVerdictsHTML(calls, base, "coaches", { trailer: more ? more.innerHTML.trim() : "" });
+  if (pair && more) more.remove();
   fill("ck-verdicts", pair || verdictsHTML(coaches) || soft("No checked call is served right now."));
   const bet = b.next && b.next.data && b.next.data.bet;
-  fill("ck-bet", `${betHTML(b.next)}${soft(moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""))}`);
+  fill("ck-bet", betHTML(b.next, { extra: moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""), ...reasonsDoor(b.next, base), oneLine: true }));
 }
 
-const PAGES = { front: mountFront, start: mountStart, story: mountStory, coaches: mountCoaches };
+const PAGES = { front: mountFront, week: mountWeek, start: mountStart, story: mountStory, coaches: mountCoaches };
 
 export async function mount() {
   const page = document.body && document.body.dataset.ckPage;

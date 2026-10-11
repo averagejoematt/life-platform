@@ -67,7 +67,9 @@ PREFIX = "generated/podcast/debrief"
 MAX_EPISODES = 60  # ~2 months of daily episodes in the feed
 
 BUDGET_FEATURE = "daily_debrief"
-MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("daily_debrief")
 MAX_TOKENS = 520
 # A clean, neutral system-narrator voice — deliberately NOT Elena's (Aoede), so the
 # daily debrief is audibly distinct from the weekly chronicle podcast.

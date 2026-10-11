@@ -461,6 +461,10 @@ def _normalize_only(only) -> list:
     return out
 
 
+def _route_key(path: str) -> str:
+    return "/" + str(path).strip().strip("/")
+
+
 def filter_plan(plan: list, only) -> list:
     """Restrict a build_plan() result to the `--only` paths (#3316).
 
@@ -469,11 +473,13 @@ def filter_plan(plan: list, only) -> list:
     wanted = _normalize_only(only)
     if not wanted:
         return plan
-    known = {p["path"] for p in plan}
+    # A prefix route's router path keeps its trailing slash (`/api/coach/`), which
+    # _normalize_only strips, so match on the slash-less form.
+    known = {_route_key(p["path"]) for p in plan}
     unknown = [w for w in wanted if w not in known]
     if unknown:
         raise ValueError(f"--only path(s) not in the discovered router surface: {unknown}")
-    return [p for p in plan if p["path"] in wanted]
+    return [p for p in plan if _route_key(p["path"]) in wanted]
 
 
 def merge_exemptions(existing: dict, fresh: dict, only_paths) -> dict:
@@ -485,8 +491,8 @@ def merge_exemptions(existing: dict, fresh: dict, only_paths) -> dict:
     scope = set(_normalize_only(only_paths))
     if not scope:
         return dict(fresh)
-    merged = {k: v for k, v in (existing or {}).items() if k not in scope}
-    merged.update({k: v for k, v in fresh.items() if k in scope})
+    merged = {k: v for k, v in (existing or {}).items() if _route_key(k) not in scope}
+    merged.update({k: v for k, v in fresh.items() if _route_key(k) in scope})
     return merged
 
 

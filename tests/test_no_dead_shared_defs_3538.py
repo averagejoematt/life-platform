@@ -88,23 +88,7 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # record_text.coach_output_text (deploy/backfill_recall_embeddings.py) and
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
-_BATCH_REASON = (
-    "ADR-132 / #409: bedrock_batch ships the batch-inference MECHANISM deliberately "
-    "unwired. Bedrock's hard floor is 100 records per job per model and measured volume "
-    "is ~62 model calls/day across ALL producers mixed across models, so no producer can "
-    "honestly submit a batch today — the module's own docstring is the decision and names "
-    "batch_preflight() as the gate a future adopter calls first. This is a documented "
-    "latent capability with full tests, not a leftover; deleting it is an ADR-132 reversal, "
-    "not a dead-code cleanup. Revisit when a producer clears the 100-record floor."
-)
-
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/ai/bedrock_batch.py:build_jsonl_record": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:submit_batch": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:wait_for_batch": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:retrieve_results": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:run_or_fallback": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:estimate_batch_savings": _BATCH_REASON,
     "lambdas/ai/ai_calls.py:call_training_coach_v2": (
         "one seat of a symmetric ADR-153 coach family (sleep / nutrition / training / mind, "
         "each a 3-line `_run_coach_v2_pipeline(<seat>, ...)` wrapper). The daily-brief tests "
@@ -148,14 +132,15 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "(lambdas/compute/coach_memoir_lambda.py), so deleting its inverse would leave the "
         "live function's boundary math asserted only against hand-typed dates."
     ),
-    "lambdas/ai/prompt_cache.py:clears_floor": (
-        "the COMPUTATION of a live gate, not a leftover. "
-        "tests/test_prompt_cache_decisions_3085.py asserts "
-        "`clears_floor(the real prompt, the real model) == entry['engaged']` for every "
-        "recorded caller — deleting it deletes the only thing that checks the "
-        "CACHING_DECISIONS ledger against the models' actual minimum prefixes (#3085). It "
-        "is misplaced (it belongs on the test side, where it would not ride ~104 bundles), "
-        "not unused; moving it is a separate change with a real regression risk."
+    # `clears_floor` was allowlisted here as the #3085 gate's computation; #4778's
+    # `decision_drift` now calls it, so the scan no longer flags it and its entry is gone.
+    "lambdas/ai/prompt_cache.py:decision_drift": (
+        "the COMPUTATION of a live gate, not a leftover (#4778). "
+        "tests/test_prompt_cache_floor_derivation_4778.py runs it for every "
+        "CACHING_DECISIONS caller under the env the CDK stack sets, and under a hypothetical "
+        "5.5 move — deleting it deletes the only check that a caching decision still matches "
+        "the floor of the model its caller RESOLVES to. Kept beside the register it reads "
+        "(and beside clears_floor, its #3085 predecessor) rather than on the test side."
     ),
     "lambdas/common/subscriber_cadence.py:delivery_weekdays": (
         "the DERIVATION half of #3564's cadence contract, arriving with the merge of "

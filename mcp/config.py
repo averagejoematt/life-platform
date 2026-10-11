@@ -7,14 +7,14 @@ import logging
 import os
 
 import boto3
-from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+from ai.model_routing import model_for  # #4770: the one model registry
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # ── AI model constants (env-overridable to avoid silent deprecation failures) ──
-AI_MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+AI_MODEL = model_for("shared.narrative")
+AI_MODEL_HAIKU = model_for("shared.workhorse")
 
 # ── Environment variables (with backwards-compatible defaults) ──
 _REGION = os.environ.get("AWS_REGION", "us-west-2")

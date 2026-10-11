@@ -1413,9 +1413,13 @@ jobs:
           # standalone (visual-qa.yml), where it reports without holding a rollback.
           # #4589: --ai-qa only when the reader-surface gate said RUN (its verdict line is above).
           # The tier-3 budget pause is unchanged — it lives inside the judge and applies on RUN.
+          # #4652 (ADR-116): a SKIP is handed to the sweep, which reports it itself — a
+          # SKIPPED-BY-READER-SURFACE line, a job-summary line, a ::warning annotation and
+          # report.json's ai_vision_status — so a green job here can never read as "the AI
+          # judge passed this deploy". This job is in no rollback's `needs`, so a skip
+          # cannot revert anything either.
           if [ "${RUN_AI}" = "false" ]; then
-            echo "::notice title=AI-vision skipped (#4589)::${SKIP_REASON}"
-            python3 tests/visual_qa.py --screenshot
+            python3 tests/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"
           else
             python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
           fi

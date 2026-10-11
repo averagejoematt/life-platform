@@ -1,0 +1,81 @@
+{
+    "_comment": "Verbatim `aws s3api get-bucket-notification-configuration --bucket matthew-life-platform` output, read 2026-10-10 (#4643). The wire shape the drift check parses.",
+    "LambdaFunctionConfigurations": [
+        {
+            "Id": "MacroFactorCSVIngest",
+            "LambdaFunctionArn": "arn:aws:lambda:us-west-2:205930651321:function:macrofactor-data-ingestion",
+            "Events": [
+                "s3:ObjectCreated:*"
+            ],
+            "Filter": {
+                "Key": {
+                    "FilterRules": [
+                        {
+                            "Name": "Prefix",
+                            "Value": "uploads/macrofactor/"
+                        },
+                        {
+                            "Name": "Suffix",
+                            "Value": ".csv"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "Id": "InboundEmailInsightParser",
+            "LambdaFunctionArn": "arn:aws:lambda:us-west-2:205930651321:function:insight-email-parser",
+            "Events": [
+                "s3:ObjectCreated:*"
+            ],
+            "Filter": {
+                "Key": {
+                    "FilterRules": [
+                        {
+                            "Name": "Prefix",
+                            "Value": "raw/inbound_email/"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "Id": "FoodDeliveryCSVIngest",
+            "LambdaFunctionArn": "arn:aws:lambda:us-west-2:205930651321:function:food-delivery-ingestion",
+            "Events": [
+                "s3:ObjectCreated:*"
+            ],
+            "Filter": {
+                "Key": {
+                    "FilterRules": [
+                        {
+                            "Name": "Prefix",
+                            "Value": "imports/food_delivery/"
+                        },
+                        {
+                            "Name": "Suffix",
+                            "Value": ".csv"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "Id": "MeasurementsCSVIngest",
+            "LambdaFunctionArn": "arn:aws:lambda:us-west-2:205930651321:function:measurements-ingestion",
+            "Events": [
+                "s3:ObjectCreated:*"
+            ],
+            "Filter": {
+                "Key": {
+                    "FilterRules": [
+                        {
+                            "Name": "Prefix",
+                            "Value": "imports/measurements/"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

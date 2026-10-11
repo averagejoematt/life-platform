@@ -385,6 +385,9 @@ def test_a_reply_writes_one_entry_per_answered_question_and_none_for_an_unanswer
 
 def _sq_email(body):
     return (
+        # #4633: SES's own verdict header is part of the wire shape — the parser refuses an allowlisted From without it.
+        "Authentication-Results: amazonses.com; spf=pass smtp.mailfrom=example.invalid; dkim=pass header.i=@example.invalid;"
+        " dmarc=pass header.from=example.invalid;\r\n"
         "From: Matthew <matthew@example.invalid>\r\n"
         "To: insight@aws.example.invalid\r\n"
         "Subject: Re: The Measured Life · Week 5 · 3 quick questions [SQ-W5]\r\n"

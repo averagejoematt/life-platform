@@ -10,7 +10,8 @@ engine (9:45 AM PT) so EWMA trends are fresh.
 
 Evaluation types:
   1. machine      — metric crosses threshold within window
-  2. directional  — metric moves in predicted direction (EWMA-based); point (#3551) — reading on the target date within ±tolerance
+  2. directional  — metric moves the called way from the first to the last reading of the call's own window,
+                    beyond its own day-to-day noise (#4617); point (#3551) — reading on the target date within ±tolerance
   3. conditional  — if X then Y (check precondition, then evaluate)
   4. qualitative  — skip (needs human/LLM, not this Lambda)
 
@@ -108,9 +109,16 @@ EWMA_DECAY = 0.87
 # EXCEPTION (2026-09-02, #3448): fixed editorial band, the de-facto null for the #813
 # rescue path. Stamp, reach + re-derive trigger: registry entry `directional_trend_verdict`
 # + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
+# #4617: since the window grade (coach.prediction_direction_window) this band grades only an UNDATED
+# direction call; every dated call is graded against its own window's day-to-day swing.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
-from coach import coach_baseline, commitment_grading  # noqa: E402  (#4585 the rule beside each grade; #3553 the follow-through ledger)
+from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts)
+    coach_baseline,
+    commitment_grading,
+    prediction_count_grader,
+    prediction_direction_window as direction_window,  # noqa: E402  (#4617: a direction call graded across its window)
+)
 from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observation floor + the provisional-grade rules, reasoned out there
     EWMA_MIN_OBSERVATIONS,
     EWMA_MIN_PRIOR_POINTS,
@@ -668,72 +676,25 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
 
 
 def _evaluate_directional(pred, eval_spec, data_cache, today_str, include_pilot=False):
+    """Directional evaluation: did the metric move the called way ACROSS THE CALL'S OWN WINDOW?
+
+    #4617: graded on the first vs last reading of [created_date, created_date + its STATED window]
+    against a noise band derived from the window's own day-to-day changes — see
+    coach.prediction_direction_window. A flat window refutes (#801); only missing data or a
+    malformed call is inconclusive. An undated row keeps the legacy EWMA trend verdict.
     """
-    Directional evaluation: metric moves in predicted direction.
-
-    Uses EWMA trend detection to determine actual direction, then compares
-    against the predicted direction. Confirmed only if the direction matches
-    AND the magnitude exceeds the noise threshold. Refuted if the metric moved
-    the opposite way, OR (#801) if it stayed flat — a directional call is a bet
-    that something moves, and "nothing happened" is evidence against that bet,
-    not a non-result. Only missing data or a malformed prediction is inconclusive.
-    """
-    metric_key = eval_spec.get("metric")
-    predicted_direction = eval_spec.get("condition")  # "up" or "down"
-    if not metric_key or not predicted_direction:
-        return None
-
-    actual_direction, slope = _get_ewma_trend(metric_key, data_cache, today_str, include_pilot)
-
-    if actual_direction is None:
-        return {
-            "status": "inconclusive",
-            "reason": f"Insufficient data to determine trend for '{metric_key}'",
-            "actual_value": None,
-            "beats_null": False,
-        }
-
-    # Normalize predicted direction
-    pred_dir = predicted_direction.lower().strip()
-    if pred_dir not in ("up", "down"):
-        return {
-            "status": "inconclusive",
-            "reason": f"Invalid predicted direction: '{predicted_direction}'",
-            "actual_value": None,
-            "beats_null": False,
-        }
-
-    direction_matches = actual_direction == pred_dir
-    magnitude_sufficient = abs(slope) > DIRECTIONAL_NOISE_THRESHOLD if slope else False
-
-    if direction_matches and magnitude_sufficient:
-        status = "confirmed"
-        beats_null = True
-        reason = f"{metric_key} trend={actual_direction} (slope={slope:.4f}), " f"predicted={pred_dir}"
-    elif actual_direction == "flat":
-        # #801: a directional call is refuted whether the metric moved the OPPOSITE
-        # way or didn't move at all. "Flat" isn't "no evidence either way" — the coach
-        # predicted movement (up/down) and the metric stayed inside the noise band
-        # (±DIRECTIONAL_NOISE_THRESHOLD), so the predicted move simply didn't happen.
-        # Only a genuinely undecidable case (missing data, invalid prediction) stays
-        # inconclusive — see the earlier early-returns in this function.
-        status = "refuted"
-        beats_null = False
-        reason = (
-            f"predicted {pred_dir}, metric flat (slope={slope:.4f}, "
-            f"within ±{DIRECTIONAL_NOISE_THRESHOLD} noise band) — no movement to confirm the call"
-        )
-    else:
-        status = "refuted"
-        beats_null = False
-        reason = f"{metric_key} trend={actual_direction} (slope={slope:.4f}), " f"predicted={pred_dir}"
-
-    return {
-        "status": status,
-        "reason": reason,
-        "actual_value": slope,
-        "beats_null": beats_null,
-    }
+    return direction_window.evaluate(
+        pred,
+        eval_spec,
+        data_cache,
+        today_str,
+        window_days=eval_spec.get("evaluation_window_days") or _get_effective_window(eval_spec, (pred or {}).get("subdomain", "")),
+        get_source_data=_get_source_data,
+        extract_metric_series=_extract_metric_series,
+        ewma_trend=_get_ewma_trend,  # resolved at call time: the legacy path for an undated row
+        noise_threshold=DIRECTIONAL_NOISE_THRESHOLD,
+        include_pilot=include_pilot,
+    )
 
 
 def _evaluate_point(pred, eval_spec, data_cache, today_str):
@@ -1021,15 +982,16 @@ def _evaluate_all(predictions, today_str):
             continue  # Window hasn't elapsed yet
 
         # Route to appropriate evaluator
-        result = None
         try:
-            if eval_type == "machine":
+            # #4541: a count claim ("at least K of N days >= X") is COUNTED, or held ungraded — never routed to slope below.
+            result = prediction_count_grader.grade(pred, eval_spec, data_cache, today_str, _get_source_data, _extract_metric_series)
+            if result is None and eval_type == "machine":
                 result = _evaluate_machine(pred, eval_spec, data_cache, today_str)
-            elif eval_type in ("directional", "point"):  # #3551: point rides the same branch
+            elif result is None and eval_type in ("directional", "point"):  # #3551: point rides the same branch
                 result = (_evaluate_point if eval_type == "point" else _evaluate_directional)(pred, eval_spec, data_cache, today_str)
-            elif eval_type == "conditional":
+            elif result is None and eval_type == "conditional":
                 result = _evaluate_conditional(pred, eval_spec, data_cache, today_str)
-            else:
+            elif result is None:
                 logger.info("Skipping unsupported evaluation type: %s", eval_type)
                 stats["skipped_error"] += 1
                 continue
@@ -1075,10 +1037,10 @@ def _evaluate_all(predictions, today_str):
             "prediction_id": prediction_id,
             "coach_id": coach_id,
             "subdomain": subdomain,
-            "evaluation_type": eval_type,
-            "metric": eval_spec.get("metric", ""),
-            "threshold": eval_spec.get("threshold"),
-            "condition": eval_spec.get("condition", ""),
+            "evaluation_type": result.get("evaluation_type", eval_type),  # #4541: "count" when the count rule graded it
+            "metric": result.get("metric", eval_spec.get("metric", "")),
+            "threshold": result.get("threshold", eval_spec.get("threshold")),
+            "condition": result.get("condition", eval_spec.get("condition", "")),
             "actual_value": result.get("actual_value"),
             "status": status,
             "beats_null": result.get("beats_null", False),
@@ -1089,11 +1051,12 @@ def _evaluate_all(predictions, today_str):
             "evaluation_window_days": effective_window,
             # #2221: undecidable inside the grace period -> provisional, re-graded tomorrow.
             "grading_open": status == "inconclusive" and not past_grace,
+            "window": result.get("window"),  # #4617: the start/end readings a direction call was graded on
         }
         evaluations.append(evaluation)
 
         # Write status update to prediction record
-        _bl = coach_baseline.stamp_at_grading(pred, eval_spec, result, status, data_cache, *_BASELINE_IO)  # #4585
+        _bl = coach_baseline.stamp_at_grading(pred, result.get("rule_spec", eval_spec), result, status, data_cache, *_BASELINE_IO)  # #4585
         _update_prediction_status(pred, evaluation, _bl)
 
         # Update Bayesian confidence if applicable

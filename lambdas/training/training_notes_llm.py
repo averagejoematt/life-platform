@@ -23,15 +23,20 @@ record, and the reason survives log retention.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 
+from ai import structured_json  # the one parse door (#4276 box 2)
 from common.numeric import decimals_to_float, floats_to_decimal
 
 logger = logging.getLogger(__name__)
 
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+HAIKU_MODEL = model_for("training_notes")
+# #4643: the budget_guard feature the Haiku tail is gated on — listed in
+# budget_guard._FEATURE_CUTOFF and scripts/ai_budget_ledger.py (tests/test_ingest_ai_budget_rows_4643.py).
+BUDGET_FEATURE = "training_notes"
 
 # MAX_TOKENS is DERIVED from a measurement, not chosen as a round number (#3699; the
 # #3678/#3403 class — a budget set from a stale observation and never re-derived). 256 was
@@ -164,6 +169,13 @@ class CapExceeded(ExtractionDegraded):
     degrade_code = "cap_exceeded"
 
 
+class BudgetPaused(ExtractionDegraded):
+    """The budget tier pauses BUDGET_FEATURE (#4643) — no spend, no attempt, no cap charge;
+    caller degrades to deterministic-only and the note is kept (Invariant 4)."""
+
+    degrade_code = "budget_paused"
+
+
 class TruncatedResponse(ExtractionDegraded):
     """Bedrock stopped at `max_tokens` — the JSON array is cut off mid-array.
 
@@ -223,15 +235,13 @@ def _parse_signals(text: str, taxonomy) -> list:
     """
     if not text:
         raise UnparseableResponse("empty response — no text content block")
-    # Tolerate a fenced block or leading prose: grab the first [...] span.
-    start, end = text.find("["), text.rfind("]")
-    if start == -1 or end == -1 or end < start:
-        raise UnparseableResponse(f"no JSON array span in a {len(text)}-char response")
-    span = text[start : end + 1]  # noqa: E203
+    # Tolerate a fenced block or leading prose: the first "[" to the last "]", parsed in the door (#4276 box 2).
     try:
-        arr = json.loads(span)
-    except (ValueError, TypeError) as e:
-        raise UnparseableResponse(f"json.loads failed on a {len(span)}-char span: {type(e).__name__}: {e}") from e
+        arr = structured_json.load_json_span(text, "[")
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":
+            raise UnparseableResponse(f"no JSON array span in a {len(text)}-char response") from None
+        raise UnparseableResponse(f"json.loads failed on a {e.span_len}-char span: {type(e.cause).__name__}: {e.cause}") from e.cause
     out = []
     for s in arr if isinstance(arr, list) else []:
         if not isinstance(s, dict):
@@ -322,6 +332,16 @@ def _bump_calls(table, now=None, lane: str = "live"):
         pass
 
 
+def _ai_allowed() -> bool:
+    """budget_guard gate for the Haiku tail (#4643). Fails open if the module is missing —
+    bedrock_client's own tier-3 backstop still applies."""
+    try:
+        from ai import budget_guard
+    except ImportError:  # pragma: no cover — budget_guard always bundled in prod
+        return True
+    return budget_guard.allow(BUDGET_FEATURE)
+
+
 def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live"):
     """Build the llm_fn passed to training_notes.extract_signals: hash-cached + capped.
 
@@ -344,6 +364,9 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live
         cached = cache_get(table, h)
         if cached is not None:
             return cached
+        if not _ai_allowed():
+            # #4643: before the cap read and before any spend — a paused tier charges nothing.
+            raise BudgetPaused(f"budget tier pauses {BUDGET_FEATURE} ({lane} lane)")
         if monthly_calls(table, lane=lane) >= monthly_cap:
             raise CapExceeded(f"training-notes Haiku monthly cap {monthly_cap} reached ({lane} lane)")
         try:

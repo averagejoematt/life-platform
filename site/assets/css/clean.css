@@ -66,7 +66,7 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-link { text-decoration: underline; text-decoration-color: var(--ck-line); text-underline-offset: 4px; text-decoration-thickness: 2px; }
 
 /* 1. Edition header */
-.ck-header { display: flex; justify-content: space-between; align-items: center; padding-block: 20px; font-size: 0.95rem; }
+.ck-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 20px; font-size: 0.95rem; }
 .ck-header__brand { font-weight: 600; letter-spacing: -0.01em; }
 .ck-header__back { text-decoration: none; color: var(--ck-soft); }
 .ck-header__day { color: var(--ck-soft); font-variant-numeric: tabular-nums; }
@@ -90,6 +90,7 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-today { display: flex; flex-direction: column; gap: var(--ck-gap-row); }
 .ck-today--ruled { padding-top: 28px; border-top: 1px solid var(--ck-line); }
 .ck-num { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.ck-num a { text-decoration: none; color: inherit; display: contents; }
 .ck-num b { font-size: clamp(2.6rem, 11vw, 3.4rem); line-height: 1; letter-spacing: -0.04em; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ck-big { font-size: clamp(3.6rem, 17vw, 5.5rem); line-height: 1; letter-spacing: -0.045em; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ck-big span { font-size: 0.26em; letter-spacing: 0; font-weight: 500; color: var(--ck-soft); margin-left: 6px; }
@@ -126,6 +127,14 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-rows--more li { display: block; padding-block: 0; }
 .ck-rows--more a { display: flex; justify-content: space-between; gap: 12px; padding-block: 15px; text-decoration: none; font-weight: 500; }
 .ck-rows--more a span { color: var(--ck-faint); font-weight: 400; }
+/* The call list: the verdict and its rule sit on their own line under the call (#4647). */
+.ck-rows--calls a { flex-direction: column; gap: 2px; }
+
+/* The "Go deeper" list on the front page: the door in ink in a fixed column, the note soft beside it. */
+.ck-rows--deeper li { grid-template-columns: 7.6rem 1fr; }
+.ck-rows--deeper .ck-rows__key { color: inherit; font-size: inherit; font-weight: 500; text-decoration: none; }
+.ck-rows--deeper .ck-rows__key:hover { text-decoration: underline; text-underline-offset: 4px; }
+.ck-rows--deeper li > span { color: var(--ck-soft); }
 
 /* 7. Bet card */
 .ck-bet { background: var(--ck-panel); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 8px; }
@@ -159,6 +168,7 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 /* 12. Footer */
 .ck-footer { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 0.92rem; color: var(--ck-soft); margin-top: var(--ck-gap-section); padding-top: 24px; border-top: 1px solid var(--ck-line); }
 .ck-footer a { text-decoration: none; }
+.ck-footer + .ck-small { margin-top: 20px; font-size: 0.82rem; }
 
 @media (max-width: 480px) {
   .ck-page { padding-inline: 20px; }

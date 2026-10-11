@@ -664,7 +664,7 @@ def _seed(table, strava_days, whoop_days=()):
 def test_a_day_in_the_window_is_enriched_and_written_back(table, frozen_clock):
     _seed(table, [strava_day("2026-08-06", [activity("Mailbox Peak", distance_miles=6.2)])])
     result = en.enrich_date_range("2026-08-06", "2026-08-06")
-    assert result == {"enriched": 1, "skipped": 0, "days_processed": 1}
+    assert result == {"enriched": 1, "skipped": 0, "malformed": 0, "days_processed": 1}  # malformed: #4643
     assert len(table.updates) == 1
 
 

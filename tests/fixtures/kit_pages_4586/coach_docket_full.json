@@ -1,49 +1,11 @@
 {
+ "_meta": {
+  "generated_at": "2026-10-10T02:35:25.115729+00:00",
+  "served_at": "2026-10-10T02:35:25.115729+00:00",
+  "cache_seconds": 300,
+  "request_id": "e73b4bf287824031"
+ },
  "open": [
-  {
-   "topic": "Recovery score directional trend confirmation",
-   "topic_slug": "recovery-score-directional-trend-confirmation",
-   "coach_a": "physical_coach",
-   "coach_b": "sleep_coach",
-   "claims": {
-    "physical_coach": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point; insufficient for confirmed directional shift; most parsimonious explanation is regression-to-mean",
-    "sleep_coach": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%; treats prediction as directional signal"
-   },
-   "criterion": {
-    "threshold": 81.6,
-    "condition": "gte",
-    "metric": "recovery_score_7day_avg",
-    "description": "recovery_score_7day_avg >= 81.6 on 2026-10-05"
-   },
-   "sides": {
-    "physical_coach": false,
-    "sleep_coach": true
-   },
-   "resolution_date": "2026-10-05",
-   "opened_date": "2026-09-28"
-  },
-  {
-   "topic": "Recovery rebound interpretation: mean reversion vs. corrective action",
-   "topic_slug": "recovery-rebound-interpretation-mean-reversion-vs-corrective",
-   "coach_a": "mind_coach",
-   "coach_b": "sleep_coach",
-   "claims": {
-    "mind_coach": "Recovery rebound from 24% to 94% represents statistical regression toward baseline after a floor event, not a signal of corrective action by the subject",
-    "sleep_coach": "Recovery spike from 24% to 94% is genuine architectural improvement; deep sleep at 28.9% and REM at 32.9% on consecutive nights represent structural signal, not noise"
-   },
-   "criterion": {
-    "condition": "gte",
-    "metric": "recovery_score_7day_avg",
-    "description": "recovery_score_7day_avg >= 80 on 2026-10-07",
-    "threshold": 80.0
-   },
-   "sides": {
-    "mind_coach": false,
-    "sleep_coach": true
-   },
-   "resolution_date": "2026-10-07",
-   "opened_date": "2026-09-23"
-  },
   {
    "topic": "Fuel-cognition link mechanistic validity",
    "topic_slug": "fuel-cognition-link-mechanistic-validity",
@@ -64,7 +26,21 @@
     "mind_coach": false
    },
    "resolution_date": "2026-10-12",
-   "opened_date": "2026-09-28"
+   "opened_date": "2026-09-28",
+   "stakes": {
+    "mind_coach": {
+     "brier": 0.25,
+     "brier_n": 9.0,
+     "confidence": 0.5,
+     "subdomain": "protein"
+    },
+    "nutrition_coach": {
+     "subdomain": "protein",
+     "brier": 0.25,
+     "confidence": 0.167,
+     "brier_n": 19.0
+    }
+   }
   },
   {
    "topic": "Deep sleep spike interpretation: signal vs. noise",
@@ -86,10 +62,120 @@
     "physical_coach": true
    },
    "resolution_date": "2026-10-16",
-   "opened_date": "2026-10-02"
+   "opened_date": "2026-10-02",
+   "stakes": {
+    "sleep_coach": {
+     "brier": 0.2505,
+     "subdomain": "sleep",
+     "brier_n": 30.0,
+     "confidence": 0.467
+    },
+    "physical_coach": {
+     "confidence": 0.5,
+     "subdomain": "sleep",
+     "brier_n": 14.0,
+     "brier": 0.25
+    }
+   }
   }
  ],
  "resolved": [
+  {
+   "topic": "Recovery rebound interpretation: mean reversion vs. corrective action",
+   "topic_slug": "recovery-rebound-interpretation-mean-reversion-vs-corrective",
+   "coach_a": "mind_coach",
+   "coach_b": "sleep_coach",
+   "claims": {
+    "sleep_coach": "Recovery spike from 24% to 94% is genuine architectural improvement; deep sleep at 28.9% and REM at 32.9% on consecutive nights represent structural signal, not noise",
+    "mind_coach": "Recovery rebound from 24% to 94% represents statistical regression toward baseline after a floor event, not a signal of corrective action by the subject"
+   },
+   "criterion": {
+    "description": "recovery_score_7day_avg >= 80 on 2026-10-07",
+    "threshold": 80.0,
+    "metric": "recovery_score_7day_avg",
+    "condition": "gte"
+   },
+   "sides": {
+    "mind_coach": false,
+    "sleep_coach": true
+   },
+   "resolution_date": "2026-10-07",
+   "opened_date": "2026-09-23",
+   "stakes": {
+    "sleep_coach": {
+     "brier_n": 20.0,
+     "subdomain": "recovery",
+     "confidence": 0.6,
+     "brier": 0.2507
+    },
+    "mind_coach": {
+     "brier_n": 4.0,
+     "subdomain": "recovery",
+     "brier": 0.25,
+     "confidence": 0.5
+    }
+   },
+   "verdict": {
+    "actual_value": 87.57142857142857,
+    "winner": "sleep_coach",
+    "holds": true,
+    "outcome": "graded",
+    "loser": "mind_coach"
+   },
+   "winner": "sleep_coach",
+   "loser": "mind_coach",
+   "actual_value": 87.57142857142857,
+   "resolved_date": "2026-10-07",
+   "concession": "CONCESSION (2026-10-07) \u2014 I lost the docket dispute on 'Recovery rebound interpretation: mean reversion vs. corrective action'. My recorded claim: \"Recovery rebound from 24% to 94% represents statistical regression toward baseline after a floor event, not a signal of corrective action by the subject\". The criterion we agreed to at open \u2014 recovery_score_7day_avg >= 80 on 2026-10-07 \u2014 resolved against me: actual value 87.5714. The sleep coach took the other side and was right. This stays on my record: when I next address Recovery rebound interpretation: mean reversion vs. corrective action, I cite this concession instead of relitigating it."
+  },
+  {
+   "topic": "Recovery score directional trend confirmation",
+   "topic_slug": "recovery-score-directional-trend-confirmation",
+   "coach_a": "physical_coach",
+   "coach_b": "sleep_coach",
+   "claims": {
+    "physical_coach": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point; insufficient for confirmed directional shift; most parsimonious explanation is regression-to-mean",
+    "sleep_coach": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9\u2013100%; treats prediction as directional signal"
+   },
+   "criterion": {
+    "description": "recovery_score_7day_avg >= 81.6 on 2026-10-05",
+    "metric": "recovery_score_7day_avg",
+    "threshold": 81.6,
+    "condition": "gte"
+   },
+   "sides": {
+    "physical_coach": false,
+    "sleep_coach": true
+   },
+   "resolution_date": "2026-10-05",
+   "opened_date": "2026-09-28",
+   "stakes": {
+    "sleep_coach": {
+     "confidence": 0.444,
+     "subdomain": "recovery",
+     "brier_n": 27.0,
+     "brier": 0.2506
+    },
+    "physical_coach": {
+     "subdomain": "recovery",
+     "brier_n": 10.0,
+     "confidence": 0.5,
+     "brier": 0.25
+    }
+   },
+   "verdict": {
+    "outcome": "graded",
+    "winner": "physical_coach",
+    "actual_value": 81.0,
+    "loser": "sleep_coach",
+    "holds": false
+   },
+   "winner": "physical_coach",
+   "loser": "sleep_coach",
+   "actual_value": 81.0,
+   "resolved_date": "2026-10-05",
+   "concession": "CONCESSION (2026-10-05) \u2014 I lost the docket dispute on 'Recovery score directional trend confirmation'. My recorded claim: \"Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9\u2013100%; treats prediction as directional signal\". The criterion we agreed to at open \u2014 recovery_score_7day_avg >= 81.6 on 2026-10-05 \u2014 resolved against me: actual value 81. The physical coach took the other side and was right. This stays on my record: when I next address Recovery score directional trend confirmation, I cite this concession instead of relitigating it."
+  },
   {
    "topic": "Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?",
    "topic_slug": "carb-reduction-recommendation-will-it-degrade-recovery-or-im",
@@ -111,6 +197,20 @@
    },
    "resolution_date": "2026-09-30",
    "opened_date": "2026-09-23",
+   "stakes": {
+    "glucose_coach": {
+     "brier_n": 3.0,
+     "brier": 0.25,
+     "subdomain": "recovery",
+     "confidence": 0.333
+    },
+    "nutrition_coach": {
+     "brier": 0.25,
+     "brier_n": 10.0,
+     "confidence": 0.5,
+     "subdomain": "recovery"
+    }
+   },
    "verdict": {
     "outcome": "graded",
     "loser": "glucose_coach",
@@ -122,7 +222,13 @@
    "loser": "glucose_coach",
    "actual_value": 59.0,
    "resolved_date": "2026-09-30",
-   "concession": "CONCESSION (2026-09-30) — I lost the docket dispute on 'Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?'. My recorded claim: \"Evening carb reduction is likely coming based on CGM data; glucose variability (not average) is the primary diagnostic signal in subjects with visceral adiposity\". The criterion we agreed to at open — recovery_score < 70 on 2026-09-30 — resolved against me: actual value 59. The nutrition coach took the other side and was right. This stays on my record: when I next address Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?, I cite this concession instead of relitigating it."
+   "concession": "CONCESSION (2026-09-30) \u2014 I lost the docket dispute on 'Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?'. My recorded claim: \"Evening carb reduction is likely coming based on CGM data; glucose variability (not average) is the primary diagnostic signal in subjects with visceral adiposity\". The criterion we agreed to at open \u2014 recovery_score < 70 on 2026-09-30 \u2014 resolved against me: actual value 59. The nutrition coach took the other side and was right. This stays on my record: when I next address Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?, I cite this concession instead of relitigating it."
   }
- ]
+ ],
+ "counts": {
+  "open": 2,
+  "resolved": 3
+ },
+ "withheld": 0,
+ "disclosure": "Standing disagreements between AI coaches, each with skin in the game: the stake is the coach's own Brier record, frozen when the docket opened. The resolution criterion and date are agreed at open and graded by deterministic code against real data \u2014 no AI writes the verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross the same standing privacy filter as the coach dossier before publishing; any hit withholds the whole entry and this payload counts it."
 }

@@ -296,6 +296,23 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #4643: the same metric for Hevy — the daily {"reconcile": true} run of
+        # hevy-backfill compares the vendor's all-time workout count with the stored,
+        # non-tombstoned workout rows (net of feed events the hourly poll has not applied
+        # yet) and emits the shortfall. Catches a workout the events cursor walked past.
+        _alarm(
+            "IngestReconciliationHevy",
+            "ingest-reconciliation-hevy",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            dims={"Source": "hevy"},
+            to_digest=True,
+        )
+
         # DI-2b: interior-gap detection. Freshness/liveness see only the latest
         # date per source; this catches a DAILY source going dead mid-window then
         # resuming (a hole behind the high-water mark). Emitted by freshness_checker
@@ -411,6 +428,14 @@ class MonitoringStack(Stack):
             "LifePlatform/IngestReconciliation",
             "MissingActivityCount",
             dims={"Source": "whoop"},
+        )
+        # #4643: and the hevy reconciler's (a failed vendor/store read emits no datapoint).
+        _heartbeat_alarm(
+            "IngestReconciliationHevyHeartbeat",
+            "ingest-reconciliation-hevy-heartbeat",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            dims={"Source": "hevy"},
         )
         _heartbeat_alarm(
             "FreshnessInteriorGapHeartbeat",
@@ -672,15 +697,23 @@ class MonitoringStack(Stack):
             self,
             "IngestAuthUnhealthy",
             alarm_name="ingest-auth-unhealthy-24h",
-            # #2976 re-cut 86400s → 3600s, superseding #2004's "do not shorten": every
-            # authenticated-successful run now emits 1 (≥1 point/30 min, and a tripped
-            # breaker keeps landing 0s) — fires as fast as before, clears ~1h after
-            # real recovery instead of a 24h latch (2026-08-21→22). See RUNBOOK.md.
-            alarm_description="some source emitted IngestAuthHealthy=0 in the last hour; clears ~1h after recovery (#2976) — confirm via AUTH_FAILURE markers.",
+            # #2976 re-cut 86400s → 3600s, superseding #2004's "do not shorten"; #4641
+            # widened it to 54000s (15 h) because the sub-daily sources were cut to sparse
+            # crons and each emits 0 only on its own runs: dropbox every 2 h, notion
+            # 14,21,3 UTC (gaps 6/7/11 h), withings 14,17,21,0 UTC (gaps 3/4/3/14 h). The
+            # window must exceed the sparsest gap among them (14 h, withings) or a dead
+            # credential flaps ALARM/OK between runs and re-pages 2-3x a day instead of
+            # holding ALARM (pinned by test_aggregate_alarm_window_exceeds_sparsest_hourly_emitters,
+            # which derives the gap from ingestion_stack.py's cron strings). Consequence,
+            # stated plainly: after real recovery this clears up to ~15 h later (the last
+            # 0 must age out), not the ~1 h of #2976. Eight Sleep (one 4-run burst, 18 h gap)
+            # and the daily-cron sources are NOT held by this window; their
+            # per-source ingest-auth-unhealthy-{source} alarms are the durable truth.
+            alarm_description="some source emitted IngestAuthHealthy=0 in the last 15h; clears up to ~15h after recovery (#2976, #4641: window > the 14h Withings cron gap) — confirm via AUTH_FAILURE markers.",
             metric=cloudwatch.Metric(
                 namespace="LifePlatform/OAuth",
                 metric_name="IngestAuthHealthy",
-                period=Duration.seconds(3600),
+                period=Duration.seconds(54000),
                 statistic="Minimum",
             ),
             evaluation_periods=1,
@@ -725,15 +758,17 @@ class MonitoringStack(Stack):
         # predates #1960. Verified against the actual 2026-08-01 outage: the
         # consecutive-failures alarm DID fire (dispatched 08-01T14:01Z, ~2h after the
         # breaker latched at 12:00:28Z) — so this is a fix-in-place, not a new report.
-        # #2976: window = emitter cadence — dropbox (≤30-min emissions) re-cut to 3600s;
-        # daily-cron sources KEEP 86400s (NB missing-data would clear them overnight).
+        # #2976: window = emitter cadence. dropbox now emits every 2 h (#4641), so its
+        # window is 10800s (> cadence): a shorter window would alternate ALARM (a 0)
+        # and OK (empty period, NOT_BREACHING) and page every 2 h. Daily-cron sources
+        # KEEP 86400s (NB missing-data would clear them overnight).
         for _auth_src in ("todoist", "habitify", "dropbox", "whoop"):
             _alarm(
                 f"IngestAuthUnhealthy{_auth_src.title()}",
                 f"ingest-auth-unhealthy-{_auth_src}",
                 "LifePlatform/OAuth",
                 "IngestAuthHealthy",
-                3600 if _auth_src == "dropbox" else 86400,
+                10800 if _auth_src == "dropbox" else 86400,
                 "Minimum",
                 1,
                 LT,

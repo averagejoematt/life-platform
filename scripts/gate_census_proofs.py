@@ -644,6 +644,41 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-16",
     },
+    # #4643 box 5: the four S3 ingestion-trigger notifications live outside CDK; this compares them with a list.
+    "guard::deploy/check_bucket_notification_drift.py": {
+        "gate_name": "deploy/check_bucket_notification_drift.py",
+        "command": (
+            "python3 deploy/check_bucket_notification_drift.py --strict   # live, read-only (one GetBucketNotification); "
+            "plus the offline suite python3 -m pytest tests/test_bucket_notification_drift_4643.py -q (6 tests, baseline 6 passed)"
+        ),
+        "mutation": (
+            "Two defects planted one at a time in the real tracked tree. M1: in `compare()`, "
+            "`missing = [exp_by_id[i] for i in exp_by_id if i not in live_by_id]` became `missing = []`, so a dropped "
+            "notification is no longer reported. M2: the docs/RUNBOOK.md heading "
+            "`## S3 bucket notifications (ingestion triggers outside CDK)` renamed to `## S3 bucket notes`, i.e. the "
+            "entry the CDK comment and the script's FIX line point to going missing. M3a: the verdict "
+            "`drift = bool(missing or unexpected or changed or non_lambda or duplicates)` lost `or duplicates`. M3b: "
+            "`duplicates.append(entry['id'])` in the Id loop became `pass`."
+        ),
+        "observed": (
+            "2026-10-10. BASELINE 6 passed; live `--strict` exit 0, `bucket notification drift: clean`, expected 4, live 4. "
+            "M1 RED (2 failed, 4 passed): test_every_drift_kind_is_reported (the `missing` and `all dropped` cases) and "
+            "test_cli_exit_codes (`--strict` returned 0 over a document with MeasurementsCSVIngest removed). "
+            "M2 RED (1 failed): test_runbook_entry_the_cdk_comment_points_to_exists. "
+            "M3a RED and M3b RED (1 failed each): test_every_drift_kind_is_reported, its `duplicate id` case (an exact "
+            "second copy of InboundEmailInsightParser, so nothing is missing/unexpected/changed). Restored after each; 6 passed."
+        ),
+        "scope": (
+            "Covers the comparison (missing, unexpected, changed function/events/prefix/suffix, non-Lambda "
+            "configurations, duplicate Ids), the CLI exit codes, an unreadable document reading as error rather than "
+            "clean, the live path making exactly one Get call, the expected set agreeing with the S3 invoke grants "
+            "declared in cdk/stacks/ingestion_stack.py, and the runbook entry. The tests use the verbatim live document "
+            "in tests/fixtures/bucket_notification_wire_4643.json. NOT covered: it does not run on a schedule yet. The CI "
+            "roles in infra/iam/ hold no s3:GetBucketNotification, so it is on-demand until that grant is applied. It "
+            "also does not check the functions' resource policies, so a removed S3 invoke grant is not caught here."
+        ),
+        "proved_on": "2026-10-10",
+    },
     "guard::lambdas/content/recap_gate.py": {
         "gate_name": "lambdas/content/recap_gate.py",
         "command": "python3 -m pytest tests/test_recap_gate_3746.py -q   # 11 tests; baseline 11 passed",
@@ -678,6 +713,41 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
             "test-mutation bar, not a live CI observation."
         ),
         "proved_on": "2026-09-13",
+    },
+    # #4694: the deterministic audit an UNAPPROVED chronicle must pass before the stale-draft sweep publishes it.
+    # The fixture is ABRIDGED from Week 5's `desk_findings_json` (the live row the 2026-10-09 sweep published with
+    # those findings unresolved): every finding's prefix/wrapper is kept exact, the two dek fact explanations are
+    # shortened and the row's 5th episode finding (a `fact: ... → N/A` non-finding) is omitted — see the test's
+    # docstring. Not the wire verbatim.
+    "guard::lambdas/content/autopublish_audit.py": {
+        "gate_name": "lambdas/content/autopublish_audit.py",
+        "command": "python3 -m pytest tests/test_chronicle_autopublish_audit_4694.py -q   # 14 tests; baseline 14 passed",
+        "mutation": (
+            "Four defects planted one at a time in the real tracked tree, each one way to lose the gate. M1: the "
+            "sweep's call site `blocking = _audit_refusal(item)` became `blocking = []` in "
+            "chronicle_approve_lambda.py, so the audit still exists and nothing reads it. M2: the Panel's "
+            '`unsafe += [f"audit: {f}" ...]` line in panelcast_desk.py became `pass`. M3: '
+            '`STYLE_PREFIXES = ("craft:", "repeat:")` became `("",)`, so every finding reads as a style note. M4: the '
+            "`out += weekday_mismatches(...)` line in blocking_items was deleted, so the weekday check still exists "
+            "and the audit never calls it. Each edit changes the file's length, so a stale __pycache__ entry cannot run the original code."
+        ),
+        "observed": (
+            "2026-10-10. M1 RED, 5 failed / 8 passed: the Week 5 specimen held, the no-audit-on-record hold, the "
+            "audit-cannot-run hold, a held week beside an audited one, and the dry-run hold. M2 RED, 1 failed / 12 "
+            "passed: test_the_panel_holds_a_desk_episode_the_desk_left_unaudited. M3 RED, 5 failed / 8 passed, "
+            "including test_style_notes_never_block_and_every_other_finding_does (M1-M3 observed on the 13-test file). "
+            "M4 RED on 2026-10-10, 1 failed / 13 passed: test_a_wrong_dated_weekday_in_the_stored_text_blocks_the_sweep "
+            "(before that test existed M4 left every test green). Restored after each; 14 passed."
+        ),
+        "scope": (
+            "Covers the audit's verdict (desk findings minus craft:/repeat:, no desk record, the reader door re-run "
+            "on the stored text, dated weekdays) and both call sites: the stale-draft sweep and the Panel's desk "
+            "episode. Offline, with the publish side-effects mocked. NOT covered: whether the deployed sweep logs "
+            "the token and whether the `chronicle-autopublish-held` alarm fires. That is the post-deploy proof "
+            "#4694 closes on. Also not covered: the podcast's legacy (non-desk) writer path, which this gate never "
+            "sees."
+        ),
+        "proved_on": "2026-10-10",
     },
     "guard::deploy/iam_additive_gate.py": {
         "gate_name": "deploy/iam_additive_gate.py",
@@ -2528,6 +2598,19 @@ REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::Hevy"] 
     "proved_on": "2026-09-26",
 }
 
+# #4674: "pace flag" (cut 2026-10-09) lands at ledger 0; the mutation is the phrase on a reader page.
+REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::pace flag"] = {
+    "gate_name": "BASELINE[pace flag]",
+    "command": "python3 -m pytest tests/test_site_vocabulary_registry.py -q -p no:cacheprovider -k 'ratchets_down and pace'",
+    "mutation": 'site/gear/index.html: "<p>the pace flag is live</p>" inserted after <main id="gr">.',
+    "observed": (
+        "MUTATED: 1 failed — test_builder_vocabulary_only_ratchets_down[pace flag]: 'pace flag' now on 1 reader pages "
+        "(ledger 0), ['site/gear/index.html']. REVERTED: 1 passed. Watched 2026-10-09."
+    ),
+    "scope": "Static HTML main content only; a phrase JS injects at runtime is not seen.",
+    "proved_on": "2026-10-09",
+}
+
 # ── #4182 M4 — the comprehension judge's own CI step ─────────────────────────
 # CI-step proofs live directly in `gate_census.PROVEN_CAN_FAIL` for every other
 # family-1 record (see e.g. "ci::ci-cd.yml::visual-qa::5" there); this one is
@@ -2840,6 +2923,22 @@ REGISTRY_PROOFS.update(
     }
 )
 
+REGISTRY_PROOFS["registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa"] = {
+    "gate_name": "ALLOWLIST[qa]",
+    "command": "python3 -m pytest tests/test_root_clutter_guard.py -q   # 4 tests",
+    "mutation": "the entry's own line deleted from ALLOWLIST, leaving the tracked `qa/` dir unlisted.",
+    "observed": (
+        "2026-10-10 on this branch: ARMED (entry removed) — 1 failed, 3 passed, "
+        "`test_no_unlisted_top_level_dir` naming `['qa']` exactly. REVERTED (entry restored): 4 passed."
+    ),
+    "scope": (
+        "Proves the entry is load-bearing for the D1 ratchet given the real tracked `qa/` dir "
+        "(qa/qa_manifest.py, qa/leak_token_sweep.py). It does not prove the reason text is accurate beyond matching "
+        "docs/REPO_STRUCTURE.md's own row for the same directory."
+    ),
+    "proved_on": "2026-10-10",
+}
+
 # #4419: the strava read-seam SET guard (and the pair-rule fixture beside it) turned
 # tests/test_shared_modules.py into a tree-sweeping structural test. Three REAL-tree
 # mutations, each restored by copying the pre-mutation file back.
@@ -3093,4 +3192,166 @@ CI_PROOFS["ci::config-drift.yml::drift::7"]["scope"] += (
     " Since 2026-10-02 the verdict is commit ancestry, not time: a late deploy of an older tree is caught, and a laptop "
     "deploy from a lane branch main has not absorbed reads stale (diverged); a bundle whose sha this checkout cannot "
     "resolve takes the LastModified basis, named in the log."
+)
+# #4652 (2026-10-04): `ci` moved from EPISODIC_CALLER_CLASSES to PROJECTED_CALLER_CLASSES — the #3554
+# premise guard measured it billing 30 days in 30 — so the entrant below replaces the sealed-unproven
+# `EPISODIC_CALLER_CLASSES::ci` line, which leaves ledgers/gate_census_unproven_residue.py in the same diff.
+REGISTRY_PROOFS["registry::lambdas/operational/cost_governor_lambda.py::PROJECTED_CALLER_CLASSES::ci"] = {
+    "gate_name": "PROJECTED_CALLER_CLASSES[ci]",
+    "command": "python3 -m pytest tests/test_caller_class_attribution_2892.py -q -p no:cacheprovider",
+    "mutation": (
+        "`ci` moved back: PROJECTED_CALLER_CLASSES = ('prod-cron', 'remediation') and EPISODIC_CALLER_CLASSES = "
+        "('ci', 'dev-session') in the real tracked lambdas/operational/cost_governor_lambda.py."
+    ),
+    "observed": (
+        "MUTATED: 7 failed, 35 passed — test_partition_covers_the_whole_registry_and_does_not_overlap, "
+        "test_ci_is_projected_so_its_run_rate_reaches_the_month_end_number, "
+        "test_a_ci_that_bills_every_day_is_no_longer_a_standing_violation, test_share_splits_prod_from_dev_ci, "
+        "test_the_premise_measurement_reaches_the_persisted_breakdown and two parameters of "
+        "test_self_report_can_never_claim_the_projected_class. REVERTED: 42 passed. Both watched 2026-10-04."
+    ),
+    "scope": (
+        "Proves the partition and the arithmetic on a recorded split (SSM budget-breakdown, 2026-10-05T00:00Z); the live "
+        "effect on the published projection is read from the breakdown after the governor's next run, not from this suite."
+    ),
+    "proved_on": "2026-10-04",
+}
+
+# ── #4252 box 4: ci-test.yml's suite split into shard legs + one combining verdict job ──
+# Two steps ENTER (the `shard` matrix job's install + coverage pass) and the combine step that
+# replaced the old two-pass coverage gate is proved here too, so its residue line leaves.
+CI_PROOFS["ci::ci-test.yml::shard::3"] = {
+    "gate_name": "shard / Install test dependencies",
+    "command": (
+        "The step's own `run:` body, read from ci-test.yml by yaml.safe_load and executed by `bash -e -c` in the lane "
+        "worktree with a scratch venv first on PATH (so `python3`/`pip` are the venv's)."
+    ),
+    "mutation": "`pillow` in the step's ci_pins.py list replaced by `pillow-not-pinned-4252` — a name requirements-dev.txt does not pin.",
+    "observed": (
+        "2026-10-09. BASELINE exit 0 in 4s (pins resolved, `Successfully installed boto3-1.43.108 … pillow-12.3.0`). "
+        "MUTATED exit 2 in 0s: `ci_pins: not pinned in requirements-dev.txt: pillow-not-pinned-4252` — under bash -e the "
+        "failed `PINS=$(…)` assignment ends the step before pip runs."
+    ),
+    "scope": "An unpinned or misspelt name and a pip resolution failure. A pin that installs but is the WRONG version is not seen here.",
+    "proved_on": "2026-10-09",
+}
+CI_PROOFS["ci::ci-test.yml::shard::4"] = {
+    "gate_name": "shard / Coverage pass — this leg's share of tests/",
+    "command": (
+        "The step's own `run:` body, read from ci-test.yml and executed by `bash -e -c` in the lane worktree with the "
+        "step's env (COVERAGE_CORE=sysmon, CI_TEST_SHARD=2/2, LEG=parallel-2), the scratch venv first on PATH and AWS "
+        "credentials disabled (as on the runner)."
+    ),
+    "mutation": (
+        "A planted tests/test_zz_planted_red_4252.py (`assert False`), whose crc32 lands it in leg 2/2 — one failing test "
+        "in the leg's share. Removed after the run."
+    ),
+    "observed": (
+        "2026-10-10, on the final body (legs carry --cov-fail-under=0). BASELINE exit 0 in 165s — 16349 passed, 0 failed. "
+        "MUTATED exit 1 in 199s — `FAILED tests/test_zz_planted_red_4252.py::test_planted_red_4252`, 1 failed, 16349 "
+        "passed; under pipefail the step stops before `mv .coverage`, and `test`'s combine step then refuses on the red "
+        "leg. Two earlier baselines were exit 1 and taught the body: once on the two census tests this very entry clears, "
+        "and once with every test passing — pytest-cov had graded the half leg against pyproject's fail_under, which is "
+        "why every leg now carries --cov-fail-under=0. END TO END the same day, all three legs' bodies then the combine "
+        "and ratchet bodies: legs exit 0 (15337 / 16349 / 113 passed), combine exit 0 over 3 data files, measured 86.59% "
+        "against the 86.30 high-water mark, OK."
+    ),
+    "scope": (
+        "Any failing or erroring test in the leg's files, through the `| tail -60` pipe (pipefail). Which files a leg holds "
+        "is tests/ci_shard.py's crc32 split, held exact by tests/test_ci_test_shards_4252.py; the serial leg runs the "
+        "same body's other branch."
+    ),
+    "proved_on": "2026-10-10",
+}
+CI_PROOFS["ci::ci-test.yml::test::6"] = {
+    "gate_name": "test / Test coverage gate (regression floor, ADR-080)",
+    "command": "python3 -m pytest tests/test_ci_test_shards_4252.py -q -p no:cacheprovider   # baseline 13 passed (coverage installed)",
+    "mutation": (
+        "The test file EXECUTES the step's own `run:` body (bash -e, real `coverage combine/xml/report` over real per-leg "
+        "data files). Mutated one at a time in the real ci-test.yml, restored byte-identical (md5 c5684e17 before and "
+        "after): M1 the `SHARD_RESULT != success` refusal deleted; M2 the EXPECTED_LEGS data-file count deleted; M3 "
+        "`--fail-under=82` dropped from the report."
+    ),
+    "observed": (
+        "2026-10-09, re-run 2026-10-10 on the final file. M1: 1 failed — test_a_red_leg_reds_the_verdict_even_with_full_data. M2: 1 failed — "
+        "test_a_missing_legs_data_reds_rather_than_grading_a_subset. M3: 2 failed — "
+        "test_the_combine_step_expects_every_leg_and_carries_the_only_floor, test_combined_coverage_under_the_floor_reds. "
+        "RESTORED: 13 passed."
+    ),
+    "scope": (
+        "A red shard leg, a missing leg's data and combined line coverage under the floor. The live per-file numbers are "
+        "the runner's; the high-water ratchet in the next step is a separate gate."
+    ),
+    "proved_on": "2026-10-09",
+}
+# ── #4770 (2026-10-10): the model-routing guard's dated exemption ─────────────────────────
+# tests/test_model_routing_4770.py::_EXEMPT spares one file from the derivation guard (no model
+# choice outside lambdas/ai/model_routing.py). The entry was deleted, alone, on the lane branch
+# and the guard WATCHED naming that file; restoring it re-greened it. The two #4769 callers
+# (horizons_retrospective, broadcast_sensitivity_gate) were exempt until #4784 gave them mapped
+# names; on the restack onto it they moved onto their ROUTES rows and their exemptions left.
+_MODEL_ROUTING_SUITE = "python3 -m pytest tests/test_model_routing_4770.py -q -p no:cacheprovider"
+# #4778 (2026-10-10): prompt_cache.CACHING_DECISIONS now names each caller's ROUTES row and
+# resolves its model through model_routing, so it spells no model and its exemption — and this
+# proof row with it — left (the gate retired, it was not re-proved). Empty, shrink-only.
+_MODEL_ROUTING_SPARED_FILES: dict[str, tuple[str, str]] = {}
+REGISTRY_PROOFS.update(
+    {
+        f"registry::tests/test_model_routing_4770.py::_EXEMPT::{path}": {
+            "gate_name": f"_EXEMPT[{path}]",
+            "command": _MODEL_ROUTING_SUITE,
+            "mutation": f"the `{path}` entry's own line(s) deleted from _EXEMPT, nothing else changed.",
+            "observed": (
+                f"MUTATED: 1 failed, 14 passed — test_no_runtime_module_chooses_a_model_outside_the_registry naming "
+                f"{hit} {more}. REVERTED: 15 passed. Both watched 2026-10-10 on issue-4770-model-routing-registry."
+            ),
+            "scope": (
+                "Keyed by PATH and spares the WHOLE file, not one line; the stale direction is "
+                "test_every_exemption_is_dated_reasoned_and_still_needed (a file that is gone, or an exemption list "
+                "that grows past one, reds)."
+            ),
+            "proved_on": "2026-10-10",
+        }
+        for path, (hit, more) in _MODEL_ROUTING_SPARED_FILES.items()
+    }
+)
+# ── #4633 (2026-10-11): the inbound-email receipt gate ───────────────────────────────────
+# `lambdas/emails/inbound_auth_gate_lambda.py` is a `# gate-entrypoint:` module: the SES
+# receipt rule invokes it RequestResponse as its first action and acts on the disposition it
+# returns — STOP_RULE_SET refuses the message before any byte is stored, CONTINUE lets the S3
+# action (and so the parser) run. Nothing in it raises (an exception is itself a refusal), so
+# the census's exit/raise scan finds no enforcement path; the proof below is what says it CAN fail.
+GUARD_PROOFS.update(
+    {
+        "guard::lambdas/emails/inbound_auth_gate_lambda.py": {
+            "gate_name": "lambdas/emails/inbound_auth_gate_lambda.py",
+            "command": "python3 -m pytest tests/test_inbound_auth_gate_4633.py -q -p no:cacheprovider   # baseline 31 passed",
+            "mutation": (
+                "The DMARC refusal deleted from `receipt_verdict()` in the REAL tracked module — the two lines "
+                '`if statuses["dmarcVerdict"] != "PASS": return False, f"dmarc_{...}", statuses` — so a receipt whose '
+                "dmarcVerdict is FAIL, GRAY, PROCESSING_FAILED or absent reads as authenticated (the pre-#4633 world: the "
+                "parser trusted the From header). md5 c465c7b3f6955ffed288ad3275de2c67 -> 72e5375265bb02c000d343fb5fae12ee; "
+                "restored from a pre-mutation copy and cmp'd byte-identical (c465c7b3… again). Run twice on 2026-10-11 — first on the file as pushed (884455f0… -> fd83e3af…), then again on the final file after a docstring edit — same 8 failed / 23 passed both times."
+            ),
+            "observed": (
+                "2026-10-11. BASELINE 31 passed. MUTATED: 8 failed, 23 passed — "
+                "test_a_failing_or_missing_verdict_stops_the_rule_set[dmarc_fail | dmarc_gray | dmarc_processing_failed | "
+                "dmarc_missing x2] (the forged receipt got CONTINUE, not STOP_RULE_SET), test_dkim_alone_is_not_enough_at_the_gate, "
+                "test_one_refusal_refuses_a_whole_batch (the FAIL record in the batch no longer refused it), and "
+                "test_an_ses_direct_record_is_refused_on_its_receipt_before_the_s3_read (the parser reuses receipt_verdict() "
+                "on an SES-direct record: the dmarc=FAIL record read S3 and landed an insight). The 23 that stayed green are "
+                "the spam/virus refusals, the allowlist/From refusals, the pass-through controls, the CDK/IaC structure "
+                "checks and the parser's Authentication-Results-header route, none of which run through the deleted lines. "
+                "RESTORED: 31 passed."
+            ),
+            "scope": (
+                "Proves the DMARC verdict is load-bearing at the gate (lambda_handler disposition) and on the parser's "
+                "SES-direct route. The spam/virus and allowlist branches are exercised by the same suite but were not "
+                "separately mutated here; the live receipt-rule ORDER (gate before the S3 action) is IaC asserted by "
+                "test_the_receipt_rule_is_defined_in_cdk_with_the_gate_as_its_only_action and watched live by the "
+                "`inbound-auth-gate-bypassed` alarm, not by this proof."
+            ),
+            "proved_on": "2026-10-11",
+        },
+    }
 )

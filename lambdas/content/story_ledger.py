@@ -219,18 +219,66 @@ def ledger_row(pk: str, ledger: Dict[str, Any], *, cycle: str, phase: str = "exp
     }
 
 
-def latest_visible(table: Any, pk: str, before_date: str) -> Dict[str, Any]:
-    """The newest ledger row strictly before ``before_date`` that the current phase can see."""
+_UNSET: Any = object()
+
+
+def current_cycle() -> Optional[str]:
+    """The cycle this experiment is — the one whose genesis is ``EXPERIMENT_START_DATE`` in the
+    CYCLE_GENESES registry (the same registry the write-time stamp derives ``cycle`` from, #3598).
+
+    Keyed on the genesis rather than today's date, so the countdown between a reset and its genesis
+    already names the NEW cycle. ``None`` when the registry cannot be read: the caller then falls
+    back to the tombstone/phase filter alone — an unknown cycle is reported, never invented."""
+    try:
+        from common.constants import EXPERIMENT_START_DATE
+        from experiment.phase_taxonomy import _cycle_geneses, cycle_for_date
+
+        n = cycle_for_date(EXPERIMENT_START_DATE, _cycle_geneses())
+        return None if n is None else str(n)
+    except Exception:  # noqa: BLE001 — a read helper never raises into the desk
+        return None
+
+
+def row_visible(item: Optional[Dict[str, Any]], cycle: Optional[str]) -> bool:
+    """Whether a ``LEDGER#`` row is this cycle's season memory (#4533).
+
+    Two independent conditions, both required:
+      * ``singleton_visible`` — not tombstoned by a reset, and phase is the current phase;
+      * the row's ``cycle`` is ``cycle`` — a ledger is one season's memory, so a row a previous
+        cycle left behind (one the reset's wipe missed, or a row re-tagged ``experiment`` by hand)
+        must never become last week's threads and bets. A row with NO cycle cannot prove it
+        belongs to this season and is hidden too. ``cycle=None`` (registry unreadable) skips only
+        this second condition.
+
+    The cycle compares as a string: the publish path writes ``"17"`` and the write-time stamp
+    overwrites it with the number 17 (a DynamoDB ``N`` → ``Decimal('17')``); both are this cycle."""
+    from experiment.phase_filter import singleton_visible
+
+    if not singleton_visible(item):
+        return False
+    if cycle is None:
+        return True
+    raw = (item or {}).get("cycle")
+    return raw is not None and str(raw).strip() == str(cycle).strip()
+
+
+def latest_visible(table: Any, pk: str, before_date: str, *, cycle: Any = _UNSET) -> Dict[str, Any]:
+    """The newest ledger row strictly before ``before_date`` that THIS cycle's season can see.
+
+    The ONE read door for the season memory: the chronicle desk, the Panel episode written with it
+    (``story_pipeline.live_week``) and the Monday questions all read through here, so a tombstoned or
+    previous-cycle row is invisible to every writer at once. ``cycle`` defaults to ``current_cycle()``."""
     import json
 
     from boto3.dynamodb.conditions import Key
-    from experiment.phase_filter import singleton_visible
 
+    if cycle is _UNSET:
+        cycle = current_cycle()
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(LEDGER_PREFIX, f"{LEDGER_PREFIX}{before_date}"), ScanIndexForward=False
     )
     for it in resp.get("Items", []):
-        if it.get("sk") == f"{LEDGER_PREFIX}{before_date}" or not singleton_visible(it):
+        if it.get("sk") == f"{LEDGER_PREFIX}{before_date}" or not row_visible(it, cycle):
             continue
         try:
             return json.loads(it.get("ledger_json") or "{}") or empty_ledger()

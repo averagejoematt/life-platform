@@ -330,13 +330,16 @@ def sheet_text(sheet: dict, extra: str = "") -> str:
     return "\n".join(lines)
 
 
-def context_text(sheet: dict, names: dict) -> str:
-    """Positions, yesterday's lines and the sidelined coaches — context only, figures masked."""
+def context_text(sheet: dict, names: dict, speaker: str = "") -> str:
+    """Positions, yesterday's lines and the sidelined coaches — context only, figures masked.
+
+    `speaker` is the coach writing today's line: her own entries read "you" (#4705), never her name,
+    so the model cannot take her own graded call for another coach's."""
     lines = []
     if sheet.get("graded"):
         lines.append("GRADED RESULTS (recent; figures removed):")
         for g in sheet["graded"]:
-            who = names.get(g["coach_id"], g["coach_id"])
+            who = "you (your own call)" if speaker and g["coach_id"] == speaker else names.get(g["coach_id"], g["coach_id"])
             lines.append(f"- [{g['prediction_id']}] {who} predicted: {g['claim']} — {g['verdict']} (graded {g['graded_on']})")
     if sheet.get("absent"):
         lines.append("SIDELINED (cannot speak today):")
@@ -344,10 +347,16 @@ def context_text(sheet: dict, names: dict) -> str:
     if sheet.get("positions"):
         lines.append("EACH COACH'S LAST PUBLIC POSITION (figures removed — use the fact sheet):")
         for cid, p in sheet["positions"].items():
-            lines.append(f"- {names.get(cid, cid)} ({cid}, {p['as_of']}): {p['text']}")
+            if speaker and cid == speaker:
+                lines.append(f"- you (your own last position, {p['as_of']}): {p['text']}")
+            else:
+                lines.append(f"- {names.get(cid, cid)} ({cid}, {p['as_of']}): {p['text']}")
     if sheet.get("yesterday"):
         lines.append("YESTERDAY'S LINES:")
-        lines += [f"- {names.get(y['coach_id'], y['coach_id'])} [{y['move']}]: {y['text']}" for y in sheet["yesterday"]]
+        lines += [
+            f"- {'you' if speaker and y['coach_id'] == speaker else names.get(y['coach_id'], y['coach_id'])} [{y['move']}]: {y['text']}"
+            for y in sheet["yesterday"]
+        ]
     return "\n".join(lines)
 
 
@@ -523,7 +532,42 @@ def binding_findings(text: str, sheet: dict) -> list:
     return out
 
 
-def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, target_name: str = "", extra: str = "") -> list:
+# Name parts that are also ordinary English words. A part on this list is never matched on its own — only
+# the full display name catches it — so "max effort", "a walk in the park" or "Max heart rate" never refuse
+# Max Reyes or Lisa Park (#4705 review). The live roster's word-parts are Max, Park, Marsh, Vale and Brooks;
+# the rest is the obvious set a future coach's name could draw from.
+COMMON_WORD_NAME_PARTS = frozenset(
+    "max park marsh vale brooks will mark bill rose grant hope faith joy frank ray dawn may june april art chase "
+    "hunter young long brown green white black gray grey rich bell page cook hill wood king lane field stone sharp "
+    "case drew sky river summer autumn star wade bush hall price love bond rock reed cliff dale glen hale nash "
+    "miles holly penny ruby jade iris heath bishop baker carter mason porter fisher".split()
+)
+
+
+def self_name_findings(text: str, speaker_name: str) -> list:
+    """A line in which the speaker names herself — a coach says "I", never her own name (#4705, the wording
+    of ai_calls.py's expert narrative rule).
+
+    A multi-word display name matches in any case. A single first name or surname matches only as the
+    capitalised name itself (case-sensitive, word-bounded) and never when it is an ordinary English word
+    (COMMON_WORD_NAME_PARTS) — "max" or "Park" alone is a word, not a self-reference."""
+    name = " ".join((speaker_name or "").split())
+    t = text or ""
+    out = []
+    multi = len(name.split()) >= 2
+    if multi and re.search(rf"\b{re.escape(name)}\b", t, re.IGNORECASE):
+        out.append(f"names_self:{name}")
+    for part in dict.fromkeys(name.split()):
+        if len(part) < 2 or part.lower() in COMMON_WORD_NAME_PARTS:
+            continue
+        if re.search(rf"(?<![\w-]){re.escape(part)}(?![\w-])", t):
+            out.append(f"names_self:{part}")
+    return out
+
+
+def check_line(
+    text: Optional[str], move: str, sheet: dict, *, today: str, target_name: str = "", extra: str = "", speaker_name: str = ""
+) -> list:
     """Reasons to refuse one coach line — [] means it may ship. Fail-closed."""
     t = (text or "").strip()
     if not t:
@@ -534,6 +578,7 @@ def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, targe
     if len(t.split()) > MAX_WORDS:
         reasons.append(f"over_{MAX_WORDS}_words")
     reasons += _rules_findings(t)
+    reasons += self_name_findings(t, speaker_name)
     reasons += restatement_findings(t, move, target_name=target_name)
     allowed, allowed_dates = allowed_for(sheet, extra)
     from ai import grounded_generation as gg
@@ -559,7 +604,106 @@ def check_line(text: Optional[str], move: str, sheet: dict, *, today: str, targe
         logger.warning("[coach_moves] served-fact/reader checks unavailable — refusing: %s", e)
         reasons.append("checks_unavailable")
     reasons += binding_findings(t, sheet)
+    reasons += jargon_findings(t)
     return list(dict.fromkeys(reasons))
+
+
+def jargon_findings(text: str) -> list:
+    """The plain-words rule (#4649) on a front-page line: one ``jargon:<term>`` per specialist or ruled term (#4583).
+    The live 2026-10-09 lines carried "glucose dynamics, not protein primacy" and "recovery architecture"."""
+    from coach import plain_words
+
+    return [f"jargon:{term}" for term in plain_words.line_terms(text)]
+
+
+# ── the day's context: no repeat of yesterday, no tic across today (#4583, round 8) ──
+
+REPEAT_RUN_WORDS = 5  # a shared run of this many consecutive words is the same sentence said again
+_RUN_WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
+# The hedge and the opener the prompt itself once handed every coach: on the live lines of 2026-10-05..09
+# "so far" and "I think" each sat in five of eight lines. Each may appear in ONE line a day.
+TICS = {
+    "so_far": re.compile(r"\bso far\b", re.IGNORECASE),
+    "i_think": re.compile(r"\bI think\b", re.IGNORECASE),
+}
+
+
+def _run_words(text: Any) -> list:
+    """Lowercased words with every figure stripped (digits, "[n]" masks, spelled counts with a unit)."""
+    t = mask_figures(str(text or "")).replace("[n]", " ").replace("’", "'").lower()
+    return _RUN_WORD_RE.findall(re.sub(r"\d+", " ", t))
+
+
+def shared_run(a: Any, b: Any, n: int = REPEAT_RUN_WORDS) -> str:
+    """The longest run of ``n`` or more consecutive words ``a`` shares with ``b`` (figures stripped), or "". Lines are ~50 words, so the plain O(n*m) scan is fine."""
+    wa, wb = _run_words(a), _run_words(b)
+    best = ""
+    for i in range(len(wa) - n + 1):
+        for k in range(len(wb) - n + 1):
+            length = 0
+            while i + length < len(wa) and k + length < len(wb) and wa[i + length] == wb[k + length]:
+                length += 1
+            if length >= n and length > len(best.split()):
+                best = " ".join(wa[i : i + length])
+    return best
+
+
+def question_subjects(text: Any) -> set:
+    """What a question is about: the absence pillars it names (journal / food log / training log)."""
+    t = str(text or "")
+    return {key for key, _words, alias in ABSENCE_PILLARS.values() if re.search(alias, t, re.IGNORECASE)}
+
+
+def repeat_findings(text: str, move: str, coach_id: str, yesterday_lines: Optional[list]) -> list:
+    """Refuse a line that says again what was said yesterday (#4583). Yesterday's lines were already in the prompt
+    as context; nothing refused a repeat, and the live 10-07/10-08 questions asked the same journal question twice.
+
+      * the SAME coach asking a question on the same subject (absence pillar) as its question yesterday;
+      * any line sharing a run of ``REPEAT_RUN_WORDS`` consecutive words with a line yesterday — the same coach's
+        point made again, or another coach's sentence copied (10-07 -> 10-08: "I think the intake concern is weaker than").
+    Each finding is ``repeats_yesterday:<what>`` so the retry can tell the model what it repeated."""
+    out = []
+    mine = question_subjects(text) if move == "question" else set()
+    for y in yesterday_lines or []:
+        if not isinstance(y, dict) or not y.get("text"):
+            continue
+        if mine and y.get("coach_id") == coach_id and y.get("move") == "question":
+            out += [f"repeats_yesterday:{key}" for key in sorted(mine & question_subjects(y["text"]))]
+        run = shared_run(text, y["text"])
+        if run:
+            out.append(f'repeats_yesterday:"{run}"')
+    return list(dict.fromkeys(out))
+
+
+def tic_findings(text: str, accepted: list) -> list:
+    """A phrase in TICS that an earlier accepted line today already used: ``tic:so_far`` / ``tic:i_think``."""
+    return [f"tic:{name}" for name, rx in TICS.items() if rx.search(text or "") and any(rx.search(a or "") for a in accepted)]
+
+
+_TIC_RETRY = {
+    "so_far": "another coach already said 'so far' today: use a different hedge ('early days', 'on a few days of data', 'for now')",
+    "i_think": "another coach already opened with 'I think' today: vary your opening and do not write 'I think'",
+}
+
+
+def retry_note(reasons: list) -> str:
+    """The one corrective message after a refused line: each refusal in words the model can act on."""
+    notes = []
+    for r in reasons:
+        kind, _, what = str(r).partition(":")
+        if kind == "repeats_yesterday":
+            notes.append(
+                f"it repeats yesterday ({what.replace('_', ' ')}) — say something new, or stay on a different subject"
+                if not what.startswith('"')
+                else f"it repeats yesterday's words {what} — say something new in your own words"
+            )
+        elif kind == "tic" and what in _TIC_RETRY:
+            notes.append(_TIC_RETRY[what])
+        elif kind == "jargon":
+            notes.append(f"'{what}' is a specialist word — use the plain word a friend would use")
+        else:
+            notes.append(str(r))
+    return "\n\nYour previous line was refused: " + "; ".join(notes) + ". Fix exactly that."
 
 
 def cross_line_findings(text: str, accepted: list, sheet: dict) -> list:

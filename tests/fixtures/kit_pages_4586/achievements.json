@@ -1,4 +1,10 @@
 {
+ "_meta": {
+  "generated_at": "2026-10-10T02:38:13.318341+00:00",
+  "served_at": "2026-10-10T02:38:13.318341+00:00",
+  "cache_seconds": 3600,
+  "request_id": "2c3623dce9b44cf5"
+ },
  "achievements": [
   {
    "id": "week_warrior",
@@ -88,7 +94,7 @@
    "earned": false,
    "earned_date": null,
    "icon": null,
-   "unlock_hint": "Level 10 → Level 20 needed"
+   "unlock_hint": "Level 10 \u2192 Level 20 needed"
   },
   {
    "id": "master_of_the_craft",
@@ -98,7 +104,7 @@
    "earned": false,
    "earned_date": null,
    "icon": null,
-   "unlock_hint": "Level 10 → Level 40 needed"
+   "unlock_hint": "Level 10 \u2192 Level 40 needed"
   },
   {
    "id": "lost_5",
@@ -117,7 +123,7 @@
    "description": "Lost 10 lbs from starting weight",
    "earned": true,
    "earned_date": "2026-09-17",
-   "icon": "⚖️",
+   "icon": "\u2696\ufe0f",
    "unlock_hint": null
   },
   {
@@ -125,10 +131,10 @@
    "label": "Lost 20 lbs",
    "category": "milestone",
    "description": "Lost 20 lbs from starting weight",
-   "earned": false,
+   "earned": true,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "5 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": null
   },
   {
    "id": "lost_30",
@@ -137,8 +143,8 @@
    "description": "Lost 30 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "15 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "9 lbs to go"
   },
   {
    "id": "lost_40",
@@ -147,8 +153,8 @@
    "description": "Lost 40 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "25 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "19 lbs to go"
   },
   {
    "id": "lost_50",
@@ -157,8 +163,8 @@
    "description": "Lost 50 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "35 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "29 lbs to go"
   },
   {
    "id": "lost_60",
@@ -167,8 +173,8 @@
    "description": "Lost 60 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "45 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "39 lbs to go"
   },
   {
    "id": "lost_70",
@@ -177,8 +183,8 @@
    "description": "Lost 70 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "55 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "49 lbs to go"
   },
   {
    "id": "lost_80",
@@ -187,8 +193,8 @@
    "description": "Lost 80 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "65 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "59 lbs to go"
   },
   {
    "id": "lost_90",
@@ -197,8 +203,8 @@
    "description": "Lost 90 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "75 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "69 lbs to go"
   },
   {
    "id": "lost_100",
@@ -207,8 +213,8 @@
    "description": "Lost 100 lbs from starting weight",
    "earned": false,
    "earned_date": null,
-   "icon": "⚖️",
-   "unlock_hint": "85 lbs to go"
+   "icon": "\u2696\ufe0f",
+   "unlock_hint": "79 lbs to go"
   },
   {
    "id": "sub_280",
@@ -217,8 +223,8 @@
    "description": "Weight under 280 lbs",
    "earned": false,
    "earned_date": null,
-   "icon": "🎯",
-   "unlock_hint": "32 lbs to go"
+   "icon": "\ud83c\udfaf",
+   "unlock_hint": "26 lbs to go"
   },
   {
    "id": "sub_250",
@@ -227,8 +233,8 @@
    "description": "Weight under 250 lbs",
    "earned": false,
    "earned_date": null,
-   "icon": "🎯",
-   "unlock_hint": "62 lbs to go"
+   "icon": "\ud83c\udfaf",
+   "unlock_hint": "56 lbs to go"
   },
   {
    "id": "sub_220",
@@ -237,8 +243,8 @@
    "description": "Weight under 220 lbs",
    "earned": false,
    "earned_date": null,
-   "icon": "🎯",
-   "unlock_hint": "92 lbs to go"
+   "icon": "\ud83c\udfaf",
+   "unlock_hint": "86 lbs to go"
   },
   {
    "id": "sub_200",
@@ -247,8 +253,8 @@
    "description": "Weight under 200 lbs",
    "earned": false,
    "earned_date": null,
-   "icon": "🎯",
-   "unlock_hint": "112 lbs to go"
+   "icon": "\ud83c\udfaf",
+   "unlock_hint": "106 lbs to go"
   },
   {
    "id": "30_days",
@@ -402,12 +408,12 @@
   }
  ],
  "summary": {
-  "earned": 5,
+  "earned": 6,
   "total": 40,
   "current_streak": 0,
   "days_tracked": 28,
   "current_level": 10,
-  "current_weight": 312,
+  "current_weight": 306,
   "completed_challenges": 0,
   "perfect_challenges": 0
  }

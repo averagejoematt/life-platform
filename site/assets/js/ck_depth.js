@@ -13,10 +13,17 @@
 // log entries are owner-only, so a day shows that day's totals and the food trend shows
 // the served summary of frequent meals.
 //
+// A day also carries what was SAID and SETTLED on it (#4648): the coaches' lines for that
+// day, in their words, and any call that was checked that day with its verdict, the rule
+// that decided it and a door to its own page. A day with neither prints nothing for them:
+// no heading, no empty section, no filler.
+//
 // The builders are pure and exported for tests/js/ck_depth_4586.test.mjs; mount() is the
 // only thing that touches the DOM.
 import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
+import { callHref, callsOf, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
+import { callCardHTML, hasRule, ruleless } from "/assets/js/ck_verdict.js";
 
 const LB_PER_KG = 2.20462;
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -220,7 +227,7 @@ export function dayFactsHTML(iso, src, base, today = "") {
     const m = MEASURES[measure];
     return num(value) === null ? "" : `<li><a href="${esc(trendHref(base, measure, "", iso))}">${esc(`${m.name}: ${m.write(value)}${note}`)} <span aria-hidden="true">→</span></a></li>`;
   };
-  const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct), row("steps", p.steps, iso === today ? " so far today" : "")].join("");
+  const rows = [row("weight", p.weight_lbs), row("sleep", p.sleep_hours), row("recovery", p.recovery_pct)].join(""); // step counts are left out: the stored day totals are unreliable (#4628)
   return rows ? `<ul class="ck-rows ck-rows--more">${rows}</ul>` : soft("Nothing was measured on this day.");
 }
 // What was lifted: every exercise with its working sets, each a door to that lift's trend.
@@ -289,6 +296,60 @@ export function dayNavHTML(iso, src, base) {
   return html ? `<div class="ck-actions">${html}</div>` : "";
 }
 
+// ── what was said and settled on the day (#4648) ───────────────────────────────
+const SETTLED_FIRST = 2; // calls shown before the rest fold under one disclosure
+export const coachHref = (base, id) => `${base}coach/?c=${encodeURIComponent(id)}`;
+// The coaches' lines for the day, from GET /api/coach_moves?date=<day>: who, the kind of
+// line it is, and the words exactly as served. "" when the day has none, when the body is
+// for another day, or when the route is not served.
+export function daySaidHTML(iso, movesBody, base) {
+  const lines = movesBody && movesBody.state === "ok" && movesBody.date === iso && Array.isArray(movesBody.lines) ? movesBody.lines.filter((l) => l && l.coach && l.text) : [];
+  if (!lines.length) return "";
+  const rows = lines
+    .map((l) => {
+      // The coach's page returns to this day by name (#4675).
+      const name = l.coach_id ? `<a class="ck-link" href="${esc(withFrom(coachHref(base, l.coach_id), iso))}">${esc(l.coach)}</a>` : esc(l.coach);
+      const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [l.move_label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
+      return `<li><span class="ck-coach__who">${name}${kind ? esc(` · ${kind}`) : ""}</span><span>“${esc(l.text)}”</span></li>`;
+    })
+    .join("");
+  // Two coaches who opened a bet in these lines share its date: it is said once, below.
+  const bets = [...new Set(lines.map((l) => l.bet_settles).filter(isDay))].map((d) => soft(`A bet opened in these lines settles ${dayInWords(d)}.`)).join("");
+  return `<p class="ck-label">The coaches</p><h2>What the coaches said.</h2><ul class="ck-coach">${rows}</ul>${bets}`;
+}
+// One settled call on a day, in the house order every page uses (#4808): the verdict with its
+// rule, the call with the result in bold, then what the allowed distance is and the door.
+function settledRow(call, base, iso = "") {
+  const href = withFrom(callHref(base, call.id), iso);
+  // A bet has a verdict per side, so the route's own sentence stands, in the same order.
+  if (call.kind === "bet") {
+    return `<li><span class="ck-soft">${esc(call.verdict_text || "Settled")}</span><span>${esc(call.called_short || call.called)} <b>${esc(call.happened_short)}</b></span><a class="ck-link" href="${esc(href)}">The whole call</a></li>`;
+  }
+  return callCardHTML(call, { href, wrap: "li" });
+}
+// Every call settled on the day, from GET /api/calls. "" when none settled that day. Under
+// the coaches' lines it takes a label, not a second heading: the two are one part of the day.
+export function daySettledHTML(iso, callsBody, base, { under = false } = {}) {
+  // A call with no readable rule is never shown as right or wrong (#4808): left out, and counted.
+  const day = callsOf(callsBody).filter((c) => c.settled_date === iso);
+  const calls = day.filter((c) => c.kind === "bet" || hasRule(c));
+  const skipped = soft(ruleless(day.length - calls.length));
+  if (!calls.length) return skipped;
+  const list = (items) => `<ul class="ck-coach">${items.map((c) => settledRow(c, base, iso)).join("")}</ul>`;
+  const rest = calls.slice(SETTLED_FIRST);
+  const more = rest.length ? `<details><summary>${rest.length} more settled this day</summary>${list(rest)}</details>` : "";
+  const title = calls.length === 1 ? "A call was checked this day." : `${calls.length} calls were checked this day.`;
+  const head = under ? `<p class="ck-label">${esc(title)}</p>` : `<p class="ck-label">Settled</p><h2>${esc(title)}</h2>`;
+  return `${head}${list(calls.slice(0, SETTLED_FIRST))}${more}${skipped}`;
+}
+// Both, in reading order, as ONE section. "" for a day with neither: the page prints
+// nothing extra.
+export function dayStoryHTML(iso, movesBody, callsBody, base) {
+  const said = daySaidHTML(iso, movesBody, base);
+  const settled = daySettledHTML(iso, callsBody, base, { under: Boolean(said) });
+  return said || settled ? `<section class="ck-section" id="ck-story">${said}${settled}</section>` : "";
+}
+
 // ── the food trend's extra: what is eaten most often ───────────────────────────
 export function frequentMealsHTML(body) {
   const meals = ((body && body.meals) || []).filter((m) => m && m.name && num(m.frequency) !== null).slice(0, 8);
@@ -336,9 +397,19 @@ async function load(routes) {
 
 const todayPT = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 
+const movesPath = (iso) => `/api/coach_moves?date=${iso}`;
+// persona id -> coach name, from the day's served lines, for a back link to a coach page.
+const movesNames = (body) => Object.fromEntries(((body && body.lines) || []).filter((l) => l && l.coach_id && l.coach).map((l) => [l.coach_id, l.coach]));
+
 async function mountDay(base) {
-  const src = await load({ pulse: "/api/pulse_history", workouts: "/api/workouts", training: "/api/training_overview", nutrition: "/api/nutrition_overview" });
-  const iso = isDay(param("d")) ? param("d") : latestDay(src);
+  const asked = isDay(param("d")) ? param("d") : "";
+  // Back goes to the page named by `from=`, by name; without it, the front page (#4675).
+  const from = param("from");
+  setBack(backFor(from, base));
+  // The day's lines are asked for alongside everything else when the address names the day.
+  const early = asked ? tryJSON(movesPath(asked)) : null;
+  const src = await load({ pulse: "/api/pulse_history", workouts: "/api/workouts", training: "/api/training_overview", nutrition: "/api/nutrition_overview", calls: "/api/calls" });
+  const iso = asked || latestDay(src);
   if (!iso) {
     fill("ck-title", "This day");
     fill("ck-facts", soft("The day’s record is not served right now."));
@@ -349,6 +420,11 @@ async function mountDay(base) {
   fill("ck-title", esc(dayInWords(iso)));
   document.title = `${dayInWords(iso)} — Average Joe Matt`;
   fill("ck-nav", dayNavHTML(iso, src, base));
+  // Said and settled: whole sections, added only when the day has them (#4648).
+  const moves = await (early || tryJSON(movesPath(iso)));
+  setBack(backFor(from, base, movesNames(moves)));
+  const story = dayStoryHTML(iso, moves, src.calls, base);
+  if (story) document.getElementById("ck-head")?.insertAdjacentHTML("afterend", story);
   fill("ck-facts", dayFactsHTML(iso, src, base, todayPT()));
   fill("ck-lifts", dayLiftsHTML(iso, src, base));
   fill("ck-food", dayFoodHTML(iso, src, base));

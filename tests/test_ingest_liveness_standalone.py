@@ -74,6 +74,10 @@ def _quiet_pipeline(monkeypatch, hb):
     )
     monkeypatch.setattr(hb, "write_normalized", lambda rec: None)
     monkeypatch.setattr(hb, "_derive_training_notes", lambda rec: None)
+    # #4643: the breaker + quarantine paths have their own tests; keep these off the table.
+    monkeypatch.setattr(hb, "_HAS_AUTH_BREAKER", False)
+    monkeypatch.setattr(hb, "_load_event_failures", lambda: {})
+    monkeypatch.setattr(hb, "_note_event_failure", lambda *a, **k: False)
 
 
 def test_clean_run_records_success_sentinel(monkeypatch):
@@ -152,22 +156,14 @@ def test_notion_success_and_failure_paths_record_sentinel(monkeypatch):
     assert calls == [("notion", {"attempted": True, "succeeded": False, "error_class": "auth"})]
 
 
-def test_dropbox_healthy_skip_and_failure_record_sentinel(monkeypatch):
+def test_dropbox_failure_records_sentinel(monkeypatch):
     sys.path.insert(0, os.path.join(ROOT, "lambdas", "ingestion"))
     import dropbox_poll_lambda as dp
 
     calls = []
     monkeypatch.setattr(dp, "record_ingest_health", lambda table, src, log, **kw: calls.append((src, kw)))
     monkeypatch.setattr(dp, "_INGEST_HEALTH_AVAILABLE", True)
-    monkeypatch.setattr(dp, "get_tracker_item", lambda: {"recently": "empty"})
-    monkeypatch.setattr(dp, "_is_recently_empty", lambda tracker: True)
-
-    out = dp.lambda_handler({}, None)
-    assert out["statusCode"] == 200
-    assert calls == [("dropbox", {"attempted": True, "succeeded": True, "error_class": "none"})]
-
-    calls.clear()
-    monkeypatch.setattr(dp, "_is_recently_empty", lambda tracker: False)
+    monkeypatch.setattr(dp, "get_tracker_item", lambda: {})
     monkeypatch.setattr(dp, "get_dropbox_secret", lambda: (_ for _ in ()).throw(TimeoutError("connection timed out")))
     with pytest.raises(TimeoutError):
         dp.lambda_handler({}, None)

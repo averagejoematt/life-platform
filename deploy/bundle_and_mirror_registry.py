@@ -422,6 +422,11 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
         "claim": ".github/workflows/citation-network-check.yml",
         "notes": "the citation network re-resolution script names the monthly workflow that schedules it (#3621 box 4)",
     },
+    "scripts/raw_kms_readability_inventory.py": {
+        "clause": "C",
+        "claim": ".github/workflows/raw-kms-readability.yml",
+        "notes": "the raw-archive readability inventory names the weekly workflow that runs its --check-against-record mode (#4634 box 3)",
+    },
     ".claude/skills/deploy/SKILL.md": {
         "clause": "C",
         "claim": ".github/workflows/site-deploy.yml",
@@ -600,7 +605,10 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
 # C 26 -> 27 (2026-10-04, #4589): scripts/reader_surface.py names ci-cd.yml / visual-qa.yml by
 # path because their AI-judge wiring is part of the reader surface it derives — registered,
 # not reworded around the regex.
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 27}
+# C 27 -> 28 (2026-10-11, #4634): scripts/raw_kms_readability_inventory.py names
+# raw-kms-readability.yml, the weekly workflow that runs its --check-against-record mode, by
+# path — registered, not reworded.
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 28}
 
 
 def main() -> None:

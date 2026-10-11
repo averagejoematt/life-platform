@@ -109,7 +109,6 @@ a new cut.
 from __future__ import annotations
 
 import logging
-import os
 import re
 from datetime import datetime, timezone
 from typing import Callable, Optional
@@ -119,7 +118,9 @@ from common.pacific_time import pacific_today  # #2811: THE Pacific day helper â
 logger = logging.getLogger(__name__)
 
 SUMMARY_SK_PREFIX = "CHAT#summary#"
-HAIKU_MODEL = os.environ.get("AI_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+from ai.model_routing import model_for  # noqa: E402 â€” #4770: the one model registry
+
+HAIKU_MODEL = model_for("coach_chat_summary")
 MAX_SUMMARY_ROWS_IN_PROMPT = 3
 _MAX_TRANSCRIPT_CHARS = 6000
 _MAX_SUMMARY_CHARS = 600

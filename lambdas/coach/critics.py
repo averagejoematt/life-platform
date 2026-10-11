@@ -75,7 +75,9 @@ CRITIC_IDS = ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_hi
 VERDICTS = ("approve", "change", "veto")
 _SEVERITY = {"info": 0, "change": 1, "veto": 2}
 
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+HAIKU_MODEL = model_for("plan_critics")
 MAX_TOKENS = 240  # one JSON object with one ≤200-char sentence; measured, not guessed: ~120 tok typical
 BUDGET_FEATURE = "plan_critics"
 
@@ -825,13 +827,14 @@ def parse_model_verdict(resp: dict[str, Any]) -> dict[str, Any]:
         # reads — the #3828 residual class (registered in tests/test_judge_verdict_retry_3688.py).
         return {"error": f"truncated at max_tokens={MAX_TOKENS}"}
     text = "".join(p.get("text", "") for p in (resp or {}).get("content", []) if p.get("type") == "text").strip()
-    a, b = text.find("{"), text.rfind("}")
-    if a == -1 or b <= a:
-        return {"error": f"no JSON object in a {len(text)}-char response"}
+    from ai import structured_json  # the one parse door (#4276 box 2)
+
     try:
-        obj = json.loads(text[a : b + 1])  # noqa: E203
-    except (ValueError, TypeError) as e:
-        return {"error": f"json.loads failed: {type(e).__name__}"}
+        obj = structured_json.load_json_span(text, "{")
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":
+            return {"error": f"no JSON object in a {len(text)}-char response"}
+        return {"error": f"json.loads failed: {type(e.cause).__name__}"}
     if not isinstance(obj, dict) or obj.get("verdict") not in VERDICTS:
         return {"error": "verdict not in approve|change|veto"}
     sentence = str(obj.get("sentence") or "").strip()

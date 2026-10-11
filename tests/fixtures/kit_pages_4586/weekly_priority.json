@@ -1,18 +1,11 @@
 {
- "weekly_priority": "I'm watching Matthew execute with precision: 43 logged training sessions in 30 days, zero missed zone-2 workouts, and a consistent 1,500-calorie eating window across 21 food-logged days. His weight has dropped 12.8 pounds over three weeks—aggressive and intentional—and his recovery score is holding steady at 89%. On day 23 of the Foundation phase, the structural work is solid. The one priority I've asked him to address next is his protein intake, currently averaging 153.5 grams across logged days against a 170-gram floor. This isn't about motivation; it's about convenience. By locking one meal into a deliberate, low-friction protein choice, he can close this gap and protect lean mass as the caloric deficit compounds through the remaining 11 months.",
- "cross_domain_notes": {
-  "sleep": "Sleep quality (7.5h target, actual ~8h) is enabling high recovery scores and consistent HRV around 48.9 ms. Early morning training depends on bedtime discipline; the 9 PM anchor is holding.",
-  "nutrition": "Protein at 153.5g is the rate-limiting variable for lean mass retention in a 1,500-calorie deficit. Closing this gap from a structural/convenience angle, not a motivation angle, is the fastest lever.",
-  "physical": "Weight loss at ~4.6 lbs/week is appropriate for a 305→185 lb recomposition. The concern flagged by Physical Coach—whether training stimulus is protecting lean mass—will only be answerable at the Month 2 DEXA (target: 275 lbs, early November). Until then, protein intake is the most controllable lever for lean mass retention.",
-  "mind": "Seventeen journal gap days signals a shift from reflective practice to automatic execution—the external structure (workouts, eating window, sleep) is running without conscious presence. This is neither failure nor silent protection; it's a normal phase transition. Resuming weekly journaling will restore visibility into how the deficit is landing emotionally as it deepens.",
-  "glucose": "Low amylase (18 U/L, below 21 reference floor) and elevated IgE (339 kU/L) suggest carbohydrate extraction may be less efficient than calorie math implies. This supports prioritizing protein density and monitoring energy levels closely—if fatigue or hunger signals spike, deficit adjustment is warranted before Week 8.",
-  "training": "43 sessions logged in 30 days represents both volume and consistency—the habit is locked in. Load progression (measured in Hevy) will matter more in weeks 5-8 when Foundation transitions to Build; intensity is secondary this week."
+ "_meta": {
+  "generated_at": "2026-10-10T02:38:12.785656+00:00",
+  "served_at": "2026-10-10T02:38:12.785656+00:00",
+  "cache_seconds": 300,
+  "request_id": "db84cba55f8d4a27"
  },
- "generated_at": "2026-09-28T14:03:19.503410+00:00",
- "data_through": "2026-09-28",
- "as_of_day_n": 23,
- "week_number": 4.0,
- "coach_name": "Eli Marsh",
- "coach_title": "Principal Investigator — Program Lead",
+ "weekly_priority": null,
+ "cross_domain_notes": {},
  "pre_start": false
 }

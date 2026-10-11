@@ -173,3 +173,13 @@ def test_mutation_a_stale_count_a_wrong_band_and_stray_first_person_are_each_cau
     assert any("first-person wording outside" in f for f in voice), voice
     unlabelled = built_page_findings(page.replace(DRAFT_LABEL, ""), module)
     assert any("does not carry the label" in f for f in unlabelled), unlabelled
+
+
+def test_the_build_cap_sentence_matches_the_laptop_cap_module():
+    """The page says what stops building-and-testing spend (red team round 7: the control
+    was real, #4623, and the page omitted it). The two amounts are the cap module's."""
+    src = (ROOT / "lambdas" / "ai" / "dev_session_cap.py").read_text()
+    run = float(re.search(r"^PER_RUN_USD = ([0-9.]+)", src, re.M).group(1))
+    day = float(re.search(r"^PER_DAY_USD = ([0-9.]+)", src, re.M).group(1))
+    sentence = re.search(r'export const BUILD_CAP = "([^"]+)"', MODULE.read_text()).group(1)
+    assert f"${run:g} in one run" in sentence and f"${day:g} in any 24 hours" in sentence, sentence

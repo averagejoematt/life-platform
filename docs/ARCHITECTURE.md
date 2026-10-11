@@ -2,9 +2,9 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-10-05 (v8.6.0 — 87 tools, 68-module MCP package, 20 data sources, 107 Lambdas, 26 secrets, 129 alarms, 10 CDK stacks deployed).
+Last updated: 2026-10-11 (v8.6.0 — 88 tools, 69-module MCP package, 20 data sources, 109 Lambdas, 26 secrets, 136 alarms, 10 CDK stacks deployed).
 
-> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **158 ADRs** (ADR-001 → ADR-160 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **159 ADRs** (ADR-001 → ADR-161 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
@@ -33,7 +33,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (87 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (88 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -84,8 +84,8 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
-| CloudWatch | Alarms + logs | **~129 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
-| CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + 92 EventBridge schedule rules (`model/platform_model.json` `meta.counts.schedules`, guarded by `check_doc_facts.py`; the live account holds more rules than CDK declares). Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
+| CloudWatch | Alarms + logs | **~136 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
+| CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + every EventBridge schedule rule (the count is `model/platform_model.json` `meta.counts.schedules` — read it there, it is not restated here so a branch adding a schedule cannot strand it between the committed and the regenerated model; the live account holds more rules than CDK declares). Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$215/mo all-in cap** (ADR-063; base $75 -> $85 -> $150 -> $215, surge-to-$252 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
 | Concurrency quota | Account-level | **100** (raised 2026-05-19 from the account default of 10 — AWS Support case 177921309700709) |
@@ -112,15 +112,15 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 |---|---|---|---|
 | Whoop | `whoop-data-ingestion` | Hourly (active hours) | API pull |
 | Garmin | `garmin-data-ingestion` | Paused (ADR-074) — no live rule | API pull |
-| Eight Sleep | `eightsleep-data-ingestion` | Hourly (active hours) | API pull |
-| Withings | `withings-data-ingestion` | Hourly (active hours) | API pull |
+| Eight Sleep | `eightsleep-data-ingestion` | 4x daily (mornings) | API pull |
+| Withings | `withings-data-ingestion` | 4x daily | API pull |
 | Habitify | `habitify-data-ingestion` | Hourly (active hours) | API pull |
 | Strava | `strava-data-ingestion` | Hourly (active hours) | API pull |
 | Todoist | `todoist-data-ingestion` | 2x daily | API pull |
-| Notion Journal | `notion-journal-ingestion` | Hourly (active hours) | API pull |
+| Notion Journal | `notion-journal-ingestion` | 3x daily | API pull |
 | Weather | `weather-data-ingestion` | 2x daily | API pull |
 | MacroFactor | `macrofactor-data-ingestion` | S3 trigger (Dropbox CSV) | File upload |
-| Dropbox Poll | `dropbox-poll` | `rate(30 minutes)` | File poll |
+| Dropbox Poll | `dropbox-poll` | `rate(2 hours)` | File poll |
 | Journal Enrichment | `journal-enrichment` | Hourly | Compute |
 | Activity Enrichment | `activity-enrichment` | Hourly | Compute |
 | Apple Health (CGM, water, BP, SOM) | `health-auto-export-webhook` | Near real-time (webhook) | HAE push |
@@ -203,7 +203,7 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 DLQ coverage: every async-invoked Lambda routes terminal failures to `life-platform-ingestion-dlq` EXCEPT these, whose CDK construct passes no DLQ at all — `life-platform-delete-user-data`, `life-platform-dlq-consumer`, `life-platform-mcp-warmer`, `life-platform-remediation-dispatcher`, `telegram-coach-worker` (#3500 owns closing the gap; the set is derived from CDK and diffed against this sentence by `scripts/doc_facts_infra.py`). Alarm actions route to SNS `life-platform-alerts`.
 
-CloudWatch carries **~129 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
+CloudWatch carries **~136 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
 
 Additional safeguards — one per line so each cadence is a checkable claim (`scripts/doc_facts_infra.py` diffs both the
 `rate(...)` literal and the prose interval against the CDK schedule):
@@ -236,7 +236,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 87 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 68 (`mcp/tools_*.py` + helpers)
+**Lambda:** `life-platform-mcp` | **Tools:** 88 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 69 (`mcp/tools_*.py` + helpers)
 **Remote MCP:** `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>`
 **Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
 
@@ -461,7 +461,7 @@ There is deliberately **no per-driver cost table here**: a hand-maintained copy 
 ~/dev/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (35 tool modules + helpers)
+  mcp/                            ← MCP server package (36 tool modules + helpers)
     handler.py, config.py, utils.py, core.py, helpers.py, labs_helpers.py
     strength_helpers.py, registry.py, warmer.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits

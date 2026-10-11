@@ -506,6 +506,16 @@ _LINKED_PRIVATE_ROUTE_HTML = (
     '<body><a href="/progress-photos/">progress</a></body></html>\n'
 )
 
+# #3759: a public serving module reading the owner-only coach-vision partition — the exact
+# reader class the isolation sweep exists to refuse (a site endpoint serving a body-fat band
+# that is an estimate as if it were a number). Planted under lambdas/web/, the one tree the
+# gate names as never-acceptable, so it proves both the allowlist leg and the tree leg.
+_COACH_VISION_READER_PY = (
+    '"""census probe — a reader that must never exist."""\n\n\n'
+    "def handle(table):\n"
+    '    return table.query(KeyConditionExpression="pk = :pk", ExpressionAttributeValues={":pk": "USER#matthew#SOURCE#coach_vision"})\n'
+)
+
 # #3615 box 5: a page under site/ advertising a feed the hook registry DECLARES dark —
 # i.e. offering a reader a podcast subscription to a show with zero episodes. This is the
 # exact 11-page defect the gate was written for, planted as a NEW page so it also proves
@@ -657,6 +667,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("site/_census_probe_3760.html", _LINKED_PRIVATE_ROUTE_HTML),),
         track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
+    ),
+    "structural::test_coach_vision_isolation_3759.py": MutationSpec(
+        gate_id="structural::test_coach_vision_isolation_3759.py",
+        target="tests/test_coach_vision_isolation_3759.py",
+        detects=(
+            "a public serving module under lambdas/web/ that reads the owner-only coach-vision record "
+            "(a sentence about his body and a body-fat band that is an estimate, not a measurement) — the "
+            "leak no other gate has an opinion about: the partition has no site/ object, no route and no "
+            "field-tier projection, so every page list and every tier guard simply has no row for it"
+        ),
+        plants=(("lambdas/web/_census_probe_3759.py", _COACH_VISION_READER_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ site/ scripts/ deploy/ cdk/ on disk, so an untracked module is in scope
     ),
     "structural::test_hook_registry_3615.py": MutationSpec(
         gate_id="structural::test_hook_registry_3615.py",
@@ -1130,6 +1152,79 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         track=False,  # the guard globs site/assets/js on disk, so an untracked module is in scope
     ),
+    "structural::test_journal_row_cowriters_4677.py": MutationSpec(
+        gate_id="structural::test_journal_row_cowriters_4677.py",
+        target="tests/test_journal_row_cowriters_4677.py",
+        detects=(
+            "a NEW pipeline that merges an attribute onto a Notion journal row with update_item and is not declared in "
+            "ingestion/journal_row_contract.py — so the ingester's full-item put erases what it wrote the next time the "
+            "page is edited (#4677: the vocal metrics were the third writer onto a row whose carried set was a hand list of two)"
+        ),
+        plants=(
+            (
+                "scripts/_census_probe_4677.py",
+                # Assembled: the guard this proves sweeps scripts/ for a module that spells the partition
+                # AND a write call, and this module is a file under scripts/.
+                _lit(
+                    'PK = "USER#matthew#SOURCE#',
+                    'notion"\n\n\ndef write(table, sk):\n    table.update',
+                    '_item(Key={"pk": PK, "sk": sk}, UpdateExpression="SET probe_score = :v", ',
+                    'ExpressionAttributeValues={":v": 1})\n',
+                ),
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ mcp/ scripts/ deploy/ on disk, so an untracked module is in scope
+    ),
+    "structural::test_key_rotator_grants_4707.py": MutationSpec(
+        gate_id="structural::test_key_rotator_grants_4707.py",
+        target="tests/test_key_rotator_grants_4707.py",
+        detects=(
+            "a NEW Secrets Manager rotation Lambda (it handles the finishSecret step) that is not registered with its "
+            "policy function and rotated secret, so nothing checks that its sm.<method> calls are granted (#4707: the "
+            "key rotator called update_secret_version_stage for seven months on a role that never granted it)"
+        ),
+        plants=(
+            (
+                "lambdas/operational/_census_probe_4707.py",
+                'STEPS = {"' + "finish" + 'Secret": None}\n',
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ on disk, so an untracked module is in scope
+    ),
+    "structural::test_retired_training_shapes_4636.py": MutationSpec(
+        gate_id="structural::test_retired_training_shapes_4636.py",
+        target="tests/test_retired_training_shapes_4636.py",
+        detects=(
+            "a NEW module that reads a stored row's nested per-day `workouts` list — the retired training shape "
+            "(#4636: the monthly digest counted 0 of 24 September sessions reading it, and two MCP views read the "
+            "writerless macrofactor_workouts partition) — outside the one bridge, training/legacy_workouts.py"
+        ),
+        plants=(
+            (
+                "lambdas/training/_census_probe_4636.py",
+                'def sessions(row):\n    return row.get("workouts") or []\n',
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ and mcp/ on disk, so an untracked module is in scope
+    ),
+    "structural::test_upstream_changes_4638.py": MutationSpec(
+        gate_id="structural::test_upstream_changes_4638.py",
+        target="tests/test_upstream_changes_4638.py",
+        detects=(
+            "a NEW operator path that rebuilds an Apple Health day authoritatively — a merge_day_to_dynamo caller "
+            "passing monotonic_guard=False POSITIONALLY, in a file that never spells 'monotonic_guard' (the form an "
+            "earlier text prefilter skipped) — while the registry still states apple_health edits and deletes as "
+            "not_propagated (#4638: the stated upstream-change behaviour silently stops being true)"
+        ),
+        plants=(
+            (
+                "scripts/_census_probe_4638.py",
+                "from ingestion.health_auto_export_lambda import merge_day_to_dynamo\n\n\n"
+                "def rebuild(date_str, fields):\n    merge_day_to_dynamo(date_str, fields, None, False)\n",
+            ),
+        ),
+        track=False,  # the guard rglobs lambdas/ scripts/ deploy/ mcp/ on disk, so an untracked module is in scope
+    ),
 }
 
 
@@ -1259,6 +1354,23 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "its real EVENT# rows). It judges SOURCE SHAPE, never live rows: whether an unstamped row "
         "actually exists is the qa-smoke inverse leg's question, not this gate's.",
         proved_on="2026-09-20",
+    ),
+    "structural::test_coach_vision_isolation_3759.py": _proof(
+        "structural::test_coach_vision_isolation_3759.py",
+        "ARMED 1/1 — baseline: 11 passed in 3.11s | mutated: 2 failed, 9 passed in 3.12s :: "
+        "test_no_file_outside_the_allowlist_names_the_partition; test_no_reader_or_narrative_tree_names_it_at_all "
+        "| reverted: 11 passed in 3.08s",
+        "lambdas/ mcp/ site/ scripts/ deploy/ cdk/ on disk (os.walk over .py/.js/.mjs/.html/.json/.md/.sh/.txt, "
+        "deploy/generated/** excluded as a live-measured artifact), so an UNTRACKED module is in scope — every "
+        "mention of the partition token is held to a written allowlist (two consumers + plumbing), and a mention "
+        "in a reader/narrative tree (lambdas/web, lambdas/emails, lambdas/content, lambdas/intelligence, site, "
+        "scripts/v4_*) fails regardless of the allowlist. Also pinned: every allowlist entry still carries the "
+        "token, the site API's ROUTES serve no vision path, the tier/class/band declarations, and the producing "
+        "role's write grant is LeadingKeys-scoped to the one partition with GetObject only on the photo prefix. "
+        "STILL INVISIBLE, stated rather than papered over: a reader that reaches the partition through a "
+        "variable-built pk (no literal token), a coach narrative that paraphrases the thread addendum into a "
+        "published line (the grounder's allow-list is what bounds that), and docs/ + tests/, which are not swept.",
+        proved_on="2026-10-11",
     ),
     "structural::test_progress_viewer_privacy_3760.py": _proof(
         "structural::test_progress_viewer_privacy_3760.py",
@@ -1901,6 +2013,77 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "`c.confirmed of c.n` off /api/calibration.coaches with no other marker) is not seen; MCP tools and emails are not "
         "reader pages and are out of scope.",
         proved_on="2026-10-03",
+    ),
+    "structural::test_journal_row_cowriters_4677.py": _proof(
+        "structural::test_journal_row_cowriters_4677.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 5 passed in 0.37s | mutated: 1 failed, 4 passed in 0.38s "
+        ":: tests/test_journal_row_cowriters_4677.py::test_every_module_that_writes_beside_the_journal_partition_is_declared_or_explained "
+        "| reverted: 5 passed in 0.36s",
+        "Covers the SET: every .py under lambdas/ mcp/ scripts/ deploy/ on disk (rglob, archive/ excluded) that spells the "
+        "journal partition key AND issues a DynamoDB write must be a declared co-writer in ingestion/journal_row_contract.py "
+        "or carry a stated reason in the test's NOT_A_JOURNAL_ROW_WRITER (stale entries red too). The same file drives each "
+        "declared co-writer's REAL update expression and reds on an attribute outside its declared families, proves a newly "
+        "declared family is carried with no ingester edit, and pins the ingester's put_item to one function that carries "
+        "first. Hand mutations on 2026-10-05 against the real files, each watched RED and restored: the vocal_ family "
+        "dropped from the contract (5 failed), the same-key carry removed (3 failed), the re-key carry removed (1 failed), "
+        "the one-row-a-day path putting directly (4 failed), the backfill writing an attribute outside vocal_ (2 failed), "
+        "an unreadable stored row rewritten anyway (1 failed), the carry copying every stored attribute (2 failed), a stored "
+        "value overriding the fresh vendor value (1 failed). STILL INVISIBLE, stated: a writer handed a journal row's key by "
+        "another module without spelling the partition itself; a co-writer whose update expression is built somewhere the "
+        "driver does not exercise; `phase`, which is re-derived from the date rather than carried.",
+        proved_on="2026-10-05",
+    ),
+    "structural::test_key_rotator_grants_4707.py": _proof(
+        "structural::test_key_rotator_grants_4707.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 7 passed in 0.25s | mutated: 1 failed, 6 passed in 0.27s "
+        ":: tests/test_key_rotator_grants_4707.py::test_every_rotation_lambda_is_registered | reverted: 7 passed in 0.25s",
+        "Covers the SET: every .py under lambdas/ on disk (rglob) that handles the Secrets Manager finishSecret step is "
+        "registered in ROTATION_LAMBDAS, and for each one every method called on a boto3.client('secretsmanager') handle is "
+        "mapped through botocore's service model to its API operation and must be granted by a statement in the registered "
+        "policy function whose resource is _secret_arn(<rotated secret>). Hand mutation on 2026-10-10 against the real policy: "
+        "deleting secretsmanager:UpdateSecretVersionStage from operational_key_rotator() (the pre-fix #4707 statement) reds "
+        "test_every_secretsmanager_call_of_every_rotation_lambda_is_granted; in-file controls red on the wrong-secret scope, "
+        "a newly added call and an unknown method. STILL INVISIBLE, stated: a Secrets Manager client reached through a helper "
+        "or another module's handle (only names bound to boto3.client('secretsmanager') in the Lambda file are read); "
+        "grants that live outside the policy function (the create_platform_lambda baseline) are not credited, so such a "
+        "call would red rather than pass; a resource-policy or KMS denial is not modelled.",
+        proved_on="2026-10-10",
+    ),
+    "structural::test_retired_training_shapes_4636.py": _proof(
+        "structural::test_retired_training_shapes_4636.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 10 passed in 4.07s | mutated: 1 failed, 9 passed in 3.54s "
+        ":: tests/test_retired_training_shapes_4636.py::test_no_retired_shape_read_outside_the_bridge | reverted: 10 passed in 4.54s",
+        "Covers the SET: every .py under lambdas/ and mcp/ on disk (rglob, AST) is swept for a string naming the "
+        'macrofactor_workouts partition (literal or a SOURCE#macrofactor_workouts key), a `.get("workouts")` or '
+        '`["workouts"]` read, and an import of training.legacy_workouts; every hit is pinned per file with its exact count '
+        "and reason, so a new file, one more occurrence in a pinned file, or a stale pin each red. Hand mutations on "
+        "2026-10-10, each watched RED and restored: reverting the monthly digest's ex_hevy, the tools_training reads and "
+        "the tools_hevy day-supersede each red the guard plus that fix's behaviour pins (3 failed each). STILL INVISIBLE, "
+        "stated: a read of the key spelled through a variable or getattr, a partition name assembled at runtime from "
+        "parts, and readers outside lambdas/ and mcp/ (scripts/, deploy/).",
+        proved_on="2026-10-10",
+    ),
+    "structural::test_upstream_changes_4638.py": _proof(
+        "structural::test_upstream_changes_4638.py",
+        "ARMED baseline=0 mutated=1 reverted=0 :: baseline: 7 passed in 0.69s | mutated: 1 failed, 6 passed in 0.74s "
+        ":: tests/test_upstream_changes_4638.py::test_apple_health_rebuild_path_has_no_operator_caller_so_nothing_propagates "
+        "| reverted: 7 passed in 0.64s",
+        "Covers the SET: every .py under lambdas/ scripts/ deploy/ mcp/ on disk that spells merge_day_to_dynamo (rglob, "
+        "AST) and calls it with monotonic_guard not literally True — by keyword, or as the 4th positional argument — "
+        "reds while the registry states apple_health as not_propagated. The planted mutation is the POSITIONAL form "
+        "merge_day_to_dynamo(d, f, None, False) in a file that never spells 'monotonic_guard': the earlier prefilter "
+        "(on the text 'monotonic_guard') skipped that file and the gate stayed green; prefiltering on "
+        "'merge_day_to_dynamo' reds it (watched on 2026-10-09: the same plant under the old prefilter ran DARK, 7 passed). "
+        "The keyword form (monotonic_guard=False) was the original plant and was re-run by hand on 2026-10-09 against the "
+        "new prefilter (1 failed). The same file pins the upstream_changes facet on every UPSTREAM_CHANGES_REQUIRED "
+        "source (closed vocabulary, window_days iff inside_window, a note), strava/whoop's window to their "
+        "refresh_trailing_days, and the MacroFactor diary import's authoritative date range. Hand mutations on 2026-10-09 "
+        "against the real files, each watched RED and restored: the empty records not merged into the write set "
+        "(1 failed), the _format skip removed (1 failed), the range bound dropped (1 failed), strava's stated window 3->4 "
+        "(1 failed), hevy's facet renamed away (1 failed), apple_health edits re-stated inside_window (2 failed). STILL "
+        "INVISIBLE, stated: a rebuild reached through another name (an alias, getattr, or **kwargs unpacking) or by "
+        "writing the apple_health partition directly.",
+        proved_on="2026-10-09",
     ),
 }
 

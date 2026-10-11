@@ -28,12 +28,16 @@ from coach import (
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
+    plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
-from web import prediction_reason  # #4220: a graded call's reason in reader words
+from web import (
+    claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
+    prediction_reason,  # #4220: a graded call's reason in reader words
+)
 from web.site_api_common import (
     PT,
     USER_PREFIX,
@@ -150,13 +154,21 @@ def handle_coach_docket(event, *, _g):
     # is not served — a stake "based on CGM data" from a coach with no CGM is not a
     # position a reader can weigh. The entry names why under `absent`. Resolved history
     # is untouched. Fail-open with a logged warning; the renderer keeps its own guard.
-    try:
-        from health import instrument_presence as _presence
+    from health import instrument_presence as _presence
 
+    try:
         absent = _presence.absent_coaches(_g["table"])
     except Exception as _pe:
         logger.warning(f"[coach_docket] instrument presence check failed (fail-open): {_pe}")
         absent = {}
+    # #4673: the resolved history was left verbatim, and that is where the defect lived — a
+    # settled bet printed "…based on CGM data" from a side argued on 2026-09-23, four weeks
+    # after the sensor's last reading. Every claim (open OR resolved, either coach) that
+    # cites a dark instrument and is dated after its last reading is held; the entry names
+    # why under `unsourced` (web.claim_sourcing). The concession quotes the loser's claim
+    # verbatim, so it is held by the same rule. #4702: "dark" is the interval form — a gap
+    # that has since CLOSED still holds what was said inside it (gap_history never raises).
+    dark = claim_sourcing.gap_instruments(absent, _presence.gap_history(_g["table"]))
     try:
         items = _docket_rows("OPEN#", DOCKET_OPEN_LIMIT, newest_first=False) + _docket_rows(
             "RESOLVED#", DOCKET_RESOLVED_LIMIT, newest_first=True
@@ -184,10 +196,14 @@ def handle_coach_docket(event, *, _g):
                 "opened_date": it.get("opened_date"),
                 "stakes": it.get("stakes") or {},
             }
+            if dark:
+                kept, held = claim_sourcing.split_claims(claims, it.get("opened_date"), dark)
+                if held:
+                    entry["claims"], entry["unsourced"] = kept, held
             if sk.startswith("OPEN#"):
                 _dark = {c: absent[c] for c in (entry["coach_a"], entry["coach_b"]) if c in absent}
                 if _dark:
-                    entry["claims"] = {c: t for c, t in dict(claims).items() if c not in _dark}
+                    entry["claims"] = {c: t for c, t in dict(entry["claims"]).items() if c not in _dark}
                     entry["absent"] = {
                         c: {"reason": st.get("reason"), "instrument": {"source": st.get("source"), "datatype": st.get("datatype")}}
                         for c, st in _dark.items()
@@ -205,6 +221,9 @@ def handle_coach_docket(event, *, _g):
                         "concession": concession,
                     }
                 )
+                held_concession = claim_sourcing.unsourced([concession], it.get("opened_date"), dark) if concession else None
+                if held_concession:
+                    entry["concession"], entry["concession_unsourced"] = None, held_concession
                 resolved.append(entry)
     except Exception as _e:
         logger.warning(f"[coach_docket] {_e}")
@@ -446,6 +465,31 @@ def _fetch_prediction_partition(coach_pk, *, _g):
     that to [] so a single bad partition degrades exactly as it did before."""
     _query_partition = _g["_query_partition"]
     return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
+
+
+#: #4701: the `_parallel_fetch` job key /api/predictions reads instrument presence under.
+#: Not a short coach id, so it can never collide with a partition key.
+PRESENCE_JOB = "__instrument_presence__"
+
+
+def _instrument_presence_safe(*, _g):
+    """The interval form every other claim-sourcing route reads (#4702) —
+    `claim_sourcing.gap_instruments(absent_coaches, gap_history)` — fail-open (#4217): a
+    sentinel or history read failing must not take the ledger down, it only means less is
+    held. Never raises, so as a `_parallel_fetch` job it can never be counted as a failed
+    coach partition. Both reads ride this ONE job, so the pool still runs one wave."""
+    from health import instrument_presence as _presence
+
+    try:
+        absent = _presence.absent_coaches(_g["table"])
+    except Exception as _pe:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument presence check failed (fail-open): {_pe}")
+        absent = {}
+    try:
+        return claim_sourcing.gap_instruments(absent, _presence.gap_history(_g["table"]))
+    except Exception as _ge:  # noqa: BLE001
+        logger.warning(f"[/api/predictions] instrument gap history failed (fail-open): {_ge}")
+        return claim_sourcing.gap_instruments(absent)
 
 
 def _parallel_fetch(jobs, *, failures=None):
@@ -762,6 +806,92 @@ def handle_calibration(event, *, _g):
         )
 
 
+def _counted_block(decided) -> dict:
+    """#4617: what the headline count counts — every decided row in exactly one class, never dropped."""
+    counted = coach_record.class_counts(decided)
+    return {"counted": counted, "counted_text": coach_record.counted_text(counted)}
+
+
+def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
+    """The record line's five facts from the coaches' raw PREDICTION# rows (#4607) — pure.
+
+    NOT a second derivation of the record: the same functions in the same order the two
+    routes use — ``coach_record.resolved_once`` → ``coach_record.counts_this_cycle`` → the
+    ``status`` tally ``handle_predictions`` keeps, and
+    ``calibration_core.pairs_from_prediction_records`` → ``score_strata`` for the stratum
+    ``handle_calibration`` serves. A stratum's own numbers depend on its own pairs only, so
+    scoring the coaches' stratum without the hypothesis and forecast strata returns the same
+    ``strata.coaches``. Returns ``{"predictions": {...}, "calibration": {...}}`` — each the
+    subset of that route's body the record line reads, in the route's own shape."""
+    confirmed = refuted = 0
+    coach_pairs: list = []
+    season_all: list = []  # #4617: the rows the class counts are taken over — the same season
+    for cid in _CALIB_COACH_NAMES:
+        records = coach_record.resolved_once(rows_by_cid.get(cid, []))
+        season = [r for r in records if coach_record.counts_this_cycle(r, genesis)]
+        season_all.extend(season)
+        for rec in season:
+            status = rec.get("status", "pending")  # the bucket key handle_predictions tallies
+            if status == "confirmed":
+                confirmed += 1
+            elif status == "refuted":
+                refuted += 1
+        coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
+    return {
+        "predictions": {
+            "overall": {
+                "confirmed": confirmed,
+                "refuted": refuted,
+                "decided": confirmed + refuted,
+                "due": {"as_of": today_pt},
+                **_counted_block(season_all),
+            }
+        },
+        "calibration": {
+            "platform": {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}},
+            "as_of": today_pt,
+        },
+    }
+
+
+def edition_record(*, _g):
+    """The record line AND the settled calls for /api/edition from ONE partition sweep
+    (#4607, #4582 box 1).
+
+    The front page read ``/api/predictions`` and ``/api/calibration`` whole for five numbers
+    (#4607 narrowed that to one sweep), and then ``/api/calls`` on its own — the same eight
+    PREDICTION# partitions a second time, at the predictions route's projection. #4582 box 1
+    (the front page makes one data request) folds the calls into the edition, so the sweep is
+    now ``/api/calls``' own read (``site_api_calls.read``: the same key condition, order and
+    Limit as ``_query_partition``, so the same page of rows), and the record is derived from
+    those same rows by ``record_bodies`` — every field it reads is in that projection (pinned
+    by tests/test_edition_latency_4607.py). One sweep, two blocks.
+
+    Returns ``{"predictions", "calibration", "calls"}``. Raises when every partition read
+    failed (the "a total outage is a failure, not a zero" rule of ``handle_predictions``,
+    #2658); the caller serves those blocks unavailable. A partial failure serves the record
+    degraded, as before, and the calls ``None`` — the calls route's own rule (a missing
+    partition would unsettle "the newest settled call"). A fault in composing the calls never
+    touches the record.
+    """
+    from web import site_api_calls as _calls
+
+    names, fetched, failures = _calls.read(_g)
+    failed = [c for c in failures if c in names]
+    if failed and len(failed) == len(names):
+        raise RuntimeError(f"all {len(failed)} coach partition reads failed: {sorted(failed)}")
+    if failed:
+        logger.error(f"[edition-record] degraded — {len(failed)} of {len(names)} partitions failed: {sorted(failed)}")
+    today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
+    out = record_bodies({cid: fetched.get(cid, []) for cid in _CALIB_COACH_NAMES}, today_pt, _g["EXPERIMENT_START"])
+    try:
+        out["calls"] = _calls.document(names, fetched, failures, _g)
+    except Exception as e:  # noqa: BLE001 — the calls block says so; the record stands
+        logger.error(f"[edition-record] calls unavailable: {e}")
+        out["calls"] = None
+    return out
+
+
 def handle_voice_fidelity(event, *, _g):
     """GET /api/voice_fidelity — the blind voice-fidelity scoreboard (#545).
 
@@ -834,6 +964,9 @@ def handle_predictions(event, *, _g):
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
         coach_filter = qs.get("coach_id", "")
+        # #4714: the coach page's "Next" list is the one request of this shape (ck_coach.js asks
+        # `?coach_id=<id>&status=pending`); only it is held to the plain-words rule below.
+        coach_page_pending = status_filter == "pending" and bool(coach_filter)
         # #2658: `int()` on an unvalidated param raised straight into the handler-wide
         # `except` below, which answered 200 with an empty ledger — a swallowed error
         # rendered as "the coaches have made no predictions" (ADR-104). Reject the bad
@@ -857,10 +990,19 @@ def handle_predictions(event, *, _g):
         # #1527: fetch every scanned coach's partition concurrently up front —
         # the loop below stays purely computational.
         _fetch_failures: list = []
-        fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches},
-            failures=_fetch_failures,
-        )
+        _jobs = {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+        # #4701: the instrument-presence read rides the SAME concurrent round as the
+        # partitions (8 coaches + 1 = the pool's 9 workers, one wave), so the #4673 hold
+        # costs this #1527-guarded path no serial round trip. It never raises.
+        _jobs[PRESENCE_JOB] = lambda: _instrument_presence_safe(_g=_g)
+        fetched = _parallel_fetch(_jobs, failures=_fetch_failures)
+        # #4701: the sourcing hold every other route that quotes a dated coach claim
+        # applies (web.claim_sourcing, #4673). A row whose words cite an instrument that
+        # had sent no reading by the day they were said keeps its date and its place in
+        # the record; its `text` is "" and `unsourced` says why. Before this the call
+        # page withheld a claim this ledger still quoted.
+        _dark = fetched.pop(PRESENCE_JOB, None) or []  # #4702: already the interval form
+        _fetch_failures[:] = [f for f in _fetch_failures if f != PRESENCE_JOB]
         # #2658: `_parallel_fetch` catches each partition error individually, so a total
         # outage never reached the handler-wide guard below — it produced a fully zeroed
         # scorecard at HTTP 200, which is the exact "absence rendered as zero" this issue
@@ -959,13 +1101,29 @@ def handle_predictions(event, *, _g):
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
+                    # #4714: the plain-words rule applies to ONE list only — the coach page's "Next" (the only
+                    # caller asking for one coach's pending calls), never the full ledger (status=all, the
+                    # method/prediction pages). There, an in-cycle pending call a friend could not read is not
+                    # listed (it is still counted above, so the scorecard keeps the row). A SEALED pre-registered
+                    # bet is never hidden: it was frozen before the experiment began, so it is served whatever its
+                    # length, and only the jargon half of the rule labels it (`reader_plain: False`) for the page.
+                    _plain_label = None
+                    if coach_page_pending and p_status == "pending":
+                        _claim = rec.get("claim_natural")
+                        if rec.get("pre_registered"):
+                            _plain_label = not plain_words.specialist_terms(_claim)
+                        elif not plain_words.is_plain(_claim, plain_words.CALL_MAX_CHARS):
+                            continue
+
                     _reason, _graded_on_data = prediction_reason.reason_words({**rec, "status": p_status})
+                    _said = rec.get("claim_natural", "")
+                    _held = claim_sourcing.unsourced([_said], claim_sourcing.claim_day(rec), _dark) if _dark else None
                     all_predictions.append(
                         {
                             "coach_id": cid,
                             "coach_name": _pred_coach_names[cid],
                             "retired": cid in _RETIRED_SHORT_IDS,
-                            "text": rec.get("claim_natural", ""),
+                            "text": "" if _held else _said,  # #4701: held words are removed, never edited
                             "confidence": rec.get("confidence", "medium"),
                             "status": p_status,
                             "date": rec.get("created_date", ""),
@@ -991,6 +1149,11 @@ def handle_predictions(event, *, _g):
                             "reason": _reason,
                             "graded_on_data": _graded_on_data,
                             "subdomain": rec.get("subdomain", ""),
+                            # #4701: present only on a held row — the same note shape the docket,
+                            # call and coach routes serve (reason, instrument, gap, said_on, text; #4702).
+                            **({"unsourced": _held} if _held else {}),
+                            # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
+                            **({"reader_plain": False} if _plain_label is False else {}),
                         }
                     )
             except Exception as _qe:
@@ -1067,6 +1230,7 @@ def handle_predictions(event, *, _g):
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
                     "due": due,
+                    **_counted_block(season_decided),  # #4617: sealed / bets / commentary / conditional, as counts
                     "lifetime": {
                         "total": l_total,
                         "confirmed": l_confirmed,

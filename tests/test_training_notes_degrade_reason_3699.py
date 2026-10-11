@@ -106,10 +106,11 @@ def test_the_three_reasons_are_distinguishable():
         tnl.TruncatedResponse("stop_reason=max_tokens at max_tokens=384"),
         tnl.UnparseableResponse("no JSON array span in a 12-char response"),
         tnl.CapExceeded("training-notes Haiku monthly cap 300 reached"),
+        tnl.BudgetPaused("budget tier pauses training_notes (live lane)"),  # #4643
         RuntimeError("bedrock threw"),
     ):
         seen.add(tn.degrade_reason(exc).split(":")[0].strip())
-    assert seen == {"truncated", "unparseable", "cap_exceeded", "llm_error"}
+    assert seen == {"truncated", "unparseable", "cap_exceeded", "budget_paused", "llm_error"}
     assert seen == set(tn.DEGRADE_CODES)
 
 

@@ -9,8 +9,9 @@
 // view and how the character is written.
 //
 // One template for every coach, read from routes the site already serves:
-//   /api/coach/<persona_id>   stance (watch list, stage ladder), record, checked calls,
-//                             the newest ask, the authored character notes
+//   /api/coach/<persona_id>   stance (the coach's own watch list) with the author's stage
+//                             ladder beside it (#4649), record, checked calls, the newest
+//                             ask, the authored character notes
 //   /api/coach_docket         open and settled bets between two coaches
 //   /api/predictions          this coach's pending calls and the date each is due
 //   /api/coaches              the roster: every coach's name, and the fallback when the
@@ -23,6 +24,12 @@
 // (#4585); no honorific; an ISO date inside served text is put into words; the page's own
 // sentences name the coach or say "this coach" — never a gendered pronoun for a persona.
 //
+// Three distances on one page, each built only from served fields (#4649): SHORT is what
+// settles next and the watch list (stance.focused_on_now, or the stage's own list when the
+// coach has written none that is served); MEDIUM is the stage Matthew is in, its plan and
+// the test that opens the next one (stance.rung, stance.graduation_gate); LONG is the
+// stages after it (stance.ladder). A watch item the route withholds is simply not here.
+//
 // A deep page: it exists only as the destination of a coach's name, has no index of its
 // own, and goes back to where the reader came from.
 //
@@ -32,6 +39,8 @@ import { tryJSON, esc, fmtShort, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, countWord } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import { COACH_JOBS } from "/assets/js/ck_pages.js";
+import { verdictTag, callCardHTML, gradedOnText, hasRule, ruleless, sharedToleranceNote } from "/assets/js/ck_verdict.js";
+import { callsOf, callHref, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { docketQuestion, recentLines, ledgerLine, standingAsk, shortId } from "/assets/js/v7_coaches.js";
 
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -56,18 +65,8 @@ export const isCoachId = (id) => /^[a-z][a-z0-9_]{1,39}$/.test(String(id || ""))
 export function coachHref(personaId, base = "/next/v8/") {
   return isCoachId(personaId) ? `${base}coach/?c=${encodeURIComponent(personaId)}` : `${base}coaches/`;
 }
-/** Where "Back" goes: the page the reader came from when it is on this site (and is not
- *  this page), otherwise the preview's Coaches page. Only a path is ever returned. */
-export function backTarget(referrer, here, base = "/next/v8/") {
-  const fallback = { href: `${base}coaches/`, text: "← The AI coaches" };
-  try {
-    const [from, at] = [new URL(String(referrer)), new URL(String(here))];
-    if (from.origin !== at.origin || (from.pathname === at.pathname && from.search === at.search)) return fallback;
-    return { href: `${from.pathname}${from.search}`, text: "← Back" };
-  } catch {
-    return fallback;
-  }
-}
+// Where "Back" goes is the page named by `from=`, by name, else the front page: one rule for
+// every deep page, in ck_call.js `backFor` (#4675).
 
 // What each coach is for, in a reader's words, keyed on the served persona id. Static
 // page copy in the third person; a coach that is not here falls back to the Coaches
@@ -130,7 +129,11 @@ export function watchingHTML(p, shown = 1) {
   if (!p || p.partial) return soft("What this coach is watching is not available right now.");
   if (p.absent) return soft(`${p.name} is sitting out${p.reason ? ` (${wordDates(p.reason)})` : ""} and has nothing to watch until the readings come back.`);
   const st = p.stance || {};
-  const items = words(st.focused_on_now);
+  const own = words(st.focused_on_now);
+  // The coach's own list first. With none served, the list the author set for the stage
+  // Matthew is in (served beside the stance) — said to be the author's, never the coach's.
+  const staged = own.length ? [] : words(st.rung && st.rung.cares_most);
+  const items = own.length ? own : staged;
   const ask = standingAsk(p.dossier && p.dossier.commitments);
   const askLine = ask
     ? `<p class="ck-soft">${esc(`The latest thing ${p.name} asked of Matthew, ${shortDay(ask.date)}: “${wordDates(ask.text)}”${isDay(ask.due_date) ? ` Due ${shortDay(ask.due_date)}.` : ""}`)}</p>`
@@ -142,16 +145,16 @@ export function watchingHTML(p, shown = 1) {
   // Whose words these are, and how old. A list the coach wrote carries its date; a list
   // that belongs to the coach's current stage is the author's, and is not this week's.
   const whose =
-    st.source === "stance" && isDay(st.as_of)
+    own.length && st.source === "stance" && isDay(st.as_of)
       ? `In ${p.name}’s own words, written ${shortDay(st.as_of)}.`
-      : st.source === "ladder"
+      : st.source === "ladder" || staged.length
         ? "Set by the author for the stage Matthew is in. Not written this week."
         : "As recorded, with no date on it.";
   const first = items.slice(0, shown);
   const firstHTML = first.map((t) => `<p>“${esc(cap(period(wordDates(t))))}”</p>${glossLines(t).map((g) => soft(g)).join("")}`).join("");
   const rest = items.slice(shown);
   const more = rest.length ? `<details><summary>${esc(`${cap(countWord(rest.length))} more on the list`)}</summary>${list(rest)}</details>` : "";
-  const aside = words(st.set_aside_for_now);
+  const aside = words(own.length || st.source === "ladder" ? st.set_aside_for_now : st.rung && st.rung.cares_less_right_now);
   const asideHTML = aside.length ? `<details><summary>${esc(`What ${p.name} has set aside for now`)}</summary>${list(aside)}</details>` : "";
   const changed = String(st.how_my_read_changed || "").trim();
   const changedHTML = changed ? `<details><summary>${esc(`How ${p.name}’s read changed`)}</summary><p class="ck-soft">“${esc(wordDates(changed))}”</p></details>` : "";
@@ -169,6 +172,10 @@ export function pendingCalls(predictions, pid) {
     .filter((c) => c && c.status === "pending" && isDay(c.due_date) && String(c.text || "").trim() && (!c.coach_id || c.coach_id === short))
     .sort((a, b) => a.due_date.localeCompare(b.due_date) || String(a.date).localeCompare(String(b.date)));
 }
+/** #4714: a sealed bet is shown in the words it was sealed in, even when they are specialist
+ *  words; the route marks those `reader_plain: false` and the page says why it reads that way. */
+export const sealedNote = (call) =>
+  call && call.pre_registered && call.reader_plain === false ? "Sealed before the experiment began, so it keeps its original wording." : "";
 const shiftDay = (iso, days) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 /** The day a call is ABOUT, when its own words name one: a machine date in the sentence,
  *  or "tonight" / "tomorrow" counted from the day it was said. "" when it names none. */
@@ -198,6 +205,7 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
   const calls = pendingCalls(predictions, pid);
   if (p.tier === "lead" && !bets.length && !calls.length) return soft(`${p.name} is the lead. The lead makes no dated calls and has no bet open, so nothing is waiting to settle.`);
   const out = [];
+  const tail = [];
   const ahead = calls.filter((c) => isUpcoming(c, today));
   const older = calls.length - ahead.length;
   const nextBet = bets.find((b) => b.resolution_date >= today);
@@ -215,35 +223,50 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
     out.push(soft(`${cap(countWord(calls.length))} ${calls.length === 1 ? "call is" : "calls are"} waiting to be checked.`));
     const rows = ahead
       .slice(0, shown)
-      .map((c) => `<li><span class="ck-rows__key"><time datetime="${esc(c.due_date)}">${esc(fmtShort(c.due_date))}</time></span><span>“${esc(wordDates(c.text))}” <span class="ck-small">${esc(isDay(c.date) ? `Said ${fmtShort(c.date)}.` : "")}</span></span></li>`)
+      .map((c) => `<li><span class="ck-rows__key"><time datetime="${esc(c.due_date)}">${esc(fmtShort(c.due_date))}</time></span><span>“${esc(wordDates(c.text))}” <span class="ck-small">${esc([isDay(c.date) ? `Said ${fmtShort(c.date)}.` : "", sealedNote(c)].filter(Boolean).join(" "))}</span></span></li>`)
       .join("");
     if (rows) out.push(`<ul class="ck-rows">${rows}</ul>`);
-    if (older) out.push(soft(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`));
+    // Every waiting call is accounted for: the ones shown, the rest still ahead, the older.
+    const later = Math.max(0, ahead.length - shown);
+    if (rows && later) tail.push(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`);
+    if (older) tail.push(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`);
   }
-  if (!docket) out.push(soft("The bets between coaches are not available right now."));
-  else if (bets.length) out.push(soft(`${cap(countWord(bets.length))} open ${bets.length === 1 ? "bet" : "bets"} against another coach: the next section has ${bets.length === 1 ? "it" : "them"}.`));
+  // The open bets are the next section's own cards, so this section no longer signposts them
+  // ("One open bet …: the next section has it."); a docket that failed to read still says so.
+  if (!docket) tail.push("The bets between coaches are not available right now.");
+  // The accounting sentences after the list are one paragraph, not several (the six-screen
+  // budget's headroom, 2026-10-11).
+  out.push(soft(tail.join(" ")));
   return out.join("");
 }
 
-// ── the longer view ────────────────────────────────────────────────────────────
-// On the wire only as a ladder of stages (the author's, keyed on where Matthew is now)
-// with the gate that opens the next one. A coach with no ladder gets the plain sentence:
-// nothing here is composed to fill the gap.
+// ── this stage, and the stages after it ────────────────────────────────────────
+// The medium and the long distance, both from the author's ladder of stages (keyed on
+// where Matthew is now), which the route serves whether or not the coach has written a
+// stance. MEDIUM: the stage he is in, its plan and the test that opens the next one.
+// LONG: the stages after it. A coach with no ladder gets the plain sentence: nothing here
+// is composed to fill the gap.
 export function longerHTML(p) {
   if (!p || p.partial) return soft("The longer view is not available right now.");
   if (p.absent) return soft(`${p.name} has no longer view on record while sitting out.`);
   const st = p.stance || {};
-  const ladder = (Array.isArray(st.ladder) ? st.ladder : []).filter((s) => s && String(s.headline || "").trim());
-  if (ladder.length < 2) return soft(`${p.name} has no longer view on record yet.`);
+  const all = (Array.isArray(st.ladder) ? st.ladder : []).filter(Boolean);
+  const named = all.filter((s) => String(s.headline || "").trim());
+  if (named.length < 2) return soft(`${p.name} has no longer view on record yet.`);
   const nowId = st.rung && st.rung.stage_id;
-  const rows = ladder.map((s) => `<li><span>${s.stage_id === nowId ? `<b>${esc(period(s.headline))}</b> Now.` : esc(period(s.headline))}</span></li>`).join("");
+  const at = all.findIndex((s) => s.stage_id === nowId);
+  const now = at >= 0 && String(all[at].headline || "").trim() ? all[at] : null;
+  const after = at >= 0 ? all.slice(at + 1).filter((s) => String(s.headline || "").trim()) : named;
   const plan = st.rung && String(st.rung.plan || "").trim();
   const gate = String(st.graduation_gate || "").trim();
+  // One line, in the served order: a row per stage cost the page a fifth of a phone screen.
+  const later = after.map((s) => period(s.headline)).join(" ");
   return [
     small("The stages this coach works through, set by the author."),
-    `<ol class="ck-rows ck-rows--steps">${rows}</ol>`,
+    now ? `<p><b>This stage:</b> ${esc(period(now.headline))}</p>` : "",
     plan ? `<p>${esc(`The plan for this stage: ${period(plan)}`)}</p>` : "",
     gate ? soft(`What opens the next stage: ${period(gate)}`) : "",
+    later ? soft(`${now || plan || gate ? "Further out, the stages after it, in order:" : "The stages, in order:"} ${later}`) : soft("This is the last stage on the list."),
   ].join("");
 }
 
@@ -270,37 +293,96 @@ export function recordHTML(p) {
   const sentence = t.comparison && String(t.comparison.sentence || "").trim();
   if (!sentence) return soft(comparisonText(null));
   const through = isDay(r.through) ? ` through ${shortDay(r.through)}` : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span>of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span> of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
 }
-/** The newest checked call of each kind, in reader words. */
+/** The newest checked call of each kind, in reader words. A line with no rule the page can
+ *  print is never a verdict (#4808 — "Marked wrong. The rule that decided it is not available"
+ *  reached Marcus Webb's page from here): it is passed over, and `skipped` counts the checked
+ *  lines passed over, so the page can say how many. */
 export function verdictPair(p) {
   const recent = [...((trackOf(p).recent || []).filter((r) => r && r.status))].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const lines = recentLines(recent, p && p.name);
-  const pair = { right: lines.find((l) => l.verdict === "right") || null, wrong: lines.find((l) => l.verdict === "wrong") || null };
+  const all = recentLines(recent, p && p.name);
+  const lines = all.filter((l) => String(l.rule || "").trim());
+  const pair = { right: lines.find((l) => l.verdict === "right") || null, wrong: lines.find((l) => l.verdict === "wrong") || null, skipped: all.length - lines.length };
   const last = ledgerLine(p && p.latest_checked, p && p.name);
-  if (last && !pair[last.verdict]) pair[last.verdict] = last;
+  if (last && String(last.rule || "").trim() && !pair[last.verdict]) pair[last.verdict] = last;
   return pair;
 }
-export function verdictsHTML(p) {
+/** This coach's newest settled call of each verdict that has a page of its own, from
+ *  GET /api/calls (newest first as served). Bets are left out: a bet has a verdict per side
+ *  and the next section has it. */
+export function pagedPair(p, callsBody) {
+  const short = shortId(p && p.persona_id);
+  const own = callsOf(callsBody).filter((c) => c.kind !== "bet" && c.coach_id === short && hasRule(c));
+  return { right: own.find((c) => c.verdict === "right") || null, wrong: own.find((c) => c.verdict === "wrong") || null };
+}
+// Round 8: "7 of 29 right" beside "no call found right yet" read as a contradiction. The
+// record counts every checked call; a card needs one whose sentence named a number, so the
+// sentence says which of the two is missing.
+function noExample(p, tag) {
+  const r = trackOf(p).record || {};
+  const n = tag === "Right" ? num(r.confirmed) : num(r.n) !== null && num(r.confirmed) !== null ? r.n - r.confirmed : null;
+  if (n === null) return `No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`;
+  if (n === 0) return `None of ${p.name}’s checked calls has come out ${tag.toLowerCase()} yet.`;
+  return `${p.name}’s ${n} ${tag.toLowerCase()} ${n === 1 ? "call has" : "calls have"} no page yet: ${n === 1 ? "its sentence" : "their sentences"} did not name a number to check.`;
+}
+// The record's line is one sentence, the call then " — " and what happened; the result is the
+// bold part (the house rule, #4808). A line with no " — " is printed plain.
+function resultBold(text) {
+  const t = String(text || "");
+  const at = t.lastIndexOf(" — ");
+  return at > 0 ? `${esc(t.slice(0, at))} — <b>${esc(t.slice(at + 3))}</b>` : esc(t);
+}
+/** The right and the wrong card. A call that has a page is shown from that page's served
+ *  sentences and opens it (#4675), and the call page returns here; a verdict with no paged
+ *  call falls back to the record's own line, which has no page to open. */
+export function verdictsHTML(p, callsBody = null, base = "/next/v8/") {
   if (!p) return "";
+  const paged = pagedPair(p, callsBody);
   const { right, wrong } = verdictPair(p);
-  if (!right && !wrong) return "";
-  const card = (line, tag, cls) =>
-    line
-      ? `<div><span class="ck-verdicts__tag${cls}">${tag}</span><p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
-      : `<div><span class="ck-verdicts__tag${cls}">${tag}</span>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-  return `<div class="ck-verdicts">${card(right, "Right", " ck-verdicts__tag--right")}${card(wrong, "Wrong", "")}</div>`;
+  if (!right && !wrong && !paged.right && !paged.wrong) return "";
+  // The record's lines are read only for a side with no paged call; when both sides have one,
+  // a record line passed over for want of a rule was never going to be shown, so the page does
+  // not say it was held back.
+  const skipped = paged.right && paged.wrong ? 0 : verdictPair(p).skipped;
+  const shared = sharedToleranceNote([paged.right, paged.wrong]);
+  const pageCard = (call) => {
+    const day = shortDay(call.settled_date);
+    const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
+    return callCardHTML(call, { when, note: !shared, href: withFrom(callHref(base, call.id), `coach:${p.persona_id}`) });
+  };
+  // The record's own line has no page: the same order — the tag, the line, then the dating.
+  const card = (call, line, tag) =>
+    call
+      ? pageCard(call)
+      : line
+        ? `<div>${verdictTag(tag === "Right", line.rule)}<p>${resultBold(line.text)}</p>${soft(line.checked)}</div>`
+        : `<div>${soft(noExample(p, tag))}</div>`;
+  return `<div class="ck-verdicts">${card(paged.right, right, "Right")}${card(paged.wrong, wrong, "Wrong")}</div>${soft([shared, ruleless(skipped)].filter(Boolean).join(" "))}`;
 }
 
 // ── disagreements ──────────────────────────────────────────────────────────────
 // A bet is a yes-or-no question with a date, built from the docket's criterion; each
 // side is yes or no. What each coach argued is one tap away, in its own words.
 const sideWord = (item, pid) => (item.sides && typeof item.sides[pid] === "boolean" ? (item.sides[pid] ? "yes" : "no") : "");
+// #4673: a side whose words cite a sensor that had sent no reading by the day the bet opened
+// is not quoted; the route serves `unsourced[id].text` instead, and it is printed beside the
+// name in the quote's place. The words are never edited here.
+const heldText = (item, id) => {
+  const held = item.unsourced && Object.prototype.hasOwnProperty.call(item.unsourced, id) ? item.unsourced[id] : null;
+  return held && typeof held.text === "string" ? held.text.trim() : "";
+};
 const argued = (item, pid, names) => {
   const claims = item.claims || {};
+  const who = (id) => (id === pid ? names[pid] || "This coach" : nameOf(names, id));
   const rows = [pid, otherOf(item, pid)]
-    .filter((id) => String(claims[id] || "").trim())
-    .map((id) => `<p class="ck-soft"><b>${esc(id === pid ? names[pid] || "This coach" : nameOf(names, id))}:</b> “${esc(wordDates(claims[id]))}”</p>`)
+    .map((id) =>
+      String(claims[id] || "").trim()
+        ? `<p class="ck-soft"><b>${esc(who(id))}:</b> “${esc(wordDates(claims[id]))}”</p>`
+        : heldText(item, id)
+          ? `<p class="ck-soft"><b>${esc(who(id))}:</b> ${esc(heldText(item, id))}</p>`
+          : "",
+    )
     .join("");
   return rows ? `<details><summary>What each one argued</summary>${rows}</details>` : "";
 };
@@ -385,17 +467,15 @@ export async function mount() {
   const page = document.body && document.body.dataset.ckPage;
   if (page !== "coach") return;
   const base = document.body.dataset.ckBase || "/next/v8/";
-  const back = backTarget(document.referrer, location.href, base);
-  for (const id of ["ck-back", "ck-back-foot"]) {
-    const a = document.getElementById(id);
-    if (a) {
-      a.setAttribute("href", back.href);
-      a.textContent = id === "ck-back" ? back.text : back.text.replace(/^← /, "");
-    }
-  }
-  const asked = new URLSearchParams(location.search).get("c") || "";
+  const params = new URLSearchParams(location.search);
+  const from = params.get("from") || "";
+  setBack(backFor(from, base));
+  const asked = params.get("c") || "";
   const pid = isCoachId(asked) ? asked : "";
-  const [profile, roster, docket] = pid ? await Promise.all([tryJSON(`/api/coach/${encodeURIComponent(pid)}`), tryJSON("/api/coaches"), tryJSON("/api/coach_docket")]) : [null, null, null];
+  const [profile, roster, docket, calls] = pid
+    ? await Promise.all([tryJSON(`/api/coach/${encodeURIComponent(pid)}`), tryJSON("/api/coaches"), tryJSON("/api/coach_docket"), tryJSON("/api/calls")])
+    : [null, null, null, null];
+  setBack(backFor(from, base, rosterNames(roster)));
   const p = pid ? coachView(pid, profile, roster) : null;
   if (!p) {
     // No coach named, or a name the roster does not have: one sentence and the way back.
@@ -417,7 +497,7 @@ export async function mount() {
     "ck-next": nextHTML(p, docket, p.tier === "lead" ? { predictions: [] } : predictions, names, today),
     "ck-longer": longerHTML(p),
     "ck-record": recordHTML(p),
-    "ck-verdicts": verdictsHTML(p) || soft(`No checked call by ${p.name} is on record yet.`),
+    "ck-verdicts": verdictsHTML(p, calls, base) || soft(`No checked call by ${p.name} is on record yet.`),
     "ck-disagreements": disagreementsHTML(p, docket, names),
     "ck-persona": personaHTML(p),
   };

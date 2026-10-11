@@ -372,6 +372,14 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
     Strava and Hevy are additive per day; a Strava echo of a Hevy session is skipped
     when Hevy has records for that day (same session, richer record). Hevy is charged
     on worked-set time (``hevy_session_load``, #4075 4A). Returns (load_by_day, basis).
+
+    ``basis["sessions"]`` is the model's own ledger of what it scored (#3754, ADR-104):
+    ``strava`` = activities left after the multi-device dedupe AND the echo skip (a Zone-1
+    walk that scores 0 is still a measured session), ``hevy`` = non-tombstoned workouts,
+    ``total`` their sum, plus what was set aside (``strava_echoes_skipped``,
+    ``strava_duplicates_dropped``). A caller that needs "how many sessions" reads this,
+    never the raw record count — the raw count overstates every duplicated walk and every
+    Hevy echo, and those are exactly the records this function refuses to score.
     """
     # Multi-device duplicates were harmless on the kJ scale (walks carried 0 kJ);
     # under the duration proxy they would double-count, so dedup here for every
@@ -383,8 +391,11 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
         d = _day_key(r)
         if d:
             strava_by_day.setdefault(d, []).extend(r.get("activities") or [])
+    strava_raw = sum(len(acts) for acts in strava_by_day.values())
     for d in strava_by_day:
         strava_by_day[d] = dedup_activities(strava_by_day[d])
+    strava_deduped = sum(len(acts) for acts in strava_by_day.values())
+    echoes_skipped = 0
     hevy_by_day = {}
     for r in hevy_60d or []:
         # A tombstoned row is a superseded legacy daily aggregate whose sessions are
@@ -420,6 +431,7 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
         day_load = 0.0
         for act in strava_by_day.get(d, []):
             if d in hevy_by_day and is_hevy_echo(act):
+                echoes_skipped += 1
                 continue  # Hevy carries this session
             pts, basis = activity_load(act)
             if basis == "hr":
@@ -482,6 +494,16 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
         "strava_duration_days": len(duration_days),
         "hevy_fallback_days": len(hevy_days),
         "hevy_worked_set_days": len(worked_set_days),
+        # What was SCORED, not what was stored (#3754): the deficit tracker's training-output
+        # channel reports `total` as its session count, and a duplicated walk or a Hevy echo
+        # is a record this function set aside, not a session the owner trained twice.
+        "sessions": {
+            "total": (strava_deduped - echoes_skipped) + sum(len(ws) for ws in hevy_by_day.values()),
+            "strava": strava_deduped - echoes_skipped,
+            "hevy": sum(len(ws) for ws in hevy_by_day.values()),
+            "strava_echoes_skipped": echoes_skipped,
+            "strava_duplicates_dropped": strava_raw - strava_deduped,
+        },
         # proxy_share = the DURATION-ONLY share (no power, no HR, no set log).
         "proxy_share": round(proxy_load / total, 3) if total > 0 else None,
         "hr_share": round(hr_load_total / total, 3) if total > 0 else None,

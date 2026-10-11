@@ -11,7 +11,9 @@ the SAME call, by the SAME grader, against the SAME tolerance; only the predicti
     ``|graded reading − filed reading| <= the call's own frozen tolerance``.
   * **Direction call** (``directional``, and a threshold-less ``machine`` spec the grader
     re-routes to directional): the rule predicts FLAT; it is right iff the grader's own
-    measured EWMA slope sits inside the grader's own noise band. No extra data is read —
+    measured change sits inside the grader's own noise band — since #4617 the change across
+    the call's window and that call's own band (``noise_band`` on the result); an undated
+    legacy row keeps the EWMA slope and the fixed band. No extra data is read —
     the slope rides on every graded direction call. A direction call cannot itself
     predict flat, so the coach and the rule are never both right on one.
   * **Yes/no bet** (``machine``/``conditional`` with a threshold, and a dispute-docket
@@ -252,7 +254,10 @@ def stamp_at_grading(pred, spec, result, status, data_cache, get_source_data, ex
             return stamp(None, NO_RULE)
         actual = (result or {}).get("actual_value")
         if kind == "direction":
-            right, why = verdict(kind, spec, actual=actual, noise_band=noise_band)
+            # #4617: a window-graded call carries its OWN band (same unit as its actual_value); the
+            # rule is scored against the band the call itself was graded with.
+            band = (result or {}).get("noise_band", noise_band)
+            right, why = verdict(kind, spec, actual=actual, noise_band=band)
             return stamp(right, why)
         filed = filed_day(pred)
         if not filed or not spec.get("metric"):

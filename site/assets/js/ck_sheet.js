@@ -65,6 +65,9 @@ export function areaLine(p) {
   const level = num(p.level);
   const score = num(p.raw_score);
   if (level === null || score === null) return "Not served right now.";
+  // An area held for thin coverage has a score built from a sliver of its inputs; printing
+  // it beside a fully measured area's score reads as a contradiction.
+  if (p.coverage_hold) return `Level ${whole(level)}. Too little of this area is measured to score it yet.`;
   const d = num(p.score_delta);
   const move = d === null || Math.abs(d) < 0.05 ? "level on the day" : d > 0 ? `up ${d.toFixed(1)} on the day` : `down ${(-d).toFixed(1)} on the day`;
   return `Level ${whole(level)}. Score ${whole(score)} of 100, ${move}.`;
@@ -93,19 +96,24 @@ export function levelHTML(body) {
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
   const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${n < of ? "; an area with nothing measuring it is left out, not counted as average" : ""}.` : "";
-  return `<div class="ck-today"><p class="ck-big">${esc(whole(c.level))}<span>level${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
+  return `<div class="ck-today"><p class="ck-big">${esc(whole(c.level))}<span> level${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
 }
 // "Level 10 across seven areas" — the front page's one line, a door to this page.
 export function sheetLine(body) {
   const c = body && body.character;
   if (!c || num(c.level) === null) return "";
-  const of = num(c.composite_pillar_total);
-  return `Level ${whole(c.level)}${of !== null ? ` across ${of === 7 ? "seven" : of} areas of his life` : ""}`;
+  const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
+  const words = (v) => ({ 5: "five", 6: "six", 7: "seven" })[v] || String(v);
+  // The same count the sheet itself prints: an area nothing measures is not in the level.
+  const across = of === null ? "" : n !== null && n < of ? ` across ${words(n)} of ${words(of)} areas of his life` : ` across ${words(of)} areas of his life`;
+  return `Level ${whole(c.level)}${across}`;
 }
 export function badgesHTML(body) {
   const all = ((body && body.achievements) || []).filter((a) => a && a.label);
   if (!all.length) return soft("The badges are not served right now.");
-  const earned = all.filter((a) => a.earned && a.earned_date).sort((a, b) => String(b.earned_date).localeCompare(String(a.earned_date)));
+  // An earned badge whose date was never recorded is still earned: it is counted and
+  // listed last as "date not recorded", never dropped and never given a made-up date (#4704).
+  const earned = all.filter((a) => a.earned).sort((a, b) => String(b.earned_date || "").localeCompare(String(a.earned_date || "")));
   if (!earned.length) return soft(`None of the ${all.length} badges has been earned yet.`);
   // A badge whose description only repeats its name ("Lost 10 lbs" / "Lost 10 lbs from
   // starting weight") prints the name alone.
@@ -114,7 +122,8 @@ export function badgesHTML(body) {
       const desc = String(a.description || "");
       const repeats = desc.toLowerCase().startsWith(String(a.label).toLowerCase());
       const text = repeats ? esc(a.label) : `${esc(a.label)}${desc ? ` <span class="ck-soft">${esc(desc)}.</span>` : ""}`;
-      return `<li><span class="ck-rows__key">${esc(shortDay(a.earned_date))}</span><span>${text}</span></li>`;
+      const when = a.earned_date ? esc(shortDay(a.earned_date)) : "date not recorded";
+      return `<li><span class="ck-rows__key">${when}</span><span>${text}</span></li>`;
     })
     .join("");
   return `${soft(`${earned.length} of ${all.length} earned so far.`)}<ul class="ck-rows">${rows}</ul>`;

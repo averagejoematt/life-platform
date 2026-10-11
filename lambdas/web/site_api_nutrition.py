@@ -21,6 +21,7 @@ from health import (
     nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
     nutrition_logging,  # #4185: THE days-logged / lag / stalled derivation (shared with the coach inputs)
     tdee as health_tdee,  # ADR-152 / #2310: THE one TDEE definition
+    training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
 
 from web.site_api_common import (
@@ -265,6 +266,18 @@ def _mf(item, field, alt_field=None):
         if v is not None:
             return v
     return None
+
+
+def _trend_row(i: dict) -> dict:
+    """One `nutrition_trend` row — the chart's day. Shared with `edition_nutrition` (#4607)."""
+    d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+    return {
+        "date": d,
+        "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
+        "protein_g": (round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None),
+        "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
+        "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
+    }
 
 
 def nutrition_overview(*, _g) -> dict:
@@ -525,20 +538,7 @@ def nutrition_overview(*, _g) -> dict:
     deficit_published = bool(trend_check.get("publish"))
 
     # Daily trend for chart
-    trend = []
-    for i in items:
-        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
-        trend.append(
-            {
-                "date": d,
-                "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
-                "protein_g": (
-                    round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None
-                ),
-                "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
-                "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
-            }
-        )
+    trend = [_trend_row(i) for i in items]
 
     # ── Weekday vs Weekend comparison ──
     weekday_items = []
@@ -1089,8 +1089,17 @@ def deficit_sustainability(*, _g) -> dict:
     trend_check = health_tdee.implied_deficit_vs_trend(tdee, avg_cal, _trend_lb_wk, _trend_days)
     deficit_published = bool(trend_check.get("publish"))
 
-    src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava")}
-    whoop, habit, strava = src["whoop"], src["habitify"], src["strava"]
+    # #3754: Hevy joins the read — the training-output channel is scored on the daily
+    # training load over Strava + Hevy, never on the Strava day row's kilojoules. Each
+    # channel names the ONE source it reads (a reference per consumer, not a hand-typed
+    # list of registry vocabulary — the #2844 conformance guard's green path).
+    def _by_day(source_id):
+        return sorted(_query_source(source_id, start, today), key=lambda x: x.get("sk", ""))
+
+    whoop = _by_day("whoop")
+    habit = _by_day("habitify")
+    strava = _by_day("strava")
+    hevy = _by_day("hevy")
 
     def trend_dir(vals):
         v = [x for x in vals if x is not None]
@@ -1149,13 +1158,12 @@ def deficit_sustainability(*, _g) -> dict:
             t0.append(hv)
     t0_dir, t0_d = trend_dir(t0)
     t0_bad = t0_dir == "declining" and abs(t0_d) > 10
-    # Channel 5 — training output (Strava kJ/day)
-    daily_kj: dict[str, float] = {}
-    for s in strava:
-        d = s.get("sk", "").replace("DATE#", "")
-        daily_kj[d] = daily_kj.get(d, 0) + (_f(s.get("total_kilojoules")) or 0)
-    train = [daily_kj[d] for d in sorted(daily_kj)]
-    train_dir, train_d = trend_dir(train)
+    # Channel 5 — training output. #3754 (2026-10-04 sweep): this read the Strava day
+    # row's `total_kilojoules`, > 0 on 0 of 1,242 stored day rows all-time, so the public
+    # channel could never read "degraded". It is now the daily training load — the same
+    # model the TSB/ACWR surfaces read (#4075) — see health/training_output_channel.py.
+    training = training_output_channel.series(strava, hevy)
+    train_dir, train_d = trend_dir(training["values"])
     train_bad = train_dir == "declining" and abs(train_d) > 15
 
     channels = [
@@ -1163,7 +1171,13 @@ def deficit_sustainability(*, _g) -> dict:
         {"name": "Sleep quality", "status": "degraded" if sleep_bad else "stable", "direction": eff_dir, "delta_pct": eff_d},
         {"name": "Recovery", "status": "degraded" if rec_bad else "stable", "direction": rec_dir, "delta_pct": rec_d},
         {"name": "Habit completion", "status": "degraded" if t0_bad else "stable", "direction": t0_dir, "delta_pct": t0_d},
-        {"name": "Training output", "status": "degraded" if train_bad else "stable", "direction": train_dir, "delta_pct": train_d},
+        {
+            "name": "Training output",
+            "status": "degraded" if train_bad else "stable",
+            "direction": train_dir,
+            "delta_pct": train_d,
+            "input": training["input"],  # #3754: what was measured, never inferred from the verdict
+        },
     ]
     degraded = sum(1 for c in channels if c["status"] == "degraded")
     if not in_deficit:
@@ -1218,3 +1232,49 @@ def deficit_sustainability(*, _g) -> dict:
         },
         cache_seconds=3600,
     )
+
+
+# ── /api/edition's narrow read (#4607) ─────────────────────────────────────────────
+#: Every MacroFactor field the edition's food rows depend on: the two names `_mf` resolves for
+#: calories and for protein, and the day (`sk` and `tombstone` are always projected by
+#: `_query_source`). Measured 2026-10-09: the whole route parsed ~670 KB of DynamoDB JSON
+#: over eleven reads (the food log, supplements, habits, three Withings, two Strava, Hevy,
+#: Whoop and the profile) for the five facts the front page prints.
+_EDITION_MF_FIELDS = ("date", "calories", "total_calories", "total_calories_kcal", "protein_g", "total_protein_g")
+
+#: The `nutrition_trend` row keys the edition reads (``site_api_edition._week`` / ``_day_detail``).
+_EDITION_TREND_KEYS = ("date", "calories", "protein_g")
+
+
+def edition_nutrition(*, _g) -> dict:
+    """The subset of `/api/nutrition_overview` the front page reads, from ONE projected read (#4607).
+
+    `site_api_edition` reads `nutrition.{protein_floor_g, protein_floor_hit_days,
+    days_logged, latest_date}` and `nutrition_trend[].{date, calories, protein_g}` — nothing
+    else. Those come from the 30-day MacroFactor window alone, so this reads that window
+    (same `_query_source`, same dates, same phase decision) with a projection, and derives
+    each fact with the route's own code: `_mf`, `_trend_row`, `nutrition_logging.logging_record`
+    and the plan's floor. Returns `{"nutrition": <body subset>}` in the route's own shape;
+    a failed read raises, and the edition serves the food rows unavailable.
+    tests/test_edition_narrow_readers_4607.py runs the route and this reader over one fake
+    table and asserts the edition's blocks are identical.
+    """
+    _query_source = _g["_query_source"]
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    d30 = _g["_experiment_date"](30)
+    protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
+    items = _query_source("macrofactor", d30, today, projection=_EDITION_MF_FIELDS)
+    items.sort(key=lambda x: x.get("sk", ""))
+    pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
+    log_rec = nutrition_logging.logging_record(items, today)
+    return {
+        "nutrition": {
+            "nutrition": {
+                "protein_floor_g": protein_floor,
+                "protein_floor_hit_days": sum(1 for v in pro_vals if v >= protein_floor),
+                "days_logged": log_rec["days_logged"],
+                "latest_date": log_rec["latest_date"],
+            },
+            "nutrition_trend": [{k: row[k] for k in _EDITION_TREND_KEYS} for row in (_trend_row(i) for i in items)],
+        }
+    }
