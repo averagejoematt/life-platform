@@ -181,7 +181,7 @@ def test_the_legacy_writer_publishes_the_chapters_title_not_its_own(monkeypatch)
     call site to prefer script['episode_title'] publishes "EP2 · Nine Days and Counting" and fails here."""
     post = {"week": 2, "date": "2026-09-15", "title": CHAPTER}
     seen = _stub_legacy(monkeypatch, post, {"episode_title": OWN, "pull_quote": "It kept score."})
-    out = panel._run_weekly(force=True, dry_run=False)
+    out = panel._run_weekly(force=True, dry_run=False, approved=True)  # #4694: an owner-approved run
     assert json.loads(out["body"])["published"] is True
     assert [e["title"] for e in seen["episodes"]] == [f"EP2 · {CHAPTER}"]
 
@@ -189,7 +189,7 @@ def test_the_legacy_writer_publishes_the_chapters_title_not_its_own(monkeypatch)
 def test_the_legacy_writer_falls_back_to_its_own_title_only_without_a_chapter(monkeypatch):
     post = {"week": 3, "date": "2026-09-22", "title": "Week 3"}  # _select_week_post's no-chapter placeholder
     seen = _stub_legacy(monkeypatch, post, {"episode_title": OWN, "pull_quote": "It kept score."})
-    panel._run_weekly(force=True, dry_run=False)
+    panel._run_weekly(force=True, dry_run=False, approved=True)  # #4694: an owner-approved run
     assert [e["title"] for e in seen["episodes"]] == [f"EP3 · {OWN}"]
 
 
@@ -197,5 +197,5 @@ def test_the_legacy_writer_drops_a_chapter_title_carrying_a_cut_term(monkeypatch
     """door_safe on the legacy title is the Panel's final check there: a cut term publishes the bare number."""
     post = {"week": 2, "date": "2026-09-15", "title": "The Pace-Flag Week"}
     seen = _stub_legacy(monkeypatch, post, {"episode_title": OWN, "pull_quote": "It kept score."})
-    panel._run_weekly(force=True, dry_run=False)
+    panel._run_weekly(force=True, dry_run=False, approved=True)  # #4694: an owner-approved run
     assert [e["title"] for e in seen["episodes"]] == ["EP2"]

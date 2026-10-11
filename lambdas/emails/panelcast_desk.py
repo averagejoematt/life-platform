@@ -134,6 +134,36 @@ def announce_legacy(ep: dict, post: dict, *, _g) -> None:
             _g["logger"].warning("[panel] subscriber blast failed — %s", e)
 
 
+def legacy_publish_gate(week, post: dict, text: str, approved: bool, *, _g) -> list:
+    """#4694 (owner ruling 2026-10-11): the legacy writer — the Mon/Wed cron and the SS-02 hold sweep — publishes only
+    with the owner's approval or a passed audit, the chronicle sweep's contract. Editor + QA alone is not enough.
+
+    `approved` is the owner's own invoke (``{"owner_approved": true}``); no schedule ever carries it. Otherwise the
+    audit (``autopublish_audit.legacy_episode_blocking``) runs on the week's chronicle row (read through ``visible`` —
+    a tombstoned or previous-cycle row is no record) and the episode's text. Returns the blocking items; empty = publish.
+    Fail-closed: an audit that cannot run holds the week. A hold logs the named PANEL_HELD_TOKEN line with the week."""
+    date = post.get("date")
+    if approved:
+        _g["logger"].info("[panel] wk%s (%s): owner-approved run — the autopublish audit is not required", week, date)
+        return []
+    try:
+        row = visible(_g["table"].get_item(Key={"pk": f"USER#{_g['USER_ID']}#SOURCE#chronicle", "sk": f"DATE#{date}"}).get("Item") or {})
+        blocking = autopublish_audit.legacy_episode_blocking(row, text, str(date or ""))
+    except Exception as e:  # noqa: BLE001 — a broken audit holds the week; it never waves it through
+        blocking = [f"the audit could not run: {e}"]
+    if blocking:
+        _g["logger"].error(
+            '%s wk%s (%s) held: no owner approval and the audit found %d blocking item(s); invoke {"owner_approved": true} '
+            "to publish. %s",
+            autopublish_audit.PANEL_HELD_TOKEN,
+            week,
+            date,
+            len(blocking),
+            blocking,
+        )
+    return blocking
+
+
 _PLACEHOLDER = re.compile(r"^week\s*\d+$", re.I)
 
 
