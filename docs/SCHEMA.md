@@ -2450,7 +2450,8 @@ Generated weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT). Engine v2 (202
 | `domains` | list | Pillars involved e.g. `["sleep", "nutrition"]` |
 | `evidence` | string | Founding evidence (generation-time, cites dates/values) |
 | `confirmation_criteria` | string | Prose criteria (numeric, human-readable) |
-| `test_spec` | map | **FROZEN pre-registration** — `condition_metric`, `condition_op` (`>=`/`<=`/`median_split`), `condition_threshold`, `outcome_metric`, `direction` (`higher`/`lower`), `min_effect`, `lag_days`. Never revised after creation |
+| `proposed_confirmation_criteria` | string | #3495: the generator's own criterion sentence, kept when the bar was re-derived and `confirmation_criteria` rewritten from the derived number (not served by `/api/hypotheses`) |
+| `test_spec` | map | **FROZEN pre-registration** — `condition_metric`, `condition_op` (`>=`/`<=`/`median_split`), `condition_threshold`, `outcome_metric`, `direction` (`higher`/`lower`), `min_effect`, `lag_days`. Never revised after creation. Since #3552 also `min_days_per_arm` + `min_effect_provenance` (`{value, kind, source}`); since #3495 a derived bar also carries `min_effect_derivation` and `min_effect_basis` (`{metric, unit, window_days, statistic, value, k, n, n_floor, replaced?}` — `replaced` is the declared/model bar it superseded at the write) |
 | `pre_registered_at` | string | ISO timestamp the spec was frozen (= created_at) |
 | `engine_version` | number | 2 for v2 records; absent on v1 |
 | `status` | string | `pending` / `confirming` / `confirmed` / `refuted` / `archived` |

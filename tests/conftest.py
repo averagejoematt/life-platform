@@ -407,6 +407,9 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # same PR that adds the test, exactly as the block above instructs.
         "test_prereg_effect_provenance_3552.py",
         "test_prereg_hash_stamp.py",
+        # #3495: reads the sealed `deploy/generated/genesis_preregistration.json` to pin that
+        # its literal min_effects do NOT meet the derived-bar predicate (never re-sealed).
+        "test_prereg_min_effect_derived_3495.py",
         "test_qa_smoke_phase_stamp_coverage_1970.py",
         # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this
         # branch derived its list, and `reset_artifact_test_files()` picked it up on the
