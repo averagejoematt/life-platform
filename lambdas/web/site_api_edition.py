@@ -809,6 +809,9 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
         "right": right,
         "decided": decided,
         "count_text": f"{right} of {decided} checked calls right.",
+        # #4617: what that count counts, as labelled counts that sum to it (None when not served).
+        "counted": overall.get("counted"),
+        "counted_text": overall.get("counted_text"),
         "beats_simple_guess": beats,
         "comparison_text": comparison,
         "brier_skill": skill if known else None,

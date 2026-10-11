@@ -85,6 +85,10 @@ def build_outcome_notes(evaluation: dict[str, Any], algo_version: str) -> str:
     }
     if evaluation.get("grading_open"):
         notes["grading_open"] = True
+    if isinstance(evaluation.get("window"), dict):
+        # #4617: a direction call graded across its own window carries the start/end days and the
+        # first/last readings (metric units) it was graded on, so a page can print a checkable rule.
+        notes["window"] = evaluation["window"]
     if evaluation.get("evaluation_type") == "count":
         # #4541: graded by COUNTING qualifying days, whatever the stored spec says — so
         # `actual_value` is a day count, and a reader of the row must not read it as the
