@@ -90,6 +90,7 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 .ck-today { display: flex; flex-direction: column; gap: var(--ck-gap-row); }
 .ck-today--ruled { padding-top: 28px; border-top: 1px solid var(--ck-line); }
 .ck-num { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.ck-num a { text-decoration: none; color: inherit; display: contents; }
 .ck-num b { font-size: clamp(2.6rem, 11vw, 3.4rem); line-height: 1; letter-spacing: -0.04em; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ck-big { font-size: clamp(3.6rem, 17vw, 5.5rem); line-height: 1; letter-spacing: -0.045em; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ck-big span { font-size: 0.26em; letter-spacing: 0; font-weight: 500; color: var(--ck-soft); margin-left: 6px; }
@@ -167,6 +168,7 @@ h2 { font-size: var(--ck-fs-h2); line-height: 1.2; letter-spacing: -0.02em; font
 /* 12. Footer */
 .ck-footer { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 0.92rem; color: var(--ck-soft); margin-top: var(--ck-gap-section); padding-top: 24px; border-top: 1px solid var(--ck-line); }
 .ck-footer a { text-decoration: none; }
+.ck-footer + .ck-small { margin-top: 20px; font-size: 0.82rem; }
 
 @media (max-width: 480px) {
   .ck-page { padding-inline: 20px; }

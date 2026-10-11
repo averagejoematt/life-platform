@@ -41,7 +41,10 @@ test("every row prints its verdict in words beside its own sentence, in the serv
 test("the rules and the day they were set are printed with the rows", () => {
   const plain = text(F.scorecardHTML(SC));
   assert.ok(plain.includes(SC.data.rules_set_text), "the day the rules were set is missing");
-  for (const key of SC.data.order) assert.ok(plain.includes(SC.data.rows[key].data.rule), `the ${key} rule is missing`);
+  for (const key of SC.data.order) assert.ok(plain.includes(F.shortRule(SC.data.rows[key].data.rule)), `the ${key} rule is missing`);
+  assert.equal(F.shortRule("Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."), "Days trained in the last seven. Going well at 4 to 6, so at least one rest day.");
+  assert.equal(F.shortRule("Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."), "Going well at 3.");
+  assert.equal(F.shortRule("A rule with no floor."), "A rule with no floor.");
   assert.doesNotMatch(F.scorecardHTML(SC), /\b20\d\d-\d\d-\d\d\b/, "an ISO date reached the page");
 });
 

@@ -58,10 +58,17 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   assert.deepEqual(F.argumentTexts(pick), []);
   // The live number against the bet: the newest recorded day of the measure the question names.
   const line = F.betLiveLine(pick.bet, B.week);
-  assert.match(line, /^(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day: \d+(\.\d)? g protein\.$/, line);
+  assert.match(line, /^(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day: \d+(\.\d)? g protein\. This week, at or above 170 g protein on \d of \d days recorded\.$/, line);
+  // The first mention of a name carries the job, when the served lines pair the name with its id.
+  const jobs = F.jobsByName(DAYS);
+  assert.equal(jobs["Marcus Webb"], "food");
+  assert.equal(jobs["Nathan Reeves"], "mind");
+  assert.equal(F.betSidesLine(pick.bet, jobs), "Nathan Reeves (mind) says no. Marcus Webb (food) says yes.");
+  assert.equal(F.betSidesLine(pick.bet), "Nathan Reeves says no. Marcus Webb says yes.");
+  assert.match(P.betHTML(B.next, { sidesText: "x says no.", extra: "Friday: 1 g.", href: "/next/v8/coaches/#ck-bet" }), /<p class="ck-soft">x says no\.<\/p><p class="ck-soft">Friday: 1 g\.<\/p><p><a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">What each one argued<\/a><\/p><\/div>$/);
   const food = B.week.data.measures.food.data.values;
   const lastIdx = food.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();
-  assert.match(line, new RegExp(`: ${String(Number(food[lastIdx].toFixed(1)))} g protein\\.$`));
+  assert.match(line, new RegExp(`: ${String(Number(food[lastIdx].toFixed(1)))} g protein\\. `));
   assert.equal(F.betLiveLine({ ...pick.bet, data: { ...pick.bet.data, question: "Will the moon be full on Monday?" } }, B.week), "", "a question naming no measure the week carries");
   assert.equal(F.betLiveLine(pick.bet, { state: "unavailable", absent_text: "x", data: null }), "");
 });
@@ -120,12 +127,17 @@ test("the Today band leaves out a line the argument already printed, and says no
   assert.match(F.coachTodayHTML({ state: "absent", absent_text: "No coach had anything to say on Saturday, October 10.", data: null }, { skip: ["x"] }), /No coach had anything to say on Saturday, October 10\./);
 });
 
-test("when no coach spoke today, the newest line heard stands with its day — never a self-naming one, never one already printed", () => {
+test("when no coach spoke today, the newest SHORT line heard stands with its day and the coach's job — never a self-naming one, never one already printed", () => {
+  const words = (t) => t.trim().split(/\s+/).length;
+  const clean = F.argumentLines(DAYS).filter((l) => !F.namesSelf(l));
+  const expected = clean.find((l) => words(l.text) <= F.HEARD_MAX_WORDS);
+  assert.ok(words(clean[0].text) > F.HEARD_MAX_WORDS, "the wire's newest clean line is long, so the rule has something to prefer");
   const html = F.lastHeardHTML(DAYS, [], BASE);
   assert.equal((html.match(/<li>/g) || []).length, 1);
-  assert.match(html, /James Okafor<\/a> · Friday, October 9<\/span><span>“I think Matthew will keep deferring the lab draw/, "October 9's other line names its own speaker and is skipped");
-  const skipped = F.lastHeardHTML(DAYS, [F.argumentLines(DAYS).find((l) => l.coach === "James Okafor" && l.date === "2026-10-09").text], BASE);
-  assert.match(skipped, /James Okafor<\/a> · answering Marcus Webb · Thursday, October 8/);
+  assert.ok(html.includes(`“${expected.text}”`), html);
+  assert.match(html, /<\/a> \((food|mind|blood tests|sleep|statistics|training|blood sugar|lead)\) · /, "the job beside the name");
+  const skipped = F.lastHeardHTML(DAYS, clean.filter((l) => words(l.text) <= F.HEARD_MAX_WORDS).map((l) => l.text), BASE);
+  assert.ok(skipped.includes(`“${clean[0].text}”`), "with every short line printed already, the newest line at all");
   assert.equal(F.lastHeardHTML([], [], BASE), "");
   assert.doesNotMatch(html, /\b20\d\d-\d\d-\d\d\b/);
 });
@@ -149,6 +161,8 @@ test("the miss leads with the week's clearest wrong call when there is one, else
   }
   assert.equal(C.lastCallPick(calls).kind, "wrong", "without a day, the all-time clearest miss");
   assert.match(C.lastCallHTML(calls, BASE, "2026-10-09"), new RegExp(`call/\\?id=${pick.call.id}`));
+  const withJobs = C.lastCallHTML(calls, BASE, "2026-10-09", F.SHORT_JOBS);
+  assert.match(withJobs, new RegExp(`^<div class="ck-bet"><p class="ck-small">Settled [A-Z][a-z]+, [A-Z][a-z]+ \\d+ · ${pick.call.coach_name}, the [a-z ]+ coach</p><p>[^<]+ <b>${pick.call.happened_short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</b></p>`), withJobs);
   assert.equal(C.lastCallPick(calls, "2020-01-01").kind, "wrong", "a window with nothing settled falls back to the record");
   assert.deepEqual(C.lastCallPick({ state: "ok", calls: [] }), { call: null, kind: "" });
   assert.deepEqual(C.lastCallPick(null), { call: null, kind: "" });
@@ -163,6 +177,12 @@ test("the deeper rows: the chapter is one door with its week and its own first s
   assert.equal(slots["ck-chapter-row"], row);
   assert.equal(slots["ck-week-span"], "How the whole thing is going · October 3 to October 9");
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
+  // The first screen's numbers are doors; a failed block prints its sentence with no door.
+  assert.match(slots["ck-record"], /^<a href="\/next\/v8\/coaches\/">56 of 131 checked calls right\./);
+  assert.match(slots["ck-mark-caption"], /^<a href="\/next\/v8\/trend\/\?m=weight"><b>306\.1 lb<\/b>/);
+  const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };
+  assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-record"], "Not served right now.");
+  assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-mark-caption"], "Not served right now.");
 });
 
 test("the week page carries the band whole: the sorted week without a second kicker, the chapter lines and the silence sentence", () => {

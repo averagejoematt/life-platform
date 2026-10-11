@@ -194,7 +194,7 @@ export function recordBigHTML(block) {
 }
 
 // ── the bet card ───────────────────────────────────────────────────────────────
-export function betHTML(nextBlock) {
+export function betHTML(nextBlock, { sidesText = "", extra = "", href = "", hrefText = "What each one argued" } = {}) {
   const bet = nextBlock && nextBlock.data && nextBlock.data.bet;
   // #4582: with the whole `next` block unserved there is no bet part at all. Its sentence is
   // the block's ("What comes next is not served right now."), never "No coach bet is waiting
@@ -202,8 +202,9 @@ export function betHTML(nextBlock) {
   if (!bet) return absent(nextBlock, "What comes next is not served right now.");
   if (!usable(bet) || !bet.data.question) return absent(bet, "No coach bet is waiting to settle.");
   const b = bet.data;
-  const sides = (b.sides || []).filter((s) => s.coach).map((s) => `${s.coach} says ${s.says}.`).join(" ");
-  return `<div class="ck-bet"><p class="ck-small">Settles ${esc(dayInWords(b.settle_date))}</p><p><b>${esc(b.question)}</b></p>${soft(sides)}</div>`;
+  const sides = sidesText || (b.sides || []).filter((s) => s.coach).map((s) => `${s.coach} says ${s.says}.`).join(" ");
+  const door = href ? `<p><a class="ck-link" href="${esc(href)}">${esc(hrefText)}</a></p>` : "";
+  return `<div class="ck-bet"><p class="ck-small">Settles ${esc(dayInWords(b.settle_date))}</p><p><b>${esc(b.question)}</b></p>${soft(sides)}${soft(extra)}${door}</div>`;
 }
 // "Three more bets settle on October 7, 12 and 16." from the served docket, minus the
 // one on the card. "" when there are none.
@@ -385,9 +386,11 @@ export function frontSlots(edition, b, base = "/") {
   return {
     // The fixed top: the record beside the premise, the daily mark, his own dated note when
     // there is a fresh one.
-    "ck-record": esc(recordLine(b.record) || (b.record && b.record.absent_text) || ""),
+    // Round 8b: every number on the first screen is a door — the record to the coaches, the
+    // weight to its trend. A failed block prints its own sentence, with no door.
+    "ck-record": recordLine(b.record) ? `<a href="${esc(base)}coaches/">${esc(recordLine(b.record))}</a>` : esc((b.record && b.record.absent_text) || ""),
     "ck-mark": F.markHTML(usable(b.week) ? b.week.data.weight_series : null, e.as_of, t.start_weight_lbs, t.goal_weight_lbs),
-    "ck-mark-caption": F.markCaption(b.today, e) || esc((b.today && b.today.absent_text) || ""),
+    "ck-mark-caption": F.markCaption(b.today, e) ? `<a href="${esc(base)}trend/?m=weight">${F.markCaption(b.today, e)}</a>` : esc((b.today && b.today.absent_text) || ""),
     ...words,
     // The argument: the open bet is the edition's; the lines come in mountFront from the
     // last seven days of served moves.
@@ -447,8 +450,9 @@ async function mountFront(edition, b) {
   fill("ck-argue-heading", esc(F.argumentHeading(pick)));
   fill("ck-argument", F.argumentHTML(pick, base));
   if (pick && pick.kind === "bet") {
-    const live = F.betLiveLine(pick.bet, b.week);
-    if (live) fill("ck-bet", `${betHTML(b.next)}${small(live)}`);
+    // The card in the bet's own terms: each coach with its job, the live number inside the
+    // card, and the door to what each one argued (round 8b).
+    fill("ck-bet", betHTML(b.next, { sidesText: F.betSidesLine(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet` }));
   } else if (pick && pick.kind === "reply") {
     document.getElementById("ck-bet")?.remove();
   }
@@ -471,7 +475,7 @@ async function mountFront(edition, b) {
   }
   // The clearest miss this week, or on record, or what the route can offer in its place.
   const { kind } = lastCallPick(calls, edition.as_of);
-  const last = lastCallHTML(calls, base, edition.as_of);
+  const last = lastCallHTML(calls, base, edition.as_of, F.SHORT_JOBS);
   if (last) {
     const heading = { recent: "The clearest miss this week.", wrong: "The clearest miss so far.", right: "The tightest right call so far." }[kind] || "The latest checked call.";
     fill("ck-miss-heading", esc(heading));

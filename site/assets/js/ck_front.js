@@ -145,7 +145,7 @@ export function todayBandHTML(edition, b, base = "/") {
   if (today) {
     const rest = factLine(today.facts, { skip: ["Weight"] });
     const first = morning || factLine(today.facts.filter((f) => f.label === "Weight"));
-    rows.push(row("Today so far", [rest && first ? first.replace(/\.$/, "") : first, rest].filter(Boolean).join(" · ") || "Nothing recorded yet today."));
+    rows.push(row("Today so far", [rest && first ? first.replace(/\.$/, "") : first, rest].filter(Boolean).join(" · ") || "Nothing recorded yet today.", `${base}day/?d=${todayIso}`));
   } else {
     rows.push(row("Today so far", "Nothing recorded yet today."));
   }
@@ -242,6 +242,9 @@ export function scorecardRows(block) {
     .map((key) => ({ key, row: rows[key] }))
     .filter(({ row }) => row && row.state);
 }
+// The rule under a row is its judgment, not its floor: the "not enough data" clause is a
+// grader's detail (round 8b: "a rulebook where a scoreboard should be").
+export const shortRule = (rule) => String(rule || "").replace(/\s*(?:Fewer than|When the)[^.]*not enough data\.?\s*$/, "").trim();
 // A row that earned its mark: going well, or ahead of the plan. Both take the filled dot.
 const EARNED = new Set(["going_well", "faster_than_planned"]);
 const NOTHING = /^nothing this week\.?$/i;
@@ -258,7 +261,7 @@ export function scorecardHTML(block, base = "/", { label = true } = {}) {
       const keyHTML = SCORE_LINKS[key] ? `<a class="ck-rows__key" href="${esc(base)}${SCORE_LINKS[key]}">${esc(name)}</a>` : `<span class="ck-rows__key">${esc(name)}</span>`;
       if (!r || !r.verdict_text) return `<li>${keyHTML}<span>${esc(row.absent_text || "Not served right now.")}</span></li>`;
       const dot = EARNED.has(r.verdict) ? '<i class="ck-dot" aria-hidden="true"></i>' : r.verdict === "not_enough_data" ? "" : '<i class="ck-dot ck-dot--off" aria-hidden="true"></i>';
-      const rule = r.rule ? `<br><span class="ck-small">${esc(r.rule)}</span>` : "";
+      const rule = r.rule ? `<br><span class="ck-small">${esc(shortRule(r.rule))}</span>` : "";
       return `<li>${keyHTML}<span>${dot}<b>${esc(r.verdict_text)}.</b> ${esc(r.text || "")}${rule}</span></li>`;
     })
     .join("");
@@ -415,17 +418,51 @@ export function betLiveLine(bet, week) {
   const m = week.data.measures && week.data.measures[hit[1]];
   const days = week.data.days || [];
   if (!usable(m) || !Array.isArray(m.data.values)) return "";
+  const weekText = String(m.data.text || "").trim();
+  const week7 = weekText ? ` This week, ${weekText.charAt(0).toLowerCase()}${weekText.slice(1)}${/[.!?]$/.test(weekText) ? "" : "."}` : "";
   for (let i = m.data.values.length - 1; i >= 0; i -= 1) {
-    if (num(m.data.values[i]) !== null && days[i]) return `${weekdayOf(days[i])}: ${hit[2](m.data.values[i])}.`;
+    if (num(m.data.values[i]) !== null && days[i]) return `${weekdayOf(days[i])}: ${hit[2](m.data.values[i])}.${week7}`;
   }
   return "";
 }
+// Each coach's job in one or two words, for the first mention of a name on the front page
+// (round 8b, the friend: "two strangers arguing"). Keyed on the served persona id.
+export const SHORT_JOBS = {
+  eli_marsh: "lead",
+  sleep_coach: "sleep",
+  explorer_coach: "statistics",
+  nutrition_coach: "food",
+  mind_coach: "mind",
+  physical_coach: "training",
+  labs_coach: "blood tests",
+  glucose_coach: "blood sugar",
+};
+// name -> short job, from the served lines (the only front-page read that pairs a name with its id).
+export function jobsByName(days) {
+  const out = {};
+  for (const l of argumentLines(days)) if (l.coach_id && SHORT_JOBS[l.coach_id] && !out[l.coach]) out[l.coach] = SHORT_JOBS[l.coach_id];
+  return out;
+}
+// "Nathan Reeves (mind) says no. Marcus Webb (food) says yes." — the job only when known.
+export function betSidesLine(bet, jobs = {}) {
+  if (!usable(bet)) return "";
+  return (bet.data.sides || [])
+    .filter((s) => s && s.coach)
+    .map((s) => `${s.coach}${jobs[s.coach] ? ` (${jobs[s.coach]})` : ""} says ${s.says}.`)
+    .join(" ");
+}
 // The newest line the coaches said in the window, minus any the page already printed, as one
 // dated row — what the Today band shows when no coach spoke today. "" with nothing left.
+// A short line is preferred (round 8b: the one coach voice on the front page was its hardest
+// sentence): the newest of forty words or fewer, else the newest at all.
+export const HEARD_MAX_WORDS = 40;
+const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
 export function lastHeardHTML(days, skip = [], base = "/") {
-  const line = argumentLines(days).filter((l) => !namesSelf(l) && !skip.includes(l.text))[0];
+  const clean = argumentLines(days).filter((l) => !namesSelf(l) && !skip.includes(l.text));
+  const line = clean.find((l) => wordCount(l.text) <= HEARD_MAX_WORDS) || clean[0];
   if (!line) return "";
-  const name = line.coach_id ? `<a class="ck-link" href="${esc(base)}coach/?c=${esc(line.coach_id)}">${esc(line.coach)}</a>` : esc(line.coach);
+  const job = line.coach_id && SHORT_JOBS[line.coach_id] ? ` (${SHORT_JOBS[line.coach_id]})` : "";
+  const name = line.coach_id ? `<a class="ck-link" href="${esc(base)}coach/?c=${esc(line.coach_id)}">${esc(line.coach)}</a>${esc(job)}` : esc(line.coach);
   const kind = line.move === "reply" && line.replies_to ? `answering ${line.replies_to}` : "";
   return `<ul class="ck-coach"><li><span class="ck-coach__who">${name}${esc(` · ${[kind, dayInWords(line.date)].filter(Boolean).join(" · ")}`)}</span><span>“${esc(line.text)}”</span></li></ul>`;
 }

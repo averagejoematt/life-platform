@@ -213,14 +213,19 @@ export function lastCallPick(callsBody, asOf = "") {
   if (pair.right) return { call: pair.right, kind: "right" };
   return { call: all[0] || null, kind: all[0] ? "latest" : "" };
 }
-export function lastCallHTML(callsBody, base, asOf = "") {
+// `jobs` maps a persona id to the coach's job in a word or two: with it, the card's first line
+// names the coach and the job ("Settled Saturday, October 10 · Lisa Park, the sleep coach"),
+// and the result is the bold line — the punch, not the rule (round 8b).
+export function lastCallHTML(callsBody, base, asOf = "", jobs = null) {
   const { call } = lastCallPick(callsBody, asOf);
   if (!call) return "";
   const day = dayInWords(call.settled_date);
   const g = call.simple_guess;
   const guess = g && g.state === "scored" && g.short ? `The simple guess: ${g.short}.` : "";
   const said = call.kind === "bet" ? esc(call.verdict_text) : callVerdictTag(call);
-  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}</p><p><b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
+  const job = jobs && call.kind !== "bet" && call.coach_name && jobs[personaOfCall(call.coach_id)] ? ` · ${call.coach_name}, the ${jobs[personaOfCall(call.coach_id)]} coach` : "";
+  const sentence = jobs ? `${esc(call.called || call.called_short)} <b>${esc(call.happened_short)}</b>` : `<b>${esc(call.called || call.called_short)}</b> ${esc(call.happened_short)}`;
+  return `<div class="ck-bet"><p class="ck-small">${esc(day ? `Settled ${day}` : "A settled call")}${esc(job)}</p><p>${sentence}</p><p>${said}</p>${soft(guess)}<p><a class="ck-link" href="${esc(callHref(base, call.id))}">The whole call</a></p></div>`;
 }
 
 // "Next: <question> settles <day>." — the day is written here from the served date so the
