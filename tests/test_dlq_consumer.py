@@ -282,6 +282,16 @@ class _CondFail(Exception):
     response = {"Error": {"Code": "ConditionalCheckFailedException"}}
 
 
+def _validate_wire(kw):
+    """DynamoDB rejects (ValidationException) an expression value that is supplied but unused, or used but undefined."""
+    import re
+
+    text = kw["UpdateExpression"] + " " + kw["ConditionExpression"]
+    used = set(re.findall(r":\w+", text))
+    supplied = set(kw["ExpressionAttributeValues"])
+    assert supplied == used, f"unused={supplied - used} undefined={used - supplied}"
+
+
 class _LedgerTable:
     """In-memory stand-in for the one ledger row, honouring the three expressions record_failure issues."""
 
@@ -289,12 +299,15 @@ class _LedgerTable:
         self.row = None
 
     def update_item(self, **kw):
+        _validate_wire(kw)
         v, cond, expr = kw["ExpressionAttributeValues"], kw["ConditionExpression"], kw["UpdateExpression"]
         row = self.row
         if cond.startswith("attribute_not_exists(last_seen)"):
             ok = row is None or row["last_seen"] >= v[":cutoff"]
         elif cond == "last_seen < :cutoff":
             ok = row is not None and row["last_seen"] < v[":cutoff"]
+        elif cond == "last_seen >= :cutoff":
+            ok = row is not None and row["last_seen"] >= v[":cutoff"]
         else:
             ok = row is not None
         if not ok:
@@ -308,7 +321,7 @@ class _LedgerTable:
         return {"Attributes": {"attempts": self.row["attempts"]}}
 
 
-def _record_at(mod, tbl, days_from_start, monkeypatch, sig="Timeout"):
+def _record_at(mod, tbl, days_from_start, monkeypatch, sig="Timeout", body="{}"):
     monkeypatch.setattr(mod.time, "time", lambda: 1_800_000_000 + days_from_start * 86400)
     real = mod.datetime
 
@@ -319,7 +332,7 @@ def _record_at(mod, tbl, days_from_start, monkeypatch, sig="Timeout"):
 
     monkeypatch.setattr(mod, "datetime", _DT)
     mod._table = tbl
-    return mod.record_failure(mod.stable_message_id("fn-x", "{}", sig), "fn-x", 1, "{}", sig)
+    return mod.record_failure(mod.stable_message_id("fn-x", body, sig), "fn-x", 1, body, sig)
 
 
 def test_ledger_resets_when_gaps_exceed_window(env, monkeypatch):
@@ -332,7 +345,7 @@ def test_ledger_resets_when_gaps_exceed_window(env, monkeypatch):
 def test_ledger_accumulates_within_window_across_message_ids(env, monkeypatch):
     mod = _import_module()
     tbl = _LedgerTable()
-    counts = [_record_at(mod, tbl, d, monkeypatch) for d in (0, 0.25, 0.5)]
+    counts = [_record_at(mod, tbl, d, monkeypatch, body=f'{{"id": {i}}}') for i, d in enumerate((0, 0.25, 0.5))]
     assert counts == [1, 2, 3] and counts[-1] >= mod.ESCALATE_THRESHOLD  # #4731 guard: one signature, many ids
 
 
@@ -341,6 +354,7 @@ def test_ledger_lost_reset_race_falls_back_to_add(env, monkeypatch):
     calls = []
 
     def upd(**kw):
+        _validate_wire(kw)
         calls.append(kw["ConditionExpression"])
         if len(calls) <= 2:
             raise _CondFail()  # stale for the ADD, then another writer already reset
@@ -349,4 +363,4 @@ def test_ledger_lost_reset_race_falls_back_to_add(env, monkeypatch):
     mod._table = MagicMock()
     mod._table.update_item.side_effect = upd
     assert mod.record_failure("sid", "fn", 1, "{}") == 2
-    assert calls[-1] == "attribute_exists(pk)"
+    assert calls[-1] == "last_seen >= :cutoff"

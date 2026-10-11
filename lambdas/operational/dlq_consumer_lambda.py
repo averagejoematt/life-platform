@@ -343,7 +343,7 @@ def record_failure(stable_id: str, fn_name: str, receive_count: int, body_str: s
             except Exception as e2:  # noqa: BLE001
                 if not _is_cond_fail(e2):
                     raise
-                resp = _update(add_expr, "attribute_exists(pk)", {":inc": Decimal(inc)})
+                resp = _update(add_expr, "last_seen >= :cutoff", {":inc": Decimal(inc)})
         return int(resp.get("Attributes", {}).get("attempts", inc))
     except Exception as e:  # noqa: BLE001 — fail-soft, never drop a message on a DDB blip
         logger.error(f"  ledger update failed for {stable_id}: {e}")
