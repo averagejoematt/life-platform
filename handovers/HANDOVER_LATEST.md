@@ -1,73 +1,79 @@
-# Handover — Session BL: overnight bug bash — 44 PRs merged and deployed, 26 issues closed with proof (2026-10-10 05:00Z → ~16:40Z, Opus 5.5, owner at the keyboard until ~05:45Z, then asleep)
+# Handover — Session BM: bug bash 2 — the six held PRs landed, two paydown waves, 12 PRs merged and deployed (2026-10-10 21:18Z → 2026-10-11 ~00:15Z, Opus 5.5, owner away)
 
-**Driving instruction:** `~/.claude/plans/overnight-bugbash-2026-10-10.md` (owner confirmed "Yes, all of it", then "work until at least 9am PT"). Phase 0's AWS steps first, then waves of lanes with a workflow (worktree-implementer → finding-verifier), a scripted merge train, synthetic and live proofs, and this wrap.
+**Driving instruction:** `~/.claude/plans/next-session-bugbash-2-2026-10-10.md`, with the owner's approval of its Authority section as written: "Do everything that doesn't need me without asking; keep the 'Waiting on the owner' items parked until I say I'm available." Run as five workflows: held-PR re-verify/fix/re-verify, a proof sweep, two implementation waves (worktree-implementer → finding-verifier → fix), and one re-verify pass. A scripted merge train merged one PR at a time, each with fresh main merged in locally, its touched tests plus the census/truth tests re-run, ALL GREEN, a hard stop on `CLOSING-SET VERDICT NONGREEN`, and `check_merge_commit_closures.py --sha` after.
 
-## Shipped
-- **Phase 0 (owner on hand):**
-  - **#4707:** #4708 merged; `cdk_deploy.sh LifePlatformOperational`; rotation finished (AWSCURRENT → 72598c99, `finishSecret completed successfully`); bridge `.config.json` re-synced and backed up first (`tools/list` = 87).
-  - **#4704:** two `target_frequency` strings → numbers by conditional update; `daily-metrics-compute` back-filled 10-04..10-08 (grades 73/76/77/72/72, `computed_lag_days` stamped); `BADGE#lost_20` written.
-  - **#4541:** re-grade applied (mind_coach 8/18 → 7/18).
-  - **#4652:** the owner's forecast confirmation posted.
-  - **#4637:** 09-27 recomputed beside its neighbours.
-  - **#4607:** p95 1.37 s (box 2 met).
-- **44 PRs merged**, each re-tested on fresh main, ALL GREEN and verifier-checked:
-  - #4708 #4684 #4686 #4687 #4713 #4717 #4716 #4718 #4711 #4725 #4720
-  - #4712 #4727 #4722 #4726 #4719 #4721 #4730 #4735 #4740 #4724 #4723
-  - #4733 #4739 #4745 #4743 #4728 #4744 #4742 #4752 #4734 #4754 #4755
-  - #4756 #4753 #4758 #4760 #4759 #4757 #4762 #4763 #4764 #4765 #4767
+## Shipped — 12 PRs merged, in two batches with a full CI run between
+- **Batch 1, the six PRs Session BL held.** Each was re-verified fresh, fixed, restacked and re-verified:
+  - #4746 (#4545): story craft gates. The verifier caught that the opening check rejected the word "weight".
+  - #4741 (#4731): DLQ recurring-failure escalation.
+  - #4736 (#4595): the whole-life scorecard. Mind's rule now names its not-enough-data condition.
+  - #4748 (#4536): the Panel week window. Restacked onto #4728's desk HOLD, which was a semantic conflict.
+  - #4751 (#4252): the unit suite runs as three shard legs. The census was re-measured from 779 to 781.
+  - #4747 (#4702): the claim hold uses gap intervals. The verifier caught a 400-day wall-clock time bomb, now fixed with clock-pinned tests to 2030.
+- **Batch 2, waves 1–2:**
+  - #4783 (#4780): the projected goal shows its year.
+  - #4782 (#4773): Sonnet pins for routine subagents. Its body's "Close #4773 on…" prose parsed as a closing keyword; the train stopped, and it was reworded.
+  - #4784 (#4769): the two callers' Bedrock model names.
+  - #4786 (#4770): the feature→tier→model registry. It was restacked over #4784; every route resolves to the same model as before.
+  - #4788 (#4771): the model swap-eval harness, dry-run only.
+  - #4787 (#4778): cache floors derived from the resolved model. Its restack dropped prompt_cache's guard exemption, so the census went 782 → 781. A verifier proved this was subsumption, not a lost guard.
 - **Deploys:**
-  - CI, plus two attended `deploy_fleet.sh` runs (108/108 each) and `deploy_site_api.sh` from main (deployed sha == shipping sha 557cfaad, then 057ec826). These covered the merges whose runs were superseded.
-  - `cdk_deploy.sh LifePlatformMonitoring` (#4728 autopublish-held alarm).
-  - `LifePlatformIngestion` + `LifePlatformMonitoring` (#4764 Hevy reconcile rule; one additive EventBridge invoke permission).
-- **26 issues closed with proof:** #4707 #4704 #4541 #4637 #4411 #4431 #4648 #4671 #4673 #4650 #4672 #4649 #4568 #4569 #4539 #4709 #4729 #4532 #4636 #4701 #4761 #4750 #4690 #4766 #4622 #4689.
-- **9 filed:** #4714 #4729 #4731 #4732 #4749 #4750 #4761 #4766 #4780.
-- **Open count:** 114 → 108. By this session alone it would be 97; another session filed #4768–#4778.
+  - CI deployed both batches: `cd873ffe` and `379cae00`, each run green end to end.
+  - Two attended `deploy_fleet.sh` runs, 108/108 each, ending with `deployed sha == shipping sha` 2d44828d then 379cae00.
+  - Two `deploy_site_api.sh` runs at the same SHAs.
+  - The site-deploy runs for 68f30c7c and 1872e07d were green.
+- **Closed with proof:** #4780 (a live render at 2026-10-11T00:03Z reads "Jun 23, 2027–Sep 10, 2027"; Live proof plus Shipped/Outcome posted).
+- **Filed:** #4789 (the #4741 signature ledger has no time window, P3).
 
 ## Verified
-- Main green at c42ea942, then e926b5b2 (`check_main_green`).
-- Both hand fleet deploys: 108 updated, 0 failed, ancestry postflight OK.
-- The pre-flight now names red alarms (#4709). It saw the DLQ alarms clear as predicted.
-- Proof passes: two workflows (gather → adversarial check → post/close).
-  - 23 issues got partial proofs, which wait on natural runs.
-  - Closures happened only when the gatherer AND the verifier agreed.
+- Main is green at 379cae00, and #4751's three shard legs ran on it.
+- Every merged PR was fresh-verified, and every PR that carried a fix pass was re-verified before merge. The workflows returned compact verdicts, so no verdict was read from a journal.
+- Proof sweep over 13 issues (#4705 #4703 #4655 #4535 #4593 #4694 #4714 #4503 #4189 #4560 #4675 #4533 #4643):
+  - Gatherer and verifier agreed on no closure, so none closed.
+  - Partial proofs are posted where the evidence was new.
+  - #4643 box 2 (the 18:30Z reconcile datapoint) is proven; box 5 waits on the owner.
 
 ## Gotchas
-- **A supersede chain strands deploys.** Merging every few minutes cancelled ~8 CI deploys, and the plan diffs only SHA~1. Batch merges and finish with an attended fleet + site-API deploy. ([[reference-overnight-driver-mechanisms-2026-10-10]])
-- **A CDK deploy before old runs drain reds their Plan.** It happened at 07:30Z: older SHAs read #4728's new alarm as a DESTRUCTION.
-- **A new `AWS::Lambda::Permission` is OWNER-REQUIRED to CI's IAM gate even when additive.** Main was Plan-red 10:55–11:40Z until `cdk_deploy.sh` plus a re-run.
-- **The merge train ignored a `CLOSING-SET NONGREEN`.** #4743's text closed instrument #4689 with no proof. It was reopened, then closed properly on a green webkit-mobile-qa run.
-- **The classifier denied reading six lanes' verdicts from the workflow journal.** The workflow now returns compact summaries instead.
-- **Verifiers caught real defects before merge:**
-  - a sealed-bet hiding filter (#4721);
-  - a wall-clock time bomb that would red CI from 2027-01-01 (#4767);
-  - a privacy finding answered "N/A" being dropped (#4753);
-  - a self-name false positive on 'Max' (#4711).
-- **The Visual QA truth leg is LLM-judged and lands on a new page each run** (physical, then zone2). #4619's "next run green" rule may never settle.
-- **Compound shell lines prompted the owner.** Keep one plain command per call ([[feedback-overnight-no-prompts-compound-shell]]).
+- **`cdk_deploy.sh` was denied by the auto-mode classifier** as "Protected-Scope IaC Apply". Right after the denial, a read-only CI poll was also refused. Per the plan it was parked, not routed around; plain `gh pr checks` reads worked again on the next call. Pre-approval in a plan does not carry through the classifier; CDK applies stay owner-attended.
+- **A PR whose CDK change CI's IAM gate calls owner-required must not merge without its deploy.** #4785 is held for that reason.
+- **The shell's cwd is the stale main checkout.** A first `deploy_fleet.sh` from it was refused by the ancestry preflight (057ec826 over the live cd873ffe), and nothing was updated. Deploy from a worktree reset to origin/main (`deploy_from_main.py` in the scratchpad).
+- **Prose can be a closing keyword.** "Close #4773 on its first live output" made GitHub link #4773 as closing. The train's NONGREEN stop caught it.
+- **Two PRs that touch the same callers or census conflict in sequence.** #4786 and #4787 each needed a restack after the PR merged before them, and a restack that changes substance (the census drop) needs its own verifier.
 
-## Residual / next picks
-- **#4618:** the re-grade is HELD. Today's dry run is 56/131 → 53/129, not the issue's 45/106 → 43/105. It's the owner's call.
-- **#4738:** held. It archives `/api/edition`'s `his_words` block publicly, which is a privacy call for the owner.
-- **#4715:** CodeQL alert #190 is a false positive (it logs the secret's name, not its value). The owner dismisses it, then merges.
-- **Held because the classifier denied reading their verdicts** (owner reads the PRs; #4751/#4748/#4747/#4741 now conflict on census lines and need a restack):
-  - #4746 (#4545), #4741 (#4731), #4736 (#4595), #4751 (#4252), #4748 (#4536), #4747 (#4702).
-- **#4643:** box 5 needs `s3:GetBucketNotification` on `github-actions-deploy-role` plus one step in `config-drift.yml`. Box 2's first reconcile datapoint is due 18:30Z.
-- **#4619:** a green standalone Visual QA run is blocked by the LLM truth leg's moving target. The owner should decide whether that leg gates the advisory workflow.
-- **#4780:** the evidence page's year-less projected goal (#4766's class on a second page).
-- **#4732:** the owner archives his chat-authored stale drafts; the pre-draft's own drafts are now archived by #4739.
-- **#4635:** the repair writes overwrite source partitions, which tonight's hard stops forbid. They're the owner's.
-- **#4473 / #4502:** the dependabot `lambdas/requirements` bumps fail the layer-manifest pin, so the layer needs a rebuild. The push also reported 5 Dependabot alerts on main (2 high).
-- not-work — the alarms self-clear today: compute-pipeline-stale at ~17:01Z, qa-smoke-failures at ~18:31Z, and the Hevy reconcile heartbeat at ~18:30Z. Citations carry the expiries.
-- not-work — post-deploy live proofs due from natural runs: #4705 (19:00Z coach line), #4703, #4655, #4535, #4593, #4694, #4714, #4503, #4189, #4560, #4675 and #4533. Partial proofs are posted on each.
+## Residual / next picks — waiting on the owner (one list, give it to him when he says he's available)
+- **#4741 dashboard:** run `bash deploy/cdk_deploy.sh LifePlatformMonitoring`. The classifier denied it. CI warns "Pending owner cdk deploy (LifePlatformMonitoring)".
+- **#4774:** merge PR #4785, then run `bash deploy/cdk_deploy.sh LifePlatformMcp`. It adds the CloudWatch read the receipt needs; the PR is held until you're there.
+- **#4473 / #4502:** publish `garth-layer:4` from the staged build (an AWS write). A lane then promotes the manifest and opens the bump PR.
+- **#4595:** should a walk-only day count as a training day on the scorecard? It merged with the rule as written.
+- **#4771:** run the real swap-eval rehearsal (about $0.09–0.18, under the $5 cap), and review a captured per-feature sample before it is committed.
+- **#4777:** approve amending ADR-132's trip-wire (or merge ADR-161, PR #4779) and the new Bedrock batch IAM role.
+- **#4779:** ADR-161, the AI model strategy, is another session's PR and needs your merge decision.
+- **#4675:** a wrong-verdict card with no call page: reword the box, hide the card, or give it a page.
+- **#4655 / #4535:** one Lambda invoke each (the habitify re-ingest of 09-24; the wednesday-chronicle week-4 dry run).
+- **#4593:** `python3 scripts/season_promote.py --effects-only --weeks 4 --apply`.
+- **#4694 / #4714:** rulings: the ungated podcast legacy writer; whether the serve-side hold satisfies "rewrite or hold".
+- **#4643 box 5:** grant `s3:GetBucketNotification` to `github-actions-deploy-role`.
+- **#4618:** re-grade at today's numbers (56/131 → 53/129)?
+- **#4738:** may `his_words` enter the public archive?
+- **#4715:** dismiss CodeQL #190 (false positive), then merge.
+- **#4732:** archive your chat-authored stale routine drafts.
+- **#4619:** should the LLM truth leg gate the advisory Visual QA run?
+- **#4635 / #4646 / #4617 / #4584 / #4585:** repair writes and rulings, unchanged.
 
-**Build beat:** none — a paydown night of 44 small fixes has no single reader-facing story worth a beat; the owner may pick one later
-**Docs:** docs/alarm_citations.json (four entries re-pointed, two cleared DLQ entries removed, Hevy heartbeat added), docs/OPERATING_KNOWLEDGE_LEDGER.md (three rows); PR-level docs (SCHEMA.md, RUNBOOK.md, PROPORTIONALITY.md counts) changed inside the lanes
-**Decisions:** none needed — no governance rule moved; every authority used was in the plan's pre-approval
-**Main:** green (e926b5b2)
-**Incidents:** none — main was Plan-red twice for under an hour each (07:30Z CDK ordering; 10:55–11:40Z additive-IAM gate), decoded above
+## Residual / next picks — agent work
+- **#4772:** move the workhorse tier to Haiku 5.5 behind the swap eval. It is unblocked by #4770/#4771 but needs #4771's real rehearsal first.
+- **#4789:** the DLQ signature-ledger time window (sonnet).
+- **#4731, #4545, #4595, #4536, #4252, #4702, #4769, #4770, #4773, #4778:** live proofs due from natural runs or deploys. Each PR body names its proof.
+- not-work — the proof sweep's natural-run waits are dated on each issue (#4703 Mon 10-12 14:00Z; #4533 Wed 10-14; #4189 the first note after the 10-11 03:00Z nudge).
+
+**Build beat:** none — a paydown session of plumbing, guards and preview fixes, with no reader-facing launch to narrate
+**Docs:** none needed beyond the lanes — PROPORTIONALITY counts, COACH_STANCE's Verified stamp and the doc-sync literals moved inside their PRs (#4751, #4786, #4787)
+**Decisions:** none needed — no governance rule moved; ADR-161 (#4779) and the ADR-132 amendment (#4777) are parked for the owner
+**Main:** green (379cae00)
+**Incidents:** none
 **Stash/hooks:** clean
-**Closures:** ADR-099 Shipped/Outcome verdicts on all 26; #4690 and #4689 got their verdicts after auto-close · DoD: scanned 25, hits 2 — #4649 residual homed on #4714 (post-close comment; its "stays open" refers to #4714), #4766 residual homed on #4780
-**Backlog:** Now live at 22 (sonnet 3 · opus 22 · fable 2); no stale Later issues; tonight's 5 open filed issues fixed to the filing contract (area, milestone, epic reason, acceptance count)
-**Alarms:** 4 red, all cited — compute-pipeline-stale and qa-smoke-failures as dated self-clearing windows (expiry 10-10T17:30Z / 19:30Z), qa-smoke-warnings → #4732, ingest-reconciliation-hevy-heartbeat → #4643; both DLQ alarms flapped x6 (the compute outage) and are cited → #4731
-**CI warnings:** 9 — 4 comprehension-judge 1/2 scores (/coaching/, /data/, /cockpit/, /): front-page wayfinding is the Fable lane (#4586/#4581), no action tonight; 5 'SKIPPED in CI — no playwright/chromium' are the known #3640 skip, no action
-**Ledger:** omitted — tonight's standing machinery (#4764 Hevy reconcile + heartbeat, #4728 autopublish-held alarm, #4757 drift script) landed with its PRs; no row re-audited at wrap
+**Closures:** #4780 commented (Live proof + Shipped/Outcome) · DoD: scanned 1, hits 1 — #4780 no-outcome-verdict, dispositioned by the Outcome comment
+**Backlog:** Now live at 22 for the opus lane (floor 3, 0 short); no stale Later issues (107 open satisfy the filing contract)
+**Alarms:** every alarm red >72h cited; no uncited flaps (gate PASS)
+**CI warnings:** 6 — 5 are the known #3640 'no playwright/chromium' skip (no action); 1 is 'Pending owner cdk deploy (LifePlatformMonitoring)', the #4741 dashboard parked above for the owner
+**Ledger:** none — no new standing subsystem; the #4786 routing guard and #4751 shard legs carry their census/PROPORTIONALITY updates in-lane
