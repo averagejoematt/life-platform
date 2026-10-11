@@ -179,11 +179,15 @@ def test_an_unlabelled_bar_leaves_the_stamp_labelled_with_the_arm_floor():
     assert "5 days in each arm" in out["confirmation_criteria"]
 
 
-def test_the_bar_itself_is_never_changed():
-    """Re-pricing a pre-registered number would contradict the criterion sentence that
-    states it — the artifact would carry two different bars for the same test."""
-    out = _stamp(_hyp(), [{"date": f"2026-08-{i + 1:02d}", "habit_pct": v} for i, v in enumerate(_SERIES)])
+def test_a_declared_bar_is_never_changed_when_the_series_cannot_price_it():
+    """Too few readings to estimate a variance: the declared bar survives, unchanged and
+    labelled as declared. (#3495 reversed the old "never re-priced" pin for the case where
+    the series CAN price it — the criterion is now rewritten from the derived number, so
+    the contradiction this test used to guard against cannot arise; see
+    tests/test_prereg_min_effect_derived_3495.py.)"""
+    out = _stamp(_hyp(), [{"date": f"2026-08-{i + 1:02d}", "habit_pct": v} for i, v in enumerate(_SERIES[:3])])
     assert out["test_spec"]["min_effect"] == 0.05
+    assert out["test_spec"]["min_effect_provenance"]["kind"] == gates.MODEL_PROPOSED
 
 
 def test_a_derived_spec_passes_through_as_a_personal_derivation():
@@ -266,19 +270,30 @@ def test_the_facet_survives_the_decimal_conversion_boto3_requires(table):
     assert table.puts[0]["test_spec"]["min_effect_provenance"]["value"] == Decimal("0.05")
 
 
-def test_the_diary_hypothesis_ships_its_bar_as_a_declared_convention(table):
-    """#1843's 0.05 is five percentage points of a 0-1 ratio — a design choice, labelled
-    as one, and reported against the measured habit_pct noise scale. This is the record
-    that is live on /api/hypotheses today."""
-    result = eng.seed_diary_intervention_hypothesis([], _rows())
+def test_the_diary_hypothesis_ships_its_bar_as_a_declared_convention_when_unpriceable(table):
+    """#1843's 0.05 is five percentage points of a 0-1 ratio — a design choice. With too few
+    habit_pct readings to estimate a variance it stays that, labelled as one."""
+    result = eng.seed_diary_intervention_hypothesis([], _rows(4))
     assert result["registered"] is True, result
     item = table.puts[0]
     facet = item["test_spec"]["min_effect_provenance"]
     assert facet["kind"] == gates.POPULATION_CONSTANT
     assert "#1843" in facet["source"] and "not a bar derived" in facet["source"]
-    assert "SD " in facet["source"] and "habit_pct" in facet["source"]
     assert item["test_spec"]["min_effect"] == Decimal("0.05")
     assert prereg_effect.ARM_FLOOR_PHRASE in item["confirmation_criteria"]
+
+
+def test_the_diary_hypothesis_is_derived_when_the_series_can_price_it(table):
+    """#3495: with a measurable habit_pct series the design bar is re-priced at the write,
+    and the design number + its #1843 citation survive in `min_effect_basis.replaced`."""
+    result = eng.seed_diary_intervention_hypothesis([], _rows())
+    assert result["registered"] is True, result
+    spec = table.puts[0]["test_spec"]
+    assert spec["min_effect_provenance"]["kind"] == gates.PERSONAL_DERIVATION
+    assert spec["min_effect_basis"]["replaced"]["kind"] == gates.POPULATION_CONSTANT
+    assert "#1843" in spec["min_effect_basis"]["replaced"]["source"]
+    assert spec["min_effect"] != Decimal("0.05")
+    assert prereg_effect.ARM_FLOOR_PHRASE in table.puts[0]["confirmation_criteria"]
 
 
 def test_the_diary_hypothesis_still_passes_the_engines_own_validator(table):

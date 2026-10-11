@@ -9,6 +9,7 @@ The new _SIMPLE_ROUTES dict in site_api_lambda.py needs to stay in sync:
 Doesn't import site_api_lambda directly (requires AWS env). Greps the source.
 """
 
+import copy as _copy
 import json as _json
 import os
 import re
@@ -214,6 +215,41 @@ def test_edition_every_block_carries_the_contract_on_the_wire():
     # #4595: the scorecard is served, one row per area, each decided by a written rule.
     assert b["scorecard"]["state"] == "ok" and b["scorecard"]["data"]["order"] == ["body", "training", "sleep", "food", "mind", "ai"]
     assert b["next"]["data"]["bet"]["data"]["question"].startswith("Will the morning recovery score")
+
+
+def test_edition_next_bet_carries_each_coachs_reason_through_the_coach_line_filter():
+    """#4809: each side of the open bet carries one clause of that coach's opening position, in
+    its served words — the docket's `claims` — through the same honest-text filter and honorific
+    strip as the coach lines; a clause the filter refuses, or one too long for the card, is None."""
+    wire = _wire()
+    sides = _edition(wire)["blocks"]["next"]["data"]["bet"]["data"]["sides"]
+    assert sides == [
+        {
+            "coach": "Max Reyes",
+            "says": "no",
+            "reason": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point",
+        },
+        {
+            "coach": "Lisa Park",
+            "says": "yes",
+            "reason": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%",
+        },
+    ]
+    for side in sides:
+        assert side["reason"] in " ".join(
+            d["claims"][pid] for d in wire["docket"]["open"] for pid in d["claims"]
+        ), "verbatim, never rewritten"
+    r = _ed.bet_reason
+    assert r("Dr. Webb says the floor holds. More later.") == "Webb says the floor holds"
+    assert r("A 500 kcal deficit explains it; nothing else") is None, "the honest-number filter the coach lines pass through"
+    assert r("This is the 17th start of the experiment") is None
+    assert r("x" * (_ed.BET_REASON_MAX_CHARS + 1)) is None, "never cut mid-clause"
+    assert r("") is None and r(None) is None
+    # a side whose claim the docket did not serve has no reason, and the side still stands
+    bare = _copy.deepcopy(wire)
+    for d in bare["docket"]["open"]:
+        d.pop("claims", None)
+    assert [s["reason"] for s in _edition(bare)["blocks"]["next"]["data"]["bet"]["data"]["sides"]] == [None, None]
 
 
 def _fake_route(bodies, fail=None):

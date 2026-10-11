@@ -223,6 +223,12 @@ SOURCE_TIERS: dict[str, int] = {
     # behavioural fact about him. Declared before the first row exists (ADR-154 ordering).
     "named_human_contact": TIER_OWNER_ONLY,
     "progress_photos": TIER_OWNER_ONLY,  # body photos (S3 raw/matthew/progress_photos/ + the DDB index); no public projection, ever
+    # #3759: the weekly coach-vision observation DERIVED from those photos — a sentence about
+    # his body and a body-fat band that is an estimate, not a measurement. Takes the tier of
+    # its input: no public projection, no aggregate carve-out, no thumbnail. Declared before
+    # the first row exists (ADR-154's ordering). Readers are the owner's MCP tool and his own
+    # Telegram coach thread; `tests/test_coach_vision_isolation_3759.py` holds that set.
+    "coach_vision": TIER_OWNER_ONLY,
     # #4078: chat writes queued for approval. A queued row carries the target write tool's exact
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.

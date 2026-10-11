@@ -37,6 +37,7 @@
   "workouts.json": "/api/workouts"
  },
  "composed": {
-  "edition.json": "blocks moves, calls, sheet and lead_read composed by lambdas/web/site_api_edition.py (#4582) from coach_moves_*.json, calls.json, character.json and weekly_priority.json of this same capture: the route that serves them was not deployed when it was taken. The next run of the script replaces the file whole."
+  "edition.json": "blocks moves, calls, sheet and lead_read composed by lambdas/web/site_api_edition.py (#4582) from coach_moves_*.json, calls.json, character.json and weekly_priority.json of this same capture: the route that serves them was not deployed when it was taken. The next run of the script replaces the file whole. Its calls block was re-derived from calls.json after that file's #4808 recomposition, and next.bet's sides carry each coach's reason (#4809, web.site_api_edition.bet_reason) from this capture's coach_docket.json.",
+  "calls.json": "number calls' sentences, title and tolerance re-composed by lambdas/web/site_api_calls.build_call (#4808) from the same settled PREDICTION# rows (read-only DynamoDB, 2026-10-11): the route that serves the whole-number call and the served tolerance was not deployed when this capture was taken; every other field is the capture's. The next run of the script replaces the file whole."
  }
 }

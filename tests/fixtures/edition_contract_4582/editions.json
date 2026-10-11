@@ -95,11 +95,13 @@
        "sides": [
         {
          "coach": "Max Reyes",
-         "says": "no"
+         "says": "no",
+         "reason": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point"
         },
         {
          "coach": "Lisa Park",
-         "says": "yes"
+         "says": "yes",
+         "reason": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%"
         }
        ]
       }
@@ -647,7 +649,7 @@
        "data": {
         "name": "Body",
         "verdict": "faster_than_planned",
-        "verdict_text": "Faster than planned",
+        "verdict_text": "Weight down faster than planned",
         "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
         "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
        }
@@ -660,7 +662,7 @@
        "data": {
         "name": "Training",
         "verdict": "not_yet",
-        "verdict_text": "Not yet",
+        "verdict_text": "No rest day",
         "text": "Trained on 7 of 7 days recorded.",
         "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
        }
@@ -673,7 +675,7 @@
        "data": {
         "name": "Sleep",
         "verdict": "going_well",
-        "verdict_text": "Going well",
+        "verdict_text": "5 or more long nights",
         "text": "7 hours or more on 7 of 7 nights recorded.",
         "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
        }
@@ -686,7 +688,7 @@
        "data": {
         "name": "Food",
         "verdict": "not_enough_data",
-        "verdict_text": "Not enough data",
+        "verdict_text": "Too few days logged",
         "text": "3 days logged; 5 are needed.",
         "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
        }
@@ -702,7 +704,7 @@
        "data": {
         "name": "Mind",
         "verdict": "not_yet",
-        "verdict_text": "Not yet",
+        "verdict_text": "In his own words on fewer than 3 days",
         "text": "An entry in his own words on 0 of 7 days.",
         "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
        }
@@ -718,9 +720,9 @@
        "data": {
         "name": "The AI",
         "verdict": "not_yet",
-        "verdict_text": "Not yet",
-        "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
-        "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+        "verdict_text": "The coaches do not beat a simple guess yet",
+        "text": "Counted across all 96 calls checked to date, not this week's alone.",
+        "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
        }
       }
      },
@@ -877,8 +879,8 @@
        "kind": "number",
        "coach_id": "explorer",
        "coach_name": "Henning Brandt",
-       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 83.7 for September 20. A call like this counts as right within 22.5 either way, his usual day-to-day swing.",
-       "called_short": "Henning Brandt called his morning recovery score at about 83.7.",
+       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 84 for September 20.",
+       "called_short": "Henning Brandt called his morning recovery score at about 84.",
        "happened_short": "It came in at 97.",
        "settled_date": "2026-10-03",
        "verdict": "right",
@@ -886,6 +888,13 @@
        "actual": {
         "value": 97.0,
         "text": "97"
+       },
+       "tolerance": {
+        "value": 22.4603,
+        "text": "22.5",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -899,7 +908,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.8 hours for September 26. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.8 hours for September 26.",
        "called_short": "Lisa Park called his sleep time at about 7.8 hours.",
        "happened_short": "It came in at 8.6 hours.",
        "settled_date": "2026-10-02",
@@ -908,6 +917,13 @@
        "actual": {
         "value": 8.61,
         "text": "8.6 hours"
+       },
+       "tolerance": {
+        "value": 1.2107,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -921,7 +937,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.4 hours for September 24. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.4 hours for September 24.",
        "called_short": "Lisa Park called his sleep time at about 7.4 hours.",
        "happened_short": "It came in at 6.7 hours.",
        "settled_date": "2026-09-30",
@@ -930,6 +946,13 @@
        "actual": {
         "value": 6.69,
         "text": "6.7 hours"
+       },
+       "tolerance": {
+        "value": 1.1787,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -965,8 +988,8 @@
        "kind": "number",
        "coach_id": "mind",
        "coach_name": "Nathan Reeves",
-       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 59.3 for September 15. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-       "called_short": "Nathan Reeves called his morning recovery score at about 59.3.",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 59 for September 15.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 59.",
        "happened_short": "It came in at 82.",
        "settled_date": "2026-09-28",
        "verdict": "wrong",
@@ -974,6 +997,13 @@
        "actual": {
         "value": 82.0,
         "text": "82"
+       },
+       "tolerance": {
+        "value": 18.5929,
+        "text": "18.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -987,7 +1017,7 @@
        "kind": "number",
        "coach_id": "glucose",
        "coach_name": "Amara Patel",
-       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 59 for September 15. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
+       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 59 for September 15.",
        "called_short": "Amara Patel called his morning recovery score at about 59.",
        "happened_short": "It came in at 82.",
        "settled_date": "2026-09-28",
@@ -996,6 +1026,13 @@
        "actual": {
         "value": 82.0,
         "text": "82"
+       },
+       "tolerance": {
+        "value": 18.5929,
+        "text": "18.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "scored",
@@ -1009,8 +1046,8 @@
        "kind": "number",
        "coach_id": "physical",
        "coach_name": "Max Reyes",
-       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 57.9 for September 14. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-       "called_short": "Max Reyes called his morning recovery score at about 57.9.",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 58 for September 14.",
+       "called_short": "Max Reyes called his morning recovery score at about 58.",
        "happened_short": "It came in at 63.",
        "settled_date": "2026-09-27",
        "verdict": "right",
@@ -1018,6 +1055,13 @@
        "actual": {
         "value": 63.0,
         "text": "63"
+       },
+       "tolerance": {
+        "value": 18.6473,
+        "text": "18.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1038,6 +1082,7 @@
        "verdict": "right",
        "verdict_text": "James Okafor was right.",
        "actual": null,
+       "tolerance": null,
        "simple_guess": {
         "state": "not_yet_scored",
         "right": null,
@@ -1057,6 +1102,7 @@
        "verdict": "wrong",
        "verdict_text": "Henning Brandt was wrong.",
        "actual": null,
+       "tolerance": null,
        "simple_guess": {
         "state": "not_yet_scored",
         "right": null,
@@ -1069,8 +1115,8 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 13. A call like this counts as right within 18.3 either way, his usual day-to-day swing.",
-       "called_short": "Lisa Park called his morning recovery score at about 52.9.",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 53 for September 13.",
+       "called_short": "Lisa Park called his morning recovery score at about 53.",
        "happened_short": "It came in at 73.",
        "settled_date": "2026-09-26",
        "verdict": "wrong",
@@ -1078,6 +1124,13 @@
        "actual": {
         "value": 73.0,
         "text": "73"
+       },
+       "tolerance": {
+        "value": 18.2532,
+        "text": "18.3",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1091,8 +1144,8 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-       "called_short": "Lisa Park called his morning recovery score at about 52.9.",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 53 for September 12.",
+       "called_short": "Lisa Park called his morning recovery score at about 53.",
        "happened_short": "It came in at 59.",
        "settled_date": "2026-09-25",
        "verdict": "right",
@@ -1100,6 +1153,13 @@
        "actual": {
         "value": 59.0,
         "text": "59"
+       },
+       "tolerance": {
+        "value": 18.6158,
+        "text": "18.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1113,8 +1173,8 @@
        "kind": "number",
        "coach_id": "mind",
        "coach_name": "Nathan Reeves",
-       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-       "called_short": "Nathan Reeves called his morning recovery score at about 52.9.",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 53 for September 12.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 53.",
        "happened_short": "It came in at 59.",
        "settled_date": "2026-09-25",
        "verdict": "right",
@@ -1122,6 +1182,13 @@
        "actual": {
         "value": 59.0,
         "text": "59"
+       },
+       "tolerance": {
+        "value": 18.6158,
+        "text": "18.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1135,8 +1202,8 @@
        "kind": "number",
        "coach_id": "glucose",
        "coach_name": "Amara Patel",
-       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-       "called_short": "Amara Patel called his morning recovery score at about 52.9.",
+       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 53 for September 12.",
+       "called_short": "Amara Patel called his morning recovery score at about 53.",
        "happened_short": "It came in at 59.",
        "settled_date": "2026-09-25",
        "verdict": "right",
@@ -1144,6 +1211,13 @@
        "actual": {
         "value": 59.0,
         "text": "59"
+       },
+       "tolerance": {
+        "value": 18.6158,
+        "text": "18.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1157,7 +1231,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.3 hours for September 18. A call like this counts as right within 1.3 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.3 hours for September 18.",
        "called_short": "Lisa Park called his sleep time at about 7.3 hours.",
        "happened_short": "It came in at 7.9 hours.",
        "settled_date": "2026-09-24",
@@ -1166,6 +1240,13 @@
        "actual": {
         "value": 7.91,
         "text": "7.9 hours"
+       },
+       "tolerance": {
+        "value": 1.2521,
+        "text": "1.3 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1179,8 +1260,8 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 66.2 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-       "called_short": "Lisa Park called his morning recovery score at about 66.2.",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 66 for September 11.",
+       "called_short": "Lisa Park called his morning recovery score at about 66.",
        "happened_short": "It came in at 24.",
        "settled_date": "2026-09-24",
        "verdict": "wrong",
@@ -1188,6 +1269,13 @@
        "actual": {
         "value": 24.0,
         "text": "24"
+       },
+       "tolerance": {
+        "value": 17.9488,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1201,8 +1289,8 @@
        "kind": "number",
        "coach_id": "physical",
        "coach_name": "Max Reyes",
-       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 59.5 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-       "called_short": "Max Reyes called his morning recovery score at about 59.5.",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 60 for September 11.",
+       "called_short": "Max Reyes called his morning recovery score at about 60.",
        "happened_short": "It came in at 24.",
        "settled_date": "2026-09-24",
        "verdict": "wrong",
@@ -1210,6 +1298,13 @@
        "actual": {
         "value": 24.0,
         "text": "24"
+       },
+       "tolerance": {
+        "value": 17.9488,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1223,8 +1318,8 @@
        "kind": "number",
        "coach_id": "mind",
        "coach_name": "Nathan Reeves",
-       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 59.5 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-       "called_short": "Nathan Reeves called his morning recovery score at about 59.5.",
+       "called": "Nathan Reeves called his morning recovery score (his wrist strap’s morning score out of 100) at about 60 for September 11.",
+       "called_short": "Nathan Reeves called his morning recovery score at about 60.",
        "happened_short": "It came in at 24.",
        "settled_date": "2026-09-24",
        "verdict": "wrong",
@@ -1232,6 +1327,13 @@
        "actual": {
         "value": 24.0,
         "text": "24"
+       },
+       "tolerance": {
+        "value": 17.9488,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1245,8 +1347,8 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 66.2 for September 10. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-       "called_short": "Lisa Park called his morning recovery score at about 66.2.",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 66 for September 10.",
+       "called_short": "Lisa Park called his morning recovery score at about 66.",
        "happened_short": "It came in at 44.",
        "settled_date": "2026-09-23",
        "verdict": "wrong",
@@ -1254,6 +1356,13 @@
        "actual": {
         "value": 44.0,
         "text": "44"
+       },
+       "tolerance": {
+        "value": 17.9239,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1267,8 +1376,8 @@
        "kind": "number",
        "coach_id": "glucose",
        "coach_name": "Amara Patel",
-       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 66.2 for September 10. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-       "called_short": "Amara Patel called his morning recovery score at about 66.2.",
+       "called": "Amara Patel called his morning recovery score (his wrist strap’s morning score out of 100) at about 66 for September 10.",
+       "called_short": "Amara Patel called his morning recovery score at about 66.",
        "happened_short": "It came in at 44.",
        "settled_date": "2026-09-23",
        "verdict": "wrong",
@@ -1276,6 +1385,13 @@
        "actual": {
         "value": 44.0,
         "text": "44"
+       },
+       "tolerance": {
+        "value": 17.9239,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1289,7 +1405,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9.",
        "called_short": "Lisa Park called his morning recovery score at about 61.",
        "happened_short": "It came in at 64.",
        "settled_date": "2026-09-22",
@@ -1298,6 +1414,13 @@
        "actual": {
         "value": 64.0,
         "text": "64"
+       },
+       "tolerance": {
+        "value": 17.6379,
+        "text": "17.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1311,7 +1434,7 @@
        "kind": "number",
        "coach_id": "physical",
        "coach_name": "Max Reyes",
-       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+       "called": "Max Reyes called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9.",
        "called_short": "Max Reyes called his morning recovery score at about 61.",
        "happened_short": "It came in at 64.",
        "settled_date": "2026-09-22",
@@ -1320,6 +1443,13 @@
        "actual": {
         "value": 64.0,
         "text": "64"
+       },
+       "tolerance": {
+        "value": 17.6379,
+        "text": "17.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1333,7 +1463,7 @@
        "kind": "number",
        "coach_id": "explorer",
        "coach_name": "Henning Brandt",
-       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+       "called": "Henning Brandt called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 9.",
        "called_short": "Henning Brandt called his morning recovery score at about 61.",
        "happened_short": "It came in at 64.",
        "settled_date": "2026-09-22",
@@ -1342,6 +1472,13 @@
        "actual": {
         "value": 64.0,
         "text": "64"
+       },
+       "tolerance": {
+        "value": 17.6379,
+        "text": "17.6",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1355,7 +1492,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 8. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 8.",
        "called_short": "Lisa Park called his morning recovery score at about 61.",
        "happened_short": "It came in at 67.",
        "settled_date": "2026-09-21",
@@ -1364,6 +1501,13 @@
        "actual": {
         "value": 67.0,
         "text": "67"
+       },
+       "tolerance": {
+        "value": 17.9029,
+        "text": "17.9",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1384,6 +1528,7 @@
        "verdict": "right",
        "verdict_text": "Lisa Park was right.",
        "actual": null,
+       "tolerance": null,
        "simple_guess": {
         "state": "not_yet_scored",
         "right": null,
@@ -1403,6 +1548,7 @@
        "verdict": "right",
        "verdict_text": "Nathan Reeves was right.",
        "actual": null,
+       "tolerance": null,
        "simple_guess": {
         "state": "not_yet_scored",
         "right": null,
@@ -1422,6 +1568,7 @@
        "verdict": "right",
        "verdict_text": "James Okafor was right.",
        "actual": null,
+       "tolerance": null,
        "simple_guess": {
         "state": "not_yet_scored",
         "right": null,
@@ -1441,6 +1588,7 @@
        "verdict": "right",
        "verdict_text": "Henning Brandt was right.",
        "actual": null,
+       "tolerance": null,
        "simple_guess": {
         "state": "not_yet_scored",
         "right": null,
@@ -1453,7 +1601,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.2 hours for September 13. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.2 hours for September 13.",
        "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
        "happened_short": "It came in at 9 hours.",
        "settled_date": "2026-09-19",
@@ -1462,6 +1610,13 @@
        "actual": {
         "value": 8.98,
         "text": "9 hours"
+       },
+       "tolerance": {
+        "value": 1.2395,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1475,7 +1630,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.2 hours for September 12. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.2 hours for September 12.",
        "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
        "happened_short": "It came in at 8.8 hours.",
        "settled_date": "2026-09-18",
@@ -1484,6 +1639,13 @@
        "actual": {
         "value": 8.76,
         "text": "8.8 hours"
+       },
+       "tolerance": {
+        "value": 1.2273,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1497,7 +1659,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.1 hours for September 11. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.1 hours for September 11.",
        "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
        "happened_short": "It came in at 4.7 hours.",
        "settled_date": "2026-09-17",
@@ -1506,6 +1668,13 @@
        "actual": {
         "value": 4.7,
         "text": "4.7 hours"
+       },
+       "tolerance": {
+        "value": 1.1708,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1519,7 +1688,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7 hours for September 10. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7 hours for September 10.",
        "called_short": "Lisa Park called his sleep time at about 7 hours.",
        "happened_short": "It came in at 7.5 hours.",
        "settled_date": "2026-09-16",
@@ -1528,6 +1697,13 @@
        "actual": {
         "value": 7.46,
         "text": "7.5 hours"
+       },
+       "tolerance": {
+        "value": 1.1708,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1541,7 +1717,7 @@
        "kind": "number",
        "coach_id": "sleep",
        "coach_name": "Lisa Park",
-       "called": "Lisa Park called his sleep time at about 7.1 hours for September 9. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Lisa Park called his sleep time at about 7.1 hours for September 9.",
        "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
        "happened_short": "It came in at 6.5 hours.",
        "settled_date": "2026-09-15",
@@ -1550,6 +1726,13 @@
        "actual": {
         "value": 6.48,
         "text": "6.5 hours"
+       },
+       "tolerance": {
+        "value": 1.182,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1563,7 +1746,7 @@
        "kind": "number",
        "coach_id": "explorer",
        "coach_name": "Henning Brandt",
-       "called": "Henning Brandt called his sleep time at about 7.1 hours for September 9. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Henning Brandt called his sleep time at about 7.1 hours for September 9.",
        "called_short": "Henning Brandt called his sleep time at about 7.1 hours.",
        "happened_short": "It came in at 6.5 hours.",
        "settled_date": "2026-09-15",
@@ -1572,6 +1755,13 @@
        "actual": {
         "value": 6.48,
         "text": "6.5 hours"
+       },
+       "tolerance": {
+        "value": 1.182,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 31
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1585,7 +1775,7 @@
        "kind": "number",
        "coach_id": "explorer",
        "coach_name": "Henning Brandt",
-       "called": "Henning Brandt called his sleep time at about 7 hours for September 7. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+       "called": "Henning Brandt called his sleep time at about 7 hours for September 7.",
        "called_short": "Henning Brandt called his sleep time at about 7 hours.",
        "happened_short": "It came in at 8.4 hours.",
        "settled_date": "2026-09-13",
@@ -1594,6 +1784,13 @@
        "actual": {
         "value": 8.37,
         "text": "8.4 hours"
+       },
+       "tolerance": {
+        "value": 1.2082,
+        "text": "1.2 hours",
+        "statistic": "one standard deviation of his readings over the 30 days before the call",
+        "window_days": 30,
+        "n": 30
        },
        "simple_guess": {
         "state": "not_yet_scored",
@@ -1875,11 +2072,13 @@
         "sides": [
          {
           "coach": "Max Reyes",
-          "says": "no"
+          "says": "no",
+          "reason": "Recovery EWMA climb from 75.1% to 81.6% shows only one consecutive same-direction point"
          },
          {
           "coach": "Lisa Park",
-          "says": "yes"
+          "says": "yes",
+          "reason": "Recovery score will be approximately 85.3% tomorrow with 80% confidence interval of 60.9–100%"
          }
         ]
        }
@@ -2111,7 +2310,7 @@
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
-         "verdict_text": "Faster than planned",
+         "verdict_text": "Weight down faster than planned",
          "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
@@ -2124,7 +2323,7 @@
         "data": {
          "name": "Training",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "No rest day",
          "text": "Trained on 7 of 7 days recorded.",
          "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
         }
@@ -2137,7 +2336,7 @@
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
-         "verdict_text": "Going well",
+         "verdict_text": "5 or more long nights",
          "text": "7 hours or more on 7 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
@@ -2150,7 +2349,7 @@
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
-         "verdict_text": "Not enough data",
+         "verdict_text": "Too few days logged",
          "text": "3 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
@@ -2166,7 +2365,7 @@
         "data": {
          "name": "Mind",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "In his own words on fewer than 3 days",
          "text": "An entry in his own words on 0 of 7 days.",
          "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
         }
@@ -2261,7 +2460,7 @@
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
-         "verdict_text": "Faster than planned",
+         "verdict_text": "Weight down faster than planned",
          "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
@@ -2274,7 +2473,7 @@
         "data": {
          "name": "Training",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "No rest day",
          "text": "Trained on 7 of 7 days recorded.",
          "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
         }
@@ -2287,7 +2486,7 @@
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
-         "verdict_text": "Going well",
+         "verdict_text": "5 or more long nights",
          "text": "7 hours or more on 7 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
@@ -2300,7 +2499,7 @@
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
-         "verdict_text": "Not enough data",
+         "verdict_text": "Too few days logged",
          "text": "3 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
@@ -2316,7 +2515,7 @@
         "data": {
          "name": "Mind",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "In his own words on fewer than 3 days",
          "text": "An entry in his own words on 0 of 7 days.",
          "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
         }
@@ -2514,7 +2713,7 @@
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
-         "verdict_text": "Faster than planned",
+         "verdict_text": "Weight down faster than planned",
          "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
@@ -2527,7 +2726,7 @@
         "data": {
          "name": "Training",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "No rest day",
          "text": "Trained on 7 of 7 days recorded.",
          "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
         }
@@ -2540,7 +2739,7 @@
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
-         "verdict_text": "Going well",
+         "verdict_text": "5 or more long nights",
          "text": "7 hours or more on 7 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
@@ -2553,7 +2752,7 @@
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
-         "verdict_text": "Not enough data",
+         "verdict_text": "Too few days logged",
          "text": "3 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
@@ -2579,9 +2778,9 @@
         "data": {
          "name": "The AI",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
-         "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
-         "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "verdict_text": "The coaches do not beat a simple guess yet",
+         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -2767,7 +2966,7 @@
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
-         "verdict_text": "Faster than planned",
+         "verdict_text": "Weight down faster than planned",
          "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
@@ -2780,7 +2979,7 @@
         "data": {
          "name": "Training",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "No rest day",
          "text": "Trained on 7 of 7 days recorded.",
          "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
         }
@@ -2793,7 +2992,7 @@
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
-         "verdict_text": "Going well",
+         "verdict_text": "5 or more long nights",
          "text": "7 hours or more on 7 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
@@ -2806,7 +3005,7 @@
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
-         "verdict_text": "Not enough data",
+         "verdict_text": "Too few days logged",
          "text": "3 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
@@ -2832,9 +3031,9 @@
         "data": {
          "name": "The AI",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
-         "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
-         "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "verdict_text": "The coaches do not beat a simple guess yet",
+         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -3534,7 +3733,7 @@
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
-         "verdict_text": "Faster than planned",
+         "verdict_text": "Weight down faster than planned",
          "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
@@ -3547,7 +3746,7 @@
         "data": {
          "name": "Training",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "No rest day",
          "text": "Trained on 7 of 7 days recorded.",
          "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
         }
@@ -3560,7 +3759,7 @@
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
-         "verdict_text": "Going well",
+         "verdict_text": "5 or more long nights",
          "text": "7 hours or more on 7 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
@@ -3583,7 +3782,7 @@
         "data": {
          "name": "Mind",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "In his own words on fewer than 3 days",
          "text": "An entry in his own words on 0 of 7 days.",
          "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
         }
@@ -3599,9 +3798,9 @@
         "data": {
          "name": "The AI",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
-         "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
-         "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "verdict_text": "The coaches do not beat a simple guess yet",
+         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -4166,7 +4365,7 @@
         "data": {
          "name": "Training",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "No rest day",
          "text": "Trained on 7 of 7 days recorded.",
          "rule": "Days trained in the last seven. Going well at 4 to 6, so at least one rest day. Fewer than 5 days recorded is not enough data."
         }
@@ -4186,7 +4385,7 @@
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
-         "verdict_text": "Not enough data",
+         "verdict_text": "Too few days logged",
          "text": "3 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
@@ -4202,7 +4401,7 @@
         "data": {
          "name": "Mind",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "In his own words on fewer than 3 days",
          "text": "An entry in his own words on 0 of 7 days.",
          "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
         }
@@ -4218,9 +4417,9 @@
         "data": {
          "name": "The AI",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
-         "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
-         "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "verdict_text": "The coaches do not beat a simple guess yet",
+         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },
@@ -4595,7 +4794,7 @@
         "data": {
          "name": "Body",
          "verdict": "faster_than_planned",
-         "verdict_text": "Faster than planned",
+         "verdict_text": "Weight down faster than planned",
          "text": "Seven-day average 312.2 lb, down 2.6 lb from the seven days before.",
          "rule": "The average of the last seven days' weigh-ins against the seven days before. Going well when it is lower; faster than planned when it fell more than 2.5 lb in the week. Fewer than 3 weigh-ins in either week is not enough data."
         }
@@ -4615,7 +4814,7 @@
         "data": {
          "name": "Sleep",
          "verdict": "going_well",
-         "verdict_text": "Going well",
+         "verdict_text": "5 or more long nights",
          "text": "7 hours or more on 7 of 7 nights recorded.",
          "rule": "Nights of 7 hours or more in the last seven. Going well at 5. Fewer than 5 nights recorded is not enough data."
         }
@@ -4628,7 +4827,7 @@
         "data": {
          "name": "Food",
          "verdict": "not_enough_data",
-         "verdict_text": "Not enough data",
+         "verdict_text": "Too few days logged",
          "text": "3 days logged; 5 are needed.",
          "rule": "Logged days at or above the plan's protein floor in the last seven. Going well at 5. Fewer than 5 logged days is not enough data."
         }
@@ -4644,7 +4843,7 @@
         "data": {
          "name": "Mind",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
+         "verdict_text": "In his own words on fewer than 3 days",
          "text": "An entry in his own words on 0 of 7 days.",
          "rule": "Days in the last seven with an entry in his own words. Going well at 3. When the 10 newest entries all fall inside the week, the count is not enough data."
         }
@@ -4660,9 +4859,9 @@
         "data": {
          "name": "The AI",
          "verdict": "not_yet",
-         "verdict_text": "Not yet",
-         "text": "The coaches do not yet beat a simple guess across 96 checked calls.",
-         "rule": "The coaches' checked calls against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
+         "verdict_text": "The coaches do not beat a simple guess yet",
+         "text": "Counted across all 96 calls checked to date, not this week's alone.",
+         "rule": "Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes from the last reading. Going well when they beat it. Fewer than 30 checked calls is not enough data."
         }
        }
       },

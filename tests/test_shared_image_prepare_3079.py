@@ -177,6 +177,14 @@ SANCTIONED_IMAGE_BLOCK_SITES = {
         "near the 8000px reject limit or the #3067 tall-page legibility bound. "
         "Registered deliberately, not exempted by accident."
     ),
+    ("lambdas/coach/coach_vision.py", "image_block"): (
+        "NOT a screenshot path and not a second copy: it forwards a camera JPEG the capture "
+        "stored under the owner-only progress-photo prefix (#3758/#3759), read by key off the "
+        "index row, never a page capture off disk; ships in a Lambda bundle that cannot import "
+        "tests/. A phone photo is nowhere near the 8000px reject limit, and the #3067 tall-page "
+        "tiling would be WRONG for a body comparison — the whole frame is the subject. "
+        "Registered deliberately, not exempted by accident."
+    ),
 }
 
 _SCAN_DIRS = ("lambdas", "tests", "scripts", "mcp", "deploy", "cdk")

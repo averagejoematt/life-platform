@@ -67,6 +67,7 @@ from stacks.role_policies_compute import (  # noqa: F401  (re-export)
     compute_coach_orchestrator,
     compute_coach_prediction_evaluator,
     compute_coach_state_updater,
+    compute_coach_vision,
     compute_daily_insight,
     compute_daily_metrics,
     compute_dashboard_refresh,

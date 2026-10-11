@@ -621,6 +621,20 @@ def _assemble(persona_id: str, coach_id: str, *, allow_referral: bool = False) -
         domain = domain_facts_block(persona_id, _table(), today_pt)
     except Exception as e:
         logger.warning("[telegram] domain facts unavailable: %s", e)
+    # #3759: the owner's coach thread is one of the TWO sanctioned consumers of the weekly
+    # coach-vision observation (the other is his MCP tool). It joins the facts the coach may
+    # cite with its label and anchors inline, and rides the domain pack's seat in the
+    # grounder's vocabulary (`_grounder_for` takes `a["domain"]`) so the band it carries is
+    # never flagged as fabrication. Telegram is his own chat; nothing here reaches a reader.
+    try:
+        from coach.coach_vision import thread_block
+
+        vision = thread_block(_table(), today_pt)
+    except Exception as e:
+        logger.warning("[telegram] coach vision unavailable: %s", e)
+        vision = ""
+    if vision:
+        domain = f"{domain}\n\n{vision}" if domain else vision
     facts_block = build_facts_block(facts)
     if moment:
         facts_block = f"{facts_block}\n{moment}"

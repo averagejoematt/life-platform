@@ -1171,6 +1171,11 @@ COVERAGE = {
     # Invocations works here because this function has exactly ONE trigger; a run that
     # honestly declines to draw a card still invokes and still emits a datapoint.
     "recap-card-generator": (ALARM, "recap-card-no-invocations-24h"),
+    # #3759: the Monday coach-vision read over the progress photos. ONE trigger, so
+    # Invocations is the absence signal; seven daily periods is the CloudWatch ceiling for
+    # a daily period (#3685) and exactly one Monday falls in every seven-day window. A run
+    # that honestly declines to write (no set this week, budget pause) still invokes.
+    "coach-vision": (ALARM, "coach-vision-no-invocations-7d"),
     "hevy-restamp": (
         CENSUS,
         "2026-07-19",

@@ -208,6 +208,14 @@ _FEATURE_CUTOFF = {
     # verdict and the deterministic layer (redline vetoes, tripped tripwires) still runs at
     # $0 — the routine is never reported as red-teamed by a model that did not run.
     "plan_critics": 2,
+    # coach_vision (#3759, epic #3743): the Monday coach-vision read over the progress
+    # photos — ONE Haiku vision call a week (≤ 6 camera JPEGs) producing an owner-only
+    # observation + a body-fat VISUAL ESTIMATE band. Matthew-facing coach voice, so it sits
+    # in band 2 with the rest of the coach narrative: it outlives every internal/dev AI
+    # feature and pauses when the reader narrative pauses. A paused Monday writes NOTHING
+    # (never a fabricated band) and the owner's MCP tool reports the week as absent.
+    # Pennies a month; the band placement is audience-order, not dollars.
+    "coach_vision": 2,
     # ── INGEST-PATH processing (#4643) — hard-stop only, BY DECLARATION ───────
     #
     # The four AI callers on the ingest path (every lambdas/ingestion/ module and

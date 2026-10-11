@@ -95,8 +95,9 @@ def test_every_row_is_decided_by_a_served_rule_with_the_day_it_was_set():
             offenders.append(f"{key}: state {row['state']} on the all-green wire")
             continue
         d = row["data"]
-        if d["verdict"] not in VERDICTS or d["verdict_text"] != sc.VERDICT_WORDS[d["verdict"]]:
-            offenders.append(f"{key}: verdict {d['verdict']!r}")
+        # #4809: the printed words are the row's own (a VERDICT_TEXT entry), never the bare verdict word
+        if d["verdict"] not in VERDICTS or d["verdict_text"] not in {v for (a, _), v in sc.VERDICT_TEXT.items() if a == key}:
+            offenders.append(f"{key}: verdict {d['verdict']!r} / {d['verdict_text']!r}")
         if d["rule"] != sc.SCORECARD_RULE_TEXT[key] or not d["rule"].endswith("."):
             offenders.append(f"{key}: the rule is not the written one")
         if not d["text"].endswith("."):
@@ -122,7 +123,16 @@ def test_the_wire_composes_to_these_verdicts():
         "ai": sc.NOT_YET,
     }
     assert rows["body"]["data"]["text"] == "Seven-day average 312.2 lb, down 2.6 lb from the seven days before."
-    assert rows["ai"]["data"]["text"] == "The coaches do not yet beat a simple guess across 96 checked calls."
+    assert rows["ai"]["data"]["text"] == "Counted across all 96 calls checked to date, not this week's alone."
+    # #4809: each verdict prints what happened against its rule
+    assert {k: rows[k]["data"]["verdict_text"] for k in sc.SCORECARD_ORDER} == {
+        "body": "Weight down faster than planned",
+        "training": "No rest day",
+        "sleep": "5 or more long nights",
+        "food": "Too few days logged",
+        "mind": "In his own words on fewer than 3 days",
+        "ai": "The coaches do not beat a simple guess yet",
+    }
 
 
 def test_the_committed_scorecard_fixture_is_what_compose_makes_of_the_wire():
@@ -254,7 +264,8 @@ def test_the_ai_row_is_the_records_comparison_never_a_count_alone():
         cal = copy.deepcopy(wire["calibration"])
         cal["platform"]["strata"]["coaches"].update({"brier_skill": skill, "n": n})
         w = {**wire, "calibration": cal}
-        text = _scorecard(w)["data"]["rows"]["ai"]["data"]["text"]
+        d = _scorecard(w)["data"]["rows"]["ai"]["data"]
+        text = f"{d['verdict_text']}. {d['text']}"  # #4809: the comparison is the verdict's words, printed first
         assert "simple guess" in text, text
         assert "right" not in text  # never the K-of-N count the record prints beside its comparison
     # With the record unavailable, the AI row is unavailable — never a count with no comparison.
@@ -297,3 +308,90 @@ def test_went_right_is_one_sourced_line_each_or_nothing_this_week():
     wire = _wire()
     wire["pulse"] = _pulse(sleep={d: 6.0 for d in _days(7)})
     assert _scorecard(wire)["data"]["went_right"]["matthew"]["text"] == "Nothing this week."
+
+
+# ── #4809: the verdict's words say what happened against the rule ─────────────────────
+
+
+def test_every_verdict_text_entry_is_reached_by_its_own_case_and_not_yet_is_never_printed():
+    """The table, row by row: each (area, what happened) entry is produced by a case built at it,
+    and no row ever prints a bare verdict word — "Not yet." over "Trained on 7 of 7 days" was the
+    defect (the fault was too much training, not too little)."""
+    wire = _wire()
+    days7 = _days(7)
+    floor = wire["nutrition"]["nutrition"]["protein_floor_g"]
+
+    def training(trained, seen=7):
+        t = copy.deepcopy(wire["training"])
+        t["daily_modality_minutes_30d"] = [{"date": d, "total_min": 45 if i < trained else 0} for i, d in enumerate(_days(seen))]
+        return {**wire, "training": t}
+
+    def food(hit, logged=7):
+        n = copy.deepcopy(wire["nutrition"])
+        n["nutrition_trend"] = [{"date": d, "protein_g": floor + 10 if i < hit else floor - 40} for i, d in enumerate(_days(logged))]
+        return {**wire, "nutrition": n}
+
+    def sleep(good, seen=7):
+        return {**wire, "pulse": _pulse(sleep={d: 8.0 if i < good else 5.0 for i, d in enumerate(_days(seen))})}
+
+    def body(before, now, n=7):
+        return {**wire, "pulse": _pulse(weights=_two_weeks(before, now, n, n))}
+
+    def ai(beats, n=96):
+        r = copy.deepcopy(wire["calibration"])
+        r["platform"]["strata"]["coaches"].update(n=n, brier_skill=0.1 if beats else -0.1)
+        return {**wire, "calibration": r}
+
+    cases = {
+        ("body", sc.GOING_WELL): ("body", body(320.0, 319.0)),
+        ("body", sc.FASTER_THAN_PLANNED): ("body", body(320.0, 316.0)),
+        ("body", "up"): ("body", body(320.0, 321.0)),
+        ("body", "level"): ("body", body(320.0, 320.0)),
+        ("body", sc.FEW): ("body", body(320.0, 319.0, n=2)),
+        ("training", sc.GOING_WELL): ("training", training(5)),
+        ("training", sc.NO_REST): ("training", training(7)),
+        ("training", sc.UNDER): ("training", training(2)),
+        ("training", sc.FEW): ("training", training(2, seen=3)),
+        ("sleep", sc.GOING_WELL): ("sleep", sleep(6)),
+        ("sleep", sc.UNDER): ("sleep", sleep(3)),
+        ("sleep", sc.FEW): ("sleep", sleep(2, seen=3)),
+        ("food", sc.GOING_WELL): ("food", food(6)),
+        ("food", sc.UNDER): ("food", food(2, logged=6)),
+        ("food", sc.FEW): ("food", food(2, logged=3)),
+        ("ai", sc.GOING_WELL): ("ai", ai(True)),
+        ("ai", sc.UNDER): ("ai", ai(False)),
+        ("ai", sc.FEW): ("ai", ai(False, n=12)),
+    }
+    entries = {k for k in sc.VERDICT_TEXT if k[0] != "mind"}
+    assert set(cases) == entries, f"a table entry with no case: {sorted(entries ^ set(cases))}"
+    bare = set(sc.VERDICT_WORDS.values())
+    for (area, what), (key, bodies) in cases.items():
+        row = _scorecard(bodies)["data"]["rows"][key]
+        assert row["state"] == "ok", (area, what)
+        assert row["data"]["verdict_text"] == sc.VERDICT_TEXT[(area, what)], (area, what, row["data"])
+        assert row["data"]["verdict_text"] not in bare
+    # the ceiling: trained on every day is told it had no rest day, never "not yet"
+    seven = _scorecard(training(7))["data"]["rows"]["training"]["data"]
+    assert seven["verdict"] == sc.NOT_YET and seven["verdict_text"] == "No rest day" and seven["text"] == "Trained on 7 of 7 days recorded."
+    six = _scorecard(training(6))["data"]["rows"]["training"]["data"]
+    assert six["verdict"] == sc.GOING_WELL, "six of seven met the ceiling, not over it"
+    assert days7[-1] == CAPTURE_DAY
+
+
+def test_the_mind_row_says_what_happened_in_each_case():
+    rows = {w: sc.VERDICT_TEXT[("mind", w)] for w in (sc.GOING_WELL, sc.UNDER, sc.FEW)}
+    wire = _wire()
+    one_day = {"entries": [{"date": CAPTURE_DAY, "text": "x"}]}
+    three = {"entries": [{"date": d, "text": "x"} for d in _days(3)]}
+    ten = {"entries": [{"date": CAPTURE_DAY, "text": "x"}] * sc.MIND_SERVE_LIMIT}
+    got = {
+        w: _scorecard({**wire, "owner_words": b})["data"]["rows"]["mind"]["data"]["verdict_text"]
+        for w, b in ((sc.GOING_WELL, three), (sc.UNDER, one_day), (sc.FEW, ten))
+    }
+    assert got == rows
+
+
+def test_the_ai_row_says_its_count_is_to_date_and_the_rule_says_so():
+    data = _scorecard(_wire())["data"]["rows"]["ai"]["data"]
+    assert "to date" in data["text"] and "not this week's" in data["text"]
+    assert "to date, not this week's alone" in data["rule"]

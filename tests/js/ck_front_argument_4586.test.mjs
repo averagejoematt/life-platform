@@ -63,8 +63,34 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   const jobs = F.jobsByName(DAYS);
   assert.equal(jobs["Marcus Webb"], "food");
   assert.equal(jobs["Nathan Reeves"], "mind");
-  assert.equal(F.betSidesLine(pick.bet, jobs), "Nathan Reeves (mind) says no. Marcus Webb (food) says yes.");
-  assert.equal(F.betSidesLine(pick.bet), "Nathan Reeves says no. Marcus Webb says yes.");
+  // #4809: each side carries the coach's reason — the opening position the docket row holds, one
+  // clause in its served words (`next.bet.data.sides[].reason`) — on its own line under the question.
+  const why = Object.fromEntries(pick.bet.data.sides.map((s) => [s.coach, s.reason]));
+  assert.ok(why["Nathan Reeves"] && why["Marcus Webb"], "the wire fixture serves both reasons");
+  assert.deepEqual(F.betSidesLines(pick.bet, jobs), [
+    `Nathan Reeves (mind) says no: “${why["Nathan Reeves"]}”.`,
+    `Marcus Webb (food) says yes: “${why["Marcus Webb"]}”.`,
+  ]);
+  assert.equal(F.betSidesLine(pick.bet), `Nathan Reeves says no: “${why["Nathan Reeves"]}”. Marcus Webb says yes: “${why["Marcus Webb"]}”.`);
+  // a side with no served reason is the side alone; nothing is written in its place
+  const bare = { ...pick.bet, data: { ...pick.bet.data, sides: pick.bet.data.sides.map((s) => ({ coach: s.coach, says: s.says })) } };
+  assert.equal(F.betSidesLine(bare, jobs), "Nathan Reeves (mind) says no. Marcus Webb (food) says yes.");
+  // Ruling 2026-10-11 (the coaches page keeps four screens): the FRONT card prints each reason
+  // under its side; the coaches page's card prints the sides alone, on one line, and its door
+  // goes to the front card — the two doors never loop on a promise neither page keeps.
+  const front = P.frontReadSlots(edition, B, BASE)["ck-bet"];
+  assert.match(front, /<a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">Every open bet, on the coaches page<\/a>/, front);
+  assert.doesNotMatch(front, /What each one argued/, "the front card prints the argument itself");
+  const coaches = P.betHTML(B.next, { ...P.reasonsDoor(B.next, BASE), extra: "One more bet settles on October 16.", oneLine: true });
+  for (const [who, reason] of Object.entries(why)) {
+    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(front, new RegExp(`<p class="ck-soft">${esc(who)}(?: \\([a-z ]+\\))? says (yes|no): “${esc(reason)}”\\.</p>`), front);
+    assert.ok(!coaches.includes(reason), `the coaches page does not print ${who}'s reason`);
+  }
+  // one paragraph (the four-screen budget): the sides, the door to the reasons, the extra sentence
+  assert.match(coaches, /<p class="ck-soft">Nathan Reeves says no\. Marcus Webb says yes\. <a class="ck-link" href="\/next\/v8\/#ck-bet">Why each says so\.<\/a> One more bet settles on October 16\.<\/p><\/div>$/, coaches);
+  // no served reason: no door to a card that would not print one
+  assert.deepEqual(P.reasonsDoor({ ...B.next, data: { ...B.next.data, bet: bare } }, BASE), {});
   assert.match(P.betHTML(B.next, { sidesText: "x says no.", extra: "Friday: 1 g.", href: "/next/v8/coaches/#ck-bet" }), /<p class="ck-soft">x says no\.<\/p><p class="ck-soft">Friday: 1 g\.<\/p><p><a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">What each one argued<\/a><\/p><\/div>$/);
   const food = B.week.data.measures.food.data.values;
   const lastIdx = food.map((v, i) => (typeof v === "number" ? i : -1)).filter((i) => i >= 0).pop();
@@ -162,7 +188,8 @@ test("the miss leads with the week's clearest wrong call when there is one, else
   assert.equal(C.lastCallPick(calls).kind, "wrong", "without a day, the all-time clearest miss");
   assert.match(C.lastCallHTML(calls, BASE, "2026-10-09"), new RegExp(`call/\\?id=${pick.call.id}`));
   const withJobs = C.lastCallHTML(calls, BASE, "2026-10-09", F.SHORT_JOBS);
-  assert.match(withJobs, new RegExp(`^<div class="ck-bet"><p class="ck-small">Settled [A-Z][a-z]+, [A-Z][a-z]+ \\d+ · ${pick.call.coach_name}, the [a-z ]+ coach</p><p>[^<]+ <b>${pick.call.happened_short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</b></p>`), withJobs);
+  // #4808, the house rule: the tag, then the call with the result in bold
+  assert.match(withJobs, new RegExp(`^<div class="ck-bet"><p class="ck-small">Settled [A-Z][a-z]+, [A-Z][a-z]+ \\d+ · ${pick.call.coach_name}, the [a-z ]+ coach</p><span class="ck-verdicts__tag[^"]*">(Right|Wrong) · [^<]+</span><p>[^<]+ <b>${pick.call.happened_short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</b></p>`), withJobs);
   assert.equal(C.lastCallPick(calls, "2020-01-01").kind, "wrong", "a window with nothing settled falls back to the record");
   assert.deepEqual(C.lastCallPick({ state: "ok", calls: [] }), { call: null, kind: "" });
   assert.deepEqual(C.lastCallPick(null), { call: null, kind: "" });

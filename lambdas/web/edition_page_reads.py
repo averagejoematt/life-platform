@@ -92,6 +92,7 @@ FRONT_CALL_FIELDS = (
     "verdict",
     "verdict_text",
     "actual",
+    "tolerance",  # #4808: the allowed distance, served once — the verdict tag prints it
     "simple_guess",
 )
 

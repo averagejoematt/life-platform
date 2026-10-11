@@ -107,8 +107,14 @@ test("his words are quoted only when fresh; silence prints the block's sentence"
 
 test("the bet card states the question, the date and both sides", () => {
   const html = P.betHTML(B.next);
-  assert.match(html, /Settles Monday, October 12/);
-  assert.match(html, /Nathan Reeves says no\. Marcus Webb says yes\./);
+  // the question names its day, so the card says it once (#4809); a question that does not gets the line
+  assert.match(html, /^<div class="ck-bet"><p><b>Will [^<]+ on Monday, October 12\?<\/b><\/p>/);
+  assert.doesNotMatch(html, /Settles Monday, October 12/);
+  const undated = { ...B.next, data: { ...B.next.data, bet: { ...B.next.data.bet, data: { ...B.next.data.bet.data, question: "Will protein stay high?" } } } };
+  assert.match(P.betHTML(undated), /<p class="ck-small">Settles Monday, October 12<\/p>/);
+  // ruling 2026-10-11: off the front card the sides stand alone on one line; the reasons are the front card's
+  assert.match(html, /<p class="ck-soft">Nathan Reeves says no\. Marcus Webb says yes\.<\/p>/);
+  assert.doesNotMatch(html, /Fuel-cognition link|Protein intake gap/);
   assert.equal(P.betLine(B.next), "A bet between Nathan Reeves and Marcus Webb settles Monday, October 12.");
   assert.equal(P.moreBetsLine(load("coach_docket"), "2026-10-12"), "One more bet settles on October 16.");
   assert.equal(P.moreBetsLine({ open: [{ resolution_date: "2026-10-12" }, { resolution_date: "2026-10-14" }, { resolution_date: "2026-10-16" }] }, "2026-10-12"), "Two more bets settle on October 14 and 16.");
@@ -128,9 +134,17 @@ test("the showcase pair leads with the tightest right call and the clearest miss
   const html = P.callVerdictsHTML(calls, "/next/v8/");
   // #4647: not the newest right call (83.7 called, 97 came in, 22.5 allowed either way),
   // which reads as a miss marked right. The tightest rule on the wire is the pick.
-  assert.match(html, /--right">Right · within 1\.2 hours either way<\/span><p><b>Lisa Park called his sleep time at about 7\.8 hours\.<\/b> It came in at 8\.6 hours\.<\/p>/);
-  assert.match(html, /Graded on the reading for September 26\. Checked October 2\. <a class="ck-link" href="\/next\/v8\/call\/\?id=sleep-20260925-6c64d91f26">The whole call<\/a>/);
-  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span><p><b>Lisa Park called his morning recovery score at about 66\.2\.<\/b> It came in at 24\.<\/p>/);
+  // #4808, the house rule: the tag (the rule, once), the call with the RESULT bold, then in one
+  // soft line what the allowed distance is in words, the day it was graded on, and the door.
+  assert.match(html, /--right">Right · within 1\.2 hours either way<\/span><p>Lisa Park called his sleep time at about 7\.8 hours\. <b>It came in at 8\.6 hours\.<\/b><\/p>/);
+  assert.match(html, /<p class="ck-soft">Graded on the reading for September 26\. Checked October 2\. <a class="ck-link" href="\/next\/v8\/call\/\?id=sleep-20260925-6c64d91f26">The whole call<\/a>/);
+  // both distances were computed the same way, so what they are is said once, under the pair
+  assert.match(html, /<\/div><\/div><p class="ck-soft">Each allowed distance is one standard deviation of his readings over the 30 days before the call\.<\/p>$/);
+  assert.equal((html.match(/standard deviation/g) || []).length, 1);
+  // the coaches page's scorecard door closes that same paragraph (one line given back, 2026-10-11)
+  const door = '<a class="ck-link" href="/coaching/scorecard/">Every prediction, right and wrong</a>';
+  assert.ok(P.callVerdictsHTML(calls, "/next/v8/", "coaches", { trailer: door }).endsWith(`before the call. ${door}</p>`));
+  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span><p>Lisa Park called his morning recovery score at about 66\. <b>It came in at 24\.<\/b><\/p>/);
   assert.match(html, /href="\/next\/v8\/call\/\?id=sleep-20260910-09aa1ff6cc"/);
   assert.doesNotMatch(html, /83\.7/);
   assert.equal(P.callVerdictsHTML(null), "");
@@ -190,7 +204,15 @@ test("progress runs from the start to the goal, and is not drawn without a goal"
 
 
 
-test("a right call that gave a range says the result fell inside it", () => {
-  assert.match(P.verdictsHTML(load("coaches")), /The result was 77, inside the range given\. Checked October 9\./);
+test("the coaches' fallback never shows a call whose rule it cannot print, and says how many it passed over (#4808)", () => {
+  // /api/coaches serves no allowed distance for a number call, so those are passed over and
+  // counted; a direction call (its rule is the trend) is shown.
+  const coaches = load("coaches");
+  const html = P.verdictsHTML(coaches);
+  const point = coaches.coaches.filter((c) => c.latest_checked && c.latest_checked.eval_type === "point" && ["confirmed", "refuted"].includes(c.latest_checked.status));
+  assert.ok(point.length >= 1, "the fixture has number calls to pass over");
+  for (const c of point) assert.ok(!html.includes(c.latest_checked.claim), `${c.name}'s number call was shown without its rule`);
+  assert.match(html, /settled calls? (has|have) no rule the page can print, so (it is|they are) not shown as right or wrong here\./);
+  assert.doesNotMatch(html, /not available for this call|Marked (right|wrong)/);
 });
 
