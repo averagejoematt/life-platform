@@ -1543,7 +1543,7 @@ def _panel_desk():
     return panelcast_desk
 
 
-def _run_weekly(force: bool, dry_run: bool = False, week=None) -> dict:
+def _run_weekly(force: bool, dry_run: bool = False, week=None, approved: bool = False) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD.
 
     dry_run=True runs the full decision pipeline (gather → write → editor → gate)
@@ -1731,6 +1731,13 @@ def _run_weekly(force: bool, dry_run: bool = False, week=None) -> dict:
             hold_class="quality",
         )
     script, clean, review = ready
+    # #4694: editor + QA alone is not enough — owner approval or a passed audit, else HOLD (human review only).
+    _said = "\n".join([str(script.get("episode_title") or ""), str(script.get("pull_quote") or "")] + [t["line"] for t in clean])
+    audit_hold = _panel_desk().legacy_publish_gate(week, post, _said, approved, _g=globals())
+    if audit_hold:
+        if dry_run:
+            return _dry(week, "HOLD", stage="autopublish-audit", reasons=audit_hold)
+        return _hold_and_alert(week, ["autopublish-audit: " + r for r in audit_hold], {"turns": clean, "qa_ledger": ledger})
 
     if dry_run:
         preview = "\n".join(f"{('Elena' if t['speaker'] == ELENA else guest_name)}: {t['line']}" for t in clean[:6])
@@ -1866,7 +1873,8 @@ def lambda_handler(event, context):
 
     # Weekly autonomous run (the board-reviewed pipeline). Latest week, publish-or-HOLD.
     try:
-        return _run_weekly(force, dry_run=dry_run, week=event.get("week"))  # #4536: {"week": N} names the week
+        # #4536: {"week": N} names the week; #4694: only the owner's own invoke carries {"owner_approved": true}
+        return _run_weekly(force, dry_run=dry_run, week=event.get("week"), approved=event.get("owner_approved") is True)
     except Exception as e:
         logger.error("[panel] weekly run failed — %s", e)
         if not dry_run:
