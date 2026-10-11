@@ -123,6 +123,10 @@ PARAMETERISED_ROUTES: dict[str, str] = {
     "/api/coach/": "prefix route requiring a coach id — the roster is archived via /api/coaches",
     "/api/coach_moves": "takes ?date= — one day's coach lines; whether it joins the archive is held for the owner's ruling (#4615)",
     "/api/coach_timeline": "requires ?coach_id= — per-coach slice of data archived elsewhere",
+    "/api/edition": (
+        "the edition carries the his_words block, whose source /api/owner_words is not archived — owner ruling "
+        "2026-10-11 (#4738): his words stay public live (E2) but never enter the public archive"
+    ),
     "/api/experiment_detail": "requires ?id= — per-experiment slice; the set is archived via /api/experiments",
     "/api/social_context": "requires ?route= — per-route slice of data archived elsewhere",
 }
@@ -162,7 +166,6 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/diary_shelf",
     "/api/discoveries",
     "/api/domains",
-    "/api/edition",
     "/api/experiment_library",
     "/api/experiment_synthesis",
     "/api/experiments",
