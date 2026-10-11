@@ -20,10 +20,10 @@ const EARLY = { ...SRC.receipts, computed_at: "2026-10-04T12:00:00+00:00", proje
 
 test("the programs block leads with the timer count and never prints the total as a figure", () => {
   const html = B.programsHTML(SRC.stats, SRC.coaches);
-  assert.match(html, /<b>83<\/b>/);
-  assert.match(html, /programs run on a timer\. Another 24 run when called\. They read 20 sources of data: devices, apps and lab results\. 8 AI coaches write and predict\./);
-  assert.match(html, /As of October 4\./);
-  assert.doesNotMatch(html, /107|served/, "the total (83 + 24) sat beside the checked calls and read as one number");
+  assert.match(html, /<b>84<\/b>/);
+  assert.match(html, /programs run on a timer\. Another 23 run when called\. They read 20 sources of data: devices, apps and lab results\. 8 AI coaches write and predict\./);
+  assert.match(html, /As of October 11\./);
+  assert.doesNotMatch(html, /107|served/, "the total (84 + 23) sat beside the checked calls and read as one number");
   assert.match(B.programsHTML(null, null), /not available right now/);
   assert.doesNotMatch(B.programsHTML({ lambdas: 5 }, null), /Another|AI coaches|sources of data/, "an absent or smaller count is left out, never a zero or a negative");
 });

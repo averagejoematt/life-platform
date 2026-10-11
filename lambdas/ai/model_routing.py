@@ -75,6 +75,7 @@ FEATURE_TIERS: dict[str, str] = {
     "coach_narrative": WORKHORSE,
     "coach_nudge": WORKHORSE,
     "coach_social_reaction": NARRATIVE,  # same generate fn as coach_diary_reaction
+    "coach_vision": VISION,  # #3759: the Monday progress-photo read (image input)
     "coherence_semantic": WORKHORSE,
     "comprehension_qa": WORKHORSE,
     "conversation_enrichment": WORKHORSE,
@@ -131,6 +132,7 @@ ROUTES: dict[str, Route] = {
     "coach_narrative.moves_cast": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
     "coach_narrative.moves_line": Route(feature="coach_narrative", tier=_N, env="AI_MODEL"),
     "coach_narrative.memoir": Route(feature="coach_narrative", tier=_N, env="AI_MODEL"),
+    "coach_vision": Route(feature="coach_vision"),  # #3759: coach/coach_vision.py, the VISION tier
     "coherence_semantic": Route(feature="coherence_semantic", env="AI_MODEL_HAIKU"),
     "conversation_enrichment": Route(feature="conversation_enrichment", env="MODEL"),
     "daily_debrief": Route(feature="daily_debrief", env="AI_MODEL_HAIKU"),

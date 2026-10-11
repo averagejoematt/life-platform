@@ -38,6 +38,12 @@
     "lambdas/coach/coach_state_updater.py": {
       "function": "coach-state-updater"
     },
+    "lambdas/coach/coach_vision_lambda.py": {
+      "function": "coach-vision",
+      "handler": "coach.coach_vision_lambda.lambda_handler",
+      "note": "#3759: Monday coach-vision read over the progress photos (one Haiku vision call). Writes USER#matthew#SOURCE#coach_vision, owner-only.",
+      "stack": "LifePlatformCompute"
+    },
     "lambdas/coach/inter_coach_dialogue_lambda.py": {
       "function": "inter-coach-dialogue",
       "handler": "coach.inter_coach_dialogue_lambda.lambda_handler",

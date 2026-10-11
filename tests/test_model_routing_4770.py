@@ -62,6 +62,7 @@ _BEFORE_4770 = {
     "coach_narrative.moves_cast": _H45,
     "coach_narrative.moves_line": _S46,
     "coach_narrative.memoir": _S46,
+    "coach_vision": _H45,  # #3759: a NEW route on the VISION tier (its caller is new too — no model moved)
     "coherence_semantic": _H45,
     "conversation_enrichment": _H45,
     "daily_debrief": _H45,

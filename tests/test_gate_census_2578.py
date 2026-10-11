@@ -1091,7 +1091,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # route let the dmarc=FAIL record through), RESTORED 31 passed. Id-set diff vs a `git archive origin/main` export at
         # f68a5e8bc: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}; enters exactly that id, leaves {}, unproven does NOT
         # move. The ceiling is not raised: #4778's retirement left it one above main's measure, and this entrant fills it.
-        <= 258
+        # Upper bound 258 -> 259 (2026-10-11, #3759 restacked onto #4633): structural::test_coach_vision_isolation_3759.py
+        # — the os.walk sweep holding the owner-only coach-vision record to its two consumers — arrives PROVEN via
+        # STRUCTURAL_PROOFS in scripts/gate_census_mutations.py (baseline 11 passed | mutated 2 failed | reverted 11 passed).
+        # Id-set diff vs a `git archive origin/main` export at the merge base: 782 {258, 512, 7, 5} -> 783 {259, 512, 7, 5};
+        # enters exactly that id, leaves {}, unproven does NOT move. #4633 used the slack this lane's first measure relied on.
+        <= 259
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
