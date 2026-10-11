@@ -53,6 +53,12 @@
           },
           "unpriced_features": {
             "type": "integer"
+          },
+          "untiered_features": {
+            "type": "integer"
+          },
+          "untiered_models": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -112,6 +118,9 @@
             },
             "month_output_tokens": {
               "type": "integer"
+            },
+            "tier": {
+              "type": "string"
             }
           },
           "type": "object"
@@ -144,6 +153,16 @@
                 }
               },
               "type": "object"
+            },
+            "tier": {
+              "type": "string"
+            },
+            "tiers": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 1,
+              "type": "array"
             },
             "today": {
               "keys": {
