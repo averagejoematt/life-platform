@@ -7683,7 +7683,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless public AppView pull (framework), 2x daily (#4641; was hourly, 0 rows in 252 runs; placeholder account #1669)",
+      "method": "Keyless public AppView pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7806,7 +7806,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API pull, 4x daily mornings (#4641; was hourly, ~5% of runs changed a row)",
+      "method": "API pull, 4x daily mornings",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7915,7 +7915,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API pull, hourly (24h) \u2014 kept hourly by decision (#3666: same-day freshness); notes/mood calls await ruling #4644 (#4641)",
+      "method": "API pull, hourly (24h)",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7928,7 +7928,7 @@
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API-key pull, hourly (24h) \u2014 kept hourly by decision (#4641): cheap cursor-based first-page poll, the walk-in workout is same-day-visible (#3720)",
+      "method": "API-key pull, hourly (24h)",
       "privacy_tier": "owner_only",
       "stale_hours": 168
     },
@@ -8015,7 +8015,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless public REST pull (framework), 2x daily (#4641; was hourly, 0 rows in 252 runs; placeholder account #1669)",
+      "method": "Keyless public REST pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8051,7 +8051,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API pull (journal database), 3x daily (#4641; was hourly, 0 of 252 runs found a page)",
+      "method": "API pull (journal database), 3x daily",
       "privacy_tier": "owner_only",
       "stale_hours": 336
     },
@@ -8271,7 +8271,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, 4x daily (#4641; was hourly, ~5% of runs changed a row) + 4 site-stats-refresh invokes",
+      "method": "OAuth API pull, about 8x daily",
       "owner_only_fields": [
         "afib_result",
         "bmr_kcal",
@@ -8316,7 +8316,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless per-channel RSS pull (framework), 2x daily (#4641; was hourly, 0 rows in 252 runs; placeholder account #1669)",
+      "method": "Keyless per-channel RSS pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     }
