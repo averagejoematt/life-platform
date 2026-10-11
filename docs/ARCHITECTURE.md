@@ -112,12 +112,12 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 |---|---|---|---|
 | Whoop | `whoop-data-ingestion` | Hourly (active hours) | API pull |
 | Garmin | `garmin-data-ingestion` | Paused (ADR-074) — no live rule | API pull |
-| Eight Sleep | `eightsleep-data-ingestion` | Hourly (active hours) | API pull |
-| Withings | `withings-data-ingestion` | Hourly (active hours) | API pull |
+| Eight Sleep | `eightsleep-data-ingestion` | 4x daily (mornings) | API pull |
+| Withings | `withings-data-ingestion` | 4x daily | API pull |
 | Habitify | `habitify-data-ingestion` | Hourly (active hours) | API pull |
 | Strava | `strava-data-ingestion` | Hourly (active hours) | API pull |
 | Todoist | `todoist-data-ingestion` | 2x daily | API pull |
-| Notion Journal | `notion-journal-ingestion` | Hourly (active hours) | API pull |
+| Notion Journal | `notion-journal-ingestion` | 3x daily | API pull |
 | Weather | `weather-data-ingestion` | 2x daily | API pull |
 | MacroFactor | `macrofactor-data-ingestion` | S3 trigger (Dropbox CSV) | File upload |
 | Dropbox Poll | `dropbox-poll` | `rate(2 hours)` | File poll |

@@ -1,7 +1,7 @@
 """
 Dropbox Poll Lambda — MacroFactor CSV ingestion via Dropbox API.
 
-Polls Dropbox app folder (Apps/Life Platform/) every 30 minutes for new
+Polls Dropbox app folder (Apps/Life Platform/) every 2 hours for new
 MacroFactor CSV files. Downloads new CSVs → uploads to S3 uploads/macrofactor/
 → triggers existing macrofactor-data-ingestion Lambda via S3 event.
 

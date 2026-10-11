@@ -275,7 +275,7 @@ def test_aggregate_alarm_description_documents_the_clear_behavior():
     assert desc_kw is not None, "ingest-auth-unhealthy-24h lost its alarm_description= (#2004/#2976 clear-window note)"
     desc = ast.literal_eval(desc_kw) if isinstance(desc_kw, (ast.Constant, ast.JoinedStr)) else None
     assert isinstance(desc, str) and desc.strip(), "alarm_description must resolve to a non-empty string literal"
-    assert "1h" in desc, f"alarm_description must state the ~1h clear window (#2976), got: {desc!r}"
+    assert "3h" in desc, f"alarm_description must state the ~3h clear window (#4641), got: {desc!r}"
     assert "AUTH_FAILURE" in desc, f"alarm_description must point triage at AUTH_FAILURE markers, not alarm state: {desc!r}"
 
 
@@ -346,14 +346,13 @@ def _per_source_loop_periods(path=_MONITORING):
     return periods
 
 
-def test_dropbox_alarm_window_matches_its_30_minute_cadence():
-    """#2976: dropbox emits IngestAuthHealthy every ≤30 min around the clock
-    (rate(30 minutes) poll; 0 on every breaker-suppressed run, 1 after
-    list_folder succeeds), so a 1h window both holds ALARM while broken and
-    clears within ~1h of recovery — instead of latching a recovered source red
-    for a day."""
+def test_dropbox_alarm_window_exceeds_its_2_hour_cadence():
+    """#2976/#4641: dropbox emits IngestAuthHealthy every 2 h around the clock
+    (0 on every breaker-suppressed run, 1 after list_folder succeeds). The window
+    must EXCEED that cadence (3h): at 1h an empty period reads NOT_BREACHING = OK
+    between 0s and a dead credential would page ~12x/day."""
     periods = _per_source_loop_periods()
-    assert periods.get("dropbox") == 3600, f"ingest-auth-unhealthy-dropbox window must be 3600s (#2976), got {periods.get('dropbox')}"
+    assert periods.get("dropbox") == 10800, f"ingest-auth-unhealthy-dropbox window must be 10800s (#4641), got {periods.get('dropbox')}"
 
 
 def test_daily_cadence_sources_keep_the_24h_window():
@@ -366,14 +365,14 @@ def test_daily_cadence_sources_keep_the_24h_window():
         assert periods.get(src) == 86400, f"ingest-auth-unhealthy-{src} must keep the 86400s cadence-matched window, got {periods.get(src)}"
 
 
-def test_aggregate_alarm_window_is_one_hour():
+def test_aggregate_alarm_window_exceeds_sparsest_hourly_emitters():
     """#2976: with every authenticated-successful run emitting a 1 (and dropbox
     guaranteeing ≥hourly datapoints), Min<1 over 1h reads 'some source emitted
     unhealthy within the hour' — fires as fast as the old 24h window, clears ~1h
     after recovery instead of 24h."""
     node = _find_alarm_call("ingest-auth-unhealthy-24h")
     assert node is not None
-    assert _alarm_period(node) == 3600, "ingest-auth-unhealthy-24h must read a 3600s window (#2976)"
+    assert _alarm_period(node) == 10800, "ingest-auth-unhealthy-24h must read a 10800s window (#2976/#4641)"
 
 
 def test_liveness_alarm_window_matches_the_daily_scan():

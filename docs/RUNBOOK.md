@@ -239,7 +239,7 @@ daily-brief-schedule                cron(0 17 * * ? *)
 | Weather | 2x daily | weather-data-ingestion |
 | Dropbox Poll | Every 2 hours | dropbox-poll |
 
-**MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 30 min) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
+**MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 2 hours) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
 
 **Apple Health** primary path is the Health Auto Export webhook (hourly push from iOS): Stelo/Apple Watch → HealthKit → Health Auto Export app → API Gateway → `health-auto-export-webhook`. Manual S3 XML upload (`s3://matthew-life-platform/imports/apple_health/`) still works for backfills.
 
@@ -718,9 +718,9 @@ These functions auto-refresh tokens and write back to Secrets Manager. If they f
 but every source looks fine — recent ingestion Lambda logs are clean and no
 credential actually needs rotating.
 
-**Since #2976 this should self-resolve within ~1h of real recovery.** The alarm
+**Since #2976 this should self-resolve within ~3h of real recovery** (window re-cut 3600s → 10800s by #4641: Dropbox now emits every 2 h, and a 1h window alternates ALARM/OK between sparse emissions). The alarm
 reads `LifePlatform/OAuth IngestAuthHealthy` (dimensionless, fleet-wide) with
-`Minimum` over a `period=3600s` / `evaluation_periods=1` window
+`Minimum` over a `period=10800s` / `evaluation_periods=1` window
 (`cdk/stacks/monitoring_stack.py`, alarm id `IngestAuthUnhealthy`; the name's
 `-24h` suffix is historical). The old fixed 86400s window latched a fully
 recovered fleet red for up to 24h after the last unhealthy emission — the
@@ -733,7 +733,7 @@ every scheduled run, and Min<1 over 1h reads "some source emitted unhealthy
 within the hour". Note the cadence caveat: a DAILY-cron source's breakage pins
 this aggregate red only around its cron hours — its per-source
 `ingest-auth-unhealthy-{source}` alarm (window matched to its own cadence,
-86400s for daily sources) is the durable per-source truth. A red older than ~1h
+86400s for daily sources) is the durable per-source truth. A red older than ~3h
 therefore means some source is emitting 0s *right now*.
 
 **Triage — confirm real state, don't trust alarm state:**
