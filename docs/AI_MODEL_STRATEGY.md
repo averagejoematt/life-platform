@@ -124,7 +124,7 @@ model_swap_eval: replay frozen inputs → incumbent vs candidate → determinist
 - **IAM.** It widens only to named model ARNs (`cdk/stacks/role_policies_base.py`), as an ask-first CDK deploy.
 - **Proof surface.** The inference receipt (`/api/inference_receipt`, MCP `get_platform_cost`) carries per-feature and per-model dollars. It was failing on 2026-10-10 (#4774).
 
-## 6. Session and SDLC lanes
+## 6. Session lanes
 
 These costs are on the Claude plan, not AWS, so the governor does not see them.
 
@@ -136,7 +136,17 @@ These costs are on the Claude plan, not AWS, so the governor does not see them.
 | `worktree-implementer` | The issue's `model:*` label |
 | Owner conversations (interviews, debriefs, coach sessions) | Frontier, for voice |
 
-This is tracked on #4773.
+**Label to tier.** A backlog issue's `model:*` label picks the tier its lane runs on. The DRIVER passes that model when it spawns the lane; the spawn's `model` argument overrides the agent's frontmatter, which is why `worktree-implementer.md` says `model: inherit` on purpose.
+
+| Label | Lane model |
+|---|---|
+| `model:sonnet` | Sonnet |
+| `model:opus` | Opus |
+| `model:fable` | The frontier session model |
+
+**Session-lane rule.** Implementation follows the label. Verification does not: `finding-verifier` is pinned to `opus` in its frontmatter (`.claude/agents/finding-verifier.md`) whatever tier produced the finding, because the first-pass false-positive failure is fixed by verification, not by model size. Mechanical subagents are pinned to `sonnet` in their own frontmatter.
+
+**Measured effect (2026-10-11, #4773).** BEFORE: the historical first-pass false-positive rate for agent findings is ~50% (`.claude/skills/review/SKILL.md` Phase 3; `docs/ONBOARDING.md`). AFTER: the 2026-10-11 zero-startable triage ran 88 Sonnet readers, one per open issue, and 27 of the A/E rows were adversarially verified by Opus. 7 of the 27 were refuted (26%) and moved to B, C or D; the other 20 stood. Sonnet readers with Opus verification therefore produced a refutation rate about half the historical one, and every refuted row was caught before it reached a lane. This is one triage run, not a controlled before/after of a `/review` lens: no paired `/review` lens run was made, so finding counts per lens are not claimed here.
 
 CI judges run Haiku on Bedrock through OIDC; their cost and cadence are #4652. The remediation agent is #4651.
 
