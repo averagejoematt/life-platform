@@ -10,7 +10,11 @@ WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
   0. `sweep_expired` (#4732): ARCHIVE — never delete — the pre-draft's own uncommitted drafts whose
      day has passed, or whose day already has a committed routine of the same archetype. The owner
      usually commits his own routine in chat, so without this every night left a pair behind.
-     Routines the pre-draft did not author are never touched. Fail-soft and reported as `sweep`.
+     Routines the pre-draft did not author are left alone EXCEPT by the one owner-ruled rule
+     (2026-10-11): a live-cycle draft the pre-draft did not author (chat-built, or an unmarked cron
+     draft), never pushed to Hevy, whose day has passed and which nobody has touched for
+     `STALE_DRAFT_DAYS` (14) days is archived the same way (reason `stale_untouched`).
+     Fail-soft and reported as `sweep`.
   1. `scheduled_session(tomorrow)` — THE seam (below). No lifting session → the first-class
      `no_session` outcome, never a guessed one. Archetype-agnostic (full / upper / lower).
   2. Idempotency + ownership: a routine already on file for tomorrow decides the run —
@@ -115,6 +119,11 @@ FAILED = "failed"  # NOT honest-terminal: emits PredraftOutcome = 0, so the dead
 SWEEP_LOOKBACK_DAYS = 120
 """#4732: how far back the expired-draft sweep looks (the orphan census's own lookback), floored at the genesis."""
 SWEEP_LIMIT = 500
+STALE_DRAFT_DAYS = 14
+"""#4732 owner ruling 2026-10-11: a non-pre-draft draft untouched this many days is auto-archived."""
+STALE_REASON = "stale_untouched"
+AUTO_ARCHIVE_KEY = "auto_archived"
+"""Where a non-pre-draft archive is stamped — NEVER `MARKER`, which would make the row read as ours."""
 """#4732: the index Query page the sweep reads — the same bound `routine_repo.stale_draft_census` uses."""
 GENERATOR_VARIANTS = ("ideal", "floor", "re_entry")
 """The variants `routine_generator` persists for a lifting session — with the date and the archetype,
@@ -353,13 +362,49 @@ def _sweep_reason(ir: Any, today: str, on_date: list[Any]) -> str | None:
     return None
 
 
+def _last_touched_day(ir: Any) -> str:
+    """The latest day any writer stamped this routine, as a day key ("" when none is stamped).
+
+    The routine IR carries no `updated_at`; every write that touches a DRAFT stamps its own clock:
+    a (re-)draft mints a fresh `created_at` (`draft`, `draft_custom`, the generator — `draft_versioned`
+    writes the new IR as the next version), stage 2 stamps `critics.ran_at`, the pre-draft stamps its
+    marker's `drafted_at`, and a Hevy push stamps `hevy_updated_at` / `hevy_pushed_at`. The newest of
+    them is the last touch — so a 3-week-old draft red-teamed yesterday is NOT untouched."""
+    snap = getattr(ir, "inputs_snapshot", None) or {}
+    stamps = (
+        getattr(ir, "created_at", None),
+        (snap.get("critics") or {}).get("ran_at") if isinstance(snap.get("critics"), dict) else None,
+        (snap.get(MARKER) or {}).get("drafted_at") if isinstance(snap.get(MARKER), dict) else None,
+        getattr(ir, "hevy_updated_at", None),
+        getattr(ir, "hevy_pushed_at", None),
+    )
+    return max((str(t)[:10] for t in stamps if t), default="")
+
+
+def _stale_reason(ir: Any, today: str, cutoff: str) -> str | None:
+    """#4732 owner ruling (2026-10-11): a draft the pre-draft did NOT author, never pushed to Hevy,
+    whose target day has passed and whose last touch is on/before `cutoff` (today − STALE_DRAFT_DAYS)
+    is dead. A draft with no stamp at all is left alone — an unknown age is never read as old."""
+    if _is_ours(ir) or getattr(ir, "status", None) != "draft" or getattr(ir, "hevy_routine_id", None):
+        return None
+    day = str(getattr(ir, "target_date", "") or "")
+    if not day or day >= today:
+        return None
+    touched = _last_touched_day(ir)
+    if not touched or touched > cutoff:
+        return None
+    return STALE_REASON
+
+
 def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[str, Any]:
     """Archive the pre-draft's own expired / superseded drafts — NEVER delete (#4732).
 
     The archive is `manage_hevy_routine archive`'s local-only branch (`_action_archive` for a routine
     never pushed to Hevy): status `archived` as the routine's next version, so every prior version stays
-    readable. A routine the pre-draft did not author is never touched here — that stays the owner's call.
-    Never targets a day after `today`, so tonight's draft (tomorrow) is never in reach."""
+    readable. A routine the pre-draft did not author is touched by ONE rule only, the owner's
+    (2026-10-11): a draft of his untouched for STALE_DRAFT_DAYS whose day has passed (`_stale_reason`),
+    stamped under `AUTO_ARCHIVE_KEY` so it never reads as a pre-draft. Never targets a day after `today`,
+    so tonight's draft (tomorrow) is never in reach."""
     from common.pacific_time import shift_day_key
     from training.routine_repo import list_by_date_range, put_versioned
 
@@ -370,6 +415,7 @@ def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[s
     start = shift_day_key(today, -SWEEP_LOOKBACK_DAYS)
     if genesis and genesis > start:
         start = genesis  # a pre-genesis draft is history, never this sweep's business
+    stale_cutoff = shift_day_key(today, -STALE_DRAFT_DAYS)
     rows = list_by_date_range(start, today, limit=SWEEP_LIMIT)
     by_date: dict[str, list[Any]] = {}
     for ir in rows:
@@ -377,11 +423,16 @@ def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[s
     archived: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     for ir in rows:
-        reason = _sweep_reason(ir, today, by_date.get(str(ir.target_date), []))
+        reason = _sweep_reason(ir, today, by_date.get(str(ir.target_date), [])) or _stale_reason(ir, today, stale_cutoff)
         if not reason:
             continue
         snap = dict(getattr(ir, "inputs_snapshot", None) or {})
-        snap[MARKER] = {**(snap.get(MARKER) or {}), "archived": {"at": run_at, "reason": reason, "by": "nightly_predraft.sweep_expired"}}
+        stamp = {"at": run_at, "reason": reason, "by": "nightly_predraft.sweep_expired"}
+        if reason == STALE_REASON:
+            stamp["last_touched"] = _last_touched_day(ir)
+            snap[AUTO_ARCHIVE_KEY] = stamp
+        else:
+            snap[MARKER] = {**(snap.get(MARKER) or {}), "archived": stamp}
         ir.inputs_snapshot = snap
         ir.status = "archived"
         ir.parent_version = int(ir.version)
@@ -392,7 +443,12 @@ def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[s
             errors.append({"routine_id": ir.routine_id, "error": f"{type(e).__name__}: {e}"[:200]})
             continue
         archived.append({"routine_id": ir.routine_id, "target_date": ir.target_date, "reason": reason})
-    return {"window": {"start": start, "end": today}, "scanned": len(rows), "archived": archived, "errors": errors}
+    return {
+        "window": {"start": start, "end": today, "stale_cutoff": stale_cutoff},
+        "scanned": len(rows),
+        "archived": archived,
+        "errors": errors,
+    }
 
 
 def run(target_date: str | None = None) -> dict[str, Any]:

@@ -202,6 +202,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/month_rollup",
     "/api/nutrition_overview",
     "/api/observatory_week",
+    "/api/owner_words",  # owner ruling 2026-10-11 ("add it", #4584): served only past content.owner_words.screen (privacy content filter + broadcast_sensitivity_gate, fail-closed)
     "/api/panel_ledger",
     "/api/phenoage",
     "/api/physical_overview",
