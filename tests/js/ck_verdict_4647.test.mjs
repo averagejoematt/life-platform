@@ -217,6 +217,19 @@ test("Marcus Webb's page: a checked call whose rule the record line cannot read 
   assert.match(html, /settled calls? (has|have) no rule the page can print/);
 });
 
+test("a coach page whose two cards both open a call page says nothing about record lines it never shows", () => {
+  // Lisa Park's page (kit capture): both cards are paged calls, so the record's own lines are
+  // never read — one of them having no readable rule is not something this page held back.
+  const lisa = load("coach_sleep_coach");
+  const paged = K.pagedPair(lisa, BODY);
+  assert.ok(paged.right && paged.wrong, "the capture pages both sides");
+  const html = K.verdictsHTML(lisa, BODY, BASE);
+  assert.doesNotMatch(html, /no rule the page can print/);
+  assert.match(html, /Each allowed distance is /, "the shared allowed-distance line still prints once");
+  // with no paged call the record's lines are read, and the one passed over is counted
+  if (K.verdictPair(lisa).skipped > 0) assert.match(K.verdictsHTML(lisa, { state: "ok", calls: [] }, BASE), /no rule the page can print/);
+});
+
 test("a direction call graded across its own window (#4617) has a rule, and its band is said once with what it is", () => {
   const base = clone(byId("labs-20260906-d2deb9b27d"));
   const call = {

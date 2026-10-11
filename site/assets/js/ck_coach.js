@@ -336,7 +336,10 @@ export function verdictsHTML(p, callsBody = null, base = "/next/v8/") {
   const paged = pagedPair(p, callsBody);
   const { right, wrong } = verdictPair(p);
   if (!right && !wrong && !paged.right && !paged.wrong) return "";
-  const { skipped } = verdictPair(p);
+  // The record's lines are read only for a side with no paged call; when both sides have one,
+  // a record line passed over for want of a rule was never going to be shown, so the page does
+  // not say it was held back.
+  const skipped = paged.right && paged.wrong ? 0 : verdictPair(p).skipped;
   const shared = sharedToleranceNote([paged.right, paged.wrong]);
   const pageCard = (call) => {
     const day = shortDay(call.settled_date);
