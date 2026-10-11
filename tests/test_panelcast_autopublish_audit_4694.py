@@ -259,3 +259,20 @@ def test_the_episode_text_goes_through_the_reader_door_and_the_weekday_check():
     assert wrong_day and "was a Tuesday" in wrong_day[0]
     assert autopublish_audit.legacy_episode_blocking(row, "", DATE) == ["no episode text to audit"]
     assert autopublish_audit.legacy_episode_blocking(None, "A steady week.", DATE)[0].startswith("no audit on record")
+
+
+# ── the loud half: one token, the lambda module and the metric filter ───────
+
+
+def test_the_panel_held_token_is_one_literal_in_the_module_and_the_metric_filter():
+    """A hold is loud twice: the SNS ping names the week (best-effort), and the PANELCAST-AUTOPUBLISH-HELD line the
+    gate logs mints the metric behind the `panelcast-autopublish-held` alarm — the backstop when the ping fails."""
+    assert autopublish_audit.PANEL_HELD_TOKEN == "PANELCAST-AUTOPUBLISH-HELD"
+    with open(os.path.join(_REPO, "cdk", "stacks", "monitoring_silence_alarms.py")) as fh:
+        cdk = fh.read()
+    block = cdk[cdk.index("AutopublishHeldLgCoachPanelPodcast") :]
+    block = block[: block.index("add_alarm_action")]
+    assert '"/aws/lambda/coach-panel-podcast"' in block[:200]
+    assert f"FilterPattern.literal('\"{autopublish_audit.PANEL_HELD_TOKEN}\"')" in block
+    assert 'alarm_name="panelcast-autopublish-held"' in block
+    assert "threshold=1," in block
