@@ -39,6 +39,15 @@ for _p in (os.path.join(ROOT, "lambdas"), os.path.dirname(os.path.abspath(__file
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import visual_ai_qa  # noqa: E402
+
+# The refusal tests need an image content block as INPUT. It comes from the repo's ONE
+# image-block implementation (`visual_ai_qa._png_block`, #3079) rather than a literal here:
+# that census allows no second construction site, and the shared helper's output is the
+# exact wire shape a real caller would hand the adapter (media_type included). The adapter
+# itself builds no image block — it refuses one before any send.
+_IMAGE_BLOCK = visual_ai_qa._png_block(b"\x89PNG\r\n\x1a\n")
+
 from ai import (  # noqa: E402
     bedrock_client as bc,
     budget_guard,  # imported here, BEFORE any test patches it, so dev_session_cap binds the real BudgetExceeded
@@ -253,7 +262,7 @@ def test_the_untranslatable_refuses_before_any_send(monkeypatch):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
     user = {"role": "user", "content": "x"}
     refused = [
-        ({"messages": [{"role": "user", "content": [{"type": "image", "source": {"type": "base64", "data": "AA=="}}]}]}, "image"),
+        ({"messages": [{"role": "user", "content": [_IMAGE_BLOCK]}]}, "image"),
         ({"messages": [{"role": "assistant", "content": [{"type": "tool_use", "id": "t", "name": "f", "input": {}}]}]}, "tool_use"),
         ({"messages": [user], "tools": [{"name": "f"}]}, "tools"),
         ({"messages": [user], "stream": True}, "stream"),
@@ -310,13 +319,13 @@ def test_a_refusal_is_never_retried_by_any_of_the_three_loops(wired, monkeypatch
     assert (attempts["n"], sleeps, fired) == (1, [], ["ru"])
     attempts["n"] = 0
     with pytest.raises(bc.ConverseUnsupported, match="image"):
-        ru.call_anthropic_api("hi", model="gpt-oss-120b", system=[{"type": "image", "source": {"type": "base64", "data": "AA=="}}])
+        ru.call_anthropic_api("hi", model="gpt-oss-120b", system=[_IMAGE_BLOCK])
     assert (attempts["n"], sleeps, fired) == (1, [], ["ru", "ru"])
 
     # 3. the brief's wrapper: the outage sentinel in one attempt, failure metric fired
     monkeypatch.setattr(at, "_emit_failure_metric", lambda *a, **k: fired.append("at"))
     attempts["n"] = 0
-    out = at.call_anthropic("hi", model="nova-micro", system=[{"type": "image", "source": {"type": "base64", "data": "AA=="}}])
+    out = at.call_anthropic("hi", model="nova-micro", system=[_IMAGE_BLOCK])
     assert out == at.AI_UNAVAILABLE_SENTINEL
     assert (attempts["n"], sleeps, fired[-1]) == (1, [], "at")
     assert fake.converse_calls == [] and fake.invoke_calls == [], "nothing was sent, nothing billed"
