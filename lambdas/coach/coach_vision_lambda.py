@@ -160,5 +160,10 @@ def run(*, table, s3, bucket: str, today: str, invoke_fn=None, allow_fn=None, no
 
 
 def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — Lambda signature
-    today = str((event or {}).get("today") or pacific_today())
-    return run(table=_ddb_table(), s3=_s3_client(), bucket=S3_BUCKET, today=today)
+    try:
+        today = str((event or {}).get("today") or pacific_today())
+        return run(table=_ddb_table(), s3=_s3_client(), bucket=S3_BUCKET, today=today)
+    except Exception as e:
+        # The class only: a message can carry a band or a photo key (no owner-only data in a log line).
+        logger.error("[coach_vision] handler failed: %s", type(e).__name__)
+        raise
