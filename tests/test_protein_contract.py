@@ -40,6 +40,11 @@ _PROFILE_TARGET_KEYS = {"calorie_target", "protein_target_g"}
 # The two figures the row (and the literal defaults beside it) carried. Neither is a plan
 # figure, so neither may sit next to a nutrition-target name again.
 _STALE_TARGET_FIGURES = {1800, 190}
+# #4540 owner ruling 2026-10-11: the floor is the plan's 170 g. 180 g was the training redlines'
+# own figure; a 180 beside a PROTEIN name is the same defect (calories keep 1800: it is the
+# redlines' 7-day energy floor, a different quantity).
+_STALE_PROTEIN_FIGURES = {180}
+_PROTEIN_NAME_RE = re.compile(r"protein|prot_|_prot", re.IGNORECASE)
 # What makes a name a nutrition TARGET name: a calorie/protein stem and a target/goal/floor
 # word, either order (`cal_target`, `protein_g_target`, `CALORIE_TARGET`, `target_kcal`).
 _TARGET_NAME_RE = re.compile(
@@ -82,6 +87,19 @@ def _context(const, parents):
     return [const]
 
 
+def _enclosing_dict_keys(const, parents):
+    """The string keys of every dict the literal is (transitively) a value of — `{"protein_floor_g": {"value": 180}}`
+    names its figure by the OUTER key."""
+    out, child, node = [], const, parents.get(const)
+    while node is not None:
+        if isinstance(node, ast.Dict) and child in node.values:
+            key = node.keys[node.values.index(child)]
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                out.append(key.value)
+        child, node = node, parents.get(node)
+    return out
+
+
 def target_literal_findings(src, path="<src>"):
     """Findings for one module's source. Two shapes:
 
@@ -116,6 +134,16 @@ def target_literal_findings(src, path="<src>"):
             hit = next((n for n in names if _TARGET_NAME_RE.search(n)), None)
             if hit:
                 found.append(f"{path}:{node.lineno}: literal {node.value!r} beside the nutrition-target name {hit!r}")
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, (int, float))
+            and not isinstance(node.value, bool)
+            and node.value in _STALE_PROTEIN_FIGURES
+        ):
+            names = [n for ctx in _context(node, parents) for n in _names_in(ctx)] + _enclosing_dict_keys(node, parents)
+            hit = next((n for n in names if _PROTEIN_NAME_RE.search(n) and _TARGET_NAME_RE.search(n)), None)
+            if hit:
+                found.append(f"{path}:{node.lineno}: literal {node.value!r} (the retired 180 g floor) beside {hit!r}")
     return found
 
 
@@ -159,6 +187,9 @@ def test_the_guard_sees_every_shape_it_exists_for():
         'row = {"calorie_target": 1800}': 1,
         "render(calorie_target=1800)": 1,
         "if cal_target == 1800:\n    pass": 1,
+        "protein_g_floor = 180": 1,  # #4540: the retired 180 g floor
+        'REDLINES = {"protein_floor_g": {"value": 180}}': 1,
+        'x = {"protein_g": 180}': 0,  # no target/floor word -> not a target name (documented limit)
     }
     for src, n in shapes.items():
         got = target_literal_findings(src)

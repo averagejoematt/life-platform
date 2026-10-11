@@ -80,8 +80,9 @@ v3.3 (2026-09-24, #4161): two owner rulings the same day. (a) The 2026-09-24 evi
 training recommendations were approved: the deload moves from every 6th session-counted week at
 −30 % to ONE pre-planned deload at the later of program week 6 (hybrid weeks) or the v0.4 block
 lock, −40 % sets for 7 days, loads held (`lifting_sessions_per_wk.deload`). (b) Ruling "B": the
-loss-rate target is CONDITIONAL ON PROTEIN ADHERENCE (`rate_protein_gate`) — the 180 g floor stays
-(~2.33 g/kg of DXA lean mass, inside Helms 2014's 2.3–3.1 g/kg range); the risk is adherence, not
+loss-rate target is CONDITIONAL ON PROTEIN ADHERENCE (`rate_protein_gate`) — the protein floor stays
+(the plan's `PLAN_DAILY_PROTEIN_MIN_G`; owner ruling 2026-10-11, #4540: 170 g, the sealed plan's number, not the 180 g
+this module carried before); the risk is adherence, not
 the floor, so a week of misses serves the envelope's LOWER band instead of the schedule step."""
 
 RED_TEAM_RECORD = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3_redteam.md"
@@ -89,6 +90,8 @@ PLAN = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.4.md"  # 
 PLAN_V0_3 = "s3://matthew-life-platform/config/coaching/TRAINING_PROGRAM_v0.3.md"  # superseded 2026-09-24, kept
 
 # The v1 -> v2 -> v3 history lives in the sibling `training.redline_changelog` (#4387, #1665 size ratchet).
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G as _PLAN_PROTEIN_FLOOR_G  # noqa: E402  (#4540: the plan root's floor)
+
 from training.green_block import SESSION_SET_CEILINGS  # noqa: E402  (#4503 OD4)
 from training.redline_changelog import CHANGELOG_V1_TO_V2, CHANGELOG_V2_TO_V3  # noqa: E402
 
@@ -231,7 +234,7 @@ REDLINES: dict[str, dict[str, Any]] = {
         ),
     },
     "protein_floor_g": {
-        "value": 180,
+        "value": _PLAN_PROTEIN_FLOOR_G,
         "target_g": 200,
         "days_of_7": 6,
         "feedings": 4,
@@ -241,7 +244,8 @@ REDLINES: dict[str, dict[str, Any]] = {
         "provenance": "owner",
         "stated": "2026-09-07",
         "note": (
-            "'Protein is the #1 preservation lever — 180 g/day target, currently under-hitting.' Unchanged from v2: 180 g is the FLOOR, "
+            "'Protein is the #1 preservation lever — 180 g/day target, currently under-hitting.' (2026-09-07 quote; the floor was re-ruled to the plan's "
+            f"{_PLAN_PROTEIN_FLOOR_G} g on 2026-10-11, #4540.) {_PLAN_PROTEIN_FLOOR_G} g is the FLOOR, "
             "200 g the target, on ≥6 of 7 days, in 4 feedings (Helms 2014, 2.3–3.1 g/kg FFM; Longland 2016, 2.4 g/kg in a 40 % deficit "
             "gained lean; Pasiakos 2013, no benefit past 2× RDA). Measured now: 107–146 g mean, floor met on 2 of 20 logged days."
         ),
@@ -290,7 +294,10 @@ REDLINES: dict[str, dict[str, Any]] = {
         "unmeasured_day": "UNKNOWN, not missed — only a MacroFactor-logged day can miss the floor",
         "provenance": "owner",
         "stated": "2026-09-24",
-        "evidence": "Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; 180 g = 2.33 g/kg of 77.4 kg DXA lean)",
+        "evidence": (
+            "Helms 2014 JISSN 11:20 doi:10.1186/1550-2783-11-20 (2.3–3.1 g/kg FFM in a deficit; "
+            f"{_PLAN_PROTEIN_FLOOR_G} g = {_PLAN_PROTEIN_FLOOR_G / 77.4:.2f} g/kg of 77.4 kg DXA lean)"
+        ),
         "note": "missed >= 3 of the trailing 7 MEASURED days -> the lower band; < 3 -> the step target returns; < 4 measured days -> unknown, target unchanged",
     },
     "fat_floor_g": {
@@ -660,7 +667,7 @@ TRIPWIRES: list[dict[str, Any]] = [
     },
     {
         "id": "protein_floor_missed",
-        "signal": "days below the protein floor (180 g) in the trailing 7",
+        "signal": f"days below the protein floor ({_PLAN_PROTEIN_FLOOR_G} g) in the trailing 7",
         "threshold_days": 3,
         "provenance": "owner",
         "action": (
