@@ -1,0 +1,12 @@
+name: repro-4560
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    uses: ./.github/workflows/ci-test.yml
+    with:
+      build_sha: ${{ github.event.pull_request.head.sha }}
+      owner_run: ''

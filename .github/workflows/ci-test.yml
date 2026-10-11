@@ -200,10 +200,10 @@ jobs:
               --ignore=tests/test_integration_aws.py \
               --cov=lambdas --cov=mcp \
               --cov-report= \
-              --durations=25 \
+              --durations=0 \
               -n auto --dist loadfile -m "not serial" \
               --junitxml=/tmp/junit_parallel.xml \
-              -q 2>&1 | tail -60
+              -q 2>&1 | grep -E "board_ask_fanout|bar 90s|passed|failed|[0-9]{2,}\.[0-9]+s call" | head -80
           echo "::endgroup::"
           echo "::group::Coverage report + gate — serial pass (-m serial, appends)"
           python3 -m pytest tests/ \
