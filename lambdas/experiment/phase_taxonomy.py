@@ -307,6 +307,10 @@ SOURCE_CLASS: dict[str, str] = {
     # reset erasing attempt 16's photos would destroy exactly the comparison they exist for), and
     # unlike every RAW_TIMESERIES source they are UNRECOMPUTABLE — no API can re-emit a photo of a
     # body on a day that has passed. Sibling of "dexa" above: a durable body fact, not a cycle fact.
+    "coach_vision": CROSS_PHASE,  # #3759: the weekly coach-vision observation over those photos — one
+    # row per photo set, keyed on the SET's date, anchored to the nearest DEXA and the tape trend. It
+    # follows its input: a before/after read that spans attempts is the comparison the photos exist
+    # for, and the model id on each row is what makes an old read re-checkable rather than re-run.
     "supplements": CROSS_PHASE,  # ADR-077 dec A: medication-safety — never hide
     "chronicling": CROSS_PHASE,  # ADR-077 dec D: frozen pre-platform "before" archive
     "subscribers": CROSS_PHASE,  # audience identity

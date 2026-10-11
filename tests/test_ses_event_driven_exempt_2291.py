@@ -114,6 +114,9 @@ def _clean_suppressor_env(monkeypatch):
 _SENDER_ADDR = "matthew@example.invalid"
 
 _RAW_EMAIL = (
+    # #4633: SES's own verdict header is part of the wire shape — the parser refuses an allowlisted From without it.
+    "Authentication-Results: amazonses.com; spf=pass smtp.mailfrom=example.invalid; dkim=pass header.i=@example.invalid;"
+    " dmarc=pass header.from=example.invalid;\r\n"
     f"From: Matthew <{_SENDER_ADDR}>\r\n"
     "To: insight@aws.example.invalid\r\n"
     "Subject: Re: Daily Brief\r\n"

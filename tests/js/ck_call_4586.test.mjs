@@ -36,8 +36,10 @@ test("the call is shown in the coach's own words, with who, when and what it mea
 
 test("what happened carries the verdict as the kit's tag, beside the simple guess", () => {
   const right = C.outcomeHTML(C.findCall(BODY, NUMBER));
-  assert.match(right, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 17\.9 either way<\/span><p><b>Morning recovery score came in at 67 against a call of 61/);
-  assert.match(right, /Lisa Park was right\. Graded on the reading for September 8\. Checked September 21\./);
+  assert.match(right, /<span class="ck-verdicts__tag ck-verdicts__tag--right">Right · within 17\.9 either way<\/span><p><b>His morning recovery score came in at 67 against a call of 61\.<\/b>/);
+  // #4808: the allowed distance is in the tag, and what it is — its statistic and window — once, below
+  assert.match(right, /Lisa Park was right\. The allowed distance is one standard deviation of his readings over the 30 days before the call\. Graded on the reading for September 8\. Checked September 21\./);
+  assert.equal((right.match(/17\.9/g) || []).length, 1, "the number is printed once");
   assert.match(right, /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess, that nothing changes, has not been checked against this call yet\.<\/p>/);
   const wrong = C.outcomeHTML(C.callsOf(BODY).find((c) => c.verdict === "wrong"));
   assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within 18\.6 either way<\/span>/);
@@ -92,8 +94,14 @@ test("the front page's last settled call is one block that opens its page", () =
   // It leads with the clearest miss on record, not the newest call (red team, round 7).
   const html = C.lastCallHTML(BODY, BASE);
   assert.match(html, /^<div class="ck-bet"><p class="ck-small">Settled Thursday, September 24<\/p>/);
-  assert.match(html, /<b>Lisa Park called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 66\.2 for September 11\. A call like this counts as right within 17\.9 either way, his usual day-to-day swing\.<\/b> It came in at 24\./, "the card says which day the call was for and what counts as right");
-  assert.match(html, /<span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span>/);
+  // #4808, the house rule: the tag (verdict and rule) first, then the call with the RESULT bold,
+  // then what the allowed distance is — the number once, in the tag
+  assert.match(
+    html,
+    /<p class="ck-small">Settled Thursday, September 24<\/p><span class="ck-verdicts__tag">Wrong · not within 17\.9 either way<\/span><p>Lisa Park called his morning recovery score \(his wrist strap’s morning score out of 100\) at about 66 for September 11\. <b>It came in at 24\.<\/b><\/p><p class="ck-soft">The allowed distance is one standard deviation of his readings over the 30 days before the call\. </,
+    "the card says which day the call was for and what counts as right",
+  );
+  assert.equal((html.match(/17\.9/g) || []).length, 1, "the allowed distance is printed once");
   assert.doesNotMatch(html, /The simple guess/, "the guess is said only once it has a result on this call");
   assert.match(html, /href="\/next\/v8\/call\/\?id=[a-z0-9-]+">The whole call<\/a>/);
   assert.doesNotMatch(html, /\d{4}-\d{2}-\d{2}|undefined|%/);
@@ -130,7 +138,7 @@ test("the list is every settled call newest first, the older ones folded away", 
   const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)&amp;from=calls"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
   assert.equal(hrefs.length, 39);
-  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 9: Lisa Park called his morning recovery score at about 89\.1\. <span>Right · within 21\.5 either way<\/span><\/a><\/li>/);
+  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 9: Lisa Park called his morning recovery score at about 89\. <span>Right · within 21\.5 either way<\/span><\/a><\/li>/);
   assert.match(html, /<details><summary>31 earlier calls<\/summary>/);
   assert.match(html, /<span>Marcus Webb was right; Amara Patel was wrong\.<\/span>/, "a bet row says who was right");
   assert.match(html, /89 more checked calls have no page here/);

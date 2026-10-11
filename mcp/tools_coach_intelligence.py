@@ -24,6 +24,20 @@ from coach.persona_registry import OPERATIONAL_SHORT_IDS, short_id_names as _sho
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 COACH_IDS = list(OPERATIONAL_SHORT_IDS)
+
+# The `get_coach_thread` input table — extracted from mcp/registry.py by #3759 to pay that
+# module's #1665 size ceiling (the #4036 pattern: the schema NAME stays in the registry).
+GET_COACH_THREAD_INPUT = {
+    "type": "object",
+    "properties": {
+        "coach_id": {
+            "type": "string",
+            "description": "Coach domain: sleep, nutrition, training, mind, physical, glucose, labs, explorer",
+        },
+        "limit": {"type": "number", "description": "Number of thread entries (default 4)"},
+    },
+    "required": ["coach_id"],
+}
 # Registry-derived (coaching-team v2); retired coaches stay resolvable so their
 # historical records keep their real byline.
 COACH_NAMES = _short_id_names(include_retired=True)

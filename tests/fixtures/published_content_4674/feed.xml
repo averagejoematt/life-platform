@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+  <title>The Measured Life — The Panel</title>
+  <atom:link href="https://averagejoematt.com/panelcast/feed.xml" rel="self" type="application/rss+xml"/>
+  <link>https://averagejoematt.com/story/panel/</link>
+  <description>A weekly two-host show: Elena Voss and a rotating AI coach review the week's data, findings, and themes from a public N=1 health experiment. AI voices, correlative, fact-anchored.</description>
+  <language>en-us</language>
+  <copyright>© averagejoematt</copyright>
+  <itunes:author>The Measured Life</itunes:author>
+  <itunes:summary>A weekly two-host show reviewing the week's data from a public N=1 health experiment. AI voices, correlative, fact-anchored.</itunes:summary>
+  <itunes:type>episodic</itunes:type>
+  <itunes:explicit>false</itunes:explicit>
+  <itunes:owner>
+    <itunes:name>The Measured Life</itunes:name>
+    <itunes:email>lifeplatform@mattsusername.com</itunes:email>
+  </itunes:owner>
+  <itunes:image href="https://averagejoematt.com/panelcast/cover.jpg"/>
+  <itunes:category text="Health &amp; Fitness"/>
+  <image>
+    <url>https://averagejoematt.com/panelcast/cover.jpg</url>
+    <title>The Measured Life — The Panel</title>
+    <link>https://averagejoematt.com/story/panel/</link>
+  </image>
+  <item>
+    <title>EP4 · The Body Answers Back</title>
+    <description>Day 24. Twenty-three straight training days. Recovery at 54 percent. Marcus Webb is zero for nine on the season — and yet the team keeps returning to his warnings. Elena Voss talks with Webb about what the numbers are finally starting to sa</description>
+    <itunes:summary>Day 24. Twenty-three straight training days. Recovery at 54 percent. Marcus Webb is zero for nine on the season — and yet the team keeps returning to his warnings. Elena Voss talks with Webb about what the numbers are finally starting to sa</itunes:summary>
+    <enclosure url="https://averagejoematt.com/panelcast/wk4.mp3" length="4200960" type="audio/mpeg"/>
+    <guid isPermaLink="false">measured-life-panel-wk4</guid>
+    <pubDate>Thu, 01 Oct 2026 16:00:00 GMT</pubDate>
+    <itunes:duration>0:07:00</itunes:duration>
+    <itunes:episode>4</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="https://averagejoematt.com/panelcast/cover.jpg"/>
+  </item>
+  <item>
+    <title>EP3 · Storming Mode</title>
+    <description>Day 17: the scan says 11.4 pounds of fat, one pound of question. But the rate flag is live, protein is short of the floor, and the man training every day says he doesn't want a day off.</description>
+    <itunes:summary>Day 17: the scan says 11.4 pounds of fat, one pound of question. But the rate flag is live, protein is short of the floor, and the man training every day says he doesn't want a day off.</itunes:summary>
+    <enclosure url="https://averagejoematt.com/panelcast/wk3.mp3" length="4533120" type="audio/mpeg"/>
+    <guid isPermaLink="false">measured-life-panel-wk3</guid>
+    <pubDate>Thu, 24 Sep 2026 16:00:00 GMT</pubDate>
+    <itunes:duration>0:07:33</itunes:duration>
+    <itunes:episode>3</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="https://averagejoematt.com/panelcast/cover.jpg"/>
+  </item>
+  <item>
+    <title>EP2 · Nine Days and Counting</title>
+    <description>Day 10, nine straight training days, 975 minutes this week — and the scale is moving fast. Lisa Park opens 1-0 on her first graded call, but says she cannot fully read the recovery numbers without data Matthew hasn't given her yet.</description>
+    <itunes:summary>Day 10, nine straight training days, 975 minutes this week — and the scale is moving fast. Lisa Park opens 1-0 on her first graded call, but says she cannot fully read the recovery numbers without data Matthew hasn't given her yet.</itunes:summary>
+    <enclosure url="https://averagejoematt.com/panelcast/wk2.mp3" length="4370160" type="audio/mpeg"/>
+    <guid isPermaLink="false">measured-life-panel-wk2</guid>
+    <pubDate>Thu, 17 Sep 2026 16:00:00 GMT</pubDate>
+    <itunes:duration>0:07:16</itunes:duration>
+    <itunes:episode>2</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="https://averagejoematt.com/panelcast/cover.jpg"/>
+  </item>
+  <item>
+    <title>EP1 · The Strap Said 76%</title>
+    <description>Day 3 of the experiment: the body is recovering well, but the man rated himself 2 out of 10. Nathan Reeves — the team's behavioral psychiatrist — names the gap the instruments couldn't close.</description>
+    <itunes:summary>Day 3 of the experiment: the body is recovering well, but the man rated himself 2 out of 10. Nathan Reeves — the team's behavioral psychiatrist — names the gap the instruments couldn't close.</itunes:summary>
+    <enclosure url="https://averagejoematt.com/panelcast/wk1.mp3" length="4043040" type="audio/mpeg"/>
+    <guid isPermaLink="false">measured-life-panel-wk1</guid>
+    <pubDate>Thu, 10 Sep 2026 16:00:00 GMT</pubDate>
+    <itunes:duration>0:06:44</itunes:duration>
+    <itunes:episode>1</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="https://averagejoematt.com/panelcast/cover.jpg"/>
+  </item>
+  <item>
+    <title>EP0 · Before the Numbers</title>
+    <description>Sixteen predictions are sealed, thirteen data sources are live, and tomorrow morning a Withings scale in Seattle will produce the first real number of a twelve-month experiment. Eli Marsh joins Elena Voss to talk about what it means to put </description>
+    <itunes:summary>Sixteen predictions are sealed, thirteen data sources are live, and tomorrow morning a Withings scale in Seattle will produce the first real number of a twelve-month experiment. Eli Marsh joins Elena Voss to talk about what it means to put </itunes:summary>
+    <enclosure url="https://averagejoematt.com/panelcast/wk0.mp3" length="4020240" type="audio/mpeg"/>
+    <guid isPermaLink="false">measured-life-panel-wk0</guid>
+    <pubDate>Sat, 05 Sep 2026 16:00:00 GMT</pubDate>
+    <itunes:duration>0:06:41</itunes:duration>
+    <itunes:episode>0</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="https://averagejoematt.com/panelcast/cover.jpg"/>
+  </item>
+</channel>
+</rss>

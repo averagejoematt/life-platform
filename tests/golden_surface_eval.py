@@ -57,8 +57,9 @@ for _sub in ("", "compute", "web", "emails", "intelligence"):
 # Hermetic: the surface modules build boto3 clients at import; fake creds keep
 # that offline (no call is ever made on the deterministic path).
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
-os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
-os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
+
+import eval_credential_stub  # noqa: E402,F401  (#4796: stub only when no real chain resolves)
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")

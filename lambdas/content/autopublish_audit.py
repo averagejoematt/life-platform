@@ -37,6 +37,8 @@ from content import story_checks
 # The literal the sweep logs when it refuses; a CloudWatch MetricFilter on it pages (cdk/stacks/monitoring_silence_alarms.py,
 # alarm `chronicle-autopublish-held`). Twin-pinned by tests/test_chronicle_autopublish_audit_4694.py.
 HELD_TOKEN = "CHRONICLE-AUTOPUBLISH-HELD"  # noqa: S105 — a log token, not a credential
+# The literal the Panel's legacy writer logs when it holds an episode nobody approved and the audit did not pass (#4694).
+PANEL_HELD_TOKEN = "PANELCAST-AUTOPUBLISH-HELD"  # noqa: S105 — a log token, not a credential
 
 # A writer's notes, not claims about the world: length, figure density, a repeated phrase. They do not block a publish.
 STYLE_PREFIXES = ("craft:", "repeat:")
@@ -116,6 +118,22 @@ def weekday_mismatches(text: str, anchor_iso: str) -> List[str]:
             out.append(f"dated weekday: {m.group(0)!r} is not a real date")
         elif _WEEKDAYS[d.weekday()] != m.group("wd").lower():
             out.append(f"dated weekday: {m.group(0)!r} — {d.isoformat()} was a {_WEEKDAYS[d.weekday()].title()}")
+    return out
+
+
+def legacy_episode_blocking(chronicle_row: Optional[Dict[str, Any]], text: str, anchor_iso: str) -> List[str]:
+    """Every reason the Panel's LEGACY writer (no desk script on the row) may NOT publish its episode without the owner's
+    approval (#4694, owner ruling 2026-10-11): editor + QA alone is not enough. The legacy writer has no dossier of its
+    own, so the raw-data audit it can lean on is the one the Story Desk wrote on the week's chronicle row — the post half
+    of ``desk_findings_json`` (its figures checked against the dossier). No record there (a legacy-written chronicle, no
+    chronicle at all, a tombstoned row) is blocking, exactly as on the chronicle sweep. The episode's own words then go
+    through the shared reader door and the dated-weekday check. Empty means the audit passed."""
+    row = chronicle_row or {}
+    out = [f for f in desk_blocking(row.get("desk_findings_json")) if not f.startswith("desk episode: ")]
+    if not str(text or "").strip():
+        out.append("no episode text to audit")
+    out += [f"reader surface: {f}" for f in story_checks.reader_surface(text or "")]
+    out += weekday_mismatches(text or "", anchor_iso)
     return out
 
 

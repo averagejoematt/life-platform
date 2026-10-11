@@ -39,7 +39,7 @@ import { tryJSON, esc, fmtShort, todayPT } from "/assets/js/evidence_shared.js";
 import { dayInWords, countWord } from "/assets/js/entry_age.js";
 import { comparisonText } from "/assets/js/coach_comparison.js";
 import { COACH_JOBS } from "/assets/js/ck_pages.js";
-import { verdictTag, callVerdictTag, gradedOnText } from "/assets/js/ck_verdict.js";
+import { verdictTag, callCardHTML, gradedOnText, hasRule, ruleless, sharedToleranceNote } from "/assets/js/ck_verdict.js";
 import { callsOf, callHref, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
 import { docketQuestion, recentLines, ledgerLine, standingAsk, shortId } from "/assets/js/v7_coaches.js";
 
@@ -205,6 +205,7 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
   const calls = pendingCalls(predictions, pid);
   if (p.tier === "lead" && !bets.length && !calls.length) return soft(`${p.name} is the lead. The lead makes no dated calls and has no bet open, so nothing is waiting to settle.`);
   const out = [];
+  const tail = [];
   const ahead = calls.filter((c) => isUpcoming(c, today));
   const older = calls.length - ahead.length;
   const nextBet = bets.find((b) => b.resolution_date >= today);
@@ -227,11 +228,15 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
     if (rows) out.push(`<ul class="ck-rows">${rows}</ul>`);
     // Every waiting call is accounted for: the ones shown, the rest still ahead, the older.
     const later = Math.max(0, ahead.length - shown);
-    if (rows && later) out.push(soft(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`));
-    if (older) out.push(soft(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`));
+    if (rows && later) tail.push(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`);
+    if (older) tail.push(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`);
   }
-  if (!docket) out.push(soft("The bets between coaches are not available right now."));
-  else if (bets.length) out.push(soft(`${cap(countWord(bets.length))} open ${bets.length === 1 ? "bet" : "bets"} against another coach: the next section has ${bets.length === 1 ? "it" : "them"}.`));
+  // The open bets are the next section's own cards, so this section no longer signposts them
+  // ("One open bet …: the next section has it."); a docket that failed to read still says so.
+  if (!docket) tail.push("The bets between coaches are not available right now.");
+  // The accounting sentences after the list are one paragraph, not several (the six-screen
+  // budget's headroom, 2026-10-11).
+  out.push(soft(tail.join(" ")));
   return out.join("");
 }
 
@@ -288,15 +293,19 @@ export function recordHTML(p) {
   const sentence = t.comparison && String(t.comparison.sentence || "").trim();
   if (!sentence) return soft(comparisonText(null));
   const through = isDay(r.through) ? ` through ${shortDay(r.through)}` : "";
-  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span>of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
+  return `<div class="ck-today ck-today--ruled"><p class="ck-soft">Right so far</p><p class="ck-big">${r.confirmed}<span> of ${r.n} checked calls</span></p><p>${esc(ownComparison(p, t.comparison))} ${esc(SIMPLE_GUESS)}</p>${small(`${p.name}’s calls alone${through}. Code checks each call against what happened; no coach does the marking.`)}</div>`;
 }
-/** The newest checked call of each kind, in reader words. */
+/** The newest checked call of each kind, in reader words. A line with no rule the page can
+ *  print is never a verdict (#4808 — "Marked wrong. The rule that decided it is not available"
+ *  reached Marcus Webb's page from here): it is passed over, and `skipped` counts the checked
+ *  lines passed over, so the page can say how many. */
 export function verdictPair(p) {
   const recent = [...((trackOf(p).recent || []).filter((r) => r && r.status))].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const lines = recentLines(recent, p && p.name);
-  const pair = { right: lines.find((l) => l.verdict === "right") || null, wrong: lines.find((l) => l.verdict === "wrong") || null };
+  const all = recentLines(recent, p && p.name);
+  const lines = all.filter((l) => String(l.rule || "").trim());
+  const pair = { right: lines.find((l) => l.verdict === "right") || null, wrong: lines.find((l) => l.verdict === "wrong") || null, skipped: all.length - lines.length };
   const last = ledgerLine(p && p.latest_checked, p && p.name);
-  if (last && !pair[last.verdict]) pair[last.verdict] = last;
+  if (last && String(last.rule || "").trim() && !pair[last.verdict]) pair[last.verdict] = last;
   return pair;
 }
 /** This coach's newest settled call of each verdict that has a page of its own, from
@@ -304,8 +313,25 @@ export function verdictPair(p) {
  *  and the next section has it. */
 export function pagedPair(p, callsBody) {
   const short = shortId(p && p.persona_id);
-  const own = callsOf(callsBody).filter((c) => c.kind !== "bet" && c.coach_id === short);
+  const own = callsOf(callsBody).filter((c) => c.kind !== "bet" && c.coach_id === short && hasRule(c));
   return { right: own.find((c) => c.verdict === "right") || null, wrong: own.find((c) => c.verdict === "wrong") || null };
+}
+// Round 8: "7 of 29 right" beside "no call found right yet" read as a contradiction. The
+// record counts every checked call; a card needs one whose sentence named a number, so the
+// sentence says which of the two is missing.
+function noExample(p, tag) {
+  const r = trackOf(p).record || {};
+  const n = tag === "Right" ? num(r.confirmed) : num(r.n) !== null && num(r.confirmed) !== null ? r.n - r.confirmed : null;
+  if (n === null) return `No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`;
+  if (n === 0) return `None of ${p.name}’s checked calls has come out ${tag.toLowerCase()} yet.`;
+  return `${p.name}’s ${n} ${tag.toLowerCase()} ${n === 1 ? "call has" : "calls have"} no page yet: ${n === 1 ? "its sentence" : "their sentences"} did not name a number to check.`;
+}
+// The record's line is one sentence, the call then " — " and what happened; the result is the
+// bold part (the house rule, #4808). A line with no " — " is printed plain.
+function resultBold(text) {
+  const t = String(text || "");
+  const at = t.lastIndexOf(" — ");
+  return at > 0 ? `${esc(t.slice(0, at))} — <b>${esc(t.slice(at + 3))}</b>` : esc(t);
 }
 /** The right and the wrong card. A call that has a page is shown from that page's served
  *  sentences and opens it (#4675), and the call page returns here; a verdict with no paged
@@ -315,19 +341,24 @@ export function verdictsHTML(p, callsBody = null, base = "/next/v8/") {
   const paged = pagedPair(p, callsBody);
   const { right, wrong } = verdictPair(p);
   if (!right && !wrong && !paged.right && !paged.wrong) return "";
+  // The record's lines are read only for a side with no paged call; when both sides have one,
+  // a record line passed over for want of a rule was never going to be shown, so the page does
+  // not say it was held back.
+  const skipped = paged.right && paged.wrong ? 0 : verdictPair(p).skipped;
+  const shared = sharedToleranceNote([paged.right, paged.wrong]);
   const pageCard = (call) => {
     const day = shortDay(call.settled_date);
     const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
-    const href = withFrom(callHref(base, call.id), `coach:${p.persona_id}`);
-    return `<div>${callVerdictTag(call)}<p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(when ? `${when} ` : "")}<a class="ck-link" href="${esc(href)}">The whole call</a></p></div>`;
+    return callCardHTML(call, { when, note: !shared, href: withFrom(callHref(base, call.id), `coach:${p.persona_id}`) });
   };
+  // The record's own line has no page: the same order — the tag, the line, then the dating.
   const card = (call, line, tag) =>
     call
       ? pageCard(call)
       : line
-        ? `<div>${verdictTag(tag === "Right", line.rule)}<p><b>${esc(line.text)}</b></p>${soft(line.checked)}</div>`
-        : `<div>${soft(`No call by ${p.name} has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-  return `<div class="ck-verdicts">${card(paged.right, right, "Right")}${card(paged.wrong, wrong, "Wrong")}</div>`;
+        ? `<div>${verdictTag(tag === "Right", line.rule)}<p>${resultBold(line.text)}</p>${soft(line.checked)}</div>`
+        : `<div>${soft(noExample(p, tag))}</div>`;
+  return `<div class="ck-verdicts">${card(paged.right, right, "Right")}${card(paged.wrong, wrong, "Wrong")}</div>${soft([shared, ruleless(skipped)].filter(Boolean).join(" "))}`;
 }
 
 // ── disagreements ──────────────────────────────────────────────────────────────

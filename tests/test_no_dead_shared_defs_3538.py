@@ -88,23 +88,7 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # record_text.coach_output_text (deploy/backfill_recall_embeddings.py) and
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
-_BATCH_REASON = (
-    "ADR-132 / #409: bedrock_batch ships the batch-inference MECHANISM deliberately "
-    "unwired. Bedrock's hard floor is 100 records per job per model and measured volume "
-    "is ~62 model calls/day across ALL producers mixed across models, so no producer can "
-    "honestly submit a batch today — the module's own docstring is the decision and names "
-    "batch_preflight() as the gate a future adopter calls first. This is a documented "
-    "latent capability with full tests, not a leftover; deleting it is an ADR-132 reversal, "
-    "not a dead-code cleanup. Revisit when a producer clears the 100-record floor."
-)
-
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/ai/bedrock_batch.py:build_jsonl_record": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:submit_batch": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:wait_for_batch": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:retrieve_results": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:run_or_fallback": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:estimate_batch_savings": _BATCH_REASON,
     "lambdas/ai/ai_calls.py:call_training_coach_v2": (
         "one seat of a symmetric ADR-153 coach family (sleep / nutrition / training / mind, "
         "each a 3-line `_run_coach_v2_pipeline(<seat>, ...)` wrapper). The daily-brief tests "

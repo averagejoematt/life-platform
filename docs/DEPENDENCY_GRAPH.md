@@ -22,7 +22,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | constant |
 | `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | constant |
 | `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | constant |
-| `bluesky-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `bluesky-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 | `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | constant |
 | `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | constant |
 | `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | constant |
@@ -34,13 +34,14 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `coach-nudge` | email_stack | `cron(10 0-5,15-23 * * ? *)` | constant |
 | `coach-panel-podcast` | email_stack | `cron(0 18 * * MON,WED *)` | constructed |
 | `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | constant |
+| `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | constant |
 | `daily-brief` | email_stack | `cron(0 17 * * ? *)` | constant |
 | `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | constant |
 | `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | constant |
 | `daily-metrics-compute` | compute_stack | `cron(40 16 * * ? *)` | constant |
 | `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | constant, constant |
-| `dropbox-poll` | ingestion_stack | `rate(30 minutes)` | constant |
-| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `dropbox-poll` | ingestion_stack | `rate(2 hours)` | constant |
+| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | resolved |
 | `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | constant |
 | `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | constant |
 | `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | constant |
@@ -68,11 +69,11 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | constant |
 | `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | constant |
 | `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | constant |
-| `mastodon-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `mastodon-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 | `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | constant |
 | `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | constant |
 | `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | constant |
-| `notion-journal-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | resolved |
 | `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | constant |
 | `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | constant |
 | `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | constant |
@@ -90,22 +91,22 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | constant |
 | `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | constant |
 | `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | constant |
-| `wednesday-chronicle` | email_stack | `cron(0 15 ? * WED *)` + `cron(0 16 * * MON *)` | constant, constructed |
+| `wednesday-chronicle` | email_stack | `cron(0 1 * * WED *)` + `cron(0 15 ? * WED *)` + `cron(0 16 * * MON *)` | constructed, constant, constructed |
 | `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | constant |
 | `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | constant |
 | `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | constant |
 | `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | constant |
 | `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | resolved, constructed, constant |
-| `withings-data-ingestion` | ingestion_stack | `cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
-| `youtube-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |
+| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | resolved |
+| `youtube-social-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | resolved |
 
-**Unscheduled lambdas (24)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
+**Unscheduled lambdas (25)** — webhook/S3-trigger/invoked-on-demand: `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `garmin-data-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (17)
+### cross_phase (18)
 
-`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `chronicling`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `genome`, `labs`, `milestones`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (34)
 
@@ -121,7 +122,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-737 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+742 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -148,6 +149,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_credibility` | — | intelligence_common.py |
 | `coach_gen_cache` | generation_cache.py | generation_cache.py |
 | `coach_thread` | intelligence_common.py, training_notes.py | tools_coach_intelligence.py |
+| `coach_vision` | — | coach_vision.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
 | `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
 | `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py |
@@ -240,7 +242,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**87 tools across 35 modules** (AST-counted from `mcp/registry.py`;
+**88 tools across 36 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -277,7 +279,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 136 alarms (4 composite)
+Routing: digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 — of 140 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -300,6 +302,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `chronicle-autopublish-held` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `chronicle-delivery-heartbeat` | email_stack | metric | urgent | declaration |  |
 | `chronicle-status-write-failed` | monitoring_silence_alarms | metric | digest | declaration |  |
+| `coach-vision-no-invocations-7d` | compute_stack | metric | digest | declaration |  |
 | `coherence-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `coherence-overall` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `commitments-ungraded` | monitoring_prediction_alarms | metric | digest | declaration |  |
@@ -344,6 +347,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `ingest-reconciliation-strava-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `ingest-reconciliation-whoop` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `ingest-reconciliation-whoop-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
+| `ingestion-error-inbound-auth-gate` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-insight-email-parser` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-og-image-generator` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-pipeline-health-check` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
@@ -371,6 +375,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `life-platform-dlq-consumer-errors` | monitoring_stack | metric | urgent | factory:_alarm |  |
 | `life-platform-dlq-depth-warning` | operational_stack | metric | digest | declaration |  |
 | `life-platform-freshness-checker-not-emitting` | operational_stack | metric | digest | declaration |  |
+| `life-platform-inbound-auth-gate-bypassed` | operational_stack | metric | digest | declaration |  |
 | `life-platform-ingestion-dlq-messages` | monitoring_stack | metric | urgent | factory:_alarm |  |
 | `life-platform-insight-email-parser-parse-failure` | operational_stack | metric | digest | declaration |  |
 | `life-platform-og-image-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
@@ -384,6 +389,7 @@ Routing: digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 
 | `nightly-predraft-missing` | mcp_stack | metric | digest | declaration |  |
 | `paging-budget-tier-3` | monitoring_stack | metric | paging | declaration |  |
 | `paging-pipeline-dead` | monitoring_stack | metric | paging | declaration |  |
+| `panelcast-autopublish-held` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
 | `prediction-gradable-share-low` | monitoring_prediction_alarms | metric | digest | declaration |  |
@@ -441,6 +447,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | Source (partition) | Tier |
 |--------------------|------|
 | `cgm_readings` | owner_only |
+| `coach_vision` | owner_only |
 | `dexa` | owner_published |
 | `felt_probe` | owner_only |
 | `flourishing` | owner_only |
@@ -512,11 +519,11 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1283 total · 922 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
-- Schedules: 83 resolved · 0 dynamic of 83 scheduled lambdas (107 lambdas total)
-- Alarms: 136 literal-named declarations across three idioms, 4 composite; routing digest 92 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 17 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 93 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
+- Edge sites: 1291 total · 930 resolved · 361 dynamic (unresolvable at AST time, tagged — never guessed)
+- Schedules: 84 resolved · 0 dynamic of 84 scheduled lambdas (109 lambdas total)
+- Alarms: 140 literal-named declarations across three idioms, 4 composite; routing digest 96 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 26 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Privacy: 18 owner-only + 3 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
+- Schedules: 95 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -530,10 +537,10 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 
 | Surface | Count | Registry |
 |---------|-------|----------|
-| ai_features | 24 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 136 | this model's alarms plane (CDK AST) |
+| ai_features | 25 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
+| alarms | 140 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 33 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 93 | this model's schedules plane (CDK AST) |
+| schedules | 95 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

@@ -57,9 +57,9 @@ test("the mark draws two rects per weighed day and says what it shows to a scree
 });
 
 test("the mark's caption carries the day, the weight and the distance, from served numbers", () => {
-  assert.equal(F.markCaption(B.today, edition), "<b>306.1 lb</b> · Day 34 · 21.2 down, 121.1 to go to 185");
+  assert.equal(F.markCaption(B.today, edition), '<b>306.1 lb</b><span class="ck-soft">Day 34 · 21.2 down, 121.1 to go to 185</span>');
   const older = { ...B.today, data: { ...B.today.data, date: "2026-10-01" } };
-  assert.match(F.markCaption(older, edition), /306\.1 lb<\/b> on October 1/);
+  assert.match(F.markCaption(older, edition), /306\.1 lb<\/b><span class="ck-soft">on October 1 · Day 34/);
   assert.equal(F.markCaption(GONE, edition), "");
 });
 
@@ -70,7 +70,9 @@ test("this morning's weight is set against the weigh-in before it", () => {
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
-  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>306\.1 lb, down 1\.1 from Thursday\./);
+  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>306\.1 lb, down 1\.1 from Thursday( ·|\.)/);
+  assert.doesNotMatch(html, /Thursday\. ·/, "no stop before a middle dot");
+  assert.match(html, /\. <a class="ck-link" href="\/next\/v8\/day\/\?d=2026-10-08">The full day/, "a stop before the link to the full day");
   assert.match(html, /<span class="ck-rows__key">Yesterday, Thursday<\/span>/);
   assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-08">The full day<\/a>/);
   assert.doesNotMatch(html, /Steps|steps/, "step counts stay off the front page");
@@ -122,15 +124,15 @@ test("first sentences are whole sentences inside the limit", () => {
   assert.equal(F.firstSentences("no full stop here", 100), "");
 });
 
-test("the lead coach's read is quoted with its author, as an AI, and its date", () => {
-  assert.match(F.leadReadHTML(load("weekly_priority"), "/next/v8/"), /not served right now/, "the captured read is null: a sentence, never a blank quote");
+test("the lead coach's read is quoted with its author, as an AI, and its date; unserved, it is nothing, and the page drops the section", () => {
+  assert.equal(F.leadReadHTML(load("weekly_priority"), "/next/v8/"), "", "the captured read is null: nothing, so no heading apologises under itself (round 8)");
   const html = F.leadReadHTML(LEAD_READ, "/next/v8/");
   assert.match(html, /Eli Marsh, the AI lead coach, on Monday, September 28/);
   assert.match(html, /“The one priority I've asked him to address next is his protein intake/);
   assert.doesNotMatch(html, /execute with precision/, "the recap of numbers is skipped for what the lead asked for");
   assert.match(F.leadReadHTML({ weekly_priority: "A plain read. Nothing else.", coach_name: "Eli Marsh", data_through: "2026-09-28" }), /“A plain read\. Nothing else\.”/);
-  assert.match(F.leadReadHTML(null), /not served right now/);
-  assert.match(F.leadReadHTML({ weekly_priority: "A read.", coach_name: "Eli Marsh" }), /not served right now/, "no date, no quote");
+  assert.equal(F.leadReadHTML(null), "");
+  assert.equal(F.leadReadHTML({ weekly_priority: "A read.", coach_name: "Eli Marsh" }), "", "no date, no quote");
 });
 
 test("the podcast line is the guest's own first turn, verbatim, and absent when there is none", () => {

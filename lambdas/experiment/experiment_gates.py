@@ -29,8 +29,12 @@ placeholder.** ADR-105's bar — thresholds from personal variance — is NOT me
 registry. What the prose comments carried (an internal review persona, a method name, a
 module reference) is neither a derivation nor a labelled constant, so the facet does not
 UPGRADE these numbers; it LABELS them, so a reader can tell an adopted convention from a
-measurement. The only personally-derived thresholds on the platform today are #3552's two
-hypothesis ``min_effect``s, and they live in ``prereg_effect.py``, not here. Re-deriving
+measurement. The only personally-derived thresholds on the platform today are the
+pre-registered hypothesis ``min_effect``s — #3552's two genesis bars and, since #3495, every
+bar the weekly engine stores — and they live in ``prereg_effect.py``, not here.
+``min_effect_meets_rigor_bar()`` below is the one predicate that says whether a stored bar
+meets ADR-105 rule 4: a derived bar that recomputes from its basis does; a
+``model_proposed`` or declared one does not. Re-deriving
 these nine against Matthew's own series is separate, measurable work — it needs a trailing
 series per gated quantity, which is the same thing a short cycle cannot supply.
 
@@ -241,3 +245,42 @@ def felt_calibration_gates(current_n=None):
             "current_n": measured_n(current_n, metric="usable felt-probe / character-sheet week pairs", window=_CYCLE_WINDOW),
         },
     }
+
+
+# ── #3495 box 4 (QS-5): does a pre-registered bar meet ADR-105 rule 4? ────────
+_BASIS_KEYS = ("metric", "window_days", "statistic", "value", "k", "n", "n_floor")
+
+
+def min_effect_meets_rigor_bar(spec) -> tuple[bool, str]:
+    """``(meets, reason)`` for a stored ``test_spec``'s ``min_effect``.
+
+    A bar meets the bar only when it is a ``personal_derivation`` AND its
+    ``min_effect_basis`` lets the number be RECOMPUTED from the record: the sanctioned
+    statistic and multiplier, an n at or above the sanctioned floor, and
+    ``round(k x value, 2)`` equal to the stored ``min_effect`` (within the rounding the
+    stored SD already carries). A ``model_proposed`` or ``population_constant`` bar never
+    does, and neither does a hand-typed number dressed in a derivation's label — the
+    recomputation is what refuses it. The rule constants are read from ``prereg_effect``
+    (lazily: that module imports this one), so this check cannot drift from the rule
+    that writes the bar.
+    """
+    from experiment import prereg_effect  # lazy — prereg_effect imports this module
+
+    if not isinstance(spec, dict) or "min_effect" not in spec:
+        return False, "no min_effect on the spec"
+    kind = (spec.get("min_effect_provenance") or {}).get("kind")
+    if kind != PERSONAL_DERIVATION:
+        return False, f"min_effect is labelled {kind or 'nothing'}, not {PERSONAL_DERIVATION}"
+    basis = spec.get("min_effect_basis")
+    if not isinstance(basis, dict) or any(basis.get(k) is None for k in _BASIS_KEYS):
+        return False, f"min_effect_basis is missing one of {', '.join(_BASIS_KEYS)}"
+    if basis["statistic"] != prereg_effect.DERIVATION_STATISTIC or float(basis["k"]) != prereg_effect.EFFECT_SD_FRACTION:
+        return False, f"basis names {basis['statistic']} x {basis['k']}, not the sanctioned rule"
+    if int(basis["n"]) < prereg_effect.MIN_PAIRS or int(basis["n_floor"]) < prereg_effect.MIN_PAIRS:
+        return False, f"n={basis['n']} is below the floor of {prereg_effect.MIN_PAIRS}"
+    expected = float(basis["k"]) * float(basis["value"])
+    # The stored SD is rounded to 3 dp, so k x SD may sit up to k x 0.0005 off the
+    # unrounded product; the bar itself is rounded to 2 dp.
+    if abs(expected - float(spec["min_effect"])) > 0.005 + float(basis["k"]) * 0.0005 + 1e-9:
+        return False, f"min_effect {spec['min_effect']} does not recompute from its basis ({expected:.4f})"
+    return True, f"derived: {basis['k']} x {basis['value']} over n={basis['n']} in {basis['window_days']} days"

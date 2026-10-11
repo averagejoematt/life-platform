@@ -75,6 +75,7 @@ FEATURE_TIERS: dict[str, str] = {
     "coach_narrative": WORKHORSE,
     "coach_nudge": WORKHORSE,
     "coach_social_reaction": NARRATIVE,  # same generate fn as coach_diary_reaction
+    "coach_vision": VISION,  # #3759: the Monday progress-photo read (image input)
     "coherence_semantic": WORKHORSE,
     "comprehension_qa": WORKHORSE,
     "conversation_enrichment": WORKHORSE,
@@ -131,6 +132,7 @@ ROUTES: dict[str, Route] = {
     "coach_narrative.moves_cast": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
     "coach_narrative.moves_line": Route(feature="coach_narrative", tier=_N, env="AI_MODEL"),
     "coach_narrative.memoir": Route(feature="coach_narrative", tier=_N, env="AI_MODEL"),
+    "coach_vision": Route(feature="coach_vision"),  # #3759: coach/coach_vision.py, the VISION tier
     "coherence_semantic": Route(feature="coherence_semantic", env="AI_MODEL_HAIKU"),
     "conversation_enrichment": Route(feature="conversation_enrichment", env="MODEL"),
     "daily_debrief": Route(feature="daily_debrief", env="AI_MODEL_HAIKU"),
@@ -216,3 +218,52 @@ def model_for(route: str, env: Optional[Mapping[str, str]] = None) -> str:
         return default
     environ = os.environ if env is None else env
     return environ.get(var, default)
+
+
+# ── Receipt lookups (#4774, box 3): tier of a metered row, None when the registry can't say ──
+# Tier order for a model that several tiers run on today (Haiku 4.5 is workhorse, economy and
+# vision at once): the first listed wins, and `tiers_for_model` returns them all.
+_RECEIPT_TIER_ORDER = (NARRATIVE, WORKHORSE, ECONOMY, VISION, EMBED)
+
+
+def _canonical_model(model_id: str) -> str:
+    """`us.anthropic.claude-haiku-4-5-20251001-v1:0` / `anthropic.…` / bare name → the bare name."""
+    m = (model_id or "").strip().lower().split("/")[-1]
+    for prefix in ("us.", "global.", "eu.", "apac."):
+        if m.startswith(prefix):
+            m = m[len(prefix) :]
+    if m.startswith("anthropic."):
+        m = m[len("anthropic.") :]
+    if ":" in m and m.rsplit(":", 1)[0].endswith(tuple("-v%d" % i for i in range(10))):
+        m = m.rsplit("-v", 1)[0]
+    return m
+
+
+def tiers_for_model(model_id: str) -> list[str]:
+    """Every tier whose TODAY model is `model_id` (a CloudWatch ModelId); [] when none is."""
+    m = _canonical_model(model_id)
+    if not m:
+        return []
+    return [t for t in _RECEIPT_TIER_ORDER if _canonical_model(TIER_MODELS[t]) == m]
+
+
+def tier_for_model(model_id: str) -> Optional[str]:
+    """The primary tier of a metered model, or None when the model is not in the registry."""
+    tiers = tiers_for_model(model_id)
+    return tiers[0] if tiers else None
+
+
+def tier_for_feature(name: str) -> Optional[str]:
+    """The tier of a `LambdaFunction` metric label, or None. The label matches a ROUTES key or a
+    budget feature (`life-platform-` prefix, `-lambda` suffix and hyphens normalised away) —
+    the registry is keyed by role, not by deployed function, so most Lambdas stay untiered
+    rather than being guessed at."""
+    key = (name or "").strip().lower()
+    if key.startswith("life-platform-"):
+        key = key[len("life-platform-") :]
+    if key.endswith("-lambda"):
+        key = key[: -len("-lambda")]
+    key = key.replace("-", "_")
+    if key in ROUTES:
+        return _tier_of(key)
+    return FEATURE_TIERS.get(key)

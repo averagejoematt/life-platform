@@ -29,6 +29,7 @@ WHAT THIS GUARDS
 
 import ast
 import os
+import re
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -266,7 +267,7 @@ def test_aggregate_alarm_description_documents_the_clear_behavior():
     #2976 removed the lag itself (86400s → 3600s, safe now that every
     authenticated-successful run emits a 1, so the stream is dense and a tripped
     breaker keeps landing 0s). The description contract survives the re-cut: it
-    must state the actual clear window (~1h) and still point triage at the
+    must state the actual clear window (~15h since #4641) and still point triage at the
     AUTH_FAILURE markers rather than alarm state alone — a rebuilt stack that
     drops the kwarg must fail here, not silently ship a null description."""
     node = _find_alarm_call("ingest-auth-unhealthy-24h")
@@ -275,7 +276,7 @@ def test_aggregate_alarm_description_documents_the_clear_behavior():
     assert desc_kw is not None, "ingest-auth-unhealthy-24h lost its alarm_description= (#2004/#2976 clear-window note)"
     desc = ast.literal_eval(desc_kw) if isinstance(desc_kw, (ast.Constant, ast.JoinedStr)) else None
     assert isinstance(desc, str) and desc.strip(), "alarm_description must resolve to a non-empty string literal"
-    assert "1h" in desc, f"alarm_description must state the ~1h clear window (#2976), got: {desc!r}"
+    assert "15h" in desc, f"alarm_description must state the ~15h clear window (#4641), got: {desc!r}"
     assert "AUTH_FAILURE" in desc, f"alarm_description must point triage at AUTH_FAILURE markers, not alarm state: {desc!r}"
 
 
@@ -346,14 +347,13 @@ def _per_source_loop_periods(path=_MONITORING):
     return periods
 
 
-def test_dropbox_alarm_window_matches_its_30_minute_cadence():
-    """#2976: dropbox emits IngestAuthHealthy every ≤30 min around the clock
-    (rate(30 minutes) poll; 0 on every breaker-suppressed run, 1 after
-    list_folder succeeds), so a 1h window both holds ALARM while broken and
-    clears within ~1h of recovery — instead of latching a recovered source red
-    for a day."""
+def test_dropbox_alarm_window_exceeds_its_2_hour_cadence():
+    """#2976/#4641: dropbox emits IngestAuthHealthy every 2 h around the clock
+    (0 on every breaker-suppressed run, 1 after list_folder succeeds). The window
+    must EXCEED that cadence (3h): at 1h an empty period reads NOT_BREACHING = OK
+    between 0s and a dead credential would page ~12x/day."""
     periods = _per_source_loop_periods()
-    assert periods.get("dropbox") == 3600, f"ingest-auth-unhealthy-dropbox window must be 3600s (#2976), got {periods.get('dropbox')}"
+    assert periods.get("dropbox") == 10800, f"ingest-auth-unhealthy-dropbox window must be 10800s (#4641), got {periods.get('dropbox')}"
 
 
 def test_daily_cadence_sources_keep_the_24h_window():
@@ -366,14 +366,42 @@ def test_daily_cadence_sources_keep_the_24h_window():
         assert periods.get(src) == 86400, f"ingest-auth-unhealthy-{src} must keep the 86400s cadence-matched window, got {periods.get(src)}"
 
 
-def test_aggregate_alarm_window_is_one_hour():
-    """#2976: with every authenticated-successful run emitting a 1 (and dropbox
-    guaranteeing ≥hourly datapoints), Min<1 over 1h reads 'some source emitted
-    unhealthy within the hour' — fires as fast as the old 24h window, clears ~1h
-    after recovery instead of 24h."""
+def _max_gap_hours(hours):
+    """Largest wrap-around gap (h) between consecutive UTC cron hours."""
+    hs = sorted(int(h) for h in hours.split(","))
+    return max((hs[(i + 1) % len(hs)] - h) % 24 or 24 for i, h in enumerate(hs))
+
+
+def _stack_hours_constant(name):
+    path = os.path.join(_REPO, "cdk", "stacks", "ingestion_stack.py")
+    for n in ast.parse(open(path, encoding="utf-8").read()).body:
+        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets):
+            return ast.literal_eval(n.value)
+    raise AssertionError(f"{name} not found in ingestion_stack.py")
+
+
+def test_aggregate_alarm_window_exceeds_sparsest_hourly_emitters():
+    """#2976/#4641: the aggregate reads Minimum over one window, so a dead credential
+    holds ALARM only if every window contains a 0 from some run of a held source.
+    The held sources are the sub-daily breaker emitters on sparse crons: dropbox
+    (rate(N hours)), notion (NOTION_HOURS) and withings (WITHINGS_HOURS). The window
+    must exceed the sparsest gap among them, DERIVED here from ingestion_stack.py
+    (not hand-typed), else the alarm flaps ALARM/OK between runs. Eight Sleep's
+    18 h burst gap and the daily sources are covered by per-source alarms, not this
+    window. Recovery clears up to one window (15 h) after the last 0."""
+    stack_src = open(os.path.join(_REPO, "cdk", "stacks", "ingestion_stack.py"), encoding="utf-8").read()
+    m = re.search(r'function_name="dropbox-poll".*?schedule="rate\((\d+) hours?\)"', stack_src, re.S)
+    assert m, "dropbox-poll rate(N hours) schedule not found in ingestion_stack.py"
+    gaps = {
+        "dropbox": int(m.group(1)),
+        "notion": _max_gap_hours(_stack_hours_constant("NOTION_HOURS")),
+        "withings": _max_gap_hours(_stack_hours_constant("WITHINGS_HOURS")),
+    }
+    sparsest = max(gaps.values())
     node = _find_alarm_call("ingest-auth-unhealthy-24h")
     assert node is not None
-    assert _alarm_period(node) == 3600, "ingest-auth-unhealthy-24h must read a 3600s window (#2976)"
+    window = _alarm_period(node)
+    assert window > sparsest * 3600, f"ingest-auth-unhealthy-24h window {window}s must exceed the sparsest emitter gap {sparsest}h ({gaps})"
 
 
 def test_liveness_alarm_window_matches_the_daily_scan():

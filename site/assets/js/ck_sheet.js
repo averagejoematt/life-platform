@@ -96,7 +96,7 @@ export function levelHTML(body) {
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];
   const from = n !== null && of !== null ? `Worked out from ${n} of ${of} areas${n < of ? "; an area with nothing measuring it is left out, not counted as average" : ""}.` : "";
-  return `<div class="ck-today"><p class="ck-big">${esc(whole(c.level))}<span>level${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
+  return `<div class="ck-today"><p class="ck-big">${esc(whole(c.level))}<span> level${day ? ` on ${esc(day)}` : ""}</span></p>${soft(from)}</div>`;
 }
 // "Level 10 across seven areas" — the front page's one line, a door to this page.
 export function sheetLine(body) {

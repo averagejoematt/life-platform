@@ -271,7 +271,7 @@ PILLOW_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_L
 # Build: `python3 deploy/build_lambda_layer.py build garth`. Consumer: garmin-data-ingestion.
 # Pinned at the 0.2.x ceiling on purpose — garminconnect 0.3.x drops garth and breaks this
 # lambda's auth path (#1780); see the LAYERS['garth'] note before proposing a bump.
-GARTH_LAYER_VERSION = 3
+GARTH_LAYER_VERSION = 4
 GARTH_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
 
 # lameenc (LAME MP3 encoder) layer (#1018: the Panel compresses its Gemini-TTS WAV

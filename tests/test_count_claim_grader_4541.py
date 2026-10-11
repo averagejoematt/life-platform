@@ -265,12 +265,18 @@ def test_the_live_row_is_refuted_by_its_count_through_the_evaluator(evaluator_io
 
 
 def test_mutation_control_without_the_count_route_the_same_fixture_is_confirmed_by_slope(evaluator_io, monkeypatch):
-    """Proves the fixture reproduces #4541: remove the count route and the live verdict returns."""
+    """Proves the fixture reproduces #4541: remove the count route and the live verdict returns.
+
+    The fixture is a dated call, so since #4617 the directional fallback is the window grade
+    (first vs last reading of the call's own window), not the EWMA slope — still "confirmed",
+    which is the wrong verdict #4541 is about: the count claim read as a direction.
+    """
     monkeypatch.setattr(ev.prediction_count_grader, "grade", lambda *a, **k: None)
     evaluations, _ = ev._evaluate_all([_issue_pred()], GRADED_ON)
     (e,) = evaluations
     assert e["status"] == "confirmed"
-    assert e["reason"].startswith("sleep_duration_hours trend=up (slope=0.06")
+    assert e["reason"].startswith("[window] sleep_duration_hours 7.93 on 2026-09-06 -> 8.98 on 2026-09-13")
+    assert e["reason"].endswith("trend=up, predicted=up")
 
 
 # ── the readers: a day count is never served as the stored spec's slope or level ──

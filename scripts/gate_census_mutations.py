@@ -506,6 +506,16 @@ _LINKED_PRIVATE_ROUTE_HTML = (
     '<body><a href="/progress-photos/">progress</a></body></html>\n'
 )
 
+# #3759: a public serving module reading the owner-only coach-vision partition — the exact
+# reader class the isolation sweep exists to refuse (a site endpoint serving a body-fat band
+# that is an estimate as if it were a number). Planted under lambdas/web/, the one tree the
+# gate names as never-acceptable, so it proves both the allowlist leg and the tree leg.
+_COACH_VISION_READER_PY = (
+    '"""census probe — a reader that must never exist."""\n\n\n'
+    "def handle(table):\n"
+    '    return table.query(KeyConditionExpression="pk = :pk", ExpressionAttributeValues={":pk": "USER#matthew#SOURCE#coach_vision"})\n'
+)
+
 # #3615 box 5: a page under site/ advertising a feed the hook registry DECLARES dark —
 # i.e. offering a reader a podcast subscription to a show with zero episodes. This is the
 # exact 11-page defect the gate was written for, planted as a NEW page so it also proves
@@ -657,6 +667,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("site/_census_probe_3760.html", _LINKED_PRIVATE_ROUTE_HTML),),
         track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
+    ),
+    "structural::test_coach_vision_isolation_3759.py": MutationSpec(
+        gate_id="structural::test_coach_vision_isolation_3759.py",
+        target="tests/test_coach_vision_isolation_3759.py",
+        detects=(
+            "a public serving module under lambdas/web/ that reads the owner-only coach-vision record "
+            "(a sentence about his body and a body-fat band that is an estimate, not a measurement) — the "
+            "leak no other gate has an opinion about: the partition has no site/ object, no route and no "
+            "field-tier projection, so every page list and every tier guard simply has no row for it"
+        ),
+        plants=(("lambdas/web/_census_probe_3759.py", _COACH_VISION_READER_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ site/ scripts/ deploy/ cdk/ on disk, so an untracked module is in scope
     ),
     "structural::test_hook_registry_3615.py": MutationSpec(
         gate_id="structural::test_hook_registry_3615.py",
@@ -1332,6 +1354,23 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "its real EVENT# rows). It judges SOURCE SHAPE, never live rows: whether an unstamped row "
         "actually exists is the qa-smoke inverse leg's question, not this gate's.",
         proved_on="2026-09-20",
+    ),
+    "structural::test_coach_vision_isolation_3759.py": _proof(
+        "structural::test_coach_vision_isolation_3759.py",
+        "ARMED 1/1 — baseline: 11 passed in 3.11s | mutated: 2 failed, 9 passed in 3.12s :: "
+        "test_no_file_outside_the_allowlist_names_the_partition; test_no_reader_or_narrative_tree_names_it_at_all "
+        "| reverted: 11 passed in 3.08s",
+        "lambdas/ mcp/ site/ scripts/ deploy/ cdk/ on disk (os.walk over .py/.js/.mjs/.html/.json/.md/.sh/.txt, "
+        "deploy/generated/** excluded as a live-measured artifact), so an UNTRACKED module is in scope — every "
+        "mention of the partition token is held to a written allowlist (two consumers + plumbing), and a mention "
+        "in a reader/narrative tree (lambdas/web, lambdas/emails, lambdas/content, lambdas/intelligence, site, "
+        "scripts/v4_*) fails regardless of the allowlist. Also pinned: every allowlist entry still carries the "
+        "token, the site API's ROUTES serve no vision path, the tier/class/band declarations, and the producing "
+        "role's write grant is LeadingKeys-scoped to the one partition with GetObject only on the photo prefix. "
+        "STILL INVISIBLE, stated rather than papered over: a reader that reaches the partition through a "
+        "variable-built pk (no literal token), a coach narrative that paraphrases the thread addendum into a "
+        "published line (the grounder's allow-list is what bounds that), and docs/ + tests/, which are not swept.",
+        proved_on="2026-10-11",
     ),
     "structural::test_progress_viewer_privacy_3760.py": _proof(
         "structural::test_progress_viewer_privacy_3760.py",

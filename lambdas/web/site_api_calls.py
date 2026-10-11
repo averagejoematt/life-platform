@@ -52,8 +52,11 @@ THE READ
 The same concurrent, projected fetch ``/api/predictions`` makes (one Query per coach
 partition, through the facade's ``_parallel_fetch``), with the two docket prefixes riding
 in the same pool. No new index, no write, no Lambda. Measured 2026-10-04: the uncached
-``/api/predictions`` — the same eight partition reads — answers in about one second; this
-route is deliberately NOT an upstream of ``/api/edition`` (#4607).
+``/api/predictions`` — the same eight partition reads — answers in about one second, so this
+route is NOT read whole by ``/api/edition`` (#4607). The edition's ``calls`` block (#4582 box
+1, the front page's one request) comes from the SAME read: ``read(_g)`` + ``document()`` are
+this route's own fetch and composition, and ``site_api_coach_ledger.edition_record`` runs them
+once, deriving the coaches' record from the same partition rows — one sweep feeds both.
 
 Honest numbers (ADR-104): counts only — no percentage is served here at any n; absence is
 a sentence, never a zero; a call the simple guess has not been scored on says exactly that.
@@ -63,6 +66,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from coach import coach_baseline, coach_dossier, coach_record, prediction_windows
@@ -96,8 +100,8 @@ WITHHELD = "withheld by the privacy filter"
 NO_IDENTITY = "the stored row has no stable identity"
 UNSOURCED = "the sentence rests on a sensor that had sent no reading by the day it was said"
 
-#: A conditional or hedged sentence is not falsifiable by the measure alone.
-_CONDITIONAL_RE = re.compile(r"\b(if|unless|once|when|whenever|assuming|provided|until|may|might|could)\b", re.IGNORECASE)
+#: A conditional or hedged sentence is not falsifiable by the measure alone (#4617: one definition, coach_record's).
+_CONDITIONAL_RE = coach_record.CONDITIONAL_RE
 _UP_RE = re.compile(r"\b(up|upward|upwards|increas\w+|ris\w+|climb\w*|higher)\b", re.IGNORECASE)
 _DOWN_RE = re.compile(r"\b(down|downward|downwards|decreas\w+|declin\w+|drop\w*|lower)\b", re.IGNORECASE)
 
@@ -131,6 +135,17 @@ _GLOSS = {
     "blood_glucose_std_dev": "how much his blood sugar moves around",
 }
 _COMPARE_WORDS = {"lt": "below", "lte": "at or below", "gt": "above", "gte": "at or above"}
+
+#: #4808: a score out of 100 is said as a whole number in ``called``, ``called_short`` and
+#: ``happened_short`` ("about 65", never "about 64.7" on a score read in whole points). The
+#: stored prediction keeps its decimals, and a bet's threshold is never rounded (it is the
+#: question the bet fixed, so "81.6 or higher" stays 81.6).
+WHOLE_SCORES = frozenset({"recovery_score", "sleep_score"})
+
+#: The rule string ``coach.prediction_emission.point_tolerance_from_series`` freezes into every
+#: point spec: "±1 SD of the trailing 30-day personal series (n=31 readings, SD=17.9029)".
+#: Measured 2026-10-11 (read-only, every coach partition): all 63 point rows carry this form.
+_TOLERANCE_RULE_RE = re.compile(r"±1 SD of the trailing (?P<days>\d+)-day personal series \(n=(?P<n>\d+) readings")
 _DIRECTION_WORDS = {"up": "up", "down": "down"}
 
 
@@ -190,6 +205,125 @@ def _amount(value: Any, metric: Any) -> str | None:
     if num is None:
         return None
     return f"{num}{prediction_reason._UNITS.get(base_metric(str(metric or '')), '')}"
+
+
+def _whole(value: Any) -> int | None:
+    """Half-up to a whole number (``round`` is half-even: 64.5 would read 64)."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(f + 0.5) if f >= 0 else -int(-f + 0.5)
+
+
+def _said(value: Any, metric: Any) -> str | None:
+    """A number as a page says it: whole on a score out of 100 (#4808), else ``_amount``."""
+    if base_metric(str(metric or "")) in WHOLE_SCORES:
+        whole = _whole(value)
+        return None if whole is None else str(whole)
+    return _amount(value, metric)
+
+
+def _places(value: Any, places: int) -> str | None:
+    """``value`` to ``places`` decimals, half-up, trailing zeros dropped ("18.30" -> "18.3")."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    if places == 0:
+        return str(_whole(f))
+    text = str(Decimal(repr(f)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+#: (decimals on the two numbers, decimals on the allowed distance), tried in order until a
+#: reader's own check on the printed figures agrees with the verdict (#4808). A score out of
+#: 100 starts whole; everything else starts at the one decimal ``_amount`` prints.
+_SCORE_PRECISIONS = ((0, 1), (0, 2), (1, 1), (1, 2), (2, 2), (3, 3), (4, 4))
+_AMOUNT_PRECISIONS = ((1, 1), (1, 2), (2, 2), (3, 3), (4, 4))
+
+
+def said_pair(want: Any, seen: Any, tolerance: Any, metric: Any, coach_right: bool) -> tuple[str | None, str | None, str | None]:
+    """The called number, the measured number and the allowed distance as the page prints them
+    (#4808) — chosen TOGETHER, because a reader checks the verdict on the printed figures:
+    is the distance between the two numbers within the printed allowance?
+
+    Whole numbers on a score out of 100 with the allowance to one decimal, and one decimal on
+    anything else — UNLESS that rounding makes the reader's check disagree with the verdict.
+    Two specimens: 64.4 against 82 with 17.7 allowed is a hit (17.6), but "64" against "82"
+    reads 18, a miss; and 54.7 against 73 with 18.2532 allowed is a miss (18.3 > 18.2532),
+    but "55"/"73" reads 18 and "54.7"/"73" against "18.3" reads 18.3 — both hits. Then the
+    precision steps up (the allowance first, the numbers next) until the printed figures
+    settle the check the way the grader did: "54.7", "73" and "18.25". Rounding is never
+    allowed to change what a reader recomputes. ``tolerance`` absent: the pair alone, as before."""
+    base = base_metric(str(metric or ""))
+    unit = prediction_reason._UNITS.get(base, "")
+    if _places(want, 0) is None or _places(seen, 0) is None:
+        return None, None, None
+    try:
+        allowed = float(tolerance)
+    except (TypeError, ValueError):
+        allowed = None
+    ladder = _SCORE_PRECISIONS if base in WHOLE_SCORES else _AMOUNT_PRECISIONS
+    if allowed is None:
+        p = ladder[0][0]
+        return f"{_places(want, p)}{unit}", f"{_places(seen, p)}{unit}", None
+    chosen = ladder[-1]
+    for numbers, allowance in ladder:
+        w, sn = Decimal(str(_places(want, numbers))), Decimal(str(_places(seen, numbers)))
+        t = Decimal(str(_places(tolerance, allowance)))
+        if (abs(sn - w) <= t) == coach_right:
+            chosen = (numbers, allowance)
+            break
+    numbers, allowance = chosen
+    return (
+        f"{_places(want, numbers)}{unit}",
+        f"{_places(seen, numbers)}{unit}",
+        f"{_places(tolerance, allowance)}{unit}",
+    )
+
+
+def tolerance_block(spec: dict, text: str | None = None) -> dict | None:
+    """The allowed distance of a number call, served ONCE per call (#4808): the number as the
+    tag prints it, and in words the statistic and window it was computed from, read off the
+    rule string frozen into the spec at emission. ``statistic`` is None when the rule string is
+    not the emitter's form — the number still stands; no wording is guessed. ``text`` is the
+    allowance as ``said_pair`` printed it beside the two numbers, when it needed more than the
+    one decimal to keep a reader's check honest."""
+    metric = spec.get("metric")
+    text = text or _amount(spec.get("tolerance"), metric)
+    if not text:
+        return None
+    m = _TOLERANCE_RULE_RE.search(str(spec.get("tolerance_rule") or ""))
+    days, n = (int(m["days"]), int(m["n"])) if m else (None, None)
+    return {
+        "value": float(spec["tolerance"]),
+        "text": text,
+        "statistic": f"one standard deviation of his readings over the {days} days before the call" if m else None,
+        "window_days": days,
+        "n": n,
+    }
+
+
+#: prediction_reason's flat-window sentence names the band as "its usual day-to-day swing of X";
+#: on a call page the band is the tag's, said once with its statistic, so the clause is dropped.
+_SWING_CLAUSE = re.compile(r", inside its usual day-to-day swing of [^—]+(?= —)")
+
+
+def window_band_block(window: dict, metric: Any) -> dict | None:
+    """A window-graded direction call's band (#4617) in the same shape as ``tolerance_block``
+    (#4808): the number, and in words what it is — the grader's own ``band_rule``."""
+    text = _amount(window.get("band"), metric)
+    rule = str(window.get("band_rule") or "").strip()
+    if not text:
+        return None
+    return {
+        "value": float(window["band"]),
+        "text": text,
+        "statistic": rule.replace("of the readings", "of his readings", 1) if rule else None,
+        "window_days": None,
+        "n": window.get("readings"),
+    }
 
 
 def _names_measure(text: str, metric: Any) -> bool:
@@ -280,7 +414,7 @@ def simple_guess(baseline: Any, kind: str | None, *, coach_right: bool, metric: 
             "short": "could not be checked on this call",
         }
     right = bool(baseline["right"])
-    filed = _amount(baseline.get("filed_value"), metric)
+    filed = _said(baseline.get("filed_value"), metric)
     if kind == "direction":
         said = "The simple guess was that it would not move."
     elif kind == "number" and filed:
@@ -323,34 +457,49 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
     metric = spec.get("metric")
     subject, plain = _subject(metric), _subject(metric, gloss=False)
     actual = None
+    tolerance = None
+    coach_right = status == "confirmed"
+    happened = f"{reason}."
     if kind == "number":
-        want, seen = _amount(spec.get("threshold"), metric), _amount(notes.get("actual_value"), metric)
+        want, seen, allowed = said_pair(spec.get("threshold"), notes.get("actual_value"), spec.get("tolerance"), metric, coach_right)
         if not want or not seen:
             return None, NO_READER_WORDS
         target = _iso_day(spec.get("target_date"))
         on = f" for {_words(target)}" if target else ""
-        margin = _amount(spec.get("tolerance"), metric)
+        # #4808: the allowed distance is NOT in this sentence any more. It is served once, in
+        # ``tolerance`` (the number and, in words, what it was computed from), and the kit
+        # prints it once — in the verdict's tag — so no page says it twice.
+        tolerance = tolerance_block(spec, allowed)
         called = f"{name} called {subject} at about {want}{on}."
-        if margin:
-            called += f" A call like this counts as right within {margin} either way, his usual day-to-day swing."
         called_short = f"{name} called {plain} at about {want}."
         happened_short = f"It came in at {seen}."
+        happened = f"{prediction_reason._cap(str(plain))} came in at {seen} against a call of {want}."
         actual = {"value": notes.get("actual_value"), "text": seen}
     else:
         direction = _DIRECTION_WORDS[str(spec.get("condition")).strip().lower()]
         happened_short = _went(reason)
         if happened_short is None:
             return None, NO_READER_WORDS
-        if "flat" in happened_short:
-            return None, FLAT_READ
+        window = notes.get("window") if isinstance(notes.get("window"), dict) else None
+        if "flat" in happened_short and window is None:
+            return None, FLAT_READ  # the pre-#4617 trend check; a window-graded flat verdict is checkable and printed
         checked = _words(_iso_day(row.get("outcome_date")))
         called = f"{name} called {subject} to go {direction}, in a prediction sealed before day one."
-        if checked:
+        if window is not None and _words(_iso_day(window.get("start"))) and _words(_iso_day(window.get("end"))):
+            # #4808: the band is served once, in ``tolerance``, with what it is in words — never
+            # as an unnamed "usual day-to-day swing" in this sentence or in what happened.
+            called += (
+                f" It was checked on the change from the first reading of its window, {_words(_iso_day(window.get('start')))}, "
+                f"to the last, {_words(_iso_day(window.get('end')))}."
+            )
+            tolerance = window_band_block(window, metric)
+            if tolerance:
+                happened = _SWING_CLAUSE.sub("", happened)
+        elif checked:
             called += f" It was checked on {checked} against the trend in his most recent readings."
         called_short = f"{name} called {plain} to go {direction}."
     sealed = bool(row.get("pre_registered"))
     logged = (pacific_date_of(row.get("pre_registered_at")) if sealed else None) or _iso_day(row.get("created_date"))
-    coach_right = status == "confirmed"
     guess = simple_guess(row.get("baseline"), kind, coach_right=coach_right, metric=metric)
     return (
         {
@@ -364,14 +513,15 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
             "settled_date": _iso_day(row.get("outcome_date")),
             "called": called,
             "called_short": called_short,
-            "happened": f"{reason}.",
+            "happened": happened,
             "happened_short": happened_short,
             "actual": actual,
+            "tolerance": tolerance,
             "verdict": "right" if coach_right else "wrong",
             "verdict_text": f"{name} was {'right' if coach_right else 'wrong'}.",
             "simple_guess": guess,
             "records": [record],
-            "title": f"{name} called {plain} {'at about ' + _amount(spec.get('threshold'), metric) if kind == 'number' else 'to go ' + direction}: {'right' if coach_right else 'wrong'}",
+            "title": f"{name} called {plain} {'at about ' + str(want) if kind == 'number' else 'to go ' + direction}: {'right' if coach_right else 'wrong'}",
         },
         None,
     )
@@ -495,7 +645,7 @@ def next_block(today: str, open_dockets: list, pending: list, names: dict) -> di
         if kind is None or not due or due < today or not plain or short_id not in names:
             continue
         if kind == "number":
-            want = _amount(spec.get("threshold"), spec.get("metric"))
+            want = _said(spec.get("threshold"), spec.get("metric"))
             if not want:
                 continue
             q = f"{names[short_id]}’s call that {plain} will be about {want}"
@@ -588,35 +738,47 @@ def _absent(_g) -> dict:
         return {}
 
 
-def handle_calls(event, *, _g):
-    """GET /api/calls — every settled, checkable call; ``?id=`` for one (see module docstring)."""
-    qs = (event or {}).get("queryStringParameters") or {}
-    wanted = str(qs.get("id") or "").strip()
-    if wanted and not ID_RE.fullmatch(wanted):
-        return _error(404, ABSENT_ID, state="absent", absent_text=ABSENT_ID)
+def read(_g) -> tuple:
+    """The route's one read -> ``(names, fetched, failures)``: every coach's PREDICTION#
+    partition (the predictions route's projection) and the two docket prefixes, in one pool.
+    ``fetched`` maps a short coach id to its raw rows (Decimals as stored), and the two
+    ``docket:*`` keys to theirs; ``failures`` names every job that raised."""
     names = {cid: plain_name(name) for cid, name in _g["_CALIB_COACH_NAMES"].items()}
     fetch, docket_rows = _g["_fetch_prediction_partition"], _g["_docket_rows"]
     jobs: dict = {cid: (lambda pk=f"COACH#{cid}_coach": fetch(pk)) for cid in names}
     jobs["docket:resolved"] = lambda: docket_rows("RESOLVED#", _g["DOCKET_RESOLVED_LIMIT"], newest_first=True)
     jobs["docket:open"] = lambda: docket_rows("OPEN#", _g["DOCKET_OPEN_LIMIT"], newest_first=False)
     failures: list = []
+    fetched = _g["_parallel_fetch"](jobs, failures=failures)
+    return names, fetched, failures
+
+
+def document(names: dict, fetched: dict, failures: list, _g) -> dict:
+    """The whole document from ``read``'s result. Raises when any coach partition failed: a
+    missing partition would silently drop that coach's calls and unsettle the "newest settled
+    call", so the caller prints a sentence instead of a partial list."""
+    if any(cid in failures for cid in names):
+        raise RuntimeError(f"coach partition reads failed: {sorted(f for f in failures if f in names)}")
+    dockets = {k: [_decimal_to_float(d) for d in fetched.get(k, []) if singleton_visible(d)] for k in ("docket:resolved", "docket:open")}
+    rows_by_coach = {cid: [_decimal_to_float(r) for r in fetched.get(cid, [])] for cid in names}
+    today = _g["datetime"].now(PT).strftime("%Y-%m-%d")  # the facade's clock hand-off
+    # #4702: the interval form — the open gap (now) AND every closed one (history).
+    dark = claim_sourcing.gap_instruments(_absent(_g), instrument_presence.gap_history(_g["table"]))
+    doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"], dark)
+    if "docket:resolved" in failures or "docket:open" in failures:
+        doc["bets_state"] = "unavailable"
+        logger.error(f"[/api/calls] degraded — docket reads failed: {sorted(f for f in failures if f.startswith('docket'))}")
+    return doc
+
+
+def handle_calls(event, *, _g):
+    """GET /api/calls — every settled, checkable call; ``?id=`` for one (see module docstring)."""
+    qs = (event or {}).get("queryStringParameters") or {}
+    wanted = str(qs.get("id") or "").strip()
+    if wanted and not ID_RE.fullmatch(wanted):
+        return _error(404, ABSENT_ID, state="absent", absent_text=ABSENT_ID)
     try:
-        fetched = _g["_parallel_fetch"](jobs, failures=failures)
-        if any(cid in failures for cid in names):
-            # A missing partition would silently drop that coach's calls and unsettle the
-            # "newest settled call"; the page prints a sentence instead of a partial list.
-            raise RuntimeError(f"coach partition reads failed: {sorted(f for f in failures if f in names)}")
-        dockets = {
-            k: [_decimal_to_float(d) for d in fetched.get(k, []) if singleton_visible(d)] for k in ("docket:resolved", "docket:open")
-        }
-        rows_by_coach = {cid: [_decimal_to_float(r) for r in fetched.get(cid, [])] for cid in names}
-        today = _g["datetime"].now(PT).strftime("%Y-%m-%d")  # the facade's clock hand-off
-        # #4702: the interval form — the open gap (now) AND every closed one (history).
-        dark = claim_sourcing.gap_instruments(_absent(_g), instrument_presence.gap_history(_g["table"]))
-        doc = compose(rows_by_coach, names, _g["EXPERIMENT_START"], today, dockets["docket:resolved"], dockets["docket:open"], dark)
-        if "docket:resolved" in failures or "docket:open" in failures:
-            doc["bets_state"] = "unavailable"
-            logger.error(f"[/api/calls] degraded — docket reads failed: {sorted(f for f in failures if f.startswith('docket'))}")
+        doc = document(*read(_g), _g)
     except Exception as exc:  # noqa: BLE001 — the honest degradation is a sentence, logged
         logger.error(f"[/api/calls] {exc}")
         body = {
