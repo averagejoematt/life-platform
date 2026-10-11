@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-10-11T02:50:26.502352+00:00",
+  "captured_at": "2026-10-11T22:19:31.415062+00:00",
   "fetch_path": "/api/edition",
   "is_prefix_sample": false,
   "path": "/api/edition",
@@ -27,6 +27,118 @@
       },
       "blocks": {
         "keys": {
+          "calls": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "calls": {
+                    "items": {
+                      "keys": {
+                        "actual": {
+                          "keys": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "value": {
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "called": {
+                          "type": "string"
+                        },
+                        "called_short": {
+                          "type": "string"
+                        },
+                        "coach_id": {
+                          "type": "string"
+                        },
+                        "coach_name": {
+                          "type": "string"
+                        },
+                        "happened_short": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "settled_date": {
+                          "type": "string"
+                        },
+                        "simple_guess": {
+                          "keys": {
+                            "right": {
+                              "type": "boolean"
+                            },
+                            "short": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "tolerance": {
+                          "keys": {
+                            "n": {
+                              "type": "integer"
+                            },
+                            "statistic": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "value": {
+                              "type": "number"
+                            },
+                            "window_days": {
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "verdict": {
+                          "type": "string"
+                        },
+                        "verdict_text": {
+                          "type": "string"
+                        }
+                      },
+                      "optional": [
+                        "tolerance"
+                      ],
+                      "type": "object"
+                    },
+                    "length_sample": 55,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           "catch_up": {
             "keys": {
               "absent_text": {
@@ -146,7 +258,51 @@
                 "type": "string"
               },
               "data": {
-                "type": "null"
+                "keys": {
+                  "lines": {
+                    "items": {
+                      "keys": {
+                        "as_of": {
+                          "type": "string"
+                        },
+                        "bet_settles": {
+                          "type": "null"
+                        },
+                        "coach": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        },
+                        "move": {
+                          "type": "string"
+                        },
+                        "move_label": {
+                          "type": "string"
+                        },
+                        "replies_to": {
+                          "type": "null"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "when_text": {
+                          "type": "null"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  },
+                  "mixed_days": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
               },
               "source": {
                 "type": "string"
@@ -234,6 +390,26 @@
                   }
                 },
                 "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "lead_read": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "null"
+              },
+              "data": {
+                "type": "null"
               },
               "source": {
                 "type": "string"
@@ -477,6 +653,96 @@
             },
             "type": "object"
           },
+          "moves": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "days": {
+                    "items": {
+                      "keys": {
+                        "_meta": {
+                          "keys": {
+                            "cache_seconds": {
+                              "type": "integer"
+                            },
+                            "generated_at": {
+                              "type": "string"
+                            },
+                            "request_id": {
+                              "type": "string"
+                            },
+                            "served_at": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "absent_text": {
+                          "type": "string"
+                        },
+                        "date": {
+                          "type": "string"
+                        },
+                        "lines": {
+                          "items": {
+                            "keys": {
+                              "bet_settles": {
+                                "type": "null"
+                              },
+                              "coach": {
+                                "type": "string"
+                              },
+                              "coach_id": {
+                                "type": "string"
+                              },
+                              "move": {
+                                "type": "string"
+                              },
+                              "move_label": {
+                                "type": "string"
+                              },
+                              "replies_to": {
+                                "type": "null"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "length_sample": 3,
+                          "type": "array"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 7,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           "next": {
             "keys": {
               "absent_text": {
@@ -507,6 +773,9 @@
                             "items": {
                               "keys": {
                                 "coach": {
+                                  "type": "string"
+                                },
+                                "reason": {
                                   "type": "string"
                                 },
                                 "says": {
@@ -622,6 +891,58 @@
                     "type": "string"
                   },
                   "count_text": {
+                    "type": "string"
+                  },
+                  "counted": {
+                    "keys": {
+                      "bet": {
+                        "keys": {
+                          "n": {
+                            "type": "integer"
+                          },
+                          "right": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "commentary": {
+                        "keys": {
+                          "n": {
+                            "type": "integer"
+                          },
+                          "right": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "conditional": {
+                        "keys": {
+                          "n": {
+                            "type": "integer"
+                          },
+                          "right": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "n": {
+                            "type": "integer"
+                          },
+                          "right": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "counted_text": {
                     "type": "string"
                   },
                   "decided": {
@@ -1007,6 +1328,42 @@
             },
             "type": "object"
           },
+          "sheet": {
+            "keys": {
+              "absent_text": {
+                "type": "string"
+              },
+              "as_of": {
+                "type": "string"
+              },
+              "data": {
+                "keys": {
+                  "character": {
+                    "keys": {
+                      "composite_pillar_count": {
+                        "type": "integer"
+                      },
+                      "composite_pillar_total": {
+                        "type": "integer"
+                      },
+                      "level": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "source": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           "today": {
             "keys": {
               "absent_text": {
@@ -1237,9 +1594,14 @@
                                 "type": "string"
                               },
                               "values": {
-                                "items": {
-                                  "type": "number"
-                                },
+                                "items": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
                                 "length_sample": 7,
                                 "type": "array"
                               }
@@ -1306,7 +1668,7 @@
         "items": {
           "type": "string"
         },
-        "length_sample": 12,
+        "length_sample": 16,
         "type": "array"
       }
     },
