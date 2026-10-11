@@ -1,7 +1,7 @@
 """
 Dropbox Poll Lambda — MacroFactor CSV ingestion via Dropbox API.
 
-Polls Dropbox app folder (Apps/Life Platform/) every 30 minutes for new
+Polls Dropbox app folder (Apps/Life Platform/) every 2 hours for new
 MacroFactor CSV files. Downloads new CSVs → uploads to S3 uploads/macrofactor/
 → triggers existing macrofactor-data-ingestion Lambda via S3 event.
 
@@ -309,35 +309,6 @@ def get_processed_hashes():
     return set(get_tracker_item().get("file_hashes", []))
 
 
-def _is_recently_empty(item: dict, window_seconds: int = 1500) -> bool:
-    """
-    COST-03: Short-circuit guard.
-    Returns True if the last Dropbox poll found no new files AND was within `window_seconds`.
-    Default 1500s = 25 min (cron runs every 30 min — avoids double-polling same window).
-    """
-    last_empty = item.get("last_empty_poll_at", "")
-    if not last_empty:
-        return False
-    try:
-        last_dt = datetime.fromisoformat(last_empty.replace("Z", "+00:00"))
-        age = (datetime.now(timezone.utc) - last_dt).total_seconds()
-        return age < window_seconds
-    except Exception:
-        return False
-
-
-def _mark_empty_poll() -> None:
-    """Record that Dropbox returned no new files this invocation (COST-03)."""
-    try:
-        table.update_item(
-            Key={"pk": PK_TRACKER, "sk": "PROCESSED_FILES"},
-            UpdateExpression="SET last_empty_poll_at = :t",
-            ExpressionAttributeValues={":t": datetime.now(timezone.utc).isoformat()},
-        )
-    except Exception as e:
-        logger.warning(f"Failed to mark empty poll: {e}")
-
-
 def mark_file_processed(filename, file_hash, file_size):
     """Add a file to the processed set in DynamoDB."""
     now = datetime.now(timezone.utc).isoformat()
@@ -497,18 +468,10 @@ def lambda_handler(event, context):
         logger.info("Dropbox poll starting...")
         force = event.get("force", False)
 
-        # COST-03: Short-circuit if we polled recently and found nothing.
-        # Saves Dropbox API calls when no files have appeared in the last ~25 min.
-        if not force:
-            tracker = get_tracker_item()
-            if _is_recently_empty(tracker):
-                logger.info("COST-03: Dropbox was empty at last poll (<25 min ago) — skipping")
-                _record_health(succeeded=True)  # deliberate healthy skip, not a dead cron
-                # #2976: no IngestAuthHealthy emission here on purpose — this path
-                # never touched Dropbox, so it proves nothing about the credential.
-                # (In practice the 30-min cron > the 25-min window, so real polls
-                # still happen essentially every run.)
-                return {"statusCode": 200, "body": "Skipped — recently checked, no new files"}
+        # #4641: the COST-03 "recently empty" skip was removed. Its 25-minute window was
+        # shorter than the 30-minute cron, so it never fired in production (666 of 672
+        # polls found nothing and none were skipped). The cadence cut to every 2 hours
+        # (cdk/stacks/ingestion_stack.py) is what saves the Dropbox calls.
 
         # ── Auth ──
         secret_data = get_dropbox_secret()
@@ -536,7 +499,6 @@ def lambda_handler(event, context):
             clear_failure(table, source_name="dropbox", user_id=USER_ID, logger=logger)
 
         if not files:
-            _mark_empty_poll()
             _record_health(succeeded=True)
             return {"statusCode": 200, "body": "No files found"}
 
@@ -571,7 +533,6 @@ def lambda_handler(event, context):
 
         if not csv_files:
             logger.info("No new MacroFactor CSVs to process")
-            _mark_empty_poll()
             _record_health(succeeded=True)
             return {"statusCode": 200, "body": "No MacroFactor CSVs found"}
 
