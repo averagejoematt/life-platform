@@ -128,7 +128,7 @@ class _FakeSSM:
     def get_parameter(self, Name):
         if Name == "/life-platform/budget-tier":
             return {"Parameter": {"Value": "0"}}
-        return {"Parameter": {"Value": json.dumps({"ceiling": 215.0, "surge_active": False})}}
+        return {"Parameter": {"Value": json.dumps({"ceiling": budget._ADR133_BASE_CEILING_USD, "surge_active": False})}}
 
 
 def _mcp_granted() -> set:
