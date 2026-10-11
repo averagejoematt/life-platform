@@ -15,6 +15,13 @@ Rules that keep it easy and safe:
 
 The loop reuses the platform's existing inbound path: SES receipt rule ``insight-capture`` → S3 →
 ``insight-email-parser``, which routes a reply whose subject carries ``[SQ-W<n>]`` here.
+
+THE TUESDAY QUESTION (#4584, epic #4580). The living front page leads with his own words, so each Tuesday evening
+Pacific the desk sends ONE more question — fixed, rotating by week, no model call — on this same channel and with
+this same routing token. His reply rides the identical route (behind the parser's one sender-authentication
+verdict, #4633): a ``STORYQA#W`` row for Wednesday's chronicle, and a verbatim, screened ``owner_words`` entry for
+the edition (``content.owner_words``). A one-question email is answered by top-posting, so ``parse_reply`` pairs an
+unlabelled top-posted reply with Q1 when — and only when — exactly one question was asked.
 """
 
 from __future__ import annotations
@@ -131,6 +138,51 @@ def render_email(week: int, questions: List[str]) -> Dict[str, str]:
     return {"subject": f"The Measured Life · Week {week} · {len(questions)} quick questions [SQ-W{week}]", "body": body}
 
 
+# ── the Tuesday question (#4584) ─────────────────────────────────────────────
+#
+# Fixed, not generated: the words this question earns are published verbatim, so the question beside them is
+# published too, and a fixed question cannot carry a false premise (see ``ungrounded``) or a forbidden subject.
+# Rotates by week number so the front page does not ask him the same thing two weeks running.
+TUESDAY_QUESTIONS = (
+    "In a sentence or two: how did this week actually go, from the inside?",
+    "What is one thing from this week you want a stranger reading the site to know?",
+    "What was the best decision you made this week, and what made it easy or hard?",
+    "What surprised you this week?",
+    "What are you going to do differently next week, and why?",
+    "What did this week cost you, and was it worth it?",
+)
+
+
+def tuesday_question(week: int) -> str:
+    """The week's one question. Deterministic in the week number; never a model call."""
+    return TUESDAY_QUESTIONS[(int(week) - 1) % len(TUESDAY_QUESTIONS)]
+
+
+def render_tuesday_email(week: int, question: str) -> Dict[str, str]:
+    """Subject + plain-text body for the Tuesday question. The SAME ``[SQ-W<n>]`` token as Monday's questions, so the
+    reply takes the desk's one authenticated route. The body states what happens to a reply, so a reply is informed."""
+    body = (
+        f"One question for Wednesday, Week {week}. Just hit reply and type — a sentence is plenty.\n\n"
+        f"Q1: {question}\n\n"
+        "—\nYour reply goes on the site word for word, as his own words on Wednesday's front page, with this question "
+        "beside it. A privacy filter holds anything it matches, and a held reply never goes up. "
+        'Put "off record" in it to keep it off the site entirely. It may also be quoted (exactly, at most two short '
+        "lines) in this week's chronicle. No reply is fine: the page says plainly that there is nothing new from him."
+    )
+    return {"subject": f"The Measured Life · Week {week} · one question for Wednesday [SQ-W{week}]", "body": body}
+
+
+def send_tuesday(ses: Any, *, week: int, question: str, to: str, sender: str) -> Dict[str, Any]:
+    """Send the Tuesday question with Reply-To the platform's inbound address. Returns the SES response."""
+    e = render_tuesday_email(week, question)
+    return ses.send_email(
+        FromEmailAddress=sender,
+        Destination={"ToAddresses": [to]},
+        ReplyToAddresses=[REPLY_TO],
+        Content={"Simple": {"Subject": {"Data": e["subject"]}, "Body": {"Text": {"Data": e["body"]}}}},
+    )
+
+
 def week_from_subject(subject: str) -> Optional[int]:
     m = SUBJECT_TOKEN.search(subject or "")
     return int(m.group(1)) if m else None
@@ -140,6 +192,19 @@ _Q_LINE = re.compile(r"^\s*(?:>\s*)*Q(\d+)\s*[:.)-]\s*(.*)$", re.IGNORECASE)
 _NUM_LINE = re.compile(r"^\s*(\d+)\s*[:.)-]\s+(.*)$")
 _QUOTE_HEADER = re.compile(r"^\s*On .{3,120}wrote:\s*$|^-{2,}\s*Original Message", re.IGNORECASE)
 _OFF = re.compile(r"\b(?:off[ -]?(?:the[ -])?record|OTR)\b", re.IGNORECASE)
+# Where a top-posted reply ends: the quoted original, a mail client's signature line, or an Outlook-style header
+# block (#4584). Anything past it is not his reply, and the top-posted answer is published verbatim.
+_LEAD_END = re.compile(r"^\s*(?:--\s*|Sent from my\b.*|Get Outlook\b.*|_{5,}\s*|From:\s.*@.*)$", re.IGNORECASE)
+_WROTE = re.compile(r"wrote:\s*$", re.IGNORECASE)
+
+
+def _trim_attribution(lead: List[str]) -> List[str]:
+    """Cut a top-posted reply at a mail client's attribution line when the client wrapped it ("On Tue, …, The
+    Measured Life <" / "lifeplatform@…> wrote:") so ``_QUOTE_HEADER`` never saw it whole."""
+    for i, ln in enumerate(lead):
+        if ln.lstrip().startswith("On ") and any(_WROTE.search(x) for x in lead[i : i + 3]):
+            return lead[:i]
+    return lead
 
 
 def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: bool = False) -> List[Dict[str, Any]]:
@@ -149,18 +214,30 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
     ``keep_raw`` (#4584) adds ``raw`` to each answer: his lines exactly as typed, joined by the newlines he typed
     (blank lines inside an answer kept, the 'Q2:' / '2.' label he typed before it removed, nothing else touched).
     It is what the owner-words store keeps. The default output — what the chronicle's ``owner_voice`` reads — is
-    unchanged."""
+    unchanged.
+
+    One-question emails (#4584, the Tuesday question): a reply typed ABOVE the quote with no "Q1:"/"1." label is the
+    answer to Q1 when exactly one question was asked (``questions`` has one entry, or the quote shows only Q1) and
+    nothing else was parsed. With several questions an unlabelled top-post stays unpaired, exactly as before."""
     lines = (body or "").replace("\r\n", "\n").split("\n")
     answers: Dict[int, List[str]] = {}
     raws: Dict[int, List[str]] = {}
     quoted_q: Dict[int, str] = {}
     current: Optional[int] = None
     seen_inline = False
+    lead: List[str] = []  # the unlabelled lines typed above the quote (#4584)
+    lead_open = True
     for raw in lines:
         if _QUOTE_HEADER.match(raw):
             current = None
+            lead_open = False
             continue
         is_quoted = raw.lstrip().startswith(">")
+        if lead_open:
+            if is_quoted or _LEAD_END.match(raw) or _Q_LINE.match(raw) or _NUM_LINE.match(raw):
+                lead_open = False
+            else:
+                lead.append(raw)
         m = _Q_LINE.match(raw)
         if m and is_quoted:  # a quoted question: answers typed below it belong to it
             current = int(m.group(1))
@@ -186,6 +263,13 @@ def parse_reply(body: str, questions: Optional[List[str]] = None, *, keep_raw: b
             raws.setdefault(current, []).append(raw)
         elif current is not None and not raw.strip() and current in raws:
             raws[current].append(raw)  # a blank line inside an answer; trailing ones are dropped below
+    single = (questions is not None and len(questions) == 1) or (questions is None and set(quoted_q) == {1})
+    lead = _trim_attribution(lead)
+    if single and not answers and "\n".join(lead).strip():
+        while lead and not lead[0].strip():
+            lead.pop(0)
+        answers[1] = [ln.strip() for ln in lead if ln.strip()]
+        raws[1] = lead
     out = []
     for q_no in sorted(answers):
         text = " ".join(answers[q_no]).strip()
