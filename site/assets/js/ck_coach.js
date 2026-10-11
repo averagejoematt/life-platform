@@ -231,10 +231,11 @@ export function nextHTML(p, docket, predictions, names, today, shown = 2) {
     if (rows && later) tail.push(`${cap(countWord(later))} more ${later === 1 ? "is" : "are"} due after ${later === 1 ? "it" : "these"}.`);
     if (older) tail.push(`${cap(countWord(older))} older ${older === 1 ? "call is" : "calls are"} still waiting to be checked.`);
   }
+  // The open bets are the next section's own cards, so this section no longer signposts them
+  // ("One open bet …: the next section has it."); a docket that failed to read still says so.
   if (!docket) tail.push("The bets between coaches are not available right now.");
-  else if (bets.length) tail.push(`${cap(countWord(bets.length))} open ${bets.length === 1 ? "bet" : "bets"} against another coach: the next section has ${bets.length === 1 ? "it" : "them"}.`);
-  // The accounting sentences after the list are one paragraph, not three (the six-screen
-  // budget's headroom, 2026-10-11): nothing dropped, two gaps and a line given back.
+  // The accounting sentences after the list are one paragraph, not several (the six-screen
+  // budget's headroom, 2026-10-11).
   out.push(soft(tail.join(" ")));
   return out.join("");
 }
