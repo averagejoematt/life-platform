@@ -144,14 +144,17 @@ def run(*, table, s3, bucket: str, today: str, invoke_fn=None, allow_fn=None, no
     created_at = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     record = coach_vision.build_record(current, prior, anchors, result, created_at=created_at)
     table.put_item(Item=floats_to_decimal(record))
+    # Owner-only health data (the band, the photo keys, the observation text) never reaches a
+    # log line — CloudWatch is not the owner-only store (CodeQL py/clear-text-logging, PR #4829).
+    # Log the address, the model, the grounded flag and counts; tests/test_coach_vision_3759.py guards it.
     logger.info(
-        "[coach_vision] wrote %s/%s model=%s band=%s-%s%% grounded=%s",
+        "[coach_vision] wrote %s/%s model=%s grounded=%s images_current=%d images_prior=%d",
         record["pk"],
         record["sk"],
         record["model_id"],
-        record["body_fat_estimate"]["low_pct"],
-        record["body_fat_estimate"]["high_pct"],
         record["qualitative"] is not None,
+        len((record.get("photo_keys") or {}).get("current") or {}),
+        len((record.get("photo_keys") or {}).get("prior") or {}),
     )
     return {"status": "written", "pk": record["pk"], "sk": record["sk"], "model_id": record["model_id"]}
 

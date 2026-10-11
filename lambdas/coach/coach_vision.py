@@ -355,7 +355,7 @@ def build_content(current: dict, prior: Optional[dict], loader: Callable[[str], 
             try:
                 data = loader(ref["key"])
             except Exception as e:  # noqa: BLE001 — one unreadable object drops one image, never the run
-                logger.warning("[coach_vision] photo unreadable (%s): %s", type(e).__name__, ref["key"])
+                logger.warning("[coach_vision] photo unreadable (%s): pose=%s", type(e).__name__, pose)  # never the key
                 continue
             content.append({"type": "text", "text": f"{pose} ({ref['date']}):"})
             content.append(image_block(data))
@@ -464,10 +464,11 @@ def observe(
         _fail("reply was not a JSON object: " + decode_error(parsed))
     problems = schema_findings(parsed, OBSERVATION_SCHEMA)
     if problems:
-        _fail("observation off-schema: " + "; ".join(problems[:3]))
+        # Paths only: a finding's tail can quote the model's value, and the reason is logged.
+        _fail(f"observation off-schema ({len(problems)} finding(s)): " + "; ".join(p.split(":", 1)[0] for p in problems[:3]))
     low, high = _num(parsed.get("body_fat_low_pct")), _num(parsed.get("body_fat_high_pct"))
     if low is None or high is None or not (0 < low <= high < 70):
-        _fail(f"implausible band {low}-{high}")
+        _fail("implausible band: low/high missing, inverted or outside 0-70")  # never the values — the reason is logged
 
     set_dates = {"current": current["as_of"], "prior": prior["as_of"] if prior else None}
     # The set dates ride in `shown` as well as in the date allow-list: the number gate reads

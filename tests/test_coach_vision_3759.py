@@ -513,3 +513,95 @@ def test_the_mcp_input_literal_is_pinned_to_the_owner_field_set():
 
     assert tuple(tool.GET_COACH_VISION_INPUT["properties"]["fields"]["items"]["enum"]) == cv.OWNER_FIELDS
     assert ", ".join(cv.DEFAULT_FIELDS) in tool.GET_COACH_VISION_INPUT["properties"]["fields"]["description"]
+
+
+# ── no owner-only health data in a log line (CodeQL py/clear-text-logging, PR #4829) ──────
+# The band, the photo keys and the observation text are owner-only; CloudWatch is not the
+# owner-only store. The guard is DERIVED from the modules' source: every logger call and
+# every `_fail(...)` reason (which `_fail` logs at ERROR) is parsed, and no argument may read
+# a sensitive field. Shapes allowed because they carry no value: `len(...)` (a count),
+# `decode_error(...)` (decoder message + position only, ai/structured_json.py) and
+# `x is not None` / `x is None` (the grounded flag).
+_VALUE_FREE_SUMMARIES = {"len", "decode_error"}
+_LOG_GUARDED_MODULES = ("lambdas/coach/coach_vision_lambda.py", "lambdas/coach/coach_vision.py")
+_LOG_METHODS = {"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}
+_SENSITIVE_LOG_TOKENS = {
+    "low_pct",
+    "high_pct",
+    "body_fat_estimate",
+    "body_fat_low_pct",
+    "body_fat_high_pct",
+    "band",
+    "low",
+    "high",
+    "photo_keys",
+    "key",
+    "keys_now",
+    "sent",
+    "qualitative",
+    "observation",
+    "text",
+    "parsed",
+}
+
+
+def _sensitive_log_reads(source: str, filename: str = "<src>") -> list:
+    """`[(filename, lineno, token)]` for every log/_fail argument that reads a sensitive field."""
+    import ast
+
+    def is_log_call(node) -> bool:
+        f = node.func
+        if isinstance(f, ast.Attribute) and f.attr in _LOG_METHODS and isinstance(f.value, ast.Name):
+            return f.value.id in {"logger", "log", "logging"}
+        return isinstance(f, ast.Name) and f.id == "_fail"
+
+    def tokens(node):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _VALUE_FREE_SUMMARIES:
+            return  # a count / a decoder position carries no value
+        if isinstance(node, ast.Compare) and all(isinstance(op, (ast.Is, ast.IsNot)) for op in node.ops):
+            if all(isinstance(c, ast.Constant) and c.value is None for c in node.comparators):
+                return  # a presence flag carries no value
+        if isinstance(node, ast.Name):
+            yield node.lineno, node.id
+        elif isinstance(node, ast.Attribute):
+            yield node.lineno, node.attr
+        elif isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+            yield node.lineno, node.slice.value
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get":
+            for a in node.args[:1]:
+                if isinstance(a, ast.Constant) and isinstance(a.value, str):
+                    yield node.lineno, a.value
+        for child in ast.iter_child_nodes(node):
+            yield from tokens(child)
+
+    out = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call) and is_log_call(node):
+            for arg in list(node.args[1:] if not isinstance(node.func, ast.Name) else node.args) + [k.value for k in node.keywords]:
+                out += [(filename, ln, t) for ln, t in tokens(arg) if t in _SENSITIVE_LOG_TOKENS]
+    return out
+
+
+def test_no_log_line_in_the_coach_vision_modules_carries_owner_only_health_data():
+    offenders = []
+    for rel in _LOG_GUARDED_MODULES:
+        offenders += _sensitive_log_reads((ROOT / rel).read_text(), rel)
+    assert not offenders, "owner-only data in a log line (log pk/sk, model, grounded flag, counts only): " + ", ".join(
+        f"{f}:{ln} reads {t!r}" for f, ln, t in offenders
+    )
+
+    # Mutation control: the reverted shape (the band in the write log line) must be caught,
+    # and so must a photo key in a warning and a band value in a `_fail` reason.
+    reverted = (
+        (ROOT / _LOG_GUARDED_MODULES[0])
+        .read_text()
+        .replace(
+            'record["model_id"],\n        record["qualitative"] is not None,',
+            'record["model_id"],\n        record["body_fat_estimate"]["low_pct"],\n        record["qualitative"] is not None,',
+        )
+    )
+    assert "low_pct" in reverted, "mutation control did not apply — the write log line moved; update the anchor"
+    assert any(t == "low_pct" for _, _, t in _sensitive_log_reads(reverted))
+    assert _sensitive_log_reads('logger.warning("x %s", ref["key"])')
+    assert _sensitive_log_reads('_fail(f"implausible band {low}-{high}")')
+    assert not _sensitive_log_reads('logger.info("%s grounded=%s n=%d", pk, rec["qualitative"] is not None, len(sent))')
