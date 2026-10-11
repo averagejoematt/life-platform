@@ -144,6 +144,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "coach-vision-no-invocations-7d": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "compute_stack",
+      "via": "declaration"
+    },
     "coherence-heartbeat": {
       "kind": "metric",
       "routing": "digest",
@@ -1010,10 +1016,10 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 24,
-    "alarms": 139,
+    "ai_features": 25,
+    "alarms": 140,
     "emf_namespaces": 33,
-    "schedules": 93,
+    "schedules": 95,
     "secrets": 30
   },
   "edges": [
@@ -1197,6 +1203,41 @@
       "lambda": "coach-prediction-evaluator",
       "module": "lambdas/coach/coach_prediction_evaluator.py",
       "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "coach_vision",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "coach_vision",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "dexa",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "measurements",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "progress_photos",
       "via": "pk"
     },
     {
@@ -6507,6 +6548,20 @@
       "stack": "compute_stack",
       "timeout_seconds": 60
     },
+    "coach-vision": {
+      "declared_alarm": null,
+      "handler": "coach.coach_vision_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/coach/coach_vision_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 180
+    },
     "daily-brief": {
       "declared_alarm": null,
       "handler": "emails.daily_brief_lambda.lambda_handler",
@@ -7488,6 +7543,10 @@
       "module": "lambdas/emails/wednesday_chronicle_lambda.py",
       "schedules": [
         {
+          "expr": "cron(0 1 * * WED *)",
+          "resolution": "constructed"
+        },
+        {
           "expr": "cron(0 15 ? * WED *)",
           "resolution": "constant"
         },
@@ -7618,9 +7677,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 139,
+      "alarms": 140,
       "alarms_by_routing": {
-        "digest": 95,
+        "digest": 96,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7632,27 +7691,27 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 737,
-      "lambdas": 108,
-      "mcp_tool_modules": 35,
-      "mcp_tools": 87,
-      "partitions": 114,
+      "edges": 742,
+      "lambdas": 109,
+      "mcp_tool_modules": 36,
+      "mcp_tools": 88,
+      "partitions": 115,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 17,
+      "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 83,
-      "schedules": 93
+      "scheduled_lambdas": 84,
+      "schedules": 95
     },
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 922,
-        "sites_total": 1283
+        "sites_resolved": 930,
+        "sites_total": 1291
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 83
+        "resolved": 84
       }
     },
     "non_census_families": [
@@ -7768,6 +7827,11 @@
       "class": "system_state",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "coach_vision": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "composite_scores": {
       "class": "system_state",
@@ -8408,6 +8472,7 @@
     },
     "sources": {
       "cgm_readings": "owner_only",
+      "coach_vision": "owner_only",
       "dexa": "owner_published",
       "felt_probe": "owner_only",
       "flourishing": "owner_only",
@@ -8441,6 +8506,13 @@
       "lambda": "dashboard-refresh",
       "resolution": "constant",
       "stack": "compute_stack",
+      "utc": "01:00"
+    },
+    {
+      "expr": "cron(0 1 * * WED *)",
+      "lambda": "wednesday-chronicle",
+      "resolution": "constructed",
+      "stack": "email_stack",
       "utc": "01:00"
     },
     {
@@ -8747,6 +8819,13 @@
     {
       "expr": "cron(0 17 ? * SUN *)",
       "lambda": "coach-history-summarizer",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "17:00"
+    },
+    {
+      "expr": "cron(0 17 ? * MON *)",
+      "lambda": "coach-vision",
       "resolution": "constant",
       "stack": "compute_stack",
       "utc": "17:00"

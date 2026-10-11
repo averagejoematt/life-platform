@@ -1355,6 +1355,46 @@ def _send_story_questions(event):
     return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": len(questions)})}
 
 
+#: #4584: the Tuesday question's send-once marker, beside Monday's ``STORYQ#W<n>`` in the chronicle partition. A
+#: suffix, not a new prefix, so story_season_qa's Monday check (an EXACT sk match) never reads it as Monday's send.
+TUESDAY_MARKER_SUFFIX = "#TUE"
+
+
+def _send_tuesday_question(event):
+    """#4584: Tuesday evening PT — ONE fixed question by email, on the Story Desk's channel and routing token, so his
+    reply lands verbatim in the owner-words store (and the week's STORYQA row) before Wednesday's edition. No model
+    call, no dossier read. Never blocks anything; sends once per week (the marker), ``force`` re-sends."""
+    import datetime as _dtm
+
+    from common.pacific_time import pacific_today
+    from content import story_dossier, story_questions
+
+    today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()
+    week = story_dossier.week_containing(today.isoformat())
+    if week is None:
+        return {"statusCode": 200, "body": json.dumps({"status": "no_week"})}
+    n = week["week"]
+    marker = {"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"STORYQ#W{n:03d}{TUESDAY_MARKER_SUFFIX}"}
+    if not event.get("force") and table.get_item(Key=marker).get("Item"):
+        return {"statusCode": 200, "body": json.dumps({"status": "already_sent", "week": n})}
+    question = story_questions.tuesday_question(n)
+    if event.get("dry_run"):
+        return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "question": question})}
+    resp = story_questions.send_tuesday(ses, week=n, question=question, to=RECIPIENT, sender=SENDER)
+    from experiment.phase_taxonomy import experiment_stamp_for
+
+    table.put_item(
+        Item={
+            **marker,
+            "questions_json": json.dumps([question]),
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "message_id": resp.get("MessageId", ""),
+            **experiment_stamp_for(marker["pk"], marker["sk"]),  # #3599: the class-gated write-time stamp
+        }
+    )
+    return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": 1})}
+
+
 def lambda_handler(event: dict, context) -> dict:
     """#2669: timeout-watchdog wrapper (common.timeout_watchdog) — _handler_core is the real flow."""
     from common.timeout_watchdog import arm, disarm
@@ -1367,6 +1407,8 @@ def lambda_handler(event: dict, context) -> dict:
     try:
         if isinstance(event, dict) and event.get("story_questions"):
             return _send_story_questions(event)  # #4546: Monday's optional questions — never touches the week's chronicle
+        if isinstance(event, dict) and event.get("tuesday_question"):
+            return _send_tuesday_question(event)  # #4584: Tuesday's one question — never touches the week's chronicle
         return _handler_core(event, context)
     finally:
         disarm(timer)

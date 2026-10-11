@@ -87,6 +87,20 @@ The reply only lands if the address he replies from is in the parser's `ALLOWED_
 (`cdk/stacks/operational_stack.py`). The questions are mailed to `EMAIL_RECIPIENT`, and a
 reply from an address outside that list is dropped with a log line (#4546).
 
+### The Tuesday question (#4584)
+
+A second rule, `OwnerWordsQuestionTuesday` (`cdk/stacks/email_stack.py`), sends one more
+question each Tuesday evening Pacific: `cron(0 1 ? * WED *)`, which is 18:00 PDT and 17:00 PST
+(the platform's crons are fixed UTC). It goes to the same `wednesday-chronicle` function with
+`{"tuesday_question": true}`. The question is fixed, chosen from
+`story_questions.TUESDAY_QUESTIONS` by week number, so there is no model call. The email carries
+the same `[SQ-W<n>]` token, which sends his reply down the route above, behind the same sender
+check: a `STORYQA#W` row for the chronicle and a verbatim owner-words entry that leads
+Wednesday's edition. A one-question email is usually answered above the quote with no `Q1:`
+label. `parse_reply` pairs such a reply with Q1 only when exactly one question was asked. The send
+is once a week, recorded by the marker `STORYQ#W{n}#TUE` (the Monday check matches its own marker
+exactly, so this one never stands in for it). There is no dead-man for the Tuesday send yet.
+
 ## The dead-men
 
 `lambdas/operational/story_season_qa.py` (#4539) runs three checks inside the nightly

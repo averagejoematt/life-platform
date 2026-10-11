@@ -518,7 +518,7 @@ def handle_review_pack_reply(reply_text, subject, sender, dry_run=False):
     return {"applied": applied, "unresolved": unresolved}
 
 
-def _store_owner_words(body_text, week, received_at, source_key):
+def _store_owner_words(body_text, week, received_at, source_key, questions=None):
     """#4584: one owner-words entry per answered question of a Story Desk reply (channel ``email``, the question as
     the prompt, the answer exactly as typed, off record when he marked it). Unanswered questions write nothing.
 
@@ -528,7 +528,7 @@ def _store_owner_words(body_text, week, received_at, source_key):
     from content import owner_words
 
     try:
-        answers = story_questions.parse_reply(body_text, keep_raw=True)
+        answers = story_questions.parse_reply(body_text, questions, keep_raw=True)
         entries = owner_words.entries_from_story_reply(answers, week=week, received_at=received_at, source_key=source_key)
         written = 0
         for entry in entries:
@@ -694,7 +694,8 @@ def lambda_handler(event, context):
             # line and would drop them) and stored as that week's owner voice. Never generates a confirmation mail.
             sq_week = story_questions.week_from_subject(subject)
             if sq_week is not None:
-                sq_answers = story_questions.parse_reply(body_text)
+                sq_questions = story_questions.questions_for_subject(subject)  # #4584: the Tuesday reply's one question
+                sq_answers = story_questions.parse_reply(body_text, sq_questions)
                 print(f"[INFO] story-questions reply for week {sq_week}: {len(sq_answers)} answer(s)")
                 if sq_answers and not dry_run:
                     sq_received_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -710,7 +711,7 @@ def lambda_handler(event, context):
                     # #4584: each answer ALSO lands in the owner-words store, word for word, with its question as the
                     # prompt. After the chronicle's row, and never able to undo it: a failure here is persisted and
                     # counted, and the chronicle still has his voice.
-                    _store_owner_words(body_text, sq_week, sq_received_at, key)
+                    _store_owner_words(body_text, sq_week, sq_received_at, key, sq_questions)
                     send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
                 continue
             if verdict != "allowed":  # #4546: a STORY_REPLY_SENDERS address reaches the desk's route and nothing else
