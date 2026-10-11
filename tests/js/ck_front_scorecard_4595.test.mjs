@@ -31,11 +31,14 @@ test("every row prints its verdict in words beside its own sentence, in the serv
     at = i;
   }
   assert.match(plain, /How the whole thing is going/);
-  // The fixture's verdicts include all three decided kinds: the dot is never the only carrier.
-  assert.match(plain, /Faster than planned\./);
-  assert.match(plain, /Not enough data\./);
-  assert.match(plain, /Going well\./);
-  assert.match(plain, /Not yet\./);
+  // #4809: each verdict's words say what happened against its rule — "No rest day.", never
+  // "Not yet." over "Trained on 7 of 7 days recorded." The bare verdict words are never printed.
+  assert.match(plain, /Training No rest day\. Trained on 7 of 7 days recorded\./);
+  assert.match(plain, /Body Weight down faster than planned\./);
+  assert.match(plain, /Food Too few days logged\./);
+  for (const word of ["Not yet.", "Going well.", "Not enough data.", "Faster than planned."]) assert.ok(!plain.includes(` ${word}`), `a bare "${word}"`);
+  // The AI row says its count is to date, and its rule says so too.
+  assert.match(plain, /The AI The coaches do not beat a simple guess yet\. Counted across all 96 calls checked to date, not this week's alone\./);
 });
 
 test("the rules and the day they were set are printed with the rows", () => {
@@ -63,9 +66,9 @@ test("what went right prints a line for each party with something to show, and n
 test("the mark is filled for a row that earned it — going well or faster than planned — and the page can drop the kicker (round 8)", () => {
   const html = F.scorecardHTML(SC, "/next/v8/");
   const row = (name) => html.split("<li>").find((li) => li.includes(`>${name}</a>`) || li.includes(`>${name}</span>`));
-  assert.match(row("Body"), /<i class="ck-dot" aria-hidden="true"><\/i><b>Faster than planned\.<\/b>/);
-  assert.match(row("Sleep"), /<i class="ck-dot" aria-hidden="true"><\/i><b>Going well\.<\/b>/);
-  assert.match(row("Training"), /<i class="ck-dot ck-dot--off" aria-hidden="true"><\/i><b>Not yet\.<\/b>/);
+  assert.match(row("Body"), /<i class="ck-dot" aria-hidden="true"><\/i><b>Weight down faster than planned\.<\/b>/);
+  assert.match(row("Sleep"), /<i class="ck-dot" aria-hidden="true"><\/i><b>5 or more long nights\.<\/b>/);
+  assert.match(row("Training"), /<i class="ck-dot ck-dot--off" aria-hidden="true"><\/i><b>No rest day\.<\/b>/);
   assert.match(row("Training"), /<span class="ck-small">Days trained in the last seven/, "the rule sits under the row it decided");
   assert.doesNotMatch(F.scorecardHTML(SC, "/next/v8/", { label: false }), /How the whole thing is going/);
   assert.match(F.scorecardHTML(SC, "/next/v8/"), /How the whole thing is going/);

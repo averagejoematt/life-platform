@@ -23,7 +23,7 @@
 import { tryJSON, esc, fmtShort } from "/assets/js/evidence_shared.js";
 import { dayInWords } from "/assets/js/entry_age.js";
 import { callHref, callsOf, withFrom, backFor, setBack } from "/assets/js/ck_call.js";
-import { callVerdictTag } from "/assets/js/ck_verdict.js";
+import { callCardHTML, hasRule, ruleless } from "/assets/js/ck_verdict.js";
 
 const LB_PER_KG = 2.20462;
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -317,25 +317,30 @@ export function daySaidHTML(iso, movesBody, base) {
   const bets = [...new Set(lines.map((l) => l.bet_settles).filter(isDay))].map((d) => soft(`A bet opened in these lines settles ${dayInWords(d)}.`)).join("");
   return `<p class="ck-label">The coaches</p><h2>What the coaches said.</h2><ul class="ck-coach">${rows}</ul>${bets}`;
 }
-// One settled call on a day: the served `called` sentence (it carries the rule the call
-// was checked by), what happened, the verdict, and the door to the call's own page.
+// One settled call on a day, in the house order every page uses (#4808): the verdict with its
+// rule, the call with the result in bold, then what the allowed distance is and the door.
 function settledRow(call, base, iso = "") {
-  // A bet has a verdict per side, so the route's own sentence stands; any other call takes
-  // the shared tag, which never prints a verdict without the rule that decided it (#4647).
-  const verdict = call.kind === "bet" ? `<span class="ck-soft">${esc(call.verdict_text || "Settled")}</span>` : callVerdictTag(call);
-  return `<li>${verdict}<span>${esc(call.called_short || call.called)}</span><span class="ck-soft">${esc(call.happened_short)}</span><a class="ck-link" href="${esc(withFrom(callHref(base, call.id), iso))}">The whole call</a></li>`;
+  const href = withFrom(callHref(base, call.id), iso);
+  // A bet has a verdict per side, so the route's own sentence stands, in the same order.
+  if (call.kind === "bet") {
+    return `<li><span class="ck-soft">${esc(call.verdict_text || "Settled")}</span><span>${esc(call.called_short || call.called)} <b>${esc(call.happened_short)}</b></span><a class="ck-link" href="${esc(href)}">The whole call</a></li>`;
+  }
+  return callCardHTML(call, { href, wrap: "li" });
 }
 // Every call settled on the day, from GET /api/calls. "" when none settled that day. Under
 // the coaches' lines it takes a label, not a second heading: the two are one part of the day.
 export function daySettledHTML(iso, callsBody, base, { under = false } = {}) {
-  const calls = callsOf(callsBody).filter((c) => c.settled_date === iso);
-  if (!calls.length) return "";
+  // A call with no readable rule is never shown as right or wrong (#4808): left out, and counted.
+  const day = callsOf(callsBody).filter((c) => c.settled_date === iso);
+  const calls = day.filter((c) => c.kind === "bet" || hasRule(c));
+  const skipped = soft(ruleless(day.length - calls.length));
+  if (!calls.length) return skipped;
   const list = (items) => `<ul class="ck-coach">${items.map((c) => settledRow(c, base, iso)).join("")}</ul>`;
   const rest = calls.slice(SETTLED_FIRST);
   const more = rest.length ? `<details><summary>${rest.length} more settled this day</summary>${list(rest)}</details>` : "";
   const title = calls.length === 1 ? "A call was checked this day." : `${calls.length} calls were checked this day.`;
   const head = under ? `<p class="ck-label">${esc(title)}</p>` : `<p class="ck-label">Settled</p><h2>${esc(title)}</h2>`;
-  return `${head}${list(calls.slice(0, SETTLED_FIRST))}${more}`;
+  return `${head}${list(calls.slice(0, SETTLED_FIRST))}${more}${skipped}`;
 }
 // Both, in reading order, as ONE section. "" for a day with neither: the page prints
 // nothing extra.

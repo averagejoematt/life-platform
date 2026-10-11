@@ -91,11 +91,13 @@
       "sides": [
        {
         "coach": "Nathan Reeves",
-        "says": "no"
+        "says": "no",
+        "reason": "Fuel-cognition link may be slower than estimated or barrier is not primarily metabolic"
        },
        {
         "coach": "Marcus Webb",
-        "says": "yes"
+        "says": "yes",
+        "reason": "Protein intake gap (102g vs 190g target) mechanistically suppresses cognition through tryptophan availability"
        }
       ]
      }
@@ -827,8 +829,8 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 89.1 for September 26. A call like this counts as right within 21.5 either way, his usual day-to-day swing.",
-      "called_short": "Lisa Park called his morning recovery score at about 89.1.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 89 for September 26.",
+      "called_short": "Lisa Park called his morning recovery score at about 89.",
       "happened_short": "It came in at 77.",
       "settled_date": "2026-10-09",
       "verdict": "right",
@@ -836,6 +838,13 @@
       "actual": {
        "value": 77.0,
        "text": "77"
+      },
+      "tolerance": {
+       "value": 21.4664,
+       "text": "21.5",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "scored",
@@ -849,8 +858,8 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 83.7 for September 24. A call like this counts as right within 20.9 either way, his usual day-to-day swing.",
-      "called_short": "Lisa Park called his morning recovery score at about 83.7.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 84 for September 24.",
+      "called_short": "Lisa Park called his morning recovery score at about 84.",
       "happened_short": "It came in at 86.",
       "settled_date": "2026-10-07",
       "verdict": "right",
@@ -858,6 +867,13 @@
       "actual": {
        "value": 86.0,
        "text": "86"
+      },
+      "tolerance": {
+       "value": 20.8524,
+       "text": "20.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "scored",
@@ -893,8 +909,8 @@
       "kind": "number",
       "coach_id": "physical",
       "coach_name": "Max Reyes",
-      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 86.1 for September 23. A call like this counts as right within 22.4 either way, his usual day-to-day swing.",
-      "called_short": "Max Reyes called his morning recovery score at about 86.1.",
+      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 86 for September 23.",
+      "called_short": "Max Reyes called his morning recovery score at about 86.",
       "happened_short": "It came in at 80.",
       "settled_date": "2026-10-06",
       "verdict": "right",
@@ -902,6 +918,13 @@
       "actual": {
        "value": 80.0,
        "text": "80"
+      },
+      "tolerance": {
+       "value": 22.3731,
+       "text": "22.4",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "scored",
@@ -915,8 +938,8 @@
       "kind": "number",
       "coach_id": "labs",
       "coach_name": "James Okafor",
-      "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 86.1 for September 23. A call like this counts as right within 22.4 either way, his usual day-to-day swing.",
-      "called_short": "James Okafor called his morning recovery score at about 86.1.",
+      "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 86 for September 23.",
+      "called_short": "James Okafor called his morning recovery score at about 86.",
       "happened_short": "It came in at 80.",
       "settled_date": "2026-10-06",
       "verdict": "right",
@@ -924,6 +947,13 @@
       "actual": {
        "value": 80.0,
        "text": "80"
+      },
+      "tolerance": {
+       "value": 22.3731,
+       "text": "22.4",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "scored",
@@ -959,8 +989,8 @@
       "kind": "number",
       "coach_id": "explorer",
       "coach_name": "Henning Brandt",
-      "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 83.7 for September 20. A call like this counts as right within 22.5 either way, his usual day-to-day swing.",
-      "called_short": "Henning Brandt called his morning recovery score at about 83.7.",
+      "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 84 for September 20.",
+      "called_short": "Henning Brandt called his morning recovery score at about 84.",
       "happened_short": "It came in at 97.",
       "settled_date": "2026-10-03",
       "verdict": "right",
@@ -968,6 +998,13 @@
       "actual": {
        "value": 97.0,
        "text": "97"
+      },
+      "tolerance": {
+       "value": 22.4603,
+       "text": "22.5",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -981,7 +1018,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.8 hours for September 26. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.8 hours for September 26.",
       "called_short": "Lisa Park called his sleep time at about 7.8 hours.",
       "happened_short": "It came in at 8.6 hours.",
       "settled_date": "2026-10-02",
@@ -990,6 +1027,13 @@
       "actual": {
        "value": 8.61,
        "text": "8.6 hours"
+      },
+      "tolerance": {
+       "value": 1.2107,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1003,7 +1047,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.4 hours for September 24. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.4 hours for September 24.",
       "called_short": "Lisa Park called his sleep time at about 7.4 hours.",
       "happened_short": "It came in at 6.7 hours.",
       "settled_date": "2026-09-30",
@@ -1012,6 +1056,13 @@
       "actual": {
        "value": 6.69,
        "text": "6.7 hours"
+      },
+      "tolerance": {
+       "value": 1.1787,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1047,8 +1098,8 @@
       "kind": "number",
       "coach_id": "mind",
       "coach_name": "Nathan Reeves",
-      "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59.3 for September 15. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-      "called_short": "Nathan Reeves called his morning recovery score at about 59.3.",
+      "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59 for September 15.",
+      "called_short": "Nathan Reeves called his morning recovery score at about 59.",
       "happened_short": "It came in at 82.",
       "settled_date": "2026-09-28",
       "verdict": "wrong",
@@ -1056,6 +1107,13 @@
       "actual": {
        "value": 82.0,
        "text": "82"
+      },
+      "tolerance": {
+       "value": 18.5929,
+       "text": "18.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1069,8 +1127,8 @@
       "kind": "number",
       "coach_id": "physical",
       "coach_name": "Max Reyes",
-      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 57.9 for September 14. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-      "called_short": "Max Reyes called his morning recovery score at about 57.9.",
+      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 58 for September 14.",
+      "called_short": "Max Reyes called his morning recovery score at about 58.",
       "happened_short": "It came in at 63.",
       "settled_date": "2026-09-27",
       "verdict": "right",
@@ -1078,6 +1136,13 @@
       "actual": {
        "value": 63.0,
        "text": "63"
+      },
+      "tolerance": {
+       "value": 18.6473,
+       "text": "18.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1098,6 +1163,7 @@
       "verdict": "right",
       "verdict_text": "James Okafor was right.",
       "actual": null,
+      "tolerance": null,
       "simple_guess": {
        "state": "not_yet_scored",
        "right": null,
@@ -1117,6 +1183,7 @@
       "verdict": "wrong",
       "verdict_text": "Henning Brandt was wrong.",
       "actual": null,
+      "tolerance": null,
       "simple_guess": {
        "state": "not_yet_scored",
        "right": null,
@@ -1129,8 +1196,8 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 52.9 for September 13. A call like this counts as right within 18.3 either way, his usual day-to-day swing.",
-      "called_short": "Lisa Park called his morning recovery score at about 52.9.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 13.",
+      "called_short": "Lisa Park called his morning recovery score at about 53.",
       "happened_short": "It came in at 73.",
       "settled_date": "2026-09-26",
       "verdict": "wrong",
@@ -1138,6 +1205,13 @@
       "actual": {
        "value": 73.0,
        "text": "73"
+      },
+      "tolerance": {
+       "value": 18.2532,
+       "text": "18.3",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1151,8 +1225,8 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-      "called_short": "Lisa Park called his morning recovery score at about 52.9.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 12.",
+      "called_short": "Lisa Park called his morning recovery score at about 53.",
       "happened_short": "It came in at 59.",
       "settled_date": "2026-09-25",
       "verdict": "right",
@@ -1160,6 +1234,13 @@
       "actual": {
        "value": 59.0,
        "text": "59"
+      },
+      "tolerance": {
+       "value": 18.6158,
+       "text": "18.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1173,8 +1254,8 @@
       "kind": "number",
       "coach_id": "mind",
       "coach_name": "Nathan Reeves",
-      "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-      "called_short": "Nathan Reeves called his morning recovery score at about 52.9.",
+      "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 12.",
+      "called_short": "Nathan Reeves called his morning recovery score at about 53.",
       "happened_short": "It came in at 59.",
       "settled_date": "2026-09-25",
       "verdict": "right",
@@ -1182,6 +1263,13 @@
       "actual": {
        "value": 59.0,
        "text": "59"
+      },
+      "tolerance": {
+       "value": 18.6158,
+       "text": "18.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1195,8 +1283,8 @@
       "kind": "number",
       "coach_id": "glucose",
       "coach_name": "Amara Patel",
-      "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 52.9 for September 12. A call like this counts as right within 18.6 either way, his usual day-to-day swing.",
-      "called_short": "Amara Patel called his morning recovery score at about 52.9.",
+      "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 53 for September 12.",
+      "called_short": "Amara Patel called his morning recovery score at about 53.",
       "happened_short": "It came in at 59.",
       "settled_date": "2026-09-25",
       "verdict": "right",
@@ -1204,6 +1292,13 @@
       "actual": {
        "value": 59.0,
        "text": "59"
+      },
+      "tolerance": {
+       "value": 18.6158,
+       "text": "18.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1217,7 +1312,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.3 hours for September 18. A call like this counts as right within 1.3 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.3 hours for September 18.",
       "called_short": "Lisa Park called his sleep time at about 7.3 hours.",
       "happened_short": "It came in at 7.9 hours.",
       "settled_date": "2026-09-24",
@@ -1226,6 +1321,13 @@
       "actual": {
        "value": 7.91,
        "text": "7.9 hours"
+      },
+      "tolerance": {
+       "value": 1.2521,
+       "text": "1.3 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1239,8 +1341,8 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66.2 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-      "called_short": "Lisa Park called his morning recovery score at about 66.2.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66 for September 11.",
+      "called_short": "Lisa Park called his morning recovery score at about 66.",
       "happened_short": "It came in at 24.",
       "settled_date": "2026-09-24",
       "verdict": "wrong",
@@ -1248,6 +1350,13 @@
       "actual": {
        "value": 24.0,
        "text": "24"
+      },
+      "tolerance": {
+       "value": 17.9488,
+       "text": "17.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1261,8 +1370,8 @@
       "kind": "number",
       "coach_id": "physical",
       "coach_name": "Max Reyes",
-      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59.5 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-      "called_short": "Max Reyes called his morning recovery score at about 59.5.",
+      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 60 for September 11.",
+      "called_short": "Max Reyes called his morning recovery score at about 60.",
       "happened_short": "It came in at 24.",
       "settled_date": "2026-09-24",
       "verdict": "wrong",
@@ -1270,6 +1379,13 @@
       "actual": {
        "value": 24.0,
        "text": "24"
+      },
+      "tolerance": {
+       "value": 17.9488,
+       "text": "17.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1283,8 +1399,8 @@
       "kind": "number",
       "coach_id": "mind",
       "coach_name": "Nathan Reeves",
-      "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59.5 for September 11. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-      "called_short": "Nathan Reeves called his morning recovery score at about 59.5.",
+      "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 60 for September 11.",
+      "called_short": "Nathan Reeves called his morning recovery score at about 60.",
       "happened_short": "It came in at 24.",
       "settled_date": "2026-09-24",
       "verdict": "wrong",
@@ -1292,6 +1408,13 @@
       "actual": {
        "value": 24.0,
        "text": "24"
+      },
+      "tolerance": {
+       "value": 17.9488,
+       "text": "17.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1305,8 +1428,8 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66.2 for September 10. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-      "called_short": "Lisa Park called his morning recovery score at about 66.2.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66 for September 10.",
+      "called_short": "Lisa Park called his morning recovery score at about 66.",
       "happened_short": "It came in at 44.",
       "settled_date": "2026-09-23",
       "verdict": "wrong",
@@ -1314,6 +1437,13 @@
       "actual": {
        "value": 44.0,
        "text": "44"
+      },
+      "tolerance": {
+       "value": 17.9239,
+       "text": "17.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1327,8 +1457,8 @@
       "kind": "number",
       "coach_id": "glucose",
       "coach_name": "Amara Patel",
-      "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66.2 for September 10. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
-      "called_short": "Amara Patel called his morning recovery score at about 66.2.",
+      "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 66 for September 10.",
+      "called_short": "Amara Patel called his morning recovery score at about 66.",
       "happened_short": "It came in at 44.",
       "settled_date": "2026-09-23",
       "verdict": "wrong",
@@ -1336,6 +1466,13 @@
       "actual": {
        "value": 44.0,
        "text": "44"
+      },
+      "tolerance": {
+       "value": 17.9239,
+       "text": "17.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1349,7 +1486,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9.",
       "called_short": "Lisa Park called his morning recovery score at about 61.",
       "happened_short": "It came in at 64.",
       "settled_date": "2026-09-22",
@@ -1358,6 +1495,13 @@
       "actual": {
        "value": 64.0,
        "text": "64"
+      },
+      "tolerance": {
+       "value": 17.6379,
+       "text": "17.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1371,7 +1515,7 @@
       "kind": "number",
       "coach_id": "physical",
       "coach_name": "Max Reyes",
-      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+      "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9.",
       "called_short": "Max Reyes called his morning recovery score at about 61.",
       "happened_short": "It came in at 64.",
       "settled_date": "2026-09-22",
@@ -1380,6 +1524,13 @@
       "actual": {
        "value": 64.0,
        "text": "64"
+      },
+      "tolerance": {
+       "value": 17.6379,
+       "text": "17.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1393,7 +1544,7 @@
       "kind": "number",
       "coach_id": "explorer",
       "coach_name": "Henning Brandt",
-      "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9. A call like this counts as right within 17.6 either way, his usual day-to-day swing.",
+      "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 9.",
       "called_short": "Henning Brandt called his morning recovery score at about 61.",
       "happened_short": "It came in at 64.",
       "settled_date": "2026-09-22",
@@ -1402,6 +1553,13 @@
       "actual": {
        "value": 64.0,
        "text": "64"
+      },
+      "tolerance": {
+       "value": 17.6379,
+       "text": "17.6",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1415,7 +1573,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 8. A call like this counts as right within 17.9 either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 61 for September 8.",
       "called_short": "Lisa Park called his morning recovery score at about 61.",
       "happened_short": "It came in at 67.",
       "settled_date": "2026-09-21",
@@ -1424,6 +1582,13 @@
       "actual": {
        "value": 67.0,
        "text": "67"
+      },
+      "tolerance": {
+       "value": 17.9029,
+       "text": "17.9",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1444,6 +1609,7 @@
       "verdict": "right",
       "verdict_text": "Lisa Park was right.",
       "actual": null,
+      "tolerance": null,
       "simple_guess": {
        "state": "not_yet_scored",
        "right": null,
@@ -1463,6 +1629,7 @@
       "verdict": "right",
       "verdict_text": "Nathan Reeves was right.",
       "actual": null,
+      "tolerance": null,
       "simple_guess": {
        "state": "not_yet_scored",
        "right": null,
@@ -1482,6 +1649,7 @@
       "verdict": "right",
       "verdict_text": "James Okafor was right.",
       "actual": null,
+      "tolerance": null,
       "simple_guess": {
        "state": "not_yet_scored",
        "right": null,
@@ -1501,6 +1669,7 @@
       "verdict": "right",
       "verdict_text": "Henning Brandt was right.",
       "actual": null,
+      "tolerance": null,
       "simple_guess": {
        "state": "not_yet_scored",
        "right": null,
@@ -1513,7 +1682,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.2 hours for September 13. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.2 hours for September 13.",
       "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
       "happened_short": "It came in at 9 hours.",
       "settled_date": "2026-09-19",
@@ -1522,6 +1691,13 @@
       "actual": {
        "value": 8.98,
        "text": "9 hours"
+      },
+      "tolerance": {
+       "value": 1.2395,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1535,7 +1711,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.2 hours for September 12. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.2 hours for September 12.",
       "called_short": "Lisa Park called his sleep time at about 7.2 hours.",
       "happened_short": "It came in at 8.8 hours.",
       "settled_date": "2026-09-18",
@@ -1544,6 +1720,13 @@
       "actual": {
        "value": 8.76,
        "text": "8.8 hours"
+      },
+      "tolerance": {
+       "value": 1.2273,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1557,7 +1740,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.1 hours for September 11. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.1 hours for September 11.",
       "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
       "happened_short": "It came in at 4.7 hours.",
       "settled_date": "2026-09-17",
@@ -1566,6 +1749,13 @@
       "actual": {
        "value": 4.7,
        "text": "4.7 hours"
+      },
+      "tolerance": {
+       "value": 1.1708,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1579,7 +1769,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7 hours for September 10. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7 hours for September 10.",
       "called_short": "Lisa Park called his sleep time at about 7 hours.",
       "happened_short": "It came in at 7.5 hours.",
       "settled_date": "2026-09-16",
@@ -1588,6 +1778,13 @@
       "actual": {
        "value": 7.46,
        "text": "7.5 hours"
+      },
+      "tolerance": {
+       "value": 1.1708,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1601,7 +1798,7 @@
       "kind": "number",
       "coach_id": "sleep",
       "coach_name": "Lisa Park",
-      "called": "Lisa Park called his sleep time at about 7.1 hours for September 9. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Lisa Park called his sleep time at about 7.1 hours for September 9.",
       "called_short": "Lisa Park called his sleep time at about 7.1 hours.",
       "happened_short": "It came in at 6.5 hours.",
       "settled_date": "2026-09-15",
@@ -1610,6 +1807,13 @@
       "actual": {
        "value": 6.48,
        "text": "6.5 hours"
+      },
+      "tolerance": {
+       "value": 1.182,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1623,7 +1827,7 @@
       "kind": "number",
       "coach_id": "explorer",
       "coach_name": "Henning Brandt",
-      "called": "Henning Brandt called his sleep time at about 7.1 hours for September 9. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Henning Brandt called his sleep time at about 7.1 hours for September 9.",
       "called_short": "Henning Brandt called his sleep time at about 7.1 hours.",
       "happened_short": "It came in at 6.5 hours.",
       "settled_date": "2026-09-15",
@@ -1632,6 +1836,13 @@
       "actual": {
        "value": 6.48,
        "text": "6.5 hours"
+      },
+      "tolerance": {
+       "value": 1.182,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 31
       },
       "simple_guess": {
        "state": "not_yet_scored",
@@ -1645,7 +1856,7 @@
       "kind": "number",
       "coach_id": "explorer",
       "coach_name": "Henning Brandt",
-      "called": "Henning Brandt called his sleep time at about 7 hours for September 7. A call like this counts as right within 1.2 hours either way, his usual day-to-day swing.",
+      "called": "Henning Brandt called his sleep time at about 7 hours for September 7.",
       "called_short": "Henning Brandt called his sleep time at about 7 hours.",
       "happened_short": "It came in at 8.4 hours.",
       "settled_date": "2026-09-13",
@@ -1654,6 +1865,13 @@
       "actual": {
        "value": 8.37,
        "text": "8.4 hours"
+      },
+      "tolerance": {
+       "value": 1.2082,
+       "text": "1.2 hours",
+       "statistic": "one standard deviation of his readings over the 30 days before the call",
+       "window_days": 30,
+       "n": 30
       },
       "simple_guess": {
        "state": "not_yet_scored",
