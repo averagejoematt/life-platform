@@ -51,6 +51,9 @@ from __future__ import annotations
 import json
 import math
 import re
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -58,8 +61,28 @@ from coach.persona_registry import plain_name as _registry_plain_name
 from common import subscriber_cadence as sc
 from common.pacific_time import day_in_words, pacific_date_of, pacific_day_n, parse_day_key, parse_iso_utc
 
-#: The page order. The front page renders blocks in exactly this sequence.
-ORDER = ("premise", "chapter", "next", "today", "week", "life", "coach_lines", "scorecard", "record", "his_words", "catch_up", "follow")
+#: The block order. The last four (#4582 box 1, the front page makes one data request) are
+#: what the front page and the week page read from their own routes until then: the last
+#: seven days of coach lines, the settled calls, the character sheet's level and the lead
+#: coach's weekly read.
+ORDER = (
+    "premise",
+    "chapter",
+    "next",
+    "today",
+    "week",
+    "life",
+    "coach_lines",
+    "scorecard",
+    "record",
+    "his_words",
+    "catch_up",
+    "follow",
+    "moves",
+    "calls",
+    "sheet",
+    "lead_read",
+)
 
 #: Upstream key -> the route (or public file) it is read from. The key is the ``bodies``
 #: key ``compose()`` reads; the value is what every block's ``source`` names.
@@ -85,6 +108,11 @@ SOURCES = {
     # The last seven days (#4586): one value per day per measure.
     "pulse": "/api/pulse_history",
     "training": "/api/training_overview",
+    # #4582 box 1: the reads the front page and the week page still made beside the edition.
+    "moves": "/api/coach_moves",  # one body per day of the last seven (read_moves)
+    "calls": "/api/calls",  # read in the record's own partition sweep (NARROW_JOBS["record"])
+    "character": "/api/character",
+    "priority": "/api/weekly_priority",
 }
 
 #: The two public manifests are S3 objects under generated/ (CloudFront strips the prefix).
@@ -106,11 +134,6 @@ CACHE_SECONDS = 300  # the neighbours' cache (/api/coach_docket, /api/decisions,
 # ``voice: "restated"``. It stands in only when no current day of moves (#4583) is served.
 COACH_VOICE = "restated"
 COACH_VOICE_MOVE = "move"  # #4583: each line is a move a coach made today, checked in code against one fact sheet
-
-# TODO(scorecard follow-up under epic #4580): the "More than weight" rows (body, training,
-# sleep, food, mind, the AI) need rules no route serves today. The block ships ``absent``
-# rather than inventing rules; the follow-up story owns them.
-SCORECARD_TODO = "epic #4580 — the scorecard rows have no served rules yet"
 
 #: Reader words for a coach's domain, keyed by the persona registry's ``domain`` field.
 #: GAP (named in the PR): config/personas.json carries no reader-facing domain word, and the
@@ -311,6 +334,28 @@ def _chapter(journal: dict | None, panelcast: dict | None, today: str, persona_o
     return _block("ok", post["date"], src, "No chapter has been published yet.", data)
 
 
+#: #4809: the longest opening position a bet card carries, in characters. The docket's claims are
+#: clauses joined by semicolons ("X shows only one point; insufficient for …; most parsimonious
+#: …"), so the card takes the FIRST clause, verbatim; one longer than this is not cut mid-clause
+#: — the side is served without a reason and the whole claim stays on /api/coach_docket.
+BET_REASON_MAX_CHARS = 160
+_CLAUSE_END = re.compile(r";|[.!?](?=\s|$)")
+
+
+def bet_reason(claim: Any) -> str | None:
+    """A coach's opening position on a bet as one clause in its served words (#4809), through
+    the SAME honest-text filter and honorific strip as the coach lines. None when there is no
+    claim, when the clause carries a figure the honest-number rules keep off the page, or when
+    the first clause is longer than ``BET_REASON_MAX_CHARS``."""
+    # The honorific goes first: its period would otherwise end the clause.
+    text = _HONORIFIC.sub("", strip_emphasis(str(claim or ""))).strip()
+    end = _CLAUSE_END.search(text)
+    clause = (text[: end.start()] if end else text).strip().rstrip(",:—– ")
+    if not clause or len(clause) > BET_REASON_MAX_CHARS or not honest_text(clause):
+        return None
+    return clause
+
+
 def _next(cadence: dict | None, docket: dict | None, today: str, persona_of, metric_words) -> dict:
     if cadence is None:
         chapter = _unavailable(SOURCES["cadence"], "The chapter schedule")
@@ -339,12 +384,18 @@ def _next(cadence: dict | None, docket: dict | None, today: str, persona_of, met
         else:
             d = due[0]
             sides = d.get("sides") or {}
+            raw_claims = d.get("claims")
+            claims: dict = raw_claims if isinstance(raw_claims, dict) else {}
             data = {
                 "question": bet_question(d.get("criterion") or {}, d["resolution_date"], metric_words),
                 "topic": d.get("topic"),
                 "settle_date": d["resolution_date"],
                 "sides": [
-                    {"coach": plain_name((persona_of(pid) or {}).get("name") or pid), "says": "yes" if sides.get(pid) else "no"}
+                    {
+                        "coach": plain_name((persona_of(pid) or {}).get("name") or pid),
+                        "says": "yes" if sides.get(pid) else "no",
+                        "reason": bet_reason(claims.get(pid)),
+                    }
                     for pid in (d.get("coach_a"), d.get("coach_b"))
                     if pid in sides
                 ],
@@ -548,8 +599,7 @@ def _week(b: dict, today: str) -> dict:
 
 # ── the whole-life rows (#4586) ─────────────────────────────────────────────────
 # One served FACT per area, each a door to its own page. No verdict on any row: whether an
-# area is "going well" is decided by written rules that are not built yet (the scorecard,
-# #4595). A row whose source failed is `unavailable`; one with nothing to say is `absent`;
+# area is "going well" is decided by the scorecard's written rules (#4595, web/edition_scorecard.py). A row whose source failed is `unavailable`; one with nothing to say is `absent`;
 # one whose fact is older than LIFE_STALE_DAYS says which day it is from.
 LIFE_ORDER = ("body", "training", "sleep", "food", "habits", "supplements", "experiments", "mind")
 LIFE_STALE_DAYS = 2
@@ -757,10 +807,6 @@ def _coach_lines(dashboard: dict | None, today: str, persona_of_short, persona_o
     return _block("ok", newest, src, "The coaches have written nothing yet.", data, voice=COACH_VOICE)
 
 
-def _scorecard() -> dict:
-    return _block("absent", None, None, "The scorecard is not built yet.", todo=SCORECARD_TODO)
-
-
 def _record(predictions: dict | None, calibration: dict | None, today: str) -> dict:
     """The coaches' checked calls — NEVER the count alone (epic #4580 rule 3, #4585).
 
@@ -791,6 +837,9 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
         "right": right,
         "decided": decided,
         "count_text": f"{right} of {decided} checked calls right.",
+        # #4617: what that count counts, as labelled counts that sum to it (None when not served).
+        "counted": overall.get("counted"),
+        "counted_text": overall.get("counted_text"),
         "beats_simple_guess": beats,
         "comparison_text": comparison,
         "brier_skill": skill if known else None,
@@ -909,9 +958,15 @@ def compose(
     return a persona dict from the registry; ``metric_words`` is the server-side metric
     vocabulary. Everything a block says is derived from these arguments.
     """
+    # The scorecard's rules live in their own module (#4595), which reads this one's helpers:
+    # imported here, once this module is whole, so neither import is circular.
+    from web.edition_page_reads import calls_block, lead_read_block, moves_block, sheet_block
+    from web.edition_scorecard import scorecard as _scorecard
+
     b = {k: bodies.get(k) for k in SOURCES}
     day_n = pacific_day_n(start_date, today) or None
     his_words = _his_words(b["decisions"], b["owner_words"], today)
+    record = _record(b["predictions"], b["calibration"], today)
     blocks = {
         "premise": _premise(today),
         "chapter": _chapter(b["journal"], b["panelcast"], today, persona_of),
@@ -920,11 +975,15 @@ def compose(
         "week": _week(b, today),
         "life": _life(b, his_words, today),
         "coach_lines": _coach_lines(b["dashboard"], today, persona_of_short, persona_of),
-        "scorecard": _scorecard(),
-        "record": _record(b["predictions"], b["calibration"], today),
+        "scorecard": _scorecard(b, record, today, start_date),
+        "record": record,
         "his_words": his_words,
         "catch_up": _catch_up(b["journal"], today),
         "follow": _follow(b["cadence"], now, today),
+        "moves": moves_block(b["moves"], today),
+        "calls": calls_block(b["calls"], today),
+        "sheet": sheet_block(b["character"], today),
+        "lead_read": lead_read_block(b["priority"], today),
     }
     return {"as_of": today, "day_n": day_n, "order": list(ORDER), "blocks": {k: blocks[k] for k in ORDER}}
 
@@ -948,16 +1007,140 @@ def body_of(response: Any) -> dict | None:
     return body
 
 
+#: #4607 — how long the upstream reads may take, counted from the moment they are handed to
+#: the pool. An upstream that has not answered when it passes is served ``unavailable`` (its
+#: own block and no other) and the document goes out without it. Far above the measured
+#: reads (the slowest is under half a second in the Lambda) and far below the function's
+#: 30 s timeout, which before this was the only bound — one hung read turned the whole front
+#: page into a 500.
+SOURCE_DEADLINE_SECONDS = 8.0
+
+#: #4607 — how many upstreams are read at once. FOUR, measured 2026-10-04 (laptop, live
+#: data, six rounds each): 1 → 4 workers took the read from 1,600 ms to 590 ms and CPU from
+#: 430 ms to 370 ms; past 6 the shared DynamoDB client's ten-connection pool overflows
+#: (urllib3 "pool is full" on 6–10 calls per request at 6 workers, 60 at one thread per
+#: upstream), every dropped connection is a fresh TLS handshake, and CPU climbs back to
+#: 420 ms. The Lambda is CPU-bound at its memory size, so the CPU figure is the one that counts.
+MAX_WORKERS = 4
+
+# ── the latency budget (#4607) ────────────────────────────────────────────────────
+#: The acceptance bar: uncached p95 of the deployed route, in milliseconds.
+LATENCY_TARGET_MS = 1500
+
+#: What each upstream costs the edition, in milliseconds INSIDE the Lambda. Every
+#: ``SOURCES`` key has an entry or tests/test_edition_latency_4607.py is red.
+#:
+#: Provenance (2026-10-04): the route's own p50 from the site API's ``route_metric`` log
+#: lines over four days, warm containers, status 200 —
+#:   filter _type="route_metric" and status=200 and ColdStart=0
+#:   | stats pct(DurationMs,50) by Route
+#: — except the four marked ``est.``, which this change reads a different way and which
+#: have no in-Lambda reading until it deploys: the two manifests (now one shared client),
+#: the dashboard without its unread dossiers (20% of the route's 685 ms, the share the
+#: profile gave the rest of the branch) and the record's one narrow sweep, split across its
+#: two keys (the old pair cost 1,193 + 1,771 ms). After a deploy, re-pin every entry from the
+#: ``[edition] upstream_ms`` log line ``read_bodies`` writes on each request.
+#:
+#: Round 2 (2026-10-09): the three entries marked ``est. r2`` are the round-1 standalone figure
+#: scaled by the CPU each new read path took against the old one on a laptop over live data,
+#: read-only, four rounds (nutrition 160 -> 2 ms CPU and 672 -> 3 KB of DynamoDB JSON;
+#: training 143 -> 11 ms and 791 -> 99 KB; the dashboard composed for the edition 47 -> 43 ms
+#: and 119 -> 92 KB). The deployed ``upstream_ms`` line is still owed for them.
+SOURCE_COST_MS = {
+    "journal": 40,  # est.
+    "panelcast": 40,  # est.
+    "cadence": 1,
+    "docket": 30,
+    "journey": 44,
+    "dashboard": 128,  # est. r2 — without the weekly call, the lead's daily read and the pause flag
+    "predictions": 170,  # est. — half of the narrow record sweep
+    "calibration": 170,  # est. — the other half
+    "decisions": 10,
+    "owner_words": 5,
+    "sleep": 41,
+    "session": 441,
+    "nutrition": 15,  # est. r2 — one projected MacroFactor window
+    "habits": 7,
+    "supplements": 81,
+    "experiments": 109,
+    "pulse": 63,
+    "training": 40,  # est. r2 — projected Strava + Apple Health windows
+    # #4582 box 1 (2026-10-11): the route's own in-Lambda p50, warm, status 200, the four days
+    # to 2026-10-11 (the query above): /api/coach_moves 6.1 ms (n=107) x seven days;
+    # /api/character 46.5 ms (n=89); /api/weekly_priority 4.0 ms (n=65). /api/calls is 1,181 ms
+    # (n=58) — the whole eight-partition sweep plus its two docket prefixes and the instrument
+    # history — and the edition now runs exactly that sweep ONCE for the record and the calls
+    # together (NARROW_JOBS["record"]), so the calls cost what the sweep costs beyond the
+    # record's 340: 1,181 - 340 = 841 (est. until the deployed ``upstream_ms`` line re-pins it).
+    "moves": 42,
+    "calls": 841,
+    "character": 47,
+    "priority": 4,
+}
+
+#: The reviewed ceiling on the SUM of ``SOURCE_COST_MS``. The reads overlap, but the Lambda
+#: is CPU-bound, so the sum is the honest upper bound on the route and the number a new
+#: upstream moves. It is pinned at today's sum: adding an upstream that costs more than the
+#: few milliseconds of headroom is red until this line AND its pin in
+#: tests/test_edition_latency_4607.py are changed in the same pull request — the explicit,
+#: reviewed budget change. Round 1 pinned it at 2,160 ms, ABOVE ``LATENCY_TARGET_MS``, with
+#: session, training and nutrition 1,208 ms of it and still read whole. Round 2 (#4607)
+#: narrowed nutrition and training and trimmed the dashboard: 1,435 ms, under the target as
+#: a sum of standalone costs. Session (441 ms) is the largest entry still read whole. The
+#: ceiling only comes down.
+#:
+#: #4582 box 1 (2026-10-11) RAISES it, 1,435 -> 2,369 ms, and says why: the front page made
+#: ten more requests after the edition (/api/calls at 1,181 ms in the Lambda, /api/character
+#: and seven days of /api/coach_moves), so a cold reader waited for the edition AND then for
+#: the slowest of those. Folding them in moves that wait into the one request rather than
+#: adding to it — the reader's path loses a 1.2 s round trip and the Lambda runs one partition
+#: sweep where the two requests ran two. The route's own measured p50 before this change was
+#: 1,537 ms (n=118, the same four days): over the target already. The ceiling is the honest
+#: sum, not a target; the next narrowing is the calls sweep's projection.
+SOURCE_COST_CEILING_MS = 2369
+
+
+#: #4607 — narrow readers: one read that serves several ``SOURCES`` keys, each as the subset
+#: of that route's body the edition reads, in the route's own shape. ``handle_edition`` hands
+#: them in; ``read_bodies`` without them reads every key through its route, as before.
+NARROW_JOBS = {
+    # #4582 box 1: the calls ride the record's sweep — one read of the eight partitions.
+    "record": ("predictions", "calibration", "calls"),
+    # #4582 box 1: the seven days of coach lines, one in-process read per day (read_moves).
+    "moves": ("moves",),
+    # #4607 round 2 (measured after #4669 deployed: nutrition 1,021 ms and training 725 ms at
+    # the in-Lambda p50, the two slowest upstreams but one): each read as the one projected
+    # window its edition fields come from. A job named for its own key keeps the
+    # ``upstream_ms`` table's column names unchanged.
+    "nutrition": ("nutrition",),
+    "training": ("training",),
+}
+
+_S3_CLIENT = None
+_S3_CLIENT_LOCK = threading.Lock()
+
+
+def _s3_client():
+    """ONE S3 client for the two manifests, built once per container. A botocore client is
+    safe to share across threads; building one per read was most of what a manifest cost."""
+    global _S3_CLIENT
+    if _S3_CLIENT is None:
+        with _S3_CLIENT_LOCK:
+            if _S3_CLIENT is None:
+                import boto3
+
+                from web.site_api_common import S3_REGION
+
+                _S3_CLIENT = boto3.client("s3", region_name=S3_REGION)
+    return _S3_CLIENT
+
+
 def _read_s3_json(key: str) -> dict | None:
     """One public manifest from S3; None on any failure (never an empty dict)."""
     import os
 
-    import boto3
-
-    from web.site_api_common import S3_REGION
-
     try:
-        obj = boto3.client("s3", region_name=S3_REGION).get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=key)
+        obj = _s3_client().get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=key)
         data = json.loads(obj["Body"].read())
         return data if isinstance(data, dict) else None
     except Exception as e:  # noqa: BLE001 — a failed read is a block state, not a 500
@@ -967,17 +1150,73 @@ def _read_s3_json(key: str) -> dict | None:
         return None
 
 
-def read_bodies(read_route: Callable[[str, dict], Any], read_s3: Callable[[str], dict | None] = _read_s3_json) -> dict:
-    """Every upstream body, each read independently: one failure never blanks another."""
-    out: dict = {}
-    for key, path in SOURCES.items():
-        try:
-            out[key] = read_s3(_S3_KEYS[key]) if key in _S3_KEYS else body_of(read_route(path, dict(_ROUTE_QS.get(key, {}))))
-        except Exception as e:  # noqa: BLE001
-            from web.site_api_common import logger
+def read_bodies(
+    read_route: Callable[[str, dict], Any],
+    read_s3: Callable[[str], dict | None] = _read_s3_json,
+    narrow: dict | None = None,
+    deadline: float = SOURCE_DEADLINE_SECONDS,
+) -> dict:
+    """Every upstream body, each read independently AND at the same time (#4607).
 
-            logger.warning(f"[edition] {path} read failed ({type(e).__name__})")
-            out[key] = None
+    One failure never blanks another: a read that raises, answers non-200 or is still
+    running at ``deadline`` seconds leaves ``None`` for its own key(s) and nothing else.
+    ``narrow`` maps a ``NARROW_JOBS`` name to a zero-argument reader returning
+    ``{source_key: body}`` for that job's keys.
+
+    Threads, not processes: the handlers share the module-level DynamoDB ``Table`` and
+    call only ``query``/``get_item`` on it — stateless per-call transforms over the one
+    thread-safe botocore client, the pattern ``site_api_coach_ledger._query_partition``
+    has run in production since #1527. A read past the deadline cannot be killed; its
+    thread finishes in the background and its result is dropped.
+    """
+    from web.site_api_common import logger
+
+    jobs: dict = {}
+    covered: set = set()
+    for name, reader in (narrow or {}).items():
+        jobs[name] = (NARROW_JOBS[name], reader)
+        covered.update(NARROW_JOBS[name])
+    for key, path in SOURCES.items():
+        if key in covered:
+            continue
+        if key in _S3_KEYS:
+            jobs[key] = ((key,), lambda k=key: {k: read_s3(_S3_KEYS[k])})
+        else:
+            jobs[key] = ((key,), lambda k=key, p=path: {k: body_of(read_route(p, dict(_ROUTE_QS.get(k, {}))))})
+
+    out: dict = {key: None for key in SOURCES}
+    took: dict = {}
+
+    def run(name: str, fn: Callable[[], Any]) -> Any:
+        started = time.monotonic()
+        try:
+            return fn()
+        finally:
+            took[name] = round((time.monotonic() - started) * 1000)
+
+    pool = ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(jobs)), thread_name_prefix="edition")
+    try:
+        futures = {pool.submit(run, name, fn): (name, keys) for name, (keys, fn) in jobs.items()}
+        done, late = wait(futures, timeout=deadline)
+        for fut in done:
+            name, keys = futures[fut]
+            try:
+                got = fut.result()
+            except Exception as e:  # noqa: BLE001 — a failed read is a block state, not a 500
+                logger.warning(f"[edition] {name} read failed ({type(e).__name__})")
+                continue
+            for key in keys:
+                body = got.get(key) if isinstance(got, dict) else None
+                out[key] = body if isinstance(body, dict) else None
+        for fut in late:
+            name, _keys = futures[fut]
+            took[name] = None
+            logger.warning(f"[edition] {name} read passed the {deadline:g} s deadline — served unavailable")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    # The per-upstream table (#4607), one line per request: milliseconds each read took on
+    # its own thread (null = past the deadline). Query it with Logs Insights on `upstream_ms`.
+    logger.info("[edition] upstream_ms " + json.dumps(took, sort_keys=True))
     return out
 
 
@@ -986,14 +1225,25 @@ def handle_edition(read_route: Callable[[str, dict], Any]) -> dict:
     from coach import persona_registry
     from common.pacific_time import pacific_today
 
+    from web import site_api_coach, site_api_observatory
+    from web.edition_page_reads import read_moves
     from web.prediction_reason import metric_words
     from web.site_api_common import EXPERIMENT_START, _error, _ok, logger
 
     try:
         now = datetime.now(timezone.utc)
+        today = pacific_today()
         doc = compose(
-            read_bodies(read_route),
-            today=pacific_today(),
+            read_bodies(
+                read_route,
+                narrow={
+                    "record": site_api_coach.edition_record,
+                    "nutrition": site_api_observatory.edition_nutrition,
+                    "training": site_api_observatory.edition_training,
+                    "moves": lambda: {"moves": read_moves(read_route, today)},
+                },
+            ),
+            today=today,
             now=now,
             start_date=EXPERIMENT_START,
             persona_of=persona_registry.resolve,

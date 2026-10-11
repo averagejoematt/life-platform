@@ -402,7 +402,9 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         # Absent provisionality is treated as PROVISIONAL, not as settled. A projected
         # rate drawn as fact is the #551 / ADR-105 failure, and this card is public.
         facts.rate_provisional = bool(computed.get("rate_provisional", True))
-        facts.protein_g = computed.get("protein_g_avg")
+        # NOT `protein_g_avg`: that is a running average over the cycle so far, and the card
+        # draws protein under "ATE" beside the day's calories. The day's protein is
+        # MacroFactor's day total, read below.
         # #4540: the plan's floor, not the day's stored copy — every computed_metrics row
         # written before this landed froze the profile row's 190 g, which was never the plan.
         facts.protein_target_g = float(PLAN_DAILY_PROTEIN_MIN_G) if computed.get("protein_g_target") is not None else None
@@ -472,29 +474,25 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
     if strava is None:
         facts.absent.append("strava")
     else:
-        miles = 0.0
-        for a in strava.get("activities") or []:
-            if (a.get("type") or a.get("sport_type") or "").lower() in ("walk", "hike"):
-                try:
-                    miles += float(a.get("distance_miles") or 0)
-                except (TypeError, ValueError):
-                    continue
-        facts.walk_miles = round(miles, 2)
+        facts.walk_miles = walk_miles(strava.get("activities") or [])
         facts.longest_outdoor_walk_mi = longest_outdoor_walk_mi(strava.get("activities") or [], hevy_rows)
 
     mf = _get_day(table, "macrofactor", date)
     if mf is None:
         facts.absent.append("macrofactor")
     else:
-        # The source row outranks the compute cron's copy of it when both exist.
-        if mf.get("total_calories_kcal") is not None:
-            facts.calories = mf.get("total_calories_kcal")
-        if facts.protein_g is None:
-            facts.protein_g = mf.get("total_protein_g") or mf.get("protein_g")
-        if facts.carbs_g is None:
-            facts.carbs_g = mf.get("total_carbs_g")
-        if facts.fat_g is None:
-            facts.fat_g = mf.get("total_fat_g")
+        # The source row outranks the compute cron's copy of it when both exist — for every
+        # macro. The cron's copy is a snapshot: a meal logged after it ran is in MacroFactor
+        # and not in the snapshot (10-01: 44 g carbs drawn against 51 g logged).
+        for attr, keys in (
+            ("calories", ("total_calories_kcal",)),
+            ("protein_g", ("total_protein_g", "protein_g")),
+            ("carbs_g", ("total_carbs_g",)),
+            ("fat_g", ("total_fat_g",)),
+        ):
+            v = next((mf.get(k) for k in keys if mf.get(k) is not None), None)
+            if v is not None:
+                setattr(facts, attr, v)
         facts.fiber_g = mf.get("total_fiber_g")
         facts.meals = mf.get("total_meals")
         facts.snacks = mf.get("total_snacks")
@@ -527,6 +525,39 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
 #: has no measurable twin and is never credited (fail-safe: it stays listed).
 _NAME_QUANTITY = re.compile(r"(\d+(?:\.\d+)?)\s*(mi|km|k|l)\b", re.IGNORECASE)
 _MI_PER = {"mi": 1.0, "km": 0.621371, "k": 0.621371}
+
+
+def walk_miles(activities: list[dict[str, Any]]) -> float:
+    """The day's walked miles, one walk counted once.
+
+    Two devices can record one walk (Garmin + WHOOP, Garmin + the Strava app) and both can
+    carry a distance; summing every Walk/Hike counted that walk twice. Walks are taken
+    longest first, and one that overlaps a walk already counted in time is the same walk
+    seen again (#4068's rule, applied to distance)."""
+    from common.pacific_time import parse_iso_utc
+
+    walks = []
+    for a in activities or []:
+        if (a.get("type") or a.get("sport_type") or "").lower() not in ("walk", "hike"):
+            continue
+        try:
+            miles = float(a.get("distance_miles") or 0)
+            elapsed = float(a.get("elapsed_time_seconds") or a.get("moving_time_seconds") or 0)
+            parsed = parse_iso_utc(a["start_date"]) if a.get("start_date") else None
+            start = parsed.timestamp() if parsed is not None else None
+        except (TypeError, ValueError):
+            continue
+        if miles > 0:
+            walks.append((miles, start, (start + elapsed) if start is not None and elapsed > 0 else None))
+    total = 0.0
+    counted: list[tuple[float, float]] = []
+    for miles, s, e in sorted(walks, key=lambda w: -w[0]):
+        if s is not None and e is not None and any(cs < e and ce > s for cs, ce in counted):
+            continue
+        total += miles
+        if s is not None and e is not None:
+            counted.append((s, e))
+    return round(total, 2)
 
 
 def longest_outdoor_walk_mi(activities: list[dict[str, Any]], hevy_rows: list[dict[str, Any]]) -> float | None:

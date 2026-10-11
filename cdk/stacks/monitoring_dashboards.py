@@ -352,6 +352,17 @@ def add_dashboards(stack) -> None:
             right=[
                 _lambda_metric("life-platform-dlq-consumer", "Errors", "Sum"),
                 _lambda_metric("life-platform-dlq-consumer", "Invocations", "Sum"),
+                # #4731: a recurring failure past the ledger threshold — the
+                # dimensionless aggregate of the consumer's per-function EMF
+                # metric (the SNS page names the function; this shows the rate).
+                cloudwatch.Metric(
+                    namespace="LifePlatform/DLQ",
+                    metric_name="DlqEscalation",
+                    statistic="Sum",
+                    period=Duration.hours(6),
+                    label="DLQ escalations (all functions)",
+                    color=cloudwatch.Color.ORANGE,
+                ),
             ],
         ),
     )

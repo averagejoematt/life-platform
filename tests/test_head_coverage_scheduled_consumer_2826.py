@@ -596,6 +596,143 @@ def test_superseded_run_a_rolls_into_run_b_plan(tmp_path):
     assert "mcp/tools_health.py" in changed
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# #4250 box 3 — a reconcile-commit push defers to the live run that pushed it.
+# The bot's PAT push mints its own run ~40 s after the merge's; both read the
+# same last-deployed base, so both fleet-deployed the same tree (four pairs on
+# 2026-10-04). Replay: base deployed → M merges a shared module → the bot
+# commits a docs line + the counter file on top.
+# ─────────────────────────────────────────────────────────────────────────
+
+_PLAN_RED = [_j("Plan deployments", "failure")]
+_NOTHING_OWED = [_j("Plan deployments", "success"), _j("Deploy", "skipped")]
+_BOT_SUBJECT = "chore(reconcile): regenerate derived artifacts after merge [skip-reconcile]"
+
+
+def _reconcile_repo(tmp_path, bot_files, bot_subject=_BOT_SUBJECT):
+    """base → M (a shared module) → bot commit touching `bot_files`. Returns (repo, shas)."""
+    repo = str(tmp_path)
+
+    def git(*a):
+        return subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    shas = {}
+    for name, subject, paths in (
+        ("base", "base", ["lambdas/emails/daily_brief_lambda.py"]),
+        ("M", "feat: a shared module", ["lambdas/web/site_api_edition.py", "tests/test_x.py"]),
+        ("bot", bot_subject, bot_files),
+    ):
+        for path in paths:
+            os.makedirs(os.path.join(repo, os.path.dirname(path)), exist_ok=True)
+            with open(os.path.join(repo, path), "w") as f:
+                f.write(name)
+        git("add", "-A")
+        git("commit", "-qm", subject)
+        shas[name] = git("rev-parse", "HEAD")
+    return repo, shas
+
+
+def test_reconcile_push_base_defers_only_to_a_live_or_deployed_parent_run():
+    """The parent sha is the base only while the run at that sha can still ship (or has
+    shipped) this tree. Every other parent state returns None — the ordinary #4472 base —
+    so the bot's run still deploys a merge whose own run went red or was dropped."""
+    wrong = {}
+    for label, jobs, expected in (
+        ("in-flight", _IN_FLIGHT, "p" * 5),
+        ("deploy-running", [_j("Plan deployments", "success"), _j("Deploy", None, None, status="in_progress")], "p" * 5),
+        ("deployed", _FLEET_DEPLOYED, "p" * 5),
+        ("plan-red", _PLAN_RED, None),
+        ("deploy-cancelled", _CANCELLED, None),
+        ("deploy-failed", _REJECTED_LEASE, None),
+        ("nothing-owed", _NOTHING_OWED, None),
+    ):
+        runs = [(_run(2, "b", "2026-09-29T18:00:40Z"), _IN_FLIGHT), (_run(1, "p", "2026-09-29T18:00:00Z"), jobs)]
+        table = {r["id"]: j for r, j in runs}
+        got = dm.reconcile_push_base([r for r, _ in runs], lambda r: table[r["id"]], _NOW, "p" * 5)
+        if got != expected:
+            wrong[label] = got
+    assert not wrong, f"parent-run states that resolved the wrong base: {wrong}"
+
+    only_this = [_run(2, "b", "2026-09-29T18:00:40Z")]
+    assert dm.reconcile_push_base(only_this, lambda r: _IN_FLIGHT, _NOW, "p" * 5) is None, "no run at the parent sha → ordinary base"
+    dispatch = [_run(1, "p", "2026-09-29T18:00:00Z", "workflow_dispatch")]
+    assert (
+        dm.reconcile_push_base(dispatch, lambda r: _IN_FLIGHT, _NOW, "p" * 5) is None
+    ), "a dispatch at the parent sha did not push this commit"
+    assert dm.reconcile_push_base(only_this, lambda r: _IN_FLIGHT, _NOW, None) is None
+
+
+def test_reconcile_push_parent_is_judged_on_the_commit_not_its_label(tmp_path):
+    """One throwaway history per case; every wrong answer is reported at once. A commit
+    that carries the marker AND a deployable path is not a reconcile-only push."""
+    cases = (
+        ("docs-and-counter", ["docs/PROPORTIONALITY.md", "lambdas/web/platform_counts.py"], _BOT_SUBJECT, True),
+        ("docs-only", ["docs/PROPORTIONALITY.md", "model/platform_model.json"], _BOT_SUBJECT, True),
+        ("marker-with-a-shared-module", ["lambdas/common/constants.py"], _BOT_SUBJECT, False),
+        ("marker-with-a-bundled-config", ["config/personas.json"], _BOT_SUBJECT, False),
+        ("marker-with-mcp", ["mcp/tools_health.py"], _BOT_SUBJECT, False),
+        ("no-marker", ["docs/PROPORTIONALITY.md"], "docs: a hand edit", False),
+        ("marker-without-the-prefix", ["docs/PROPORTIONALITY.md"], "docs: a hand edit [skip-reconcile]", False),
+    )
+    wrong = {}
+    for label, files, subject, is_reconcile in cases:
+        case_dir = tmp_path / label
+        case_dir.mkdir()
+        repo, shas = _reconcile_repo(case_dir, files, subject)
+        expected = shas["M"] if is_reconcile else None
+        got = dm.reconcile_push_parent(shas["bot"], cwd=repo)
+        if got != expected:
+            wrong[label] = got
+    assert not wrong, f"cases that resolved the wrong parent: {wrong}"
+
+    assert dm.reconcile_push_parent(shas["M"], cwd=repo) is None, "the pushed sha is not the checked-out commit → never a guessed parent"
+    assert dm.reconcile_push_parent(None, cwd=repo) is None
+    assert dm.reconcile_push_parent(shas["bot"], cwd=str(tmp_path / "not-a-repo")) is None, "an unreadable git side falls through"
+
+
+def test_reconcile_commit_push_plans_no_second_deploy_of_the_merge(tmp_path, monkeypatch, capsys):
+    """The 2026-10-04 pairs, replayed through `--deploy-base` and the workflow's own
+    CHANGED command: with the merge's run alive, the bot push's plan sees only the counter
+    file (which the fleet loop ignores — test_bundle_deploy_trigger_registry). Control:
+    the merge's run red → the ordinary base, and the bot push plans the merge's module."""
+    repo, shas = _reconcile_repo(tmp_path, ["docs/PROPORTIONALITY.md", "lambdas/web/platform_counts.py"])
+    runs = [
+        (_run(3, "x", "2026-10-04T09:22:10Z"), _IN_FLIGHT),  # the bot push's own run, planning now
+        (_run(2, "y", "2026-10-04T09:21:28Z"), _IN_FLIGHT),  # the merge's run — it pushed the bot commit
+        (_run(1, "z", "2026-10-04T08:40:46Z"), _FLEET_DEPLOYED),
+    ]
+    runs[0][0]["head_sha"], runs[1][0]["head_sha"], runs[2][0]["head_sha"] = shas["bot"], shas["M"], shas["base"]
+    jobs = {r["id"]: j for r, j in runs}
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("GITHUB_SHA", shas["bot"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setattr(dm, "collect", lambda: ([r for r, _ in runs], lambda r: jobs[r["id"]]))
+
+    def planned():
+        assert dm.main(["--deploy-base"]) == dm.EXIT_OK
+        base = capsys.readouterr().out
+        assert base.endswith("\n") and base.count("\n") == 1, f"stdout must carry the sha and nothing else: {base!r}"
+        env = {**os.environ, "DEPLOY_BASE": base.strip(), "GITHUB_SHA": shas["bot"]}
+        out = subprocess.run(["bash", "-c", _plan_changed_command()], cwd=repo, env=env, check=True, capture_output=True, text=True).stdout
+        return base.strip(), set(out.split())
+
+    base, changed = planned()
+    assert base == shas["M"], "the live merge run owns the deploy of this tree"
+    assert changed == {"lambdas/web/platform_counts.py"}, f"the bot push re-planned the merge's files: {changed}"
+
+    jobs[2] = _PLAN_RED
+    base, changed = planned()
+    assert base == shas["base"], "a red merge run does not own the deploy — the ordinary #4472 base applies"
+    assert "lambdas/web/site_api_edition.py" in changed, "the bot push must still ship a merge whose own run failed"
+
+    jobs[2] = _IN_FLIGHT
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    assert planned()[0] == shas["base"], "a manual dispatch at the bot sha is a deliberate re-run, never deferred"
+
+
 # #4472 box 2 — live Lambda older than its source on main (the nightly advisory).
 _T = lambda s: datetime.fromisoformat(s).replace(tzinfo=timezone.utc)  # noqa: E731
 

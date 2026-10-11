@@ -175,20 +175,28 @@ jobs:
           # every uncertainty to RUN. A manual dispatch and qa-level=full are explicit asks and are
           # never gated; the deterministic sweep is never gated. Nightly content truth still runs in
           # the qa-smoke Lambda (reader_truth check), which this gate does not touch.
+          # #4652 (ADR-116): a SKIP is not just a flag that goes missing. The gate's verdict line is
+          # handed to the sweep (--ai-qa-skipped / --reader-truth-skipped, via the two *_skip
+          # outputs), and the sweep itself reports SKIPPED-BY-READER-SURFACE — not run, not a pass —
+          # on stdout, in the job summary, as a ::warning annotation and in report.json.
+          AI_SKIP=""
+          RT_SKIP=""
           if [ "${{ github.event_name }}" = "schedule" ] && [ "$LEVEL" = "standard" ]; then
             if [ -n "$RT" ]; then
               V=$(python3 scripts/reader_surface.py --since-hours 24)
               echo "$V"
-              case "$V" in *"(#4589): SKIP"*) RT=""; echo "::notice title=reader-truth skipped (#4589)::$V" ;; esac
+              case "$V" in *"(#4589): SKIP"*) RT=""; RT_SKIP="$V" ;; esac
             fi
             if [ -n "$AI" ]; then
               V=$(python3 scripts/reader_surface.py --since-hours 168)
               echo "$V"
-              case "$V" in *"(#4589): SKIP"*) AI=""; echo "::notice title=AI-vision skipped (#4589)::$V" ;; esac
+              case "$V" in *"(#4589): SKIP"*) AI=""; AI_SKIP="$V" ;; esac
             fi
           fi
           echo "ai_qa_flag=$AI" >> "$GITHUB_OUTPUT"
           echo "reader_truth_flag=$RT" >> "$GITHUB_OUTPUT"
+          echo "ai_qa_skip=$AI_SKIP" >> "$GITHUB_OUTPUT"
+          echo "reader_truth_skip=$RT_SKIP" >> "$GITHUB_OUTPUT"
 
           # #1991 — the axe-core a11y audit gains a light-theme dimension: this
           # standalone full-surface sweep alternates color_scheme by ISO-week
@@ -209,9 +217,16 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         if: steps.dial.outputs.level != 'off'
+        env:
+          # #4652: the gate's verdict lines travel as env, never interpolated into the script.
+          AI_QA_SKIP: ${{ steps.cadence.outputs.ai_qa_skip }}
+          READER_TRUTH_SKIP: ${{ steps.cadence.outputs.reader_truth_skip }}
         run: |
+          SKIPPED=()
+          if [ -n "${AI_QA_SKIP}" ]; then SKIPPED+=(--ai-qa-skipped "${AI_QA_SKIP}"); fi
+          if [ -n "${READER_TRUTH_SKIP}" ]; then SKIPPED+=(--reader-truth-skipped "${READER_TRUTH_SKIP}"); fi
           python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }} \
-            --color-scheme ${{ steps.cadence.outputs.color_scheme }}
+            --color-scheme ${{ steps.cadence.outputs.color_scheme }} "${SKIPPED[@]}"
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         if: always() && steps.dial.outputs.level != 'off'

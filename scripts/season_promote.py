@@ -15,6 +15,11 @@ owner approved. Every write goes through a path the platform already owns:
   3. LEDGER   one LEDGER#{date} row per installment — the season memory the next week reads.
   4. PAGES    deploy/restart_leadin_pages.run(apply=True) re-renders every journal page and
               the manifest from DDB through the live template (+ CloudFront invalidation).
+  4b. EFFECTS  chronicle-approve's publish-time side effects through its OWN function
+              (chronicle_approve_lambda.publish_side_effects, #4593): the share kit built from the rebuilt row and the
+              recall index run; recap/ledger/panel/mark-published are declined because a step here owns them; delivery
+              is declined — with a no-send decision stamped on the row — unless the owner passes --deliver.
+              ``--effects-only --weeks N --apply`` re-runs just this for already-published rows (the week-4 repair).
   5. PANEL    synthesize each episode with the Panel's own voices and style, publish through
               its own audio publisher, write transcripts, rewrite episodes.json + feed.xml
               through its own index writer, delete the holds and the July placeholder stubs,
@@ -26,6 +31,13 @@ owner approved. Every write goes through a path the platform already owns:
     python3 scripts/season_promote.py --staging <dir>                # the plan, nothing written
     python3 scripts/season_promote.py --staging <dir> --apply        # owner-approved publish
     python3 scripts/season_promote.py --staging <dir> --apply --only chronicle,pages
+    python3 scripts/season_promote.py --staging <dir> --audit-hashes    # the map the auditor records
+
+THE AUDIT GATE (#4549). ``--apply`` refuses (exit 5, before the backup or any write) unless
+``<staging>/audit.json`` — written by the story-auditor agent (.claude/agents/story-auditor.md) —
+is a JSON object with an empty ``blocking`` list, verdict ``publishable``, the per-week floors on
+``items_checked`` / ``raw_verified``, and a ``staged_sha256`` map whose hash for every file that
+publishes (``AUDITED_FILES`` for each promoted week) matches the staging folder now.
 """
 
 from __future__ import annotations
@@ -49,7 +61,19 @@ CHRONICLE_PK = "USER#matthew#SOURCE#chronicle"
 PANEL_PK = "USER#matthew#SOURCE#panelcast"
 PANEL_PREFIX = "generated/panelcast"
 HOLD_PREFIX = "panelcast-holds"
-STEPS = ("backup", "chronicle", "ledger", "pages", "panel", "recap")
+STEPS = ("backup", "chronicle", "ledger", "pages", "effects", "panel", "recap")
+
+# #4593: what the promote declines of chronicle-approve's publish-time side effects, and why. Every other effect in
+# chronicle_approve_lambda.SIDE_EFFECTS RUNS (today: s3_artifacts — the share kit this script builds from the rebuilt
+# row — and recall_index). A new side effect added there runs here too unless it is named below with a reason.
+PROMOTE_DECLINES = {
+    "recap": "the promote's recap step rebuilds RECAP#latest from every corrected installment",
+    "ledger": "the promote's ledger step wrote LEDGER# from the audited staging; the row's desk ledger predates the rebuild",
+    "mark_published": "the promote's chronicle step wrote status=published in place",
+    "elena_state": "a multi-week promote would fire her updater out of order; re-run elena-state-updater for the newest week by hand",
+    "panel_podcast": "the promote's panel step publishes this season's episodes itself",
+}
+NO_DELIVER_REASON = "season promote without --deliver: a rebuilt or corrected installment is not mailed unless the owner passes --deliver"
 
 # week → the chronicle row it rebuilds (the sk never moves: the URL slot is sequenced over sks)
 ROWS = {0: "DATE#2026-02-28", 1: "DATE#2026-09-08", 2: "DATE#2026-09-15", 3: "DATE#2026-09-22", 4: "DATE#2026-09-29"}
@@ -299,6 +323,95 @@ def apply_pages() -> None:
     restart_leadin_pages.run(apply=True)
 
 
+def share_kit_json(row: Dict[str, Any], installments: List[Dict[str, Any]]) -> str:
+    """#4593: the week's share kit built from the REBUILT row — the draft kit the approve path would write was built
+    from the superseded draft and is dropped with the other draft_* fields. Slug and label come from the same
+    (date, sk) sequence restart_leadin_pages renders the pages at, so the kit lands at the post's own week-NN."""
+    import restart_leadin_pages as rlp
+    from content import chronicle_share_kit
+    from privacy import privacy_guard
+
+    date_str = str(row.get("date") or str(row.get("sk", "")).replace("DATE#", ""))
+    week = int(row.get("week_number", 0) or 0)
+    all_dates = sorted(x.get("date", "") for x in installments if x.get("date", ""))
+    all_keys = rlp.installment_keys(installments)
+    listed_keys = rlp.installment_keys([x for x in installments if not x.get("unlisted")])
+    sk = str(row.get("sk", ""))
+    seq = rlp.seq_for(date_str, all_dates, week, sk=sk, all_keys=all_keys)
+    label = "From the archive" if row.get("unlisted") else rlp.series_label(date_str, all_dates, week, sk=sk, all_keys=listed_keys)
+    kit = chronicle_share_kit.build_kit(
+        title=row.get("title", ""),
+        stats_line=rlp.display_stats_line(row.get("stats_line", ""), date_str),
+        label=label,
+        date_str=date_str,
+        canonical_url=rlp.CANONICAL_URL_FMT.format(seq=seq),
+        excerpt_source=rlp.body_markdown_from_record(row),
+        week_number=week,
+    )
+    privacy_guard.assert_clean(kit.get("caption", ""), context=f"share kit {sk}")  # parity with the Wednesday writer
+    return json.dumps(kit)
+
+
+def effects_plan(deliver: bool) -> Dict[str, str]:
+    """The decline map this promote passes to publish_side_effects."""
+    decline = dict(PROMOTE_DECLINES)
+    if not deliver:
+        decline["delivery"] = NO_DELIVER_REASON
+    return decline
+
+
+def _sender_pick() -> Dict[str, Any] | None:
+    """The row chronicle-email-sender would mail right now (its own selector, not a copy of it)."""
+    import chronicle_email_sender_lambda as sender
+
+    return sender._get_this_weeks_installment()
+
+
+def delivery_skip_reason(sk: str, pick: Dict[str, Any] | None) -> str:
+    """#4729: the sender mails the newest undelivered in-window row, never a named one. '' when that row is `sk`."""
+    if pick is None:
+        return f"the sender would mail nothing now ({sk} is outside its 7-day window, already delivered, or declined)"
+    if pick.get("sk") != sk:
+        return f"not the sender's newest in-window row (it would mail {pick.get('sk')}, not {sk})"
+    return ""
+
+
+def apply_effects(sks: List[str], deliver: bool = False) -> Dict[str, Dict[str, str]]:
+    """#4593: run — or decline by name, with a reason — every publish-time side effect chronicle-approve runs, through
+    the SAME function (chronicle_approve_lambda.publish_side_effects). Before this, the promote wrote the row and ran
+    none of them: week 4 shipped with no share kit and no email and no recorded decision not to send one."""
+    import boto3
+    import chronicle_approve_lambda as approve
+    import restart_leadin_pages as rlp
+
+    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    installments = rlp.fetch_visible_installments(table)
+    decline = effects_plan(deliver)
+    results: Dict[str, Dict[str, str]] = {}
+    sender_pick = _sender_pick() if deliver else None
+    for sk in sks:
+        row = table.get_item(Key={"pk": CHRONICLE_PK, "sk": sk}).get("Item")
+        if not row or row.get("status") != "published":
+            raise SystemExit(f"EFFECTS {sk}: row is {'missing' if not row else row.get('status')!r}, not published — refusing")
+        fresh = next((x for x in installments if x.get("sk") == sk), row)
+        item = dict(row)
+        for f in DRAFT_FIELDS:  # only the kit is written: never a superseded draft page or manifest
+            item.pop(f, None)
+        item["draft_share_kit_json"] = share_kit_json(fresh, installments)
+        date_str = str(row.get("date") or sk.replace("DATE#", ""))
+        defer = ()
+        skip_reason = ""
+        if deliver:
+            skip_reason = delivery_skip_reason(sk, sender_pick)
+            if skip_reason:
+                defer = ("delivery",)  # never invoke a sender that would mail a different row
+        results[sk] = approve.publish_side_effects(item, date_str, decline=decline, defer=defer)
+        if skip_reason:
+            results[sk]["delivery"] = f"skipped: {skip_reason}"
+        print(f"EFFECTS {sk}: " + ", ".join(f"{k}={v}" for k, v in results[sk].items()))
+    return results
+
+
 def apply_panel(staging: str, weeks: List[int]) -> None:
     import boto3
     import coach_panel_podcast_lambda as panel
@@ -437,38 +550,134 @@ for _k, _v in {"TABLE_NAME": TABLE, "S3_BUCKET": BUCKET, "USER_ID": "matthew", "
     os.environ.setdefault(_k, _v)
 
 
+# #4549: the staged files whose content reaches a reader on --apply — the post, the episode, the ledger (LEDGER rows and
+# the Panel's bet record) and the dossier (the stats line). The audit names each one by content hash, so an audit of an
+# earlier draft can never pass a later one: a re-stage, a --repair or a hand edit changes a hash and the gate refuses.
+AUDITED_FILES = ("chronicle.md", "episode.json", "ledger.json", "dossier.json")
+# Floors from .claude/agents/story-auditor.md §Method: 8 claims per week; 15 raw-verified per five-week season (3/week).
+ITEMS_PER_WEEK = 8
+RAW_VERIFIED_PER_WEEK = 3
+
+
+def staged_hashes(staging: str, weeks: List[int]) -> Dict[str, Optional[str]]:
+    """sha256 of every staged file that publishes for ``weeks`` (None = the file is missing). The auditor records this
+    map as ``staged_sha256`` in audit.json (``--audit-hashes`` prints it)."""
+    import hashlib
+
+    out: Dict[str, Optional[str]] = {}
+    for w in weeks:
+        for k in AUDITED_FILES:
+            name = f"wk{w}_{k}"
+            try:
+                with open(os.path.join(staging, name), "rb") as fh:
+                    out[name] = hashlib.sha256(fh.read()).hexdigest()
+            except OSError:
+                out[name] = None
+    return out
+
+
+def _count(v: Any) -> Optional[int]:
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
 def audit_gate(staging: str, weeks: List[int]) -> List[str]:
-    """#4549: an adversarial raw-data audit (the story-auditor agent) must have read THIS staging — newer than every
-    staged installment file — and left zero blocking items. Returns the reasons it refuses (empty = pass)."""
+    """#4549: an adversarial raw-data audit (the story-auditor agent) must have read THIS staging — every file that would
+    publish, by content hash — and left zero blocking items. Fails closed: a missing, unreadable, malformed, stale,
+    under-sized or blocking audit refuses. Returns the reasons it refuses (empty = pass)."""
     path = os.path.join(staging, "audit.json")
     if not os.path.exists(path):
         return ["no audit.json — run the story-auditor agent on this staging folder first"]
     try:
         with open(path, encoding="utf-8") as fh:
             audit = json.load(fh)
-    except ValueError:
-        return ["audit.json is unreadable"]
-    reasons = []
-    newest = max(os.path.getmtime(os.path.join(staging, f"wk{w}_{k}")) for w in weeks for k in ("chronicle.md", "episode.json"))
-    if os.path.getmtime(path) < newest:
-        reasons.append("audit.json is older than a staged installment — the audit did not read what would publish; re-audit")
-    if audit.get("blocking"):
-        reasons.append(f"audit.json lists {len(audit['blocking'])} blocking item(s)")
+    except (OSError, ValueError) as exc:
+        return [f"audit.json is unreadable ({exc.__class__.__name__}) — re-audit"]
+    if not isinstance(audit, dict):
+        return [f"audit.json is malformed — a JSON object is required, found {type(audit).__name__}"]
+    reasons: List[str] = []
+
+    blocking = audit.get("blocking")
+    if not isinstance(blocking, list):
+        reasons.append("audit.json is malformed — `blocking` must be a list (empty when nothing blocks); absent is not zero")
+    elif blocking:
+        reasons.append(f"audit.json lists {len(blocking)} blocking item(s)")
+    if audit.get("verdict") != "publishable":
+        reasons.append(f"audit.json verdict is {audit.get('verdict')!r}, not 'publishable'")
+
+    items, raw = _count(audit.get("items_checked")), _count(audit.get("raw_verified"))
+    if items is None or items < ITEMS_PER_WEEK * len(weeks):
+        reasons.append(
+            f"audit.json items_checked={audit.get('items_checked')!r} — at least {ITEMS_PER_WEEK * len(weeks)} for {len(weeks)} week(s)"
+        )
+    if raw is None or raw < RAW_VERIFIED_PER_WEEK * len(weeks):
+        reasons.append(
+            f"audit.json raw_verified={audit.get('raw_verified')!r} — at least {RAW_VERIFIED_PER_WEEK * len(weeks)} claims checked "
+            f"against raw DynamoDB for {len(weeks)} week(s)"
+        )
+
+    recorded = audit.get("staged_sha256")
+    if not isinstance(recorded, dict):
+        reasons.append(
+            "audit.json has no `staged_sha256` map — it does not name the content it read; re-audit "
+            "(`season_promote.py --staging <dir> --weeks <w> --audit-hashes` prints the map)"
+        )
+        return reasons
+    for name, digest in staged_hashes(staging, weeks).items():
+        if digest is None:
+            reasons.append(f"{name} is missing from staging")
+        elif name not in recorded:
+            reasons.append(f"audit.json does not cover {name} — the audit did not read it; re-audit")
+        elif recorded[name] != digest:
+            reasons.append(f"{name} changed after the audit (sha256 mismatch) — the audit did not read what would publish; re-audit")
     return reasons
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--staging", required=True)
+    ap.add_argument("--staging", default=None, help="the staging folder (required except with --effects-only)")
     ap.add_argument("--weeks", default="0-4")
+    ap.add_argument(
+        "--deliver",
+        action="store_true",
+        help="#4593: OWNER DECISION — let the effects step invoke chronicle-email-sender (one week only). Without it, "
+        "delivery is declined and a no-send decision is stamped on each row.",
+    )
+    ap.add_argument(
+        "--effects-only",
+        action="store_true",
+        help="#4593 repair: run only the publish-time side effects for already-published rows (no staging, no audit "
+        "gate — nothing is republished). Dry-run unless --apply.",
+    )
     ap.add_argument("--apply", action="store_true", help="OWNER ACT: perform the publish")
     ap.add_argument("--only", default=",".join(STEPS), help=f"comma list of steps from {STEPS}")
     ap.add_argument("--backup-dir", default=None)
     ap.add_argument("--accept-reviewed", action="store_true", help="the remaining fact-read findings were adjudicated by a person")
+    ap.add_argument(
+        "--audit-hashes",
+        action="store_true",
+        help="print the staged_sha256 map the story-auditor records in audit.json, and exit (no AWS)",
+    )
     args = ap.parse_args(argv)
     os.environ.setdefault("AWS_MAX_ATTEMPTS", "1")
     a, _, b = args.weeks.partition("-")
     weeks = list(range(int(a), int(b or a) + 1))
+    if args.deliver and len(weeks) != 1:
+        # chronicle-email-sender mails the newest installment of the last 7 days, not a named one
+        raise SystemExit("--deliver takes exactly one week (the sender mails the newest installment, not a named one)")
+    if args.effects_only:
+        sks = [ROWS[w] for w in weeks]
+        print(json.dumps({"effects_for": sks, "decline": effects_plan(args.deliver)}, indent=1))
+        if not args.apply:
+            print("\nDRY RUN — nothing written. Re-run with --apply (owner act).")
+            return 0
+        apply_effects(sks, deliver=args.deliver)
+        return 0
+    if not args.staging:
+        raise SystemExit("--staging is required (except with --effects-only)")
+    if args.audit_hashes:
+        hashes = staged_hashes(args.staging, weeks)
+        print(json.dumps(hashes, indent=1))
+        return 0 if all(hashes.values()) else 2
     steps = [s for s in args.only.split(",") if s]
     unknown = set(steps) - set(STEPS)
     if unknown:
@@ -501,6 +710,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         apply_ledger(args.staging, weeks)
     if "pages" in steps:
         apply_pages()
+    if "effects" in steps:
+        apply_effects([ROWS[w] for w in weeks], deliver=args.deliver)
     if "panel" in steps:
         apply_panel(args.staging, weeks)
     if "recap" in steps:

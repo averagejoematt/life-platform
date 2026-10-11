@@ -322,7 +322,7 @@ def _wire_weekly(monkeypatch, zeitgeist_result):
 
 def test_run_weekly_fetches_once_and_feeds_builders_and_ground_truth(monkeypatch):
     fetches, judged_gt, builder_beats = _wire_weekly(monkeypatch, HEADLINES)
-    out = panel._run_weekly(force=False, dry_run=True)
+    out = panel._run_weekly(force=False, dry_run=True, approved=True)  # #4694: past the audit gate
     assert json.loads(out["body"])["would"] == "PUBLISH"
     assert fetches == [1]  # ONE fetch per run
     assert builder_beats[0]["zeitgeist"] == list(HEADLINES)  # both builders read beats["zeitgeist"]
@@ -332,7 +332,7 @@ def test_run_weekly_fetches_once_and_feeds_builders_and_ground_truth(monkeypatch
 
 def test_run_weekly_empty_fetch_leaves_generation_path_unchanged(monkeypatch):
     fetches, judged_gt, builder_beats = _wire_weekly(monkeypatch, [])
-    out = panel._run_weekly(force=False, dry_run=True)
+    out = panel._run_weekly(force=False, dry_run=True, approved=True)  # #4694: past the audit gate
     assert json.loads(out["body"])["would"] == "PUBLISH"  # generation proceeds exactly as before
     assert builder_beats[0]["zeitgeist"] == []
     assert "TOPICAL HEADLINES" not in judged_gt[0]

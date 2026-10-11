@@ -44,7 +44,7 @@
 #      an EventBridge rule. A real data run needs the whoop-style re-auth first.
 #
 # ── DEPLOYED — the full resolved contents of the LIVE layer version below.
-#   garth-layer:3, measured 2026-08-08 read-only via
+#   garth-layer:4, measured 2026-10-11 read-only via
 #   `aws lambda get-layer-version-by-arn` + inspection of the returned zip's
 #   *.dist-info. Ground truth, not an estimate. Transitive packages are listed
 #   explicitly so pip-audit sees the WHOLE layer, not just its top-level pins.
@@ -52,18 +52,18 @@
 annotated-types==0.8.0
 certifi==2026.7.22
 cffi==2.1.1
-charset-normalizer==3.4.9
-curl-cffi==0.16.0
+charset-normalizer==3.5.2
+curl-cffi==0.16.3
 garminconnect==0.3.8
 garth==0.6.3
-idna==3.18
-oauthlib==3.3.1
-pycparser==3.0
-pydantic==2.13.4
-pydantic-core==2.46.4
+idna==3.20
+oauthlib==4.0.0
+pycparser==3.11
+pydantic==2.14.0
+pydantic-core==2.50.0
 requests==2.34.2
 requests-oauthlib==2.0.0
 typing-extensions==4.16.0
-typing-inspection==0.4.2
-ua-generator==2.1.3
-urllib3==2.7.0
+typing-inspection==0.4.4
+ua-generator==2.1.6
+urllib3==2.8.0

@@ -151,6 +151,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - coach-prediction-evaluator → `lambdas/coach/coach_prediction_evaluator.py`
 - coach-quality-gate → `lambdas/coach/coach_quality_gate.py`
 - coach-state-updater → `lambdas/coach/coach_state_updater.py`
+- coach-vision → `lambdas/coach/coach_vision_lambda.py`
 - inter-coach-dialogue → `lambdas/coach/inter_coach_dialogue_lambda.py` (cdk_only†)
 - telegram-coach-worker → `lambdas/coach/telegram_worker_lambda.py`
 - voice-fidelity-harness → `lambdas/coach/voice_fidelity_harness.py` (cdk_only†)
@@ -168,6 +169,8 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - daily-debrief → `lambdas/emails/daily_debrief_lambda.py`
 - elena-state-updater → `lambdas/emails/elena_state_updater.py`
 - evening-nudge → `lambdas/emails/evening_nudge_lambda.py`
+- habit-skip-review → `lambdas/emails/habit_skip_review_lambda.py`
+- inbound-auth-gate → `lambdas/emails/inbound_auth_gate_lambda.py`
 - insight-email-parser → `lambdas/emails/insight_email_parser_lambda.py`
 - life-platform-freshness-checker → `lambdas/emails/freshness_checker_lambda.py`
 - milestone-digest → `lambdas/emails/milestone_digest_lambda.py`

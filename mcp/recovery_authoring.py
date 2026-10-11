@@ -186,6 +186,24 @@ def render_branch_block(branches):
     return f"🟢 {g} · 🟡 {y} · 🔴 {r} · {LOWER_OF_RULE}"
 
 
+def render_loaded_streak_line(training_context):
+    """The one line that states the loaded-lifting count in the note — or None when it is unknown.
+
+    #4411: the count is carried on EVERY adaptive note where it could be read, not only once it
+    crosses `LATE_WEEK_STREAK`. Below the threshold the old note said nothing, so the owner could
+    not tell "2 loaded days, nothing to flag" from "the count was never read" — and no note showed
+    which streak the platform holds. This line is CONTEXT: it names what is counted (loaded lifting)
+    and what is not (walk and cardio days), and it never asks for rest; the only streak-driven change
+    to the session is the `late_week` reason on the "Today:" line. None (unread) writes no line —
+    never a 0-day claim (ADR-104).
+    """
+    streak = (training_context or {}).get("loaded_lifting_streak")
+    if streak is None:
+        return None
+    n = int(streak)
+    return f"Loaded lifting: {n} day{'' if n == 1 else 's'} in a row before this session (walk and cardio days are not counted)."
+
+
 def render_session_block(training_context, inputs_current_through=None):
     """The always-present session-level adaptive block written into routine.notes.
 
@@ -208,6 +226,9 @@ def render_session_block(training_context, inputs_current_through=None):
     ]
     if training_context and training_context.get("reasons"):
         lines.append("Today: " + "; ".join(training_context["reasons"]) + ".")
+    streak_line = render_loaded_streak_line(training_context)
+    if streak_line:
+        lines.append(streak_line)
     if inputs_current_through:
         lines.append(f"inputs_current_through: {inputs_current_through}")
     return "\n".join(lines)

@@ -582,3 +582,326 @@ def test_a_cast_that_names_coaches_by_name_is_recognised(sheet):
     assert not refused["speakers"] and len(refused["dropped"]) == 3
     # A name that is nobody's still finds nobody.
     assert M.admit_cast({"speakers": [{"coach_id": "Somebody Else", "move": "call"}]}, sheet, ELIGIBLE, TODAY, names)["speakers"] == []
+
+
+# ── a coach never names herself (#4705) ──────────────────────────────────────
+
+# /api/coach_moves?date=2026-10-07, live 2026-10-10 03:04Z (sleep_coach, reaction) — the wire.
+SELF_NAMED = (
+    "I was skeptical when Lisa called the recovery spike genuine architecture rather than noise, "
+    "but today's recovery suggests she was right."
+)
+
+
+def test_a_line_naming_its_own_speaker_is_refused_4705(sheet):
+    reasons = S.check_line(SELF_NAMED, "reaction", sheet, today=TODAY, speaker_name=NAMES["sleep_coach"])
+    assert "names_self:Lisa" in reasons, reasons
+    assert "names_self:Reyes" in S.check_line("Reyes would say it held.", "reaction", sheet, today=TODAY, speaker_name="Max Reyes")
+    assert "names_self:Lisa Park" in S.check_line("lisa park here: it held.", "reaction", sheet, today=TODAY, speaker_name="Lisa Park")
+    assert "names_self:Max Reyes" in S.check_line("Max Reyes thinks it held.", "reaction", sheet, today=TODAY, speaker_name="Max Reyes")
+    # another coach's name is not the speaker's
+    assert not [r for r in S.check_line(SELF_NAMED, "reaction", sheet, today=TODAY, speaker_name="Max Reyes") if r.startswith("names_self")]
+
+
+def _self_named(text, name):
+    return [r for r in S.self_name_findings(text, name) if r.startswith("names_self")]
+
+
+def test_a_name_part_that_is_an_ordinary_word_never_refuses_4705():
+    """Max Reyes (physical_coach) and Lisa Park (sleep_coach) carry name parts that are English words —
+    "max", "park". A line using the word is not the coach naming herself (#4705 review)."""
+    for text in (
+        "I think he should push to max effort on Saturday.",
+        "Max heart rate is not the point; I expect the steps to matter more.",
+        "I think his VO2 Max will climb through October.",
+        "I expect the max he lifts to hold, and a max-effort week to follow.",
+        "I think a long walk in the park would do more than another lifting day.",
+        "Park the scale for a week; I expect the trend to hold.",
+    ):
+        assert _self_named(text, "Max Reyes") == [], text
+        assert _self_named(text, "Lisa Park") == [], text
+    # the surname that is no word, and lowercase first names, behave as names only when capitalised
+    assert _self_named("I think reyes is a word nobody uses.", "Max Reyes") == []
+    assert _self_named("Reyes thinks it held.", "Max Reyes") == ["names_self:Reyes"]
+    # every live word-part is on the list, so no roster coach trips on it
+    for part in ("Max", "Park", "Marsh", "Vale", "Brooks"):
+        assert part.lower() in S.COMMON_WORD_NAME_PARTS
+
+
+def test_run_wires_the_speakers_name_into_the_gate_4705(monkeypatch):
+    """The production wiring: run() passes the speaker's display name to check_line. A line in which
+    physical_coach names himself twice is held; without the wiring it would ship."""
+    named = "Reyes thinks the long nights will keep the weight falling, and I expect that to hold through the weekend."
+    cast = {"speakers": [{"coach_id": "physical_coach", "move": "call"}], "bet": None}
+    out, table, inv, opened = _run(monkeypatch, cast, {"physical_coach": [named, named]})
+    row = table.puts[-1]
+    assert row["lines"] == [], row["lines"]
+    assert row["held"][0]["coach_id"] == "physical_coach"
+    assert row["held"][0]["reasons"] == ["names_self:Reyes"], row["held"]
+    # control: the same line from another coach is not self-naming and ships
+    cast = {"speakers": [{"coach_id": "sleep_coach", "move": "call"}], "bet": None}
+    out, table, inv, opened = _run(monkeypatch, cast, {"sleep_coach": [named, named]})
+    assert [ln["coach_id"] for ln in table.puts[-1]["lines"]] == ["sleep_coach"], table.puts[-1]["held"]
+
+
+def test_the_speakers_own_entries_read_you_4705(sheet):
+    ctx = S.context_text(sheet, NAMES, speaker="sleep_coach")
+    assert "you (your own call) predicted" in ctx and "Lisa Park predicted" not in ctx, ctx
+    other = S.context_text(sheet, NAMES, speaker="mind_coach")
+    assert "Lisa Park predicted" in other
+    sh = S.build_sheet(_inputs(positions={"sleep_coach": {"text": "Sleep held.", "as_of": "2026-10-03"}}), TODAY)
+    assert "you (your own last position" in S.context_text(sh, NAMES, speaker="sleep_coach")
+    assert "Lisa Park (sleep_coach" not in S.context_text(sh, NAMES, speaker="sleep_coach")
+
+
+def test_line_user_and_prompt_tell_the_speaker_who_she_is_4705(sheet):
+    sp = {"coach_id": "sleep_coach", "move": "reaction", "result": "pred_sleep_0930"}
+    user = M.line_user(sp, sheet, NAMES, {}, None, "")
+    assert "YOU ARE Lisa Park" in user
+    assert "your own call predicted" in user and "sleep_coach predicted" not in user, user
+    assert 'Say "I", never your own name' in M.LINE_PROMPT
+
+
+# ── round 8: repeats, tics, jargon (the live lines of 2026-10-05..09) ───────
+#
+# The fixtures are the WIRE: each text is what https://averagejoematt.com/api/coach_moves?date=...
+# served on that date (read 2026-10-11), keyed by date and coach.
+
+WIRE = {
+    ("2026-10-05", "nutrition_coach", "reaction"): (
+        "Marcus Webb called it — non-compensated carb cuts correlating with recovery decline — and that result is graded "
+        "true, yet Matthew's recovery score today is 98, his strongest so far; I think the structure held better than the "
+        "prediction implied."
+    ),
+    ("2026-10-07", "sleep_coach", "reaction"): (
+        "I was skeptical when Lisa called the recovery spike genuine architecture rather than noise, but today's 77 recovery "
+        "score and HRV of 57 — so far — suggest she was right and Matthew's sleep structure is holding load, not just "
+        "bouncing off a floor event."
+    ),
+    ("2026-10-07", "nutrition_coach", "reply"): (
+        "James Okafor's protein hold deserves scrutiny — I was wrong about dinner disruption collapsing intake during the "
+        "dark journal gap, and Matthew held his average intact, so I think the intake concern is weaker than James is "
+        "framing it right now."
+    ),
+    ("2026-10-07", "mind_coach", "question"): (
+        "Does Matthew see the 28-day journal silence as a deliberate choice, or has it quietly become the path of least "
+        "resistance — and I wonder if even he knows which one it is yet?"
+    ),
+    ("2026-10-08", "labs_coach", "reply"): (
+        "Marcus Webb is right that dinner underperforms, but so far Matthew's 27-day average has held at 146.9g — I think "
+        "the intake concern is weaker than the lab draw absence, which is now the clearest blocker I see."
+    ),
+    ("2026-10-08", "mind_coach", "question"): (
+        "Is the 29-day journal silence something Matthew chose, or something that simply accumulated while he was busy with "
+        "everything the logged data shows he's been doing well?"
+    ),
+    ("2026-10-09", "explorer_coach", "reaction"): (
+        "Henning's prediction just came true, and I think it reshapes what we thought we knew — so far, Matthew's recovery "
+        "holding at 52ms HRV alongside 20.2 lbs lost suggests glucose dynamics, not protein primacy, are driving his "
+        "recovery architecture."
+    ),
+    ("2026-10-09", "labs_coach", "call"): (
+        "I think Matthew will keep deferring the lab draw as long as the symptom baseline stays uncollected — so far, 30 "
+        "days of journal silence makes it nearly impossible to build that case, and I expect that gap, not protein, is what "
+        "stalls clinical progress next."
+    ),
+}
+
+
+def _wire(day, cid, move):
+    return WIRE[(day, cid, move)]
+
+
+def _yesterday_of(day):
+    """Yesterday's lines exactly as the sheet carries them (build_sheet masks their figures)."""
+    lines = [{"coach_id": cid, "move": mv, "text": t} for (d, cid, mv), t in WIRE.items() if d == day]
+    return S.build_sheet(_inputs(yesterday=lines), TODAY)["yesterday"]
+
+
+def test_the_wire_tics_are_the_prompts_own_words():
+    """The count the round-8 read found: 'so far' and 'I think' each sit in five of the eight served lines."""
+    texts = list(WIRE.values())
+    assert sum(bool(S.TICS["so_far"].search(t)) for t in texts) == 5
+    assert sum(bool(S.TICS["i_think"].search(t)) for t in texts) == 5
+
+
+def test_the_same_coach_asking_the_same_question_twice_is_refused():
+    y = _yesterday_of("2026-10-07")
+    again = _wire("2026-10-08", "mind_coach", "question")
+    assert S.repeat_findings(again, "question", "mind_coach", y) == ["repeats_yesterday:journal"]
+    # the subject arm alone carries this one: the two questions share no five-word run
+    assert S.shared_run(again, _wire("2026-10-07", "mind_coach", "question")) == ""
+    # another coach asking about the journal is not this coach repeating itself
+    assert S.repeat_findings(again, "question", "sleep_coach", y) == []
+    # a question on a different subject passes
+    assert S.repeat_findings("Does Matthew plan his dinners, or take them as they come?", "question", "mind_coach", y) == []
+
+
+def test_a_sentence_said_again_the_next_day_is_refused():
+    y = _yesterday_of("2026-10-07")
+    found = S.repeat_findings(_wire("2026-10-08", "labs_coach", "reply"), "reply", "labs_coach", y)
+    assert found == ['repeats_yesterday:"i think the intake concern is weaker than"']
+
+
+def test_the_word_run_strips_figures_and_case():
+    a = "On 28 days he Held The Line on protein, and that matters."
+    b = "after 29 days he held the line on protein again"
+    assert S.shared_run(a, b) == "days he held the line on protein"  # 28 / 29 stripped, so the runs meet at "days"
+    assert S.shared_run("he held the line today", "he held the line yesterday") == ""  # four words is not a repeat
+
+
+def test_a_new_point_the_next_day_passes():
+    y = _yesterday_of("2026-10-08")
+    for (day, cid, mv), text in WIRE.items():
+        if day == "2026-10-09":
+            assert S.repeat_findings(text, mv, cid, y) == [], (cid, text)
+
+
+def test_a_second_line_with_the_same_tic_is_refused():
+    first = _wire("2026-10-09", "explorer_coach", "reaction")
+    second = _wire("2026-10-09", "labs_coach", "call")
+    assert S.tic_findings(first, []) == []
+    assert S.tic_findings(second, [first]) == ["tic:so_far", "tic:i_think"]
+    assert S.tic_findings("Early days, but I expect the scale to hold through Sunday.", [first]) == []
+
+
+def test_jargon_in_a_served_line_is_refused(sheet):
+    expected = {
+        ("2026-10-05", "nutrition_coach", "reaction"): ["jargon:compensated"],
+        ("2026-10-07", "sleep_coach", "reaction"): ["jargon:architecture"],
+        ("2026-10-09", "explorer_coach", "reaction"): ["jargon:architecture", "jargon:dynamics", "jargon:primacy"],
+        ("2026-10-09", "labs_coach", "call"): ["jargon:baseline"],
+    }
+    for key, text in WIRE.items():
+        assert S.jargon_findings(text) == expected.get(key, []), key
+    # and check_line carries it
+    reasons = S.check_line(_wire("2026-10-09", "explorer_coach", "reaction"), "reaction", sheet, today=TODAY)
+    assert {"jargon:architecture", "jargon:dynamics", "jargon:primacy"} <= set(reasons)
+
+
+def test_mutation_control_check_line_refuses_jargon_only_through_the_plain_words_check(sheet, monkeypatch):
+    text = "I expect the journal to stay quiet through the weekend, and the recovery architecture matters more than a score of 98."
+    assert "jargon:architecture" in S.check_line(text, "call", sheet, today=TODAY)
+    monkeypatch.setattr(S, "jargon_findings", lambda t: [])
+    assert "jargon:architecture" not in S.check_line(text, "call", sheet, today=TODAY)
+
+
+def test_the_retry_names_what_was_wrong():
+    note = S.retry_note(['repeats_yesterday:"i think the intake concern is weaker than"', "repeats_yesterday:food_log"])
+    assert '"i think the intake concern is weaker than"' in note and "food log" in note
+    note = S.retry_note(["tic:so_far", "tic:i_think", "jargon:primacy"])
+    assert "different hedge" in note and "early days" in note
+    assert "do not write 'I think'" in note
+    assert "'primacy'" in note and "plain word" in note
+
+
+class _RecordingInvoke(_Invoke):
+    def __init__(self, cast, lines):
+        super().__init__(cast, lines)
+        self.messages = []
+
+    def __call__(self, body, model_name=None):
+        if model_name == M.LINE_MODEL:
+            self.messages.append((_CURRENT["speaker"], body["messages"][0]["content"]))
+        return super().__call__(body, model_name)
+
+
+def _run_round8(monkeypatch, cast, lines, yesterday):
+    table = FakeDdbTable()
+    real_line_user = M.line_user
+
+    def _line_user(sp, *a, **k):
+        _CURRENT["speaker"] = sp["coach_id"]
+        return real_line_user(sp, *a, **k)
+
+    monkeypatch.setattr(M, "line_user", _line_user)
+    inv = _RecordingInvoke(cast, lines)
+    out = M.run(
+        table,
+        names=NAMES,
+        voices=lambda cid: ("", ""),
+        today=TODAY,
+        coach_ids=list(NAMES),
+        invoke=inv,
+        allow=lambda f: True,
+        inputs=_inputs(yesterday=yesterday),
+        open_bet=lambda dis, day: {"opened": [], "skipped": []},
+    )
+    return out, table.puts[-1], inv
+
+
+# The 10-08 wire question's shape on the test sheet (2026-10-03: journal quiet 24 days). The wire text itself also
+# trips today's absence binding on this sheet ("logged"), so the run tests use this form, which only the repeat refuses.
+_AGAIN = "Is the 24-day journal silence something Matthew chose, or something that simply crept up on him this month?"
+_NEW_QUESTION = "Does Matthew plan his dinners ahead, or take them as they come each night?"
+
+
+def test_run_refuses_a_repeated_question_and_tells_the_model_what_it_repeated(monkeypatch):
+    yesterday = [{"coach_id": "mind_coach", "move": "question", "text": _wire("2026-10-07", "mind_coach", "question")}]
+    cast = {"speakers": [{"coach_id": "mind_coach", "move": "question"}], "bet": None}
+    again = _AGAIN
+    out, row, inv = _run_round8(monkeypatch, cast, {"mind_coach": [again, _NEW_QUESTION]}, yesterday)
+    assert [ln["text"] for ln in row["lines"]] == [_NEW_QUESTION], row["held"]
+    retry = inv.messages[1][1]
+    assert "it repeats yesterday (journal)" in retry
+    # held, never shipped, when the model repeats twice
+    out, row, inv = _run_round8(monkeypatch, cast, {"mind_coach": [again, again]}, yesterday)
+    assert row["lines"] == [] and row["held"][0]["reasons"] == ["repeats_yesterday:journal"]
+
+
+def test_mutation_control_the_run_refuses_a_repeat_only_through_repeat_findings(monkeypatch):
+    yesterday = [{"coach_id": "mind_coach", "move": "question", "text": _wire("2026-10-07", "mind_coach", "question")}]
+    cast = {"speakers": [{"coach_id": "mind_coach", "move": "question"}], "bet": None}
+    again = _AGAIN
+    monkeypatch.setattr(S, "repeat_findings", lambda *a, **k: [])
+    out, row, inv = _run_round8(monkeypatch, cast, {"mind_coach": [again, again]}, yesterday)
+    assert [ln["text"] for ln in row["lines"]] == [again]
+
+
+_FIRST = "I expect his recovery to hold up through Sunday, so far the long nights are carrying it."
+_SECOND_TIC = "I disagree with Lisa Park: so far the scale says more than recovery does about this week."
+_SECOND_OK = "I disagree with Lisa Park: early days, but the scale says more than recovery does about this week."
+
+
+def test_run_refuses_a_second_so_far_and_asks_for_a_different_hedge(monkeypatch):
+    cast = {
+        "speakers": [
+            {"coach_id": "sleep_coach", "move": "call"},
+            {"coach_id": "physical_coach", "move": "reply", "replies_to": "sleep_coach"},
+        ],
+        "bet": None,
+    }
+    out, row, inv = _run_round8(monkeypatch, cast, {"sleep_coach": _FIRST, "physical_coach": [_SECOND_TIC, _SECOND_OK]}, [])
+    assert [ln["text"] for ln in row["lines"]] == [_FIRST, _SECOND_OK], row["held"]
+    assert "use a different hedge" in inv.messages[2][1]
+
+
+def test_mutation_control_the_run_refuses_a_tic_only_through_tic_findings(monkeypatch):
+    cast = {
+        "speakers": [
+            {"coach_id": "sleep_coach", "move": "call"},
+            {"coach_id": "physical_coach", "move": "reply", "replies_to": "sleep_coach"},
+        ],
+        "bet": None,
+    }
+    monkeypatch.setattr(S, "tic_findings", lambda *a, **k: [])
+    out, row, inv = _run_round8(monkeypatch, cast, {"sleep_coach": _FIRST, "physical_coach": [_SECOND_TIC, _SECOND_OK]}, [])
+    assert [ln["text"] for ln in row["lines"]] == [_FIRST, _SECOND_TIC]
+
+
+def test_run_retry_names_the_jargon_term(monkeypatch):
+    cast = {"speakers": [{"coach_id": "sleep_coach", "move": "call"}], "bet": None}
+    jargon = "I expect his recovery architecture to hold up through Sunday; the long nights are carrying it."
+    plain = "I expect his recovery to hold up through Sunday; the long nights are carrying it."
+    out, row, inv = _run_round8(monkeypatch, cast, {"sleep_coach": [jargon, plain]}, [])
+    assert [ln["text"] for ln in row["lines"]] == [plain], row["held"]
+    assert "'architecture' is a specialist word" in inv.messages[1][1]
+
+
+def test_the_prompts_carry_the_round8_rules():
+    assert "not cast again for it unless the fact changed or Matthew answered" in M.CAST_PROMPT
+    for hedge in ("'early days'", "'on a few days of data'", "'for now'", "'so far'"):
+        assert hedge in M.LINE_PROMPT
+    assert "vary your opening; do not start with 'I think'" in M.LINE_PROMPT
+    assert "('I think'" not in M.LINE_PROMPT, "the prompt no longer hands every coach the same opener"
+    assert "{metrics}" in M.CAST_PROMPT and M.CAST_PROMPT.format(metrics="x")

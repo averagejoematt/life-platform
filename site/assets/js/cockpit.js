@@ -38,6 +38,7 @@ import { cohortAheadPercent } from "/assets/js/cohort_math.js"; // #1820 — dir
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { coachPayloadRead, deterministicPillarRead, isDark } from "/assets/js/absence_read.js"; // #2388 — real payload fields + no trend verb on a dark source
 import { mountOrientStrip } from "/assets/js/orient.js"; // #4182 — the one-line newcomer strip (replaces the PG-02 card)
+import { mountMorningNoteBox } from "/assets/js/morning_note_box.js"; // #4189 — the owner-only four-word box
 import { weekLine, nightLine, sessionLine, proteinLine, askLine, freshLine, nutritionPillarNote, unwrap, fmtDay } from "/assets/js/three_questions.js"; // #4182 — the first screen
 
 const API = "/api";
@@ -1791,6 +1792,9 @@ function wireScrub() {
   configureScrub(GENESIS_ISO);
 }
 
+// #4189: the owner's four-word box — renders ONLY from his signed #note=<day>.<token> link; a reader's
+// cockpit is untouched (no element, no request). Fail-soft: the cockpit never breaks on it.
+try { mountMorningNoteBox({ doc: document, loc: location, hist: history, anchor: $(".cockpit-hero") }); } catch (e) {}
 wireScope();
 initTheme();
 wireFirstRun();

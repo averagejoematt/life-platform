@@ -744,7 +744,14 @@ def operational_reading_recall_sweep() -> list[iam.PolicyStatement]:
 
 
 def operational_key_rotator() -> list[iam.PolicyStatement]:
-    """Key rotator: rotates MCP API key in Secrets Manager."""
+    """Key rotator: rotates MCP API key in Secrets Manager.
+
+    UpdateSecretVersionStage is what `finish_secret` calls to move AWSCURRENT onto the
+    pending version. It was dropped on 2026-03-10 (d2f996914 re-added this function after
+    385894fbb truncated the file), so every rotation failed at finishSecret (#4707).
+    tests/test_key_rotator_grants_4707.py derives the action set from the Lambda's own
+    `sm.<method>` calls and reds on any call this statement does not grant.
+    """
     return [
         iam.PolicyStatement(
             sid="Secrets",
@@ -752,6 +759,7 @@ def operational_key_rotator() -> list[iam.PolicyStatement]:
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:PutSecretValue",
                 "secretsmanager:UpdateSecret",
+                "secretsmanager:UpdateSecretVersionStage",
                 "secretsmanager:DescribeSecret",
             ],
             resources=[_secret_arn("life-platform/mcp-api-key")],

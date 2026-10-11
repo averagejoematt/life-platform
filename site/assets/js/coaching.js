@@ -237,12 +237,6 @@ function coachCharacterHTML(c) {
   if (c.arc) h += `<p class="cc-arc label">their arc: ${esc(c.arc)}</p>`;
   return h + `</section>`;
 }
-function coachHypothesesHTML(hyps) {
-  if (!(hyps && hyps.length)) return "";
-  return `<section class="coach-hyp"><p class="dx-kicker label">working hypotheses · live bets</p><ul class="ch-list">` +
-    hyps.map((x) => `<li class="ch-${esc(x.kind || "thread")}"><span class="label">${esc(x.kind || "thread")}</span> ${esc(x.claim)}</li>`).join("") +
-    `</ul></section>`;
-}
 function disclose(summary, innerHTML) {
   if (!innerHTML) return "";
   return `<details class="coach-more"><summary class="dx-kicker label">${esc(summary)}</summary>${innerHTML}</details>`;
@@ -402,9 +396,8 @@ function coachLiveRecordHTML(d) {
     h += `<p class="cl-empty dx-prose">No evidence-derived stance yet — the opinion engine writes its first weekly read once the data accrues.` +
       (st.stage && st.stage.label ? ` Until then the authored starting scaffold has them at <strong>${esc(String(st.stage.label).replace(/[.\s]+$/, ""))}</strong>.` : "") + `</p>`;
   }
-  const hyps = (d.working_hypotheses || []).filter((x) => x && x.claim);
-  if (hyps.length) h += coachHypothesesHTML(hyps);
-  else if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
+  // #4649: /api/coach/<id> no longer carries `working_hypotheses` (it was [] for every coach).
+  if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
   else h += `<p class="cl-empty dx-prose">No open calls on the board yet — when this coach makes a falsifiable prediction it shows here, then gets graded on the <a href="/coaching/scorecard/">scorecard</a>, hit or miss.</p>`;
   const trail = (d.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
   const outs = (d.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
@@ -988,7 +981,6 @@ async function renderByCoach(read, id) {
   }
 
   // 3) LIVE BETS + a thin track strip (the accountability, not a whole section).
-  h += coachHypothesesHTML(coach.working_hypotheses);
   const tr = (coach.report_card && coach.report_card.track_record) || {};
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     // #4220: the ONE record's headline when served; the legacy rate line only for an older response.
@@ -1636,12 +1628,15 @@ function _scCallHTML(p, shareUrl) {
   // #3046: an open call shows WHEN its verdict is due (the API computes it from
   // the evaluator's own domain-clamped window), not just when it was made.
   const dueBit = st === "pending" && p.due_date ? `<span class="sc-call-d label">grades ${esc(p.due_date)}</span>` : "";
+  // #4701: a held call (`text: ""` + `unsourced`) prints the API's sentence, never a blank
+  // quote, and offers no share card — there are no words of his to share.
+  const held = p.unsourced && typeof p.unsourced.text === "string" ? p.unsourced.text.trim() : "";
   return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
     `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}${dueBit}</div>` +
-    `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>` +
+    (held ? `<p class="sc-call-claim sc-call-unsourced label" data-unsourced>${esc(held)}</p>` : `<p class="sc-call-claim" data-verbatim>${esc(p.text || "")}</p>`) +
     `${callReasonText(st, p.outcome_notes) ? `<p class="sc-call-why label">${esc(callReasonText(st, p.outcome_notes))}</p>` : ""}` + // #4220: reader words, never the raw dict
-    `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
+    `${shareUrl && !held ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
 }
 // #404: a graded call's permalink, from the moments index (built by the daily
 // sweep). Key mirrors og_moments._prediction_key — plain composite, no hashing.

@@ -1,5 +1,11 @@
 """stance_lint.py — the deterministic lint a coach STANCE must pass before it is kept.
 
+Since #4649 it also carries the writer's side of the plain-words rule
+(``coach.plain_words``): ``self_correction`` builds the one strict retry instruction for
+a leaked number and/or a watch item a general reader could not read, ``retry_is_better``
+decides whether that retry is kept, and ``keep_plain`` drops whatever still fails before
+the record is stored — a watch item that is not plain is never written, so never served.
+
 Two regex rules the stance writer (coach_history_summarizer) has always applied, moved
 here by #4217 when that module reached its size ceiling — same patterns, same names
 (the summarizer imports them under its historical `_`-prefixed aliases):
@@ -14,6 +20,8 @@ here by #4217 when that module reached its size ceiling — same patterns, same 
 from __future__ import annotations
 
 import re
+
+from coach import plain_words
 
 RAW_VITAL_RE = re.compile(
     r"\b\d{2,3}\s?(?:bpm|ms|mg/?dl|lbs?|kg|kcal|cal)\b"
@@ -55,3 +63,54 @@ def vital_hits(stance):
 def claims_change(text):
     """True if the prose asserts the read has evolved (needs a real change signal)."""
     return bool(CHANGE_RE.search(text or ""))
+
+
+VITALS_CORRECTION = (
+    "\n\nSTRICT CORRECTION: your previous attempt cited raw numeric values (HRV/RHR/"
+    "weights/percentages). Rewrite with ZERO numbers — describe patterns and positions only."
+)
+
+
+def _focus(stance):
+    return stance.get("focused_on_now") if isinstance(stance, dict) else None
+
+
+def _aside(stance):
+    return stance.get("set_aside_for_now") if isinstance(stance, dict) else None
+
+
+def _watch(stance):
+    """Both printed lists, one after the other: 'watching now' and 'set aside' (#4714)."""
+    return [*(_focus(stance) or []), *(_aside(stance) or [])]
+
+
+def self_correction(stance):
+    """The strict instruction for the ONE self-correcting retry, or "" when the draft needs none:
+    a leaked raw number, a watch item that is not plain (#4649), or both in one message."""
+    vitals = VITALS_CORRECTION if vital_hits(stance) > 0 else ""
+    return vitals + plain_words.correction(plain_words.failing(_watch(stance)))
+
+
+def retry_is_better(retry, first):
+    """Keep the retry when it leaks fewer numbers; on a tie, when fewer of its printed items fail, then when more are plain."""
+    if not isinstance(retry, dict):
+        return False
+    before, after = vital_hits(first), vital_hits(retry)
+    if after != before:
+        return after < before
+    bad_r, bad_f = len(plain_words.failing(_watch(retry))), len(plain_words.failing(_watch(first)))
+    return bad_r < bad_f or (bad_r == bad_f and len(plain_words.plain_items(_watch(retry))) > len(plain_words.plain_items(_watch(first))))
+
+
+def keep_plain(stance, coach_id=None, logger=None):
+    """The stance's watch list with every item that is not plain dropped (#4649). Nothing
+    replaces a dropped item; the count and the reasons are logged, never the reader's problem."""
+    dropped = plain_words.failing(_watch(stance))
+    if dropped and logger is not None:
+        logger.warning("[stance] %s: withheld %d watch item(s) that are not plain: %s", coach_id, len(dropped), dropped)
+    return plain_words.plain_items(_focus(stance))
+
+
+def keep_plain_aside(stance):
+    """The stance's 'set aside' list with every item that is not plain dropped (#4714)."""
+    return plain_words.plain_items(_aside(stance))

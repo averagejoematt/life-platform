@@ -44,7 +44,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import boto3
-from ai.model_defaults import NARRATIVE_MODEL  # #4275: the one Sonnet default
+from ai.model_routing import model_for  # #4770: the one model registry
 
 try:
     from common.platform_logger import get_logger
@@ -70,7 +70,7 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 # Narrative register on a personal chat surface — Sonnet, same tier as the coach
 # cards (structured tasks take Haiku; a coach texting in their own voice is not a
 # structured task).
-MODEL = os.environ.get("AI_MODEL", NARRATIVE_MODEL)
+MODEL = model_for("coach_telegram")
 
 _dynamodb = None
 _secrets = None
@@ -621,6 +621,20 @@ def _assemble(persona_id: str, coach_id: str, *, allow_referral: bool = False) -
         domain = domain_facts_block(persona_id, _table(), today_pt)
     except Exception as e:
         logger.warning("[telegram] domain facts unavailable: %s", e)
+    # #3759: the owner's coach thread is one of the TWO sanctioned consumers of the weekly
+    # coach-vision observation (the other is his MCP tool). It joins the facts the coach may
+    # cite with its label and anchors inline, and rides the domain pack's seat in the
+    # grounder's vocabulary (`_grounder_for` takes `a["domain"]`) so the band it carries is
+    # never flagged as fabrication. Telegram is his own chat; nothing here reaches a reader.
+    try:
+        from coach.coach_vision import thread_block
+
+        vision = thread_block(_table(), today_pt)
+    except Exception as e:
+        logger.warning("[telegram] coach vision unavailable: %s", e)
+        vision = ""
+    if vision:
+        domain = f"{domain}\n\n{vision}" if domain else vision
     facts_block = build_facts_block(facts)
     if moment:
         facts_block = f"{facts_block}\n{moment}"

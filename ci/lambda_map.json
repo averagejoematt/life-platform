@@ -38,6 +38,12 @@
     "lambdas/coach/coach_state_updater.py": {
       "function": "coach-state-updater"
     },
+    "lambdas/coach/coach_vision_lambda.py": {
+      "function": "coach-vision",
+      "handler": "coach.coach_vision_lambda.lambda_handler",
+      "note": "#3759: Monday coach-vision read over the progress photos (one Haiku vision call). Writes USER#matthew#SOURCE#coach_vision, owner-only.",
+      "stack": "LifePlatformCompute"
+    },
     "lambdas/coach/inter_coach_dialogue_lambda.py": {
       "function": "inter-coach-dialogue",
       "handler": "coach.inter_coach_dialogue_lambda.lambda_handler",
@@ -159,6 +165,12 @@
     },
     "lambdas/emails/ai_review_pack_lambda.py": {
       "function": "ai-review-pack"
+    },
+    "lambdas/emails/habit_skip_review_lambda.py": {
+      "function": "habit-skip-review"
+    },
+    "lambdas/emails/inbound_auth_gate_lambda.py": {
+      "function": "inbound-auth-gate"
     },
     "lambdas/emails/insight_email_parser_lambda.py": {
       "function": "insight-email-parser"

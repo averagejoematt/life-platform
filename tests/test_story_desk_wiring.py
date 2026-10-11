@@ -115,8 +115,15 @@ def test_a_counted_title_or_line_is_blocked_on_the_panel_desk_and_legacy_paths(m
     for field in ("title", "excerpt"):
         out = json.dumps(panel._publish_desk_episode(4, post, dict(DESK["episode"], **{field: "The Fifteenth Reset"}), dry_run=True))
         assert "HOLD" in out and "story-door" in out, field
+    out = json.dumps(panel._publish_desk_episode(4, post, dict(DESK["episode"], title="Attempt 17"), dry_run=True))
+    assert "HOLD" in out and "story-door" in out  # the noun-then-number shape, as a title
     assert "story-door" in panel._safety_gate("That makes sixteen attempts, by his own count.")
+    assert "story-door" in panel._safety_gate("Call it attempt 17, he said.")
     assert "story-door" in panel._safety_gate("You could hear it when his wife asked about the plan.")
     assert panel._safety_gate("Day 3 starts with a walk, and the second session went long.") == []  # ordinary speech passes
     desk = panel._panel_desk()
-    assert desk.door_safe("The Seventeenth Start") == "" and desk.door_safe("The Body Answers Back") == "The Body Answers Back"
+    assert (
+        desk.door_safe("The Seventeenth Start") == ""
+        and desk.door_safe("EP4 · Attempt 17") == ""
+        and desk.door_safe("The Body Answers Back") == "The Body Answers Back"
+    )

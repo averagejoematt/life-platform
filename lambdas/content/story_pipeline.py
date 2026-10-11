@@ -37,6 +37,8 @@ class _Gates:
         )
         self.nye = ["macrofactor"] if (dossier.get("nutrition") or {}).get("not_yet_exported_dates") else []
         w = dossier.get("weight") or {}
+        # a week with a weigh-in: the opening must say which way the scale went (#4545)
+        self.weight_known = bool(w.get("available"))
         self.weights = [x["lbs"] for x in w.get("weigh_ins_in_window", [])] + [
             x for x in (w.get(k, {}).get("lbs") for k in ("first_weigh_in", "week_start", "week_end")) if x
         ]
@@ -59,6 +61,7 @@ class _Gates:
             for f in story_checks.ungrounded_numbers(top_line, self.allowed)
             + story_checks.story_door(top_line)
             + story_craft.banned(top_line)
+            + story_craft.top_line_findings(top_line)
         ] + [f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)]
 
     def post(self, md: str, stop: Optional[str]) -> List[str]:
@@ -67,7 +70,7 @@ class _Gates:
             story_checks.all_findings(
                 md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
             )
-            + story_craft.chronicle_findings(body, week=self.n)
+            + story_craft.chronicle_findings(body, week=self.n, weight_known=self.weight_known)
             + story_craft.callback_findings(body, self.previous)
             + story_craft.quote_findings(body, self.corpus)
             + story_craft.repeat_findings(body, self.previous, self.owner_lines)
@@ -81,7 +84,7 @@ class _Gates:
             + story_checks.story_door(txt, not_yet_exported=self.nye)
             + story_checks.ungrounded_numbers(txt, self.allowed)
             + story_writers.spoken_word_findings(ep.get("turns", []), body_weights=self.weights)
-            + story_craft.episode_findings(ep.get("turns", []))
+            + story_craft.episode_findings(ep.get("turns", []), segments=self.n > 0)
             + story_craft.callback_findings(txt, self.previous)
             + story_craft.repeat_findings(txt, self.previous, self.owner_lines)
             + story_writers.fact_check(txt, self.dossier, context=self.context)

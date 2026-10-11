@@ -1,1 +1,75 @@
-{"meals": [{"name": "Morning Smoothies", "frequency": 26, "avg_calories": 80, "avg_protein_g": 15, "avg_carbs_g": 4, "protein_cal_pct": 75}, {"name": "Sugar Free Jello", "frequency": 23, "avg_calories": 10, "avg_protein_g": 1, "avg_carbs_g": 0, "protein_cal_pct": 40}, {"name": "Fiber Gummies", "frequency": 15, "avg_calories": 25, "avg_protein_g": 0, "avg_carbs_g": 10, "protein_cal_pct": 0}, {"name": "Cool Whip Lite", "frequency": 14, "avg_calories": 68, "avg_protein_g": 1, "avg_carbs_g": 10, "protein_cal_pct": 6}, {"name": "Onion, White, Yellow or Red, Raw", "frequency": 14, "avg_calories": 15, "avg_protein_g": 0, "avg_carbs_g": 4, "protein_cal_pct": 0}, {"name": "Red Bell Peppers, Cooked", "frequency": 13, "avg_calories": 16, "avg_protein_g": 0, "avg_carbs_g": 4, "protein_cal_pct": 0}, {"name": "Rice White Cooked Without Salt", "frequency": 11, "avg_calories": 160, "avg_protein_g": 3, "avg_carbs_g": 35, "protein_cal_pct": 8}, {"name": "Chocolate Brownie Protein Bar Gluten Free", "frequency": 10, "avg_calories": 170, "avg_protein_g": 20, "avg_carbs_g": 23, "protein_cal_pct": 47}], "period_days": 29}
+{
+ "_meta": {
+  "generated_at": "2026-10-10T02:38:12.702450+00:00",
+  "served_at": "2026-10-10T02:38:12.702450+00:00",
+  "cache_seconds": 3600,
+  "request_id": "186936fbf98b4b82"
+ },
+ "meals": [
+  {
+   "name": "Morning Smoothies",
+   "frequency": 24,
+   "avg_calories": 80,
+   "avg_protein_g": 15,
+   "avg_carbs_g": 4,
+   "protein_cal_pct": 75
+  },
+  {
+   "name": "Sugar Free Jello",
+   "frequency": 17,
+   "avg_calories": 10,
+   "avg_protein_g": 1,
+   "avg_carbs_g": 0,
+   "protein_cal_pct": 40
+  },
+  {
+   "name": "Fiber Gummies",
+   "frequency": 14,
+   "avg_calories": 25,
+   "avg_protein_g": 0,
+   "avg_carbs_g": 10,
+   "protein_cal_pct": 0
+  },
+  {
+   "name": "Onion, White, Yellow or Red, Raw",
+   "frequency": 11,
+   "avg_calories": 15,
+   "avg_protein_g": 0,
+   "avg_carbs_g": 4,
+   "protein_cal_pct": 0
+  },
+  {
+   "name": "Rice White Cooked Without Salt",
+   "frequency": 11,
+   "avg_calories": 180,
+   "avg_protein_g": 3,
+   "avg_carbs_g": 40,
+   "protein_cal_pct": 7
+  },
+  {
+   "name": "Cool Whip Lite",
+   "frequency": 11,
+   "avg_calories": 75,
+   "avg_protein_g": 1,
+   "avg_carbs_g": 11,
+   "protein_cal_pct": 5
+  },
+  {
+   "name": "Red Bell Peppers, Cooked",
+   "frequency": 10,
+   "avg_calories": 18,
+   "avg_protein_g": 0,
+   "avg_carbs_g": 4,
+   "protein_cal_pct": 0
+  },
+  {
+   "name": "Complete Vanilla 20g Protein Greek Yogurt",
+   "frequency": 9,
+   "avg_calories": 111,
+   "avg_protein_g": 13,
+   "avg_carbs_g": 11,
+   "protein_cal_pct": 47
+  }
+ ],
+ "period_days": 30
+}

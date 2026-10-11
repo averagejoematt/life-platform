@@ -1,8 +1,10 @@
 """lambdas/operational/episodic_premise.py — is "episodic" still true? (#3554)
 
 `cost_governor_lambda` splits the four CallerClass values into the ones its month-end
-projection extrapolates (PROJECTED_CALLER_CLASSES — prod-cron, remediation) and the ones
-it excludes (EPISODIC_CALLER_CLASSES — ci, dev-session). The exclusion is correct in
+projection extrapolates (PROJECTED_CALLER_CLASSES) and the ones it excludes
+(EPISODIC_CALLER_CLASSES). When this guard was written the excluded pair was ci and
+dev-session; the guard then named `ci` on every run, and #4652 (2026-10-04) acted on it —
+`ci` is projected now and dev-session is the one excluded class. The exclusion is correct in
 principle and it is what stops one dev session reading as a permanent run-rate (#2892).
 
 But it rests on a CLAIM ABOUT BEHAVIOUR: that an episodic class's trailing rate says what

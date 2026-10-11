@@ -209,6 +209,8 @@ _RE_POINT_RULE = re.compile(r"±1 SD of the trailing (?P<days>\d+)-day personal 
 _RE_TREND = re.compile(r"\btrend=(?P<dir>up|down|flat)\b")
 _RE_FLAT = re.compile(r"metric flat .*?within ±(?P<band>[\d.]+) noise band")
 _RE_DOCKET = re.compile(r"^dispute docket resolved\b.*?\bon (?P<on>\d{4}-\d{2}-\d{2})\s*$")
+# #4541: a count call's reason (coach/prediction_count_grader.py) — "... on 3 of 7 days 2026-09-06..2026-09-12 (claim: at least 5)"
+_RE_COUNT = re.compile(r"\bon (?P<q>\d+) of (?P<n>\d+) days \S+\.\.\S+ \(claim: (?P<bound>at least|at most) (?P<k>\d+)\)")
 
 
 def _wrong_num(v, *, keep_decimal: bool = False) -> str:
@@ -313,6 +315,18 @@ def _wrong_obituary_text(rec: dict) -> tuple:
             what_changed = f"The trend ran {seen}, the opposite of the call, so it was graded refuted."
         else:
             what_changed = "The trend did not go the way the call said, so it was graded refuted."
+        return believed, number, what_changed
+
+    # ── Count (#4541): 'X at or above T on at least K of N days' — actual_value is a DAY COUNT, never a reading ──
+    if etype == "count":
+        cm = _RE_COUNT.search(reason)
+        phrase = _WRONG_COND_PHRASE.get(cond, "")
+        if not (cm and label and phrase and thr is not None):
+            return fallback, "", "Too few days cleared the call's bar, so it was graded refuted."
+        bar = f"{phrase} {_with_unit(_wrong_num(thr), unit)}"
+        believed = f"{label} would come in {bar} on {cm.group('bound')} {cm.group('k')} of {cm.group('n')} days"
+        number = f"{cm.group('q')} of {cm.group('n')} days came in {bar} — the call needed {cm.group('bound')} {cm.group('k')}"
+        what_changed = f"The days were counted: {cm.group('q')} of {cm.group('n')}, so the call was graded refuted."
         return believed, number, what_changed
 
     # ── Point: 'X on <date> would land at <centre> ± 1 SD' ──

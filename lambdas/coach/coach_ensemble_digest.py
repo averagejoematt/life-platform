@@ -54,7 +54,9 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("ensemble")
 
 # All coach IDs in the system — DERIVED from the canonical registry, never
 # re-typed. persona_registry.OPERATIONAL_COACH_IDS is the list that MUST stay

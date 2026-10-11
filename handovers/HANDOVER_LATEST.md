@@ -1,70 +1,60 @@
-# Handover — Session BH: the first candidate pages graded C to D, two research rounds, and the redesign's direction reset (2026-10-04 13:40Z → ~19:30Z, Fable 5.1, owner on hand)
+# Handover — Session BO: the Fable overnight — round 8 of the preview front page, eight lanes merged and deployed, the owner list parked (2026-10-11 ~05:00Z → ~10:00Z, Fable 5.1, owner asleep)
 
-**Driving instruction:** the owner read the overnight candidate pages and said they looked "so bare bones … only podcast+chronicle", asked whether expert red teams and research on comparable sites had been done (they had not), and then steered the session: grade it honestly, research what makes such a site break out, keep the character sheet and badges, lose no good content, serve a daily reader and a weekly one, and make open design calls without asking ("you just fill in the blanks or recommend"). He will supply his own words by email or through his Claude chat.
+**Driving instruction:** `~/.claude/plans/next-session-fable-overnight-2026-10-11.md`, its Authority section approved as written: do everything that needs no owner, park the rest, never stop to ask. Fable drove the site (round 8) and the judgment calls; one workflow of eight worktree-implementer lanes, each adversarially verified and repaired, did the paydown; two red-team workflows (seven hard-marking reviewers each) graded the preview before and after the fixes.
 
-## Shipped: 4 PRs merged (main at 01994e30); the first three are live on the preview, the fourth was deploying at wrap
-- **#4602** → #4586: the preview front page shows progress to goal, the last seven days as rows of dots, the coaches with the open bet, a labelled one-sentence chapter with Read and Listen, and "the rest of it" as doors. `/api/edition` gained a `week` block and a `life` block; eight routes joined its `SOURCES`.
-- **#4603** → #4586: each of the last seven days opens in place to what was recorded that day; today's unlogged training is no reading, never a day without training.
-- **#4605** → #4586 (merged 19:15Z; `/next/v8/day/` and `/next/v8/trend/` returned 200 at 19:30Z): a page per day (`/next/v8/day/?d=`) and a page per trend (`/next/v8/trend/?m=`, and `?m=lift&x=`), plus one index of trends. A lift's trend is its best set by estimated one-rep max; daily counts are bars from zero with a target line and a seven-day average; each lift shows the best set last time. Steps left the front page's day.
-- **#4606** → #4583 (merged 19:29Z; its deploy was still running at wrap, so the function is unverified live): the coach-moves cast recognises a coach referred to by name.
-- **Filed:** #4604 (five served, sitemap-listed pages still show the count of earlier starts), #4607 (`/api/edition` takes about five seconds uncached).
-- **Research, private and off-repo:** two reports under `~/.claude/plans/averagejoematt-platform-plan/reports/` ("Journey site design research", "Journey site breakout and virality") with their notes. A content map of all 95 live pages was published privately to the owner.
+## Shipped — 8 PRs merged, all deployed
+- **#4806** (#4586 / #4580): round 8 of `/next/v8/`. The open bet leads as the one real disagreement (two coaches, opposite sides, each with its job, the live number inside the card, the door to what each argued); then the week's clearest miss with the coach named and the result in bold; then the last 24 hours (a line already printed above is not printed twice; with nothing said today, the newest short line heard, or nothing); then one row each to go deeper. The week band moved whole to the new `/next/v8/week/` (the scorecard with each rule under its row, the lead's read when served, the latest chapter). Three commits: the rebuild, the round-8a fixes, the round-8b fixes. Squash `76c607336`; site deploy 38117977820 (deploy + smoke green; the visual QA leg was in flight at the wrap). The front page is 4.5 phone screens on live data.
+- **#4805** (#4583): the daily coach moves refuse a repeat of yesterday's point, a second "so far" / "I think" in one day, and jargon (plain words); the prompts rewritten; 15 tests on the wire lines. Fable's read of the live lines 10-05 → 10-09 is on the issue.
+- **#4802** (#4774, box 3): the inference receipt's model and feature rows carry the registry tier, untiered rows counted. **#4774 closed on live proof** (tier on every row at 08:25Z; 13 of 43 Lambda rows resolve, honestly null for the rest).
+- **#4804** (#4535, box 2): the week-5 packet never reached the week-4 writer; four things that did leak the current window (output date, idempotency row, fallback writer, unlabelled logs) are fixed and pinned.
+- **#4801** (#4789): the DLQ ledger's attempts reset after `LEDGER_WINDOW_DAYS` (3) with a conditional two-step update. **#4800** (#4797): `run_or_fallback` stops the job, falls back on-demand and cleans up when the wait raises. **#4803** (#4796): the eval credential stub never shadows a resolvable chain; a $0.015 real call proved it.
+- **#4807** (#4674): `deploy/repair_published_content_4674.py`, a dry-run repair for the published week-2 episode title and week-4 excerpt; the dry run's three one-line diffs are on the issue; `--apply` is the owner's.
+- **Deploys:** attended `deploy_fleet.sh` (108 updated, 0 failed) and `deploy_site_api.sh` from a worktree at `b7bb49df`, every postflight `deployed sha == shipping sha`; CI/CD green on `b7bb49dfb` and on `76c607336` (the earlier per-merge runs were superseded, as expected).
+- **PR #4544** (#4257, held): refreshed against main by a lane (`befed8ce4`, MERGEABLE; the read-only role gained `s3:GetBucketNotification` because #4798 moved that call to a job the PR gives the read-only role); the design reviewed and the owner steps posted on #4257.
+- **Filed:** #4808 (one house rule for the verdict line) and #4809 (scorecard verdict words say what happened; the bet carries each side's reason) — the round-8 asks that are served text, not kit.
 
-## Verified live
-- `/api/edition` serves `week` (measures, per-day `detail`, `weight_series`) and `life` (eight rows) — read by content at 17:14Z and again after #4603's deploy ("Trained on 6 of 6 days recorded").
-- The preview front page renders with the day's weigh-in at 390×844 with no JS error and no sideways overflow; the day rows open.
-- `coach-daily-reflection` ran its moves stage for the first time at 19:00Z and wrote `MOVES#2026-10-04` with **zero lines**: the cast chose three speakers by name and `admit_cast` dropped all three as off the roster (read from the stored row's `dropped`). #4606 fixes it; the lines' quality is still unproven.
-- `GET /api/edition` uncached: 5.35 s, 4.58 s, 4.56 s (three timed requests), against 0.10 s for `/api/journey`.
-
-## Grades the work received (hard-marked reviewers, unfiltered)
-- First candidate front page: called "a chapter landing page"; a design director refused to present it.
-- Revised front page: design C+, storytelling C, returnability C to C+, platform as a whole C−, depth D+.
-- Four readers on the current preview — would they come back: cold Reddit newcomer D+, non-technical friend D+, quantified-self skeptic C, hiring leader C+ on taking a meeting.
-- Day page C+, trend page D+ before fixes; not re-graded after.
-- What every reader agreed: the owner is missing from his own page; the one new idea (coaches publicly graded against a simple guess, with bets) is buried three and a half screens down; "Open a day" and "The rest of it" pushed the story down, and "The rest of it" is the old topic menu returning.
-
-## Decisions the owner made
-- Keep the character sheet and badges as a feature. Pages marked to retire stay reachable from an appendix at the foot of the site; only exact duplicates redirect.
-- Renamed topic sections (Today / Team / Record / Method / Story) are the first version's mistake; he wants a new approach to the design itself.
-- He will supply his own words, by email or his Claude chat; design may assume it. The Telegram Tuesday question (PR #4596) is the wrong channel.
-- Two rhythms: he returns daily and wants specifics on the last 24 hours; a casual reader returns weekly and wants what is trending up and down, the overall read, and quotes that invite a tap. Coaches likewise speak at three distances.
-- Open design calls are the driver's to make. Before he is shown work it is red-teamed with honest grades and grounded in research.
+## Verified
+- **Red-team round 8**, posted beside round 7 in `~/.claude/plans/averagejoematt-platform-plan/red-team-2026-10-04.md`. 8a (first commit): front page C+, storytelling C, daily return D+, coherence D+, first screen B, feel him D+, honesty C, meeting B; all seven said first that "Two coaches disagree." sat over two quotes that agreed. 8b (after the fixes): daily return → C, weekly return → B−, day page → B−, 20-second → B, wayfinding → B−, coherence → C, honesty → C+, return → B−, understand → B, meeting → B+, ten-second read → B; flat: the director (front C+), the newcomer, `cast` C−, `feel him` D+. All seven, both rounds: capped by his dated note and question (#4584), the simple guess's score (#4585), the unprintable-calls ruling (#4617).
+- **#4607:** 20 cache-busted `/api/edition` reads at 06:25Z — p50 1.18 s, p95 1.27 s, with the `upstream_ms` table (nutrition 1,021 → 12 ms after #4699). Box 4 reads on 10-12 against the 10-11 UTC day (the 10-10 day carries one pre-deploy flap).
+- **#4732 box 2:** the 02:00Z sweep archived 24 expired pre-drafts, 0 errors, matching the dry run. **#4643 box 5:** a dispatched config-drift run printed `expected 4, live 4` again (the run is red on `GetBucketPolicy`, the owner's grant).
+- **The moves data, read honestly (#4583):** the lines are moves (reactions, replies, questions, calls) and carry a real exchange (Webb/Okafor on protein) and a real bet (Reeves/Webb, 190 g), but they repeat day to day, five of eight carry "so far" and "I think", and three name their own speaker. The front page never picks a self-naming line; #4805 refuses the rest going forward.
+- JS suite 801/801; the kit gate clean (front 4.51 of 6, week 1.95 of 4); Python 282 passed on the appendix, fixture, vocabulary and structural gates; every lane's PR asserted ALL GREEN with no `CLOSING-SET NONGREEN` before its merge.
 
 ## Gotchas
-- **A composed route's cost is the sum of its upstreams.** Eight sources added to `/api/edition` in one morning took it to about five seconds uncached and flapped `site-api-p95-latency-high` twice on cold preview loads. Measure the route after adding a source (#4607).
-- **A fixture is not the wire.** The coach-moves cast passed 33 tests and produced nothing live, because the tests cast by id and the model answered with names.
-- **The research cuts against two ideas the driver proposed the same day:** opening content in place is the last resort for depth, not the first (days, coaches and chapters should be real pages); and the scoreboard is proof and a source of shareable misses, not the hook — framing the man as a contestant invites wagering on his body.
-- **Nothing shows a game layer interests onlookers**, and badges have documented backfire; the character sheet stays by the owner's ruling and should be presented plainly.
-- **Step counts are unreliable** (1,113 on a day with 155 minutes of training). They are off the front page's day and carry a caveat on their trend page; the cause is not established.
-- **A lift's estimated one-rep max overstates high-rep sets**, so a "peak" from a set of 12 is partly a formula artefact. The page says it is an estimate; it does not yet say this.
-- **`gh pr merge --squash` with a custom subject/body is seen by no guard**; use the bare form. An artifact upload rejects a filename containing a question mark.
+- **A reply and its answer are not a disagreement.** The first cut headed an exchange "Two coaches disagree." over two lines that reached the same conclusion; every reviewer caught it. Only a bet (opposite sides by construction) is ever headed that way now; an exchange is "the latest exchange".
+- **A section with nothing to show must not render its heading.** "No coach had anything to say on Saturday" under "The coaches today" was read as the site being down (the built page lists that sentence as an outage symptom).
+- **`gh issue view` returned empty files for five issues** (#4580, #4702, #4789, #4796, #4797) with no error; `gh api repos/.../issues/N` worked. Read issues through the REST path when a view comes back empty.
+- **The merge train skips a PR whose full suite is still pending** (one check not green) — re-run the batch once the suite lands; six of seven merged on the second pass.
+- **`test_experiment_library_citations_1983` red on HTTP 429 again** (PR #4806's full suite); `gh run rerun --failed` cleared it. Same class as BK's.
+- **In zsh, `echo =====` is an `=command` expansion**, not text — quote it.
+- **A worktree created from inside another worktree lands outside the canonical parent** (`worktrees/life-platform/worktrees/merge-train-scratch/issue-4643-…`); the reaper names it. Create lanes from the main checkout.
+- **Nothing was classifier-denied tonight**; the session ran with bypass permissions, and the plan's hard stops (no invokes, no DDB/S3/IAM writes, no `cdk_deploy.sh`) were kept by hand.
 
-## Residual / next picks
-- **#4607** first: `/api/edition` takes about five seconds uncached; it gates the cut-over and flaps the latency alarm on every cold preview load.
-- **#4586**: the agreed build order — the owner's words at the top; a page for each settled prediction and the latest on the front page; the front page reshaped into a fixed top line, his dated note, the last settled call and the next, a Today band and a This week band; coaches at three distances; one signature daily mark proposed on a real screen; the character sheet presented plainly; the appendix. Take "The rest of it" off the front page, make the seven-day list one link, and drop the list of individual lifts from the trend index.
-- **#4583**: confirm #4606 deployed (`coach-daily-reflection` updated after 19:29Z on 10-04); read `MOVES#<date>` after the next 19:00 UTC run and judge the lines; the 14-day box has not started.
-- **#4584**: a lane is building the owner's-words channel (an MCP tool for his Claude chat, and his email replies to the Monday questions) with one store, one filter and one route; find its PR, review, land and prove it with one real note. PR #4596 is superseded; close it with a note once the replacement merges.
-- **#4585**: the back-fill is still the owner's write; the Coaches page's examples must be checkable calls (threshold, result, what the simple guess said), not a conditional.
-- **#4604**: five served, sitemap-listed pages still show the count of earlier starts; the owner rules per page.
-- **#4595**: the scorecard by written rule; consider whether the character sheet's seven areas are that view.
-- **#4588**: the cut-over, only after every screen has his yes, five real readers, and #4607.
-- **#4587** five real readers and **#4590** the interview — owner-gated; the research found no substitute for either.
-- **#4589**: live proofs still due (Tuesday 2026-10-06 off-day brief; the first judge skip; the 14-day projection).
-- **#4582**: the page-side contract test and a schema baseline for `/api/edition`.
-- **#4540**, **#4546**, **#4593**, **#4531**: unchanged from Session BG.
-- not-work — the memory backup to S3: an AWS write outside the stories; run it at the next attended wrap.
-- not-work — whether readers may make their own predictions about his outcomes, and whether each day's meals are public: owner rulings; neither is built.
-- not-work — why 185 and why in public, in his own words: only he can say; the top of the site and Start here wait on it.
-- not-work — the first-person copy on the preview is draft wording; each page says so.
+## Residual / next picks — waiting on the owner (the ELI5 list is in the wrap message)
+- **#4771 / #4772 / #4796 box 4:** enable Claude Haiku 5.5 in Bedrock → Model access (us-west-2).
+- **#4257:** run PR #4544's IAM steps 2–3, merge it, `setup_github_oidc.sh`, `verify_oidc_iam.py --strict`. This also ends **#4643**'s nightly red (`GetBucketPolicy` rides the read-only role); otherwise a one-line grant on the deploy role.
+- **#4674:** `python3 deploy/repair_published_content_4674.py --apply`, then re-read the two objects (boxes 1–2).
+- **#4535 box 2:** the `{"week":4,"dry_run":true}` invoke with `--cli-read-timeout 900`; expect `"date": "2026-09-29"` and the `[#4535] legacy data packet` line.
+- **#4793 / #4732 box 3:** the cron-draft scope ruling, then merge; three nightly qa-smoke runs read the box.
+- **#4768:** add #4796 and #4797 to the epic's story list.
+- **#4705 / #4583 (stored rows):** the three self-naming lines (10-05, 10-07, 10-09) stay on their day pages unless the owner wants the one-line DynamoDB correction.
+- **#4586 / #4588:** the owner's yes per screen on the round-8 preview; promoting it is his call.
+- **#4646, #4590, #4584, #4585, #4617, #4627, #4644, #4615, #4678 (PR #4679), #4645:** unchanged.
 
-**Build beat:** none — everything this session shipped is on the unlisted preview path, and the reviewers graded it C to D
-**Docs:** docs/alarm_citations.json and docs/OPERATING_KNOWLEDGE_LEDGER.md (this wrap); the kit page gate's PROPORTIONALITY row landed in the previous wrap
-**Decisions:** none needed — the owner's rulings are design direction recorded in memory and on the issues; no governance rule moved
-**Main:** green (9e03b929)
-**Incidents:** none — `site-api-p95-latency-high` flapped twice for five minutes on cold preview loads (cited to #4607); no reader surface was affected
-**Stash/hooks:** clean
-**Closures:** none — no issues closed this session (every PR used Refs) · DoD: scanned 2, hits 1 (#4330 post-close comment from Session BF, advisory), blocking=none
-**Backlog:** Now live; #4604 and #4607 filed to Now, #4595 in Next; no promotion made
-**Alarms:** 1 flap cited — `site-api-p95-latency-high` → #4607; no uncited alarm red over 72 h
-**CI warnings:** 5 — all `SKIPPED in CI — no playwright/chromium`, #3640's deliberate skip notice; no action
-**Ledger:** none — no standing machinery shipped this session beyond the kit page gate, whose row landed in the previous wrap
+## Residual / next picks — agent work and proofs due
+- **#4705:** live proof on the 19:00Z run (a first-person self-reaction with no self-name). **#4583:** the same run shows the new refusals in the `HELD` reasons; watch the verifier's over-refusal note (`as of`, `model`, `gate`).
+- **#4703:** box 4 on the Monday 14:00Z analyzer run. **#4694:** the first Mon/Wed hold. **#4593:** the qa-smoke `share_kit` cell at 18:31Z. **#4607:** box 4 on 10-12. **#4702:** closes when the CGM reports again and the gap has an end date.
+- **#4808, #4809:** the two round-8 lanes (opus, Next). **#4789 / #4797:** live proofs on the first qualifying event.
+- not-work — the design calls Fable made tonight and did not ask about: the bet leads, an exchange is never "disagree", empty states vanish, the weight is the hero number, the miss rotates weekly, the week band is a page.
+
+**Build beat:** none — the merged work is preview-page and pipeline plumbing behind `/next/v8/`; nothing new on a reader-facing surface
+**Docs:** none needed — the new `/next/v8/week/` page is a preview candidate held by the kit gate and the appendix test, not a live door in SITE_MAP_AND_INTENT; the lanes updated their own docstrings
+**Decisions:** none needed — no governance rule moved; the round-8 design calls are the owner's standing delegation (10-04) and are recorded on #4586
+**Main:** green (76c60733)
+**Incidents:** none — the two flaky 429s on the citation test were not code; no rollback fired before the wrap (the visual QA leg of site deploy 38117977820 was still running)
+**Stash/hooks:** clean — the reaper removed 3 released lanes and named one worktree outside the canonical parent (a #4643 lane created from inside the scratch worktree)
+**Closures:** #4774 commented (Shipped/Outcome, live proof at 08:25Z) · DoD: scanned 5, hits 0
+**Backlog:** Now live at 3 for the fable lane (floor 3); no stale Later issues (105 open satisfy the filing contract); filed #4808, #4809
+**Alarms:** every alarm red >72h cited; no uncited flaps (gate PASS)
+**CI warnings:** 5 — all the #3640 class ("SKIPPED in CI — no playwright/chromium" on the unit shards); no action, the render and kit gates run them on a chromium machine
+**Ledger:** none — no standing machinery shipped; the week page sits under the existing kit gate and the repair script is a one-shot owner tool

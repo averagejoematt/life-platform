@@ -332,6 +332,20 @@ LEDGER: dict[str, dict] = {
             "tell 'all good' from 'nobody ran'. Densest possible rent per series."
         ),
     ),
+    "LifePlatform/DLQ": _row(
+        owner="lambdas/operational/dlq_consumer_lambda.py",
+        verdict=KEEP,
+        cardinality=FAN_OUT,
+        driver="functions whose failure crosses the DLQ ledger threshold x DlqEscalation, + 1 dimensionless aggregate",
+        live_series=0,
+        series_budget=12,
+        note=(
+            "#4731 (added 2026-10-10, after MEASURED_ON — hence 0 live series). One DlqEscalation "
+            "datapoint per escalated DLQ message, per FunctionName plus a dimensionless aggregate "
+            "the ops dashboard's 'Ingestion DLQ' widget plots. Sparse by construction: a series "
+            "only exists for a function that has failed the same way past the threshold."
+        ),
+    ),
     "LifePlatform": _row(
         owner="lambdas/emails/daily_brief_lambda.py (bare namespace, deliberate)",
         verdict=KEEP,

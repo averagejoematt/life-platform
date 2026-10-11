@@ -11,7 +11,7 @@ Lambdas (11):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
   wednesday-chronicle, weekly-plate, monday-compass, partner-weekly-email,
   evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12),
-  weekly-signal (PB-06)
+  weekly-signal (PB-06), habit-skip-review (#4622)
 
 """
 
@@ -289,6 +289,22 @@ class EmailStack(Stack):
             targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"story_questions": True}))
         )
 
+        # #4584 the Tuesday question: ONE fixed question on the same channel and routing token, so his reply lands
+        # verbatim in the owner-words store and leads Wednesday's edition. Same target function, same role: no new
+        # IAM (it already sends SES and writes the STORYQ# marker for Monday).
+        # Clock: cron(0 1 ? * WED *) = Wednesday 01:00 UTC = Tuesday 18:00 PDT (UTC-7, mid-March → early November) and
+        # Tuesday 17:00 PST (UTC-8) in winter. EventBridge crons here are fixed UTC, so the send drifts one hour
+        # earlier across the November DST change; both are Tuesday evening Pacific, and the sender reads the PT day.
+        tuesday_question_rule = events.Rule(
+            self,
+            "OwnerWordsQuestionTuesday",
+            schedule=events.Schedule.cron(minute="0", hour="1", week_day="WED"),
+            description="#4584: the Tuesday-evening-PT question whose verbatim reply leads Wednesday's edition (optional)",
+        )
+        tuesday_question_rule.add_target(
+            targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"tuesday_question": True}))
+        )
+
         create_platform_lambda(
             self,
             "WeeklyPlate",
@@ -314,6 +330,24 @@ class EmailStack(Stack):
             memory_mb=512,
             environment=_email_env,
             custom_policies=rp.email_monday_compass(),
+            **shared,
+        )
+
+        # #4622: the Saturday skipped-habits queue. Saturday 16:00 UTC (fixed, no DST drift —
+        # 09:00 PDT). Reads the previous seven Pacific days of stored habitify records and mails
+        # the owner ONE list of daily habits still `skipped` (sends nothing on an empty week;
+        # every run emits an EMF run record). No AI, no secret: its role is a LeadingKeys-scoped
+        # Query on the habitify partition + SES, nothing else.
+        create_platform_lambda(
+            self,
+            "HabitSkipReview",
+            function_name="habit-skip-review",
+            handler="emails.habit_skip_review_lambda.lambda_handler",
+            source_file="lambdas/emails/habit_skip_review_lambda.py",
+            schedule="cron(0 16 ? * SAT *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            custom_policies=rp.email_habit_skip_review(),
             **shared,
         )
 

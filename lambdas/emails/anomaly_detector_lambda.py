@@ -107,7 +107,9 @@ ses = boto3.client("sesv2", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # AI model constant — read from env so model can be updated without redeployment
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+AI_MODEL_HAIKU = model_for("anomaly_detector")
 
 RECIPIENT = "awsdev@mattsusername.com"
 SENDER = "awsdev@mattsusername.com"

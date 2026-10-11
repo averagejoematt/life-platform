@@ -102,6 +102,7 @@ WATCHED_LOG_GROUPS = (
     "/aws/lambda/daily-brief",
     "/aws/lambda/daily-debrief",
     "/aws/lambda/elena-state-updater",
+    "/aws/lambda/habit-skip-review",
     "/aws/lambda/milestone-digest",
     "/aws/lambda/monday-compass",
     "/aws/lambda/monthly-digest",
@@ -116,6 +117,7 @@ WATCHED_LOG_GROUPS = (
     # ── LifePlatformOperational ──────────────────────────────────────────────
     "/aws/lambda/hevy-restamp",
     "/aws/lambda/hevy-routine-cron",
+    "/aws/lambda/inbound-auth-gate",
     "/aws/lambda/insight-email-parser",
     "/aws/lambda/life-platform-ai-quality-canary",
     "/aws/lambda/life-platform-alert-digest",

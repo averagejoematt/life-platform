@@ -122,7 +122,9 @@ def test_create_todoist_task_sends_correct_payload_through_dispatch():
     method, path, body = mock_req.call_args[0]
     assert method == "POST"
     assert path == "/tasks"
-    assert body == {"content": "Buy milk", "priority": 4, "project_id": "42", "due_string": "every! Sunday"}, body
+    # #4635: no priority given → the vendor's own default, API 1 (normal). It was 4,
+    # the vendor's MOST urgent level, on every task created without one.
+    assert body == {"content": "Buy milk", "priority": 1, "project_id": "42", "due_string": "every! Sunday"}, body
     assert payload.get("error") is None, f"tool returned an error: {payload}"
     assert payload["created"] is True
     assert payload["task_id"] == "999"

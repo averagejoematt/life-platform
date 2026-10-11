@@ -953,18 +953,54 @@ def gha_paused_gate_annotation(gate, status, env=None, stream=None):
     local run stays free of CI noise.
     """
     env = os.environ if env is None else env
-    if not (status or {}).get("status") == "skipped_by_budget":
+    state = (status or {}).get("status")
+    if state not in ("skipped_by_budget", SKIPPED_BY_READER_SURFACE):
         return ""
     if not env.get("GITHUB_ACTIONS"):
         return ""
-    tier = (status or {}).get("tier")
-    line = (
-        f"::warning title={gate} SKIPPED-BY-BUDGET::"
-        f"{gate} did NOT run — paused by budget guard at tier {tier} (ADR-125). "
-        f"This check is not evidence about this deploy."
-    )
+    if state == SKIPPED_BY_READER_SURFACE:
+        # #4652: the cost gate's skip gets the SAME annotation the budget pause gets. A
+        # `::notice` in the workflow was the only trace before, under a job that still read
+        # "Visual + AI-vision QA ✔" — a skip recorded as a pass (ADR-116).
+        line = (
+            f"::warning title={gate} SKIPPED-BY-READER-SURFACE::"
+            f"{gate} did NOT run — skipped by the reader-surface gate (#4589/#4652): {status.get('reason')}. "
+            f"This check is not evidence about this deploy."
+        )
+    else:
+        tier = (status or {}).get("tier")
+        line = (
+            f"::warning title={gate} SKIPPED-BY-BUDGET::"
+            f"{gate} did NOT run — paused by budget guard at tier {tier} (ADR-125). "
+            f"This check is not evidence about this deploy."
+        )
     print(line, file=stream or sys.stdout)
     return line
+
+
+# #4652: the second sanctioned non-run of an AI gate — the reader-surface cost gate
+# (scripts/reader_surface.py, #4589) said no reader surface changed. The workflow hands the
+# gate's own verdict line to the sweep (--ai-qa-skipped / --reader-truth-skipped) so the
+# sweep, not a shell `echo`, owns saying so on every surface it reports on: stdout, the job
+# summary, a ::warning annotation and report.json. A status of None means "never asked for";
+# this status means "asked for, deliberately not run, and NOT a pass".
+SKIPPED_BY_READER_SURFACE = "skipped_by_reader_surface"
+
+
+def reader_surface_skip_status(reason):
+    """The status dict for a gate the reader-surface gate skipped, or None when `reason` is unset."""
+    if reason is None:
+        return None
+    return {"status": SKIPPED_BY_READER_SURFACE, "reason": str(reason).strip() or "no reason was passed"}
+
+
+def reader_surface_skip_line(gate, status, markdown=False):
+    """The one line a skipped gate prints — '' unless `status` is a reader-surface skip."""
+    if (status or {}).get("status") != SKIPPED_BY_READER_SURFACE:
+        return ""
+    if markdown:
+        return f"⏸ **{gate}: SKIPPED-BY-READER-SURFACE** — not run, not a pass. {status.get('reason')}\n"
+    return f"{gate}: SKIPPED-BY-READER-SURFACE — not run, not a pass ({status.get('reason')})"
 
 
 def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None, today_pt=None):
@@ -994,6 +1030,10 @@ def _write_step_summary(path, passed, failed, warns, results, reader_truth_statu
     # summary — never silently absent, never indistinguishable from a clean run.
     if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
         lines.append(f"⏸ **AI-vision QA: SKIPPED-BY-BUDGET** (tier {ai_vision_status['tier']}) — not run, not a pass.\n")
+    # #4652: the reader-surface gate's skips, in the same place and the same words.
+    for gate, st in (("AI-vision QA", ai_vision_status), ("Reader-truth QA", reader_truth_status)):
+        if reader_surface_skip_line(gate, st):
+            lines.append(reader_surface_skip_line(gate, st, markdown=True))
     # #1990: the a11y ledger-shrink signal (gate_findings' "fixed" list) gets its
     # own hard-to-miss section instead of scrolling by folded into per-page
     # `warnings` — the "consumer" #1990's acceptance criteria asks for.
@@ -1787,6 +1827,8 @@ def run_sweep(
     update_truth_baseline=False,
     leak_scan=True,
     color_scheme="dark",
+    ai_qa_skipped=None,
+    reader_truth_skipped=None,
 ):
     """Run the v4 visual QA sweep. Returns True if no page FAILED.
 
@@ -1913,7 +1955,8 @@ def run_sweep(
     # ran over every page in `pages`/PAGES regardless, so tiering the AI layer
     # never reduces deterministic coverage. None (weekly full-surface run) skips
     # the filter and assesses every captured page, same as before #1428.
-    ai_vision_status = None
+    # #4652: None unless the reader-surface gate skipped this judge (never when it was asked to run).
+    ai_vision_status = None if ai_qa else reader_surface_skip_status(ai_qa_skipped)
     if ai_qa:
         try:
             from visual_ai_qa import assess_results
@@ -1928,7 +1971,7 @@ def run_sweep(
         ai_vision_status = assess_results(ai_targets)  # mutates ai_targets in place: adds ai_verdict + may add issues
 
     # ── optional phase-aware reader-truth QA over the captured prose (#1095) ──
-    reader_truth_status = None
+    reader_truth_status = None if reader_truth else reader_surface_skip_status(reader_truth_skipped)
     if reader_truth:
         try:
             from visual_ai_qa import assess_reader_truth
@@ -2084,6 +2127,10 @@ def run_sweep(
         print(f"AI-vision QA: SKIPPED-BY-BUDGET (tier {ai_vision_status['tier']}) — not run, not a pass")
     if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
         print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
+    # #4652: …and the reader-surface gate's skip reads the same way, from the same place.
+    for _gate, _st in (("AI-vision QA", ai_vision_status), ("Reader-truth QA", reader_truth_status)):
+        if reader_surface_skip_line(_gate, _st):
+            print(reader_surface_skip_line(_gate, _st))
     # #1927: …and once more as a CI ANNOTATION, the only one of the three surfaces
     # that is visible without opening the job log. Both gates now pause at tier 3
     # only (ADR-125 amendment), so this fires when Bedrock is stopped fleet-wide.

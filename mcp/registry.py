@@ -21,6 +21,7 @@ from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach
 # #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
 from mcp.tools_coach_corrections import tool_log_coach_correction
 from mcp.tools_coach_intelligence import (
+    GET_COACH_THREAD_INPUT,
     tool_audit_coach_dossier,
     tool_evaluate_prediction,
     tool_get_coach_thread,
@@ -28,6 +29,7 @@ from mcp.tools_coach_intelligence import (
     tool_get_predictions,
 )
 from mcp.tools_coach_packet import COACH_PACKET_DESCRIPTION, COACH_PACKET_INPUT, tool_get_coach_session_packet  # #4082
+from mcp.tools_coach_vision import GET_COACH_VISION_DESCRIPTION, GET_COACH_VISION_INPUT, tool_get_coach_vision  # #3759
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
     tool_find_days,
@@ -196,7 +198,7 @@ from mcp.tools_surfaces import (  # #4584: the two input schemas moved beside th
     tool_describe_platform_surfaces,
     tool_get_platform_surface,
 )
-from mcp.tools_todoist import close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
+from mcp.tools_todoist import PRIORITY_DESCRIPTION, close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
 from mcp.tools_training_notes import tool_get_exercise_notes
 
@@ -329,23 +331,17 @@ TOOLS = {
             },
         },
     },
+    # #3759 paid this module's #1665 ceiling the #4036 way — by extraction, never by raising
+    # the ratchet: this tool's input table moved beside its function (GET_COACH_THREAD_INPUT
+    # in mcp/tools_coach_intelligence.py). The schema NAME stays here, which is what R3 reads.
     "get_coach_thread": {
         "fn": tool_get_coach_thread,
-        "schema": {
-            "name": "get_coach_thread",
-            "description": GET_COACH_THREAD_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "coach_id": {
-                        "type": "string",
-                        "description": "Coach domain: sleep, nutrition, training, mind, physical, glucose, labs, explorer",
-                    },
-                    "limit": {"type": "number", "description": "Number of thread entries (default 4)"},
-                },
-                "required": ["coach_id"],
-            },
-        },
+        "schema": {"name": "get_coach_thread", "description": GET_COACH_THREAD_DESCRIPTION, "inputSchema": GET_COACH_THREAD_INPUT},
+    },
+    # #3759: owner-only, field-selective; the description + input table live in the tool's own module.
+    "get_coach_vision": {
+        "fn": tool_get_coach_vision,
+        "schema": {"name": "get_coach_vision", "description": GET_COACH_VISION_DESCRIPTION, "inputSchema": GET_COACH_VISION_INPUT},
     },
     "get_predictions": {
         "fn": tool_get_predictions,
@@ -1242,7 +1238,7 @@ TOOLS = {
                     "due_date": {"type": "string", "description": "First-fire date YYYY-MM-DD."},
                     "content": {"type": "string", "description": "New task name."},
                     "description": {"type": "string", "description": "Task description/notes."},
-                    "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "priority": {"type": "integer", "description": PRIORITY_DESCRIPTION},
                     "project_id": {"type": "string", "description": "Move to project ID."},
                 },
                 "required": ["task_id"],
@@ -1261,7 +1257,7 @@ TOOLS = {
                     "project_id": {"type": "string", "description": "Todoist project id. Omit for Inbox."},
                     "due_string": {"type": "string", "description": "e.g. 'every! Sunday', 'every! month'. Use every! for recurring."},
                     "due_date": {"type": "string", "description": "YYYY-MM-DD for one-time or first-fire date."},
-                    "priority": {"type": "integer", "description": "1=urgent 2=high 3=medium 4=normal."},
+                    "priority": {"type": "integer", "description": PRIORITY_DESCRIPTION},
                     "description": {"type": "string", "description": "Task description."},
                 },
                 "required": ["content"],

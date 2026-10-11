@@ -109,10 +109,10 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry (each route keeps its env override)
 
-# AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+AI_MODEL = model_for("hypothesis_engine")
+AI_MODEL_HAIKU = model_for("hypothesis_engine.check")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
 CALIBRATION_PK = f"USER#{USER_ID}#SOURCE#calibration"  # #530: resolution ledger (cross_phase)
@@ -288,7 +288,7 @@ def store_hypothesis(hypothesis: dict, daily_rows=None, *, kind=None, citation=N
     # per-arm n floor stated in both the spec and the criterion. Additive and idempotent:
     # a spec that already carries a derivation (the genesis seeder's) passes through with
     # that derivation expressed as the facet and nothing else touched. `daily_rows`, when
-    # given, prices a DECLARED bar against the outcome metric's own measured noise scale.
+    # given, DERIVES the bar from the outcome's own trailing variance (#3495; else labels it).
     # (The prose is a comment, not a docstring, because this module sits on its #1665
     # size ceiling and that ratchet counts logical lines, not comments — #3537.)
     hypothesis = prereg_effect.stamp_spec_provenance(hypothesis, MIN_DAYS_PER_ARM, daily_rows, kind=kind, citation=citation)
@@ -1594,9 +1594,9 @@ def lambda_handler(event, context):
                         window = 21
                     hyp["monitoring_window_days"] = window
 
-                    # #3552: the generated bar rides with its MODEL_PROPOSED facet and the
-                    # arm floor — stamped in store_hypothesis, after validation, because it
-                    # only adds registry-grounded text to an already-valid criterion.
+                    # #3552/#3495: store_hypothesis re-derives the model's bar from the outcome's
+                    # trailing variance over the FULL daily_rows (min_effect_basis), rewrites the
+                    # criterion to read it, states the arm floor; an unpriceable bar stays labelled.
                     store_hypothesis(hyp, daily_rows)
                     new_hypotheses_stored += 1
 

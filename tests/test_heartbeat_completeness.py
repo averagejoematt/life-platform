@@ -1019,6 +1019,17 @@ COVERAGE = {
     # in place of the former TODO. Still not a ledger row — no `schedule=`, so absence
     # is not this file's question; error coverage is the CDK declaration's.
     "weekly-plate": (CENSUS, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
+    # #4622: the Saturday skipped-habits queue sends NOTHING on an empty week by design, so
+    # its reader cannot notice a missing issue — silence is the normal good-week state. What
+    # separates "nothing skipped" from "never ran" is the run itself: every invocation emits
+    # LifePlatform/Email::HabitSkipReviewRun (EMF), which makes it a ledger producer the
+    # census grades on its weekly cadence (FIRST_DUE in sentinel_producer_census until the
+    # first Saturday fire). No dedicated alarm: one owner email a week does not earn one.
+    "habit-skip-review": (
+        CENSUS,
+        "2026-10-04",
+        "Owner email that is silent on an empty week by design; its death is measured by the producer census, not noticed by a reader.",
+    ),
     # #2820: the stale "Operator email" rationale predated #1951 lifting this to a
     # real subscriber send (2026-08-03). Same one-metric delivery dead-man as the
     # chronicle sender.
@@ -1160,6 +1171,11 @@ COVERAGE = {
     # Invocations works here because this function has exactly ONE trigger; a run that
     # honestly declines to draw a card still invokes and still emits a datapoint.
     "recap-card-generator": (ALARM, "recap-card-no-invocations-24h"),
+    # #3759: the Monday coach-vision read over the progress photos. ONE trigger, so
+    # Invocations is the absence signal; seven daily periods is the CloudWatch ceiling for
+    # a daily period (#3685) and exactly one Monday falls in every seven-day window. A run
+    # that honestly declines to write (no set this week, budget pause) still invokes.
+    "coach-vision": (ALARM, "coach-vision-no-invocations-7d"),
     "hevy-restamp": (
         CENSUS,
         "2026-07-19",
@@ -1212,6 +1228,12 @@ COVERAGE = {
         "(LifePlatform/Email::InsightParseFailure) for a caught-and-continued per-record failure that never raises. Both fire "
         "on invocation, which is exactly the case an absence alarm cannot cover.",
     ),
+    # #4633: the receipt rule's FIRST action (RequestResponse) for the inbound-email door. Event-driven like the parser
+    # above, so 'no mail' and 'the trigger died' are indistinguishable by count — but unlike the parser it HAS an absence
+    # signal: every parser invocation must be preceded by a gate invocation, and the metric-math alarm fires on a day
+    # with more parser runs than gate runs (the rule set edited by hand to drop or re-order the gate). Errors: the
+    # shared helper's per-function alarm. Not an exemption — EXEMPT_CEILING stays where it is.
+    "inbound-auth-gate": (ALARM, "life-platform-inbound-auth-gate-bypassed"),
 }
 
 

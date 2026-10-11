@@ -568,30 +568,12 @@ def test_mutation_control_a_planted_default_literal_is_found(tmp_path):
 _JSON_PARSE_HOMES = {"lambdas/ai/structured_json.py", "lambdas/ai/bedrock_client.py"}
 _TEXT_TRANSPORTS = {"call_anthropic", "call_anthropic_api"}
 # path::function -> (hand parses in it, why it has not migrated yet). The ledger may only shrink.
-# Every member is a judge or classifier whose span parse carries a contract of its own that the
-# door's `parse_json_span` (None on any failure) would flatten.
-JSON_HAND_PARSE_LEDGER = {
-    "lambdas/coach/critics.py::parse_model_verdict": (
-        1,
-        "2026-10-02 (#4276): names WHICH failure it was (no object vs json.loads) in the error the critics record; migrate with a door error-kind helper",
-    ),
-    "lambdas/intelligence/lenient_json.py::lenient_json": (
-        2,
-        "2026-10-02 (#4276): B4 trailing-comma repair + the key-regex partial salvage; move the repair into the door, then call_json the three analyzer generators",
-    ),
-    "lambdas/operational/reader_truth_qa.py::parse_verdict": (
-        1,
-        "2026-10-02 (#4276): typed UNEVALUATED verdicts (#3540) + the #4474 greedy-span second attempt; a CI gate's verdict typing, migrate on its own",
-    ),
-    "lambdas/privacy/broadcast_sensitivity_gate.py::bedrock_offtopic_classifier": (
-        1,
-        "2026-10-02 (#4276): a parse error PROPAGATES to the caller's classifier_error hold; a None-returning span would change the privacy gate's failure path",
-    ),
-    "lambdas/training/training_notes_llm.py::_parse_signals": (
-        1,
-        "2026-10-02 (#4276): raises UnparseableResponse naming lengths and parser positions (never the private text); migrate with decode_error",
-    ),
-}
+# EMPTY since #4276 box 2: the five judge/classifier span parsers it held (critics.parse_model_verdict,
+# lenient_json, reader_truth_qa.parse_verdict, broadcast_sensitivity_gate.bedrock_offtopic_classifier,
+# training_notes_llm._parse_signals) now parse through `structured_json.load_json_span`, whose typed
+# `JsonSpanError` (kind, decoder msg/pos, lengths) carries each one's own failure contract. A new entry
+# here is a regression — route the parse through the door instead.
+JSON_HAND_PARSE_LEDGER: dict = {}
 
 
 def _model_text_json_loads(root):
@@ -793,6 +775,131 @@ def test_parse_json_span_takes_first_opener_to_last_closer_and_never_raises():
     assert parse_json_span("} then {") is None  # closer before the opener
     assert parse_json_span('{"a": 1,}') is None  # unparseable span → None, never an exception
     assert parse_json_span(None) is None
+
+
+def test_json_hand_parse_ledger_is_empty():
+    # #4276 box 2 is "no module under lambdas/ calls json.loads on raw model text outside the door" —
+    # a non-empty ledger is a named exception to that, which needs an owner ruling, not a line here.
+    assert JSON_HAND_PARSE_LEDGER == {}
+
+
+def test_load_json_span_types_each_failure_and_keeps_the_text_out_of_its_message():
+    from ai.structured_json import JsonSpanError, load_json_span
+
+    assert load_json_span('Sure! {"a": 1} hope that helps', "{") == {"a": 1}
+    assert load_json_span('```json\n[{"n": 1}]\n```', "[") == [{"n": 1}]
+    for no_span in ("no json here", '{"a": 1', "} then {", "", None):
+        try:
+            load_json_span(no_span, "{")
+        except JsonSpanError as e:
+            assert e.kind == "no_span" and e.cause is None, no_span
+        else:
+            raise AssertionError(no_span)
+    secret = '{"private note": "do not echo", oops}'
+    try:
+        load_json_span(secret, "{")
+    except JsonSpanError as e:
+        assert e.kind == "decode" and isinstance(e.cause, json.JSONDecodeError)
+        assert e.span == secret and e.span_len == len(secret) and e.pos == e.cause.pos
+        assert "private" not in str(e) and "private" not in repr(e)
+    else:
+        raise AssertionError("a broken span must raise")
+
+
+def test_load_json_span_options_are_the_old_callers_contracts():
+    from ai.structured_json import JsonSpanError, load_json_span
+
+    # #4474: a whole verdict, then prose holding a brace — the greedy span fails, the first value reads.
+    two = '{"findings": [], "severity": "none"} note: {see above}'
+    try:
+        load_json_span(two, "{")
+    except JsonSpanError as e:
+        greedy = e
+    assert load_json_span(two, "{", first_value_fallback=True) == {"findings": [], "severity": "none"}
+    # and a broken first object still raises, carrying the GREEDY error (as reader_truth_qa reported it)
+    try:
+        load_json_span('{"a": } {"b": 1}', "{", first_value_fallback=True)
+    except JsonSpanError as e:
+        assert e.kind == "decode" and e.span_len == len('{"a": } {"b": 1}')
+    else:
+        raise AssertionError("broken first object must raise")
+    assert greedy.kind == "decode"
+    # B4: a trailing comma repairs; no span + whole_text_if_no_span parses the whole text.
+    assert load_json_span('{"a": [1, 2,],}', "{", repair_trailing_commas=True) == {"a": [1, 2]}
+    assert load_json_span("  42  ", "{", whole_text_if_no_span=True) == 42
+
+
+def test_salvage_string_field_unescapes_or_returns_the_raw_capture():
+    from ai.structured_json import salvage_string_field
+
+    assert salvage_string_field('{"narrative": "line one\\nline two", "x": [1,', "narrative") == "line one\nline two"
+    assert salvage_string_field('{"narrative": "bad \\q escape"', "narrative") == "bad \\q escape"
+    assert salvage_string_field('{"other": "v"}', "narrative") is None
+
+
+def test_the_five_migrated_parsers_keep_their_contracts():
+    from coach import critics
+    from intelligence.lenient_json import lenient_json
+    from operational import reader_truth_qa as rtq
+    from training import training_notes_llm as tn
+
+    def resp(t):
+        return {"content": [{"type": "text", "text": t}], "stop_reason": "end_turn"}
+
+    assert critics.parse_model_verdict(resp("nothing")) == {"error": "no JSON object in a 7-char response"}
+    assert critics.parse_model_verdict(resp("{oops}")) == {"error": "json.loads failed: JSONDecodeError"}
+    assert critics.parse_model_verdict(resp('x {"verdict": "approve", "sentence": "Fine. More."}'))["sentence"] == "Fine."
+
+    assert lenient_json('```json\n{"weekly_priority": "p", "n": [1,],}\n```', "weekly_priority", {}) == {"weekly_priority": "p", "n": [1]}
+    assert lenient_json('{"weekly_priority": "kept", "n": [1, 2', "weekly_priority", {"d": []}) == {
+        "weekly_priority": "kept",
+        "_partial": True,
+        "d": [],
+    }
+    assert lenient_json("no object", "weekly_priority", {}) is None
+
+    assert rtq.parse_verdict("prose only")[rtq.UNEVALUATED_FIELD] == rtq.KIND_NO_VERDICT
+    bad = rtq.parse_verdict('{"findings": [ }')
+    assert bad[rtq.UNEVALUATED_FIELD] == rtq.KIND_UNPARSEABLE and bad["detail"].endswith("of 16")
+    assert rtq.parse_verdict('{"severity": "none"} then {x}') == {"severity": "none", "findings": []}
+
+    for text, needle in (
+        ("no array", "no JSON array span in a 8-char response"),
+        ("[1, }]", "json.loads failed on a 6-char span: JSONDecodeError"),
+    ):
+        try:
+            tn._parse_signals(text, {"sleep"})
+        except tn.UnparseableResponse as e:
+            assert needle in str(e), (needle, str(e))
+        else:
+            raise AssertionError(text)
+
+
+def test_the_offtopic_classifier_holds_on_no_span_and_propagates_a_decode_error(monkeypatch):
+    from ai import bedrock_client
+    from privacy import broadcast_sensitivity_gate as gate
+
+    reply = {"text": ""}
+    monkeypatch.setattr(bedrock_client, "invoke", lambda body, model_name=None: {"content": [{"type": "text", "text": reply["text"]}]})
+    try:
+        from ai import budget_guard
+
+        monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+    except ImportError:
+        pass
+    reply["text"] = "I cannot say."
+    assert gate.bedrock_offtopic_classifier("post") == gate.OfftopicResult(None, 0.0)
+    reply["text"] = '{"on_topic": true, "confidence": 0.9}'
+    assert gate.bedrock_offtopic_classifier("post") == gate.OfftopicResult(True, 0.9)
+    reply["text"] = '{"on_topic": tru}'
+    try:
+        gate.bedrock_offtopic_classifier("post")
+    except json.JSONDecodeError:
+        pass
+    else:
+        raise AssertionError("a decode error must propagate to the classifier_error hold")
+    held = gate.classify_sensitivity("a plain post about sleep", offtopic_classifier=gate.bedrock_offtopic_classifier)
+    assert gate.CATEGORY_CLASSIFIER_ERROR in held.categories
 
 
 _REPO_ROOT_4276 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

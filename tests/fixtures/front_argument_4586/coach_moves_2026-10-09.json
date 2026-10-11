@@ -1,0 +1,26 @@
+{
+  "state": "ok",
+  "date": "2026-10-09",
+  "source": "/api/coach_moves",
+  "absent_text": "No coach line is recorded for Friday, October 9.",
+  "lines": [
+    {
+      "coach_id": "explorer_coach",
+      "coach": "Henning Brandt",
+      "move": "reaction",
+      "move_label": "On a result",
+      "text": "Henning's prediction just came true, and I think it reshapes what we thought we knew — so far, Matthew's recovery holding at 52ms HRV alongside 20.2 lbs lost suggests glucose dynamics, not protein primacy, are driving his recovery architecture.",
+      "replies_to": null,
+      "bet_settles": null
+    },
+    {
+      "coach_id": "labs_coach",
+      "coach": "James Okafor",
+      "move": "call",
+      "move_label": "A call",
+      "text": "I think Matthew will keep deferring the lab draw as long as the symptom baseline stays uncollected — so far, 30 days of journal silence makes it nearly impossible to build that case, and I expect that gap, not protein, is what stalls clinical progress next.",
+      "replies_to": null,
+      "bet_settles": null
+    }
+  ]
+}

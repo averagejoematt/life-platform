@@ -77,6 +77,16 @@ def handle_nutrition_overview() -> dict:
     return _nutrition.nutrition_overview(_g=globals())
 
 
+def edition_nutrition() -> dict:
+    """/api/edition's narrow read of /api/nutrition_overview (#4607) — delegated to web.site_api_nutrition."""
+    return _nutrition.edition_nutrition(_g=globals())
+
+
+def edition_training() -> dict:
+    """/api/edition's narrow read of /api/training_overview (#4607) — delegated to web.site_api_training."""
+    return _training.edition_training(_g=globals())
+
+
 def handle_deficit_sustainability() -> dict:
     """GET /api/deficit_sustainability — delegated to web.site_api_nutrition."""
     return _nutrition.deficit_sustainability(_g=globals())

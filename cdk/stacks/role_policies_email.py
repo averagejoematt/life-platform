@@ -791,3 +791,38 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
             resources=[DLQ_ARN],
         ),
     ]
+
+
+def email_habit_skip_review() -> list[iam.PolicyStatement]:
+    """Saturday skipped-habits queue (#4622): read the habitify partition, send ONE owner email.
+
+    Deliberately NOT _email_base — it makes no AI call (no ai-keys, no Bedrock), reads no
+    S3 config, holds no Habitify secret and writes no DynamoDB row. The read is Query only,
+    scoped by dynamodb:LeadingKeys to the habitify partition (the #468 shape), so the role
+    cannot read any other partition. Its run record is an EMF stdout line (no
+    cloudwatch:PutMetricData needed). kms:Decrypt is the table CMK the Query reads through;
+    the DLQ grant is the shared failure route every email Lambda carries.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="HabitifyPartitionRead",
+            actions=["dynamodb:Query"],
+            resources=[TABLE_ARN],
+            conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#habitify"]}},
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]

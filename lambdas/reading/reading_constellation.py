@@ -22,7 +22,9 @@ import re
 
 logger = logging.getLogger()
 
-MODEL = "claude-haiku-4-5-20251001"
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+MODEL = model_for("reading.constellation")
 MIN_NODES = 4  # the Constellation refuses to render below this (brief §2)
 
 # The ADR-104 grounded-generation harness (#2425). The prompt's grounding

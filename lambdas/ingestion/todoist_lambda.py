@@ -140,17 +140,74 @@ def get_filtered_tasks(api_token, filter_str):
         return []
 
 
+# ── Priority (#4635) ───────────────────────────────────────────────────────────
+# The Todoist API's priority runs 1 = normal … 4 = very urgent. The APP shows the
+# reverse numbering: its "p1" (red flag) is API 4 and its "p4" (no flag) is API 1.
+# Until #4635 this module labelled API 1 "p1_urgent" and API 4 "p4_normal", so every
+# stored breakdown read as the reverse of the truth.
+#
+# Two fields now, with separate jobs:
+#   priority_counts_vendor  the count per API integer, keyed by that integer exactly
+#                           as the vendor sent it ("1".."4"). This is the stored fact.
+#   priority_breakdown      DERIVED from it in the app's p1..p4 order, for readers
+#                           that want the human labels. Never the other way round.
+# A per-task `priority` is the vendor's integer, untouched. A task with no usable
+# priority is counted under "unknown" and keeps no `priority` key — it is not
+# defaulted to either end of the scale.
+VENDOR_PRIORITIES = (1, 2, 3, 4)
+PRIORITY_LABEL_BY_VENDOR = {4: "p1_urgent", 3: "p2_high", 2: "p3_medium", 1: "p4_normal"}
+
+
+def vendor_priority(task):
+    """The task's priority exactly as the API sent it, or None when it is not one of
+    the four documented integers (`bool` is an `int` to Python — excluded)."""
+    p = task.get("priority")
+    if isinstance(p, bool) or p not in VENDOR_PRIORITIES:
+        return None
+    return int(p)
+
+
+def priority_counts_vendor(tasks):
+    """Count tasks per API priority integer. Keys are the vendor's integers as
+    strings (DynamoDB map keys are strings); "unknown" appears only when non-zero."""
+    counts = {str(p): 0 for p in VENDOR_PRIORITIES}
+    unknown = 0
+    for t in tasks:
+        p = vendor_priority(t)
+        if p is None:
+            unknown += 1
+        else:
+            counts[str(p)] += 1
+    if unknown:
+        counts["unknown"] = unknown
+    return counts
+
+
+def priority_breakdown_from_vendor(counts):
+    """The app-order p1..p4 view of a `priority_counts_vendor` map (API 4 → p1_urgent)."""
+    return {label: int(counts.get(str(p), 0)) for p, label in PRIORITY_LABEL_BY_VENDOR.items()}
+
+
+def _with_vendor_priority(record, task):
+    p = vendor_priority(task)
+    if p is not None:
+        record["priority"] = p
+    return record
+
+
 def normalize_completed_task(task, project_map):
     """Normalize a completed task from the v1 API."""
-    return {
-        "task_id": str(task.get("id", "")),
-        "task_name": task.get("content", ""),
-        "project_id": str(task.get("project_id", "")),
-        "project_name": project_map.get(str(task.get("project_id", "")), "Unknown"),
-        "completed_at": task.get("completed_at", ""),
-        "labels": task.get("labels", []),
-        "priority": task.get("priority", 1),
-    }
+    return _with_vendor_priority(
+        {
+            "task_id": str(task.get("id", "")),
+            "task_name": task.get("content", ""),
+            "project_id": str(task.get("project_id", "")),
+            "project_name": project_map.get(str(task.get("project_id", "")), "Unknown"),
+            "completed_at": task.get("completed_at", ""),
+            "labels": task.get("labels", []),
+        },
+        task,
+    )
 
 
 # ── SIMP-2 framework callbacks ─────────────────────────────────────────────────
@@ -226,20 +283,20 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         proj = task["project_name"]
         by_project[proj] = by_project.get(proj, 0) + 1
 
-    priority_map = {1: "p1_urgent", 2: "p2_high", 3: "p3_medium", 4: "p4_normal"}
-    priority_breakdown = {"p1_urgent": 0, "p2_high": 0, "p3_medium": 0, "p4_normal": 0}
-    for t in active_tasks:
-        key = priority_map.get(t.get("priority", 4), "p4_normal")
-        priority_breakdown[key] += 1
+    # #4635: the vendor's integers are the stored fact; the p1..p4 view derives from them.
+    counts_vendor = priority_counts_vendor(active_tasks)
+    priority_breakdown = priority_breakdown_from_vendor(counts_vendor)
 
     tasks_due_today = [
-        {
-            "task_id": str(t.get("id", "")),
-            "task_name": t.get("content", ""),
-            "project_id": str(t.get("project_id", "")),
-            "project_name": project_map.get(str(t.get("project_id", "")), "Unknown"),
-            "priority": t.get("priority", 4),
-        }
+        _with_vendor_priority(
+            {
+                "task_id": str(t.get("id", "")),
+                "task_name": t.get("content", ""),
+                "project_id": str(t.get("project_id", "")),
+                "project_name": project_map.get(str(t.get("project_id", "")), "Unknown"),
+            },
+            t,
+        )
         for t in due_today_tasks[:50]
     ]
 
@@ -251,6 +308,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             "active_count": len(active_tasks),
             "overdue_count": len(overdue_tasks),
             "due_today_count": len(due_today_tasks),
+            "priority_counts_vendor": counts_vendor,
             "priority_breakdown": priority_breakdown,
             "completed_tasks": normalized,
             "completions_by_project": by_project,

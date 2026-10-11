@@ -418,6 +418,8 @@ def test_reconcile_runs_normally_when_the_breaker_is_clear(monkeypatch):
     monkeypatch.setattr(whoop, "_fetch_all_records", lambda *a, **k: [])
     monkeypatch.setattr(whoop, "_fetch_stored_records", lambda *a, **k: (set(), []))
     monkeypatch.setattr(whoop, "_emit_reconciliation_metric", lambda n: None)
+    monkeypatch.setattr(whoop, "_fetch_stored_workouts", lambda *a, **k: [])
+    monkeypatch.setattr(whoop, "_emit_store_vendor_metrics", lambda *a: None)
 
     body = json.loads(whoop._reconcile({"reconcile": True}, None)["body"])
     assert body["missing_count"] == 0

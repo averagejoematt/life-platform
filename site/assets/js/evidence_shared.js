@@ -44,7 +44,19 @@ export const ttl = (s) => String(s).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) 
 // Returns a short "Jun 16" label for the night a wake-date reading came from.
 export const _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export const fmtShort = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${_MON[+m[2] - 1]} ${+m[3]}` : ""; };
+// #4780 — OPT-IN `{ yearIfNotCurrent: true, now }`: a date outside the CURRENT Pacific year
+// prints its year ("Jul 2, 2027"), so a projected goal window in next year never reads as past
+// dates. The same rule as entry_age.js dayInWords (#4766), and opt-in for the same reason: the
+// default spelling must not depend on the clock (a clock-dependent default turns every
+// year-less fixture assertion into a New-Year time bomb). `now` is injectable for tests.
+export const fmtShort = (iso, { yearIfNotCurrent = false, now = new Date() } = {}) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  if (!m) return "";
+  const md = `${_MON[+m[2] - 1]} ${+m[3]}`;
+  if (!yearIfNotCurrent) return md;
+  const ptYear = Number(now.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }).slice(0, 4));
+  return +m[1] !== ptYear ? `${md}, ${+m[1]}` : md;
+};
 
 // Sleep/recovery are wake-date-keyed: a record dated D describes the night of D-1.
 // Returns a short "Jun 16" label for the night a wake-date reading came from.

@@ -1,0 +1,41 @@
+{
+ "_meta": {
+  "generated_at": "2026-10-10T02:36:15.090042+00:00",
+  "served_at": "2026-10-10T02:36:15.090042+00:00",
+  "cache_seconds": 300,
+  "request_id": "00958c0f85554b60"
+ },
+ "state": "ok",
+ "date": "2026-10-07",
+ "source": "/api/coach_moves",
+ "absent_text": "No coach line is recorded for Wednesday, October 7.",
+ "lines": [
+  {
+   "coach_id": "sleep_coach",
+   "coach": "Lisa Park",
+   "move": "reaction",
+   "move_label": "On a result",
+   "text": "I was skeptical when Lisa called the recovery spike genuine architecture rather than noise, but today's 77 recovery score and HRV of 57 \u2014 so far \u2014 suggest she was right and Matthew's sleep structure is holding load, not just bouncing off a floor event.",
+   "replies_to": null,
+   "bet_settles": null
+  },
+  {
+   "coach_id": "nutrition_coach",
+   "coach": "Marcus Webb",
+   "move": "reply",
+   "move_label": "A reply",
+   "text": "James Okafor's protein hold deserves scrutiny \u2014 I was wrong about dinner disruption collapsing intake during the dark journal gap, and Matthew held his average intact, so I think the intake concern is weaker than James is framing it right now.",
+   "replies_to": "James Okafor",
+   "bet_settles": null
+  },
+  {
+   "coach_id": "mind_coach",
+   "coach": "Nathan Reeves",
+   "move": "question",
+   "move_label": "A question for Matthew",
+   "text": "Does Matthew see the 28-day journal silence as a deliberate choice, or has it quietly become the path of least resistance \u2014 and I wonder if even he knows which one it is yet?",
+   "replies_to": null,
+   "bet_settles": null
+  }
+ ]
+}

@@ -24,6 +24,7 @@ Last updated: 2026-10-01 Session BB Opus paydown wrap (#1332 gate; +1 row — tw
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-10-05 | **P2** (daily compute down five days; day grade, weight, projections and the first-earn badge sweep not written; the alarms fired and nobody read them) | **`daily-metrics-compute` raised on every invocation from 2026-10-05T00:00:43Z to at least 2026-10-10T00:00:42Z:** `TypeError: '>' not supported between instances of 'int' and 'str'` in `scoring_engine.score_habits_registry`. `computed_metrics` rows from `DATE#2026-10-04` carry only the ACWR fields, `BADGE#lost_20` was never recorded (served earned with no date), and the character sheet's earned count (5) disagreed with `summary.earned` (6). `compute-pipeline-stale`, both ingestion-DLQ alarms (the function's DeadLetterConfig) and the QA smoke's `score:day_grade` check all went red and stayed red or flapped daily; no session read them until the Session BK kit-fixture re-capture traced the undated badge. | Verified: two `habit_registry` entries added by hand on 2026-10-04 (the Habitify session) store `target_frequency` as a DynamoDB string (`"7"`, `"5"`); the scorer compared it with an int. Fixed by #4706 (`_registry_number` reads `tier`, `scoring_weight` and `target_frequency` as numbers however stored and names any non-numeric value in `details.registry_type_drift`; the sheet now counts and lists an undated earned badge). Class: a hand-edited profile config field read with no type tolerance; the tracker is #4704 (open until live proof and the back-fill); the procedure gap (the boot pre-flight names no red alarm) is #4709. | ~5 days (found 2026-10-10 ~03:05Z by a fixture lane, not by the four red alarms). | Code fixed and merged 2026-10-10 ~04:15Z; live proof, the two registry values' correction and the 10-04→today back-fill are owner steps on #4704. | No raw data lost; derived rows for 10-04 onward are missing until the back-fill. |
 | 2026-10-01 | **P4** (false-positive monitoring red; auto-filed and auto-closed) | **`Cron freshness` went red 3 times (17:01Z, 17:27Z, 18:26Z) on false `STALE` verdicts:** deploy-wedge-watch.yml, which is scheduled every 15 min, read 643–644 h since its newest run, and config-drift.yml read 194 h. Each red auto-filed #4520. | Verified: `check_cron_freshness.newest_scheduled_run` trusted `workflow_runs[0]` of a `per_page=1` runs query, and GitHub's runs endpoint intermittently returned a weeks-old run as that element. Six repeats of the same query seconds later returned the 18:33Z run. Fixed by #4521 (bc87e54ec): read a page of 10 and take `max(created_at)`, with a mutation control. | ~1.5 h (the Session BD boot read the red run). | ~1 h (PR merged 19:24Z; every Cron freshness run since is green, and #4520 auto-closed). | No. |
 | 2026-09-30 | **P4** (urgent budget-class alarms, fired and cleared unattended; budget tier stayed 0) | **`ai-daily-spend-high-urgent` (ALARM 08:13Z → OK 12:22Z) and `ai-tokens-platform-daily-total-urgent` (ALARM 08:16Z → OK 14:34Z) fired and cleared between Session BA's wrap and Session BB's boot, so no session saw them live; the Session BB wrap's flap leg (#2912) surfaced them.** SSM `/life-platform/budget-tier` read 0 at the wrap; UTC-day `EstimatedCostUSD` sums were 09-29 $4.98 / 09-30 $0.01 against the $6 threshold. | Inferred, not verified: the underlying metric alarms evaluate a rolling 86400 s window, which ending ~08:13Z spans Session BA's late-09-29 attended AI runs (dry runs, recap regeneration, the 02:00Z pre-draft) — a window the UTC-day sums cannot show. | ~16 h (the next wrap's flap read). | Self-cleared (~4–6 h). | No. |
 | 2026-09-29 | **P3** (a merged fix silently not deployed; a dry-run leaked one insight row, removed same session) | **PR #4452 (the weekly-digest dry-run fix, 5add0eaea, merged 17:42Z) never reached production:** its CI/CD run was cancelled when a newer push queued behind it, and the next run deployed only its own `GITHUB_SHA~1` diff. The attended `weekly-digest {"dry_run": true}` proof invoke at 19:19Z therefore ran the OLD code — returned 'Digest v4.0 sent.' and wrote `INSIGHT#2026-09-29T19:20:04.043Z#weekly_digest` (genuine W4 board text; next week's prompt would have replayed it). | `ci-cd.yml` `plan` diffs `GITHUB_SHA~1..HEAD` only, and the job-level `ci-cd-deploy` concurrency group keeps one PENDING run, cancelling the older — so a superseded merge's Lambdas stay on old code until something else touches them (#4472) | ~1.5 h (the driver read the pre-fix return string, then grepped the deployed zip: 0 hits for the fix) | ~8 h (owner-granted delete of the row 23:3xZ; owner-approved `deploy_all=true` dispatch 03:25Z 09-30) | No (one duplicate insight row, deleted) |
@@ -285,7 +286,7 @@ Last updated: 2026-10-01 Session BB Opus paydown wrap (#1332 gate; +1 row — tw
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 239 dated rows, 204 post-June** (newest row 2026-10-01):
+**Distribution — 240 dated rows, 205 post-June** (newest row 2026-10-05):
 
 | month | rows |
 |---|---|
@@ -297,9 +298,9 @@ Last updated: 2026-10-01 Session BB Opus paydown wrap (#1332 gate; +1 row — tw
 | 2026-07 | 36 |
 | 2026-08 | 126 |
 | 2026-09 | 41 |
-| 2026-10 | 1 |
+| 2026-10 | 2 |
 
-**By severity:** P1 6 · P2 34 · P3 90 · P4 104 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 35 · P3 90 · P4 104 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 31 match none):
@@ -307,7 +308,7 @@ than one, and 31 match none):
 | n | class |
 |---|---|
 | 151 | deployment error |
-| 60 | stale config / literal drift |
+| 61 | stale config / literal drift |
 | 47 | QA-oracle false positive |
 | 43 | QA false positive — deploy-race (#2978) |
 | 37 | deploy-plane wedge / strand / race |
@@ -316,7 +317,7 @@ than one, and 31 match none):
 | 26 | IAM / permission |
 | 21 | timezone / wallclock |
 | 19 | QA false positive — semantic oracle (#2959) |
-| 7 | data quality / scoring |
+| 8 | data quality / scoring |
 | 31 | *(unclassified)* |
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:END -->
 
@@ -343,17 +344,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**54 of 239 rows are silent.**
+**54 of 240 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 54 | 185 |
-| TTD parseable | 41 | 125 |
-| median TTD | **28 min** | 20 min |
-| mean TTD | 1,752 min | 1,401 min |
-| exceeded 1 day | 6 (15% of parsed) | 9 (7% of parsed) |
+| rows | 54 | 186 |
+| TTD parseable | 41 | 126 |
+| median TTD | **28 min** | 22 min |
+| mean TTD | 1,752 min | 1,447 min |
+| exceeded 1 day | 6 (15% of parsed) | 10 (8% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~2.1× more likely to run past a day**. But the *means* are only 20% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 239 TTD cells (31%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.3× longer to detect at the median** and are **~1.9× more likely to run past a day**. But the *means* are only 17% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 240 TTD cells (30%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -364,7 +365,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 1 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 2 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

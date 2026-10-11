@@ -257,6 +257,17 @@ LEDGER: dict[str, dict] = {
         "2026-09-19). Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo "
         "gets a look at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=life-platform-mcp}",
     ),
+    "coach_vision": _row(
+        owner="lambdas/coach/coach_vision.py",
+        attribution=EXCLUSIVE,
+        attribution_keys=("coach-vision",),
+        founding_usd=0.00,
+        monthly_budget_usd=1.00,
+        note="#3759: the Monday coach-vision read over the progress photos — ONE Haiku vision call a week with up to "
+        "six camera JPEGs, inside its own single-purpose Lambda (coach-vision), which makes no other Bedrock call. "
+        "Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo gets a look "
+        "at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=coach-vision}",
+    ),
     "coach_diary_reaction": _row(
         owner="lambdas/coach/coach_diary_reaction.py",
         attribution=SHARED,
@@ -277,6 +288,43 @@ LEDGER: dict[str, dict] = {
         note="call sites spread across site-api-ai (ask retrieval), the recall indexer, reading "
         "resonance and recall-freshness QA — spend lands under several host keys each shared "
         "with other features",
+    ),
+    # ── ingest-path processing (#4643): hard-stop only, by declaration ───────
+    # Founding values are the measured LifePlatform/AI::EstimatedCostUSD for FOUNDING_WINDOW
+    # (2026-08), read 2026-10-10 alongside Sep and Oct-to-date so the note can say what the
+    # founding month did not show.
+    "journal_enrichment": _row(
+        owner="lambdas/ingestion/journal_enrichment_lambda.py",
+        attribution=SHARED,
+        attribution_keys=("journal-enrichment",),
+        note="the Notion-journal Haiku extraction; the journal-enrichment lambda also runs conversation_enrichment "
+        "and coach_diary_reaction, so per-feature dollars are not separable. Lambda total Aug $0.011, Sep $0.010",
+    ),
+    "social_enrichment": _row(
+        owner="lambdas/ingestion/social_enrichment_lambda.py",
+        attribution=SHARED,
+        attribution_keys=("social-enrichment",),
+        note="the inbound-social Haiku extraction; the social-enrichment lambda also runs coach_social_reaction. "
+        "$0.00 Aug, Sep and Oct-to-date — no live social source has a provisioned channel yet",
+    ),
+    "broadcast_sensitivity": _row(
+        owner="lambdas/privacy/broadcast_sensitivity_gate.py",
+        attribution=EXCLUSIVE,
+        attribution_keys=("youtube-social-ingestion", "bluesky-social-ingestion"),
+        founding_usd=0.00,
+        monthly_budget_usd=1.00,
+        note="the auto-publish gate's off-topic Haiku layer, the only AI either social ingestion lambda makes. "
+        "$0.00 Aug, Sep and Oct-to-date (no channel provisioned); the floor budget means growth past $1/mo gets a look",
+    ),
+    "training_notes": _row(
+        owner="lambdas/training/training_notes_llm.py",
+        attribution=EXCLUSIVE,
+        attribution_keys=("hevy-backfill",),
+        founding_usd=0.00,
+        monthly_budget_usd=1.00,
+        note="the training-note extractor's Haiku tail — the only AI hevy-backfill makes. $0.00 in the founding "
+        "window (the Bedrock grant was missing until #3768), Sep $0.035; worst case both cap lanes full is ~$0.61/mo "
+        "(training_notes_llm.MONTHLY_CAP_DERIVATION). The bulk sweep run from a workstation lands under dev-session",
     ),
     # ── band 3: irreducible reader promises + CI gates ───────────────────────
     "reader_truth_qa": _row(

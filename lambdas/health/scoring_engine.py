@@ -16,10 +16,13 @@ Extraction order per review:
   Phase 6 (future):    lambda_handler.py (lambda_handler, _regrade_handler)
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
 from common.constants import PLAN_DAILY_CALORIES_TARGET, PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+
+logger = logging.getLogger(__name__)
 
 # Public type aliases used across this module.
 Numeric = Union[int, float]
@@ -227,6 +230,22 @@ def habitify_reading(habits_map: dict[str, Any], name: str, meta: Optional[dict[
     return None
 
 
+def _registry_number(meta: dict[str, Any], key: str, default: float, drift: list[str], habit_name: str) -> float:
+    """A numeric habit_registry field as a number (#4704). The registry is hand-edited,
+    and on 2026-10-04 two entries stored target_frequency as the string "7"/"5", which
+    crashed every daily compute. A numeric string or Decimal reads as its number; any
+    other value falls back to the default and the habit is named in the details."""
+    raw = meta.get(key, default)
+    if isinstance(raw, bool):
+        drift.append(f"{habit_name}.{key}")
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        drift.append(f"{habit_name}.{key}")
+        return default
+
+
 def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     """Tier-weighted habit scoring using habit_registry.
 
@@ -260,14 +279,18 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
 
     habitify_7d = data.get("habitify_7d") or []
     unobserved: list[str] = []
+    type_drift: list[str] = []
 
     for habit_name, meta in registry.items():
         if meta.get("status") != "active":
             continue
-        tier = meta.get("tier", 2)
+        tier = int(_registry_number(meta, "tier", 2, type_drift, habit_name))
+        if tier not in (0, 1, 2):
+            type_drift.append(f"{habit_name}.tier")
+            tier = 2
         applicable = meta.get("applicable_days", "daily")
         is_vice = meta.get("vice", False)
-        sw = meta.get("scoring_weight", 1.0)
+        sw = _registry_number(meta, "scoring_weight", 1.0, type_drift, habit_name)
         if applicable == "weekdays" and not is_weekday:
             continue
         if applicable == "post_training":
@@ -288,7 +311,7 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             tier_scores[tier].append(habit_score * sw)
             tier_status[tier][habit_name] = is_done
         else:
-            target_freq = meta.get("target_frequency", 7)
+            target_freq = _registry_number(meta, "target_frequency", 7, type_drift, habit_name)
             week_count = 1 if is_done else 0
             for day_rec in habitify_7d[-6:]:
                 day_habits = day_rec.get("habits", {}) if isinstance(day_rec, dict) else {}
@@ -307,6 +330,9 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
             w = tier_weights[tier_num]
             weighted_sum += tier_avg * w
             total_weight += w
+
+    if type_drift:
+        logger.warning("[habits] habit_registry fields not numeric, defaults used: %s", sorted(set(type_drift)))
 
     if total_weight == 0:
         return None, {}
@@ -332,6 +358,8 @@ def score_habits_registry(data: dict[str, Any], profile: dict[str, Any]) -> Scor
     }
     if unobserved:
         details["unobserved"] = unobserved
+    if type_drift:
+        details["registry_type_drift"] = sorted(set(type_drift))
     return composite, details
 
 

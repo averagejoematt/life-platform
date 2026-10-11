@@ -582,8 +582,10 @@ def _semantic_pass(facts, narratives):
             '{"coherent": true|false, "issues": ["..."]}.\n\n'
             f"AUTHORITATIVE FACTS: {facts_line}\n\nNARRATIVES:\n{joined}"
         )
+        from ai.model_routing import model_for  # #4770: the one model registry (read at call time, as before)
+
         body = {
-            "model": os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001"),
+            "model": model_for("coherence_semantic"),
             "max_tokens": 400,
             "messages": [{"role": "user", "content": prompt}],
         }

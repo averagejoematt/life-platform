@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-04 (v8.6.0 — 87 MCP tools, 20 data sources, 106 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-11 (v8.6.0 — 88 MCP tools, 20 data sources, 109 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -152,6 +152,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#training_constraints` / `DISMISSAL#<site>#<YYYY-MM-DD>` | **owner dismissals of derived pain flags (#4036)** — `site` (his words, e.g. `right lower back`) + `site_key` (normalized, and what is in the sk) + `dismissed_on` + `words` (VERBATIM) + `movements`/`movement_keys` + `flag_note_date` (the flag instance dismissed) + `recorded_at`/`recorded_via`. Read at runtime beside the flag layer by `plan_engine._tripwire_states` (the row becomes `dismissed_by_owner`, **never `clear`** — an absence and an override are different facts) and `coach/critics.py::build_joints_packet` (no `pain_flag_loaded` veto on the dismissed instance). RE-ARMS by date: a note dated after the dismissal trips the flag again and marks the dismissal superseded; the one comparison lives in `training/training_context_registry.resolve_flag`. **Tier 2 owner-only** (his verbatim words about his body; no public projection). CROSS_PHASE (ADR-077 ruling 2026-09-21): a reset that wiped it would silently re-arm every site he has already said is resolved, and the input — a sentence he said once — cannot be recomputed | `mcp/tools_training_notes.py::tool_get_exercise_notes` (`action='dismiss'`) | `plan_next_session` (stage 1 tripwire + stage 2 joints critic) | cross_phase | n/v (owner-only; first live entry pending) |
 | `…SOURCE#named_human_contact` / `STATE#current` | **the named-human contact path's episode de-dup / cooldown row (#4063, v0.3 §9/§13.3)** — ONE row: `episode_anchor` (the last day any engagement channel logged, or `none`) + `episode_quiet_days` + per-rung `quiet_sent_on`/`quiet_mode` and `four_week_sent_on`/`four_week_mode` (mode ∈ `preview` / `armed` / `superseded_*`) + the cross-episode cooldown pair `last_quiet_sent_on`/`last_quiet_sent_mode` + `updated_at`. Dates and modes ONLY — **the contact's identity is never written here**; it lives only in the private S3 object `config/coaching/named_human.json`, read at send time. Written only after an actual send. **Tier 2 owner-only** (a disengagement record is a behavioural fact about him; no public projection). SYSTEM_STATE (ADR-077): a reset must not wipe it, or the contact would be re-mailed for a stretch they were already told about | `coach/named_human_contact.py::run_leg` (a fail-soft leg of `evening-nudge`) | the same leg (next night's `decide`) | system_state | n/v (no row until the first preview send) |
 | `…SOURCE#eyeball_estimate` / `ESTIMATE#<date>#<id8>`, `GRADE#<date>#<id8>` | **meal-photo macro estimates and their grades against MacroFactor truth** (#1390, epic #1080) — the reliability record for the model's eyeballing, not nutrition data (the module carries an isolation guard saying so). CROSS_PHASE for the same reason as `calibration` and `coach_corrections`: it measures the MODEL's accuracy across the whole cross-cycle history, and wiping it at a reset would discard the accumulating error distribution the public chart is built on | `lambdas/eyeball_calibration.py` | the eyeball accuracy chart | cross_phase | n/v (no graded probe yet) |
+| `…SOURCE#coach_vision` / `DATE#<set date>` | **the weekly coach-vision observation over the progress photos** (#3759, epic #3743) — one row per photo set, written Mondays by the `coach-vision` Lambda from this week's set + the prior one: `qualitative` (the grounded observation, or null with `qualitative_withheld_reason`), `deltas`, `body_fat_estimate {low_pct, high_pct, label: "visual estimate, not a measurement", confidence}`, `anchors {dexa {scan_date, body_fat_pct, days_from_set}, tape_trend {latest, previous, waist_delta_in}}`, `photo_keys` (exactly what the model saw), `set_dates`, `model_id`, `data_class: visual_estimate`. **Tier 2, owner-only (`field_tiers.SOURCE_TIERS`)** — the only readers are the owner's MCP tool `get_coach_vision` and his Telegram coach thread; no site, email, chronicle or narrative path reads it (`tests/test_coach_vision_isolation_3759.py`). CROSS_PHASE with its input: a before/after read that spans attempts is the comparison the photos exist for | `coach/coach_vision_lambda.py` (via `coach/coach_vision.py`) | `mcp/tools_coach_vision.py`, `coach/telegram_worker_lambda.py` (owner-only; no public projection) | cross_phase | n/v |
 | `…SOURCE#recall_embeddings` / `DOC#<kind>#<date>` | semantic-recall index (#1384, epic #1080): one item per corpus doc (kind ∈ chronicle/coach_output/journal). The Titan-v2 vector rides as a base64-packed float32 **String** attribute `emb` (compact ≈1.4 KB/256-dim, sidesteps float→Decimal); each item carries its source `cycle` stamp + `artifact_pk`/`artifact_sk` (resolves the precedent to a real record) + `text_sha` (backfill idempotency) + `link`/`snippet`. **cross_phase on purpose** — cross-reset recall is the whole point, so the index survives resets and is read by a RAW query (no phase filter). NO vector DB, NO GSI (ADR-103) — re-examined against DynamoDB native vector search at GA and deliberately kept, with the measurements and a numeric revisit trigger in **ADR-150**: the small corpus loads in one Query, cosine is brute-forced in-Lambda | `lambdas/ai/recall_indexer.py` at PUBLISH (`chronicle_approve` + the direct-publish path — the corpus had no automated writer at all until then, and froze for 18 days), `deploy/backfill_recall_embeddings.py` (bulk catch-up), `bedrock_client.embed_text` | `lambdas/ai/semantic_recall.py` (coach precedent line in `ai_calls`; chronicle recall card rendered on the published post by `chronicle_render`), `lambdas/operational/recall_freshness_qa.py` (nightly: every published installment must be indexed) | cross_phase | live (17 rows at 2026-08-08; publish-time writer added) |
 
 ### Derived intelligence (EXPERIMENT_SCOPED — tagged + tombstoned + cycle-stamped at reset)
@@ -197,7 +198,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `STANCE#<date>` + `STANCE#latest` | evidence-derived coach stance (see `docs/engines/COACH_STANCE.md`) | `coach/coach_history_summarizer.py` | site_api_coach, orchestrator | ✓ (partition) |
 | `OUTPUT#<date>#<type>` | generated coach narratives | `coach/coach_state_updater.py` | summarizer, observatory | ✓ (partition) |
 | `THREAD#<date>#<slug>` | open coaching threads | `coach/coach_state_updater.py` | summarizer | ✓ (partition) |
-| `PREDICTION#<id>`, `LEARNING#<date>#<slug>`, `CONFIDENCE#<subdomain>`, `COMMITMENT#<id>` | predictions + graded outcomes + per-subdomain confidence. `PREDICTION#` statuses: `pending`/`confirming` → `confirmed`/`refuted`/`inconclusive`/`expired`, **plus `observation` (#3046)** — a qualitative claim with no deterministic grading path, stamped `gradeable_by: "none"` at emission (`coach/prediction_emission.py`) and never counted as pending; gradable records carry `gradeable_by: "deterministic"`. **A graded row carries `baseline` (#4585)** — the "nothing changes" rule's verdict on the same call, frozen beside the grade: `{rule: "nothing_changes", version, right: bool}` or `{…, unscorable: "<reason>"}`, plus `filed_value`/`filed_on` (the metric's last reading before the filing day) for number and yes/no calls; absent = not yet scored, never a miss (`coach/coach_baseline.py`) | `coach/coach_state_updater.py` (writes), `coach/coach_prediction_evaluator.py` (grades + stamps `baseline`), `coach/dispute_docket.py` (docket rows + `baseline`), `scripts/backfill_coach_baseline_4585.py` (one-off back-fill), `coach_checkin.py` | track-record pages, stance engine | ✓ (partition) |
+| `PREDICTION#<id>`, `LEARNING#<date>#<slug>`, `CONFIDENCE#<subdomain>`, `COMMITMENT#<id>` | predictions + graded outcomes + per-subdomain confidence. `PREDICTION#` statuses: `pending`/`confirming` → `confirmed`/`refuted`/`inconclusive`/`expired`, **plus `observation` (#3046)** — a qualitative claim with no deterministic grading path, stamped `gradeable_by: "none"` at emission (`coach/prediction_emission.py`) and never counted as pending; gradable records carry `gradeable_by: "deterministic"`. **A graded row carries `baseline` (#4585)** — the "nothing changes" rule's verdict on the same call, frozen beside the grade: `{rule: "nothing_changes", version, right: bool}` or `{…, unscorable: "<reason>"}`, plus `filed_value`/`filed_on` (the metric's last reading before the filing day) for number and yes/no calls; absent = not yet scored, never a miss (`coach/coach_baseline.py`). **#4618:** a number (`point`) call's `evaluation.target_date` is the day its own sentence names (`coach/prediction_windows.py::sentence_target_day` — "tomorrow" is the Pacific day after `created_date`); a call due more than 365 days after filing is written as an `observation` carrying `emission_refused` (the reason); a corrected row keeps its earlier state under `verdict_correction` (a re-graded or withdrawn verdict: prior status, reason, target day, reading) or `respecified_from` / `respecified_at` / `respecified_reason` (a pending call whose target or window was re-derived). **#4617:** a dated direction call is graded across its own stated window (`coach/prediction_direction_window.py`); its `outcome_notes` JSON carries `window` — `{start, end, first_date, first_value, last_date, last_value, averaged_over, readings, change, band, band_rule, direction}` in the metric's own units — and a call re-graded by `scripts/regrade_direction_calls_4617.py` keeps its prior status and reason under `verdict_correction` (`issue: "#4617"`) | `coach/coach_state_updater.py` (writes), `coach/coach_prediction_evaluator.py` (grades + stamps `baseline`), `coach/dispute_docket.py` (docket rows + `baseline`), `scripts/backfill_coach_baseline_4585.py` (one-off back-fill), `scripts/regrade_tomorrow_calls_4618.py` / `scripts/regrade_direction_calls_4617.py` (one-off corrections, dry-run by default), `coach_checkin.py` | track-record pages, stance engine | ✓ (partition) |
 | `CHECKIN#<YYYY-MM-DD>#<uuid8>` | coach check-in loop (#917): a coach's question + Matthew's verbatim answer (field detail in [Coach Check-ins](#coach-check-ins-917)) | `mcp/tools_coach_checkin.py` (core: `lambdas/coach/coach_checkin.py`) | check-in queue tool, `recent_checkins_block` prompt injection | ✓ (partition) |
 | `COMPRESSED#latest`, `MEMOIR#…`, `INTERACTION#…`, `RELATIONSHIP#state`, `VOICE#state`, `BRIEF#<date>` | compressed memory, memoirs, board Q&A, relationship/voice state | summarizer, memoir lambda, site-api-ai | summarizer, site_api_coach | ✓ (partition) |
 
@@ -419,10 +420,13 @@ This population is the denominator of every all-time "top N%" distance/elevation
 | `active_count` | number | Active tasks at time of sync |
 | `overdue_count` | number | Overdue tasks |
 | `due_today_count` | number | Tasks due today |
-| `priority_breakdown` | object | Count by priority level (p1-p4) |
+| `priority_counts_vendor` | object | **The stored fact (#4635).** Active-task count per Todoist API priority integer, keyed by that integer as the vendor sent it (`"1"`..`"4"`; `"unknown"` only when a task carried no usable priority). The API scale is 1 = normal … 4 = urgent. Absent on rows written before #4635. |
+| `priority_breakdown` | object | **Derived** from `priority_counts_vendor` in the app's order: `p1_urgent` = API 4, `p2_high` = API 3, `p3_medium` = API 2, `p4_normal` = API 1. On a row WITHOUT `priority_counts_vendor` the labels are mirrored (API 1 was stored as `p1_urgent`); `mcp/tools_todoist.py::priority_breakdown` is the read seam that returns the right view for both generations, and `deploy/repair_vendor_flags_4635.py` rewrites the old rows. |
 | `completed_tasks` | list | List of completed task objects |
 | `completions_by_project` | object | Completion count per project |
 | `tasks_due_today` | list | List of today's due tasks |
+
+A task object's `priority` (in `completed_tasks` and `tasks_due_today`) is the Todoist API integer exactly as sent — 4 is the app's p1. It is omitted when the vendor sent none; it is never defaulted.
 
 ### apple_health
 
@@ -606,6 +610,37 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 | `sleep_onset_hour` | number | Hour of sleep onset (derived) |
 | `wake_hour` | number | Hour of wake (derived) |
 | `sleep_midpoint_hour` | number | Midpoint hour (derived) |
+| `vendor_incomplete` | boolean | The vendor's `incomplete` flag for this day entry, as sent (#4635). Stored for True AND False. **Absent = never read** (a row written before #4635, or a payload without the key) — not "complete". |
+| `vendor_processing` | boolean | The vendor's `processing` flag, only when sent (#4635) |
+| `vendor_lag_minutes` | number | The vendor's `lagMinutes`, only when sent, unrounded (#4635) |
+
+**What `vendor_incomplete` does and does not say (#4635).** It is the vendor's statement,
+at the moment of the fetch, that the night's record is not final. It is not a
+short-night detector. Measured on the 2026-09/10 archive: of 9 flagged nights, 8
+reappear in the next evening's payload unflagged with identical durations and a revised
+score (by up to 7 points), and 1 is a genuinely short record; an unflagged night can
+also fall far short of the wrist device. The stored row is the flagged fetch — a
+stored date is not re-fetched — so on a flagged night the durations are the vendor's
+final ones in 8 of 8 re-seen cases while `sleep_score` is the provisional one. The
+writer stores the night as sent and never drops, alters or promotes it; whether a
+flagged night belongs in an average, and with what label, is a read-side decision.
+
+**The site reader's decision (`lambdas/web/site_api_sleep.py`, #4635).** It follows the
+platform's partial-day rule (#1084: a day that is not final never enters a mean) and
+reads the flag as a tri-state — True, False, or absent = unknown:
+- `vendor_incomplete: true` — the night is **left out** of `/api/sleep_detail`'s
+  `avg_score_window` / `avg_efficiency_window` (and their gated `30d_` twins) and out of
+  every `/api/sleep_correlations` sleep-score series. It stays in `sleep_trend`, labelled:
+  each row's `eightsleep.vendor_incomplete` carries the flag; when the latest night is
+  flagged, `sleep_detail.vendor_incomplete` is true and `figure_scope.vendor_incomplete_note`
+  says the headline score is provisional. `sleep_detail.avg_window_nights` is the n behind
+  the averages and `sleep_detail.nights_vendor_incomplete` the count left out
+  (`days_tracked` still counts every stored night).
+- `false` or **absent** — included and unlabelled, exactly as before #4635. An absent flag
+  is never read as "complete" nor as "incomplete"; the payload passes it through as `null`.
+- Because the flag is not a short-night detector, this does not catch every short night
+  (an unflagged night can be far short of the wrist device), and a flagged night with
+  final durations is still excluded — the rule is "the vendor said not final", nothing more.
 
 **SoT ruling — sleep duration/staging (#2921):** Whoop (wrist HRV/motion) and Eight
 Sleep (mattress pressure sensor) each independently measure sleep duration, stage
@@ -660,6 +695,8 @@ Hevy data is stored at the workout and set level, not day-level aggregates. Acce
 | `phase` | string | ADR-058 phase tag (`pilot`/`experiment`) |
 
 **Delete tombstones** (`sk = DELETE#WORKOUT#<id>`, written by `hevy_backfill_lambda.py` on Hevy deleted-events): `tombstone: true`, `tombstoned_at`, `tombstoned_reason: "hevy_event_delete"`. Reconciled by the next audit pass (the date isn't known at delete time).
+
+**Event failure streak / quarantine** (`pk = USER#system`, `sk = INGESTION_QUARANTINE#hevy#WORKOUT#<id>` — beside the `INGESTION_STATE#hevy` cursor, NOT in the hevy source partition; #4643, written by `hevy_backfill_lambda.py` when one feed event fails to process): `workout_id`, `event_type`, `fail_count` (consecutive failing runs), `first_failed_at`, `last_failed_at`, `last_error`, `quarantined` (true from `HEVY_QUARANTINE_AFTER`, default 3, runs), `quarantined_at`. While `quarantined` is false the event holds the `since` cursor; once true it no longer does. Deleted when the event next processes cleanly. It is kept out of the source partition because sorting after `DATE#` does NOT hide a row from an open-ended `sk >= DATE#…` query — that query returns every later sk, and a projected read then sees it as an empty item (`routine_title._query_performed` counted the `DELETE#WORKOUT#` tombstones above as sessions that way until #4643 closed its range at `DATE#~`).
 
 ### macrofactor
 | Field | Type | Description |
@@ -1023,6 +1060,8 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `DATE#YYYY-MM-DD#journal#solo_recording#N` | Solo Recording — local-Whisper solo-diary transcript (#1573, numbered/stable-suffix) |
 | `DATE#YYYY-MM-DD#journal#journal#N` | Fallback for unstructured entries without a Template property (numbered) |
 
+`#N` on the multi-per-day templates is a stable suffix — the last 12 hex characters of the Notion page id (#476). Rows written before #476 still carry a positional `#1`, `#2`, …; a row moves to its stable key the next time its page is re-fetched, taking every co-owned attribute with it (below), and no other row of the date is touched (#4631 — the reconcile's rules are in `docs/RUNBOOK.md`, "Notion journal").
+
 **Common fields (all templates):**
 
 | Field | Type | Description |
@@ -1144,6 +1183,8 @@ Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extrac
 | `enriched_defense_context` | string | 1-sentence description of what's being defended against |
 | `enriched_emotional_depth` | number | 1-5 emotional depth rating (1=very surface/avoidant, 5=deep processing) |
 | `defense_enriched_at` | string | ISO timestamp of defense enrichment |
+
+**Co-owned attributes — what a re-ingest carries (#4677).** The ingester rebuilds a journal row from what Notion sent and writes it whole, on first sight of a page and on every later edit. Attributes another pipeline merged onto the row afterwards are copied from the stored row first: every attribute whose name starts with a family declared in `lambdas/ingestion/journal_row_contract.py` (`JOURNAL_ROW_COWRITERS`) — today `enriched_` (journal-enrichment), `vocal_` (the vocal-metrics backfill) and `defense_` (a retired pass). Only attributes the fresh item lacks are copied, so a stored value never replaces one Notion just sent, and nothing outside those families is copied. A pipeline that starts writing onto journal rows declares its family there; `tests/test_journal_row_cowriters_4677.py` fails until it does. If the stored row cannot be read, the row is not rewritten on that run.
 
 **Vocal metrics fields (#1842, `channel` = `video_diary` / `solo_recording` only):**
 
@@ -2039,6 +2080,7 @@ Pre-computed daily metrics written by `daily-metrics-compute` Lambda at 9:40 AM 
 | `consecutive_logging_days` | number | Streak of days with nutrition logged |
 | `habit_streak_t0` | number | Consecutive days all Tier 0 habits completed |
 | `computed_at` | string | ISO timestamp of computation |
+| `computed_lag_days` | number | Pacific days between the row's `date` and the day it was written (#4637). `1` = the scheduled morning-after run; `>= 2` = a late or back-filled recompute (`event["date"]`). Written on scored and sick-day rows alike; absent on rows written before #4637. Trailing windows are anchored on `date + 1` regardless of this value. |
 
 ---
 
@@ -2409,7 +2451,8 @@ Generated weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT). Engine v2 (202
 | `domains` | list | Pillars involved e.g. `["sleep", "nutrition"]` |
 | `evidence` | string | Founding evidence (generation-time, cites dates/values) |
 | `confirmation_criteria` | string | Prose criteria (numeric, human-readable) |
-| `test_spec` | map | **FROZEN pre-registration** — `condition_metric`, `condition_op` (`>=`/`<=`/`median_split`), `condition_threshold`, `outcome_metric`, `direction` (`higher`/`lower`), `min_effect`, `lag_days`. Never revised after creation |
+| `proposed_confirmation_criteria` | string | #3495: the generator's own criterion sentence, kept when the bar was re-derived and `confirmation_criteria` rewritten from the derived number (not served by `/api/hypotheses`) |
+| `test_spec` | map | **FROZEN pre-registration** — `condition_metric`, `condition_op` (`>=`/`<=`/`median_split`), `condition_threshold`, `outcome_metric`, `direction` (`higher`/`lower`), `min_effect`, `lag_days`. Never revised after creation. Since #3552 also `min_days_per_arm` + `min_effect_provenance` (`{value, kind, source}`); since #3495 a derived bar also carries `min_effect_derivation` and `min_effect_basis` (`{metric, unit, window_days, statistic, value, k, n, n_floor, replaced?}` — `replaced` is the declared/model bar it superseded at the write) |
 | `pre_registered_at` | string | ISO timestamp the spec was frozen (= created_at) |
 | `engine_version` | number | 2 for v2 records; absent on v1 |
 | `status` | string | `pending` / `confirming` / `confirmed` / `refuted` / `archived` |
@@ -2552,6 +2595,9 @@ Stores Wednesday Chronicle installments by Elena Voss. Also published to S3 blog
 | `thesis` | string | The central argument/idea of this installment |
 | `body` | string | Full article text (HTML) |
 | `word_count` | number | Approximate word count |
+| `stats_line` | string | The week's numbers as one line (the dek under the title; the card engine and the manifest read it here) |
+| `stats` | map | The same numbers, structured (#4191): `weight_lbs`, `week_grade_avg`, `t0_streak_days` — a key is absent when the line does not carry that number; the map is absent when it carries none. Derived from `stats_line` at write (`content.chronicle_schema.stats_fields`) |
+| `content_markdown` | string | The quoted title, a blank line, the body. The model's bracketed stat header is dropped at the store (#4191, `strip_stat_header`); rows written before that still hold it, so reader surfaces go through `chronicle_schema.body_markdown` |
 | `s3_key` | string | S3 path of published blog post |
 | `installment_number` | number | Sequential installment number |
 | `board_interview` | boolean | Whether this installment includes a BoD interview |

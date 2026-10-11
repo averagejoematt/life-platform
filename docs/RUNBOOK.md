@@ -2,10 +2,10 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-10-04 (v8.6.0 — 87 MCP tools, 68-module package, 106 Lambdas, 20 data sources)
+Last updated: 2026-10-11 (v8.6.0 — 88 MCP tools, 69-module package, 109 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
-- Lambda functions defined (CDK): 106 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
+- Lambda functions defined (CDK): 109 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
 - Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
 - Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
@@ -237,9 +237,9 @@ daily-brief-schedule                cron(0 17 * * ? *)
 | Dashboard Refresh | 02:00 PM | dashboard-refresh (lightweight, no AI — updates weight/glucose/zone2/TSB/buddy) |
 | Dashboard Refresh | 06:00 PM | dashboard-refresh (same as above, second daily run) |
 | Weather | 2x daily | weather-data-ingestion |
-| Dropbox Poll | Every 30 min | dropbox-poll |
+| Dropbox Poll | Every 2 hours | dropbox-poll |
 
-**MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 30 min) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
+**MacroFactor** uses an automated Dropbox pipeline: phone export → Dropbox `/life-platform/` → `dropbox-poll` Lambda (every 2 hours) → S3 → `macrofactor-data-ingestion`. Auto-detects nutrition vs workout CSVs. Manual S3 upload (`s3://matthew-life-platform/imports/macrofactor/`) still works as fallback.
 
 **Apple Health** primary path is the Health Auto Export webhook (hourly push from iOS): Stelo/Apple Watch → HealthKit → Health Auto Export app → API Gateway → `health-auto-export-webhook`. Manual S3 XML upload (`s3://matthew-life-platform/imports/apple_health/`) still works for backfills.
 
@@ -322,6 +322,43 @@ aws sqs start-message-move-task \
   --source-arn arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq --region us-west-2
 ```
 Fix the root cause FIRST — redriving into a still-broken Lambda just round-trips the messages.
+
+---
+
+## S3 bucket notifications (ingestion triggers outside CDK)
+
+Four functions start from an S3 event notification on `matthew-life-platform`. The notifications are ONE bucket-level document that CDK does not own; `cdk/stacks/` only grants `s3.amazonaws.com` permission to invoke the functions. A dropped notification shows up nowhere except as eventual staleness of the source (#4643).
+
+| Notification Id | Function | Filter |
+|---|---|---|
+| `MacroFactorCSVIngest` | `macrofactor-data-ingestion` | prefix `uploads/macrofactor/`, suffix `.csv` |
+| `InboundEmailInsightParser` | `insight-email-parser` | prefix `raw/inbound_email/` |
+| `FoodDeliveryCSVIngest` | `food-delivery-ingestion` | prefix `imports/food_delivery/`, suffix `.csv` |
+| `MeasurementsCSVIngest` | `measurements-ingestion` | prefix `imports/measurements/` |
+
+All four fire on `s3:ObjectCreated:*`. The authoritative list is `EXPECTED_NOTIFICATIONS` in `deploy/check_bucket_notification_drift.py`; this table restates it.
+
+**Check (read-only, run any time):**
+
+```bash
+python3 deploy/check_bucket_notification_drift.py --strict   # exit 1 on drift or a read error
+```
+
+It makes one `s3:GetBucketNotification` call and reports `missing`, `unexpected`, `changed` and any non-Lambda configuration. It also runs nightly, blocking, in `.github/workflows/config-drift.yml` (the ownership/bucket-policy drift step) under `github-actions-deploy-role`, whose `S3BucketNotificationRead` grant was applied 2026-10-11 (`infra/iam/README.md`).
+
+**Repair (owner, attended — this is an AWS write):** `put-bucket-notification-configuration` REPLACES the whole document, so never put a single entry. Read the full live document, edit it, and put the whole thing back:
+
+```bash
+aws s3api get-bucket-notification-configuration --bucket matthew-life-platform > /tmp/notif.json
+# edit /tmp/notif.json so it matches EXPECTED_NOTIFICATIONS — keep the other entries
+aws s3api put-bucket-notification-configuration --bucket matthew-life-platform \
+  --notification-configuration file:///tmp/notif.json
+python3 deploy/check_bucket_notification_drift.py --strict   # must print `clean`
+```
+
+S3 validates each destination when the document is put: a function whose resource policy has no `s3.amazonaws.com` invoke grant fails the whole call. Three of the grants are CDK-owned (`S3InvokeMacrofactor`, `S3InvokeFoodDelivery`, `S3InvokeMeasurements` in `cdk/stacks/ingestion_stack.py`). The `insight-email-parser` grant (`AllowS3InvokeRefresh`, read 2026-10-10) is also outside CDK: its stack declares only the SES grant.
+
+To add or remove a trigger, change `EXPECTED_NOTIFICATIONS` and this table in the same PR, then apply the document change above after the merge.
 
 ---
 
@@ -681,23 +718,24 @@ These functions auto-refresh tokens and write back to Secrets Manager. If they f
 but every source looks fine — recent ingestion Lambda logs are clean and no
 credential actually needs rotating.
 
-**Since #2976 this should self-resolve within ~1h of real recovery.** The alarm
+**Since #2976 this self-resolves instead of latching 24h, but #4641 widened the window to 15 h**: the sub-daily sources were cut to sparse crons (dropbox every 2 h, notion 14,21,3 UTC, withings 14,17,21,0 UTC, a 14 h sparsest gap), and a shorter window alternates ALARM/OK between their runs and re-pages a dead credential 2-3x a day. The alarm
 reads `LifePlatform/OAuth IngestAuthHealthy` (dimensionless, fleet-wide) with
-`Minimum` over a `period=3600s` / `evaluation_periods=1` window
+`Minimum` over a `period=54000s` / `evaluation_periods=1` window
 (`cdk/stacks/monitoring_stack.py`, alarm id `IngestAuthUnhealthy`; the name's
 `-24h` suffix is historical). The old fixed 86400s window latched a fully
 recovered fleet red for up to 24h after the last unhealthy emission — the
 2026-08-21→22 dropbox incident held two alarms red for a day after a transient
 403. The shorten is safe *only because* #2976 also made every
 authenticated-successful run emit a 1 (framework `errors == 0`, dropbox after
-`list_folder`, notion after `query_database`): the stream now carries datapoints
-at least every 30 min around the clock, a tripped breaker keeps landing 0s on
-every scheduled run, and Min<1 over 1h reads "some source emitted unhealthy
-within the hour". Note the cadence caveat: a DAILY-cron source's breakage pins
-this aggregate red only around its cron hours — its per-source
+`list_folder`, notion after `query_database`); a tripped breaker keeps landing 0s
+on every scheduled run, so Min<1 over 15h reads "some held source emitted unhealthy
+within the window". **Honest clear delay: up to ~15 h after real recovery** (the last
+0 has to age out), not the ~1 h of #2976. Cadence caveat: Eight Sleep (one 4-run
+burst, 18 h gap) and DAILY-cron sources are not held by this window — their
+breakage pins the aggregate only around their cron hours; the per-source
 `ingest-auth-unhealthy-{source}` alarm (window matched to its own cadence,
-86400s for daily sources) is the durable per-source truth. A red older than ~1h
-therefore means some source is emitting 0s *right now*.
+86400s for daily sources) is the durable per-source truth. A red older than ~15h
+therefore means some held source is emitting 0s *right now*.
 
 **Triage — confirm real state, don't trust alarm state:**
 
@@ -776,6 +814,18 @@ Then watch the alarm `life-platform-garmin-data-ingestion-errors` return to OK w
 
 ### Eight Sleep: JWT auth failure
 Eight Sleep uses username/password → JWT (no OAuth). If the JWT refresh fails, the function will write to the DLQ. Check logs for the specific error. Resolution may require re-entering credentials in Secrets Manager if the account password changed.
+
+### Notion journal: no full re-sync yet, and how the reconcile decides (#4631)
+
+**No full re-sync of the journal (`{"full_sync": true}`, or a wide `start`/`end` backfill) until the #4631 fixes are merged, deployed and proven** — proven means the first production run that re-fetches an old-dated page has logged its reconcile decision with the row count unchanged. The legacy-key migration runs only after that, with the journal row count and the enriched-row count recorded before and after (counts only). Before the fix, a re-sync would have stripped the enrichment from every entry it re-keyed and could have deleted same-day entries outright; DynamoDB holds the only processed copy of most of them.
+
+How `notion-journal-ingestion` treats the multi-per-day templates (`MULTI_PER_DAY` in `lambdas/ingestion/notion_lambda.py`):
+
+- A run that reaches a date with one page in hand (an old page edited today, a page created today and dated back) writes that page and **leaves the date's other rows alone**. Holding one page of a date is not a view of the whole date.
+- A stored row is removed in two cases only: the same Notion page was just written under its stable key and its `enriched_*`/`defense_*` fields were read and carried across first; or a whole-date re-query of Notion no longer returns the row's page. A failed or inconsistent re-query, an unreadable row, or a row with no `notion_page_id` removes nothing.
+- Each `(date, template)` the run touches logs one line, counts only — no key, page id or text:
+  `[E-6] reconcile decision date=… template=… outcome=done rows_before=N written=W rekeyed_removed=R vendor_absent_removed=A kept_unwritten=K requery=… rows_after=M`.
+  `rows_after = rows_before + (new pages) − A`; a re-key leaves the count unchanged. Find them with `filter @message like /reconcile decision/` on `/aws/lambda/notion-journal-ingestion`.
 
 ### MacroFactor: Function not triggered
 Ensure your export CSV is dropped into the correct S3 path: `s3://matthew-life-platform/uploads/macrofactor/`. The filename does not matter but the prefix does. The primary path is Dropbox poll → S3 → `macrofactor-data-ingestion` (S3 trigger).

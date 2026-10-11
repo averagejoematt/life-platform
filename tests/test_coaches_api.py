@@ -167,7 +167,7 @@ def test_lead_coach_detail_route_shape():
     # the standard dynamic sections are present and honest-empty pre-data:
     # no ladder scaffold is fabricated for him (source "none", never "ladder")
     assert data["stance"]["source"] == "none"
-    assert data["working_hypotheses"] == []
+    assert "working_hypotheses" not in data  # #4649: dropped from the contract (it was [] for every coach)
     assert data["stance_history"] == []
     assert data["recent_outputs"] == []
     # no generation voice spec exists for the lead — null, never a fabricated spec

@@ -108,7 +108,9 @@ MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 # Tiny call (Haiku, max_tokens=1) ≈ $0.0001/run × 6 runs/day = $0.0006/day.
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 ANTHROPIC_API_BASE = "https://api.anthropic.com/v1/messages"
-ANTHROPIC_CANARY_MODEL = os.environ.get("ANTHROPIC_CANARY_MODEL", "claude-haiku-4-5-20251001")
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+
+ANTHROPIC_CANARY_MODEL = model_for("bedrock_canary")
 SENDER = os.environ["EMAIL_SENDER"]
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 

@@ -25,6 +25,7 @@ import hmac
 import json
 import logging
 import os
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -182,7 +183,26 @@ def _refresh_access_token(secret: dict) -> dict:
     body = resp["body"]
     secret["access_token"] = body["access_token"]
     secret["refresh_token"] = body["refresh_token"]
+    # #4641: stamp when this access token dies, so the next run can reuse it instead of
+    # exchanging the rotating refresh token again. Withings returns expires_in (~10800s).
+    secret["access_token_expires_at"] = int(time.time()) + int(body.get("expires_in") or 0)
     return secret
+
+
+# Reuse the stored access token while it has at least this long left.
+REFRESH_MARGIN_SECONDS = 900
+
+
+def _token_fresh(secret: dict, now: float | None = None) -> bool:
+    """True when the stored access token is known to outlive this run (#4641).
+    No stamp (first run after deploy, or a hand-edited secret) -> not fresh -> refresh."""
+    try:
+        expires_at = int(secret.get("access_token_expires_at") or 0)
+    except (TypeError, ValueError):
+        return False
+    if not secret.get("access_token") or not expires_at:
+        return False
+    return (now if now is not None else time.time()) < expires_at - REFRESH_MARGIN_SECONDS
 
 
 def _withings_get(secret: dict, url: str, params: dict) -> tuple[dict, dict]:
@@ -269,10 +289,15 @@ _range_cache: dict = {"window": None, "by_date": {}}
 
 
 def authenticate(secret_data: dict) -> dict:
-    """Refresh tokens unconditionally on every cold-Lambda invocation.
-    Framework writes the returned dict back to Secrets Manager via
-    enable_secret_writeback=True so the next invocation reads fresh tokens."""
-    refreshed = _refresh_access_token(dict(secret_data))
+    """Refresh the access token only when it is near expiry (#4641; was every run, 308
+    rotating-token exchanges in 14 days). A refreshed dict differs from the stored one, so
+    the framework writes it back (enable_secret_writeback=True); an unchanged dict is not
+    written (ingestion_framework._writeback_credentials). The refresh MUST happen here, before
+    the writeback: a rotation inside a later 401 retry would not be persisted."""
+    if _token_fresh(secret_data):
+        refreshed = dict(secret_data)
+    else:
+        refreshed = _refresh_access_token(dict(secret_data))
     _secret_cache["secret"] = refreshed
     _range_cache["window"] = None  # new invocation — force a fresh range fetch
     _range_cache["by_date"] = {}

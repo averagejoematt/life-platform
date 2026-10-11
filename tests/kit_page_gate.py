@@ -5,7 +5,8 @@ kit_page_gate.py — the pre-merge gate for the kit pages of the living front pa
 
 What it holds, per page in KIT_PAGES, rendered at a phone (390x844) from a local static
 serve of site/ with the data routes mocked by committed fixtures
-(tests/fixtures/kit_pages_4586/ — live captures of 2026-10-03, never fetched):
+(tests/fixtures/kit_pages_4586/ — one live capture, scripts/capture_kit_page_fixtures.py, its
+time in _capture.json; never fetched here):
 
   1. HEIGHT. A page taller than its phone-screen budget fails: six screens for the front
      page, four elsewhere (the appendix, a reference list, carries its own). The owner approved "about three and a half phone screens, one
@@ -53,34 +54,80 @@ _RUN_AXE_JS = """async () => {
 #: path -> phone-screen budget. Adding a kit page means adding it here.
 KIT_PAGES = {
     "/next/v8/": 6,
+    "/next/v8/week/": 4,  # round 8: the week band moved here whole from the front page
     "/next/v8/start/": 4,
     "/next/v8/story/": 4,
+    # #4808/#4809 (ruling 2026-10-11): four screens stand — the bet's reasons are the front
+    # card's, and this page's bet card carries a door to them instead of printing both.
     "/next/v8/coaches/": 4,
     "/next/v8/day/": 4,
-    "/next/v8/day/?d=2026-10-02": 4,  # a lifting day: the longest a day page gets
+    # The longest a day page gets: eight lifts, three coach lines (the most a day holds) and two
+    # settled calls (#4648). What was said and settled is a fifth part of the day, so this one
+    # worst case has five screens; every other day keeps four.
+    "/next/v8/day/?d=2026-10-07": 5,
+    "/next/v8/day/?d=2026-10-01": 4,  # a day with no coach line and no settled call: nothing extra
+    "/next/v8/day/?d=2026-09-24": 4,  # four calls settled: two shown, two folded
     "/next/v8/trend/": 4,  # the index of every trend
     "/next/v8/trend/?m=weight": 4,
     "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
+    "/next/v8/sheet/": 4,  # the character sheet, plainly: one level, seven areas, the earned badges
+    "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
+    # One page per AI coach, one template: the record first, then what settles next, the
+    # bets, the watch list, the longer view, the character and the terms — six screens at most.
+    "/next/v8/coach/?c=sleep_coach": 6,  # the stage's watch list, a read that changed, one open bet and two settled
+    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the coach has a longer view
+    "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
+    "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
+    "/next/v8/coach/": 4,  # no coach named: one sentence and the way back
     # The appendix is a reference list, not a reading page: one two-line row per live page that
     # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
     # room for a few more rows, so a list that doubles still fails here.
     "/next/v8/appendix/": 11,
+    "/next/v8/call/": 4,  # the newest settled call above the list of all of them
+    "/next/v8/call/?id=sleep-20260907-8436f03290": 4,  # one number call
+    "/next/v8/call/?id=bet-20260930-994b3d89f6": 4,  # a bet: both sides' words, the longest a call page gets
+    "/next/v8/call/?id=sleep-20260907-0000000000": 4,  # an address that names no call: one sentence and the list
 }
 
-#: route glob -> fixture file. Every route ck_pages.js reads.
+#: route glob -> fixture file. Every route the kit pages' modules read.
 ROUTES = {
     "**/api/edition": "edition.json",
     "**/journal/posts.json": "posts.json",
     "**/panelcast/episodes.json": "episodes.json",
     "**/api/coaches": "coaches.json",
-    "**/api/coach_docket": "coach_docket.json",
+    "**/api/coach_docket": "coach_docket_full.json",  # every field the coach page reads; the same four dates
+    "**/api/coach/sleep_coach": "coach_sleep_coach.json",
+    "**/api/coach/physical_coach": "coach_physical_coach.json",
+    "**/api/coach/glucose_coach": "coach_glucose_coach.json",
+    "**/api/coach/eli_marsh": "coach_eli_marsh.json",
+    "**/api/predictions?coach_id=sleep&*": "predictions_sleep.json",
+    "**/api/predictions?coach_id=physical&*": "predictions_physical.json",
+    "**/api/predictions?coach_id=glucose&*": "predictions_glucose.json",
     "**/api/timeline": "timeline.json",
     "**/api/pulse_history": "pulse_history.json",
     "**/api/workouts": "workouts.json",
     "**/api/training_overview": "training_overview.json",
     "**/api/nutrition_overview": "nutrition_overview.json",
     "**/api/frequent_meals": "frequent_meals.json",
+    "**/api/weekly_priority": "weekly_priority.json",
+    "**/api/character": "character.json",
+    "**/api/achievements": "achievements.json",
+    "**/panelcast/wk4.transcript.json": "transcript_wk4.json",
+    "**/api/platform_stats": "platform_stats.json",
+    "**/api/receipts": "receipts.json",
+    "**/api/predictions": "predictions.json",
+    "**/api/calls": "calls.json",  # ck_call.js
 }
+#: ck_depth.js asks GET /api/coach_moves?date=<day> for the day it shows (#4648). One capture per
+#: day the gate opens, written by scripts/capture_kit_page_fixtures.py; a day with no file gets
+#: the catch-all {} (no lines).
+ROUTES.update(
+    {
+        f"**/api/coach_moves?date={name[len('coach_moves_'):-len('.json')]}": name
+        for name in sorted(os.listdir(FIXTURES_DIR))
+        if name.startswith("coach_moves_") and name.endswith(".json")
+    }
+)
 
 _FORBIDDEN = (
     (re.compile(r"\bDr\.\s"), "an honorific on a persona"),

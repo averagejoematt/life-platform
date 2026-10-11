@@ -158,6 +158,8 @@ def test_story_door_drops_a_recap_that_counts_attempts(monkeypatch):
         ("story_so_far", "This is his sixteenth attempt, and it shows."),
         ("where_we_are_now", "Fifteen resets in, the plan holds."),
         ("threads_to_watch", ["whether cycle 17 outlasts the others"]),
+        ("story_so_far", "Attempt 17 opened quietly."),
+        ("where_we_are_now", "16 lost · 0 kept, and a new week."),
     ):
         _mock_llm(monkeypatch, {**clean, field: bad})
         assert chron.build_recap(_data()) is None, field

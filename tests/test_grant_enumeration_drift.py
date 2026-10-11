@@ -702,6 +702,11 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # and removed here in the same lane: post-apply `deploy/verify_oidc_iam.py --strict` reported
     # CLEAN across all 15 targets, and live now carries 3 DynamoDB actions on 14 statements.
     # Same #2824 rule as the #3562 entry above — this queue stays a queue.
+    # 2026-10-11: the #4643 deploy-role entry (S3BucketNotificationRead, `s3:GetBucketNotification`
+    # on arn:aws:s3:::matthew-life-platform for deploy/check_bucket_notification_drift.py in
+    # config-drift.yml) was applied by the owner ~03:30Z with the same put-role-policy command;
+    # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 15 targets.
+    # Removed here per the same #2824 rule.
 }
 
 

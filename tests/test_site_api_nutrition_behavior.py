@@ -1596,6 +1596,27 @@ def _whoop_series(hrv, eff, rec, start="2026-04-30"):
 FLAT6 = [100, 100, 100, 100, 100, 100]
 DROP6 = [100, 100, 90, 90, 70, 70]  # first_avg 100, last_avg 70 -> -30%
 
+#: A Zone-1 walk the way Strava stores one for the owner: no power meter, so `kilojoules`
+#: is 0, and an average HR under the Zone-1 ceiling (109.8 bpm, `training_load.Z1_CEILING_HR`)
+#: scores 0 load — an OBSERVED rest day, not a gap (#4075). This is what a "zero output" day
+#: looks like in the real partition; a bare `total_kilojoules: 0` is what EVERY stored day
+#: row looks like (#3754, the 2026-10-04 sweep), which is why the channel no longer reads it.
+Z1_WALK = {"kilojoules": 0, "moving_time_seconds": 3600, "average_heartrate": 100, "sport_type": "Walk"}
+
+
+def strava_day(date: str, *kj_per_activity: float) -> dict:
+    """ONE Strava day row holding N activities, with the day totals the writer stores
+    beside them — built through `common.strava_read_seam.day_totals`, the writer's own
+    formula (`tests/test_shared_modules.py` pins it equal to `strava_lambda.transform`;
+    the writer module itself needs `S3_BUCKET` at import, which this file does not set).
+    The training-output channel scores each activity's load — a power-backed activity
+    at `kilojoules / 7.2` (so a kJ series keeps its percentages), a 0-kJ activity as the
+    Zone-1 walk above."""
+    from common.strava_read_seam import day_totals
+
+    acts = [dict(Z1_WALK) if not kj else {"kilojoules": kj, "moving_time_seconds": 3600} for kj in kj_per_activity]
+    return row("strava", date, activities=acts, **day_totals(acts))
+
 
 def _sust_sources(intake=2000, tdee=3000, hrv=None, eff=None, rec=None, t0=None, kj=None, mf_days=7):
     days = [(datetime(2026, 5, 9) - timedelta(days=mf_days - 1 - i)).strftime("%Y-%m-%d") for i in range(mf_days)]
@@ -1611,7 +1632,10 @@ def _sust_sources(intake=2000, tdee=3000, hrv=None, eff=None, rec=None, t0=None,
     # redefined. (The fixture used to write `tier_0_completion_rate`, a name no writer in
     # the repo has ever produced — see the reader/writer test below.)
     habit = [row("habitify", d, completion_pct=(t0 or FLAT6)[i] / 100) for i, d in enumerate(wdays)]
-    strava = [row("strava", d, total_kilojoules=(kj or FLAT6)[i]) for i, d in enumerate(wdays)]
+    # #3754: the channel reads the daily training LOAD over the day's activities, never the
+    # day row's `total_kilojoules` (0 on every stored day row); `strava_day` builds the row
+    # the writer builds, with the kJ on the activity where the load model reads it.
+    strava = [strava_day(d, (kj or FLAT6)[i]) for i, d in enumerate(wdays)]
     return FakeSources(macrofactor=macro, whoop=whoop, habitify=habit, strava=strava)
 
 
@@ -1765,9 +1789,9 @@ def test_a_shallow_decline_below_a_channels_threshold_is_not_called_degraded():
 
 
 def test_a_channel_starting_from_zero_reads_as_stable_instead_of_an_infinite_change():
-    """Two rest days open the window, so training output starts at 0 kJ. There is no
-    percentage change to state from a zero baseline — the panel must say stable, not
-    divide by zero."""
+    """Two Zone-1 walks open the window — observed rest at 0 load (#4075) — so training
+    output starts at 0. There is no percentage change to state from a zero baseline —
+    the panel must say stable, not divide by zero."""
     ds = sustainability(_sust_sources(kj=[0, 0, 50, 50, 80, 80]))["deficit_sustainability"]
     train = next(c for c in ds["channels"] if c["name"] == "Training output")
     assert train["direction"] == "stable"
@@ -1874,13 +1898,17 @@ def test_the_deep_sleep_signal_is_surfaced_when_it_is_what_triggered_the_strain(
 
 
 def test_training_output_sums_multiple_activities_onto_one_day_before_trending():
-    """Two rides on one day is one day of output, not two data points."""
+    """Two rides on one day is one day of output, not two data points. The partition
+    holds ONE row per day with both activities on it (the writer's shape, #3754)."""
+    from training.training_load import KJ_PER_TSS_POINT  # 7.2 kJ per load point
+
     wdays = [(datetime(2026, 5, 9) - timedelta(days=5 - i)).strftime("%Y-%m-%d") for i in range(6)]
     days = [(datetime(2026, 5, 9) - timedelta(days=6 - i)).strftime("%Y-%m-%d") for i in range(7)]
-    strava = []
-    for i, d in enumerate(wdays):
-        strava.append(row("strava", d, total_kilojoules=DROP6[i] / 2))
-        strava.append(row("strava", d, total_kilojoules=DROP6[i] / 2))
+    # Each activity carries half the day's output, sized in WHOLE load points so the
+    # per-day 0.1-point rounding cannot nudge the hand-derived percentage:
+    # day load = 2 x (DROP6[i] x 7.2 / 2) / 7.2 = DROP6[i] points -> first 100, last 70 -> -30%.
+    half_day_kj = [p * KJ_PER_TSS_POINT / 2 for p in DROP6]
+    strava = [strava_day(d, half_day_kj[i], half_day_kj[i]) for i, d in enumerate(wdays)]
     src = FakeSources(
         macrofactor=[mf(d, total_calories_kcal=2000, expenditure_kcal=3000) for d in days],
         strava=strava,
@@ -1971,7 +1999,7 @@ def test_each_severity_carries_its_own_prose_verdict_rather_than_one_generic_lin
 def test_deficit_sustainability_reads_only_the_partitions_the_panel_needs():
     src = _sust_sources()
     sustainability(src)
-    allowed = {"macrofactor", "whoop", "habitify", "strava", "withings"}
+    allowed = {"macrofactor", "whoop", "habitify", "strava", "hevy", "withings"}  # hevy: #3754, the training-load input
     assert src.sources_read <= allowed, f"unexpected partition read: {sorted(src.sources_read - allowed)}"
 
 

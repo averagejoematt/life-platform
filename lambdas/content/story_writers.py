@@ -16,9 +16,11 @@ import json
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from ai.model_defaults import NARRATIVE_MODEL as WRITER_MODEL  # noqa: E402 — the one narrative default (#4275)
+from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
 
-from content import story_craft, story_ledger
+WRITER_MODEL = model_for("story.writer")
+
+from content import story_checks, story_craft, story_ledger
 
 CHRONICLE_MAX_TOKENS = 7000  # ~1,100-1,500 words lands near 2,500 tokens; the ceiling is headroom, never the target
 EPISODE_MAX_TOKENS = 8000
@@ -324,26 +326,39 @@ correct — return ONLY claims that must change. If the installment is clean, re
 For each finding give the exact claim, the problem, and the corrected wording."""
 
 
-def fact_check(
-    text: str, dossier: Dict[str, Any], *, context: Optional[Dict[str, Any]] = None, invoke: Optional[Callable[..., Dict[str, Any]]] = None
-) -> List[str]:
-    """Findings (as gate strings) from the fact read. An unreadable reply is itself a finding — never a pass.
-    ``context`` carries the series' own record the dossier does not: last week's open bet, this week's new
-    bet and the previous titles — facts of the SERIES, which an installment may state."""
+def fact_check_body(text: str, dossier: Dict[str, Any], *, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The fact read's request body for one installment (or dek, or episode). Split from ``fact_check`` so a
+    rebuild can fan many reads out as one Bedrock batch job (#4777) and still parse every reply through the
+    same ``fact_findings`` gate a real-time read goes through."""
     ctx = f"SERIES RECORD (facts of the series itself — bets made on air, previous titles):\n{json.dumps(context or {}, indent=1, default=str)}\n\n"
-    body = {
+    return {
         "system": FACT_RUBRIC,
         "messages": [{"role": "user", "content": f"DOSSIER:\n{json.dumps(dossier, indent=1, default=str)}\n\n{ctx}INSTALLMENT:\n{text}"}],
         "max_tokens": 8000,
         "temperature": 0,
         "output_config": {"format": {"type": "json_schema", "schema": FACT_SCHEMA}},
     }
+
+
+def fact_check(
+    text: str, dossier: Dict[str, Any], *, context: Optional[Dict[str, Any]] = None, invoke: Optional[Callable[..., Dict[str, Any]]] = None
+) -> List[str]:
+    """Findings (as gate strings) from the fact read. An unreadable reply is itself a finding — never a pass.
+    ``context`` carries the series' own record the dossier does not: last week's open bet, this week's new
+    bet and the previous titles — facts of the SERIES, which an installment may state."""
+    body = fact_check_body(text, dossier, context=context)
     if invoke is None:
         from ai import bedrock_client
 
         resp = bedrock_client.invoke_with_retry(body, FACT_MODEL)
     else:
         resp = invoke(body, FACT_MODEL)
+    return fact_findings(resp)
+
+
+def fact_findings(resp: Dict[str, Any]) -> List[str]:
+    """One fact-read reply → gate strings. The same parse for a real-time reply and a batch record's modelOutput:
+    a cheaper path skips no gate (ADR-132 as amended for #4777)."""
     if resp.get("stop_reason") != "end_turn":
         return [f"fact-read: incomplete (stop_reason={resp.get('stop_reason')}) — the installment is unverified"]
     try:
@@ -353,5 +368,12 @@ def fact_check(
     _noop = re.compile(
         r"(?i)\bno (?:change|error|issue|correction)s? (?:is )?(?:needed|found|here|required|necessary)\b|\bskipping\b|\bthis is accurate\b"
     )
-    real = [f for f in found if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}")]
+    # an N/A fix whose problem says the fact does not apply ("not reportable") is a non-finding — unless it touches the
+    # privacy rules, which keep blocking however the reader phrased the fix (#4749; the one predicate the audit shares)
+    real = [
+        f
+        for f in found
+        if not _noop.search(f"{f.get('problem', '')} {f.get('fix', '')}")
+        and not story_checks.is_na_nonfinding(f.get("problem", ""), f.get("fix", ""), f.get("claim", ""))
+    ]
     return [f"fact: {f['claim']!r} — {f['problem']} → {f['fix']}" for f in real]

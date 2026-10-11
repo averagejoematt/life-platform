@@ -40,6 +40,21 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 > any-ref trust) live for ≈6 minutes — `docs/INCIDENT_LOG.md`. `tests/test_iam_twin_free_3336.py`
 > fails the suite if an inline policy document for any role listed here reappears under `deploy/`.
 
+### APPLIED 2026-10-11 — the deploy role's bucket-notification read (#4643)
+
+> Applied by the owner ~03:30Z with
+> `aws iam put-role-policy --role-name github-actions-deploy-role --policy-name life-platform-cicd-permissions --policy-document file://infra/iam/github-actions-deploy-role.permissions.json`.
+> Post-apply `python3 deploy/verify_oidc_iam.py --strict` → **CLEAN — every checked-in identity
+> matches live exactly (15 targets)**. The `github-actions-deploy-role` entry was deleted from
+> `_PENDING_PERMISSIONS_APPLY` (`tests/test_grant_enumeration_drift.py`) per the #2824 rule that
+> the queue stays a queue.
+
+`github-actions-deploy-role.permissions.json` carries one read-only statement,
+`S3BucketNotificationRead` (`s3:GetBucketNotification` on `arn:aws:s3:::matthew-life-platform`,
+owner ruling 2026-10-11 ~02:40Z). Its consumer is `deploy/check_bucket_notification_drift.py`
+(#4757), which `config-drift.yml` runs nightly (`--strict`, blocking) in its
+ownership/bucket-policy drift step. The role is hand-managed, not CDK, so no stack deploy applies it.
+
 ### PENDING APPLY — the remediation role's narrowed grants (#3562, 2026-09-05)
 
 `github-actions-remediation-role.permissions.json` was narrowed in the repo; **the

@@ -1052,6 +1052,26 @@ def test_a_title_that_counts_attempts_holds_the_week_at_the_story_door(env):
     assert _pending_marker(env)["reason"] == "story_door_hold"
 
 
+def test_a_title_in_the_noun_then_number_shape_is_held_too(env):
+    """#4538: the rule is the structure, not the founding phrase — "Attempt 17" (the owner's own words, 2026-09-19)
+    holds the week exactly as "The Fifteenth Reset" does, and a title that only numbers the day publishes."""
+    env["state"]["ai"] = RAW_INSTALLMENT.replace(TITLE, "Attempt 17: What the Body Remembers")
+    body = json.loads(m.lambda_handler({}, None)["body"])
+    assert body["status"] == "story_door_hold" and "Attempt 17" in body["findings"][0]
+    assert env["ses"].sent == [] and _stored_installment(env) is None
+
+
+def test_a_registry_cut_term_in_the_body_holds_the_week_at_the_story_door(env):
+    """#4674: week 4 published "pace flag" in its excerpt because only the desk writers' door knew the term. The
+    handler's final check now refuses it in the body whichever writer produced it — in the hyphenated spelling too
+    (one handler run per test: a second run would reuse the first's cached generation)."""
+    env["state"]["ai"] = RAW_INSTALLMENT.replace("the week did not fall apart", "the pace-flag stayed on")
+    body = json.loads(m.lambda_handler({}, None)["body"])
+    assert body["status"] == "story_door_hold" and "pace-flag" in body["findings"][0]
+    assert env["ses"].sent == [] and _stored_installment(env) is None
+    assert _pending_marker(env)["reason"] == "story_door_hold"
+
+
 def test_a_privacy_held_week_leaves_a_marker_explaining_the_gap(env):
     def _boom(text, context=""):
         raise privacy_guard.PrivacyViolation([("name", "a real public figure")])

@@ -114,6 +114,19 @@ DEFAULT_STALE_HOURS = 48
 #                  transport pipe; its tracker lives elsewhere). Default True.
 #   active_api     scheduled API *pull* that must attempt at least daily — the
 #                  silent-auth-rot / 44-day-outage class (pipeline_health_check).
+#   probe_functions
+#                  (#4643) the Lambda functions the daily boot probe
+#                  (pipeline_health_check) invokes with {"healthcheck": true} for this
+#                  source: ((function_name, display_name), …). Covers the source's own
+#                  ingestion function AND any scheduled enrichment that rides on it
+#                  (strava → activity-enrichment, notion → journal-enrichment, the open
+#                  social channels → social-enrichment). A function named on several
+#                  sources is probed once, under the first source in registry order.
+#                  A `paused` source keeps its entry and is reported paused, never
+#                  invoked. Was a hand-written PIPELINES literal that omitted the Hevy
+#                  poller and every enrichment function while still listing the paused
+#                  one. Read by health_probe_targets(); tests/test_health_probe_registry_4643.py
+#                  holds it equal to the scheduled functions in cdk/stacks/ingestion_stack.py.
 #   best_effort    known-brittle by an accepted upstream cause; evaluated + logged
 #                  but excluded from UnhealthySourceCount (pipeline_health_check).
 #   expected_days  expected record days per week for gap reconciliation
@@ -226,6 +239,19 @@ DEFAULT_STALE_HOURS = 48
 #                  whose provider exposes a queryable record list AND that aren't
 #                  rate-limit-degraded qualify; garmin is EXPLICITLY excluded
 #                  (ADR-123). Default absent/False. Read by provider_reconcile_source_ids().
+#   upstream_changes
+#                  (#4638) what happens to the STORE when Matthew edits or deletes a
+#                  record in the vendor's app. {edits, deletes, window_days, standing,
+#                  note}: `edits`/`deletes` are each one of UPSTREAM_CHANGE_BEHAVIOURS —
+#                  'any_age' (propagates however old), 'inside_window' (propagates only
+#                  while the day is inside the source's re-fetch window of `window_days`
+#                  days), 'not_propagated' (the store keeps what it first saw).
+#                  `standing` is 'stated_default' (the CURRENT behaviour, recorded so it
+#                  is never unstated, while the owner's ruling on #4638 is pending) or
+#                  'accepted' (ruled). Required on every member of
+#                  UPSTREAM_CHANGES_REQUIRED (the polled/uploaded sources of #4638's
+#                  set; habitify and notion are owned by #4632/#4631). Read by
+#                  tests/test_upstream_changes_4638.py (no runtime reader yet).
 #   oauth          (#1960) True = a CREDENTIALED API pull whose auth can DIE — an
 #                  OAuth token that expires/gets revoked, or a static API key that
 #                  gets rotated. This is exactly the set that routes through
@@ -368,6 +394,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "instrument_for": ("sleep_coach",),  # #4217: the sleep/recovery sensor — dark => Park is absent
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("whoop-data-ingestion", "Whoop"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
         "method": "OAuth API pull, 5x daily",
@@ -461,6 +488,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # against the API is cheap and catches the late-workout / dropped-day silent
         # drop the DDB-only checks are blind to. whoop_lambda._reconcile.
         "provider_reconcile": True,
+        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=2.
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "not_propagated",
+            "window_days": 2,
+            "standing": "stated_default",
+            "note": (
+                "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
+                "stored record by id; older edits are never re-fetched. A workout deleted in the app keeps its "
+                "DATE#…#WORKOUT#id row at any age — the vendor's update/delete webhooks are unused. Since #4638 the "
+                "daily _reconcile REPORTS the store → vendor difference inside its 14-day window (stored workout ids "
+                "the vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
+                "ChangedActivityCount with Source=whoop) but stays read-only: nothing is removed."
+            ),
+        },
     },
     "withings": {
         "label": "Withings",
@@ -475,9 +517,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # Weigh-ins are sporadic (often ~weekly); a missed week before alerting.
         "stale_hours": 7 * 24,
         "active_api": True,
+        "probe_functions": (("withings-data-ingestion", "Withings"),),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         "qa_tier": "optional",  # weigh-ins are sporadic — a missing day is behavior
-        "method": "OAuth API pull, hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; ~5% of runs changed a row (#4641)
+        "method": "OAuth API pull, about 8x daily",
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
         "raw_layout": {
@@ -505,6 +549,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #914: weigh-ins are a manual engagement channel — he has to step on the
         # scale. Sporadic (~weekly is healthy), so a lenient ~10d before "quiet".
         "engagement_channel": {"label": "measurement", "stale_days": 10},
+        # #4638: stated default (owner ruling pending). Only today is re-fetched (refresh_today).
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "not_propagated",
+            "window_days": 1,
+            "standing": "stated_default",
+            "note": (
+                "Today is re-fetched every run, so a weigh-in edited the same day propagates; past days are "
+                "fetched only to fill gaps. A measurement deleted in the app is never removed from the store."
+            ),
+        },
     },
     "strava": {
         "label": "Strava",
@@ -516,6 +571,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": True,
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (
+            ("strava-data-ingestion", "Strava"),
+            ("activity-enrichment", "Activity Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         "qa_tier": "optional",  # workouts are event-driven — a missing day is behavior
         "method": "OAuth API pull, hourly",
@@ -552,6 +611,22 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # fix). strava_lambda._reconcile, wired in ingestion_stack. TR-07 generalized
         # this facet so whoop opts in the same way.
         "provider_reconcile": True,
+        # #4638: stated default (owner ruling pending). Re-fetch is refresh_trailing_days=3 (full replace).
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "inside_window",
+            "window_days": 3,
+            "standing": "stated_default",
+            "note": (
+                "An edit (rename, sport type, trim) inside the 3-day trailing re-fetch propagates, and so does a "
+                "PARTIAL delete there (the re-fetch is a full replace of the day). A day whose activities are ALL "
+                "deleted is rewritten as an explicit empty, tombstoned day by the daily _reconcile (store → vendor, "
+                "#4638) anywhere inside its 14-day window except the first and last day, at most 3 days per run, and "
+                "never when the vendor list comes back wholly empty. An edit, or a partial delete, older than 3 days "
+                "is not written: _reconcile REPORTS it (StoreOnlyActivityCount / ChangedActivityCount, Source=strava) "
+                "and the store keeps what it first saw."
+            ),
+        },
     },
     "eightsleep": {
         "label": "Eight Sleep",
@@ -562,9 +637,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,  # he sleeps on it every night — passive
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("eightsleep-data-ingestion", "Eight Sleep"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "optional",
-        "method": "API pull, hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; ~5% of runs changed a row (#4641)
+        "method": "API pull, 4x daily mornings",
         "metrics": "Sleep stages, HR/HRV, restlessness",  # bed temp retired — ADR-118, #489
         "posture": "portfolio",
         "raw_layout": {
@@ -598,6 +675,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,  # HAE webhook automations — passive
         "stale_hours": None,
         "active_api": False,  # webhook push — no cron to go stale
+        "probe_functions": (("health-auto-export-webhook", "Health Auto Export"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
         "method": "Health Auto Export webhook, near-real-time",
@@ -814,6 +892,22 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "evidence_for": ("steps",),
             },
         ],
+        # #4638: stated default (owner ruling pending). The webhook path is append-only by design:
+        # merge_day_to_dynamo(monotonic_guard=True) never lowers a total, the per-reading maps never
+        # overwrite an existing timestamp, and the rebuild-a-day path (monotonic_guard=False) has no
+        # operator caller. tests/test_upstream_changes_4638.py pins all three facts.
+        "upstream_changes": {
+            "edits": "not_propagated",
+            "deletes": "not_propagated",
+            "window_days": None,
+            "standing": "stated_default",
+            "note": (
+                "A corrected amount is ignored and a deleted reading stays counted: per-reading maps never "
+                "overwrite an existing timestamp, workouts dedup on id (id-less ones are dropped) and additive "
+                "totals can only rise. The rebuild-a-day hook (merge_day_to_dynamo(monotonic_guard=False)) "
+                "exists but no operator path calls it."
+            ),
+        },
     },
     "todoist": {
         "label": "Todoist",
@@ -832,6 +926,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # within a day of the pipe breaking.
         "stale_hours": 72,
         "active_api": True,
+        "probe_functions": (("todoist-data-ingestion", "Todoist"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": None,
         "method": "API pull, 1x daily (14:00 UTC)",
@@ -856,9 +951,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,  # scheduled API pull writes a record daily
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        "method": "API pull, hourly",
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness); notes/mood calls await ruling #4644 (#4641)
+        "method": "API pull, hourly (24h)",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/habitify", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
@@ -956,6 +1053,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
         # #3252: the only source that records what he ate.
         "evidence_for": ("nutrition",),
+        # #4638: stated default (owner ruling pending). The diary export is a rolling 7-day window and
+        # its date range is authoritative (macrofactor_lambda.absent_day_items).
+        "upstream_changes": {
+            "edits": "inside_window",
+            "deletes": "inside_window",
+            "window_days": 7,
+            "standing": "stated_default",
+            "note": (
+                "Every diary upload re-writes each day it carries, so an edit propagates while the day is in "
+                "the rolling 7-day export. A day emptied or deleted in the app is cleared once an upload "
+                "carries rows on both sides of it: a stored day strictly inside the file's date range with no "
+                "rows is replaced by an explicit empty, tombstoned record. A day older than the export window "
+                "never changes; a daily-summary-format record is not touched by a diary import."
+            ),
+        },
     },
     "hevy": {
         "label": "Hevy",
@@ -967,8 +1079,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "instrument_for": ("physical_coach",),  # #4217: the lifting log (behavioral — a rest week never darks Reyes)
         "stale_hours": 7 * 24,
         "active_api": True,
+        "probe_functions": (("hevy-backfill", "Hevy Poller"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # lifting is event-driven — gaps are training structure
         "qa_tier": None,
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision: cheap cursor first-page poll, walk-in workout same-day-visible (#4641, #3720)
         "method": "API-key pull, hourly (24h)",
         "metrics": "Strength sets, reps, load, rest times",
         "posture": "load-bearing",
@@ -979,6 +1093,21 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #3252: strength sessions only. Hevy is ONE of three workout sources, which is
         # the whole point of the facet — Hevy-only evidence cannot carry "no training".
         "evidence_for": ("workout",),
+        # #4638: the one source that already propagates at any age — the events feed carries
+        # updates and deletes, and a delete writes a DELETE#WORKOUT#id tombstone that
+        # hevy_common.resolve_tombstones() consumes (hevy_backfill_lambda, #475).
+        "upstream_changes": {
+            "edits": "any_age",
+            "deletes": "any_age",
+            "window_days": None,
+            "standing": "stated_default",
+            "note": "Hevy's events feed reports updated and deleted workouts at any age; deletes are tombstoned (#475).",
+        },
+        # #4643: opt-in provider reconciliation. Hevy's API has a one-call all-time count
+        # (GET /v1/workouts/count) and no rate-limit degradation, so a daily compare of that
+        # count with the stored, non-tombstoned DATE#…#WORKOUT# rows catches a drop the events
+        # cursor walked past. hevy_backfill_lambda.reconcile, HevyReconciliation rule.
+        "provider_reconcile": True,
     },
     "measurements": {
         "label": "Tape measure",
@@ -1064,6 +1193,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # server-side OAuth refresh from datacenter IPs. See ADR-074.
         "paused": True,
         "active_api": True,
+        "probe_functions": (("garmin-data-ingestion", "Garmin"),),  # #4643: the daily boot probe's targets
         # Best-effort: still evaluated + logged, excluded from UnhealthySourceCount
         # so the accepted 429 failure can't mask a real source death (2026-06-19).
         "best_effort": True,
@@ -1133,11 +1263,16 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # public board (the board mirrors the checker's monitored set).
         "monitored": False,
         "active_api": True,
+        "probe_functions": (
+            ("notion-journal-ingestion", "Notion"),
+            ("journal-enrichment", "Journal Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
         "qa_tier": "optional",
-        "method": "API pull (journal database), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641)
+        "method": "API pull (journal database), 3x daily",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",
         # #476/X-7: raw archive added — date-tree with a per-page suffix
@@ -1175,9 +1310,14 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless RSS pull; flip True once the channel id is live
+        "probe_functions": (
+            ("youtube-social-ingestion", "YouTube"),
+            ("social-enrichment", "Social Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        "method": "Keyless per-channel RSS pull (framework), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
+        "method": "Keyless per-channel RSS pull (framework), 2x daily",
         "metrics": "Video posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
         # #1682 follow-up: deliberately NO capture_channel. YouTube is a scheduled,
@@ -1218,9 +1358,14 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,  # registry-resident until the handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public AppView pull; flip True once the handle is live
+        "probe_functions": (
+            ("bluesky-social-ingestion", "Bluesky"),
+            ("social-enrichment", "Social Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        "method": "Keyless public AppView pull (framework), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
+        "method": "Keyless public AppView pull (framework), 2x daily",
         "metrics": "Posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
         # Deliberately NO capture_channel — same #1682 rationale as youtube: a
@@ -1257,9 +1402,14 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
         "active_api": False,  # keyless public REST pull; flip True once the account is live
+        "probe_functions": (
+            ("mastodon-social-ingestion", "Mastodon"),
+            ("social-enrichment", "Social Enrichment"),
+        ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        "method": "Keyless public REST pull (framework), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
+        "method": "Keyless public REST pull (framework), 2x daily",
         "metrics": "Posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
         # Deliberately NO capture_channel — same #1682 rationale as youtube.
@@ -1292,6 +1442,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "behavioral": False,
         "stale_hours": None,
         "active_api": True,
+        "probe_functions": (("weather-data-ingestion", "Weather"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": None,
         "method": "Open-Meteo API pull, 2x daily",
@@ -1398,9 +1549,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "freshness": False,
         "partition": False,  # a transport pipe — its tracker partition is SYSTEM_STATE
         "active_api": True,
+        "probe_functions": (("dropbox-poll", "Dropbox Poll"),),  # #4643: the daily boot probe's targets
         "expected_days": None,
         "qa_tier": None,
-        "method": "Dropbox API poll (MacroFactor CSV transport)",
+        # cadence reason (internal, kept out of the published method text): was every 30 min; 6 of 672 polls found a file (#4641)
+        "method": "Dropbox API poll every 2 hours (MacroFactor CSV transport)",
         "metrics": None,
         "posture": "load-bearing",  # nutrition's transport
         "raw_layout": None,
@@ -1916,6 +2069,25 @@ def best_effort_source_ids() -> set:
     return {k for k, v in SOURCE_REGISTRY.items() if v.get("best_effort")}
 
 
+def health_probe_targets() -> list:
+    """[(function_name, display_name, source_id)] for the daily boot probe (#4643).
+
+    Derived from every source's `probe_functions` facet, in registry order, each
+    function once (the first source naming it owns it). Paused sources stay IN the
+    list — the probe reports them `paused` by the same facet and never invokes them —
+    so the status page keeps showing the off-by-design row. Replaces the hand-written
+    pipeline_health_check.PIPELINES ingestion rows."""
+    seen: set = set()
+    out: list = []
+    for key, entry in SOURCE_REGISTRY.items():
+        for fn_name, display in entry.get("probe_functions") or ():
+            if fn_name in seen:
+                continue
+            seen.add(fn_name)
+            out.append((fn_name, display, key))
+    return out
+
+
 def reconciliation_sources() -> list:
     """[(key, expected_days_per_week, desc)] for gap reconciliation over source
     partitions. Replaces the source rows of data_reconciliation.SOURCES (the
@@ -1929,6 +2101,12 @@ def provider_reconcile_source_ids() -> list:
     provider-API diff that catches a silent drop the DDB high-water mark hides.
     garmin is deliberately absent (ADR-123 — rate-limited/paused, not worth it)."""
     return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("provider_reconcile"))
+
+
+# #4638: the `upstream_changes` facet's vocabulary and the set that must state it.
+UPSTREAM_CHANGE_BEHAVIOURS = ("any_age", "inside_window", "not_propagated")
+UPSTREAM_CHANGE_STANDINGS = ("stated_default", "accepted")
+UPSTREAM_CHANGES_REQUIRED = ("apple_health", "hevy", "macrofactor", "strava", "whoop", "withings")
 
 
 def oauth_source_ids() -> list:

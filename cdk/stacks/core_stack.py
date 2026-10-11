@@ -1,5 +1,5 @@
 """
-CoreStack — Shared infrastructure: SQS DLQ, SNS alerts, budget.
+CoreStack — Shared infrastructure: SQS DLQ, SNS alerts, budget, the Bedrock batch service role.
 
 DynamoDB and S3 are deliberately NOT CDK-managed (stateful resources).
 SQS DLQ and SNS topic are CDK-managed via `cdk import` (first time).
@@ -17,6 +17,7 @@ from aws_cdk import (
     Stack,
     aws_budgets as budgets,
     aws_dynamodb as dynamodb,
+    aws_iam as iam,
     aws_s3 as s3,
     aws_sns as sns,
     aws_sqs as sqs,
@@ -178,6 +179,56 @@ class CoreStack(Stack):
             notifications_with_subscribers=_budget_notifications,
         )
 
+        # ── Bedrock batch service role (#4777, ADR-132 as amended 2026-10-11) ──
+        # The role Bedrock assumes to run a CreateModelInvocationJob: read the staged
+        # JSONL and write results, ONLY under the private `bedrock-batch/` prefix
+        # (`lambdas/ai/bedrock_batch.BATCH_PREFIX` — never under `generated/`, which
+        # is anonymously readable at the origin). The trust is pinned to this
+        # account's model-invocation jobs (confused-deputy guard). InvokeModel on the
+        # Claude profiles/models: a job submitted against a cross-region inference
+        # profile is run by Bedrock as this role. No Lambda role gains batch rights
+        # here — the caller today is the operator's own credentials.
+        _batch_prefix = "bedrock-batch/"
+        self.bedrock_batch_role = iam.Role(
+            self,
+            "BedrockBatchServiceRole",
+            role_name="life-platform-bedrock-batch",
+            description="Bedrock batch inference service role (#4777): bedrock-batch/ prefix only",
+            assumed_by=iam.ServicePrincipal(
+                "bedrock.amazonaws.com",
+                conditions={
+                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "ArnLike": {"aws:SourceArn": f"arn:aws:bedrock:{self.region}:{self.account}:model-invocation-job/*"},
+                },
+            ),
+        )
+        self.bedrock_batch_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="BatchStagingObjects",
+                actions=["s3:GetObject", "s3:PutObject"],
+                resources=[self.bucket.arn_for_objects(f"{_batch_prefix}*")],
+                conditions={"StringEquals": {"aws:ResourceAccount": self.account}},
+            )
+        )
+        self.bedrock_batch_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="BatchStagingList",
+                actions=["s3:ListBucket"],
+                resources=[self.bucket.bucket_arn],
+                conditions={"StringLike": {"s3:prefix": [f"{_batch_prefix}*"]}},
+            )
+        )
+        self.bedrock_batch_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="BatchInvokeClaude",
+                actions=["bedrock:InvokeModel"],
+                resources=[
+                    f"arn:aws:bedrock:*:{self.account}:inference-profile/us.anthropic.claude-*",
+                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+                ],
+            )
+        )
+
         # ── Outputs ──
         cdk.CfnOutput(self, "TableName", value=self.table.table_name)
         cdk.CfnOutput(self, "BucketName", value=self.bucket.bucket_name)
@@ -185,3 +236,4 @@ class CoreStack(Stack):
         cdk.CfnOutput(self, "DlqArn", value=self.dlq.queue_arn)
         cdk.CfnOutput(self, "AlertsTopicArn", value=self.alerts_topic.topic_arn)
         cdk.CfnOutput(self, "DigestTopicArn", value=self.digest_topic.topic_arn)
+        cdk.CfnOutput(self, "BedrockBatchRoleArn", value=self.bedrock_batch_role.role_arn)
