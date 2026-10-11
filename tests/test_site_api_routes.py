@@ -125,7 +125,10 @@ def test_dispatch_call_exists_in_handler():
 _sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 from coach import persona_registry as _personas  # noqa: E402
-from web import site_api_edition as _ed  # noqa: E402
+from web import (
+    edition_page_reads as _reads,  # noqa: E402
+    site_api_edition as _ed,  # noqa: E402
+)
 from web.prediction_reason import metric_words as _metric_words  # noqa: E402
 
 _WIRE = os.path.join(ROOT, "tests", "fixtures", "edition_wire_4582")
@@ -251,6 +254,11 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
         "decisions": {"his_words", "life.mind", "scorecard.mind"},
         # #4584: either source failing is a failed read of his words
         "owner_words": {"his_words", "life.mind", "scorecard.mind"},
+        # #4582 box 1: the reads the front page and the week page made beside the edition
+        "moves": {"moves"},
+        "calls": {"calls"},
+        "character": {"sheet"},
+        "priority": {"lead_read"},
     }
     offenders = []
     for key, fed in feeds.items():
@@ -277,6 +285,75 @@ def test_edition_one_upstream_failing_leaves_only_its_block_unavailable():
     # A degraded 200 (a fallback payload from inside an except, #2686) is a failed read too.
     assert _ed.body_of({"statusCode": 200, "body": _json.dumps({"_meta": {"degraded": {"reason": "x"}}, "coaches": []})}) is None
     assert not offenders, offenders
+
+
+def test_edition_serves_what_the_front_page_read_beside_it():
+    """#4582 box 1: the settled calls, seven days of coach lines, the sheet's level and the
+    lead's weekly read are blocks of the one document — each under the one as_of."""
+    wire = _wire()
+    b = _edition(wire)["blocks"]
+    calls = b["calls"]
+    assert calls["state"] == "ok" and calls["source"] == "/api/calls"
+    served = [c for c in wire["calls"]["calls"] if c["settled_date"] <= _CAPTURE_DAY]
+    later = [c for c in wire["calls"]["calls"] if c["settled_date"] > _CAPTURE_DAY]
+    assert later, "the capture has no call settled after the edition's day — the one-as_of filter is untested"
+    assert [c["id"] for c in calls["data"]["calls"]] == [c["id"] for c in sorted(served, key=lambda c: c["settled_date"], reverse=True)]
+    assert calls["as_of"] == max(c["settled_date"] for c in served) <= _CAPTURE_DAY
+    assert all(set(c) <= set(_reads.FRONT_CALL_FIELDS) for c in calls["data"]["calls"])
+    # The sheet: the level and how many areas it is across, dated the edition's day.
+    assert b["sheet"]["state"] == "ok" and b["sheet"]["as_of"] == _CAPTURE_DAY
+    assert set(b["sheet"]["data"]["character"]) == {"level", "composite_pillar_count", "composite_pillar_total"}
+    # The capture's week had no coach line, and the lead had no weekly read: each says so.
+    assert b["moves"]["state"] == "absent" and b["moves"]["absent_text"] == "No coach line is recorded in these seven days."
+    assert b["lead_read"]["state"] == "absent" and b["lead_read"]["data"] is None
+
+
+def test_edition_moves_carry_each_day_as_its_route_serves_it():
+    wire = _wire()
+    days = [dict(d) for d in wire["moves"]["days"]]
+    line = {
+        "coach_id": "sleep_coach",
+        "coach": "Lisa Park",
+        "move": "ask",
+        "move_label": "An ask",
+        "text": "Bed by ten.",
+        "replies_to": None,
+        "bet_settles": None,
+    }
+    days[2] = {**days[2], "state": "ok", "lines": [line]}
+    # A day outside the window (the route never serves it for this edition) is dropped.
+    days.append({**days[0], "date": "2026-09-20", "state": "ok", "lines": [line]})
+    block = _edition({**wire, "moves": {"days": days}})["blocks"]["moves"]
+    assert block["state"] == "ok" and block["as_of"] == days[2]["date"]
+    assert [d["date"] for d in block["data"]["days"]] == [
+        f"2026-{d}" for d in ("10-03", "10-02", "10-01", "09-30", "09-29", "09-28", "09-27")
+    ]
+    # Read through the route with no date (read_bodies without its narrow readers): one day.
+    one = _edition({**wire, "moves": days[0]})["blocks"]["moves"]
+    assert one["state"] == "absent"
+    # Every day's read failing is a failed read, not a silent week.
+    down = [{"state": "unavailable", "date": d["date"], "lines": []} for d in wire["moves"]["days"]]
+    assert _edition({**wire, "moves": {"days": down}})["blocks"]["moves"]["state"] == "unavailable"
+
+
+def test_edition_reads_seven_days_of_moves_and_a_failed_day_is_never_an_empty_one():
+    """``read_moves``: one in-process read of /api/coach_moves per day, the edition's day first;
+    a day whose read failed is the route's own unavailable body, not a day nobody spoke."""
+    asked = []
+
+    def read(path, qs):
+        asked.append((path, dict(qs)))
+        if qs["date"] == "2026-10-01":
+            return {"statusCode": 503, "body": _json.dumps({"error": "x"})}
+        return {"statusCode": 200, "body": _json.dumps({"state": "absent", "date": qs["date"], "lines": []})}
+
+    got = _reads.read_moves(read, _CAPTURE_DAY)
+    days = [d["date"] for d in got["days"]]
+    assert asked == [("/api/coach_moves", {"date": d}) for d in days]
+    assert days == ["2026-10-03", "2026-10-02", "2026-10-01", "2026-09-30", "2026-09-29", "2026-09-28", "2026-09-27"]
+    failed = got["days"][2]
+    assert failed["state"] == "unavailable" and failed["absent_text"].endswith("are not served right now.")
+    assert _edition({**_wire(), "moves": got})["blocks"]["moves"]["state"] == "absent"
 
 
 def test_edition_coach_texts_from_different_days_are_each_dated():

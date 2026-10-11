@@ -213,20 +213,22 @@ def test_a_narrow_reader_that_raises_blanks_exactly_the_keys_it_serves():
         raise RuntimeError("every partition read failed")
 
     bodies = ed.read_bodies(_route_of(wire), read_s3=_s3_of(wire), narrow={"record": boom})
-    assert [k for k in ed.SOURCES if bodies[k] is None] == ["predictions", "calibration"]
+    # #4582 box 1: the calls ride the record's sweep, so they go down with it — and nothing else does.
+    assert [k for k in ed.SOURCES if bodies[k] is None] == ["predictions", "calibration", "calls"]
     doc = _compose(bodies)
     assert doc["blocks"]["record"]["state"] == "unavailable" and doc["blocks"]["record"]["data"] is None
+    assert doc["blocks"]["calls"]["state"] == "unavailable" and doc["blocks"]["calls"]["data"] is None
     assert doc["blocks"]["scorecard"]["data"]["rows"]["ai"]["state"] == "unavailable"  # #4595: the AI row reads the record
     baseline = _compose(wire)
-    assert all(doc["blocks"][n] == baseline["blocks"][n] for n in doc["blocks"] if n not in ("record", "scorecard"))
+    assert all(doc["blocks"][n] == baseline["blocks"][n] for n in doc["blocks"] if n not in ("record", "scorecard", "calls"))
 
 
 def test_a_narrow_reader_replaces_its_routes_and_nothing_else():
     wire = _wire()
     seen = []
-    narrow_body = {"predictions": wire["predictions"], "calibration": wire["calibration"]}
+    narrow_body = {"predictions": wire["predictions"], "calibration": wire["calibration"], "calls": wire["calls"]}
     bodies = ed.read_bodies(_route_of(wire, seen.append), read_s3=_s3_of(wire), narrow={"record": lambda: narrow_body})
-    assert sorted(seen) == sorted(k for k in ed.SOURCES if k not in ed._S3_KEYS and k not in ("predictions", "calibration"))
+    assert sorted(seen) == sorted(k for k in ed.SOURCES if k not in ed._S3_KEYS and k not in ("predictions", "calibration", "calls"))
     assert json.dumps(_compose(bodies)) == json.dumps(_compose(wire))
     for job, keys in ed.NARROW_JOBS.items():
         assert set(keys) <= set(ed.SOURCES), f"{job} serves a key SOURCES does not have"
@@ -320,10 +322,18 @@ def test_the_narrow_record_reader_serves_the_same_record_as_the_two_whole_routes
     assert whole_predictions is not None and whole_calibration is not None
     whole = _record_block(whole_predictions, whole_calibration)
 
+    whole_calls = ed.body_of(coach_api.handle_calls({}))
+    assert whole_calls is not None
+
     del projections[:]
     narrow = coach_api.edition_record()
-    assert set(projections) == {ledger._RECORD_PROJECTION_FIELDS}, "the narrow reader did not ask for its narrow projection"
+    # #4582 box 1: ONE sweep, at the calls route's own projection, feeds the record and the calls.
+    assert set(projections) == {tuple(ledger._PREDICTION_PROJECTION_FIELDS)}, "the edition's sweep is not the calls route's own read"
+    assert len(projections) == len(ledger._CALIB_COACH_NAMES), "the edition read a coach partition twice, or skipped one"
     assert set(narrow) == set(ed.NARROW_JOBS["record"])
+    # The calls are the route's own document, field for field — over rows it really graded.
+    assert narrow["calls"]["excluded"]["count"] > 0, "the fixture's rows never reached the calls composition"
+    assert json.dumps(narrow["calls"], sort_keys=True) == json.dumps({k: v for k, v in whole_calls.items() if k != "_meta"}, sort_keys=True)
 
     # The fixture exercises the record: 5 right of 8 decided this cycle (the docket's three
     # rows are one call; the archived, tombstoned and pre-genesis calls are not this cycle's).
@@ -341,8 +351,36 @@ def test_the_narrow_record_reader_serves_the_same_record_as_the_two_whole_routes
     assert narrow["calibration"]["as_of"] == whole_calibration["as_of"]
 
 
-def test_the_narrow_projection_stays_inside_the_routes_projection():
-    assert set(ledger._RECORD_PROJECTION_FIELDS) < set(ledger._PREDICTION_PROJECTION_FIELDS)
+#: The fields the record line is computed from (#4607): the identity and cycle keys
+#: ``coach_record`` reads, and the grade and the Brier pair. The edition reads them in the
+#: calls route's sweep (#4582), so that projection must carry every one.
+_RECORD_FIELDS = ("status", "outcome", "confidence", "tombstone", "phase", "prediction_id", "outcome_date")
+
+
+def test_the_record_fields_are_inside_the_sweeps_projection():
+    assert set(_RECORD_FIELDS) < set(ledger._PREDICTION_PROJECTION_FIELDS)
+
+
+def test_a_partial_partition_failure_serves_the_record_and_withholds_the_calls(monkeypatch):
+    """One coach partition failing: the record is served degraded (#4607's rule, unchanged)
+    and the calls are None — the calls route's own rule, so the block prints its sentence."""
+    monkeypatch.setattr(coach_api, "EXPERIMENT_START", _GENESIS)
+    rows = _ledger_rows()
+    good = _projected_table(rows, [])
+
+    def one_down(table, **kw):
+        expr = kw["KeyConditionExpression"].get_expression()
+        pk = expr["values"][0].get_expression()["values"][1]
+        if pk == "COACH#mind_coach":
+            raise RuntimeError("one partition is down")
+        return good._query_hook(table, **kw)
+
+    monkeypatch.setattr(coach_api, "table", FakeDdbTable(query_hook=one_down))
+    narrow = coach_api.edition_record()
+    assert narrow["calls"] is None
+    assert narrow["predictions"]["overall"]["decided"] > 0
+    doc = _compose({**_wire(), **narrow})
+    assert doc["blocks"]["calls"]["state"] == "unavailable" and doc["blocks"]["record"]["state"] == "ok"
 
 
 def test_the_narrow_record_reader_raises_when_every_partition_read_fails(monkeypatch):
@@ -447,7 +485,7 @@ def test_the_edition_marks_every_read_it_makes(monkeypatch):
 
 # The second place the ceiling lives. Raising SOURCE_COST_CEILING_MS in the module without
 # changing this line is red; changing both is the explicit, reviewed budget change (#4607).
-REVIEWED_CEILING_MS = 1435
+REVIEWED_CEILING_MS = 2369  # #4582 box 1 raised it from 1435: the front page's ten other reads folded in (see the module)
 
 
 def latency_budget_offences(sources=None, costs=None, ceiling=None):
