@@ -7,10 +7,18 @@
 // saying the rule is not available instead of a tag. No other file builds the kit's
 // `ck-verdicts__tag` (tests/js/ck_verdict_4647.test.mjs holds that).
 //
-// The rule is read from the served sentences of GET /api/calls and nowhere else: the route
-// writes "A call like this counts as right within 22.5 either way" into `called`, and this
-// file lifts that phrase. Nothing is computed, rounded or assumed; a sentence this file
-// cannot read yields no rule, and the page says so.
+// The rule is read from GET /api/calls and nowhere else. A number call's allowed distance is
+// served ONCE, in `tolerance` (#4808: the number as printed, and in words the statistic and
+// window it was computed from); a route deployed before that wrote it into `called` ("counts
+// as right within 22.5 either way"), and this file still lifts that phrase when `tolerance`
+// is absent. Nothing is computed, rounded or assumed.
+//
+// THE HOUSE RULE (#4808), one builder for every page that prints a graded call —
+// `callCardHTML`: the tag first (the verdict and its rule: the rule is said HERE and nowhere
+// else on the card), then the call with the RESULT in bold, then one soft line (what the
+// allowed distance is, in words; the day it was graded on; the door). And a call whose rule
+// cannot be read is never shown as right or wrong: the tag is "", the card is "", and the
+// pickers skip it and say how many they skipped (`ruleless`).
 import { esc } from "/assets/js/evidence_shared.js";
 
 const MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
@@ -28,8 +36,18 @@ const betQuestion = (call) => {
 
 /** The allowed distance of a number call, as served: "22.5", "1.2 hours". "" when none. */
 export function toleranceText(call) {
-  const m = call && call.kind === "number" ? RE_WITHIN.exec(String(call.called || "")) : null;
+  if (!call || call.kind !== "number") return "";
+  const t = call.tolerance && typeof call.tolerance.text === "string" ? call.tolerance.text.trim() : "";
+  if (t) return t;
+  const m = RE_WITHIN.exec(String(call.called || ""));
   return m ? m[1].trim() : "";
+}
+/** What the allowed distance is, in the route's words: "The allowed distance is one standard
+ *  deviation of his readings over the 30 days before the call." "" when not served —
+ *  the number in the tag still stands, and no wording is guessed. */
+export function toleranceNote(call) {
+  const st = call && call.kind === "number" && call.tolerance && typeof call.tolerance.statistic === "string" ? call.tolerance.statistic.trim() : "";
+  return st ? `The allowed distance is ${st.replace(/[.\s]+$/, "")}.` : "";
 }
 
 /** The rule that decided a verdict on this call, in the route's own words. `right` is the
@@ -53,25 +71,71 @@ export function ruleFor(call, right) {
 }
 
 /** The verdict and its rule as plain text: "Right · within 22.5 either way". With no rule
- *  it is a sentence that says so, never the bare word. `label` names whose verdict it is
+ *  it is "" — never the bare word, and never "marked wrong" with the rule missing (#4808: a
+ *  verdict a reader cannot check is not printed at all). `label` names whose verdict it is
  *  when it is not the coach's ("The simple guess"). */
 export function verdictText(right, rule, label = "") {
-  const word = right ? "right" : "wrong";
   const r = String(rule || "").trim();
-  if (!r) return `${label ? `${label} was marked` : "Marked"} ${word}. The rule that decided it is not available for this call.`;
-  return `${label ? `${label}: ${word}` : right ? "Right" : "Wrong"} · ${r}`;
+  if (!r) return "";
+  return `${label ? `${label}: ${right ? "right" : "wrong"}` : right ? "Right" : "Wrong"} · ${r}`;
 }
 
-/** The kit's verdict tag, always with its rule. No rule: a soft sentence, not a tag. */
+/** The kit's verdict tag, always with its rule. No rule: "" — the caller shows no verdict. */
 export function verdictTag(right, rule, label = "") {
-  const text = esc(verdictText(right, rule, label));
-  if (!String(rule || "").trim()) return `<span class="ck-soft">${text}</span>`;
-  return `<span class="ck-verdicts__tag${right ? " ck-verdicts__tag--right" : ""}">${text}</span>`;
+  const text = verdictText(right, rule, label);
+  if (!text) return "";
+  return `<span class="ck-verdicts__tag${right ? " ck-verdicts__tag--right" : ""}">${esc(text)}</span>`;
 }
 
 /** The tag for one settled call from /api/calls, on the call's own verdict. */
 export const callVerdictTag = (call) => verdictTag(call.verdict === "right", ruleFor(call, call.verdict === "right"));
 export const callVerdictText = (call) => verdictText(call.verdict === "right", ruleFor(call, call.verdict === "right"));
+/** Whether a settled call can be shown as a verdict: it has a rule a reader can read. A bet's
+ *  rule is its question. */
+export const hasRule = (call) => Boolean(call && ruleFor(call, call.verdict === "right"));
+/** "2 settled calls have no rule the page can print, so they are not shown as right or wrong
+ *  here." for the calls a picker skipped; "" for none. (Not a record count — the record and
+ *  its comparison are said elsewhere on the page, #4585.) */
+export function ruleless(n) {
+  const k = Number(n) || 0;
+  if (k < 1) return "";
+  return `${k === 1 ? "One settled call has" : `${k} settled calls have`} no rule the page can print, so ${k === 1 ? "it is" : "they are"} not shown as right or wrong here.`;
+}
+
+/** A pair of cards whose allowed distances were all computed the same way says so ONCE, under
+ *  the pair, instead of once per card: "Each allowed distance is one standard deviation of …".
+ *  "" when the shown number calls disagree or none serves its statistic — then each card says
+ *  its own (`note: true`). */
+export function sharedToleranceNote(calls) {
+  const stats = (calls || []).filter((c) => c && c.kind === "number").map((c) => (c.tolerance && typeof c.tolerance.statistic === "string" ? c.tolerance.statistic.trim() : ""));
+  if (stats.length < 2 || !stats[0] || stats.some((x) => x !== stats[0])) return "";
+  return `Each allowed distance is ${stats[0].replace(/[.\s]+$/, "")}.`;
+}
+
+/** THE card for one settled call — the house rule (#4808), the same on the front page, the
+ *  coaches page, a coach's page and a day page: the tag (verdict and rule) first; then the call
+ *  with the RESULT in bold; then one soft line — what the allowed distance is in words, then
+ *  `when` (the page's own dating), then the door. "" for a call with no readable rule or no
+ *  sentences: it is never shown as a verdict. Options:
+ *    full     the call's whole sentence (`called`, with its gloss) instead of `called_short`
+ *    when     the page's dating sentence, e.g. "Graded on the reading for October 9."
+ *    extra    one more soft sentence (the front page's simple guess)
+ *    href     the call's own page; linkText its words
+ *    wrap     "div" (a card in a .ck-verdicts pair), "li" (a day page's row) or "" (inside a
+ *             card the caller already drew)
+ *    note     false when the caller prints `sharedToleranceNote` once under a pair */
+export function callCardHTML(call, { full = false, when = "", extra = "", href = "", linkText = "The whole call", wrap = "div", note = true } = {}) {
+  if (!call || call.kind === "bet") return "";
+  const tag = callVerdictTag(call);
+  const said = String((full && call.called) || call.called_short || "").trim();
+  const result = String(call.happened_short || "").trim();
+  if (!tag || !said || !result) return "";
+  const soft = [note ? toleranceNote(call) : "", String(when || "").trim(), String(extra || "").trim()].filter(Boolean).join(" ");
+  const door = href ? `<a class="ck-link" href="${esc(href)}">${esc(linkText)}</a>` : "";
+  const softHTML = soft || door ? `<p class="ck-soft">${esc(soft)}${soft && door ? " " : ""}${door}</p>` : "";
+  const inner = `${tag}<p>${esc(said)} <b>${esc(result)}</b></p>${softHTML}`;
+  return wrap ? `<${wrap}>${inner}</${wrap}>` : inner;
+}
 
 /** A card heading in the tag's type that is NOT a verdict ("The simple guess", before it is
  *  checked). It refuses a verdict word, so it cannot be used to print one bare. */
@@ -133,7 +197,8 @@ export function missBy(call) {
  *  missed by the most allowed distances. Ties go to the newer call (the list arrives
  *  newest first). With no number call of a kind, the newest call of that kind stands in. */
 export function showcasePair(calls) {
-  const list = (Array.isArray(calls) ? calls : []).filter((c) => c && c.kind !== "bet");
+  // A call with no readable rule is never a verdict on a page (#4808), so it is never picked.
+  const list = (Array.isArray(calls) ? calls : []).filter((c) => c && c.kind !== "bet" && hasRule(c));
   const best = (verdict, score, wantHigh) => {
     const of = list.filter((c) => c.verdict === verdict);
     let pick = null;

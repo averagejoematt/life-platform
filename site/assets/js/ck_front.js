@@ -443,14 +443,22 @@ export function jobsByName(days) {
   for (const l of argumentLines(days)) if (l.coach_id && SHORT_JOBS[l.coach_id] && !out[l.coach]) out[l.coach] = SHORT_JOBS[l.coach_id];
   return out;
 }
-// "Nathan Reeves (mind) says no. Marcus Webb (food) says yes." — the job only when known.
-export function betSidesLine(bet, jobs = {}) {
-  if (!usable(bet)) return "";
+// One sentence per side: "Nathan Reeves (mind) says no: “Fuel-cognition link may be slower than
+// estimated”." — the job only when known, and the coach's reason (#4809: the opening position
+// from the docket row, one clause in its served words, `sides[].reason`) only when served. A
+// side with no reason is the side alone; nothing is written in a coach's voice here.
+export function betSidesLines(bet, jobs = {}) {
+  if (!usable(bet)) return [];
   return (bet.data.sides || [])
     .filter((s) => s && s.coach)
-    .map((s) => `${s.coach}${jobs[s.coach] ? ` (${jobs[s.coach]})` : ""} says ${s.says}.`)
-    .join(" ");
+    .map((s) => {
+      const who = `${s.coach}${jobs[s.coach] ? ` (${jobs[s.coach]})` : ""} says ${s.says}`;
+      const why = typeof s.reason === "string" ? s.reason.trim() : "";
+      return why ? `${who}: “${why}”.` : `${who}.`;
+    });
 }
+// The sides as one line: "Nathan Reeves (mind) says no. Marcus Webb (food) says yes."
+export const betSidesLine = (bet, jobs = {}) => betSidesLines(bet, jobs).join(" ");
 // The newest line the coaches said in the window, minus any the page already printed, as one
 // dated row — what the Today band shows when no coach spoke today. "" with nothing left.
 // A short line is preferred (round 8b: the one coach voice on the front page was its hardest

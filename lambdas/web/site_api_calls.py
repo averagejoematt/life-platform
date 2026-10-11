@@ -134,6 +134,17 @@ _GLOSS = {
     "blood_glucose_std_dev": "how much his blood sugar moves around",
 }
 _COMPARE_WORDS = {"lt": "below", "lte": "at or below", "gt": "above", "gte": "at or above"}
+
+#: #4808: a score out of 100 is said as a whole number in ``called``, ``called_short`` and
+#: ``happened_short`` ("about 65", never "about 64.7" on a score read in whole points). The
+#: stored prediction keeps its decimals, and a bet's threshold is never rounded (it is the
+#: question the bet fixed, so "81.6 or higher" stays 81.6).
+WHOLE_SCORES = frozenset({"recovery_score", "sleep_score"})
+
+#: The rule string ``coach.prediction_emission.point_tolerance_from_series`` freezes into every
+#: point spec: "±1 SD of the trailing 30-day personal series (n=31 readings, SD=17.9029)".
+#: Measured 2026-10-11 (read-only, every coach partition): all 63 point rows carry this form.
+_TOLERANCE_RULE_RE = re.compile(r"±1 SD of the trailing (?P<days>\d+)-day personal series \(n=(?P<n>\d+) readings")
 _DIRECTION_WORDS = {"up": "up", "down": "down"}
 
 
@@ -193,6 +204,63 @@ def _amount(value: Any, metric: Any) -> str | None:
     if num is None:
         return None
     return f"{num}{prediction_reason._UNITS.get(base_metric(str(metric or '')), '')}"
+
+
+def _whole(value: Any) -> int | None:
+    """Half-up to a whole number (``round`` is half-even: 64.5 would read 64)."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(f + 0.5) if f >= 0 else -int(-f + 0.5)
+
+
+def _said(value: Any, metric: Any) -> str | None:
+    """A number as a page says it: whole on a score out of 100 (#4808), else ``_amount``."""
+    if base_metric(str(metric or "")) in WHOLE_SCORES:
+        whole = _whole(value)
+        return None if whole is None else str(whole)
+    return _amount(value, metric)
+
+
+def said_pair(want: Any, seen: Any, tolerance: Any, metric: Any, coach_right: bool) -> tuple[str | None, str | None]:
+    """The called and the measured number as the page prints them (#4808).
+
+    Whole numbers on a score out of 100 — UNLESS the whole numbers would make a reader's own
+    check (the distance between the two, against the allowed distance as printed) disagree
+    with the verdict: a call of 64.4 against 82 with 17.7 allowed is a hit (17.6), but "64"
+    against 82 reads as a miss (18). Then both keep their one decimal — rounding is never
+    allowed to change what a reader recomputes."""
+    exact = (_amount(want, metric), _amount(seen, metric))
+    if base_metric(str(metric or "")) not in WHOLE_SCORES:
+        return exact
+    w, s = _whole(want), _whole(seen)
+    if w is None or s is None:
+        return exact
+    shown = prediction_reason._num(tolerance)
+    if shown is not None and (abs(s - w) <= float(shown)) != coach_right:
+        return exact
+    return str(w), str(s)
+
+
+def tolerance_block(spec: dict) -> dict | None:
+    """The allowed distance of a number call, served ONCE per call (#4808): the number as the
+    tag prints it, and in words the statistic and window it was computed from, read off the
+    rule string frozen into the spec at emission. ``statistic`` is None when the rule string is
+    not the emitter's form — the number still stands; no wording is guessed."""
+    metric = spec.get("metric")
+    text = _amount(spec.get("tolerance"), metric)
+    if not text:
+        return None
+    m = _TOLERANCE_RULE_RE.search(str(spec.get("tolerance_rule") or ""))
+    days, n = (int(m["days"]), int(m["n"])) if m else (None, None)
+    return {
+        "value": float(spec["tolerance"]),
+        "text": text,
+        "statistic": f"one standard deviation of his readings over the {days} days before the call" if m else None,
+        "window_days": days,
+        "n": n,
+    }
 
 
 def _names_measure(text: str, metric: Any) -> bool:
@@ -283,7 +351,7 @@ def simple_guess(baseline: Any, kind: str | None, *, coach_right: bool, metric: 
             "short": "could not be checked on this call",
         }
     right = bool(baseline["right"])
-    filed = _amount(baseline.get("filed_value"), metric)
+    filed = _said(baseline.get("filed_value"), metric)
     if kind == "direction":
         said = "The simple guess was that it would not move."
     elif kind == "number" and filed:
@@ -326,18 +394,23 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
     metric = spec.get("metric")
     subject, plain = _subject(metric), _subject(metric, gloss=False)
     actual = None
+    tolerance = None
+    coach_right = status == "confirmed"
+    happened = f"{reason}."
     if kind == "number":
-        want, seen = _amount(spec.get("threshold"), metric), _amount(notes.get("actual_value"), metric)
+        want, seen = said_pair(spec.get("threshold"), notes.get("actual_value"), spec.get("tolerance"), metric, coach_right)
         if not want or not seen:
             return None, NO_READER_WORDS
         target = _iso_day(spec.get("target_date"))
         on = f" for {_words(target)}" if target else ""
-        margin = _amount(spec.get("tolerance"), metric)
+        # #4808: the allowed distance is NOT in this sentence any more. It is served once, in
+        # ``tolerance`` (the number and, in words, what it was computed from), and the kit
+        # prints it once — in the verdict's tag — so no page says it twice.
+        tolerance = tolerance_block(spec)
         called = f"{name} called {subject} at about {want}{on}."
-        if margin:
-            called += f" A call like this counts as right within {margin} either way, his usual day-to-day swing."
         called_short = f"{name} called {plain} at about {want}."
         happened_short = f"It came in at {seen}."
+        happened = f"{prediction_reason._cap(str(plain))} came in at {seen} against a call of {want}."
         actual = {"value": notes.get("actual_value"), "text": seen}
     else:
         direction = _DIRECTION_WORDS[str(spec.get("condition")).strip().lower()]
@@ -353,7 +426,6 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         called_short = f"{name} called {plain} to go {direction}."
     sealed = bool(row.get("pre_registered"))
     logged = (pacific_date_of(row.get("pre_registered_at")) if sealed else None) or _iso_day(row.get("created_date"))
-    coach_right = status == "confirmed"
     guess = simple_guess(row.get("baseline"), kind, coach_right=coach_right, metric=metric)
     return (
         {
@@ -367,14 +439,15 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
             "settled_date": _iso_day(row.get("outcome_date")),
             "called": called,
             "called_short": called_short,
-            "happened": f"{reason}.",
+            "happened": happened,
             "happened_short": happened_short,
             "actual": actual,
+            "tolerance": tolerance,
             "verdict": "right" if coach_right else "wrong",
             "verdict_text": f"{name} was {'right' if coach_right else 'wrong'}.",
             "simple_guess": guess,
             "records": [record],
-            "title": f"{name} called {plain} {'at about ' + _amount(spec.get('threshold'), metric) if kind == 'number' else 'to go ' + direction}: {'right' if coach_right else 'wrong'}",
+            "title": f"{name} called {plain} {'at about ' + str(want) if kind == 'number' else 'to go ' + direction}: {'right' if coach_right else 'wrong'}",
         },
         None,
     )
@@ -498,7 +571,7 @@ def next_block(today: str, open_dockets: list, pending: list, names: dict) -> di
         if kind is None or not due or due < today or not plain or short_id not in names:
             continue
         if kind == "number":
-            want = _amount(spec.get("threshold"), spec.get("metric"))
+            want = _said(spec.get("threshold"), spec.get("metric"))
             if not want:
                 continue
             q = f"{names[short_id]}’s call that {plain} will be about {want}"

@@ -57,7 +57,11 @@ KIT_PAGES = {
     "/next/v8/week/": 4,  # round 8: the week band moved here whole from the front page
     "/next/v8/start/": 4,
     "/next/v8/story/": 4,
-    "/next/v8/coaches/": 4,
+    # #4808/#4809: the two examples say once what their allowed distance is (its statistic and
+    # window), and the open bet carries each coach's reason in its own words — measured 4.09 on
+    # the committed fixtures after the card dropped its "Settles <day>" line (the question names
+    # the day) and took the "more bets" line inside it. A quarter screen, named, for both.
+    "/next/v8/coaches/": 4.25,
     "/next/v8/day/": 4,
     # The longest a day page gets: eight lifts, three coach lines (the most a day holds) and two
     # settled calls (#4648). What was said and settled is a fifth part of the day, so this one

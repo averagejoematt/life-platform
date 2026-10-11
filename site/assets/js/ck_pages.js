@@ -23,7 +23,7 @@ import { comparisonText } from "/assets/js/coach_comparison.js";
 import * as F from "/assets/js/ck_front.js";
 import { sheetLine } from "/assets/js/ck_sheet.js";
 import { lastCallHTML, lastCallPick, nextCallHTML, withFrom } from "/assets/js/ck_call.js";
-import { verdictTag, callVerdictTag, gradedOnText, showcasePair } from "/assets/js/ck_verdict.js";
+import { verdictTag, callCardHTML, gradedOnText, showcasePair, hasRule, ruleless, sharedToleranceNote } from "/assets/js/ck_verdict.js";
 
 export const MIN_PERCENT_N = 20; // plan §6: never a percentage (or its picture) on fewer items
 
@@ -205,9 +205,15 @@ export function betHTML(nextBlock, { sidesText = "", extra = "", href = "", href
   if (!bet) return absent(nextBlock, "What comes next is not served right now.");
   if (!usable(bet) || !bet.data.question) return absent(bet, "No coach bet is waiting to settle.");
   const b = bet.data;
-  const sides = sidesText || (b.sides || []).filter((s) => s.coach).map((s) => `${s.coach} says ${s.says}.`).join(" ");
+  // #4809: each side on its own line, with the coach's reason when the route serves one. A
+  // string `sidesText` is printed as one line (the caller's own wording).
+  const sides = Array.isArray(sidesText) ? sidesText : sidesText ? [sidesText] : F.betSidesLines(bet);
   const door = href ? `<p><a class="ck-link" href="${esc(href)}">${esc(hrefText)}</a></p>` : "";
-  return `<div class="ck-bet"><p class="ck-small">Settles ${esc(dayInWords(b.settle_date))}</p><p><b>${esc(b.question)}</b></p>${soft(sides)}${soft(extra)}${door}</div>`;
+  // The question names its own day ("… on Monday, October 12?"), so the card's "Settles <day>"
+  // line is printed only when it does not: room for the reasons (#4809), nothing said twice.
+  const day = dayInWords(b.settle_date);
+  const head = day && String(b.question).includes(day) ? "" : `<p class="ck-small">Settles ${esc(day)}</p>`;
+  return `<div class="ck-bet">${head}<p><b>${esc(b.question)}</b></p>${sides.map(soft).join("")}${soft(extra)}${door}</div>`;
 }
 // "Three more bets settle on October 7, 12 and 16." from the served docket, minus the
 // one on the card. "" when there are none.
@@ -311,7 +317,7 @@ export function teamHTML(coachesBody, base = "", from = "") {
 // The newest checked call of each kind, in the coach's own words. Only a call with a plain
 // measured result ("point") shows its number; a direction call's stored result is a slope,
 // which is not a reader's number, so it shows the date alone.
-export function verdictPick(coachesBody) {
+export function verdictPick(coachesBody, ruleOf = null) {
   // A conditional ("If dinner is disrupted…") is graded on its outcome with the condition
   // never checked, so it is no example of a right or a wrong call. A claim that quotes a
   // raw date is machine wording and is passed over too.
@@ -319,25 +325,28 @@ export function verdictPick(coachesBody) {
   const calls = ((coachesBody && coachesBody.coaches) || [])
     .filter((c) => c && c.latest_checked && c.latest_checked.claim && !conditional.test(c.latest_checked.claim) && !/\b20\d\d-\d\d-\d\d\b/.test(c.latest_checked.claim))
     .map((c) => ({ coach: c.name, ...c.latest_checked }));
+  // With `ruleOf`, a call it gives no rule is skipped and counted (#4808).
+  const ruled = ruleOf ? calls.filter((c) => ruleOf(c)) : calls;
+  const skipped = calls.filter((c) => c.status === "confirmed" || c.status === "refuted").length - ruled.filter((c) => c.status === "confirmed" || c.status === "refuted").length;
   const newest = (status) => {
-    const of = calls.filter((c) => c.status === status).sort((a, b) => String(b.outcome_date).localeCompare(String(a.outcome_date)));
+    const of = ruled.filter((c) => c.status === status).sort((a, b) => String(b.outcome_date).localeCompare(String(a.outcome_date)));
     return of.find((c) => c.eval_type === "point" && num(c.actual_value) !== null) || of[0] || null;
   };
-  return { right: newest("confirmed"), wrong: newest("refuted") };
+  return { right: newest("confirmed"), wrong: newest("refuted"), skipped };
 }
+// /api/coaches serves no allowed distance for a number call, so only a direction call has a
+// rule this fallback can print. A call with no printable rule is never shown as right or wrong
+// (#4808): the pick passes over it, and the page says how many it passed over.
+const coachesRule = (call) => (call && call.eval_type === "directional" ? "by the trend in his most recent readings" : "");
 export function verdictsHTML(coachesBody) {
-  const { right, wrong } = verdictPick(coachesBody);
-  if (!right && !wrong) return "";
+  const { right, wrong, skipped } = verdictPick(coachesBody, coachesRule);
+  if (!right && !wrong) return skipped ? soft(ruleless(skipped)) : "";
   const card = (call, tag) => {
-    if (!call) return `<div>${soft(`No call has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
-    // /api/coaches serves no allowed distance for a number call, so only a direction call
-    // has a rule to print here; any other says plainly that its rule is not served.
-    const rule = call.eval_type === "directional" ? "by the trend in his most recent readings" : "";
-    const inRange = call.status === "confirmed" && /interval|range|between/i.test(call.claim) ? ", inside the range given" : "";
-    const result = call.eval_type === "point" && num(call.actual_value) !== null ? `The result was ${Number(call.actual_value.toFixed(1))}${inRange}. ` : "";
-    return `<div>${verdictTag(tag === "Right", rule)}<p><b>${esc(call.coach)}: “${esc(call.claim)}”</b></p>${soft(`${result}Checked ${shortDay(call.outcome_date)}.`)}</div>`;
+    if (!call) return `<div>${soft(`No call with a printable rule has been checked and found ${tag.toLowerCase()} yet.`)}</div>`;
+    // Only a direction call reaches here (its rule is the trend), so there is no number result.
+    return `<div>${verdictTag(tag === "Right", coachesRule(call))}<p>${esc(call.coach)}: “${esc(call.claim)}”</p>${soft(`Checked ${shortDay(call.outcome_date)}.`)}</div>`;
   };
-  return `<div class="ck-verdicts">${card(right, "Right")}${card(wrong, "Wrong")}</div>`;
+  return `<div class="ck-verdicts">${card(right, "Right")}${card(wrong, "Wrong")}</div>${soft(ruleless(skipped))}`;
 }
 
 // The same pair from the settled calls that have a page (GET /api/calls), each a door to
@@ -349,13 +358,16 @@ export function callVerdictsHTML(callsBody, base = "/", from = "") {
   const calls = ((callsBody && callsBody.calls) || []).filter((c) => c && c.id && c.called_short && c.kind !== "bet");
   const { right, wrong } = showcasePair(calls);
   if (!right && !wrong) return "";
+  // What the allowed distance is: once under the pair when both were computed the same way.
+  const shared = sharedToleranceNote([right, wrong]);
   const card = (call, word) => {
     if (!call) return `<div>${soft(`No call with a page has been found ${word} yet.`)}</div>`;
     const day = shortDay(call.settled_date);
     const when = `${gradedOnText(call)} ${day ? `Checked ${day}.` : ""}`.trim();
-    return `<div>${callVerdictTag(call)}<p><b>${esc(call.called_short)}</b> ${esc(call.happened_short || "")}</p><p class="ck-soft">${esc(when ? `${when} ` : "")}<a class="ck-link" href="${esc(withFrom(`${base}call/?id=${encodeURIComponent(call.id)}`, from))}">The whole call</a></p></div>`;
+    return callCardHTML(call, { when, note: !shared, href: withFrom(`${base}call/?id=${encodeURIComponent(call.id)}`, from) });
   };
-  return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>`;
+  const after = [shared, ruleless(calls.filter((c) => !hasRule(c)).length)].filter(Boolean).join(" ");
+  return `<div class="ck-verdicts">${card(right, "right")}${card(wrong, "wrong")}</div>${soft(after)}`;
 }
 
 // ── the catch-up list on the front page ────────────────────────────────────────
@@ -474,7 +486,7 @@ export function frontReadSlots(edition, b, base = "/") {
   if (pick && pick.kind === "bet") {
     // The card in the bet's own terms: each coach with its job, the live number inside the
     // card, and the door to what each one argued (round 8b).
-    out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLine(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet` });
+    out["ck-bet"] = betHTML(b.next, { sidesText: F.betSidesLines(pick.bet, F.jobsByName(moves)), extra: F.betLiveLine(pick.bet, b.week), href: `${base}coaches/#ck-bet` });
   } else if (pick && pick.kind === "reply") {
     out["ck-bet"] = null;
   }
@@ -565,7 +577,7 @@ async function mountCoaches(edition, b) {
   const pair = callVerdictsHTML(calls, base, "coaches");
   fill("ck-verdicts", pair || verdictsHTML(coaches) || soft("No checked call is served right now."));
   const bet = b.next && b.next.data && b.next.data.bet;
-  fill("ck-bet", `${betHTML(b.next)}${soft(moreBetsLine(docket, usable(bet) ? bet.data.settle_date : ""))}`);
+  fill("ck-bet", betHTML(b.next, { extra: moreBetsLine(docket, usable(bet) ? bet.data.settle_date : "") }));
 }
 
 const PAGES = { front: mountFront, week: mountWeek, start: mountStart, story: mountStory, coaches: mountCoaches };

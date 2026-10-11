@@ -334,6 +334,28 @@ def _chapter(journal: dict | None, panelcast: dict | None, today: str, persona_o
     return _block("ok", post["date"], src, "No chapter has been published yet.", data)
 
 
+#: #4809: the longest opening position a bet card carries, in characters. The docket's claims are
+#: clauses joined by semicolons ("X shows only one point; insufficient for …; most parsimonious
+#: …"), so the card takes the FIRST clause, verbatim; one longer than this is not cut mid-clause
+#: — the side is served without a reason and the whole claim stays on /api/coach_docket.
+BET_REASON_MAX_CHARS = 160
+_CLAUSE_END = re.compile(r";|[.!?](?=\s|$)")
+
+
+def bet_reason(claim: Any) -> str | None:
+    """A coach's opening position on a bet as one clause in its served words (#4809), through
+    the SAME honest-text filter and honorific strip as the coach lines. None when there is no
+    claim, when the clause carries a figure the honest-number rules keep off the page, or when
+    the first clause is longer than ``BET_REASON_MAX_CHARS``."""
+    # The honorific goes first: its period would otherwise end the clause.
+    text = _HONORIFIC.sub("", strip_emphasis(str(claim or ""))).strip()
+    end = _CLAUSE_END.search(text)
+    clause = (text[: end.start()] if end else text).strip().rstrip(",:—– ")
+    if not clause or len(clause) > BET_REASON_MAX_CHARS or not honest_text(clause):
+        return None
+    return clause
+
+
 def _next(cadence: dict | None, docket: dict | None, today: str, persona_of, metric_words) -> dict:
     if cadence is None:
         chapter = _unavailable(SOURCES["cadence"], "The chapter schedule")
@@ -362,12 +384,18 @@ def _next(cadence: dict | None, docket: dict | None, today: str, persona_of, met
         else:
             d = due[0]
             sides = d.get("sides") or {}
+            raw_claims = d.get("claims")
+            claims: dict = raw_claims if isinstance(raw_claims, dict) else {}
             data = {
                 "question": bet_question(d.get("criterion") or {}, d["resolution_date"], metric_words),
                 "topic": d.get("topic"),
                 "settle_date": d["resolution_date"],
                 "sides": [
-                    {"coach": plain_name((persona_of(pid) or {}).get("name") or pid), "says": "yes" if sides.get(pid) else "no"}
+                    {
+                        "coach": plain_name((persona_of(pid) or {}).get("name") or pid),
+                        "says": "yes" if sides.get(pid) else "no",
+                        "reason": bet_reason(claims.get(pid)),
+                    }
                     for pid in (d.get("coach_a"), d.get("coach_b"))
                     if pid in sides
                 ],

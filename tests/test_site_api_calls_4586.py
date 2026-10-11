@@ -106,11 +106,14 @@ def test_a_number_call_reads_as_a_sentence_with_the_measure_glossed():
     assert call["kind"] == "number" and call["coach_name"] == "Lisa Park" and call["verdict"] == "right"
     assert call["claim"].startswith("Recovery score is expected to climb back to roughly 61% tomorrow")
     assert call["logged_date"] == "2026-09-07" and call["settled_date"] == "2026-09-21" and call["sealed"] is False
-    assert call["called"] == (
-        "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 8. "
-        "A call like this counts as right within 17.9 either way, his usual day-to-day swing."
+    # #4808: the allowed distance is served once, in `tolerance`, never in the sentence too
+    assert (
+        call["called"]
+        == "Lisa Park called his morning recovery score (his wrist strap’s morning score out of 100) at about 61 for September 8."
     )
-    assert call["happened"] == "Morning recovery score came in at 67 against a call of 61 — within its usual day-to-day range."
+    assert call["happened"] == "His morning recovery score came in at 67 against a call of 61."
+    assert call["tolerance"]["text"] == "17.9" and call["tolerance"]["window_days"] == 30
+    assert call["tolerance"]["statistic"] == "one standard deviation of his readings over the 30 days before the call"
     assert call["happened_short"] == "It came in at 67." and call["actual"] == {"value": 67.0, "text": "67"}
     record = call["records"][0]
     assert {k: record[k] for k in ("state", "right", "n", "through", "text")} == {
@@ -155,7 +158,7 @@ def test_a_number_call_graded_on_another_day_gets_no_page():
     assert _doc()["excluded"]["reasons"][calls.OTHER_DAY] == 5
     for c in _doc()["calls"]:
         if c["kind"] == "number":
-            assert re.search(r" for [A-Z][a-z]+ \d{1,2}\. ", c["called"]), c["called"]
+            assert re.search(r" for [A-Z][a-z]+ \d{1,2}\.$", c["called"]), c["called"]
 
 
 def test_a_direction_call_graded_flat_gets_no_page():
@@ -273,7 +276,7 @@ def test_next_names_the_next_bet_or_call_to_settle_and_its_day():
     first = _doc()["next"]
     assert first["state"] == "ok" and first["as_of"] == "2026-10-04"
     assert first["data"]["kind"] == "number" and first["data"]["coach_names"] == ["Lisa Park"]
-    assert first["data"]["text"] == "Next: Lisa Park’s call that his morning recovery score will be about 90.6 settles Sunday, October 4."
+    assert first["data"]["text"] == "Next: Lisa Park’s call that his morning recovery score will be about 91 settles Sunday, October 4."
     nxt = _doc(today="2026-10-05")["next"]
     assert nxt["state"] == "ok" and nxt["as_of"] == "2026-10-05"
     assert nxt["data"]["kind"] == "bet" and nxt["data"]["coach_names"] == ["Max Reyes", "Lisa Park"]
@@ -429,3 +432,68 @@ def test_the_route_is_registered_and_dispatched():
     from web import site_api_lambda
 
     assert "/api/calls" in site_api_lambda.ROUTES
+
+
+# ── #4808: one house rule for the verdict line ──────────────────────────────────────────
+
+
+def test_the_allowed_distance_is_served_once_with_its_statistic_and_window_and_never_in_the_sentence():
+    numbers = [c for c in _doc()["calls"] if c["kind"] == "number"]
+    assert len(numbers) == 26
+    for c in numbers:
+        tol = c["tolerance"]
+        assert tol["text"] and tol["value"] > 0 and (tol["window_days"], tol["n"]) == (30, tol["n"]) and tol["n"] >= 5
+        assert tol["statistic"] == "one standard deviation of his readings over the 30 days before the call"
+        for field in ("called", "called_short", "happened", "happened_short"):
+            assert "either way" not in c[field] and tol["text"] not in c[field].replace(f"at about {tol['text']}", ""), (c["id"], field)
+            assert "swing" not in c[field] and "day-to-day" not in c[field], (c["id"], field)
+    assert all(c.get("tolerance") is None for c in _doc()["calls"] if c["kind"] != "number")
+
+
+def test_a_tolerance_rule_in_another_form_keeps_its_number_and_guesses_no_words():
+    spec = {"metric": "recovery_score", "tolerance": 18.5929, "tolerance_rule": "±1 SD"}
+    assert calls.tolerance_block(spec) == {"value": 18.5929, "text": "18.6", "statistic": None, "window_days": None, "n": None}
+    assert calls.tolerance_block({"metric": "recovery_score"}) is None
+    hours = calls.tolerance_block(
+        {
+            "metric": "sleep_duration_hours",
+            "tolerance": 1.2,
+            "tolerance_rule": "±1 SD of the trailing 30-day personal series (n=29 readings, SD=1.2)",
+        }
+    )
+    assert hours["text"] == "1.2 hours" and hours["n"] == 29
+
+
+def test_a_score_out_of_100_is_a_whole_number_and_the_stored_call_keeps_its_decimals():
+    doc = _doc()
+    rows = _load("prediction_rows.json")
+    for c in doc["calls"]:
+        if c["kind"] != "number" or "recovery score" not in c["called_short"]:
+            continue
+        for field in ("called", "called_short", "happened_short", "title"):
+            assert not re.search(r"\b(?:about|at) \d+\.\d", c[field]), (c["id"], field, c[field])
+    stored = [
+        r["evaluation"]["threshold"]
+        for rs in rows.values()
+        for r in rs
+        if isinstance(r.get("evaluation"), dict) and r["evaluation"].get("type") == "point"
+    ]
+    assert any(t != int(t) for t in stored), "the stored predictions keep their decimals"
+    # hours, pounds and grams are not scores: their decimal stays
+    assert calls.said_pair(7.8, 7.1, 1.2, "sleep_duration_hours", True) == ("7.8 hours", "7.1 hours")
+    assert calls.said_pair(64.5, 70, 17.9, "recovery_score", True) == ("65", "70"), "half rounds up, not to even"
+
+
+def test_rounding_never_changes_the_verdict_a_reader_recomputes():
+    # 64.4 against 82 with 17.7 allowed is a hit (17.6); "64" against 82 would read as a miss (18)
+    assert calls.said_pair(64.4, 82, 17.7, "recovery_score", True) == ("64.4", "82")
+    # the same numbers graded as a miss keep their whole numbers: 18 > 17.7 agrees with it
+    assert calls.said_pair(64.4, 82, 17.7, "recovery_score", False) == ("64", "82")
+    # every call the route serves: the printed numbers agree with the printed verdict
+    for c in _doc()["calls"]:
+        if c["kind"] != "number":
+            continue
+        want = float(re.search(r"at about (-?[\d.]+)", c["called_short"]).group(1))
+        seen = float(re.search(r"came in at (-?[\d.]+)", c["happened_short"]).group(1))
+        tol = float(c["tolerance"]["text"].split()[0])
+        assert (abs(seen - want) <= tol) == (c["verdict"] == "right"), c["id"]

@@ -91,9 +91,42 @@ SCORECARD_RULE_TEXT = {
         f"When the {MIND_SERVE_LIMIT} newest entries all fall inside the week, the count is not enough data."
     ),
     "ai": (
-        f"The coaches' checked calls against a simple guess that nothing changes from the last reading. "
-        f"Going well when they beat it. Fewer than {AI_MIN_CALLS} checked calls is not enough data."
+        f"Every call the coaches have had checked to date, not this week's alone, against a simple guess that nothing changes "
+        f"from the last reading. Going well when they beat it. Fewer than {AI_MIN_CALLS} checked calls is not enough data."
     ),
+}
+
+# #4809: the words a row's verdict prints, in the row's own terms — one entry per (area, what
+# happened), chosen in code by the scorer below. The four verdicts stay the dot's (and
+# ``verdict``'s) vocabulary; they are never the printed words, because "Not yet." over "Trained
+# on 7 of 7 days recorded." read as nonsense: that rule's fault is too MUCH training, not too
+# little. So a count that met or passed a ceiling is never told "not yet" — it is told what it
+# did. ``tests/test_edition_scorecard_4595.py`` holds every entry.
+NO_REST = "no_rest"
+UNDER = "under"
+FEW = "few"
+VERDICT_TEXT = {
+    ("body", GOING_WELL): "Weight down on the week",
+    ("body", FASTER_THAN_PLANNED): "Weight down faster than planned",
+    ("body", "up"): "Weight up on the week",
+    ("body", "level"): "Weight level with the week before",
+    ("body", FEW): "Too few weigh-ins to compare the weeks",
+    ("training", GOING_WELL): "Trained, with a rest day",
+    ("training", NO_REST): "No rest day",
+    ("training", UNDER): f"Fewer than {TRAINING_WELL_DAYS[0]} training days",
+    ("training", FEW): "Too few days recorded",
+    ("sleep", GOING_WELL): f"{SLEEP_WELL_NIGHTS} or more long nights",
+    ("sleep", UNDER): f"Fewer than {SLEEP_WELL_NIGHTS} long nights",
+    ("sleep", FEW): "Too few nights recorded",
+    ("food", GOING_WELL): "Protein at the floor most days",
+    ("food", UNDER): "Protein under the floor too often",
+    ("food", FEW): "Too few days logged",
+    ("mind", GOING_WELL): f"In his own words on {MIND_WELL_DAYS} or more days",
+    ("mind", UNDER): f"In his own words on fewer than {MIND_WELL_DAYS} days",
+    ("mind", FEW): "More entries than the count can see",
+    ("ai", GOING_WELL): "The coaches beat a simple guess",
+    ("ai", UNDER): "The coaches do not beat a simple guess yet",
+    ("ai", FEW): "Too few checked calls to compare",
 }
 
 
@@ -107,11 +140,12 @@ def _window(today: str, start_date: str, offset: int = 0) -> list:
     return [d.isoformat() for d in days if not start or d >= start]
 
 
-def _verdict_row(area: str, src: Any, today: str, verdict: str, text: str) -> dict:
+def _verdict_row(area: str, src: Any, today: str, verdict: str, text: str, what: str) -> dict:
+    """One row. ``what`` keys ``VERDICT_TEXT`` with the area: the words the verdict prints."""
     data = {
         "name": SCORECARD_NAMES[area],
         "verdict": verdict,
-        "verdict_text": VERDICT_WORDS[verdict],
+        "verdict_text": VERDICT_TEXT[(area, what)],
         "text": text,
         "rule": SCORECARD_RULE_TEXT[area],
     }
@@ -127,18 +161,18 @@ def score_body(pulse: dict | None, today: str, start_date: str) -> dict:
     before = [weights[d] for d in _window(today, start_date, offset=1) if weights.get(d) is not None]
     if len(now) < BODY_MIN_WEIGHINS or len(before) < BODY_MIN_WEIGHINS:
         text = f"{len(now)} weigh-ins this week and {len(before)} the week before; {BODY_MIN_WEIGHINS} in each are needed."
-        return _verdict_row("body", src, today, NOT_ENOUGH_DATA, text)
+        return _verdict_row("body", src, today, NOT_ENOUGH_DATA, text, FEW)
     avg_now, avg_before = round(sum(now) / len(now), 1), round(sum(before) / len(before), 1)
     change = round(avg_now - avg_before, 1)
     way = f"down {_fmt_num(-change)} lb from" if change < 0 else f"up {_fmt_num(change)} lb from" if change > 0 else "level with"
     text = f"Seven-day average {avg_now:.1f} lb, {way} the seven days before."
     if change >= 0:
-        verdict = NOT_YET
+        verdict, what = NOT_YET, "up" if change > 0 else "level"
     elif -change > BODY_FAST_LBS_PER_WEEK:
-        verdict = FASTER_THAN_PLANNED
+        verdict = what = FASTER_THAN_PLANNED
     else:
-        verdict = GOING_WELL
-    return _verdict_row("body", src, today, verdict, text)
+        verdict = what = GOING_WELL
+    return _verdict_row("body", src, today, verdict, text, what)
 
 
 def score_training(training: dict | None, today: str, start_date: str) -> dict:
@@ -149,10 +183,11 @@ def score_training(training: dict | None, today: str, start_date: str) -> dict:
     seen = [minutes[d] for d in _window(today, start_date) if minutes.get(d) is not None]
     trained = sum(1 for m in seen if m > 0)
     if len(seen) < TRAINING_MIN_DAYS:
-        return _verdict_row("training", src, today, NOT_ENOUGH_DATA, f"{len(seen)} days recorded; {TRAINING_MIN_DAYS} are needed.")
+        return _verdict_row("training", src, today, NOT_ENOUGH_DATA, f"{len(seen)} days recorded; {TRAINING_MIN_DAYS} are needed.", FEW)
     low, high = TRAINING_WELL_DAYS
     verdict = GOING_WELL if low <= trained <= high else NOT_YET
-    return _verdict_row("training", src, today, verdict, f"Trained on {trained} of {len(seen)} days recorded.")
+    what = GOING_WELL if verdict == GOING_WELL else NO_REST if trained > high else UNDER
+    return _verdict_row("training", src, today, verdict, f"Trained on {trained} of {len(seen)} days recorded.", what)
 
 
 def score_sleep(pulse: dict | None, today: str, start_date: str) -> dict:
@@ -162,11 +197,11 @@ def score_sleep(pulse: dict | None, today: str, start_date: str) -> dict:
     hours = _by_date(pulse.get("pulse_history"), "sleep_hours")
     seen = [hours[d] for d in _window(today, start_date) if hours.get(d) is not None]
     if len(seen) < SLEEP_MIN_NIGHTS:
-        return _verdict_row("sleep", src, today, NOT_ENOUGH_DATA, f"{len(seen)} nights recorded; {SLEEP_MIN_NIGHTS} are needed.")
+        return _verdict_row("sleep", src, today, NOT_ENOUGH_DATA, f"{len(seen)} nights recorded; {SLEEP_MIN_NIGHTS} are needed.", FEW)
     good = sum(1 for h in seen if h >= SLEEP_BAR_HOURS)
     verdict = GOING_WELL if good >= SLEEP_WELL_NIGHTS else NOT_YET
     text = f"{_fmt_num(SLEEP_BAR_HOURS)} hours or more on {good} of {len(seen)} nights recorded."
-    return _verdict_row("sleep", src, today, verdict, text)
+    return _verdict_row("sleep", src, today, verdict, text, GOING_WELL if verdict == GOING_WELL else UNDER)
 
 
 def score_food(nutrition: dict | None, today: str, start_date: str) -> dict:
@@ -178,11 +213,11 @@ def score_food(nutrition: dict | None, today: str, start_date: str) -> dict:
     protein = _by_date(nutrition.get("nutrition_trend"), "protein_g")
     logged = [protein[d] for d in _window(today, start_date) if protein.get(d) is not None]
     if len(logged) < FOOD_MIN_LOGGED:
-        return _verdict_row("food", src, today, NOT_ENOUGH_DATA, f"{len(logged)} days logged; {FOOD_MIN_LOGGED} are needed.")
+        return _verdict_row("food", src, today, NOT_ENOUGH_DATA, f"{len(logged)} days logged; {FOOD_MIN_LOGGED} are needed.", FEW)
     hit = sum(1 for g in logged if g >= floor)
     verdict = GOING_WELL if hit >= FOOD_WELL_DAYS else NOT_YET
     text = f"At or above the {_fmt_num(floor)} g protein floor on {hit} of {len(logged)} logged days."
-    return _verdict_row("food", src, today, verdict, text)
+    return _verdict_row("food", src, today, verdict, text, GOING_WELL if verdict == GOING_WELL else UNDER)
 
 
 def score_mind(decisions: dict | None, owner_words: dict | None, today: str, start_date: str) -> dict:
@@ -205,24 +240,28 @@ def score_mind(decisions: dict | None, owner_words: dict | None, today: str, sta
     n = len(days)
     text = f"An entry in his own words on {n} of {len(window)} days."
     if n >= MIND_WELL_DAYS:
-        return _verdict_row("mind", src, today, GOING_WELL, text)
+        return _verdict_row("mind", src, today, GOING_WELL, text, GOING_WELL)
     truncated = len(entries) >= MIND_SERVE_LIMIT and all(str(e["date"]) in window for e in entries)
-    return _verdict_row("mind", src, today, NOT_ENOUGH_DATA if truncated else NOT_YET, text)
+    return _verdict_row("mind", src, today, NOT_ENOUGH_DATA if truncated else NOT_YET, text, FEW if truncated else UNDER)
 
 
 def score_ai(record: dict, today: str) -> dict:
-    """The record block's own comparison (#4585): the count is never served without it."""
+    """The record block's own comparison (#4585): the count is never served without it.
+
+    #4809: the count is every call checked TO DATE, not the week's — the record block has no
+    per-week split — so the row's own words say so, and the rule says which."""
     src = record.get("source")
     if record.get("state") == "unavailable":
         return _unavailable(src, "The coaches' record")
     data = record.get("data") or {}
     n, skill = data.get("skill_n"), data.get("brier_skill")
     if record.get("state") != "ok" or not isinstance(n, int) or n < AI_MIN_CALLS or not isinstance(skill, (int, float)):
-        text = f"Fewer than {AI_MIN_CALLS} checked calls to compare with a simple guess."
-        return _verdict_row("ai", src, today, NOT_ENOUGH_DATA, text)
+        text = f"Fewer than {AI_MIN_CALLS} calls checked to date to compare with a simple guess."
+        return _verdict_row("ai", src, today, NOT_ENOUGH_DATA, text, FEW)
+    across = f"Counted across all {n} calls checked to date, not this week's alone."
     if data.get("beats_simple_guess"):
-        return _verdict_row("ai", src, today, GOING_WELL, f"The coaches beat a simple guess across {n} checked calls.")
-    return _verdict_row("ai", src, today, NOT_YET, f"The coaches do not yet beat a simple guess across {n} checked calls.")
+        return _verdict_row("ai", src, today, GOING_WELL, across, GOING_WELL)
+    return _verdict_row("ai", src, today, NOT_YET, across, UNDER)
 
 
 def _went_right(rows: dict) -> dict:
@@ -233,7 +272,10 @@ def _went_right(rows: dict) -> dict:
         for area in areas:
             row = rows.get(area) or {}
             if row.get("state") == "ok" and (row.get("data") or {}).get("verdict") == GOING_WELL:
-                return {"area": area, "text": f"{row['data']['name']}: {row['data']['text']}", "source": row.get("source")}
+                d = row["data"]
+                # The AI row's text is its count's scope (#4809); its claim is the verdict's words.
+                said = f"{d['verdict_text']}, {d['text'][:1].lower()}{d['text'][1:]}" if area == "ai" else d["text"]
+                return {"area": area, "text": f"{d['name']}: {said}", "source": row.get("source")}
         return {"area": None, "text": "Nothing this week.", "source": None}
 
     return {"matthew": line(("body", "training", "sleep", "food", "mind")), "engine": line(("ai",))}
