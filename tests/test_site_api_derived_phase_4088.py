@@ -120,7 +120,9 @@ SITE_RULINGS = {
     ("edition_training", "_query_source", "'apple_health'", "site_api_training.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,
-    ("deficit_sustainability", "_query_source", "s", "site_api_nutrition.py"): CLAMPED,  # whoop/habitify/strava over start
+    # deficit_sustainability's per-channel reads (whoop/habitify/strava/hevy over `start`) go through its
+    # nested _by_day helper since #3754 — one named read per channel, no hand-typed source list (#2844)
+    ("_by_day", "_query_source", "source_id", "site_api_nutrition.py"): CLAMPED,
     # the Mifflin TDEE fallback's exercise energy: a physiological trailing week (today-6)
     ("deficit_sustainability", "_query_source", "'strava'", "site_api_nutrition.py"): HISTORY,
     ("deficit_sustainability", "_query_source", "'hevy'", "site_api_nutrition.py"): HISTORY,
