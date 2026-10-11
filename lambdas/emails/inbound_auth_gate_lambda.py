@@ -1,3 +1,5 @@
+# gate-entrypoint: the inbound-email hazard gate (#4633) — `lambda_handler()` returns SES's STOP_RULE_SET disposition for a
+# failed/GRAY/missing DMARC verdict, a spam/virus FAIL or an unlisted From; SES does the blocking on that return, so nothing here raises.
 """
 Inbound Auth Gate Lambda — v1.0.0 (#4633)
 

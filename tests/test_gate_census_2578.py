@@ -1082,6 +1082,15 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # prompt_cache.py arrives PROVEN (REGISTRY_PROOFS; entry deleted -> 1 failed naming prompt_cache.py:143/:159, restored
         # 15 passed). The two #4769 callers moved onto ROUTES rows, so their exemptions never enter. Id-set diff vs a
         # `git archive origin/main` export at 16dcddf20: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}.
+        # Upper bound stays 258 (2026-10-11, #4633 the inbound-email receipt gate, merged onto f68a5e8bc): ONE entrant,
+        # guard::lambdas/emails/inbound_auth_gate_lambda.py — a `# gate-entrypoint:` module (lambda_handler returns SES's
+        # STOP_RULE_SET disposition; SES does the blocking, nothing raises) — arrives PROVEN via GUARD_PROOFS in
+        # scripts/gate_census_proofs.py: the DMARC refusal deleted from receipt_verdict() in the REAL tracked file (md5
+        # 884455f0… -> fd83e3af…, restored byte-identical): baseline 31 passed, MUTATED 8 failed / 23 passed (the five
+        # forged/GRAY/missing DMARC fixtures got CONTINUE, DKIM-alone passed, the batch refusal and the parser's SES-direct
+        # route let the dmarc=FAIL record through), RESTORED 31 passed. Id-set diff vs a `git archive origin/main` export at
+        # f68a5e8bc: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}; enters exactly that id, leaves {}, unproven does NOT
+        # move. The ceiling is not raised: #4778's retirement left it one above main's measure, and this entrant fills it.
         <= 258
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"

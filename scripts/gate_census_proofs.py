@@ -3315,3 +3315,43 @@ REGISTRY_PROOFS.update(
         for path, (hit, more) in _MODEL_ROUTING_SPARED_FILES.items()
     }
 )
+# ── #4633 (2026-10-11): the inbound-email receipt gate ───────────────────────────────────
+# `lambdas/emails/inbound_auth_gate_lambda.py` is a `# gate-entrypoint:` module: the SES
+# receipt rule invokes it RequestResponse as its first action and acts on the disposition it
+# returns — STOP_RULE_SET refuses the message before any byte is stored, CONTINUE lets the S3
+# action (and so the parser) run. Nothing in it raises (an exception is itself a refusal), so
+# the census's exit/raise scan finds no enforcement path; the proof below is what says it CAN fail.
+GUARD_PROOFS.update(
+    {
+        "guard::lambdas/emails/inbound_auth_gate_lambda.py": {
+            "gate_name": "lambdas/emails/inbound_auth_gate_lambda.py",
+            "command": "python3 -m pytest tests/test_inbound_auth_gate_4633.py -q -p no:cacheprovider   # baseline 31 passed",
+            "mutation": (
+                "The DMARC refusal deleted from `receipt_verdict()` in the REAL tracked module — the two lines "
+                '`if statuses["dmarcVerdict"] != "PASS": return False, f"dmarc_{...}", statuses` — so a receipt whose '
+                "dmarcVerdict is FAIL, GRAY, PROCESSING_FAILED or absent reads as authenticated (the pre-#4633 world: the "
+                "parser trusted the From header). md5 884455f09400f9775dda4e796784638c -> fd83e3af50f644314319a227cbab3a14; "
+                "restored from a pre-mutation copy and cmp'd byte-identical (884455f0… again)."
+            ),
+            "observed": (
+                "2026-10-11. BASELINE 31 passed. MUTATED: 8 failed, 23 passed — "
+                "test_a_failing_or_missing_verdict_stops_the_rule_set[dmarc_fail | dmarc_gray | dmarc_processing_failed | "
+                "dmarc_missing x2] (the forged receipt got CONTINUE, not STOP_RULE_SET), test_dkim_alone_is_not_enough_at_the_gate, "
+                "test_one_refusal_refuses_a_whole_batch (the FAIL record in the batch no longer refused it), and "
+                "test_an_ses_direct_record_is_refused_on_its_receipt_before_the_s3_read (the parser reuses receipt_verdict() "
+                "on an SES-direct record: the dmarc=FAIL record read S3 and landed an insight). The 23 that stayed green are "
+                "the spam/virus refusals, the allowlist/From refusals, the pass-through controls, the CDK/IaC structure "
+                "checks and the parser's Authentication-Results-header route, none of which run through the deleted lines. "
+                "RESTORED: 31 passed."
+            ),
+            "scope": (
+                "Proves the DMARC verdict is load-bearing at the gate (lambda_handler disposition) and on the parser's "
+                "SES-direct route. The spam/virus and allowlist branches are exercised by the same suite but were not "
+                "separately mutated here; the live receipt-rule ORDER (gate before the S3 action) is IaC asserted by "
+                "test_the_receipt_rule_is_defined_in_cdk_with_the_gate_as_its_only_action and watched live by the "
+                "`inbound-auth-gate-bypassed` alarm, not by this proof."
+            ),
+            "proved_on": "2026-10-11",
+        },
+    }
+)
