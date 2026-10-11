@@ -520,7 +520,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("withings-data-ingestion", "Withings"),),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         "qa_tier": "optional",  # weigh-ins are sporadic — a missing day is behavior
-        "method": "OAuth API pull, hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; ~5% of runs changed a row (#4641)
+        "method": "OAuth API pull, about 8x daily",
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
         "raw_layout": {
@@ -639,7 +640,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("eightsleep-data-ingestion", "Eight Sleep"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "optional",
-        "method": "API pull, hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; ~5% of runs changed a row (#4641)
+        "method": "API pull, 4x daily mornings",
         "metrics": "Sleep stages, HR/HRV, restlessness",  # bed temp retired — ADR-118, #489
         "posture": "portfolio",
         "raw_layout": {
@@ -952,7 +954,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("habitify-data-ingestion", "Habitify"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        "method": "API pull, hourly",
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision (#3666 same-day freshness); notes/mood calls await ruling #4644 (#4641)
+        "method": "API pull, hourly (24h)",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/habitify", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
@@ -1079,6 +1082,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("hevy-backfill", "Hevy Poller"),),  # #4643: the daily boot probe's targets
         "expected_days": None,  # lifting is event-driven — gaps are training structure
         "qa_tier": None,
+        # cadence reason (internal, kept out of the published method text): kept hourly by decision: cheap cursor first-page poll, walk-in workout same-day-visible (#4641, #3720)
         "method": "API-key pull, hourly (24h)",
         "metrics": "Strength sets, reps, load, rest times",
         "posture": "load-bearing",
@@ -1267,7 +1271,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # was checked as a phantom "journal" partition in qa_smoke — the real
         # partition is notion (X-10; the check is warn-only either way).
         "qa_tier": "optional",
-        "method": "API pull (journal database), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 of 252 runs found a page (#4641)
+        "method": "API pull (journal database), 3x daily",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",
         # #476/X-7: raw archive added — date-tree with a per-page suffix
@@ -1311,7 +1316,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        "method": "Keyless per-channel RSS pull (framework), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
+        "method": "Keyless per-channel RSS pull (framework), 2x daily",
         "metrics": "Video posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
         # #1682 follow-up: deliberately NO capture_channel. YouTube is a scheduled,
@@ -1358,7 +1364,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        "method": "Keyless public AppView pull (framework), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
+        "method": "Keyless public AppView pull (framework), 2x daily",
         "metrics": "Posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
         # Deliberately NO capture_channel — same #1682 rationale as youtube: a
@@ -1401,7 +1408,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         ),  # #4643: the daily boot probe's targets
         "expected_days": None,  # sporadic — not a reconciliation source
         "qa_tier": None,
-        "method": "Keyless public REST pull (framework), hourly",
+        # cadence reason (internal, kept out of the published method text): was hourly; 0 rows in 252 runs; placeholder account (#4641, #1669)
+        "method": "Keyless public REST pull (framework), 2x daily",
         "metrics": "Posts — the outbound public voice, ingested back in",
         "posture": "portfolio",
         # Deliberately NO capture_channel — same #1682 rationale as youtube.
@@ -1544,7 +1552,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("dropbox-poll", "Dropbox Poll"),),  # #4643: the daily boot probe's targets
         "expected_days": None,
         "qa_tier": None,
-        "method": "Dropbox API poll (MacroFactor CSV transport)",
+        # cadence reason (internal, kept out of the published method text): was every 30 min; 6 of 672 polls found a file (#4641)
+        "method": "Dropbox API poll every 2 hours (MacroFactor CSV transport)",
         "metrics": None,
         "posture": "load-bearing",  # nutrition's transport
         "raw_layout": None,
