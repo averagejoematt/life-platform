@@ -31,7 +31,7 @@ from common.numeric import decimals_to_float, floats_to_decimal
 
 logger = logging.getLogger(__name__)
 
-from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+from ai.model_routing import batch_model_for, model_for  # noqa: E402 — #4770: the one model registry
 
 HAIKU_MODEL = model_for("training_notes")
 # #4643: the budget_guard feature the Haiku tail is gated on — listed in
@@ -408,18 +408,9 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live
 
 
 # ── The bulk batch pass (#4814) ───────────────────────────────────────────────
-# Models Bedrock lists WITHOUT batch inference. A route that resolves to one of these pins the
-# batch-capable Haiku 4.5 for the job (same price class, same JSON task) instead of failing at submit.
-BATCH_UNSUPPORTED_MODELS = ("haiku-5-5",)
-BATCH_FALLBACK_MODEL = "claude-haiku-4-5-20251001"
-
-
 def batch_model() -> str:
-    """The model a batch job runs on: `model_for('training_notes')`, or Haiku 4.5 if that lists no Batch."""
-    m = model_for("training_notes")
-    if any(marker in m.lower() for marker in BATCH_UNSUPPORTED_MODELS):
-        return BATCH_FALLBACK_MODEL
-    return m
+    """The model a batch job runs on: the registry's batch-capable resolution for `training_notes`."""
+    return batch_model_for("training_notes")
 
 
 def uncached_notes(table, notes) -> dict:

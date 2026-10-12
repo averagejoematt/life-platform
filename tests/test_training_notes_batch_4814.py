@@ -27,7 +27,10 @@ from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
-from ai import bedrock_batch as bb  # noqa: E402
+from ai import (
+    bedrock_batch as bb,  # noqa: E402
+    model_routing as mr,  # noqa: E402
+)
 from bundle_stubs import stub_bundled_module  # noqa: E402
 from training import (  # noqa: E402
     training_notes as tn,
@@ -187,11 +190,11 @@ def test_cached_notes_are_not_records(calls):
 
 
 def test_a_model_listed_without_batch_is_pinned_to_haiku_4_5(monkeypatch, calls):
-    monkeypatch.setattr(tnl, "model_for", lambda feature: "claude-haiku-5-5")
-    assert tnl.batch_model() == tnl.BATCH_FALLBACK_MODEL == "claude-haiku-4-5-20251001"
-    monkeypatch.setattr(tnl, "model_for", lambda feature: "claude-haiku-4-5-20251001")
+    monkeypatch.setattr(mr, "model_for", lambda route, env=None: "claude-haiku-5-5")
+    assert tnl.batch_model() == mr.BATCH_FALLBACK_MODEL == "claude-haiku-4-5-20251001"
+    monkeypatch.setattr(mr, "model_for", lambda route, env=None: "claude-haiku-4-5-20251001")
     assert tnl.batch_model() == "claude-haiku-4-5-20251001"
-    monkeypatch.setattr(tnl, "model_for", lambda feature: "claude-haiku-5-5")
+    monkeypatch.setattr(mr, "model_for", lambda route, env=None: "claude-haiku-5-5")
     table = WireTable()
     notes = _notes(100)
     _answer_all(calls, notes, _reply(_GOOD))
@@ -206,7 +209,7 @@ def test_the_backfill_script_prints_mode_and_returns_the_degrade_map(capsys):
     workouts = [
         {
             "date": "2026-09-01",
-            "exercises": [{"title": "Row", "exercise_template_id": "t1", "notes": "grip gave out"}, {"title": "Curl", "notes": " "}],
+            "exercises": [{"title": "Row", "notes": "grip gave out"}, {"title": "Curl", "notes": " "}],
         }
     ]
     seen = {}
