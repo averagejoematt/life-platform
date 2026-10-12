@@ -11,6 +11,8 @@ last_write filter), has no "← freshest" marker, and its glow is gated per sour
 via motion.js's shared wireFreshness() primitive (data-fresh-ts/-window).
 """
 
+# clock-literal-ok: every stamp is built as now-minus-delta from the SAME wall clock the handler reads, and 72/168 are registry windows, not clock outputs.
+
 import json
 import os
 import sys
