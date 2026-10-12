@@ -1,7 +1,7 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-10-11",
+    "updated": "2026-10-12",
     "count": 21
   },
   "sources": [
@@ -50,7 +50,7 @@
       "name": "Strava",
       "category": "Wearables",
       "metrics": "Activities, walks, heart rate",
-      "method": "OAuth API pull, hourly",
+      "method": "OAuth API pull, hourly, 18 hours a day",
       "posture": "load-bearing"
     },
     {
@@ -66,7 +66,7 @@
       "name": "Whoop",
       "category": "Wearables",
       "metrics": "Recovery, sleep, HRV, resting HR, strain",
-      "method": "OAuth API pull, 5x daily",
+      "method": "OAuth API pull, 5x daily plus a recovery refresh",
       "posture": "load-bearing"
     },
     {
@@ -74,7 +74,7 @@
       "name": "Withings",
       "category": "Wearables",
       "metrics": "Weight, body composition",
-      "method": "OAuth API pull, about 8x daily",
+      "method": "OAuth API pull, 4x daily",
       "posture": "load-bearing"
     },
     {
