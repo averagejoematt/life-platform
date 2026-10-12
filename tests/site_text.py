@@ -11,7 +11,7 @@ Two pure helpers over the STATIC HTML under site/ (legacy/ excluded by standing 
 
 Known limit, stated so no one over-reads a green: this is the STATIC surface. Text and
 links that JS injects at runtime (the cockpit's level name, evidence.js's topic rail) are
-invisible here; the render harness and tests/visual_qa.py see those. A term that leaves
+invisible here; the render harness and qa/visual_qa.py see those. A term that leaves
 the static HTML but survives in a renderer is still on the page.
 """
 

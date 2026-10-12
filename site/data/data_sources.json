@@ -1,7 +1,7 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-09-18",
+    "updated": "2026-10-11",
     "count": 21
   },
   "sources": [
@@ -26,7 +26,7 @@
       "name": "Habitify",
       "category": "Inputs",
       "metrics": "Daily habit completions",
-      "method": "API pull, hourly",
+      "method": "API pull, hourly (24h)",
       "posture": "load-bearing"
     },
     {
@@ -74,7 +74,7 @@
       "name": "Withings",
       "category": "Wearables",
       "metrics": "Weight, body composition",
-      "method": "OAuth API pull, hourly",
+      "method": "OAuth API pull, about 8x daily",
       "posture": "load-bearing"
     },
     {
@@ -82,7 +82,7 @@
       "name": "Eight Sleep",
       "category": "Wearables",
       "metrics": "Sleep stages, HR/HRV, restlessness",
-      "method": "API pull, hourly",
+      "method": "API pull, 4x daily mornings",
       "posture": "portfolio"
     },
     {
@@ -98,7 +98,7 @@
       "name": "Notion",
       "category": "Inputs",
       "metrics": "Journal entries — the subjective layer",
-      "method": "API pull (journal database), hourly",
+      "method": "API pull (journal database), 3x daily",
       "posture": "portfolio"
     },
     {
@@ -129,8 +129,8 @@
       "id": "garmin",
       "name": "Garmin",
       "category": "Wearables",
-      "metrics": "Stress, body battery, steps",
-      "method": "OAuth API pull, 4x daily — paused (ADR-074)",
+      "metrics": "Activities (via Strava)",
+      "method": "Delivered through Strava — direct-API function retired 2026-10-11 (#4640, ADR-074)",
       "posture": "paused"
     },
     {

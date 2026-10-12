@@ -165,6 +165,7 @@ def call_anthropic_api(
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # Auth is IAM — no API key. See lambdas/bedrock_client.py.
     from ai.bedrock_client import (
+        ConverseUnsupported as _ConverseUnsupported,
         UnknownModelError as _UnknownModel,
         budget_stop_cls as _budget_stop_cls,
         first_text as _first_text,
@@ -197,6 +198,13 @@ def call_anthropic_api(
         _emit_failure_metric()
         print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
         raise
+    except _ConverseUnsupported as e:
+        # #4776: the Converse adapter refused the body before any send — a caller-side
+        # defect (an image, a tool list …) attempt 2 cannot fix. Refusal, not failure:
+        # re-raise at once, never the backoff ladder; the metric names it.
+        _emit_failure_metric()
+        print(f"[ERROR] Converse adapter refused the request body — NOT retried, nothing billed: {e}")
+        raise
     except Exception:
         _emit_failure_metric()
         raise
@@ -227,6 +235,7 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
     system message (the wire format is identical on Bedrock).
     """
     from ai.bedrock_client import (
+        ConverseUnsupported as _ConverseUnsupported,
         UnknownModelError as _UnknownModel,
         budget_stop_cls as _budget_stop_cls,
         invoke_with_retry as _invoke_with_retry,
@@ -260,6 +269,13 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
         _emit_failure_metric()
         print(f"[ERROR] AI model name did not resolve — NOT retried, nothing billed: {e}")
         raise
+    except _ConverseUnsupported as e:
+        # #4776: the Converse adapter refused the body before any send — a caller-side
+        # defect (an image, a tool list …) attempt 2 cannot fix. Refusal, not failure:
+        # re-raise at once, never the backoff ladder; the metric names it.
+        _emit_failure_metric()
+        print(f"[ERROR] Converse adapter refused the request body — NOT retried, nothing billed: {e}")
+        raise
     except Exception:
         _emit_failure_metric()
         raise
@@ -284,7 +300,7 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
 # `Visual QA (standalone)` workflow has failed every run since 2026-09-05 —
 # run 34907061838 (2026-09-14T23:03Z) recorded 2 truncated + 1 unparseable
 # reader-truth batches, 14 reader-facing surfaces unjudged, and because
-# `ai-unevaluated` is a DECLINE class in tests/visual_qa_verdict.py the site was
+# `ai-unevaluated` is a DECLINE class in qa/visual_qa_verdict.py the site was
 # never reverted. Red for 9 consecutive days, silent by construction.
 #
 # So the retry is deliberately NARROW and lives here, at the existing chokepoint,

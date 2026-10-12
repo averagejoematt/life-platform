@@ -39,7 +39,7 @@ THE PATTERN SET
   the generic `<tool_call>` / `<tool_use>` / `<tool_result>` shapes other clients
   emit, and the ONE closing tag on record, `</decision>`. Every alternative is
   unambiguous on a rendered HTML page too, so the leak-token sweep
-  (`tests/leak_token_sweep.py`) uses this exact object — one pattern, three doors.
+  (`qa/leak_token_sweep.py`) uses this exact object — one pattern, three doors.
 
   `TOOL_CALL_RESIDUE_RE` is the envelope set PLUS a generic closing tag
   (`</note>`, `</content>` — the field-closer half of the specimen for any other

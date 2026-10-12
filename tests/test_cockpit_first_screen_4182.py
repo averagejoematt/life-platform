@@ -14,7 +14,7 @@ failing grade ("He's a 6 out of 100?!", B1 newcomer audit). The rulings:
 
 Source-level pins, in the style of tests/test_home_fold.py. The sentence builders are
 pinned against the live payload in tests/js/three_questions_4182.test.mjs; the render
-is checked by the Playwright harness pre-merge and tests/visual_qa.py post-deploy.
+is checked by the Playwright harness pre-merge and qa/visual_qa.py post-deploy.
 
 Pinned decisions this REVERSES (each named where it is asserted below): #578 ("the big
 score below is the real headline"), #807 (the dismiss-once level hint), #1106 (the

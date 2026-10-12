@@ -73,8 +73,8 @@ def test_site_deploy_wires_rollback_and_gates():
     assert "deploy/rollback_site.sh" in code, "the failure path must roll back via rollback_site.sh (#418 semantics)"
     assert '"HEAD~1"' in code, "auto-rollback restores the previous good site build (squash-merge convention)"
     assert "deploy/smoke_test_site.sh" in code, "the HTTP/content smoke gate must run post-deploy"
-    assert "tests/visual_qa.py --screenshot --ai-qa" in code, "the visual/AI-QA gate must run post-deploy"
-    assert "tests/accuracy_audit.py --live" in code, "the accuracy gate must run post-deploy"
+    assert "qa/visual_qa.py --screenshot --ai-qa" in code, "the visual/AI-QA gate must run post-deploy"
+    assert "qa/accuracy_audit.py --live" in code, "the accuracy gate must run post-deploy"
     assert "sns publish" in code, "rollback/failure must alert via SNS"
     # Rollback fires only after a successful deploy, on a failed gate.
     assert "needs.deploy-site.result == 'success'" in text
@@ -155,7 +155,7 @@ def test_the_install_composite_runs_what_the_guards_expand_it_to():
         executable = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
         # The set is DERIVED: every workflow that runs the visual-QA harness. Other
         # Playwright users (fresh-eyes, v4-gate) run different tools and are out of scope.
-        if "python3 tests/visual_qa.py" in executable:
+        if "python3 qa/visual_qa.py" in executable:
             assert (
                 "playwright install" not in executable
             ), f"{name} runs visual_qa.py but installs Playwright inline again; use {ACTION_REF} (#4254)"
@@ -223,7 +223,7 @@ def _step_block(text, step_name):
 
 def test_visual_qa_exports_a_machine_readable_surface_verdict():
     text = _read(_SITE_DEPLOY)
-    assert "tests/visual_qa_verdict.py" in text, "the visual-QA job must classify the failing surface (#3352)"
+    assert "qa/visual_qa_verdict.py" in text, "the visual-QA job must classify the failing surface (#3352)"
     for output in ("site_reachable:", "surfaces:", "summary:"):
         assert output in text, f"visual-qa must export {output} for the rollback's scope check"
     # A job output can only be set by a step that RAN — if the classifier sat behind the

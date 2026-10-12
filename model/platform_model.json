@@ -144,6 +144,12 @@
       "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
+    "coach-vision-no-invocations-7d": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "compute_stack",
+      "via": "declaration"
+    },
     "coherence-heartbeat": {
       "kind": "metric",
       "routing": "digest",
@@ -300,12 +306,6 @@
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
     },
-    "ingest-auth-unhealthy-garmin": {
-      "kind": "metric",
-      "routing": "digest",
-      "stack": "monitoring_stack",
-      "via": "factory:_alarm"
-    },
     "ingest-auth-unhealthy-habitify": {
       "kind": "metric",
       "routing": "urgent",
@@ -407,6 +407,12 @@
       "routing": "digest",
       "stack": "monitoring_stack",
       "via": "factory:_heartbeat_alarm"
+    },
+    "ingestion-error-inbound-auth-gate": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "ingestion-error-insight-email-parser": {
       "kind": "metric",
@@ -570,6 +576,12 @@
       "stack": "operational_stack",
       "via": "declaration"
     },
+    "life-platform-inbound-auth-gate-bypassed": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "declaration"
+    },
     "life-platform-ingestion-dlq-messages": {
       "kind": "metric",
       "routing": "urgent",
@@ -646,6 +658,12 @@
       "kind": "metric",
       "routing": "paging",
       "stack": "monitoring_stack",
+      "via": "declaration"
+    },
+    "panelcast-autopublish-held": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms",
       "via": "declaration"
     },
     "permanence-errors": {
@@ -992,10 +1010,10 @@
     }
   ],
   "cost_surface": {
-    "ai_features": 24,
-    "alarms": 136,
+    "ai_features": 25,
+    "alarms": 139,
     "emf_namespaces": 33,
-    "schedules": 93,
+    "schedules": 95,
     "secrets": 30
   },
   "edges": [
@@ -1179,6 +1197,41 @@
       "lambda": "coach-prediction-evaluator",
       "module": "lambdas/coach/coach_prediction_evaluator.py",
       "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "coach_vision",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "coach_vision",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "dexa",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "measurements",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_vision.py",
+      "partition": "progress_photos",
       "via": "pk"
     },
     {
@@ -3160,13 +3213,6 @@
       "lambda": "food-delivery-ingestion",
       "module": "lambdas/ingestion/food_delivery_lambda.py",
       "partition": "food_delivery",
-      "via": "pk"
-    },
-    {
-      "direction": "unknown",
-      "lambda": "garmin-data-ingestion",
-      "module": "lambdas/ingestion/garmin_lambda.py",
-      "partition": "garmin",
       "via": "pk"
     },
     {
@@ -6265,7 +6311,7 @@
       "module": "lambdas/ingestion/bluesky_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(0 14,2 * * ? *)",
           "resolution": "resolved"
         }
       ],
@@ -6489,6 +6535,20 @@
       "stack": "compute_stack",
       "timeout_seconds": 60
     },
+    "coach-vision": {
+      "declared_alarm": null,
+      "handler": "coach.coach_vision_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/coach/coach_vision_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 180
+    },
     "daily-brief": {
       "declared_alarm": null,
       "handler": "emails.daily_brief_lambda.lambda_handler",
@@ -6570,7 +6630,7 @@
       "module": "lambdas/ingestion/dropbox_poll_lambda.py",
       "schedules": [
         {
-          "expr": "rate(30 minutes)",
+          "expr": "rate(2 hours)",
           "resolution": "constant"
         }
       ],
@@ -6584,7 +6644,7 @@
       "module": "lambdas/ingestion/eightsleep_lambda.py",
       "schedules": [
         {
-          "expr": "cron(15 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(15 14,16,18,20 * * ? *)",
           "resolution": "resolved"
         }
       ],
@@ -6688,15 +6748,6 @@
       "stack": "compute_stack",
       "timeout_seconds": 120
     },
-    "garmin-data-ingestion": {
-      "declared_alarm": null,
-      "handler": "ingestion.garmin_lambda.lambda_handler",
-      "memory_mb": 512,
-      "module": "lambdas/ingestion/garmin_lambda.py",
-      "schedules": [],
-      "stack": "ingestion_stack",
-      "timeout_seconds": 300
-    },
     "habit-skip-review": {
       "declared_alarm": null,
       "handler": "emails.habit_skip_review_lambda.lambda_handler",
@@ -6797,6 +6848,15 @@
       ],
       "stack": "compute_stack",
       "timeout_seconds": 120
+    },
+    "inbound-auth-gate": {
+      "declared_alarm": null,
+      "handler": "emails.inbound_auth_gate_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/emails/inbound_auth_gate_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 10
     },
     "insight-email-parser": {
       "declared_alarm": null,
@@ -7101,7 +7161,7 @@
       "module": "lambdas/ingestion/mastodon_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(0 14,2 * * ? *)",
           "resolution": "resolved"
         }
       ],
@@ -7166,7 +7226,7 @@
       "module": "lambdas/ingestion/notion_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(0 14,21,3 * * ? *)",
           "resolution": "resolved"
         }
       ],
@@ -7461,6 +7521,10 @@
       "module": "lambdas/emails/wednesday_chronicle_lambda.py",
       "schedules": [
         {
+          "expr": "cron(0 1 * * WED *)",
+          "resolution": "constructed"
+        },
+        {
           "expr": "cron(0 15 ? * WED *)",
           "resolution": "constant"
         },
@@ -7557,7 +7621,7 @@
       "module": "lambdas/ingestion/withings_lambda.py",
       "schedules": [
         {
-          "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(5 14,17,21,0 * * ? *)",
           "resolution": "resolved"
         }
       ],
@@ -7571,7 +7635,7 @@
       "module": "lambdas/ingestion/youtube_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(0 14,2 * * ? *)",
           "resolution": "resolved"
         }
       ],
@@ -7591,9 +7655,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 136,
+      "alarms": 139,
       "alarms_by_routing": {
-        "digest": 92,
+        "digest": 95,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -7605,27 +7669,27 @@
       "contracts_enrolled": 12,
       "contracts_known": 12,
       "contracts_ratchet": 12,
-      "edges": 737,
-      "lambdas": 107,
-      "mcp_tool_modules": 35,
-      "mcp_tools": 87,
-      "partitions": 114,
+      "edges": 741,
+      "lambdas": 108,
+      "mcp_tool_modules": 36,
+      "mcp_tools": 88,
+      "partitions": 115,
       "privacy_fields_owner_only": 33,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 17,
+      "privacy_sources_owner_only": 18,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 83,
-      "schedules": 93
+      "scheduled_lambdas": 84,
+      "schedules": 95
     },
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 361,
-        "sites_resolved": 923,
-        "sites_total": 1284
+        "sites_resolved": 929,
+        "sites_total": 1290
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 83
+        "resolved": 84
       }
     },
     "non_census_families": [
@@ -7683,7 +7747,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless public AppView pull (framework), hourly",
+      "method": "Keyless public AppView pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7741,6 +7805,11 @@
       "class": "system_state",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "coach_vision": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "composite_scores": {
       "class": "system_state",
@@ -7806,7 +7875,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API pull, hourly",
+      "method": "API pull, 4x daily mornings",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7887,7 +7956,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+      "method": "Delivered through Strava \u2014 direct-API function retired 2026-10-11 (#4640, ADR-074)",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -7915,7 +7984,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API pull, hourly",
+      "method": "API pull, hourly (24h)",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8015,7 +8084,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless public REST pull (framework), hourly",
+      "method": "Keyless public REST pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     },
@@ -8051,7 +8120,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "API pull (journal database), hourly",
+      "method": "API pull (journal database), 3x daily",
       "privacy_tier": "owner_only",
       "stale_hours": 336
     },
@@ -8271,7 +8340,7 @@
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "OAuth API pull, hourly",
+      "method": "OAuth API pull, about 8x daily",
       "owner_only_fields": [
         "afib_result",
         "bmr_kcal",
@@ -8316,7 +8385,7 @@
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
-      "method": "Keyless per-channel RSS pull (framework), hourly",
+      "method": "Keyless per-channel RSS pull (framework), 2x daily",
       "privacy_tier": "public",
       "stale_hours": null
     }
@@ -8381,6 +8450,7 @@
     },
     "sources": {
       "cgm_readings": "owner_only",
+      "coach_vision": "owner_only",
       "dexa": "owner_published",
       "felt_probe": "owner_only",
       "flourishing": "owner_only",
@@ -8414,6 +8484,13 @@
       "lambda": "dashboard-refresh",
       "resolution": "constant",
       "stack": "compute_stack",
+      "utc": "01:00"
+    },
+    {
+      "expr": "cron(0 1 * * WED *)",
+      "lambda": "wednesday-chronicle",
+      "resolution": "constructed",
+      "stack": "email_stack",
       "utc": "01:00"
     },
     {
@@ -8725,6 +8802,13 @@
       "utc": "17:00"
     },
     {
+      "expr": "cron(0 17 ? * MON *)",
+      "lambda": "coach-vision",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "17:00"
+    },
+    {
       "expr": "cron(0 17 * * ? *)",
       "lambda": "daily-brief",
       "resolution": "constant",
@@ -8935,7 +9019,7 @@
       "utc": "22:00"
     },
     {
-      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(0 14,2 * * ? *)",
       "lambda": "bluesky-social-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
@@ -8949,14 +9033,14 @@
       "utc": null
     },
     {
-      "expr": "rate(30 minutes)",
+      "expr": "rate(2 hours)",
       "lambda": "dropbox-poll",
       "resolution": "constant",
       "stack": "ingestion_stack",
       "utc": null
     },
     {
-      "expr": "cron(15 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(15 14,16,18,20 * * ? *)",
       "lambda": "eightsleep-data-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
@@ -8998,14 +9082,14 @@
       "utc": null
     },
     {
-      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(0 14,2 * * ? *)",
       "lambda": "mastodon-social-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
       "utc": null
     },
     {
-      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(0 14,21,3 * * ? *)",
       "lambda": "notion-journal-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
@@ -9047,14 +9131,14 @@
       "utc": null
     },
     {
-      "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(5 14,17,21,0 * * ? *)",
       "lambda": "withings-data-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",
       "utc": null
     },
     {
-      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(0 14,2 * * ? *)",
       "lambda": "youtube-social-ingestion",
       "resolution": "resolved",
       "stack": "ingestion_stack",

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 test_leak_token_sweep.py — offline tests for the shared leak-token sweep
-core (tests/leak_token_sweep.py, #1448) and its two callers.
+core (qa/leak_token_sweep.py, #1448) and its two callers.
 
 No Playwright import anywhere in this file (memory:
-reference_test_layer_dep_import_collection_red) — importing tests/visual_qa.py
+reference_test_layer_dep_import_collection_red) — importing qa/visual_qa.py
 is safe because it imports `playwright.sync_api` lazily inside run_sweep(),
 not at module scope. No network calls: sweep()/run_leak_token_sweep() are
 exercised with fetch monkeypatched.
@@ -23,7 +23,7 @@ Coverage:
     (the reset-time path's public surface, pinned by test_restart_verify_truth.py
     too — this file adds the FORBIDDEN_TOKENS/JSON_ENDPOINTS identity check).
   - deploy/sync_doc_metadata.py's AST discoverer still finds JSON_ENDPOINTS
-    after the move (it now falls back to tests/leak_token_sweep.py).
+    after the move (it now falls back to qa/leak_token_sweep.py).
 """
 
 import importlib.util
@@ -266,7 +266,7 @@ def test_cli_exposes_no_leak_scan_escape_hatch():
     import subprocess
 
     out = subprocess.run(
-        [sys.executable, os.path.join(_REPO, "tests", "visual_qa.py"), "--help"],
+        [sys.executable, os.path.join(_REPO, "qa", "visual_qa.py"), "--help"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -419,7 +419,7 @@ def test_every_sweep_caller_handles_unreachable():
     import ast
 
     known_handled = {
-        os.path.join("tests", "visual_qa.py"),
+        os.path.join("qa", "visual_qa.py"),
         os.path.join("deploy", "restart_verify_rendered.py"),
     }
     callers = set()
@@ -430,7 +430,7 @@ def test_every_sweep_caller_handles_unreachable():
                     continue
                 full = os.path.join(dirpath, fn)
                 rel = os.path.relpath(full, _REPO)
-                if rel in (os.path.join("tests", "leak_token_sweep.py"), os.path.join("qa", "leak_token_sweep.py")) or rel.startswith(
+                if rel in (os.path.join("qa", "leak_token_sweep.py"), os.path.join("qa", "leak_token_sweep.py")) or rel.startswith(
                     os.path.join("tests", "test_")
                 ):
                     continue

@@ -59,6 +59,11 @@ DERIVED_LAYERS: dict[str, dict] = {
         "health": None,
         "cadence_days": 7,  # EventBridge weekly, Mon 14:00 UTC (compute_stack.py, #3366)
     },
+    "coach_vision": {
+        "producer": "coach-vision Lambda (coach.coach_vision_lambda) over the progress-photo index",
+        "health": None,
+        "cadence_days": 7,  # EventBridge weekly, Mondays (compute_stack.py, #3759); a week with no photo set writes nothing
+    },
     "platform_memory": {
         "producer": "compute lambdas (channel=computed) + MCP write_platform_memory (channel=conversation)",
         "health": None,

@@ -54,8 +54,11 @@ _RUN_AXE_JS = """async () => {
 #: path -> phone-screen budget. Adding a kit page means adding it here.
 KIT_PAGES = {
     "/next/v8/": 6,
+    "/next/v8/week/": 4,  # round 8: the week band moved here whole from the front page
     "/next/v8/start/": 4,
     "/next/v8/story/": 4,
+    # #4808/#4809 (ruling 2026-10-11): four screens stand — the bet's reasons are the front
+    # card's, and this page's bet card carries a door to them instead of printing both.
     "/next/v8/coaches/": 4,
     "/next/v8/day/": 4,
     # The longest a day page gets: eight lifts, three coach lines (the most a day holds) and two

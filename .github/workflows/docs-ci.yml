@@ -85,7 +85,7 @@ on:
       # itself — a workflow-only change (a new/removed CI step) can stale the row and
       # nothing else in this list would catch it.
       - '.github/workflows/**'
-      # #4270: the real homes of the two tests-side fact sources (tests/ keeps re-export shims).
+      # #4270: the tests-side fact sources live in qa/ now.
       - 'qa/qa_manifest.py'             # PAGES — sync_doc_metadata runs `qa/qa_manifest.py --emit leak` (#1426)
       - 'qa/leak_token_sweep.py'        # JSON_ENDPOINTS — AST-read from the literal there (#1448)
   # #2982 — the ONE deliberate asymmetry between these two lists, and the only one
@@ -134,14 +134,11 @@ on:
       # #3000: same reasoning as the push list above — a workflow-only change can stale
       # the gate_census_count fact.
       - '.github/workflows/**'
-      # #4270: the real homes of the two tests-side fact sources (tests/ keeps re-export shims).
-      - 'qa/qa_manifest.py'             # PAGES — sync_doc_metadata runs `qa/qa_manifest.py --emit leak` (#1426)
-      - 'qa/leak_token_sweep.py'        # JSON_ENDPOINTS — AST-read from the literal there (#1448)
       # NOT 'tests/**' — see the #2982 note above. These are the tests-side paths a doc
       # gate actually READS as a fact source, verified 2026-08-22 by scanning every gate
       # script for a reference under tests/:
-      - 'tests/qa_manifest.py'          # PAGES — sync_doc_metadata runs `--emit leak` (#1426)
-      - 'tests/leak_token_sweep.py'     # JSON_ENDPOINTS — AST-read from the literal there (#1448)
+      - 'qa/qa_manifest.py'          # PAGES — sync_doc_metadata runs `--emit leak` (#1426)
+      - 'qa/leak_token_sweep.py'     # JSON_ENDPOINTS — AST-read from the literal there (#1448)
       # Not a fact source — it is the pytest that reds when the PLATFORM_STATS literal
       # drifts, and it runs in CI/CD's Unit Tests. Listed anyway so a change to the guard
       # still runs the gate family it belongs to.

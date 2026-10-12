@@ -17,7 +17,7 @@ This file keeps both fixed:
      re-captured back to the pre-#3023 shape without this going red);
   2. the render-gate fixture matches the baseline's shape (fixture-shape drift
      fails HERE, offline, before the browser pass would re-render the empty state);
-  3. the fixture is wired into tests/pr_render_gate.py's populated pass with a
+  3. the fixture is wired into qa/pr_render_gate.py's populated pass with a
      whoop-block marker check — the acceptance the issue asked for;
   4. a negative control: the drift gate's own diff (`diff_shape`, the function
      `--check-drift` calls — never a re-implementation) reports a BREAKING finding

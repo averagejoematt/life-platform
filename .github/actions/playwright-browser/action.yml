@@ -1,6 +1,6 @@
 name: 'Playwright browser for the visual-QA harness'
 description: >-
-  The ONE install step list for tests/visual_qa.py (#4254). It replaces the copied
+  The ONE install step list for qa/visual_qa.py (#4254). It replaces the copied
   "Install Playwright + <browser>" block in the four visual-QA jobs: ci-cd.yml visual-qa,
   site-deploy.yml visual-qa, visual-qa.yml (standalone) and webkit-mobile-qa.yml. Before
   this, a change to the pins or the engine install had to land four times, and the callers

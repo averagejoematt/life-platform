@@ -1,7 +1,7 @@
 """Guard the mypy-clean module set (#1656, part of eng-excellence #1648).
 
 The clean set is now **the whole first-party Python surface** — every package under
-``lambdas/`` plus ``mcp/``, with an EMPTY denylist. See ``tests/mypy_clean_set.py``
+``lambdas/`` plus ``mcp/``, with an EMPTY denylist. See ``scripts/mypy_clean_set.py``
 (the single source of truth this test and the ci-lint.yml "Mypy gate" step both
 consume, so they can never drift). Mypy must pass cleanly on that whole set under
 ``mypy.ini``; CI runs the identical list and FAILS THE BUILD on a regression
@@ -107,7 +107,7 @@ def test_every_first_party_package_is_in_the_clean_set() -> None:
     missing = [d for d in on_disk if d not in CLEAN_DIRS]
     assert not missing, (
         f"first-party package(s) {missing} hold .py modules but are absent from "
-        "tests/mypy_clean_set.py::CLEAN_DIRS, so none of their modules are type-checked. "
+        "scripts/mypy_clean_set.py::CLEAN_DIRS, so none of their modules are type-checked. "
         "Add each directory to CLEAN_DIRS (the globs are non-recursive) in the same PR "
         "that creates it."
     )
@@ -181,7 +181,7 @@ def test_mypy_clean_on_first_party_surface() -> None:
 
 
 def test_this_docstring_names_no_error_codes() -> None:
-    """#3539: tests/mypy_clean_set.py's docstring may not ENUMERATE mypy.ini's disabled
+    """#3539: scripts/mypy_clean_set.py's docstring may not ENUMERATE mypy.ini's disabled
     codes — it may only point at them.
 
     It used to say "four structural codes — assignment / arg-type / return-value /
@@ -198,7 +198,7 @@ def test_this_docstring_names_no_error_codes() -> None:
     codes = _mypy_global_disabled_codes()
     named = sorted(c for c in codes if c in doc)
     assert not named, (
-        f"tests/mypy_clean_set.py's docstring names mypy.ini disabled code(s) {named}. "
+        f"scripts/mypy_clean_set.py's docstring names mypy.ini disabled code(s) {named}. "
         "Do not restate the list — point at mypy.ini's `disable_error_code` and at this "
         "file's ratchet, which read it. A prose copy is what drifted at #3539."
     )

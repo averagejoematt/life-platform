@@ -15,9 +15,9 @@ on:
       - '.github/workflows/v4-gate.yml'
       # #408: the PR-time render/accuracy gate harness — a change to it must re-run
       # the gate against itself.
-      - 'tests/pr_render_gate.py'
-      - 'tests/visual_qa.py'
-      - 'tests/accuracy_audit.py'
+      - 'qa/pr_render_gate.py'
+      - 'qa/visual_qa.py'
+      - 'qa/accuracy_audit.py'
       # #1039: the realistic-data fixtures the render gate's populated pass mocks
       # with — a fixture-shape change must re-run the gate against itself too.
       - 'tests/fixtures/render_gate/**'
@@ -153,7 +153,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Render + accuracy gate (headless local render, mocked API)
-        run: python3 tests/pr_render_gate.py --out qa-render-gate --keep
+        run: python3 qa/pr_render_gate.py --out qa-render-gate --keep
 
       # #4586 — the kit pages of the living front page: a page taller than its
       # phone-screen budget (six for the front page, four elsewhere) fails here,

@@ -130,7 +130,10 @@ test("next names the first date something settles, gives the whole count and lis
   assert.match(html, /Four more are due after these\./);
   assert.match(html, /Seven older calls are still waiting to be checked\./);
   assert.doesNotMatch(text(html), /\b20\d\d-\d\d-\d\d\b/);
-  assert.match(html, /One open bet against another coach: the next section has it\./);
+  assert.match(html, /<p class="ck-soft">Four more are due after these\. Seven older calls are still waiting to be checked\.<\/p>$/, "the accounting is one paragraph");
+  // the open bet is the next section's own card; this section does not signpost it (2026-10-11)
+  assert.doesNotMatch(html, /next section/);
+  assert.match(C.nextHTML(SLEEP, null, CALLS.sleep, NAMES, TODAY), /The bets between coaches are not available right now\.<\/p>$/);
   // A bet that settles before the first call leads instead (the October 4 shape of the docket).
   const soon = structuredClone(DOCKET);
   soon.open.find((b) => [b.coach_a, b.coach_b].includes("sleep_coach")).resolution_date = "2026-10-12";
@@ -219,7 +222,7 @@ test("the stage Matthew is in, its plan and what opens the next one; then the st
 
 test("the record is a count beside the comparison, never a percentage and never alone", () => {
   const html = C.recordHTML(SLEEP);
-  assert.match(html, /<p class="ck-big">15<span>of 35 checked calls<\/span><\/p>/);
+  assert.match(html, /<p class="ck-big">15<span> of 35 checked calls<\/span><\/p>/);
   // The route serves the comparison for this coach's calls alone, so the sentence says whose.
   assert.equal(SLEEP.report_card.track_record.comparison.sentence, "Across 35 checked calls, so far they do not beat a simple guess.");
   assert.match(html, /Across Lisa Park’s 35 checked calls, so far they do not beat a simple guess\. The simple guess is that nothing changes from the last reading\./);
@@ -312,7 +315,7 @@ test("when the coach's own route is not served, the roster still names it and ca
   assert.equal(view.name, "Lisa Park");
   assert.equal(view.partial, true);
   assert.match(C.watchingHTML(view), /not available right now/);
-  assert.match(C.recordHTML(view), /15<span>of 35 checked calls/, "the roster carries the record and its comparison");
+  assert.match(C.recordHTML(view), /15<span> of 35 checked calls/, "the roster carries the record and its comparison");
   const thin = structuredClone(ROSTER);
   thin.coaches.find((c) => c.persona_id === "sleep_coach").comparison = null;
   assert.match(C.recordHTML(C.coachView("sleep_coach", null, thin)), /What a simple guess would have scored/, "a roster entry with no comparison draws no count");

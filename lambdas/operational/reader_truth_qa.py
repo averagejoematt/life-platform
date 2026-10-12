@@ -1,14 +1,14 @@
 """
 reader_truth_qa.py — the shared phase-aware "reader truth" rubric (#1095/#1096).
 
-The visual AI-QA layer (tests/visual_ai_qa.py) judges whether pages RENDER; this
+The visual AI-QA layer (qa/visual_ai_qa.py) judges whether pages RENDER; this
 module judges whether their PROSE can be TRUE at the current experiment phase.
 Matthew's 2026-07-11 manual review found ~10 truth-class items by hand (week-long
 trends narrated on day 0, numbers that could not exist yet, the same paragraph
 pasted across lenses) — this rubric turns that read-through into a machine gate.
 
 ONE prompt, TWO hooks (both import this module so the rubric can never fork):
-  - CI post-deploy: tests/visual_ai_qa.assess_reader_truth() over the harness's
+  - CI post-deploy: qa/visual_ai_qa.assess_reader_truth() over the harness's
     rendered-prose dumps (visual_qa.py --reader-truth), gating like AI-vision.
   - Nightly: lambdas/operational/qa_smoke_lambda.check_reader_truth() over a
     small HTTPS-fetched surface set, so truth regressions surface between
@@ -39,7 +39,6 @@ importable by the CI-side harness (tests/ already puts lambdas/ on sys.path).
 Stdlib-only — safe to import anywhere.
 """
 
-import json
 import os
 import re
 from datetime import date, timedelta
@@ -637,7 +636,7 @@ def build_prompt(pages, phase, max_chars=MAX_PROSE_CHARS):
 # The fix is a NAMED third state on the verdict itself. `severity` becomes
 # "unknown" (never a severity any caller gates or clears on) and the
 # UNEVALUATED_FIELD carries WHY, so the two callers can route:
-#   * the CI gate (tests/visual_ai_qa.assess_reader_truth) FAILs the surfaces in
+#   * the CI gate (qa/visual_ai_qa.assess_reader_truth) FAILs the surfaces in
 #     an unevaluated batch — it blocks a deploy on `high`, so "the judge did not
 #     answer" is a failure to evaluate, never a pass;
 #   * the nightly advisory (operational/qa_check_reader_truth) WARNs — it is
@@ -741,40 +740,36 @@ def parse_verdict(text):
     `findings` is empty because nothing was read, not because nothing was found,
     and callers must route on `unevaluated` before they read `findings`.
     """
-    m = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not m:
-        return {
-            "findings": [],
-            "severity": "unknown",
-            "summary": "(no structured verdict)",
-            UNEVALUATED_FIELD: KIND_NO_VERDICT,
-            "raw": (text or "")[:200],
-        }
+    from ai import structured_json  # the one parse door (#4276 box 2)
+
+    # The span runs from the FIRST "{" to the LAST "}" (the greedy DOTALL regex this
+    # replaced). #4474: a complete verdict followed by prose that itself contains a brace
+    # (or by a second object) spans both and fails to parse, although the verdict is
+    # whole — `first_value_fallback` then reads exactly one object from the first "{".
+    # A reply whose first object is itself broken still fails, and the GREEDY decoder
+    # error is kept, so the next unparseable batch names the position and reason.
     try:
-        v = json.loads(m.group(0))
-    except json.JSONDecodeError as greedy_err:
-        # #4474: the greedy span runs from the FIRST "{" to the LAST "}". A complete
-        # verdict followed by prose that itself contains a brace (or by a second
-        # object) spans both and fails to parse, although the verdict is whole.
-        # raw_decode reads exactly one object from the first "{" and ignores what
-        # follows. A reply whose first object is itself broken still fails, and the
-        # decoder's own message is kept, so the next unparseable batch names the
-        # position and reason instead of only "unparseable".
-        try:
-            v, _end = json.JSONDecoder().raw_decode(m.group(0))
-        except json.JSONDecodeError:
+        v = structured_json.load_json_span(text, "{", first_value_fallback=True)
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":
             return {
                 "findings": [],
                 "severity": "unknown",
-                "summary": "(unparseable verdict)",
-                UNEVALUATED_FIELD: KIND_UNPARSEABLE,
+                "summary": "(no structured verdict)",
+                UNEVALUATED_FIELD: KIND_NO_VERDICT,
                 "raw": (text or "")[:200],
-                "detail": f"{greedy_err.msg} at char {greedy_err.pos} of {len(m.group(0))}",
             }
-    # No isinstance(v, dict) guard here on purpose: the regex above only ever
-    # yields a span that starts "{" and ends "}", so json.loads returns a dict or
-    # raises — a third case does not exist, and a guard that cannot fire is the
-    # thing this issue is about.
+        return {
+            "findings": [],
+            "severity": "unknown",
+            "summary": "(unparseable verdict)",
+            UNEVALUATED_FIELD: KIND_UNPARSEABLE,
+            "raw": (text or "")[:200],
+            "detail": f"{e.msg} at char {e.pos} of {e.span_len}",
+        }
+    # No isinstance(v, dict) guard here on purpose: the span always starts "{" and
+    # ends "}", so the parse returns a dict or raises — a third case does not exist,
+    # and a guard that cannot fire is the thing this issue is about.
     if not isinstance(v.get("findings"), list):
         v["findings"] = []
     return v

@@ -21,6 +21,7 @@ from stacks.role_policies_base import (
     SES_IDENTITY,
     TABLE_ARN,
     _bedrock_statement,
+    _bedrock_telemetry_statement,
     _s3,
     _secret_arn,
 )
@@ -317,6 +318,67 @@ def compute_state_of_matthew() -> list[iam.PolicyStatement]:
         needs_s3_config=True,
         needs_s3_write=["generated/qa_archive/text/*"],
     )
+
+
+def compute_coach_vision() -> list[iam.PolicyStatement]:
+    """#3759 (epic #3743): the Monday coach-vision Lambda — the ONE compute role that may read
+    the progress photos, and only to show them to the model.
+
+    Deliberately NOT `_compute_base()`: that helper grants table-wide PutItem/UpdateItem, and
+    this function writes exactly one owner-only partition. Each statement is the minimum
+    that makes the run complete:
+
+      * **DDB read** — the photo index (`USER#matthew#SOURCE#progress_photos`), the `dexa`
+        and `measurements` anchors, and its own partition (the idempotence read).
+      * **DDB write, LeadingKeys `USER#matthew#SOURCE#coach_vision`** — the observation row
+        and nothing else on the table. It can never write a photo index row, a nutrition
+        row, or anything a reader surface serves.
+      * **S3 GetObject on the photo prefix** — by the keys the index rows carry. No
+        ListBucket (the index is the enumeration), no Put, no Delete. The viewer (#3760)
+        holds the same read for presigning; `telegram-worker` holds the matching PutObject;
+        no site-API role names `raw/` at all (#3757).
+      * **Bedrock + the telemetry companion** (#3563) and the budget-tier SSM read — the
+        ADR-062 chokepoint and the ADR-125 gate in front of it.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDBRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DynamoDBCoachVisionWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringEquals": {
+                    "dynamodb:LeadingKeys": ["USER#matthew#SOURCE#coach_vision"],
+                },
+            },
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3ProgressPhotoRead",
+            actions=["s3:GetObject"],
+            resources=_s3("raw/matthew/progress_photos/*"),
+        ),
+        _bedrock_statement(),
+        _bedrock_telemetry_statement(),
+        iam.PolicyStatement(
+            sid="BudgetTierRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
 
 
 # ingestion_google_calendar() removed v3.7.46 — ADR-030 (integration retired)

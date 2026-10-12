@@ -10,7 +10,7 @@ constellation keeps its section BELOW the fold — it is a pillar-correlation
 instrument, not a loop teacher.
 
 Source-level pins (the geometric render check runs via the local Playwright
-harness pre-merge at 1280 + 390; tests/visual_qa.py's manifest checks are the
+harness pre-merge at 1280 + 390; qa/visual_qa.py's manifest checks are the
 live arbiter).
 """
 

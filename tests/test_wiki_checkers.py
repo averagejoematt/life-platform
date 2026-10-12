@@ -329,7 +329,7 @@ def test_doc_facts_gate_is_not_vacuous():
     # the "python3 tests/" glue class must NOT match a test-count pattern.
     joined = [p for _, pats, _ in facts.FACT_SPECS for p in pats if "tests?" in p]
     assert joined, "expected test_count patterns to exist"
-    assert not any(re.search(p, "run python3 tests/visual_qa.py now") for p in joined)
+    assert not any(re.search(p, "run python3 qa/visual_qa.py now") for p in joined)
     # a real "N MCP tools" claim IS caught.
     tool_pats = [p for key, pats, _ in facts.FACT_SPECS if key == "tool_count" for p in pats]
     assert any(re.search(p, "the server exposes 143 MCP tools") for p in tool_pats)

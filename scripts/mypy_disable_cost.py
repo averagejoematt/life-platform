@@ -59,7 +59,7 @@ def disabled_codes(ini_path: str | None = None) -> list[str]:
 
 def clean_set() -> list[str]:
     out = subprocess.run(
-        [sys.executable, os.path.join(_REPO, "tests", "mypy_clean_set.py")],
+        [sys.executable, os.path.join(_REPO, "scripts", "mypy_clean_set.py")],
         capture_output=True,
         text=True,
         cwd=_REPO,

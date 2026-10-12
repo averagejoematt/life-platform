@@ -54,7 +54,7 @@ Last reconciled: **2026-08-23**. 26 active us-west-2 + 3 us-east-1, 0 in deletio
 
 | Source | Secret name (AWS Secrets Manager) | Auth pattern | Re-auth cadence | Re-auth procedure | Verified |
 |---|---|---|---|---|---|
-| Garmin | `life-platform/garmin` | OAuth1 + OAuth2 | ~30 days (OAuth1 refresh) | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | ✅ 2026-07-10 |
+| Garmin | `life-platform/garmin` | OAuth1 + OAuth2 | RETIRED 2026-10-11 (#4640) — no consumer; delete is owner-attended | n/a | n/a |
 | Withings | `life-platform/withings` | OAuth2 | similar to Garmin (manual refresh on rate-limit) | `setup/fix_withings_oauth.py` | ✅ 2026-07-10 |
 | Strava | `life-platform/strava` | OAuth2 | similar pattern | manual refresh script | ✅ 2026-07-10 |
 | Whoop | `life-platform/whoop` | OAuth2 | similar pattern | `python3 setup/setup_whoop_auth.py` (localhost:3000 callback server, mirrors `fix_withings_oauth.py`; moved from `deploy/` by #935) | ✅ 2026-07-11 |
@@ -170,7 +170,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 | `life-platform/whoop` | `whoop-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens — Whoop Lambda refreshes on expiry |
 | `life-platform/withings` | `withings-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens |
 | `life-platform/strava` | `strava-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens |
-| `life-platform/garmin` | `garmin-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | garth OAuth tokens |
+| `life-platform/garmin` | none — direct-API function retired (#4640); freshness-checker/pipeline-health-check describe-only; owner-attended delete pending | garth OAuth tokens (dormant) |
 | `life-platform/eightsleep` + `life-platform/eightsleep-client` | `eightsleep-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | creds + client ID |
 | `life-platform/habitify` | `habitify-data-ingestion`, `pipeline-health-check` | API key |
 | `life-platform/hevy` | `hevy-backfill` (via `hevy_common.py`), `pipeline-health-check` | read API key |

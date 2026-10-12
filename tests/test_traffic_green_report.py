@@ -17,7 +17,7 @@ duty for "healthy" and "broken reporter". These tests pin the new contract:
      yields error dicts, not an exception).
   4. lambda_handler sends the Monday email even on a quiet-traffic week — the
      green report IS the positive confirmation.
-  5. Coverage numbers derive live from tests/qa_manifest.py via
+  5. Coverage numbers derive live from qa/qa_manifest.py via
      build_bundle.stage_qa_coverage() — never hand-maintained — and the staged
      payload is deterministic (no timestamps: a churning payload would flip
      the CDK asset hash every synth and force spurious full-fleet updates).
@@ -52,7 +52,7 @@ FULL_REPORT = {
         "paused_checks": 1,
     },
     "coverage": {
-        "source": "tests/qa_manifest.py (#1426)",
+        "source": "qa/qa_manifest.py (#1426)",
         "pages_total": 80,
         "pages_by_tier": {"tier1": 6, "tier2": 53, "tier3": 17, "tier4": 4},
         "visual_defs": 79,

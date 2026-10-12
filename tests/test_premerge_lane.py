@@ -313,14 +313,14 @@ def test_the_structural_gates_run_pre_merge():
 def test_the_mypy_gate_runs_pre_merge_with_the_same_command():
     """ci-lint.yml's Mypy gate is ENFORCED and was invisible on a PR. Both lanes must run
     the identical command against the identical authoritative module list, so a change to
-    tests/mypy_clean_set.py cannot move one lane and leave the other behind."""
+    scripts/mypy_clean_set.py cannot move one lane and leave the other behind."""
     pre, lint = _text(), CI_LINT.read_text(encoding="utf-8")
-    command = "mypy --config-file mypy.ini $(python3 tests/mypy_clean_set.py)"
+    command = "mypy --config-file mypy.ini $(python3 scripts/mypy_clean_set.py)"
     assert (
         command in pre
     ), f"pr-checks.yml no longer runs the tier-2 mypy gate (`{command}`) — a var-annotated error red-mained main twice on 2026-08-08"
     assert (
-        "tests/mypy_clean_set.py" in lint
+        "scripts/mypy_clean_set.py" in lint
     ), "ci-lint.yml no longer reads the authoritative clean set — the two lanes would be checking different module sets"
 
 

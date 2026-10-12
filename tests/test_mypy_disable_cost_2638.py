@@ -12,7 +12,7 @@ issue was filed into; it is kept because the measurement trap at the bottom is s
 **silently** across the clean set. So "mypy passed" means a narrower thing than it reads as.
 
 The tracker said otherwise. **#1656 — "mypy strict-clean globally (empty the disable list)"
-— is CLOSED, with the list non-empty**, while `tests/mypy_clean_set.py` still described that
+— is CLOSED, with the list non-empty**, while `scripts/mypy_clean_set.py` still described that
 work as "the OTHER #1656 axis, still open". The code knew; the tracker did not. That is the
 #2578 defect class at tracker level: a thing that reads as done and is not.
 
@@ -71,7 +71,7 @@ import pytest  # noqa: E402
 cost = importlib.import_module("mypy_disable_cost")
 
 MYPY_INI = (pathlib.Path(_REPO) / "mypy.ini").read_text()
-CLEAN_SET_DOC = (pathlib.Path(_REPO) / "tests" / "mypy_clean_set.py").read_text()
+CLEAN_SET_DOC = (pathlib.Path(_REPO) / "scripts" / "mypy_clean_set.py").read_text()
 
 
 # ── the residual has an owner that is actually open ──────────────────────────

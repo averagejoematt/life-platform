@@ -104,7 +104,7 @@ without the name next to them.**
 
 - Recipes land in `config/portraits/<persona_id>.json`; the build regenerates the bundled module
   (`portrait_data.js`) which rides the ADR-098 content-hashed graph via `sync_site_to_s3.sh`.
-- Live pages must pass visual QA + the AI-vision pass (`tests/visual_qa.py --screenshot --ai-qa`)
+- Live pages must pass visual QA + the AI-vision pass (`qa/visual_qa.py --screenshot --ai-qa`)
   before the deploy is called done.
 - Rollback is structural: delete/revert the recipe → the fallback chain renders the sigil,
   pixel-identical to before.

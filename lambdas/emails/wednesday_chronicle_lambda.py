@@ -477,6 +477,18 @@ def _handler_core(event: dict, context) -> dict:
     if _dry:
         logger.info("[dry_run] rehearsal invoke — the week will be built but never stored, published or mailed")
 
+    # #4535 box 2: a rehearsal that NAMES a past week ({"dry_run": true, "week": N} / "desk_week_end") is built by the
+    # desk from that week's window alone (story_pipeline.live_week reads only (table, week_end)). The legacy gather and
+    # data packet below still run — they are the fallback writer's input and the continuity context — but they cover
+    # the CURRENT window, so every log line and every output field that would otherwise carry the current window's
+    # date or week is labelled or replaced, and the rehearsal never falls back to writing the current week.
+    _rehearsal_end = _rehearsal_week_end(event)
+    if _rehearsal_end:
+        logger.info(
+            f"[#4535] rehearsal names the week ending {_rehearsal_end} — the desk builds that window only; the legacy "
+            "gather/packet below cover the CURRENT window and are never handed to the desk's writer"
+        )
+
     # Phase 3 bootstrap/regenerate: {"recap_only": true} builds + commits the
     # "previously on" recap from EXISTING published installments WITHOUT writing a new
     # chronicle week. Lets the first recap go live now (and supports regeneration)
@@ -523,6 +535,8 @@ def _handler_core(event: dict, context) -> dict:
     except ImportError:
         pass
 
+    if _rehearsal_end:
+        logger.info("[#4535] legacy gather (current window — fallback-writer input only, not the rehearsed week):")
     data = gather_chronicle_data()
     if not data:
         return _held_week(
@@ -545,7 +559,9 @@ def _handler_core(event: dict, context) -> dict:
     # #2112 closed this class on the downstream sender; this is the generator's half.
     _target_date = (data.get("dates") or {}).get("end")
     _existing_status = None
-    if _target_date and not event.get("force"):
+    # A named-week rehearsal skips it: it writes nothing and mints no token, and the current window's row says
+    # nothing about the week it rehearses (a published current week would otherwise refuse a week-4 rehearsal).
+    if _target_date and not event.get("force") and not _rehearsal_end:
         _existing = _existing_installment(_target_date)
         _existing_status = (_existing or {}).get("status")
         if _existing_status in _store.PROTECTED_STATUSES:
@@ -583,7 +599,13 @@ def _handler_core(event: dict, context) -> dict:
             f"Failed to build data packet: {e}",
             dry_run=_dry,
         )
-    logger.info(f"Data packet: {len(data_packet)} chars, Week {week_num}")
+    if _rehearsal_end:
+        logger.info(
+            f"[#4535] legacy data packet: {len(data_packet)} chars, current window Week {week_num} — "
+            f"fallback-writer input only; the rehearsal's desk builds the week ending {_rehearsal_end}"
+        )
+    else:
+        logger.info(f"Data packet: {len(data_packet)} chars, Week {week_num}")
 
     # Build user message with previous installments for continuity
     user_parts = [data_packet]
@@ -728,6 +750,8 @@ def _handler_core(event: dict, context) -> dict:
     # replace the legacy passes below — including the #914 presence gate, which forced a logging stall into the story
     # and so narrated MacroFactor export lag as silence. STORY_DESK=off restores the legacy writer.
     _desk = None
+    # the week end every output field carries (date, confidence, recap meta, share-kit label) — the desk's when it wrote
+    _week_end = data["dates"]["end"]
     if _cached is None and os.environ.get("STORY_DESK", "on").lower() != "off" and _target_date:
         try:
             from content import story_pipeline
@@ -745,7 +769,23 @@ def _handler_core(event: dict, context) -> dict:
             raw_installment = _desk["raw_installment"]
             _skip_model_passes = True
             week_num = _desk["week"]
+            _week_end = _desk_end
             logger.info(f"[#4535] story desk wrote week {week_num}: {_desk['title']!r} · findings {_desk['findings']}")
+
+    # #4535 box 2: a named-week rehearsal never falls back to the legacy writer — that writer only knows the CURRENT
+    # window, so its output would be the current week reported as the rehearsed one.
+    if _rehearsal_end and not _desk:
+        logger.error(f"[#4535] rehearsal of the week ending {_rehearsal_end}: the desk did not build it — no legacy fallback")
+        return {
+            "statusCode": 422,
+            "body": json.dumps(
+                {
+                    "status": "rehearsal_not_built",
+                    "week_end": _rehearsal_end,
+                    "reason": "story desk declined or failed (STORY_DESK=off, not a season week end, or a desk error — see the log)",
+                }
+            ),
+        }
 
     # Call Sonnet
     try:
@@ -902,7 +942,7 @@ def _handler_core(event: dict, context) -> dict:
     if _HAS_CONFIDENCE:
         try:
             _journey_start = data.get("profile", {}).get("journey_start_date", EXPERIMENT_START_DATE)
-            _journey_days = (datetime.strptime(data["dates"]["end"], "%Y-%m-%d") - datetime.strptime(_journey_start, "%Y-%m-%d")).days
+            _journey_days = (datetime.strptime(_week_end, "%Y-%m-%d") - datetime.strptime(_journey_start, "%Y-%m-%d")).days
             _conf = compute_confidence(days_of_data=_journey_days)
             _conf_level = _conf.get("level") or "UNKNOWN"
             _conf_badge_html = _conf.get("badge_html", "")
@@ -926,7 +966,7 @@ def _handler_core(event: dict, context) -> dict:
     has_board = any(line.strip().startswith(">") and "editor's note" not in line.strip().lower() for line in body_md.split("\n"))
 
     # Collect all installments for index pages (including the new one)
-    date_str = data["dates"]["end"]
+    date_str = _week_end
     all_installments: list = []
     try:
         # ADR-058: phase=pilot hidden by default.
@@ -1315,6 +1355,46 @@ def _send_story_questions(event):
     return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": len(questions)})}
 
 
+#: #4584: the Tuesday question's send-once marker, beside Monday's ``STORYQ#W<n>`` in the chronicle partition. A
+#: suffix, not a new prefix, so story_season_qa's Monday check (an EXACT sk match) never reads it as Monday's send.
+TUESDAY_MARKER_SUFFIX = "#TUE"
+
+
+def _send_tuesday_question(event):
+    """#4584: Tuesday evening PT — ONE fixed question by email, on the Story Desk's channel and routing token, so his
+    reply lands verbatim in the owner-words store (and the week's STORYQA row) before Wednesday's edition. No model
+    call, no dossier read. Never blocks anything; sends once per week (the marker), ``force`` re-sends."""
+    import datetime as _dtm
+
+    from common.pacific_time import pacific_today
+    from content import story_dossier, story_questions
+
+    today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()
+    week = story_dossier.week_containing(today.isoformat())
+    if week is None:
+        return {"statusCode": 200, "body": json.dumps({"status": "no_week"})}
+    n = week["week"]
+    marker = {"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"STORYQ#W{n:03d}{TUESDAY_MARKER_SUFFIX}"}
+    if not event.get("force") and table.get_item(Key=marker).get("Item"):
+        return {"statusCode": 200, "body": json.dumps({"status": "already_sent", "week": n})}
+    question = story_questions.tuesday_question(n)
+    if event.get("dry_run"):
+        return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "question": question})}
+    resp = story_questions.send_tuesday(ses, week=n, question=question, to=RECIPIENT, sender=SENDER)
+    from experiment.phase_taxonomy import experiment_stamp_for
+
+    table.put_item(
+        Item={
+            **marker,
+            "questions_json": json.dumps([question]),
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "message_id": resp.get("MessageId", ""),
+            **experiment_stamp_for(marker["pk"], marker["sk"]),  # #3599: the class-gated write-time stamp
+        }
+    )
+    return {"statusCode": 200, "body": json.dumps({"status": "sent", "week": n, "questions": 1})}
+
+
 def lambda_handler(event: dict, context) -> dict:
     """#2669: timeout-watchdog wrapper (common.timeout_watchdog) — _handler_core is the real flow."""
     from common.timeout_watchdog import arm, disarm
@@ -1327,6 +1407,8 @@ def lambda_handler(event: dict, context) -> dict:
     try:
         if isinstance(event, dict) and event.get("story_questions"):
             return _send_story_questions(event)  # #4546: Monday's optional questions — never touches the week's chronicle
+        if isinstance(event, dict) and event.get("tuesday_question"):
+            return _send_tuesday_question(event)  # #4584: Tuesday's one question — never touches the week's chronicle
         return _handler_core(event, context)
     finally:
         disarm(timer)

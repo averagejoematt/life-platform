@@ -91,7 +91,7 @@ DIST_FOR_IMPORT = {
 
 # The directories a repo script's `sys.path.insert(...)` can point at. A top-level import
 # name that resolves under any of these is repo-local and is followed, not required.
-_LOCAL_ROOTS = [".", "scripts", "deploy", "deploy/lib", "tests", "lambdas", "mcp", "remediation", "cdk"]
+_LOCAL_ROOTS = [".", "scripts", "deploy", "deploy/lib", "qa", "tests", "lambdas", "mcp", "remediation", "cdk"]
 _LOCAL_ROOTS += sorted(
     os.path.relpath(d, _REPO) for d in glob.glob(os.path.join(_REPO, "lambdas", "*")) if os.path.isdir(d) and not d.endswith("__pycache__")
 )
@@ -244,7 +244,7 @@ ALLOWED_ABSENT = (
     (
         "webkit-mobile-qa.yml",
         "webkit-mobile-qa",
-        "tests/visual_qa.py",
+        "qa/visual_qa.py",
         "boto3",
         "deploy_convergence's CloudWatch emit is reached only with VISUAL_QA_EXPECT_BUILD set (the deploy-time path); "
         "the weekly WebKit sweep is deterministic-only and holds no AWS role for it",
@@ -252,14 +252,14 @@ ALLOWED_ABSENT = (
     (
         "v4-gate.yml",
         "render-accuracy-gate",
-        "tests/pr_render_gate.py",
+        "qa/pr_render_gate.py",
         "boto3",
         "accuracy_audit's boto3 is its DynamoDB path; the render gate calls impossible_values/sanity_scan against a mocked local API",
     ),
     (
         "v4-gate.yml",
         "render-accuracy-gate",
-        "tests/pr_render_gate.py",
+        "qa/pr_render_gate.py",
         "pillow",
         "PIL is reached only through visual_ai_qa under --ai-qa; the render gate is deterministic",
     ),
@@ -521,14 +521,14 @@ def _resolve_py(raw: str, repo: str, caller_dir: str | None, cd_dir: str | None)
         p = p[3:]
     if p.startswith("$") or not p.endswith(".py"):
         return None
-    bases = [b for b in (cd_dir, caller_dir) if b] + ["", "deploy", "deploy/lib", "scripts", "tests"]
+    bases = [b for b in (cd_dir, caller_dir) if b] + ["", "deploy", "deploy/lib", "scripts", "qa", "tests"]
     for b in bases:
         cand = os.path.normpath(os.path.join(repo, b, p))
         if os.path.isfile(cand):
             return os.path.relpath(cand, repo)
     hits = [
         os.path.relpath(h, repo)
-        for root in ("scripts", "deploy", "deploy/lib", "tests")
+        for root in ("scripts", "deploy", "deploy/lib", "qa", "tests")
         for h in glob.glob(os.path.join(repo, root, os.path.basename(p)))
     ]
     return hits[0] if len(hits) == 1 else "UNRESOLVED:" + p

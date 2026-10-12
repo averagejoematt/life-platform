@@ -45,10 +45,11 @@ CAPTURE_DAY = "2026-10-03"
 CAPTURE_INSTANT = datetime(2026, 10, 4, 2, 29, tzinfo=timezone.utc)
 START_DATE = "2026-09-06"
 
-# What the front page still reads besides the edition (#4582 box 1, "the front page makes
-# one data request", is NOT met while this set is non-empty). A ratchet: it may only shrink.
-# The transcript is read from the edition's own podcast URL, so it is not a route.
-FRONT_EXTRA_READS = {"/api/calls", "/api/weekly_priority", "/api/character"}
+# #4582 box 1, "the front page makes one data request": met 2026-10-11, when the last routes
+# the front page read beside the edition (/api/calls, /api/character and seven days of
+# /api/coach_moves) and the week page's /api/weekly_priority became blocks of the edition.
+# The front page's mount makes NO read of its own; the week page's only other read is the
+# chapter's published transcript, addressed by the edition's own podcast URL.
 
 
 def _wire() -> dict:
@@ -108,8 +109,33 @@ def _paths(node, pre: str = "") -> set:
 
 def _moves_wire() -> dict:
     """The wire with a current day of coach moves (#4583) on the dashboard — the other voice
-    the coach_lines block speaks in, so its fields are part of the route's shape too."""
+    the coach_lines block speaks in, so its fields are part of the route's shape too — and a
+    week of served lines and a weekly read from the lead (the capture's week had neither), so
+    the moves and lead_read blocks' served fields are part of it as well."""
     wire = _wire()
+    days = copy.deepcopy(wire["moves"]["days"])
+    days[0] = {
+        **days[0],
+        "state": "ok",
+        "lines": [
+            {
+                "coach_id": "physical_coach",
+                "coach": "Max Reyes",
+                "move": "push_back",
+                "move_label": "Push back",
+                "text": "I disagree.",
+                "replies_to": "Lisa Park",
+                "bet_settles": "2026-10-06",
+            }
+        ],
+    }
+    wire["moves"] = {"days": days}
+    wire["priority"] = {
+        **wire["priority"],
+        "weekly_priority": "The priority this week is sleep.",
+        "data_through": CAPTURE_DAY,
+        "coach_name": "Eli Marsh",
+    }
     dash = copy.deepcopy(wire["dashboard"])
     dash["moves"] = {
         "date": CAPTURE_DAY,
@@ -201,23 +227,49 @@ def test_the_page_reads_only_blocks_the_route_serves():
     """A block name the page reads that the route does not serve resolves to the generic
     UNSERVED stand-in, so a typo would print "not served" forever on a served block."""
     read, fns = _blocks_read_by_page()
-    assert {"frontSlots", "mountFront", "todayBandHTML"} <= set(fns), f"scanned {fns} — the block-read scan has gone blind"
+    assert {"frontSlots", "frontReadSlots", "mountFront", "mountWeek", "todayBandHTML"} <= set(
+        fns
+    ), f"scanned {fns} — the block-read scan has gone blind"
     assert len(read) >= 6, f"found only {sorted(read)} — the block-read scan has gone blind"
     unknown = sorted(read - set(_ed.ORDER))
     assert not unknown, f"the page reads blocks /api/edition does not serve: {unknown}"
 
 
-def test_the_front_page_reads_nothing_new_beside_the_edition():
-    """#4582 box 1 is one data request. The front page still reads FRONT_EXTRA_READS after
-    the edition; that set is named here and may only shrink."""
+def _body(src: str, head: str) -> str:
+    """The text of the top-level function starting ``head``, up to the next top-level one."""
+    at = src.index(head)
+    nxt = _NEXT_FN.search(src, at + len(head))
+    return src[at : nxt.start() if nxt else len(src)]
+
+
+_ANY_READ = re.compile(r"\b(?:tryJSON|fetch)\(")
+
+
+def test_the_front_page_makes_one_data_request():
+    """#4582 box 1. The mount reads the edition once, for every page; the front page's own
+    mount, and every builder it fills from, reads nothing else — not a route, not a file, not
+    a templated address (the seven /api/coach_moves?date= reads were a template literal that
+    an exact-string scan never saw)."""
     pages = _read(PAGES_JS)
-    front = pages[pages.index("async function mountFront") : pages.index("async function mountStart")]
-    reads = set(re.findall(r'tryJSON\("([^"]+)"\)', front))
-    assert "tryJSON(transcriptUrl)" in front, "the transcript read moved — re-check this scan"
-    grown = sorted(reads - FRONT_EXTRA_READS)
-    assert not grown, f"the front page reads more besides /api/edition: {grown} — fold it into the edition instead"
-    # The mount reads the edition once, for every page.
     assert len(re.findall(r'tryJSON\("/api/edition"\)', pages)) == 1
+    mount = _body(pages, "export async function mount()")
+    assert len(_ANY_READ.findall(mount)) == 1, "mount() reads something besides the edition"
+    for head in ("async function mountFront", "export function frontReadSlots", "export function frontSlots"):
+        assert not _ANY_READ.findall(_body(pages, head)), f"{head} reads something besides the edition"
+    # The builders the front page fills from are pure: ck_front.js reads nothing at all.
+    assert not _ANY_READ.findall(_read(FRONT_JS)), "ck_front.js reads a route — the front page's builders must be pure"
+
+
+def test_the_week_page_reads_only_the_transcript_beside_the_edition():
+    week = _body(_read(PAGES_JS), "async function mountWeek")
+    assert _ANY_READ.findall(week) == ["tryJSON("], "the week page reads more than the chapter's transcript"
+    assert "tryJSON(transcriptUrl)" in week
+
+
+def test_MUST_FAIL_the_one_request_scan_sees_a_templated_read():
+    """The control: the scan catches the read shape it once missed."""
+    planted = "async function mountFront(edition, b) {\n  const m = await tryJSON(`/api/coach_moves?date=${d}`);\n}\n"
+    assert _ANY_READ.findall(_body(planted, "async function mountFront")) == ["tryJSON("]
 
 
 if __name__ == "__main__":

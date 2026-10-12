@@ -29,7 +29,7 @@ WHY THIS FILE AND NOT AN EXTENSION OF sync_doc_metadata
 
 WHAT EACH FIELD IS CHECKED AGAINST
   review_grade   → the modal lens grade in the newest docs/reviews/*_grades_*.json
-  site_pages     → len(tests/qa_manifest.MANIFEST), the single page registry
+  site_pages     → len(qa/qa_manifest.MANIFEST), the single page registry
   active_secrets → model/platform_model.json cost_surface.secrets
 
   `review_count`, `board_technical` and `board_product` are deliberately NOT checked, and
@@ -133,7 +133,7 @@ def test_site_pages_matches_the_single_page_registry():
     served = _stats()["site_pages"]
     actual = len(qa_manifest.MANIFEST)
     assert served == actual, (
-        f"PLATFORM_STATS['site_pages'] is {served} but tests/qa_manifest.py registers {actual}. "
+        f"PLATFORM_STATS['site_pages'] is {served} but qa/qa_manifest.py registers {actual}. "
         "qa_manifest is the single page registry four consumers derive from; it is the number."
     )
 

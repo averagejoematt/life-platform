@@ -6,9 +6,11 @@ import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from health import (
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
+    training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
 )
 
 from mcp.core import (
@@ -497,10 +499,10 @@ def _get_nutrition_summary(args):
     averages["fiber_per_1000kcal"] = avg("fiber_per_1000kcal")
 
     # Reference targets (from profile / common goals)
-    # Matthew-specific targets: 2400 kcal deficit, 180g protein (~0.8g/lb BW)
+    # Matthew-specific targets: 2400 kcal deficit; protein is the plan's floor (common.constants, #4540)
     TARGETS = {
         "calories_kcal": 2400,
-        "protein_g": 180,
+        "protein_g": PLAN_DAILY_PROTEIN_MIN_G,
         "fiber_g": _FIBER_TARGET_G,
         "fiber_per_1000kcal": 14,  # Board rec 1A (Norton): minimum fiber density
         "sodium_mg": 2300,
@@ -568,7 +570,7 @@ def _get_macro_targets(args):
     if budget and not refused:
         calorie_target = budget["target"]
     calorie_target = None if refused else (calorie_target or _DEFAULT_CALORIE_TARGET)
-    protein_target = protein_target or 180  # Matthew-specific: 180g protein (~0.8g/lb BW)
+    protein_target = protein_target or PLAN_DAILY_PROTEIN_MIN_G  # the plan's floor (#4540)
 
     def measured(item, field):
         """The day's rollup for `field`, or None when the day carries none.
@@ -652,7 +654,7 @@ def _get_macro_targets(args):
             "note": (
                 "REFUSED: the deficit this model implies cannot be reconciled with the measured weight trend, so no "
                 "calorie target is published and calorie adherence is not graded. Both figures are in "
-                "calorie_target_check. Protein (180 g floor) is unaffected and remains the primary nutrition gate."
+                "calorie_target_check. Protein (the plan's floor) is unaffected and remains the primary nutrition gate."
                 if refused
                 else (
                     "Calorie target = TDEE − deficit, where TDEE is Mifflin-St Jeor BMR plus the WORKED-SET exercise "
@@ -844,14 +846,17 @@ def tool_get_deficit_sustainability(args):
     habits_degraded = t0_dir == "declining" and abs(t0_delta) > _habit_cutoff
 
     # ── Channel 5: Training output ──
+    # #3754 (2026-10-04 sweep): this channel read the Strava day row's `total_kilojoules`,
+    # which is > 0 on 0 of 1,242 stored day rows all-time (only power-equipped activities
+    # report kilojoules), so its series was always all-zero and it could never read
+    # "degraded". The input is now the SAME per-day training load the ACWR/TSB surfaces
+    # use (`training.training_load`, #4075) over Strava + Hevy — see
+    # health/training_output_channel.py for the series contract.
     _training_cutoff = deficit_disclosures.CHANNEL_CUTOFFS["training_output"]["decline_pct"]
-    daily_kj = {}
-    for s in strava_items:
-        d = s.get("date", "")
-        kj = float(s.get("total_kilojoules", 0) or 0)
-        daily_kj[d] = daily_kj.get(d, 0) + kj
-    training_vals = [daily_kj[d] for d in sorted(daily_kj)] if daily_kj else []
+    _training = training_output_channel.series(strava_items, sources.get("hevy", []))
+    training_vals = _training["values"]
     train_dir, train_delta = trend_direction(training_vals)
+    train_avg = safe_avg(training_vals)
     training_degraded = train_dir == "declining" and abs(train_delta) > _training_cutoff
 
     # ── Composite assessment ──
@@ -899,8 +904,12 @@ def tool_get_deficit_sustainability(args):
             "status": "degraded" if training_degraded else "stable",
             "direction": train_dir,
             "delta_pct": train_delta,
+            "avg": train_avg,
             "cutoff_pct": _training_cutoff,
             "provenance": deficit_disclosures.CHANNEL_CUTOFFS["training_output"]["provenance"],
+            # #3754: what this channel measured, so a reader can tell a measured rest
+            # window from the all-zero input the channel used to carry.
+            "input": _training["input"],
         },
     ]
     degraded_count = sum(1 for c in channels if c["status"] == "degraded")

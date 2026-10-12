@@ -52,7 +52,7 @@ USAGE
         --expect-build "$GITHUB_SHA"            # exit 0 converged / 2 pending / 3 unavailable
 
 Consumers: `deploy/smoke_test_site.sh` (SMOKE_EXPECT_BUILD) and
-`tests/visual_qa.py` (VISUAL_QA_EXPECT_BUILD), both wired from
+`qa/visual_qa.py` (VISUAL_QA_EXPECT_BUILD), both wired from
 `.github/workflows/site-deploy.yml`.
 """
 

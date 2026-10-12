@@ -79,3 +79,11 @@ take any agent's account of elapsed time or its own exit code at face value.
 
 Return the full list, every finding accounted for, most severe first. Never soften a
 refutation to be polite to the finder.
+
+10. **A red that begins at a round-number instant is a clock before it is a merge.** Main went
+   red at exactly 2026-10-12T00:00Z on five energy-budget tests; two merges from the
+   previous hour were bisected as suspects for two hours before the cause was found: a
+   literal TDEE pinned through `resolve_age`'s live `datetime.now()` (#4848). When the first
+   failing run's timestamp is a midnight, a month boundary or a DST change, bisect the CLOCK
+   first — run the failing test with the clock frozen one day either side — and only then
+   the diffs.

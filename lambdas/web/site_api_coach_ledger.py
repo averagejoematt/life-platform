@@ -806,63 +806,30 @@ def handle_calibration(event, *, _g):
         )
 
 
-#: #4607 — the fields the front page's record line is computed from, and nothing else: a
-#: strict SUBSET of ``_PREDICTION_PROJECTION_FIELDS`` (pinned by
-#: tests/test_edition_latency_4607.py), all scalars. The identity and cycle keys
-#: (``prediction_id``, ``outcome_date``, ``phase``, ``tombstone``) are the ones
-#: ``coach_record`` reads; ``status``/``outcome``/``confidence`` are the grade and the Brier
-#: pair. The maps and prose the two full routes also carry (``evaluation``, ``baseline``,
-#: ``claim_natural``, ``outcome_notes`` …) are what made the same partitions cost megabytes.
-_RECORD_PROJECTION_FIELDS = ("status", "outcome", "confidence", "tombstone", "phase", "prediction_id", "outcome_date")
+def _counted_block(decided) -> dict:
+    """#4617: what the headline count counts — every decided row in exactly one class, never dropped."""
+    counted = coach_record.class_counts(decided)
+    return {"counted": counted, "counted_text": coach_record.counted_text(counted)}
 
 
-def edition_record(*, _g):
-    """The five facts /api/edition's record line prints, from ONE narrow partition sweep (#4607).
+def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
+    """The record line's five facts from the coaches' raw PREDICTION# rows (#4607) — pure.
 
-    The front page read ``/api/predictions`` and ``/api/calibration`` whole for
-    ``overall.confirmed``, ``overall.decided`` and the coaches' stratum (``brier_skill``,
-    ``n``). Measured 2026-10-04: those two reads were 7.8 MB of the 10.0 MB of DynamoDB
-    JSON one edition request parsed, and ~3.0 s of its ~4.8 s in the Lambda — each walks all
-    coach PREDICTION# partitions with the full projection, and the calibration route adds
-    the paginated CALIB# ledger, none of which the record line reads.
-
-    NOT a second derivation of the record. The rows are the same unfiltered career
-    partitions (``_query_partition`` — same key condition, order and Limit, so the same
-    page), run through the same functions in the same order the two routes use:
-    ``coach_record.resolved_once`` → ``coach_record.counts_this_cycle`` → the
+    NOT a second derivation of the record: the same functions in the same order the two
+    routes use — ``coach_record.resolved_once`` → ``coach_record.counts_this_cycle`` → the
     ``status`` tally ``handle_predictions`` keeps, and
     ``calibration_core.pairs_from_prediction_records`` → ``score_strata`` for the stratum
-    ``handle_calibration`` serves. Only the projection is narrower, and every field those
-    functions read is in it. A stratum's own numbers depend on its own pairs only, so
-    scoring the coaches' stratum without the hypothesis and forecast strata returns the
-    same ``strata.coaches``. tests/test_edition_latency_4607.py runs the two routes and
-    this reader over one fake table and asserts the record block is identical.
-
-    Returns ``{"predictions": {...}, "calibration": {...}}`` — each the subset of that
-    route's body the record line reads, in the route's own shape. Raises when every
-    partition read failed (the same "a total outage is a failure, not a zero" rule as
-    ``handle_predictions``, #2658); the caller serves the block unavailable.
-    """
-    _query_partition = _g["_query_partition"]
-    _parallel_fetch = _g["_parallel_fetch"]
-    EXPERIMENT_START = _g["EXPERIMENT_START"]
-    failures: list = []
-    fetched = _parallel_fetch(
-        {
-            cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _query_partition(pk, "PREDICTION#", _RECORD_PROJECTION_FIELDS))
-            for cid in _CALIB_COACH_NAMES
-        },
-        failures=failures,
-    )
-    if failures and len(failures) == len(_CALIB_COACH_NAMES):
-        raise RuntimeError(f"all {len(failures)} coach partition reads failed: {sorted(failures)}")
-    if failures:
-        logger.error(f"[edition-record] degraded — {len(failures)} of {len(_CALIB_COACH_NAMES)} partitions failed: {sorted(failures)}")
+    ``handle_calibration`` serves. A stratum's own numbers depend on its own pairs only, so
+    scoring the coaches' stratum without the hypothesis and forecast strata returns the same
+    ``strata.coaches``. Returns ``{"predictions": {...}, "calibration": {...}}`` — each the
+    subset of that route's body the record line reads, in the route's own shape."""
     confirmed = refuted = 0
     coach_pairs: list = []
+    season_all: list = []  # #4617: the rows the class counts are taken over — the same season
     for cid in _CALIB_COACH_NAMES:
-        records = coach_record.resolved_once(fetched.get(cid, []))
-        season = [r for r in records if coach_record.counts_this_cycle(r, EXPERIMENT_START)]
+        records = coach_record.resolved_once(rows_by_cid.get(cid, []))
+        season = [r for r in records if coach_record.counts_this_cycle(r, genesis)]
+        season_all.extend(season)
         for rec in season:
             status = rec.get("status", "pending")  # the bucket key handle_predictions tallies
             if status == "confirmed":
@@ -870,16 +837,59 @@ def edition_record(*, _g):
             elif status == "refuted":
                 refuted += 1
         coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
-    today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
     return {
         "predictions": {
-            "overall": {"confirmed": confirmed, "refuted": refuted, "decided": confirmed + refuted, "due": {"as_of": today_pt}}
+            "overall": {
+                "confirmed": confirmed,
+                "refuted": refuted,
+                "decided": confirmed + refuted,
+                "due": {"as_of": today_pt},
+                **_counted_block(season_all),
+            }
         },
         "calibration": {
             "platform": {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}},
             "as_of": today_pt,
         },
     }
+
+
+def edition_record(*, _g):
+    """The record line AND the settled calls for /api/edition from ONE partition sweep
+    (#4607, #4582 box 1).
+
+    The front page read ``/api/predictions`` and ``/api/calibration`` whole for five numbers
+    (#4607 narrowed that to one sweep), and then ``/api/calls`` on its own — the same eight
+    PREDICTION# partitions a second time, at the predictions route's projection. #4582 box 1
+    (the front page makes one data request) folds the calls into the edition, so the sweep is
+    now ``/api/calls``' own read (``site_api_calls.read``: the same key condition, order and
+    Limit as ``_query_partition``, so the same page of rows), and the record is derived from
+    those same rows by ``record_bodies`` — every field it reads is in that projection (pinned
+    by tests/test_edition_latency_4607.py). One sweep, two blocks.
+
+    Returns ``{"predictions", "calibration", "calls"}``. Raises when every partition read
+    failed (the "a total outage is a failure, not a zero" rule of ``handle_predictions``,
+    #2658); the caller serves those blocks unavailable. A partial failure serves the record
+    degraded, as before, and the calls ``None`` — the calls route's own rule (a missing
+    partition would unsettle "the newest settled call"). A fault in composing the calls never
+    touches the record.
+    """
+    from web import site_api_calls as _calls
+
+    names, fetched, failures = _calls.read(_g)
+    failed = [c for c in failures if c in names]
+    if failed and len(failed) == len(names):
+        raise RuntimeError(f"all {len(failed)} coach partition reads failed: {sorted(failed)}")
+    if failed:
+        logger.error(f"[edition-record] degraded — {len(failed)} of {len(names)} partitions failed: {sorted(failed)}")
+    today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
+    out = record_bodies({cid: fetched.get(cid, []) for cid in _CALIB_COACH_NAMES}, today_pt, _g["EXPERIMENT_START"])
+    try:
+        out["calls"] = _calls.document(names, fetched, failures, _g)
+    except Exception as e:  # noqa: BLE001 — the calls block says so; the record stands
+        logger.error(f"[edition-record] calls unavailable: {e}")
+        out["calls"] = None
+    return out
 
 
 def handle_voice_fidelity(event, *, _g):
@@ -1220,6 +1230,7 @@ def handle_predictions(event, *, _g):
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
                     "due": due,
+                    **_counted_block(season_decided),  # #4617: sealed / bets / commentary / conditional, as counts
                     "lifetime": {
                         "total": l_total,
                         "confirmed": l_confirmed,

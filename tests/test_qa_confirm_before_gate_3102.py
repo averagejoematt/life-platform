@@ -1,5 +1,5 @@
 """tests/test_qa_confirm_before_gate_3102.py — #3102: confirm-before-gate for
-NEW reader-truth highs in tests/visual_ai_qa.py (the CI deploy-time gate).
+NEW reader-truth highs in qa/visual_ai_qa.py (the CI deploy-time gate).
 
 WHY THIS EXISTS. Measured in the 2026-08-23/24 session: three site-deploys
 rolled back on single-run AI-truth verdicts, and two of the three did NOT
@@ -11,7 +11,7 @@ already solved the AI-verdict half for ITS surface (#2741,
 lambdas/operational/qa_check_reader_truth.py::_confirm_high_findings —
 measured 2/8 flake on byte-identical content). This is the same fix for the
 sibling surface that had none: the pre-merge CI gate
-(tests/visual_ai_qa.py::assess_reader_truth).
+(qa/visual_ai_qa.py::assess_reader_truth).
 
 Offline throughout — no Playwright, no live Bedrock; every judge call is a
 stub that never leaves the process.

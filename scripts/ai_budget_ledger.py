@@ -181,7 +181,7 @@ LEDGER: dict[str, dict] = {
         "per-feature dollars not separable; Aug journal-enrichment $0.01",
     ),
     "comprehension_qa": _row(
-        owner="tests/comprehension_qa.py",
+        owner="qa/comprehension_qa.py",
         attribution=EXCLUSIVE,
         attribution_keys=("comprehension_qa",),
         founding_usd=0.00,
@@ -257,6 +257,17 @@ LEDGER: dict[str, dict] = {
         "2026-09-19). Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo "
         "gets a look at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=life-platform-mcp}",
     ),
+    "coach_vision": _row(
+        owner="lambdas/coach/coach_vision.py",
+        attribution=EXCLUSIVE,
+        attribution_keys=("coach-vision",),
+        founding_usd=0.00,
+        monthly_budget_usd=1.00,
+        note="#3759: the Monday coach-vision read over the progress photos — ONE Haiku vision call a week with up to "
+        "six camera JPEGs, inside its own single-purpose Lambda (coach-vision), which makes no other Bedrock call. "
+        "Did not exist in the founding window, so $0 stamped; the floor budget means growth past $1/mo gets a look "
+        "at close. Re-measure from LifePlatform/AI::EstimatedCostUSD{LambdaFunction=coach-vision}",
+    ),
     "coach_diary_reaction": _row(
         owner="lambdas/coach/coach_diary_reaction.py",
         attribution=SHARED,
@@ -326,7 +337,7 @@ LEDGER: dict[str, dict] = {
         "nightly qa-smoke lambda, whose only AI is this gate",
     ),
     "visual_ai_qa": _row(
-        owner="tests/visual_ai_qa.py",
+        owner="qa/visual_ai_qa.py",
         attribution=EXCLUSIVE,
         attribution_keys=("visual-ai-qa",),
         founding_usd=3.11,

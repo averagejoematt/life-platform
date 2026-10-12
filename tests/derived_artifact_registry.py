@@ -306,7 +306,7 @@ ARTIFACTS: dict[str, dict] = {
         "scripts/v4_build_tone.py",
         step="deploy/sync_site_to_s3.sh / design-sync",
         reason=(
-            "Renders /method/tone/ from lambdas/coach/coach_register.py (#1390). tests/qa_manifest.py "
+            "Renders /method/tone/ from lambdas/coach/coach_register.py (#1390). qa/qa_manifest.py "
             "marks the page GENERATED so the QA sweep knows not to treat hand edits as authoritative."
         ),
     ),
@@ -473,6 +473,18 @@ ARTIFACTS: dict[str, dict] = {
         reason=(
             "Regenerates lambdas/common/constants.py, which is NOT under an artifact root. It only "
             "READS config/user_goals.json. Discovery sees the read because the module also writes."
+        ),
+    ),
+    "scripts/raw_kms_readability_inventory.py": _excluded(
+        "scripts/raw_kms_readability_inventory.py",
+        reason=(
+            "The #4634 raw-archive KMS readability check. It only READS docs/audits/"
+            "RAW_KMS_UNREADABLE_INVENTORY_2026-10.md (RECORD_PATH, the hand-written owner-reviewed "
+            "record that --check-against-record compares the live S3 set against); its one write is "
+            "the operator-supplied --json-out path, never a committed file. Discovery sees it because "
+            "the module names a committed docs/ literal and also calls open(..., 'w'). Regenerating the "
+            "record from this script would defeat the check, which exists to red when the live set "
+            "drifts from what the owner recorded."
         ),
     ),
 }

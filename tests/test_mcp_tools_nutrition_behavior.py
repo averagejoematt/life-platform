@@ -836,11 +836,11 @@ def test_summary_averages_only_the_days_that_carry_each_field(monkeypatch):
 
 
 def test_summary_compares_each_average_to_its_target_with_a_signed_gap(monkeypatch):
-    """protein average 125.0 vs the 180 g target -> gap -55.0, 69.4% of target, over the
+    """protein average 125.0 vs the plan's 170 g floor -> gap -45.0, 73.5% of target, over the
     n=2 days that carried protein."""
     install(monkeypatch, SUMMARY_ROWS)
     tc = tn.tool_get_nutrition(SUMMARY_ARGS)["target_comparison"]["protein_g"]
-    assert tc == {"target": 180, "average": 125.0, "gap": -55.0, "pct_of_target": 69.4, "n": 2}
+    assert tc == {"target": 170, "average": 125.0, "gap": -45.0, "pct_of_target": 73.5, "n": 2}
 
 
 def test_summary_errors_and_echoes_the_window_when_macrofactor_is_silent(monkeypatch):
@@ -990,7 +990,7 @@ def test_macros_falls_back_to_the_flat_default_when_no_weigh_in_exists(monkeypat
     install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT)
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
-    assert out["targets"]["protein_g"] == 180
+    assert out["targets"]["protein_g"] == 170
 
 
 def test_macros_errors_when_macrofactor_is_silent(monkeypatch):
@@ -1003,7 +1003,7 @@ def test_macros_still_answers_when_the_weight_lookup_fails(monkeypatch):
     install(monkeypatch, MACRO_ROWS, profile=PROFILE_WITH_HEIGHT, raise_sources={"withings"})
     out = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": "2026-05-02"})
     assert out["targets"]["calories_kcal"] == 2400
-    assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 180*0.95
+    assert out["adherence"]["protein_target_hit_pct"] == 0.0  # 150 and 100 both short of 170*0.95
 
 
 def test_macros_ignores_a_withings_row_that_carries_no_weight(monkeypatch):
@@ -1063,7 +1063,7 @@ def test_macros_refuses_the_calorie_target_when_the_weight_trend_contradicts_it(
     # ...and it does NOT quietly fall back to the 2400 flat default under another label
     assert t["daily_breakdown"][0]["calories_pct"] is None
     assert t["adherence"]["calorie_target_hit_pct"] is None
-    # the 180 g protein floor is unaffected and stays the primary nutrition gate (#3931)
+    # the 170 g protein floor is unaffected and stays the primary nutrition gate (#3931)
     assert t["adherence"]["protein_target_hit_pct"] == 100.0
 
 
@@ -1131,16 +1131,25 @@ def sust_rows(hrv=None, eff=None, rec=None, cal=1800, t0=None, kj=None) -> list[
         # exactly the shape ingestion/habitify_lambda.py writes
         rows += [habitify(day, completion_pct=t0[i], total_completed=8, total_possible=10) for i, day in enumerate(_SUST_DAYS)]
     if kj:
-        # DERIVED from the real writer: ingestion/strava_lambda.transform() rolls the
-        # per-activity `kilojoules` up into a day-level `total_kilojoules`, so the fixture
-        # cannot drift from what the strava partition actually holds.
+        # DERIVED from the real writer: ingestion/strava_lambda.transform() stores the
+        # per-activity `kilojoules` on the activity (and rolls a day-level
+        # `total_kilojoules` up beside it), so the fixture cannot drift from what the
+        # strava partition actually holds. #3754: the channel scores each activity's
+        # LOAD (`training.training_load`, kJ / 7.2 — a kJ series keeps its percentages),
+        # never the day-level rollup, which is 0 on every stored day row. A 0-kJ entry is
+        # the owner's real zero-output day: a Zone-1 walk with HR, observed rest at 0 load.
         from ingestion import strava_lambda
 
         for i, day in enumerate(_SUST_DAYS):
-            raw = {"activities": [{"kilojoules": kj[i], "moving_time_seconds": 3600}]}
-            produced = {k: v for k, v in strava_lambda.transform(raw, day)[0].items() if k not in ("source", "date")}
+            act = {"kilojoules": kj[i], "moving_time_seconds": 3600} if kj[i] else dict(Z1_WALK)
+            produced = {k: v for k, v in strava_lambda.transform({"activities": [act]}, day)[0].items() if k not in ("source", "date")}
             rows.append(strava(day, **produced))
     return rows
+
+
+#: A Zone-1 walk as Strava stores one for the owner: no power meter (`kilojoules` 0) and an
+#: average HR under the Zone-1 ceiling (109.8 bpm) — scores 0 load, an OBSERVED rest day.
+Z1_WALK = {"kilojoules": 0, "moving_time_seconds": 3600, "average_heartrate": 100, "sport_type": "Walk"}
 
 
 def channel(out: dict, name: str) -> dict:
@@ -1248,9 +1257,9 @@ def test_deficit_raises_a_watch_not_an_alarm_when_two_channels_degrade(monkeypat
 
 
 def test_deficit_reads_a_channel_that_starts_from_zero_as_stable(monkeypatch):
-    """Two rest days open the window, so the training series starts at 0 kJ. There
-    is no percentage change to state from a zero baseline — the channel must say
-    stable rather than divide by zero."""
+    """Two Zone-1 walks open the window — observed rest at 0 load (#4075) — so the
+    training series starts at 0. There is no percentage change to state from a zero
+    baseline — the channel must say stable rather than divide by zero."""
     install(monkeypatch, sust_rows(hrv=FLAT, kj=[0, 0, 50, 50, 80, 80]))
     train = channel(tn.tool_get_deficit_sustainability(SUST_ARGS), "Training Output")
     assert train["direction"] == "stable" and train["delta_pct"] == 0

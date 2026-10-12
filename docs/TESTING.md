@@ -361,7 +361,7 @@ diffs against the *previous* run, not perpetually against 2026-07-18.
 | Axis | Baseline (2026-07-18) | Target | Current | Evidence for baseline grade |
 |---|---|---|---|---|
 | Deploy gating | A− | A | A− | Production-approval gate + post-deploy smoke + auto-rollback exist and are exercised on every deploy, but `visual-qa` is not yet the only gate with edge cases (see ADR-076 history) and the approval-gate itself has had live drift incidents (#1319 — GitHub env protection dropping on a repo-visibility flip). |
-| Render breadth | C | A− | C | `tests/visual_qa.py` `PAGES` covered ~35 of ~80 live pages at baseline — 44 live pages (including live-data/AI/write pages) had zero render coverage. |
+| Render breadth | C | A− | C | `qa/visual_qa.py` `PAGES` covered ~35 of ~80 live pages at baseline — 44 live pages (including live-data/AI/write pages) had zero render coverage. |
 | FE unit tests | F | B | F | Zero JavaScript unit-test harness existed; no front-end code has ever run under a unit test. |
 | API contracts | B− | A− | B− | ~118 `/api` endpoints (101 `ROUTES` + 13 `_SIMPLE_ROUTES` + ~23 inline) with no per-endpoint schema baselines and no E2E coverage of the 8 write paths. |
 | AI-content QA | B | A− | B | `visual_ai_qa.py` (Haiku vision) and the ER-03 faithfulness harness exist and gate, but AI QA is not yet tiered/budget-visible — a budget-tier pause degrades silently rather than reporting. |

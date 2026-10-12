@@ -53,6 +53,12 @@ JARGON_TERMS: tuple[str, ...] = ("EWMA", "EMA", "slow wave", "hypothesis", "z-sc
 # The registry's renamed and cut terms, in registry order. Held equal to the registry by test.
 REGISTRY_TERMS: tuple[str, ...] = ("reset", "chronicle", "model", "as of", "Third Wall", "pillar", "pace flag", "gate", "character level")
 
+# Trade terms the coaches' daily front-page line carried past every other check (#4583, the live lines of
+# 2026-10-05..09: "non-compensated carb cuts", "glucose dynamics, not protein primacy", "recovery architecture",
+# "symptom baseline"). A whole line is a sentence or two, so the watch-item LENGTH rules above do not apply to it;
+# its plain-words check is the term lists: these, JARGON_TERMS and the registry's ruled terms (`line_terms`).
+LINE_JARGON_TERMS: tuple[str, ...] = ("architecture", "dynamics", "primacy", "baseline", "compensated", "mechanistic")
+
 _WORD_RE = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 
 
@@ -90,6 +96,21 @@ def reasons(text: Any, max_chars: int = MAX_CHARS) -> list[str]:
     if jargon:
         out.append("a specialist term: %s" % ", ".join(jargon))
     return out
+
+
+_LINE_JARGON_RES = tuple((term, _term_re(term)) for term in LINE_JARGON_TERMS)
+
+
+def line_terms(text: Any) -> list[str]:
+    """The plain-words check for a coach's daily line (#4583): every specialist term (JARGON_TERMS, then
+    LINE_JARGON_TERMS) and every registry-ruled term the line uses, in that order, each once. No length rule —
+    a line is a sentence, not an 80-character watch item. Empty when the line is plain."""
+    if not isinstance(text, str):
+        return []
+    found = (
+        specialist_terms(text) + [t for t, rx in _LINE_JARGON_RES if rx.search(text)] + [t for t, rx in _REGISTRY_RES if rx.search(text)]
+    )
+    return list(dict.fromkeys(found))
 
 
 def specialist_terms(text: Any) -> list[str]:

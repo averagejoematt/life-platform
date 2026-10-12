@@ -150,20 +150,6 @@ def ingestion_whoop() -> list[iam.PolicyStatement]:
     )
 
 
-def ingestion_garmin() -> list[iam.PolicyStatement]:
-    # #499: garmin_lambda.save_secret() calls secretsmanager.update_secret()
-    # directly (garth session-token writeback) — verified at
-    # lambdas/ingestion/garmin_lambda.py:136. UpdateSecret is opt-in and
-    # scoped to this Lambda's own life-platform/garmin secret only.
-    return _ingestion_base(
-        "garmin",
-        secret_name="life-platform/garmin",
-        extra_secret_actions=["secretsmanager:UpdateSecret"],
-        # DeleteItem added for SIMP-2 framework auth-breaker clear_failure path
-        ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:DeleteItem"],
-    )
-
-
 def ingestion_notion() -> list[iam.PolicyStatement]:
     # #499: Notion uses a static integration token — no refresh, no writeback
     # (verified: no update_secret/put_secret_value call anywhere in

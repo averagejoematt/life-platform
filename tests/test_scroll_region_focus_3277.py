@@ -28,7 +28,7 @@ committed) and running the gate against the copy:
     </div>
 
     cp -R site /tmp/site-trap && <inject into /tmp/site-trap/data/labs/index.html>
-    python3 tests/pr_render_gate.py --a11y --site-dir /tmp/site-trap
+    python3 qa/pr_render_gate.py --a11y --site-dir /tmp/site-trap
 
 It scrolls ONLY below the tablet breakpoint (so the desktop pass cannot see it) and
 carries tabindex="-1" — programmatic focus, not keyboard reach — which the primitive

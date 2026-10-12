@@ -30,18 +30,37 @@ into an issue or committed to the repo (the issue's own rule).
 (owner rule). Pass ``--include-config`` only when the owner runs it by hand.
 
 Exit status: 0 when no object carries a dead key (and no sampled read failed),
-1 when any does — so the same entry point can back a scheduled check.
+1 when any does.
+
+**Check mode** (``--check-against-record``, the scheduled check — #4634 box 3,
+``.github/workflows/raw-kms-readability.yml``): the 25 May-2026 objects are known
+dead and stay dead (``raw/*`` is delete-protected), so a plain run is red forever.
+In check mode the run instead fails when the set of undecryptable objects under the
+scanned prefix differs from the set RECORDED in
+``docs/audits/RAW_KMS_UNREADABLE_INVENTORY_2026-10.md`` — in either direction: a
+NEW dead object (a key lost again) or a recorded one that now reads (re-fetched,
+re-encrypted — the record is stale and must be updated in the same change). It
+also fails on any ``HeadObject`` error (readability unknowable is not readable)
+and on any failed 1-byte read in a random sample of the objects that should
+decrypt (``--sample-readable N``) — a decrypt failure the key-state test cannot
+see. Needs only ``s3:ListBucket`` + ``s3:GetObject`` on the prefix: without
+``kms:DescribeKey`` a KMS key's state is ``Unknown(...)``, which counts as
+undecryptable — conservative, and correct for ``raw/`` whose policy is SSE-S3.
 
 Usage:
     python3 scripts/raw_kms_readability_inventory.py                       # raw/, every month
     python3 scripts/raw_kms_readability_inventory.py --month 2026-05      # one month
     python3 scripts/raw_kms_readability_inventory.py --check-backup --sample-get 5 --markdown
+    python3 scripts/raw_kms_readability_inventory.py --check-against-record --sample-readable 20 --markdown  # the scheduled check
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import random
+import re
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -51,6 +70,13 @@ BUCKET = "matthew-life-platform"
 REGION = "us-west-2"
 BACKUP_BUCKET = "matthew-life-platform-raw-backup"
 BACKUP_REGION = "us-east-2"
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# The repo's record of every object known to be undecryptable (#4634 box 1). Its
+# "## The affected objects" section lists each key as a ``- `key` `` bullet; the
+# scheduled check compares the live dead set against exactly that list.
+RECORD_PATH = os.path.join(REPO_ROOT, "docs", "audits", "RAW_KMS_UNREADABLE_INVENTORY_2026-10.md")
+RECORD_SECTION = "## The affected objects"
 
 # Prefixes an unattended run never reads (owner rule: config/ is off-limits).
 REFUSED_PREFIXES = ("config/",)
@@ -172,6 +198,31 @@ def build_inventory(objects, key_state_of) -> Inventory:
     return inv
 
 
+def top_prefix(path: str) -> str:
+    """``raw/matthew/whoop`` -> ``raw/``; ``generated/`` -> ``generated/``; a root object -> ``(root)``."""
+    return path.split("/")[0] + "/" if "/" in path else "(root)"
+
+
+def prefix_rollup(inv: Inventory) -> list:
+    """Per top-level prefix: objects, month span, and the encryption mix — the coverage proof."""
+    agg: dict[str, dict] = {}
+    for (path, month), c in inv.cells.items():
+        r = agg.setdefault(
+            top_prefix(path), {"prefix": top_prefix(path), "objects": 0, "months": set(), "sse_s3": 0, "sse_kms": 0, "dead_key": 0}
+        )
+        r["objects"] += c.get("objects", 0)
+        r["months"].add(month)
+        for k in ("sse_s3", "sse_kms", "dead_key"):
+            r[k] += c.get(k, 0)
+        r["other"] = r.get("other", 0) + c.get("unencrypted", 0) + c.get("head_error", 0)
+    out = []
+    for p in sorted(agg):
+        r = agg[p]
+        ms = sorted(r.pop("months"))
+        out.append({**r, "first_month": ms[0], "last_month": ms[-1], "months": len(ms)})
+    return out
+
+
 def summarize(inv: Inventory, backup: dict | None = None, sampled: dict | None = None, versions: dict | None = None) -> dict:
     """JSON-safe summary. Carries NO KMS key identifiers — only opaque labels."""
     dead_cells = []
@@ -206,6 +257,7 @@ def summarize(inv: Inventory, backup: dict | None = None, sampled: dict | None =
             s["unrecoverable"] = proven_missing > 0 and s["refetchable"].startswith("no")
     months = sorted({m for (_, m) in inv.cells})
     return {
+        "by_prefix": prefix_rollup(inv),
         "objects_scanned": inv.total,
         "months_scanned": months,
         "head_errors": inv.head_errors,
@@ -229,8 +281,63 @@ def verdict(summary: dict) -> int:
     return 0
 
 
+def recorded_dead_keys(record_text: str) -> set[str]:
+    """Every ``- `key` `` bullet in the record's affected-objects section."""
+    start = record_text.find(RECORD_SECTION)
+    if start < 0:
+        raise ValueError(f"record has no {RECORD_SECTION!r} section")
+    end = record_text.find("\n## ", start + len(RECORD_SECTION))
+    body = record_text[start : end if end >= 0 else len(record_text)]
+    return set(re.findall(r"^- `([^`]+)`\s*$", body, flags=re.M))
+
+
+def compare_to_record(summary: dict, recorded: set, prefix: str) -> dict:
+    """Live dead set vs the recorded one, restricted to the scanned prefix."""
+    live = set(summary["affected_objects"])
+    rec = {k for k in recorded if k.startswith(prefix or "")}
+    return {
+        "recorded_in_scope": len(rec),
+        "new_dead": sorted(live - rec),
+        "recorded_now_readable_or_gone": sorted(rec - live),
+        "matches_record": live == rec,
+    }
+
+
+def check_verdict(summary: dict, comparison: dict) -> int:
+    """Check-mode exit code: 0 only when the dead set IS the record, no head failed, every sampled read decrypted."""
+    if not comparison["matches_record"]:
+        return 1
+    if summary["head_errors"]:
+        return 1
+    if any(v != "ok" for v in summary["sampled_get"].values()):
+        return 1
+    return 0
+
+
+def render_comparison(comparison: dict, prefix: str, record: str = "docs/audits/RAW_KMS_UNREADABLE_INVENTORY_2026-10.md") -> str:
+    out = [
+        "",
+        f"### Against the record (`{record}`, scope `{prefix or '(whole bucket)'}`)",
+        "",
+        f"Recorded undecryptable in scope: {comparison['recorded_in_scope']}. "
+        f"**Matches the record: {'yes' if comparison['matches_record'] else 'NO'}.**",
+    ]
+    if comparison["new_dead"]:
+        out.append("")
+        out.append(f"NEW undecryptable objects, not in the record ({len(comparison['new_dead'])}) — a key was lost again:")
+        out += [f"- `{k}`" for k in comparison["new_dead"]]
+    if comparison["recorded_now_readable_or_gone"]:
+        out.append("")
+        out.append(
+            f"Recorded objects that now read or no longer exist ({len(comparison['recorded_now_readable_or_gone'])}) "
+            "— update the record in the same change that re-fetched or re-encrypted them:"
+        )
+        out += [f"- `{k}`" for k in comparison["recorded_now_readable_or_gone"]]
+    return "\n".join(out)
+
+
 def render_markdown(summary: dict, prefix: str) -> str:
-    out = [f"### KMS readability — `{prefix}`", ""]
+    out = [f"### KMS readability — `{prefix or '(whole bucket)'}`", ""]
     out.append(
         f"Scanned {summary['objects_scanned']} objects across {len(summary['months_scanned'])} months "
         f"({summary['months_scanned'][0] if summary['months_scanned'] else '-'} → "
@@ -241,6 +348,12 @@ def render_markdown(summary: dict, prefix: str) -> str:
     out.append(f"KMS keys seen (opaque labels, no identifiers): {keys}.")
     out.append(f"**Objects whose key cannot decrypt: {summary['dead_key_objects']}.**")
     out.append("")
+    if summary.get("by_prefix"):
+        out += ["| Top-level prefix | Objects | Months | SSE-S3 | SSE-KMS | Undecryptable |", "|---|---|---|---|---|---|"]
+        for r in summary["by_prefix"]:
+            span = r["first_month"] if r["months"] == 1 else f"{r['first_month']} → {r['last_month']} ({r['months']})"
+            out.append(f"| `{r['prefix']}` | {r['objects']} | {span} | {r['sse_s3']} | {r['sse_kms']} | {r['dead_key']} |")
+        out.append("")
     if summary["dead_key_cells"]:
         out += ["| Source path | Month | Objects in cell | Undecryptable |", "|---|---|---|---|"]
         for c in summary["dead_key_cells"]:
@@ -264,7 +377,12 @@ def render_markdown(summary: dict, prefix: str) -> str:
             out.append(row)
         out.append("")
     if summary["sampled_get"]:
-        out.append("Sampled 1-byte GetObject: " + ", ".join(f"`{k}` → {v}" for k, v in sorted(summary["sampled_get"].items())))
+        # Only the FAILURES are named: the scheduled check's step summary is public (public repo),
+        # and a list of which raw days exist says nothing a failure-free run needs to say.
+        sg = summary["sampled_get"]
+        fails = {k: v for k, v in sorted(sg.items()) if v != "ok"}
+        line = f"Sampled 1-byte GetObject: {len(sg) - len(fails)} of {len(sg)} decrypted"
+        out.append(line + ("; failed: " + ", ".join(f"`{k}` → {v}" for k, v in fails.items()) if fails else "."))
     return "\n".join(out)
 
 
@@ -364,6 +482,15 @@ def _sample_get(s3, bucket: str, keys) -> dict:
     return out
 
 
+def readable_sample(objs, affected_keys, n: int, rng=None) -> list:
+    """Up to ``n`` random keys among objects that SHOULD decrypt (headed fine, not already dead)."""
+    dead = set(affected_keys)
+    pool = sorted(o.key for o in objs if o.sse != "error" and o.key not in dead)
+    if n <= 0 or not pool:
+        return []
+    return (rng or random.SystemRandom()).sample(pool, min(n, len(pool)))
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--bucket", default=BUCKET)
@@ -373,6 +500,15 @@ def main(argv=None) -> int:
     ap.add_argument("--check-backup", action="store_true", help="HeadObject every affected key in the backup bucket")
     ap.add_argument("--versions", action="store_true", help="check every affected key's noncurrent versions for one that decrypts")
     ap.add_argument("--sample-get", type=int, default=0, help="ranged 1-byte GetObject on up to N affected objects")
+    ap.add_argument(
+        "--sample-readable", type=int, default=0, help="ranged 1-byte GetObject on N random objects that should decrypt (any failure fails)"
+    )
+    ap.add_argument(
+        "--check-against-record",
+        action="store_true",
+        help="scheduled-check mode: fail unless the undecryptable set equals the one recorded in the repo",
+    )
+    ap.add_argument("--record", default=RECORD_PATH, help="the recorded inventory (default: the 2026-10 audit doc)")
     ap.add_argument("--include-config", action="store_true", help="owner-only: allow config/")
     ap.add_argument("--markdown", action="store_true")
     ap.add_argument("--json-out", help="write the JSON summary to this path")
@@ -396,13 +532,25 @@ def main(argv=None) -> int:
     affected_keys = [a["key"] for a in inv.affected]
     backup = _backup_copies(affected_keys) if args.check_backup else None
     versions = _older_readable_versions(s3, args.bucket, affected_keys, key_state_of) if args.versions else None
-    sampled = _sample_get(s3, args.bucket, affected_keys[: args.sample_get]) if args.sample_get else None
+    to_read = affected_keys[: args.sample_get] + readable_sample(objs, affected_keys, args.sample_readable)
+    sampled = _sample_get(s3, args.bucket, to_read) if to_read else None
     summary = summarize(inv, backup, sampled, versions)
+    comparison = None
+    if args.check_against_record:
+        with open(args.record) as f:
+            comparison = compare_to_record(summary, recorded_dead_keys(f.read()), args.prefix)
+        summary["record_comparison"] = comparison
     if args.json_out:
         with open(args.json_out, "w") as f:
             json.dump(summary, f, indent=2, default=str)
-    print(render_markdown(summary, args.prefix) if args.markdown else json.dumps(summary, indent=2, default=str))
-    return verdict(summary)
+    if args.markdown:
+        print(
+            render_markdown(summary, args.prefix)
+            + (render_comparison(comparison, args.prefix, os.path.relpath(args.record, REPO_ROOT)) if comparison else "")
+        )
+    else:
+        print(json.dumps(summary, indent=2, default=str))
+    return check_verdict(summary, comparison) if comparison is not None else verdict(summary)
 
 
 if __name__ == "__main__":

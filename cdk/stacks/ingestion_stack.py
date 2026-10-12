@@ -23,7 +23,6 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets,
     aws_iam as iam,
-    aws_lambda as _lambda,
     aws_logs as logs,
     aws_s3 as s3,
     aws_sns as sns,
@@ -32,7 +31,7 @@ from aws_cdk import (
 from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
+from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.lambda_helpers import create_platform_lambda
 
 # ── #2806/#2807/#2808: the social-enrichment channel set, derived at synth time ──
@@ -52,6 +51,16 @@ SOCIAL_CHANNELS_ENV = ",".join(social_channel_source_ids())
 # Skipped: UTC 6,7,8,9,10,11 = 10pm-4am PST (maintenance window — no user activity expected)
 # Cost: ~$0/month — gap-aware Lambdas short-circuit in <50ms when no new data exists
 INGEST_HOURLY = "0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23"
+
+# ── #4641: the low-yield sources run at their data's real cadence, not INGEST_HOURLY ──
+# 14-day measurements (2026-10-04): Notion 0 of 252 runs found a page, the three social
+# feeds 0 of 756 rows, Dropbox 6 of 672 polls found a file, Withings ~5% of runs changed a
+# row, Eight Sleep ~5%. Each hour is vendor-API churn and (for the rotating-token sources)
+# a token exchange. The hours are UTC; PT in the comments (PDT = UTC-7).
+NOTION_HOURS = "14,21,3"  # 07:00, 14:00, 20:00 PT — journal entries are rare; 3/day
+SOCIAL_HOURS = "14,2"  # 07:00, 19:00 PT — placeholder accounts (#1669); 2/day, ready for real ids
+WITHINGS_HOURS = "14,17,21,0"  # 07:00, 10:00, 14:00, 17:00 PT; site-stats-refresh adds 4 more invokes
+EIGHTSLEEP_HOURS = "14,16,18,20"  # 07:00-13:00 PT — the nightly record lands in the morning
 
 # ── Habitify runs the FULL 24 hours (#3666) ──
 # The maintenance-window assumption above — "10pm-4am PT, no user activity expected" —
@@ -85,7 +94,6 @@ DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 class IngestionStack(Stack):
     def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
-        garth_layer = _lambda.LayerVersion.from_layer_version_arn(self, "GarthLayer", GARTH_LAYER_ARN)
         local_dlq = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
@@ -175,41 +183,20 @@ class IngestionStack(Stack):
             )
         )
 
-        # ── 2. Garmin — PAUSED, no schedule (#497/C-2, 2026-07-04). ADR-074
-        # declares the pause (vendor anti-automation 429-blocks server-side
-        # OAuth refresh), yet the cron kept firing 4×/day into the throttle —
-        # ~73 consecutive failures, and per the code's own note each hit only
-        # prolongs the lockout. Revive = manual re-auth (setup_garmin_browser_auth.py)
-        # + restore `schedule="cron(0 0,6,14,22 * * ? *)"` here. The function
-        # stays deployed for manual invokes; the INGEST_HEALTH sentinel keeps
-        # tracking whatever runs.
-        garmin = create_platform_lambda(
-            self,
-            "GarminIngestion",
-            function_name="garmin-data-ingestion",
-            source_file="lambdas/ingestion/garmin_lambda.py",
-            handler="ingestion.garmin_lambda.lambda_handler",
-            timeout_seconds=300,
-            memory_mb=512,
-            additional_layers=[garth_layer],
-            custom_policies=rp.ingestion_garmin(),
-            # No async retry: a failed run is almost always an OAuth-refresh 429.
-            # Retrying re-hammers Garmin's throttled endpoint and prolongs the
-            # lockout; the gap-fill loop recovers missed days on the next run.
-            retry_attempts=0,
-            alerts_topic=None,
-            **{k: v for k, v in shared.items() if k != "alerts_topic"},
-        )
-        garmin.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
+        # ── 2. Garmin direct-API function — RETIRED (#4640, owner ruling 2026-10-11).
+        # `garmin-data-ingestion` (no schedule since #497, 74 consecutive throttle
+        # failures, last success 2026-06-16), its role, its reserved-concurrency slot
+        # and its alarm are removed. Garmin-watch activities arrive through Strava.
+        # The `life-platform/garmin` secret is an owner-attended delete.
 
-        # ── 3. Notion — 5x daily
+        # ── 3. Notion — 3x daily (#4641; was 18/day for 0 pages in 252 runs)
         create_platform_lambda(
             self,
             "NotionIngestion",
             function_name="notion-journal-ingestion",
             source_file="lambdas/ingestion/notion_lambda.py",
             handler="ingestion.notion_lambda.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(0 {NOTION_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_notion(),
@@ -230,7 +217,7 @@ class IngestionStack(Stack):
             function_name="youtube-social-ingestion",
             source_file="lambdas/ingestion/youtube_lambda.py",
             handler="ingestion.youtube_lambda.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(0 {SOCIAL_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"YOUTUBE_SECRET_NAME": "life-platform/youtube"},
             custom_policies=rp.ingestion_youtube(),
@@ -250,7 +237,7 @@ class IngestionStack(Stack):
             function_name="bluesky-social-ingestion",
             source_file="lambdas/ingestion/bluesky_lambda.py",
             handler="ingestion.bluesky_lambda.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(0 {SOCIAL_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"BLUESKY_SECRET_NAME": "life-platform/bluesky"},
             custom_policies=rp.ingestion_bluesky(),
@@ -270,7 +257,7 @@ class IngestionStack(Stack):
             function_name="mastodon-social-ingestion",
             source_file="lambdas/ingestion/mastodon_lambda.py",
             handler="ingestion.mastodon_lambda.lambda_handler",
-            schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(0 {SOCIAL_HOURS} * * ? *)",
             timeout_seconds=120,
             environment={"MASTODON_SECRET_NAME": "life-platform/mastodon"},
             custom_policies=rp.ingestion_mastodon(),
@@ -278,14 +265,14 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 4. Withings — 5x daily (:05 stagger)
+        # ── 4. Withings — 4x daily (:05 stagger; #4641, was 18/day)
         withings = create_platform_lambda(
             self,
             "WithingsIngestion",
             function_name="withings-data-ingestion",
             source_file="lambdas/ingestion/withings_lambda.py",
             handler="ingestion.withings_lambda.lambda_handler",
-            schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(5 {WITHINGS_HOURS} * * ? *)",
             timeout_seconds=120,
             custom_policies=rp.ingestion_withings(),
             **shared,
@@ -553,7 +540,7 @@ class IngestionStack(Stack):
             function_name="eightsleep-data-ingestion",
             source_file="lambdas/ingestion/eightsleep_lambda.py",
             handler="ingestion.eightsleep_lambda.lambda_handler",
-            schedule=f"cron(15 {INGEST_HOURLY} * * ? *)",
+            schedule=f"cron(15 {EIGHTSLEEP_HOURS} * * ? *)",
             timeout_seconds=120,
             custom_policies=rp.ingestion_eightsleep(),
             **shared,
@@ -609,14 +596,14 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 13. Dropbox Poll — every 30 minutes
+        # ── 13. Dropbox Poll — every 2 hours (#4641; 6 of 672 polls at */30 found a file)
         create_platform_lambda(
             self,
             "DropboxPoll",
             function_name="dropbox-poll",
             source_file="lambdas/ingestion/dropbox_poll_lambda.py",
             handler="ingestion.dropbox_poll_lambda.lambda_handler",
-            schedule="rate(30 minutes)",
+            schedule="rate(2 hours)",
             timeout_seconds=120,
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_dropbox(),

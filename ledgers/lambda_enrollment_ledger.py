@@ -156,13 +156,6 @@ ALARM_STORY: dict[str, tuple[str, str]] = {
         "is settled against live AWS, 'what should alarm' is not answerable — an alarm on a Lambda that is "
         "never invoked would be decoration.",
     ),
-    "garmin-data-ingestion": (
-        "2026-08-24",
-        "PAUSED under ADR-074 — no EventBridge rule at all, because the vendor 429-blocks server-side OAuth "
-        "refresh and each retry prolongs the lockout. There is no cadence to be silent against and no "
-        "invocation to error. The row retires when the source is revived and its schedule restored, which is "
-        "exactly when it needs a liveness row instead.",
-    ),
     # 2026-08-25: the og-image ALARM_STORY row retired — #3161 (same integration
     # train) added life-platform-og-image-errors in web_stack.py, digest-routed, so
     # the function now HAS an alarm story and the G4 ratchet tightened on the spot.

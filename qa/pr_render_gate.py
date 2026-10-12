@@ -1,0 +1,591 @@
+#!/usr/bin/env python3
+"""
+pr_render_gate.py — shift render + accuracy QA LEFT onto site pull requests (#408).
+
+Today the Playwright render sweep (qa/visual_qa.py) and the accuracy
+impossible-number checks (qa/accuracy_audit.py --live) run only AFTER deploy,
+against the LIVE site, and only when backend code ships — so a site-only PR (the
+change most likely to break a page) gets just an HTML well-formedness check before
+merge. This harness closes that gap: it runs the SAME render harness at PR time
+against a LOCAL static serve of site/ with the API mocked, and fails on render
+errors / layout overflow / leaked impossible numbers — before it reaches readers.
+
+How it stays fast + non-flaky (per handovers/HANDOVER_LATEST.md render-QA notes +
+reference_local_render_qa memory):
+  • Serves site/ over http.server (absolute /assets ES-module paths need a real
+    origin, not file://) on an ephemeral localhost port.
+  • Chromium headless, ONE context, service_workers="block" (SW-handled fetches
+    bypass page.route and would silently 404 against the static server).
+  • Mocks **/api/** with a catch-all registered FIRST (Playwright matches routes in
+    REVERSE registration order, so specific mocks registered AFTER win). The mock
+    data is realistic-but-static, so no live deploy / real data is touched and the
+    gate can't flake on daily data drift.
+  • Pages that render a legitimately-empty state (honest empty data) PASS — only a
+    genuine render failure, a JS error, a horizontal overflow, or a leaked
+    NaN/undefined/[object Object] in the visitor-facing prose blocks the merge.
+
+Mobile coverage (#1012): capture_page runs a mobile pass at 390×844 (+ the app-bar
+chrome check at 360×800) on every gate page, so the pre-merge gate now renders mobile
+in addition to 1440×900 desktop — and asserts the Epic-A failure classes there
+(stuck reveals #1002, app-bar overflow #1003, missing viewport meta #1004; the 44px
+tap-target floor #1010/#1249 now gates). A PR that reintroduces one of those classes fails the gate
+before merge instead of surfacing on the live site.
+
+Mobile FIRST-LOAD pass (#3542): capture_page also drives a SEPARATE, FRESH navigation
+at 390x844 per gate page — a new page in the same (mocked, clock-pinned) context, sized
+before goto and never touched afterwards. The pre-existing mobile coverage above resizes
+an already-loaded, already-scrolled desktop page, so it was structurally unable to see a
+page that scrolls itself on first paint: evidence.js called scrollIntoView() on its
+INITIAL render at phone width, and every /data/ · /protocols/ · /method/ shell jumped
+past its own hero with no user input. The same probe asserts the DES-3 invariant — a
+sticky top bar whose computed backdrop-filter is `none` must be fully opaque. Both
+assertions live in visual_qa.mobile_first_load_findings, so this gate and the live
+post-deploy sweep enforce byte-for-byte the same contract.
+
+Realistic-data pass (#1039): the empty-mock pass is structurally blind to DATA-DRIVEN
+layout overflow — PR #1008 passed 8/8 here, then blew out /data/vitals/ by +255px at
+390px under real data (caught only by the post-deploy visual-AI QA + rollback, fixed
+forward in #1034). So a SECOND pass now renders the overflow-prone data pages with
+committed realistic fixtures (tests/fixtures/render_gate/*.json — real API shapes
+captured/derived from lambdas/web/, never fetched live, so the gate stays offline and
+deterministic) registered as specific mocks that win over the catch-all. Both passes
+run the same capture_page assertions (JS errors, overflow @390/360, reveals, chrome).
+Each populated page also carries a min-count marker check, so fixture-shape drift that
+silently re-renders the empty state fails loudly instead of restoring the blind spot.
+The empty-state pass is retained — honest-empty is still a valid state to gate.
+
+This SUPPLEMENTS the post-deploy live QA (ci-cd.yml visual-qa job) — it never
+replaces it. The live sweep still runs against real prod data after deploy.
+
+Usage:
+    python3 qa/pr_render_gate.py                 # gate over site/ (representative pages)
+    python3 qa/pr_render_gate.py --site-dir /tmp/broken-site   # gate a copy (demo)
+    python3 qa/pr_render_gate.py --keep          # keep the screenshot/prose capture dir
+    python3 qa/pr_render_gate.py --a11y          # + axe at 1440x900 AND 390x844 vs the ledger (#3277)
+Exit 0 = gate passed; exit 1 = a render or accuracy regression blocked the merge.
+"""
+
+import argparse
+import functools
+import json
+import os
+import socket
+import sys
+import tempfile
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+
+# ── Representative page set ───────────────────────────────────────────────────
+# One page per door + a chart/data page + the cockpit (its pillar interaction is
+# the richest client-side render on the site). Kept small so the gate stays fast;
+# every path here is a COMMITTED file under site/ (so the static serve resolves it
+# without a build step). Checks are deliberately STRUCTURAL/lenient — the shell
+# (page-hero · loop-ribbon · footer) is present regardless of data, so an honest
+# empty-data state passes; capture_page still enforces no-JS-error, no-overflow,
+# no-blank-section, no-stale-text on every one.
+GATE_PAGES = [
+    {"path": "/", "name": "Home (constellation)", "wait_for": "body"},
+    {
+        "path": "/cockpit/",
+        "name": "Cockpit",
+        "wait_for": "body",
+        # Exercise the pillar disclosure when data mounted a row; if the mock
+        # yielded no rows it's skipped as a warning, not failed (honest empty state).
+        "interact": {"open": ".engine-sum", "click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens"},
+    },
+    {"path": "/story/", "name": "Story hub", "wait_for": "body"},
+    {"path": "/data/", "name": "Data hub", "wait_for": "body"},
+    {"path": "/data/vitals/", "name": "Evidence · vitals", "wait_for": "body", "charts": ["[data-readout] svg"]},
+    {"path": "/protocols/", "name": "Protocols hub", "wait_for": "body"},
+    {"path": "/coaching/", "name": "Coaching hub", "wait_for": "body"},
+    {"path": "/method/character/", "name": "Method · character", "wait_for": "body"},
+]
+
+# ── Realistic-data page set (#1039) ───────────────────────────────────────────
+# The data-driven, overflow-prone surfaces the empty-mock pass cannot exercise:
+# the vitals readout (the #1008 +255px incident page — wide stat rows/strips only
+# materialize with history), the labs biomarker tables (the widest 4-col tables on
+# the site), and the experiments backlog (the ~70-card pipeline). Each page carries
+# a marker check so the pass fails loudly if the fixtures stop rendering (shape
+# drift would otherwise silently re-render the empty state = the blind spot back).
+POPULATED_GATE_PAGES = [
+    {
+        "path": "/data/vitals/",
+        "name": "Evidence · vitals [populated]",
+        "wait_for": "body",
+        "charts": ["[data-readout] svg"],
+        "checks": [
+            {"selector": ".vr-row", "min_count": 1, "desc": "component rings render from the pulse fixture"},
+            {"selector": ".sm-cell, .vl-row", "min_count": 1, "desc": "history-driven blocks render from pulse_history fixture"},
+            # #1091 — cross-phase provenance: VO2max / walking HR / fitness age carry the
+            # "multi-year history · not reset with the experiment" stamp (scope: multi_year).
+            {"selector": ".rd-scope", "min_count": 3, "desc": "cross-phase metrics carry the multi-year provenance stamp (#1091)"},
+        ],
+    },
+    {
+        "path": "/data/labs/",
+        "name": "Evidence · labs [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": "table.rd-tbl", "min_count": 3, "desc": "biomarker category tables render from the labs fixture"},
+        ],
+    },
+    {
+        "path": "/protocols/experiments/",
+        "name": "Protocols · experiments [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".rd-card", "min_count": 20, "desc": "running + backlog pipeline cards render from the experiments fixture"},
+        ],
+    },
+    {
+        # #1116 — the loop station: an annotated supplement states its hypothesis
+        # (hoped_outcome) and the instrument that adjudicates it (measured_by). The
+        # fixture carries 7 annotated entries + 1 paused UNANNOTATED entry
+        # (lions_mane), so this page renders BOTH states: loop blocks mount on the
+        # annotated cards, and the unannotated card stays honest-empty (ADR-104 —
+        # no placeholder prose). The min-counts are the completeness guard.
+        "path": "/protocols/supplements/",
+        "name": "Protocols · supplements [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".supp", "min_count": 8, "desc": "supplement cards render from the registry fixture"},
+            {
+                "selector": ".supp-loop",
+                "min_count": 7,
+                "desc": "hoped_outcome + measured_by loop blocks render on annotated entries (#1116)",
+            },
+        ],
+    },
+    {
+        # #1118 — the protocols grammar on challenges: taken-on cards state their
+        # hypothesis contract — why now (source_detail), hoped outcome, measured
+        # by (verification_method). The fixture carries 3 annotated live entries
+        # + 1 historical UNANNOTATED entry (daily-10k-steps), so this page renders
+        # BOTH states: loop blocks mount on the annotated cards, and the
+        # historical card stays honest-empty (ADR-104 — no placeholder prose).
+        "path": "/protocols/challenges/",
+        "name": "Protocols · challenges [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".rd-card", "min_count": 6, "desc": "taken-on + backlog cards render from the challenges fixture"},
+            {
+                "selector": ".supp-loop",
+                "min_count": 3,
+                "desc": "why-now / hoped-outcome / measured-by loop blocks render on annotated live cards (#1118)",
+            },
+        ],
+    },
+    {
+        # #1971 (completes #802 on the door's first screen): under a tier >= 2
+        # budget pause the dashboard payload carries regeneration_paused: true and
+        # every roster card's as-of kicker must disclose "refresh paused (budget
+        # guard)" — coaching.js marks that state with .rd-paused. The fixture IS
+        # the paused payload, so this pass renders the disclosure deterministically
+        # (the live site only shows it when the budget guard actually holds).
+        "path": "/coaching/",
+        "name": "Coaching hub · paused board [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".rd-card", "min_count": 3, "desc": "roster read cards render from the paused dashboard fixture"},
+            {
+                "selector": ".rd-asof.rd-paused",
+                "min_count": 3,
+                "desc": "every card's as-of kicker carries the budget-guard paused disclosure (#1971/#802)",
+            },
+            # #2383 — the tensions band renders its dated argument (coach_team
+            # fixture carries generated_at) AND the band-level as-of stamp, so a
+            # paused week's argument can never read as today's live coaching.
+            {
+                "selector": ".tt-card",
+                "min_count": 1,
+                "desc": "tensions band renders the dated argument from the coach_team fixture (#2383)",
+            },
+            {"selector": ".tt-asof", "min_count": 1, "desc": "the tensions band carries its as-of stamp (#2383 honest dating)"},
+        ],
+    },
+    {
+        # #3316 (#2921's residual): /data/sleep/ with POPULATED whoop data. The page's
+        # main body — "Last night's stages" (reads sleep_detail.whoop.*_hours, the
+        # #2921 per-device block), the two-device dumbbell, the stage-composition
+        # columns — only materializes when sleep_detail.whoop / whoop_hours are
+        # present; the empty-mock pass renders the honest-empty state and so never
+        # exercised the post-#3023 shape. The fixture is the live payload's shape
+        # (tests/api_schemas/api_sleep_detail.json is the contract it must match —
+        # tests/test_sleep_schema_fixture_3316.py holds the two together).
+        "path": "/data/sleep/",
+        "name": "Evidence · sleep [populated whoop]",
+        "wait_for": "body",
+        "charts": ["[data-readout] svg"],
+        "checks": [
+            {
+                "selector": '.sbar[aria-label*="Whoop"]',
+                "min_count": 1,
+                "desc": "'Last night's stages' renders from sleep_detail.whoop (the #2921 per-device block)",
+            },
+            {
+                "selector": ".db-track",
+                "min_count": 3,
+                "desc": "the two-device stage dumbbell renders Deep/REM/Light from whoop_hours + the Eight Sleep pcts",
+            },
+            {
+                "selector": ".scol",
+                "min_count": 4,
+                "desc": "stage composition columns render from sleep_trend rows carrying whoop stage hours",
+            },
+        ],
+    },
+    {
+        # #974: the cockpit's levers strip (the Protocols station in the daily
+        # slice) only materializes with supplement-registry/experiment data — the
+        # empty-mock pass renders its honest-hidden state, so this pass asserts
+        # the populated rows (the stack, the experiment under way, and the #1066
+        # training-block row from the routine fixture) actually mount, and
+        # capture_page's mobile pass keeps them inside 390px.
+        # #975: same for the inputs row (manual-channel freshness) — it only
+        # materializes with the /api/presence channels projection; the check holds
+        # in BOTH clock states (pre-genesis it renders the staged marks, after it
+        # the fixture's dated marks), so the gate can't flip at genesis.
+        "path": "/cockpit/",
+        "name": "Cockpit · levers + inputs [populated]",
+        "wait_for": "body",
+        "checks": [
+            {
+                "selector": ".lever-row",
+                "min_count": 3,
+                "desc": "levers strip renders stack + experiment + training-block rows from their fixtures (#974/#1066)",
+            },
+            {
+                "selector": ".input-row",
+                "min_count": 3,
+                "desc": "the inputs freshness row renders a mark per manual channel from the presence fixture (#975)",
+            },
+        ],
+    },
+]
+
+# ── API mocks ─────────────────────────────────────────────────────────────────
+# The site's fetch layer is heavily try/caught + defensively coded (optional
+# chaining, `|| []`, `?? 0`), so an empty object is a safe universal default: a
+# page that gets it renders its honest empty state instead of throwing. A clean,
+# in-range public_stats lets the accuracy impossible-number check run the exact
+# same rubric as the post-deploy --live gate against the local render.
+DEFAULT_API_MOCK = {}
+
+CLEAN_PUBLIC_STATS = {
+    "training": {"ctl_fitness": 42.0, "atl_fatigue": 38.0, "ctl": 42.0, "atl": 38.0},
+    "journey": {"progress_pct": 61.0, "adherence_pct": 88.0},
+    "vitals": {"recovery_pct": 74.0},
+}
+
+# Realistic-data fixtures (#1039) — committed JSON matching the real endpoint shapes
+# (captured from the live API / derived from the lambdas/web/ handlers, values
+# in-range for the accuracy rubric). Registered AFTER the catch-all so they win.
+FIXTURES_DIR = os.path.join(os.path.dirname(HERE), "tests", "fixtures", "render_gate")
+POPULATED_API_MOCKS = {
+    "**/api/pulse": "pulse.json",
+    "**/api/pulse_history": "pulse_history.json",
+    "**/api/habits": "habits.json",
+    "**/api/vitals_depth": "vitals_depth.json",
+    "**/api/labs": "labs.json",
+    "**/api/experiments": "experiments.json",
+    "**/api/challenges": "challenges.json",
+    "**/api/supplements": "supplements.json",
+    "**/api/presence": "presence.json",
+    "**/api/routine": "routine.json",
+    "**/api/coaching-dashboard": "coaching_dashboard_paused.json",  # #1971 — paused-board disclosure
+    "**/api/coach_team": "coach_team.json",  # #2383 — dated tensions → the band's as-of stamp
+    "**/api/sleep_detail": "sleep_detail.json",  # #3316 — post-#3023 per-device eightsleep/whoop blocks
+}
+
+
+@functools.lru_cache(maxsize=None)
+def _load_fixture(name):
+    with open(os.path.join(FIXTURES_DIR, name)) as fh:
+        return json.load(fh)
+
+
+# ── the gate's clock is PINNED, never the runner's (#3206 class; found by the
+# 2026-09-01 future-genesis reset) ─────────────────────────────────────────────
+# Several page scripts branch on the wall clock vs the site's genesis literal
+# (coach_popover.preStart() falls back to genesisCount() when a payload carries
+# no pre_start). Left unpinned, this gate's verdict flips with the calendar: the
+# first afternoon a reset staged a FUTURE genesis, /coaching/ rendered its
+# pre-start shell and the populated-board check went red on every PR while main
+# stayed green — a time-dependent gate outside its window. The pin derives from
+# the site's own literal (genesis + 5 days, noon PT = a mid-cycle morning), so a
+# reset re-anchors the gate automatically and the gate always exercises the
+# regime it has actually guarded since #1039: a live mid-cycle site.
+def _pinned_clock_ms():
+    import re as _re
+    from datetime import datetime, timedelta, timezone
+
+    src = open(os.path.join(REPO, "site", "assets", "js", "coach_popover.js"), encoding="utf-8").read()
+    m = _re.search(r'GENESIS_ISO = "(\d{4}-\d{2}-\d{2})"', src)
+    if not m:
+        raise SystemExit("pr_render_gate: cannot derive the clock pin — GENESIS_ISO not found in coach_popover.js")
+    genesis = datetime.fromisoformat(m.group(1)).replace(tzinfo=timezone.utc)
+    return int((genesis + timedelta(days=5, hours=19)).timestamp() * 1000)  # Day 6, ~noon PT
+
+
+def _clock_pin_script():
+    return (
+        "(() => {{ const FIXED = {ms}; const RealDate = Date;\n"
+        "  class PinnedDate extends RealDate {{\n"
+        "    constructor(...a) {{ if (a.length === 0) {{ super(FIXED); }} else {{ super(...a); }} }}\n"
+        "    static now() {{ return FIXED; }}\n"
+        "  }}\n"
+        "  PinnedDate.parse = RealDate.parse; PinnedDate.UTC = RealDate.UTC;\n"
+        "  window.Date = PinnedDate; }})();"
+    ).format(ms=_pinned_clock_ms())
+
+
+def _install_routes(context, extra_stats=None, fixtures=None):
+    """Wire the API mocks onto the browser context.
+
+    ORDER MATTERS: the catch-all is registered FIRST so the specific mocks
+    registered after it take precedence (reverse-order matching).
+
+    `fixtures` (#1039): optional {url_glob: fixture_filename} map — realistic-data
+    payloads from tests/fixtures/render_gate/, registered LAST so they beat both
+    the catch-all and the generic specific mocks.
+    """
+    stats = extra_stats if extra_stats is not None else CLEAN_PUBLIC_STATS
+
+    # 1) catch-all — anything under /api/** (and any un-mocked JSON) → empty object.
+    def _catch_all(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(DEFAULT_API_MOCK))
+
+    context.route("**/api/**", _catch_all)
+
+    # 2) specific mocks — registered after, so they win.
+    def _make(payload):
+        def _h(route):
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
+        return _h
+
+    context.route("**/public_stats.json", _make(stats))
+    context.route("**/moments/**", _make({}))
+    # Generated JSON that lives in the S3 `generated/` prefix, not committed under
+    # site/ — mock it empty so the static serve doesn't log a spurious 404 warning.
+    context.route("**/journal/**", _make({}))
+
+    # 3) realistic-data fixtures (#1039) — registered last, so they win over everything.
+    for pattern, fname in (fixtures or {}).items():
+        context.route(pattern, _make(_load_fixture(fname)))
+
+
+# ── Local static server ───────────────────────────────────────────────────────
+def _serve(directory):
+    """Start a threaded static file server for `directory` on an ephemeral port.
+
+    Returns (base_url, shutdown_fn). Silences the default request logging so the
+    gate output stays readable.
+    """
+
+    class _QuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, *_a):  # noqa: D401 - silence access log
+            pass
+
+    handler = functools.partial(_QuietHandler, directory=directory)
+    # Bind :0 to grab a free port (avoids the "port left bound after a crashed run"
+    # trap called out in the handover render-QA notes).
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    port = httpd.socket.getsockname()[1]
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+    return f"http://127.0.0.1:{port}", httpd.shutdown
+
+
+def _wait_port(host, port, timeout=5.0):
+    import time
+
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.05)
+    return False
+
+
+# ── Gate ──────────────────────────────────────────────────────────────────────
+def run_gate(site_dir, screenshot_dir, keep=False, a11y=False):
+    """Serve site_dir, drive the representative pages, run render + accuracy checks.
+
+    a11y (#3277, opt-in): also run capture_page's axe-core pass — at BOTH the
+    desktop context and 390×844 — against the committed tests/a11y_baseline.json,
+    gating on NEW serious/critical exactly as the live sweep does. Off by default
+    so CI's v4-gate is byte-for-byte unchanged (the mocked render can differ from
+    the live surface the ledger was captured on); it is the local proof path for
+    a site change that touches scroll containers, tables or code blocks.
+
+    Returns (ok: bool, results: list, accuracy_findings: list).
+    """
+    base_url, shutdown = _serve(site_dir)
+    host, port = base_url.replace("http://", "").split(":")
+    if not _wait_port(host, int(port)):
+        print(f"❌ local server never came up on {base_url}")
+        return False, [], []
+
+    # capture_page reads visual_qa.SITE_URL at call time — point it local. Set the
+    # env override BEFORE importing so a fresh interpreter also picks it up.
+    os.environ["QA_SITE_URL"] = base_url
+    sys.path.insert(0, HERE)
+    import visual_qa as VQ
+
+    VQ.SITE_URL = base_url
+    import accuracy_audit as AA
+
+    os.makedirs(screenshot_dir, exist_ok=True)
+    # Populated-pass captures land in a subdir: /data/vitals/ renders in BOTH passes,
+    # so a shared dir would collide on the slug and overwrite the empty-state evidence.
+    populated_dir = os.path.join(screenshot_dir, "populated")
+    os.makedirs(populated_dir, exist_ok=True)
+    results = []
+    # #3277: None keeps capture_page's axe pass off (the pre-#3277 behaviour); a
+    # loaded baseline turns it on at both viewports.
+    a11y_baseline = VQ.a11y_audit.load_baseline() if a11y else None
+
+    def _drive(context, pages, out_dir):
+        for page_def in pages:
+            # capture_prose=True writes <slug>.txt (the visitor-facing text) so
+            # the accuracy sentinel scan reads exactly what rendered.
+            res = VQ.capture_page(context, page_def, out_dir, save_screenshots=True, capture_prose=True, a11y_baseline=a11y_baseline)
+            results.append(res)
+            icon = "✅" if not res["issues"] else "❌"
+            print(f"  {icon} {res['page']} ({res['path']})")
+            for x in res["issues"]:
+                print(f"      → {x}")
+            for w in res["warnings"]:
+                print(f"      ⚠ {w}")
+
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            # ── pass 1: empty mocks — the honest-empty render (unchanged) ──
+            # service_workers="block" — SW-handled fetches bypass page.route.
+            context = browser.new_context(
+                viewport={"width": 1440, "height": 900},
+                color_scheme="dark",
+                service_workers="block",
+            )
+            context.add_init_script(_clock_pin_script())
+            _install_routes(context)
+            print("— pass 1: empty-state mocks —")
+            _drive(context, GATE_PAGES, screenshot_dir)
+            context.close()
+
+            # ── pass 2 (#1039): realistic-data fixtures on the overflow-prone pages ──
+            # Same assertions, populated render — catches the #1008 class (layout
+            # overflow that only manifests under real data volume) before merge.
+            context = browser.new_context(
+                viewport={"width": 1440, "height": 900},
+                color_scheme="dark",
+                service_workers="block",
+            )
+            context.add_init_script(_clock_pin_script())
+            _install_routes(context, fixtures=POPULATED_API_MOCKS)
+            print("— pass 2: realistic-data fixtures —")
+            _drive(context, POPULATED_GATE_PAGES, populated_dir)
+            context.close()
+            browser.close()
+    finally:
+        shutdown()
+
+    # ── accuracy: impossible-number rubric + leaked-sentinel scan over the render ──
+    accuracy = []
+    # (a) impossible values in the (locally-served) public_stats — same rubric as --live.
+    accuracy += AA.impossible_values(CLEAN_PUBLIC_STATS)
+    # (b) leaked NaN/undefined/[object Object] in the rendered visitor prose we just
+    #     captured (a render bug that stringifies a bad value shows up HERE).
+    accuracy += AA.sanity_scan(screenshot_dir)
+    # (c) same leak scan over the populated-pass prose (#1039) — a formatter that
+    #     stringifies a bad value only shows itself when the data is actually there.
+    accuracy += AA.sanity_scan(populated_dir)
+
+    render_ok = all(not r["issues"] for r in results)
+    acc_high = [f for f in accuracy if f.get("severity") == "high"]
+
+    print(f"\n{'=' * 60}")
+    passed = sum(1 for r in results if not r["issues"])
+    print(f"Render: {passed}/{len(results)} pages clean")
+    if a11y:
+        # #3277: state the n — page-passes × viewports actually audited, not assumed.
+        n_desk = sum(1 for r in results if r.get("a11y") is not None)
+        n_mob = sum(1 for r in results if r.get("a11y_mobile") is not None)
+        n_new = sum(len(r["a11y"]["new"]) for r in results if r.get("a11y")) + sum(
+            len(r["a11y_mobile"]["new"]) for r in results if r.get("a11y_mobile")
+        )
+        print(
+            f"a11y (axe): {n_desk} page-pass(es) @1440x900 + {n_mob} @390x844 = {n_desk + n_mob} audits over "
+            f"{len(results)} page-passes; {n_new} NEW serious/critical (gating)"
+        )
+    print(f"Accuracy: {len(acc_high)} impossible-number/leak finding(s)")
+    for f in acc_high:
+        print(
+            f"  ❌ {f.get('check', 'leak')}: {f.get('field') or f.get('source') or ''} {f.get('note') or f.get('snippet') or ''}".rstrip()
+        )
+
+    if not keep:
+        # Leave the report.json-style artifact only when asked (CI uploads it).
+        pass
+
+    ok = render_ok and not acc_high
+    return ok, results, accuracy
+
+
+def main():
+    ap = argparse.ArgumentParser(description="PR-time render + accuracy gate for the static site (#408).")
+    ap.add_argument("--site-dir", default=os.path.join(REPO, "site"), help="Static site dir to serve (default: site/)")
+    ap.add_argument("--out", default=None, help="Screenshot/prose capture dir (default: a temp dir)")
+    ap.add_argument("--keep", action="store_true", help="Keep the capture dir after the run")
+    ap.add_argument(
+        "--a11y",
+        action="store_true",
+        help="Also run the axe-core pass at 1440x900 AND 390x844 against tests/a11y_baseline.json (#3277; opt-in)",
+    )
+    args = ap.parse_args()
+
+    site_dir = os.path.abspath(args.site_dir)
+    if not os.path.isdir(site_dir):
+        sys.exit(f"site dir not found: {site_dir}")
+
+    out = args.out or tempfile.mkdtemp(prefix="pr-render-gate-")
+    print(f"PR render + accuracy gate — serving {site_dir}\n  capture → {out}\n{'=' * 60}")
+
+    ok, results, accuracy = run_gate(site_dir, out, keep=args.keep, a11y=args.a11y)
+
+    # CI job summary (same convention as visual_qa).
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        try:
+            lines = [f"## PR render + accuracy gate — {'PASS' if ok else 'FAIL'}\n"]
+            for r in results:
+                if r["issues"]:
+                    lines.append(f"- ❌ **{r['page']}** (`{r['path']}`)")
+                    for i in r["issues"]:
+                        lines.append(f"  - 🔴 {i}")
+            for f in [x for x in accuracy if x.get("severity") == "high"]:
+                lines.append(f"- ❌ accuracy: {f.get('check', 'leak')} {f.get('field') or f.get('source') or ''}")
+            with open(summary_path, "a") as fh:
+                fh.write("\n".join(lines) + "\n")
+        except Exception:  # noqa: BLE001
+            pass
+
+    with open(os.path.join(out, "gate_report.json"), "w") as fh:
+        json.dump({"ok": ok, "results": results, "accuracy": accuracy}, fh, indent=2)
+
+    print(f"\n{'✅ GATE PASSED' if ok else '❌ GATE FAILED — regression blocked before merge'}")
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    main()

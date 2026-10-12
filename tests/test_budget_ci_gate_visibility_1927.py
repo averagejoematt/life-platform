@@ -145,7 +145,7 @@ def test_a_gate_that_ran_raises_no_annotation():
 
 
 def test_annotation_is_ci_only():
-    """A local `python3 tests/visual_qa.py` run must not print CI markup."""
+    """A local `python3 qa/visual_qa.py` run must not print CI markup."""
     assert visual_qa.gha_paused_gate_annotation("AI-vision QA", {"status": "skipped_by_budget", "tier": 3}, env={}) == ""
 
 

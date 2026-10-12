@@ -42,6 +42,8 @@ IAM: the service role is CDK-owned (`cdk/stacks/core_stack.py`). The CALLER need
 `iam:PassRole` on that role and S3 read/write/delete on the prefix — the operator's
 own credentials for a laptop rebuild. No Lambda role is granted batch rights: no
 Lambda calls this path yet.
+
+Adopters: `scripts/season_rebuild.py --recheck` (the season's fact-read sweep, #4777).
 """
 
 import json
@@ -430,15 +432,22 @@ def run_or_fallback(
     log(f"[batch] submitted {job_arn} — {len(records)} records on {model_id}, staged at {in_uri}")
 
     deadline = deadline_epoch if deadline_epoch is not None else time.time() + DEFAULT_WAIT_SECONDS
-    snap = wait_for_batch(job_arn, deadline, poll_interval=poll_interval)
     outputs: dict = {}
     errors: dict = {}
+    try:
+        snap = wait_for_batch(job_arn, deadline, poll_interval=poll_interval)
+    except Exception as e:  # noqa: BLE001 — a throttled/failed poll must not strand a billing job or drop records (#4797)
+        log(f"[batch] waiting on {job_arn} raised {type(e).__name__}: {e}; stopping it and running on-demand")
+        snap = {"status": f"WaitError:{type(e).__name__}", "done": False, "succeeded": False, "message": str(e), "wait_error": True}
     if not snap["done"]:
         try:
             _ctrl().stop_model_invocation_job(jobIdentifier=job_arn)
         except Exception as e:  # noqa: BLE001 — a failed stop leaves a job that bills at most once
             log(f"[batch] could not stop {job_arn} after the deadline ({type(e).__name__}); it may still complete and bill")
-        why = f"batch job {job_arn} missed its deadline ({snap['status']}); every record re-ran on-demand"
+        if snap.get("wait_error"):
+            why = f"batch job {job_arn} wait failed ({snap['status']}); every record re-ran on-demand"
+        else:
+            why = f"batch job {job_arn} missed its deadline ({snap['status']}); every record re-ran on-demand"
     elif not snap["succeeded"]:
         why = f"batch job {job_arn} ended {snap['status']} ({snap.get('message') or 'no message'}); every record re-ran on-demand"
     else:

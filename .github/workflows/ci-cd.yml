@@ -1432,9 +1432,9 @@ jobs:
           # judge passed this deploy". This job is in no rollback's `needs`, so a skip
           # cannot revert anything either.
           if [ "${RUN_AI}" = "false" ]; then
-            python3 tests/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"
+            python3 qa/visual_qa.py --screenshot --ai-qa-skipped "${SKIP_REASON}"
           else
-            python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+            python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
           fi
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
@@ -1442,7 +1442,7 @@ jobs:
           # Truth-audit guardrail: every harness page must resolve (catches the
           # /data-vs-/method drift class) and public_stats must carry no impossible
           # value (negative CTL/ATL, out-of-range %). Gating — a HIGH finding fails.
-          python3 tests/accuracy_audit.py --live
+          python3 qa/accuracy_audit.py --live
 
       - name: Upload screenshots + report
         if: always()

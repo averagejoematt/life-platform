@@ -1,7 +1,7 @@
 """
 tests/test_perf_trend.py — perf-vitals persistence + weekly regression trend (#1435).
 
-Covers the PURE surface of tests/perf_trend.py (no AWS, no network, runs in the
+Covers the PURE surface of qa/perf_trend.py (no AWS, no network, runs in the
 offline unit subset):
   - snapshot_from_results  extracts per-page vitals, skips non-perf rows
   - run_key / iso_week      date-first S3 key + ISO-week label

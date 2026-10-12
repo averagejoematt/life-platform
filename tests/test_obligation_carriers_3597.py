@@ -322,7 +322,7 @@ def test_the_registry_names_the_four_ledgers_the_issue_lists():
     for must in (
         "ledgers/conformance_residue.py::CONFORMANCE_RESIDUE",
         "ledgers/pair_seam_residue.py::PAIR_SEAM_RESIDUE",
-        "tests/mypy_clean_set.py::DIRTY",
+        "scripts/mypy_clean_set.py::DIRTY",
         "tests/a11y_baseline.json",
     ):
         assert must in keys, must
@@ -338,7 +338,7 @@ def test_an_entry_without_an_expiry_is_red(discovered):
 def test_an_entry_past_ninety_days_or_without_an_issue_carrier_is_red(discovered):
     reg = {k: dict(v) for k, v in oc.RESIDUE_LEDGERS.items()}
     reg["ledgers/conformance_residue.py::CONFORMANCE_RESIDUE"].update(expires="2031-01-01")
-    reg["tests/mypy_clean_set.py::DIRTY"].update(carrier="someday")
+    reg["scripts/mypy_clean_set.py::DIRTY"].update(carrier="someday")
     problems = oc.registry_findings(registry=reg, discovered=discovered)
     assert any("CONFORMANCE_RESIDUE" in p and "90 days" in p for p in problems)
     assert any("DIRTY" in p and "not an issue" in p for p in problems)

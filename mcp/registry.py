@@ -4,6 +4,8 @@ Tool registry: maps tool names to their functions and JSON schemas.
 
 from typing import Any, cast
 
+from common.constants import PLAN_DAILY_PROTEIN_MIN_G
+
 from mcp.config import RAW_DAY_LIMIT, SOURCES
 from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 from mcp.tool_output_schemas import attach_output_schemas  # #4286 box 2: outputSchema, the ten most-called tools
@@ -21,6 +23,7 @@ from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach
 # #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
 from mcp.tools_coach_corrections import tool_log_coach_correction
 from mcp.tools_coach_intelligence import (
+    GET_COACH_THREAD_INPUT,
     tool_audit_coach_dossier,
     tool_evaluate_prediction,
     tool_get_coach_thread,
@@ -28,6 +31,7 @@ from mcp.tools_coach_intelligence import (
     tool_get_predictions,
 )
 from mcp.tools_coach_packet import COACH_PACKET_DESCRIPTION, COACH_PACKET_INPUT, tool_get_coach_session_packet  # #4082
+from mcp.tools_coach_vision import GET_COACH_VISION_DESCRIPTION, GET_COACH_VISION_INPUT, tool_get_coach_vision  # #3759
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
     tool_find_days,
@@ -329,23 +333,17 @@ TOOLS = {
             },
         },
     },
+    # #3759 paid this module's #1665 ceiling the #4036 way — by extraction, never by raising
+    # the ratchet: this tool's input table moved beside its function (GET_COACH_THREAD_INPUT
+    # in mcp/tools_coach_intelligence.py). The schema NAME stays here, which is what R3 reads.
     "get_coach_thread": {
         "fn": tool_get_coach_thread,
-        "schema": {
-            "name": "get_coach_thread",
-            "description": GET_COACH_THREAD_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "coach_id": {
-                        "type": "string",
-                        "description": "Coach domain: sleep, nutrition, training, mind, physical, glucose, labs, explorer",
-                    },
-                    "limit": {"type": "number", "description": "Number of thread entries (default 4)"},
-                },
-                "required": ["coach_id"],
-            },
-        },
+        "schema": {"name": "get_coach_thread", "description": GET_COACH_THREAD_DESCRIPTION, "inputSchema": GET_COACH_THREAD_INPUT},
+    },
+    # #3759: owner-only, field-selective; the description + input table live in the tool's own module.
+    "get_coach_vision": {
+        "fn": tool_get_coach_vision,
+        "schema": {"name": "get_coach_vision", "description": GET_COACH_VISION_DESCRIPTION, "inputSchema": GET_COACH_VISION_INPUT},
     },
     "get_predictions": {
         "fn": tool_get_predictions,
@@ -649,7 +647,10 @@ TOOLS = {
                         "type": "number",
                         "description": "[macros] Override daily calorie target (kcal). Defaults to TDEE estimate.",
                     },
-                    "protein_target": {"type": "number", "description": "[macros] Override daily protein target (g). Default: 180g."},
+                    "protein_target": {
+                        "type": "number",
+                        "description": f"[macros] Override daily protein target (g). Default: {PLAN_DAILY_PROTEIN_MIN_G}g (the plan's floor).",
+                    },
                 },
                 "required": [],
             },

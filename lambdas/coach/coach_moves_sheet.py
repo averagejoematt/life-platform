@@ -604,7 +604,106 @@ def check_line(
         logger.warning("[coach_moves] served-fact/reader checks unavailable — refusing: %s", e)
         reasons.append("checks_unavailable")
     reasons += binding_findings(t, sheet)
+    reasons += jargon_findings(t)
     return list(dict.fromkeys(reasons))
+
+
+def jargon_findings(text: str) -> list:
+    """The plain-words rule (#4649) on a front-page line: one ``jargon:<term>`` per specialist or ruled term (#4583).
+    The live 2026-10-09 lines carried "glucose dynamics, not protein primacy" and "recovery architecture"."""
+    from coach import plain_words
+
+    return [f"jargon:{term}" for term in plain_words.line_terms(text)]
+
+
+# ── the day's context: no repeat of yesterday, no tic across today (#4583, round 8) ──
+
+REPEAT_RUN_WORDS = 5  # a shared run of this many consecutive words is the same sentence said again
+_RUN_WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
+# The hedge and the opener the prompt itself once handed every coach: on the live lines of 2026-10-05..09
+# "so far" and "I think" each sat in five of eight lines. Each may appear in ONE line a day.
+TICS = {
+    "so_far": re.compile(r"\bso far\b", re.IGNORECASE),
+    "i_think": re.compile(r"\bI think\b", re.IGNORECASE),
+}
+
+
+def _run_words(text: Any) -> list:
+    """Lowercased words with every figure stripped (digits, "[n]" masks, spelled counts with a unit)."""
+    t = mask_figures(str(text or "")).replace("[n]", " ").replace("’", "'").lower()
+    return _RUN_WORD_RE.findall(re.sub(r"\d+", " ", t))
+
+
+def shared_run(a: Any, b: Any, n: int = REPEAT_RUN_WORDS) -> str:
+    """The longest run of ``n`` or more consecutive words ``a`` shares with ``b`` (figures stripped), or "". Lines are ~50 words, so the plain O(n*m) scan is fine."""
+    wa, wb = _run_words(a), _run_words(b)
+    best = ""
+    for i in range(len(wa) - n + 1):
+        for k in range(len(wb) - n + 1):
+            length = 0
+            while i + length < len(wa) and k + length < len(wb) and wa[i + length] == wb[k + length]:
+                length += 1
+            if length >= n and length > len(best.split()):
+                best = " ".join(wa[i : i + length])
+    return best
+
+
+def question_subjects(text: Any) -> set:
+    """What a question is about: the absence pillars it names (journal / food log / training log)."""
+    t = str(text or "")
+    return {key for key, _words, alias in ABSENCE_PILLARS.values() if re.search(alias, t, re.IGNORECASE)}
+
+
+def repeat_findings(text: str, move: str, coach_id: str, yesterday_lines: Optional[list]) -> list:
+    """Refuse a line that says again what was said yesterday (#4583). Yesterday's lines were already in the prompt
+    as context; nothing refused a repeat, and the live 10-07/10-08 questions asked the same journal question twice.
+
+      * the SAME coach asking a question on the same subject (absence pillar) as its question yesterday;
+      * any line sharing a run of ``REPEAT_RUN_WORDS`` consecutive words with a line yesterday — the same coach's
+        point made again, or another coach's sentence copied (10-07 -> 10-08: "I think the intake concern is weaker than").
+    Each finding is ``repeats_yesterday:<what>`` so the retry can tell the model what it repeated."""
+    out = []
+    mine = question_subjects(text) if move == "question" else set()
+    for y in yesterday_lines or []:
+        if not isinstance(y, dict) or not y.get("text"):
+            continue
+        if mine and y.get("coach_id") == coach_id and y.get("move") == "question":
+            out += [f"repeats_yesterday:{key}" for key in sorted(mine & question_subjects(y["text"]))]
+        run = shared_run(text, y["text"])
+        if run:
+            out.append(f'repeats_yesterday:"{run}"')
+    return list(dict.fromkeys(out))
+
+
+def tic_findings(text: str, accepted: list) -> list:
+    """A phrase in TICS that an earlier accepted line today already used: ``tic:so_far`` / ``tic:i_think``."""
+    return [f"tic:{name}" for name, rx in TICS.items() if rx.search(text or "") and any(rx.search(a or "") for a in accepted)]
+
+
+_TIC_RETRY = {
+    "so_far": "another coach already said 'so far' today: use a different hedge ('early days', 'on a few days of data', 'for now')",
+    "i_think": "another coach already opened with 'I think' today: vary your opening and do not write 'I think'",
+}
+
+
+def retry_note(reasons: list) -> str:
+    """The one corrective message after a refused line: each refusal in words the model can act on."""
+    notes = []
+    for r in reasons:
+        kind, _, what = str(r).partition(":")
+        if kind == "repeats_yesterday":
+            notes.append(
+                f"it repeats yesterday ({what.replace('_', ' ')}) — say something new, or stay on a different subject"
+                if not what.startswith('"')
+                else f"it repeats yesterday's words {what} — say something new in your own words"
+            )
+        elif kind == "tic" and what in _TIC_RETRY:
+            notes.append(_TIC_RETRY[what])
+        elif kind == "jargon":
+            notes.append(f"'{what}' is a specialist word — use the plain word a friend would use")
+        else:
+            notes.append(str(r))
+    return "\n\nYour previous line was refused: " + "; ".join(notes) + ". Fix exactly that."
 
 
 def cross_line_findings(text: str, accepted: list, sheet: dict) -> list:

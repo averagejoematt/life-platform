@@ -469,6 +469,26 @@ SURFACES = {
             "night": _NOT_A_VITALS_SURFACE,
         },
     ),
+    # #3759: the weekly coach-vision read over the progress photos. The body-fat BAND is
+    # deliberately outside every gate class — it is an estimate stored under the literal
+    # label 'visual estimate, not a measurement' beside the DEXA/tape anchors it was shown,
+    # and the schema checks it as data. The `qualitative` observation is the module's ONE
+    # free-text field: prose about two photo sets, owner-only, cited by his MCP tool and his
+    # Telegram coach thread. Its numeric vocabulary is literally the anchors + the band;
+    # its only legitimate dates are the two set dates. Fail-closed on the text alone.
+    "lambdas/coach/coach_vision.py::_grounded_text": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "the surface is a description of TWO SETS OF BODY PHOTOGRAPHS — what changed visually between "
+                "them — written by a prompt that forbids any claim about diet, training or sleep. There is no "
+                "second-person same-day completed-action claim to grade (#1699's only shape) and no behavior log "
+                "could make one legitimate; what is load-bearing is that the prose invents no number the anchors "
+                "and the band do not assert, and cites no date but the two set dates."
+            ),
+            "night": _NOT_A_VITALS_SURFACE,
+        },
+    ),
     # #2421: the module's SINGLE chokepoint. It used to be `generate_and_cache` and only
     # that — the Mode-B correction rewrote the text AFTER this gate ran, and the weekly
     # priority, the experiment arc and the month rollup never entered a gate at all (the
@@ -954,6 +974,15 @@ SURFACE_FACETS = {
         "The note rides the estimate row the /method/eyeball/ exhibit renders. Fail-closed on the NOTE alone: "
         "`return None if findings else str(note)` drops the phrase and keeps the graded estimate, because holding the "
         "estimate would delete a measured data point over a descriptive sentence.",
+    ),
+    "lambdas/coach/coach_vision.py::_grounded_text": _facet(
+        INTERNAL,
+        FAIL_CLOSED,
+        "_grounded_text@findings",
+        "Owner-only (Tier 2 by `field_tiers.SOURCE_TIERS`, #3759): the record is read by the owner's MCP tool and his "
+        "own Telegram coach thread and by nothing a reader sees. Fail-closed on the TEXT alone: `return None, reason` "
+        "withholds the observation with its reason and the band + anchors stand, because dropping the whole record "
+        "over a phrase would delete the week's comparison.",
     ),
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::_gate_prose": _facet(
         PUBLIC,

@@ -736,7 +736,7 @@ def test_pillar_coupling_honest_null_on_a_thin_fresh_cycle(monkeypatch):
 
 # ── #1895: the front-end belts (story.js) ────────────────────────────────────
 # Source-level assertions: these are ES modules with site-absolute imports, so a
-# real DOM render lives in tests/visual_qa.py (post-deploy). What must not happen
+# real DOM render lives in qa/visual_qa.py (post-deploy). What must not happen
 # silently is the belts being deleted, so pin their presence and their reasons.
 
 

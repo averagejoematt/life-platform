@@ -827,13 +827,14 @@ def parse_model_verdict(resp: dict[str, Any]) -> dict[str, Any]:
         # reads — the #3828 residual class (registered in tests/test_judge_verdict_retry_3688.py).
         return {"error": f"truncated at max_tokens={MAX_TOKENS}"}
     text = "".join(p.get("text", "") for p in (resp or {}).get("content", []) if p.get("type") == "text").strip()
-    a, b = text.find("{"), text.rfind("}")
-    if a == -1 or b <= a:
-        return {"error": f"no JSON object in a {len(text)}-char response"}
+    from ai import structured_json  # the one parse door (#4276 box 2)
+
     try:
-        obj = json.loads(text[a : b + 1])  # noqa: E203
-    except (ValueError, TypeError) as e:
-        return {"error": f"json.loads failed: {type(e).__name__}"}
+        obj = structured_json.load_json_span(text, "{")
+    except structured_json.JsonSpanError as e:
+        if e.kind == "no_span":
+            return {"error": f"no JSON object in a {len(text)}-char response"}
+        return {"error": f"json.loads failed: {type(e.cause).__name__}"}
     if not isinstance(obj, dict) or obj.get("verdict") not in VERDICTS:
         return {"error": "verdict not in approve|change|veto"}
     sentence = str(obj.get("sentence") or "").strip()

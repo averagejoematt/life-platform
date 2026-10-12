@@ -636,7 +636,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # scripts/ (1 failed each — the subscript form is what the first draft missed);
         # M3/M3b are negative controls, the same idiom as a leading and as a trailing comment
         # (32 passed, no cry-wolf); M4b stripped truncation handling from the covered site in
-        # tests/visual_ai_qa.py (3 failed). Three gaps are STATED in the record rather than
+        # qa/visual_ai_qa.py (3 failed). Three gaps are STATED in the record rather than
         # papered over — a two-line bind-then-compare form, a helper that returns the stop
         # reason, and a parse failure reached without reading it at all — which is why both
         # covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live
@@ -958,7 +958,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # Upper bound 213 -> 214 (2026-09-26, #4182 M4, the comprehension judge): `ci::visual-qa.yml::visual-qa::10`, the new
         # `continue-on-error` CI step this lane's workflow edit mints, arrives PROVEN — CI_PROOFS in
         # scripts/gate_census_proofs.py, wired into gate_census.PROVEN_CAN_FAIL. Mutation planted directly in the real tracked
-        # tests/comprehension_qa.py: main()'s body replaced with a bare `return 0`, deleting the
+        # qa/comprehension_qa.py: main()'s body replaced with a bare `return 0`, deleting the
         # `if not os.path.exists(_ARTIFACT_PATH): return 1` check. `python3 -m pytest tests/test_comprehension_qa.py -k
         # main_returns -v`: BASELINE 3 passed; MUTATED 2 failed / 1 passed (the two artifact-missing/crash cases both asserted
         # `main() == 1` and got 0); REVERTED 3 passed, byte-identical. Unproven stays 540; one entrant.
@@ -1082,7 +1082,21 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # prompt_cache.py arrives PROVEN (REGISTRY_PROOFS; entry deleted -> 1 failed naming prompt_cache.py:143/:159, restored
         # 15 passed). The two #4769 callers moved onto ROUTES rows, so their exemptions never enter. Id-set diff vs a
         # `git archive origin/main` export at 16dcddf20: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}.
-        <= 258
+        # Upper bound stays 258 (2026-10-11, #4633 the inbound-email receipt gate, merged onto f68a5e8bc): ONE entrant,
+        # guard::lambdas/emails/inbound_auth_gate_lambda.py — a `# gate-entrypoint:` module (lambda_handler returns SES's
+        # STOP_RULE_SET disposition; SES does the blocking, nothing raises) — arrives PROVEN via GUARD_PROOFS in
+        # scripts/gate_census_proofs.py: the DMARC refusal deleted from receipt_verdict() in the REAL tracked file (md5
+        # c465c7b3… -> 72e53752…, restored byte-identical): baseline 31 passed, MUTATED 8 failed / 23 passed (the five
+        # forged/GRAY/missing DMARC fixtures got CONTINUE, DKIM-alone passed, the batch refusal and the parser's SES-direct
+        # route let the dmarc=FAIL record through), RESTORED 31 passed. Id-set diff vs a `git archive origin/main` export at
+        # f68a5e8bc: 781 {257, 512, 7, 5} -> 782 {258, 512, 7, 5}; enters exactly that id, leaves {}, unproven does NOT
+        # move. The ceiling is not raised: #4778's retirement left it one above main's measure, and this entrant fills it.
+        # Upper bound 258 -> 259 (2026-10-11, #3759 restacked onto #4633): structural::test_coach_vision_isolation_3759.py
+        # — the os.walk sweep holding the owner-only coach-vision record to its two consumers — arrives PROVEN via
+        # STRUCTURAL_PROOFS in scripts/gate_census_mutations.py (baseline 11 passed | mutated 2 failed | reverted 11 passed).
+        # Id-set diff vs a `git archive origin/main` export at the merge base: 782 {258, 512, 7, 5} -> 783 {259, 512, 7, 5};
+        # enters exactly that id, leaves {}, unproven does NOT move. #4633 used the slack this lane's first measure relied on.
+        <= 259
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

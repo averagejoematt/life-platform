@@ -29,6 +29,49 @@ for _sp in ("ingestion", "compute", "coach", "emails", "web", "operational", "in
     if os.path.isdir(_path):
         sys.path.insert(0, _path)
 
+# #4270: the QA tooling moved to qa/ (the mypy set to scripts/). Tests (and the qa modules' own lazy bare imports,
+# `from visual_ai_qa import ...`) still name them bare; this finder resolves each bare name to the ONE qa.<name>
+# module object, so a monkeypatch on `qa_manifest` is seen by every importer whichever spelling it used.
+_QA_BARE = frozenset(
+    {
+        "qa_manifest",
+        "leak_token_sweep",
+        "visual_qa",
+        "visual_ai_qa",
+        "visual_qa_verdict",
+        "visual_qa_cli",
+        "accuracy_audit",
+        "comprehension_qa",
+        "perf_trend",
+        "pr_render_gate",
+    }
+)
+
+
+class _QaAliasFinder:
+    @classmethod
+    def find_spec(cls, name, path=None, target=None):
+        if name not in _QA_BARE:
+            return None
+        import importlib.util
+
+        return importlib.util.spec_from_loader(name, cls)
+
+    @staticmethod
+    def create_module(spec):
+        import importlib
+
+        if _REPO not in sys.path:
+            sys.path.insert(0, _REPO)
+        return importlib.import_module("qa." + spec.name)
+
+    @staticmethod
+    def exec_module(module):
+        return None
+
+
+sys.meta_path.insert(0, _QaAliasFinder)
+
 # ADR-104: keep the unit suite hermetic — ai_output_validator's health_context
 # autoload would otherwise perform a real DynamoDB read when local creds exist.
 os.environ.setdefault("AI_VALIDATOR_AUTOLOAD", "off")
@@ -236,6 +279,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
         "test_model_routing_4770.py",  # #4770: glob sweep of lambdas/ + mcp/ — no model literal, model env read or model_defaults import outside ai/model_routing.py
         "test_invoke_model_names_resolve_4769.py",  # #4769: glob sweep — every statically-known model_name= under lambdas/ + mcp/ resolves at the Bedrock chokepoint
+        "test_coach_vision_isolation_3759.py",  # #3759: os.walk sweep of lambdas/ mcp/ site/ scripts/ deploy/ cdk/ — no public or narrative consumer names the owner-only coach-vision record
         "test_bedrock_client.py",  # #4276: rglob sweep — model text (subscript, text transport, fence helper, span grab) is json.loads-ed only in ai/structured_json.py (down-only ledger)
         "test_upstream_changes_4638.py",  # #4638: rglob sweep — a new Apple Health rebuild-a-day caller falsifies the stated upstream_changes facet
         "test_key_rotator_grants_4707.py",  # #4707: rglob sweep — every Secrets Manager rotation Lambda is registered, and each sm.<method> call it makes is granted
@@ -261,7 +305,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # harness files for every site that DECIDES on `stop_reason == "max_tokens"`.
         # A registry-join check, and pre-merge by construction: a NEW AI judge inherits
         # the no-retry default silently, and its failure mode — `ai-unevaluated`, which
-        # tests/visual_qa_verdict.py routes to DECLINE — cannot revert a deploy, so
+        # qa/visual_qa_verdict.py routes to DECLINE — cannot revert a deploy, so
         # post-merge there is nothing that would ever surface it. Nine days of a red
         # Visual QA (standalone) is what that looks like.
         "test_judge_verdict_retry_3688.py",
@@ -407,6 +451,9 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # same PR that adds the test, exactly as the block above instructs.
         "test_prereg_effect_provenance_3552.py",
         "test_prereg_hash_stamp.py",
+        # #3495: reads the sealed `deploy/generated/genesis_preregistration.json` to pin that
+        # its literal min_effects do NOT meet the derived-bar predicate (never re-sealed).
+        "test_prereg_min_effect_derived_3495.py",
         "test_qa_smoke_phase_stamp_coverage_1970.py",
         # `test_reset_writer_contract_3598.py` arrived on main with #3622 AFTER this
         # branch derived its list, and `reset_artifact_test_files()` picked it up on the
@@ -752,7 +799,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_smoke_structural.py",
         "test_stance_behavioral_gate_2195.py",
         "test_traffic_green_report.py",
-        # #3567: imports tests/qa_manifest.py to derive the sitemap's own registry-vs-
+        # #3567: imports qa/qa_manifest.py to derive the sitemap's own registry-vs-
         # disk consistency (registry membership, live noindex, self-matching canonical)
         # — same shape as the 20 files above, joined by the same import-detection rule.
         "test_v4_build_sitemap_3567.py",

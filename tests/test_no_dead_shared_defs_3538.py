@@ -25,7 +25,7 @@ WHAT IS FLAGGED. A top-level, non-underscore ``def``/``async def`` in any packag
 references across the live surface:
 
     lambdas/  mcp/  deploy/  scripts/  cdk/  and the harnesses in tests/ that are
-    not themselves tests (tests/visual_qa.py, tests/visual_ai_qa.py, …)
+    not themselves tests (qa/visual_qa.py, qa/visual_ai_qa.py, …)
 
 ``tests/test_*.py`` is deliberately NOT live surface — a function whose only caller is
 its own unit test is the thing this guard exists to find. The harnesses ARE live: they
@@ -38,7 +38,7 @@ HOW A REFERENCE IS COUNTED — both ways, because either alone is wrong:
     ``budget_guard.hard_stopped`` is the live specimen: its only non-test "reference" in
     the repo is a sentence in scripts/gate_census_enforcement.py's prose.
   * String literals. ``getattr(mod, "name")`` is invisible to AST, and this repo does it:
-    ``tests/visual_ai_qa.py`` reaches ``bedrock_client.attributed_to`` by string. An
+    ``qa/visual_ai_qa.py`` reaches ``bedrock_client.attributed_to`` by string. An
     AST-only scan calls that function dead, and deleting it breaks the visual-QA gate —
     the exact "string/getattr dispatch is invisible to the scan" caveat #3538 carries.
 
@@ -88,19 +88,7 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # record_text.coach_output_text (deploy/backfill_recall_embeddings.py) and
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
-_BATCH_REASON = (
-    "ADR-132 / #409, amended for #4777: bedrock_batch is the batch-inference path for "
-    "bulk rebuilds/backfills of 100+ independent records per job. run_or_fallback is the "
-    "adopter API (it reaches submit/wait/retrieve itself) and build_jsonl_record builds its "
-    "records; no producer adopts them yet — each adoption is its own change (the season "
-    "rebuild is a sequential chain and must be restructured first; the training-notes "
-    "backfill is the flat candidate). Deleting them is an ADR-132 reversal, not a dead-code "
-    "cleanup. Revisit when the first producer adopts run_or_fallback."
-)
-
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/ai/bedrock_batch.py:build_jsonl_record": _BATCH_REASON,
-    "lambdas/ai/bedrock_batch.py:run_or_fallback": _BATCH_REASON,
     "lambdas/ai/ai_calls.py:call_training_coach_v2": (
         "one seat of a symmetric ADR-153 coach family (sleep / nutrition / training / mind, "
         "each a 3-line `_run_coach_v2_pipeline(<seat>, ...)` wrapper). The daily-brief tests "
@@ -504,6 +492,7 @@ def _live_surface() -> list[pathlib.Path]:
     for rel in LIVE_DIRS:
         files += list(_py_files(rel))
     files += [p for p in _py_files("tests") if not p.name.startswith("test_")]
+    files += list(_py_files("qa"))  # #4270: the QA harnesses moved out of tests/
     return files
 
 
@@ -587,12 +576,12 @@ def test_the_allowlist_has_no_dead_entries():
 
 
 def test_the_scan_counts_a_string_dispatch_as_a_reference():
-    """The caveat that makes this guard safe to act on. ``tests/visual_ai_qa.py`` reaches
+    """The caveat that makes this guard safe to act on. ``qa/visual_ai_qa.py`` reaches
     ``bedrock_client.attributed_to`` through ``getattr(bedrock, "attributed_to", None)``.
     An AST-only scan reports it dead; deleting it breaks the visual-QA gate. Pin the
     live specimen, not a synthetic one — a synthetic proves the code path, this proves
     the repo still contains the hazard the code path exists for."""
-    harness = _REPO / "tests" / "visual_ai_qa.py"
+    harness = _REPO / "qa" / "visual_ai_qa.py"
     assert (
         'getattr(bedrock, "attributed_to"' in harness.read_text()
     ), "the live string-dispatch specimen moved; re-verify this guard's string-literal branch against its replacement"

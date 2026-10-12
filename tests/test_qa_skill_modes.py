@@ -5,7 +5,7 @@ the skill is prose the agent executes, so the contract is what the prose names):
 
   1. All five #1449 modes exist — quick / tier1 / full / mobile / ai-review — plus
      the #1450 `audit` mode, each as a documented invocation of a real harness.
-  2. Zero hand lists: every page/API set derives from tests/qa_manifest.py (#1426).
+  2. Zero hand lists: every page/API set derives from qa/qa_manifest.py (#1426).
      The pre-#1449 skill hand-listed API endpoints (`- https://averagejoematt.com/api/...`)
      — exactly the drift class the manifest killed for pages. Banned outright.
   3. Each mode maps to the right underlying sweep flags (#1428/#1434 tiering —
@@ -63,7 +63,7 @@ def test_no_hand_listed_api_endpoints():
 def test_no_hand_listed_page_paths_as_examples_of_state():
     """The endpoint set for the api mode must be derived, not enumerated."""
     text = _skill_text()
-    assert "qa_manifest" in text, "the skill never references tests/qa_manifest.py — page/API sets must derive from THE registry (#1426)"
+    assert "qa_manifest" in text, "the skill never references qa/qa_manifest.py — page/API sets must derive from THE registry (#1426)"
     assert "api_deps" in text, "the skill never derives endpoints from the manifest's api_deps facet"
 
 
@@ -85,7 +85,7 @@ def test_mobile_mode_is_the_webkit_shape():
 def test_ai_review_and_full_modes_reach_the_ai_layer():
     text = _skill_text()
     assert "--ai-qa" in text, "no mode invokes the Claude/Bedrock vision layer (--ai-qa)"
-    assert "tests/visual_qa.py" in text, "the skill never invokes the visual sweep harness"
+    assert "qa/visual_qa.py" in text, "the skill never invokes the visual sweep harness"
 
 
 def test_audit_mode_wires_the_coverage_audit():

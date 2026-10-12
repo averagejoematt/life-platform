@@ -192,7 +192,6 @@ ALL_LAMBDAS = sorted(_ALL_LAMBDA_SITES)
 INGESTION_LAMBDAS = [
     "strava_lambda.py",
     "whoop_lambda.py",
-    "garmin_lambda.py",
     "eightsleep_lambda.py",
     "habitify_lambda.py",
     "withings_lambda.py",
@@ -240,6 +239,7 @@ PROMPT_LAMBDAS = [
     "hypothesis_engine_lambda.py",
     "adaptive_mode_lambda.py",
     "ai_calls.py",  # The main prompt module — always checked
+    "coach_vision.py",  # #3759: the coach-vision prompt lives in the pure module, not the handler
 ]
 
 # ── Known gaps (dated, reasoned, shrink-only — #2825 ratchet) ────────────────

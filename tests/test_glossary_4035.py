@@ -222,7 +222,7 @@ def test_evidence_js_never_blindly_overwrites_the_glossed_topic_lede():
     EVERY render call, including the initial page load — discarding the server's
     already-glossed `<p class="topic-lede" data-blurb>` (v4_glossary.py's own build-
     time gloss wrap) for a live reader before they ever saw it. A
-    Playwright render pass (`tests/pr_render_gate.py`) is what actually caught this —
+    Playwright render pass (`qa/pr_render_gate.py`) is what actually caught this —
     this regression test pins the fix at the source level so it can't quietly revert:
     the unconditional overwrite must not reappear, and a same-content guard must.
     """

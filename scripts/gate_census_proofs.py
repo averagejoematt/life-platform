@@ -1079,7 +1079,7 @@ STRUCTURAL_HAND_PROOFS: dict[str, dict[str, Any]] = {
         "scope": (
             "A verdict on three of the six hand-maintained public stats — review_grade, "
             "site_pages, active_secrets — each against a real source (newest "
-            "docs/reviews/*_grades_*.json, tests/qa_manifest.MANIFEST, "
+            "docs/reviews/*_grades_*.json, qa/qa_manifest.MANIFEST, "
             "model/platform_model.json cost_surface.secrets). review_count, "
             "board_technical and board_product are deliberately NOT covered: nothing in "
             "the repo enumerates reviews and the board rosters' live source is an S3 "
@@ -1979,7 +1979,7 @@ _RECEDE_SCOPE = (
     "each rule's ink tokens over --page and --surface at the opacity parsed from the sheet; it does not know "
     "which background a given instance actually lands on, does not see a wash/image ground (the .ch-state "
     "class, guarded separately by test_ch_state_grounds_on_a_ramp_step_not_an_accent_wash), and does not see "
-    "inline styles or JS-set colours. The live arbiter stays tests/visual_qa.py's axe sweep. Also scoped: the "
+    "inline styles or JS-set colours. The live arbiter stays qa/visual_qa.py's axe sweep. Also scoped: the "
     "companion set-completeness check test_every_opacity_declaration_is_classified sweeps evidence.css ONLY — "
     "tokens.css's ~40 further opacity declarations are deliberately unclassified rather than asserted "
     "text-free on inspection this change did not do."
@@ -2272,7 +2272,7 @@ _DERIVED_DECOR_SCOPE = (
     "reach. Whether the exempt selector really carries no text node is a HUMAN judgement recorded as the row's "
     "written reason (aria-hidden in the emitting JS/HTML, an SVG-only child, a :disabled control); the guard "
     "proves the row is load-bearing and still points at a live rule, not that the reason is true. The live "
-    "arbiter stays tests/visual_qa.py's axe sweep."
+    "arbiter stays qa/visual_qa.py's axe sweep."
 )
 
 # selector: (alpha, n failures when un-exempted, worst ratio per palette block)
@@ -2632,7 +2632,7 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
         "command": "python3 -m pytest tests/test_comprehension_qa.py -k main_returns -v",
         "mutation": (
             "The step's whole failure contract collapses to `comprehension_qa.main()`'s own "
-            "logic (the step is a bare `python3 tests/comprehension_qa.py`, so the step's exit "
+            "logic (the step is a bare `python3 qa/comprehension_qa.py`, so the step's exit "
             "code IS this function's return value) — planted directly in the real tracked file: "
             "main()'s body replaced with a bare `return 0`, deleting the "
             "`if not os.path.exists(_ARTIFACT_PATH): ... return 1` check entirely. Bedrock/AWS "
@@ -3313,5 +3313,45 @@ REGISTRY_PROOFS.update(
             "proved_on": "2026-10-10",
         }
         for path, (hit, more) in _MODEL_ROUTING_SPARED_FILES.items()
+    }
+)
+# ── #4633 (2026-10-11): the inbound-email receipt gate ───────────────────────────────────
+# `lambdas/emails/inbound_auth_gate_lambda.py` is a `# gate-entrypoint:` module: the SES
+# receipt rule invokes it RequestResponse as its first action and acts on the disposition it
+# returns — STOP_RULE_SET refuses the message before any byte is stored, CONTINUE lets the S3
+# action (and so the parser) run. Nothing in it raises (an exception is itself a refusal), so
+# the census's exit/raise scan finds no enforcement path; the proof below is what says it CAN fail.
+GUARD_PROOFS.update(
+    {
+        "guard::lambdas/emails/inbound_auth_gate_lambda.py": {
+            "gate_name": "lambdas/emails/inbound_auth_gate_lambda.py",
+            "command": "python3 -m pytest tests/test_inbound_auth_gate_4633.py -q -p no:cacheprovider   # baseline 31 passed",
+            "mutation": (
+                "The DMARC refusal deleted from `receipt_verdict()` in the REAL tracked module — the two lines "
+                '`if statuses["dmarcVerdict"] != "PASS": return False, f"dmarc_{...}", statuses` — so a receipt whose '
+                "dmarcVerdict is FAIL, GRAY, PROCESSING_FAILED or absent reads as authenticated (the pre-#4633 world: the "
+                "parser trusted the From header). md5 c465c7b3f6955ffed288ad3275de2c67 -> 72e5375265bb02c000d343fb5fae12ee; "
+                "restored from a pre-mutation copy and cmp'd byte-identical (c465c7b3… again). Run twice on 2026-10-11 — first on the file as pushed (884455f0… -> fd83e3af…), then again on the final file after a docstring edit — same 8 failed / 23 passed both times."
+            ),
+            "observed": (
+                "2026-10-11. BASELINE 31 passed. MUTATED: 8 failed, 23 passed — "
+                "test_a_failing_or_missing_verdict_stops_the_rule_set[dmarc_fail | dmarc_gray | dmarc_processing_failed | "
+                "dmarc_missing x2] (the forged receipt got CONTINUE, not STOP_RULE_SET), test_dkim_alone_is_not_enough_at_the_gate, "
+                "test_one_refusal_refuses_a_whole_batch (the FAIL record in the batch no longer refused it), and "
+                "test_an_ses_direct_record_is_refused_on_its_receipt_before_the_s3_read (the parser reuses receipt_verdict() "
+                "on an SES-direct record: the dmarc=FAIL record read S3 and landed an insight). The 23 that stayed green are "
+                "the spam/virus refusals, the allowlist/From refusals, the pass-through controls, the CDK/IaC structure "
+                "checks and the parser's Authentication-Results-header route, none of which run through the deleted lines. "
+                "RESTORED: 31 passed."
+            ),
+            "scope": (
+                "Proves the DMARC verdict is load-bearing at the gate (lambda_handler disposition) and on the parser's "
+                "SES-direct route. The spam/virus and allowlist branches are exercised by the same suite but were not "
+                "separately mutated here; the live receipt-rule ORDER (gate before the S3 action) is IaC asserted by "
+                "test_the_receipt_rule_is_defined_in_cdk_with_the_gate_as_its_only_action and watched live by the "
+                "`inbound-auth-gate-bypassed` alarm, not by this proof."
+            ),
+            "proved_on": "2026-10-11",
+        },
     }
 )

@@ -48,7 +48,7 @@ test("every served driver has plain words", () => {
 
 test("the level says how many areas it came from and the day it is for", () => {
   const html = S.levelHTML(character);
-  assert.match(html, /<p class="ck-big">10<span>level on Thursday, October 8<\/span><\/p>/);
+  assert.match(html, /<p class="ck-big">10<span> level on Thursday, October 8<\/span><\/p>/);
   assert.match(html, /Worked out from 6 of 7 areas; an area with nothing measuring it is left out, not counted as average\./);
   assert.match(S.levelHTML(null), /not served right now/);
   assert.equal(S.sheetLine(character), "Level 10 across six of seven areas of his life", "the front page states the same count the sheet does");

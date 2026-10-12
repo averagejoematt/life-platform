@@ -32,8 +32,9 @@ the HR family (`average_heartrate`, `max_heartrate`, `has_heartrate`, `zone*_sec
 `hr_recovery`) is taken from the dropped copy as a unit and the kept copy is stamped
 `hr_from_strava_id`. The distance stays with the device that measured it.
 
-Garmin has been paused since ADR-074, so live days are single-device and this is a no-op on
-them; it bites every historical read and would return on the day a second device syncs.
+Garmin's direct API was retired (ADR-074 amendment, #4640) and the watch now reaches us through
+Strava, so three devices push to Strava today; live days can carry duplicate copies of one
+walk and this runs on them as well as on every historical read.
 Pure — no boto3, no I/O, no clock reads.
 """
 

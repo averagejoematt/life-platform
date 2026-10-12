@@ -553,7 +553,9 @@ def test_ruling_b_carries_its_provenance_and_version():
         "2026-09-24",
     )
     assert "Helms 2014" in g["evidence"] and "10.1186/1550-2783-11-20" in g["evidence"]
-    assert owner_redlines.REDLINES_VERSION == "3.3" and owner_redlines.REDLINES["protein_floor_g"]["value"] == 180
+    assert (
+        owner_redlines.REDLINES_VERSION == "3.3" and owner_redlines.REDLINES["protein_floor_g"]["value"] == 170
+    )  # 2026-10-11 ruling (#4540): the plan's floor, was 180
 
 
 # ── #4161 review fixes ─────────────────────────────────────────────────────────────────

@@ -64,7 +64,6 @@ def _exists(filename: str) -> bool:
 DDB_LAMBDAS = [
     "strava_lambda.py",
     "whoop_lambda.py",
-    "garmin_lambda.py",
     "eightsleep_lambda.py",
     "habitify_lambda.py",
     "withings_lambda.py",
@@ -103,7 +102,6 @@ DDB_LAMBDAS = [
 INGESTION_LAMBDAS = [
     "strava_lambda.py",
     "whoop_lambda.py",
-    "garmin_lambda.py",
     "eightsleep_lambda.py",
     "habitify_lambda.py",
     "withings_lambda.py",

@@ -290,7 +290,7 @@ def check_reader_truth():
     # unreadable reply is not evidence the SITE is wrong. So the honest ceiling here
     # is "loud, counted, and never absorbed into a clean line" — which is what the
     # coverage suffix on every summary below enforces. The CI gate
-    # (tests/visual_ai_qa.assess_reader_truth) rules the other way, because there
+    # (qa/visual_ai_qa.assess_reader_truth) rules the other way, because there
     # "no answer" decides a deploy.
     unread = [e for e in errors if reader_truth_qa.is_unevaluated(e)]
     for err in errors:

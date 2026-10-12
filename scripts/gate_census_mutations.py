@@ -506,6 +506,16 @@ _LINKED_PRIVATE_ROUTE_HTML = (
     '<body><a href="/progress-photos/">progress</a></body></html>\n'
 )
 
+# #3759: a public serving module reading the owner-only coach-vision partition — the exact
+# reader class the isolation sweep exists to refuse (a site endpoint serving a body-fat band
+# that is an estimate as if it were a number). Planted under lambdas/web/, the one tree the
+# gate names as never-acceptable, so it proves both the allowlist leg and the tree leg.
+_COACH_VISION_READER_PY = (
+    '"""census probe — a reader that must never exist."""\n\n\n'
+    "def handle(table):\n"
+    '    return table.query(KeyConditionExpression="pk = :pk", ExpressionAttributeValues={":pk": "USER#matthew#SOURCE#coach_vision"})\n'
+)
+
 # #3615 box 5: a page under site/ advertising a feed the hook registry DECLARES dark —
 # i.e. offering a reader a podcast subscription to a show with zero episodes. This is the
 # exact 11-page defect the gate was written for, planted as a NEW page so it also proves
@@ -657,6 +667,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         ),
         plants=(("site/_census_probe_3760.html", _LINKED_PRIVATE_ROUTE_HTML),),
         track=False,  # the guard rglobs site/ on disk, so an untracked file is in scope
+    ),
+    "structural::test_coach_vision_isolation_3759.py": MutationSpec(
+        gate_id="structural::test_coach_vision_isolation_3759.py",
+        target="tests/test_coach_vision_isolation_3759.py",
+        detects=(
+            "a public serving module under lambdas/web/ that reads the owner-only coach-vision record "
+            "(a sentence about his body and a body-fat band that is an estimate, not a measurement) — the "
+            "leak no other gate has an opinion about: the partition has no site/ object, no route and no "
+            "field-tier projection, so every page list and every tier guard simply has no row for it"
+        ),
+        plants=(("lambdas/web/_census_probe_3759.py", _COACH_VISION_READER_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ site/ scripts/ deploy/ cdk/ on disk, so an untracked module is in scope
     ),
     "structural::test_hook_registry_3615.py": MutationSpec(
         gate_id="structural::test_hook_registry_3615.py",
@@ -1333,6 +1355,23 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "actually exists is the qa-smoke inverse leg's question, not this gate's.",
         proved_on="2026-09-20",
     ),
+    "structural::test_coach_vision_isolation_3759.py": _proof(
+        "structural::test_coach_vision_isolation_3759.py",
+        "ARMED 1/1 — baseline: 11 passed in 3.11s | mutated: 2 failed, 9 passed in 3.12s :: "
+        "test_no_file_outside_the_allowlist_names_the_partition; test_no_reader_or_narrative_tree_names_it_at_all "
+        "| reverted: 11 passed in 3.08s",
+        "lambdas/ mcp/ site/ scripts/ deploy/ cdk/ on disk (os.walk over .py/.js/.mjs/.html/.json/.md/.sh/.txt, "
+        "deploy/generated/** excluded as a live-measured artifact), so an UNTRACKED module is in scope — every "
+        "mention of the partition token is held to a written allowlist (two consumers + plumbing), and a mention "
+        "in a reader/narrative tree (lambdas/web, lambdas/emails, lambdas/content, lambdas/intelligence, site, "
+        "scripts/v4_*) fails regardless of the allowlist. Also pinned: every allowlist entry still carries the "
+        "token, the site API's ROUTES serve no vision path, the tier/class/band declarations, and the producing "
+        "role's write grant is LeadingKeys-scoped to the one partition with GetObject only on the photo prefix. "
+        "STILL INVISIBLE, stated rather than papered over: a reader that reaches the partition through a "
+        "variable-built pk (no literal token), a coach narrative that paraphrases the thread addendum into a "
+        "published line (the grounder's allow-list is what bounds that), and docs/ + tests/, which are not swept.",
+        proved_on="2026-10-11",
+    ),
     "structural::test_progress_viewer_privacy_3760.py": _proof(
         "structural::test_progress_viewer_privacy_3760.py",
         "ARMED 1/1 — baseline: 16 passed in 0.19s | mutated: 1 failed, 15 passed in 0.20s :: "
@@ -1340,7 +1379,7 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "site/ on disk (rglob, every file except binary image/font/archive suffixes), so an "
         "UNTRACKED page is in scope — plus a named sweep of the sitemap, both feeds, robots.txt "
         "and redirects.map, and an rglob of scripts/**/*.py for a GENERATOR that would emit the "
-        "link on the next build. Also pinned: the route carries a tests/qa_manifest.PRIVATE_ROUTES "
+        "link on the next build. Also pinned: the route carries a qa/qa_manifest.PRIVATE_ROUTES "
         "row whose accepted anonymous statuses exclude 200, it is in no manifest page entry, the "
         "CloudFront behaviour targets the viewer's own origin with the no-cache policy pair, the "
         "cookie literal agrees between the Lambda and the CDK policy, and the site-api role still "
@@ -1448,8 +1487,8 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
     ),
     "structural::test_judge_verdict_retry_3688.py": _proof(
         "structural::test_judge_verdict_retry_3688.py",
-        "M1 (harness, ARMED 1/1) baseline: 32 passed | mutated: 1 failed, 31 passed :: test_the_judge_call_site_set_is_enumerated_from_source_and_every_member_is_covered | reverted: 32 passed. M2 the same probe under mcp/ and M2b a SUBSCRIPT-form probe under scripts/: 1 failed each (the scan reaches all five dirs, and the subscript form is the one the FIRST DRAFT of the pattern missed). M3/M3b negative controls \u2014 the identical idiom as a leading and as a trailing comment: 32 passed, no cry-wolf. M4b the covered site in tests/visual_ai_qa.py stops deciding on truncation at all: 3 failed \u2014 the Set test naming the file, plus two behavioural tests. All watched 2026-09-14 and restored.",
-        "lambdas/ mcp/ scripts/ deploy/ cdk/ on disk (os.walk, .py only) plus tests/visual_ai_qa.py, tests/visual_qa.py and tests/visual_qa_verdict.py by name, so an UNTRACKED judge is in scope and the rest of tests/ deliberately is not \u2014 its stop-reason literals are FIXTURES implementing the wire, not decisions on it. THE PATTERN WAS WIDENED BY THIS MUTATION RUN and that is the record's most useful line: the first draft matched only the get-and-equality form, and mutation M4 \u2014 rewriting the covered site to the membership form, semantically identical code \u2014 went RED as a phantom new site while the real judge was still there. The rule now requires the two names on one line with a comparison between them and strips trailing comments first; re-measured over the whole scan surface it returns the SAME three sites with no new false positives, and M4 now correctly passes. STILL INVISIBLE, stated rather than papered over: a two-line form (bind the stop reason, compare it on the next line), a helper that returns it, and a parse failure reached without reading it at all \u2014 gaps, not passes, which is why the two covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live gate: whether the next Visual QA (standalone) run actually retries is an observation no offline gate can make (#3688 closes on that run, not on this test).",
+        "M1 (harness, ARMED 1/1) baseline: 32 passed | mutated: 1 failed, 31 passed :: test_the_judge_call_site_set_is_enumerated_from_source_and_every_member_is_covered | reverted: 32 passed. M2 the same probe under mcp/ and M2b a SUBSCRIPT-form probe under scripts/: 1 failed each (the scan reaches all five dirs, and the subscript form is the one the FIRST DRAFT of the pattern missed). M3/M3b negative controls \u2014 the identical idiom as a leading and as a trailing comment: 32 passed, no cry-wolf. M4b the covered site in qa/visual_ai_qa.py stops deciding on truncation at all: 3 failed \u2014 the Set test naming the file, plus two behavioural tests. All watched 2026-09-14 and restored.",
+        "lambdas/ mcp/ scripts/ deploy/ cdk/ on disk (os.walk, .py only) plus qa/visual_ai_qa.py, qa/visual_qa.py and qa/visual_qa_verdict.py by name, so an UNTRACKED judge is in scope and the rest of tests/ deliberately is not \u2014 its stop-reason literals are FIXTURES implementing the wire, not decisions on it. THE PATTERN WAS WIDENED BY THIS MUTATION RUN and that is the record's most useful line: the first draft matched only the get-and-equality form, and mutation M4 \u2014 rewriting the covered site to the membership form, semantically identical code \u2014 went RED as a phantom new site while the real judge was still there. The rule now requires the two names on one line with a comparison between them and strips trailing comments first; re-measured over the whole scan surface it returns the SAME three sites with no new false positives, and M4 now correctly passes. STILL INVISIBLE, stated rather than papered over: a two-line form (bind the stop reason, compare it on the next line), a helper that returns it, and a parse failure reached without reading it at all \u2014 gaps, not passes, which is why the two covered sites ALSO carry behavioural tests. It judges SOURCE SHAPE, never the live gate: whether the next Visual QA (standalone) run actually retries is an observation no offline gate can make (#3688 closes on that run, not on this test).",
         proved_on="2026-09-14",
     ),
     "structural::test_role_family_write_scope.py": _proof(

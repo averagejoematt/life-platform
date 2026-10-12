@@ -98,7 +98,8 @@ def test_registry_covers_every_scheduled_ingestion_function():
     assert not unknown, f"facet names a function the ingestion stack does not define: {sorted(unknown)}"
     extra = probed - scheduled - _paused_fns() - UNSCHEDULED_BY_DESIGN
     assert not extra, f"probed but unscheduled, and neither paused nor a webhook: {sorted(extra)}"
-    assert _paused_fns(), "the registry has a paused source today (garmin) — the facet must reach it"
+    # #4640: garmin's direct-API function was retired, so no paused source carries a probe today;
+    # the subset check below still holds vacuously and bites the day a paused source regains one.
     assert _paused_fns() <= probed - scheduled, "a paused source still has a schedule in CDK"
 
 

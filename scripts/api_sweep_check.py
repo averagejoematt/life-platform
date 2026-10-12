@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """api_sweep_check.py — the #2652 box-3 live-route sweep (status + JSON shape).
 
-Probes every row of `tests/qa_manifest.api_sweep_records()` — the router-derived
+Probes every row of `qa/qa_manifest.api_sweep_records()` — the router-derived
 /api long tail no page declares as an api_dep — against the live site. This is
 the sweep that closes the hole `light_pct: 106.7` shipped through: the numeric
 rule existed, but only ever ran over the endpoints the manifest happened to
@@ -24,7 +24,7 @@ Exit: 1 if any FAIL, or if the derivation yields ZERO rows (a sweep that
 checked nothing must not report like a clean sweep — the #2578 rule); else 0.
 
 The numeric/impossible-value scan over these routes lives in
-tests/accuracy_audit.py --live, whose endpoint denominator includes these rows
+qa/accuracy_audit.py --live, whose endpoint denominator includes these rows
 (one instrument per concern — this script owns status+shape, that one owns the
 numeric rubric).
 
@@ -52,7 +52,7 @@ import urllib.request
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-for _p in (os.path.join(_REPO, "tests"), os.path.join(_REPO, "deploy")):
+for _p in (_REPO, os.path.join(_REPO, "deploy")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -132,7 +132,7 @@ def main() -> int:
     ap.add_argument("--base", default=DEFAULT_BASE, help=f"origin to probe (default {DEFAULT_BASE})")
     args = ap.parse_args()
 
-    import qa_manifest
+    from qa import qa_manifest
 
     records = qa_manifest.api_sweep_records()
     if not records:

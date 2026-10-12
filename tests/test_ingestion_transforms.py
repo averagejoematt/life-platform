@@ -32,7 +32,6 @@ for _k, _v in {
     os.environ.setdefault(_k, _v)
 
 from ingestion import strava_lambda as strava  # noqa: E402
-from ingestion.garmin_lambda import transform as garmin_transform  # noqa: E402
 from ingestion.strava_lambda import _normalize as strava_normalize  # noqa: E402
 from ingestion.whoop_lambda import (  # noqa: E402
     _extract_cycle,
@@ -487,13 +486,6 @@ def test_strava_fetch_day_assigns_each_activity_to_one_local_date(monkeypatch):
 # ══════════════════════════════════════════════════════════════════════════
 # Garmin — transform is a pass-through wrapper (the mapping is upstream)
 # ══════════════════════════════════════════════════════════════════════════
-def test_garmin_transform_passthrough_and_empty():
-    out = garmin_transform({"steps": 5000, "body_battery": 60}, "2026-06-09")
-    assert out == [{"source": "garmin", "date": "2026-06-09", "steps": 5000, "body_battery": 60}]
-    assert garmin_transform({}, "2026-06-09") == []
-    assert garmin_transform(None, "2026-06-09") == []
-
-
 # ══════════════════════════════════════════════════════════════════════════
 # Strava — reconciliation diff (DI-2: catch a silent drop vs the source of truth)
 # ══════════════════════════════════════════════════════════════════════════
@@ -610,13 +602,10 @@ def test_trailing_refresh_policy_per_source():
     finalized or rate-limit-fragile sources deliberately stay at 0. Pinning the policy
     makes any change a conscious, re-justified decision rather than a silent drift.
     """
-    from ingestion import garmin_lambda, strava_lambda, whoop_lambda
+    from ingestion import strava_lambda, whoop_lambda
 
     # Activity sources with late device-sync → trailing re-fetch ON.
     assert strava_lambda._config.refresh_trailing_days == 3  # phone-uploaded walks, hours-to-days late
     assert whoop_lambda._config.refresh_trailing_days == 2  # band workouts stored as DATE#..#WORKOUT# sub-records
 
-    # Garmin: activities already flow to Strava (covered); its unique data is same-day-
-    # finalized wellness; it 429-throttles aggressively (4x/day + a refresh breaker), so
-    # extra trailing re-fetches would be low-value and risk worsening the throttle.
-    assert getattr(garmin_lambda._config, "refresh_trailing_days", 0) == 0
+    # Garmin direct API retired (#4640): its activities arrive through Strava, covered above.

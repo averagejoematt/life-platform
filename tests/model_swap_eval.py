@@ -63,15 +63,32 @@ WHAT IS NOT HERE (stated, not glossed)
     fixtures do not carry. Both arms always receive the identical body, which is what a
     pairwise comparison needs; each case's `prompt_provenance` says which kind it is.
 
+THE THREE INTERNAL FEATURES OF THE OPEN-WEIGHT TRIAL (#4776)
+  `coach_quality_gate`, `coach_state_update` and `coherence_semantic` replay the LLM half of
+  the blocking coach judge, the coach state extraction and the coherence sentinel's semantic
+  pass over the labelled `tests/fixtures/golden_briefs` corpus (30 goldens + 15 canaries): the
+  judge and the sentinel see each brief's text against its own facts, the extractor sees each
+  golden's text. Every body comes from the LIVE builder (`_build_quality_gate_message` under
+  `QUALITY_GATE_SYSTEM_PROMPT`, `build_extraction_message` under `EXTRACTION_SYSTEM_PROMPT`,
+  `coherence_sentinel_lambda.semantic_body`) and is requested under the feature's own output
+  schema. Their deterministic gates: schema conformance; for the judge, a seeded fault the
+  DETERMINISTIC grounder flagged (rendered into the prompt, which the rubric says to report)
+  or an anti-pattern canary that the reply waves through (`passed` true at a passing score)
+  is `missed_seeded_fault`; for the sentinel, `coherent: true` with issues listed is a
+  contradiction. The pairwise judge decides everything else. A non-Anthropic candidate goes
+  through the same chokepoint, translated by its Converse adapter — the arms and the meters
+  do not know the difference, which is the point.
+
 Run (one feature per run):
-    python3 tests/model_swap_eval.py --feature field_notes --candidate us.anthropic.claude-haiku-5-5 --dry-run
-    python3 tests/model_swap_eval.py --feature field_notes --candidate us.anthropic.claude-haiku-5-5 --n 4
+    python3 tests/model_swap_eval.py --feature field_notes --candidate claude-haiku-5-5 --dry-run
+    python3 tests/model_swap_eval.py --feature field_notes --candidate claude-haiku-5-5 --n 4
+    python3 tests/model_swap_eval.py --feature coach_quality_gate --incumbent claude-haiku-5-5 --candidate gpt-oss-120b --dry-run
     python3 tests/model_swap_eval.py --list
 
-On main today `claude-haiku-5-5` is not yet a NAME the chokepoint resolves (#4770 / PR #4786
-adds it, and its price row); pass the profile id `us.anthropic.claude-haiku-5-5`, which
-`resolve_model_id` passes through. Until that price row lands the candidate is metered on
-the `haiku` (4.5) row — about 10x over — which is the conservative direction for the cap.
+`claude-haiku-5-5` is a mapped NAME since #4770 and the four #4776 candidates (gpt-oss-120b,
+gpt-oss-20b, qwen3-32b, nova-micro) since #4776; each prices on its own row. The Haiku 5.5
+baseline the #4776 trial runs against needs model access first (#4772) — until then a real run
+against it fails at the candidate/incumbent call and is reported as such, never as a verdict.
 """
 
 from __future__ import annotations
@@ -380,6 +397,156 @@ def _field_notes_cases():
     return cases
 
 
+# ── #4776: the three internal features of the open-weight trial, over the labelled briefs ─────
+def _labelled_briefs():
+    """[(label, fixture, text)] — the 30 goldens (good) and 15 canaries (defective) of
+    tests/fixtures/golden_briefs, the same corpus judge_calibration.py replays."""
+    golden, canaries = gbe.load_fixtures()
+    rows = [("good", fx, fx["reference_output"]) for fx in golden]
+    rows += [("defective", cn, cn["mutated_output"]) for cn in canaries]
+    return rows
+
+
+def _brief_with_grounding(fx):
+    from ai.quality_gate_contract import brief_with_grounding
+
+    return brief_with_grounding(fx.get("generation_brief"), fx.get("authoritative_facts") or {}, gbe.allowed_for(fx))
+
+
+def _schema_gate(output, schema, label):
+    from ai.structured_json import schema_findings
+
+    if not isinstance(output, dict):
+        return [{"gate": label, "detail": f"output is not a JSON object: {str(output)[:160]!r}"}]
+    return _gate_label([{"detail": d} for d in schema_findings(output, schema)], label)
+
+
+def _coach_quality_gate_cases():
+    """The LLM half of the blocking coach judge (coach/coach_quality_gate.py), one case per
+    labelled brief. The deterministic number verdict is computed exactly as production does
+    and rendered INTO the prompt; a seeded fault it flagged, or an anti-pattern canary, that the
+    reply still passes is `missed_seeded_fault` — the one thing a judge may never do."""
+    from coach import coach_quality_gate as cqg
+    from coach.persona_core import load_voice_spec
+
+    cases = []
+    for label, fx, text in _labelled_briefs():
+        coach_id = fx["coach_id"]
+        brief = _brief_with_grounding(fx)
+        grounding = cqg._number_grounding_report(text, brief)
+        spec = load_voice_spec(coach_id) or {}
+        user = cqg._build_quality_gate_message(coach_id, text, spec, brief, None, grounding=grounding)
+        grounder_failed = grounding.get("status") == "measured" and bool(grounding.get("findings"))
+        anti_pattern = label == "defective" and "anti_pattern" in (fx.get("expect_checks") or [])
+
+        def gate(output, grounder_failed=grounder_failed, anti_pattern=anti_pattern):
+            findings = _schema_gate(output, cqg.QUALITY_GATE_OUTPUT_SCHEMA, "schema_conformance")
+            if not isinstance(output, dict):
+                return findings
+            score = output.get("score")
+            waved_through = output.get("passed") is True and isinstance(score, (int, float)) and score >= cqg.PASS_SCORE_THRESHOLD
+            if grounder_failed and waved_through:
+                findings.append(
+                    {
+                        "gate": "missed_seeded_fault",
+                        "detail": "the deterministic grounder FAILED this draft (rendered in the prompt) and the reply still passed it at a passing score",
+                    }
+                )
+            elif anti_pattern and waved_through and not output.get("anti_pattern_violations"):
+                findings.append(
+                    {
+                        "gate": "missed_seeded_fault",
+                        "detail": "an anti-pattern canary passed at a passing score with no anti_pattern_violations",
+                    }
+                )
+            return findings
+
+        cases.append(
+            Case(
+                id=fx["id"],
+                source="tests/fixtures/golden_briefs/" + ("golden.json" if label == "good" else "canaries.json"),
+                body={
+                    "system": [{"type": "text", "text": cqg.QUALITY_GATE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                    "messages": [{"role": "user", "content": user}],
+                    "max_tokens": cqg.QUALITY_GATE_MAX_TOKENS,
+                    "temperature": 0.1,
+                },
+                gate=gate,
+                prompt_provenance="live builder (coach_quality_gate._build_quality_gate_message; repo voice spec, no peer outputs — judge_calibration.FIDELITY_GAPS)",
+                schema=cqg.QUALITY_GATE_OUTPUT_SCHEMA,
+            )
+        )
+    return cases
+
+
+def _coach_state_update_cases():
+    """The coach state extraction (coach/coach_state_updater.py) over each GOLDEN brief's own
+    text — the exact body `_call_haiku` builds, under EXTRACTION_OUTPUT_SCHEMA."""
+    from coach import coach_json_schemas as schemas, coach_state_updater as csu
+    from coach.persona_core import load_voice_spec
+
+    cases = []
+    for label, fx, text in _labelled_briefs():
+        if label != "good":
+            continue
+        spec = load_voice_spec(fx["coach_id"]) or {}
+        user = csu._build_extraction_message(fx["coach_id"], text, "daily_brief_section", spec)
+
+        def gate(output):
+            return _schema_gate(output, schemas.EXTRACTION_OUTPUT_SCHEMA, "schema_conformance")
+
+        cases.append(
+            Case(
+                id=fx["id"],
+                source="tests/fixtures/golden_briefs/golden.json",
+                body={
+                    "system": [{"type": "text", "text": csu.EXTRACTION_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                    "messages": [{"role": "user", "content": user}],
+                    "max_tokens": 3000,
+                    "temperature": 0.1,
+                },
+                gate=gate,
+                prompt_provenance="live builder (coach_state_updater._build_extraction_message; repo voice spec)",
+                schema=schemas.EXTRACTION_OUTPUT_SCHEMA,
+            )
+        )
+    return cases
+
+
+def _coherence_semantic_cases():
+    """The coherence sentinel's semantic pass (operational/coherence_sentinel_lambda.py) with each
+    labelled brief as the served narrative and its own authoritative facts as the facts line —
+    the live `semantic_body`, under _SEMANTIC_SCHEMA. `coherent: true` with issues listed is a
+    self-contradiction; whether a canary's fault clears the prompt's own >25% bar is the judge's call."""
+    from operational import coherence_sentinel_lambda as sentinel
+
+    cases = []
+    for label, fx, text in _labelled_briefs():
+        facts = fx.get("authoritative_facts") or {}
+        if not facts:
+            continue
+        body = sentinel.semantic_body(facts, [text])
+        body.pop("model", None)
+
+        def gate(output):
+            findings = _schema_gate(output, sentinel._SEMANTIC_SCHEMA, "schema_conformance")
+            if isinstance(output, dict) and output.get("coherent") is True and output.get("issues"):
+                findings.append({"gate": "coherent_but_issues_listed", "detail": f"coherent=true with issues {output.get('issues')!r}"})
+            return findings
+
+        cases.append(
+            Case(
+                id=fx["id"],
+                source="tests/fixtures/golden_briefs/" + ("golden.json" if label == "good" else "canaries.json"),
+                body=body,
+                gate=gate,
+                prompt_provenance="live builder (coherence_sentinel_lambda.semantic_body; the brief's own facts as the facts line)",
+                schema=sentinel._SEMANTIC_SCHEMA,
+            )
+        )
+    return cases
+
+
 @dataclass(frozen=True)
 class Feature:
     name: str
@@ -398,6 +565,28 @@ FEATURES = {
         Feature("memoir", "coach_narrative.memoir", ("compute.coach_memoir_lambda", "MODEL"), _memoir_cases),
         Feature("state_of_matthew", "state_of_matthew", ("compute.state_of_matthew_lambda", "MODEL"), _state_of_matthew_cases),
         Feature("field_notes", "field_notes", ("field_notes_lambda", "AI_MODEL"), _field_notes_cases, structured=True),
+        # #4776: the open-weight trial's three internal features (all structured).
+        Feature(
+            "coach_quality_gate",
+            "coach_narrative.quality_gate",
+            ("coach.coach_quality_gate", "AI_MODEL_HAIKU"),
+            _coach_quality_gate_cases,
+            structured=True,
+        ),
+        Feature(
+            "coach_state_update",
+            "coach_narrative.state_update",
+            ("coach.coach_state_updater", "AI_MODEL_HAIKU"),
+            _coach_state_update_cases,
+            structured=True,
+        ),
+        Feature(
+            "coherence_semantic",
+            "coherence_semantic",
+            ("operational.coherence_sentinel_lambda", "AI_MODEL_HAIKU"),
+            _coherence_semantic_cases,
+            structured=True,
+        ),
     )
 }
 
@@ -497,6 +686,33 @@ def bedrock_invoker(body: dict, model: str) -> dict:
     return _bc().invoke_with_retry(dict(body), model_name=model)
 
 
+def schema_stub(schema):
+    """A minimal instance of a JSON schema — every required key (all keys when none are
+    required), strings as the dry-run stub (or the first enum value), numbers 0, booleans True,
+    arrays empty, a nullable as its first non-null type. Offline only; it answers the schema,
+    never the task."""
+    t = schema.get("type")
+    if isinstance(t, list):
+        t = next((x for x in t if x != "null"), "null")
+    if "enum" in schema:
+        return schema["enum"][0]
+    if t == "object":
+        props = schema.get("properties") or {}
+        keys = schema.get("required") or list(props)
+        return {k: schema_stub(props.get(k) or {}) for k in keys}
+    if t == "array":
+        return []
+    if t == "string":
+        return DRY_RUN_STUB
+    if t == "integer":
+        return 0
+    if t == "number":
+        return 0.0
+    if t == "boolean":
+        return True
+    return None
+
+
 def dry_run_invoker_for(cases):
     """An offline invoker: echoes each case's frozen reference output (or a stub) with a
     chars/4 usage estimate. Nothing leaves the machine."""
@@ -506,11 +722,8 @@ def dry_run_invoker_for(cases):
         case = by_body.get(body_key(body))
         ref = case.reference if case is not None and case.reference is not None else None
         if ref is None:
-            ref = (
-                {"ai_present": DRY_RUN_STUB, "ai_cautionary": None, "ai_affirming": None, "ai_tone": "mixed"}
-                if body.get("output_config")
-                else DRY_RUN_STUB
-            )
+            fmt = ((body.get("output_config") or {}).get("format") or {}).get("schema")
+            ref = schema_stub(fmt) if fmt else DRY_RUN_STUB
         text = _text(ref)
         return {
             "content": [{"type": "text", "text": text}],

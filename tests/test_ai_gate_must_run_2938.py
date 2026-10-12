@@ -133,7 +133,7 @@ def test_the_exit_code_actually_depends_on_this():
     """A helper nobody wires into the return value is the very shape this issue is
     about. Pins the call site by source inspection."""
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    src = open(os.path.join(root, "tests", "visual_qa.py")).read()
+    src = open(os.path.join(root, "qa", "visual_qa.py")).read()
     assert (
         "return failed == 0 and unevaluated == 0 and not ai_gate_failures" in src
     ), "run_sweep's return value ignores the AI-gate verdict — the fix is decorative"

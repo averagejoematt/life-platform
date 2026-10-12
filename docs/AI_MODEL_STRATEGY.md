@@ -104,6 +104,29 @@ Once the workhorse tier is on Haiku 5.5, it costs about $5 a month. Open-weight 
 - Every gate passes.
 - It is **either** ≥30% cheaper **or** it delivers a named non-price benefit.
 
+### The trial table (#4776) — pre-filled, not run
+
+The adapter, the price rows, the IAM rows and the replay harness for the three features landed with #4776; the eval itself has **not run**, because its baseline is Haiku 5.5 and that model's access is not enabled in the account yet (#4772). Each cell below is filled in from `tests/model_swap_eval.py --feature <f> --incumbent claude-haiku-5-5 --candidate <c>` once it can run; until then every verdict reads *not run*. Thresholds are the harness's own (`MARGIN` 0.10: the Wilson 95% lower bound of the candidate's preference share must be ≥ 0.40; a candidate gate failure blocks whatever the judge says). The price arm is arithmetic on the chokepoint's rows (`bedrock_client.PRICES`, every open-weight row **unverified †**) against `haiku-5-5` ($0.10 / $0.50): a model that is not ≥30% cheaper on both legs must earn its place on a **named** non-price benefit.
+
+| Feature (n) | Candidate | $ in / out vs Haiku 5.5 † | Price arm (≥30% cheaper) | Non-price benefit it must show | Quality: p, Wilson 95% ≥ 0.40 | Every gate | Verdict |
+|---|---|---|---|---|---|---|---|
+| coach_quality_gate (45) | gpt-oss-120b | 0.15 / 0.60 = +50% / +20% | **no** — dearer | in-region, or strict JSON the baseline lacks, or second provider | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_quality_gate (45) | gpt-oss-20b | 0.07 / 0.30 = −30% / −40% | yes (on the bar) | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_quality_gate (45) | Qwen3-32B | ~0.15 / 0.60 = +50% / +20% | **no** — dearer | in-region, or a second family's result | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_quality_gate (45) | Nova Micro | 0.035 / 0.14 = −65% / −72% | yes | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | gpt-oss-120b | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | gpt-oss-20b | −30% / −40% | yes (on the bar) | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | Qwen3-32B | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coach_state_update (30) | Nova Micro | −65% / −72% | yes | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | gpt-oss-120b | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | gpt-oss-20b | −30% / −40% | yes (on the bar) | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | Qwen3-32B | +50% / +20% | **no** — dearer | as above | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+| coherence_semantic (22) | Nova Micro | −65% / −72% | yes | — | not run | not run | not run — Haiku 5.5 baseline (#4772) needs model access |
+
+Two things the table already says before a single call: gpt-oss-120b and Qwen3-32B cannot be adopted on price at all, so their only route in is a measured non-price benefit (the in-region claim needs a stated reason it matters; "strict JSON" needs the baseline to fail the schema gate where the candidate passes it); and the sample sizes are small — at an even split the harness needs about n=93 to clear the bar, so an INCONCLUSIVE verdict is the likely first reading and is reported as such, never rounded up. Reading the n: `coherence_semantic` has 22 inputs because only the briefs carrying `authoritative_facts` can be served as a facts line.
+
+How the adapter sends a schema: Converse has no Anthropic `output_config`, so the JSON schema is rendered into a trailing system instruction and the reply is checked against the schema afterwards (`schema_conformance` is a gate). That is the honest shape of the "strict JSON" question — a model that cannot hold the shape fails the gate rather than being helped by the wire.
+
 ## 5. Architecture
 
 ```
@@ -124,7 +147,7 @@ model_swap_eval: replay frozen inputs → incumbent vs candidate → determinist
 - **IAM.** It widens only to named model ARNs (`cdk/stacks/role_policies_base.py`), as an ask-first CDK deploy.
 - **Proof surface.** The inference receipt (`/api/inference_receipt`, MCP `get_platform_cost`) carries per-feature and per-model dollars. It was failing on 2026-10-10 (#4774).
 
-## 6. Session and SDLC lanes
+## 6. Session lanes
 
 These costs are on the Claude plan, not AWS, so the governor does not see them.
 
@@ -136,7 +159,17 @@ These costs are on the Claude plan, not AWS, so the governor does not see them.
 | `worktree-implementer` | The issue's `model:*` label |
 | Owner conversations (interviews, debriefs, coach sessions) | Frontier, for voice |
 
-This is tracked on #4773.
+**Label to tier.** A backlog issue's `model:*` label picks the tier its lane runs on. The DRIVER passes that model when it spawns the lane; the spawn's `model` argument overrides the agent's frontmatter, which is why `worktree-implementer.md` says `model: inherit` on purpose.
+
+| Label | Lane model |
+|---|---|
+| `model:sonnet` | Sonnet |
+| `model:opus` | Opus |
+| `model:fable` | The frontier session model |
+
+**Session-lane rule.** Implementation follows the label. Verification does not: `finding-verifier` is pinned to `opus` in its frontmatter (`.claude/agents/finding-verifier.md`) whatever tier produced the finding, because the first-pass false-positive failure is fixed by verification, not by model size. Mechanical subagents are pinned to `sonnet` in their own frontmatter.
+
+**Measured effect (2026-10-11, #4773).** The 2026-10-11 zero-startable triage ran 88 Sonnet readers, one per open issue, and 27 of the A/E rows were adversarially verified by Opus. 7 of the 27 were refuted (26%) and moved to B, C or D; the other 20 stood, and every refuted row was caught before it reached a lane. For context only: the historical first-pass false-positive rate for agent findings was ~50% (`.claude/skills/review/SKILL.md` Phase 2), and the brief discipline then took first-pass survival to 67/70 on 2026-07-11, about 4% refuted (same file, Phase 1 brief). 7/27 is a triage-row number (an A/E bucket call on issue state), not a `/review` finding refutation rate, so it is not comparable to either figure and no conclusion about quality holding is drawn from it. This is one triage run, not a controlled before/after of a `/review` lens: no paired `/review` lens run was made, so finding counts per lens and verifier pass rate are not claimed here.
 
 CI judges run Haiku on Bedrock through OIDC; their cost and cadence are #4652. The remediation agent is #4651.
 

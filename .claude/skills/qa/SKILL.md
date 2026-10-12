@@ -16,13 +16,13 @@ Parse `$ARGUMENTS` to pick a mode. **Default to `quick` if no arguments** (prese
 pre-#1449 behavior). A leading `/`-path argument (e.g. `/data/glucose/`) selects the
 single-page mode.
 
-**Every page and API set below DERIVES from THE page registry — `tests/qa_manifest.py`
+**Every page and API set below DERIVES from THE page registry — `qa/qa_manifest.py`
 (#1426) — never a hand list in this file** (`tests/test_qa_skill_modes.py` enforces).
 Useful derivations:
 
 ```bash
-python3 tests/qa_manifest.py --emit paths      # every live page
-python3 tests/qa_manifest.py --emit coverage   # the coverage rollup (#1446)
+python3 qa/qa_manifest.py --emit paths      # every live page
+python3 qa/qa_manifest.py --emit coverage   # the coverage rollup (#1446)
 # API endpoints for a tier (the api_deps facet — tier 1 = the flagship doors):
 python3 -c "import sys; sys.path.insert(0,'tests'); from qa_manifest import MANIFEST; \
   print('\n'.join(sorted({d for p in MANIFEST if p['tier']<=1 for d in p['api_deps'] if d.startswith('/api/')})))"
@@ -54,7 +54,7 @@ Exactly what the deploy-time gates run — flagship doors only, deterministic + 
 (no `--reader-truth`: since #3251/C1 the prose judge runs only in the daily standalone;
 the `full` mode below carries it):
 ```bash
-python3 tests/visual_qa.py --max-tier 1 --screenshot --ai-qa --ai-qa-max-tier 1
+python3 qa/visual_qa.py --max-tier 1 --screenshot --ai-qa --ai-qa-max-tier 1
 ```
 Then read `qa-screenshots/report.json` and summarize failures + `ai_verdict`s.
 
@@ -63,7 +63,7 @@ Then read `qa-screenshots/report.json` and summarize failures + `ai_verdict`s.
 2. Run the full-surface sweep (all manifest pages with a `visual` def) + full AI-vision
    + reader-truth:
    ```bash
-   python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
+   python3 qa/visual_qa.py --screenshot --ai-qa --reader-truth
    ```
    (Needs `playwright install chromium`. Drop `--ai-qa` to skip Bedrock spend.)
 3. Read `qa-screenshots/report.json` and summarize:
@@ -79,14 +79,14 @@ The weekly WebKit run, on demand (catches the backdrop-filter/position:fixed cla
 Chromium emulation cannot see):
 ```bash
 python3 -m playwright install webkit   # once per machine
-python3 tests/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
+python3 qa/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
 ```
 Tier<=2 = flagship doors + live-data topic pages, iPhone-class profile (390x844,
 dpr 3, touch). $0 Bedrock — deterministic only.
 
 ### Mode: `ai-review` — full-surface Claude-vision read
 ```bash
-python3 tests/visual_qa.py --screenshot --ai-qa
+python3 qa/visual_qa.py --screenshot --ai-qa
 ```
 The untiered AI-vision pass over every swept page (what the standalone workflow runs
 Sundays). Summarize every non-"ok" `ai_verdict` with its screenshot path. Skips itself

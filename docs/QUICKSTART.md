@@ -39,7 +39,7 @@ python3 -m venv .venv                 # python3 must be 3.12.x — see table abo
 source .venv/bin/activate
 pip install -r requirements-dev.txt   # pytest, black, ruff, flake8, playwright, boto3 — pinned to match CI's gates
 pip install -r cdk/requirements.txt   # aws-cdk-lib + constructs (pinned)
-playwright install chromium           # browser for tests/visual_qa.py (local visual QA)
+playwright install chromium           # browser for qa/visual_qa.py (local visual QA)
 bash scripts/install_hooks.sh         # pre-commit hook: black/ruff format gate + doc-metadata sync (sync_doc_metadata.py --apply)
 ```
 
@@ -323,7 +323,7 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 - **Data model**: `docs/SCHEMA.md`
 - **Decision history**: `docs/DECISIONS.md` (159 ADRs)
 - **Daily operations**: `docs/RUNBOOK.md`
-- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (87 tools)
+- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (88 tools)
 - **V2 audit findings**: `docs/archive/V2_AUDIT_PLAN.md` (76 findings, ~33 shipped, formally closed in ADR-057)
 
 ---
