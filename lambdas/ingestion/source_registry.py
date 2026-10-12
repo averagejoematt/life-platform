@@ -397,7 +397,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "probe_functions": (("whoop-data-ingestion", "Whoop"),),  # #4643: the daily boot probe's targets
         "expected_days": 7,
         "qa_tier": "required",
-        "method": "OAuth API pull, 5x daily",
+        "method": "OAuth API pull, 5x daily plus a recovery refresh",
         # #3913: the SECOND source whose DATE# key names a UTC calendar day — declared here
         # after measurement, not inherited from a default. #3677 measured the store and left
         # this facet as its named residual precisely because flipping it moves a reader-facing
@@ -521,7 +521,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 5,
         "qa_tier": "optional",  # weigh-ins are sporadic — a missing day is behavior
         # cadence reason (internal, kept out of the published method text): was hourly; ~5% of runs changed a row (#4641)
-        "method": "OAuth API pull, about 8x daily",
+        "method": "OAuth API pull, 4x daily",
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
         "raw_layout": {
@@ -577,7 +577,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         ),  # #4643: the daily boot probe's targets
         "expected_days": 5,
         "qa_tier": "optional",  # workouts are event-driven — a missing day is behavior
-        "method": "OAuth API pull, hourly",
+        "method": "OAuth API pull, hourly, 18 hours a day",
         "metrics": "Activities, walks, heart rate",
         "posture": "load-bearing",
         "raw_layout": {
