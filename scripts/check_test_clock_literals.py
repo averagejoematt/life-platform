@@ -23,7 +23,10 @@ WHAT THIS SWEEP DECIDES (an AST walk, no phrase grep -- #2959)
 
 NOT COVERED (stated, not hidden): a producer reached through importlib/``sys.modules`` loading
 or two or more hops away, a clock read that never scales an elapsed span (a pure timestamp),
-and a literal derived from the clock in the test body itself.  This is a lead-finder with a
+and a literal derived from the clock in the test body itself.  Also not recognised: a pin
+written as a named constant (``== EXPECTED``), ``assertEqual`` or ``abs(x - k) < tol``; a freeze
+or a ``# clock-literal-ok:`` marker is MODULE-wide, so one anywhere clears every pin in that
+module (a freeze is read from the patch target only, never the replacement value).  This is a lead-finder with a
 named recall bound; widening it is a new issue, not a silent claim.
 
 USAGE
@@ -232,7 +235,7 @@ def _is_frozen(tree: ast.AST, src: str, producer_names: Set[str]) -> bool:
             fn = n.func.attr if isinstance(n.func, ast.Attribute) else n.func.id
             if fn in ("setattr", "patch", "object", "setitem", "freeze"):
                 toks = set()
-                for arg in list(n.args) + [k.value for k in n.keywords]:
+                for arg in list(n.args[:2]):  # the patch TARGET only, never the replacement value
                     toks |= _tokens(arg)
                 if toks & (FREEZE_TOKENS | producer_names):
                     return True
@@ -277,8 +280,8 @@ def scan_source(src: str, name: str, producers: Set[Key], inj: Dict[Key, List[Tu
     return sorted(member)
 
 
-def sweep(repo: pathlib.Path = REPO) -> Dict[str, List[Key]]:
-    producers, inj, base_names = build_producers(repo)
+def sweep(repo: pathlib.Path = REPO, world=None) -> Dict[str, List[Key]]:
+    producers, inj, base_names = world if world is not None else build_producers(repo)
     out: Dict[str, List[Key]] = {}
     for p in sorted((repo / "tests").rglob("*.py")):
         r = scan_source(p.read_text(), p.name, producers, inj, base_names)

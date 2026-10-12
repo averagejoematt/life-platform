@@ -39,8 +39,8 @@ def test_age():
 """
 
 
-def test_the_sweep_is_empty():
-    members = g.sweep(REPO)
+def test_the_sweep_is_empty(world):
+    members = g.sweep(REPO, world)
     assert members == {}, (
         "tests pin a literal through an unfrozen clock-scaled producer (freeze the clock, derive the expectation "
         f"from the same call, or add '# clock-literal-ok: <reason>'): {members}"
@@ -92,3 +92,8 @@ def test_mutation_the_4032_file_with_its_freeze_removed_fails_the_guard(world):
     mutated = src.replace(needle, 'monkeypatch.setattr(tdee_core, "noop_4848"')
     found = _scan(mutated, world, path.name)
     assert found and ("tools_health", "_get_energy_expenditure") in found, found
+
+
+def test_control_an_unrelated_patch_with_a_date_value_does_not_clear(world):
+    src = PINNED + "\n\ndef _x(monkeypatch):\n    monkeypatch.setattr('other.mod.thing', lambda: {'date': 1})\n"
+    assert _scan(src, world) == [("tdee", "resolve_age")]

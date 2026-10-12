@@ -627,4 +627,8 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "guard::scripts/verify_fake_creds_parity.py": (
         "2026-09-19 (#3608 box 5) — same gate, script half; exits 1 on a real credential, 0 under the §4 prefix (watched locally)"
     ),
+    "guard::scripts/check_test_clock_literals.py": (
+        "2026-10-12 (#4848) — can-fail watched by tests/test_clock_literal_guard_4848.py negative control (unfrozen pin flagged, "
+        "exits 1); no census MutationSpec because the plant needs the AST producer world, not a tracked file"
+    ),
 }
