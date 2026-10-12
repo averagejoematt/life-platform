@@ -6,7 +6,7 @@ Pinned dependency files per Lambda group (MAINT-1, v2.99.0).
 
 | File | Lambda(s) | Notes |
 |------|-----------|-------|
-| `garmin.txt` | garmin-data-ingestion | **Binary layer** `garth-layer` (`GARTH_LAYER_ARN`). 🤖 GENERATED (#2099) — build spec `LAYERS['garth']`. Lists all 14 packages in the live layer, not just the 2 top-level pins |
+| `garmin.txt` | none (retired #4640) | `GARTH_LAYER_VERSION` record only; the `garth-layer` is no longer consumed by any Lambda. 🤖 GENERATED (#2099) — build spec `LAYERS['garth']` |
 | `pillow.txt` | og-image-generator, reading-cover-pipeline | **Binary layer** `pillow-layer` (`PILLOW_LAYER_ARN`). 🤖 GENERATED (#2099) — build spec `LAYERS['pillow']` |
 | `lameenc.txt` | coach-panel-podcast | **Binary layer** `lameenc-layer` (`LAMEENC_LAYER_ARN`). 🤖 GENERATED (#2099) — build spec `LAYERS['lameenc']`. The #1336 "UNVERIFIED" flag is cleared: measured 2026-08-04 against the live layer, `lameenc==1.8.4` was already correct |
 | `withings.txt` | withings-data-ingestion | withings-api SDK |

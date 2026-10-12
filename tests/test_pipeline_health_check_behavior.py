@@ -492,8 +492,13 @@ def test_default_mode_flags_a_deleted_and_a_missing_required_secret(probe_env):
     assert "Secret: life-platform/whoop" in names
     assert "Secret: life-platform/hevy" in names
     assert not any("notion" in n for n in names), "a non-NotFound error (e.g. AccessDenied) is not evidence the secret is gone"
-    assert len(rec.described) == 12, "the audited REQUIRED_SECRETS list (#518) — dropbox deliberately absent"
+    assert (
+        len(rec.described) == 11
+    ), "the audited REQUIRED_SECRETS list (#518) — dropbox deliberately absent; garmin secret retired in #4640"
     assert "life-platform/dropbox" not in rec.described
+    assert (
+        "life-platform/garmin" not in rec.described
+    ), "the garmin secret was retired in #4640; re-adding it makes the health check flag SecretDeleted"
 
 
 def test_default_mode_stores_the_run_and_survives_a_failed_store(probe_env):

@@ -170,7 +170,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 | `life-platform/whoop` | `whoop-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens — Whoop Lambda refreshes on expiry |
 | `life-platform/withings` | `withings-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens |
 | `life-platform/strava` | `strava-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | OAuth tokens |
-| `life-platform/garmin` | none — direct-API function retired (#4640); freshness-checker/pipeline-health-check describe-only; owner-attended delete pending | garth OAuth tokens (dormant) |
+| `life-platform/garmin` | none — direct-API function retired (#4640); no checker names it since the #4640 follow-up; owner-attended delete pending | garth OAuth tokens (dormant) |
 | `life-platform/eightsleep` + `life-platform/eightsleep-client` | `eightsleep-data-ingestion`, `life-platform-freshness-checker`, `pipeline-health-check` | creds + client ID |
 | `life-platform/habitify` | `habitify-data-ingestion`, `pipeline-health-check` | API key |
 | `life-platform/hevy` | `hevy-backfill` (via `hevy_common.py`), `pipeline-health-check` | read API key |

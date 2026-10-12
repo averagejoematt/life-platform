@@ -318,7 +318,6 @@ REQUIRED_SECRETS = [
     "life-platform/whoop",
     "life-platform/strava",
     "life-platform/withings",
-    "life-platform/garmin",
     "life-platform/eightsleep",
     "life-platform/todoist",
     "life-platform/notion",

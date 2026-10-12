@@ -200,7 +200,6 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
                 _secret_arn("life-platform/whoop"),
                 _secret_arn("life-platform/withings"),
                 _secret_arn("life-platform/strava"),
-                _secret_arn("life-platform/garmin"),
                 _secret_arn("life-platform/ai-keys"),
                 _secret_arn("life-platform/site-api-ai-key"),
                 _secret_arn("life-platform/eightsleep-client"),

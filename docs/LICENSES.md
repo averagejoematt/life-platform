@@ -38,7 +38,7 @@ Package pins live in `deploy/build_lambda_layer.py`'s `LAYERS` registry (from wh
 | Layer | Package | Used by | License | Distribution obligation |
 |---|---|---|---|---|
 | `pillow-layer` | Pillow (PIL) | OG share-card image generator (HP-13), visual-QA render | **HPND** (MIT/BSD-style permissive) | None. Permissive; server-side use only. |
-| `garth-layer` | `garth`, `garminconnect` | `garmin-data-ingestion` (OAuth + intervals) | **MIT** | None. |
+| `garth-layer` | `garth`, `garminconnect` | none (retired #4640; `garmin-data-ingestion` no longer consumes it) | **MIT** | None. |
 | `lameenc-layer` | `lameenc` (LAME MP3 encoder wheel, #1018) | `coach-panel-podcast` → `lambdas/ai/audio_encode.py` (WAV→MP3 compression) | Wrapper permissive; **statically links LGPL-2.1 LAME** | **None today** — see §1.1. |
 
 ### 1.1 The one copyleft edge — lameenc / LAME (stated as a non-issue)
