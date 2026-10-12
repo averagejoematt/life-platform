@@ -307,6 +307,7 @@ def _score_sanity_with(monkeypatch, payload):
     from operational import qa_check_outputs as qco
 
     monkeypatch.setattr(qco, "s3", _S3JsonStub(payload))
+    monkeypatch.setattr(qco, "_sick_days_between", lambda start, end: set())  # #4847: no DynamoDB from a unit test
     return {c.name: c for c in qco.check_score_sanity()}
 
 
