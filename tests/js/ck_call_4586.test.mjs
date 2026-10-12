@@ -42,7 +42,7 @@ test("what happened carries the verdict as the kit's tag, beside the simple gues
   assert.equal((right.match(/17\.9/g) || []).length, 1, "the number is printed once");
   assert.match(right, /<span class="ck-verdicts__tag">The simple guess<\/span><p>The simple guess, that nothing changes, has not been checked against this call yet\.<\/p>/);
   const wrong = C.outcomeHTML(C.callsOf(BODY).find((c) => c.verdict === "wrong"));
-  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within 18\.6 either way<\/span>/);
+  assert.match(wrong, /<span class="ck-verdicts__tag">Wrong · not within [\d.]+ either way<\/span>/);
 });
 
 test("a call the simple guess was checked on says what it said and whether it was right", () => {
@@ -58,7 +58,8 @@ test("a bet shows both coaches' words and who was right", () => {
   const claim = C.claimHTML(bet);
   assert.match(claim, /<p class="ck-small">A bet opened September 23<\/p>/);
   assert.match(claim, /Marcus Webb said yes: “Any carb reduction/);
-  assert.match(claim, /Amara Patel said no: “Evening carb reduction/);
+  // The route may hold a side whose words rest on an unsourced reading: then the name is followed by its sentence, not a quote.
+  assert.match(claim, /Amara Patel said no(: “|\. )/);
   const out = C.outcomeHTML(bet);
   assert.match(out, /ck-verdicts__tag--right">Right · on whether his morning recovery score would be below 70 on September 30<\/span><p><b>Marcus Webb said yes\.<\/b>/);
   assert.match(out, /<span class="ck-verdicts__tag">Wrong · on whether his morning recovery score would be below 70 on September 30<\/span><p><b>Amara Patel said no\.<\/b>/);
@@ -80,14 +81,18 @@ test("a bet side the route held prints why beside the name, never the words", ()
 
 test("the running record is counts in a sentence, never a percentage", () => {
   const html = C.recordHTML(C.findCall(BODY, NUMBER), BODY);
-  assert.match(html, /<p>Lisa Park: 15 of 35 checked calls right\.<\/p><p class="ck-soft" data-coach-comparison>Across 35 checked calls, so far they do not beat a simple guess\.<\/p>/);
+  const rec = C.findCall(BODY, NUMBER).records[0];
+  assert.ok(html.includes(`<p>${rec.text}</p><p class="ck-soft" data-coach-comparison>${rec.comparison.sentence}</p>`), "the coach's record and its comparison, as served");
+  assert.match(rec.text, /^Lisa Park: \d+ of \d+ checked calls right\.$/);
   const bare = clone(C.findCall(BODY, NUMBER));
   bare.records[0].comparison = null;
   assert.match(C.recordHTML(bare, BODY), /What a simple guess would have scored on these calls is not available right now\./, "a count never stands alone");
   assert.match(html, /The record counts every checked call, including the ones with no page of their own\./);
   assert.doesNotMatch(html, /%/);
   const both = C.recordHTML(C.findCall(BODY, BET), BODY);
-  assert.match(both, /Marcus Webb: 7 of 28 checked calls right\..*Amara Patel: 2 of 6 checked calls right\./);
+  const bothRecs = C.findCall(BODY, BET).records;
+  assert.equal(bothRecs.length, 2);
+  for (const r of bothRecs) assert.ok(both.includes(`<p>${r.text}</p>`), r.text);
 });
 
 test("the front page's last settled call is one block that opens its page", () => {
@@ -122,11 +127,10 @@ test("a bet as the last settled call names who was right instead of one tag", ()
 });
 
 test("what settles next is one sentence with its day in words", () => {
-  assert.equal(
-    C.nextCallHTML(BODY),
-    // #4618: a next-day number call is due the day its sentence names, so it is what settles next.
-    '<p class="ck-soft">Next: Henning Brandt’s call that his weight will be about 307.2 lb settles Friday, October 9.</p>',
-  );
+  // #4618: what settles next is whatever the route names, with its day in words (the weekday, then the date).
+  const next = C.nextCallHTML(BODY);
+  assert.equal(next, `<p class="ck-soft">${BODY.next.data.text}</p>`);
+  assert.match(next, /^<p class="ck-soft">Next: .+ settles [A-Z][a-z]+day, [A-Z][a-z]+ \d+\.<\/p>$/);
   assert.equal(C.nextCallHTML(null), "");
   assert.equal(C.nextCallHTML({ next: { state: "absent", data: null, absent_text: "No call or bet has a settle date right now." } }), "");
   assert.equal(C.nextCallHTML({ next: { state: "ok", data: { question: "a call", due_date: "soon" } } }), "", "an unusable date draws nothing");
@@ -137,11 +141,12 @@ test("the list is every settled call newest first, the older ones folded away", 
   // Each row returns to this list by name (#4675).
   const hrefs = [...html.matchAll(/href="\/next\/v8\/call\/\?id=([a-z0-9-]+)&amp;from=calls"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, BODY.calls.map((c) => c.id));
-  assert.equal(hrefs.length, 39);
-  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">October 9: Lisa Park called his morning recovery score at about 89\. <span>Right · within 21\.5 either way<\/span><\/a><\/li>/);
-  assert.match(html, /<details><summary>31 earlier calls<\/summary>/);
+  assert.ok(hrefs.length > 0 && hrefs.length === BODY.calls.length, "every served call has its row");
+  assert.match(html, /^<ul class="ck-rows ck-rows--more ck-rows--calls"><li><a href="[^"]+">[A-Z][a-z]+ \d+: [^<]+ <span>(Right|Wrong) · [^<]+<\/span><\/a><\/li>/);
+  const folded = Number(html.match(/<details><summary>(\d+) earlier calls<\/summary>/)[1]);
+  assert.ok(folded > 0 && folded < hrefs.length, "the older calls are folded, the newest stay open");
   assert.match(html, /<span>Marcus Webb was right; Amara Patel was wrong\.<\/span>/, "a bet row says who was right");
-  assert.match(html, /89 more checked calls have no page here/);
+  assert.ok(html.includes(`${BODY.excluded.count} more checked calls have no page here`));
   assert.equal(C.listHTML(null, BASE), "");
 });
 

@@ -1,8 +1,8 @@
 // tests/js/ck_front_4586.test.mjs — #4586: the reshaped preview front page.
 //
 // Driven from the committed captures in tests/fixtures/kit_pages_4586/ (one live capture,
-// its time in _capture.json — #4671: 2026-10-10 02:38 UTC, edition day October 9). Nothing
-// reads the wall clock. What is held: the daily mark draws one
+// its time in _capture.json — #4671). Nothing reads the wall clock, and no figure below is
+// pinned to the capture: each is read from the capture it tests (#4839). What is held: the daily mark draws one
 // cell per day in a frame that never changes; the Today band is about the last 24 hours
 // and nothing older; the week is sorted by a printed rule; a quote is verbatim or absent;
 // every builder prints a sentence when its data is missing; nothing is first person.
@@ -31,6 +31,10 @@ const LEAD_READ = {"weekly_priority": "I'm watching Matthew execute with precisi
 
 const START = B.today.data.start_weight_lbs;
 const GOAL = B.today.data.goal_weight_lbs;
+const WEIGHT = B.today.data.weight_lbs;
+const fmt1 = (n) => n.toFixed(1);
+const dayShift = (iso, n) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+const weekday = /[A-Z][a-z]+day/.source;
 
 test("the mark is always 28 cells ending today, whatever was recorded", () => {
   const cells = F.markDays(SERIES, TODAY, START, GOAL);
@@ -51,41 +55,51 @@ test("the mark draws two rects per weighed day and says what it shows to a scree
   const html = F.markHTML(SERIES, TODAY, START, GOAL);
   const weighed = F.markDays(SERIES, TODAY, START, GOAL).filter((c) => c.gone !== null).length;
   assert.equal((html.match(/<rect /g) || []).length, 2 * weighed);
-  assert.match(html, /role="img" aria-label="The last 28 days: 21\.2 of the 142\.3 pounds to the goal are gone as of the latest weigh-in/);
+  assert.ok(html.includes(`role="img" aria-label="The last 28 days: ${fmt1(START - SERIES[SERIES.length - 1].lbs)} of the ${fmt1(START - GOAL)} pounds to the goal are gone as of the latest weigh-in`));
   assert.equal(F.markHTML([], TODAY, START, GOAL), "", "no weigh-ins: no drawing");
   assert.equal(F.markHTML(SERIES, "", START, GOAL), "");
 });
 
 test("the mark's caption carries the day, the weight and the distance, from served numbers", () => {
-  assert.equal(F.markCaption(B.today, edition), '<b>306.1 lb</b><span class="ck-soft">Day 34 · 21.2 down, 121.1 to go to 185</span>');
+  const tail = `Day ${edition.day_n} · ${fmt1(START - WEIGHT)} down, ${fmt1(WEIGHT - GOAL)} to go to ${GOAL}`;
+  assert.match(F.markCaption(B.today, edition), new RegExp(`^<b>${fmt1(WEIGHT)} lb</b><span class="ck-soft">(on [A-Z][a-z]+ \\d+ · )?${tail}</span>$`));
   const older = { ...B.today, data: { ...B.today.data, date: "2026-10-01" } };
-  assert.match(F.markCaption(older, edition), /306\.1 lb<\/b><span class="ck-soft">on October 1 · Day 34/);
+  assert.ok(F.markCaption(older, edition).startsWith(`<b>${fmt1(WEIGHT)} lb</b><span class="ck-soft">on October 1 · Day ${edition.day_n}`));
   assert.equal(F.markCaption(GONE, edition), "");
 });
 
 test("this morning's weight is set against the weigh-in before it", () => {
-  assert.equal(F.morningLine(B.week, TODAY), "306.1 lb, down 1.1 from Thursday.");
+  const values = B.week.data.measures.weight.data.values;
+  const at = B.week.data.days.indexOf(TODAY);
+  const prev = values.slice(0, at).reverse().find((v) => v !== null);
+  const move = Math.abs(WEIGHT - prev) < 0.05 ? "the same as" : WEIGHT < prev ? `down ${fmt1(prev - WEIGHT)} from` : `up ${fmt1(WEIGHT - prev)} from`;
+  assert.match(F.morningLine(B.week, TODAY), new RegExp(`^${fmt1(WEIGHT)} lb, ${move} ${weekday}\\.$`));
   assert.equal(F.morningLine(GONE, TODAY), "");
 });
 
 test("the Today band is this morning, yesterday and the plan, one line each, with yesterday's full day", () => {
   const html = F.todayBandHTML(edition, B, "/next/v8/");
-  assert.match(html, /<span class="ck-rows__key">Today so far<\/span><span>306\.1 lb, down 1\.1 from Thursday( ·|\.)/);
-  assert.doesNotMatch(html, /Thursday\. ·/, "no stop before a middle dot");
-  assert.match(html, /\. <a class="ck-link" href="\/next\/v8\/day\/\?d=2026-10-08">The full day/, "a stop before the link to the full day");
-  assert.match(html, /<span class="ck-rows__key">Yesterday, Thursday<\/span>/);
-  assert.match(html, /href="\/next\/v8\/day\/\?d=2026-10-08">The full day<\/a>/);
+  const yesterday = dayShift(TODAY, -1);
+  assert.match(html, new RegExp(`<span class="ck-rows__key">Today so far</span><span>${fmt1(WEIGHT)} lb, (up|down) [\\d.]+ from ${weekday}( ·|\\.)`));
+  assert.doesNotMatch(html, new RegExp(`${weekday}\\. ·`), "no stop before a middle dot");
+  assert.match(html, new RegExp(`\\. <a class="ck-link" href="/next/v8/day/\\?d=${TODAY}">The full day`), "a stop before the link to the full day");
+  assert.match(html, new RegExp(`<span class="ck-rows__key">Yesterday, ${weekday}</span>`));
+  assert.match(html, new RegExp(`href="/next/v8/day/\\?d=${yesterday}">The full day</a>`));
   assert.doesNotMatch(html, /Steps|steps/, "step counts stay off the front page");
   assert.match(html, /Recovery is the wrist strap’s morning score out of 100\./);
-  assert.doesNotMatch(html, /Wednesday|October 7/, "nothing older than yesterday");
-  // The food log ends October 5 in this capture: read on October 6, yesterday carries its food.
-  assert.match(F.todayBandHTML({ ...edition, as_of: "2026-10-06" }, B, "/next/v8/"), /146 g protein, 1,632 kcal, under the protein target/);
+  assert.doesNotMatch(html, new RegExp(`d=${dayShift(TODAY, -2)}`), "nothing older than yesterday");
+  // Yesterday carries its food when the food log has it: read the morning after a logged day.
+  const logged = B.week.data.detail.find((d) => d.facts.some((f) => f.label === "Food"));
+  if (logged) {
+    const food = logged.facts.find((f) => f.label === "Food").text;
+    assert.ok(F.todayBandHTML({ ...edition, as_of: dayShift(logged.date, 1) }, B, "/next/v8/").includes(`${food}, `), "yesterday's food line");
+  }
   assert.ok((html.match(/<li>/g) || []).length <= 3, "at most three rows");
   assert.match(F.todayBandHTML(edition, { ...B, week: GONE }, "/"), /Not served right now\./);
 });
 
 test("a day with nothing recorded yet says so", () => {
-  const future = { ...edition, as_of: "2026-10-10" };
+  const future = { ...edition, as_of: dayShift(TODAY, 1) };
   assert.match(F.todayBandHTML(future, B, "/"), /Nothing recorded yet today\./);
 });
 

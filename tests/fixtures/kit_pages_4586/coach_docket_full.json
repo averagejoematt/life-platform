@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:35:25.115729+00:00",
-  "served_at": "2026-10-10T02:35:25.115729+00:00",
+  "generated_at": "2026-10-12T15:35:27.693578+00:00",
+  "served_at": "2026-10-12T15:35:27.693578+00:00",
   "cache_seconds": 300,
-  "request_id": "e73b4bf287824031"
+  "request_id": "06ccc3b822ad4362"
  },
  "open": [
   {
@@ -182,8 +182,7 @@
    "coach_a": "glucose_coach",
    "coach_b": "nutrition_coach",
    "claims": {
-    "nutrition_coach": "Any carb reduction that is not calorie-neutral will push intake to a level that degrades recovery and lean mass preservation simultaneously",
-    "glucose_coach": "Evening carb reduction is likely coming based on CGM data; glucose variability (not average) is the primary diagnostic signal in subjects with visceral adiposity"
+    "nutrition_coach": "Any carb reduction that is not calorie-neutral will push intake to a level that degrades recovery and lean mass preservation simultaneously"
    },
    "criterion": {
     "condition": "lt",
@@ -211,6 +210,22 @@
      "subdomain": "recovery"
     }
    },
+   "unsourced": {
+    "glucose_coach": {
+     "reason": "no sensor since 2026-08-27",
+     "instrument": {
+      "source": "apple_health",
+      "datatype": "cgm"
+     },
+     "last_seen": "2026-08-27",
+     "gap": {
+      "start": "2026-08-27",
+      "end": null
+     },
+     "said_on": "2026-09-23",
+     "text": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+    }
+   },
    "verdict": {
     "outcome": "graded",
     "loser": "glucose_coach",
@@ -222,7 +237,21 @@
    "loser": "glucose_coach",
    "actual_value": 59.0,
    "resolved_date": "2026-09-30",
-   "concession": "CONCESSION (2026-09-30) \u2014 I lost the docket dispute on 'Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?'. My recorded claim: \"Evening carb reduction is likely coming based on CGM data; glucose variability (not average) is the primary diagnostic signal in subjects with visceral adiposity\". The criterion we agreed to at open \u2014 recovery_score < 70 on 2026-09-30 \u2014 resolved against me: actual value 59. The nutrition coach took the other side and was right. This stays on my record: when I next address Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?, I cite this concession instead of relitigating it."
+   "concession": null,
+   "concession_unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-23",
+    "text": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   }
  ],
  "counts": {

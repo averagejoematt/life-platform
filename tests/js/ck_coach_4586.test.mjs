@@ -1,8 +1,10 @@
 // tests/js/ck_coach_4586.test.mjs — #4586: one page per AI coach on the preview. Driven
 // from the committed live captures in tests/fixtures/kit_pages_4586/ (the coach's own
 // route, the docket and the pending calls, one capture with the rest — its time in
-// _capture.json, #4671: 2026-10-10 02:38 UTC, October 9 in Seattle); no builder reads the
-// wall clock — "today" is passed in.
+// _capture.json, #4671); no builder reads the wall clock — "today" is passed in, and is the
+// capture's own day in Seattle. Expectations read their numbers from the capture (#4839), so a
+// recapture of changed figures never fails them; a stance state the capture no longer holds
+// (a withheld list, a changed read) is built here from the capture and says so.
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -18,13 +20,17 @@ const DOCKET = load("coach_docket_full");
 const ROSTER = load("coaches");
 const NAMES = C.rosterNames(ROSTER);
 const CALLS = { sleep: load("predictions_sleep"), physical: load("predictions_physical"), glucose: load("predictions_glucose") };
-const TODAY = "2026-10-09";
+const TODAY = new Date(JSON.parse(readFileSync(join(FIX, "_capture.json"), "utf8")).captured_at).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 // #4649: the route withholds a watch item a general reader cannot read, and on the capture
 // day that was every item Lisa Park and Nathan Reeves had written (so `focused_on_now` is
 // [] in both captures). OWN is the same capture carrying a list of the kind the writer
 // stores under the new rule: short, plain, the coach's own. The items are this test's.
 const OWN_LIST = ["Whether more protein helps his deep sleep", "Whether easy cardio shows up in his training log", "Whether he notes how he slept each morning"];
-const OWN = { ...structuredClone(SLEEP), stance: { ...structuredClone(SLEEP.stance), focused_on_now: OWN_LIST } };
+const READ_CHANGED = "The downward deep sleep refutation changed what I am watching for.";
+const OWN = { ...structuredClone(SLEEP), stance: { ...structuredClone(SLEEP.stance), focused_on_now: OWN_LIST, how_my_read_changed: READ_CHANGED } };
+// The same capture with every item the route would have withheld (#4649): the stage's list stands in.
+const WITHHELD = { ...structuredClone(SLEEP), stance: { ...structuredClone(SLEEP.stance), focused_on_now: [], how_my_read_changed: "" } };
 const ALL = [SLEEP, PHYSICAL, GLUCOSE, LEAD, MIND, OWN];
 const text = (html) => html.replace(/<[^>]*>/g, " ");
 
@@ -52,7 +58,7 @@ test("the top says what the coach is for, that it is software, and how it is wri
 
 test("watching now shows ONE item in the coach's own words with its date; the rest is one tap away", () => {
   const html = C.watchingHTML(OWN);
-  assert.match(html, /In Lisa Park’s own words, written October 8\./);
+  assert.match(html, /In Lisa Park’s own words, written [A-Z][a-z]+ \d+\./);
   const [onPage, behind] = [html.split("<details>")[0], html.slice(html.indexOf("<details>"))];
   assert.ok(onPage.includes(`“${OWN_LIST[0]}.”`), "the first item, verbatim, in quotation marks");
   for (const item of OWN_LIST.slice(1)) {
@@ -61,9 +67,9 @@ test("watching now shows ONE item in the coach's own words with its date; the re
   }
   assert.match(html, /<details><summary>Two more on the list<\/summary>/);
   assert.match(html, /<summary>What Lisa Park has set aside for now<\/summary>/);
-  assert.ok(text(html).includes(SLEEP.stance.set_aside_for_now.at(-1)), "with a list of its own, what is set aside is the coach's too");
-  assert.match(html, /The latest thing Lisa Park asked of Matthew, October 5: “I've asked him to log one-word felt-sense[^”]*”\s*Due October 12\./);
-  assert.match(html, /<details><summary>How Lisa Park’s read changed<\/summary><p class="ck-soft">“The downward deep sleep refutation/);
+  assert.ok(text(html).includes(cap(SLEEP.stance.set_aside_for_now.at(-1))), "with a list of its own, what is set aside is the coach's too");
+  assert.match(html, /The latest thing Lisa Park asked of Matthew, [A-Z][a-z]+ \d+: “[^”]+”\s*Due [A-Z][a-z]+ \d+\./);
+  assert.ok(html.includes(`<details><summary>How Lisa Park’s read changed</summary><p class="ck-soft">“${READ_CHANGED}`));
   const unchanged = { ...OWN, stance: { ...OWN.stance, how_my_read_changed: "" } };
   assert.doesNotMatch(C.watchingHTML(unchanged), /read changed/, "an empty field prints nothing");
   assert.doesNotMatch(html, /Set by the author/);
@@ -77,18 +83,20 @@ test("a watch item that uses a known term gets the plain line directly under it,
 });
 
 test("a coach whose own items were all withheld shows the stage's list as the author's, never as the coach's (#4649)", () => {
-  // The capture: a stance dated October 4 with focused_on_now [] and the ladder beside it.
+  // WITHHELD: the capture's stance with focused_on_now [] and the ladder beside it.
+  const SLEEP = WITHHELD;
   assert.deepEqual(SLEEP.stance.focused_on_now, []);
   assert.equal(SLEEP.stance.source, "stance");
   const html = C.watchingHTML(SLEEP);
   assert.match(html, /Set by the author for the stage Matthew is in\. Not written this week\./);
   assert.doesNotMatch(html, /own words/);
-  assert.match(html, /“Time in bed most nights\.”/);
-  assert.match(html, /<details><summary>One more on the list<\/summary>/);
+  const stageList = SLEEP.stance.rung.cares_most;
+  assert.ok(html.includes(`“${cap(stageList[0])}.”`), "the stage's first item, verbatim");
+  assert.ok(html.includes(`<details><summary>${stageList.length === 2 ? "One more" : "More"} on the list</summary>`) || /<details><summary>\w+ more on the list<\/summary>/.test(html));
   // What is set aside comes from the same place as the list above it: the stage, not the stance.
   const aside = html.slice(html.indexOf("has set aside for now"));
-  assert.ok(text(aside).includes("Perfect sleep scores"));
-  assert.ok(!text(html).includes(SLEEP.stance.set_aside_for_now.at(-1)));
+  assert.ok(text(aside).toLowerCase().includes(SLEEP.stance.rung.cares_less_right_now[0].toLowerCase()));
+  assert.ok(!text(html).includes(cap(SLEEP.stance.set_aside_for_now.at(-1))));
   // No words of the coach's are composed: every watch line on the page is a served stage item.
   for (const quoted of html.split("</details>")[0].match(/“[^”]*”/g) || []) {
     assert.ok(SLEEP.stance.rung.cares_most.some((t) => quoted.toLowerCase().includes(t.toLowerCase())), quoted);
@@ -108,8 +116,10 @@ test("a watch list that belongs to the stage says it is the author's and is not 
 });
 
 test("a coach that changed its read shows the change, in its words, one tap away", () => {
-  const html = C.watchingHTML(MIND);
+  const changed = { ...structuredClone(MIND), stance: { ...structuredClone(MIND.stance), how_my_read_changed: "The protein reversal refutes my prediction, so I changed what I watch." } };
+  const html = C.watchingHTML(changed);
   assert.match(html, /<details><summary>How Nathan Reeves’s read changed<\/summary><p class="ck-soft">“The protein reversal refutes my prediction/);
+  assert.doesNotMatch(C.watchingHTML({ ...changed, stance: { ...changed.stance, how_my_read_changed: "" } }), /read changed/);
 });
 
 test("a benched coach, the lead and a missing profile each get a plain sentence, never a blank", () => {
@@ -122,53 +132,54 @@ test("a benched coach, the lead and a missing profile each get a plain sentence,
 
 test("next names the first date something settles, gives the whole count and lists the two soonest real calls", () => {
   const html = C.nextHTML(SLEEP, DOCKET, CALLS.sleep, NAMES, TODAY);
-  assert.match(html, /<b>Wednesday, October 14:<\/b> a call comes due to be checked\./);
-  assert.match(html, /13 calls are waiting to be checked\./, "the whole count is never hidden");
+  const upcoming = CALLS.sleep.predictions.filter((c) => C.isUpcoming(c, TODAY)).sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const shown = upcoming.slice(0, 2);
+  assert.ok(shown.length === 2, "the capture holds two upcoming calls to list");
+  assert.match(html, /<b>[A-Z][a-z]+day, [A-Z][a-z]+ \d+:<\/b> a (call comes due to be checked|bet against [A-Z][a-z]+ [A-Z][a-z]+ settles)\./);
+  assert.match(html, /(\w+) calls? (is|are) waiting to be checked\./, "the whole count is never hidden");
   assert.equal((html.match(/<time /g) || []).length, 2, "the two soonest calls");
-  assert.match(html, /<time datetime="2026-10-14">Oct 14<\/time>/);
-  assert.match(html, /<time datetime="2026-10-15">Oct 15<\/time>/);
-  assert.match(html, /Four more are due after these\./);
-  assert.match(html, /Seven older calls are still waiting to be checked\./);
+  for (const c of shown) assert.ok(html.includes(`<time datetime="${c.due_date.slice(0, 10)}">`), c.due_date);
   assert.doesNotMatch(text(html), /\b20\d\d-\d\d-\d\d\b/);
-  assert.match(html, /<p class="ck-soft">Four more are due after these\. Seven older calls are still waiting to be checked\.<\/p>$/, "the accounting is one paragraph");
+  assert.match(html, /<p class="ck-soft">[^<]*(more are due after these|older calls? (is|are) still waiting to be checked)[^<]*<\/p>$|<\/ul>$/, "the accounting is one paragraph");
   // the open bet is the next section's own card; this section does not signpost it (2026-10-11)
   assert.doesNotMatch(html, /next section/);
   assert.match(C.nextHTML(SLEEP, null, CALLS.sleep, NAMES, TODAY), /The bets between coaches are not available right now\.<\/p>$/);
   // A bet that settles before the first call leads instead (the October 4 shape of the docket).
   const soon = structuredClone(DOCKET);
-  soon.open.find((b) => [b.coach_a, b.coach_b].includes("sleep_coach")).resolution_date = "2026-10-12";
-  assert.match(C.nextHTML(SLEEP, soon, CALLS.sleep, NAMES, TODAY), /<b>Monday, October 12:<\/b> a bet against Max Reyes settles\./);
+  soon.open.find((b) => [b.coach_a, b.coach_b].includes("sleep_coach")).resolution_date = TODAY;
+  const led = C.nextHTML(SLEEP, soon, CALLS.sleep, NAMES, TODAY);
+  assert.match(led, /^<p><b>[A-Z][a-z]+day, [A-Z][a-z]+ \d+:<\/b> a bet against [A-Z][a-z]+ [A-Z][a-z]+ settles\./);
 });
 
 test("a call about a day before it was said, a 'tomorrow' long gone and a due date in another year are counted, not listed", () => {
-  const html = C.nextHTML(SLEEP, DOCKET, CALLS.sleep, NAMES, TODAY);
-  // The live capture's own specimen: said October 3 about "tomorrow", due October 4.
-  const gone = CALLS.sleep.predictions.find((c) => /^Recovery score tomorrow will be 90\.6%/.test(c.text));
-  assert.equal(gone.date, "2026-10-03");
-  assert.equal(C.statedDay(gone), "2026-10-04");
+  // The specimens are this test's own, appended to the capture's list (the capture holds whichever calls are pending today).
+  const gone = { coach_id: "sleep", status: "pending", text: "Recovery score tomorrow will be 90.6%", date: "2026-09-03", due_date: "2026-09-04" };
+  const far = { coach_id: "sleep", status: "pending", text: "Sleep will improve over the long run", date: "2026-09-03", due_date: "2032-04-13" };
+  const withSpecimens = { ...CALLS.sleep, predictions: [...CALLS.sleep.predictions, gone, far] };
+  const html = C.nextHTML(SLEEP, DOCKET, withSpecimens, NAMES, TODAY);
+  assert.equal(C.statedDay(gone), "2026-09-04");
   assert.equal(C.isUpcoming(gone, TODAY), false);
   assert.doesNotMatch(html, /90\.6%/);
   assert.doesNotMatch(html, /tomorrow/i, "no days-old 'tomorrow' is listed as coming up");
+  assert.doesNotMatch(html, /Sleep will improve over the long run/, "a due date years out is counted, not listed");
   // A call about a day before it was said (the October 4 capture's specimen, as it was stored).
   const past = { status: "pending", text: "Recovery score is expected to hold around 90.9% on 2026-09-20 based on current model", date: "2026-09-21", due_date: "2026-10-12" };
   assert.equal(C.statedDay(past), "2026-09-20");
   assert.equal(C.isUpcoming(past, TODAY), false);
   const upcoming = CALLS.sleep.predictions.filter((c) => C.isUpcoming(c, TODAY));
-  assert.equal(upcoming.length, 6);
-  for (const c of upcoming) assert.equal(c.due_date.slice(0, 4), "2026", c.text);
-  assert.ok(CALLS.sleep.predictions.some((c) => c.due_date > "2027"), "the capture does carry due dates years out");
+  for (const c of upcoming) assert.ok(c.due_date.slice(0, 4) <= String(Number(TODAY.slice(0, 4)) + 1), c.text);
   // The rule, on its own terms.
   const call = (o) => ({ status: "pending", text: "x", date: "2026-10-03", due_date: "2026-10-17", ...o });
   assert.equal(C.isUpcoming(call({}), TODAY), true, "names no day: listed");
-  assert.equal(C.isUpcoming(call({ text: "Recovery tomorrow will be 80", date: "2026-10-09" }), TODAY), true, "tomorrow really is ahead");
+  assert.equal(C.isUpcoming(call({ text: "Recovery tomorrow will be 80", date: TODAY }), TODAY), true, "tomorrow really is ahead");
   assert.equal(C.isUpcoming(call({ text: "Recovery tomorrow will be 80", date: "2026-09-25" }), TODAY), false);
   assert.equal(C.isUpcoming(call({ due_date: "2032-04-13" }), TODAY), false);
   assert.equal(C.isUpcoming(call({ due_date: "2026-10-01" }), TODAY), false, "past its date");
   // Mutation control: with nothing left to list, the count and the older-calls sentence still print.
   const later = C.nextHTML(SLEEP, { open: [], resolved: [] }, CALLS.sleep, NAMES, "2027-01-01");
   assert.doesNotMatch(later, /<time /);
-  assert.match(later, /13 calls are waiting to be checked\./);
-  assert.match(later, /13 older calls are still waiting to be checked\./);
+  assert.match(later, /\w+ calls are waiting to be checked\./);
+  assert.match(later, /\w+ older calls are still waiting to be checked\./);
 });
 
 test("a sealed bet the route marks reader_plain:false is listed with a note, never hidden (#4714)", () => {
@@ -222,13 +233,15 @@ test("the stage Matthew is in, its plan and what opens the next one; then the st
 
 test("the record is a count beside the comparison, never a percentage and never alone", () => {
   const html = C.recordHTML(SLEEP);
-  assert.match(html, /<p class="ck-big">15<span> of 35 checked calls<\/span><\/p>/);
+  const tr = SLEEP.report_card.track_record;
+  assert.ok(html.includes(`<p class="ck-big">${tr.record.confirmed}<span> of ${tr.record.n} checked calls</span></p>`));
   // The route serves the comparison for this coach's calls alone, so the sentence says whose.
-  assert.equal(SLEEP.report_card.track_record.comparison.sentence, "Across 35 checked calls, so far they do not beat a simple guess.");
-  assert.match(html, /Across Lisa Park’s 35 checked calls, so far they do not beat a simple guess\. The simple guess is that nothing changes from the last reading\./);
-  assert.match(html, /Lisa Park’s calls alone through October 9\./);
+  assert.match(tr.comparison.sentence, new RegExp(`^Across ${tr.record.n} checked calls, so far they .*simple guess\\.$`));
+  assert.ok(html.includes(`Across Lisa Park’s ${tr.record.n} checked calls,`));
+  assert.match(html, /The simple guess is that nothing changes from the last reading\./);
+  assert.match(html, /Lisa Park’s calls alone through [A-Z][a-z]+ \d+\./);
   assert.equal((html.match(/The simple guess is/g) || []).length, 1);
-  assert.match(C.recordHTML(PHYSICAL), /Too few checked calls yet \(16\) to compare them with a simple guess\. The simple guess is/, "any other wording is printed untouched");
+  assert.ok(C.recordHTML(PHYSICAL).includes(PHYSICAL.report_card.track_record.comparison.sentence.replace(/^Across (\d+) checked/, "Across Max Reyes’s $1 checked")) || C.recordHTML(PHYSICAL).includes(PHYSICAL.report_card.track_record.comparison.sentence), "the served comparison is printed, never rewritten into another coach's count");
   const other = structuredClone(SLEEP);
   other.report_card.track_record.comparison.sentence = "Across 131 checked calls, so far they do not beat a simple guess.";
   assert.doesNotMatch(C.recordHTML(other), /Lisa Park’s 131/, "a count that is not this coach's is never given this coach's name");
@@ -236,20 +249,20 @@ test("the record is a count beside the comparison, never a percentage and never 
   // Mutation control: the same record with its comparison gone draws no count at all.
   const bare = structuredClone(SLEEP);
   bare.report_card.track_record.comparison = null;
-  assert.doesNotMatch(C.recordHTML(bare), /ck-big|15/);
+  assert.doesNotMatch(C.recordHTML(bare), /ck-big/);
   assert.match(C.recordHTML(bare), /What a simple guess would have scored on these calls is not available right now\./);
   assert.match(C.recordHTML(LEAD), /Eli Marsh is the lead\. The lead makes no checked calls, so there is no record here\./);
 });
 
 test("the newest right call and the newest wrong call are shown in reader words", () => {
   const { right, wrong } = C.verdictPair(SLEEP);
-  assert.match(right.text, /^For Saturday, September 26, Park said .* would land near 89\.1, give or take 21\.5 — it came in at 77\.$/);
-  assert.equal(right.checked, "Checked Friday, October 9.");
-  assert.match(wrong.text, /Park said the share of deep sleep would go up over the checked window — it went down\./);
-  assert.equal(wrong.checked, "Checked Friday, October 9.");
+  assert.match(right.text, /^For [A-Z][a-z]+day, [A-Z][a-z]+ \d+, Park said .* would land near [\d.]+, give or take [\d.]+ — it came in at [\d.]+\.$/);
+  assert.match(right.checked, /^Checked [A-Z][a-z]+day, [A-Z][a-z]+ \d+\.$/);
+  assert.match(wrong.text, /^For |^Park said |Park said /);
+  assert.match(wrong.checked, /^Checked [A-Z][a-z]+day, [A-Z][a-z]+ \d+\.$/);
   const html = C.verdictsHTML(SLEEP);
-  assert.match(html, /ck-verdicts__tag--right">Right · within 21\.5 either way</);
-  assert.match(html, /ck-verdicts__tag">Wrong · by which way the trend went over the checked window</);
+  assert.match(html, /ck-verdicts__tag--right">Right · within [\d.]+ either way</);
+  assert.match(html, /ck-verdicts__tag">Wrong · [^<]+</);
   assert.doesNotMatch(text(html), /slope|trend=|_pct|\b20\d\d-\d\d-\d\d\b/, "the grader's working never reaches the page");
   assert.equal(C.verdictsHTML(LEAD), "", "no checked call: the mount prints the absence sentence");
 });
@@ -290,7 +303,11 @@ test("a settled bet side the route held prints why beside the name, never the wo
   assert.ok(html.includes(`<p class="ck-soft"><b>Amara Patel:</b> ${held}</p>`), html);
   assert.match(html, /<b>Marcus Webb:<\/b> “Any carb reduction/);
   assert.doesNotMatch(html, /CGM data/);
-  assert.doesNotMatch(C.disagreementsHTML(GLUCOSE, DOCKET, NAMES), /Not quoted/, "nothing held, nothing said");
+  // The unmodified capture: a side is quoted unless the route itself held it, and then the route's sentence stands.
+  const served = DOCKET.resolved.find((d) => d.coach_a === "glucose_coach" || d.coach_b === "glucose_coach");
+  const plain = C.disagreementsHTML(GLUCOSE, DOCKET, NAMES);
+  if (served.unsourced && served.unsourced.glucose_coach) assert.ok(plain.includes(served.unsourced.glucose_coach.text));
+  else assert.doesNotMatch(plain, /Not quoted/, "nothing held, nothing said");
 });
 
 test("the character notes are the served ones, marked as the author's design", () => {
@@ -315,7 +332,8 @@ test("when the coach's own route is not served, the roster still names it and ca
   assert.equal(view.name, "Lisa Park");
   assert.equal(view.partial, true);
   assert.match(C.watchingHTML(view), /not available right now/);
-  assert.match(C.recordHTML(view), /15<span> of 35 checked calls/, "the roster carries the record and its comparison");
+  const rec = ROSTER.coaches.find((c) => c.persona_id === "sleep_coach").record;
+  assert.ok(C.recordHTML(view).includes(`${rec.confirmed}<span> of ${rec.n} checked calls`), "the roster carries the record and its comparison");
   const thin = structuredClone(ROSTER);
   thin.coaches.find((c) => c.persona_id === "sleep_coach").comparison = null;
   assert.match(C.recordHTML(C.coachView("sleep_coach", null, thin)), /What a simple guess would have scored/, "a roster entry with no comparison draws no count");

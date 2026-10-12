@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:08.595153+00:00",
-  "served_at": "2026-10-10T02:38:08.595153+00:00",
+  "generated_at": "2026-10-12T15:35:30.115395+00:00",
+  "served_at": "2026-10-12T15:35:30.115395+00:00",
   "cache_seconds": 300,
-  "request_id": "9a41bba597e345cc"
+  "request_id": "8d333d675b044c6c"
  },
  "persona_id": "physical_coach",
  "name": "Max Reyes",
@@ -94,17 +94,17 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20260925_recovery_trend_is_pointing_the_right_dir",
-  "claim": "Recovery trend is pointing the right direction and may establish as a confirmed trajectory.",
-  "created_date": "2026-09-25",
+  "prediction_id": "pred_20261002_tomorrow_s_recovery_will_reach_approxima",
+  "claim": "Tomorrow's recovery will reach approximately 75.8%, a single-day rebound from the September 30 low",
+  "created_date": "2026-10-02",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-09",
+  "outcome_date": "2026-10-11",
   "metric": "recovery_score",
-  "eval_type": "directional",
-  "condition": "up",
-  "threshold": null,
-  "actual_value": 0.0626,
-  "status": "confirmed"
+  "eval_type": "point",
+  "condition": "within",
+  "threshold": 75.8,
+  "actual_value": 98.0,
+  "status": "refuted"
  },
  "instrument": {
   "source": "hevy",
@@ -135,7 +135,7 @@
   "grounding_flag": false,
   "graduation_gate": "A steady downward weight trend over a month unlocks the 'recomposition' rung.",
   "band_metric": "weight_lbs",
-  "current_value": 306.13,
+  "current_value": 308.29,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -251,28 +251,28 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 8,
-   "refuted": 8,
-   "decided": 16,
-   "hit_rate_pct": 50.0,
+   "confirmed": 10,
+   "refuted": 12,
+   "decided": 22,
+   "hit_rate_pct": 45.5,
    "record": {
-    "confirmed": 8,
-    "refuted": 8,
-    "n": 16,
-    "through": "2026-10-09"
+    "confirmed": 10,
+    "refuted": 12,
+    "n": 22,
+    "through": "2026-10-11"
    },
-   "headline": "8 of 16 checked calls right (50%) through October 9",
+   "headline": "10 of 22 checked calls right (45%) through October 11",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 4,
-      "coach_right": 3,
-      "scored": 1,
-      "coach_right_on_scored": 1,
-      "rule_right": 1,
+      "graded": 9,
+      "coach_right": 5,
+      "scored": 6,
+      "coach_right_on_scored": 3,
+      "rule_right": 3,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -284,9 +284,9 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 9,
+      "graded": 10,
       "coach_right": 4,
-      "scored": 2,
+      "scored": 3,
       "coach_right_on_scored": 1,
       "rule_right": 0,
       "coach_only": 1,
@@ -335,53 +335,53 @@
     "unclassified": 0,
     "scored_complete": false,
     "skill": {
-     "n": 16,
-     "brier_skill": -0.1181,
-     "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+     "n": 22,
+     "brier_skill": -0.095,
+     "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
     },
     "rule_sentence": null,
-    "sentence": "Too few checked calls yet (16) to compare them with a simple guess.",
+    "sentence": "Across 22 checked calls, so far they do not beat a simple guess.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=16 decided",
+   "n_note": "n=22 decided",
    "recent": [
     {
-     "date": "2026-10-09",
-     "status": "confirmed",
-     "metric": "recovery_score",
-     "reason": "recovery_score trend=up (slope=0.0626), predicted=up"
-    },
-    {
-     "date": "2026-10-06",
-     "status": "confirmed",
-     "metric": "recovery_score",
-     "reason": "recovery_score=80.00 on 2026-09-23 vs predicted 86.1 \u00b122.3731 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=22.3731)); |\u0394|=6.10 \u2192 within tolerance"
-    },
-    {
-     "date": "2026-10-04",
+     "date": "2026-10-11",
      "status": "refuted",
      "metric": "recovery_score",
-     "reason": "recovery_score trend=down (slope=-0.0434), predicted=up"
+     "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 75.8 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=22.20 \u2192 outside tolerance"
     },
     {
-     "date": "2026-10-04",
+     "date": "2026-10-11",
+     "status": "confirmed",
+     "metric": "recovery_score",
+     "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance"
+    },
+    {
+     "date": "2026-10-11",
      "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score trend=down (slope=-0.0334), predicted=up"
+    },
+    {
+     "date": "2026-10-11",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score=73.00 on 2026-09-13 vs predicted 54.7 \u00b118.2532 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.2532)); |\u0394|=18.30 \u2192 outside tolerance"
+    },
+    {
+     "date": "2026-10-10",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 64.7 \u00b117.5951 (\u00b11 SD of the trailing 30-day personal series (n=30 readings, SD=17.5951)); |\u0394|=33.30 \u2192 outside tolerance"
+    },
+    {
+     "date": "2026-10-10",
+     "status": "confirmed",
      "metric": "weight_lbs",
-     "reason": "predicted down, metric flat (slope=-0.0076, within \u00b10.02 noise band) \u2014 no movement to confirm the call"
-    },
-    {
-     "date": "2026-10-02",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score trend=down (slope=-0.0882), predicted=up"
-    },
-    {
-     "date": "2026-10-01",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score trend=down (slope=-0.1015), predicted=up"
+     "reason": "weight_lbs=315.43 on 2026-09-23 vs predicted 315 \u00b15.1527 (\u00b11 SD of the trailing 30-day personal series (n=13 readings, SD=5.1527)); |\u0394|=0.43 \u2192 within tolerance"
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -777,7 +777,7 @@
    "superseded": {
     "note": "superseded \u2014 generated before the logging-record fix",
     "claimed_logging_stopped_after": "2026-09-10",
-    "served_last_log": "2026-10-05",
+    "served_last_log": "2026-10-09",
     "ref": "#4185 / #4227"
    }
   },
@@ -1044,11 +1044,11 @@
     "record_id": "COMMITMENT#commit_20260926_track_subjective_signals_of_fatigue_and",
     "date": "2026-09-26",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-03",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-11",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1073,11 +1073,11 @@
     "record_id": "COMMITMENT#commit_20260926_clarify_whether_step_contraction_is_deli",
     "date": "2026-09-26",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-03",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-11",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1102,11 +1102,11 @@
     "record_id": "COMMITMENT#commit_20260925_monitor_and_report_subjective_signals_of",
     "date": "2026-09-25",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-02",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-10",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1115,11 +1115,11 @@
     "record_id": "COMMITMENT#commit_20260925_clarify_the_cause_of_the_step_contractio",
     "date": "2026-09-25",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-02",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-10",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1611,11 +1611,114 @@
    "held": 51,
    "kept": 14,
    "broken": 9,
-   "pending": 14,
-   "unresolved": 14,
+   "pending": 10,
+   "unresolved": 18,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-11#pred-20261002-tomorrow-s-recovery-will-reach-approxima-refut",
+    "date": "2026-10-11",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 75.8 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=22.20 \u2192 outside tolerance",
+    "evidence": {
+     "prediction_id": "pred_20261002_tomorrow_s_recovery_will_reach_approxima",
+     "actual_value": 98.0,
+     "threshold": 75.8,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-11#pred-20260926-recovery-score-will-be-85-3-tomorrow-wi-confir",
+    "date": "2026-10-11",
+    "status": "confirmed",
+    "metric": "recovery_score",
+    "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance",
+    "evidence": {
+     "prediction_id": "pred_20260926_recovery_score_will_be_85_3_tomorrow_wi",
+     "actual_value": 89.0,
+     "threshold": 85.3,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-11#pred-20260924-the-model-expects-84-8-recovery-tomorro-refute",
+    "date": "2026-10-11",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score trend=down (slope=-0.0334), predicted=up",
+    "evidence": {
+     "prediction_id": "pred_20260924_the_model_expects_84_8_recovery_tomorro",
+     "actual_value": -0.033382,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-11#pred-20260912-tomorrow-s-recovery-score-will-rebound-t-refut",
+    "date": "2026-10-11",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score=73.00 on 2026-09-13 vs predicted 54.7 \u00b118.2532 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.2532)); |\u0394|=18.30 \u2192 outside tolerance",
+    "evidence": {
+     "prediction_id": "pred_20260912_tomorrow_s_recovery_score_will_rebound_t",
+     "actual_value": 73.0,
+     "threshold": 54.7,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-10#pred-20261002-recovery-will-reach-64-7-tomorrow-with-refuted",
+    "date": "2026-10-10",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 64.7 \u00b117.5951 (\u00b11 SD of the trailing 30-day personal series (n=30 readings, SD=17.5951)); |\u0394|=33.30 \u2192 outside tolerance",
+    "evidence": {
+     "prediction_id": "pred_20261002_recovery_will_reach_64_7_tomorrow_with",
+     "actual_value": 98.0,
+     "threshold": 64.7,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-10#pred-20260922-weight-will-be-approximately-315-lbs-tom-confi",
+    "date": "2026-10-10",
+    "status": "confirmed",
+    "metric": "weight_lbs",
+    "reason": "weight_lbs=315.43 on 2026-09-23 vs predicted 315 \u00b15.1527 (\u00b11 SD of the trailing 30-day personal series (n=13 readings, SD=5.1527)); |\u0394|=0.43 \u2192 within tolerance",
+    "evidence": {
+     "prediction_id": "pred_20260922_weight_will_be_approximately_315_lbs_tom",
+     "actual_value": 315.43,
+     "threshold": 315.0,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-10#pred-20260910-weight-tomorrow-morning-will-be-326-8-lb-expir",
+    "date": "2026-10-10",
+    "status": "expired",
+    "metric": "weight_lbs",
+    "reason": "Expired: 30 days elapsed (window=1, max=2). No reading for 'weight_lbs' on 2026-09-11 (or within 2 days before it)",
+    "evidence": {
+     "prediction_id": "pred_20260910_weight_tomorrow_morning_will_be_326_8_lb",
+     "threshold": 326.8,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-09#pred-20260925-recovery-trend-is-pointing-the-right-dir-confi",

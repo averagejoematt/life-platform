@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:13.318341+00:00",
-  "served_at": "2026-10-10T02:38:13.318341+00:00",
+  "generated_at": "2026-10-12T15:35:38.658489+00:00",
+  "served_at": "2026-10-12T15:35:38.658489+00:00",
   "cache_seconds": 3600,
-  "request_id": "2c3623dce9b44cf5"
+  "request_id": "0a4370b0bff84a02"
  },
  "achievements": [
   {
@@ -132,7 +132,7 @@
    "category": "milestone",
    "description": "Lost 20 lbs from starting weight",
    "earned": true,
-   "earned_date": null,
+   "earned_date": "2026-10-08",
    "icon": "\u2696\ufe0f",
    "unlock_hint": null
   },
@@ -144,7 +144,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "9 lbs to go"
+   "unlock_hint": "11 lbs to go"
   },
   {
    "id": "lost_40",
@@ -154,7 +154,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "19 lbs to go"
+   "unlock_hint": "21 lbs to go"
   },
   {
    "id": "lost_50",
@@ -164,7 +164,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "29 lbs to go"
+   "unlock_hint": "31 lbs to go"
   },
   {
    "id": "lost_60",
@@ -174,7 +174,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "39 lbs to go"
+   "unlock_hint": "41 lbs to go"
   },
   {
    "id": "lost_70",
@@ -184,7 +184,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "49 lbs to go"
+   "unlock_hint": "51 lbs to go"
   },
   {
    "id": "lost_80",
@@ -194,7 +194,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "59 lbs to go"
+   "unlock_hint": "61 lbs to go"
   },
   {
    "id": "lost_90",
@@ -204,7 +204,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "69 lbs to go"
+   "unlock_hint": "71 lbs to go"
   },
   {
    "id": "lost_100",
@@ -214,7 +214,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\u2696\ufe0f",
-   "unlock_hint": "79 lbs to go"
+   "unlock_hint": "81 lbs to go"
   },
   {
    "id": "sub_280",
@@ -224,7 +224,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\ud83c\udfaf",
-   "unlock_hint": "26 lbs to go"
+   "unlock_hint": "28 lbs to go"
   },
   {
    "id": "sub_250",
@@ -234,7 +234,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\ud83c\udfaf",
-   "unlock_hint": "56 lbs to go"
+   "unlock_hint": "58 lbs to go"
   },
   {
    "id": "sub_220",
@@ -244,7 +244,7 @@
    "earned": false,
    "earned_date": null,
    "icon": "\ud83c\udfaf",
-   "unlock_hint": "86 lbs to go"
+   "unlock_hint": "88 lbs to go"
   },
   {
    "id": "sub_200",
@@ -254,17 +254,17 @@
    "earned": false,
    "earned_date": null,
    "icon": "\ud83c\udfaf",
-   "unlock_hint": "106 lbs to go"
+   "unlock_hint": "108 lbs to go"
   },
   {
    "id": "30_days",
    "label": "Month of Data",
    "category": "data",
    "description": "30+ days of habit logging",
-   "earned": false,
-   "earned_date": null,
+   "earned": true,
+   "earned_date": "2026-10-05",
    "icon": null,
-   "unlock_hint": "2 days to unlock"
+   "unlock_hint": null
   },
   {
    "id": "100_days",
@@ -274,7 +274,7 @@
    "earned": false,
    "earned_date": null,
    "icon": null,
-   "unlock_hint": "72 days to unlock"
+   "unlock_hint": "66 days to unlock"
   },
   {
    "id": "365_days",
@@ -284,7 +284,7 @@
    "earned": false,
    "earned_date": null,
    "icon": null,
-   "unlock_hint": "337 days to unlock"
+   "unlock_hint": "331 days to unlock"
   },
   {
    "id": "first_experiment",
@@ -408,12 +408,12 @@
   }
  ],
  "summary": {
-  "earned": 6,
+  "earned": 7,
   "total": 40,
   "current_streak": 0,
-  "days_tracked": 28,
+  "days_tracked": 34,
   "current_level": 10,
-  "current_weight": 306,
+  "current_weight": 308,
   "completed_challenges": 0,
   "perfect_challenges": 0
  }

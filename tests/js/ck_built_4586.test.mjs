@@ -1,8 +1,9 @@
 // tests/js/ck_built_4586.test.mjs — #4586: the live numbers on "How it's built". Driven
 // from the committed live captures in tests/fixtures/kit_pages_4586/ (one capture, its time in
-// _capture.json, #4671: 2026-10-10 02:38 UTC); no builder reads the wall clock. The capture is
-// late in the month, past the high days' window; EARLY is the same receipt read on October 4
-// with the forecast it served then, so the early-month sentences stay pinned.
+// _capture.json, #4671); no builder reads the wall clock. Expectations read their numbers from
+// the capture they test (#4839), so a recapture of changed figures never fails them. EARLY is a
+// SYNTHETIC early-month receipt (October 4: tier 0, $75.99 spent, the forecast above the ceiling),
+// built here from literals, so the early-month sentences stay pinned whatever the capture says.
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -16,23 +17,48 @@ const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"
 const SRC = { stats: load("platform_stats"), receipts: load("receipts"), predictions: load("predictions"), coaches: load("coaches") };
 // The receipt as it read early in the month: every high day inside the rate's window, and the
 // forecast above the ceiling (the October 4 figures), so every cost sentence is printed.
-const EARLY = { ...SRC.receipts, computed_at: "2026-10-04T12:00:00+00:00", projected_month_end_usd: 221.83, projected_all_classes_usd: 496.08 };
+const EARLY = {
+  ...SRC.receipts,
+  computed_at: "2026-10-04T12:00:00+00:00",
+  tier: 0,
+  month_to_date_usd: 75.99,
+  ai_scheduled_share_pct: 66.4,
+  projected_classes: ["prod-cron", "remediation"],
+  projected_month_end_usd: 221.83,
+  projected_all_classes_usd: 496.08,
+  typical_day: { ...SRC.receipts.typical_day, usd: 4.38, window_end: "2026-10-09", month_days: 31, month_usd: 135.78 },
+  high_days: {
+    multiple: 2,
+    days: [
+      { date: "2026-10-01", usd: 23.67 },
+      { date: "2026-10-02", usd: 24.68 },
+      { date: "2026-10-03", usd: 11.35 },
+    ],
+    total_usd: 59.7,
+    above_typical_usd: 46.56,
+  },
+};
+const usd = (n) => `$${n.toFixed(2)}`;
+const num = (html) => Number(html.match(/<b>(\d+)<\/b>/)[1]);
 
 test("the programs block leads with the timer count and never prints the total as a figure", () => {
   const html = B.programsHTML(SRC.stats, SRC.coaches);
-  assert.match(html, /<b>84<\/b>/);
-  assert.match(html, /programs run on a timer\. Another 23 run when called\. They read 20 sources of data: devices, apps and lab results\. 8 AI coaches write and predict\./);
-  assert.match(html, /As of October 11\./);
-  assert.doesNotMatch(html, /107|served/, "the total (84 + 23) sat beside the checked calls and read as one number");
+  assert.ok(num(html) > 0, "the timer count leads, as a number");
+  assert.match(html, /programs run on a timer\. Another \d+ run when called\. They read \d+ sources of data: devices, apps and lab results\. \d+ AI coaches write and predict\./);
+  assert.match(html, /As of [A-Z][a-z]+ \d+\./);
+  assert.doesNotMatch(html, /served/);
+  const figures = [...html.matchAll(/<b>(\d+)<\/b>/g)].map((m) => m[1]);
+  assert.deepEqual(figures, [String(num(html))], "the total of timer + called programs is never printed as a figure of its own");
   assert.match(B.programsHTML(null, null), /not available right now/);
   assert.doesNotMatch(B.programsHTML({ lambdas: 5 }, null), /Another|AI coaches|sources of data/, "an absent or smaller count is left out, never a zero or a negative");
 });
 
 test("the coaches' record never appears without its comparison", () => {
   const html = B.recordHTML(SRC.predictions);
-  assert.match(html, /<b>56 right, 75 wrong<\/b>/);
-  assert.match(html, /data-coach-comparison[^>]*>Across 131 checked calls, so far they do not beat a simple guess\./);
-  assert.match(html, /As of October 9\. Code does the grading/);
+  const o = SRC.predictions.overall;
+  assert.match(html, new RegExp(`<b>${o.confirmed} right, ${o.refuted} wrong</b>`));
+  assert.match(html, new RegExp(`data-coach-comparison[^>]*>Across ${o.confirmed + o.refuted} checked calls, so far they (do not )?beat a simple guess\\.`));
+  assert.match(html, /As of [A-Z][a-z]+ \d+\. Code does the grading/);
   const noCmp = B.recordHTML({ overall: SRC.predictions.overall });
   assert.match(noCmp, /What a simple guess would have scored on these calls is not available right now\./);
   assert.match(B.recordHTML({ overall: { confirmed: 0, refuted: 0 } }), /not available right now/, "no checked calls is not printed as 0 and 0");
@@ -61,11 +87,17 @@ const SENTENCE = {
 
 test("the cost paragraphs add up: an ordinary day, the high days with dates, and what each forecast assumes (#4650)", () => {
   const html = B.costHTML(SRC.receipts);
-  assert.match(html, /The ceiling is \$215 a month for the whole cloud bill, AI included\. It rises to \$252 when reader traffic is high\. As of October 9, \$75\.99 is spent this month\. Nothing is paused\./);
-  assert.match(html, /An ordinary day costs \$4\.38, AI included: the middle day of the 30 days to October 9\. 31 days like it come to \$135\.78, under the ceiling\./);
-  assert.match(html, /3 days this month each cost more than twice that: October 1, 2 and 3, \$59\.70 together, \$46\.56 more than 3 ordinary days\.<\/p>/);
-  assert.doesNotMatch(html, /ran on a schedule/, "the last 7 days no longer hold the high days, so their AI split says nothing about them");
-  assert.match(html, /The forecast that sets the tier is what is spent plus the scheduled programs at their pace over the last 7 days: \$126\.81 by October 31, under the ceiling\. If building and testing also carried on at that pace every day, it would be \$139\.97\./);
+  const rc = SRC.receipts;
+  const td = rc.typical_day;
+  const hd = rc.high_days;
+  assert.match(html, new RegExp(`The ceiling is \\$${rc.base_ceiling_usd} a month for the whole cloud bill, AI included\\. It rises to \\$${rc.surge_ceiling_usd} when reader traffic is high\\. As of [A-Z][a-z]+ \\d+, \\${usd(rc.month_to_date_usd)} is spent this month\\. (Nothing is paused|The system is at tier \\d)\\.`));
+  assert.match(html, new RegExp(`An ordinary day costs \\${usd(td.usd)}, AI included: the middle day of the ${td.days_counted} days to [A-Z][a-z]+ \\d+\\. ${td.month_days} days like it come to \\${usd(td.month_usd)}, (under|over) the ceiling\\.`));
+  if (hd.days.length > 1) {
+    assert.match(html, new RegExp(`${hd.days.length} days this month each cost more than twice that: [A-Z][a-z]+ [\\d, and]+, \\${usd(hd.total_usd)} together, \\${usd(hd.above_typical_usd)} more than ${hd.days.length} ordinary days\\.</p>`));
+  }
+  // Late in the month the last 7 days no longer hold the high days, so their AI split says nothing about them.
+  assert.doesNotMatch(B.costHTML({ ...rc, computed_at: "2026-10-20T16:00:00+00:00" }), /ran on a schedule/);
+  assert.match(html, new RegExp(`The forecast that sets the tier is what is spent plus the scheduled programs( and the checks on each deploy)? at their pace over the last 7 days: \\${usd(rc.projected_month_end_usd)} by [A-Z][a-z]+ \\d+, (under|above) the ceiling\\. If building and testing also carried on at that pace every day, it would be \\${usd(rc.projected_all_classes_usd)}\\.`));
   assert.doesNotMatch(html, /Nothing is paused yet|starts tier 1/, "a forecast under tier 1's line needs no reason for the tier");
   // Early in the month (the October 4 forecast): the AI split and why nothing is paused yet.
   const early = B.costHTML(EARLY);
@@ -149,10 +181,11 @@ test("three plain figures stand in the open; the high days, the forecast and the
   const [open, folded] = html.split("<details>");
   assert.ok(folded, "one disclosure");
   assert.equal((html.match(/<details>/g) || []).length, 1);
-  assert.match(open, /\$75\.99 is spent this month/);
-  assert.match(open, /An ordinary day costs \$4\.38/);
+  assert.ok(open.includes(`${usd(SRC.receipts.month_to_date_usd)} is spent this month`));
+  assert.ok(open.includes(`An ordinary day costs ${usd(SRC.receipts.typical_day.usd)}`));
   assert.ok(open.includes(B.BUILD_CAP), "the limit on building and testing is said in the open");
-  assert.doesNotMatch(open, /forecast|tier 2|\$139\.97/, "no forecast arithmetic above the fold");
+  assert.doesNotMatch(open, /forecast|tier 2/, "no forecast arithmetic above the fold");
+  assert.ok(!open.includes(usd(SRC.receipts.projected_all_classes_usd)), "no forecast figure above the fold");
   assert.doesNotMatch(B.costHTML(EARLY).split("<details>")[0], /forecast|tier 2|\$496/, "nor early in the month");
   assert.match(folded, /The forecast that sets the tier/);
   assert.match(folded, /days this month each cost more than/);

@@ -1,64 +1,83 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:10.394140+00:00",
-  "served_at": "2026-10-10T02:38:10.394140+00:00",
+  "generated_at": "2026-10-12T15:35:34.376429+00:00",
+  "served_at": "2026-10-12T15:35:34.376429+00:00",
   "cache_seconds": 300,
-  "request_id": "49a5be8485084f76"
+  "request_id": "cf928480ee704963"
  },
  "overall": {
   "total": 67,
-  "confirmed": 8,
-  "refuted": 8,
-  "pending": 16,
-  "inconclusive": 1,
-  "expired": 0,
+  "confirmed": 10,
+  "refuted": 12,
+  "pending": 10,
+  "inconclusive": 0,
+  "expired": 1,
   "observational": 34,
-  "decided": 16,
-  "accuracy_pct": 50.0,
+  "decided": 22,
+  "accuracy_pct": 45.5,
   "due": {
-   "as_of": "2026-10-09",
-   "due_now": 2,
-   "earliest_due": "2026-09-23"
+   "as_of": "2026-10-12",
+   "due_now": 0,
+   "earliest_due": "2026-10-14"
   },
+  "counted": {
+   "sealed": {
+    "n": 2,
+    "right": 0
+   },
+   "bet": {
+    "n": 1,
+    "right": 1
+   },
+   "commentary": {
+    "n": 12,
+    "right": 6
+   },
+   "conditional": {
+    "n": 7,
+    "right": 3
+   }
+  },
+  "counted_text": "Counted: 2 sealed before day one, 1 side of a bet between two coaches, 12 read out of the coaches' running commentary and 7 conditional or hedged sentences.",
   "lifetime": {
    "total": 468,
-   "confirmed": 9,
-   "refuted": 10,
-   "pending": 177,
-   "inconclusive": 55,
-   "expired": 0,
+   "confirmed": 11,
+   "refuted": 14,
+   "pending": 171,
+   "inconclusive": 54,
+   "expired": 1,
    "observational": 217,
-   "decided": 19,
-   "accuracy_pct": 47.4
+   "decided": 25,
+   "accuracy_pct": 44.0
   }
  },
  "by_coach": {
   "physical": {
    "total": 67,
-   "confirmed": 8,
-   "refuted": 8,
-   "pending": 16,
-   "inconclusive": 1,
-   "expired": 0,
+   "confirmed": 10,
+   "refuted": 12,
+   "pending": 10,
+   "inconclusive": 0,
+   "expired": 1,
    "observational": 34,
-   "decided": 16,
+   "decided": 22,
    "lifetime": {
     "total": 468,
-    "confirmed": 9,
-    "refuted": 10,
-    "pending": 177,
-    "inconclusive": 55,
-    "expired": 0,
+    "confirmed": 11,
+    "refuted": 14,
+    "pending": 171,
+    "inconclusive": 54,
+    "expired": 1,
     "observational": 217,
-    "decided": 19,
-    "hit_rate_pct": 47.4
+    "decided": 25,
+    "hit_rate_pct": 44.0
    },
    "retired": false,
    "record": {
-    "confirmed": 8,
-    "refuted": 8,
-    "n": 16,
-    "through": "2026-10-09"
+    "confirmed": 10,
+    "refuted": 12,
+    "n": 22,
+    "through": "2026-10-11"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -66,11 +85,11 @@
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 4,
-      "coach_right": 3,
-      "scored": 1,
-      "coach_right_on_scored": 1,
-      "rule_right": 1,
+      "graded": 9,
+      "coach_right": 5,
+      "scored": 6,
+      "coach_right_on_scored": 3,
+      "rule_right": 3,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -82,9 +101,9 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 9,
+      "graded": 10,
       "coach_right": 4,
-      "scored": 2,
+      "scored": 3,
       "coach_right_on_scored": 1,
       "rule_right": 0,
       "coach_only": 1,
@@ -133,16 +152,16 @@
     "unclassified": 0,
     "scored_complete": false,
     "skill": {
-     "n": 16,
-     "brier_skill": -0.1181,
-     "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+     "n": 22,
+     "brier_skill": -0.095,
+     "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
     },
     "rule_sentence": null,
-    "sentence": "Too few checked calls yet (16) to compare them with a simple guess.",
+    "sentence": "Across 22 checked calls, so far they do not beat a simple guess.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
-   "hit_rate_pct": 50.0
+   "hit_rate_pct": 45.5
   }
  },
  "comparison": {
@@ -151,11 +170,11 @@
   "rule_version": 1,
   "records": {
    "number": {
-    "graded": 4,
-    "coach_right": 3,
-    "scored": 1,
-    "coach_right_on_scored": 1,
-    "rule_right": 1,
+    "graded": 9,
+    "coach_right": 5,
+    "scored": 6,
+    "coach_right_on_scored": 3,
+    "rule_right": 3,
     "coach_only": 0,
     "rule_only": 0,
     "unscorable": 0,
@@ -167,9 +186,9 @@
     "rule_right_pct": null
    },
    "direction": {
-    "graded": 9,
+    "graded": 10,
     "coach_right": 4,
-    "scored": 2,
+    "scored": 3,
     "coach_right_on_scored": 1,
     "rule_right": 0,
     "coach_only": 1,
@@ -218,12 +237,12 @@
   "unclassified": 0,
   "scored_complete": false,
   "skill": {
-   "n": 16,
-   "brier_skill": -0.1181,
-   "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+   "n": 22,
+   "brier_skill": -0.095,
+   "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
   },
   "rule_sentence": null,
-  "sentence": "Too few checked calls yet (16) to compare them with a simple guess.",
+  "sentence": "Across 22 checked calls, so far they do not beat a simple guess.",
   "min_n_for_rate": 20,
   "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
  },
@@ -271,25 +290,6 @@
    "coach_id": "physical",
    "coach_name": "Max Reyes",
    "retired": false,
-   "text": "Tomorrow's recovery will reach approximately 75.8%, a single-day rebound from the September 30 low",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-10-02",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-11-01",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "point",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
    "text": "Running average of recovery across 27 data points since September 6 is moving downward",
    "confidence": 0.5,
    "status": "pending",
@@ -300,25 +300,6 @@
    "gradeable": true,
    "metric": "recovery_score",
    "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "Recovery will reach 64.7% tomorrow with an 80% interval of 41.9\u201387.5%.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-10-02",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-10-03",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "point",
    "outcome_notes": "",
    "reason": null,
    "graded_on_data": null,
@@ -366,25 +347,6 @@
    "coach_id": "physical",
    "coach_name": "Max Reyes",
    "retired": false,
-   "text": "Recovery score will be 85.3% tomorrow with 80% confidence interval of 60.9\u2013100%",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-26",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2032-04-13",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "point",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
    "text": "Weight will continue to decline, but body composition question remains open.",
    "confidence": 0.5,
    "status": "pending",
@@ -399,25 +361,6 @@
    "reason": null,
    "graded_on_data": null,
    "subdomain": "weight"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "The model expects 84.8% recovery tomorrow (from the night of 2026-09-22 baseline).",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-24",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2032-04-11",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
   },
   {
    "coach_id": "physical",
@@ -461,25 +404,6 @@
    "coach_id": "physical",
    "coach_name": "Max Reyes",
    "retired": false,
-   "text": "Weight will be approximately 315 lbs tomorrow morning, within an 80% interval of 310.9\u2013319.1 lbs.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-22",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-09-23",
-   "gradeable": true,
-   "metric": "weight_lbs",
-   "eval_type": "point",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "weight"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
    "text": "Weight loss trajectory from September 6th directional prediction will continue tracking downward.",
    "confidence": 0.5,
    "status": "pending",
@@ -494,82 +418,44 @@
    "reason": null,
    "graded_on_data": null,
    "subdomain": "weight"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "If protein EWMA holds at 170g or above for seven consecutive days and step etiology is resolved, Zone 2 training escalation can resume.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-21",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2027-03-10",
-   "gradeable": true,
-   "metric": "total_protein_g",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "protein"
-  },
-  {
-   "coach_id": "physical",
-   "coach_name": "Max Reyes",
-   "retired": false,
-   "text": "Tomorrow's recovery score will rebound to approximately 54.7%, but this represents regression-to-mean rather than intervention effect.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-12",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2032-03-30",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "point",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
   }
  ],
  "commitments": {
-  "as_of": "2026-10-09",
+  "as_of": "2026-10-11",
   "lifetime": {
+   "pending": 60.0,
+   "ungradeable": 38.0,
+   "ungradeable_by_metric": {
+    "total_calories_kcal": 2.0,
+    "total_protein_g": 36.0
+   },
+   "graded": 75.0,
+   "checkable": 118.0,
+   "follow_through_pct": 65.3,
+   "broken": 26.0,
+   "kept": 49.0,
    "follow_through_ci95": [
     54.1,
     75.1
    ],
-   "ungradeable": 38.0,
-   "kept": 49.0,
-   "total": 800.0,
-   "checkable": 118.0,
-   "graded": 75.0,
-   "follow_through_pct": 65.3,
-   "unresolved": 604.0,
-   "pending": 83.0,
-   "ungradeable_by_metric": {
-    "total_protein_g": 36.0,
-    "total_calories_kcal": 2.0
-   },
-   "broken": 26.0
+   "unresolved": 627.0,
+   "total": 800.0
   },
   "season": {
-   "graded": 57.0,
-   "kept": 39.0,
-   "ungradeable": 0.0,
    "follow_through_pct": 68.4,
-   "checkable": 60.0,
-   "pending": 76.0,
-   "broken": 18.0,
-   "unresolved": 176.0,
-   "total": 309.0,
+   "pending": 55.0,
+   "graded": 57.0,
+   "ungradeable": 0.0,
    "follow_through_ci95": [
     55.5,
     79.0
    ],
-   "ungradeable_by_metric": {}
+   "unresolved": 197.0,
+   "kept": 39.0,
+   "broken": 18.0,
+   "ungradeable_by_metric": {},
+   "total": 309.0,
+   "checkable": 60.0
   }
  },
  "cycle": 17,

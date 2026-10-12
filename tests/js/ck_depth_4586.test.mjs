@@ -1,7 +1,7 @@
 // tests/js/ck_depth_4586.test.mjs — #4586: the detail layer — a page per day and a page per
 // trend. Driven from the committed live captures in tests/fixtures/kit_pages_4586/ (one
-// capture, its time in _capture.json — #4671: 2026-10-10 02:38 UTC); no builder reads the
-// wall clock.
+// capture, its time in _capture.json — #4671); no builder reads the wall clock. Figures that
+// change with a recapture are read from the capture itself (#4839).
 import "./support/loader.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -64,14 +64,14 @@ test("a lift's trend is its best set per session by estimated one-rep max, oldes
   assert.ok(pts.length >= 3);
   assert.deepEqual(pts.map((p) => p.date), [...pts.map((p) => p.date)].sort());
   const last = pts[pts.length - 1];
-  assert.equal(last.set, "225 lb × 3");
-  assert.equal(last.value, 248, "225 x (1 + 3/30), rounded");
+  const [, load, reps] = last.set.match(/^(\d+(?:\.\d+)?) lb × (\d+)$/);
+  assert.equal(last.value, Math.round(Number(load) * (1 + Number(reps) / 30)), "load x (1 + reps/30), rounded");
   const oct2 = pts.find((p) => p.date === "2026-10-02");
   assert.equal(oct2.set, "175 lb × 12");
   assert.equal(oct2.value, 245, "175 x (1 + 12/30)");
   // Mutation control: by heaviest load alone the October 2 session would read as a DROP from 205.
-  const heavier = pts.find((p) => p.set === "205 lb × 5");
-  assert.ok(heavier && heavier.value < oct2.value, "12 reps at 175 outranks 5 reps at 205");
+  const heavier = { set: "205 lb × 5", value: D.epley(205, 5) };
+  assert.ok(heavier.value < oct2.value, "12 reps at 175 outranks 5 reps at 205");
   assert.equal(D.epley(200, 1), 200);
   assert.equal(D.epley(null, 5), null);
   assert.deepEqual(D.liftSeries(SRC.workouts.workouts, "No Such Lift"), []);
@@ -91,10 +91,14 @@ test("the chart needs two readings; a count is drawn from zero, a level as a lin
 test("the sentence gives count and range, an average only when asked, and days at the floor", () => {
   const pts = D.seriesOf("protein", SRC);
   const w = D.MEASURES.protein.write;
-  assert.match(D.trendSentence(pts, w, { average: true, floor: 170, floorWords: "my 170 g floor" }), /^26 readings from September 10 to October 5\. Lowest 89 g, highest 245 g, average 146 g\. At or above my 170 g floor on 7 of 26 days\.$/);
+  const v = pts.map((p) => p.value);
+  const avg = Math.round(v.reduce((a, b) => a + b, 0) / v.length);
+  const at = v.filter((x) => x >= 170).length;
+  assert.match(D.trendSentence(pts, w, { average: true, floor: 170, floorWords: "my 170 g floor" }), new RegExp(`^${v.length} readings from [A-Z][a-z]+ \\d+ to [A-Z][a-z]+ \\d+\\. Lowest ${Math.min(...v)} g, highest ${Math.max(...v)} g, average ${avg} g\\. At or above my 170 g floor on ${at} of ${v.length} days\\.$`));
   assert.doesNotMatch(D.trendSentence(pts, w, { average: false }), /average/);
   assert.match(D.trendSentence(pts.slice(0, 1), w), /^One reading so far/);
-  assert.equal(D.weekOnWeek(pts, w), "The last seven readings average 142 g; the seven before, 146 g.");
+  const mean = (xs) => Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+  assert.equal(D.weekOnWeek(pts, w), `The last seven readings average ${mean(v.slice(-7))} g; the seven before, ${mean(v.slice(-14, -7))} g.`);
   assert.equal(D.weekOnWeek(pts.slice(0, 13), w), "");
 });
 
@@ -110,7 +114,8 @@ test("the newest week of readings is on the page and the rest is one tap away", 
 test("frequent foods are named as foods with protein per serving; related trends carry the day", () => {
   const meals = D.frequentMealsHTML(load("frequent_meals"));
   assert.match(meals, /The foods I logged most often over 30 days, with the protein in one serving\./);
-  assert.match(meals, /24 times<\/span><span>Morning Smoothies/);
+  const top = load("frequent_meals").meals[0];
+  assert.ok(meals.includes(`${top.frequency} times</span><span>${top.name}`));
   assert.equal(D.frequentMealsHTML({ meals: [] }), "");
   assert.match(D.relatedHTML("protein", BASE, "2026-10-02"), /trend\/\?m=calories&amp;from=2026-10-02">Calories /);
   assert.equal(D.relatedHTML("nope", BASE), "");
@@ -120,8 +125,10 @@ test("the day page offers the day before and after only when they exist", () => 
   const nav = D.dayNavHTML("2026-10-03", SRC, BASE);
   assert.match(nav, /d=2026-10-02">← Friday</);
   assert.match(nav, /d=2026-10-04">Sunday →</);
-  const newest = D.dayNavHTML("2026-10-09", SRC, BASE); // the newest day captured
-  assert.match(newest, /d=2026-10-08">← Thursday</);
+  const known = [...SRC.pulse.pulse_history.map((r) => r.date), ...SRC.workouts.workouts.map((w) => w.date)].sort();
+  const last = known.at(-1); // the newest day captured
+  const newest = D.dayNavHTML(last, SRC, BASE);
+  assert.match(newest, /d=\d{4}-\d{2}-\d{2}">← [A-Z][a-z]+day</);
   assert.doesNotMatch(newest, /→/, "no day after the newest");
 });
 

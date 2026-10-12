@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:09.933061+00:00",
-  "served_at": "2026-10-10T02:38:09.933061+00:00",
+  "generated_at": "2026-10-12T15:35:32.397884+00:00",
+  "served_at": "2026-10-12T15:35:32.397884+00:00",
   "cache_seconds": 300,
-  "request_id": "cd50a3b7c5344e0a"
+  "request_id": "a562354a02c5464b"
  },
  "persona_id": "eli_marsh",
  "name": "Eli Marsh",
@@ -327,16 +327,16 @@
   "degraded": false,
   "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
  },
- "daily": "Matthew has lost 20.2 pounds since Sunday, September 6, bringing him to 307.2 pounds as of Thursday, October 8. His recovery score this morning is 59, with heart-rate variability at 52 milliseconds and resting heart rate at 52 beats per minute after 7.2 hours of sleep. He is on day 34 of the experiment and continues to track progress across weight, sleep, and cardiovascular metrics.",
+ "daily": "Matthew has lost 21.2 pounds since Sunday, September 6, bringing him to 306.1 pounds as of Friday, October 9, and his weekly loss rate has settled at 3.1 pounds per week, likely between 2.5 and 3.3. His morning recovery score sits at 56, heart-rate variability at 50 milliseconds, and resting heart rate at 52 beats per minute after 6.7 hours of sleep last night. He ate 158 grams of protein on Friday, falling short of his 170-gram daily floor.",
  "lead_daily": {
-  "text": "Matthew has lost 20.2 pounds since Sunday, September 6, bringing him to 307.2 pounds as of Thursday, October 8. His recovery score this morning is 59, with heart-rate variability at 52 milliseconds and resting heart rate at 52 beats per minute after 7.2 hours of sleep. He is on day 34 of the experiment and continues to track progress across weight, sleep, and cardiovascular metrics.",
-  "generated_at": "2026-10-09T17:00:14.287047+00:00",
-  "data_through": "2026-10-08",
+  "text": "Matthew has lost 21.2 pounds since Sunday, September 6, bringing him to 306.1 pounds as of Friday, October 9, and his weekly loss rate has settled at 3.1 pounds per week, likely between 2.5 and 3.3. His morning recovery score sits at 56, heart-rate variability at 50 milliseconds, and resting heart rate at 52 beats per minute after 6.7 hours of sleep last night. He ate 158 grams of protein on Friday, falling short of his 170-gram daily floor.",
+  "generated_at": "2026-10-10T17:00:19.183223+00:00",
+  "data_through": "2026-10-09",
   "cited": [
    {
     "metric": "day of the experiment",
-    "value": "34",
-    "as_of": "2026-10-09",
+    "value": "35",
+    "as_of": "2026-10-10",
     "source_field": "ai_context.build_experiment_phase_context.days_in"
    },
    {
@@ -347,14 +347,14 @@
    },
    {
     "metric": "latest weigh-in (lb)",
-    "value": "307.2",
-    "as_of": "2026-10-08",
+    "value": "306.1",
+    "as_of": "2026-10-09",
     "source_field": "withings.weight_lbs"
    },
    {
     "metric": "latest weigh-in date",
-    "value": "Thursday, October 8",
-    "as_of": "2026-10-08",
+    "value": "Friday, October 9",
+    "as_of": "2026-10-09",
     "source_field": "withings.sk"
    },
    {
@@ -365,33 +365,69 @@
    },
    {
     "metric": "lost since the start (lb)",
-    "value": "20.2",
-    "as_of": "2026-10-08",
+    "value": "21.2",
+    "as_of": "2026-10-09",
     "source_field": "journey.lost_lbs"
    },
    {
-    "metric": "morning recovery score (0-100, Whoop)",
-    "value": "59",
+    "metric": "weekly loss rate (lb per week)",
+    "value": "3.1",
     "as_of": "2026-10-09",
+    "source_field": "computed_metrics.weekly_rate_lbs"
+   },
+   {
+    "metric": "weekly loss rate, likely range (lb per week)",
+    "value": "2.5 to 3.3",
+    "as_of": "2026-10-09",
+    "source_field": "computed_metrics.weekly_rate_ci"
+   },
+   {
+    "metric": "rate status",
+    "value": "settled",
+    "as_of": "2026-10-09",
+    "source_field": "computed_metrics.rate_provisional"
+   },
+   {
+    "metric": "morning recovery score (0-100, Whoop)",
+    "value": "56",
+    "as_of": "2026-10-10",
     "source_field": "whoop.recovery_score"
    },
    {
     "metric": "heart-rate variability (ms)",
-    "value": "52",
-    "as_of": "2026-10-09",
+    "value": "50",
+    "as_of": "2026-10-10",
     "source_field": "whoop.hrv"
    },
    {
     "metric": "resting heart rate (beats per minute)",
     "value": "52",
-    "as_of": "2026-10-09",
+    "as_of": "2026-10-10",
     "source_field": "whoop.resting_heart_rate"
    },
    {
     "metric": "sleep last night (hours)",
-    "value": "7.2",
-    "as_of": "2026-10-09",
+    "value": "6.7",
+    "as_of": "2026-10-10",
     "source_field": "whoop.sleep_duration_hours"
+   },
+   {
+    "metric": "protein eaten (grams)",
+    "value": "158",
+    "as_of": "2026-10-09",
+    "source_field": "macrofactor.total_protein_g"
+   },
+   {
+    "metric": "protein floor (grams a day)",
+    "value": "170",
+    "as_of": "2026-10-09",
+    "source_field": "profile.protein_floor_g"
+   },
+   {
+    "metric": "protein floor met",
+    "value": "no",
+    "as_of": "2026-10-09",
+    "source_field": "macrofactor.total_protein_g vs profile.protein_floor_g"
    }
   ],
   "coach_id": "eli_marsh"

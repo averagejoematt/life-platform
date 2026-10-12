@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:09.517222+00:00",
-  "served_at": "2026-10-10T02:38:09.517222+00:00",
+  "generated_at": "2026-10-12T15:35:31.882960+00:00",
+  "served_at": "2026-10-12T15:35:31.882960+00:00",
   "cache_seconds": 300,
-  "request_id": "72f93012b88f4b6e"
+  "request_id": "cf14f5ae51dd4e27"
  },
  "persona_id": "mind_coach",
  "name": "Nathan Reeves",
@@ -90,41 +90,42 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20260923_recovery_is_trending_directionally_upwar",
-  "claim": "Recovery is trending directionally upward over the past week based on EWMA analysis",
-  "created_date": "2026-09-23",
+  "prediction_id": "pred_20261001_recovery_will_reach_around_64_7_tomorro",
+  "claim": "Recovery will reach around 64.7% tomorrow",
+  "created_date": "2026-10-01",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-07",
+  "outcome_date": "2026-10-10",
   "metric": "recovery_score",
-  "eval_type": "directional",
-  "condition": "up",
-  "threshold": null,
-  "actual_value": 0.1035,
-  "status": "confirmed"
+  "eval_type": "point",
+  "condition": "within",
+  "threshold": 64.7,
+  "actual_value": 98.0,
+  "status": "refuted"
  },
  "instrument": null,
  "absent": false,
  "reason": null,
  "stance": {
   "source": "stance",
-  "headline_read": "Matthew's protein intake has reversed course downward after I predicted recovery\u2014a miss that forces me to abandon the fuel-cognition hypothesis entirely and confront a harder question: whether the barrier to journaling is not metabolic at all, but something he's actively choosing or unable to name. His silence now reads less like depletion and more like deliberate withdrawal or blockage.",
-  "focused_on_now": [],
+  "headline_read": "Matthew's journaling silence persists despite protein recovery, forcing me to abandon the metabolic-barrier hypothesis entirely. I now read this as a structural or emotional blockage rather than a fuel problem\u2014something he's either actively choosing or unable to articulate. The question is no longer 'what does he need to write?' but 'what is he protecting by not writing?'",
+  "focused_on_now": [
+   "what the silence feels like from inside\u2014heaviness or emptiness"
+  ],
   "set_aside_for_now": [
-   "Recovery device volatility and deep sleep trends for now; they've proven too noisy to anchor predictions.",
-   "The interoception-vs-device-narration debate until I understand what's driving the protein and journaling shifts.",
-   "Mean reversion explanations; I need to ask before I theorize."
+   "protein as a lever for cognitive capacity",
+   "recovery device readings as primary signal"
   ],
   "stage": {
-   "label": "Active Withdrawal or Blockage",
-   "rationale": "Matthew is no longer in a phase of metabolic constraint or signal literacy. The protein decline after recovery suggests he may be stepping back from deliberate effort, or that something has shifted in his willingness or capacity to sustain the work. This is a behavioral inflection, not a fuel problem. I'm now in diagnostic mode: is this resistance, exhaustion, or a signal that the structure itself no longer fits?"
+   "label": "Diagnostic Withdrawal",
+   "rationale": "Matthew has moved past metabolic constraint into a behavioral inflection. Protein recovered but journaling remained silent, which tells me the barrier was never primarily fuel. I'm now in phenomenological mode: trying to distinguish between active resistance (something he's protecting) and depletion (something he's run out of). This stage requires listening more than predicting."
   },
-  "how_my_read_changed": "The protein reversal refutes my prediction and forces me to abandon the metabolic-constraint model entirely. I was wrong not just about the mechanism but about the entire frame. Protein recovery did not unlock journaling, and now protein itself is declining\u2014this suggests the barrier is not fuel but something deeper: autonomy, readiness, or an unspoken conflict with the structure. My previous read treated silence as a symptom to decode; I now suspect it may be a statement.",
-  "confidence_note": "My confidence in protein trajectory has collapsed (0.286 before; now lower). I'm uncertain whether this is temporary fatigue, structural misalignment, or intentional deprioritization. I'm holding this lightly and asking before I predict.",
-  "as_of": "2026-10-05",
-  "grounding_flag": false,
+  "how_my_read_changed": "I was wrong about the mechanism. On Oct 5 I held that protein decline signaled stepping back from deliberate effort. But protein has since recovered to baseline while silence continues\u2014which means the blockage is independent of metabolic state. This is a genuine shift: I'm no longer chasing a fuel story. I'm now asking what emotional or structural barrier keeps him from writing, even when the body has resources.",
+  "confidence_note": "My hit rate is low (0% confirmed, 1 refuted). I conceded the recovery rebound interpretation on Oct 7\u2014mean reversion, not corrective action\u2014which humbles my predictive reach. I hold my hypotheses lightly now, especially around device signals. I'm more confident in the phenomenological question than in any mechanistic claim.",
+  "as_of": "2026-10-11",
+  "grounding_flag": true,
   "graduation_gate": "Recovering from a missed day without spiraling, repeatedly, unlocks the 'momentum' rung.",
   "band_metric": "weight_lbs",
-  "current_value": 306.13,
+  "current_value": 308.29,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -168,6 +169,15 @@
   ]
  },
  "stance_history": [
+  {
+   "as_of": "2026-10-11",
+   "headline_read": "Matthew's journaling silence persists despite protein recovery, forcing me to abandon the metabolic-barrier hypothesis entirely. I now read this as a structural or emotional blockage rather than a fuel problem\u2014something he's either actively choosing or unable to articulate. The question is no longer 'what does he need to write?' but 'what is he protecting by not writing?'",
+   "stage": {
+    "label": "Diagnostic Withdrawal",
+    "rationale": "Matthew has moved past metabolic constraint into a behavioral inflection. Protein recovered but journaling remained silent, which tells me the barrier was never primarily fuel. I'm now in phenomenological mode: trying to distinguish between active resistance (something he's protecting) and depletion (something he's run out of). This stage requires listening more than predicting."
+   },
+   "how_my_read_changed": "I was wrong about the mechanism. On Oct 5 I held that protein decline signaled stepping back from deliberate effort. But protein has since recovered to baseline while silence continues\u2014which means the blockage is independent of metabolic state. This is a genuine shift: I'm no longer chasing a fuel story. I'm now asking what emotional or structural barrier keeps him from writing, even when the body has resources."
+  },
   {
    "as_of": "2026-10-05",
    "headline_read": "Matthew's protein intake has reversed course downward after I predicted recovery\u2014a miss that forces me to abandon the fuel-cognition hypothesis entirely and confront a harder question: whether the barrier to journaling is not metabolic at all, but something he's actively choosing or unable to name. His silence now reads less like depletion and more like deliberate withdrawal or blockage.",
@@ -228,15 +238,6 @@
    "stage": {
     "rationale": "",
     "label": "Felt-Sense Calibration Under Load"
-   },
-   "how_my_read_changed": ""
-  },
-  {
-   "as_of": "2026-09-13",
-   "headline_read": "",
-   "stage": {
-    "rationale": "",
-    "label": "Calibration & Signal Mapping"
    },
    "how_my_read_changed": ""
   }
@@ -313,17 +314,17 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 8,
-   "refuted": 10,
+   "confirmed": 6,
+   "refuted": 12,
    "decided": 18,
-   "hit_rate_pct": 44.4,
+   "hit_rate_pct": 33.3,
    "record": {
-    "confirmed": 8,
-    "refuted": 10,
+    "confirmed": 6,
+    "refuted": 12,
     "n": 18,
-    "through": "2026-10-07"
+    "through": "2026-10-10"
    },
-   "headline": "8 of 18 checked calls right (44%) through October 7",
+   "headline": "6 of 18 checked calls right (33%) through October 10",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -331,15 +332,15 @@
     "records": {
      "number": {
       "graded": 6,
-      "coach_right": 3,
-      "scored": 1,
+      "coach_right": 2,
+      "scored": 2,
       "coach_right_on_scored": 1,
       "rule_right": 1,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 5,
+      "not_yet_scored": 4,
       "verdict": "not_yet_scored",
       "sign_test_p": null,
       "coach_right_pct": null,
@@ -379,7 +380,7 @@
      },
      "sealed": {
       "graded": 2,
-      "coach_right": 2,
+      "coach_right": 1,
       "scored": 0,
       "coach_right_on_scored": 0,
       "rule_right": 0,
@@ -398,7 +399,7 @@
     "scored_complete": false,
     "skill": {
      "n": 18,
-     "brier_skill": -0.0125,
+     "brier_skill": -0.125,
      "sentence": "Too few checked calls yet (18) to compare them with a simple guess."
     },
     "rule_sentence": null,
@@ -409,6 +410,12 @@
    "preliminary": false,
    "n_note": "n=18 decided",
    "recent": [
+    {
+     "date": "2026-10-10",
+     "status": "refuted",
+     "metric": "recovery_score",
+     "reason": "recovery_score=98.00 on 2026-10-02 vs predicted 64.7 \u00b117.3031 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.3031)); |\u0394|=33.30 \u2192 outside tolerance"
+    },
     {
      "date": "2026-10-07",
      "status": "confirmed",
@@ -438,12 +445,6 @@
      "status": "refuted",
      "metric": "recovery_score",
      "reason": "recovery_score=98.00 on 2026-10-02 vs predicted 54.7 \u00b121.4282 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.4282)); |\u0394|=43.30 \u2192 outside tolerance"
-    },
-    {
-     "date": "2026-10-01",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score trend=down (slope=-0.1015), predicted=up"
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -1119,11 +1120,11 @@
     "record_id": "COMMITMENT#commit_20260926_reflect_on_whether_you_felt_the_recovery",
     "date": "2026-09-26",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-03",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-11",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1132,11 +1133,11 @@
     "record_id": "COMMITMENT#commit_20260926_distinguish_which_emotional_texture_the",
     "date": "2026-09-26",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-03",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-11",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1161,11 +1162,11 @@
     "record_id": "COMMITMENT#commit_20260925_before_checking_the_device_each_morning",
     "date": "2026-09-25",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-02",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-10",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1174,11 +1175,11 @@
     "record_id": "COMMITMENT#commit_20260925_be_the_detective_about_the_journaling_si",
     "date": "2026-09-25",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-02",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-10",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1385,11 +1386,26 @@
    "held": 33,
    "kept": 1,
    "broken": 1,
-   "pending": 17,
-   "unresolved": 14,
+   "pending": 13,
+   "unresolved": 18,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-10#pred-20261001-recovery-will-reach-around-64-7-tomorro-refute",
+    "date": "2026-10-10",
+    "status": "refuted",
+    "metric": "recovery_score",
+    "reason": "recovery_score=98.00 on 2026-10-02 vs predicted 64.7 \u00b117.3031 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.3031)); |\u0394|=33.30 \u2192 outside tolerance",
+    "evidence": {
+     "prediction_id": "pred_20261001_recovery_will_reach_around_64_7_tomorro",
+     "actual_value": 98.0,
+     "threshold": 64.7,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-07#pred-20260923-recovery-is-trending-directionally-upwar-confi",
