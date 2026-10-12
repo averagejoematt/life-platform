@@ -27,6 +27,8 @@ would not be a can-it-fail proof): with a sick day logged, the stale-source
 SNS alert is suppressed; without one, an identical stale condition sends it.
 """
 
+# clock-literal-ok: the literals are stale/source counts over an empty or sick-day fixture; the only clock-scaled value is each source's age, which no assertion pins.
+
 import os
 import sys
 from datetime import datetime, timedelta, timezone

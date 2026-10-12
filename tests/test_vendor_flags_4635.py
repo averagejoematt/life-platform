@@ -19,6 +19,8 @@ Every expected number below is counted by hand from the fixture, never captured
 from the code's output.
 """
 
+# clock-literal-ok: transform's clock read is only the current UTC offset (DST) for bed/wake local times; the pinned literals are durations, scores and vendor flags that offset never touches.
+
 from __future__ import annotations
 
 import copy
