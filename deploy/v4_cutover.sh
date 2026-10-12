@@ -148,7 +148,7 @@ echo "[5/5] Cutover deploy done. Verify:"
 echo "  • Doors:    curl -sI https://averagejoematt.com/ ; /cockpit ; /evidence/"
 echo "  • Redirect: curl -sI https://averagejoematt.com/training/   # expect 301 -> /evidence/training/"
 echo "  • Legacy:   curl -sI https://averagejoematt.com/legacy/      # preserved, noindex"
-echo "  • Visual:   python3 tests/visual_qa.py            # green across the three doors"
+echo "  • Visual:   python3 qa/visual_qa.py            # green across the three doors"
 echo "  • Crawl:    python3 tests/validate_links.py       # no unintended 404s"
 echo
 echo "If anything is wrong: see ROLLBACK in this script's header."

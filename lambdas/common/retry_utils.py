@@ -300,7 +300,7 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
 # `Visual QA (standalone)` workflow has failed every run since 2026-09-05 —
 # run 34907061838 (2026-09-14T23:03Z) recorded 2 truncated + 1 unparseable
 # reader-truth batches, 14 reader-facing surfaces unjudged, and because
-# `ai-unevaluated` is a DECLINE class in tests/visual_qa_verdict.py the site was
+# `ai-unevaluated` is a DECLINE class in qa/visual_qa_verdict.py the site was
 # never reverted. Red for 9 consecutive days, silent by construction.
 #
 # So the retry is deliberately NARROW and lives here, at the existing chokepoint,

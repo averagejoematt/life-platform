@@ -407,7 +407,7 @@ def test_ci_jobs_that_assume_a_role_are_discovered():
     assert any(j.entrypoints for j in jobs), "no job resolved a python entrypoint — the `run:` scan broke"
 
     # The #3059 subject, pinned: the visual-qa job's `--reader-truth` path must be seen
-    # reaching BOTH cycle params through tests/visual_ai_qa.py. If this ever goes empty
+    # reaching BOTH cycle params through qa/visual_ai_qa.py. If this ever goes empty
     # the CI half has stopped covering the incident it was written for — and would have
     # reported green on the exact defect #3059 found by hand.
     diagnosis = {c: set() for c in ge.CHANNELS}

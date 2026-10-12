@@ -12,7 +12,7 @@ live (could be hours). This fired >=5 times with only reflex-level fixes —
 07-19 (IAM-gate flavor), 07-23 (#1704, the log's own words: "a recurrence of
 the 2026-07-09 API-before-frontend class"), 08-02 (#2040, gate-registration
 flavor) — see docs/INCIDENT_LOG.md for the dated rows. The only prior
-machinery was tests/visual_qa.py's `pending_deploy_apis` — a bare, manually
+machinery was qa/visual_qa.py's `pending_deploy_apis` — a bare, manually
 hand-edited `set()` literal, empty by default, that someone had to remember
 to populate DURING an incident and empty again AFTER the deploy (the #2050
 pattern). Nothing ran BEFORE merge.
@@ -24,7 +24,7 @@ whether a touched site/ file actually references it. If so, the PR must
 declare in deploy/api_deploy_sequencing.json either:
   - a `sequenced_routes` entry ("the API is already deployed, no risk"), or
   - a `pending_deploy_routes` entry (the #2050 pattern, generalized) — the
-    SAME registry tests/visual_qa.py and deploy/smoke_test_site.sh read to
+    SAME registry qa/visual_qa.py and deploy/smoke_test_site.sh read to
     downgrade that route's 404 from a gating failure to a warning until it's
     re-armed post-deploy.
 An undeclared at-risk route fails the check with the exact remediation.

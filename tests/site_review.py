@@ -2,7 +2,7 @@
 """
 site_review.py — capture + corroborate harness for the holistic /site-review.
 
-The companion to the gating tests/visual_qa.py. visual_qa answers "did it render";
+The companion to the gating qa/visual_qa.py. visual_qa answers "did it render";
 this builds the REVIEW PACKET a human-in-the-loop reviewer (Claude Code, via the
 /site-review skill) reads to judge whether each page's STORY lands and whether the
 DATA shown corroborates the source of truth.

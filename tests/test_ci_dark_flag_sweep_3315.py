@@ -221,7 +221,7 @@ def test_a_waiver_needs_the_exact_job_not_just_the_script():
     """A reason written for one job must not silently cover another job's copy of the script."""
     job = _job(
         "PINS=$(python3 scripts/ci_pins.py playwright)\npython -m pip install $PINS\npython -m playwright install --with-deps chromium",
-        "python3 tests/pr_render_gate.py",
+        "python3 qa/pr_render_gate.py",
     )
     other_job = sweep.violations(sweep.evaluate_job("some-other.yml", "render", job, _REPO))
     assert any("pr_render_gate.py" in v and "pillow" in v for v in other_job), other_job

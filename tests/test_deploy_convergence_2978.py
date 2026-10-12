@@ -402,7 +402,7 @@ def test_smoke_script_runs_the_convergence_gate_before_any_check():
 
 
 def test_visual_qa_runs_the_convergence_gate():
-    vq = open(os.path.join(_REPO, "tests", "visual_qa.py"), encoding="utf-8").read()
+    vq = open(os.path.join(_REPO, "qa", "visual_qa.py"), encoding="utf-8").read()
     assert "VISUAL_QA_EXPECT_BUILD" in vq and "deploy_convergence" in vq
 
 

@@ -173,7 +173,7 @@ faint/ember. Pick the step by job, not taste: a rail behind a fill is toned pape
 
 ## 6. Verification
 
-`python3 tests/visual_qa.py --screenshot --ai-qa` (gating `visual-qa` CI job) for visual
+`python3 qa/visual_qa.py --screenshot --ai-qa` (gating `visual-qa` CI job) for visual
 coherence; the `/review site` lens for the holistic "does each page's story land" pass.
 Local render without deploy: Playwright + `http.server` + route-mocked API.
 
@@ -209,7 +209,7 @@ if it would read as "AI-template gloss," it's wrong. Restraint is the credibilit
 Run every visual proposal — internal session or design-partner — through all ten. A miss
 on any point sends the work back for a revision round; cite the point number. (The
 design-partner brief references THIS list; it is not duplicated there.) The advisory
-AI-vision lens in `tests/visual_ai_qa.py` watches the live site for the same drift —
+AI-vision lens in `qa/visual_ai_qa.py` watches the live site for the same drift —
 advisory by construction, it can never block a deploy on its own.
 
 1. **The masthead test.** Cover the wordmark — is the screen still identifiably THIS
@@ -436,12 +436,12 @@ vocabulary or from real data, and any vocabulary a second module needs moves int
 
 ## 9. Performance budget — LCP/CLS/JS-bytes (#580)
 
-The craft floor the later motion/cinematic phases build on top of: `tests/visual_qa.py` (the
+The craft floor the later motion/cinematic phases build on top of: `qa/visual_qa.py` (the
 gating CI job, ADR-076) now asserts a per-page performance budget alongside its render checks, so
 a future change cannot quietly regress load quality. Numbers below were measured against
 production on 2026-07-05 (headless Chromium, `PerformanceObserver` for LCP/CLS, response-body
 byte-counting for JS) across the full 33-page sweep — re-derive them (`LCP_BUDGET_MS`,
-`CLS_BUDGET`, `JS_BYTES_SOFT_BUDGET` at the top of `tests/visual_qa.py`) if the site's shape
+`CLS_BUDGET`, `JS_BYTES_SOFT_BUDGET` at the top of `qa/visual_qa.py`) if the site's shape
 changes enough that the headroom stops making sense, and update this section to match.
 
 | Metric | Observed baseline (33 pages) | Enforced budget | Gate |
@@ -454,8 +454,8 @@ Budgets carry headroom over the observed max (LCP ~2.2x, CLS ~1.2x, JS ~1.35x) s
 CI-runner network jitter doesn't flake the gate — the point is catching a real regression (a
 newly-added render-blocking script, a runaway layout shift from a new widget), not chasing a
 "good" Core Web Vitals score. `CLS_BUDGET` (0.75) is the **global ceiling**; a page that has paid
-down its shift sets a tighter **per-page `cls_budget`** in `tests/qa_manifest.py` so the gain
-can't silently regress (`tests/visual_qa.py` reads the override).
+down its shift sets a tighter **per-page `cls_budget`** in `qa/qa_manifest.py` so the gain
+can't silently regress (`qa/visual_qa.py` reads the override).
 
 **CLS paydown — the archive readout pages (#1474).** The 0.5-0.6 CLS on the `/data/`, `/method/`,
 `/protocols/` pages was this site's async data-render pattern: the shared evidence shell shipped an
@@ -506,8 +506,8 @@ The site is **one responsive codebase + an installable Cockpit PWA** (board-rati
 2026-06-14, PRs #118/#119) — not a separate mobile build. This section is the **spec a PR
 must satisfy** on the responsive layer, written after the 2026-07-11 mobile review filed it
 as tribal knowledge (this doc had zero mobile content before #1011). The enforcing harness is
-the pre-merge render gate at 390 + 360 (`tests/pr_render_gate.py`, #1012) plus the failure-class
-assertions in `tests/visual_qa.py` (#1013): a PR that violates the rules below fails CI.
+the pre-merge render gate at 390 + 360 (`qa/pr_render_gate.py`, #1012) plus the failure-class
+assertions in `qa/visual_qa.py` (#1013): a PR that violates the rules below fails CI.
 
 ### 10.1 Breakpoints — six canonical boundaries, nothing else (#1006)
 
@@ -600,7 +600,7 @@ The triad's jobs are unchanged on mobile; only the register tightens. Data table
 smallest register that ships, and only for machine-voice labels, never body copy. App-bar door
 labels sit at `--fs-label` too (#2674 retired their `.66rem` = 10.56px drop — measured @360px the
 five doors + toggle still fit at 11px with no wrap; icon-over-label gives them the width). The
-floor is enforced in the browser: `tests/visual_qa.py` measures every rendered text node on the
+floor is enforced in the browser: `qa/visual_qa.py` measures every rendered text node on the
 three highest-traffic pages (`/`, `/cockpit/`, `/data/`) and fails the sweep below 11px — the
 HTML-text sibling of the #1210 SVG-text audit.
 
@@ -616,7 +616,7 @@ breakpoint). **Rule:** a wide data table must scroll inside its own box (`width:
 `width:auto` — `auto` lets a `display:block` table size to content and blow out the page under real
 data, which auto-rolled-back a deploy on 2026-07-11) or reflow to cards; it must never squeeze
 columns until headers truncate, and it must never push the page body itself past the viewport at any
-width — `tests/visual_qa.py` now measures horizontal page overflow once at the desktop context's own
+width — `qa/visual_qa.py` now measures horizontal page overflow once at the desktop context's own
 viewport in addition to the pre-existing 390px check (#1013), so a table widened past its container
 reds the sweep by name instead of shipping silently. Wide **non-table** content (stat rows, strips)
 relies on the section-level `.rd-sec { overflow-x:auto }` scroll (still `≤820` — that catch-all is
@@ -639,7 +639,7 @@ traded the 33 serious nodes for 3 new moderate `landmark-unique` findings, `grou
 new rules), and never any role on a `<table>` (it destroys table semantics). **Do not hand-add
 `tabindex` to tables or `<pre>` blocks** — the primitive owns them and reverts what it owns. The
 gating sweep now runs axe at 390×844 as well as desktop, against its own ledger (`pages_mobile` /
-`pages_light_mobile` in `tests/a11y_baseline.json`); `python3 tests/pr_render_gate.py --a11y` is the
+`pages_light_mobile` in `tests/a11y_baseline.json`); `python3 qa/pr_render_gate.py --a11y` is the
 local proof at both viewports.
 
 ### 10.7 PWA layer

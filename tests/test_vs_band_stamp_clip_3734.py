@@ -28,7 +28,7 @@ TOKENS = ROOT / "site" / "assets" / "css" / "tokens.css"
 
 
 def _visual_qa():
-    spec = importlib.util.spec_from_file_location("_vq_3734", ROOT / "tests" / "visual_qa.py")
+    spec = importlib.util.spec_from_file_location("_vq_3734", ROOT / "qa" / "visual_qa.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     try:
@@ -91,7 +91,7 @@ def test_the_container_overflow_check_exists_and_is_wired_into_the_mobile_pass()
     vq = _visual_qa()
     assert hasattr(vq, "_container_text_overflow"), "the #3734 container check is gone"
     assert ".vs-band" in vq.TEXT_CONTAINER_SEL
-    src = (ROOT / "tests" / "visual_qa.py").read_text(encoding="utf-8")
+    src = (ROOT / "qa" / "visual_qa.py").read_text(encoding="utf-8")
     assert "_container_text_overflow(page)" in src, "the check exists but nothing calls it"
     assert "#3734 class" in src, "a finding from this check must name its class so a reader can trace it"
 
@@ -102,7 +102,7 @@ def test_the_check_measures_CONTAINERS_not_the_document():
     vq = _visual_qa()
     body = vq._container_text_overflow.__doc__ or ""
     assert "scrollWidth" in body, "the docstring must say why scrollWidth is the wrong measure here"
-    src = (ROOT / "tests" / "visual_qa.py").read_text(encoding="utf-8")
+    src = (ROOT / "qa" / "visual_qa.py").read_text(encoding="utf-8")
     fn = src.split("def _container_text_overflow", 1)[1].split("\ndef ", 1)[0]
     assert (
         "getBoundingClientRect" in fn and "scrollWidth" not in fn.split('"""', 2)[-1]

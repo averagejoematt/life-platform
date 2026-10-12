@@ -618,7 +618,7 @@ def test_the_page_is_registered_in_both_page_registries():
     import site_review_bindings
 
     page = next((p for p in qa_manifest.MANIFEST if p["path"] == "/story/diary/"), None)
-    assert page is not None, "/story/diary/ missing from tests/qa_manifest.py"
+    assert page is not None, "/story/diary/ missing from qa/qa_manifest.py"
     assert page["api_deps"] == ["/api/diary_shelf"]
     assert "diary_shelf.js" in page["js_modules"]
 

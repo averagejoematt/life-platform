@@ -1,14 +1,14 @@
 """
 reader_truth_qa.py — the shared phase-aware "reader truth" rubric (#1095/#1096).
 
-The visual AI-QA layer (tests/visual_ai_qa.py) judges whether pages RENDER; this
+The visual AI-QA layer (qa/visual_ai_qa.py) judges whether pages RENDER; this
 module judges whether their PROSE can be TRUE at the current experiment phase.
 Matthew's 2026-07-11 manual review found ~10 truth-class items by hand (week-long
 trends narrated on day 0, numbers that could not exist yet, the same paragraph
 pasted across lenses) — this rubric turns that read-through into a machine gate.
 
 ONE prompt, TWO hooks (both import this module so the rubric can never fork):
-  - CI post-deploy: tests/visual_ai_qa.assess_reader_truth() over the harness's
+  - CI post-deploy: qa/visual_ai_qa.assess_reader_truth() over the harness's
     rendered-prose dumps (visual_qa.py --reader-truth), gating like AI-vision.
   - Nightly: lambdas/operational/qa_smoke_lambda.check_reader_truth() over a
     small HTTPS-fetched surface set, so truth regressions surface between
@@ -636,7 +636,7 @@ def build_prompt(pages, phase, max_chars=MAX_PROSE_CHARS):
 # The fix is a NAMED third state on the verdict itself. `severity` becomes
 # "unknown" (never a severity any caller gates or clears on) and the
 # UNEVALUATED_FIELD carries WHY, so the two callers can route:
-#   * the CI gate (tests/visual_ai_qa.assess_reader_truth) FAILs the surfaces in
+#   * the CI gate (qa/visual_ai_qa.assess_reader_truth) FAILs the surfaces in
 #     an unevaluated batch — it blocks a deploy on `high`, so "the judge did not
 #     answer" is a failure to evaluate, never a pass;
 #   * the nightly advisory (operational/qa_check_reader_truth) WARNs — it is

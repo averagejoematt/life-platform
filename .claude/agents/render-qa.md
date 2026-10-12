@@ -31,7 +31,7 @@ temp scripts go to your scratchpad directory.
    check is not render QA.
 5. **Check the deployed baseline too** when comparing: `curl /version.json` == expected
    git SHA before trusting a live comparison (stale CloudFront/SW cache is a known trap).
-6. Existing harnesses to reuse before building your own: `tests/visual_qa.py`
+6. Existing harnesses to reuse before building your own: `qa/visual_qa.py`
    (Playwright sweep: SVG renders, cockpit pillar interaction, responsive overflow) and
    `deploy/smoke_test_site.sh` (HTTP/content). Extend, don't fork.
 

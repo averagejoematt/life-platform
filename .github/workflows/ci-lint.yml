@@ -132,11 +132,11 @@ jobs:
 
       - name: Format gate (black — ENFORCED, config in pyproject.toml)
         if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
-        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
         if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
-        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
         if: always() && steps.proven.outputs.pr_proven != 'true'   # #4252
@@ -144,12 +144,12 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py mypy)   # version from requirements-dev.txt (CQ-01, #1963/#2609)
           pip install $PINS
           echo "::group::Mypy on the first-party clean surface (#1656)"
-          # Authoritative list: tests/mypy_clean_set.py (single source of truth,
+          # Authoritative list: scripts/mypy_clean_set.py (single source of truth,
           # also consumed by tests/test_mypy_clean_modules.py so the two can't
           # drift). The clean set is the whole lambdas/ + lambdas/web/ top-level
           # surface MINUS the documented DIRTY denylist — a ratchet that only
           # grows. Blocking — a type regression here fails CI.
-          python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)
+          python -m mypy --config-file mypy.ini $(python scripts/mypy_clean_set.py)
           echo "::endgroup::"
 
       - name: Syntax check (py_compile)

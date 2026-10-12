@@ -56,8 +56,8 @@ stop re-improvising briefs from memory prose (#796).
 - **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 88 tools that let Claude query the live platform data directly during a session.
 
 **5. Verification — Claude checks its own work**
-- `tests/visual_qa.py` — a Playwright browser sweep after deploys.
-- `tests/visual_ai_qa.py` (ADR-076) — a Claude/Bedrock **vision** pass that reads each screenshot for regressions a pixel-diff would miss or false-alarm on.
+- `qa/visual_qa.py` — a Playwright browser sweep after deploys.
+- `qa/visual_ai_qa.py` (ADR-076) — a Claude/Bedrock **vision** pass that reads each screenshot for regressions a pixel-diff would miss or false-alarm on.
 
 ## Working norms (how changes land)
 

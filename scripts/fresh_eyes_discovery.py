@@ -11,7 +11,7 @@ there (see deploy/setup_remediation_role.sh); this routine adds no new IAM.
 Pipeline:
   1. Gate on SSM /life-platform/budget-tier — skip the whole run at tier >= 2.
   2. Screenshot the three doors + home (/, /cockpit/, /story/, /data/) desktop+mobile,
-     reusing tests/visual_qa.py's capture_page() (the same harness the gating
+     reusing qa/visual_qa.py's capture_page() (the same harness the gating
      CI visual-qa job uses). NB: the issue text says "/evidence/" — that's the
      pre-v5 door name; it 301s to /data/ live (checked 2026-07-08), so /data/ is
      used directly to avoid an extra redirect hop.
@@ -57,10 +57,10 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "averagejoematt/life-platform")
 # The three doors + home (issue #823's literal scope).
 DOOR_PATHS = ["/", "/cockpit/", "/story/", "/data/"]
 
-# tests/visual_qa.py + lambdas/bedrock_client.py (and its budget_guard import)
+# qa/visual_qa.py + lambdas/bedrock_client.py (and its budget_guard import)
 # aren't installed packages — add their directories to sys.path like
-# tests/visual_ai_qa.py already does for bedrock_client.
-sys.path.insert(0, os.path.join(ROOT, "tests"))
+# qa/visual_ai_qa.py already does for bedrock_client.
+sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 # The 4 north-star audiences (docs/PLATFORM_NORTH_STAR.md) — the same lens
@@ -181,7 +181,7 @@ def _image_blocks(path):
     full-page door reached the model at ~9% scale with every glyph illegible
     (the #3067 class — the judge then grades the degraded input, not the page),
     and an oversized payload could be rejected outright by Bedrock (the #2973
-    class). It now delegates to tests/visual_ai_qa.py's `_image_blocks`, which
+    class). It now delegates to qa/visual_ai_qa.py's `_image_blocks`, which
     is the same code the gating visual-qa job uses: in-bound captures are sent
     unchanged as one image, taller ones are sliced into labelled overlapping
     full-width tiles covering the whole page.
@@ -191,20 +191,21 @@ def _image_blocks(path):
     tests/test_shared_image_prepare_3079.py. Raises RuntimeError with a NAMED
     reason when no legible payload exists — never a silent degrade.
     """
-    import visual_ai_qa  # tests/ is already on sys.path (see the insert above)
+    from qa import visual_ai_qa  # the repo root is already on sys.path (see the insert above)
 
     return visual_ai_qa._image_blocks(path)
 
 
-# ── screenshot capture (reuses tests/visual_qa.py) ──────────────────────────
+# ── screenshot capture (reuses qa/visual_qa.py) ──────────────────────────
 
 
 def capture_screenshots(screenshot_dir):
     """Screenshot the 4 doors (desktop full-page + mobile 390px) against the live
-    site, reusing tests/visual_qa.py's capture_page() — the same harness the
+    site, reusing qa/visual_qa.py's capture_page() — the same harness the
     gating CI visual-qa job drives. Returns visual_qa's per-page result dicts."""
-    import visual_qa
     from playwright.sync_api import sync_playwright
+
+    from qa import visual_qa
 
     os.makedirs(screenshot_dir, exist_ok=True)
     door_defs = [d for d in visual_qa.PAGES if d["path"] in DOOR_PATHS]
@@ -250,7 +251,7 @@ def parse_findings(text, page, path, viewport):
 def vision_read(bedrock, page_name, path, screenshot_path, viewport, model_name="claude-haiku-4-5-20251001"):
     """One Bedrock Haiku vision call for one screenshot. Fail-soft: any error or
     an empty/near-empty image (zero-height crop) yields no findings, never a
-    crash — matches tests/visual_ai_qa.py's degrade pattern."""
+    crash — matches qa/visual_ai_qa.py's degrade pattern."""
     try:
         if not os.path.exists(screenshot_path) or os.path.getsize(screenshot_path) <= 256:
             return []

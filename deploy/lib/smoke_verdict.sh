@@ -6,7 +6,7 @@
 # ---------------
 # `site-deploy.yml`'s `rollback-site-on-failure` reverts `site/**` whenever the smoke
 # or visual-QA gate reds. #3352 gave the VISUAL leg a per-surface scope verdict
-# (`tests/visual_qa_verdict.py`); the smoke leg kept firing unconditionally. Live
+# (`qa/visual_qa_verdict.py`); the smoke leg kept firing unconditionally. Live
 # 2026-09-01 01:35Z (INCIDENT_LOG P3): site-deploy run 33459065966 failed ONE smoke
 # check — `/api/vitals` weight arbitration, a data-plane state served from DynamoDB —
 # and the rollback reverted PR #3392's site content, "successfully", without touching

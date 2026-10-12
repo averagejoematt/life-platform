@@ -4,7 +4,7 @@
 The 2026-07-18 QA review needed a three-agent survey to answer "what does QA
 actually cover?" (site/ vs manifest vs each sweep vs alarms). This script makes
 that a deterministic, repeatable ritual: everything derives at run time from
-tests/qa_manifest.py (THE page registry, #1426) + the repo's own sweep/workflow/
+qa/qa_manifest.py (THE page registry, #1426) + the repo's own sweep/workflow/
 CDK sources — no hand lists, no cached numbers.
 
 What it computes
@@ -49,11 +49,11 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-for _p in (os.path.join(_REPO, "tests"), _HERE, os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "deploy")):
+for _p in (_REPO, _HERE, os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "deploy")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import qa_manifest  # noqa: E402
+from qa import qa_manifest  # noqa: E402
 
 
 def _skill_registry():
@@ -78,7 +78,7 @@ BUDGET_TIER_PARAM = "/life-platform/budget-tier"
 # The derive-don't-relist contract (#1426): every sweep consumer must read the
 # manifest, never re-list pages. file → marker that proves derivation.
 CONSUMER_CONTRACT = {
-    os.path.join(_REPO, "tests", "visual_qa.py"): "qa_manifest",
+    os.path.join(_REPO, "qa", "visual_qa.py"): "qa_manifest",
     os.path.join(_REPO, "deploy", "smoke_test_site.sh"): "qa_manifest",
     os.path.join(_REPO, "deploy", "restart_verify_rendered.py"): "qa_manifest",
     os.path.join(_REPO, "tests", "site_review_bindings.py"): "qa_manifest",
@@ -382,7 +382,7 @@ def workflows_section():
             {
                 "file": name,
                 "crons": re.findall(r"cron:\s*'([^']+)'", text),
-                "invokes_visual_qa": "tests/visual_qa.py" in text,
+                "invokes_visual_qa": "qa/visual_qa.py" in text,
                 "invokes_smoke": "smoke_test_site.sh" in text,
                 "gating": gating,
                 "failure_surface": surfaces,
@@ -476,7 +476,7 @@ def hard_drift(audit):
 def render(audit):
     L = []
     reg, sw, unc = audit["registry"], audit["sweeps"], audit["uncovered"]
-    L.append("QA COVERAGE MAP — derived live from tests/qa_manifest.py + repo sources (#1450)")
+    L.append("QA COVERAGE MAP — derived live from qa/qa_manifest.py + repo sources (#1450)")
     L.append(f"  pages registered: {reg['pages_total']} · unregistered: {len(reg['unregistered'])} · ghosts: {len(reg['ghosts'])}")
     for k, v in reg["exempt"].items():
         L.append(f"  exempt {k} — {v}")

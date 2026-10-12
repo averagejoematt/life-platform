@@ -5,7 +5,7 @@
 # viewports, so the WebKit-only bug class — backdrop-filter vs position:fixed,
 # -webkit- quirks, IntersectionObserver timing (memory: project_mobile_pwa) —
 # passes every current gate invisibly. This run drives the SAME
-# tests/visual_qa.py harness on Playwright WebKit at an iPhone-class profile
+# qa/visual_qa.py harness on Playwright WebKit at an iPhone-class profile
 # (390x844, dpr 3, touch) over the qa_manifest tier-1/2 pages (flagship doors +
 # live-data topic pages; --max-tier 2 → 60 of 79 sweep defs), weekly.
 #
@@ -130,7 +130,7 @@ jobs:
         run: |
           START=$(date +%s)
           echo "start=$START" >> "$GITHUB_OUTPUT"
-          python3 tests/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
+          python3 qa/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
 
       - name: Record runtime (Actions-minutes cost, AC #2 of #1434)
         if: always()
@@ -170,7 +170,7 @@ jobs:
           job-status: ${{ job.status }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           failure-summary: >-
-            The weekly WebKit (iOS-Safari engine) mobile sweep — tests/visual_qa.py
+            The weekly WebKit (iOS-Safari engine) mobile sweep — qa/visual_qa.py
             --browser webkit --mobile --max-tier 2 against https://averagejoematt.com —
             failed. If today's daily Chromium standalone (visual-qa.yml) is green this
             is an ENGINE-SPECIFIC regression (the backdrop-filter/position:fixed class);

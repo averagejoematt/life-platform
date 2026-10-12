@@ -122,7 +122,7 @@ suite with `node --test` from the repo root (auto-discovers everything under `te
 - **Adding tests for the next module:** prefer testing a module's **pure functions** (data in,
   string/value out — most of `charts.js`, `evidence_shared.js`, and any future `evidence_*.js`
   renderer fit this). A module that's mostly DOM wiring (event listeners, `querySelector` chains)
-  is a poor unit-test target — that's what `tests/visual_qa.py` / `tests/pr_render_gate.py`
+  is a poor unit-test target — that's what `qa/visual_qa.py` / `qa/pr_render_gate.py`
   (a real Playwright browser) already cover; don't reach for a DOM shim to force it into
   `node:test`. If a module mixes the two, consider splitting the pure logic out (as
   `evidence_router.js` did) rather than shimming a fake DOM.

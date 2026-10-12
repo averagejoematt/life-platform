@@ -251,7 +251,7 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
     # ── high-consequence: the blocking type gate (ADR-107 tier 2) ────────────────
     "ci::ci-lint.yml::lint::7": Proof(
         gate_name="lint / Mypy gate (ENFORCED — clean-module set, ADR-080)",
-        command="python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)   # 440 files",
+        command="python -m mypy --config-file mypy.ini $(python scripts/mypy_clean_set.py)   # 440 files",
         mutation=(
             "appended to lambdas/common/auth_breaker.py (a clean-set module), one error code "
             "at a time: (a) `def p() -> int: return _undefined_symbol` [name-defined]; "
@@ -435,7 +435,7 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
         # #3251 (C1, 2026-08-30): --reader-truth left the per-deploy copies; the prose judge
         # runs in visual-qa.yml's daily fire only. tests/test_ci_ai_gate_cadence_3251.py
         # holds this string to the workflow's actual invocation.
-        command="python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1",
+        command="python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1",
         mutation=(
             "NONE PLANTED — the cannot-fail state was observed live in run 32509917798 / job "
             "96909117231 (2026-08-21), a real fleet deploy. The 'mutation' was the standing "
@@ -843,8 +843,10 @@ def discover_guard_scripts(root: Path, files: list[Path], detail: bool = True) -
             continue
         if rel.startswith("tests/test_"):
             continue  # covered by the structural-test family
-        counters["candidates"] += 1
         text = _read(path)
+        if rel.startswith("tests/") and "Compatibility shim (#4270)" in text:
+            continue  # a bare-name re-export of a qa/ module (#4270): the real file is the gate, the alias is not a second one
+        counters["candidates"] += 1
         # #3220 — the seam. The `no_nonzero_exit` bucket's own detail line already
         # said "it may be a library, or it may be unable to fail"; the census could
         # see the condition and had no way to act on it. Now it does.

@@ -10,7 +10,7 @@ one re-probe — and every confirmed transient is COUNTED AND PRINTED (ADR-104),
 so the race rate stays measurable for this issue's 30-day re-measure.
 
 Three surfaces, all mutation-proved here:
-  - tests/visual_qa.confirm_before_fail (pure function, sleeper injected);
+  - qa/visual_qa.confirm_before_fail (pure function, sleeper injected);
   - deploy/lib/resilient_curl.sh::smoke_confirm (real bash, sleep stubbed);
   - scripts/incident_log_patterns.py's sub-shape split (the umbrella's rate can
     now be measured without the semantic-oracle rows inflating it).

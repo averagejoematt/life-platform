@@ -29,7 +29,7 @@ import qa_manifest  # noqa: E402
 # ── 1. Completeness ───────────────────────────────────────────────────────────
 def test_every_site_page_registered_or_exempt():
     unregistered, ghosts = qa_manifest.self_check()
-    assert not unregistered, f"Unregistered site/ pages (add a tests/qa_manifest.py entry or an EXEMPT reason): {sorted(unregistered)}"
+    assert not unregistered, f"Unregistered site/ pages (add a qa/qa_manifest.py entry or an EXEMPT reason): {sorted(unregistered)}"
     assert not ghosts, f"Manifest entries with no file under site/: {sorted(ghosts)}"
 
 
@@ -69,7 +69,7 @@ def test_visual_qa_pages_derive_from_manifest():
 
     assert visual_qa.PAGES == qa_manifest.visual_pages()
     # and no literal page list survives in the module source
-    src = open(os.path.join(_HERE, "visual_qa.py")).read()
+    src = open(os.path.join(os.path.dirname(_HERE), "qa", "visual_qa.py")).read()
     assert (
         "EVIDENCE_TOPICS = [" not in src and '"path": "/cockpit/"' not in src
     ), "visual_qa.py has grown an independent page list again — pages belong in qa_manifest.py"
@@ -123,7 +123,7 @@ def test_emitters_run(emit):
     import subprocess
 
     r = subprocess.run(
-        [sys.executable, os.path.join(_HERE, "qa_manifest.py"), "--emit", emit],
+        [sys.executable, os.path.join(os.path.dirname(_HERE), "qa", "qa_manifest.py"), "--emit", emit],
         capture_output=True,
         text=True,
         timeout=60,
@@ -145,7 +145,7 @@ def test_api_deps_emitter_runs():
     import subprocess
 
     r = subprocess.run(
-        [sys.executable, os.path.join(_HERE, "qa_manifest.py"), "--emit", "api_deps"],
+        [sys.executable, os.path.join(os.path.dirname(_HERE), "qa", "qa_manifest.py"), "--emit", "api_deps"],
         capture_output=True,
         text=True,
         timeout=60,

@@ -143,7 +143,7 @@ def _load_module(rel: str, name: str):
 def _ast_constant(rel: str, name: str):
     """A module-level constant read WITHOUT executing the module.
 
-    `tests/visual_qa.py` reaches for Playwright and a browser; importing it to read a
+    `qa/visual_qa.py` reaches for Playwright and a browser; importing it to read a
     floor would make the anchor resolution depend on a browser install. Same rule
     `scripts/budget_ceilings.py` states for the governor: import when you can, parse when
     you can't, hand-copy never.
@@ -219,10 +219,10 @@ def _resolve_cycle_day(ctx: dict) -> Resolution:
 
 
 def _resolve_page_count(ctx: dict) -> Resolution:
-    if os.path.join(REPO, "tests") not in sys.path:
-        sys.path.insert(0, os.path.join(REPO, "tests"))
-    mod = _load_module("tests/qa_manifest.py", "_anchor_qa_manifest")
-    return Resolution("page_count", len(mod.visual_pages()), "tests/qa_manifest.visual_pages()")
+    if REPO not in sys.path:
+        sys.path.insert(0, REPO)
+    mod = _load_module("qa/qa_manifest.py", "_anchor_qa_manifest")
+    return Resolution("page_count", len(mod.visual_pages()), "qa/qa_manifest.visual_pages()")
 
 
 def _resolve_min_n(ctx: dict) -> Resolution:
@@ -260,7 +260,7 @@ def _resolve_lane_budget(ctx: dict) -> Resolution:
 
 
 def _resolve_type_floor_px(ctx: dict) -> Resolution:
-    return Resolution("type_floor_px", _ast_constant("tests/visual_qa.py", "SVG_TEXT_FLOOR_PX"), "tests/visual_qa.SVG_TEXT_FLOOR_PX")
+    return Resolution("type_floor_px", _ast_constant("qa/visual_qa.py", "SVG_TEXT_FLOOR_PX"), "qa/visual_qa.SVG_TEXT_FLOOR_PX")
 
 
 def _resolve_mobile_viewport(ctx: dict) -> Resolution:

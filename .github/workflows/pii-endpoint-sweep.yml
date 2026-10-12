@@ -84,7 +84,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # setup-ci installs no packages. pii_surface_guard.py's --endpoints arm pulls
-      # in deploy/capture_api_schemas.py -> tests/accuracy_audit.py, whose reachable
+      # in deploy/capture_api_schemas.py -> qa/accuracy_audit.py, whose reachable
       # import closure includes boto3/botocore (its DynamoDB path, never exercised
       # here — this job holds no table access) and pillow (accuracy_audit's optional
       # visual_qa import). scripts/ci_dark_flag_sweep.py (#3315) walks that closure

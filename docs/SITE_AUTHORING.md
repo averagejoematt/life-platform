@@ -264,8 +264,8 @@ The chain, when you move/rename a page:
 3. **Fonts** — explicit `aws s3 sync site/assets/fonts/` (the main sync deliberately
    excludes non-CSS/JS under `assets/`; the workflow automates the once-manual step).
 4. **Gates** — `deploy/smoke_test_site.sh` (HTTP/content) ∥ visual + AI-vision QA
-   (`tests/visual_qa.py --screenshot --ai-qa`) + accuracy audit
-   (`tests/accuracy_audit.py --live`).
+   (`qa/visual_qa.py --screenshot --ai-qa`) + accuracy audit
+   (`qa/accuracy_audit.py --live`).
 5. **Auto-rollback** — a red gate after a successful deploy runs
    `deploy/rollback_site.sh HEAD~1` (re-hash, re-stamp `version.json` to the prior
    build, re-invalidate) + SNS alert.
@@ -283,7 +283,7 @@ auto-rolls the site back (this happened on #750's first day).
 
 **Before you merge — local render-QA.** `node --check` proves nothing about runtime;
 render the page:
-- `python3 tests/visual_qa.py --screenshot --ai-qa` (needs `playwright install chromium`)
+- `python3 qa/visual_qa.py --screenshot --ai-qa` (needs `playwright install chromium`)
   against live, or drive the changed page locally with Playwright + route-mocked
   `/api/*`. Route-mock gotchas: register the **catch-all route first**, **block service
   workers** (or the mocks are bypassed), and scroll the page before a full-page shot
@@ -296,7 +296,7 @@ render the page:
    API freshness. Runs post-deploy in CI; cheap to run any time.
 2. **`lambdas/operational/qa_smoke_lambda.py`** — data/output health (DDB freshness,
    score sanity), nightly against the live pipeline.
-3. **`tests/visual_qa.py` (+ `visual_ai_qa.py`)** — Playwright browser sweep + Claude
+3. **`qa/visual_qa.py` (+ `visual_ai_qa.py`)** — Playwright browser sweep + Claude
    vision QA of each screenshot; **gating** in CI (deterministic FAIL or AI "high"
    verdict blocks/rolls back).
 

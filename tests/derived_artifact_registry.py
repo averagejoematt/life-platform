@@ -306,7 +306,7 @@ ARTIFACTS: dict[str, dict] = {
         "scripts/v4_build_tone.py",
         step="deploy/sync_site_to_s3.sh / design-sync",
         reason=(
-            "Renders /method/tone/ from lambdas/coach/coach_register.py (#1390). tests/qa_manifest.py "
+            "Renders /method/tone/ from lambdas/coach/coach_register.py (#1390). qa/qa_manifest.py "
             "marks the page GENERATED so the QA sweep knows not to treat hand edits as authoritative."
         ),
     ),

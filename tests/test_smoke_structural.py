@@ -9,7 +9,7 @@ between reviews. deploy/smoke_test_site.sh now asserts, for every static/utility
 
 Contract pinned here, in three layers (same shape as tests/test_smoke_cache_aware.py):
 
-  A. DERIVATION — the page list comes from tests/qa_manifest.py content_class
+  A. DERIVATION — the page list comes from qa/qa_manifest.py content_class
      (static/utility), never a hand list (#1426/#1454); every eligible page must
      declare a marker (a new static page can't land outside the gate).
   B. TRUTH — every declared marker is actually present in the repo's site/ file and

@@ -52,12 +52,12 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
   registry is epic #2797.
 - **A lambda**: its ADR-146 domain package under `lambdas/`, registered in its CDK
   stack with its own least-privilege role, added to the mypy clean set
-  (`tests/mypy_clean_set.py` globs are non-recursive), and — if scheduled — a
+  (`scripts/mypy_clean_set.py` globs are non-recursive), and — if scheduled — a
   heartbeat under `tests/test_heartbeat_completeness.py`. Enrollment-by-construction
   (all of that from one declaration) is being paved as #2846; until it lands the
   consumer sweep is manual and `tests/test_lambdas_packaging_guard.py` holds the
   packaging invariant.
-- **A page**: `tests/qa_manifest.py` is THE page registry (#1426); visual QA and
+- **A page**: `qa/qa_manifest.py` is THE page registry (#1426); visual QA and
   the smoke sweep derive from it (`tests/test_qa_manifest.py` gates the
   derivation). A page not in the manifest does not exist to QA.
 - **A coach**: `config/personas.json` via `lambdas/coach/persona_registry.py`

@@ -13,7 +13,7 @@ partitions leaks through. This script catches that class of bug.
 
 The token list + fetch/check core live in qa/leak_token_sweep.py (#1448)
 so the SAME deterministic, AI-free sweep also runs inside the daily
-tests/visual_qa.py pass, not only here at reset time — this script's own
+qa/visual_qa.py pass, not only here at reset time — this script's own
 behavior is unchanged (full FORBIDDEN_TOKENS list, same --old-genesis waiver
 logic, same report).
 

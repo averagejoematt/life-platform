@@ -48,10 +48,8 @@ def test_a_cron_only_producer_is_not_on_the_surface(surface):
 
 
 def test_the_judges_and_their_wiring_are_on_the_surface(surface):
-    kinds = dict(
-        rs.classify(["tests/visual_ai_qa.py", "lambdas/operational/reader_truth_qa.py", ".github/workflows/visual-qa.yml"], surface)
-    )
-    assert set(kinds) == {"tests/visual_ai_qa.py", "lambdas/operational/reader_truth_qa.py", ".github/workflows/visual-qa.yml"}
+    kinds = dict(rs.classify(["qa/visual_ai_qa.py", "lambdas/operational/reader_truth_qa.py", ".github/workflows/visual-qa.yml"], surface))
+    assert set(kinds) == {"qa/visual_ai_qa.py", "lambdas/operational/reader_truth_qa.py", ".github/workflows/visual-qa.yml"}
 
 
 def test_a_missing_entry_point_fails_loudly_never_shrinks_the_surface():
@@ -153,7 +151,7 @@ def test_the_deploy_time_vision_gate_consults_the_reader_surface():
     assert 'scripts/reader_surface.py --base "${DEPLOY_BASE}" --github-output' in wf
     assert "deploy_base: ${{ steps.base.outputs.sha }}" in wf
     # RUN keeps the exact pre-#4589 judge invocation; SKIP keeps the deterministic sweep.
-    assert "python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1" in wf
+    assert "python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1" in wf
     assert 'if [ "${RUN_AI}" = "false" ]; then' in wf
 
 
@@ -167,5 +165,5 @@ def test_the_scheduled_judges_consult_the_reader_surface_per_judge_window():
 
 def test_the_tier_3_pause_still_lives_inside_the_judge():
     """The gate only decides whether --ai-qa is passed; the budget pause is the judge's own."""
-    src = _read("tests/visual_ai_qa.py")
+    src = _read("qa/visual_ai_qa.py")
     assert "SKIPPED-BY-BUDGET" in src

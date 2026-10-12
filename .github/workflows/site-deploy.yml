@@ -365,12 +365,12 @@ jobs:
           # #3251 (owner decision 2026-08-29, option C1): --reader-truth REMOVED from
           # the per-deploy copies (see ci-cd.yml's twin comment for the full basis);
           # the prose judge lives in the daily standalone (visual-qa.yml), non-gating.
-          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+          python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         id: accuracy
         run: |
-          python3 tests/accuracy_audit.py --live
+          python3 qa/accuracy_audit.py --live
 
       # #3352 — WHICH surface failed, and can a site/** revert even reach it?
       # `if: always()` on purpose: this step is only interesting when a step above it
@@ -381,7 +381,7 @@ jobs:
         id: verdict
         if: always()
         run: |
-          python3 tests/visual_qa_verdict.py \
+          python3 qa/visual_qa_verdict.py \
             --report qa-screenshots/report.json \
             --out qa-screenshots/verdict.json \
             --accuracy-audit-result "${{ steps.accuracy.outcome }}" \

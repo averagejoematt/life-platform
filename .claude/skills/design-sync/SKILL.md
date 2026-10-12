@@ -63,7 +63,7 @@ python3 scripts/design_sync_capture.py
 ```
 
 (same `--out` default — it writes INTO the bundle just built, and refuses to run if the
-bundle isn't there). It screenshots the doors (the `tests/qa_manifest.py` tier-1 set) +
+bundle isn't there). It screenshots the doors (the `qa/qa_manifest.py` tier-1 set) +
 the data-dense surface (`/data/sleep/`) at 1440×900 dark over the network — read-only
 GETs, honoring the `QA_SITE_URL` override — reusing the visual-QA harness's
 navigation/scroll discipline. It writes `reference/captures/<slug>.png`, one

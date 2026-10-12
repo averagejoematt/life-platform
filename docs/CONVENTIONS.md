@@ -522,8 +522,8 @@ above cannot see the failure either: the gate lives in a workflow the `premerge`
 does not cover. Three PRs paid a full CI round-trip to it in one session.
 
 Resolved by dropping `tests/**` from that **`pull_request`** filter only, and listing the
-two files a doc gate genuinely reads as fact sources (`tests/qa_manifest.py` → `PAGES`,
-`tests/leak_token_sweep.py` → `JSON_ENDPOINTS`) plus `tests/test_platform_stats_truth.py`.
+two files a doc gate genuinely reads as fact sources (`qa/qa_manifest.py` → `PAGES`,
+`qa/leak_token_sweep.py` → `JSON_ENDPOINTS`) plus `tests/test_platform_stats_truth.py`.
 The **`push`** trigger keeps `tests/**` unchanged, so main is still fully gated and the
 reconcile bot still owns the counter — which is §4c's division of labour, not an exception
 to it. `tests/test_docs_ci_owns_doc_gates.py` pins both halves: the asymmetry is the only
@@ -619,7 +619,7 @@ page set in all three — only the AI-vision layer is tiered (#1428, see below):
 the expensive part (Haiku, ~$0.001/image); the deterministic Playwright checks are free
 (CI minutes only) and are NEVER restricted by this.
 - Both gating copies pass `--ai-qa-max-tier 1` — AI-vision covers exactly the 6 tier-1
-  flagship doors (`tests/qa_manifest.py`) on every deploy.
+  flagship doors (`qa/qa_manifest.py`) on every deploy.
 - The standalone copy's full, untiered AI-vision pass (`--ai-qa`, no tier filter) fires
   only on the Sunday occurrence of its existing daily cron, or on any manual
   `workflow_dispatch` — no second cron was added; the flag is computed at runtime from
@@ -640,7 +640,7 @@ surfaces in the Monday green report and in `/qa` + `scripts/qa_audit.py --live`.
 Full semantics: `docs/RUNBOOK.md` § QA Depth Dial.
 
 All three step lists must stay in sync — change one, change all three. Run it on demand:
-`gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`,
+`gh workflow run visual-qa.yml` (or locally `python3 qa/visual_qa.py --screenshot --ai-qa`,
 add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
 
 **What the site auto-rollback can and cannot reach (2026-08-27).** `deploy/rollback_site.sh`
@@ -649,7 +649,7 @@ Lambda and no DynamoDB row. The gate that fires it judges `/api/*`
 content too, so for any failure sourced from DynamoDB the rollback reverts good static
 content, reports success on every step and leaves the defect live (it did exactly that to a
 wanted build beat). Since #3352/#3395/#3652 the rollback asks
-`tests/visual_qa_verdict.py` first and DECLINES by name on an `api`, `deploy-script` or
+`qa/visual_qa_verdict.py` first and DECLINES by name on an `api`, `deploy-script` or
 `ai-unevaluated` verdict — `ai-unevaluated` being "the AI oracle never returned a
 judgement for this page", which reverted every `site/**` merge for a day when it read as
 an ordinary rendering defect. Two reflexes: when a gating copy reds, ask **which storage layer
@@ -1568,7 +1568,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | **The budget is raised every time it fires, so the fifth raise guarantees a sixth breach** — the class's own response was the defect (#3224). Measured 2026-08-27: the suite grew 5.3% in tests but 32.9% in wall clock, i.e. mean cost per test rose 26.2%; the dominant term is N tests each shelling out to the same whole-repo scanner, not test count | Hard ceiling the budget may not be raised past, pinned to `pr-checks.yml` `full-suite`'s own timeout (#3224) | `HARD_CEILING_SECONDS` + the full class record in `tests/test_duration_budget_ratchet.py` |
 | The same whole-repo scan is spawned once per test that asserts it — cost = (callers) × (scan cost), and both grow with the repo (three tests each paid ~27.5s for a byte-identical `check_doc_facts.py` on the 1994s run) | Per-process memoized repo scan; call sites guarded structurally so a revert to a bare `subprocess.run` cannot go quiet (#3224) | `tests/repo_scan_cache.py`; `tests/test_repo_scan_cache_3224.py` |
 | A visible page/component regresses (layout break, blank data-bind, JS error) | Visual-QA (Playwright + Bedrock vision) | §4b above |
-| A door a first-time reader can't say the purpose of, or wouldn't know what to click | Comprehension judge — ADVISORY until 2026-10-10 (#4182 M4) | `tests/comprehension_qa.py`; `visual-qa.yml` step |
+| A door a first-time reader can't say the purpose of, or wouldn't know what to click | Comprehension judge — ADVISORY until 2026-10-10 (#4182 M4) | `qa/comprehension_qa.py`; `visual-qa.yml` step |
 | A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A live `config/` object a Lambda reads is stale or unowned — a writer class the repo-twin check cannot see | Config mirror ownership + freshness audit (#2057) | `deploy/config_mirror_audit.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A registry published through two prefixes drifts between its copies — two endpoints, two answers | `config/` ↔ `site/config/` byte parity (#2084) | `tests/test_config_site_mirror_parity.py`; §7 above |

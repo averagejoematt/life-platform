@@ -7,7 +7,7 @@ deterministic, AI-free token-grep runs in two places:
   - deploy/restart_verify_rendered.py — the manual reset-time verification
     path. Behavior unchanged: same full token list, same --old-genesis
     waiver logic, same report — it just imports the checks from here now.
-  - tests/visual_qa.py — the daily/standalone visual-qa run (#1448), so a
+  - qa/visual_qa.py — the daily/standalone visual-qa run (#1448), so a
     template/leak-token regression (a hardcoded stale literal, a cached S3
     JSON blob, a missed DDB partition) is caught within a day instead of
     only at the next reset.

@@ -31,7 +31,7 @@ already carrying one is masked until the ledger entry drains — which is why
 every entry carries an issue ref and the shrink report keeps the pressure on.
 
 Baseline update path (DELIBERATE, REVIEWED — never auto-regenerated):
-    python3 tests/visual_qa.py --reader-truth --update-truth-baseline
+    python3 qa/visual_qa.py --reader-truth --update-truth-baseline
 rewrites entries for the pages the sweep drove (a --page run touches only that
 page; the rest is preserved). Fresh entries land as issue="UNTRIAGED", and the
 unit suite REDS the committed file on any UNTRIAGED entry — so the update can
@@ -214,7 +214,7 @@ def update_baseline(observed_by_path, path=None):
             "The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries "
             "surface as warnings naming their issue every run. Entries are recorded at any observed "
             "severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY "
-            "via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; "
+            "via `python3 qa/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; "
             "every entry must carry a real issue ref (UNTRIAGED reds the unit suite). "
             "Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
         ),

@@ -8,7 +8,7 @@ blocks a PR that adds new QA-relevant surface without its registration:
 
 | leg | new surface in the diff | required registration |
 |-------|--------------------------|------------------------|
-| page  | `site/**/*.html` (non-legacy) | entry (or `EXEMPT` reason) in `tests/qa_manifest.py` |
+| page  | `site/**/*.html` (non-legacy) | entry (or `EXEMPT` reason) in `qa/qa_manifest.py` |
 | route | site-api dispatcher route in `lambdas/web/site_api_lambda.py` | schema baseline in `tests/api_schemas/` (advisory until #1436 lands that directory; blocking automatically after) |
 | cron  | EventBridge `Schedule.cron/rate/expression` under `cdk/stacks/` | a heartbeat/alarm change in the **same PR** (monitoring_stack touched, or an alarm-count increase in a changed stack file) |
 | js    | `.js` under `site/` **outside** `site/assets/js/` | move it under `site/assets/js/` — the #1432 import gate covers that directory by construction |

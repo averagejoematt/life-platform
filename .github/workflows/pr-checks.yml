@@ -217,25 +217,25 @@ jobs:
           python3 scripts/report_premerge_deselection.py /tmp/premerge_collect_output.txt /tmp/premerge_lane_output.txt >> "$GITHUB_STEP_SUMMARY"
 
       # The SAME command ci-lint.yml's "Mypy gate" runs, against the same authoritative
-      # module list (tests/mypy_clean_set.py). It is duplicated as an explicit step rather
+      # module list (scripts/mypy_clean_set.py). It is duplicated as an explicit step rather
       # than left to test_mypy_clean_modules.py because that test carries a
       # `skipif(not _mypy_available())` — in a lane without mypy installed it would report
       # green while checking nothing, which is the one failure shape this repo keeps
       # re-learning. Measured 0.31s warm; ~30-60s cold on a runner.
       - name: Mypy gate (tier-2 clean set — same command + pin as ci-lint.yml)
         if: always()
-        run: python3 -m mypy --config-file mypy.ini $(python3 tests/mypy_clean_set.py)
+        run: python3 -m mypy --config-file mypy.ini $(python3 scripts/mypy_clean_set.py)
 
       - name: Format gate (same pin as ci-cd lint)
         if: always()
-        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       # Same class as the mypy gate above: ENFORCED in ci-lint.yml, invisible on a PR.
       # The full six-directory set is load-bearing — running a subset locally is how a
       # ruff red reaches main.
       - name: Lint gate (ruff — same command + pin as ci-lint.yml)
         if: always()
-        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/
 
       # #2632. THE ONE CLASS EVERY GATE ABOVE IS STRUCTURALLY BLIND TO. tests/conftest.py
       # puts lambdas/ AND each subpackage on sys.path so flat-name imports keep resolving,
@@ -387,7 +387,7 @@ jobs:
   # class", 08-02 #2040) with only reflex-level fixes each time. This job is
   # the first PRE-merge machinery — see scripts/check_api_before_frontend.py
   # for the full mechanism and deploy/api_deploy_sequencing.json for the
-  # declaration registry it (and tests/visual_qa.py + deploy/smoke_test_site.sh's
+  # declaration registry it (and qa/visual_qa.py + deploy/smoke_test_site.sh's
   # runtime deferral) reads.
   #
   # ADVISORY, not required, on landing (ADR-139 default posture) — promoting

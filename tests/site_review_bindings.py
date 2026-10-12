@@ -424,7 +424,7 @@ PAGE_BINDINGS = [
 def _build_evidence_bindings():
     """Append a binding for each evidence topic the visual sweep covers.
 
-    Derived from THE page registry (tests/qa_manifest.py, #1426) — the archive
+    Derived from THE page registry (qa/qa_manifest.py, #1426) — the archive
     pages carrying a visual def — so coverage matches the screenshots by
     construction; primary endpoint comes from REGISTRY, secondary from the
     hand-curated map above.

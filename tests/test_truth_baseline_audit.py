@@ -189,7 +189,7 @@ class TestUpdateIsNeverABareSuccessLine(unittest.TestCase):
 
     def test_the_caller_renders_the_report_rather_than_its_own_success_line(self):
         """visual_qa.py must print update_summary's lines, not a literal of its own."""
-        src = open(os.path.join(os.path.dirname(__file__), "visual_qa.py"), encoding="utf-8").read()
+        src = open(os.path.join(os.path.dirname(os.path.dirname(__file__)), "qa", "visual_qa.py"), encoding="utf-8").read()
         self.assertIn("truth_baseline_audit.update_summary(report)", src)
         self.assertNotIn("truth baseline rewritten", src)
 

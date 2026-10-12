@@ -709,7 +709,7 @@ def collect_green_report(now=None):
     except Exception as e:
         report["qa_smoke"] = {"error": f"CloudWatch read failed ({str(e)[:120]})"}
 
-    # 2. Coverage stats — derived from tests/qa_manifest.py at bundle time (#1426)
+    # 2. Coverage stats — derived from qa/qa_manifest.py at bundle time (#1426)
     stats, reason = load_coverage_stats()
     report["coverage"] = stats if stats else {"error": reason}
 

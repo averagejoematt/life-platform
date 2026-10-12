@@ -3,8 +3,8 @@
 
 WHY THIS EXISTS
 ---------------
-The two AI checks in CI — the Claude-vision judge (`tests/visual_ai_qa.py`, run by
-`tests/visual_qa.py --ai-qa`) and the reader-truth prose judge (`--reader-truth`) — read
+The two AI checks in CI — the Claude-vision judge (`qa/visual_ai_qa.py`, run by
+`qa/visual_qa.py --ai-qa`) and the reader-truth prose judge (`--reader-truth`) — read
 the LIVE site. They ran on every deploy and every daily fire regardless of what changed,
 so a diff that only touched an ingestion Lambda, a CDK alarm or a docs file paid Bedrock
 to re-judge pages that diff could not have moved. The owner ruled (platform plan,
@@ -41,7 +41,7 @@ and why none of them counted.
 
 A SKIP IS NOT A PASS (#4652, ADR-116)
 -------------------------------------
-The workflows hand the SKIP verdict line to the sweep (`tests/visual_qa.py
+The workflows hand the SKIP verdict line to the sweep (`qa/visual_qa.py
 --ai-qa-skipped "<line>"` / `--reader-truth-skipped "<line>"`), and the sweep reports the
 judge as SKIPPED-BY-READER-SURFACE — "not run, not a pass" — on stdout, in the job summary,
 as a `::warning` annotation beside the check, and as `ai_vision_status` /
@@ -87,7 +87,7 @@ REQUEST_TIME_ENTRIES = (
 # reads the stacks and reds on a Function URL that is in neither place, so a new public origin
 # cannot be invisible to this gate by default.
 FUNCTION_URLS_NO_SWEPT_PAGE = {
-    "progress_viewer_fn": "owner-gated photo viewer; its route is deliberately absent from tests/qa_manifest.py (#3760)",
+    "progress_viewer_fn": "owner-gated photo viewer; its route is deliberately absent from qa/qa_manifest.py (#3760)",
     "og_image_fn": "returns the link-unfurl PNG at /og; no page the sweep opens renders it",
     "telegram_webhook_fn": "called by Telegram's servers, not fronted by CloudFront, renders no page",
 }
@@ -104,8 +104,8 @@ UNGATED_JUDGE_WORKFLOWS = {
 
 # The two AI judges and the harness that drives them. A judge edit must run the judge.
 JUDGE_ENTRIES = (
-    "tests/visual_qa.py",
-    "tests/visual_ai_qa.py",
+    "qa/visual_qa.py",
+    "qa/visual_ai_qa.py",
     "lambdas/operational/reader_truth_qa.py",
 )
 

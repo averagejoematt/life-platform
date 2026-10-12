@@ -140,7 +140,7 @@ def test_scan_is_not_vacuous_on_a_deeply_nested_breach():
 
 
 def test_impossible_values_still_grades_public_stats_the_same_way():
-    """Back-compat: `impossible_values` is the entry point tests/pr_render_gate.py uses.
+    """Back-compat: `impossible_values` is the entry point qa/pr_render_gate.py uses.
     Delegating its percentage half to the shared scanner must not change its verdicts."""
     assert _fields(impossible_values({"vitals": {"sleep_pct": 140}})) == {"vitals.sleep_pct"}
     assert impossible_values({"journey": {"progress_pct": -1.2}}) == []

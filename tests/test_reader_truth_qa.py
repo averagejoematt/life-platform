@@ -6,7 +6,7 @@ Covers the ONE shared module (lambdas/reader_truth_qa.py) and both of its hooks:
     categories present, batching at 4-6 surfaces per call;
   - verdict parsing: tolerant of fences/garbage, coerces junk severities so an
     unrecognized severity can never gate;
-  - the CI harness merge (tests/visual_ai_qa.assess_reader_truth): the #1095
+  - the CI harness merge (qa/visual_ai_qa.assess_reader_truth): the #1095
     regression guard — a synthetic contradiction ("30-day trend" at day 0/2)
     with a high verdict must flip the page to FAIL;
   - the nightly qa_smoke check (#1096) with mocked Bedrock: flag → FAIL check,
@@ -817,7 +817,7 @@ _NOTE_3208_CI = (
 )
 
 # The already-working phrasing: a live re-run of the identical scoped sweep
-# (`python3 tests/visual_qa.py --page /method/intelligence/ --reader-truth`)
+# (`python3 qa/visual_qa.py --page /method/intelligence/ --reader-truth`)
 # against the same page independently generated this note, which DID happen to
 # carry "a maximum of" and demoted correctly under the pre-#3208 matcher —
 # captured live during this fix's own verification. It must keep demoting so
@@ -1525,7 +1525,7 @@ def test_negative_control_a_plain_string_error_reads_as_transport():
     assert rtq.is_unevaluated("batch [/now/]: something went wrong") is False
 
 
-# ── the CI caller (tests/visual_ai_qa.assess_reader_truth): FAIL ──────────────
+# ── the CI caller (qa/visual_ai_qa.assess_reader_truth): FAIL ──────────────
 
 
 @pytest.mark.parametrize("text,kind", _UNREADABLE)

@@ -33,7 +33,7 @@ DATA SOURCE — build-time, read-only (no new /api endpoint, so no autodeploy ra
 CHROME NOTE (#1009/#1639): the doors nav / footer / head-chrome emitted here are the
 canonical partials from `v4_chrome.py`; `scripts/v4_apply_chrome.py` re-flattens them
 on deploy, so this page passes the site-chrome gate as-is. Run apply_chrome after any
-build. Register once in `tests/qa_manifest.py` (the #1426 "new page = one registry"
+build. Register once in `qa/qa_manifest.py` (the #1426 "new page = one registry"
 rule).
 
 Run from repo root.

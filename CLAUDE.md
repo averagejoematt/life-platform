@@ -75,7 +75,7 @@ python3 mcp_bridge.py
 
 **Shared code — ONE bundle, no layer (#781)** — `docs/CONVENTIONS.md` §1.
 
-**`lambdas/` is packaged by domain (ADR-146)** — no loose modules at the `lambdas/` root (`tests/test_lambdas_packaging_guard.py`); the bundle stages the tree at the zip root, so imports read `from common import constants`. Two rules that bite: (a) `tests/mypy_clean_set.py`'s `CLEAN_DIRS` globs are **non-recursive** — add a new package there or its modules silently leave the mypy gate; (b) never resolve a data file as `dirname(dirname(__file__))/config/...` — use `common.repo_config`.
+**`lambdas/` is packaged by domain (ADR-146)** — no loose modules at the `lambdas/` root (`tests/test_lambdas_packaging_guard.py`); the bundle stages the tree at the zip root, so imports read `from common import constants`. Two rules that bite: (a) `scripts/mypy_clean_set.py`'s `CLEAN_DIRS` globs are **non-recursive** — add a new package there or its modules silently leave the mypy gate; (b) never resolve a data file as `dirname(dirname(__file__))/config/...` — use `common.repo_config`.
 
 **Prompt caching (COST-OPT-2, ADR-049)** — `ai_calls.py`/`retry_utils.py` auto-wrap system messages as cached blocks, but **a `cache_control` block is NOT evidence of caching**: below the model's minimum cacheable prefix it is silently ignored. Read the floors and per-caller record from `lambdas/ai/prompt_cache.py` and the live proof from the `PromptCacheNoOp` metric. Haiku for structured tasks, Sonnet for narrative; `AI_MODEL` overrides.
 
@@ -87,7 +87,7 @@ The stacks are `cdk/stacks/*_stack.py`, entry point `cdk/app.py`; each stack cre
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy (manual approval, GitHub Environment `production`) → Smoke → auto-rollback; OIDC auth, no long-lived keys. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `tests/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and when it rolls back is `docs/CONVENTIONS.md` §4b.
+`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy (manual approval, GitHub Environment `production`) → Smoke → auto-rollback; OIDC auth, no long-lived keys. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and when it rolls back is `docs/CONVENTIONS.md` §4b.
 
 ## AI Inference (Bedrock + Budget Guard)
 

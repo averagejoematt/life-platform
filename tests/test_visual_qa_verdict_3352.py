@@ -258,7 +258,7 @@ def test_cli_writes_verdict_json_and_github_outputs(tmp_path):
     proc = subprocess.run(
         [
             sys.executable,
-            os.path.join(_REPO, "tests", "visual_qa_verdict.py"),
+            os.path.join(_REPO, "qa", "visual_qa_verdict.py"),
             "--report",
             str(report),
             "--out",

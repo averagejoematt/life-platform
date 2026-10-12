@@ -212,7 +212,7 @@ def test_replay_1704_broadcast_incident_undeclared_reds_the_check():
 def test_replay_1704_broadcast_incident_passes_with_pending_deploy_declaration():
     """The fix path: declaring the route in pending_deploy_routes (the #2050
     pattern this issue generalizes) lets the same PR pass — and that same
-    registry entry is what tests/visual_qa.py + deploy/smoke_test_site.sh
+    registry entry is what qa/visual_qa.py + deploy/smoke_test_site.sh
     read to downgrade the resulting 404 to a warning instead of a rollback.
     """
     registry = {
@@ -275,10 +275,10 @@ def test_declared_routes_unions_both_buckets():
 
 
 def test_visual_qa_reads_the_same_registry_module():
-    """tests/visual_qa.py must derive pending_deploy_apis from
+    """qa/visual_qa.py must derive pending_deploy_apis from
     deploy/api_deploy_sequencing.json, not a bare hand-edited set literal —
     the exact drift #2050 could recur without this."""
-    with open(os.path.join(REPO_ROOT, "tests", "visual_qa.py"), encoding="utf-8") as f:
+    with open(os.path.join(REPO_ROOT, "qa", "visual_qa.py"), encoding="utf-8") as f:
         source = f.read()
     assert "api_deploy_sequencing.json" in source
     assert "pending_deploy_apis: set = set()" not in source, "the old hand-edited-per-incident literal should be gone"

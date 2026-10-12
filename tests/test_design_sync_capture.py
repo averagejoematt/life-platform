@@ -3,7 +3,7 @@
 Covers the acceptance criteria that don't need a browser or the network — the pure layer
 (the live Playwright leg itself is exercised by running /design-sync for real):
 
-  1. the capture SET derives from THE page registry (tests/qa_manifest.py): every tier-1
+  1. the capture SET derives from THE page registry (qa/qa_manifest.py): every tier-1
      door + the one data-dense surface — never a hand list that can drift
      (memory: reference_new_site_page_registries).
   2. every capture card carries the first-line `@dsCard group="reference"` marker, so

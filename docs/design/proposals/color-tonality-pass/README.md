@@ -6,7 +6,7 @@ documented in `docs/DESIGN_SYSTEM_V5.md` §4a and enforced by
 `tests/test_paper_ramp_contrast.py`.
 
 `render/` — before/after captures from the local render harness
-(`tests/pr_render_gate.py` serve + mocks; Chromium, `color_scheme` emulation):
+(`qa/pr_render_gate.py` serve + mocks; Chromium, `color_scheme` emulation):
 
 - `*-dark-home.png` — 1280px dark home: the bumped `--ink-faint` label register
   (AA on every ramp step) + tonal steps.

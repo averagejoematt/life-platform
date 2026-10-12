@@ -94,7 +94,7 @@ FEATURE_TIERS: dict[str, str] = {
     "social_enrichment": WORKHORSE,
     "state_of_matthew": WORKHORSE,
     "training_notes": WORKHORSE,
-    "visual_ai_qa": VISION,  # tests/visual_ai_qa.py (CI, outside the runtime guard)
+    "visual_ai_qa": VISION,  # qa/visual_ai_qa.py (CI, outside the runtime guard)
     "website_ai": WORKHORSE,
 }
 

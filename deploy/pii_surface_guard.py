@@ -309,9 +309,8 @@ _SNAPSHOT_DIR = os.path.join(_ROOT, "tests", "api_schemas")
 def _import_endpoint_tools():
     """Lazy import of the shared route-enumeration machinery. Lazy so the static
     site path (sync_site_to_s3.sh) keeps zero dependencies beyond this file."""
-    for p in (_HERE, os.path.join(_ROOT, "tests")):
-        if p not in sys.path:
-            sys.path.insert(0, p)
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
     import capture_api_schemas as cas  # noqa: PLC0415 — deliberate lazy import
     import endpoint_registry as er  # noqa: PLC0415
 

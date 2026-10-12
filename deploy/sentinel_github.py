@@ -70,6 +70,7 @@ PUSH_TRIGGER_GLOBS = (
     "mcp/**",
     "mcp_server.py",
     "tests/**",
+    "qa/**",
     "cdk/**",
     "ci/**",
     "config/**",

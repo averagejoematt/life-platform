@@ -15,7 +15,7 @@ What it writes (all under `<bundle>/reference/`):
     captures/<slug>.png       full-page Chromium screenshot per page — 1440x900, dark,
                               scrolled top-to-bottom first so lazy data fetches and
                               .reveal animations have fired. The navigation + scroll
-                              discipline is IMPORTED from tests/visual_qa.py (the
+                              discipline is IMPORTED from qa/visual_qa.py (the
                               visual-QA sweep) — reuse, don't reinvent, per the issue's
                               evidence line.
     <slug>-capture.html       one card per capture with the first-line
@@ -29,7 +29,7 @@ What it writes (all under `<bundle>/reference/`):
                               case #3 in design_sync_bundle.py), so a design-project
                               upload surface never has to re-derive binary payloads.
 
-Page set — derived from THE page registry (tests/qa_manifest.py, #1426), never a hand
+Page set — derived from THE page registry (qa/qa_manifest.py, #1426), never a hand
 list here: every tier-1 entry (the doors — home, cockpit, story, data, protocols,
 coaching) plus one data-dense readout surface (DATA_DENSE_PATH, asserted to still exist
 in the manifest). A door added to the manifest is picked up automatically on the next
@@ -85,17 +85,17 @@ def _slug(path: str) -> str:
 def capture_set(repo_root: Path = REPO_ROOT_DEFAULT) -> list[dict]:
     """The doors (every tier-1 manifest entry, in manifest order) + the data-dense surface.
 
-    Derived from tests/qa_manifest.py — THE page registry (#1426) — never a hand list
+    Derived from qa/qa_manifest.py — THE page registry (#1426) — never a hand list
     (memory: reference_new_site_page_registries). Returns [{path, name, slug}, …].
     """
-    tests_dir = str(repo_root / "tests")
-    if tests_dir not in sys.path:
-        sys.path.insert(0, tests_dir)
-    from qa_manifest import MANIFEST, PAGES_BY_PATH  # noqa: E402  (repo tests/ path added just above)
+    root_dir = str(repo_root)
+    if root_dir not in sys.path:
+        sys.path.insert(0, root_dir)
+    from qa.qa_manifest import MANIFEST, PAGES_BY_PATH  # noqa: E402  (repo root added just above)
 
     pages = [p for p in MANIFEST if p["tier"] == 1]
     if DATA_DENSE_PATH not in PAGES_BY_PATH:
-        raise AssertionError(f"DATA_DENSE_PATH {DATA_DENSE_PATH!r} is not in tests/qa_manifest.py — route renamed? update this constant")
+        raise AssertionError(f"DATA_DENSE_PATH {DATA_DENSE_PATH!r} is not in qa/qa_manifest.py — route renamed? update this constant")
     if DATA_DENSE_PATH not in {p["path"] for p in pages}:
         pages.append(PAGES_BY_PATH[DATA_DENSE_PATH])
     out = [{"path": p["path"], "name": p["name"], "slug": _slug(p["path"])} for p in pages]
@@ -142,18 +142,19 @@ def write_captures_manifest(reference_dir: Path) -> Path:
 
 def capture_live_pages(pages: list[dict], captures_dir: Path, repo_root: Path) -> None:
     """Screenshot each page from the live site (or QA_SITE_URL), reusing the visual-QA
-    harness's navigation-with-fallback + scroll/reveal discipline (tests/visual_qa.py).
+    harness's navigation-with-fallback + scroll/reveal discipline (qa/visual_qa.py).
 
     Lazy imports on purpose: playwright is not a dependency of the unit-test
     environment — a module-level import would red the whole suite at collection
     (memory: reference_test_layer_dep_import_collection_red), and visual_qa's SITE_URL
     is read here (not copied) so the QA_SITE_URL override keeps working identically.
     """
-    tests_dir = str(repo_root / "tests")
-    if tests_dir not in sys.path:
-        sys.path.insert(0, tests_dir)
-    import visual_qa  # noqa: E402  (repo tests/ path added just above)
+    root_dir = str(repo_root)
+    if root_dir not in sys.path:
+        sys.path.insert(0, root_dir)
     from playwright.sync_api import sync_playwright  # noqa: E402
+
+    from qa import visual_qa  # noqa: E402  (repo root added just above)
 
     captures_dir.mkdir(parents=True, exist_ok=True)
     failures = []

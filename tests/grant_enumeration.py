@@ -325,7 +325,7 @@ def consumer_refs(entry_path: str, roots=DEFAULT_ROOTS) -> dict:
     live code, and dispatch tables mean "called from `lambda_handler`" is not
     decidable. Beyond the entry module, only import-resolved targets are followed.
     """
-    # A script's own directory is on sys.path when it runs — `tests/visual_qa.py`
+    # A script's own directory is on sys.path when it runs — `qa/visual_qa.py`
     # reaches `visual_ai_qa` as a bare sibling import, and missing that root is how
     # the CI half would have missed #3059's subject entirely.
     own_dir = os.path.dirname(os.path.abspath(entry_path))

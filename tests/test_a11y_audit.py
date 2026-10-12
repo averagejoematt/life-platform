@@ -5,7 +5,7 @@ test_a11y_audit.py — offline tests for the axe-core a11y gate (#1433).
 Pure-logic coverage of tests/a11y_audit.py (gate classification, baseline
 round-trip, the vendored-bundle/version pins). NO Playwright import anywhere
 in this file — the browser-driving path is exercised by the sweep itself
-(tests/visual_qa.py), and a layer-only import here would red the whole unit
+(qa/visual_qa.py), and a layer-only import here would red the whole unit
 suite at collection (memory: reference_test_layer_dep_import_collection_red).
 """
 
@@ -222,7 +222,7 @@ def test_summarize_counts_by_impact():
 # ── #1990 regression guard: the ledger re-arm actually restores gating ────────
 #
 # tests/a11y_baseline.json's dark "pages" ledger was re-captured against the
-# live site with the real tests/visual_qa.py capture_page/run_sweep harness
+# live site with the real qa/visual_qa.py capture_page/run_sweep harness
 # (#1990) — most baselined entries were stale (a color-contrast fix landed,
 # the entry never shrank) so real gating was silently off on those pages.
 # These tests prove the re-arm didn't just produce an empty diff: a page whose
@@ -282,7 +282,7 @@ def test_recede_swept_pages_gate_after_the_3544_shrink():
     The three pages the recede-grammar sweep cleaned carried color-contrast as accepted
     debt in the dark desktop AND mobile ledgers — 61/40/10 and 60/39/11 nodes — which
     meant the gate could not fire on them at all. Direct re-measurement with the real
-    tests/visual_qa.py harness (live pages, this branch's CSS served in place) read zero
+    qa/visual_qa.py harness (live pages, this branch's CSS served in place) read zero
     color-contrast nodes on each, so their rows are gone and a REAPPEARANCE is now a NEW
     serious violation that reds the sweep. If someone re-baselines the debt without
     fixing it, this reds."""
@@ -310,7 +310,7 @@ def test_committed_baseline_exists_and_matches_pinned_axe_version():
     base = a11y_audit.load_baseline()
     assert base["_meta"].get("axe_version") == a11y_audit.AXE_VERSION, (
         "tests/a11y_baseline.json was captured under a different axe version — re-capture via "
-        "`python3 tests/visual_qa.py --update-baseline` in the same PR as the bump (#1433)"
+        "`python3 qa/visual_qa.py --update-baseline` in the same PR as the bump (#1433)"
     )
     # every committed entry is well-formed (the gate reads only these fields) —
     # both the dark 'pages' ledger and the #1991 'pages_light' sibling.
@@ -500,8 +500,8 @@ def test_the_three_gating_sweeps_get_the_mobile_pass_with_no_flag_to_forget():
     for wf in ("ci-cd.yml", "site-deploy.yml", "visual-qa.yml"):
         with open(os.path.join(root, ".github", "workflows", wf), encoding="utf-8") as f:
             text = f.read()
-        invocations = [ln for ln in text.splitlines() if "tests/visual_qa.py" in ln and ln.strip().startswith("python3")]
-        assert invocations, f"{wf} no longer invokes tests/visual_qa.py — the gating chain moved (#3277)"
+        invocations = [ln for ln in text.splitlines() if "qa/visual_qa.py" in ln and ln.strip().startswith("python3")]
+        assert invocations, f"{wf} no longer invokes qa/visual_qa.py — the gating chain moved (#3277)"
         for ln in invocations:
             assert "--no-a11y" not in ln, f"{wf} opts out of the axe audit — the 390px pass goes with it (#3277): {ln.strip()}"
     # the pass itself is not behind a flag: capture_page runs it whenever a baseline

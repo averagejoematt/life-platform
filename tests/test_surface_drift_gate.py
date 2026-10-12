@@ -75,7 +75,7 @@ def test_page_leg_fails_added_unregistered_and_names_the_manifest():
     findings = g.page_leg({"/newpage/"}, unregistered={"/newpage/"}, ghosts=set(), exemptions=[])
     (f,) = [f for f in findings if f.severity == "fail"]
     assert f.leg == "PAGE" and f.surface == "/newpage/"
-    assert "tests/qa_manifest.py" in f.fix and "_CURATED" in f.fix and "EXEMPT" in f.fix
+    assert "qa/qa_manifest.py" in f.fix and "_CURATED" in f.fix and "EXEMPT" in f.fix
 
 
 def test_page_leg_registered_added_page_is_ok():
