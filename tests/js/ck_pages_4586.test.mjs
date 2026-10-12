@@ -130,7 +130,7 @@ test("the bet card states the question, the date and both sides", () => {
   const undated = { ...B.next, data: { ...B.next.data, bet: { ...B.next.data.bet, data: { ...B.next.data.bet.data, question: "Will protein stay high?" } } } };
   assert.match(P.betHTML(undated), new RegExp(`<p class="ck-small">Settles ${BET_DAY}</p>`));
   // ruling 2026-10-11: off the front card the sides stand alone on one line; the reasons are the front card's
-  assert.match(html, new RegExp(`<p class="ck-soft">${SIDES_LINE.replace(/\./g, "\\.")}</p>`));
+  assert.ok(html.includes(`<p class="ck-soft">${SIDES_LINE}</p>`));
   assert.doesNotMatch(html, /Fuel-cognition link|Protein intake gap/);
   assert.equal(P.betLine(B.next), `A bet between ${SIDE_A} and ${SIDE_B} settles ${BET_DAY}.`);
   assert.equal(P.moreBetsLine(load("coach_docket"), BET.settle_date), `One more bet settles on ${shortDayOf(OTHER_BET)}.`);
