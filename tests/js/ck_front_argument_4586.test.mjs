@@ -28,6 +28,8 @@ const DAYS = readdirSync(FIX).filter((n) => n.startsWith("coach_moves_")).map((n
 const edition = load(KIT, "edition");
 const B = edition.blocks;
 const BASE = "/next/v8/";
+const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+const WEEK_SPAN = `${inWords(B.week.data.days[0])} to ${inWords(B.week.data.days.at(-1))}`;
 // The edition's `next` block with its bet absent: what the page sees between bets.
 const NO_BET = { ...B.next, data: { ...B.next.data, bet: { state: "absent", as_of: null, source: "/api/coach_docket", absent_text: "No coach bet is waiting to settle.", data: null } } };
 
@@ -202,11 +204,11 @@ test("the deeper rows: the chapter is one door with its week and its own first s
   assert.equal(F.chapterRowHTML({ state: "unavailable", absent_text: "The latest chapter is not served right now.", data: null }), '<p class="ck-soft">The latest chapter is not served right now.</p>');
   const slots = P.frontSlots(edition, B, BASE);
   assert.equal(slots["ck-chapter-row"], row);
-  assert.equal(slots["ck-week-span"], "How the whole thing is going · October 3 to October 9");
+  assert.equal(slots["ck-week-span"], `How the whole thing is going · ${WEEK_SPAN}`);
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
   // The first screen's numbers are doors; a failed block prints its sentence with no door.
-  assert.match(slots["ck-record"], /^<a href="\/next\/v8\/coaches\/">56 of 131 checked calls right\./);
-  assert.match(slots["ck-mark-caption"], /^<a href="\/next\/v8\/trend\/\?m=weight"><b>306\.1 lb<\/b>/);
+  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text}`));
+  assert.ok(slots["ck-mark-caption"].startsWith(`<a href="/next/v8/trend/?m=weight"><b>${B.today.data.weight_lbs.toFixed(1)} lb</b>`));
   const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-record"], "Not served right now.");
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-mark-caption"], "Not served right now.");
@@ -214,7 +216,7 @@ test("the deeper rows: the chapter is one door with its week and its own first s
 
 test("the week page carries the band whole: the sorted week without a second kicker, the chapter lines and the silence sentence", () => {
   const slots = P.weekSlots(edition, B, BASE);
-  assert.equal(slots["ck-week-label"], "This week · October 3 to October 9");
+  assert.equal(slots["ck-week-label"], `This week · ${WEEK_SPAN}`);
   assert.doesNotMatch(slots["ck-week"], /ck-label">How the whole thing is going/, "the page's own heading says it");
   assert.match(slots["ck-week"], /Going well|Not yet/);
   assert.match(slots["ck-quotes"], /“Park's Blind Spot”, the chapter/);

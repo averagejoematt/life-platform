@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:11.263481+00:00",
-  "served_at": "2026-10-10T02:38:11.263481+00:00",
+  "generated_at": "2026-10-12T15:35:36.524562+00:00",
+  "served_at": "2026-10-12T15:35:36.524562+00:00",
   "cache_seconds": 3600,
-  "request_id": "1c9788182df848e6"
+  "request_id": "dc57a0c4018d4f89"
  },
  "pulse_history": [
   {
@@ -444,9 +444,48 @@
    "sleep_hours": 7.2,
    "hrv_ms": 51.9,
    "rhr_bpm": 52,
-   "strain": 6.0,
+   "strain": 8.9,
    "steps": 2731,
    "headline": "306 lbs (-21.2) \u00b7 Recovery 59% \u00b7 Sleep 7.2h"
+  },
+  {
+   "date": "2026-10-10",
+   "day_number": 35,
+   "weight_lbs": 306.5,
+   "weight_delta": -20.8,
+   "recovery_pct": 56,
+   "sleep_hours": 6.7,
+   "hrv_ms": 50.0,
+   "rhr_bpm": 52,
+   "strain": 13.1,
+   "steps": 424,
+   "headline": "307 lbs (-20.8) \u00b7 Recovery 56% \u00b7 Sleep 6.7h"
+  },
+  {
+   "date": "2026-10-11",
+   "day_number": 36,
+   "weight_lbs": null,
+   "weight_delta": null,
+   "recovery_pct": 88,
+   "sleep_hours": 8.1,
+   "hrv_ms": 136.9,
+   "rhr_bpm": 66,
+   "strain": 8.4,
+   "steps": 4798,
+   "headline": "Recovery 88% \u00b7 Sleep 8.1h"
+  },
+  {
+   "date": "2026-10-12",
+   "day_number": 37,
+   "weight_lbs": 308.3,
+   "weight_delta": -19.0,
+   "recovery_pct": null,
+   "sleep_hours": null,
+   "hrv_ms": null,
+   "rhr_bpm": null,
+   "strain": null,
+   "steps": 183,
+   "headline": "308 lbs (-19.0)"
   }
  ]
 }

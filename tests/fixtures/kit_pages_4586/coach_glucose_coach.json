@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:36:46.398354+00:00",
-  "served_at": "2026-10-10T02:36:46.398354+00:00",
+  "generated_at": "2026-10-12T15:35:30.863686+00:00",
+  "served_at": "2026-10-12T15:35:30.863686+00:00",
   "cache_seconds": 300,
-  "request_id": "15abaac95d7f490c"
+  "request_id": "1dfa4ad62ada484c"
  },
  "persona_id": "glucose_coach",
  "name": "Amara Patel",
@@ -92,7 +92,7 @@
  },
  "latest_checked": {
   "prediction_id": "pred_20260909_nocturnal_glucose_dips_will_trigger_cort",
-  "claim": "Nocturnal glucose dips will trigger cortisol counter-regulation, fragmenting slow-wave sleep and degrading next-day insulin sensitivity, creating a bidirectional loop between CGM and sleep architecture.",
+  "claim": "",
   "created_date": "2026-09-09",
   "pre_registered_at": null,
   "outcome_date": "2026-09-30",
@@ -101,7 +101,21 @@
   "condition": "down",
   "threshold": null,
   "actual_value": 0.0035,
-  "status": "refuted"
+  "status": "refuted",
+  "unsourced": {
+   "reason": "no sensor since 2026-08-27",
+   "instrument": {
+    "source": "apple_health",
+    "datatype": "cgm"
+   },
+   "last_seen": "2026-08-27",
+   "gap": {
+    "start": "2026-08-27",
+    "end": null
+   },
+   "said_on": "2026-09-09",
+   "text": "Not quoted: this was said on September 9 and rests on his glucose sensor, which had sent no reading since August 27."
+  }
  },
  "instrument": {
   "source": "apple_health",
@@ -197,17 +211,17 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 2,
-   "refuted": 4,
+   "confirmed": 1,
+   "refuted": 5,
    "decided": 6,
-   "hit_rate_pct": 33.3,
+   "hit_rate_pct": 16.7,
    "record": {
-    "confirmed": 2,
-    "refuted": 4,
+    "confirmed": 1,
+    "refuted": 5,
     "n": 6,
     "through": "2026-09-30"
    },
-   "headline": "2 of 6 checked calls right through September 30",
+   "headline": "1 of 6 checked calls right through September 30",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -215,15 +229,15 @@
     "records": {
      "number": {
       "graded": 3,
-      "coach_right": 2,
-      "scored": 0,
+      "coach_right": 1,
+      "scored": 1,
       "coach_right_on_scored": 0,
-      "rule_right": 0,
+      "rule_right": 1,
       "coach_only": 0,
-      "rule_only": 0,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 3,
+      "not_yet_scored": 2,
       "verdict": "not_yet_scored",
       "sign_test_p": null,
       "coach_right_pct": null,
@@ -282,7 +296,7 @@
     "scored_complete": false,
     "skill": {
      "n": 6,
-     "brier_skill": -0.0207,
+     "brier_skill": -0.6331,
      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
     },
     "rule_sentence": null,
@@ -426,342 +440,402 @@
  "recent_outputs": [
   {
    "date": "2026-09-26",
-   "summary": "His CGM is generating traces, but without meal timestamps those waveforms remain mechanistically uninterpretable \u2014 a glucose excursion at 2:00 PM could be post-prandial, stress-driven, or a rebound.",
-   "themes": [
-    "glucose logging",
-    "CGM data interpretation",
-    "protein intake",
-    "gluconeogenesis",
-    "fasting glucose",
-    "nocturnal glucose",
-    "cortisol sleep interaction",
-    "deep sleep",
-    "recovery score",
-    "meal timing",
-    "mechanistic hypothesis"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-26T17:05:32.874424+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-26",
+    "text": "Not quoted: this was said on September 26 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-25",
-   "summary": "I made a mechanistically grounded prediction about his glucose pattern\u2014high-amplitude post-prandial excursions masked by an unremarkable mean\u2014but cannot yet test it because his CGM traces lack meal timestamps.",
-   "themes": [
-    "CGM data interpretation",
-    "post prandial glucose excursions",
-    "meal logging",
-    "protein intake",
-    "hepatic gluconeogenesis",
-    "fasting glucose",
-    "nocturnal glucose dynamics",
-    "deep sleep glucose interaction",
-    "insulin sensitivity",
-    "visceral adiposity"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-25T17:07:40.311307+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-25",
+    "text": "Not quoted: this was said on September 25 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-24",
    "summary": "",
-   "themes": [
-    "CGM data quality",
-    "meal logging",
-    "protein intake",
-    "hepatic gluconeogenesis",
-    "fasting glucose",
-    "post prandial glucose",
-    "HRV sleep coupling",
-    "nocturnal glucose regulation",
-    "cortisol counter regulation",
-    "deep sleep fragmentation"
-   ],
+   "themes": [],
    "generated_at": "2026-09-24T17:06:23.309592+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-24",
+    "text": "Not quoted: this was said on September 24 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-23",
-   "summary": "The CGM sensor is active, but without meal logging since 2026-09-10, every glucose waveform remains uninterpretable \u2014 a spike at 2pm could signal lunch, stress, or a longer walk.",
-   "themes": [
-    "CGM logging synchronization",
-    "meal logging compliance",
-    "protein intake trajectory",
-    "hepatic gluconeogenesis",
-    "fasting glucose baseline",
-    "nocturnal glucose dynamics",
-    "recovery score interpretation",
-    "HRV analysis",
-    "data quality gates"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-23T17:05:37.973695+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-23",
+    "text": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-22",
-   "summary": "I'm watching for a critical data gap: meal logging has been absent since September 19th, exactly when the CGM sensor is warming up and paired timestamps become essential for interpretation.",
-   "themes": [
-    "CGM data quality",
-    "meal logging",
-    "glucose variability",
-    "post prandial excursions",
-    "protein intake",
-    "gluconeogenesis",
-    "fasting glucose",
-    "visceral adiposity",
-    "nocturnal glucose",
-    "cortisol sleep interaction",
-    "deep sleep",
-    "kidney function"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-22T17:05:22.737848+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-22",
+    "text": "Not quoted: this was said on September 22 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-21",
-   "summary": "The CGM sensor is warming up and will be readable within a day or two, but I'm facing a critical constraint: meal logging has been absent since September 10th.",
-   "themes": [
-    "CGM data gaps",
-    "meal logging",
-    "protein intake",
-    "gluconeogenesis",
-    "fasting glucose",
-    "nocturnal glucose",
-    "cortisol counter regulation",
-    "sleep quality",
-    "metabolic context"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-21T17:06:45.704172+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-21",
+    "text": "Not quoted: this was said on September 21 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-20",
-   "summary": "The CGM sensor is arriving within days, but I cannot interpret glucose waveforms without meal composition logged in MacroFactor. Logging restart is the prerequisite for any meaningful analysis.",
-   "themes": [
-    "CGM logging",
-    "macrofactor integration",
-    "protein intake",
-    "hepatic gluconeogenesis",
-    "glucose variability",
-    "fasting glucose",
-    "nocturnal glucose",
-    "cortisol counter regulation",
-    "visceral adiposity",
-    "post prandial excursions"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-20T17:06:06.446921+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-20",
+    "text": "Not quoted: this was said on September 20 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-19",
-   "summary": "I'm testing whether nocturnal glucose dips are triggering counter-regulatory cortisol release that fragments his slow-wave sleep.",
-   "themes": [
-    "nocturnal glucose",
-    "counter regulatory response",
-    "slow wave sleep",
-    "CGM initialization",
-    "meal logging",
-    "hepatic gluconeogenesis",
-    "protein target",
-    "visceral adiposity",
-    "glucose variability",
-    "autonomic state",
-    "HRV recovery"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-19T17:06:49.642831+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-19",
+    "text": "Not quoted: this was said on September 19 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-18",
-   "summary": "His CGM sensor is on Day 13 and completing its warm-up phase, with usable data expected within 1-2 days.",
-   "themes": [
-    "glucose monitoring",
-    "CGM sensor readiness",
-    "meal logging",
-    "protein intake",
-    "gluconeogenesis",
-    "glucose interpretation",
-    "sleep glucose interaction",
-    "cortisol counter regulation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-18T17:06:13.253628+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-18",
+    "text": "Not quoted: this was said on September 18 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-17",
-   "summary": "Food logging stopped on 2026-09-10, leaving five days of CGM data unanchored to meals \u2014 a glucose trace without timestamps is an uninterpretable waveform. I can see the shape but not what drove it.",
-   "themes": [
-    "glucose logging",
-    "CGM calibration",
-    "meal context",
-    "protein intake",
-    "hepatic gluconeogenesis",
-    "nocturnal glucose",
-    "sleep glucose coupling",
-    "glucose variability",
-    "visceral adiposity",
-    "insulin sensitivity"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-17T17:06:17.457553+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-17",
+    "text": "Not quoted: this was said on September 17 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-16",
-   "summary": "His food logging stopped September 10th, creating a critical gap in CGM interpretation.",
-   "themes": [
-    "glucose logging",
-    "CGM data interpretation",
-    "protein intake",
-    "hepatic gluconeogenesis",
-    "nocturnal glucose",
-    "sleep glucose hypothesis",
-    "cortisol counter regulation",
-    "insulin sensitivity",
-    "recovery metrics",
-    "data quality"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-16T17:06:18.688797+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-16",
+    "text": "Not quoted: this was said on September 16 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-15",
-   "summary": "Matthew's CGM sensor enters its usable window through 2026-09-17, and I've asked him to restart food logging in parallel\u2014unlogged meals create signal without metabolic context.",
-   "themes": [
-    "CGM sensor logistics",
-    "food logging synchronization",
-    "glucose variability",
-    "visceral adiposity",
-    "protein intake",
-    "hepatic gluconeogenesis",
-    "nocturnal glucose sleep coupling",
-    "cortisol counter regulation",
-    "slow wave sleep fragmentation",
-    "recovery ceiling"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-15T17:06:23.220763+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-15",
+    "text": "Not quoted: this was said on September 15 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-14",
-   "summary": "The logging gap is the critical blocker. Food logging stopped on 2026-09-10, and the CGM sensor will produce usable readings between 2026-09-14 and 2026-09-17.",
-   "themes": [
-    "glucose logging",
-    "CGM sensor timing",
-    "glucose variability",
-    "visceral adiposity",
-    "insulin sensitivity",
-    "protein intake",
-    "gluconeogenesis",
-    "nocturnal glucose",
-    "cortisol counter regulation",
-    "data synchronization"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-14T17:05:37.195051+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-14",
+    "text": "Not quoted: this was said on September 14 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-13",
-   "summary": "The CGM sensor is on day 8 and usable readings should arrive within 48 hours, but I'm holding interpretation until two prerequisites align.",
-   "themes": [
-    "glucose monitoring",
-    "CGM sensor readiness",
-    "protein intake",
-    "visceral adiposity",
-    "insulin sensitivity",
-    "logging compliance",
-    "sleep glucose coupling",
-    "recovery score",
-    "HRV",
-    "resting heart rate"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-13T17:05:50.008161+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-13",
+    "text": "Not quoted: this was said on September 13 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-11",
-   "summary": "I'm establishing the prerequisites for meaningful glucose interpretation.",
-   "themes": [
-    "CGM protocol",
-    "logging requirements",
-    "protein intake",
-    "glucose variability",
-    "visceral adiposity",
-    "insulin sensitivity",
-    "nocturnal glucose",
-    "sleep glucose coupling",
-    "recovery score",
-    "HRV baseline"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-11T17:05:39.174128+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-11",
+    "text": "Not quoted: this was said on September 11 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-09",
-   "summary": "The CGM is warming up on Day 4 \u2014 null glucose fields are exactly what should be happening. I'm establishing the interpretive frame now, before the data arrives.",
-   "themes": [
-    "CGM data collection",
-    "glucose variability",
-    "meal logging protocol",
-    "insulin sensitivity",
-    "visceral adiposity",
-    "nocturnal glucose",
-    "sleep glucose coupling",
-    "post prandial response"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-09T17:05:42.164271+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-09",
+    "text": "Not quoted: this was said on September 9 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-08",
-   "summary": "His CGM is connected but all glucose metrics are returning null on Day 3\u2014Week 1 is data-collection work.",
-   "themes": [
-    "glucose monitoring",
-    "CGM data collection",
-    "insulin signaling",
-    "visceral adiposity",
-    "glucose variability",
-    "cardiometabolic health",
-    "logging protocol",
-    "cross coach coordination"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-08T17:05:38.218053+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-08",
+    "text": "Not quoted: this was said on September 8 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-07",
-   "summary": "I'm using glucose monitoring to map cardiometabolic risk, metabolic regulation efficiency, and autonomic stress in real time.",
-   "themes": [
-    "glucose monitoring",
-    "insulin sensitivity",
-    "cardiometabolic risk",
-    "visceral adiposity",
-    "fasting glucose",
-    "post meal response",
-    "glucose variability",
-    "autonomic stress signal",
-    "sleep glucose interaction",
-    "logging protocol",
-    "homa ir"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-07T17:05:49.790767+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-07",
+    "text": "Not quoted: this was said on September 7 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   },
   {
    "date": "2026-09-06",
-   "summary": "I'm spending the next 1-2 weeks mapping his individual glucose baseline \u2014 not to judge it against population norms, but to understand how *his* body manages fuel and stress at the cellular level.",
-   "themes": [
-    "glucose baseline establishment",
-    "CGM data collection",
-    "insulin sensitivity",
-    "metabolic regulation",
-    "glucose variability",
-    "post meal response",
-    "fasting glucose",
-    "sleep glucose interaction",
-    "cortisol dynamics",
-    "context logging"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-06T17:04:59.756885+00:00",
-   "data_through": null
+   "data_through": null,
+   "unsourced": {
+    "reason": "no sensor since 2026-08-27",
+    "instrument": {
+     "source": "apple_health",
+     "datatype": "cgm"
+    },
+    "last_seen": "2026-08-27",
+    "gap": {
+     "start": "2026-08-27",
+     "end": null
+    },
+    "said_on": "2026-09-06",
+    "text": "Not quoted: this was said on September 6 and rests on his glucose sensor, which had sent no reading since August 27."
+   }
   }
  ],
  "conversations": {
@@ -777,11 +851,11 @@
     "record_id": "COMMITMENT#commit_20260926_restart_meal_logging_today_to_provide_cg",
     "date": "2026-09-26",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-03",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-11",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -790,11 +864,11 @@
     "record_id": "COMMITMENT#commit_20260925_restart_meal_logging_today_in_parallel_w",
     "date": "2026-09-25",
     "text": "",
-    "status": "pending",
+    "status": "unresolved",
     "due_date": "2026-10-02",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-10",
+    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
     "check": null,
     "evidence_link": null
    },
@@ -1239,8 +1313,8 @@
    "held": 33,
    "kept": 10,
    "broken": 1,
-   "pending": 2,
-   "unresolved": 20,
+   "pending": 0,
+   "unresolved": 22,
    "ungradeable": 0
   },
   "learnings": [

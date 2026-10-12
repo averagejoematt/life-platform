@@ -1,42 +1,61 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:10.707187+00:00",
-  "served_at": "2026-10-10T02:38:10.707187+00:00",
+  "generated_at": "2026-10-12T15:35:34.597004+00:00",
+  "served_at": "2026-10-12T15:35:34.597004+00:00",
   "cache_seconds": 300,
-  "request_id": "fefebe4d44864475"
+  "request_id": "b5f968b3a9c94233"
  },
  "overall": {
   "total": 50,
-  "confirmed": 2,
-  "refuted": 4,
+  "confirmed": 1,
+  "refuted": 5,
   "pending": 2,
   "inconclusive": 4,
   "expired": 2,
   "observational": 36,
   "decided": 6,
-  "accuracy_pct": 33.3,
+  "accuracy_pct": 16.7,
   "due": {
-   "as_of": "2026-10-09",
+   "as_of": "2026-10-12",
    "due_now": 0,
    "earliest_due": "2026-10-16"
   },
+  "counted": {
+   "sealed": {
+    "n": 0,
+    "right": 0
+   },
+   "bet": {
+    "n": 1,
+    "right": 0
+   },
+   "commentary": {
+    "n": 5,
+    "right": 1
+   },
+   "conditional": {
+    "n": 0,
+    "right": 0
+   }
+  },
+  "counted_text": "Counted: 1 side of a bet between two coaches and 5 read out of the coaches' running commentary.",
   "lifetime": {
    "total": 401,
-   "confirmed": 2,
-   "refuted": 6,
+   "confirmed": 1,
+   "refuted": 7,
    "pending": 128,
    "inconclusive": 77,
    "expired": 3,
    "observational": 185,
    "decided": 8,
-   "accuracy_pct": 25.0
+   "accuracy_pct": 12.5
   }
  },
  "by_coach": {
   "glucose": {
    "total": 50,
-   "confirmed": 2,
-   "refuted": 4,
+   "confirmed": 1,
+   "refuted": 5,
    "pending": 2,
    "inconclusive": 4,
    "expired": 2,
@@ -44,19 +63,19 @@
    "decided": 6,
    "lifetime": {
     "total": 401,
-    "confirmed": 2,
-    "refuted": 6,
+    "confirmed": 1,
+    "refuted": 7,
     "pending": 128,
     "inconclusive": 77,
     "expired": 3,
     "observational": 185,
     "decided": 8,
-    "hit_rate_pct": 25.0
+    "hit_rate_pct": 12.5
    },
    "retired": false,
    "record": {
-    "confirmed": 2,
-    "refuted": 4,
+    "confirmed": 1,
+    "refuted": 5,
     "n": 6,
     "through": "2026-09-30"
    },
@@ -67,15 +86,15 @@
     "records": {
      "number": {
       "graded": 3,
-      "coach_right": 2,
-      "scored": 0,
+      "coach_right": 1,
+      "scored": 1,
       "coach_right_on_scored": 0,
-      "rule_right": 0,
+      "rule_right": 1,
       "coach_only": 0,
-      "rule_only": 0,
+      "rule_only": 1,
       "unscorable": 0,
       "unscorable_reasons": {},
-      "not_yet_scored": 3,
+      "not_yet_scored": 2,
       "verdict": "not_yet_scored",
       "sign_test_p": null,
       "coach_right_pct": null,
@@ -134,7 +153,7 @@
     "scored_complete": false,
     "skill": {
      "n": 6,
-     "brier_skill": -0.0207,
+     "brier_skill": -0.6331,
      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
     },
     "rule_sentence": null,
@@ -142,7 +161,7 @@
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
-   "hit_rate_pct": 33.3
+   "hit_rate_pct": 16.7
   }
  },
  "comparison": {
@@ -152,15 +171,15 @@
   "records": {
    "number": {
     "graded": 3,
-    "coach_right": 2,
-    "scored": 0,
+    "coach_right": 1,
+    "scored": 1,
     "coach_right_on_scored": 0,
-    "rule_right": 0,
+    "rule_right": 1,
     "coach_only": 0,
-    "rule_only": 0,
+    "rule_only": 1,
     "unscorable": 0,
     "unscorable_reasons": {},
-    "not_yet_scored": 3,
+    "not_yet_scored": 2,
     "verdict": "not_yet_scored",
     "sign_test_p": null,
     "coach_right_pct": null,
@@ -219,7 +238,7 @@
   "scored_complete": false,
   "skill": {
    "n": 6,
-   "brier_skill": -0.0207,
+   "brier_skill": -0.6331,
    "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
   },
   "rule_sentence": null,
@@ -228,82 +247,43 @@
   "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
  },
  "percent_floor": 10,
- "predictions": [
-  {
-   "coach_id": "glucose",
-   "coach_name": "Amara Patel",
-   "retired": false,
-   "text": "Nocturnal glucose dips are contributing to deep sleep decline through counter-regulatory cortisol fragmentation of slow-wave sleep.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-25",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-10-16",
-   "gradeable": true,
-   "metric": "deep_pct",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "general"
-  },
-  {
-   "coach_id": "glucose",
-   "coach_name": "Amara Patel",
-   "retired": false,
-   "text": "Nocturnal glucose dips will trigger cortisol counter-regulation, fragmenting slow-wave sleep and contributing to the recovery ceiling observed in Whoop data.",
-   "confidence": 0.5,
-   "status": "pending",
-   "date": "2026-09-15",
-   "pre_registered_at": null,
-   "pre_registered": false,
-   "due_date": "2026-11-03",
-   "gradeable": true,
-   "metric": "recovery_score",
-   "eval_type": "directional",
-   "outcome_notes": "",
-   "reason": null,
-   "graded_on_data": null,
-   "subdomain": "recovery"
-  }
- ],
+ "predictions": [],
  "commitments": {
-  "as_of": "2026-10-09",
+  "as_of": "2026-10-11",
   "lifetime": {
+   "pending": 60.0,
+   "ungradeable": 38.0,
+   "ungradeable_by_metric": {
+    "total_calories_kcal": 2.0,
+    "total_protein_g": 36.0
+   },
+   "graded": 75.0,
+   "checkable": 118.0,
+   "follow_through_pct": 65.3,
+   "broken": 26.0,
+   "kept": 49.0,
    "follow_through_ci95": [
     54.1,
     75.1
    ],
-   "ungradeable": 38.0,
-   "kept": 49.0,
-   "total": 800.0,
-   "checkable": 118.0,
-   "graded": 75.0,
-   "follow_through_pct": 65.3,
-   "unresolved": 604.0,
-   "pending": 83.0,
-   "ungradeable_by_metric": {
-    "total_protein_g": 36.0,
-    "total_calories_kcal": 2.0
-   },
-   "broken": 26.0
+   "unresolved": 627.0,
+   "total": 800.0
   },
   "season": {
-   "graded": 57.0,
-   "kept": 39.0,
-   "ungradeable": 0.0,
    "follow_through_pct": 68.4,
-   "checkable": 60.0,
-   "pending": 76.0,
-   "broken": 18.0,
-   "unresolved": 176.0,
-   "total": 309.0,
+   "pending": 55.0,
+   "graded": 57.0,
+   "ungradeable": 0.0,
    "follow_through_ci95": [
     55.5,
     79.0
    ],
-   "ungradeable_by_metric": {}
+   "unresolved": 197.0,
+   "kept": 39.0,
+   "broken": 18.0,
+   "ungradeable_by_metric": {},
+   "total": 309.0,
+   "checkable": 60.0
   }
  },
  "cycle": 17,

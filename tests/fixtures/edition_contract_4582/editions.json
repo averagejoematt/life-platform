@@ -754,18 +754,35 @@
    },
    "record": {
     "state": "ok",
-    "as_of": "2026-10-03",
+    "as_of": "2026-10-12",
     "source": [
      "/api/predictions",
      "/api/calibration"
     ],
     "absent_text": "No coach call has been checked yet.",
     "data": {
-     "right": 41,
-     "decided": 96,
-     "count_text": "41 of 96 checked calls right.",
-     "counted": null,
-     "counted_text": null,
+     "right": 62,
+     "decided": 152,
+     "count_text": "62 of 152 checked calls right.",
+     "counted": {
+      "sealed": {
+       "n": 11,
+       "right": 5
+      },
+      "bet": {
+       "n": 6,
+       "right": 3
+      },
+      "commentary": {
+       "n": 92,
+       "right": 41
+      },
+      "conditional": {
+       "n": 43,
+       "right": 13
+      }
+     },
+     "counted_text": "Counted: 11 sealed before day one, 6 sides of bets between two coaches, 92 read out of the coaches' running commentary and 43 conditional or hedged sentences.",
      "beats_simple_guess": false,
      "comparison_text": "So far they do not beat a simple guess.",
      "brier_skill": -0.0158,

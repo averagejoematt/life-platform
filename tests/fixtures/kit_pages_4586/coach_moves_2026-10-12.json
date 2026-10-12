@@ -1,0 +1,13 @@
+{
+ "_meta": {
+  "generated_at": "2026-10-12T15:35:39.445659+00:00",
+  "served_at": "2026-10-12T15:35:39.445659+00:00",
+  "cache_seconds": 300,
+  "request_id": "3dc551b7466d4042"
+ },
+ "state": "absent",
+ "date": "2026-10-12",
+ "source": "/api/coach_moves",
+ "absent_text": "No coach line is recorded for Monday, October 12.",
+ "lines": []
+}
