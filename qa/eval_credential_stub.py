@@ -24,7 +24,7 @@ def install_credential_stub():
         except Exception:
             pass
     os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"  # noqa: S105 - deliberate dummy for the offline stub
 
 
 install_credential_stub()

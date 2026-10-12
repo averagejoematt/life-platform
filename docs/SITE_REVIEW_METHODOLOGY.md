@@ -8,8 +8,8 @@
 > and tell the right story." Runs as a human-in-the-loop pass in Claude Code via the
 > `/review site` lens (Claude Code sees the screenshots directly).
 > First review: 2026-06-20. Cadence: weekly through the first 3 months, then monthly.
-> Findings stored in `docs/site-reviews/`. Tooling: `tests/site_review.py` (capture +
-> data corroboration), `tests/site_review_bindings.py` (page→endpoint map).
+> Findings stored in `docs/site-reviews/`. Tooling: `qa/site_review.py` (capture +
+> data corroboration), `qa/site_review_bindings.py` (page→endpoint map).
 
 ---
 
@@ -123,10 +123,10 @@ The doc leads with the **story spine** and a one-line **throughline verdict** (`
 ## Data corroboration — three layers
 
 1. **Rendered vs source** (per page, in the skill): does the number on the screenshot equal the value in that page's captured `api/*.json`? Catches render/format bugs.
-2. **Cross-page consistency** (deterministic, in `site_review.py`): the same canonical metric pulled from ≥2 endpoints must agree within tolerance (weight ≤0.1 lb; level/day-count exact; ratios ≤0.5pp). Catches "weight = 305 on Home but 306 on Cockpit." Tracked metrics + tolerances live in `tests/site_review_bindings.py::METRIC_TOLERANCE`.
+2. **Cross-page consistency** (deterministic, in `site_review.py`): the same canonical metric pulled from ≥2 endpoints must agree within tolerance (weight ≤0.1 lb; level/day-count exact; ratios ≤0.5pp). Catches "weight = 305 on Home but 306 on Cockpit." Tracked metrics + tolerances live in `qa/site_review_bindings.py::METRIC_TOLERANCE`.
 3. **Right story** (judgement, in the skill): beyond exact-match — is the number *framed honestly* (anti-Blueprint, setbacks shown), in the right unit, with enough context to inform rather than mislead?
 
-The binding map (`tests/site_review_bindings.py`) is the single source of truth for which endpoints back which page; its evidence half is generated from `scripts/v4_build_evidence.py::REGISTRY` so it can't drift. Add a new page or rename an endpoint and the binding self-check fails loudly.
+The binding map (`qa/site_review_bindings.py`) is the single source of truth for which endpoints back which page; its evidence half is generated from `scripts/v4_build_evidence.py::REGISTRY` so it can't drift. Add a new page or rename an endpoint and the binding self-check fails loudly.
 
 ---
 

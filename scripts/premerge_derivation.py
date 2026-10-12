@@ -1,4 +1,4 @@
-"""tests/premerge_derivation.py — #2372: mechanically find tree-sweeping test files.
+"""scripts/premerge_derivation.py — #2372: mechanically find tree-sweeping test files.
 
 `_PREMERGE_EXTRA_FILES` (tests/conftest.py) is the pre-merge lane's structural-gate
 list — "test files that sweep the source tree (git ls-files / os.walk) and are not
@@ -105,7 +105,7 @@ def _imports_a_sweeping_helper(text: str, helpers: set[str]) -> bool:
 
 
 def discover_tree_sweeping_test_files(root: Path | None = None) -> set[str]:
-    """Return the basenames of every `test_*.py` file under `root` (default: this
+    """Return the basenames of every `test_*.py` file under `root` (default: `tests/`
     directory) that sweeps a directory tree — **directly**, or by importing a
     sweeping helper module (#2924) — excluding the `*_behavior.py` suite.
 

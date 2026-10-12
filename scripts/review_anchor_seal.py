@@ -271,7 +271,7 @@ def _resolve_mobile_viewport(ctx: dict) -> Resolution:
 
 def _resolve_a11y_viewports(ctx: dict) -> Resolution:
     values = _ast_constant("qa/a11y_audit.py", "VIEWPORTS")
-    return Resolution("a11y_viewports", ", ".join(values), "tests/a11y_audit.VIEWPORTS")
+    return Resolution("a11y_viewports", ", ".join(values), "qa/a11y_audit.VIEWPORTS")
 
 
 #: name -> (resolver, one-line statement of where the value comes from). A placeholder

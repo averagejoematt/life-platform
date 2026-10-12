@@ -81,7 +81,7 @@ Single-page deep dive: run `python3 qa/site_review.py --page <path>`, then do th
 ## Notes
 
 - **The capture phase is $0** — no Bedrock; the session reads the PNGs itself.
-- The binding map (`tests/site_review_bindings.py`) defines which endpoints back which page and
+- The binding map (`qa/site_review_bindings.py`) defines which endpoints back which page and
   which metrics are cross-checked; if a page looks un-corroborated, check that it has a binding
   entry (the self-check `python3 qa/site_review_bindings.py` asserts coverage).
 - **Site shells are generator output.** If a page has a matching `scripts/v4_build_*.py`, a finding

@@ -15,7 +15,4 @@ if _ROOT not in sys.path:
 _mod = importlib.import_module("qa.eval_credential_stub")
 # Path-loaded callers (spec_from_file_location, no sys.modules lookup) keep THIS module object: mirror the surface.
 globals().update({k: v for k, v in vars(_mod).items() if not k.startswith("__")})
-if __name__ == "__main__":
-    _mod.main()
-else:
-    sys.modules[__name__] = _mod
+sys.modules[__name__] = _mod
