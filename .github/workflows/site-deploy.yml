@@ -109,6 +109,10 @@ jobs:
     timeout-minutes: 10
     outputs:
       superseded: ${{ steps.supersede.outputs.superseded }}
+    # #4257: the deploy role trusts only `environment:` subjects, never a bare main ref. This
+    # environment has NO reviewers (the site ships itself on merge, #750) and a main-only
+    # branch policy — it is the job's identity, not an approval gate.
+    environment: ungated-deploy
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -424,6 +428,10 @@ jobs:
       needs.deploy-site.result == 'success' &&
       needs.deploy-site.outputs.superseded != 'true' &&
       (needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure')
+    # #4257: the deploy role trusts only `environment:` subjects, never a bare main ref. This
+    # environment has NO reviewers (the site ships itself on merge, #750) and a main-only
+    # branch policy — it is the job's identity, not an approval gate.
+    environment: ungated-deploy
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -621,7 +629,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Post failure to SNS

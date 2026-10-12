@@ -13,8 +13,8 @@
         },
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
-            "repo:averagejoematt/life-platform:ref:refs/heads/main",
-            "repo:averagejoematt/life-platform:environment:production"
+            "repo:averagejoematt/life-platform:environment:production",
+            "repo:averagejoematt/life-platform:environment:ungated-deploy"
           ]
         }
       }
