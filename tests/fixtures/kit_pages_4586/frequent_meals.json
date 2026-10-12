@@ -1,14 +1,14 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:12.702450+00:00",
-  "served_at": "2026-10-10T02:38:12.702450+00:00",
+  "generated_at": "2026-10-12T15:35:38.033972+00:00",
+  "served_at": "2026-10-12T15:35:38.033972+00:00",
   "cache_seconds": 3600,
-  "request_id": "186936fbf98b4b82"
+  "request_id": "6a4746e5d6084079"
  },
  "meals": [
   {
    "name": "Morning Smoothies",
-   "frequency": 24,
+   "frequency": 25,
    "avg_calories": 80,
    "avg_protein_g": 15,
    "avg_carbs_g": 4,
@@ -24,35 +24,43 @@
   },
   {
    "name": "Fiber Gummies",
-   "frequency": 14,
+   "frequency": 13,
    "avg_calories": 25,
    "avg_protein_g": 0,
    "avg_carbs_g": 10,
    "protein_cal_pct": 0
   },
   {
-   "name": "Onion, White, Yellow or Red, Raw",
+   "name": "Complete Vanilla 20g Protein Greek Yogurt",
    "frequency": 11,
+   "avg_calories": 106,
+   "avg_protein_g": 13,
+   "avg_carbs_g": 10,
+   "protein_cal_pct": 49
+  },
+  {
+   "name": "Cool Whip Lite",
+   "frequency": 11,
+   "avg_calories": 78,
+   "avg_protein_g": 1,
+   "avg_carbs_g": 12,
+   "protein_cal_pct": 5
+  },
+  {
+   "name": "Onion, White, Yellow or Red, Raw",
+   "frequency": 10,
    "avg_calories": 15,
    "avg_protein_g": 0,
    "avg_carbs_g": 4,
    "protein_cal_pct": 0
   },
   {
-   "name": "Rice White Cooked Without Salt",
-   "frequency": 11,
-   "avg_calories": 180,
-   "avg_protein_g": 3,
-   "avg_carbs_g": 40,
-   "protein_cal_pct": 7
-  },
-  {
-   "name": "Cool Whip Lite",
-   "frequency": 11,
-   "avg_calories": 75,
-   "avg_protein_g": 1,
-   "avg_carbs_g": 11,
-   "protein_cal_pct": 5
+   "name": "Olive Oil",
+   "frequency": 10,
+   "avg_calories": 64,
+   "avg_protein_g": 0,
+   "avg_carbs_g": 0,
+   "protein_cal_pct": 0
   },
   {
    "name": "Red Bell Peppers, Cooked",
@@ -61,14 +69,6 @@
    "avg_protein_g": 0,
    "avg_carbs_g": 4,
    "protein_cal_pct": 0
-  },
-  {
-   "name": "Complete Vanilla 20g Protein Greek Yogurt",
-   "frequency": 9,
-   "avg_calories": 111,
-   "avg_protein_g": 13,
-   "avg_carbs_g": 11,
-   "protein_cal_pct": 47
   }
  ],
  "period_days": 30

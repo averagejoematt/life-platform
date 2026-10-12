@@ -22,6 +22,10 @@ The day pages' coach lines are captured for every day the gate opens (each ``?d=
 ``KIT_PAGES``) and for the newest day the captured pulse and workouts carry (the day page with
 no ``?d=``), one ``coach_moves_<day>.json`` each; the gate routes each file to its own day.
 
+Last recaptured: 2026-10-12 (#4839). tests/test_kit_fixtures_fresh_4839.py reds when
+``_capture.json`` is more than ``MAX_AGE_DAYS`` (30) days old, and when this line and the
+manifest name different days — re-run the script, then change the date here.
+
 Usage:
     python3 scripts/capture_kit_page_fixtures.py            # capture and write
     python3 scripts/capture_kit_page_fixtures.py --check    # capture, report, write nothing
@@ -41,6 +45,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(REPO, "tests", "fixtures", "kit_pages_4586")
 MANIFEST = "_capture.json"
 BASE = "https://averagejoematt.com"
+#: #4839: the committed captures describe the site; a month on, they describe a site that is gone.
+MAX_AGE_DAYS = 30
 USER_AGENT = "life-platform-kit-fixture-capture/4671 (read-only)"
 
 #: fixture file -> the address it is captured from. Every file the gate routes and every file
@@ -77,6 +83,12 @@ CAPTURES = {
 }
 
 _DAY = re.compile(r"[?&]d=(\d{4}-\d{2}-\d{2})\b")
+
+
+def age_days(captured_at: str, now: datetime) -> float:
+    """Days between the manifest's ``captured_at`` (UTC, ``%Y-%m-%dT%H:%M:%SZ``) and ``now`` (tz-aware)."""
+    taken = datetime.strptime(captured_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return (now - taken).total_seconds() / 86400
 
 
 def moves_file(day: str) -> str:

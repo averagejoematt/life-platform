@@ -223,6 +223,21 @@ def model_for(route: str, env: Optional[Mapping[str, str]] = None) -> str:
     return environ.get(var, default)
 
 
+# ── Batch inference (#4814): the batch-capable stand-in ─────────────────────────────────
+# Models Bedrock lists WITHOUT batch inference. A route that resolves to one of these runs its
+# batch job on Haiku 4.5 (same price class, same structured-JSON task) instead of failing at submit.
+BATCH_UNSUPPORTED_MODELS = ("haiku-5-5",)
+BATCH_FALLBACK_MODEL = _HAIKU_4_5
+
+
+def batch_model_for(route: str, env: Optional[Mapping[str, str]] = None) -> str:
+    """The model a BATCH job for `route` runs on: `model_for(route)`, or Haiku 4.5 if that lists no Batch."""
+    m = model_for(route, env)
+    if any(marker in m.lower() for marker in BATCH_UNSUPPORTED_MODELS):
+        return BATCH_FALLBACK_MODEL
+    return m
+
+
 # ── Receipt lookups (#4774, box 3): tier of a metered row, None when the registry can't say ──
 # Tier order for a model that several tiers run on today (Haiku 4.5 is workhorse, economy and
 # vision at once): the first listed wins, and `tiers_for_model` returns them all.

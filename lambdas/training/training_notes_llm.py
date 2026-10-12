@@ -31,7 +31,7 @@ from common.numeric import decimals_to_float, floats_to_decimal
 
 logger = logging.getLogger(__name__)
 
-from ai.model_routing import model_for  # noqa: E402 — #4770: the one model registry
+from ai.model_routing import batch_model_for, model_for  # noqa: E402 — #4770: the one model registry
 
 HAIKU_MODEL = model_for("training_notes")
 # #4643: the budget_guard feature the Haiku tail is gated on — listed in
@@ -192,18 +192,31 @@ class UnparseableResponse(ExtractionDegraded):
     degrade_code = "unparseable"
 
 
-def _haiku_call(note_text: str, taxonomy) -> list:
-    """The single Bedrock chokepoint for this feature. Returns a list of raw signals."""
-    from ai.bedrock_client import invoke
-
+def build_request_body(note_text: str, taxonomy, model: str | None = None) -> dict:
+    """The one Messages body for a note — shared by the on-demand call and the batch record (#4814)."""
     allowed = ", ".join(sorted(taxonomy))
-    body = {
-        "model": HAIKU_MODEL,
+    return {
+        "model": model or HAIKU_MODEL,
         "max_tokens": MAX_TOKENS,
         "system": f"{_SYSTEM}\nAllowed classes: {allowed}.",
         "messages": [{"role": "user", "content": f"Note: {note_text}\nReturn the JSON array."}],
     }
+
+
+def _haiku_call(note_text: str, taxonomy) -> list:
+    """The single Bedrock chokepoint for this feature. Returns a list of raw signals."""
+    from ai.bedrock_client import invoke
+
+    body = build_request_body(note_text, taxonomy)
     resp = invoke(body, model_name=HAIKU_MODEL)
+    return signals_from_response(resp, taxonomy)
+
+
+def signals_from_response(resp: dict, taxonomy) -> list:
+    """A Messages response (on-demand OR a batch record's modelOutput) -> in-taxonomy signals.
+
+    Raises the same `ExtractionDegraded` subclasses either way (#4814: a batch reply passes
+    the identical truncation check and in-taxonomy filter)."""
     text = "".join(part.get("text", "") for part in resp.get("content", []) if part.get("type") == "text").strip()
     # #3699: truncation is read from Bedrock's own stop_reason BEFORE the parse. A response
     # cut off at the cap is billed in full and yields a partial array; parsing it (or failing
@@ -342,7 +355,7 @@ def _ai_allowed() -> bool:
     return budget_guard.allow(BUDGET_FEATURE)
 
 
-def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live"):
+def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live", precomputed: dict | None = None):
     """Build the llm_fn passed to training_notes.extract_signals: hash-cached + capped.
 
     `lane` names the monthly counter this closure charges (#4151): `live` for the on-ingest
@@ -353,6 +366,11 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live
     the cached signals with no model call and no cap consumption. On a cap breach it
     raises CapExceeded (→ the caller degrades, deterministic-only). The future Bedrock
     swap only touches _haiku_call.
+
+    `precomputed` ({note_hash: ExtractionDegraded}, #4814) carries a bulk batch pass's billed-but-unusable
+    answers: the note raises that degrade without a second model call or a second cap charge, exactly as
+    the on-demand path degraded it the first time. A batch-answered USABLE note is already in the hash
+    cache, so it is an ordinary cache hit here.
     """
 
     usage_sk(lane=lane)  # validate the lane at build time, not on the first uncached note
@@ -364,6 +382,8 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live
         cached = cache_get(table, h)
         if cached is not None:
             return cached
+        if precomputed and h in precomputed:
+            raise precomputed[h]
         if not _ai_allowed():
             # #4643: before the cap read and before any spend — a paused tier charges nothing.
             raise BudgetPaused(f"budget tier pauses {BUDGET_FEATURE} ({lane} lane)")
@@ -385,3 +405,110 @@ def make_llm_fn(table, monthly_cap: int = DEFAULT_MONTHLY_CAP, lane: str = "live
         return signals
 
     return _fn
+
+
+# ── The bulk batch pass (#4814) ───────────────────────────────────────────────
+def batch_model() -> str:
+    """The model a batch job runs on: the registry's batch-capable resolution for `training_notes`."""
+    return batch_model_for("training_notes")
+
+
+def uncached_notes(table, notes) -> dict:
+    """{note_hash: note_text} for the distinct notes with no hash-cache entry. `notes` are the stripped texts
+    the extractor would send (`extract_signals` hashes the stripped text)."""
+    from training.training_notes import note_hash as _nh
+
+    out: dict = {}
+    for text in notes:
+        h = _nh(text)
+        if h in out:
+            continue
+        if cache_get(table, h) is None:
+            out[h] = text
+    return out
+
+
+def bulk_prefetch(
+    table,
+    notes,
+    taxonomy,
+    *,
+    monthly_cap: int = DEFAULT_MONTHLY_CAP,
+    lane: str = "bulk",
+    force_realtime: bool = False,
+    wait_hours: float | None = None,
+    run=None,
+    realtime_fn=None,
+    log=print,
+) -> dict:
+    """Answer the uncached notes of a sweep as ONE Bedrock batch job when they clear the 100-record floor.
+
+    Returns {mode, reason, records, job_arn, answered, degraded, errors, precomputed}; `mode` is
+    "realtime" when nothing was submitted (the caller's ordinary per-note `make_llm_fn` path then does the
+    work, exactly as before), else "batch" / "batch+realtime".
+
+    The cap is checked on the RECORD COUNT before submit: a job that would pass `monthly_cap` is refused
+    whole (mode=realtime, the per-note path degrades the overflow as `cap_exceeded`, as today). Every record
+    that gets a model answer, batch or fallback, is charged one call on the lane (`_bump_calls`) and a
+    usable answer is `cache_put` — the same two side effects `make_llm_fn` has on-demand. An answer that
+    degrades is billed and counted but never cached, and is handed back in `precomputed` so the sweep
+    records the same degrade without re-billing the note."""
+    import time
+
+    from ai import bedrock_batch, bedrock_client
+
+    usage_sk(lane=lane)  # validate the lane
+    todo = uncached_notes(table, notes)
+    base = {"mode": "realtime", "records": len(todo), "job_arn": None, "answered": 0, "degraded": 0, "errors": 0, "precomputed": {}}
+    if force_realtime:
+        return {**base, "reason": f"{len(todo)} uncached notes — real-time requested (--realtime)"}
+    if not _ai_allowed():
+        return {**base, "reason": f"budget tier pauses {BUDGET_FEATURE}; nothing submitted"}
+    used = monthly_calls(table, lane=lane)
+    if used + len(todo) > monthly_cap:
+        return {
+            **base,
+            "reason": f"{len(todo)} records + {used} used would pass the {lane}-lane monthly cap {monthly_cap}; nothing submitted",
+        }
+    model = batch_model()
+    eligible, why = bedrock_batch.batch_preflight(len(todo), model)
+    if not eligible:
+        return {**base, "reason": why}
+
+    records = [bedrock_batch.build_jsonl_record(h, build_request_body(t, taxonomy, model), model) for h, t in todo.items()]
+
+    plain = realtime_fn or (lambda mi: bedrock_client.invoke_with_retry(mi, model))
+
+    def guarded(model_input):
+        try:
+            return plain(model_input)
+        except Exception as e:  # noqa: BLE001 — a failed fallback leaves that note to the per-note path
+            return {"_read_error": f"{type(e).__name__}: {e}"}
+
+    run = run or bedrock_batch.run_or_fallback
+    deadline = time.time() + wait_hours * 3600 if wait_hours is not None else None
+    res = run(
+        records,
+        model,
+        guarded,
+        deadline_epoch=deadline,
+        job_name=f"training-notes-{time.strftime('%Y%m%d-%H%M%S', time.gmtime())}",
+        log=log,
+    )
+    out = {**base, "mode": res["mode"], "reason": res["reason"], "job_arn": res.get("job_arn"), "savings": res.get("savings")}
+    for rec, resp in zip(records, res["results"]):
+        h = rec["recordId"]
+        if not isinstance(resp, dict) or resp.get("_read_error"):
+            out["errors"] += 1  # unanswered: no bill, no cache — the per-note path retries it
+            continue
+        try:
+            signals = signals_from_response(resp, taxonomy)
+        except ExtractionDegraded as e:
+            _bump_calls(table, lane=lane)
+            out["degraded"] += 1
+            out["precomputed"][h] = e
+            continue
+        _bump_calls(table, lane=lane)
+        cache_put(table, h, signals)
+        out["answered"] += 1
+    return out

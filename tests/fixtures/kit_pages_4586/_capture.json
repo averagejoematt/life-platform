@@ -1,5 +1,5 @@
 {
- "captured_at": "2026-10-10T02:38:50Z",
+ "captured_at": "2026-10-12T15:35:22Z",
  "base": "https://averagejoematt.com",
  "by": "scripts/capture_kit_page_fixtures.py (#4671) \u2014 one pass, read-only GETs; re-run it, never hand-edit a file",
  "files": {
@@ -14,7 +14,7 @@
   "coach_moves_2026-09-24.json": "/api/coach_moves?date=2026-09-24",
   "coach_moves_2026-10-01.json": "/api/coach_moves?date=2026-10-01",
   "coach_moves_2026-10-07.json": "/api/coach_moves?date=2026-10-07",
-  "coach_moves_2026-10-09.json": "/api/coach_moves?date=2026-10-09",
+  "coach_moves_2026-10-12.json": "/api/coach_moves?date=2026-10-12",
   "coach_physical_coach.json": "/api/coach/physical_coach",
   "coach_sleep_coach.json": "/api/coach/sleep_coach",
   "coaches.json": "/api/coaches",
@@ -35,9 +35,5 @@
   "transcript_wk4.json": "/panelcast/wk4.transcript.json",
   "weekly_priority.json": "/api/weekly_priority",
   "workouts.json": "/api/workouts"
- },
- "composed": {
-  "edition.json": "blocks moves, calls, sheet and lead_read composed by lambdas/web/site_api_edition.py (#4582) from coach_moves_*.json, calls.json, character.json and weekly_priority.json of this same capture: the route that serves them was not deployed when it was taken. The next run of the script replaces the file whole. Its calls block was re-derived from calls.json after that file's #4808 recomposition, and next.bet's sides carry each coach's reason (#4809, web.site_api_edition.bet_reason) from this capture's coach_docket.json.",
-  "calls.json": "number calls' sentences, title and tolerance re-composed by lambdas/web/site_api_calls.build_call (#4808) from the same settled PREDICTION# rows (read-only DynamoDB, 2026-10-11): the route that serves the whole-number call and the served tolerance was not deployed when this capture was taken; every other field is the capture's. The next run of the script replaces the file whole."
  }
 }

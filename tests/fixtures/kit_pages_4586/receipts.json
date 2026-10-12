@@ -1,15 +1,15 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:38:13.580342+00:00",
-  "served_at": "2026-10-10T02:38:13.580342+00:00",
+  "generated_at": "2026-10-12T15:35:39.181914+00:00",
+  "served_at": "2026-10-12T15:35:39.181914+00:00",
   "cache_seconds": 900,
-  "request_id": "3aa2db724b9d469f"
+  "request_id": "ed724141d97f45ef"
  },
- "as_of": "2026-10-10T02:38:13+00:00",
+ "as_of": "2026-10-12T15:35:38+00:00",
  "stale": false,
  "stale_reason": null,
- "tier": 0,
- "tier_semantics": "All AI features active. Nothing is paused.",
+ "tier": 1,
+ "tier_semantics": "Internal/dev AI paused \u2014 the ensemble, the chronicle editor, and coherence-semantic checks. Reader-facing AI is untouched.",
  "base_ceiling_usd": 215.0,
  "surge_ceiling_usd": 252.0,
  "ceiling_window": null,
@@ -19,32 +19,30 @@
  "surge_held_by": "none",
  "surge_engaged_at_bar": null,
  "recent_uniques": 1255,
- "month_to_date_usd": 75.99,
- "projected_month_end_usd": 126.81,
- "projected_all_classes_usd": 139.97,
- "projected_scope": "recurring classes only (prod-cron, remediation)",
+ "month_to_date_usd": 92.75,
+ "projected_month_end_usd": 163.6,
+ "projected_all_classes_usd": 164.07,
+ "projected_scope": "recurring classes only (prod-cron, remediation, ci)",
  "projected_classes": [
   "prod-cron",
-  "remediation"
+  "remediation",
+  "ci"
  ],
  "episodic_classes": [
-  "ci",
   "dev-session"
  ],
  "episodic_billing_days": {
   "prod-cron": 30,
-  "ci": 27,
-  "dev-session": 12,
-  "remediation": 12
+  "ci": 26,
+  "dev-session": 13,
+  "remediation": 14
  },
- "episodic_premise_violations": [
-  "ci"
- ],
- "projection_note": "Scope: this month-end projection extrapolates only the spend classes that recur on a schedule (prod-cron, remediation). Episodic spend (ci, dev-session) is counted in full in month-to-date \u2014 it is real money already spent \u2014 but is not multiplied out across the days remaining (#2892). Extrapolating every class instead gives $139.97. Premise check: ci billed on 27 of the last 30 days \u2014 at or above the 25-day bar, so calling it episodic understates the forecast. The all-class figure is the one to read.",
+ "episodic_premise_violations": [],
+ "projection_note": "Scope: this month-end projection extrapolates only the spend classes that recur on a schedule (prod-cron, remediation, ci). Episodic spend (dev-session) is counted in full in month-to-date \u2014 it is real money already spent \u2014 but is not multiplied out across the days remaining (#2892). Extrapolating every class instead gives $164.07.",
  "month_end_date": "2026-10-31",
- "ai_daily_usd": 1.78,
- "non_ai_daily_usd": 1.13,
- "computed_at": "2026-10-10T00:00:11.244368+00:00",
+ "ai_daily_usd": 2.13,
+ "non_ai_daily_usd": 1.5,
+ "computed_at": "2026-10-12T08:00:11.150733+00:00",
  "history": [
   {
    "date": "2026-10-01",
@@ -84,16 +82,24 @@
   },
   {
    "date": "2026-10-10",
-   "mtd_usd": 75.99
+   "mtd_usd": 78.49
+  },
+  {
+   "date": "2026-10-11",
+   "mtd_usd": 87.06
+  },
+  {
+   "date": "2026-10-12",
+   "mtd_usd": 92.75
   }
  ],
  "typical_day": {
-  "usd": 4.38,
+  "usd": 5.06,
   "days_counted": 30,
-  "window_start": "2026-09-10",
-  "window_end": "2026-10-09",
+  "window_start": "2026-09-12",
+  "window_end": "2026-10-11",
   "month_days": 31,
-  "month_usd": 135.78,
+  "month_usd": 156.86,
   "basis": "Median whole-bill spend per complete UTC day (AI and everything else), from the cost governor's running month-to-date total. A median, so a few unusually expensive days do not move it; month_usd is that day repeated for every day of the current month, not a forecast."
  },
  "high_days": {
@@ -113,12 +119,12 @@
    }
   ],
   "total_usd": 59.7,
-  "above_typical_usd": 46.56
+  "above_typical_usd": 44.52
  },
- "ai_scheduled_share_pct": 66.4,
+ "ai_scheduled_share_pct": 98.9,
  "per_feature_note": "Per-feature dollars are published on the inference receipt. They are self-metered at the inference chokepoint (ADR-062) \u2014 each call priced from its own token usage and its resolved model, then emitted per Lambda \u2014 so they are an estimate against list prices, not the billed figure; the governor reconciles them against the native AWS/Bedrock meter every 8 hours and alarms if the ratio leaves the #2883 drift bar. One row is one Lambda, and several budget-guard features can share a Lambda, so a row is not a per-feature budget. See /method/inference/ for the full table.",
  "note": "One AWS budget covers the WHOLE platform, not just AI. The governor reprojects month-end spend every 8 hours and writes the tier it implies; every AI feature reads that tier before it runs.",
- "projected_pct_of_ceiling": 59.0,
- "projected_all_classes_pct_of_ceiling": 65.1,
- "mtd_pct_of_ceiling": 35.3
+ "projected_pct_of_ceiling": 76.1,
+ "projected_all_classes_pct_of_ceiling": 76.3,
+ "mtd_pct_of_ceiling": 43.1
 }

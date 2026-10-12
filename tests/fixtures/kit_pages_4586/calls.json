@@ -1,17 +1,752 @@
 {
  "_meta": {
-  "generated_at": "2026-10-10T02:35:55.344986+00:00",
-  "served_at": "2026-10-10T02:35:55.344986+00:00",
+  "generated_at": "2026-10-12T15:35:35.994296+00:00",
+  "served_at": "2026-10-12T15:35:35.994296+00:00",
   "cache_seconds": 300,
-  "request_id": "090a260978d9430a"
+  "request_id": "23c96be6fe7b4a91"
  },
  "state": "ok",
- "as_of": "2026-10-09",
+ "as_of": "2026-10-11",
  "source": "/api/calls",
  "absent_text": "No call has been checked against the data yet.",
- "today": "2026-10-09",
- "count": 39,
+ "today": "2026-10-12",
+ "count": 55,
  "calls": [
+  {
+   "id": "sleep-20260926-a9f7e98e40",
+   "kind": "number",
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "claim": "Recovery score will be approximately 85.3% tomorrow, with 80% confidence interval of 60.9\u2013100%",
+   "logged_date": "2026-09-26",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 85 for September 27.",
+   "called_short": "Lisa Park called his morning recovery score at about 85.",
+   "happened": "His morning recovery score came in at 89 against a call of 85.",
+   "happened_short": "It came in at 89.",
+   "actual": {
+    "value": 89.0,
+    "text": "89"
+   },
+   "tolerance": {
+    "value": 21.308,
+    "text": "21.3",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "Lisa Park was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 99, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Lisa Park called his morning recovery score at about 85: right"
+  },
+  {
+   "id": "physical-20261002-12e3b80e35",
+   "kind": "number",
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "claim": "Tomorrow's recovery will reach approximately 75.8%, a single-day rebound from the September 30 low",
+   "logged_date": "2026-10-02",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 76 for October 3.",
+   "called_short": "Max Reyes called his morning recovery score at about 76.",
+   "happened": "His morning recovery score came in at 98 against a call of 76.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 17.8725,
+    "text": "17.9",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Max Reyes was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Max Reyes called his morning recovery score at about 76: wrong"
+  },
+  {
+   "id": "physical-20260926-2849d27353",
+   "kind": "number",
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "claim": "Recovery score will be 85.3% tomorrow with 80% confidence interval of 60.9\u2013100%",
+   "logged_date": "2026-09-26",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 85 for September 27.",
+   "called_short": "Max Reyes called his morning recovery score at about 85.",
+   "happened": "His morning recovery score came in at 89 against a call of 85.",
+   "happened_short": "It came in at 89.",
+   "actual": {
+    "value": 89.0,
+    "text": "89"
+   },
+   "tolerance": {
+    "value": 21.308,
+    "text": "21.3",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "Max Reyes was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 99, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Max Reyes called his morning recovery score at about 85: right"
+  },
+  {
+   "id": "physical-20260912-7c9a8852c3",
+   "kind": "number",
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "claim": "Tomorrow's recovery score will rebound to approximately 54.7%, but this represents regression-to-mean rather than intervention effect.",
+   "logged_date": "2026-09-12",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 54.7 for September 13.",
+   "called_short": "Max Reyes called his morning recovery score at about 54.7.",
+   "happened": "His morning recovery score came in at 73 against a call of 54.7.",
+   "happened_short": "It came in at 73.",
+   "actual": {
+    "value": 73.0,
+    "text": "73"
+   },
+   "tolerance": {
+    "value": 18.2532,
+    "text": "18.25",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Max Reyes was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 24, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Max Reyes called his morning recovery score at about 54.7: wrong"
+  },
+  {
+   "id": "labs-20260924-87bbc45eff",
+   "kind": "number",
+   "coach_id": "labs",
+   "coach_name": "James Okafor",
+   "claim": "Recovery score is expected to be around 84.8% tomorrow, with an 80% confidence interval of 60.5\u2013100%.",
+   "logged_date": "2026-09-24",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 85 for September 25.",
+   "called_short": "James Okafor called his morning recovery score at about 85.",
+   "happened": "His morning recovery score came in at 99 against a call of 85.",
+   "happened_short": "It came in at 99.",
+   "actual": {
+    "value": 99.0,
+    "text": "99"
+   },
+   "tolerance": {
+    "value": 20.7078,
+    "text": "20.7",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "James Okafor was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 80, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 7,
+     "n": 8,
+     "through": "2026-10-11",
+     "text": "James Okafor: 7 of 8 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
+     }
+    }
+   ],
+   "title": "James Okafor called his morning recovery score at about 85: right"
+  },
+  {
+   "id": "labs-20260921-b497af605f",
+   "kind": "number",
+   "coach_id": "labs",
+   "coach_name": "James Okafor",
+   "claim": "Recovery score will be 90.9% tomorrow (following the 97% recovery on night of 2026-09-19).",
+   "logged_date": "2026-09-21",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "James Okafor called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 91 for September 22.",
+   "called_short": "James Okafor called his morning recovery score at about 91.",
+   "happened": "His morning recovery score came in at 78 against a call of 91.",
+   "happened_short": "It came in at 78.",
+   "actual": {
+    "value": 78.0,
+    "text": "78"
+   },
+   "tolerance": {
+    "value": 23.7331,
+    "text": "23.7",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "James Okafor was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 97, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 7,
+     "n": 8,
+     "through": "2026-10-11",
+     "text": "James Okafor: 7 of 8 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
+     }
+    }
+   ],
+   "title": "James Okafor called his morning recovery score at about 91: right"
+  },
+  {
+   "id": "explorer-20260915-6be2fa5fb4",
+   "kind": "number",
+   "coach_id": "explorer",
+   "coach_name": "Henning Brandt",
+   "claim": "Whoop recovery will rebound to approximately 63.5% tomorrow (80% interval 38\u201389%)",
+   "logged_date": "2026-09-15",
+   "sealed": false,
+   "settled_date": "2026-10-11",
+   "called": "Henning Brandt called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 64 for September 16.",
+   "called_short": "Henning Brandt called his morning recovery score at about 64.",
+   "happened": "His morning recovery score came in at 92 against a call of 64.",
+   "happened_short": "It came in at 92.",
+   "actual": {
+    "value": 92.0,
+    "text": "92"
+   },
+   "tolerance": {
+    "value": 19.2925,
+    "text": "19.3",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Henning Brandt was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 63, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Henning Brandt called his morning recovery score at about 64: wrong"
+  },
+  {
+   "id": "sleep-20261003-762e1a236b",
+   "kind": "number",
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "claim": "Recovery score tomorrow will be 90.6% with 80% interval running from 66.8% to 100%",
+   "logged_date": "2026-10-03",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 91 for October 4.",
+   "called_short": "Lisa Park called his morning recovery score at about 91.",
+   "happened": "His morning recovery score came in at 98 against a call of 91.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 18.3648,
+    "text": "18.4",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "right",
+   "verdict_text": "Lisa Park was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 98, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Lisa Park called his morning recovery score at about 91: right"
+  },
+  {
+   "id": "sleep-20261002-11965e2549",
+   "kind": "number",
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "claim": "Recovery will be around 75.8% tomorrow",
+   "logged_date": "2026-10-02",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 76 for October 3.",
+   "called_short": "Lisa Park called his morning recovery score at about 76.",
+   "happened": "His morning recovery score came in at 98 against a call of 76.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 17.8725,
+    "text": "17.9",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Lisa Park was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Lisa Park called his morning recovery score at about 76: wrong"
+  },
+  {
+   "id": "sleep-20261002-0a21ebc7cb",
+   "kind": "number",
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "claim": "Recovery score tomorrow will be 64.7%",
+   "logged_date": "2026-10-02",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 3.",
+   "called_short": "Lisa Park called his morning recovery score at about 65.",
+   "happened": "His morning recovery score came in at 98 against a call of 65.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 17.8725,
+    "text": "17.9",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Lisa Park was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Lisa Park called his morning recovery score at about 65: wrong"
+  },
+  {
+   "id": "sleep-20261001-0c82650519",
+   "kind": "number",
+   "coach_id": "sleep",
+   "coach_name": "Lisa Park",
+   "claim": "Recovery tomorrow will be approximately 64.7%, with an 80% confidence interval of 41.9\u201387.5%.",
+   "logged_date": "2026-10-01",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Lisa Park called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 2.",
+   "called_short": "Lisa Park called his morning recovery score at about 65.",
+   "happened": "His morning recovery score came in at 98 against a call of 65.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 17.3031,
+    "text": "17.3",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Lisa Park was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 59, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Lisa Park called his morning recovery score at about 65: wrong"
+  },
+  {
+   "id": "physical-20261002-0b83540ced",
+   "kind": "number",
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "claim": "Recovery will reach 64.7% tomorrow with an 80% interval of 41.9\u201387.5%.",
+   "logged_date": "2026-10-02",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Max Reyes called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 3.",
+   "called_short": "Max Reyes called his morning recovery score at about 65.",
+   "happened": "His morning recovery score came in at 98 against a call of 65.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 17.5951,
+    "text": "17.6",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 30
+   },
+   "verdict": "wrong",
+   "verdict_text": "Max Reyes was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 62, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Max Reyes called his morning recovery score at about 65: wrong"
+  },
+  {
+   "id": "physical-20260922-f397c4a46c",
+   "kind": "number",
+   "coach_id": "physical",
+   "coach_name": "Max Reyes",
+   "claim": "Weight will be approximately 315 lbs tomorrow morning, within an 80% interval of 310.9\u2013319.1 lbs.",
+   "logged_date": "2026-09-22",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Max Reyes called his weight at about 315 lb for September 23.",
+   "called_short": "Max Reyes called his weight at about 315 lb.",
+   "happened": "His weight came in at 315.4 lb against a call of 315 lb.",
+   "happened_short": "It came in at 315.4 lb.",
+   "actual": {
+    "value": 315.43,
+    "text": "315.4 lb"
+   },
+   "tolerance": {
+    "value": 5.1527,
+    "text": "5.2 lb",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 13
+   },
+   "verdict": "right",
+   "verdict_text": "Max Reyes was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 315.8 lb, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Max Reyes called his weight at about 315 lb: right"
+  },
+  {
+   "id": "mind-20261001-a080dd1fc8",
+   "kind": "number",
+   "coach_id": "mind",
+   "coach_name": "Nathan Reeves",
+   "claim": "Recovery will reach around 64.7% tomorrow",
+   "logged_date": "2026-10-01",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Nathan Reeves called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 65 for October 2.",
+   "called_short": "Nathan Reeves called his morning recovery score at about 65.",
+   "happened": "His morning recovery score came in at 98 against a call of 65.",
+   "happened_short": "It came in at 98.",
+   "actual": {
+    "value": 98.0,
+    "text": "98"
+   },
+   "tolerance": {
+    "value": 17.3031,
+    "text": "17.3",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Nathan Reeves was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": false,
+    "text": "The simple guess was that it would stay at 59, the last reading before the call. That guess was also wrong.",
+    "short": "also wrong"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 6,
+     "n": 18,
+     "through": "2026-10-10",
+     "text": "Nathan Reeves: 6 of 18 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Too few checked calls yet (18) to compare them with a simple guess."
+     }
+    }
+   ],
+   "title": "Nathan Reeves called his morning recovery score at about 65: wrong"
+  },
+  {
+   "id": "explorer-20261008-674d1a44b6",
+   "kind": "number",
+   "coach_id": "explorer",
+   "coach_name": "Henning Brandt",
+   "claim": "Weight will be 307.2 lbs tomorrow morning.",
+   "logged_date": "2026-10-08",
+   "sealed": false,
+   "settled_date": "2026-10-10",
+   "called": "Henning Brandt called his weight at about 307.2 lb for October 9.",
+   "called_short": "Henning Brandt called his weight at about 307.2 lb.",
+   "happened": "His weight came in at 306.1 lb against a call of 307.2 lb.",
+   "happened_short": "It came in at 306.1 lb.",
+   "actual": {
+    "value": 306.13,
+    "text": "306.1 lb"
+   },
+   "tolerance": {
+    "value": 3.1713,
+    "text": "3.2 lb",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 24
+   },
+   "verdict": "right",
+   "verdict_text": "Henning Brandt was right.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 308.3 lb, the last reading before the call. That guess was also right.",
+    "short": "also right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
+     }
+    }
+   ],
+   "title": "Henning Brandt called his weight at about 307.2 lb: right"
+  },
   {
    "id": "sleep-20260925-8e1782dfe1",
    "kind": "number",
@@ -47,15 +782,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -96,15 +831,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -155,23 +890,23 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     },
     {
      "state": "ok",
-     "right": 8,
+     "right": 6,
      "n": 18,
-     "through": "2026-10-07",
-     "text": "Nathan Reeves: 8 of 18 checked calls right.",
+     "through": "2026-10-10",
+     "text": "Nathan Reeves: 6 of 18 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -217,15 +952,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
-     "n": 16,
-     "through": "2026-10-09",
-     "text": "Max Reyes: 8 of 16 checked calls right.",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -266,15 +1001,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 5,
-     "n": 6,
-     "through": "2026-10-06",
-     "text": "James Okafor: 5 of 6 checked calls right.",
+     "right": 7,
+     "n": 8,
+     "through": "2026-10-11",
+     "text": "James Okafor: 7 of 8 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+      "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
      }
     }
    ],
@@ -325,28 +1060,28 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
-     "n": 16,
-     "through": "2026-10-09",
-     "text": "Max Reyes: 8 of 16 checked calls right.",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
      }
     },
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -387,15 +1122,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-09",
-     "text": "Henning Brandt: 11 of 22 checked calls right.",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -436,15 +1171,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -485,15 +1220,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -516,9 +1251,23 @@
     {
      "coach_id": "glucose",
      "coach_name": "Amara Patel",
-     "claim": "Evening carb reduction is likely coming based on CGM data; glucose variability (not average) is the primary diagnostic signal in subjects with visceral adiposity",
+     "claim": "",
      "said": "no",
-     "right": false
+     "right": false,
+     "unsourced": {
+      "reason": "no sensor since 2026-08-27",
+      "instrument": {
+       "source": "apple_health",
+       "datatype": "cgm"
+      },
+      "last_seen": "2026-08-27",
+      "gap": {
+       "start": "2026-08-27",
+       "end": null
+      },
+      "said_on": "2026-09-23",
+      "text": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+     }
     }
    ],
    "topic": "Carb reduction recommendation: will it degrade recovery or improve glucose dynamics?",
@@ -545,22 +1294,22 @@
     {
      "state": "ok",
      "right": 7,
-     "n": 28,
-     "through": "2026-10-08",
-     "text": "Marcus Webb: 7 of 28 checked calls right.",
+     "n": 29,
+     "through": "2026-10-10",
+     "text": "Marcus Webb: 7 of 29 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 29 checked calls, so far they do not beat a simple guess."
      }
     },
     {
      "state": "ok",
-     "right": 2,
+     "right": 1,
      "n": 6,
      "through": "2026-09-30",
-     "text": "Amara Patel: 2 of 6 checked calls right.",
+     "text": "Amara Patel: 1 of 6 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -606,10 +1355,10 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
+     "right": 6,
      "n": 18,
-     "through": "2026-10-07",
-     "text": "Nathan Reeves: 8 of 18 checked calls right.",
+     "through": "2026-10-10",
+     "text": "Nathan Reeves: 6 of 18 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -619,6 +1368,55 @@
     }
    ],
    "title": "Nathan Reeves called his morning recovery score at about 59: wrong"
+  },
+  {
+   "id": "glucose-20260914-6d451f1e07",
+   "kind": "number",
+   "coach_id": "glucose",
+   "coach_name": "Amara Patel",
+   "claim": "Recovery will soften to roughly 59% tomorrow (from 73% on 2026-09-12).",
+   "logged_date": "2026-09-14",
+   "sealed": false,
+   "settled_date": "2026-09-28",
+   "called": "Amara Patel called his morning recovery score (his wrist strap\u2019s morning score out of 100) at about 59 for September 15.",
+   "called_short": "Amara Patel called his morning recovery score at about 59.",
+   "happened": "His morning recovery score came in at 82 against a call of 59.",
+   "happened_short": "It came in at 82.",
+   "actual": {
+    "value": 82.0,
+    "text": "82"
+   },
+   "tolerance": {
+    "value": 18.5929,
+    "text": "18.6",
+    "statistic": "one standard deviation of his readings over the 30 days before the call",
+    "window_days": 30,
+    "n": 31
+   },
+   "verdict": "wrong",
+   "verdict_text": "Amara Patel was wrong.",
+   "simple_guess": {
+    "state": "scored",
+    "right": true,
+    "text": "The simple guess was that it would stay at 73, the last reading before the call. That guess was right.",
+    "short": "right"
+   },
+   "records": [
+    {
+     "state": "ok",
+     "right": 1,
+     "n": 6,
+     "through": "2026-09-30",
+     "text": "Amara Patel: 1 of 6 checked calls right.",
+     "comparison": {
+      "rule": "nothing_changes",
+      "rule_words": "a guess that nothing changes",
+      "scored_complete": false,
+      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+     }
+    }
+   ],
+   "title": "Amara Patel called his morning recovery score at about 59: wrong"
   },
   {
    "id": "physical-20260913-dabfd973c0",
@@ -655,15 +1453,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
-     "n": 16,
-     "through": "2026-10-09",
-     "text": "Max Reyes: 8 of 16 checked calls right.",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -695,15 +1493,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 5,
-     "n": 6,
-     "through": "2026-10-06",
-     "text": "James Okafor: 5 of 6 checked calls right.",
+     "right": 7,
+     "n": 8,
+     "through": "2026-10-11",
+     "text": "James Okafor: 7 of 8 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+      "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
      }
     }
    ],
@@ -735,15 +1533,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-09",
-     "text": "Henning Brandt: 11 of 22 checked calls right.",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -784,15 +1582,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -833,15 +1631,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -882,10 +1680,10 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
+     "right": 6,
      "n": 18,
-     "through": "2026-10-07",
-     "text": "Nathan Reeves: 8 of 18 checked calls right.",
+     "through": "2026-10-10",
+     "text": "Nathan Reeves: 6 of 18 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -931,10 +1729,10 @@
    "records": [
     {
      "state": "ok",
-     "right": 2,
+     "right": 1,
      "n": 6,
      "through": "2026-09-30",
-     "text": "Amara Patel: 2 of 6 checked calls right.",
+     "text": "Amara Patel: 1 of 6 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -980,15 +1778,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1029,15 +1827,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1078,15 +1876,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
-     "n": 16,
-     "through": "2026-10-09",
-     "text": "Max Reyes: 8 of 16 checked calls right.",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1127,10 +1925,10 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
+     "right": 6,
      "n": 18,
-     "through": "2026-10-07",
-     "text": "Nathan Reeves: 8 of 18 checked calls right.",
+     "through": "2026-10-10",
+     "text": "Nathan Reeves: 6 of 18 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -1176,15 +1974,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1225,10 +2023,10 @@
    "records": [
     {
      "state": "ok",
-     "right": 2,
+     "right": 1,
      "n": 6,
      "through": "2026-09-30",
-     "text": "Amara Patel: 2 of 6 checked calls right.",
+     "text": "Amara Patel: 1 of 6 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -1274,15 +2072,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1323,15 +2121,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
-     "n": 16,
-     "through": "2026-10-09",
-     "text": "Max Reyes: 8 of 16 checked calls right.",
+     "right": 10,
+     "n": 22,
+     "through": "2026-10-11",
+     "text": "Max Reyes: 10 of 22 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (16) to compare them with a simple guess."
+      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1372,15 +2170,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-09",
-     "text": "Henning Brandt: 11 of 22 checked calls right.",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1421,15 +2219,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1461,15 +2259,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1501,10 +2299,10 @@
    "records": [
     {
      "state": "ok",
-     "right": 8,
+     "right": 6,
      "n": 18,
-     "through": "2026-10-07",
-     "text": "Nathan Reeves: 8 of 18 checked calls right.",
+     "through": "2026-10-10",
+     "text": "Nathan Reeves: 6 of 18 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
@@ -1541,15 +2339,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 5,
-     "n": 6,
-     "through": "2026-10-06",
-     "text": "James Okafor: 5 of 6 checked calls right.",
+     "right": 7,
+     "n": 8,
+     "through": "2026-10-11",
+     "text": "James Okafor: 7 of 8 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Too few checked calls yet (6) to compare them with a simple guess."
+      "sentence": "Too few checked calls yet (8) to compare them with a simple guess."
      }
     }
    ],
@@ -1581,15 +2379,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-09",
-     "text": "Henning Brandt: 11 of 22 checked calls right.",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1630,15 +2428,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1679,15 +2477,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1728,15 +2526,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1777,15 +2575,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1826,15 +2624,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 15,
-     "n": 35,
-     "through": "2026-10-09",
-     "text": "Lisa Park: 15 of 35 checked calls right.",
+     "right": 17,
+     "n": 41,
+     "through": "2026-10-11",
+     "text": "Lisa Park: 17 of 41 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 35 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 41 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1875,15 +2673,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-09",
-     "text": "Henning Brandt: 11 of 22 checked calls right.",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1924,15 +2722,15 @@
    "records": [
     {
      "state": "ok",
-     "right": 11,
-     "n": 22,
-     "through": "2026-10-09",
-     "text": "Henning Brandt: 11 of 22 checked calls right.",
+     "right": 14,
+     "n": 28,
+     "through": "2026-10-11",
+     "text": "Henning Brandt: 14 of 28 checked calls right.",
      "comparison": {
       "rule": "nothing_changes",
       "rule_words": "a guess that nothing changes",
       "scored_complete": false,
-      "sentence": "Across 22 checked calls, so far they do not beat a simple guess."
+      "sentence": "Across 28 checked calls, so far they do not beat a simple guess."
      }
     }
    ],
@@ -1940,30 +2738,31 @@
   }
  ],
  "excluded": {
-  "count": 89,
+  "count": 94,
   "reasons": {
-   "a direction read out of commentary, not a call sealed before day one": 71,
-   "graded on a day the sentence does not name": 6,
+   "a direction read out of commentary, not a call sealed before day one": 79,
+   "graded on a day the sentence does not name": 3,
    "graded as no movement by a trend check that reads only the most recent readings": 3,
    "the sentence was conditional or hedged": 7,
    "the sentence does not state the number or direction that was graded": 2
   },
-  "text": "89 more checked calls have no page here: the coach\u2019s sentence was conditional, did not state the number or direction that was measured, or was graded on a different day or by a check too coarse to print. They still count in each coach\u2019s record."
+  "text": "94 more checked calls have no page here: the coach\u2019s sentence was conditional, did not state the number or direction that was measured, or was graded on a different day or by a check too coarse to print. They still count in each coach\u2019s record."
  },
  "simple_guess_words": "The simple guess is that nothing changes: the measure stays where it was when the call was made.",
  "next": {
   "state": "ok",
-  "as_of": "2026-10-09",
+  "as_of": "2026-10-12",
   "source": "/api/calls",
   "absent_text": "No call or bet has a settle date right now.",
   "data": {
-   "kind": "number",
+   "kind": "bet",
    "coach_names": [
-    "Henning Brandt"
+    "Nathan Reeves",
+    "Marcus Webb"
    ],
-   "question": "Henning Brandt\u2019s call that his weight will be about 307.2 lb",
-   "due_date": "2026-10-09",
-   "text": "Next: Henning Brandt\u2019s call that his weight will be about 307.2 lb settles Friday, October 9."
+   "question": "the bet between Nathan Reeves and Marcus Webb on whether the 7-day average of his protein eaten will be at or above 190 g",
+   "due_date": "2026-10-12",
+   "text": "Next: the bet between Nathan Reeves and Marcus Webb on whether the 7-day average of his protein eaten will be at or above 190 g settles Monday, October 12."
   }
  }
 }

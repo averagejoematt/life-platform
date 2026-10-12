@@ -28,6 +28,13 @@ const DAYS = readdirSync(FIX).filter((n) => n.startsWith("coach_moves_")).map((n
 const edition = load(KIT, "edition");
 const B = edition.blocks;
 const BASE = "/next/v8/";
+const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+const esc0 = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const BETD = B.next.data.bet.data;
+const [SA, SB] = BETD.sides;
+const OTHER = load(KIT, "coach_docket").open.map((d) => d.resolution_date).filter((d) => d && d !== BETD.settle_date).sort()[0];
+const MORE_BETS = `One more bet settles on ${inWords(OTHER)}.`;
+const WEEK_SPAN = `${inWords(B.week.data.days[0])} to ${inWords(B.week.data.days.at(-1))}`;
 // The edition's `next` block with its bet absent: what the page sees between bets.
 const NO_BET = { ...B.next, data: { ...B.next.data, bet: { state: "absent", as_of: null, source: "/api/coach_docket", absent_text: "No coach bet is waiting to settle.", data: null } } };
 
@@ -61,34 +68,34 @@ test("with an open bet, the bet is the argument: two coaches on opposite sides, 
   assert.match(line, /^(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day: \d+(\.\d)? g protein\. This week, at or above 170 g protein on \d of \d days recorded\.$/, line);
   // The first mention of a name carries the job, when the served lines pair the name with its id.
   const jobs = F.jobsByName(DAYS);
-  assert.equal(jobs["Marcus Webb"], "food");
-  assert.equal(jobs["Nathan Reeves"], "mind");
+  // a name carries its job only when the served lines pair it with one (a recapture may bring a coach with none)
+  const who = (c) => (jobs[c] ? `${c} (${jobs[c]})` : c);
   // #4809: each side carries the coach's reason — the opening position the docket row holds, one
   // clause in its served words (`next.bet.data.sides[].reason`) — on its own line under the question.
   const why = Object.fromEntries(pick.bet.data.sides.map((s) => [s.coach, s.reason]));
-  assert.ok(why["Nathan Reeves"] && why["Marcus Webb"], "the wire fixture serves both reasons");
+  assert.ok(why[SA.coach] && why[SB.coach], "the wire fixture serves both reasons");
   assert.deepEqual(F.betSidesLines(pick.bet, jobs), [
-    `Nathan Reeves (mind) says no: “${why["Nathan Reeves"]}”.`,
-    `Marcus Webb (food) says yes: “${why["Marcus Webb"]}”.`,
+    `${who(SA.coach)} says ${SA.says}: “${why[SA.coach]}”.`,
+    `${who(SB.coach)} says ${SB.says}: “${why[SB.coach]}”.`,
   ]);
-  assert.equal(F.betSidesLine(pick.bet), `Nathan Reeves says no: “${why["Nathan Reeves"]}”. Marcus Webb says yes: “${why["Marcus Webb"]}”.`);
+  assert.equal(F.betSidesLine(pick.bet), `${SA.coach} says ${SA.says}: “${why[SA.coach]}”. ${SB.coach} says ${SB.says}: “${why[SB.coach]}”.`);
   // a side with no served reason is the side alone; nothing is written in its place
   const bare = { ...pick.bet, data: { ...pick.bet.data, sides: pick.bet.data.sides.map((s) => ({ coach: s.coach, says: s.says })) } };
-  assert.equal(F.betSidesLine(bare, jobs), "Nathan Reeves (mind) says no. Marcus Webb (food) says yes.");
+  assert.equal(F.betSidesLine(bare, jobs), `${who(SA.coach)} says ${SA.says}. ${who(SB.coach)} says ${SB.says}.`);
   // Ruling 2026-10-11 (the coaches page keeps four screens): the FRONT card prints each reason
   // under its side; the coaches page's card prints the sides alone, on one line, and its door
   // goes to the front card — the two doors never loop on a promise neither page keeps.
   const front = P.frontReadSlots(edition, B, BASE)["ck-bet"];
   assert.match(front, /<a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">Every open bet, on the coaches page<\/a>/, front);
   assert.doesNotMatch(front, /What each one argued/, "the front card prints the argument itself");
-  const coaches = P.betHTML(B.next, { ...P.reasonsDoor(B.next, BASE), extra: "One more bet settles on October 16.", oneLine: true });
+  const coaches = P.betHTML(B.next, { ...P.reasonsDoor(B.next, BASE), extra: MORE_BETS, oneLine: true });
   for (const [who, reason] of Object.entries(why)) {
     const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     assert.match(front, new RegExp(`<p class="ck-soft">${esc(who)}(?: \\([a-z ]+\\))? says (yes|no): “${esc(reason)}”\\.</p>`), front);
     assert.ok(!coaches.includes(reason), `the coaches page does not print ${who}'s reason`);
   }
   // one paragraph (the four-screen budget): the sides, the door to the reasons, the extra sentence
-  assert.match(coaches, /<p class="ck-soft">Nathan Reeves says no\. Marcus Webb says yes\. <a class="ck-link" href="\/next\/v8\/#ck-bet">Why each says so\.<\/a> One more bet settles on October 16\.<\/p><\/div>$/, coaches);
+  assert.match(coaches, new RegExp(`<p class="ck-soft">${esc0(`${SA.coach} says ${SA.says}. ${SB.coach} says ${SB.says}.`)} <a class="ck-link" href="\\/next\\/v8\\/#ck-bet">Why each says so\\.</a> ${esc0(MORE_BETS)}</p></div>$`), coaches);
   // no served reason: no door to a card that would not print one
   assert.deepEqual(P.reasonsDoor({ ...B.next, data: { ...B.next.data, bet: bare } }, BASE), {});
   assert.match(P.betHTML(B.next, { sidesText: "x says no.", extra: "Friday: 1 g.", href: "/next/v8/coaches/#ck-bet" }), /<p class="ck-soft">x says no\.<\/p><p class="ck-soft">Friday: 1 g\.<\/p><p><a class="ck-link" href="\/next\/v8\/coaches\/#ck-bet">What each one argued<\/a><\/p><\/div>$/);
@@ -202,11 +209,11 @@ test("the deeper rows: the chapter is one door with its week and its own first s
   assert.equal(F.chapterRowHTML({ state: "unavailable", absent_text: "The latest chapter is not served right now.", data: null }), '<p class="ck-soft">The latest chapter is not served right now.</p>');
   const slots = P.frontSlots(edition, B, BASE);
   assert.equal(slots["ck-chapter-row"], row);
-  assert.equal(slots["ck-week-span"], "How the whole thing is going · October 3 to October 9");
+  assert.equal(slots["ck-week-span"], `How the whole thing is going · ${WEEK_SPAN}`);
   for (const gone of ["ck-week", "ck-quotes", "ck-lead-read", "ck-sheet-line"]) assert.equal(slots[gone], undefined, `${gone} left the front page`);
   // The first screen's numbers are doors; a failed block prints its sentence with no door.
-  assert.match(slots["ck-record"], /^<a href="\/next\/v8\/coaches\/">56 of 131 checked calls right\./);
-  assert.match(slots["ck-mark-caption"], /^<a href="\/next\/v8\/trend\/\?m=weight"><b>306\.1 lb<\/b>/);
+  assert.ok(slots["ck-record"].startsWith(`<a href="/next/v8/coaches/">${B.record.data.count_text}`));
+  assert.ok(slots["ck-mark-caption"].startsWith(`<a href="/next/v8/trend/?m=weight"><b>${B.today.data.weight_lbs.toFixed(1)} lb</b>`));
   const gone = { state: "unavailable", absent_text: "Not served right now.", data: null };
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-record"], "Not served right now.");
   assert.equal(P.frontSlots(edition, { ...B, record: gone, today: gone }, BASE)["ck-mark-caption"], "Not served right now.");
@@ -214,7 +221,7 @@ test("the deeper rows: the chapter is one door with its week and its own first s
 
 test("the week page carries the band whole: the sorted week without a second kicker, the chapter lines and the silence sentence", () => {
   const slots = P.weekSlots(edition, B, BASE);
-  assert.equal(slots["ck-week-label"], "This week · October 3 to October 9");
+  assert.equal(slots["ck-week-label"], `This week · ${WEEK_SPAN}`);
   assert.doesNotMatch(slots["ck-week"], /ck-label">How the whole thing is going/, "the page's own heading says it");
   assert.match(slots["ck-week"], /Going well|Not yet/);
   assert.match(slots["ck-quotes"], /“Park's Blind Spot”, the chapter/);

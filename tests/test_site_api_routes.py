@@ -419,7 +419,9 @@ def test_edition_record_never_serializes_the_count_without_the_comparison():
     sentence; with either upstream (or the coaches stratum) missing, no count is served."""
     wire = _wire()
     ok = _edition(wire)["blocks"]["record"]
-    assert ok["data"]["count_text"] == "41 of 96 checked calls right."
+    served = wire["predictions"]["overall"]
+    count_text = f"{served['confirmed']} of {served['confirmed'] + served['refuted']} checked calls right."
+    assert ok["data"]["count_text"] == count_text
     assert ok["data"]["beats_simple_guess"] is False and ok["data"]["comparison_text"] == "So far they do not beat a simple guess."
     no_stratum = _json.loads(_json.dumps(wire["calibration"]))
     no_stratum["platform"]["strata"].pop("coaches")
@@ -433,7 +435,7 @@ def test_edition_record_never_serializes_the_count_without_the_comparison():
     for label, bodies in cases.items():
         block = _edition(bodies)["blocks"]["record"]
         data = block.get("data") or {}
-        has_count = any(k in data for k in ("right", "decided", "count_text")) or "41 of 96" in _json.dumps(block)
+        has_count = any(k in data for k in ("right", "decided", "count_text")) or count_text in _json.dumps(block)
         has_comparison = isinstance(data.get("beats_simple_guess"), bool) and bool(data.get("comparison_text"))
         if has_count and not has_comparison:
             offenders.append(f"{label}: count served without the comparison")
