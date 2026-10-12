@@ -53,9 +53,6 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests")
-)  # a11y_audit / truth_baseline_audit / site_review (#4270)
 import qa_manifest  # noqa: E402 — the six doors' `intent` facet lives here
 import visual_ai_qa as _vqa  # noqa: E402 — the shared Bedrock plumbing this module reuses
 
