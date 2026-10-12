@@ -124,6 +124,18 @@ write surface is your own worktree and your own branch.
    `docs/PROPORTIONALITY.md` row carries `demote_by:` or `demote_when:`. A parametrized
    per-page test counts as one gate PER PARAMETER in the census — collapse it to one test
    that iterates and reports every offender.
+6a2. **A test that asserts a literal value must not reach the clock (#4848, incident 2026-10-12).**
+   If the expected number is computed through any path that reads `datetime.now()`,
+   `date.today()`, `time.time()` or `pacific_now()` (an age from a date of birth, a
+   trailing window, a 'days since'), freeze the clock at a fixed instant in the fixture
+   (`freezegun`, a `monkeypatch` of the clock, or the function's own `ref=`/`now=`
+   argument) — or derive the expectation from the same call under the same clock. A
+   literal pinned through a live clock reds main by itself at a round-number instant:
+   `test_energy_budget_cross_phase_4032` stepped 2426 → 2425 kcal at 2026-10-12T00:00Z
+   when the subject's fractional age crossed a rounding edge, two hours after two
+   unrelated merges, which were bisected first. Structural check: `grep -n` the asserted
+   literal's producer for a clock read before you pin it.
+
 6b. **If your issue carries `review:*` or `incident*` labels (#3594):** it names a class,
    not just the specimen you're fixing. Re-run the issue's own `## Set` enumeration query
    before you write the PR body, and paste the member list (not just the count) into the

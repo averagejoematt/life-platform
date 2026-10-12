@@ -3862,6 +3862,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4567"
         }
       ]
+    },
+    {
+      "id": "2026-10-12-the-night-nothing-was-left-unstarted",
+      "date": "2026-10-12",
+      "title": "One night, every open issue got a next step",
+      "shipped": "An overnight session read every open issue on the backlog, sorted each into one of five states (closeable now, one lane of work, several lanes, waiting on a scheduled run, or waiting on the owner), and then worked the list: 31 pull requests merged and deployed, 26 issues closed on proof, and every issue still open now carries a comment naming the exact run, date or decision it waits on. Along the way the inbound-mail path gained a sender-authentication gate, the coaches' verdicts print the rule that decided them on every preview page, the weekly hypothesis engine derives its thresholds from his own variance, and the dormant Garmin pull was retired.",
+      "why_it_mattered": "A backlog where nothing says what it is waiting for is a backlog nobody can trust. Each open issue now states its next step, so a reader of the build log, or the owner at breakfast, can tell merged-and-waiting from stuck. The cost of not having that was real: a dozen issues sat for weeks as 'open' when their code had shipped days earlier, and the only way to know was to read every comment.",
+      "gotcha": "Each pull request passed its own tests, and seven still failed the full suite on merge: not the code, but the counts and ledgers the platform pins (the number of tools, alarms, schedules; a cost baseline; a doc's verified-on stamp). And at midnight UTC main went red on its own: a test pinned an exact calorie figure against the wall clock, and the subject's fractional age stepped a kilocalorie overnight. Two hours of bisecting the wrong suspects before the clock was the answer.",
+      "honest_miss": "Thirty-four issues now wait on the owner, not on code: four stack applies, a model-access click, two replies, a yes-per-screen on the new front page. Nothing a session can do moves them, and the session said so on each one. Two of the night's merges also left behind a fixture set a month behind the served site and a guard that trips on gitignored build output; both are filed, neither is fixed.",
+      "prs": [
+        {
+          "label": "PR #4823",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4823"
+        },
+        {
+          "label": "PR #4830",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4830"
+        },
+        {
+          "label": "PR #4832",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4832"
+        },
+        {
+          "label": "PR #4841",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4841"
+        },
+        {
+          "label": "PR #4843",
+          "url": "https://github.com/averagejoematt/life-platform/pull/4843"
+        }
+      ]
     }
   ]
 }
