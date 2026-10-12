@@ -5,8 +5,7 @@
 # Spec: deploy/build_lambda_layer.py::LAYERS['garth'] · drift gate: --check-manifest (#2099)
 #
 # garminconnect + garth — Garmin Connect OAuth and biometric/activity pulls.
-# Attached to: garmin-data-ingestion (CDK stack: LifePlatformIngestion).
-# Layer ARN: cdk/stacks/constants.py::GARTH_LAYER_ARN.
+# Attached to: nothing — RETIRED (#4640); published but unreferenced. Version record: cdk/stacks/constants.py::GARTH_LAYER_VERSION.
 #
 # WHY THIS FILE EXISTS (#1336): third-party code reaches a running Lambda ONLY via
 # these binary layers — no deploy path pip-installs from lambdas/requirements/. So

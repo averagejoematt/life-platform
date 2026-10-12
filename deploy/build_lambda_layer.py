@@ -190,7 +190,7 @@ LAYERS: dict[str, LayerSpec] = {
         # interactive re-auth against a vendor mid anti-automation crackdown (ADR-074).
         # 0.6.3 is retained rather than raised so this rebuild changes exactly one thing.
         requirements=("garminconnect==0.3.8", "garth==0.6.3"),
-        attached_to=("garmin-data-ingestion",),
+        attached_to=(),  # RETIRED (#4640): consumer garmin-data-ingestion removed; layer published but unattached
         purpose="garminconnect + garth — Garmin Connect OAuth and biometric/activity pulls.",
         stack="LifePlatformIngestion",
         notes=(
@@ -283,8 +283,13 @@ def render_manifest(spec: LayerSpec, deployed: dict | None = None) -> str:
     a(f"# Spec: deploy/build_lambda_layer.py::LAYERS['{spec.key}'] · drift gate: --check-manifest (#2099)")
     a("#")
     a(f"# {spec.purpose}")
-    a(f"# Attached to: {', '.join(spec.attached_to)} (CDK stack: {spec.stack}).")
-    a(f"# Layer ARN: cdk/stacks/constants.py::{spec.version_constant.replace('_VERSION', '_ARN')}.")
+    if spec.attached_to:
+        a(f"# Attached to: {', '.join(spec.attached_to)} (CDK stack: {spec.stack}).")
+        a(f"# Layer ARN: cdk/stacks/constants.py::{spec.version_constant.replace('_VERSION', '_ARN')}.")
+    else:
+        a(
+            f"# Attached to: nothing — RETIRED (#4640); published but unreferenced. Version record: cdk/stacks/constants.py::{spec.version_constant}."
+        )
     a("#")
     a("# WHY THIS FILE EXISTS (#1336): third-party code reaches a running Lambda ONLY via")
     a("# these binary layers — no deploy path pip-installs from lambdas/requirements/. So")

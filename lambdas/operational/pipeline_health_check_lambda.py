@@ -403,7 +403,6 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         "life-platform/strava",
         "life-platform/todoist",
         "life-platform/eightsleep",
-        "life-platform/garmin",
         "life-platform/habitify",
         "life-platform/notion",
         "life-platform/hevy",
