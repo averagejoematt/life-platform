@@ -43,7 +43,8 @@ IAM: the service role is CDK-owned (`cdk/stacks/core_stack.py`). The CALLER need
 own credentials for a laptop rebuild. No Lambda role is granted batch rights: no
 Lambda calls this path yet.
 
-Adopters: `scripts/season_rebuild.py --recheck` (the season's fact-read sweep, #4777).
+Adopters: `scripts/season_rebuild.py --recheck` (the season's fact-read sweep, #4777);
+`deploy/backfill_training_notes.py --apply` (the Hevy training-notes sweep, #4814).
 """
 
 import json

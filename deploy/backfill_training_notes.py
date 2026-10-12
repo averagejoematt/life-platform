@@ -139,6 +139,26 @@ def _cached_llm_fn(table):
     return _fn
 
 
+def batch_prefetch(table, workouts, *, force_realtime=False, wait_hours=None, prefetch=None):
+    """#4814: answer the sweep's uncached notes as one Bedrock batch job at 100+ records (half price).
+
+    Prints which path ran and why (`mode=realtime` below the floor, with --realtime, over the cap, or when
+    the budget tier pauses the feature) and returns the `precomputed` degrade map for `make_llm_fn`. Under
+    the floor nothing is submitted and the ordinary per-note loop does the work, unchanged."""
+    from training import training_notes_llm as tl
+
+    notes = [note for w in workouts for (_ex, _tid, _name, _occ, note) in _noted_sessions(w)]
+    prefetch = prefetch or tl.bulk_prefetch
+    res = prefetch(table, notes, tn.TAXONOMY, force_realtime=force_realtime, wait_hours=wait_hours)
+    print(f"batch-prefetch: {res['records']} uncached distinct notes · mode={res['mode']} · {res['reason']}")
+    if res["mode"] != "realtime":
+        print(
+            f"  job={res['job_arn']} answered={res['answered']} degraded={res['degraded']} "
+            f"unanswered(retried per-note)={res['errors']} savings={res.get('savings')}"
+        )
+    return res["precomputed"]
+
+
 def report_overwrites(table, since):
     """Read-only: which stored note records would a re-run VERSION? (#3816 box 4)
 
@@ -630,7 +650,13 @@ def main():
         metavar="N",
         help="with --only-note --apply: raise the monthly Haiku cap by exactly N above the live count for this run (bounded spend)",
     )
+    ap.add_argument(
+        "--realtime", action="store_true", help="with --apply: never submit a Bedrock batch job; every note runs on-demand (#4814)"
+    )
+    ap.add_argument("--batch-wait-hours", type=float, default=None, help="with --apply: how long to wait on a batch job (default 24)")
     args = ap.parse_args()
+    if (args.realtime or args.batch_wait_hours is not None) and not args.apply:
+        ap.error("--realtime / --batch-wait-hours only apply with --apply")
     if args.allow_calls and not (args.only_note and args.apply):
         ap.error("--allow-calls is only meaningful with --only-note --apply")
     if args.only_note and (args.migrate or args.report_overwrites or args.value_census or args.pain_burst_census):
@@ -674,7 +700,10 @@ def main():
     else:
         workouts = _noted_workouts(table, args.since)
         # #4151: a sweep charges the bulk lane, so it can never spend the live path's month.
-        llm_fn = make_llm_fn(table, lane="bulk") if args.apply else None  # dry-run: deterministic-only, no model spend
+        precomputed = None
+        if args.apply:
+            precomputed = batch_prefetch(table, workouts, force_realtime=args.realtime, wait_hours=args.batch_wait_hours)
+        llm_fn = make_llm_fn(table, lane="bulk", precomputed=precomputed) if args.apply else None  # dry-run: no model spend
 
     total_records = total_pain = total_workouts = 0
     total_wrote = total_skipped = total_versioned = 0
