@@ -46,6 +46,8 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 
 ### PENDING APPLY — the deploy role trusts only its environments; a read-only role for everything else (#4257, 2026-10-01)
 
+> Steps 1–3 below were applied by the owner on 2026-10-12 ~03:15Z (environment `ungated-deploy` with a main-only branch policy; `github-actions-readonly-role` live with 17 statements; the transitional deploy-role trust with three subjects, snapshot kept outside the repo). Steps 4–5 follow the merge.
+
 **Why.** Until #4257 the deploy role trusted `ref:refs/heads/main` as well as
 `environment:production`, so EVERY main-branch job held its 15 statements / 48 actions —
 the nightly `config-drift` and `pii-endpoint-sweep` crons, `plan`, `smoke-test`,
