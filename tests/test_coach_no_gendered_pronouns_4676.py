@@ -54,7 +54,7 @@ MATTHEW_SENTENCES = {
 }
 
 # Down-only: pronoun count per prompt config. Established 2026-10-12 (#4676).
-COACH_FILE_BASELINE = {
+COACH_FILE_PRONOUN_COUNTS = {
     "_shared_standard.json": 7,
     "career_coach.json": 14,
     "eli_marsh.json": 11,
@@ -151,8 +151,8 @@ def test_coach_prompt_configs_never_gain_a_pronoun():
         name = os.path.basename(path)
         with open(path) as f:
             n = len(PRONOUN.findall(f.read()))
-        if n > COACH_FILE_BASELINE.get(name, 0):
-            over.append(f"{name}: {n} > baseline {COACH_FILE_BASELINE.get(name, 0)}")
+        if n > COACH_FILE_PRONOUN_COUNTS.get(name, 0):
+            over.append(f"{name}: {n} > baseline {COACH_FILE_PRONOUN_COUNTS.get(name, 0)}")
     assert not over, "coach prompt config gained a gendered pronoun (#4676):\n  " + "\n  ".join(over)
 
 
