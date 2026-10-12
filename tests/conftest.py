@@ -275,6 +275,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_handler_type_hints.py",
         # ── registries a new module must join (none discoverable from the module) ──
         "test_rate_limit_identity_1221.py",  # #1221: AST sweep — no handler may derive its own client identity
+        "test_coach_no_gendered_pronouns_4676.py",  # #4676: glob sweep of config/coaches/*.json + board members — no gendered pronoun in a coach self-description
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_deploy_does_not_import_tests_4270.py",  # #4270/#4846: git ls-files sweep of workflows/lambdas/qa/cdk for tests/ shim imports
         "test_routine_generator.py",  # #4410: rglob sweep — no GeneratorInputs caller may pass a literal (or no) z2_minutes_7d
