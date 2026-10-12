@@ -188,7 +188,19 @@ def _live_genesis() -> str | None:
     return g or None
 
 
-def stale_draft_census(older_than_days: int = 7, lookback_days: int = 120, today: str | None = None, genesis: str | None = None) -> dict:
+ORPHAN_DRAFT_DAYS = 14
+"""#4732: THE age at which an uncommitted live-cycle routine draft is dead. ONE constant, two readers:
+the nightly pre-draft sweep (`mcp/nightly_predraft.py`, `STALE_DRAFT_DAYS`) ARCHIVES at this age and the
+qa-smoke leg `data:orphan_routine_drafts` WARNS at this age, so a draft is never both "too old to be
+fine" and "not old enough to be archived". Why 14, not the leg's old 7: the owner ruled it on 2026-10-11
+(a chat-built or unmarked cron draft untouched 14 days, day passed, never pushed to Hevy, is
+auto-archived) and a week-old draft can still be a session he means to commit. The 2026-10-12 18:31Z
+read proved the split: sweep at 14 / leg at 7 left every 7-14 day draft in the gap, every night."""
+
+
+def stale_draft_census(
+    older_than_days: int = ORPHAN_DRAFT_DAYS, lookback_days: int = 120, today: str | None = None, genesis: str | None = None
+) -> dict:
     """#4183: the orphan-draft census, partitioned by the genesis.
 
     #3772's question was "which drafts did the soft-timeout leave behind that nobody knows
