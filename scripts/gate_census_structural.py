@@ -6,7 +6,7 @@ module-size ratchet (#1665's 1200-line hard ceiling, #2610's extraction-not-base
 policy — `gate_census.py` was never baselined, so any fix here has to be a split, not a
 BASELINE entry or the top-of-file exemption). Kept in its own module rather than folded
 into `gate_census_sentinel.py` — the two families are unrelated (this one delegates to
-`tests/premerge_derivation.py`'s tree-sweeping-test discovery; #3129's family walks
+`scripts/premerge_derivation.py`'s tree-sweeping-test discovery; #3129's family walks
 deploy/drift_sentinel.py) and a shared file would blur which extraction paid for which
 review incident.
 
@@ -29,7 +29,7 @@ def discover_structural_test_gates(
     static_flags_fn: Callable[[str], list[str]],
     log_fn: Callable[[str], None],
 ) -> tuple[list[Any], dict[str, int]]:
-    sys.path.insert(0, str(root / "tests"))
+    sys.path.insert(0, str(root / "scripts"))
     try:
         from premerge_derivation import discover_tree_sweeping_test_files  # type: ignore
     except ImportError as exc:  # pragma: no cover
@@ -39,8 +39,8 @@ def discover_structural_test_gates(
         # reported that short number to the doc-sync layer as a successful measurement
         # (104 gates short, measured 2026-08-27: 554 -> 450 with this import blocked).
         # The reason travels in the counters so a consumer can refuse the sweep.
-        log_fn("tests/premerge_derivation.py not importable — structural-test family SKIPPED (n unknown)")
-        return [], {"importable": 0, "skipped_reason": f"tests/premerge_derivation.py not importable ({type(exc).__name__}: {exc})"}
+        log_fn("scripts/premerge_derivation.py not importable — structural-test family SKIPPED (n unknown)")
+        return [], {"importable": 0, "skipped_reason": f"scripts/premerge_derivation.py not importable ({type(exc).__name__}: {exc})"}
     names = sorted(discover_tree_sweeping_test_files(root / "tests"))
     gates: list[Any] = []
     for name in names:

@@ -23,7 +23,7 @@ multi-agent sweep and is the one the calendar reads.
 
 The numbers-are-true pass:
 
-1. `python3 tests/site_review.py` — captures every page's screenshots + prose (`<slug>.txt`) +
+1. `python3 qa/site_review.py` — captures every page's screenshots + prose (`<slug>.txt`) +
    bound `api/*.json` + `consistency.json` into `qa-screenshots/<date>/`. (Needs
    `playwright install chromium`.)
 2. `python3 qa/accuracy_audit.py` — over that capture: (a) cross-page metric consistency

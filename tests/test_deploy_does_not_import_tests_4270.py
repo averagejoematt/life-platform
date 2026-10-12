@@ -49,6 +49,13 @@ SHIMS = {
     "tests/comprehension_qa.py",
     "tests/perf_trend.py",
     "tests/pr_render_gate.py",
+    "tests/site_review.py",
+    "tests/site_review_bindings.py",
+    "tests/a11y_audit.py",
+    "tests/truth_baseline_audit.py",
+    "tests/premerge_derivation.py",
+    "tests/golden_surface_eval.py",
+    "tests/eval_credential_stub.py",
     "tests/mypy_clean_set.py",  # also the CLI path .claude/settings.json's permission entry names (owner edit)
 }
 
@@ -58,31 +65,17 @@ EXEMPT = {
     "deploy/sentinel_producer_census.py": "reads scheduled_lambda_cadences() out of tests/test_heartbeat_completeness.py",
     "scripts/diligence_verify.py": "imports the canonical PRIVATE-marker predicate from tests/test_no_private_markers_3043.py",
     "scripts/generate_platform_model.py": "AST-reads tests/pair_contract_registry.py (the pair-seam test registry)",
-    "scripts/qa_audit.py": "reads the TEXT of tests/site_review_bindings.py to prove it derives from the manifest (CONSUMER_CONTRACT)",
     "scripts/capture_kit_page_fixtures.py": "writes tests/fixtures/kit_pages_4586 and imports tests/kit_page_gate.py",
 }
 
-# Shrink-only: tooling still in tests/ that a follow-up slice of #4270 moves out.
-LEGACY = {
-    "scripts/gate_census_structural.py",  # tests/premerge_derivation.py (the pr-checks premerge-lane story)
-    "scripts/harvest_eval_fixtures.py",  # tests/golden_surface_eval.py (the golden-brief eval-harness slice -> qa/eval)
-}
+# Shrink-only: tooling still in tests/ that a follow-up slice of #4270 moves out. Empty: the last two reachers moved (#4270).
+LEGACY: set = set()
 
-# qa/ modules that still put tests/ on sys.path (they import tests-owned site_review / a11y_audit / truth_baseline_audit).
-# Shrink-only. Anything that imports one of these loads tests/ one step removed, so it is NOT "moved clean".
-QA_TESTS_PATH_LEGACY = {
-    "qa/accuracy_audit.py",
-    "qa/comprehension_qa.py",
-    "qa/visual_ai_qa.py",
-    "qa/visual_qa.py",
-}
+# qa/ modules that still put tests/ on sys.path. Empty since the last support modules moved into qa/ (#4270). Shrink-only.
+QA_TESTS_PATH_LEGACY: set = set()
 
-# deploy/ or scripts/ modules with no tests/ path line of their own that reach tests/ transitively via a qa/ module above.
-TRANSITIVE = {
-    "deploy/capture_api_schemas.py": "from qa import accuracy_audit -> qa/accuracy_audit.py appends tests/ and imports site_review*",
-    "scripts/design_sync_capture.py": "lazy `from qa import visual_qa` -> qa/visual_qa.py appends tests/",
-    "scripts/fresh_eyes_discovery.py": "lazy `from qa import visual_qa / visual_ai_qa` -> both append tests/",
-}
+# deploy/ or scripts/ modules that reach tests/ transitively via a qa/ module. Empty: qa/ no longer puts tests/ on sys.path.
+TRANSITIVE: dict = {}
 
 _PATTERNS = [
     re.compile(r"sys\.path\.(insert|append)\(.*[\"']tests[\"']"),

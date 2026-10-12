@@ -81,10 +81,10 @@ Each page is read through these standing questions. Findings are tagged with the
 
 ### Step 1 — Capture (build the packet)
 ```bash
-python3 tests/site_review.py                # full site → qa-screenshots/<today>/
-python3 tests/site_review.py --door story   # one door (the weekly-cadence default)
-python3 tests/site_review.py --page /now/    # single-page deep dive
-python3 tests/site_review.py --from-report qa-screenshots   # augment a CI capture instead of re-shooting
+python3 qa/site_review.py                # full site → qa-screenshots/<today>/
+python3 qa/site_review.py --door story   # one door (the weekly-cadence default)
+python3 qa/site_review.py --page /now/    # single-page deep dive
+python3 qa/site_review.py --from-report qa-screenshots   # augment a CI capture instead of re-shooting
 ```
 Produces `qa-screenshots/<date>/`: screenshots (full + mobile + chart crops), `api/*.json` (the data each page is built from), `consistency.json` (cross-page metric agreement), `manifest.json` (the index), and an `annotations/` drop-zone.
 

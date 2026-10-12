@@ -1,30 +1,21 @@
-"""The offline AWS credential stub, shared by the eval harnesses (#4796).
+"""Compatibility shim (#4270) - eval_credential_stub now lives in qa/eval_credential_stub.py.
 
-Importing this module installs the stub only when it cannot shadow a real chain."""
+tests/ holds tests and fixtures; this file keeps `import eval_credential_stub` (tests on sys.path) working: it returns the SAME
+module object (sys.modules alias) so monkeypatching and private-name access behave exactly as before.
+No workflow or tool references this path any more (tests/test_deploy_does_not_import_tests_4270.py guards that).
+"""
 
+import importlib
 import os
 import sys
 
-
-def install_credential_stub():
-    """Inject the 'testing' stub only when it cannot shadow a real chain (#4796).
-
-    Environment credentials outrank the shared credentials file, so an unconditional stub
-    made every real-mode Bedrock/SSM call sign with 'testing'. Stub only for --dry-run, or
-    when no chain resolves at all (CI, the hermetic golden-surface tests).
-    """
-    if "AWS_ACCESS_KEY_ID" in os.environ or "AWS_SECRET_ACCESS_KEY" in os.environ:
-        return
-    if "--dry-run" not in sys.argv:
-        try:
-            import boto3
-
-            if boto3.Session().get_credentials() is not None:
-                return
-        except Exception:
-            pass
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-
-
-install_credential_stub()
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+_mod = importlib.import_module("qa.eval_credential_stub")
+# Path-loaded callers (spec_from_file_location, no sys.modules lookup) keep THIS module object: mirror the surface.
+globals().update({k: v for k, v in vars(_mod).items() if not k.startswith("__")})
+if __name__ == "__main__":
+    _mod.main()
+else:
+    sys.modules[__name__] = _mod

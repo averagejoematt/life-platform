@@ -83,7 +83,7 @@ jobs:
           python3 tests/golden_brief_eval.py | tee /tmp/golden.txt
           echo "::endgroup::"
           echo "::group::Golden-surface deterministic harness (#812)"
-          python3 tests/golden_surface_eval.py | tee /tmp/golden_surfaces.txt
+          python3 qa/golden_surface_eval.py | tee /tmp/golden_surfaces.txt
           echo "::endgroup::"
           # first lines are the ops-email lines — surface them in the run summary
           head -1 /tmp/golden.txt >> "$GITHUB_STEP_SUMMARY"

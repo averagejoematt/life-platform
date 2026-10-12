@@ -8,7 +8,7 @@ spot-checks the live API's headline raw numbers against DynamoDB ground truth, a
 (3) scans captured API JSON + rendered prose for leaked NaN/undefined/None, unit
 mismatches, and UTC-vs-PT date drift.
 
-Inputs: a capture run dir from `tests/site_review.py` (api/*.json + <slug>.txt).
+Inputs: a capture run dir from `qa/site_review.py` (api/*.json + <slug>.txt).
   python3 qa/accuracy_audit.py                       # use latest qa-screenshots/<date>/
   python3 qa/accuracy_audit.py --run-dir qa-screenshots/2026-06-28
   python3 qa/accuracy_audit.py --no-ddb              # skip the live-DDB ground-truth pass
@@ -28,9 +28,6 @@ import sys
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests")
-)  # a11y_audit / truth_baseline_audit / site_review (#4270)
 import site_review as SR  # noqa: E402  (reuses SITE_URL, cross_page_consistency, _slug_for_endpoint)
 import site_review_bindings as B  # noqa: E402
 
@@ -216,7 +213,7 @@ def scan_json_value_leaks(data, source_label):
 
     Extracted (#1436) so this is the ONE leak-scan walk shared by:
       - sanity_scan() below, which reads already-captured api/*.json files off disk
-        (the tests/site_review.py capture flow — a curated page-binding subset), and
+        (the qa/site_review.py capture flow — a curated page-binding subset), and
       - deploy/capture_api_schemas.py, which scans the LIVE response in-memory at
         capture time, across the FULL AST-discovered ~115-endpoint router surface —
         before the raw value is discarded in favor of the shape-only snapshot that
@@ -681,7 +678,7 @@ def main():
 
     run_dir = args.run_dir or _latest_run_dir()
     if not run_dir or not os.path.isdir(run_dir):
-        sys.exit("No capture run dir found. Run `python3 tests/site_review.py` first.")
+        sys.exit("No capture run dir found. Run `python3 qa/site_review.py` first.")
     print(f"Axis-A accuracy audit over {run_dir}\n")
 
     api_index = _rebuild_api_index(run_dir)

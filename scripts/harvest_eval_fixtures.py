@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
-sys.path.insert(0, os.path.join(_REPO, "tests"))
+sys.path.insert(0, os.path.join(_REPO, "qa"))
 
 import golden_surface_eval as harness  # noqa: E402  (also sets the hermetic env defaults)
 

@@ -77,7 +77,7 @@ def main(vqa=None, argv=None):
         help=(
             "Rewrite tests/a11y_baseline.json from this run's axe findings for the pages swept (#1433). DELIBERATE path: "
             "the run still reds on NEW serious/critical violations, and the committed baseline diff is the review surface "
-            "(added entries = newly accepted debt, removed = fixes). See tests/a11y_audit.py."
+            "(added entries = newly accepted debt, removed = fixes). See qa/a11y_audit.py."
         ),
     )
     ap.add_argument(

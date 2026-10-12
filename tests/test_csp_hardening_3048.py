@@ -50,7 +50,7 @@ from stacks.csp import (  # noqa: E402
 )
 
 _WEB_STACK = os.path.join(_CDK, "stacks", "web_stack.py")
-_A11Y = os.path.join(_ROOT, "tests", "a11y_audit.py")
+_A11Y = os.path.join(_ROOT, "qa", "a11y_audit.py")
 _SITE = os.path.join(_ROOT, "site")
 
 # Inline (no src=) script blocks; type="application/json"/ld+json are exempt —
@@ -186,6 +186,6 @@ def test_a11y_audit_does_not_call_add_script_tag():
     tree = ast.parse(open(_A11Y, encoding="utf-8").read())
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "add_script_tag"]
     assert not calls, (
-        "tests/a11y_audit.py reverted to add_script_tag — that creates a real inline <script>, which the hardened CSP "
+        "qa/a11y_audit.py reverted to add_script_tag — that creates a real inline <script>, which the hardened CSP "
         "blocks; the audit would raise on every page. Inject via page.evaluate (CDP) instead."
     )

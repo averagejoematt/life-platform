@@ -26,7 +26,7 @@ read-only engine:
      GATES on NEW serious/critical violations vs the committed baseline
      (tests/a11y_baseline.json); baselined + minor/moderate findings are
      recorded honestly as warnings, never hidden, never gating. Baseline
-     shrinks/updates DELIBERATELY via --update-baseline (see tests/a11y_audit.py
+     shrinks/updates DELIBERATELY via --update-baseline (see qa/a11y_audit.py
      for the full semantics + review discipline). Runs at BOTH viewports (#3277):
      once post-reveal at the desktop context, once again at 390×844 after the
      mobile reveal pass, each against its own ledger — a violation that only
@@ -129,9 +129,6 @@ try {
 # Derivation verified identical to the pre-#1426 hand list (36 entries, same
 # paths + checks); tests/test_qa_manifest.py gates the derivation from drifting.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests")
-)  # a11y_audit / truth_baseline_audit / site_review (#4270)
 import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
 import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright import)
 from qa_manifest import leak_scan_paths, text_floor_paths, visual_pages  # noqa: E402
@@ -290,7 +287,8 @@ def _api_deps_all_empty(page, api_deps) -> bool:
 
 def _scroll_and_reveal(page):
     """Scroll the page top-to-bottom, then force all .reveal animations visible."""
-    page.evaluate("""
+    page.evaluate(
+        """
         () => new Promise(resolve => {
             let y = 0; const step = 400;
             const timer = setInterval(() => {
@@ -302,12 +300,15 @@ def _scroll_and_reveal(page):
             }, 80);
             setTimeout(() => { clearInterval(timer); window.scrollTo(0, 0); resolve(); }, 10000);
         })
-    """)
-    page.evaluate("""
+    """
+    )
+    page.evaluate(
+        """
         () => document.querySelectorAll('.reveal').forEach(el => {
             el.classList.add('is-visible'); el.style.opacity = '1'; el.style.transform = 'none';
         })
-    """)
+    """
+    )
     page.wait_for_timeout(1500)
 
 
@@ -340,7 +341,8 @@ def _constellation_edge_cpts(page):
     no data-cpts attribute at all, so this fails regardless of how many edges the live
     coupling data currently has (it fails even at 0 edges) — see test_constellation_edge_cpts.
     """
-    return page.evaluate("""() => {
+    return page.evaluate(
+        """() => {
         const svg = document.querySelector('.constellation svg');
         if (!svg) return { skip: 'no constellation svg on this page' };
         const edges = svg.querySelectorAll('[data-edges] line').length;
@@ -352,12 +354,14 @@ def _constellation_edge_cpts(page):
         const n = Array.isArray(pts) ? pts.length : -1;
         if (n < edges) return { ok: false, edges, n, reason: `data-cpts has ${n} point(s) < ${edges} served edge line(s)` };
         return { ok: true, edges, n };
-    }""")
+    }"""
+    )
 
 
 def _check_sections_for_blank(page):
     """Visible sections >100px tall with <5 chars of text and no chart (excludes closed <details>)."""
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const issues = [];
             const insideClosedDetails = (el) => {
@@ -375,12 +379,14 @@ def _check_sections_for_blank(page):
             });
             return issues;
         }
-    """)
+    """
+    )
 
 
 def _check_stale_text(page):
     """Visible development/placeholder/stuck-loading copy that should never ship."""
-    return page.evaluate(r"""
+    return page.evaluate(
+        r"""
         () => {
             const body = document.body.innerText;
             const issues = [];
@@ -413,7 +419,8 @@ def _check_stale_text(page):
             }
             return issues;
         }
-    """)
+    """
+    )
 
 
 def _mobile_overflow(page):
@@ -495,7 +502,8 @@ TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs
 def _app_bar_overflow(page):
     """px by which the fixed bottom app-bar (.doors) row exceeds the viewport at the
     current width — >2 is the #1003 overflow (clipped toggle / truncated door)."""
-    return page.evaluate("""() => {
+    return page.evaluate(
+        """() => {
         const bar = document.querySelector('.doors');
         if (!bar) return null;                       // page has no app-bar → n/a
         const vw = document.documentElement.clientWidth;
@@ -508,7 +516,8 @@ def _app_bar_overflow(page):
             far = Math.max(far, c.getBoundingClientRect().right);
         });
         return Math.round(Math.max(bar.scrollWidth - vw, far - vw));
-    }""")
+    }"""
+    )
 
 
 def _stuck_reveals(page, sel):
@@ -709,10 +718,12 @@ def mobile_first_load_check(context, url, path):
 
 def _viewport_meta_ok(page):
     """True if a width=device-width viewport meta is present (the #1004 class)."""
-    return page.evaluate("""() => {
+    return page.evaluate(
+        """() => {
         const m = document.querySelector('meta[name="viewport"]');
         return !!(m && /width\\s*=\\s*device-width/i.test(m.getAttribute('content') || ''));
-    }""")
+    }"""
+    )
 
 
 def _tap_target_audit(page, sel):
@@ -1330,7 +1341,7 @@ def capture_page(
     qa/pr_render_gate.py, which drives this same function; False is the escape
     hatch for a harness that cannot afford the extra navigation.
 
-    Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
+    Extracted from run_sweep's per-page loop (2026-06-20) so qa/site_review.py
     can reuse identical capture without forking the gating visual-qa harness.
     """
     page = context.new_page()

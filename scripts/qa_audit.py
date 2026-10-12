@@ -81,7 +81,7 @@ CONSUMER_CONTRACT = {
     os.path.join(_REPO, "qa", "visual_qa.py"): "qa_manifest",
     os.path.join(_REPO, "deploy", "smoke_test_site.sh"): "qa_manifest",
     os.path.join(_REPO, "deploy", "restart_verify_rendered.py"): "qa_manifest",
-    os.path.join(_REPO, "tests", "site_review_bindings.py"): "qa_manifest",
+    os.path.join(_REPO, "qa", "site_review_bindings.py"): "qa_manifest",
     str(_skill_registry().require_skill("qa")): "qa_manifest",
 }
 
