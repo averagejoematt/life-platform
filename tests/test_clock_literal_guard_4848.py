@@ -97,3 +97,9 @@ def test_mutation_the_4032_file_with_its_freeze_removed_fails_the_guard(world):
 def test_control_an_unrelated_patch_with_a_date_value_does_not_clear(world):
     src = PINNED + "\n\ndef _x(monkeypatch):\n    monkeypatch.setattr('other.mod.thing', lambda: {'date': 1})\n"
     assert _scan(src, world) == [("tdee", "resolve_age")]
+
+
+def test_control_a_dotted_string_patch_of_the_clock_clears(world):
+    """The positive twin: the same dotted-string form, but the TARGET names the clock, does clear."""
+    src = PINNED + "\n\ndef _x(monkeypatch):\n    monkeypatch.setattr('health.tdee.datetime', lambda: 1)\n"
+    assert _scan(src, world) is None

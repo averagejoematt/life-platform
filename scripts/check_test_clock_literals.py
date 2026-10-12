@@ -235,7 +235,11 @@ def _is_frozen(tree: ast.AST, src: str, producer_names: Set[str]) -> bool:
             fn = n.func.attr if isinstance(n.func, ast.Attribute) else n.func.id
             if fn in ("setattr", "patch", "object", "setitem", "freeze"):
                 toks = set()
-                for arg in list(n.args[:2]):  # the patch TARGET only, never the replacement value
+                # the patch TARGET only, never the replacement value: a dotted-string target
+                # ("a.b.c", value) is args[0] alone; (obj, "attr", value) is args[0..1]
+                first = n.args[0] if n.args else None
+                dotted = isinstance(first, ast.Constant) and isinstance(first.value, str)
+                for arg in n.args[: 1 if dotted else 2]:
                     toks |= _tokens(arg)
                 if toks & (FREEZE_TOKENS | producer_names):
                     return True
